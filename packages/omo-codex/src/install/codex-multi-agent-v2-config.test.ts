@@ -41,7 +41,7 @@ describe("codex MultiAgentV2 config", () => {
     expect(content).not.toMatch(/^\s*multi_agent_v2\s*=/m)
     expect(parsed.features.multi_agent_v2).toEqual({
       usage_hint_enabled: false,
-      max_concurrent_threads_per_session: 10000,
+      max_concurrent_threads_per_session: 1000,
     })
   })
 
@@ -74,7 +74,7 @@ describe("codex MultiAgentV2 config", () => {
     expect(content).not.toMatch(/^\s*multi_agent_v2\s*=/m)
     expect(parsed.features.multi_agent_v2).toEqual({
       enabled: false,
-      max_concurrent_threads_per_session: 10000,
+      max_concurrent_threads_per_session: 1000,
     })
   })
 })
