@@ -1,0 +1,9 @@
+# Task 9 diff checks
+
+## git diff --check v4.13.0..HEAD
+range_exit_code=0
+
+## git diff --check
+worktree_exit_code=0
+
+cleanup: no runtime resources spawned; no cleanup required

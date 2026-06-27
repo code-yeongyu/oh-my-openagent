@@ -61,7 +61,7 @@ Evidence: `task-4-wf-at-dependencies.json`, `task-4-wf-at-summary.md`.
 
 - `BLOCKED-PENDING-WF-AT`: final publish gate cannot be truthfully rerun to release-ready status until WF/AT code-fix slices are landed or superseded.
 - Broad historical evidence references remain noisy, but the current release summaries were checked directly and their actual `.omo/evidence/...` artifacts are present/tracked.
-- CI for the RG PR still needs to run after push.
+- CI must rerun after each RG PR update; final publish readiness remains dependent on WF/AT landing or being superseded.
 
 ## Cleanup Receipts
 
@@ -70,8 +70,11 @@ Evidence: `task-4-wf-at-dependencies.json`, `task-4-wf-at-summary.md`.
 
 ## Reviewer Gate
 
-Pending:
-- F1 plan compliance.
-- F2 commit-range diff-check after final evidence commit.
-- F3 evidence presence.
-- F4 scope fidelity.
+Completed for the RG hygiene slice:
+- F1 plan compliance: `f1-plan-compliance.txt`.
+- F2 commit-range diff-check after the evidence commits: `f2-diff-check.txt`, `task-8-final-diff-check.txt`.
+- F3 evidence presence: `f3-evidence-presence.txt`.
+- F4 scope fidelity: `f4-changed-files.txt`.
+
+Leader blocker resolution:
+- Commit footers point at `.omo/plans/release-gate-hygiene.md`; that plan artifact is included in this PR with `git add -f` because `.omo/*` is ignored.

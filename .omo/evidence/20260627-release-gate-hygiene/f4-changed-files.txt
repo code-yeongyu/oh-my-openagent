@@ -2,6 +2,10 @@
 .omo/evidence/20260625-codex-config-generated-bundle/generated-bundle-false-shorthand-probe.txt
 .omo/evidence/20260627-release-gate-hygiene/candidate-green-git-diff-check.txt
 .omo/evidence/20260627-release-gate-hygiene/evidence-reconciliation.md
+.omo/evidence/20260627-release-gate-hygiene/f1-plan-compliance.txt
+.omo/evidence/20260627-release-gate-hygiene/f2-diff-check.txt
+.omo/evidence/20260627-release-gate-hygiene/f3-evidence-presence.txt
+.omo/evidence/20260627-release-gate-hygiene/f4-changed-files.txt
 .omo/evidence/20260627-release-gate-hygiene/notepad.md
 .omo/evidence/20260627-release-gate-hygiene/range-plus-worktree-diff-check-before-commit.txt
 .omo/evidence/20260627-release-gate-hygiene/red-git-diff-check.txt
@@ -25,10 +29,16 @@
 .omo/evidence/20260627-release-gate-hygiene/task-6-fix-diff.txt
 .omo/evidence/20260627-release-gate-hygiene/task-6-green-diff-check.txt
 .omo/evidence/20260627-release-gate-hygiene/task-7-packet-integrity.txt
+.omo/evidence/20260627-release-gate-hygiene/task-8-cleanup-receipt.txt
 .omo/evidence/20260627-release-gate-hygiene/task-8-final-diff-check.txt
 .omo/evidence/20260627-release-gate-hygiene/task-8-post-rebase-status.txt
+.omo/evidence/20260627-release-gate-hygiene/task-8-pr-proof.txt
+.omo/evidence/20260627-release-gate-hygiene/task-8-pr-view.json
 .omo/evidence/20260627-release-gate-hygiene/task-8-staged-status-before-first-commit.txt
+.omo/evidence/20260627-release-gate-hygiene/task-9-diff-check.txt
+.omo/evidence/20260627-release-gate-hygiene/task-9-leader-blocker-resolution.txt
 .omo/evidence/20260627-release-gate-hygiene/worktree-diff-check-before-commit.txt
+.omo/plans/release-gate-hygiene.md
 
 PASS no WF/AT-owned code paths touched
 cleanup: no runtime resources spawned; no cleanup required
