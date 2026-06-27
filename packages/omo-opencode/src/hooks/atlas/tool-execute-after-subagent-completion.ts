@@ -45,8 +45,6 @@ export async function handleSubagentCompletionAfter(input: {
   toolInput: ToolExecuteAfterInput
   toolOutput: ToolExecuteAfterOutput
   metadataSessionId: string | undefined
-  /** True when the gate fired from a non-`task` plugin tool retrieval (e.g. `background_output`), not a fresh `task` completion. */
-  isPluginToolRetrieval?: boolean
 }): Promise<void> {
   const {
     ctx,
@@ -58,7 +56,6 @@ export async function handleSubagentCompletionAfter(input: {
     toolInput,
     toolOutput,
     metadataSessionId,
-    isPluginToolRetrieval = false,
   } = input
   const outputStr = typeof toolOutput.output === "string" ? toolOutput.output : ""
   const pendingTaskRef = toolInput.callID ? pendingTaskRefs.get(toolInput.callID) : undefined
@@ -214,7 +211,6 @@ export async function handleSubagentCompletionAfter(input: {
   const isAlreadyVerified = currentTask && !isFinalWaveTask
     ? isTrackedTaskChecked(planPath, currentTask.key)
       || sessionState?.verifiedTaskKeys?.has(currentTask.key) === true
-      || (isPluginToolRetrieval && trackedTaskSession !== null)
     : false
 
   let leadReminder: string
