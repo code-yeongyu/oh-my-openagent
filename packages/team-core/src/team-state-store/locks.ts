@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { access, open, readFile, rename, rm, unlink } from "node:fs/promises"
+import { dirname } from "node:path"
 
 import { tolerantFsync } from "../tolerant-fsync"
 
@@ -16,6 +17,7 @@ type AtomicWriteDeps = {
 
 type LockOpenErrorDeps = {
   readonly access?: typeof access
+  readonly platform?: NodeJS.Platform
 }
 
 type LockReleaseDeps = {
@@ -83,7 +85,10 @@ export async function assertRetryableLockOpenError(
 ): Promise<void> {
   const code = errorCode(error)
   if (code === "EEXIST") return
-  if (code === "EPERM" && (await pathMayExist(lockPath, deps))) return
+  if (code === "EPERM") {
+    if (await pathMayExist(lockPath, deps)) return
+    if ((deps?.platform ?? process.platform) === "win32" && (await pathMayExist(dirname(lockPath), deps))) return
+  }
   throw error
 }
 
