@@ -14,6 +14,54 @@ import { getSisyphusJuniorModelOverride } from "./tool-registry-team-tools"
 import { createSkillContext } from "./skill-context"
 import { createRuntimeSkillsResolver, readRuntimeHostSkills } from "./runtime-skill-resolver"
 
+type NativeSkillAccessor = NonNullable<SkillLoadOptions["nativeSkills"]>
+type NativeSkillList = Awaited<ReturnType<NativeSkillAccessor["all"]>>
+type NativeSkillResponse = NativeSkillList | { data?: NativeSkillList | null }
+
+type RawSkillClient = {
+  _client?: {
+    get?: (input: { url: string; query: { directory: string } }) => Promise<NativeSkillResponse>
+  }
+}
+
+function createNativeSkillAccessor(ctx: PluginContext, disabledSkills?: Set<string>): NativeSkillAccessor | undefined {
+  if ("skills" in ctx) {
+    return (ctx as { skills?: NativeSkillAccessor }).skills
+  }
+
+  const rawClient = (ctx.client as unknown as RawSkillClient | undefined)?._client
+  const rawGet = rawClient?.get
+  if (typeof rawGet !== "function") return undefined
+
+  const dir = ctx.directory
+  let listPromise: Promise<NativeSkillList> | undefined
+
+  const all = async (): Promise<NativeSkillList> => {
+    const response = await rawGet.call(rawClient, { url: "/skill", query: { directory: dir } })
+    let list: NativeSkillList = []
+    if (Array.isArray(response)) {
+      list = response
+    } else if (response && typeof response === "object" && Array.isArray((response as { data: unknown }).data)) {
+      list = (response as { data: NativeSkillList }).data
+    }
+    if (!disabledSkills || disabledSkills.size === 0) return list
+    return list.filter((skill) => !disabledSkills.has(skill.name))
+  }
+
+  return {
+    all() {
+      listPromise ??= all()
+      return listPromise
+    },
+    async get(name) {
+      return (await this.all()).find((skill) => skill.name === name)
+    },
+    dirs() {
+      return []
+    },
+  }
+}
+
 export function createCoreTools(args: {
   readonly ctx: PluginContext
   readonly pluginConfig: OhMyOpenCodeConfig
@@ -23,6 +71,7 @@ export function createCoreTools(args: {
   readonly factories: ToolRegistryFactories
 }): Record<string, ToolDefinition> {
   const { ctx, pluginConfig, managers, skillContext, availableCategories, factories } = args
+  const nativeSkills = createNativeSkillAccessor(ctx, skillContext.disabledSkills)
   const backgroundTools = factories.createBackgroundTools(managers.backgroundManager, ctx.client)
   const callOmoAgent = factories.createCallOmoAgent(
     ctx,
@@ -48,7 +97,7 @@ export function createCoreTools(args: {
     teamModeEnabled: pluginConfig.team_mode?.enabled ?? false,
     availableCategories,
     availableSkills: skillContext.availableSkills,
-    nativeSkills: "skills" in ctx ? (ctx as { skills: SkillLoadOptions["nativeSkills"] }).skills : undefined,
+    nativeSkills,
     sisyphusAgentConfig: pluginConfig.sisyphus_agent,
     syncPollTimeoutMs: pluginConfig.background_task?.syncPollTimeoutMs,
     modelFallbackControllerAccessor: managers.modelFallbackControllerAccessor,
@@ -109,7 +158,7 @@ export function createCoreTools(args: {
     browserProvider: skillContext.browserProvider,
     disabledSkills: skillContext.disabledSkills,
     teamModeEnabled: pluginConfig.team_mode?.enabled ?? false,
-    nativeSkills: "skills" in ctx ? (ctx as { skills: SkillLoadOptions["nativeSkills"] }).skills : undefined,
+    nativeSkills,
     pluginsEnabled: pluginConfig.claude_code?.plugins ?? true,
     enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
     includeSkillsInDescription: true,
