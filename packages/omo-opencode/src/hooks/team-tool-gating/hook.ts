@@ -7,6 +7,7 @@ import {
   listActiveTeams,
   loadRuntimeState,
 } from "../../features/team-mode/team-state-store"
+import { detectDestructiveBashCommand, isEditPathAllowed } from "./inline-file-guard"
 
 const ACTIVE_RUNTIME_STATUSES = new Set<RuntimeState["status"]>(["creating", "active", "shutdown_requested"])
 const UNIVERSAL_TOOL_NAMES = new Set([
@@ -78,7 +79,7 @@ function isTargetMember(participant: TeamParticipant, teamRunId: string | undefi
     && participant.memberName === memberName
 }
 
-export function createTeamToolGating(_ctx: PluginInput, config: TeamModeConfig | undefined): Hooks {
+export function createTeamToolGating(ctx: PluginInput, config: TeamModeConfig | undefined): Hooks {
   return {
     "tool.execute.before": async (
       input: { tool: string; sessionID: string; callID: string },
@@ -89,6 +90,17 @@ export function createTeamToolGating(_ctx: PluginInput, config: TeamModeConfig |
       }
 
       const toolName = input.tool
+
+      if (toolName === "edit") {
+        await enforceEditAllowedPaths(input.sessionID, output.args, ctx, config)
+        return
+      }
+
+      if (toolName === "bash") {
+        await enforceBashGuardrail(input.sessionID, output.args, ctx, config)
+        return
+      }
+
       if (!toolName.startsWith("team_") && toolName !== "delegate-task") {
         return
       }
@@ -145,5 +157,72 @@ export function createTeamToolGating(_ctx: PluginInput, config: TeamModeConfig |
         )
       }
     },
+  }
+}
+
+type MemberFileBoundary = {
+  worktreePath?: string
+  allowedPaths?: string[]
+}
+
+async function resolveMemberFileBoundary(
+  teamRunId: string,
+  memberName: string,
+  config: TeamModeConfig,
+): Promise<MemberFileBoundary | undefined> {
+  const runtimeState = await loadRuntimeState(teamRunId, config)
+  if (!ACTIVE_RUNTIME_STATUSES.has(runtimeState.status)) return undefined
+  const member = runtimeState.members.find((entry) => entry.name === memberName)
+  if (!member) return undefined
+  return { worktreePath: member.worktreePath, allowedPaths: member.allowedPaths }
+}
+
+async function enforceEditAllowedPaths(
+  sessionID: string,
+  args: Record<string, unknown>,
+  ctx: PluginInput,
+  config: TeamModeConfig,
+): Promise<void> {
+  const participant = await resolveParticipant(sessionID, config)
+  if (participant.role !== "member") return
+
+  const boundary = await resolveMemberFileBoundary(participant.teamRunId, participant.memberName, config)
+  if (!boundary) return
+  if (boundary.worktreePath) return
+  if (!boundary.allowedPaths || boundary.allowedPaths.length === 0) return
+
+  const filePath = getStringArg(args, "filePath")
+  if (!filePath) {
+    throw new Error(`edit denied: member ${participant.memberName} has allowedPaths set but no filePath was provided`)
+  }
+  if (!isEditPathAllowed(boundary.allowedPaths, filePath, ctx.directory)) {
+    throw new Error(
+      `edit denied: "${filePath}" is outside member ${participant.memberName}'s allowedPaths [${boundary.allowedPaths.join(", ")}]`,
+    )
+  }
+}
+
+async function enforceBashGuardrail(
+  sessionID: string,
+  args: Record<string, unknown>,
+  ctx: PluginInput,
+  config: TeamModeConfig,
+): Promise<void> {
+  const participant = await resolveParticipant(sessionID, config)
+  if (participant.role !== "member") return
+
+  const boundary = await resolveMemberFileBoundary(participant.teamRunId, participant.memberName, config)
+  if (!boundary) return
+  if (boundary.worktreePath) return
+  if (!boundary.allowedPaths || boundary.allowedPaths.length === 0) return
+
+  const command = getStringArg(args, "command")
+  if (!command) return
+
+  const matchedPattern = detectDestructiveBashCommand(command)
+  if (matchedPattern !== null) {
+    throw new Error(
+      `bash denied: command matches destructive pattern "${matchedPattern}". Member ${participant.memberName} is in inline mode with allowedPaths set; destructive git/rm commands that could destroy other members' work are blocked. If you genuinely need this, ask the lead or use a worktree member.`,
+    )
   }
 }

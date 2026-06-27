@@ -103,6 +103,14 @@ function buildMemberPrompt(
   const promptLines = [`Team: ${spec.name}`, `TeamRunId: ${teamRunId}`, `Member: ${member.name}`]
   if (worktreePath) promptLines.push(`Worktree: ${worktreePath}`)
   if (member.prompt) promptLines.push(member.prompt)
+  if (!worktreePath && member.allowedPaths && member.allowedPaths.length > 0) {
+    promptLines.push(
+      `Allowed paths (inline protection): ${member.allowedPaths.join(", ")}`,
+      "You are in inline mode (shared working directory). The `edit` tool is hard-gated to these paths.",
+      "The `bash` tool also has a best-effort guardrail: destructive git/rm commands (git restore, git reset --hard, git clean -f, git rm, rm -rf, etc.) will be rejected.",
+      "Do NOT attempt to modify, revert, or destroy files outside your assignment — other members' in-flight work shares this directory.",
+    )
+  }
   promptLines.push(buildTeammateCommunicationAddendum(config))
   return promptLines.join("\n")
 }
