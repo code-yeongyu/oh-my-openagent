@@ -399,4 +399,51 @@ describe("latestAssistantTurnBlocksInternalPrompt", () => {
     // then
     expect(blocks).toBe(true)
   })
+
+  test("#given stale incomplete assistant message with finish=undefined and no substantive content #when staleMessageThresholdMs is set #then internal prompts are admitted (not blocked)", () => {
+    // given — an incomplete assistant message (stream died) with very old timestamp
+    const messages = [
+      {
+        info: { role: "user", time: { created: 500 } },
+        parts: [{ type: "text", text: "hi" }],
+      },
+      {
+        info: { role: "assistant", finish: undefined, time: { created: 1000 } },
+        parts: [
+          { type: "step-start" },
+          { type: "step-finish", reason: "error" },
+        ],
+      },
+    ]
+
+    // when — staleMessageThresholdMs=100 means the message (created at 1000)
+    // is definitely older than Date.now() - 100
+    const blocks = latestAssistantTurnBlocksInternalPrompt(messages, 100)
+
+    // then — should NOT block, the stale-message escape hatch fires
+    expect(blocks).toBe(false)
+  })
+
+  test("#given stale incomplete assistant message with finish=undefined #when staleMessageThresholdMs is NOT set #then behavior is unchanged (still blocks)", () => {
+    // given — same incomplete message, no threshold
+    const messages = [
+      {
+        info: { role: "user", time: { created: 500 } },
+        parts: [{ type: "text", text: "hi" }],
+      },
+      {
+        info: { role: "assistant", finish: undefined, time: { created: 1000 } },
+        parts: [
+          { type: "step-start" },
+          { type: "step-finish", reason: "error" },
+        ],
+      },
+    ]
+
+    // when — no staleMessageThresholdMs
+    const blocks = latestAssistantTurnBlocksInternalPrompt(messages)
+
+    // then — blocks as before (original behavior unchanged)
+    expect(blocks).toBe(true)
+  })
 })

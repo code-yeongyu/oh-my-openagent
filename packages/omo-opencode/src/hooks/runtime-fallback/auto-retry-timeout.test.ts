@@ -95,7 +95,9 @@ describe("createFallbackTimeoutHelpers", () => {
     expect(retryModel).toBe("litellm/openai.eu.gpt-5.5")
     expect(state.currentModel).toBe("openai/gpt-5.4")
     expect(state.fallbackIndex).toBe(-1)
-    expect(state.attemptCount).toBe(0)
+    // attemptCount is NOT restored by restoreFallbackState so it accumulates
+    // and acts as a circuit breaker when dispatch keeps getting rejected.
+    expect(state.attemptCount).toBe(1)
     expect(state.pendingFallbackModel).toBe(undefined)
     expect(state.failedModels.size).toBe(0)
   })
