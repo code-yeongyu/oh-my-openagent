@@ -80,6 +80,48 @@ describe("processFilePathForAgentsInjection", () => {
     expect(output.output).not.toContain(rootAgents);
   });
 
+  it("#given injected paths already persisted #when memory cache is reset #then storage prevents duplicate injection", async () => {
+    // given
+    rootDirectory = join(tmpdir(), `agents-md-core-injector-${randomUUID()}`);
+    const srcDirectory = join(rootDirectory, "src");
+    mkdirSync(srcDirectory, { recursive: true });
+    writeFileSync(join(srcDirectory, "AGENTS.md"), "# src");
+    writeFileSync(join(srcDirectory, "first.ts"), "export const first = true;\n");
+    writeFileSync(join(srcDirectory, "second.ts"), "export const second = true;\n");
+
+    const output = {
+      title: "read result",
+      output: "base output",
+      metadata: {},
+    };
+
+    // when
+    await processFilePathForAgentsInjection({
+      rootDirectory,
+      truncator,
+      sessionCaches,
+      storage,
+      filePath: join(srcDirectory, "first.ts"),
+      sessionID: "session-storage-dedupe",
+      output,
+    });
+    const outputAfterFirstInjection = output.output;
+    sessionCaches.clear();
+    await processFilePathForAgentsInjection({
+      rootDirectory,
+      truncator,
+      sessionCaches,
+      storage,
+      filePath: join(srcDirectory, "second.ts"),
+      sessionID: "session-storage-dedupe",
+      output,
+    });
+
+    // then
+    expect(output.output).toBe(outputAfterFirstInjection);
+    expect(output.output.match(/\[Directory Context:/g)).toHaveLength(1);
+  });
+
   it("#given absolute file path outside root #when injecting AGENTS.md #then outside context is ignored", async () => {
     // given
     rootDirectory = join(tmpdir(), `agents-md-core-injector-${randomUUID()}`);
