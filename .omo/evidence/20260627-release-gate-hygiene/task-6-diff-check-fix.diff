@@ -1,0 +1,9 @@
+diff --git a/.omo/evidence/20260625-codex-config-generated-bundle/generated-bundle-false-shorthand-probe.txt b/.omo/evidence/20260625-codex-config-generated-bundle/generated-bundle-false-shorthand-probe.txt
+index a6c10be47..4e1961ee1 100644
+--- a/.omo/evidence/20260625-codex-config-generated-bundle/generated-bundle-false-shorthand-probe.txt
++++ b/.omo/evidence/20260625-codex-config-generated-bundle/generated-bundle-false-shorthand-probe.txt
+@@ -20,4 +20,3 @@ source = "/repo/packages/omo-codex"
+
+ [plugins."omo@debug"]
+ enabled = true
+-

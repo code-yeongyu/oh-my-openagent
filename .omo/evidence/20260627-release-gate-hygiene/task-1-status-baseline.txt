@@ -1,0 +1,22 @@
+# branch.head code-yeongyu/fix-release-gate-hygiene
+
+## status porcelain v2
+# branch.oid a8d5c94814ee54763550681a7b3e3150214a5bb7
+# branch.head code-yeongyu/fix-release-gate-hygiene
+# branch.upstream origin/dev
+# branch.ab +0 -0
+1 .M N... 100644 100644 100644 a6c10be478913ea5339e2b115cdf51318724c577 a6c10be478913ea5339e2b115cdf51318724c577 .omo/evidence/20260625-codex-config-generated-bundle/generated-bundle-false-shorthand-probe.txt
+
+## unmerged names
+
+## unmerged index
+
+## ignored evidence rule
+.gitignore:2:.omo/*	.omo/evidence/20260627-release-gate-hygiene/task-1-status-baseline.txt
+.gitignore:57:plans/	.omo/plans/release-gate-hygiene.md
+
+## branch assertion
+PASS
+
+## cleanup
+no runtime resources spawned; no cleanup required

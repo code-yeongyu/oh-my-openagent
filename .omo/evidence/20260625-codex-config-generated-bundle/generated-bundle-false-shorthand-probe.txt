@@ -20,4 +20,3 @@ source = "/repo/packages/omo-codex"
 
 [plugins."omo@debug"]
 enabled = true
-

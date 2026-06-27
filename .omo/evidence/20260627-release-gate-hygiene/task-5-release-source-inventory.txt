@@ -1,0 +1,705 @@
+## package.json version
+4.13.0
+
+## optional dependency versions
+oh-my-opencode-darwin-arm64 4.13.0
+oh-my-opencode-darwin-x64 4.13.0
+oh-my-opencode-darwin-x64-baseline 4.13.0
+oh-my-opencode-linux-arm64 4.13.0
+oh-my-opencode-linux-arm64-musl 4.13.0
+oh-my-opencode-linux-x64 4.13.0
+oh-my-opencode-linux-x64-baseline 4.13.0
+oh-my-opencode-linux-x64-musl 4.13.0
+oh-my-opencode-linux-x64-musl-baseline 4.13.0
+oh-my-opencode-windows-arm64 4.13.0
+oh-my-opencode-windows-x64 4.13.0
+oh-my-opencode-windows-x64-baseline 4.13.0
+
+## draft-release workflow refs
+  draft-release:
+    runs-on: ubuntu-latest
+    needs: [test, typecheck, codex-compatibility, build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - run: git fetch --force --tags
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.12"
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          NOTES=$(bun run script/generate-changelog.ts)
+          {
+            echo "notes<<EOF"
+            echo "$NOTES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create or update draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NOTES: ${{ steps.notes.outputs.notes }}
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          EXISTING_DRAFT=$(gh release list --json tagName,isDraft --jq '.[] | select(.isDraft == true and .tagName == "next") | .tagName')
+
+          if [ -n "$EXISTING_DRAFT" ]; then
+            echo "Updating existing draft release..."
+            gh release edit next \
+              --title "Upcoming Changes 🍿" \
+              --notes-file - \
+              --draft <<EOF
+          $NOTES
+          EOF
+          else
+            echo "Creating new draft release..."
+            gh release create next \
+              --title "Upcoming Changes 🍿" \
+              --notes-file - \
+              --draft \
+              --target "$TARGET_SHA" <<EOF
+          $NOTES
+          EOF
+          fi
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Draft release notes
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Generates changelog notes from the current `dev` branch.
+            - Creates or updates the `next` draft release.
+          JOB_SUMMARY_NEXT: Check changelog generation output first, then GitHub release permissions.
+
+## publish gates
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.12"
+
+      - name: Build vendored lsp-tools-mcp package
+        run: npm ci && npm run build
+        working-directory: packages/lsp-tools-mcp
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build vendored lsp-daemon package
+        run: npm ci && npm run build
+        working-directory: packages/lsp-daemon
+
+      - name: Run tests
+        run: bun test
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Release test gate
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds vendored LSP packages before release tests.
+            - Runs the full root `bun test` suite before publishing.
+          JOB_SUMMARY_NEXT: Fix the first failing test or vendored package build before rerunning release.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.12"
+
+      - name: Build vendored lsp-tools-mcp package
+        run: npm ci && npm run build
+        working-directory: packages/lsp-tools-mcp
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type check
+        run: bun run typecheck
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Release typecheck gate
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds vendored LSP tooling.
+            - Runs `bun run typecheck` before any publish job can start.
+          JOB_SUMMARY_NEXT: Start with the first TypeScript diagnostic; release jobs stay blocked until this is green.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  codex-compatibility:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v5
+    needs: [release-metadata]
+    if: github.repository == 'code-yeongyu/oh-my-openagent'
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Require LazyCodex sync token
+        if: needs.release-metadata.outputs.dist_tag == ''
+        env:
+          LAZYCODEX_SYNC_TOKEN: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}
+        run: |
+          if [ -z "$LAZYCODEX_SYNC_TOKEN" ]; then
+            echo "::error::LAZYCODEX_SYNC_TOKEN is required to push the Codex marketplace bundle to code-yeongyu/lazycodex."
+            exit 1
+          fi
+
+      - name: Verify trusted publisher for release packages
+        env:
+          REPO: code-yeongyu/oh-my-openagent
+          WORKFLOW_FILE: publish.yml
+          PUBLISH_LAZYCODEX: ${{ inputs.publish_lazycodex }}
+        run: |
+          OIDC_TOKEN=$(curl -sH "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm:registry.npmjs.org" \
+            | jq -r '.value // empty')
+
+          if [ -z "${OIDC_TOKEN}" ]; then
+            echo "::error::Failed to acquire GitHub OIDC token"
+            exit 1
+          fi
+
+          PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64)
+          ALL_PACKAGES=(oh-my-opencode oh-my-openagent)
+          if [ "${PUBLISH_LAZYCODEX}" = "true" ]; then
+            ALL_PACKAGES+=(lazycodex-ai)
+          fi
+          for plat in "${PLATFORMS[@]}"; do
+            ALL_PACKAGES+=("oh-my-opencode-${plat}")
+            ALL_PACKAGES+=("oh-my-openagent-${plat}")
+          done
+
+          FAILED=()
+          for pkg in "${ALL_PACKAGES[@]}"; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X POST \
+              "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/${pkg}" \
+              -H "Authorization: Bearer ${OIDC_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d '{}')
+
+            # npm returns 200 or 201 when trusted publisher is configured (token issued).
+            # 404 means the package has no trusted publisher mapping for this workflow.
+            if [ "${STATUS}" -ge 200 ] && [ "${STATUS}" -lt 300 ]; then
+              echo "OK   ${pkg}"
+            else
+              echo "FAIL ${pkg} (HTTP ${STATUS})"
+              FAILED+=("${pkg}")
+            fi
+          done
+
+          if [ ${#FAILED[@]} -gt 0 ]; then
+            {
+              echo
+              echo "::error::Trusted publisher not configured for ${#FAILED[@]} required package(s)."
+              echo "::error::Configure each below at the URL with these values:"
+              echo "::error::  Provider: GitHub Actions"
+              echo "::error::  Organization: code-yeongyu"
+              echo "::error::  Repository: ${REPO}"
+              echo "::error::  Workflow filename: ${WORKFLOW_FILE}"
+              echo
+              for pkg in "${FAILED[@]}"; do
+                echo "::error::  https://www.npmjs.com/package/${pkg}/access"
+              done
+            } >&2
+            exit 1
+          fi
+
+          echo
+          echo "All ${#ALL_PACKAGES[@]} packages have trusted publisher configured."
+
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## Trusted publishing preflight"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Result | \`${{ job.status }}\` |"
+            echo "| Workflow | \`${{ github.workflow }}\` |"
+            echo "| LazyCodex publish | \`${{ inputs.publish_lazycodex }}\` |"
+            echo
+            echo "### What this job checks"
+            echo
+            echo "- Requires the LazyCodex sync token for stable releases."
+            echo "- Verifies npm trusted-publisher mappings before release writes begin."
+            echo
+            echo "### If this fails"
+            echo
+            echo "Configure the missing npm trusted publisher or required sync secret before rerunning."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  release-metadata:
+  prepare-release-state:
+    runs-on: ubuntu-latest
+    needs: [test, typecheck, codex-compatibility, preflight-trust, release-metadata]
+    if: >-
+      always() &&
+      github.repository == 'code-yeongyu/oh-my-openagent' &&
+      needs.test.result == 'success' &&
+      needs.typecheck.result == 'success' &&
+      needs.codex-compatibility.result == 'success' &&
+      needs.preflight-trust.result == 'success' &&
+      needs.release-metadata.result == 'success'
+    permissions:
+      actions: read
+      contents: write
+      id-token: write
+      pull-requests: write
+    outputs:
+      release_sha: ${{ steps.prepare.outputs.release_sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - run: git fetch --force --tags
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.12"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Prepare and merge release state before publishing
+        id: prepare
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          RELEASE_REF: ${{ github.ref_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          BASE_REF="${RELEASE_REF:-dev}"
+          RELEASE_BRANCH="release/v${VERSION}-source-state"
+
+          git fetch origin "${BASE_REF}" --tags
+
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            RELEASE_SHA="$(git rev-list --max-count=1 "refs/tags/v${VERSION}")"
+            echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
+            echo "Release tag v${VERSION} already exists locally at ${RELEASE_SHA}"
+            exit 0
+          fi
+
+          RELEASE_SHA="$(git rev-list --max-count=1 --grep="^release: v${VERSION}$" "origin/${BASE_REF}" 2>/dev/null || true)"
+          if [ -n "$RELEASE_SHA" ]; then
+            echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
+            echo "Release commit already exists on origin/${BASE_REF}: ${RELEASE_SHA}"
+            exit 0
+          fi
+
+          git checkout -B "$RELEASE_BRANCH" "origin/${BASE_REF}"
+
+          CURRENT_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$CURRENT_VERSION" = "$VERSION" ]; then
+            RELEASE_SHA="$(git rev-parse HEAD)"
+            echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
+            echo "origin/${BASE_REF} is already stamped as v${VERSION}: ${RELEASE_SHA}"
+            exit 0
+          fi
+
+          jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+
+          for platform in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64; do
+            package_dir="packages/oh-my-opencode-${platform}"
+            jq --arg v "$VERSION" '.version = $v' "${package_dir}/package.json" > tmp.json
+            mv tmp.json "${package_dir}/package.json"
+          done
+
+          jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
+
+          node packages/omo-codex/plugin/scripts/sync-version.mjs
+          node packages/omo-codex/plugin/scripts/sync-hook-status-messages.mjs
+          bun install --lockfile-only
+
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add package.json packages/oh-my-opencode-*/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/*.json packages/omo-codex/plugin/components/*/hooks/hooks.json bun.lock
+          git diff --cached --quiet || git commit -m "release: v${VERSION}"
+          git push --force-with-lease origin "HEAD:${RELEASE_BRANCH}"
+
+          PR_NUMBER="$(gh pr list --head "$RELEASE_BRANCH" --base "$BASE_REF" --state open --json number --jq '.[0].number // empty')"
+          if [ -z "$PR_NUMBER" ]; then
+            PR_URL="$(gh pr create --base "$BASE_REF" --head "$RELEASE_BRANCH" --title "release: v${VERSION}" --body "Automated release-state PR for v${VERSION}. This must merge before npm publication starts so protected-branch push failures cannot create a half-published release.")"
+            PR_NUMBER="${PR_URL##*/}"
+          fi
+
+          gh pr merge "$PR_NUMBER" --merge --auto --delete-branch=false
+
+          for attempt in $(seq 1 120); do
+            PR_STATE="$(gh pr view "$PR_NUMBER" --json state --jq '.state')"
+            if [ "$PR_STATE" = "MERGED" ]; then
+              RELEASE_SHA="$(gh pr view "$PR_NUMBER" --json mergeCommit --jq '.mergeCommit.oid')"
+              echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
+              echo "Release-state PR #${PR_NUMBER} merged at ${RELEASE_SHA}"
+              exit 0
+            fi
+
+            FAILURES="$(gh pr view "$PR_NUMBER" --json statusCheckRollup --jq '[.statusCheckRollup[] | select(.conclusion == "FAILURE" or .conclusion == "CANCELLED" or .conclusion == "TIMED_OUT")] | length')"
+            if [ "$FAILURES" != "0" ]; then
+              echo "::error::Release-state PR #${PR_NUMBER} has failing required checks; refusing to publish npm packages."
+              gh pr view "$PR_NUMBER" --json url,statusCheckRollup --jq '{url, statusCheckRollup}'
+              exit 1
+            fi
+
+            echo "Waiting for release-state PR #${PR_NUMBER} to merge (attempt ${attempt}/120)"
+            sleep 30
+          done
+
+          echo "::error::Timed out waiting for release-state PR #${PR_NUMBER} to merge; refusing to publish npm packages."
+          exit 1
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Release source-state gate
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Ensures the `release: v${{ needs.release-metadata.outputs.version }}` source-state commit exists on the release branch before npm publish starts.
+            - Creates and auto-merges a release-state PR when source manifests need stamping.
+            - Refuses to publish packages if protected-branch rules or required checks prevent that PR from merging.
+          JOB_SUMMARY_NEXT: If this fails, merge the release-state PR or fix its checks before rerunning publish.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [release-metadata, publish-main, publish-platform]
+    if: >-
+      always() &&
+      needs.release-metadata.result == 'success' &&
+      needs.publish-main.result == 'success' &&
+      (inputs.skip_platform == true || needs.publish-platform.result == 'success')
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - run: git fetch --force --tags
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.12"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Generate changelog
+        run: |
+          bun run script/generate-changelog.ts > /tmp/changelog.md
+          cat /tmp/changelog.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve release state
+        id: release-state
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          RELEASE_REF: ${{ github.ref_name }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            echo "tag_exists=true" >> "$GITHUB_OUTPUT"
+            echo "release_commit_exists=true" >> "$GITHUB_OUTPUT"
+            git checkout --detach "v${VERSION}"
+            exit 0
+          fi
+
+          echo "tag_exists=false" >> "$GITHUB_OUTPUT"
+          RELEASE_SHA=""
+          if [ -n "$RELEASE_REF" ]; then
+            RELEASE_SHA=$(git rev-list --max-count=1 --grep="^release: v${VERSION}$" "origin/${RELEASE_REF}" 2>/dev/null || true)
+          fi
+
+          if [ -n "$RELEASE_SHA" ]; then
+            echo "release_commit_exists=true" >> "$GITHUB_OUTPUT"
+            git checkout --detach "$RELEASE_SHA"
+          else
+            echo "release_commit_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Apply release version to source tree
+        if: steps.release-state.outputs.release_commit_exists != 'true'
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+        run: |
+          jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+
+          for platform in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64; do
+            package_dir="packages/oh-my-opencode-${platform}"
+            jq --arg v "$VERSION" '.version = $v' "${package_dir}/package.json" > tmp.json
+            mv tmp.json "${package_dir}/package.json"
+          done
+
+          jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
+
+          node packages/omo-codex/plugin/scripts/sync-version.mjs
+          node packages/omo-codex/plugin/scripts/sync-hook-status-messages.mjs
+          bun install --lockfile-only
+
+      - name: Commit version bump
+        if: steps.release-state.outputs.release_commit_exists != 'true'
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add package.json packages/oh-my-opencode-*/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/*.json packages/omo-codex/plugin/components/*/hooks/hooks.json bun.lock
+          git diff --cached --quiet || git commit -m "release: v${VERSION}"
+
+      - name: Create release tag
+        if: steps.release-state.outputs.tag_exists != 'true'
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            echo "Release tag v${VERSION} already exists locally"
+          else
+            git tag "v${VERSION}"
+          fi
+
+      - name: Push release state
+        if: steps.release-state.outputs.tag_exists != 'true'
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          RELEASE_REF: ${{ github.ref_name }}
+          RELEASE_COMMIT_EXISTS: ${{ steps.release-state.outputs.release_commit_exists }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "$RELEASE_COMMIT_EXISTS" != "true" ]; then
+            if [ -z "$RELEASE_REF" ]; then
+              echo "::error::Cannot push release commit because github.ref_name is empty."
+              exit 1
+            fi
+            git push origin "HEAD:${RELEASE_REF}"
+          else
+            echo "Release commit already exists on origin/${RELEASE_REF}"
+          fi
+
+          if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null 2>&1; then
+            echo "Release tag v${VERSION} already exists on origin"
+          else
+            git push origin "v${VERSION}"
+          fi
+
+      - name: Checkout LazyCodex marketplace
+        if: needs.release-metadata.outputs.dist_tag == ''
+        uses: actions/checkout@v5
+        with:
+          repository: code-yeongyu/lazycodex
+          path: lazycodex-marketplace
+          token: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}
+          fetch-depth: 0
+
+      - name: Sync LazyCodex Codex marketplace
+        if: needs.release-metadata.outputs.dist_tag == ''
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          LAZYCODEX_RELEASE_VERSION: ${{ needs.release-metadata.outputs.version }}
+        run: |
+          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json > tmp.json
+          mv tmp.json packages/omo-codex/plugin/.codex-plugin/plugin.json
+          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/package.json > tmp.json
+          mv tmp.json packages/omo-codex/plugin/package.json
+          npm --prefix packages/omo-codex/plugin ci
+          bun run build:git-bash-mcp
+          bun run build:lsp-tools-mcp
+          bun run build:lsp-daemon
+          bun build packages/omo-opencode/src/cli/index.ts --outdir dist/cli --target bun --format esm
+          bun run build:cli-node
+          bun run --cwd packages/omo-codex/plugin build
+          bun run script/sync-lazycodex-marketplace.ts "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/lazycodex-marketplace"
+          cd "$GITHUB_WORKSPACE/lazycodex-marketplace"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add .agents/plugins/marketplace.json .github/workflows/pr-source-guidance.yml plugins/omo
+          if git diff --cached --quiet; then
+            echo "LazyCodex marketplace already up to date"
+          else
+            git commit -m "chore: sync Codex marketplace v${VERSION}"
+            git push origin HEAD:main
+          fi
+
+      - name: Resolve LazyCodex release payload
+        id: lazycodex-release-state
+        if: needs.release-metadata.outputs.dist_tag == ''
+        env:
+          PREVIOUS_LAZYCODEX_VERSION: ${{ needs.release-metadata.outputs.previous_lazycodex_version }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$PREVIOUS_LAZYCODEX_VERSION" ]; then
+            echo "No previous lazycodex-ai package found"
+            echo "lazycodex_changed=true" >> "$GITHUB_OUTPUT"
+            echo "previous_lazycodex_version=none" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          STATE_DIR="$(mktemp -d)"
+          trap 'rm -rf "$STATE_DIR"' EXIT
+          PACKAGE_TGZ="$(npm pack "lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}" --pack-destination "$STATE_DIR" --silent)"
+          tar -xzf "$STATE_DIR/$PACKAGE_TGZ" -C "$STATE_DIR"
+
+          PREVIOUS_PACKAGE_ROOT="$STATE_DIR/package"
+          PREVIOUS_MARKETPLACE_ROOT="$STATE_DIR/previous-lazycodex"
+          CURRENT_MARKETPLACE_ROOT="$GITHUB_WORKSPACE/lazycodex-marketplace"
+          bun run script/sync-lazycodex-marketplace.ts "$PREVIOUS_PACKAGE_ROOT" "$PREVIOUS_MARKETPLACE_ROOT" --previous-payload
+
+          if diff -qr "$PREVIOUS_MARKETPLACE_ROOT/.agents/plugins/marketplace.json" "$CURRENT_MARKETPLACE_ROOT/.agents/plugins/marketplace.json" &&
+             diff -qr "$PREVIOUS_MARKETPLACE_ROOT/.github/workflows/pr-source-guidance.yml" "$CURRENT_MARKETPLACE_ROOT/.github/workflows/pr-source-guidance.yml" &&
+             diff -qr "$PREVIOUS_MARKETPLACE_ROOT/plugins/omo" "$CURRENT_MARKETPLACE_ROOT/plugins/omo"; then
+            echo "LazyCodex payload unchanged from lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}"
+            echo "lazycodex_changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "LazyCodex payload changed from lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}"
+            echo "lazycodex_changed=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "previous_lazycodex_version=${PREVIOUS_LAZYCODEX_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Create LazyCodex GitHub release
+        if: needs.release-metadata.outputs.dist_tag == '' && steps.lazycodex-release-state.outputs.lazycodex_changed == 'true'
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          PREVIOUS_LAZYCODEX_VERSION: ${{ steps.lazycodex-release-state.outputs.previous_lazycodex_version }}
+          GH_TOKEN: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}
+        run: |
+          {
+            printf '%s\n' "Synced Codex Light marketplace payload from oh-my-openagent v${VERSION}."
+            printf '%s\n' ""
+            printf '%s\n' "Compared against: lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}"
+          } > /tmp/lazycodex-release-notes.md
+
+          gh release view "v${VERSION}" --repo code-yeongyu/lazycodex >/dev/null 2>&1 || \
+            gh release create "v${VERSION}" --repo code-yeongyu/lazycodex --target main --title "v${VERSION}" --notes-file /tmp/lazycodex-release-notes.md
+
+      - name: Create GitHub release
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "v${VERSION}" >/dev/null 2>&1 || \
+            gh release create "v${VERSION}" --title "v${VERSION}" --notes-file /tmp/changelog.md
+
+      - name: Delete draft release
+        run: gh release delete next --yes 2>/dev/null || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge to master
+        continue-on-error: true
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git stash --include-untracked || true
+          git checkout master
+          git reset --hard "v${VERSION}"
+          git push -f origin master || echo "::warning::Failed to push to master"
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Release finalization
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Applies and commits release state when needed.
+            - Creates or reuses the release tag.
+            - Syncs LazyCodex marketplace payload and creates GitHub releases.
+            - Attempts the protected `master` mirror update after release.
+          JOB_SUMMARY_NEXT: Inspect the first failing release-state, marketplace sync, or GitHub release step.
+
+## prior QA summaries
+# Codex Config Generated Bundle Follow-Up
+
+PR: #5566
+Branch: code-yeongyu/fix-codex-config-migration
+
+## Scope
+
+- Preserve explicit legacy `[features] multi_agent_v2 = false` as `[features.multi_agent_v2] enabled = false`.
+- Keep installer behavior aligned between TypeScript source and shipped `packages/omo-codex/scripts/install-dist/install-local.mjs`.
+- Prove the generated public installer surface no longer drops the disabled setting.
+
+## Evidence
+
+- `build-codex-install.txt`: regenerated the shipped installer bundle.
+- `source-config-tests.txt`: `bun test packages/omo-codex/src/install/codex-config-toml.test.ts packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts`, 21 pass / 0 fail.
+- `generated-config-and-bundle-tests.txt`: `node --test packages/omo-codex/scripts/install-generated-bundle.test.mjs packages/omo-codex/scripts/install-config.test.mjs`, 19 pass / 0 fail.
+- `generated-bundle-false-shorthand-probe.txt`: direct generated-bundle probe showing legacy `multi_agent_v2 = false` becomes a disabled table with `max_concurrent_threads_per_session = 10000`.
+- `install-verify.txt`: `codex-qa` isolated install verification passed; real `~/.codex/config.toml` unchanged.
+- `typecheck-omo-codex.txt`: `tsgo --noEmit -p packages/omo-codex/tsconfig.json` passed.
+- `git-diff-check.txt`: whitespace/conflict-marker check passed.
+# Shared Skills Release Blocker Evidence
+
+PR: #5565
+Branch: code-yeongyu/fix-shared-skills-release-blockers
+
+## Scope
+
+- Prove the shared-skills PR removes unprovenanced frontend references from the committed tree while keeping materialization reproducible from pinned upstream submodules.
+- Prove the legacy `ultraresearch` alias is visible through the Codex skill sync path.
+- Commit reviewer-inspectable evidence for the already-green PR.
+
+## Evidence
+
+- `submodule-status.txt`: initialized the four frontend provenance upstream submodules at the pins recorded in `ATTRIBUTION.md`.
+- `materialize-frontend-refs.txt`: strict materialization wrote 147 frontend reference files from submodules for local QA only.
+- `shared-skills-focused-tests-rerun.txt`: `bun test packages/shared-skills/{depersonalization-gate,frontend-thirdparty-manifest,materialize-frontend-refs,provenance-gate,upstreams}.test.ts`, 20 pass / 0 fail.
+- `node-resolution.txt`: confirms `@oh-my-opencode/shared-skills` resolved to this PR worktree during sync QA.
+- `sync-skills-materialize.txt`: regenerated the local ignored Codex plugin skill tree before sync assertions.
+- `codex-sync-skills-test.txt`: `node --test packages/omo-codex/plugin/test/sync-skills.test.mjs`, 15 pass / 0 fail, including the `ultraresearch` alias.
+- `codex-qa-common-self-check.txt`: Codex QA isolation harness self-check passed; real `~/.codex/config.toml` unchanged.
+- `opencode-qa-common-self-check.txt`: OpenCode QA common harness self-check passed.
+- `github-checks.json`: GitHub checks for PR #5565 were all pass/skipping at capture time.
+- `git-diff-check.txt`: whitespace/conflict-marker check passed.
+- `git-status-before-stage.txt`: pre-stage status for this evidence-only follow-up.
+
+## Notes
+
+The materialized frontend references and generated Codex plugin skill tree were used only as local QA inputs. They are ignored/generated surfaces and are not part of this PR's tracked source diff.
+
+## cleanup
+no runtime resources spawned; no cleanup required

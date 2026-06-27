@@ -1,0 +1,45 @@
+# Current release summary artifact presence
+
+## .omo/evidence/20260625-codex-config-generated-bundle/QA-SUMMARY.md
+present-tracked	.omo/evidence/20260625-codex-config-generated-bundle/build-codex-install.txt
+present-tracked	.omo/evidence/20260625-codex-config-generated-bundle/generated-bundle-false-shorthand-probe.txt
+present-tracked	.omo/evidence/20260625-codex-config-generated-bundle/generated-config-and-bundle-tests.txt
+present-tracked	.omo/evidence/20260625-codex-config-generated-bundle/git-diff-check.txt
+present-tracked	.omo/evidence/20260625-codex-config-generated-bundle/install-verify.txt
+present-tracked	packages/omo-codex/tsconfig.json
+present-tracked	.omo/evidence/20260625-codex-config-generated-bundle/source-config-tests.txt
+present-tracked	.omo/evidence/20260625-codex-config-generated-bundle/typecheck-omo-codex.txt
+
+## .omo/evidence/20260625-shared-skills-release-blockers/QA-SUMMARY.md
+missing	.omo/evidence/20260625-shared-skills-release-blockers/ATTRIBUTION.md
+present-tracked	.omo/evidence/20260625-shared-skills-release-blockers/codex-qa-common-self-check.txt
+present-tracked	.omo/evidence/20260625-shared-skills-release-blockers/codex-sync-skills-test.txt
+present-tracked	.omo/evidence/20260625-shared-skills-release-blockers/git-diff-check.txt
+present-tracked	.omo/evidence/20260625-shared-skills-release-blockers/git-status-before-stage.txt
+present-tracked	.omo/evidence/20260625-shared-skills-release-blockers/github-checks.json
+present-tracked	.omo/evidence/20260625-shared-skills-release-blockers/materialize-frontend-refs.txt
+present-tracked	.omo/evidence/20260625-shared-skills-release-blockers/node-resolution.txt
+present-tracked	.omo/evidence/20260625-shared-skills-release-blockers/opencode-qa-common-self-check.txt
+present-tracked	.omo/evidence/20260625-shared-skills-release-blockers/shared-skills-focused-tests-rerun.txt
+present-tracked	.omo/evidence/20260625-shared-skills-release-blockers/submodule-status.txt
+present-tracked	.omo/evidence/20260625-shared-skills-release-blockers/sync-skills-materialize.txt
+
+## .omo/evidence/20260626-issue-71-codegraph-mcp/qa-summary.md
+present-tracked	.omo/evidence/20260626-issue-71-codegraph-mcp/changed-file-loc.txt
+present-tracked	.omo/evidence/20260626-issue-71-codegraph-mcp/codegraph-build.txt
+present-tracked	.omo/evidence/20260626-issue-71-codegraph-mcp/codegraph-component-tests.txt
+present-tracked	.omo/evidence/20260626-issue-71-codegraph-mcp/codegraph-typecheck.txt
+present-tracked	.omo/evidence/20260626-issue-71-codegraph-mcp/codex-qa-app-server-drive.txt
+present-tracked	.omo/evidence/20260626-issue-71-codegraph-mcp/codex-qa-install-verify.txt
+present-tracked	.omo/evidence/20260626-issue-71-codegraph-mcp/green-focused.txt
+present-tracked	.omo/evidence/20260626-issue-71-codegraph-mcp/green-serve-wrapper.txt
+present-tracked	.omo/evidence/20260626-issue-71-codegraph-mcp/manual-qa-framed-mcp.txt
+present-tracked	.omo/evidence/20260626-issue-71-codegraph-mcp/red.txt
+present-tracked	.omo/evidence/20260626-issue-71-codegraph-mcp/test-codex.txt
+present-tracked	.omo/evidence/20260626-issue-71-codegraph-mcp/typescript-no-excuse.txt
+
+## .omo/evidence/20260626-issue-77-sparkshell-guidance/qa-summary.md
+present-tracked	.omo/evidence/20260626-issue-77-sparkshell-guidance/check-rules.txt
+missing	.omo/evidence/20260626-issue-77-sparkshell-guidance/directive.md
+
+cleanup: no runtime resources spawned; no cleanup required
