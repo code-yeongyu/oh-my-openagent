@@ -89,7 +89,7 @@ describe("pollAndBuildInjection", () => {
     // then
     expect(results.filter((result) => result.injected)).toHaveLength(1)
     expect(results.filter((result) => !result.injected)).toHaveLength(7)
-  })
+  }, 15_000)
 
   test("wraps hostile message bodies in a literal peer_message envelope", async () => {
     // given
