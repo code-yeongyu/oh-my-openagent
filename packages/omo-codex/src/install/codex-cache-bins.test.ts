@@ -63,6 +63,25 @@ describe("linkRootRuntimeBin runtime wrapper parity", () => {
     expect(wrapper).toContain("exit /b 127")
   })
 
+  it("#given win32 platform #when writing the omo runtime wrapper #then discovers Codex bundled Node from config before bare node", async () => {
+    // given
+    const fixture = await createRepoFixture()
+
+    // when
+    const link = await linkRootRuntimeBin({ ...fixture, platform: "win32" })
+
+    // then
+    expect(link).not.toBeNull()
+    const wrapper = await readFile(link?.path ?? "", "utf8")
+    expect(wrapper).toContain('for /f "tokens=1,* delims==" %%A in (\'findstr /R /C:"NODE_REPL_NODE_PATH[ ]*=" "%CODEX_HOME%\\config.toml" 2^>nul\') do (')
+    expect(wrapper).toContain('if "!OMO_NODE_BINARY:~0,1!"=="^"" set "OMO_NODE_BINARY=!OMO_NODE_BINARY:~1!"')
+    expect(wrapper).toContain(`if "!OMO_NODE_BINARY:~0,1!"=="'" set "OMO_NODE_BINARY=!OMO_NODE_BINARY:~1!"`)
+    expect(wrapper).toContain('if "%OMO_RUNTIME%"=="node" if defined OMO_NODE_BINARY if exist "')
+    expect(wrapper.indexOf("NODE_REPL_NODE_PATH")).toBeLessThan(wrapper.indexOf('if "%OMO_RUNTIME%"=="node"'))
+    expect(wrapper).toContain('"%OMO_NODE_BINARY%" "')
+    expect(wrapper).not.toContain('  node "')
+  })
+
   const posixOnly = process.platform === "win32" ? test.skip : test
   posixOnly("#given posix wrapper target was removed #when running omo #then exits with reinstall guidance", async () => {
     // given
