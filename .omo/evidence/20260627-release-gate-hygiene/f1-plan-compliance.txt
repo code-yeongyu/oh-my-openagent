@@ -1,0 +1,49 @@
+# F1 plan compliance
+.omo/evidence/20260627-release-gate-hygiene/task-6-candidate-green-diff-check.txt:2:exit_code=0
+.omo/evidence/20260627-release-gate-hygiene/task-8-final-diff-check.txt:2:exit_code=0
+.omo/evidence/20260627-release-gate-hygiene/task-1-status-baseline.txt:21:## cleanup
+.omo/evidence/20260627-release-gate-hygiene/task-1-status-baseline.txt:22:no runtime resources spawned; no cleanup required
+.omo/evidence/20260627-release-gate-hygiene/task-6-green-diff-check.txt:2:exit_code=0
+.omo/evidence/20260627-release-gate-hygiene/range-plus-worktree-diff-check-before-commit.txt:2:exit_code=0
+.omo/evidence/20260627-release-gate-hygiene/release-packet.md:9:RED:
+.omo/evidence/20260627-release-gate-hygiene/release-packet.md:12:Candidate GREEN:
+.omo/evidence/20260627-release-gate-hygiene/release-packet.md:13:- `candidate-green-git-diff-check.txt` records `git diff --check v4.13.0` exiting `0` after the one-line evidence cleanup.
+.omo/evidence/20260627-release-gate-hygiene/release-packet.md:15:Commit-range GREEN:
+.omo/evidence/20260627-release-gate-hygiene/release-packet.md:52:Status: `BLOCKED-PENDING-WF-AT`.
+.omo/evidence/20260627-release-gate-hygiene/release-packet.md:62:- `BLOCKED-PENDING-WF-AT`: final publish gate cannot be truthfully rerun to release-ready status until WF/AT code-fix slices are landed or superseded.
+.omo/evidence/20260627-release-gate-hygiene/release-packet.md:69:- PR body temp file cleanup will be recorded in `task-8-cleanup-receipt.txt`.
+.omo/evidence/20260627-release-gate-hygiene/task-3-tracking-classification.txt:35:tracked	.omo/evidence/20260615-codegraph-omo-integration/task-9-codegraph-bootstrap/opencode-missing-bin-cleanup.txt
+.omo/evidence/20260627-release-gate-hygiene/task-3-tracking-classification.txt:37:tracked	.omo/evidence/20260615-codegraph-omo-integration/task-9-codegraph-bootstrap/opencode-normal-cleanup.txt
+.omo/evidence/20260627-release-gate-hygiene/task-3-tracking-classification.txt:95:tracked	.omo/evidence/final-qa/cleanup.txt
+.omo/evidence/20260627-release-gate-hygiene/task-3-tracking-classification.txt:111:cleanup: no runtime resources spawned; no cleanup required
+.omo/evidence/20260627-release-gate-hygiene/task-8-cleanup-receipt.txt:2:cleanup: no runtime resources remain from PR creation
+.omo/evidence/20260627-release-gate-hygiene/evidence-reconciliation.md:5:Status: `BLOCKED-PENDING-WF-AT` for final publish readiness, but RG hygiene can be PR'd.
+.omo/evidence/20260627-release-gate-hygiene/evidence-reconciliation.md:8:- `git diff --check v4.13.0..HEAD` RED source identified as one extra blank line at EOF in `.omo/evidence/20260625-codex-config-generated-bundle/generated-bundle-false-shorthand-probe.txt`.
+.omo/evidence/20260627-release-gate-hygiene/evidence-reconciliation.md:27:- RED proof: `red-git-diff-check.txt`, `task-2-red-diff-check.txt`.
+.omo/evidence/20260627-release-gate-hygiene/evidence-reconciliation.md:28:- Candidate GREEN proof before commit: `candidate-green-git-diff-check.txt`, `task-6-candidate-green-diff-check.txt`.
+.omo/evidence/20260627-release-gate-hygiene/evidence-reconciliation.md:36:No runtime resources were spawned for the reconciliation. No cleanup required.
+.omo/evidence/20260627-release-gate-hygiene/task-3-evidence-claims.txt:42:.omo/evidence/20260615-todo9-codegraph-bootstrap-disabled-hooks/summary.txt:39:.omo/evidence/20260615-codegraph-omo-integration/task-9-codegraph-bootstrap/opencode-normal-cleanup.txt
+.omo/evidence/20260627-release-gate-hygiene/task-3-evidence-claims.txt:43:.omo/evidence/20260615-todo9-codegraph-bootstrap-disabled-hooks/summary.txt:41:.omo/evidence/20260615-codegraph-omo-integration/task-9-codegraph-bootstrap/opencode-missing-bin-cleanup.txt
+.omo/evidence/20260627-release-gate-hygiene/task-3-evidence-claims.txt:88:.omo/evidence/final-qa/summary.txt:27:.omo/evidence/final-qa/cleanup.txt
+.omo/evidence/20260627-release-gate-hygiene/task-3-evidence-claims.txt:112:.omo/notepads/20260615-stale-codex-guidance-cleanup.md:18:.omo/evidence/20260615-stale-codex-guidance/red-codex-goal-instruction-test.txt
+.omo/evidence/20260627-release-gate-hygiene/task-3-evidence-claims.txt:113:.omo/notepads/20260615-stale-codex-guidance-cleanup.md:19:.omo/evidence/20260615-stale-codex-guidance/green-codex-goal-instruction-test.txt
+.omo/evidence/20260627-release-gate-hygiene/task-3-evidence-claims.txt:114:.omo/notepads/20260615-stale-codex-guidance-cleanup.md:20:.omo/evidence/20260615-stale-codex-guidance/node-sync-skills-tests.txt
+.omo/evidence/20260627-release-gate-hygiene/task-3-evidence-claims.txt:115:.omo/notepads/20260615-stale-codex-guidance-cleanup.md:21:.omo/evidence/20260615-stale-codex-guidance/ulw-loop-typecheck.txt
+.omo/evidence/20260627-release-gate-hygiene/task-3-evidence-claims.txt:116:.omo/notepads/20260615-stale-codex-guidance-cleanup.md:22:.omo/evidence/20260615-stale-codex-guidance/plugin-check.txt
+.omo/evidence/20260627-release-gate-hygiene/task-3-evidence-claims.txt:117:.omo/notepads/20260615-stale-codex-guidance-cleanup.md:23:.omo/evidence/20260615-stale-codex-guidance/test-codex.txt
+.omo/evidence/20260627-release-gate-hygiene/task-3-evidence-claims.txt:118:.omo/notepads/20260615-stale-codex-guidance-cleanup.md:24:.omo/evidence/20260615-stale-codex-guidance/final-stale-scan.txt
+.omo/evidence/20260627-release-gate-hygiene/task-3-evidence-claims.txt:119:.omo/notepads/20260615-stale-codex-guidance-cleanup.md:25:.omo/evidence/20260615-stale-codex-guidance/extra-targeted-stale-scan.txt
+.omo/evidence/20260627-release-gate-hygiene/task-3-evidence-claims.txt:120:.omo/notepads/20260615-stale-codex-guidance-cleanup.md:26:.omo/evidence/20260615-stale-codex-guidance/evidence-path-redaction-scan.txt
+.omo/evidence/20260627-release-gate-hygiene/task-6-fix-diff-assertion.txt:2:cleanup: no runtime resources spawned; no cleanup required
+.omo/evidence/20260627-release-gate-hygiene/candidate-green-git-diff-check.txt:2:exit_code=0
+.omo/evidence/20260627-release-gate-hygiene/worktree-diff-check-before-commit.txt:2:exit_code=0
+.omo/evidence/20260627-release-gate-hygiene/task-4-wf-at-summary.md:5:RG-BLOCKED-PENDING-WF-AT: no remote WF/AT PRs found; release readiness packet must mark external blocker until leader confirms peer landing path.
+.omo/evidence/20260627-release-gate-hygiene/task-4-wf-at-summary.md:7:cleanup: no runtime resources spawned; no cleanup required
+.omo/evidence/20260627-release-gate-hygiene/task-3-current-release-summary-presence.txt:45:cleanup: no runtime resources spawned; no cleanup required
+.omo/evidence/20260627-release-gate-hygiene/task-7-packet-integrity.txt:1:section_check=0
+.omo/evidence/20260627-release-gate-hygiene/task-7-packet-integrity.txt:2:wf_at_fail_closed=0
+.omo/evidence/20260627-release-gate-hygiene/task-7-packet-integrity.txt:4:cleanup_receipt_check=0
+.omo/evidence/20260627-release-gate-hygiene/task-5-release-source-inventory.txt:704:## cleanup
+.omo/evidence/20260627-release-gate-hygiene/task-5-release-source-inventory.txt:705:no runtime resources spawned; no cleanup required
+
+cleanup: no runtime resources spawned; no cleanup required

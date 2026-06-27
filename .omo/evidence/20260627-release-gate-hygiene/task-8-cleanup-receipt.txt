@@ -1,0 +1,3 @@
+removed /tmp/release-gate-hygiene-pr-body.md
+cleanup: no runtime resources remain from PR creation
+pr_url=https://github.com/code-yeongyu/oh-my-openagent/pull/5650

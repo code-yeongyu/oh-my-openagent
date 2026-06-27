@@ -1,0 +1,34 @@
+# F4 scope fidelity
+.omo/evidence/20260625-codex-config-generated-bundle/generated-bundle-false-shorthand-probe.txt
+.omo/evidence/20260627-release-gate-hygiene/candidate-green-git-diff-check.txt
+.omo/evidence/20260627-release-gate-hygiene/evidence-reconciliation.md
+.omo/evidence/20260627-release-gate-hygiene/notepad.md
+.omo/evidence/20260627-release-gate-hygiene/range-plus-worktree-diff-check-before-commit.txt
+.omo/evidence/20260627-release-gate-hygiene/red-git-diff-check.txt
+.omo/evidence/20260627-release-gate-hygiene/release-packet.md
+.omo/evidence/20260627-release-gate-hygiene/status-after-red-capture.txt
+.omo/evidence/20260627-release-gate-hygiene/task-1-status-baseline.txt
+.omo/evidence/20260627-release-gate-hygiene/task-2-red-diff-check-error.txt
+.omo/evidence/20260627-release-gate-hygiene/task-2-red-diff-check.txt
+.omo/evidence/20260627-release-gate-hygiene/task-3-current-release-summary-presence.txt
+.omo/evidence/20260627-release-gate-hygiene/task-3-evidence-claims.txt
+.omo/evidence/20260627-release-gate-hygiene/task-3-missing-claimed-evidence.txt
+.omo/evidence/20260627-release-gate-hygiene/task-3-tracking-classification.txt
+.omo/evidence/20260627-release-gate-hygiene/task-3-untracked-ignored-evidence.txt
+.omo/evidence/20260627-release-gate-hygiene/task-4-wf-at-dependencies.json
+.omo/evidence/20260627-release-gate-hygiene/task-4-wf-at-summary.md
+.omo/evidence/20260627-release-gate-hygiene/task-5-release-source-inventory-error.txt
+.omo/evidence/20260627-release-gate-hygiene/task-5-release-source-inventory.txt
+.omo/evidence/20260627-release-gate-hygiene/task-6-candidate-green-diff-check.txt
+.omo/evidence/20260627-release-gate-hygiene/task-6-diff-check-fix.diff
+.omo/evidence/20260627-release-gate-hygiene/task-6-fix-diff-assertion.txt
+.omo/evidence/20260627-release-gate-hygiene/task-6-fix-diff.txt
+.omo/evidence/20260627-release-gate-hygiene/task-6-green-diff-check.txt
+.omo/evidence/20260627-release-gate-hygiene/task-7-packet-integrity.txt
+.omo/evidence/20260627-release-gate-hygiene/task-8-final-diff-check.txt
+.omo/evidence/20260627-release-gate-hygiene/task-8-post-rebase-status.txt
+.omo/evidence/20260627-release-gate-hygiene/task-8-staged-status-before-first-commit.txt
+.omo/evidence/20260627-release-gate-hygiene/worktree-diff-check-before-commit.txt
+
+PASS no WF/AT-owned code paths touched
+cleanup: no runtime resources spawned; no cleanup required

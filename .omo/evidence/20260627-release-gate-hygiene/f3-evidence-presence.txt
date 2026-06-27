@@ -1,0 +1,12 @@
+# F3 evidence presence
+present task-1-status-baseline.txt
+present task-2-red-diff-check.txt
+present task-3-evidence-claims.txt
+present task-3-current-release-summary-presence.txt
+present task-4-wf-at-summary.md
+present task-5-release-source-inventory.txt
+present task-6-green-diff-check.txt
+present task-7-packet-integrity.txt
+present task-8-pr-proof.txt
+present task-8-cleanup-receipt.txt
+cleanup: no runtime resources spawned; no cleanup required
