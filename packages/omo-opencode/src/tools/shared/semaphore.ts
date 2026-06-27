@@ -30,3 +30,7 @@ export class Semaphore {
 
 /** Global semaphore limiting concurrent ripgrep processes to 2 */
 export const rgSemaphore = new Semaphore(2)
+
+/** Global semaphore limiting concurrent LLM agent sessions.
+ *  Stays under opencode's 32-slot worker pool cap to avoid ResourceExhausted errors. */
+export const llmSemaphore = new Semaphore(24)

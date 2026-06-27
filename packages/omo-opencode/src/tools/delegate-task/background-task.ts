@@ -13,6 +13,7 @@ import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import { resolveMetadataModel } from "./resolve-metadata-model"
 import { getPersistedBackgroundTaskDescription } from "./background-task-description"
+import { llmSemaphore } from "../shared/semaphore.js"
 
 function registerBackgroundSessionContext(args: {
   sessionId: string
@@ -112,6 +113,8 @@ export async function executeBackgroundTask(
   const { manager } = executorCtx
 
   try {
+    await llmSemaphore.acquire()
+
     const tddEnabled = executorCtx.sisyphusAgentConfig?.tdd
     const normalizedAgent = stripAgentListSortPrefix(agentToUse)
     const effectivePrompt = buildTaskPrompt(args.prompt, normalizedAgent, tddEnabled)
@@ -228,5 +231,7 @@ Do NOT call background_output now. Wait for <system-reminder> notification first
       agent: stripAgentListSortPrefix(agentToUse),
       category: args.category,
     })
+  } finally {
+    llmSemaphore.release()
   }
 }
