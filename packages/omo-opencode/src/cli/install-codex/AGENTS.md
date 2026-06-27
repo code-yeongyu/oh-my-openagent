@@ -25,7 +25,7 @@ Installs the `omo` plugin into `~/.codex/` for the Codex CLI Light edition. This
 ```
 runCodexInstaller()
   1. resolve repoRoot / codexHome / binDir / projectDirectory
-  2. git-bash.ts: Windows Git Bash preflight (auto-install via winget if missing)
+  2. git-bash.ts: Windows Git Bash preflight (discovery-first; no automatic winget/system install)
   3. codex-marketplace.ts: read marketplace.json + plugin manifests
   4. lazycodex-version-stamp.ts: resolve plugin version from distribution manifest
   5. For each marketplace plugin:
