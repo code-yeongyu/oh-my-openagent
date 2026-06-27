@@ -1,0 +1,5 @@
+# Shared skills asset build
+Command: bun run build:shared-skills-assets
+$ bun run build:materialize-frontend && rm -rf dist/skills && cp -R packages/shared-skills/skills dist/skills
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+[materialize] wrote 147 frontend reference files from submodules

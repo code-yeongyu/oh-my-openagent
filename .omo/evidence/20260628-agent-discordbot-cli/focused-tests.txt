@@ -1,0 +1,44 @@
+# Focused regression tests
+Command: bun test packages/shared-skills/harness-guidance.test.ts packages/skills-loader-core/src/features/builtin-skills/skills.test.ts packages/skills-loader-core/src/features/builtin-skills/shared-skill-extraction.test.ts packages/skills-loader-core/src/features/builtin-skills/skill-file-loader.test.ts
+bun test v1.3.14 (0d9b296a)
+
+packages/shared-skills/harness-guidance.test.ts:
+(pass) shared skill harness guidance > #given review-work is shared #when reading its guidance #then OpenCode remains the primary tool surface [0.43ms]
+(pass) shared skill harness guidance > #given start-work is shared #when reading its verifier guidance #then OpenCode is not sent to LazyCodex reviewers [0.11ms]
+
+packages/skills-loader-core/src/features/builtin-skills/shared-skill-extraction.test.ts:
+(pass) shared builtin skill extraction > #given extracted builtin skill markdown #when compared to TS sources #then bodies and metadata stay byte-equivalent [2.45ms]
+
+packages/skills-loader-core/src/features/builtin-skills/skills.test.ts:
+(pass) createBuiltinSkills > returns playwright skill by default [0.20ms]
+(pass) createBuiltinSkills > exports browser skill contracts with stable tool surfaces [0.09ms]
+(pass) createBuiltinSkills > returns playwright skill when browserProvider is 'playwright' [0.10ms]
+(pass) createBuiltinSkills > returns dev-browser skill when browserProvider is 'dev-browser' [0.09ms]
+(pass) createBuiltinSkills > returns agent-browser skill when browserProvider is 'agent-browser' [0.06ms]
+(pass) createBuiltinSkills > always includes frontend, git-master, review-work, shared skills, and runtime security skills [0.11ms]
+(pass) createBuiltinSkills > git-master skill keeps commit workflow phases in order [0.05ms]
+(pass) createBuiltinSkills > returns exactly 10 skills regardless of provider [0.04ms]
+(pass) createBuiltinSkills > should exclude playwright when it is in disabledSkills [0.10ms]
+(pass) createBuiltinSkills > should exclude multiple skills when they are in disabledSkills [0.08ms]
+(pass) createBuiltinSkills > should return an empty array when all skills are disabled [0.04ms]
+(pass) createBuiltinSkills > should return all 10 skills when disabledSkills set is empty [0.04ms]
+(pass) createBuiltinSkills > #given disabled_skills with debugging and visual-qa #when creating builtin skills #then both are filtered out [0.06ms]
+(pass) createBuiltinSkills > init-deep skill has correct structure [0.05ms]
+(pass) createBuiltinSkills > debugging skill is available from shared template [0.06ms]
+(pass) createBuiltinSkills > review-work skill has correct structure [0.04ms]
+(pass) createBuiltinSkills > review-work skill keeps OpenCode instructions primary while documenting Codex translations [0.09ms]
+(pass) createBuiltinSkills > remove-ai-slops skill has correct structure [0.04ms]
+(pass) createBuiltinSkills > security-research skill has correct structure [0.04ms]
+(pass) createBuiltinSkills > security-review skill remains a runtime alias for security-research [0.05ms]
+(pass) createBuiltinSkills > returns playwright-cli skill when browserProvider is 'playwright-cli' [0.04ms]
+
+packages/skills-loader-core/src/features/builtin-skills/skill-file-loader.test.ts:
+(pass) shared builtin skill file loader > #given extracted shared skill files #when builtin skills are created #then templates load from SKILL.md bodies [0.55ms]
+(pass) shared builtin skill file loader > #given repeated loads #when using the same loader #then it reads each shared skill file once [0.10ms]
+(pass) shared builtin skill file loader > #given shared skills root #when loading shared skill templates #then the package root path resolves [0.06ms]
+(pass) shared builtin skill file loader > #given a missing shared skill file #when loading the template #then the loader fails fast [0.09ms]
+
+ 28 pass
+ 0 fail
+ 147 expect() calls
+Ran 28 tests across 4 files. [68.00ms]

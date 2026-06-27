@@ -1,0 +1,26 @@
+# Discord report
+Command: agent-discordbot message get 1490536332961906829 1520440787844726836 --pretty
+{
+  "id": "1520440787844726836",
+  "channel_id": "1490536332961906829",
+  "content": "why the prometheus  PlanBuilder suddenly trying to use codex cli for review ? i am using opencode with OMO only not using lazy codex \ni haven't asked to use codex , not even mentioned codex",
+  "author": "aayushrai.",
+  "timestamp": "2026-06-27T14:48:52.246000+00:00",
+  "edited_timestamp": null,
+  "thread_id": null
+}
+
+# Regression history
+Command: git log --all --date=iso -G ...
+d758990a7 2026-06-26 18:02:42 +0800 LYY fix(visual-qa): replace lazycodex-specific reviewer with dual-harness dispatch
+f88ad0e28 2026-06-26 17:05:53 +0800 LYY fix(ulw-plan): replace Codex CLI review with Oracle for OpenCode compatibility
+a645839ac 2026-06-23 16:53:39 +0900 YeonGyu-Kim fix(visual-qa): enforce exhaustive per-page CJK review via mandatory subagent gate
+3f11c4557 2026-06-15 17:12:41 +0900 YeonGyu-Kim fix(ulw-plan): forbid unsafe codex review bypass
+795cfd1e6 2026-06-15 17:31:17 +0900 YeonGyu-Kim fix(codex): remove stale orchestration guidance
+45e5008be 2026-06-15 16:57:45 +0900 YeonGyu-Kim fix(shared-skills): align Codex subagent guidance
+7aaa5de35 2026-06-15 16:12:50 +0900 YeonGyu-Kim fix(codex): retire stale ultrawork reviewer install surface
+babfde357 2026-06-15 14:21:19 +0900 YeonGyu-Kim feat(omo-codex): replace legacy reviewer role
+535a3f1dd 2026-06-13 01:58:46 +0900 YeonGyu-Kim refactor(prompts): single-source ultrawork prompts
+92c4affb2 2026-06-10 19:55:17 +0900 YeonGyu-Kim feat(skills): lock start-work into orchestrator-only delegation
+8e8e60c45 2026-06-10 17:00:05 +0900 YeonGyu-Kim feat(prompts): scale ulw/start-work verification by fact-based tier triage
+bd7a883db 2026-06-09 10:31:51 +0900 YeonGyu-Kim refactor(omo-codex): migrate multiagent v2 tool references to v1 API

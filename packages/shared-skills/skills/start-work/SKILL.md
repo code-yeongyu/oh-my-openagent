@@ -1,15 +1,17 @@
 ---
 name: start-work
-description: "Execute a Prometheus work plan in Codex with Boulder state, evidence ledger updates, worktree discipline, parallel subagents, and Stop-hook continuation. Use after planning when the user says start work, execute plan, continue plan, resume plan, or asks to run a .omo/plans plan."
+description: "Execute a Prometheus work plan with Boulder state, evidence ledger updates, worktree discipline, parallel subagents, and continuation hooks. Use after planning when the user says start work, execute plan, continue plan, resume plan, or asks to run a .omo/plans plan."
 ---
 
 ## ABSOLUTE RULE: YOU ARE AN ORCHESTRATOR — NEVER THE IMPLEMENTER
 
 **YOU DO NOT WRITE CODE. YOU DO NOT EDIT PRODUCT FILES. YOU DO NOT RUN QA YOURSELF. EVERY unit of implementation, test, QA, and review work MUST be delegated to a spawned subagent. NO EXCEPTIONS.** Your hands touch only plan selection, `.omo/` state (Boulder, ledger, plan checkboxes), decomposition, dispatch, verdicts, and evidence records. About to edit a product file or run an implementation command yourself? **STOP. SPAWN A WORKER INSTEAD.** Orchestrate at **MAXIMUM PARALLELISM**: every independent unit runs concurrently; only named dependencies serialize.
 
-## Codex Harness Tool Compatibility
+## Harness Tool Compatibility
 
-Translate any OpenCode-only tool name in an inherited example to its Codex equivalent:
+This skill is shared by OpenCode and Codex. In OpenCode, use OpenCode examples literally: `task(...)`, `background_output(...)`, and `team_*(...)` are native OpenCode tools.
+
+In Codex only, translate OpenCode tool names to Codex equivalents:
 
 | OpenCode example | Codex tool to use |
 | --- | --- |
@@ -18,7 +20,7 @@ Translate any OpenCode-only tool name in an inherited example to its Codex equiv
 | `background_output(task_id="...")` | `multi_agent_v1.wait_agent(...)` for mailbox signals |
 | `team_*(...)` | `multi_agent_v1.spawn_agent` + `multi_agent_v1.send_input` + `multi_agent_v1.wait_agent` + `multi_agent_v1.close_agent` |
 
-When translating `load_skills=[...]`, name the skills inside the spawned agent's `message`. If a code block below conflicts with this section, this section wins.
+When translating for Codex, name `load_skills=[...]` inside the spawned agent's `message`. If a code block below conflicts with this section while running in Codex, this section wins.
 
 ## Codex Subagent Reliability
 
@@ -28,7 +30,7 @@ Plan and reviewer agents may run for a long time: spawn them in the background, 
 
 # start-work
 
-Execute a Prometheus work plan until every top-level checkbox is complete. This skill pairs with the Codex `Stop` / `SubagentStop` continuation hook (`components/start-work-continuation`), which re-injects the next turn while `.omo/boulder.json` says this `codex:<session_id>` still has unchecked plan work.
+Execute a Prometheus work plan until every top-level checkbox is complete. In Codex, this skill pairs with the `Stop` / `SubagentStop` continuation hook (`components/start-work-continuation`), which re-injects the next turn while `.omo/boulder.json` says this `codex:<session_id>` still has unchecked plan work.
 
 ## Usage
 
@@ -145,7 +147,7 @@ A worker done claim is never final: each implementation sub-task returns a `Done
 
 Rules:
 - `confirmed` is the only pass verdict. `false-positive`, `needs-fix`, and `needs-human-review` all block checkbox completion.
-- The verifier must be independent from the executor: use `lazycodex-gate-reviewer`, a scoped `worker` reviewer, or root only when root did not implement or materially rewrite that task.
+- The verifier must be independent from the executor: in OpenCode use `task(subagent_type="oracle", ...)` or a scoped reviewer; in Codex use `lazycodex-gate-reviewer`, a scoped `worker` reviewer, or root only when root did not implement or materially rewrite that task.
 - A worker done claim must be independently verified before it becomes checkbox completion.
 - On any non-confirmed verdict, append the feedback to the ledger, reset the checkbox work to in-progress, and re-dispatch the executor with the exact failure.
 - The verifier must probe the applicable adversarial keys, including `stale_state`, `dirty_worktree`, and `misleading_success_output`, before allowing `FullyDone`.

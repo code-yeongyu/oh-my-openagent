@@ -1,0 +1,12 @@
+# Shared skill prompt surface
+Command: bun --print import createBuiltinSkills and inspect review-work/start-work templates
+{
+  "reviewHarnessHeading": true,
+  "reviewOpenCodeLiteral": true,
+  "reviewCodexOnly": true,
+  "reviewAgentTypeCodexOnly": true,
+  "startOpenCodeVerifier": true,
+  "staleCodexHeading": false
+}
+
+# Remaining stale-string scan

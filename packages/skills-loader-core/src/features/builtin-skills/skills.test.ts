@@ -266,19 +266,24 @@ describe("createBuiltinSkills", () => {
 		expect(reviewWork?.description).toContain("review")
 	})
 
-	test("review-work skill explains Codex tool compatibility before OpenCode orchestration examples", () => {
+	test("review-work skill keeps OpenCode instructions primary while documenting Codex translations", () => {
 		// #given
 		const skills = createBuiltinSkills()
 
 		// #when
 		const reviewWork = skills.find((s) => s.name === "review-work")
 		const reviewWorkTemplate = reviewWork?.template ?? ""
-		const compatibilityIndex = reviewWorkTemplate.indexOf("## Codex Harness Tool Compatibility")
+		const compatibilityIndex = reviewWorkTemplate.indexOf("## Harness Tool Compatibility")
+		const opencodeLiteralIndex = reviewWorkTemplate.indexOf("In OpenCode, use them literally")
+		const codexOnlyIndex = reviewWorkTemplate.indexOf("In Codex only")
 		const opencodeExampleIndex = reviewWorkTemplate.search(/\b(?:background_output|team_[a-z_]+|task)\s*\(/)
 
 		// #then
 		expect(compatibilityIndex >= 0).toBe(true)
-		expect(compatibilityIndex < opencodeExampleIndex).toBe(true)
+		expect(opencodeLiteralIndex > compatibilityIndex).toBe(true)
+		expect(codexOnlyIndex > opencodeLiteralIndex).toBe(true)
+		expect(opencodeExampleIndex > compatibilityIndex).toBe(true)
+		expect(reviewWorkTemplate).toContain("pass the matching name as `agent_type` only when running under Codex")
 	})
 
 	test("remove-ai-slops skill has correct structure", () => {
