@@ -62,7 +62,18 @@ export function latestAssistantTurnHasUnansweredQuestion(messages: unknown[]): b
   return false
 }
 
-export function latestAssistantTurnBlocksInternalPrompt(messages: unknown[]): boolean {
+function messageCreatedAt(message: unknown): number | undefined {
+  if (!isRecord(message)) return undefined
+  const info = message.info
+  const time = isRecord(info) && isRecord(info.time) ? info.time : undefined
+  const created = time?.created
+  return typeof created === "number" && Number.isFinite(created) ? created : undefined
+}
+
+export function latestAssistantTurnBlocksInternalPrompt(
+  messages: unknown[],
+  staleMessageThresholdMs?: number,
+): boolean {
   let sawAssistantAfterLatestUser = false
   for (let index = messages.length - 1; index >= 0; index--) {
     const message = messages[index]
@@ -80,6 +91,15 @@ export function latestAssistantTurnBlocksInternalPrompt(messages: unknown[]): bo
         (finish === undefined || finish === "unknown")
         && !messageHasSubstantiveAssistantOutput(message)
       ) {
+        // Escape hatch: if a stale message threshold is configured and this
+        // incomplete message is older than the threshold, the stream died
+        // permanently — don't block dispatch forever.
+        if (staleMessageThresholdMs !== undefined) {
+          const createdAt = messageCreatedAt(message)
+          if (createdAt !== undefined && Date.now() - createdAt > staleMessageThresholdMs) {
+            return false
+          }
+        }
         return !(messageCompleted(message) && messageHasTerminalError(message))
       }
       if (messageCompleted(message)) {
@@ -138,7 +158,7 @@ export async function sessionLatestAssistantBlocksInternalPrompt<TInput>(args: {
       args.timeoutMs,
       `[prompt-async-gate] ${args.sessionName} session.messages`,
     )
-    return latestAssistantTurnBlocksInternalPrompt(getMessagesData(response))
+    return latestAssistantTurnBlocksInternalPrompt(getMessagesData(response), 30_000)
   } catch (error) {
     log("[prompt-async-gate] latest assistant prompt-block check failed", {
       sessionID: args.sessionID,

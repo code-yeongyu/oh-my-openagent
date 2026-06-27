@@ -27,7 +27,9 @@ export function restoreFallbackState(state: FallbackState, snapshot: FallbackSta
   state.currentModel = snapshot.currentModel
   state.fallbackIndex = snapshot.fallbackIndex
   state.failedModels = new Map(snapshot.failedModels)
-  state.attemptCount = snapshot.attemptCount
+  // Don't restore attemptCount — let it accumulate so max_fallback_attempts
+  // acts as a circuit breaker when dispatch keeps getting rejected
+  // (e.g. prompt gate blocks due to a stale incomplete assistant message).
   state.pendingFallbackModel = snapshot.pendingFallbackModel
   state.pendingFallbackPromptMayHaveBeenAccepted = snapshot.pendingFallbackPromptMayHaveBeenAccepted
 }

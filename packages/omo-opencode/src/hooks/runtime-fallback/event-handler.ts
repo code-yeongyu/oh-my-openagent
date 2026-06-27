@@ -115,8 +115,21 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     const sessionID = resolveSessionEventID(props)
     if (!sessionID) return
 
+    const isInternalAbort = deps.internallyAbortedSessions.has(sessionID)
+    log(`[${HOOK_NAME}] [TRACE] handleSessionStop - sessionID=${sessionID}, internallyAborted=${isInternalAbort}, retryInFlight=${sessionRetryInFlight.has(sessionID)}, awaitingResult=${sessionAwaitingFallbackResult.has(sessionID)}`, { sessionID })
+
     if (sessionRetryInFlight.has(sessionID) || sessionAwaitingFallbackResult.has(sessionID)) {
       await helpers.abortSessionRequest(sessionID, "session.stop")
+    }
+
+    // If this stop event was triggered by our own internal abort
+    // (runtime-fallback preparing a fallback model), preserve the retry
+    // state so fallbackIndex/attemptCount survive into the next
+    // retry attempt. Only reset state on user-initiated stops.
+    if (isInternalAbort) {
+      deps.internallyAbortedSessions.delete(sessionID)
+      log(`[${HOOK_NAME}] session.stop for internal abort; preserving retry state`, { sessionID })
+      return
     }
 
     cancelledSessions.add(sessionID)
