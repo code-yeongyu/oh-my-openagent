@@ -1,4 +1,5 @@
 import { join } from "node:path"
+import { windowsNodeDiscoveryLines } from "./codex-cache-command-shim"
 
 export const RUNTIME_WRAPPER_MARKER = "OMO_GENERATED_RUNTIME_WRAPPER"
 
@@ -55,23 +56,24 @@ export function windowsRuntimeWrapper(cliPath: string, codexHome: string, binDir
     `rem ${RUNTIME_WRAPPER_MARKER}`,
     `if not defined CODEX_HOME set "CODEX_HOME=${codexHome}"`,
     'if not defined OMO_SPARKSHELL_APP_SERVER_SOCKET set "OMO_SPARKSHELL_APP_SERVER_SOCKET=%CODEX_HOME%\\app-server-control\\app-server-control.sock"',
+    ...windowsNodeDiscoveryLines(),
     `if "%~1"=="ulw-loop" if exist "${ulwLoopBin}" (`,
     "  shift /1",
     `  "${ulwLoopBin}" %*`,
     "  exit /b %ERRORLEVEL%",
     ")",
-    `if "%OMO_RUNTIME%"=="node" if exist "${nodeCliPath}" (`,
-    `  node "${nodeCliPath}" %*`,
+    `if "%OMO_RUNTIME%"=="node" if defined OMO_NODE_BINARY if exist "${nodeCliPath}" (`,
+    `  "%OMO_NODE_BINARY%" "${nodeCliPath}" %*`,
     "  exit /b %ERRORLEVEL%",
     ")",
     'if not defined BUN_BINARY where bun >nul 2>nul && set "BUN_BINARY=bun"',
     'if not defined BUN_BINARY if exist "%USERPROFILE%\\.bun\\bin\\bun.exe" set "BUN_BINARY=%USERPROFILE%\\.bun\\bin\\bun.exe"',
     "if not defined BUN_BINARY (",
-    `  if exist "${nodeCliPath}" (`,
-    `    node "${nodeCliPath}" %*`,
+    `  if defined OMO_NODE_BINARY if exist "${nodeCliPath}" (`,
+    `    "%OMO_NODE_BINARY%" "${nodeCliPath}" %*`,
     "    exit /b %ERRORLEVEL%",
     "  )",
-    `  echo omo: bun runtime not found and the node fallback CLI is missing at ${nodeCliPath}; install bun from https://bun.sh or reinstall omo and force OMO_RUNTIME=node 1>&2`,
+    `  echo omo: bun runtime not found, no Node runtime was discovered from NODE_REPL_NODE_PATH or PATH, or the node fallback CLI is missing at ${nodeCliPath}; install bun from https://bun.sh or rerun LazyCodex install from Codex Desktop 1>&2`,
     "  exit /b 127",
     ")",
     `if not exist "${cliPath}" (`,

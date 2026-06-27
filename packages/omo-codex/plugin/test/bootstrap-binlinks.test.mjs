@@ -18,6 +18,10 @@ const OMO_CLI_DEGRADED_ENTRY = {
 	reason: "marketplace payload has no dist/cli",
 };
 
+function escapeRegExp(value) {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 async function withBinLinkFixture(run) {
 	const root = await mkdtemp(join(tmpdir(), "omo-bootstrap-binlinks-"));
 	try {
@@ -201,7 +205,11 @@ test("#given platform win32 #when the worker setup links bins #then component bi
 		assert.deepEqual(outcome.degraded, []);
 		const shim = await readFile(join(fixture.binDir, `${COMPONENT_BIN_NAME}.cmd`), "utf8");
 		assert.match(shim, /@echo off/);
-		assert.ok(shim.includes(`node "${join(pluginRoot, "components", "toolbox", "dist", "cli.js")}"`));
+		const componentEntrypoint = join(pluginRoot, "components", "toolbox", "dist", "cli.js");
+		assert.match(shim, /NODE_REPL_NODE_PATH/);
+		assert.match(shim, /"%OMO_NODE_BINARY%"/);
+		assert.match(shim, new RegExp(`"${escapeRegExp(componentEntrypoint)}" %\\*`));
+		assert.doesNotMatch(shim, new RegExp(`node "${escapeRegExp(componentEntrypoint)}" %\\*`));
 		const wrapper = await readFile(join(fixture.binDir, "omo.cmd"), "utf8");
 		assert.ok(wrapper.includes(join(pluginRoot, "dist", "cli", "index.js")));
 		await assert.rejects(() => lstat(join(fixture.binDir, COMPONENT_BIN_NAME)), "win32 must not leave posix symlinks behind");

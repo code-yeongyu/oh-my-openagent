@@ -1,6 +1,6 @@
 import { chmod, lstat, mkdir, readFile, readdir, readlink, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path"
-import { COMMAND_SHIM_MARKER } from "./codex-cache-command-shim"
+import { COMMAND_SHIM_MARKER, windowsCommandShim } from "./codex-cache-command-shim"
 import { isNodeErrorWithCode, isPlainRecord } from "./codex-cache-fs"
 import { removeLegacyCodexComponentBins } from "./codex-cache-legacy-bins"
 import { RUNTIME_WRAPPER_MARKER, posixRuntimeWrapper, windowsRuntimeWrapper } from "./codex-cache-runtime-wrapper"
@@ -175,7 +175,7 @@ async function replaceSymlink(linkPath: string, targetPath: string): Promise<voi
 
 async function replaceCommandShim(linkPath: string, targetPath: string): Promise<void> {
   if (await existingNonShim(linkPath)) throw new Error(`${linkPath} already exists and is not a command shim`)
-  await writeFile(linkPath, `@echo off\r\n${COMMAND_SHIM_MARKER}\r\nnode "${targetPath}" %*\r\n`)
+  await writeFile(linkPath, windowsCommandShim(targetPath))
 }
 
 async function replaceRuntimeWrapper(linkPath: string, content: string): Promise<void> {
