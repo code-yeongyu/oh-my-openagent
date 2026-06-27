@@ -1,34 +1,33 @@
 import { dirname } from "node:path"
-import { tool, type ToolDefinition } from "@opencode-ai/plugin"
+import { type ToolDefinition, tool } from "@opencode-ai/plugin"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
-import { TOOL_DESCRIPTION_PREFIX } from "./constants"
-import { shouldInvalidateSkillCacheForSession } from "./session-skill-cache"
-import type { SkillArgs, SkillLoadOptions } from "./types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
-import { clearSkillCache, getAllSkills } from "../../features/opencode-skill-loader/skill-content"
-import { injectGitMasterConfig } from "../../features/opencode-skill-loader/skill-content"
+import { clearSkillCache, getAllSkills, injectGitMasterConfig } from "../../features/opencode-skill-loader/skill-content"
 import * as commandDiscovery from "../slashcommand/command-discovery"
-import type { CommandInfo } from "../slashcommand/types"
 import { formatLoadedCommand } from "../slashcommand/command-output-formatter"
+import type { CommandInfo } from "../slashcommand/types"
+import { TOOL_DESCRIPTION_PREFIX } from "./constants"
 import { formatCombinedDescription } from "./description-formatter"
 import { formatMcpCapabilities } from "./mcp-capability-formatter"
-import {
-  findPartialMatches,
-  matchCommandByName,
-  matchSkillByName,
-} from "./skill-matcher"
-import { extractSkillBody } from "./skill-body"
 import {
   isPromiseLike,
   loadedSkillToInfo,
   mergeNativeSkillInfos,
   mergeNativeSkills,
 } from "./native-skills"
+import { shouldInvalidateSkillCacheForSession } from "./session-skill-cache"
+import { extractSkillBody } from "./skill-body"
+import {
+  findPartialMatches,
+  matchCommandByName,
+  matchSkillByName,
+} from "./skill-matcher"
+import type { SkillArgs, SkillLoadOptions } from "./types"
 
 export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
   let cachedDescription: string | null = null
 
-  const getSkills = async (context?: ToolContext): Promise<LoadedSkill[]> => {
+  const getBaseSkills = async (context?: ToolContext): Promise<LoadedSkill[]> => {
     if (shouldInvalidateSkillCacheForSession(context?.sessionID)) {
       clearSkillCache()
     }
@@ -39,17 +38,23 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
       teamModeEnabled: options?.teamModeEnabled,
       directory: options.directory,
     })) ?? []
-    const allSkills = options.skills ? [...options.skills] : discovered
+    return options.skills ? [...options.skills] : discovered
+  }
 
+  const mergeNativeSkillsInto = async (skills: LoadedSkill[]): Promise<void> => {
     if (options.nativeSkills) {
       try {
         const nativeAll = await options.nativeSkills.all()
-        mergeNativeSkills(allSkills, nativeAll, options.disabledSkills)
+        mergeNativeSkills(skills, nativeAll, options.disabledSkills)
       } catch (error) {
         if (!(error instanceof Error)) throw error
       }
     }
+  }
 
+  const getSkills = async (context?: ToolContext): Promise<LoadedSkill[]> => {
+    const allSkills = await getBaseSkills(context)
+    await mergeNativeSkillsInto(allSkills)
     return allSkills
   }
 
@@ -123,14 +128,20 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
         .describe("Optional arguments or context for command invocation. Example: name='publish', user_message='patch'"),
     },
     async execute(args: SkillArgs, ctx?: ToolContext) {
-      const skills = await getSkills(ctx)
+      const skills = await getBaseSkills(ctx)
       const commands = getCommands()
+
+      const requestedName = args.name.replace(/^\//, "")
+      let matchedSkill = matchSkillByName(skills, requestedName)
+
+      if (!matchedSkill && options.nativeSkills) {
+        await mergeNativeSkillsInto(skills)
+        matchedSkill = matchSkillByName(skills, requestedName)
+      }
+
       cachedDescription = formatCombinedDescription(skills.map(loadedSkillToInfo), commands, {
         includeSkills: options.includeSkillsInDescription,
       })
-
-      const requestedName = args.name.replace(/^\//, "")
-      const matchedSkill = matchSkillByName(skills, requestedName)
 
       if (matchedSkill) {
         await ctx?.ask({
