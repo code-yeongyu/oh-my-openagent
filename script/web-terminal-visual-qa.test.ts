@@ -87,6 +87,7 @@ describe("web terminal visual QA helper", () => {
   test("#given secret-bearing terminal output #when rendering #then text ansi html and metadata are redacted", async () => {
     // given
     const literalSecret = "local-secret-value"
+    const customCapturingSecret = "cap-secret-12345"
     const rendered = await renderTranscript(
       "secret-capture.txt",
       "Secret QA",
@@ -94,9 +95,10 @@ describe("web terminal visual QA helper", () => {
         "Authorization: Bearer ghp_1234567890abcdefghijklmnop",
         "OPENAI_API_KEY=sk-1234567890abcdefghijklmnop",
         `custom=${literalSecret}`,
+        `capturing=${customCapturingSecret}`,
         "session_id=sess_live_12345",
       ].join("\n"),
-      ["--redact", literalSecret, "--redact-regex", "sess_live_[0-9]+"],
+      ["--redact", literalSecret, "--redact-regex", "(cap-secret-)([0-9]+)", "--redact-regex", "sess_live_[0-9]+"],
     )
 
     // then
@@ -104,13 +106,15 @@ describe("web terminal visual QA helper", () => {
     expect(combinedArtifacts).not.toContain("ghp_1234567890abcdefghijklmnop")
     expect(combinedArtifacts).not.toContain("sk-1234567890abcdefghijklmnop")
     expect(combinedArtifacts).not.toContain(literalSecret)
+    expect(combinedArtifacts).not.toContain(customCapturingSecret)
+    expect(combinedArtifacts).not.toContain("cap-secret-")
     expect(combinedArtifacts).not.toContain("sess_live_12345")
     expect(combinedArtifacts).toContain("[REDACTED]")
     expect(rendered.metadata()).toMatchObject({
       redaction: {
         builtInRules: 5,
         literalRules: 1,
-        regexRules: 1,
+        regexRules: 2,
       },
     })
   })

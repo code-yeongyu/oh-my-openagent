@@ -131,6 +131,30 @@ test("lock open treats EPERM access probes as possible contention", async () => 
   await rm(rootDirectory, { recursive: true, force: true })
 })
 
+test("lock open treats Windows EPERM with an existing parent as possible contention", async () => {
+  // given
+  const { assertRetryableLockOpenError } = await import("./locks")
+  const rootDirectory = await createTempDirectory("locks-eperm-win-parent-")
+  const lockPath = join(rootDirectory, "lock")
+  const accessCalls: string[] = []
+
+  // when
+  const result = assertRetryableLockOpenError(lockPath, createErrnoError("EPERM"), {
+    platform: "win32",
+    access: async (path: PathLike) => {
+      accessCalls.push(String(path))
+      if (String(path) === lockPath) {
+        throw createErrnoError("ENOENT")
+      }
+    },
+  })
+
+  // then
+  await expect(result).resolves.toBeUndefined()
+  expect(accessCalls).toEqual([lockPath, rootDirectory])
+  await rm(rootDirectory, { recursive: true, force: true })
+})
+
 test("lock open rethrows EPERM when the lock path does not exist", async () => {
   // given
   const { assertRetryableLockOpenError } = await import("./locks")
@@ -138,7 +162,21 @@ test("lock open rethrows EPERM when the lock path does not exist", async () => {
   const lockPath = join(rootDirectory, "lock")
 
   // when
-  const result = assertRetryableLockOpenError(lockPath, createErrnoError("EPERM"))
+  const result = assertRetryableLockOpenError(lockPath, createErrnoError("EPERM"), { platform: "linux" })
+
+  // then
+  await expect(result).rejects.toThrow("EPERM")
+  await rm(rootDirectory, { recursive: true, force: true })
+})
+
+test("lock open rethrows Windows EPERM when the lock parent does not exist", async () => {
+  // given
+  const { assertRetryableLockOpenError } = await import("./locks")
+  const rootDirectory = await createTempDirectory("locks-eperm-win-missing-")
+  const lockPath = join(rootDirectory, "missing", "lock")
+
+  // when
+  const result = assertRetryableLockOpenError(lockPath, createErrnoError("EPERM"), { platform: "win32" })
 
   // then
   await expect(result).rejects.toThrow("EPERM")

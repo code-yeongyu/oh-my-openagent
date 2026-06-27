@@ -209,6 +209,20 @@ The boulder has paused. Please either:
 Do NOT auto-continue until you have a clear verdict.`
 }
 
+export function buildRejectedVerdictEscalation(planName: string, taskLabel: string, sessionId: string): string {
+  return `
+**FINAL REVIEW REJECTED - BOULDER PAUSED**
+
+A reviewer for task \`${taskLabel}\` in plan \`${planName}\` returned VERDICT: REJECT. Boulder paused.
+
+The boulder has paused. Please either:
+1. Delegate the required fix: \`task(task_id="${sessionId}", prompt="Fix the final review rejection and preserve the reviewer evidence")\`
+2. Ask the user how to proceed if the rejection requires a product or scope decision
+3. Re-run the affected final-wave reviewer after fixes
+
+Do NOT mark any final-wave checkbox complete and do NOT auto-continue until the rejection is resolved.`
+}
+
 export function buildAdvanceDirective(planName: string): string {
   return `
 **TASK ALREADY COMPLETE - ADVANCE TO NEXT**

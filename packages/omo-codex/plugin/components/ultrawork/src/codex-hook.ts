@@ -91,7 +91,7 @@ function isContextPressureRecoveryPrompt(prompt: string): boolean {
 function isContextPressureTranscript(transcriptPath: string | null | undefined): boolean {
 	if (transcriptPath === undefined || transcriptPath === null) return false;
 	try {
-		return isContextPressureRecoveryPrompt(readFileSync(transcriptPath, "utf8"));
+		return isContextPressureRecoveryPrompt(readTranscriptTail(transcriptPath));
 	} catch (error) {
 		if (error instanceof Error) return false;
 		throw error;

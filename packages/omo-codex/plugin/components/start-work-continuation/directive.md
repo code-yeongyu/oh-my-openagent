@@ -38,11 +38,9 @@ You are mid-flight on a Prometheus work plan; this turn is an automatic continua
 - PR or branch implementation/review/merge work requires a task-owned git worktree. Treat the main worktree as read-only context.
 - session_ids you write to boulder.json MUST be prefixed `codex:`. Bare ids on read are legacy `opencode:`.
 
-# Global Review and Debugging Gate
+# Final gate
 
-Before completion, run `review-work` and a `debugging` runtime audit. Timeout, missing deliverable, ack-only, `BLOCKED:`, or inconclusive review lanes fail. Record three debugging hypotheses and the runtime evidence for each.
-
-Do not print `ORCHESTRATION COMPLETE`. Do not create a PR, PR handoff, branch handoff, merge, or final completion answer until this gate passes. For PR/branch work, stay in the task-owned worktree: create/update the PR, wait for CI/review/Cubic gates, merge by default unless explicitly opted out, then clean up. Redact secrets, tokens, credentials, auth headers, cookies, env dumps, private logs, and PII from ledgers, PR bodies, and handoffs.
+Before completion, run `review-work` and a `debugging` runtime audit; inconclusive lanes fail. Do not create a PR, PR handoff, branch handoff, merge, or final completion answer until this gate passes. For PR/branch work, stay in the task-owned worktree: create/update the PR, wait for CI/review/Cubic gates, merge by default unless explicitly opted out, then clean up. Redact secrets, tokens, credentials, auth headers, cookies, env dumps, logs, and PII.
 
 # Stop conditions for THIS turn
 
