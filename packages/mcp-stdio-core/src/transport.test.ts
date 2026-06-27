@@ -34,6 +34,46 @@ describe("stdio JSON-RPC transport", () => {
     ])
   })
 
+  test("#given multiple content-length frames #when read #then it yields each framed request", async () => {
+    const input = new PassThrough()
+    const firstBody = '{"jsonrpc":"2.0","id":1,"method":"initialize"}'
+    const secondBody = '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+    input.end([
+      `Content-Length: ${Buffer.byteLength(firstBody, "utf8")}\r\n\r\n${firstBody}`,
+      `Content-Length: ${Buffer.byteLength(secondBody, "utf8")}\r\n\r\n${secondBody}`,
+    ].join(""))
+
+    const messages = await collect(input)
+
+    expect(messages).toEqual([
+      {
+        kind: "request",
+        payload: { jsonrpc: "2.0", id: 1, method: "initialize" },
+        responseMode: "framed",
+      },
+      {
+        kind: "request",
+        payload: { jsonrpc: "2.0", id: 2, method: "tools/list" },
+        responseMode: "framed",
+      },
+    ])
+  })
+
+  test("#given invalid content-length header #when read #then it yields framed parse error", async () => {
+    const input = new PassThrough()
+    input.end("Content-Length: nope\r\n\r\n")
+
+    const messages = await collect(input)
+
+    expect(messages).toEqual([
+      {
+        kind: "parse_error",
+        message: "Missing or invalid Content-Length header",
+        responseMode: "framed",
+      },
+    ])
+  })
+
   test("#given response mode #when written #then framing bytes are stable", () => {
     const output = new PassThrough()
     const chunks: string[] = []
