@@ -134,6 +134,11 @@ export function isGpt5_5Model(model: string): boolean {
   return modelName.includes("gpt-5.5") || modelName.includes("gpt-5-5");
 }
 
+export function isDeepSeekV4Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase().replaceAll("_", "-").replaceAll(".", "-");
+  return modelName.includes("deepseek") && /v[_-]?4/.test(modelName);
+}
+
 export type BuiltinAgentName =
   | "sisyphus"
   | "hephaestus"
