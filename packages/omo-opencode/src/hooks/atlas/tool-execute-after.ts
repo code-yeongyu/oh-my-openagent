@@ -63,7 +63,6 @@ export function createToolExecuteAfterHandler(input: {
       toolInput,
       toolOutput,
       metadataSessionId,
-      isPluginToolRetrieval: isPluginToolWithSession,
     })
   }
 }
