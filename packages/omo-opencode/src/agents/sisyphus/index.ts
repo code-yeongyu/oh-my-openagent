@@ -6,6 +6,7 @@
  * - claude-opus-4-7.ts: Native Claude Opus 4.7 prompt with literal-instruction tuning
  * - claude-opus-4-8.ts: Native Claude Opus 4.8 prompt with silence-default + autonomy tuning
  * - claude-fable-5.ts: Native Claude Fable 5 prompt (Opus 4.8 direction, top-tier model)
+ * - deepseek-v4.ts: DeepSeek V4 Pro/Flash prompt with agentic guardrails
  * - gemini.ts: Corrective overlays for Gemini's aggressive tendencies
  * - gpt-5-4.ts: Native GPT-5.4 prompt with block-structured guidance
  * - gpt-5-5.ts: Native GPT-5.5 prompt with Codex-style sections
@@ -25,5 +26,6 @@ export {
 } from "./gemini";
 export { buildGpt54SisyphusPrompt } from "./gpt-5-4";
 export { buildGpt55SisyphusPrompt } from "./gpt-5-5";
+export { buildDeepSeekV4SisyphusPrompt } from "./deepseek-v4";
 export { buildGlm52SisyphusPrompt } from "./glm-5-2";
 export { buildKimiK26SisyphusPrompt } from "./kimi-k2-6";
