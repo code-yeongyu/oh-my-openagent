@@ -13,7 +13,7 @@ Candidate GREEN:
 - `candidate-green-git-diff-check.txt` records `git diff --check v4.13.0` exiting `0` after the one-line evidence cleanup.
 
 Commit-range GREEN:
-- Pending until the RG commit is created, because `git diff --check v4.13.0..HEAD` checks committed `HEAD`, not the unstaged worktree.
+- `task-6-green-diff-check.txt` and `task-8-final-diff-check.txt` record `git diff --check v4.13.0..HEAD` exiting `0` after the RG evidence commit was rebased onto current `origin/dev`.
 
 ## Evidence Reconciliation
 
@@ -72,6 +72,6 @@ Evidence: `task-4-wf-at-dependencies.json`, `task-4-wf-at-summary.md`.
 
 Pending:
 - F1 plan compliance.
-- F2 commit-range diff-check after commit.
+- F2 commit-range diff-check after final evidence commit.
 - F3 evidence presence.
 - F4 scope fidelity.
