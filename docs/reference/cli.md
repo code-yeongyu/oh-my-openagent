@@ -13,8 +13,10 @@ All published packages expose the same compiled CLI with these bin entries:
 
 - `oh-my-opencode` (legacy name, still primary)
 - `oh-my-openagent` (renamed primary)
-- `omo` (short alias, recommended in docs and prompts)
-- `lazycodex-ai` (Light edition shortcut; `lazycodex-ai install` is equivalent to `omo install --platform=codex` unless `--platform` is explicitly overridden)
+- `omo` (short alias after the package has already resolved to oh-my-openagent)
+- `lazycodex-ai` (Light edition shortcut; `lazycodex-ai install` is equivalent to `oh-my-openagent install --platform=codex` unless `--platform` is explicitly overridden)
+
+Do not use `bunx omo` or `npx omo` for installation. The npm name `omo` belongs to a different package, so package managers can resolve the wrong project. Use `bunx oh-my-openagent install` for Ultimate/OpenCode or `npx lazycodex-ai install` for Light/Codex.
 
 ## Basic Usage
 
