@@ -30,6 +30,7 @@ describe("CodeGraph SessionStart hook", () => {
 				stdin: Readable.from(["{}"]),
 				stdout: { write: (chunk) => stdout.push(chunk) },
 				spawnWorker: (invocation) => spawned.push(invocation),
+				statusProbe: () => Promise.resolve(false),
 			});
 
 			// then
@@ -218,6 +219,7 @@ describe("CodeGraph SessionStart hook", () => {
 				stdin: Readable.from(["{}"]),
 				stdout: { write: (chunk) => stdout.push(chunk) },
 				spawnWorker: (invocation) => spawned.push(invocation),
+				statusProbe: () => Promise.resolve(false),
 				workerCliPath: "/plugin/components/codegraph/dist/cli.js",
 			});
 
@@ -240,6 +242,33 @@ describe("CodeGraph SessionStart hook", () => {
 					hookEventName: "SessionStart",
 				},
 			});
+		} finally {
+			rmSync(workspace, { recursive: true, force: true });
+		}
+	});
+
+	it("#given CodeGraph is already initialized #when SessionStart fires #then it stays silent without spawning", async () => {
+		// given
+		const stdout: string[] = [];
+		const spawned: WorkerSpawnInvocation[] = [];
+		const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-initialized-workspace-"));
+
+		try {
+			// when
+			const result = await executeCodegraphSessionStartHook({
+				config: { codegraph: { enabled: true }, sources: [], warnings: [] },
+				cwd: workspace,
+				env: { HOME: "/tmp/home", KEEP: "1" },
+				stdin: Readable.from(["{}"]),
+				stdout: { write: (chunk) => stdout.push(chunk) },
+				spawnWorker: (invocation) => spawned.push(invocation),
+				statusProbe: () => Promise.resolve(true),
+			});
+
+			// then
+			expect(result).toEqual({ action: "skipped-initialized", exitCode: 0 });
+			expect(spawned).toEqual([]);
+			expect(stdout.join("")).toBe("");
 		} finally {
 			rmSync(workspace, { recursive: true, force: true });
 		}
