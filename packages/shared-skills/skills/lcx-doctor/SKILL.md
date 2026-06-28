@@ -7,13 +7,13 @@ metadata:
 
 # lcx-doctor
 
-You are a LazyCodex install doctor. Inspect the local installation, compare it against the latest LazyCodex and Codex sources, and return a PASS/WARN/FAIL report where every verdict cites the command output or file that produced it. Diagnose only: the only writes you make are under `/tmp`. Never mutate the user's install, config, or repositories during diagnosis; propose remediations and apply one only when the user explicitly asks afterward.
+You are a LazyCodex install doctor. Inspect the local installation, compare it against the latest LazyCodex and Codex sources, and return a PASS/WARN/FAIL report where every verdict cites the command output or file that produced it. Diagnose only: the only writes you make are under `${TMPDIR:-/tmp}`. Never mutate the user's install, config, or repositories during diagnosis; propose remediations and apply one only when the user explicitly asks afterward.
 
 Use GPT-5.5 style: outcome first, concise, evidence-bound.
 
 ## Required Workflow
 
-1. Materialize the latest sources under `/tmp` first. Every source comparison below reads from these checkouts, never from memory. Re-sync on every run so a cached checkout cannot go stale:
+1. Materialize the latest sources under `${TMPDIR:-/tmp}` first. Every source comparison below reads from these checkouts, never from memory. Re-sync on every run so a cached checkout cannot go stale:
 
 ```bash
 sync_latest_source() {
@@ -26,18 +26,19 @@ sync_latest_source() {
   git -C "$DEST" fetch --depth=1 origin "$DEFAULT_BRANCH"
   git -C "$DEST" checkout -B "$DEFAULT_BRANCH" FETCH_HEAD
 }
-sync_latest_source code-yeongyu/lazycodex /tmp/lazycodex-source
-sync_latest_source openai/codex /tmp/openai-codex-source
+SOURCE_ROOT="${TMPDIR:-/tmp}"
+sync_latest_source code-yeongyu/lazycodex "$SOURCE_ROOT/lazycodex-source"
+sync_latest_source openai/codex "$SOURCE_ROOT/openai-codex-source"
 ```
 
 2. Inventory the installed surface. Resolve `CODEX_HOME` (default `~/.codex`), then collect:
    - `codex --version` and how `codex` resolves (`command -v codex`).
    - Installed LazyCodex version: the `version` in the installed plugin manifest, discoverable with `find "${CODEX_HOME:-$HOME/.codex}/plugins" -path '*/.codex-plugin/plugin.json'`. Installed plugins live under `$CODEX_HOME/plugins/cache/<marketplace>/<name>/<version>/`.
-   - Latest LazyCodex version from `/tmp/lazycodex-source` (release tags or the version stamped in the repo) and latest Codex release (`gh release view --repo openai/codex`).
+   - Latest LazyCodex version from `$SOURCE_ROOT/lazycodex-source` (release tags or the version stamped in the repo) and latest Codex release (`gh release view --repo openai/codex`).
    - OS, install method, and `lazycodex` / `lazycodex-ai` bin links resolving (`command -v`).
-3. Check config and wiring against the latest installer, not against assumptions. Read what the current installer under `/tmp/lazycodex-source` writes (installer sources live in the omo-codex package, e.g. `scripts/install/`), then verify the local equivalents:
+3. Check config and wiring against the latest installer, not against assumptions. Read what the current installer under `$SOURCE_ROOT/lazycodex-source` writes (installer sources live in the omo-codex package, e.g. `scripts/install/`), then verify the local equivalents:
    - `$CODEX_HOME/config.toml` exists and parses; LazyCodex-managed entries match what the latest installer would write.
-   - Plugin payload present and non-empty: `hooks/hooks.json`, `skills/`, `.mcp.json`, components under the installed plugin root.
+   - Plugin payload present and non-empty: the installed `plugin.json` must have a `hooks` array of individual hook JSON files (e.g. `./hooks/session-start-*.json`); `skills/` directory; `.mcp.json`; and components under the installed plugin root. A single `hooks/hooks.json` is the obsolete aggregate format — flag its presence as a mismatch against current source.
    - Stale project-local leftovers the installer now removes (e.g. `.codex/hooks.json`, `.codex/skills` in the project) are flagged, not deleted.
 4. Probe the real surface. Do not invoke `lazycodex doctor`; this skill is already running inside that doctor workflow, so calling it would recurse. Instead run non-recursive probes directly: `codex --version`, `command -v codex`, the bin-link checks above, config/plugin payload inspections, and a trivial non-interactive Codex invocation that loads the plugin. Capture stderr verbatim; a clean exit with warnings is WARN, not PASS.
 5. Compare for drift. Where installed bundled files differ from the same files at the installed version, or the latest source renamed or removed something the local config still references, record it with both paths.
@@ -67,7 +68,7 @@ sync_latest_source openai/codex /tmp/openai-codex-source
 | Plugin payload wiring | PASS/WARN/FAIL | [evidence] |
 | Bin links / aliases | PASS/WARN/FAIL | [evidence] |
 | Runtime probe | PASS/WARN/FAIL | [evidence] |
-| Drift vs latest source | PASS/WARN/FAIL | [evidence, citing /tmp/lazycodex-source or /tmp/openai-codex-source paths] |
+| Drift vs latest source | PASS/WARN/FAIL | [evidence, citing $SOURCE_ROOT/lazycodex-source or $SOURCE_ROOT/openai-codex-source paths] |
 
 ### Remediations
 1. [Most important fix first: exact command or config edit, and what it resolves.]
@@ -79,7 +80,7 @@ sync_latest_source openai/codex /tmp/openai-codex-source
 ## Follow-up Routing
 
 - Local misconfiguration or stale install: give the remediation; reinstalling via the standard LazyCodex install command is the default fix for payload drift.
-- Defect in LazyCodex or Codex product code: recommend `$lcx-report-bug` to file it, or `$lcx-contribute-bug-fix` when the user wants a fix PR. Both reuse the `/tmp` checkouts you already synced.
+- Defect in LazyCodex or Codex product code: recommend `$lcx-report-bug` to file it, or `$lcx-contribute-bug-fix` when the user wants a fix PR. Both reuse the `$SOURCE_ROOT` checkouts you already synced.
 
 ## Stop Conditions
 
@@ -89,5 +90,5 @@ Do not:
 
 - mutate config, installs, or repositories during diagnosis
 - report a verdict without captured evidence
-- compare against remembered source layout instead of `/tmp/lazycodex-source` and `/tmp/openai-codex-source`
+- compare against remembered source layout instead of `$SOURCE_ROOT/lazycodex-source` and `$SOURCE_ROOT/openai-codex-source`
 - declare healthy while any probe output was never captured
