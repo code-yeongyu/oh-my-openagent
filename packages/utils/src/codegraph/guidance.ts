@@ -3,7 +3,7 @@ import { homedir } from "node:os"
 import { resolveCodegraphWorkspacePaths } from "./workspace"
 
 const CODEGRAPH_UNINITIALIZED_PATTERN =
-  /CodeGraph not initialized in ([\s\S]*?)\.\s*Run ['`]codegraph init['`] in that project first\./i
+  /CodeGraph not initialized in ([\s\S]*?)\.\s*Run ["'`]codegraph init["'`] in that project first\./i
 const ANSI_ESCAPE_PATTERN = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g
 const CODEGRAPH_STATUS_PROJECT_PATTERN = /^.*?\bProject:\s*(.+?)\s*$/im
 const CODEGRAPH_STATUS_UNINITIALIZED_PATTERN =

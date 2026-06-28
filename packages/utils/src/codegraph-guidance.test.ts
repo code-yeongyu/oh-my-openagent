@@ -20,6 +20,40 @@ describe("CodeGraph initialization guidance", () => {
     expect(projectPath).toBe("/Users/me/project")
   })
 
+  test("#given CodeGraph MCP reports an uninitialized dotted project #when parsed #then the full project path is extracted", () => {
+    // given
+    const output = [
+      "Tool execution failed: CodeGraph not initialized in /Users/me/my.repo.",
+      "Run 'codegraph init' in that project first.",
+    ].join(" ")
+
+    // when
+    const projectPath = getCodegraphUninitializedProject({
+      toolName: "codegraph.codegraph_status",
+      toolOutput: output,
+    })
+
+    // then
+    expect(projectPath).toBe("/Users/me/my.repo")
+  })
+
+  test("#given CodeGraph MCP reports a double-quoted init hint #when parsed #then the project path is extracted", () => {
+    // given
+    const output = [
+      "Tool execution failed: CodeGraph not initialized in /Users/me/project.",
+      'Run "codegraph init" in that project first.',
+    ].join(" ")
+
+    // when
+    const projectPath = getCodegraphUninitializedProject({
+      toolName: "codegraph.codegraph_status",
+      toolOutput: output,
+    })
+
+    // then
+    expect(projectPath).toBe("/Users/me/project")
+  })
+
   test("#given non-CodeGraph output mentions initialization #when parsed #then no guidance is emitted", () => {
     // given
     const output = [
