@@ -34,9 +34,11 @@ function isBackgroundOutputIncompleteReport(toolName: string, output: string): b
   const taskStatusTable = new RegExp(
     `^# Task Status\\b[\\s\\S]*\\|\\s*Status\\s*\\|\\s*\\*\\*${incompleteStatus}\\*\\*\\s*\\|`,
   )
+  const fullSessionStatusReport = new RegExp(`^# Full Session Output\\b[\\s\\S]*^Status:\\s*${incompleteStatus}\\s*$`, "m")
   const bareStatusReport = new RegExp(`^Status:\\s*${incompleteStatus}\\s*$`)
 
   return taskStatusTable.test(trimmedOutput)
+    || fullSessionStatusReport.test(trimmedOutput)
     || bareStatusReport.test(trimmedOutput)
     || trimmedOutput.startsWith("Error fetching messages:")
 }
