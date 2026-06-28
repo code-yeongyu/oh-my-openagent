@@ -23,10 +23,13 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Fetch download stats
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: bun run script/stats.ts --dry-run
 
       - name: Send download stats
         env:
+          GH_TOKEN: ${{ github.token }}
           POSTHOG_KEY: ${{ secrets.POSTHOG_KEY }}
         run: bun run script/stats.ts
 
