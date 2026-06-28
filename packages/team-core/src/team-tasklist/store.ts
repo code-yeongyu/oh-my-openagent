@@ -1,4 +1,4 @@
-import { mkdir, readFile } from "node:fs/promises"
+import { mkdir, readFile, readdir } from "node:fs/promises"
 import path from "node:path"
 
 import type { TeamModeConfig } from "../config"
@@ -9,16 +9,36 @@ import type { Task } from "../types"
 
 const HIGH_WATERMARK_FILE = ".highwatermark"
 
-async function readHighWatermark(watermarkPath: string): Promise<number> {
+async function readTaskFileHighWatermark(tasksDirectory: string): Promise<number> {
+  try {
+    const entries = await readdir(tasksDirectory, { withFileTypes: true })
+    return entries.reduce((maxTaskId, entry) => {
+      if (!entry.isFile() || !entry.name.endsWith(".json")) return maxTaskId
+      const taskFileStem = path.basename(entry.name, ".json")
+      if (!/^\d+$/.test(taskFileStem)) return maxTaskId
+      const taskId = Number.parseInt(taskFileStem, 10)
+      return Number.isInteger(taskId) && taskId > maxTaskId ? taskId : maxTaskId
+    }, 0)
+  } catch (error) {
+    error instanceof Error
+    return 0
+  }
+}
+
+async function readHighWatermark(watermarkPath: string, tasksDirectory: string): Promise<number> {
   try {
     const watermarkContent = (await readFile(watermarkPath, "utf8")).trim()
     const parsedWatermark = Number.parseInt(watermarkContent, 10)
-    return Number.isInteger(parsedWatermark) && parsedWatermark >= 0 ? parsedWatermark : 0
+    if (Number.isInteger(parsedWatermark) && parsedWatermark >= 0) {
+      return parsedWatermark
+    }
   } catch (error) {
     error instanceof Error
-    await atomicWrite(watermarkPath, "0")
-    return 0
   }
+
+  const recoveredWatermark = await readTaskFileHighWatermark(tasksDirectory)
+  await atomicWrite(watermarkPath, String(recoveredWatermark))
+  return recoveredWatermark
 }
 
 export async function createTask(
@@ -33,7 +53,7 @@ export async function createTask(
 
   return withLock(path.join(tasksDirectory, ".lock"), async () => {
     const watermarkPath = path.join(tasksDirectory, HIGH_WATERMARK_FILE)
-    const nextTaskId = (await readHighWatermark(watermarkPath)) + 1
+    const nextTaskId = (await readHighWatermark(watermarkPath, tasksDirectory)) + 1
     await atomicWrite(watermarkPath, String(nextTaskId))
 
     const now = Date.now()
