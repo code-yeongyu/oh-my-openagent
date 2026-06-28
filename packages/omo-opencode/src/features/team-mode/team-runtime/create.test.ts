@@ -90,6 +90,20 @@ async function loadSingleRuntimeState(baseDir: string) {
   return await loadRuntimeState(teamRunId ?? "", createConfig(baseDir))
 }
 
+type Deferred<T> = {
+  readonly promise: Promise<T>
+  readonly resolve: (value: T | PromiseLike<T>) => void
+}
+
+function createDeferred<T>(): Deferred<T> {
+  let resolveDeferred: Deferred<T>["resolve"] | undefined
+  const promise = new Promise<T>((resolve) => {
+    resolveDeferred = resolve
+  })
+  if (!resolveDeferred) throw new Error("deferred resolver was not initialized")
+  return { promise, resolve: resolveDeferred }
+}
+
 describe("createTeamRun", () => {
   const temporaryDirectories: string[] = []
 
@@ -342,23 +356,35 @@ describe("createTeamRun", () => {
     // given
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-parallel-"))
     temporaryDirectories.push(baseDir)
+    const launchLimit = 4
+    const firstBatchStarted = createDeferred<void>()
+    const releaseLaunches = createDeferred<void>()
     let inFlight = 0
     let maxInFlight = 0
     let launchCount = 0
     const { manager } = createManager(baseDir, async () => {
-      launchCount += 1
+      const launchId = ++launchCount
       inFlight += 1
       maxInFlight = Math.max(maxInFlight, inFlight)
-      await new Promise((resolve) => setTimeout(resolve, 10))
+      if (launchCount === launchLimit) firstBatchStarted.resolve(undefined)
+      await releaseLaunches.promise
       inFlight -= 1
-      return { id: `task-${launchCount}`, sessionId: `session-${launchCount}`, status: "running" } as BackgroundTask
+      return { id: `task-${launchId}`, sessionId: `session-${launchId}`, status: "running" } as BackgroundTask
     })
 
     // when
-    await createTeamRun(createSpec(8), "lead-session", createContext(baseDir, manager), createConfig(baseDir, 4), manager)
+    const run = createTeamRun(createSpec(8), "lead-session", createContext(baseDir, manager), createConfig(baseDir, launchLimit), manager)
+    await firstBatchStarted.promise
+    const firstBatchLaunchCount = launchCount
+    const firstBatchMaxInFlight = maxInFlight
+    releaseLaunches.resolve(undefined)
+    await run
 
     // then
-    expect(maxInFlight).toBeLessThanOrEqual(4)
+    expect(firstBatchLaunchCount).toBe(launchLimit)
+    expect(firstBatchMaxInFlight).toBe(launchLimit)
+    expect(launchCount).toBe(8)
+    expect(maxInFlight).toBeLessThanOrEqual(launchLimit)
   })
 
   test("reuses the caller session for the lead when the lead matches the caller agent", async () => {
