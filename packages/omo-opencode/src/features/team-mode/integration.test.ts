@@ -18,6 +18,7 @@ import {
   getSessionPromptParams,
 } from "../../shared/session-prompt-params-state"
 import { getRuntimeStateDir, resolveBaseDir } from "./team-registry/paths"
+import { createLaunchConcurrencyProbe } from "./test-support/async-test-helpers"
 import type { TeamSpec } from "./types"
 
 const resolveMemberMock = mock(async (member: TeamSpec["members"][number]) => ({
@@ -295,24 +296,34 @@ describe("team-mode integration", () => {
   test("C-10.4 keeps member spawn concurrency within max_parallel_members", async () => {
     // given
     const baseDir = await createBaseDir()
-    let inFlight = 0
-    let maxInFlight = 0
-    const manager = createManager(async () => {
-      inFlight += 1
-      maxInFlight = Math.max(maxInFlight, inFlight)
-      await new Promise((resolve) => setTimeout(resolve, 10))
-      inFlight -= 1
-      return { id: `task-${randomUUID()}`, sessionId: `ses_mock_${randomUUID()}`, status: "running" } as BackgroundTask
+    const launchLimit = 2
+    const launchProbe = createLaunchConcurrencyProbe({
+      launchLimit,
+      sessionIdPrefix: "ses_mock",
+      taskIdPrefix: "task",
     })
+    const manager = createManager(async (input) => launchProbe.launch(input))
 
     // when
-    await createTeamRun(createSpec("parallel-team", "lead", [
+    const run = createTeamRun(createSpec("parallel-team", "lead", [
       { kind: "subagent_type", name: "lead", subagent_type: "sisyphus", backendType: "in-process", isActive: true },
       { kind: "subagent_type", name: "worker-a", subagent_type: "atlas", backendType: "in-process", isActive: true },
       { kind: "subagent_type", name: "worker-b", subagent_type: "atlas", backendType: "in-process", isActive: true },
-    ]), "ses_lead", createContext(baseDir, manager, new Set(["ses_lead"])), createConfig(baseDir, { max_parallel_members: 2 }), manager)
+    ]), "ses_lead", createContext(baseDir, manager, new Set(["ses_lead"])), createConfig(baseDir, { max_parallel_members: launchLimit }), manager)
+    try {
+      const firstBatch = await launchProbe.waitForFirstBatch("timed out waiting for the first two member launches")
+      await launchProbe.releaseAndWaitForCompletion(run, "timed out waiting for all member launches")
+      const completed = launchProbe.snapshot()
 
-    // then
-    expect(maxInFlight).toBeLessThanOrEqual(2)
+      // then
+      expect(firstBatch.launchCount).toBe(launchLimit)
+      expect(firstBatch.inFlight).toBe(launchLimit)
+      expect(firstBatch.maxInFlight).toBe(launchLimit)
+      expect(completed.launchCount).toBe(3)
+      expect(completed.maxInFlight).toBeLessThanOrEqual(launchLimit)
+    } finally {
+      launchProbe.release()
+      run.catch(() => undefined)
+    }
   })
 })

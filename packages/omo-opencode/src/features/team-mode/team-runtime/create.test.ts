@@ -18,6 +18,7 @@ import {
   clearSessionTeamRunCleanupRegistry,
   getSessionCreatedTeamRunIds,
 } from "./session-cleanup"
+import { createLaunchConcurrencyProbe } from "../test-support/async-test-helpers"
 
 const resolveMemberMock = mock(async (member: TeamSpec["members"][number]) => ({
   agentToUse: `${member.name}-agent`,
@@ -88,20 +89,6 @@ async function pathExists(targetPath: string): Promise<boolean> {
 async function loadSingleRuntimeState(baseDir: string) {
   const [teamRunId] = await readdir(path.join(baseDir, "runtime"))
   return await loadRuntimeState(teamRunId ?? "", createConfig(baseDir))
-}
-
-type Deferred<T> = {
-  readonly promise: Promise<T>
-  readonly resolve: (value: T | PromiseLike<T>) => void
-}
-
-function createDeferred<T>(): Deferred<T> {
-  let resolveDeferred: Deferred<T>["resolve"] | undefined
-  const promise = new Promise<T>((resolve) => {
-    resolveDeferred = resolve
-  })
-  if (!resolveDeferred) throw new Error("deferred resolver was not initialized")
-  return { promise, resolve: resolveDeferred }
 }
 
 describe("createTeamRun", () => {
@@ -357,34 +344,30 @@ describe("createTeamRun", () => {
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-parallel-"))
     temporaryDirectories.push(baseDir)
     const launchLimit = 4
-    const firstBatchStarted = createDeferred<void>()
-    const releaseLaunches = createDeferred<void>()
-    let inFlight = 0
-    let maxInFlight = 0
-    let launchCount = 0
-    const { manager } = createManager(baseDir, async () => {
-      const launchId = ++launchCount
-      inFlight += 1
-      maxInFlight = Math.max(maxInFlight, inFlight)
-      if (launchCount === launchLimit) firstBatchStarted.resolve(undefined)
-      await releaseLaunches.promise
-      inFlight -= 1
-      return { id: `task-${launchId}`, sessionId: `session-${launchId}`, status: "running" } as BackgroundTask
+    const launchProbe = createLaunchConcurrencyProbe({
+      launchLimit,
+      sessionIdPrefix: "session",
+      taskIdPrefix: "task",
     })
+    const { manager } = createManager(baseDir, async (input) => launchProbe.launch(input))
 
     // when
     const run = createTeamRun(createSpec(8), "lead-session", createContext(baseDir, manager), createConfig(baseDir, launchLimit), manager)
-    await firstBatchStarted.promise
-    const firstBatchLaunchCount = launchCount
-    const firstBatchMaxInFlight = maxInFlight
-    releaseLaunches.resolve(undefined)
-    await run
+    try {
+      const firstBatch = await launchProbe.waitForFirstBatch("timed out waiting for the first four member launches")
+      await launchProbe.releaseAndWaitForCompletion(run, "timed out waiting for all member launches")
+      const completed = launchProbe.snapshot()
 
-    // then
-    expect(firstBatchLaunchCount).toBe(launchLimit)
-    expect(firstBatchMaxInFlight).toBe(launchLimit)
-    expect(launchCount).toBe(8)
-    expect(maxInFlight).toBeLessThanOrEqual(launchLimit)
+      // then
+      expect(firstBatch.launchCount).toBe(launchLimit)
+      expect(firstBatch.inFlight).toBe(launchLimit)
+      expect(firstBatch.maxInFlight).toBe(launchLimit)
+      expect(completed.launchCount).toBe(8)
+      expect(completed.maxInFlight).toBeLessThanOrEqual(launchLimit)
+    } finally {
+      launchProbe.release()
+      run.catch(() => undefined)
+    }
   })
 
   test("reuses the caller session for the lead when the lead matches the caller agent", async () => {
