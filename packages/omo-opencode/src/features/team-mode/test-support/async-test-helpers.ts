@@ -1,5 +1,7 @@
 import type { BackgroundTask, LaunchInput } from "../../background-agent/types"
 
+const DEFAULT_LAUNCH_PROBE_TIMEOUT_MS = 5_000
+
 type Deferred<T> = {
   readonly promise: Promise<T>
   readonly resolve: (value: T | PromiseLike<T>) => void
@@ -81,12 +83,12 @@ export function createLaunchConcurrencyProbe(options: LaunchConcurrencyProbeOpti
       } satisfies BackgroundTask
     },
     release,
-    async releaseAndWaitForCompletion<T>(promise: Promise<T>, message: string, timeoutMs = 1_000): Promise<T> {
+    async releaseAndWaitForCompletion<T>(promise: Promise<T>, message: string, timeoutMs = DEFAULT_LAUNCH_PROBE_TIMEOUT_MS): Promise<T> {
       release()
       return await withCircuitBreaker(promise, timeoutMs, message)
     },
     snapshot,
-    async waitForFirstBatch(message: string, timeoutMs = 1_000): Promise<LaunchConcurrencySnapshot> {
+    async waitForFirstBatch(message: string, timeoutMs = DEFAULT_LAUNCH_PROBE_TIMEOUT_MS): Promise<LaunchConcurrencySnapshot> {
       await withCircuitBreaker(firstBatchStarted.promise, timeoutMs, message)
       return snapshot()
     },
