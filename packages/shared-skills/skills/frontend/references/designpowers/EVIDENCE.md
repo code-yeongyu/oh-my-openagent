@@ -38,7 +38,7 @@ exit=0
 $ find packages/shared-skills/skills/frontend/references/designpowers/vendor -path '*/hooks/*' -o -path '*/scripts/*' -o -path '*/.claude/*' -o -path '*/.gemini/*' -o -path '*/.github/*'
 ```
 
-## Byte-for-byte Checks
+## Byte-for-byte And Normalized Checks
 
 ### LICENSE cmp
 
@@ -54,12 +54,32 @@ $ for file in packages/shared-skills/upstreams/designpowers/agents/*.md; do cmp 
 exit=0
 ```
 
-### Skill cmp loop
+### Skill normalized cmp loop
 
 ```sh
-$ for dir in packages/shared-skills/upstreams/designpowers/skills/*; do name=${dir##*/}; case "$name" in figma-bridge|design-express|design-library|using-designpowers|design-discovery|design-memory|design-state|design-strategy|design-taste) continue ;; esac; cmp -s "$dir/SKILL.md" "packages/shared-skills/skills/frontend/references/designpowers/vendor/skills/$name/SKILL.md"; done
+$ node --input-type=module <<'NODE'
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { includedDesignpowersSkills } from "./packages/shared-skills/scripts/designpowers-refs-manifest.mjs";
+import { normalizeSkillFrontmatter } from "./packages/shared-skills/scripts/materialize-frontend-refs.mjs";
+const rawMismatches = [];
+const normalizedMismatches = [];
+for (const name of includedDesignpowersSkills) {
+  const upstream = readFileSync(join("packages/shared-skills/upstreams/designpowers/skills", name, "SKILL.md"), "utf8");
+  const materialized = readFileSync(join("packages/shared-skills/skills/frontend/references/designpowers/vendor/skills", name, "SKILL.md"), "utf8");
+  if (upstream !== materialized) rawMismatches.push(name);
+  if (normalizeSkillFrontmatter(upstream) !== materialized) normalizedMismatches.push(name);
+}
+console.log(`raw_skill_cmp_mismatches=${rawMismatches.length}`);
+console.log(`normalized_skill_cmp_mismatches=${normalizedMismatches.length}`);
+if (normalizedMismatches.length > 0) throw new Error(`normalized mismatches: ${normalizedMismatches.join(", ")}`);
+NODE
+raw_skill_cmp_mismatches=27
+normalized_skill_cmp_mismatches=0
 exit=0
 ```
+
+The 27 raw mismatches are expected frontmatter-only `description:` quoting changes from the materializer. The normalized check proves the shipped skill bodies have no upstream drift.
 
 ### Excluded-router hard invocation absent
 

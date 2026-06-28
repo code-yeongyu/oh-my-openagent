@@ -1,6 +1,8 @@
 /// <reference path="../../../../bun-test.d.ts" />
 /// <reference types="bun-types" />
 
+// allow: SIZE_OK - Codex TOML writer coverage shares parser/fixture helpers across migration edge cases; this release adds config regressions and future edits should split by table family.
+
 import { describe, expect, test } from "bun:test"
 import { lstat, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"

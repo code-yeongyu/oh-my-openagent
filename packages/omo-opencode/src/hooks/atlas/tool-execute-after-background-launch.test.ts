@@ -1,5 +1,7 @@
 /// <reference types="bun-types" />
 
+// allow: SIZE_OK - Atlas background-launch scenarios share one session/event harness; this release adds final-wave regressions and future additions should split by verdict class.
+
 import { afterEach, beforeEach, describe, expect, it, mock, afterAll, spyOn } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"

@@ -1,3 +1,5 @@
+// allow: SIZE_OK - notification template tests cover one rendering contract with shared cases; this release adds narrow status cases and future additions should split by template section.
+
 import { describe, expect, test } from "bun:test"
 import { buildBackgroundTaskNotificationText } from "./background-task-notification-template"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"

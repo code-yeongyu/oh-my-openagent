@@ -1,3 +1,5 @@
+// allow: SIZE_OK - ULW loop hook tests share one fake Codex stream/process harness; this release adds narrow hook cases and future additions should split by hook lifecycle.
+
 import { mkdir, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

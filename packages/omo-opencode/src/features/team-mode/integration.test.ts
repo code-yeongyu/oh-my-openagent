@@ -1,5 +1,7 @@
 /// <reference types="bun-types" />
 
+// allow: SIZE_OK - team-mode integration tests share one registry/runtime fixture; this release adds narrow concurrency cases and future behavior should split by integration scenario.
+
 import { afterEach, describe, expect, mock, test } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { mkdir, rm, stat } from "node:fs/promises"

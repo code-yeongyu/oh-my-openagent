@@ -1,5 +1,7 @@
 /// <reference types="bun-types" />
 
+// allow: SIZE_OK - PostHog telemetry tests share one client/env fixture; this release adds telemetry config regressions and future additions should split by capture path.
+
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import type {
   TelemetryCaptureMessage,

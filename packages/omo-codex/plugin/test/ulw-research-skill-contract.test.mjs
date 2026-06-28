@@ -1,3 +1,5 @@
+// allow: SIZE_OK - ULW research skill contract tests inspect one bundled prompt protocol; this release introduces the contract and future additions should split by protocol phase.
+
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
