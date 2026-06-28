@@ -6,7 +6,13 @@ import * as sharedModule from "../../../shared"
 import * as sharedTmuxModule from "../../../shared/tmux"
 import * as tmuxPathResolverModule from "../../../tools/interactive-bash/tmux-path-resolver"
 import * as resolveCallerTmuxSessionModule from "./resolve-caller-tmux-session"
-import { canVisualize, createTeamLayout, removeTeamLayout, type TeamLayoutCleanupTarget, type TeamLayoutDeps } from "./layout"
+import {
+  canVisualize,
+  createTeamLayout,
+  removeTeamLayout,
+  type TeamLayoutCleanupTarget,
+  type TeamLayoutDeps,
+} from "./layout"
 
 let nextWindowNumber = 1
 let nextPaneNumber = 1

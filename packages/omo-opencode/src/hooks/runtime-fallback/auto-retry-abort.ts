@@ -11,6 +11,8 @@ export function createAbortSessionRequest(deps: HookDeps) {
       source === "session.status.retry-signal" ||
       source === "message.updated.retry-signal" ||
       source === "message.updated.quota-fallback" ||
+      source === "session.error.provider-fallback" ||
+      source === "message.updated.provider-fallback" ||
       source === "session.timeout"
     ) {
       deps.internallyAbortedSessions.add(sessionID)

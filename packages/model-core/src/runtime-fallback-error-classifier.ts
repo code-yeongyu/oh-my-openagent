@@ -15,13 +15,28 @@ import {
   getRuntimeFallbackRetryableSignal,
   getRuntimeFallbackStatusCode,
 } from "./runtime-fallback-error-shape"
+import { extractRuntimeFallbackAutoRetrySignal } from "./runtime-fallback-auto-retry-signal"
 
-export type RuntimeFallbackErrorType =
-  | "missing_api_key"
-  | "invalid_api_key"
-  | "model_not_found"
-  | "quota_exceeded"
-  | "abort"
+export type RuntimeFallbackErrorType = "missing_api_key" | "invalid_api_key" | "model_not_found" | "quota_exceeded" | "abort"
+
+export type RuntimeFallbackErrorKind =
+  | RuntimeFallbackErrorType
+  | "rate_limit"
+  | "provider_auto_retry"
+  | "auth_failure"
+  | "network"
+  | "service_unavailable"
+  | "unknown"
+
+export type RuntimeFallbackErrorClassification = {
+  readonly kind: RuntimeFallbackErrorKind
+  readonly retryable: boolean
+  readonly providerExhausted: boolean
+}
+
+function isRuntimeFallbackRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
 
 export const RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERNS = [
   /rate.?limit/i,
@@ -67,6 +82,22 @@ function isLocalizedQuotaExhaustionMessage(message: string): boolean {
     (/预扣费额度失败/i.test(message) && /用户剩余额度/i.test(message)) ||
     (/用户剩余额度/i.test(message) && /需要预扣费额度/i.test(message))
   )
+}
+
+function isRuntimeFallbackAuthFailure(statusCode: number | undefined, message: string): boolean {
+  return statusCode === 401 || statusCode === 403 || /unauthori[sz]ed|authentication.?failed|invalid.?(bearer|token|api.?key)/i.test(message)
+}
+
+function hasRuntimeFallbackRateLimitSignal(statusCode: number | undefined, message: string): boolean {
+  return statusCode === 429 || /rate.?limit|too.?many.?requests|频率限制|请求过于频繁/i.test(message)
+}
+
+function hasRuntimeFallbackServiceUnavailableSignal(statusCode: number | undefined, message: string): boolean {
+  return statusCode === 503 || statusCode === 529 || /service.?unavailable|temporarily.?unavailable|overloaded|服务不可用|暂时不可用/i.test(message)
+}
+
+function hasRuntimeFallbackNetworkSignal(message: string): boolean {
+  return /network.?error|connection.?reset|connection.?refused|socket.?hang.?up|fetch.?failed|econnreset|enotfound/i.test(message)
 }
 
 export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErrorType | undefined {
@@ -126,6 +157,43 @@ export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErr
   }
 
   return undefined
+}
+
+export function classifyRuntimeFallbackErrorResult(
+  error: unknown,
+  retryOnErrors: readonly number[],
+  options: RuntimeFallbackRetryOptions = {},
+): RuntimeFallbackErrorClassification {
+  const message = getRuntimeFallbackErrorMessage(error)
+  const statusCode = getRuntimeFallbackStatusCode(error, retryOnErrors)
+  const errorType = classifyRuntimeFallbackError(error)
+  const retryable = isRuntimeFallbackRetryableError(error, retryOnErrors, options)
+
+  if (errorType !== undefined) {
+    return { kind: errorType, retryable, providerExhausted: errorType === "quota_exceeded" }
+  }
+
+  if (isRuntimeFallbackAuthFailure(statusCode, message)) {
+    return { kind: "auth_failure", retryable, providerExhausted: false }
+  }
+
+  if (hasRuntimeFallbackRateLimitSignal(statusCode, message)) {
+    return { kind: "rate_limit", retryable, providerExhausted: false }
+  }
+
+  if (isRuntimeFallbackRecord(error) && extractRuntimeFallbackAutoRetrySignal(error) !== undefined) {
+    return { kind: "provider_auto_retry", retryable, providerExhausted: true }
+  }
+
+  if (hasRuntimeFallbackServiceUnavailableSignal(statusCode, message)) {
+    return { kind: "service_unavailable", retryable, providerExhausted: false }
+  }
+
+  if (hasRuntimeFallbackNetworkSignal(message)) {
+    return { kind: "network", retryable, providerExhausted: false }
+  }
+
+  return { kind: "unknown", retryable, providerExhausted: false }
 }
 
 export function isRuntimeFallbackRetryableError(

@@ -25,6 +25,7 @@ import { clearTeamSessionRegistry, registerTeamSession } from "../team-session-r
 import type { Message } from "@oh-my-opencode/team-core/types"
 import { MessageSchema } from "@oh-my-opencode/team-core/types"
 import { createTeamIdleWakeHint } from "../../../hooks/team-session-events/team-idle-wake-hint"
+import { aggregateStatus } from "../team-runtime/status"
 import { createTeamSendMessageTool } from "./messaging"
 import { resolveTeamRuntimeDetails } from "./messaging-runtime"
 
@@ -409,6 +410,36 @@ describe("createTeamSendMessageTool", () => {
     const inboxEntries = await readdir(getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2"))
     expect(inboxEntries.filter((entry) => entry.endsWith(".json") && !entry.startsWith("."))).toHaveLength(1)
     expect(inboxEntries.some((entry) => entry.startsWith(".delivering-"))).toBe(false)
+  })
+
+  test("#given runtime marks recipient running #when team_send_message defers live delivery #then team status records a pending wake requirement", async () => {
+    // given
+    const fixture = await createTeamFixture()
+    const { loadRuntimeState: loadState, saveRuntimeState: saveState } = await import("../team-state-store/store")
+    const state = await loadState(fixture.teamRunId, fixture.config)
+    const memberTwo = state.members.find((member) => member.name === "m2")
+    if (!memberTwo) throw new Error("m2 runtime member missing")
+    memberTwo.status = "running"
+    await saveState(state, fixture.config)
+
+    const { client, calls } = createRecordingClient()
+    const liveTool = createTeamSendMessageTool(fixture.config, client)
+
+    // when
+    await liveTool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "wake me when idle",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+    const status = await aggregateStatus(fixture.teamRunId, fixture.config)
+
+    // then
+    expect(calls).toHaveLength(0)
+    expect(status.members.find((member) => member.name === "m2")?.wakeRequirement).toEqual({
+      state: "pending",
+      reason: "recipient running has unread messages",
+      messageCount: 1,
+    })
   })
 
   test("#given recipient OpenCode session is busy #when team_send_message attempts live delivery #then it releases the message for later mailbox injection", async () => {

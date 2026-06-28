@@ -113,6 +113,7 @@ export function createCoreTools(args: {
     pluginsEnabled: pluginConfig.claude_code?.plugins ?? true,
     enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
     includeSkillsInDescription: true,
+    descriptionMode: pluginConfig.experimental?.token_budget_mode === "compact" ? "compact" : "full",
   })
 
   const tools: ToolsRecord = {

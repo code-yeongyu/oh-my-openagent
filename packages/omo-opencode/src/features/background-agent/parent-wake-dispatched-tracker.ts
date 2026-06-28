@@ -9,6 +9,7 @@ type ParentWakeDispatchedTrackerOptions = {
 export class ParentWakeDispatchedTracker {
   private dispatchedParentWakes: Map<string, PendingParentWake> = new Map()
   private dispatchedParentWakeTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
+  private assistantTurnStartedParentWakes: Map<string, PendingParentWake> = new Map()
   // Sessions whose wake has left the pending queue but is still mid-dispatch
   // (the `await dispatchInternalPrompt(...)` window, which can span the prompt
   // gate's status/message checks plus the dispatch itself). The pending entry is
@@ -34,6 +35,10 @@ export class ParentWakeDispatchedTracker {
 
   getTimers(): Map<string, ReturnType<typeof setTimeout>> {
     return this.dispatchedParentWakeTimers
+  }
+
+  getAssistantTurnStartedWakes(): Map<string, PendingParentWake> {
+    return this.assistantTurnStartedParentWakes
   }
 
   markInFlight(sessionID: string): void {
@@ -85,10 +90,23 @@ export class ParentWakeDispatchedTracker {
     this.dispatchedParentWakes.delete(sessionID)
   }
 
+  recordAssistantTurnStarted(sessionID: string): void {
+    const wake = this.dispatchedParentWakes.get(sessionID)
+    if (!wake) {
+      return
+    }
+    const startedWake = cloneParentWake(wake)
+    startedWake.deliveryState = { kind: "assistant-turn-started" }
+    this.assistantTurnStartedParentWakes.set(sessionID, startedWake)
+    this.clearWake(sessionID)
+  }
+
   trackWake(sessionID: string, wake: PendingParentWake, dispatchedAt: number): void {
     this.clearWake(sessionID)
+    this.assistantTurnStartedParentWakes.delete(sessionID)
     const dispatchedWake = cloneParentWake(wake)
     dispatchedWake.dispatchedAt = dispatchedAt
+    dispatchedWake.deliveryState = { kind: "dispatched" }
     this.dispatchedParentWakes.set(sessionID, dispatchedWake)
     this.scheduleFailureWindowTimer(sessionID)
   }
@@ -123,6 +141,7 @@ export class ParentWakeDispatchedTracker {
     }
     this.dispatchedParentWakeTimers.clear()
     this.dispatchedParentWakes.clear()
+    this.assistantTurnStartedParentWakes.clear()
     this.inFlightDispatches.clear()
     this.notificationPreparations.clear()
   }

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { classifyErrorType, extractAutoRetrySignal, extractStatusCode, isRetryableError } from "./error-classifier"
+import { classifyErrorResult, classifyErrorType, extractAutoRetrySignal, extractStatusCode, isRetryableError } from "./error-classifier"
 
 describe("runtime-fallback error classifier", () => {
   test("detects cooling-down auto-retry status signals", () => {
@@ -279,6 +279,21 @@ describe("runtime-fallback error classifier", () => {
 
     //#then
     expect(signal).toBeUndefined()
+  })
+
+  test("exposes model-core structured classification for adapter consumers", () => {
+    //#given
+    const error = { statusCode: 401, message: "Unauthorized: invalid bearer token" }
+
+    //#when
+    const result = classifyErrorResult(error, [429, 503, 529])
+
+    //#then
+    expect(result).toEqual({
+      kind: "auth_failure",
+      retryable: false,
+      providerExhausted: false,
+    })
   })
 })
 

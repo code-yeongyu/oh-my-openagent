@@ -12,6 +12,7 @@ import { CommentCheckerConfigSchema } from "./comment-checker"
 import { BuiltinCommandNameSchema } from "./commands"
 import { DefaultModeConfigSchema } from "./default-mode"
 import { ExperimentalConfigSchema } from "./experimental"
+import { ExternalMcpAllowlistConfigSchema } from "./external-mcp"
 import { GitMasterConfigSchema } from "./git-master"
 import { I18nConfigSchema } from "./i18n"
 import { KeywordDetectorConfigSchema } from "./keyword-detector"
@@ -56,6 +57,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
    */
   disabled_providers: z.array(z.string()).optional(),
   mcp_env_allowlist: z.array(z.string()).optional(),
+  /** Per-subagent opt-in allowlist for external MCP tool patterns such as codegraph_*. */
+  external_mcp_allowlist: ExternalMcpAllowlistConfigSchema.optional(),
   /** Enable hashline_edit tool/hook integrations (default: false) */
   hashline_edit: z.boolean().optional(),
   /** Enable model fallback on API errors (default: false). Set to true to enable automatic model switching when model errors occur. */

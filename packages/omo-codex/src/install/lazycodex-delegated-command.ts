@@ -14,6 +14,7 @@ export async function runDelegatedOmoCommand(
   parsed: LazyCodexDelegatedCommand,
   options: {
     readonly cwd: string
+    readonly platform?: NodeJS.Platform
     readonly log: (line: string) => void
     readonly runCommand: RunCommand
   },
@@ -23,7 +24,7 @@ export async function runDelegatedOmoCommand(
   }
   const invocation = buildDelegatedOmoInvocation(parsed)
   if (parsed.dryRun) {
-    options.log(formatShellCommand(invocation.command, invocation.args))
+    options.log(formatShellCommand(invocation.command, invocation.args, options.platform ?? process.platform))
     return
   }
   const env = invocation.delegatesToOmo
@@ -89,11 +90,12 @@ function buildDoctorOutputInstruction(doctorArgs: readonly string[]): string {
   return "Return the standard Markdown LazyCodex Doctor Report."
 }
 
-function formatShellCommand(command: string, args: readonly string[]): string {
-  return [command, ...args].map(shellQuote).join(" ")
+function formatShellCommand(command: string, args: readonly string[], platform: NodeJS.Platform): string {
+  return [command, ...args].map((value) => shellQuote(value, platform)).join(" ")
 }
 
-function shellQuote(value: string): string {
-  if (/^[A-Za-z0-9_/:=.,@%+-]+$/.test(value)) return value
+function shellQuote(value: string, platform: NodeJS.Platform): string {
+  if (/^[A-Za-z0-9_/:=.,%+-]+$/.test(value)) return value
+  if (platform === "win32") return `"${value.replaceAll('"', '""')}"`
   return `'${value.replaceAll("'", "'\\''")}'`
 }

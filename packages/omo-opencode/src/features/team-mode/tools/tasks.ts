@@ -20,6 +20,7 @@ type TeamTaskCreateArgs = {
   subject: string
   description: string
   blockedBy?: string[]
+  metadata?: Record<string, unknown>
 }
 
 type TeamTaskListArgs = {
@@ -33,6 +34,7 @@ type TeamTaskUpdateArgs = {
   taskId: string
   status: "pending" | "claimed" | "in_progress" | "completed" | "deleted"
   owner?: string
+  metadata?: Record<string, unknown>
 }
 
 type TeamTaskGetArgs = {
@@ -79,6 +81,7 @@ export function createTeamTaskCreateTool(config: TeamModeConfig, client: Opencod
       subject: tool.schema.string().describe("Task subject"),
       description: tool.schema.string().describe("Task description"),
       blockedBy: tool.schema.array(tool.schema.string()).optional().describe("Blocking task IDs"),
+      metadata: tool.schema.record(tool.schema.string(), tool.schema.unknown()).optional().describe("Task metadata, including requiredOutput status"),
     },
     execute: async (args: TeamTaskCreateArgs): Promise<string> => {
       const createdTask: Task = await deps.createTask(args.teamRunId, {
@@ -87,6 +90,7 @@ export function createTeamTaskCreateTool(config: TeamModeConfig, client: Opencod
         blocks: [],
         blockedBy: args.blockedBy ?? [],
         status: "pending",
+        metadata: args.metadata,
       }, config)
 
       return JSON.stringify({ taskId: createdTask.id, task: createdTask })
@@ -121,13 +125,16 @@ export function createTeamTaskUpdateTool(config: TeamModeConfig, client: Opencod
       taskId: tool.schema.string().describe("Task ID"),
       status: tool.schema.enum(["pending", "claimed", "in_progress", "completed", "deleted"]).describe("Task status"),
       owner: tool.schema.string().optional().describe("Task owner"),
+      metadata: tool.schema.record(tool.schema.string(), tool.schema.unknown()).optional().describe("Task metadata to merge while updating status"),
     },
     execute: async (args: TeamTaskUpdateArgs, ctx?: TeamTaskToolContext): Promise<string> => {
       const senderName = await resolveSenderName(args.teamRunId, config, ctx?.sessionID, deps)
 
       const updatedTask = args.status === "claimed"
         ? await deps.claimTask(args.teamRunId, args.taskId, senderName, config)
-        : await deps.updateTaskStatus(args.teamRunId, args.taskId, args.status, args.owner ?? senderName, config)
+        : args.metadata === undefined
+          ? await deps.updateTaskStatus(args.teamRunId, args.taskId, args.status, args.owner ?? senderName, config)
+          : await deps.updateTaskStatus(args.teamRunId, args.taskId, args.status, args.owner ?? senderName, config, { metadata: args.metadata })
 
       return JSON.stringify({ task: updatedTask })
     },

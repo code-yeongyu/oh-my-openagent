@@ -255,6 +255,27 @@ describe("mergeConfigs", () => {
 
       expect(result.mcp_env_allowlist).toEqual(["PROJECT_TOKEN"]);
     });
+
+    it("should deep merge external_mcp_allowlist by subagent", () => {
+      const base = createConfig({
+        external_mcp_allowlist: {
+          explore: ["codegraph_*"],
+        },
+      });
+
+      const override = createConfig({
+        external_mcp_allowlist: {
+          oracle: ["codegraph_*"],
+        },
+      });
+
+      const result = mergeConfigs(base, override);
+
+      expect(result.external_mcp_allowlist).toEqual({
+        explore: ["codegraph_*"],
+        oracle: ["codegraph_*"],
+      });
+    });
   });
 });
 

@@ -11,12 +11,19 @@ export type PendingParentWake = {
   promptContext: ParentWakePromptContext
   notifications: string[]
   shouldReply: boolean
+  deliveryState?: ParentWakeDeliveryState
   dispatchedAt?: number
   noReplyAdmittedAt?: number
   toolCallDeferralStartedAt?: number
   allowEmptyAssistantTurnRetry?: boolean
   noAssistantOutputRetryCount?: number
 }
+
+export type ParentWakeDeliveryState =
+  | { kind: "queued" }
+  | { kind: "dispatched" }
+  | { kind: "assistant-turn-started" }
+  | { kind: "requeued"; reason: string }
 
 export function resolveParentWakePromptContext(promptContext: ParentWakePromptContext): ParentWakePromptContext {
   const resolvedAgent = resolveRegisteredAgentName(promptContext.agent)
@@ -34,6 +41,7 @@ export function cloneParentWake(wake: PendingParentWake): PendingParentWake {
     promptContext,
     notifications: [...wake.notifications],
     shouldReply: wake.shouldReply,
+    ...(wake.deliveryState ? { deliveryState: { ...wake.deliveryState } } : {}),
     ...(wake.dispatchedAt !== undefined ? { dispatchedAt: wake.dispatchedAt } : {}),
     ...(wake.noReplyAdmittedAt !== undefined ? { noReplyAdmittedAt: wake.noReplyAdmittedAt } : {}),
     ...(wake.toolCallDeferralStartedAt !== undefined

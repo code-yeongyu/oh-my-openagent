@@ -2,7 +2,7 @@ import type { HookDeps } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
-import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError } from "./error-classifier"
+import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, shouldAbortFailedAssistantTurnForFallback } from "./error-classifier"
 import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
@@ -262,6 +262,11 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       sessionLastAccess.set(sessionID, Date.now())
     } else {
       sessionLastAccess.set(sessionID, Date.now())
+    }
+
+    if (shouldAbortFailedAssistantTurnForFallback(error, config.retry_on_errors)) {
+      await helpers.abortSessionRequest(sessionID, "session.error.provider-fallback")
+      sessionRetryInFlight.delete(sessionID)
     }
 
     await dispatchFallbackRetry(deps, helpers, {

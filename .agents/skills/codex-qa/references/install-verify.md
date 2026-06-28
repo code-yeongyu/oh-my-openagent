@@ -27,9 +27,12 @@ Source: `packages/omo-codex/src/install/install-codex.ts`.
 3. Links agent TOMLs into `$CODEX_HOME/agents/*.toml`.
 4. Writes a marketplace snapshot under `$CODEX_HOME/.tmp/marketplaces/sisyphuslabs/`.
 5. Edits `$CODEX_HOME/config.toml`: enables `[plugins."omo@sisyphuslabs"]`,
-   the `[marketplaces.sisyphuslabs]` local source, `[features]`
-   (plugins/plugin_hooks/multi_agent/child_agents_md), and one
-   `[hooks.state."omo@sisyphuslabs:hooks/hooks.json:<event>:i:j"] trusted_hash`
+    the `[marketplaces.sisyphuslabs]` local source, `[features]`
+    (plugins/plugin_hooks/multi_agent/child_agents_md), seeds per-hook and
+    per-rule disable switch tables such as
+    `[plugins."omo@sisyphuslabs".hooks.comment_checker]` and
+    `[plugins."omo@sisyphuslabs".rules.hephaestus]`, and writes one
+    `[hooks.state."omo@sisyphuslabs:hooks/hooks.json:<event>:i:j"] trusted_hash`
    per hook (so Codex trusts them — no `--dangerously-bypass-hook-trust` needed
    for the app-server turn).
 
@@ -38,6 +41,8 @@ Source: `packages/omo-codex/src/install/install-codex.ts`.
 ```bash
 ls "$CODEX_HOME"/plugins/cache/sisyphuslabs/omo/*/                 # cache present
 grep -A2 '\[plugins."omo@sisyphuslabs"\]' "$CODEX_HOME/config.toml" | grep 'enabled = true'
+grep -F '[plugins."omo@sisyphuslabs".hooks.comment_checker]' "$CODEX_HOME/config.toml"
+grep -F '[plugins."omo@sisyphuslabs".rules.hephaestus]' "$CODEX_HOME/config.toml"
 ls "$CODEX_HOME"/bin/omo-*                                          # component bins
 ls "$CODEX_HOME"/agents/*.toml                                      # agent links
 ```

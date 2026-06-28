@@ -692,10 +692,9 @@ describe("skill tool - dynamic description cache invalidation", () => {
     const initialDescription = tool.description
     expect(initialDescription).toBeString()
 
-    try {
-      await tool.execute({ name: "nonexistent-skill-12345" }, mockContext)
-    } catch {
-    }
+    await expect(tool.execute({ name: "nonexistent-skill-12345" }, mockContext)).rejects.toThrow(
+      'Skill or command "nonexistent-skill-12345" not found',
+    )
 
     // then
     expect(tool.description).toBeDefined()
@@ -839,6 +838,33 @@ describe("skill tool - nativeSkills integration", () => {
     expect(result).toContain("External plugin skill body")
   })
 
+  it("passes through to a host-native skill returned by PluginInput.skills.get() when OMO lookup misses", async () => {
+    //#given
+    const tool = createSkillTool({
+      skills: [],
+      nativeSkills: {
+        all() { return [] },
+        get(name) {
+          if (name !== "customize-opencode") return undefined
+          return {
+            name: "customize-opencode",
+            description: "Configure OpenCode itself",
+            location: "/host/native/customize-opencode/SKILL.md",
+            content: "# Customize OpenCode\n\nHost-native skill body",
+          }
+        },
+        dirs() { return [] },
+      },
+    })
+
+    //#when
+    const result = await tool.execute({ name: "customize-opencode" }, mockContext)
+
+    //#then
+    expect(result).toContain("## Skill: customize-opencode")
+    expect(result).toContain("Host-native skill body")
+  })
+
   it("does not reintroduce disabled native skills from PluginInput.skills.all()", async () => {
     //#given
     const tool = createSkillTool({
@@ -865,6 +891,53 @@ describe("skill tool - nativeSkills integration", () => {
     await expect(tool.execute({ name: "blocked-native-skill" }, mockContext)).rejects.toThrow(
       'Skill or command "blocked-native-skill" not found',
     )
+  })
+
+  it("keeps missing host-native skill diagnostics source-only when PluginInput.skills.get() misses", async () => {
+    //#given
+    const tool = createSkillTool({
+      skills: [],
+      nativeSkills: {
+        all() { return [] },
+        get() { return undefined },
+        dirs() { return ["/private/host/skills"] },
+      },
+    })
+
+    //#when
+    const result = tool.execute({ name: "definitely-not-a-skill" }, mockContext)
+
+    //#then
+    await expect(result).rejects.toThrow("Checked registries: OMO static, project, user, host-native")
+    await expect(result).rejects.not.toThrow("/private/host/skills")
+  })
+
+  it("does not pass through disabled host-native skills returned by PluginInput.skills.get()", async () => {
+    //#given
+    const tool = createSkillTool({
+      skills: [],
+      disabledSkills: new Set(["blocked-native-skill"]),
+      nativeSkills: {
+        all() { return [] },
+        get(name) {
+          if (name !== "blocked-native-skill") return undefined
+          return {
+            name: "blocked-native-skill",
+            description: "Blocked host-native skill",
+            location: "/private/host/blocked-native-skill/SKILL.md",
+            content: "SECRET_HOST_NATIVE_BODY",
+          }
+        },
+        dirs() { return [] },
+      },
+    })
+
+    //#when
+    const result = tool.execute({ name: "blocked-native-skill" }, mockContext)
+
+    //#then
+    await expect(result).rejects.toThrow('Skill or command "blocked-native-skill" is disabled')
+    await expect(result).rejects.not.toThrow("SECRET_HOST_NATIVE_BODY")
   })
 })
 

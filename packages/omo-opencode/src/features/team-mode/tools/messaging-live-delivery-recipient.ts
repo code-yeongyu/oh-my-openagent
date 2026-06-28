@@ -3,6 +3,7 @@ import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../
 import { log } from "../../../shared/logger"
 import { isAmbiguousPostDispatchPromptFailure } from "../../../shared/prompt-failure-classifier"
 import { applyMemberSessionRouting, buildMemberPromptBody } from "../member-session-routing"
+import { recordWakeDeliveryError } from "../team-mailbox/wake-errors"
 import { buildEnvelope } from "@oh-my-opencode/team-core/team-mailbox/poll"
 import { commitDeliveryReservation } from "@oh-my-opencode/team-core/team-mailbox/reservation"
 import type { Message, RuntimeState } from "@oh-my-opencode/team-core/types"
@@ -113,6 +114,15 @@ export async function deliverLiveToRecipient(input: {
       return
     }
     if (!isInternalPromptDispatchAccepted(promptResult)) {
+      if (promptResult.status === "failed") {
+        await recordWakeFailure({
+          teamRunId,
+          recipientName,
+          messageId: message.messageId,
+          error: promptResult.error,
+          config,
+        })
+      }
       log("[team-mailbox] live delivery skipped by promptAsync gate, falling back to inbox injection", {
         status: promptResult.status,
         teamRunId,
@@ -143,6 +153,13 @@ export async function deliverLiveToRecipient(input: {
       messageId: message.messageId,
     })
   } catch (error) {
+    await recordWakeFailure({
+      teamRunId,
+      recipientName,
+      messageId: message.messageId,
+      error,
+      config,
+    })
     log("[team-mailbox] live delivery failed, falling back to inbox injection", {
       error: error instanceof Error ? error.message : String(error),
       teamRunId,
@@ -153,6 +170,27 @@ export async function deliverLiveToRecipient(input: {
       teamRunId,
       recipient: recipientName,
       messageId: message.messageId,
+    })
+  }
+}
+
+async function recordWakeFailure(input: {
+  readonly teamRunId: string
+  readonly recipientName: string
+  readonly messageId: string
+  readonly error: unknown
+  readonly config: TeamModeConfig
+}): Promise<void> {
+  const reason = input.error instanceof Error ? input.error.message : String(input.error)
+  try {
+    await recordWakeDeliveryError(input.teamRunId, input.recipientName, input.messageId, reason, input.config)
+  } catch (recordError) {
+    log("[team-mailbox] failed to record wake delivery error", {
+      teamRunId: input.teamRunId,
+      recipient: input.recipientName,
+      messageId: input.messageId,
+      wakeError: reason,
+      error: recordError instanceof Error ? recordError.message : String(recordError),
     })
   }
 }

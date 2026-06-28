@@ -5,8 +5,11 @@ import { describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, readdir, readFile, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { buildDelegatedOmoInvocation, runDelegatedOmoCommand } from "./lazycodex-delegated-command"
 import { findRepoRoot, findRepoRootFromImporter, resolveCodexInstallerBinDir, runCodexInstaller } from "./install-codex"
 import { createRepoWithBuiltComponentBins } from "./install-codex-test-fixtures"
+import { parseLazyCodexInstallCliArgs } from "./lazycodex-cli-args"
+import { createCodexModelInventory } from "./codex-model-catalog"
 
 const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
 
@@ -17,6 +20,45 @@ function formatTomlString(value: string): string {
 }
 
 describe("install-codex", () => {
+  test("#given Windows npx @version install path #when lazycodex install delegates #then repo root stays one argument", () => {
+    // given
+    const repoRoot = String.raw`C:\Users\cole\AppData\Local\npm-cache\_npx\lazycodex-ai@4.13.0\node_modules\lazycodex-ai`
+    const parsed = parseLazyCodexInstallCliArgs(["--dry-run", "install", "--repo-root", repoRoot])
+    if (parsed.kind !== "command") throw new Error("expected dry-run install to delegate")
+
+    // when
+    const invocation = buildDelegatedOmoInvocation(parsed)
+
+    // then
+    expect(invocation.command).toBe("npx")
+    expect(invocation.args).toContain("--platform=codex")
+    expect(invocation.args).toContain(`--repo-root=${repoRoot}`)
+    expect(invocation.args.join(" ")).toContain("lazycodex-ai@4.13.0")
+  })
+
+  test("#given project-local cleanup dry run #when lazycodex uninstall delegates #then logs command without running cleanup", async () => {
+    // given
+    const projectPath = join(tmpdir(), "omo-codex-cleanup-dry-run-project")
+    const parsed = parseLazyCodexInstallCliArgs(["--dry-run", "uninstall", "--project", projectPath])
+    if (parsed.kind !== "command") throw new Error("expected dry-run uninstall to delegate")
+    const logs: string[] = []
+
+    // when
+    await runDelegatedOmoCommand(parsed, {
+      cwd: projectPath,
+      log: (line) => logs.push(line),
+      runCommand: async () => {
+        throw new Error("dry-run must not execute cleanup")
+      },
+    })
+
+    // then
+    expect(logs).toHaveLength(1)
+    expect(logs[0]).toContain("omo cleanup --platform=codex")
+    expect(logs[0]).toContain("--project")
+    expect(logs[0]).toContain(projectPath)
+  })
+
   test("#given npm platform binary package #when resolving vendored repo root #then finds sibling wrapper package", async () => {
     // given
     const nodeModules = await mkdtemp(join(tmpdir(), "omo-codex-node-modules-"))
@@ -131,6 +173,8 @@ describe("install-codex", () => {
     expect(configContent).not.toContain('source = "https://github.com/code-yeongyu/lazycodex.git"')
     expect(configContent).not.toContain('ref = "main"')
     expect(configContent).toContain("[plugins.\"omo@sisyphuslabs\"]")
+    expect(configContent).toContain('[plugins."omo@sisyphuslabs".hooks.comment_checker]')
+    expect(configContent).toContain('[plugins."omo@sisyphuslabs".rules.hephaestus]')
     expect(configContent).toContain("[hooks.state.")
     expect(configContent).not.toContain("code-yeongyu-codex-plugins")
     expect(configContent).not.toContain("[marketplaces.lazycodex]")
@@ -314,5 +358,51 @@ describe("install-codex", () => {
     expect(configContent).toContain('network_access = "enabled"')
     expect(configContent).toContain("hide_full_access_warning = true")
     expect(configContent).toContain("hide_world_writable_warning = true")
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
+
+  test("#given Codex inventory command fails #when installing omo #then warns and uses static model catalog", async () => {
+    // given
+    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-model-inventory-fail-home-"))
+    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-model-inventory-fail-bin-"))
+    const repoRoot = process.cwd()
+    const logs: string[] = []
+
+    // when
+    await runCodexInstaller({
+      codexHome,
+      binDir,
+      repoRoot,
+      astGrepInstaller: skipAstGrepInstall,
+      runCommand: async () => undefined,
+      modelInventoryResolver: async () => ({ kind: "unavailable", warning: "fake inventory command failed" }),
+      log: (line) => logs.push(line),
+    })
+
+    // then
+    const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
+    expect(configContent).toContain('model = "gpt-5.5"')
+    expect(logs.join("\n")).toContain("fake inventory command failed")
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
+
+  test("#given fake Codex inventory #when installing omo #then writes only the available model", async () => {
+    // given
+    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-model-inventory-home-"))
+    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-model-inventory-bin-"))
+    const repoRoot = process.cwd()
+
+    // when
+    await runCodexInstaller({
+      codexHome,
+      binDir,
+      repoRoot,
+      astGrepInstaller: skipAstGrepInstall,
+      runCommand: async () => undefined,
+      modelInventoryResolver: async () => ({ kind: "available", inventory: createCodexModelInventory(["gpt-5-codex"]) }),
+    })
+
+    // then
+    const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
+    expect(configContent).toContain('model = "gpt-5-codex"')
+    expect(configContent).not.toContain('model = "gpt-5.5"')
   }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 })

@@ -56,6 +56,23 @@ describe("provider model ID transforms", () => {
 		}
 	})
 
+	test("#given gateway providers and bare model IDs #when transformed for display #then sub-provider routing is explicit", () => {
+		// #given
+		const scenarios = [
+			{ provider: "vercel", model: "gpt-5.5", expected: "openai/gpt-5.5" },
+			{ provider: "vercel", model: "gemini-3-flash", expected: "google/gemini-3-flash" },
+			{ provider: "vercel", model: "openai/gpt-5.5", expected: "openai/gpt-5.5" },
+		] as const
+
+		for (const scenario of scenarios) {
+			// #when
+			const result = transformModelForProviderDisplay(scenario.provider, scenario.model)
+
+			// #then
+			expect(result).toBe(scenario.expected)
+		}
+	})
+
 	test("produces identical results for non-Anthropic providers", () => {
 		// #given non-Anthropic provider/model pairs
 		const scenarios = [

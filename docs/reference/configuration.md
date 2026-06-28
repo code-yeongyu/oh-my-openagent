@@ -21,6 +21,7 @@ Complete reference for Oh My OpenCode plugin configuration. During the rename tr
   - [Skills](#skills)
   - [Hooks](#hooks)
   - [Commands](#commands)
+  - [Team Mode](#team-mode)
   - [Browser Automation](#browser-automation)
   - [Tmux Integration](#tmux-integration)
   - [Git Master](#git-master)
@@ -362,7 +363,7 @@ Examples:
 - o-series models support `none` through `high` - `xhigh` is downgraded to `high`
 - GPT-5 supports `none`, `minimal`, `low`, `medium`, `high`, `xhigh` - all pass through
 
-Capability data comes from provider runtime metadata first. OmO also ships bundled models.dev-backed capability data, supports a refreshable local models.dev cache, and falls back to heuristic family detection plus alias rules when exact metadata is unavailable. `bunx oh-my-opencode doctor` surfaces capability diagnostics and warns when a configured model relies on compatibility fallback.
+Capability data comes from provider runtime metadata first. OmO also ships bundled models.dev-backed capability data, supports a refreshable local models.dev cache, and falls back to heuristic family detection plus alias rules when exact metadata is unavailable. Installers that can read a live model inventory choose from available models first and fall back to the static chains only when inventory is unavailable. `bunx oh-my-opencode doctor` surfaces capability diagnostics and warns when a configured model relies on compatibility fallback.
 
 
 #### Agent Provider Chains
@@ -424,6 +425,14 @@ Control parallel agent execution and concurrency limits.
 | `modelConcurrency`    | -        | Per-model limits (key = `provider/model`). Overrides provider limits. |
 
 Priority: `modelConcurrency` > `providerConcurrency` > `defaultConcurrency`
+
+Background lifecycle guarantees:
+
+- Terminal states are `completed`, `error`, `cancelled`, and `interrupt`.
+- A task terminalizes once. The controller releases its concurrency slot, records history, and runs terminal cleanup on that first transition only.
+- Invalid terminal transitions are ignored and logged instead of double-cleaning a task.
+- A final assistant text response can complete a task even if old internal todos still show as pending. Fresh tool activity, a fresh in-progress assistant turn, or no final output still keeps the task running.
+- Parent wake delivery is observable. A reply-required wake is queued, dispatched, accepted by an assistant turn, or requeued with a reason such as prompt failure or empty assistant output.
 
 ### Sisyphus Agent
 
@@ -526,6 +535,8 @@ Disable built-in skills: `{ "disabled_skills": ["playwright"] }`
 | `recursive`      | `false` | Recurse into subdirectories     |
 | `glob`           | -       | Glob pattern for file selection |
 
+Skill lookup checks OMO-discovered skills first. If no OMO skill matches, the `skill` tool can pass through host-native OpenCode skills exposed by the host registry without copying them into OMO's static skill directories. Missing-skill diagnostics name the checked sources, including OMO static, project, user, and host-native registries, while avoiding private file contents.
+
 ### Hooks
 
 Disable built-in hooks via `disabled_hooks`:
@@ -553,6 +564,22 @@ Disable built-in commands via `disabled_commands`:
 ```
 
 Available commands: `init-deep`, `ralph-loop`, `ulw-loop`, `cancel-ralph`, `refactor`, `start-work`, `stop-continuation`, `handoff`
+
+### Team Mode
+
+Enable Team Mode with `team_mode.enabled: true`. It registers the 12 `team_*` tools, team status transforms, mailbox injection, and team session event handlers.
+
+```jsonc
+{
+  "team_mode": {
+    "enabled": true,
+    "max_parallel_members": 4,
+    "tmux_visualization": true
+  }
+}
+```
+
+Lifecycle behavior is fail-closed. `team_status` reports member wake state, pending wake errors, task terminality, shutdown state, and closure blockers. `team_delete` rejects active members or unverifiable required outputs; request shutdown first, approve or reject it, then delete after all required outputs and resources are terminal. The optional tmux visualization runs through a backend contract. The shipped backend is tmux and preserves server auth in pane attach commands.
 
 ### Browser Automation
 
@@ -623,11 +650,27 @@ Force-enable session notifications:
 
 ### MCPs
 
-Built-in MCPs (enabled by default): `websearch` (Exa AI), `context7` (library docs), `grep_app` (GitHub code search), and `lsp` (local language-server tools). Structural search and rewrite is provided by the `ast-grep` skill instead of a built-in MCP.
+Built-in MCPs (enabled by default): `websearch` (Exa AI), `context7` (library docs), `grep_app` (GitHub code search), `lsp` (local language-server tools), and `codegraph` (local code intelligence). Structural search and rewrite is provided by the `ast-grep` skill instead of a built-in MCP.
 
 ```json
-{ "disabled_mcps": ["websearch", "context7", "grep_app", "lsp"] }
+{ "disabled_mcps": ["websearch", "context7", "grep_app", "lsp", "codegraph"] }
 ```
+
+External MCP tools that can expand read-only subagent reach stay denied unless explicitly allowed for selected subagents. To let `explore`, `librarian`, or `oracle` use CodeGraph tools, opt in with `external_mcp_allowlist`:
+
+```jsonc
+{
+  "external_mcp_allowlist": {
+    "explore": ["codegraph_*"],
+    "librarian": ["codegraph_*"],
+    "oracle": ["codegraph_*"]
+  }
+}
+```
+
+Unsupported subagents or unsupported external MCP patterns are ignored and logged at startup.
+
+The current allowlist is intentionally narrow: only `explore`, `librarian`, and `oracle` are eligible, and only the `codegraph_*` tool pattern is accepted. Defaults still deny CodeGraph to read-only subagents.
 
 ### LSP
 
@@ -689,6 +732,10 @@ Auto-switches to backup models on API errors.
 | `cooldown_seconds`      | `60`                | Seconds before retrying a failed model                                                                                         |
 | `timeout_seconds`       | `30`                | Seconds before forcing next fallback. **Set to `0` to disable timeout-based escalation and `message.updated` provider retry signal detection.** Structured `session.status` retry events can still trigger fallback. |
 | `notify_on_fallback`    | `true`              | Toast notification on model switch                                                                                             |
+
+Runtime fallback classifies provider errors into typed results before deciding whether to retry. The classifier distinguishes rate limits, quota exhaustion, provider auto-retry signals, auth failures, network errors, service availability, aborts, missing keys, invalid keys, model-not-found, and unknown errors. Quota exhaustion and provider auto-retry signals mark the current provider as exhausted. Auth failures and unknown errors do not trigger unsafe prompt injection.
+
+When a retryable provider error leaves an assistant turn incomplete, runtime fallback uses the shared prompt gate to dispatch one fallback retry after the failed turn is marked safe for retry. Non-retryable errors still block fallback dispatch.
 
 #### Speeding Up Fallback (Proxy APIs)
 
@@ -959,6 +1006,7 @@ When enabled, OmO registers the hash-anchored `edit` tool and activates the `has
     "truncate_all_tool_outputs": false,
     "aggressive_truncation": false,
     "disable_omo_env": false,
+    "token_budget_mode": "compact",
     "task_system": true,
     "dynamic_context_pruning": {
       "enabled": false,
@@ -988,6 +1036,7 @@ When enabled, OmO registers the hash-anchored `edit` tool and activates the `has
 | `truncate_all_tool_outputs`              | `false`    | Truncate all tool outputs (not just whitelisted)                                     |
 | `aggressive_truncation`                  | `false`    | Aggressively truncate when token limit exceeded                                      |
 | `disable_omo_env`                        | `false`    | Disable auto-injected `<omo-env>` block (date/time/locale). Improves cache hit rate. |
+| `token_budget_mode`                      | -          | Set to `compact` to shorten tool and skill descriptions without changing tool schemas |
 | `task_system`                            | `false`    | Enable Sisyphus task system                                                          |
 | `dynamic_context_pruning.enabled`        | `false`    | Auto-prune old tool outputs to manage context window                                 |
 | `dynamic_context_pruning.notification`   | `detailed` | Pruning notifications: `off` / `minimal` / `detailed`                                |
@@ -1033,7 +1082,21 @@ When an LSP tool hits a language server that is not installed, it asks once per 
 
 Native Windows Codex installs bundle a `git_bash` MCP server and write `[plugins."omo@sisyphuslabs".mcp_servers.git_bash] enabled = true`. Non-Windows installs keep the bundled manifest entry but write `enabled = false`, so the plugin detail can still show the server while policy prevents exposure.
 
-The installer discovers Git Bash with `OMO_CODEX_GIT_BASH_PATH`, standard Git for Windows locations, and PATH. If discovery fails, it prints manual install guidance and stops without running `winget` or changing system dependencies. The Light plugin also emits a fixed reminder before the first Codex shell-like `Bash` hook call in a Windows session, and resets that reminder after `PostCompact` so the first post-compaction shell call recommends `git_bash` again.
+The installer discovers Git Bash with `OMO_CODEX_GIT_BASH_PATH`, standard Git for Windows locations, and PATH. If discovery fails, it prints manual install guidance and stops without running `winget` or changing system dependencies. The Light plugin also emits a fixed reminder before the first Codex shell-like `Bash` hook call in a Windows session, and resets that reminder after `PostCompact` so the first post-compaction shell call recommends `git_bash` again. Each cached plugin install stamps a Git Bash MCP transport id from the final cache path, so same-repository or same-worktree sessions do not collide on one transport id.
+
+### Codex Light Hook And Rule Switches
+
+The Light installer seeds per-hook and per-rule switches under the managed plugin block. Leave entries enabled unless you have a targeted reason to disable one behavior.
+
+```toml
+[plugins."omo@sisyphuslabs".hooks.comment_checker]
+enabled = true
+
+[plugins."omo@sisyphuslabs".rules.windows_git_bash]
+enabled = true
+```
+
+Known hook switch names include `session_start_loading_project_rules`, `user_prompt_submit_checking_ultrawork_trigger`, `pre_tool_use_recommending_git_bash_mcp`, `comment_checker`, `post_tool_use_checking_lsp_diagnostics`, `post_compact_resetting_git_bash_mcp_reminder`, `stop_checking_start_work_continuation`, and `subagent_stop_checking_start_work_continuation`. Known rule switch names are `hephaestus` and `windows_git_bash`. Unknown switches are ignored by the current components rather than disabling the whole plugin.
 
 ### Provider-Specific
 

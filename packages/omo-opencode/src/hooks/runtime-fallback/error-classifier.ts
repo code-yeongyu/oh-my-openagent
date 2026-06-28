@@ -1,4 +1,5 @@
 import {
+  classifyRuntimeFallbackErrorResult,
   classifyRuntimeFallbackError,
   extractRuntimeFallbackAutoRetrySignal,
   getRuntimeFallbackErrorMessage,
@@ -7,6 +8,7 @@ import {
   getRuntimeFallbackStatusCode,
   isRuntimeFallbackRetryableError,
 } from "@oh-my-opencode/model-core"
+import type { RuntimeFallbackErrorKind } from "@oh-my-opencode/model-core"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 
@@ -17,6 +19,37 @@ export const extractErrorName = getRuntimeFallbackErrorName
 export const extractRetryableSignal = getRuntimeFallbackRetryableSignal
 
 export const classifyErrorType = classifyRuntimeFallbackError
+export const classifyErrorResult = classifyRuntimeFallbackErrorResult
+
+function assertNeverRuntimeFallbackKind(kind: never): never {
+  throw new Error(`Unhandled runtime fallback error kind: ${String(kind)}`)
+}
+
+export function shouldAbortFailedAssistantTurnForFallback(error: unknown, retryOnErrors: number[]): boolean {
+  const classification = classifyRuntimeFallbackErrorResult(error, retryOnErrors)
+  if (!classification.retryable) {
+    return false
+  }
+
+  const kind: RuntimeFallbackErrorKind = classification.kind
+  switch (kind) {
+    case "model_not_found":
+    case "quota_exceeded":
+    case "rate_limit":
+    case "provider_auto_retry":
+    case "network":
+      return true
+    case "service_unavailable":
+    case "missing_api_key":
+    case "invalid_api_key":
+    case "abort":
+    case "auth_failure":
+    case "unknown":
+      return false
+    default:
+      return assertNeverRuntimeFallbackKind(kind)
+  }
+}
 
 export function containsErrorContent(
   parts: Array<{ type?: string; text?: string }> | undefined

@@ -34,18 +34,21 @@ test("#given win32 install with OMO_CODEX_GIT_BASH_PATH set #when stamping #then
 
 	assert.equal(changed, true);
 	const parsed = JSON.parse(await readFile(join(pluginRoot, ".mcp.json"), "utf8"));
-	assert.deepEqual(parsed.mcpServers.git_bash.env, { OMO_CODEX_GIT_BASH_PATH: "D:\\Git\\bin\\bash.exe" });
+	assert.equal(parsed.mcpServers.git_bash.env.OMO_CODEX_GIT_BASH_PATH, "D:\\Git\\bin\\bash.exe");
+	assert.match(parsed.mcpServers.git_bash.env.OMO_CODEX_GIT_BASH_MCP_TRANSPORT_ID, /^git-bash-[a-f0-9]{16}$/);
 	assert.equal(Object.hasOwn(parsed.mcpServers, "ast_grep"), false);
 });
 
-test("#given the override is unset #when stamping #then the manifest stays byte-identical", async (t) => {
+test("#given the override is unset #when stamping Windows manifest #then transport id is still written", async (t) => {
 	const pluginRoot = await createPluginRoot();
 	t.after(() => rm(pluginRoot, { recursive: true, force: true }));
 
 	const changed = await stampGitBashMcpEnv({ pluginRoot, env: {}, platform: "win32" });
 
-	assert.equal(changed, false);
-	assert.equal(await readFile(join(pluginRoot, ".mcp.json"), "utf8"), MANIFEST);
+	assert.equal(changed, true);
+	const parsed = JSON.parse(await readFile(join(pluginRoot, ".mcp.json"), "utf8"));
+	assert.deepEqual(Object.keys(parsed.mcpServers.git_bash.env), ["OMO_CODEX_GIT_BASH_MCP_TRANSPORT_ID"]);
+	assert.match(parsed.mcpServers.git_bash.env.OMO_CODEX_GIT_BASH_MCP_TRANSPORT_ID, /^git-bash-[a-f0-9]{16}$/);
 });
 
 test("#given a non-Windows install #when stamping #then the manifest stays byte-identical", async (t) => {

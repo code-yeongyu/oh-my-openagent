@@ -5,7 +5,7 @@ export interface NpmDistTags {
   [tag: string]: string | undefined
 }
 
-const NPM_FETCH_TIMEOUT_MS = 5000
+const NPM_FETCH_TIMEOUT_MS = 1000
 
 export async function fetchNpmDistTags(packageName: string): Promise<NpmDistTags | null> {
   try {

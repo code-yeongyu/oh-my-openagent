@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import {
   classifyRuntimeFallbackError,
+  classifyRuntimeFallbackErrorResult,
   extractRuntimeFallbackAutoRetrySignal,
   getRuntimeFallbackErrorMessage,
   getRuntimeFallbackStatusCode,
@@ -156,5 +157,71 @@ describe("runtime fallback error classifier", () => {
 
     //#then
     expect(signal).toEqual({ signal: retryInfo.summary })
+  })
+
+  test("returns a structured result while preserving current string and retry classifiers", () => {
+    //#given
+    const cases = [
+      {
+        label: "429 rate limit",
+        error: { statusCode: 429, message: "Too Many Requests: rate limit reached" },
+        expectedLegacyType: undefined,
+        expectedRetryable: true,
+        expectedResult: { kind: "rate_limit", retryable: true, providerExhausted: false },
+      },
+      {
+        label: "quota exhausted",
+        error: { name: "QuotaExceededError", message: "Subscription quota exceeded" },
+        expectedLegacyType: "quota_exceeded",
+        expectedRetryable: true,
+        expectedResult: { kind: "quota_exceeded", retryable: true, providerExhausted: true },
+      },
+      {
+        label: "localized quota exhausted",
+        error: { message: "预扣费额度失败，用户剩余额度不足，需要预扣费额度" },
+        expectedLegacyType: "quota_exceeded",
+        expectedRetryable: true,
+        expectedResult: { kind: "quota_exceeded", retryable: true, providerExhausted: true },
+      },
+      {
+        label: "provider auto-retry",
+        error: {
+          status:
+            "All credentials for model claude-opus-4-7 are cooling down [retrying in 7m 56s attempt #1]",
+        },
+        expectedLegacyType: undefined,
+        expectedRetryable: true,
+        expectedResult: { kind: "provider_auto_retry", retryable: true, providerExhausted: true },
+      },
+      {
+        label: "auth failure",
+        error: { statusCode: 401, message: "Unauthorized: invalid bearer token" },
+        expectedLegacyType: undefined,
+        expectedRetryable: false,
+        expectedResult: { kind: "auth_failure", retryable: false, providerExhausted: false },
+      },
+      {
+        label: "unknown network",
+        error: { message: "Network error: ENOTFOUND provider.example" },
+        expectedLegacyType: undefined,
+        expectedRetryable: false,
+        expectedResult: { kind: "network", retryable: false, providerExhausted: false },
+      },
+    ] as const
+
+    //#when
+    const results = cases.map(({ error, ...metadata }) => ({
+      ...metadata,
+      legacyType: classifyRuntimeFallbackError(error),
+      retryable: isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES),
+      structured: classifyRuntimeFallbackErrorResult(error, DEFAULT_RETRY_CODES),
+    }))
+
+    //#then
+    for (const result of results) {
+      expect(result.legacyType, result.label).toBe(result.expectedLegacyType)
+      expect(result.retryable, result.label).toBe(result.expectedRetryable)
+      expect(result.structured, result.label).toEqual(result.expectedResult)
+    }
   })
 })

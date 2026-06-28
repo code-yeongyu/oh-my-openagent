@@ -1,5 +1,6 @@
 import type { ProjectLocalCodexCleanupResult } from "./codex-project-local-cleanup"
 import type { RunAstGrepSkillInstall } from "@oh-my-opencode/utils"
+import type { CodexModelInventoryResult } from "./codex-model-catalog"
 
 export interface MarketplacePluginSourceLocal {
   readonly source: "local"
@@ -88,6 +89,7 @@ export interface CodexInstallOptions {
   readonly autonomousPermissions?: boolean
   readonly astGrepInstaller?: RunAstGrepSkillInstall
   readonly runCommand?: RunCommand
+  readonly modelInventoryResolver?: () => Promise<CodexModelInventoryResult>
   readonly log?: (message: string) => void
 }
 

@@ -437,6 +437,63 @@ describe("BackgroundManager tmux callback ordering", () => {
       manager.shutdown()
     }
   })
+
+  test("starts promptAsync before launch session-created readiness resolves", async () => {
+    //#given
+    const events: string[] = []
+    let resolveReadiness: () => void = () => {}
+    const readiness = new Promise<void>((resolve) => {
+      resolveReadiness = resolve
+    })
+
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/tmp/test" } }),
+        create: async () => {
+          events.push("session.create")
+          return { data: { id: "ses_manager_readiness" } }
+        },
+        promptAsync: async () => {
+          events.push("promptAsync")
+          return { data: {} }
+        },
+        abort: async () => ({ data: {} }),
+      },
+    }
+
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput(client, "/tmp/test"),
+      enableParentSessionNotifications: false,
+    })
+
+    try {
+      //#when
+      await manager.launch({
+        description: "Slow readiness test",
+        prompt: "Do work",
+        agent: "general",
+        parentSessionId: "ses_parent",
+        parentMessageId: "msg_parent",
+        onSessionCreated: async () => {
+          events.push("readiness.start")
+          await readiness
+          events.push("readiness.end")
+        },
+      })
+      await new Promise((resolve) => setTimeout(resolve, 20))
+
+      //#then
+      expect(events).toContain("promptAsync")
+      expect(events).toContain("readiness.start")
+      expect(events).not.toContain("readiness.end")
+      const readinessIdx = events.indexOf("readiness.start")
+      const promptIdx = events.indexOf("promptAsync")
+      expect(readinessIdx < promptIdx).toBe(true)
+    } finally {
+      resolveReadiness()
+      manager.shutdown()
+    }
+  })
 })
 
 describe("BackgroundManager session.error fallback hydration", () => {

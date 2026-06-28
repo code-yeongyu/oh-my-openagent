@@ -650,6 +650,28 @@ describe("Sisyphus-Junior agent override", () => {
     }
   })
 
+  test("schema accepts external MCP allowlist policy", () => {
+    // given
+    const config = {
+      external_mcp_allowlist: {
+        explore: ["codegraph_*"],
+        librarian: ["codegraph_*"],
+        oracle: ["codegraph_*"],
+      },
+    }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.external_mcp_allowlist?.explore).toEqual(["codegraph_*"])
+      expect(result.data.external_mcp_allowlist?.librarian).toEqual(["codegraph_*"])
+      expect(result.data.external_mcp_allowlist?.oracle).toEqual(["codegraph_*"])
+    }
+  })
+
   test("schema accepts lowercase agent names (sisyphus, atlas, prometheus)", () => {
     // given
     const config = {
@@ -1031,6 +1053,45 @@ describe("ExperimentalConfigSchema feature flags", () => {
   test("rejects non-boolean disable_live_parent_wake_routing", () => {
     //#given
     const config = { disable_live_parent_wake_routing: "yes" }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("accepts token_budget_mode compact as opt-in compact descriptions", () => {
+    //#given
+    const config = { token_budget_mode: "compact" }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.token_budget_mode).toBe("compact")
+    }
+  })
+
+  test("leaves token_budget_mode absent by default", () => {
+    //#given
+    const config = {}
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.token_budget_mode).toBeUndefined()
+    }
+  })
+
+  test("rejects unsupported token_budget_mode values", () => {
+    //#given
+    const config = { token_budget_mode: "full" }
 
     //#when
     const result = ExperimentalConfigSchema.safeParse(config)

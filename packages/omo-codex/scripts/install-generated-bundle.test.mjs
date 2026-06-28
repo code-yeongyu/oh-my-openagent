@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -52,4 +53,25 @@ test("#given generated installer output #when importing direct bundle #then comp
 	for (const name of exportedNames) {
 		assert.equal(typeof module[name], "function", `${name} must be exported`);
 	}
+});
+
+test("#given generated installer output #when updating Codex config #then OMO hook and rule switches are seeded", async () => {
+	// given
+	const module = await import(`./install-dist/install-local.mjs?switches=${Date.now()}`);
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-generated-switches-"));
+	const configPath = join(root, "config.toml");
+
+	// when
+	await module.updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "sisyphuslabs",
+		marketplaceSource: { sourceType: "local", source: "/repo/cache/sisyphuslabs" },
+		pluginNames: ["omo"],
+	});
+
+	// then
+	const config = await readFile(configPath, "utf8");
+	assert.match(config, /\[plugins\."omo@sisyphuslabs"\.hooks\.comment_checker\]/);
+	assert.match(config, /\[plugins\."omo@sisyphuslabs"\.rules\.hephaestus\]/);
 });

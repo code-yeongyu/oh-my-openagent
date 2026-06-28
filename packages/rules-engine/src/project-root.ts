@@ -1,4 +1,5 @@
 import { existsSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { PROJECT_MARKERS } from "./constants";
 
@@ -28,7 +29,7 @@ export function findProjectRoot(startPath: string): string | null {
       break;
     }
     visited.push(current);
-    if (hasProjectMarker(current)) {
+    if (!isSystemTempDirectory(current) && hasProjectMarker(current)) {
       resolved = current;
       break;
     }
@@ -52,4 +53,8 @@ function resolveStartDir(startPath: string): string {
 
 function hasProjectMarker(directory: string): boolean {
   return PROJECT_MARKERS.some((marker) => existsSync(join(directory, marker)));
+}
+
+function isSystemTempDirectory(directory: string): boolean {
+  return directory === tmpdir();
 }

@@ -23,7 +23,7 @@ type ParentWakePromptDispatchInput = {
   readonly getDispatchedWake: () => PendingParentWake | undefined
   readonly hasRecordedPromptAfterDispatch: (wake: PendingParentWake) => Promise<boolean>
   readonly trackDispatchedWake: (wake: PendingParentWake, dispatchedAt: number) => void
-  readonly requeueWake: (wake: PendingParentWake) => void
+  readonly requeueWake: (wake: PendingParentWake, reason: string) => void
   readonly scheduleFlush: (delayMs?: number) => void
 }
 
@@ -82,7 +82,7 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
         })
         return
       }
-      input.requeueWake(input.latestWake)
+      input.requeueWake(input.latestWake, "prompt-gate-reserved:background-agent-parent-wake")
       input.scheduleFlush(2_000)
       log("[background-agent] Requeued parent wake flush reserved by promptAsync gate hold:", {
         sessionID: input.sessionID,
@@ -90,7 +90,7 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
       return
     }
     if (!isInternalPromptDispatchAccepted(promptResult)) {
-      input.requeueWake(input.latestWake)
+      input.requeueWake(input.latestWake, `prompt-gate-${promptResult.status}`)
       input.scheduleFlush()
       log("[background-agent] Deferred parent wake skipped by promptAsync gate:", {
         sessionID: input.sessionID,
@@ -104,7 +104,7 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
     input.trackDispatchedWake(createTrackedDispatchedWake(input.latestWake, input.forceNoReply), dispatchStartedAt)
   } catch (error) {
     const errorText = error instanceof Error ? `${error.name}: ${error.message}` : getErrorText(error) || String(error)
-    input.requeueWake(input.latestWake)
+    input.requeueWake(input.latestWake, `prompt-dispatch-error:${errorText}`)
     input.scheduleFlush()
     log("[background-agent] Failed to send deferred parent wake:", { sessionID: input.sessionID, error: errorText })
   }

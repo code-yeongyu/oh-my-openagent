@@ -2,6 +2,33 @@ import { appendBlock, findTomlSection, replaceOrInsertSetting } from "./toml-sec
 import { removeTomlSections } from "./codex-config-toml-sections"
 import type { CodexInstallPlatform, TrustedHookState } from "./types"
 
+const OMO_HOOK_DISABLE_SWITCHES = [
+  "session_start_loading_project_rules",
+  "session_start_recording_session_telemetry",
+  "session_start_checking_auto_update",
+  "session_start_checking_bootstrap_provisioning",
+  "session_start_checking_codegraph_bootstrap",
+  "user_prompt_submit_loading_project_rules",
+  "user_prompt_submit_selecting_lazycodex_workflow",
+  "user_prompt_submit_checking_ultrawork_trigger",
+  "user_prompt_submit_checking_ulw_loop_steering",
+  "pre_tool_use_recommending_git_bash_mcp",
+  "pre_tool_use_enforcing_unlimited_goal_budget",
+  "comment_checker",
+  "post_tool_use_checking_lsp_diagnostics",
+  "post_tool_use_checking_codegraph_init_guidance",
+  "post_tool_use_matching_project_rules",
+  "post_tool_use_checking_thread_title_hygiene",
+  "post_compact_resetting_git_bash_mcp_reminder",
+  "post_compact_resetting_project_rule_cache",
+  "post_compact_resetting_lsp_diagnostics_cache",
+  "stop_checking_start_work_continuation",
+  "subagent_stop_checking_start_work_continuation",
+  "subagent_stop_verifying_lazycodex_executor_evidence",
+] as const
+
+const OMO_RULE_DISABLE_SWITCHES = ["hephaestus", "windows_git_bash"] as const
+
 export function ensurePluginEnabled(config: string, pluginKey: string): string {
   const header = `plugins.${JSON.stringify(pluginKey)}`
   const section = findTomlSection(config, header)
@@ -26,6 +53,21 @@ export function ensureOmoBuiltinMcpPolicies(config: string, input: {
   return nextConfig
 }
 
+export function ensureOmoDisableSwitches(config: string, input: {
+  readonly marketplaceName: string
+  readonly pluginNames: readonly string[]
+}): string {
+  if (input.marketplaceName !== "sisyphuslabs" || !input.pluginNames.includes("omo")) return config
+  let nextConfig = config
+  for (const hookName of OMO_HOOK_DISABLE_SWITCHES) {
+    nextConfig = ensureSwitchSeed(nextConfig, `plugins.${JSON.stringify("omo@sisyphuslabs")}.hooks.${hookName}`)
+  }
+  for (const ruleName of OMO_RULE_DISABLE_SWITCHES) {
+    nextConfig = ensureSwitchSeed(nextConfig, `plugins.${JSON.stringify("omo@sisyphuslabs")}.rules.${ruleName}`)
+  }
+  return nextConfig
+}
+
 export function ensureHookTrusted(config: string, state: TrustedHookState): string {
   const header = `hooks.state.${JSON.stringify(state.key)}`
   const section = findTomlSection(config, header)
@@ -39,6 +81,12 @@ function ensurePluginMcpEnabled(config: string, pluginKey: string, serverName: s
   const enabledValue = enabled ? "true" : "false"
   if (!section) return appendBlock(config, `[${header}]\nenabled = ${enabledValue}\n`)
   return replaceOrInsertSetting(config, section, "enabled", enabledValue)
+}
+
+function ensureSwitchSeed(config: string, header: string): string {
+  const section = findTomlSection(config, header)
+  if (section) return config
+  return appendBlock(config, `[${header}]\nenabled = true\n`)
 }
 
 function removeStaleContext7PlaceholderMcp(config: string): string {

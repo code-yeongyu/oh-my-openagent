@@ -1,8 +1,15 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { SOURCE_PRIORITY } from "@oh-my-opencode/rules-engine/engine";
 import { defaultConfig } from "@oh-my-opencode/rules-engine/engine";
 import type { PiRulesConfig, RuleSource } from "@oh-my-opencode/rules-engine/engine";
 
-export function configFromEnvironment(env: NodeJS.ProcessEnv = process.env): PiRulesConfig {
+export type CodexRulesConfig = PiRulesConfig & {
+	readonly disabledRuleIds: ReadonlySet<string>;
+};
+
+export function configFromEnvironment(env: NodeJS.ProcessEnv = process.env): CodexRulesConfig {
 	const config = defaultConfig();
 	const disableBundledRules = isTruthy(firstEnv(env, "CODEX_RULES_DISABLE_BUNDLED", "PI_RULES_DISABLE_BUNDLED"));
 	config.disabled = isTruthy(firstEnv(env, "CODEX_RULES_DISABLED", "PI_RULES_DISABLED"));
@@ -38,7 +45,18 @@ export function configFromEnvironment(env: NodeJS.ProcessEnv = process.env): PiR
 		firstEnv(env, "CODEX_RULES_ENABLED_SOURCES", "PI_RULES_ENABLED_SOURCES"),
 		disableBundledRules,
 	);
-	return config;
+	return {
+		...config,
+		disabledRuleIds: disabledRuleIdsFromEnvironment(env),
+	};
+}
+
+export function disabledRuleIdsFromEnvironment(env: NodeJS.ProcessEnv = process.env): ReadonlySet<string> {
+	return new Set([...disabledRuleIdsFromToml(readCodexConfig(env)), ...disabledRuleIdsFromCsv(env["CODEX_RULES_DISABLED_RULES"])]);
+}
+
+export function normalizeRuleId(value: string): string {
+	return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 }
 
 function firstEnv(env: NodeJS.ProcessEnv, ...names: string[]): string | undefined {
@@ -91,6 +109,52 @@ function parseEnabledSources(value: string | undefined, disableBundledRules: boo
 	}
 	const enabledSources = disableBundledRules ? sources.filter((source) => source !== "plugin-bundled") : sources;
 	return enabledSources;
+}
+
+function readCodexConfig(env: NodeJS.ProcessEnv): string {
+	const codexHome = env["CODEX_HOME"];
+	if (typeof codexHome !== "string" || codexHome.trim().length === 0) return "";
+	try {
+		return readFileSync(join(codexHome, "config.toml"), "utf8");
+	} catch (error) {
+		if (error instanceof Error) return "";
+		throw error;
+	}
+}
+
+function disabledRuleIdsFromToml(config: string): readonly string[] {
+	const disabled = new Set<string>();
+	let currentRuleId: string | null = null;
+	for (const line of config.split("\n")) {
+		const headerRuleId = readRuleSwitchHeader(line);
+		if (headerRuleId !== null) {
+			currentRuleId = headerRuleId;
+			continue;
+		}
+		if (line.trimStart().startsWith("[")) {
+			currentRuleId = null;
+			continue;
+		}
+		if (currentRuleId !== null && /^\s*enabled\s*=\s*false\s*(?:#.*)?$/i.test(line)) {
+			disabled.add(currentRuleId);
+		}
+	}
+	return [...disabled];
+}
+
+function readRuleSwitchHeader(line: string): string | null {
+	const trimmed = line.trim();
+	const prefix = '[plugins."omo@sisyphuslabs".rules.';
+	if (!trimmed.startsWith(prefix) || !trimmed.endsWith("]")) return null;
+	const rawKey = trimmed.slice(prefix.length, -1).trim();
+	const key = rawKey.startsWith('"') && rawKey.endsWith('"') ? rawKey.slice(1, -1) : rawKey;
+	const normalized = normalizeRuleId(key);
+	return normalized.length > 0 ? normalized : null;
+}
+
+function disabledRuleIdsFromCsv(value: string | undefined): readonly string[] {
+	if (value === undefined) return [];
+	return value.split(",").map(normalizeRuleId).filter((ruleId) => ruleId.length > 0);
 }
 
 function sourcesWithoutBundledRules(): RuleSource[] {

@@ -5,6 +5,9 @@ import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { BackgroundManager } from "./manager"
 
 type PendingParentWakeForTest = {
+  readonly deliveryState?: {
+    readonly kind: string
+  }
   readonly notifications: readonly string[]
 }
 
@@ -40,6 +43,14 @@ function getPendingParentWakes(manager: BackgroundManager): Map<string, PendingP
   }>(manager).parentWakeNotifier.getPendingParentWakes()
 }
 
+function getAssistantTurnStartedParentWakes(manager: BackgroundManager): Map<string, PendingParentWakeForTest> {
+  return unsafeTestValue<{
+    readonly parentWakeNotifier: {
+      readonly getAssistantTurnStartedParentWakes: () => Map<string, PendingParentWakeForTest>
+    }
+  }>(manager).parentWakeNotifier.getAssistantTurnStartedParentWakes()
+}
+
 function getObservedOutputSessions(manager: BackgroundManager): Set<string> {
   return unsafeTestValue<{ readonly observedOutputSessions: Set<string> }>(manager).observedOutputSessions
 }
@@ -66,6 +77,45 @@ async function dispatchParentWake(manager: BackgroundManager, sessionID: string)
 }
 
 describe("BackgroundManager parent-wake part event regression", () => {
+  test("records assistant-turn-started delivery when assistant output consumes a dispatched parent wake", async () => {
+    // given
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput({
+        session: {
+          status: async () => ({ data: { "parent-session-assistant-started": { type: "idle" } } }),
+          messages: async () => ({ data: [] }),
+          promptAsync: async () => ({}),
+          abort: async () => ({}),
+        },
+      }),
+    })
+
+    try {
+      await dispatchParentWake(manager, "parent-session-assistant-started")
+
+      // when
+      manager.handleEvent({
+        type: "message.part.updated",
+        properties: {
+          sessionID: "parent-session-assistant-started",
+          role: "assistant",
+          part: {
+            type: "text",
+            text: "I saw the completed background task.",
+          },
+        },
+      })
+
+      // then
+      expect(getDispatchedParentWakes(manager).has("parent-session-assistant-started")).toBe(false)
+      expect(getAssistantTurnStartedParentWakes(manager).get("parent-session-assistant-started")?.deliveryState).toEqual({
+        kind: "assistant-turn-started",
+      })
+    } finally {
+      manager.shutdown()
+    }
+  })
+
   test("keeps a dispatched wake when message.part.updated is only the injected internal user wake", async () => {
     // given
     const manager = new BackgroundManager({

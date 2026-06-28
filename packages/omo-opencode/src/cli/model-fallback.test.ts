@@ -3,6 +3,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { generateModelConfig, shouldShowChatGPTOnlyWarning } from "./model-fallback"
+import { createModelInventory } from "./install-model-inventory"
 import type { InstallConfig } from "./types"
 
 function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
@@ -35,6 +36,19 @@ function flattenConfiguredModels(result: ReturnType<typeof generateModelConfig>)
   ].flatMap((entry) => [entry, ...(entry.fallback_models ?? [])])
 }
 describe("generateModelConfig", () => {
+
+  test("uses only available fake inventory models when inventory is available", () => {
+    // #given Claude and OpenAI are configured but fake inventory exposes only OpenAI GPT-5.5
+    const config = createConfig({ hasClaude: true, hasOpenAI: true })
+    const inventory = createModelInventory(["openai/gpt-5.5"])
+
+    // #when generateModelConfig is called with inventory
+    const result = generateModelConfig(config, { inventory })
+
+    // #then unavailable Claude primaries are promoted to the available OpenAI fallback
+    expect(result.agents?.sisyphus?.model).toBe("openai/gpt-5.5")
+    expect(flattenConfiguredModels(result).every((entry) => entry.model === "openai/gpt-5.5")).toBe(true)
+  })
 
   describe("fallback providers", () => {
 

@@ -6,6 +6,10 @@ import type { Task } from "../types"
 import { claimTask } from "./claim"
 import { getTask } from "./get"
 
+type TaskStatusUpdateOptions = {
+  readonly metadata?: Record<string, unknown>
+}
+
 const ALLOWED_TRANSITIONS: Readonly<Record<Task["status"], ReadonlyArray<Task["status"]>>> = {
   pending: ["claimed", "deleted"],
   claimed: ["in_progress", "deleted"],
@@ -39,14 +43,15 @@ export async function updateTaskStatus(
   newStatus: Task["status"],
   memberName: string,
   config: TeamModeConfig,
+  options?: TaskStatusUpdateOptions,
 ): Promise<Task> {
   const task = await getTask(teamRunId, taskId, config)
 
-  if (task.status === newStatus) return task
+  if (task.status === newStatus && options?.metadata === undefined) return task
 
   if (task.status === "pending" && newStatus === "in_progress") {
     await claimTask(teamRunId, taskId, memberName, config)
-    return updateTaskStatus(teamRunId, taskId, newStatus, memberName, config)
+    return updateTaskStatus(teamRunId, taskId, newStatus, memberName, config, options)
   }
 
   if (!isValidTransition(task.status, newStatus)) {
@@ -60,6 +65,7 @@ export async function updateTaskStatus(
   const updatedTask = TaskSchema.parse({
     ...task,
     status: newStatus,
+    metadata: options?.metadata === undefined ? task.metadata : { ...task.metadata, ...options.metadata },
     updatedAt: Date.now(),
   })
 

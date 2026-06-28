@@ -12,9 +12,9 @@ import {
   removeStaleMarketplacePluginBlocks,
 } from "./codex-config-marketplaces"
 import { ensureAutonomousPermissions } from "./codex-config-permissions"
-import { ensureHookTrusted, ensureOmoBuiltinMcpPolicies, ensurePluginEnabled } from "./codex-config-plugins"
+import { ensureHookTrusted, ensureOmoBuiltinMcpPolicies, ensureOmoDisableSwitches, ensurePluginEnabled } from "./codex-config-plugins"
 import { ensureCodexReasoningConfig } from "./codex-config-reasoning"
-import { readCodexModelCatalog } from "./codex-model-catalog"
+import { readCodexModelCatalog, type CodexModelInventory } from "./codex-model-catalog"
 import { removeUnsupportedCodexMultiAgentModeConfig } from "./codex-multi-agent-mode-config"
 import { ensureCodexMultiAgentV2Config } from "./codex-multi-agent-v2-config"
 import type { CodexAgentConfig, CodexInstallPlatform, CodexMarketplaceSource, TrustedHookState } from "./types"
@@ -32,6 +32,7 @@ export async function updateCodexConfig(input: {
   readonly agentConfigs?: readonly CodexAgentConfig[]
   readonly autonomousPermissions?: boolean
   readonly preserveMarketplaceSource?: boolean
+  readonly modelInventory?: CodexModelInventory
 }): Promise<void> {
   await mkdir(dirname(input.configPath), { recursive: true })
   let config = ""
@@ -54,7 +55,7 @@ export async function updateCodexConfig(input: {
   config = ensureFeatureEnabled(config, "multi_agent")
   config = ensureFeatureEnabled(config, "child_agents_md")
   config = removeUnsupportedCodexMultiAgentModeConfig(config)
-  config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(input.repoRoot))
+  config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(input.repoRoot, { inventory: input.modelInventory }))
   config = ensureCodexMultiAgentV2Config(config)
   if (input.autonomousPermissions === true) config = ensureAutonomousPermissions(config)
   if (!(input.preserveMarketplaceSource === true && hasMarketplaceBlock(config, input.marketplaceName))) {
@@ -63,6 +64,7 @@ export async function updateCodexConfig(input: {
   for (const pluginName of input.pluginNames) {
     config = ensurePluginEnabled(config, `${pluginName}@${input.marketplaceName}`)
   }
+  config = ensureOmoDisableSwitches(config, input)
   config = ensureOmoBuiltinMcpPolicies(config, input)
   for (const state of input.trustedHookStates ?? []) {
     config = ensureHookTrusted(config, state)

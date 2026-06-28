@@ -7,7 +7,9 @@ import { sweepStaleTeamSessions } from "../team-layout-tmux/sweep-stale-team-ses
 import { getRuntimeStateDir, resolveBaseDir } from "../team-registry/paths"
 import { unregisterTeamSessionsByTeam } from "../team-session-registry"
 import { listActiveTeams, loadRuntimeState, saveRuntimeState, transitionRuntimeState } from "../team-state-store/store"
+import { listTasks } from "../team-tasklist/list"
 import type { RuntimeState } from "../types"
+import { assessClosureEligibility } from "./lifecycle-status"
 import { DELETABLE_MEMBER_STATUSES, removeWorktrees } from "./shutdown-helpers"
 import { unregisterTeamRunForSessionCleanup } from "./session-team-run-registry"
 
@@ -51,6 +53,24 @@ function ignoreStaleTeamSessionSweepFailure(error: unknown): void {
   if (error instanceof Error) return
 }
 
+async function assertClosurePolicy(
+  runtimeState: RuntimeState,
+  config: TeamModeConfig,
+  forceDelete: boolean,
+): Promise<void> {
+  const tasks = await listTasks(runtimeState.teamRunId, config)
+  const closureEligibility = assessClosureEligibility(runtimeState, tasks)
+  const firstBlockedRequiredOutput = closureEligibility.blockedRequiredOutputs[0]
+  if (firstBlockedRequiredOutput !== undefined) {
+    throw new Error(`required output not verifiable for task ${firstBlockedRequiredOutput.taskId}: ${firstBlockedRequiredOutput.reason}`)
+  }
+
+  if (forceDelete || closureEligibility.activeTasks === 0) return
+
+  const activeTaskReason = closureEligibility.reasons.find((reason) => reason.startsWith("task "))
+  throw new Error(activeTaskReason ?? "tasks still active")
+}
+
 function getTeamBackgroundTasks(
   bgMgr: DeleteTeamBackgroundManager,
   runtimeState: RuntimeState,
@@ -72,6 +92,8 @@ export async function deleteTeam(
 ): Promise<{ removedWorktrees: string[]; removedLayout: boolean }> {
   const runtimeState = await loadRuntimeState(teamRunId, config)
   const nonLeadMembers = runtimeState.members.filter((member) => member.agentType !== "leader")
+
+  await assertClosurePolicy(runtimeState, config, options?.force === true)
 
   if (options?.force !== true && nonLeadMembers.some((member) => !DELETABLE_MEMBER_STATUSES.has(member.status))) {
     throw new Error("members still active")

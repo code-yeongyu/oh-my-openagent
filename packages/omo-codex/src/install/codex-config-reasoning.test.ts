@@ -6,7 +6,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { updateCodexConfig } from "./codex-config-toml"
-import { readCodexModelCatalog } from "./codex-model-catalog"
+import { createCodexModelInventory, readCodexModelCatalog } from "./codex-model-catalog"
 
 describe("codex-config-reasoning", () => {
   test("#given empty Codex config #when updating config #then sets worker model and reasoning defaults", async () => {
@@ -142,6 +142,34 @@ describe("codex-config-reasoning", () => {
     expect(content).toContain("model_context_window = 123456")
     expect(content).toContain('model_reasoning_effort = "medium"')
     expect(content).toContain('plan_mode_reasoning_effort = "high"')
+  })
+
+  test("#given fake Codex model inventory #when reading catalog #then selects only available model", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-reasoning-inventory-"))
+    const repoRoot = join(root, "omo-codex")
+    await mkdir(join(repoRoot, "plugin"), { recursive: true })
+    await writeFile(
+      join(repoRoot, "plugin", "model-catalog.json"),
+      JSON.stringify({
+        version: "test.catalog",
+        current: {
+          model: "gpt-5.5",
+          model_context_window: 400000,
+          model_reasoning_effort: "high",
+          plan_mode_reasoning_effort: "xhigh",
+        },
+        managedProfiles: [],
+      }),
+    )
+
+    // when
+    const catalog = await readCodexModelCatalog(repoRoot, {
+      inventory: createCodexModelInventory(["gpt-5-codex"]),
+    })
+
+    // then
+    expect(catalog.current.model).toBe("gpt-5-codex")
   })
 
   test("#given fallback Codex model catalog #when catalog file is unavailable #then no managed preset uses pure GPT-5.4", async () => {

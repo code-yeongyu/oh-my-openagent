@@ -3,6 +3,7 @@ import type { FallbackEntry } from "./model-requirements"
 import { transformModelForProvider } from "./provider-model-id-transform"
 import { normalizeModel } from "./model-normalization"
 import type { ProviderCache } from "./provider-cache"
+import { parseModelRoute, type ParsedModelRoute } from "./model-string-parser"
 
 type LogImplementation = (message: string, data?: unknown) => void
 
@@ -71,6 +72,45 @@ const DEFAULT_MODEL_RESOLUTION_DEPS: ModelResolutionDeps = {
   transformModelForProvider,
 }
 
+function routeModelForProvider(provider: string, modelID: string, deps: ModelResolutionDeps): string {
+  return `${provider}/${deps.transformModelForProvider(provider, modelID)}`
+}
+
+function rawRouteModelForProvider(provider: string, modelID: string): string {
+  return `${provider}/${modelID}`
+}
+
+function matchProviderModelInAvailableModels(
+  provider: string,
+  modelID: string,
+  availableModels: Set<string>,
+  deps: ModelResolutionDeps,
+): string | null {
+  const rawModel = rawRouteModelForProvider(provider, modelID)
+  const rawMatch = deps.fuzzyMatchModel(rawModel, availableModels, [provider])
+  if (rawMatch) return rawMatch
+
+  const transformedModel = routeModelForProvider(provider, modelID, deps)
+  if (transformedModel === rawModel) return null
+  return deps.fuzzyMatchModel(transformedModel, availableModels, [provider])
+}
+
+function matchRouteInAvailableModels(route: ParsedModelRoute, availableModels: Set<string>, deps: ModelResolutionDeps): string | null {
+  for (const provider of route.providers) {
+    const match = matchProviderModelInAvailableModels(provider, route.modelID, availableModels, deps)
+    if (match) return match
+  }
+  return null
+}
+
+function resolveRouteForConnectedProvider(route: ParsedModelRoute, connectedSet: Set<string>, deps: ModelResolutionDeps): string | undefined {
+  for (const provider of route.providers) {
+    if (connectedSet.has(provider)) {
+      return routeModelForProvider(provider, route.modelID, deps)
+    }
+  }
+  return undefined
+}
 
 export function resolveModelPipeline(
   request: ModelResolutionRequest,
@@ -101,10 +141,11 @@ export function resolveModelPipeline(
   const normalizedCategoryDefault = normalizeModel(intent?.categoryDefaultModel)
   if (normalizedCategoryDefault) {
     attempted.push(normalizedCategoryDefault)
+    const categoryRoute = parseModelRoute(normalizedCategoryDefault)
     if (availableModels.size > 0) {
-      const parts = normalizedCategoryDefault.split("/")
-      const providerHint = parts.length >= 2 ? [parts[0]] : undefined
-      const match = deps.fuzzyMatchModel(normalizedCategoryDefault, availableModels, providerHint)
+      const match = categoryRoute
+        ? matchRouteInAvailableModels(categoryRoute, availableModels, deps)
+        : deps.fuzzyMatchModel(normalizedCategoryDefault, availableModels)
       if (match) {
         log("Model resolved via category default (fuzzy matched)", {
           original: normalizedCategoryDefault,
@@ -120,18 +161,16 @@ export function resolveModelPipeline(
         })
         return { model: normalizedCategoryDefault, provenance: "category-default", attempted }
       }
-      const parts = normalizedCategoryDefault.split("/")
-      if (parts.length >= 2) {
-        const provider = parts[0]
-        if (connectedProviders.includes(provider)) {
-          const modelName = parts.slice(1).join("/")
-          const transformedModel = `${provider}/${deps.transformModelForProvider(provider, modelName)}`
-          log("Model resolved via category default (connected provider)", {
-            model: transformedModel,
-            original: normalizedCategoryDefault,
-          })
-          return { model: transformedModel, provenance: "category-default", attempted }
-        }
+      const connectedSet = new Set(connectedProviders)
+      const transformedModel = categoryRoute
+        ? resolveRouteForConnectedProvider(categoryRoute, connectedSet, deps)
+        : undefined
+      if (transformedModel) {
+        log("Model resolved via category default (connected provider)", {
+          model: transformedModel,
+          original: normalizedCategoryDefault,
+        })
+        return { model: transformedModel, provenance: "category-default", attempted }
       }
     }
     log("Category default model not available, falling through to fallback chain", {
@@ -149,15 +188,12 @@ export function resolveModelPipeline(
       if (connectedSet !== null) {
         for (const model of userFallbackModels) {
           attempted.push(model)
-          const parts = model.split("/")
-          if (parts.length >= 2) {
-            const provider = parts[0]
-            if (connectedSet.has(provider)) {
-              const modelName = parts.slice(1).join("/")
-              const transformedModel = `${provider}/${deps.transformModelForProvider(provider, modelName)}`
-              log("Model resolved via user fallback_models (connected provider)", { model: transformedModel, original: model })
-              return { model: transformedModel, provenance: "provider-fallback", attempted }
-            }
+          const route = parseModelRoute(model)
+          if (!route) continue
+          const transformedModel = resolveRouteForConnectedProvider(route, connectedSet, deps)
+          if (transformedModel) {
+            log("Model resolved via user fallback_models (connected provider)", { model: transformedModel, original: model })
+            return { model: transformedModel, provenance: "provider-fallback", attempted }
           }
         }
         log("No connected provider found in user fallback_models, falling through to hardcoded chain")
@@ -165,9 +201,9 @@ export function resolveModelPipeline(
     } else {
       for (const model of userFallbackModels) {
         attempted.push(model)
-        const parts = model.split("/")
-        const providerHint = parts.length >= 2 ? [parts[0]] : undefined
-        const match = deps.fuzzyMatchModel(model, availableModels, providerHint)
+        const route = parseModelRoute(model)
+        if (!route) continue
+        const match = matchRouteInAvailableModels(route, availableModels, deps)
         if (match) {
           log("Model resolved via user fallback_models (availability confirmed)", { model: model, match })
           return { model: match, provenance: "provider-fallback", attempted }
@@ -209,8 +245,7 @@ export function resolveModelPipeline(
     } else {
       for (const entry of fallbackChain) {
         for (const provider of entry.providers) {
-          const fullModel = `${provider}/${entry.model}`
-          const match = deps.fuzzyMatchModel(fullModel, availableModels, [provider])
+          const match = matchProviderModelInAvailableModels(provider, entry.model, availableModels, deps)
           if (match) {
             log("Model resolved via fallback chain (availability confirmed)", {
               provider,

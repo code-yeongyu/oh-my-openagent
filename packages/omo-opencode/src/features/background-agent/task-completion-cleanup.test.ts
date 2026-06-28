@@ -22,9 +22,16 @@ type SessionMessageForTest = {
   info?: {
     role?: string
     finish?: string
-    time?: { created?: number }
+    time?: { created?: number; completed?: number }
   }
-  parts?: Array<{ type?: string; state?: { status?: string } }>
+  parts?: Array<{ type?: string; text?: string; state?: { status?: string } }>
+}
+
+type TodoForTest = {
+  readonly content: string
+  readonly status: string
+  readonly priority: string
+  readonly id?: string
 }
 
 type FakeTimers = {
@@ -92,6 +99,7 @@ function createManager(
   const client = {
     session: {
       messages: async () => sessionMessages,
+      todo: async () => ({ data: [] }),
       status: async () => ({ data: sessionStatuses ?? {} }),
       prompt: async () => ({}),
       promptAsync: async (call: PromptAsyncCall) => {
@@ -118,6 +126,34 @@ function createManager(
   )
 
   return { manager, promptAsyncCalls }
+}
+
+function createManagerForTodoCompletion(input: {
+  readonly sessionMessages: readonly SessionMessageForTest[]
+  readonly todos: readonly TodoForTest[]
+}): BackgroundManager {
+  const client = {
+    session: {
+      messages: async () => input.sessionMessages,
+      todo: async () => ({ data: input.todos }),
+      status: async () => ({ data: {} }),
+      prompt: async () => ({}),
+      promptAsync: async () => ({}),
+      abort: async () => ({}),
+    },
+  }
+  const ctx: PluginInput = {
+    client: client as PluginInput["client"],
+    project: {} as PluginInput["project"],
+    directory: tmpdir(),
+    worktree: tmpdir(),
+    serverUrl: new URL("http://localhost"),
+    $: {} as PluginInput["$"],
+  }
+
+  return new BackgroundManager(
+    { pluginContext: ctx, config: undefined, enableParentSessionNotifications: false }
+  )
 }
 
 function installFakeTimers(): FakeTimers {
@@ -242,6 +278,11 @@ async function flushMicrotasks(): Promise<void> {
   }
 }
 
+async function emitIdleAndFlush(manager: BackgroundManager, sessionID: string): Promise<void> {
+  manager.handleEvent({ type: "session.idle", properties: { sessionID } })
+  await flushMicrotasks()
+}
+
 async function flushParentWake(manager: BackgroundManager, sessionID = "parent-1"): Promise<void> {
   if (!fakeTimers) {
     throw new Error("Fake timers must be installed before flushing parent wakes")
@@ -298,6 +339,102 @@ function getRequiredTimer(manager: BackgroundManager, taskID: string): ReturnTyp
 }
 
 describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
+  describe("#given stale todo state after final assistant output", () => {
+    test("#when idle completion sees pending todos after terminal text #then todo completion completes the background task", async () => {
+      // given
+      const now = Date.now()
+      const sessionID = "session-final-stale-todos"
+      const manager = createManagerForTodoCompletion({
+        sessionMessages: [
+          {
+            info: { role: "user", time: { created: now - 20_000 } },
+            parts: [{ type: "text", text: "go" }],
+          },
+          {
+            info: { role: "assistant", finish: "stop", time: { created: now - 10_000, completed: now - 9_000 } },
+            parts: [{ type: "text", text: "final answer" }],
+          },
+        ],
+        todos: [{ id: "todo-stale", content: "write final output", status: "pending", priority: "high" }],
+      })
+      managerUnderTest = manager
+      const task = createTask({
+        id: "task-stale-todos",
+        parentSessionId: "parent-1",
+        sessionId: sessionID,
+        status: "running",
+        startedAt: new Date(now - 30_000),
+      })
+      getTasks(manager).set(task.id, task)
+
+      // when
+      await emitIdleAndFlush(manager, sessionID)
+
+      // then
+      expect(task.status).toBe("completed")
+    })
+
+    test("#when idle completion sees pending todos with fresh tool activity #then todo completion keeps the task running", async () => {
+      // given
+      const now = Date.now()
+      const sessionID = "session-fresh-tool-todos"
+      const manager = createManagerForTodoCompletion({
+        sessionMessages: [
+          {
+            info: { role: "assistant", finish: "tool-calls", time: { created: now - 100 } },
+            parts: [{ type: "tool", state: { status: "running" } }],
+          },
+        ],
+        todos: [{ id: "todo-active-tool", content: "wait for tool", status: "in_progress", priority: "high" }],
+      })
+      managerUnderTest = manager
+      const task = createTask({
+        id: "task-fresh-tool-todos",
+        parentSessionId: "parent-1",
+        sessionId: sessionID,
+        status: "running",
+        startedAt: new Date(now - 30_000),
+      })
+      getTasks(manager).set(task.id, task)
+
+      // when
+      await emitIdleAndFlush(manager, sessionID)
+
+      // then
+      expect(task.status).toBe("running")
+    })
+
+    test("#when idle completion sees pending todos with an in-progress assistant turn #then todo completion keeps the task running", async () => {
+      // given
+      const now = Date.now()
+      const sessionID = "session-active-assistant-todos"
+      const manager = createManagerForTodoCompletion({
+        sessionMessages: [
+          {
+            info: { role: "assistant", finish: "unknown", time: { created: now - 100 } },
+            parts: [{ type: "text", text: "still working" }],
+          },
+        ],
+        todos: [{ id: "todo-active-assistant", content: "finish reply", status: "pending", priority: "high" }],
+      })
+      managerUnderTest = manager
+      const task = createTask({
+        id: "task-active-assistant-todos",
+        parentSessionId: "parent-1",
+        sessionId: sessionID,
+        status: "running",
+        startedAt: new Date(now - 30_000),
+      })
+      getTasks(manager).set(task.id, task)
+
+      // when
+      await emitIdleAndFlush(manager, sessionID)
+
+      // then
+      expect(task.status).toBe("running")
+    })
+  })
+
   describe("#given 3 tasks for same parent and task A completed first", () => {
     test("#when siblings are still running or pending #then task A remains until siblings also complete", async () => {
       // given

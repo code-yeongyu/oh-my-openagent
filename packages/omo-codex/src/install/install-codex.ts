@@ -18,6 +18,7 @@ import { resolveCodexInstallerBinDir } from "./codex-installer-bin-dir"
 import { seedAndMigrateOmoSot } from "./omo-sot-migration"
 import { installAstGrepForCodex } from "./install-ast-grep-sg"
 import { trackCodexInstallTelemetry } from "./codex-install-telemetry"
+import { resolveCodexInstallModelInventory } from "./codex-model-catalog"
 import { resolveCodegraphNodeSupport } from "@oh-my-opencode/utils"
 import type { CodexInstallOptions, CodexInstallResult, CodexMarketplaceSource, InstalledPlugin, MarketplaceManifest } from "./types"
 
@@ -33,6 +34,8 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
   const runCommand = options.runCommand ?? defaultRunCommand
   const log = options.log ?? (() => undefined)
   const buildSource = await shouldBuildSourcePackages(repoRoot)
+  const modelInventoryResult = await (options.modelInventoryResolver ?? (() => resolveCodexInstallModelInventory({ codexHome, cwd: repoRoot, env })))()
+  if (modelInventoryResult.kind === "unavailable") log(`Warning: ${modelInventoryResult.warning}`)
 
   const gitBashResolution = await prepareGitBashForInstall({
     platform,
@@ -181,6 +184,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     trustedHookStates,
     agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
     autonomousPermissions: options.autonomousPermissions !== false,
+    modelInventory: modelInventoryResult.kind === "available" ? modelInventoryResult.inventory : undefined,
   })
   await seedAndMigrateOmoSot({ env, log, repoRoot, runCommand })
 

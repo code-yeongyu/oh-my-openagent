@@ -4,15 +4,24 @@ import type { RuntimeState, Task } from "../types"
 import { detectStaleLock } from "../team-state-store/locks"
 import { loadRuntimeState } from "../team-state-store/store"
 import { listUnreadMessages } from "../team-mailbox/inbox"
+import { listWakeDeliveryErrors } from "../team-mailbox/wake-errors"
 import { listTasks } from "../team-tasklist/list"
 import { getTasksDir, resolveBaseDir } from "../team-registry/paths"
 import { readdir } from "node:fs/promises"
 import path from "node:path"
+import {
+  assessClosureEligibility,
+  deriveTeamStatus,
+  resolveMemberWakeRequirement,
+  type ClosureEligibility,
+  type DerivedTeamStatus,
+  type MemberWakeRequirement,
+} from "./lifecycle-status"
 
 export interface TeamStatus {
   teamName: string
   teamRunId: string
-  status: RuntimeState["status"]
+  status: DerivedTeamStatus
   leadSessionId?: string
   createdAt: number
   members: Array<{
@@ -22,6 +31,7 @@ export interface TeamStatus {
     color?: string
     worktreePath?: string
     unreadMessages: number
+    wakeRequirement: MemberWakeRequirement
     paneId?: string
   }>
   tasks: {
@@ -32,6 +42,7 @@ export interface TeamStatus {
     deleted: number
     total: number
   }
+  closureEligibility: ClosureEligibility
   shutdownRequests: RuntimeState["shutdownRequests"]
   concurrency: {
     runningOnSameModel: number
@@ -106,12 +117,21 @@ export async function aggregateStatus(
 ): Promise<TeamStatus> {
   const runtimeState = await loadRuntimeState(teamRunId, config)
   const unreadCounts = await Promise.all(
-    runtimeState.members.map(async (member) => ({
-      member,
-      unreadMessages: (await listUnreadMessages(teamRunId, member.name, config)).length,
-    })),
+    runtimeState.members.map(async (member) => {
+      const unreadMessages = await listUnreadMessages(teamRunId, member.name, config)
+      const unreadMessageIds = new Set(unreadMessages.map((message) => message.messageId))
+      const wakeErrors = (await listWakeDeliveryErrors(teamRunId, member.name, config))
+        .filter((wakeError) => unreadMessageIds.has(wakeError.messageId))
+
+      return {
+        member,
+        unreadMessages: unreadMessages.length,
+        wakeErrors,
+      }
+    }),
   )
   const tasks = await listTasks(teamRunId, config)
+  const closureEligibility = assessClosureEligibility(runtimeState, tasks)
   const teamBackgroundManager: TeamBackgroundManager | undefined = bgMgr
   const concurrencyCounts = resolveConcurrencyCounts(teamBackgroundManager, runtimeState.leadSessionId)
   const teamRunIdSpecific = teamBackgroundManager?.listTasksByParentSession?.(runtimeState.leadSessionId ?? teamRunId)?.length
@@ -133,19 +153,21 @@ export async function aggregateStatus(
   return {
     teamName: runtimeState.teamName,
     teamRunId: runtimeState.teamRunId,
-    status: runtimeState.status,
+    status: deriveTeamStatus(runtimeState, closureEligibility),
     leadSessionId: runtimeState.leadSessionId,
     createdAt: runtimeState.createdAt,
-    members: unreadCounts.map(({ member, unreadMessages }) => ({
+    members: unreadCounts.map(({ member, unreadMessages, wakeErrors }) => ({
       name: member.name,
       sessionId: member.sessionId,
       status: member.status,
       color: member.color,
       worktreePath: member.worktreePath,
       unreadMessages,
+      wakeRequirement: resolveMemberWakeRequirement(member, unreadMessages, wakeErrors),
       paneId: member.tmuxPaneId,
     })),
     tasks: countTasks(tasks),
+    closureEligibility,
     shutdownRequests: runtimeState.shutdownRequests,
     concurrency: {
       runningOnSameModel: concurrencyCounts.running,

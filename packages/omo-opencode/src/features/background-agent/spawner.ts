@@ -74,7 +74,16 @@ export async function startTask(
 
   const sessionID = createResult.data.id
   const normalizedAgent = stripAgentListSortPrefix(input.agent)
-  await input.onSessionCreated?.(sessionID)
+  if (input.onSessionCreated) {
+    try {
+      const sessionCreatedResult = input.onSessionCreated(sessionID)
+      void Promise.resolve(sessionCreatedResult).catch((error: unknown) => {
+        log("[background-agent] session-created callback failed:", error instanceof Error ? error : new Error(String(error)))
+      })
+    } catch (error) {
+      log("[background-agent] session-created callback failed:", error instanceof Error ? error : new Error(String(error)))
+    }
+  }
   subagentSessions.add(sessionID)
   setSessionAgent(sessionID, normalizedAgent)
 

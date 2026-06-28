@@ -17,6 +17,14 @@ type SessionMessageStub = {
   readonly parts?: readonly { readonly type?: string; readonly text?: string }[]
 }
 
+type PendingWakeForTest = {
+  readonly deliveryState?: {
+    readonly kind: string
+    readonly reason?: string
+  }
+  readonly notifications: readonly string[]
+}
+
 const FINAL_WAKE = "<system-reminder>\n[BACKGROUND TASK COMPLETED]\n[ALL BACKGROUND TASKS COMPLETE]\n</system-reminder>"
 
 function createNotifier(options: {
@@ -79,6 +87,57 @@ function releaseParentWakeHold(sessionID: string): void {
 }
 
 describe("ParentWakeNotifier dispatched wake recovery", () => {
+  test("#given prompt gate reports an active parent after idle check #when a reply wake flushes #then the wake is requeued with the gate reason", async () => {
+    // given
+    const promptAsyncCalls: PromptAsyncCall[] = []
+    let statusCalls = 0
+    const client: ParentWakeNotifierClientForTest = {
+      session: {
+        messages: async () => ({ data: [] }),
+        status: async () => {
+          statusCalls += 1
+          return { data: { "parent-active-at-gate": { type: statusCalls <= 2 ? "idle" : "busy" } } }
+        },
+        promptAsync: async (call: PromptAsyncCall) => {
+          promptAsyncCalls.push(call)
+          return { data: {} }
+        },
+      },
+    }
+    const notifier = new ParentWakeNotifier(
+      {
+        client,
+        directory: "/tmp/test-omo",
+        enqueueNotificationForParent: async (_sessionID, operation) => {
+          await operation()
+        },
+      },
+      {
+        pendingRetryMs: 1_000,
+        acceptedMessageSkewMs: 100,
+        toolCallDeferMaxMs: 5_000,
+        failureRequeueWindowMs: 5_000,
+        userMessageInProgressWindowMs: 0,
+      },
+    )
+    const sessionID = "parent-active-at-gate"
+    notifier.queuePendingParentWake(sessionID, FINAL_WAKE, { agent: "sisyphus" }, true)
+
+    try {
+      // when
+      await notifier.flushPendingParentWake(sessionID)
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(0)
+      const pendingWake = notifier.getPendingParentWakes().get(sessionID) as PendingWakeForTest | undefined
+      expect(pendingWake?.deliveryState).toEqual({ kind: "requeued", reason: "prompt-gate-active" })
+      expect(notifier.getPendingParentWakeTimers().has(sessionID)).toBe(true)
+    } finally {
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
   test("#given a parent wake is accepted but produces no assistant output #when the recovery window elapses #then the wake is requeued for another dispatch", async () => {
     // given
     const { notifier, promptAsyncCalls } = createNotifier()
@@ -96,7 +155,9 @@ describe("ParentWakeNotifier dispatched wake recovery", () => {
 
       // then
       expect(notifier.getDispatchedParentWakes().has(sessionID)).toBe(false)
-      expect(notifier.getPendingParentWakes().get(sessionID)?.notifications).toEqual([FINAL_WAKE])
+      const pendingWake = notifier.getPendingParentWakes().get(sessionID) as PendingWakeForTest | undefined
+      expect(pendingWake?.notifications).toEqual([FINAL_WAKE])
+      expect(pendingWake?.deliveryState).toEqual({ kind: "requeued", reason: "no-assistant-output" })
       expect(notifier.getPendingParentWakeTimers().has(sessionID)).toBe(true)
     } finally {
       notifier.shutdown()

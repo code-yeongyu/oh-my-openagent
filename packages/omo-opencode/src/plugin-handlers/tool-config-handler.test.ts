@@ -1,12 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test"
 import { applyToolConfig } from "./tool-config-handler"
 import type { OhMyOpenCodeConfig } from "../config"
+import * as shared from "../shared"
 import { getAgentDisplayName } from "../shared/agent-display-names"
 
 function createParams(overrides: {
   taskSystem?: boolean
   agents?: string[]
   disabledTools?: string[]
+  externalMcpAllowlist?: Record<string, string[]>
 }) {
   const agentResult: Record<string, { permission?: Record<string, unknown> }> = {}
   for (const agent of overrides.agents ?? []) {
@@ -18,6 +20,7 @@ function createParams(overrides: {
     pluginConfig: {
       experimental: overrides.taskSystem === undefined ? undefined : { task_system: overrides.taskSystem },
       disabled_tools: overrides.disabledTools,
+      external_mcp_allowlist: overrides.externalMcpAllowlist,
     } as OhMyOpenCodeConfig,
     agentResult: agentResult as Record<string, unknown>,
   }
@@ -272,6 +275,73 @@ describe("applyToolConfig", () => {
         }
         expect(agent.permission.todowrite).toBeUndefined()
         expect(agent.permission.todoread).toBeUndefined()
+      })
+    })
+  })
+
+  describe("#given external MCP policy", () => {
+    describe("#when no opt-in allowlist is configured", () => {
+      it("#then should keep codegraph tools denied by default", () => {
+        const params = createParams({ agents: ["explore"] })
+
+        applyToolConfig(params)
+
+        const tools = params.config.tools as Record<string, unknown>
+        const explore = params.agentResult.explore as { permission: Record<string, unknown> }
+        expect(tools["codegraph_*"]).toBe(false)
+        expect(explore.permission["codegraph_*"]).toBeUndefined()
+      })
+    })
+
+    describe("#when selected read-only subagents opt in to codegraph", () => {
+      it("#then should grant only the configured external MCP pattern to those subagents", () => {
+        const params = createParams({
+          agents: ["explore", "librarian", "oracle"],
+          externalMcpAllowlist: {
+            explore: ["codegraph_*"],
+            librarian: ["codegraph_*"],
+            oracle: ["codegraph_*"],
+          },
+        })
+
+        applyToolConfig(params)
+
+        const tools = params.config.tools as Record<string, unknown>
+        expect(tools["codegraph_*"]).toBe(false)
+        for (const agentName of ["explore", "librarian", "oracle"]) {
+          const agent = params.agentResult[agentName] as { permission: Record<string, unknown> }
+          expect(agent.permission["codegraph_*"]).toBe("allow")
+        }
+      })
+    })
+
+    describe("#when an allowlist targets unsupported agents or tools", () => {
+      it("#then should leave the tool absent from agent permissions and log a warning", () => {
+        const logSpy = spyOn(shared, "log").mockImplementation(() => {})
+        const params = createParams({
+          agents: ["hephaestus", "explore"],
+          externalMcpAllowlist: {
+            hephaestus: ["codegraph_*"],
+            explore: ["context7_*"],
+          },
+        })
+
+        try {
+          applyToolConfig(params)
+
+          const hephaestus = params.agentResult.hephaestus as { permission: Record<string, unknown> }
+          const explore = params.agentResult.explore as { permission: Record<string, unknown> }
+          expect(hephaestus.permission["codegraph_*"]).toBeUndefined()
+          expect(explore.permission["context7_*"]).toBeUndefined()
+          expect(logSpy).toHaveBeenCalledWith(
+            expect.stringContaining('external MCP allowlist ignored for unsupported subagent "hephaestus"'),
+          )
+          expect(logSpy).toHaveBeenCalledWith(
+            expect.stringContaining('external MCP allowlist ignored unsupported tool pattern "context7_*"'),
+          )
+        } finally {
+          logSpy.mockRestore()
+        }
       })
     })
   })

@@ -120,11 +120,13 @@ export function getOpenCodeConfigDirs(options: OpenCodeConfigDirOptions): string
   }
 
   const customConfigDir = getCliCustomConfigDir()
+  const defaultConfigDir = getCliDefaultConfigDir()
+  const shouldIncludeDefaultConfigDir = !customConfigDir || process.env.XDG_CONFIG_HOME !== undefined
 
   return Array.from(
     new Set([
       ...(customConfigDir ? [customConfigDir] : []),
-      getCliDefaultConfigDir(),
+      ...(shouldIncludeDefaultConfigDir ? [defaultConfigDir] : []),
     ]),
   )
 }

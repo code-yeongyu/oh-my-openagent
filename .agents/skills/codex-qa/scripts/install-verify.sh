@@ -2,8 +2,9 @@
 # install-verify.sh - install THIS repo's local omo build into an ISOLATED
 # CODEX_HOME and prove it landed correctly while the real ~/.codex is untouched.
 #
-# Asserts: plugin cache dir exists, config.toml enables omo@sisyphuslabs, the
-# component bins + agent TOMLs linked inside the sandbox, and the real
+# Asserts: plugin cache dir exists, config.toml enables omo@sisyphuslabs, hook
+# and rule disable switch tables are seeded, component bins + agent TOMLs link
+# inside the sandbox, and the real
 # ~/.codex/config.toml shasum is unchanged.
 #
 #   --self-test   run the full isolated install + assertions (default)
@@ -30,6 +31,14 @@ cqa_install_verify() {
      && grep -A2 '\[plugins."omo@sisyphuslabs"\]' "$CODEX_HOME/config.toml" | grep -q 'enabled = true'; then
     cqa_pass "config.toml enables omo@sisyphuslabs"
   else cqa_log "FAIL: omo not enabled in isolated config.toml"; fails=$((fails+1)); fi
+
+  if grep -Fq '[plugins."omo@sisyphuslabs".hooks.comment_checker]' "$CODEX_HOME/config.toml" 2>/dev/null; then
+    cqa_pass "config.toml seeds comment_checker hook disable switch"
+  else cqa_log "FAIL: comment_checker hook disable switch missing"; fails=$((fails+1)); fi
+
+  if grep -Fq '[plugins."omo@sisyphuslabs".rules.hephaestus]' "$CODEX_HOME/config.toml" 2>/dev/null; then
+    cqa_pass "config.toml seeds hephaestus rule disable switch"
+  else cqa_log "FAIL: hephaestus rule disable switch missing"; fails=$((fails+1)); fi
 
   if ls "$CODEX_HOME"/bin/omo-* >/dev/null 2>&1; then
     cqa_pass "component bins linked in sandbox ($(ls "$CODEX_HOME"/bin/omo-* | wc -l | tr -d ' ') bins)"

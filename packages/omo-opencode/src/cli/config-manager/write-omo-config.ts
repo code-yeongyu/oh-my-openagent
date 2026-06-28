@@ -11,12 +11,13 @@ import { deepMergeRecord } from "./deep-merge-record"
 import { ensureConfigDirectoryExists } from "./ensure-config-directory-exists"
 import { formatErrorWithSuggestion } from "./format-error-with-suggestion"
 import { generateOmoConfig } from "./generate-omo-config"
+import type { GenerateModelConfigOptions } from "../model-fallback"
 
 function isEmptyOrWhitespace(content: string): boolean {
   return content.trim().length === 0
 }
 
-export function writeOmoConfig(installConfig: InstallConfig): ConfigMergeResult {
+export function writeOmoConfig(installConfig: InstallConfig, options: GenerateModelConfigOptions = {}): ConfigMergeResult {
   try {
     ensureConfigDirectoryExists()
   } catch (err) {
@@ -37,7 +38,7 @@ export function writeOmoConfig(installConfig: InstallConfig): ConfigMergeResult 
     : detectedConfigPath
 
   try {
-    const newConfig = generateOmoConfig(installConfig)
+    const newConfig = generateOmoConfig(installConfig, options)
 
     if (existsSync(omoConfigPath)) {
       const backupResult = backupConfigFile(omoConfigPath)
