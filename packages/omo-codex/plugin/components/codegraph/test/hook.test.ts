@@ -239,8 +239,8 @@ describe("CodeGraph SessionStart hook", () => {
 					},
 				},
 			]);
-			expect(spawned[0]?.env.OPENAI_API_KEY).toBeUndefined();
-			expect(spawned[0]?.env.KEEP).toBeUndefined();
+			expect(spawned[0]?.env["OPENAI_API_KEY"]).toBeUndefined();
+			expect(spawned[0]?.env["KEEP"]).toBeUndefined();
 			expect(JSON.parse(stdout.join(""))).toEqual({
 				hookSpecificOutput: {
 					additionalContext: "LazyCodex CodeGraph bootstrap scheduled in background",
