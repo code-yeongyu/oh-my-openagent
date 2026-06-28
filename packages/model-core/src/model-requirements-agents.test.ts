@@ -72,6 +72,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(seventh?.providers).toContain("anthropic")
     expect(seventh?.model).toBe("claude-haiku-4-5")
     expect(eighth?.providers).toContain("openai")
+    expect(eighth?.providers).toContain("github-copilot")
     expect(eighth?.model).toBe("gpt-5.4-nano")
   })
 
@@ -100,6 +101,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(seventh?.providers).toContain("anthropic")
     expect(seventh?.model).toBe("claude-haiku-4-5")
     expect(eighth?.providers).toContain("openai")
+    expect(eighth?.providers).toContain("github-copilot")
     expect(eighth?.model).toBe("gpt-5.4-nano")
   })
 

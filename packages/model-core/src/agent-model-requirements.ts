@@ -69,7 +69,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
       { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
       { providers: ["anthropic", "github-copilot", "vercel"], model: "claude-haiku-4-5" },
-      { providers: ["openai", "vercel"], model: "gpt-5.4-nano" },
+      { providers: ["openai", "github-copilot", "vercel"], model: "gpt-5.4-nano" },
     ],
   },
   explore: {
@@ -81,7 +81,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
       { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
       { providers: ["anthropic", "github-copilot", "vercel"], model: "claude-haiku-4-5" },
-      { providers: ["openai", "vercel"], model: "gpt-5.4-nano" },
+      { providers: ["openai", "github-copilot", "vercel"], model: "gpt-5.4-nano" },
     ],
   },
   "multimodal-looker": {
