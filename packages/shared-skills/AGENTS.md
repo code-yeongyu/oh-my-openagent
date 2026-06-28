@@ -25,12 +25,12 @@ skills/ (source)
 
 ## FRONTEND THIRD-PARTY REFS — SUBMODULE-ONLY + BUILD-MATERIALIZE (DMCA-safe)
 
-The `frontend` skill's brand / taste-skill / ui-ux-db / designpowers references are third-party content. Under the DMCA-safe model the repo holds ZERO committed copies; each upstream is a pinned git submodule under `upstreams/<name>` (NOT under `skills/`, so it never lands in the tarball), and the build materializes the referenced files VERBATIM, path-mapped, into `skills/frontend/references/{design,ui-ux-db,designpowers/vendor}`.
+The `frontend` skill's brand / taste-skill / ui-ux-db / designpowers references are third-party content. Under the DMCA-safe model the repo holds ZERO committed copies; each upstream is a pinned git submodule under `upstreams/<name>` (NOT under `skills/`, so it never lands in the tarball), and the build materializes the referenced files path-mapped into `skills/frontend/references/{design,ui-ux-db,designpowers/vendor}`. File bodies are copied verbatim, except materialized `SKILL.md` frontmatter may normalize an unquoted single-line `description:` scalar into a JSON-quoted YAML string so Codex/OpenCode frontmatter parsing stays deterministic; the description text itself is unchanged.
 
 ```
 upstreams/{open-design,taste-skill,ui-ux-pro-max,designpowers}   # pinned submodules (provenance, build input)
   └─ packages/shared-skills/scripts/frontend-refs-manifest.mjs   # single source of truth: partition + upstream path map
-       └─ packages/shared-skills/scripts/materialize-frontend-refs.mjs   # verbatim path-mapped copy → references/{design,ui-ux-db}
+       └─ packages/shared-skills/scripts/materialize-frontend-refs.mjs   # path-mapped copy + SKILL.md description quoting → references/{design,ui-ux-db}
             └─ chokepoint: packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs  (submodule init + materialize)
                  • PREPENDED to the codex plugin build chain BEFORE sync-skills.mjs (every ship path runs it)
                  • root build:shared-skills-assets + root prepack also run it
@@ -38,7 +38,7 @@ upstreams/{open-design,taste-skill,ui-ux-pro-max,designpowers}   # pinned submod
 
 - The materialized files are GITIGNORED (`skills/frontend/.gitignore`) so they are never committed; a `skills/frontend/.npmignore` overrides that `.gitignore` for npm pack so the materialized refs DO ship. The lazycodex marketplace sync is a raw file copy and ships whatever is on disk after the plugin build materialized it.
 - The §4 project-original design docs (`README.md`, `_INDEX.md`, `design-system-architecture.md`, `react-dev-tooling-skill.md`) and all of `references/perfection/*` stay committed (un-ignored in `.gitignore`).
-- ATTRIBUTION pins each upstream's SHA (`Pinned upstream commit:`); `script/update-frontend-upstreams.mjs` bumps the submodules + rewrites the pins (`--check` verifies pins == submodule HEAD, no network). `provenance-gate.test.ts` fails CI if any third-party path is committed, the materialize set is missing, or a pin drifts.
+- ATTRIBUTION pins each upstream's SHA (`Pinned upstream commit:`); `script/update-frontend-upstreams.mjs` bumps the submodules + rewrites the pins (`--check` verifies pins == submodule HEAD, no network). `provenance-gate.test.ts` fails CI if any third-party path is committed, the materialize set is missing, or a pin drifts. `materialize-frontend-refs.test.ts` covers the allowed `SKILL.md` description quoting normalization.
 - Submodule init is non-fatal ONLY in `script/agent/setup.sh` (offline devs get a working tree minus brand refs); the plugin build chain runs it `--strict` so CI/publish ship a complete package.
 
 ## CONSUMERS

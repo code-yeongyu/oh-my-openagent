@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { frontendSkillRoot, thirdPartyMaterializeMap, upstreamsRoot } from "./frontend-refs-manifest.mjs";
@@ -8,6 +8,22 @@ function upstreamPopulated(name) {
 	if (!existsSync(dir)) return false;
 	const entries = readdirSync(dir).filter((entry) => entry !== ".git");
 	return entries.length > 0;
+}
+
+function quoteYamlScalar(value) {
+	return JSON.stringify(value);
+}
+
+function normalizeSkillFrontmatter(content) {
+	return content.replace(/^description:\s+([^"'\[{\|>][^\r\n]*)$/m, (_match, description) => {
+		return `description: ${quoteYamlScalar(description.trim())}`;
+	});
+}
+
+function materializedContent(relTarget, sourcePath) {
+	const content = readFileSync(sourcePath, "utf8");
+	if (relTarget.endsWith("/SKILL.md")) return normalizeSkillFrontmatter(content);
+	return content;
 }
 
 export function materializeFrontendRefs({ strict = false } = {}) {
@@ -33,7 +49,7 @@ export function materializeFrontendRefs({ strict = false } = {}) {
 		}
 		const targetPath = join(frontendSkillRoot, relTarget);
 		mkdirSync(dirname(targetPath), { recursive: true });
-		copyFileSync(sourcePath, targetPath);
+		writeFileSync(targetPath, materializedContent(relTarget, sourcePath));
 		materialized += 1;
 	}
 

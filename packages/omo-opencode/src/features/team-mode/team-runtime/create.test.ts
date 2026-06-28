@@ -18,6 +18,7 @@ import {
   clearSessionTeamRunCleanupRegistry,
   getSessionCreatedTeamRunIds,
 } from "./session-cleanup"
+import { createLaunchConcurrencyProbe } from "../test-support/async-test-helpers"
 
 const resolveMemberMock = mock(async (member: TeamSpec["members"][number]) => ({
   agentToUse: `${member.name}-agent`,
@@ -342,23 +343,31 @@ describe("createTeamRun", () => {
     // given
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-parallel-"))
     temporaryDirectories.push(baseDir)
-    let inFlight = 0
-    let maxInFlight = 0
-    let launchCount = 0
-    const { manager } = createManager(baseDir, async () => {
-      launchCount += 1
-      inFlight += 1
-      maxInFlight = Math.max(maxInFlight, inFlight)
-      await new Promise((resolve) => setTimeout(resolve, 10))
-      inFlight -= 1
-      return { id: `task-${launchCount}`, sessionId: `session-${launchCount}`, status: "running" } as BackgroundTask
+    const launchLimit = 4
+    const launchProbe = createLaunchConcurrencyProbe({
+      launchLimit,
+      sessionIdPrefix: "session",
+      taskIdPrefix: "task",
     })
+    const { manager } = createManager(baseDir, async (input) => launchProbe.launch(input))
 
     // when
-    await createTeamRun(createSpec(8), "lead-session", createContext(baseDir, manager), createConfig(baseDir, 4), manager)
+    const run = createTeamRun(createSpec(8), "lead-session", createContext(baseDir, manager), createConfig(baseDir, launchLimit), manager)
+    try {
+      const firstBatch = await launchProbe.waitForFirstBatch("timed out waiting for the first four member launches")
+      await launchProbe.releaseAndWaitForCompletion(run, "timed out waiting for all member launches")
+      const completed = launchProbe.snapshot()
 
-    // then
-    expect(maxInFlight).toBeLessThanOrEqual(4)
+      // then
+      expect(firstBatch.launchCount).toBe(launchLimit)
+      expect(firstBatch.inFlight).toBe(launchLimit)
+      expect(firstBatch.maxInFlight).toBe(launchLimit)
+      expect(completed.launchCount).toBe(8)
+      expect(completed.maxInFlight).toBeLessThanOrEqual(launchLimit)
+    } finally {
+      launchProbe.release()
+      run.catch(() => undefined)
+    }
   })
 
   test("reuses the caller session for the lead when the lead matches the caller agent", async () => {
