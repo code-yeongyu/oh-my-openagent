@@ -5,9 +5,10 @@ import type { ServerLookupResult } from "./types.js";
 
 export function findServerForExtension(ext: string): ServerLookupResult {
 	const servers = getMergedServers();
+	const normalizedExtension = ext.toLowerCase();
 
 	for (const server of servers) {
-		if (server.extensions.includes(ext) && isServerInstalled(server.command)) {
+		if (includesExtension(server.extensions, normalizedExtension) && isServerInstalled(server.command)) {
 			const resolvedServer = {
 				id: server.id,
 				command: server.command,
@@ -35,7 +36,7 @@ export function findServerForExtension(ext: string): ServerLookupResult {
 	}
 
 	for (const server of servers) {
-		if (server.extensions.includes(ext)) {
+		if (includesExtension(server.extensions, normalizedExtension)) {
 			const installHint =
 				LSP_INSTALL_HINTS[server.id] ?? `Install '${server.command[0]}' and ensure it's in your PATH`;
 			return {
@@ -56,6 +57,10 @@ export function findServerForExtension(ext: string): ServerLookupResult {
 		extension: ext,
 		availableServers,
 	};
+}
+
+function includesExtension(extensions: string[], normalizedExtension: string): boolean {
+	return extensions.some((extension) => extension.toLowerCase() === normalizedExtension);
 }
 
 export interface ServerStatus {
