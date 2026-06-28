@@ -107,6 +107,30 @@ Direct skill.
       expect(skills[0].name).toBe("direct-skill")
     })
 
+    it("parses allowed-tools through the shared parser", async () => {
+      // given
+      const skillContent = `---
+name: allowed-tools-skill
+description: Skill with allowed tools
+allowed-tools:
+  - Read
+  - " Write "
+  - ""
+  - Bash
+---
+Skill body.
+`
+      createTestSkill("allowed-tools-skill", skillContent)
+
+      // when
+      const { discoverSkillsInDirAsync } = await import("./async-loader")
+      const skills = await discoverSkillsInDirAsync(SKILLS_DIR)
+
+      // then
+      expect(skills).toHaveLength(1)
+      expect(skills[0]?.allowedTools).toEqual(["Read", "Write", "Bash"])
+    })
+
     it("preserves nested skill path names during recursive discovery", async () => {
       // given
       const nestedSkillDir = join(SKILLS_DIR, "superpowers", "brainstorming")
