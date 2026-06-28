@@ -95,3 +95,53 @@ describe("Sisyphus runtime prompt family reconciliation (#5297/#5316)", () => {
     expect(output.system[0]).not.toContain(GPT_APPLY_PATCH_GUIDANCE)
   })
 })
+
+describe("Sisyphus runtime prompt reconciler — per-turn rebuild cache (#5578)", () => {
+  test("#given a stable runtime model #when reconcile runs on consecutive turns #then rebuildPromptForModel is called only once", () => {
+    const baked = createSisyphusAgent(GPT_MODEL, [], [], [], []).prompt ?? ""
+    let rebuildCalls = 0
+    setSisyphusRuntimePromptContext({
+      configuredModel: GPT_MODEL,
+      bakedPrompt: baked,
+      rebuildPromptForModel: (model) => {
+        rebuildCalls++
+        return createSisyphusAgent(model, [], [], [], []).prompt ?? ""
+      },
+    })
+
+    // Turn 1: first reconciliation with a non-GPT model
+    const system1 = [baked]
+    const swapped1 = reconcileSisyphusRuntimePrompt(system1, NON_GPT_MODEL)
+    expect(swapped1).toBe(true)
+    expect(rebuildCalls).toBe(1)
+
+    // Turn 2: same stable runtime model — rebuild must be skipped, swap still applied
+    const system2 = [baked]
+    const swapped2 = reconcileSisyphusRuntimePrompt(system2, NON_GPT_MODEL)
+    expect(swapped2).toBe(true)
+    expect(rebuildCalls).toBe(1) // must NOT have incremented
+    expect(system2[0]).not.toContain("based on GPT-5.5")
+  })
+
+  test("#given a model switch between turns #when reconcile runs #then rebuildPromptForModel is called again for the new model", () => {
+    const ANOTHER_NON_GPT_MODEL = "kimi-k2/Kimi-K2"
+    const baked = createSisyphusAgent(GPT_MODEL, [], [], [], []).prompt ?? ""
+    let rebuildCalls = 0
+    setSisyphusRuntimePromptContext({
+      configuredModel: GPT_MODEL,
+      bakedPrompt: baked,
+      rebuildPromptForModel: (model) => {
+        rebuildCalls++
+        return createSisyphusAgent(model, [], [], [], []).prompt ?? ""
+      },
+    })
+
+    // Turn 1: NON_GPT_MODEL
+    reconcileSisyphusRuntimePrompt([baked], NON_GPT_MODEL)
+    expect(rebuildCalls).toBe(1)
+
+    // Turn 2: different model — must trigger a fresh rebuild
+    reconcileSisyphusRuntimePrompt([baked], ANOTHER_NON_GPT_MODEL)
+    expect(rebuildCalls).toBe(2)
+  })
+})
