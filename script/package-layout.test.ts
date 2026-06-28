@@ -17,6 +17,12 @@ const codexHookComponentRuntimePaths = [
   "packages/omo-codex/plugin/components/ultrawork/dist/cli.js",
   "packages/omo-codex/plugin/components/ulw-loop/dist/cli.js",
 ] as const
+const webTerminalVisualQaRuntimePaths = [
+  "script/qa/web-terminal-redaction.d.mts",
+  "script/qa/web-terminal-redaction.mjs",
+  "script/qa/web-terminal-renderer.mjs",
+  "script/qa/web-terminal-visual-qa.mjs",
+] as const
 const packageLayoutTestTimeoutMs = 60_000
 const packDryRunTimeoutMs = 15_000
 
@@ -181,6 +187,18 @@ describe("published package layout", () => {
   test("#given Codex hook component runtimes #when packing package #then every hook command target ships", async () => {
     // given
     const expectedRuntimePaths = codexHookComponentRuntimePaths
+
+    // when
+    const packedPaths = await packDryRunPaths()
+    const missingRuntimePaths = expectedRuntimePaths.filter((expectedPath) => !packedPaths.has(expectedPath))
+
+    // then
+    expect(missingRuntimePaths).toEqual([])
+  }, packDryRunTimeoutMs)
+
+  test("#given shipped QA skills reference web terminal helpers #when packing package #then helper runtime ships", async () => {
+    // given
+    const expectedRuntimePaths = webTerminalVisualQaRuntimePaths
 
     // when
     const packedPaths = await packDryRunPaths()
