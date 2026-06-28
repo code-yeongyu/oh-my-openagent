@@ -39,7 +39,11 @@ export async function loadSkillsFromDir(options: {
   const depth = options.depth ?? 0
   const maxDepth = options.maxDepth ?? 2
 
+  console.error(`[loadSkillsFromDir] Scanning: ${options.skillsDir} (depth=${depth}, scope=${options.scope})`)
+
   const entries = await readDirectoryEntries(options.skillsDir)
+  console.error(`[loadSkillsFromDir] Found ${entries.length} entries in ${options.skillsDir}`)
+
   const skillMap = new Map<string, LoadedSkill>()
 
   const directories = entries.filter(
@@ -53,13 +57,22 @@ export async function loadSkillsFromDir(options: {
       isMarkdownFile(entry)
   )
 
+  console.error(`[loadSkillsFromDir] ${directories.length} directories, ${files.length} markdown files`)
+
   for (const entry of directories) {
     const entryPath = join(options.skillsDir, entry.name)
     const resolvedPath = await resolveSymlinkAsync(entryPath)
     const dirName = entry.name
 
     const skillMdPath = join(resolvedPath, "SKILL.md")
+    const namedSkillMdPath = join(resolvedPath, `${dirName}.md`)
+
+    console.error(`[loadSkillsFromDir] Checking directory: ${dirName}`)
+    console.error(`[loadSkillsFromDir]   SKILL.md path: ${skillMdPath}`)
+    console.error(`[loadSkillsFromDir]   ${dirName}.md path: ${namedSkillMdPath}`)
+
     if (await canAccessFile(skillMdPath)) {
+      console.error(`[loadSkillsFromDir]   Found SKILL.md, loading...`)
       const skill = await loadSkillFromPath({
         skillPath: skillMdPath,
         resolvedPath,
@@ -68,13 +81,18 @@ export async function loadSkillsFromDir(options: {
         namePrefix,
       })
       if (skill && !skillMap.has(skill.name)) {
+        console.error(`[loadSkillsFromDir]   ✓ Loaded skill: ${skill.name}`)
         skillMap.set(skill.name, skill)
+      } else if (!skill) {
+        console.error(`[loadSkillsFromDir]   ✗ loadSkillFromPath returned null for ${dirName}`)
+      } else {
+        console.error(`[loadSkillsFromDir]   ⊘ Skill ${skill.name} already exists in map, skipping`)
       }
       continue
     }
 
-    const namedSkillMdPath = join(resolvedPath, `${dirName}.md`)
     if (await canAccessFile(namedSkillMdPath)) {
+      console.error(`[loadSkillsFromDir]   Found ${dirName}.md, loading...`)
       const skill = await loadSkillFromPath({
         skillPath: namedSkillMdPath,
         resolvedPath,
@@ -83,10 +101,17 @@ export async function loadSkillsFromDir(options: {
         namePrefix,
       })
       if (skill && !skillMap.has(skill.name)) {
+        console.error(`[loadSkillsFromDir]   ✓ Loaded skill: ${skill.name}`)
         skillMap.set(skill.name, skill)
+      } else if (!skill) {
+        console.error(`[loadSkillsFromDir]   ✗ loadSkillFromPath returned null for ${dirName}`)
+      } else {
+        console.error(`[loadSkillsFromDir]   ⊘ Skill ${skill.name} already exists in map, skipping`)
       }
       continue
     }
+
+    console.error(`[loadSkillsFromDir]   No SKILL.md or ${dirName}.md found, checking nested...`)
 
     if (depth < maxDepth) {
       const newPrefix = namePrefix ? `${namePrefix}/${dirName}` : dirName
@@ -97,6 +122,7 @@ export async function loadSkillsFromDir(options: {
         depth: depth + 1,
         maxDepth,
       })
+      console.error(`[loadSkillsFromDir]   Found ${nestedSkills.length} nested skills`)
       for (const nestedSkill of nestedSkills) {
         if (!skillMap.has(nestedSkill.name)) {
           skillMap.set(nestedSkill.name, nestedSkill)
@@ -108,6 +134,7 @@ export async function loadSkillsFromDir(options: {
   for (const entry of files) {
     const entryPath = join(options.skillsDir, entry.name)
     const baseName = inferSkillNameFromFileName(entryPath)
+    console.error(`[loadSkillsFromDir] Loading markdown file: ${entry.name}`)
     const skill = await loadSkillFromPath({
       skillPath: entryPath,
       resolvedPath: options.skillsDir,
@@ -116,9 +143,13 @@ export async function loadSkillsFromDir(options: {
       namePrefix,
     })
     if (skill && !skillMap.has(skill.name)) {
+      console.error(`[loadSkillsFromDir]   ✓ Loaded skill: ${skill.name}`)
       skillMap.set(skill.name, skill)
+    } else if (!skill) {
+      console.error(`[loadSkillsFromDir]   ✗ loadSkillFromPath returned null for ${entry.name}`)
     }
   }
 
+  console.error(`[loadSkillsFromDir] Completed: ${skillMap.size} skills loaded from ${options.skillsDir}`)
   return Array.from(skillMap.values())
 }

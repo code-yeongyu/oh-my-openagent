@@ -64,8 +64,16 @@ export async function loadSkillFromPath(options: {
       lazyContent: eagerLoader,
     }
   } catch (error) {
+    console.error(`[loadSkillFromPath] FAILED: ${options.skillPath}`)
     if (error instanceof Error) {
-      return null
+      console.error(`[loadSkillFromPath] Error type: ${error.constructor.name}`)
+      console.error(`[loadSkillFromPath] Message: ${error.message}`)
+      if (error.stack) {
+        console.error(`[loadSkillFromPath] Stack:\n${error.stack}`)
+      }
+    } else {
+      console.error(`[loadSkillFromPath] Non-Error thrown: ${typeof error}`)
+      console.error(`[loadSkillFromPath] Value:`, error)
     }
     return null
   }
