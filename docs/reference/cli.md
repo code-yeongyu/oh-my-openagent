@@ -79,13 +79,15 @@ Subscription flags (`--claude`, `--openai`, etc.) only apply when `--platform` i
 
 Anonymous telemetry uses PostHog with a hashed installation identifier. Two streams exist:
 
-- `omo_daily_active`: fired by the main plugin and `oh-my-openagent run`.
+- `omo_daily_active`: fired by the main plugin when it loads (`reason: "plugin_loaded"`) and by `oh-my-openagent run` (`reason: "run_started"`).
 - `omo_codex_daily_active`: fired by `omo install --platform=codex` or `--platform=both` (`reason: "install_completed"`) and by the Codex plugin's `SessionStart` hook on every Codex session (`reason: "session_start"`). Both sources share the same UTC-day deduplication, so daily/weekly/monthly active counts reflect real Codex usage, not just install events.
 
 Opt-out env vars:
 
 - Global opt-out for oh-my-openagent and omo-codex: `OMO_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_DISABLE_POSTHOG=1`
 - Codex-only opt-out for `omo_codex_daily_active`: `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_CODEX_DISABLE_POSTHOG=1`
+
+The OpenCode plugin can also opt out through oh-my-openagent config with `"telemetry": false`.
 
 For the full Codex Light event inventory, collected properties, local state path, and lazycodex marketplace copy path, see [Codex Light telemetry](./codex-telemetry.md).
 
