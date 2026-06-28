@@ -1,3 +1,4 @@
+# allow: SIZE_OK - Windows bootstrap hook keeps PowerShell 5.1-compatible resolver/provisioning flow in one audited entrypoint.
 # LazyCodex bootstrap SessionStart hook for native Windows (Windows PowerShell 5.1).
 # Codex runs hooks through %COMSPEC%, so node may be absent from PATH entirely.
 # Resolve Codex-managed Node first, then the portable ZIP pinned by
