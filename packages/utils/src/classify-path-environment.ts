@@ -16,12 +16,16 @@ function isUnderPath(normalizedPath: string, normalizedParentPath: string): bool
   return normalizedPath === normalizedParentPath || normalizedPath.startsWith(`${normalizedParentPath}/`)
 }
 
+function isOneDriveSegment(segment: string): boolean {
+  const lowercaseSegment = segment.toLowerCase()
+  return lowercaseSegment === "onedrive" || lowercaseSegment.startsWith("onedrive - ")
+}
+
 export function classifyPathEnvironment(absolutePath: string): PathClassification {
   if (absolutePath.length === 0) return "unknown"
 
   const normalizedPath = normalizeInputPath(absolutePath)
-  const lowercasePath = normalizedPath.toLowerCase()
-  if (lowercasePath.includes("/onedrive") || lowercasePath.includes("/onedrive/")) {
+  if (normalizedPath.split("/").some(isOneDriveSegment)) {
     return "onedrive"
   }
 
