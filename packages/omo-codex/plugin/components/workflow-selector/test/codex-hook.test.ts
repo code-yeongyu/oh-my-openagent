@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
 	buildAutoWorkflowContext,
@@ -24,7 +24,6 @@ describe("codex workflow selector hook", () => {
 		} else {
 			process.env["OMO_CODEX_AUTO_WORKFLOW"] = originalAutoWorkflowFlag;
 		}
-		vi.restoreAllMocks();
 	});
 
 	it("#given auto workflow is disabled #when prompt asks for debugging #then hook stays quiet", () => {
@@ -45,10 +44,7 @@ describe("codex workflow selector hook", () => {
 
 	it("#given auto workflow is disabled #when transcript path is present #then hook does not read transcript", () => {
 		// given
-		delete process.env["OMO_CODEX_AUTO_WORKFLOW"];
-		const transcriptReader = vi.fn(() => {
-			throw new Error("transcript should not be read");
-		});
+		let readCount = 0;
 		const payload = {
 			hook_event_name: "UserPromptSubmit",
 			prompt: "Fix this flaky test and diagnose why CI is failing",
@@ -56,11 +52,17 @@ describe("codex workflow selector hook", () => {
 		};
 
 		// when
-		const output = runUserPromptSubmitHook(payload, transcriptReader);
+		const output = runUserPromptSubmitHook(payload, {
+			hookEnv: {},
+			transcriptReader: () => {
+				readCount += 1;
+				throw new Error("Transcript should not be read while disabled");
+			},
+		});
 
 		// then
 		expect(output).toBe("");
-		expect(transcriptReader).not.toHaveBeenCalled();
+		expect(readCount).toBe(0);
 	});
 
 	it("#given auto workflow is enabled #when prompt asks for debugging #then hook selects ulw-loop guidance", () => {

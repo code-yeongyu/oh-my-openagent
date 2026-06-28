@@ -89,6 +89,11 @@ export type CodexUserPromptSubmitInput = {
 
 type TranscriptReader = (transcriptPath: string) => string;
 
+type UserPromptSubmitHookRuntime = {
+	readonly hookEnv?: NodeJS.ProcessEnv;
+	readonly transcriptReader?: TranscriptReader;
+};
+
 interface UserPromptSubmitHookOutput {
 	readonly hookSpecificOutput: {
 		readonly hookEventName: "UserPromptSubmit";
@@ -96,14 +101,25 @@ interface UserPromptSubmitHookOutput {
 	};
 }
 
-export function runUserPromptSubmitHook(input: unknown, transcriptReader: TranscriptReader = readTranscriptTail): string {
+export function runUserPromptSubmitHook(
+	input: unknown,
+	runtime: UserPromptSubmitHookRuntime = {},
+): string {
 	if (!isCodexUserPromptSubmitInput(input)) return "";
-	if (!isAutoWorkflowEnabled(env)) return "";
+	const hookEnv = runtime.hookEnv ?? env;
+	if (!isAutoWorkflowEnabled(hookEnv)) return "";
+	const transcriptReader = runtime.transcriptReader ?? readTranscriptTail;
 	if (isContextPressureRecoveryPrompt(input.prompt)) return "";
-	if (hasAutoWorkflowContextAlreadyInTranscript(input.transcript_path, transcriptReader))
+	if (
+		hasAutoWorkflowContextAlreadyInTranscript(
+			input.transcript_path,
+			transcriptReader,
+		)
+	)
 		return "";
-	if (isContextPressureTranscript(input.transcript_path, transcriptReader)) return "";
-	const autoWorkflowContext = buildAutoWorkflowContext(input.prompt);
+	if (isContextPressureTranscript(input.transcript_path, transcriptReader))
+		return "";
+	const autoWorkflowContext = buildAutoWorkflowContext(input.prompt, hookEnv);
 	return autoWorkflowContext === null
 		? ""
 		: formatAdditionalContextOutput(autoWorkflowContext);
