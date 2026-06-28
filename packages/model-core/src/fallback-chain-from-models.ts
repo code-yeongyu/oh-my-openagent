@@ -15,7 +15,7 @@ function parseVariantFromModel(rawModel: string): { modelID: string; variant?: s
   const parenthesizedVariant = trimmedModel.match(/^(.*)\(([^()]+)\)\s*$/)
   if (parenthesizedVariant) {
     const modelID = parenthesizedVariant[1]?.trim() ?? ""
-    const variant = parenthesizedVariant[2]?.trim()
+    const variant = parenthesizedVariant[2]?.trim().toLowerCase()
     return variant ? { modelID, variant } : { modelID }
   }
 
