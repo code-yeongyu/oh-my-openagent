@@ -1,5 +1,6 @@
 const BUILT_IN_REDACTION_REGEXES = [
   /((?:authorization|proxy-authorization):\s*(?:bearer|basic)\s+)[^\s"'<>]+/gi,
+  /\b((?:api[_-]?key|token|password|secret|access[_-]?token|refresh[_-]?token)=["'])[^\r\n"']+(["'])/gi,
   /\b((?:api[_-]?key|token|password|secret|access[_-]?token|refresh[_-]?token)=)[^\s"'<>]+/gi,
   /\b(?:gh[pousr]_[A-Za-z0-9_]{20,})\b/g,
   /\b(?:github_pat_[A-Za-z0-9_]{20,})\b/g,
@@ -31,8 +32,10 @@ export function compileRedactions({ redactions, redactRegexes }) {
 export function redactEvidence(text, rules) {
   return rules.reduce(
     (current, rule) =>
-      current.replace(rule.regex, (match, prefix) =>
-        rule.preservePrefix && typeof prefix === "string" ? `${prefix}[REDACTED]` : "[REDACTED]",
+      current.replace(rule.regex, (match, prefix, suffix) =>
+        rule.preservePrefix && typeof prefix === "string"
+          ? `${prefix}[REDACTED]${typeof suffix === "string" ? suffix : ""}`
+          : "[REDACTED]",
       ),
     text,
   );
