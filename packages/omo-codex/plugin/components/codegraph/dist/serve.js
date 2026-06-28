@@ -874,20 +874,20 @@ class CodegraphProjectSyncError extends Error {
   }
 }
 function createProjectSynchronizer(options) {
-  const run = options.run ?? runCodegraphCommand;
   return {
     initialize: async (projectRoot, autoInit) => {
-      await ensureProjectReady(projectRoot, autoInit, options, run);
+      await ensureCodegraphProjectReady(projectRoot, autoInit, options);
     },
-    refresh: (projectPath, autoInit) => ensureProjectReady(projectPath, autoInit, options, run)
+    refresh: async (projectPath, autoInit) => (await ensureCodegraphProjectReady(projectPath, autoInit, options)).action !== "skipped"
   };
 }
-async function ensureProjectReady(projectPath, autoInit, options, run) {
+async function ensureCodegraphProjectReady(projectPath, autoInit, options) {
+  const run = options.run ?? runCodegraphCommand;
   const indexedRoot = findCodegraphRoot(projectPath);
   const projectRoot = indexedRoot ?? resolve3(projectPath);
   if (indexedRoot === null) {
     if (!autoInit)
-      return false;
+      return { action: "skipped", projectRoot };
     prepareCodegraphWorkspace(projectRoot, { homeDir: options.homeDir });
     ensureCodegraphGitignored(projectRoot);
   }
@@ -897,13 +897,13 @@ async function ensureProjectReady(projectPath, autoInit, options, run) {
   const initialized = parseInitialized(status.stdout, status.stderr);
   if (initialized === false) {
     if (!autoInit)
-      return false;
-    await runRequired("init", projectRoot, options, run);
-    return true;
+      return { action: "skipped", projectRoot };
+    const result = await runRequired("init", projectRoot, options, run);
+    return { action: "initialized", exitCode: result.exitCode, projectRoot, timedOut: result.timedOut };
   }
   if (initialized === true) {
-    await runRequired("sync", projectRoot, options, run);
-    return true;
+    const result = await runRequired("sync", projectRoot, options, run);
+    return { action: "synced", exitCode: result.exitCode, projectRoot, timedOut: result.timedOut };
   }
   const detail = status.stderr.trim() || `status exited ${status.exitCode}`;
   throw new CodegraphProjectSyncError("status", projectRoot, detail);
@@ -922,7 +922,7 @@ function findCodegraphRoot(startPath) {
 async function runRequired(action, projectRoot, options, run) {
   const result = await run(projectRoot, options.command, [action], options.env);
   if (result.exitCode === 0 && !result.timedOut)
-    return;
+    return result;
   const detail = result.timedOut ? "command timed out" : result.stderr.trim() || `exit code ${result.exitCode}`;
   throw new CodegraphProjectSyncError(action, projectRoot, detail);
 }
@@ -2437,7 +2437,6 @@ function requestedProtocolVersion(params) {
 
 // src/session-start-worker.ts
 var SESSION_START_CWD_ENV = "OMO_CODEGRAPH_SESSION_START_CWD";
-var WINDOWS_CMD_EXTENSIONS2 = new Set([".bat", ".cmd"]);
 
 // src/serve.ts
 var CODEGRAPH_SKIP_HINT = `CodeGraph MCP skipped: codegraph binary not found. Install CodeGraph or set OMO_CODEGRAPH_BIN.
@@ -2446,15 +2445,7 @@ var CODEGRAPH_DISABLED_HINT = `CodeGraph MCP skipped: disabled by OMO SOT config
 `;
 var CODEGRAPH_VERSION2 = "1.1.1";
 var PROJECT_CWD_ENV_KEYS = ["OMO_CODEGRAPH_PROJECT_CWD", SESSION_START_CWD_ENV, "PWD"];
-
-class CodegraphServeOptionMixError extends Error {
-  name = "CodegraphServeOptionMixError";
-  constructor() {
-    super("CodeGraph serve options cannot mix runProcess with shared proxy injectables");
-  }
-}
 async function runCodegraphServe(options = {}) {
-  rejectMixedServeOptions(options);
   const env2 = options.env ?? processEnv;
   const homeDir = options.homeDir ?? homedir7();
   const wrapperCwd = options.cwd ?? processCwd();
@@ -2496,16 +2487,6 @@ async function runCodegraphServe(options = {}) {
     ...env2,
     ...codegraphEnv
   };
-  if (isDirectProcessOptions(options)) {
-    return options.runProcess(resolution.command, [...resolution.argsPrefix, "serve", "--mcp"], {
-      cwd: projectCwd,
-      env: mergedEnv,
-      input: options.stdin ?? processStdin,
-      output: options.stdout ?? processStdout,
-      stderr: options.stderr ?? processStderr,
-      stdio: "pipe"
-    });
-  }
   const command = { argsPrefix: resolution.argsPrefix, command: resolution.command };
   return runCodegraphMcpProxy({
     autoInit: codegraphConfig.auto_init !== false,
@@ -2599,16 +2580,6 @@ function isDirectInvocation(argvPath) {
   if (moduleName !== "serve.js" && moduleName !== "serve.ts")
     return false;
   return realpathSync2(resolve5(argvPath)) === realpathSync2(modulePath);
-}
-function isDirectProcessOptions(options) {
-  return options.runProcess !== undefined;
-}
-function rejectMixedServeOptions(options) {
-  if (!isDirectProcessOptions(options))
-    return;
-  if (options.runCommand !== undefined || options.spawnServer !== undefined || options.synchronizer !== undefined) {
-    throw new CodegraphServeOptionMixError;
-  }
 }
 export {
   runCodegraphServeCli,
