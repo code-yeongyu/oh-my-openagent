@@ -52,6 +52,17 @@ export function mergeAgentConfig(
     merged.prompt = merged.prompt + "\n" + resolvePromptAppend(prompt_append, directory)
   }
 
+  // OpenCode reads `options` (flat record) for provider-specific request-body params.
+  // OMO's schema accepts `providerOptions` for ergonomic naming, but the key must be
+  // translated before it reaches OpenCode — otherwise it is silently dropped because
+  // OpenCode's agent assembly only enumerates known keys and passes `options` through.
+  const providerOptions = merged.providerOptions
+  if (providerOptions && typeof providerOptions === 'object' && !Array.isArray(providerOptions)) {
+    const existing = (merged.options as Record<string, unknown> | undefined) ?? {}
+    merged.options = { ...existing, ...(providerOptions as Record<string, unknown>) }
+    delete merged.providerOptions
+  }
+
   return merged
 }
 
