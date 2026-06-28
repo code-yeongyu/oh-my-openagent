@@ -1,5 +1,7 @@
 /// <reference types="bun-types" />
 
+// allow: SIZE_OK - LazyCodex publish workflow tests exercise one release workflow fixture; this release adds narrow payload assertions and future additions should split by publish step.
+
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 
