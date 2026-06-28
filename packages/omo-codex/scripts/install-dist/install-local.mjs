@@ -12698,6 +12698,42 @@ async function runAstGrepSkillInstall(options) {
     return { kind: "failed", reason: String(error) };
   }
 }
+// packages/utils/src/codegraph/env.ts
+var SAFE_AMBIENT_ENV_KEYS = new Set([
+  "APPDATA",
+  "CI",
+  "CODEX_HOME",
+  "ComSpec",
+  "HOME",
+  "HOMEDRIVE",
+  "HOMEPATH",
+  "LANG",
+  "LC_ALL",
+  "LC_CTYPE",
+  "LOCALAPPDATA",
+  "PATH",
+  "PATHEXT",
+  "Path",
+  "SystemRoot",
+  "TEMP",
+  "TMP",
+  "TMPDIR",
+  "USERPROFILE",
+  "WINDIR",
+  "XDG_CACHE_HOME",
+  "XDG_CONFIG_HOME",
+  "XDG_DATA_HOME",
+  "XDG_STATE_HOME"
+]);
+var SAFE_CODEGRAPH_RUNTIME_ENV_KEYS = new Set([
+  "CODEGRAPH_ALLOW_UNSAFE_NODE",
+  "CODEGRAPH_BIN",
+  "CODEGRAPH_FAKE_LOG",
+  "CODEGRAPH_NODE_BIN",
+  "OMO_CODEGRAPH_BIN",
+  "OMO_CODEGRAPH_PROJECT_CWD",
+  "OMO_CODEGRAPH_SESSION_START_CWD"
+]);
 // packages/utils/src/codegraph/provision.ts
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";

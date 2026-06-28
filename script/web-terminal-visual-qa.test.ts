@@ -94,6 +94,9 @@ describe("web terminal visual QA helper", () => {
       "Secret QA",
       [
         "Authorization: Bearer ghp_1234567890abcdefghijklmnop",
+        '{"headers":{"Authorization":"Bearer jsonSecretToken1234567890"}}',
+        "{ headers: { Authorization: 'Bearer objectSecretToken1234567890' } }",
+        "{ headers: { 'authorization': 'Bearer singleQuotedKeySecret1234567890' } }",
         "OPENAI_API_KEY=sk-1234567890abcdefghijklmnop",
         'TOKEN="abc123SECRET"',
         "PASSWORD='hunter2SECRET'",
@@ -107,8 +110,18 @@ describe("web terminal visual QA helper", () => {
     )
 
     // then
+    const textArtifact = rendered.text()
+    const textLines = textArtifact.split("\n")
+    expect(textLines).toContain("Authorization: Bearer [REDACTED]")
+    expect(textLines).toContain('{"headers":{"Authorization":"Bearer [REDACTED]"}}')
+    expect(textLines).toContain("{ headers: { Authorization: 'Bearer [REDACTED]' } }")
+    expect(textLines).toContain("{ headers: { 'authorization': 'Bearer [REDACTED]' } }")
+
     const combinedArtifacts = [rendered.text(), rendered.ansi(), rendered.html(), JSON.stringify(rendered.metadata())].join("\n")
     expect(combinedArtifacts).not.toContain("ghp_1234567890abcdefghijklmnop")
+    expect(combinedArtifacts).not.toContain("jsonSecretToken1234567890")
+    expect(combinedArtifacts).not.toContain("objectSecretToken1234567890")
+    expect(combinedArtifacts).not.toContain("singleQuotedKeySecret1234567890")
     expect(combinedArtifacts).not.toContain("sk-1234567890abcdefghijklmnop")
     expect(combinedArtifacts).not.toContain("abc123SECRET")
     expect(combinedArtifacts).not.toContain("hunter2SECRET")

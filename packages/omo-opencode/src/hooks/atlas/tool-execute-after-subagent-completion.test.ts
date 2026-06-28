@@ -113,6 +113,56 @@ describe("handleSubagentCompletionAfter background_output incomplete reports", (
     })
   }
 
+  for (const status of ["pending", "running", "error", "cancelled", "interrupt"] as const) {
+    it(`#given full-session output for a ${status} background task #when handled #then it is left untouched`, async () => {
+      const output = `# Full Session Output
+
+Task ID: bg_${status}
+Description: Implement auth flow
+Status: ${status}
+Session ID: ses_child
+Total messages: 1
+Returned: 1
+Has more: false
+
+## Messages
+
+[assistant] 2026-01-01T00:00:00.000Z
+Still working.
+`
+
+      const result = await runBackgroundOutput(output)
+
+      expect(result.output).toBe(output)
+      expect(result.output).not.toContain("COMPLETION GATE")
+      expect(result.output).not.toContain("SUBAGENT WORK COMPLETED")
+      expect(result.collectCalls).toBe(0)
+    })
+  }
+
+  it("#given full-session output for a completed background task #when handled #then verification reminder is appended", async () => {
+    const output = `# Full Session Output
+
+Task ID: bg_completed
+Description: Implement auth flow
+Status: completed
+Session ID: ses_child
+Total messages: 1
+Returned: 1
+Has more: false
+
+## Messages
+
+[assistant] 2026-01-01T00:00:00.000Z
+Done.
+`
+
+    const result = await runBackgroundOutput(output)
+
+    expect(result.output).toContain("VERIFICATION_REMINDER")
+    expect(result.collectCalls).toBe(1)
+  })
+
   it("#given background_output cannot fetch messages #when handled #then it is left untouched", async () => {
     const output = "Error fetching messages: task still running"
 

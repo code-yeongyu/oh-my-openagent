@@ -1,5 +1,6 @@
 const BUILT_IN_REDACTION_REGEXES = [
   /((?:authorization|proxy-authorization):\s*(?:bearer|basic)\s+)[^\s"'<>]+/gi,
+  /((?:"|')?(?:authorization|proxy-authorization)(?:"|')?\s*:\s*(?:"|')?(?:bearer|basic)\s+)[^"'\s,}\]\[]+((?:"|')?)/gi,
   /\b((?:api[_-]?key|token|password|secret|access[_-]?token|refresh[_-]?token)=["'])[^\r\n"']+(["'])/gi,
   /\b((?:api[_-]?key|token|password|secret|access[_-]?token|refresh[_-]?token)=)[^\s"'<>]+/gi,
   /\b(?:gh[pousr]_[A-Za-z0-9_]{20,})\b/g,

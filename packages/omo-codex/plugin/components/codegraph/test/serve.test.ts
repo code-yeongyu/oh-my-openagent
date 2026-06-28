@@ -24,7 +24,7 @@ describe("runCodegraphServe", () => {
 		// when
 		const exitCode = await runCodegraphServe({
 			cwd: runCwd,
-			env: { CUSTOM: "keep", HOME: "/tmp/home" },
+			env: { CUSTOM: "drop", HOME: "/tmp/home", OPENAI_API_KEY: "sk-test-secret" },
 			nodeVersion: "22.14.0",
 			homeDir: "/tmp/home",
 			buildEnv: ({ homeDir }) => ({
@@ -56,13 +56,14 @@ describe("runCodegraphServe", () => {
 					CODEGRAPH_INSTALL_DIR: "/tmp/home/.omo/codegraph",
 					CODEGRAPH_NO_DOWNLOAD: "1",
 					CODEGRAPH_TELEMETRY: "0",
-					CUSTOM: "keep",
 					DO_NOT_TRACK: "1",
 					HOME: "/tmp/home",
 				},
 				stdio: "pipe",
 			},
 		]);
+		expect(calls[0]?.env["CUSTOM"]).toBeUndefined();
+		expect(calls[0]?.env["OPENAI_API_KEY"]).toBeUndefined();
 	});
 
 	it("#given an unsupported local Node but the unsafe override is set #when serving MCP #then it still spawns codegraph", async () => {

@@ -20,6 +20,41 @@ var CODEGRAPH_INSTALL_DIR_ENV = "CODEGRAPH_INSTALL_DIR";
 var CODEGRAPH_NO_DOWNLOAD_ENV = "CODEGRAPH_NO_DOWNLOAD";
 var CODEGRAPH_TELEMETRY_ENV = "CODEGRAPH_TELEMETRY";
 var DO_NOT_TRACK_ENV = "DO_NOT_TRACK";
+var SAFE_AMBIENT_ENV_KEYS = new Set([
+  "APPDATA",
+  "CI",
+  "CODEX_HOME",
+  "ComSpec",
+  "HOME",
+  "HOMEDRIVE",
+  "HOMEPATH",
+  "LANG",
+  "LC_ALL",
+  "LC_CTYPE",
+  "LOCALAPPDATA",
+  "PATH",
+  "PATHEXT",
+  "Path",
+  "SystemRoot",
+  "TEMP",
+  "TMP",
+  "TMPDIR",
+  "USERPROFILE",
+  "WINDIR",
+  "XDG_CACHE_HOME",
+  "XDG_CONFIG_HOME",
+  "XDG_DATA_HOME",
+  "XDG_STATE_HOME"
+]);
+var SAFE_CODEGRAPH_RUNTIME_ENV_KEYS = new Set([
+  "CODEGRAPH_ALLOW_UNSAFE_NODE",
+  "CODEGRAPH_BIN",
+  "CODEGRAPH_FAKE_LOG",
+  "CODEGRAPH_NODE_BIN",
+  "OMO_CODEGRAPH_BIN",
+  "OMO_CODEGRAPH_PROJECT_CWD",
+  "OMO_CODEGRAPH_SESSION_START_CWD"
+]);
 function buildCodegraphEnv(options = {}) {
   const homeDir = options.homeDir ?? homedir();
   return {
@@ -28,6 +63,26 @@ function buildCodegraphEnv(options = {}) {
     [CODEGRAPH_TELEMETRY_ENV]: "0",
     [DO_NOT_TRACK_ENV]: "1"
   };
+}
+function copyDefinedEnvKeys(output, input, allowedKeys) {
+  for (const key of allowedKeys) {
+    const value = input[key];
+    if (value !== undefined)
+      output[key] = value;
+  }
+}
+function copyDefinedEnv(output, input) {
+  for (const [key, value] of Object.entries(input)) {
+    if (value !== undefined)
+      output[key] = value;
+  }
+}
+function buildCodegraphChildEnv(options = {}) {
+  const env = {};
+  copyDefinedEnvKeys(env, options.ambientEnv ?? {}, SAFE_AMBIENT_ENV_KEYS);
+  copyDefinedEnvKeys(env, options.runtimeEnv ?? {}, SAFE_CODEGRAPH_RUNTIME_ENV_KEYS);
+  copyDefinedEnv(env, options.codegraphEnv ?? {});
+  return env;
 }
 
 // ../../utils/src/codegraph/guidance.ts
@@ -1715,7 +1770,7 @@ import { execFile as execFile2 } from "node:child_process";
 import { appendFileSync as appendFileSync2, existsSync as existsSync6, mkdirSync as mkdirSync2 } from "node:fs";
 import { homedir as homedir8 } from "node:os";
 import { extname, join as join7 } from "node:path";
-import { cwd as processCwd, env as processEnv, stderr as processStderr } from "node:process";
+import { cwd as processCwd, env as processEnv, execPath as processExecPath, stderr as processStderr } from "node:process";
 
 // ../../utils/src/codegraph/provision.ts
 import { createHash as createHash2, randomUUID } from "node:crypto";
@@ -1941,6 +1996,7 @@ var SESSION_START_CWD_ENV = "OMO_CODEGRAPH_SESSION_START_CWD";
 var CODEGRAPH_VERSION = "1.0.1";
 var COMMAND_TIMEOUT_MS = 60000;
 var WINDOWS_CMD_EXTENSIONS = new Set([".bat", ".cmd"]);
+var WINDOWS_NODE_SCRIPT_EXTENSIONS = new Set([".cjs", ".js", ".mjs"]);
 var defaultDeps = {
   ensureGitignored: ensureCodegraphGitignored,
   ensureProvisioned: ensureCodegraphProvisioned,
@@ -2050,7 +2106,7 @@ function jsonSaysInitialized(value) {
 async function runCodegraphCommand(projectRoot, command, args, options) {
   const invocation = resolveCodegraphCommandInvocation(command, args);
   return new Promise((resolvePromise) => {
-    execFile2(invocation.command, [...invocation.args], { cwd: projectRoot, encoding: "utf8", env: { ...process.env, ...options.env }, maxBuffer: 1024 * 1024, timeout: options.timeoutMs, windowsHide: true }, (error, stdout, stderr) => {
+    execFile2(invocation.command, [...invocation.args], { cwd: projectRoot, encoding: "utf8", env: buildCodegraphChildEnv({ ambientEnv: processEnv, codegraphEnv: options.env }), maxBuffer: 1024 * 1024, timeout: options.timeoutMs, windowsHide: true }, (error, stdout, stderr) => {
       if (error === null) {
         resolvePromise({ exitCode: 0, stderr: toOutputText(stderr), stdout: toOutputText(stdout), timedOut: false });
         return;
@@ -2062,7 +2118,10 @@ async function runCodegraphCommand(projectRoot, command, args, options) {
 function resolveCodegraphCommandInvocation(command, args, platform = process.platform) {
   if (platform !== "win32")
     return { args: [...args], command };
-  if (!WINDOWS_CMD_EXTENSIONS.has(extname(command).toLowerCase()))
+  const extension = extname(command).toLowerCase();
+  if (WINDOWS_NODE_SCRIPT_EXTENSIONS.has(extension))
+    return { args: [command, ...args], command: processExecPath };
+  if (!WINDOWS_CMD_EXTENSIONS.has(extension))
     return { args: [...args], command };
   return { args: ["/d", "/s", "/c", command, ...args], command: "cmd.exe" };
 }
@@ -2143,7 +2202,11 @@ async function executeCodegraphSessionStartHook(options = {}) {
   (options.spawnWorker ?? spawnDetachedWorker)({
     args: [options.workerCliPath ?? defaultWorkerCliPath(), "hook", "session-start-worker"],
     command: process.execPath,
-    env: { ...env, [SESSION_START_CWD_ENV]: projectRoot }
+    env: buildCodegraphChildEnv({
+      ambientEnv: env,
+      codegraphEnv: { [SESSION_START_CWD_ENV]: projectRoot },
+      runtimeEnv: env
+    })
   });
   writeHookJson(options.stdout ?? processStdout);
   return { action: "spawned", exitCode: 0 };
@@ -2157,11 +2220,11 @@ async function isCodegraphProjectInitialized(options) {
   if (!resolved.exists)
     return false;
   const invocation = resolveCodegraphCommandInvocation(resolved.command, [...resolved.argsPrefix, "status", "--json"]);
-  const status = await runStatusProbe(options.projectRoot, invocation.command, invocation.args, {
+  const codegraphEnv = {
     ...buildCodegraphEnv({ homeDir: options.homeDir }),
-    ...options.trustedCodegraphInstallDir === undefined ? {} : { CODEGRAPH_INSTALL_DIR: options.trustedCodegraphInstallDir },
-    ...definedEnv(options.env)
-  });
+    ...options.trustedCodegraphInstallDir === undefined ? {} : { CODEGRAPH_INSTALL_DIR: options.trustedCodegraphInstallDir }
+  };
+  const status = await runStatusProbe(options.projectRoot, invocation.command, invocation.args, buildCodegraphChildEnv({ ambientEnv: options.env, codegraphEnv, runtimeEnv: options.env }));
   if (status.exitCode !== 0 || status.timedOut)
     return false;
   return codegraphStatusSaysInitialized(status.stdout);
@@ -2171,7 +2234,7 @@ function runStatusProbe(projectRoot, command, args, env) {
     execFile3(command, [...args], {
       cwd: projectRoot,
       encoding: "utf8",
-      env: { ...process.env, ...env },
+      env,
       maxBuffer: 1024 * 1024,
       timeout: STATUS_PROBE_TIMEOUT_MS,
       windowsHide: true
@@ -2196,9 +2259,6 @@ function codegraphStatusSaysInitialized(stdout) {
     return false;
   const normalized = status.toLowerCase();
   return (normalized.includes("initialized") || normalized.includes("ready")) && !normalized.includes("not initialized") && !normalized.includes("uninitialized");
-}
-function definedEnv(env) {
-  return Object.fromEntries(Object.entries(env).filter((entry) => entry[1] !== undefined));
 }
 function provisionedBinFromInstallDir2(installDir) {
   if (installDir === undefined)
@@ -2504,15 +2564,15 @@ function createIdleTimer(idleTimeoutMs, log, onIdleTimeout) {
 }
 // components/codegraph/src/serve-invocation.ts
 import { extname as extname2 } from "node:path";
-import { execPath as processExecPath } from "node:process";
+import { execPath as processExecPath2 } from "node:process";
 var WINDOWS_CMD_EXTENSIONS2 = new Set([".bat", ".cmd"]);
-var WINDOWS_NODE_SCRIPT_EXTENSIONS = new Set([".cjs", ".js", ".mjs"]);
+var WINDOWS_NODE_SCRIPT_EXTENSIONS2 = new Set([".cjs", ".js", ".mjs"]);
 function resolveServeProcessInvocation(command, args, platform = process.platform) {
   if (platform !== "win32")
     return { args: [...args], command };
   const extension = extname2(command).toLowerCase();
-  if (WINDOWS_NODE_SCRIPT_EXTENSIONS.has(extension)) {
-    return { args: [command, ...args], command: processExecPath };
+  if (WINDOWS_NODE_SCRIPT_EXTENSIONS2.has(extension)) {
+    return { args: [command, ...args], command: processExecPath2 };
   }
   if (WINDOWS_CMD_EXTENSIONS2.has(extension)) {
     return { args: ["/d", "/s", "/c", command, ...args], command: "cmd.exe" };
@@ -2702,10 +2762,7 @@ async function runCodegraphServe(options = {}) {
   }
   const runProcess = options.runProcess ?? runBridgedCodegraphProcess;
   const codegraphEnv = codegraphEnvForConfig2(trustedInstallDir, homeDir, options.buildEnv);
-  const mergedEnv = {
-    ...env,
-    ...codegraphEnv
-  };
+  const mergedEnv = buildCodegraphChildEnv({ ambientEnv: env, codegraphEnv, runtimeEnv: env });
   return runProcess(resolution.command, [...resolution.argsPrefix, "serve", "--mcp"], {
     cwd: projectCwd,
     env: mergedEnv,

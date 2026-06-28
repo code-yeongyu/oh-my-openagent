@@ -12,7 +12,7 @@ import {
 import type { Readable, Writable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
-import { buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
+import { buildCodegraphChildEnv, buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
 import {
 	buildCodegraphNodeSkipHint,
 	evaluateCodegraphNodeSupport,
@@ -123,10 +123,7 @@ export async function runCodegraphServe(options: RunCodegraphServeOptions = {}):
 
 	const runProcess = options.runProcess ?? runBridgedCodegraphProcess;
 	const codegraphEnv = codegraphEnvForConfig(trustedInstallDir, homeDir, options.buildEnv);
-	const mergedEnv = {
-		...env,
-		...codegraphEnv,
-	};
+	const mergedEnv = buildCodegraphChildEnv({ ambientEnv: env, codegraphEnv, runtimeEnv: env });
 	return runProcess(resolution.command, [...resolution.argsPrefix, "serve", "--mcp"], {
 		cwd: projectCwd,
 		env: mergedEnv,
