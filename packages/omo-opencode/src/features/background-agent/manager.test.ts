@@ -9,7 +9,8 @@ import {
 } from "../../shared/delegated-child-session-bootstrap"
 import { dispatchInternalPrompt, releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
-import { clearSessionPromptParams, getSessionPromptParams } from "../../shared/session-prompt-params-state"
+import { clearSessionPromptParams, getSessionPromptParams, setSessionPromptParams } from "../../shared/session-prompt-params-state"
+import { deleteSessionTools, getSessionTools, setSessionTools } from "../../shared/session-tools-store"
 import {
   getSessionAgent,
   registerAgentName,
@@ -5407,7 +5408,17 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: createPluginInput(client), config: { messageStalenessTimeoutMs: 600_000 } })
+    const clearSessionFallbackChain = mock(() => {})
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput(client),
+      config: { messageStalenessTimeoutMs: 600_000 },
+      modelFallbackControllerAccessor: {
+        register: () => {},
+        setSessionFallbackChain: () => {},
+        getSessionFallbackChain: () => undefined,
+        clearSessionFallbackChain,
+      },
+    })
     stubNotifyParentSession(manager)
     const sessionID = "session-stale-cleanup"
     const rootSessionID = "root-stale-cleanup"
@@ -5431,6 +5442,8 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       category: "quick",
     })
     setSessionAgent(sessionID, "sisyphus-junior")
+    setSessionPromptParams(sessionID, { temperature: 0.2 })
+    setSessionTools(sessionID, { bash: true, task: false })
     subagentSessions.add(sessionID)
 
     try {
@@ -5444,10 +5457,15 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       expect(getDelegatedChildSessionBootstrap(sessionID)).toBeUndefined()
       expect(SessionCategoryRegistry.has(sessionID)).toBe(false)
       expect(getSessionAgent(sessionID)).toBeUndefined()
+      expect(getSessionPromptParams(sessionID)).toBeUndefined()
+      expect(getSessionTools(sessionID)).toBeUndefined()
+      expect(clearSessionFallbackChain).toHaveBeenCalledWith(sessionID)
       expect(subagentSessions.has(sessionID)).toBe(false)
     } finally {
       manager.shutdown()
       clearAllDelegatedChildSessionBootstrap()
+      clearSessionPromptParams(sessionID)
+      deleteSessionTools(sessionID)
       subagentSessions.delete(sessionID)
     }
   })

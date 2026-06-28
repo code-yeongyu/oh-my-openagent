@@ -31,7 +31,8 @@ import {
 } from "../../shared/model-error-classifier"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
-import { setSessionTools } from "../../shared/session-tools-store"
+import { clearSessionPromptParams } from "../../shared/session-prompt-params-state"
+import { deleteSessionTools, setSessionTools } from "../../shared/session-tools-store"
 import { isInsideTmux } from "../../shared/tmux"
 import { clearSessionAgent, setSessionAgent, subagentSessions, updateSessionAgent } from "../claude-code-session-state"
 import { MESSAGE_STORAGE } from "../hook-message-injector"
@@ -2420,6 +2421,9 @@ The task was re-queued on a fallback model after a retryable failure.
     clearSessionAgent(sessionID)
     clearDelegatedChildSessionBootstrap(sessionID)
     SessionCategoryRegistry.remove(sessionID)
+    clearSessionPromptParams(sessionID)
+    deleteSessionTools(sessionID)
+    this.modelFallbackControllerAccessor?.clearSessionFallbackChain(sessionID)
     this.clearSessionOutputObserved(sessionID)
     this.clearSessionTodoObservation(sessionID)
   }
