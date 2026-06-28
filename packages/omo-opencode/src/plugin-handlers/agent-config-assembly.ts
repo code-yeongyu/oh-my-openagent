@@ -132,6 +132,7 @@ async function createCoreAgentConfig(
     pluginConfig.agents?.["sisyphus-junior"],
     (builtinAgents.atlas as { model?: string } | undefined)?.model,
     useTaskSystem,
+    pluginConfig.categories,
   );
 
   return agentConfig;

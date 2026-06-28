@@ -100,6 +100,70 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
     })
   })
 
+  describe("category model resolution", () => {
+    test("resolves model from category when no explicit model is set", () => {
+      // given
+      const override = { category: "deep" }
+      const categories = { deep: { model: "opencode-go/deepseek-v4-flash" } }
+
+      // when
+      const result = createSisyphusJuniorAgentWithOverrides(override, undefined, false, categories)
+
+      // then
+      expect(result.model).toBe("opencode-go/deepseek-v4-flash")
+    })
+
+    test("explicit model takes priority over category model", () => {
+      // given
+      const override = { model: "openai/gpt-5.4", category: "deep" }
+      const categories = { deep: { model: "opencode-go/deepseek-v4-flash" } }
+
+      // when
+      const result = createSisyphusJuniorAgentWithOverrides(override, undefined, false, categories)
+
+      // then
+      expect(result.model).toBe("openai/gpt-5.4")
+    })
+
+    test("category model takes priority over systemDefaultModel", () => {
+      // given
+      const override = { category: "deep" }
+      const categories = { deep: { model: "opencode-go/deepseek-v4-flash" } }
+      const systemDefaultModel = "anthropic/claude-opus-4-7"
+
+      // when
+      const result = createSisyphusJuniorAgentWithOverrides(override, systemDefaultModel, false, categories)
+
+      // then
+      expect(result.model).toBe("opencode-go/deepseek-v4-flash")
+    })
+
+    test("falls back to systemDefaultModel when category has no model", () => {
+      // given
+      const override = { category: "deep" }
+      const categories = { deep: {} }
+      const systemDefaultModel = "anthropic/claude-opus-4-7"
+
+      // when
+      const result = createSisyphusJuniorAgentWithOverrides(override, systemDefaultModel, false, categories)
+
+      // then
+      expect(result.model).toBe(systemDefaultModel)
+    })
+
+    test("falls back to default when category not found in categories map", () => {
+      // given
+      const override = { category: "nonexistent" }
+      const categories = { deep: { model: "opencode-go/deepseek-v4-flash" } }
+
+      // when
+      const result = createSisyphusJuniorAgentWithOverrides(override, undefined, false, categories)
+
+      // then
+      expect(result.model).toBe(SISYPHUS_JUNIOR_DEFAULTS.model)
+    })
+  })
+
   describe("disable semantics", () => {
     test("disable: true causes override block to be ignored", () => {
       // given
