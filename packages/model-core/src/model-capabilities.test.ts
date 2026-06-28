@@ -1,3 +1,5 @@
+// allow: SIZE_OK - model capability tests validate one generated snapshot contract with shared provider-cache stubs; this release adds small regressions and future growth should split by capability family.
+
 import type { ModelCapabilitiesSnapshot } from "./model-capabilities"
 import { afterEach, describe, expect, test, spyOn } from "bun:test"
 import { getModelCapabilities, getBundledModelCapabilitiesSnapshot } from "./model-capabilities"

@@ -1,3 +1,5 @@
+// allow: SIZE_OK - model resolver fallback tests cover one provider/model matrix with shared cache spies; this release adds narrow regressions and future growth should split by resolver phase.
+
 import { describe, expect, test, spyOn, beforeEach, afterEach, mock } from "bun:test"
 
 import { resolveModel, resolveModelWithFallback, type ModelResolutionInput, type ExtendedModelResolutionInput, type ModelResolutionResult } from "./model-resolver"
