@@ -14,7 +14,7 @@ function quoteYamlScalar(value) {
 	return JSON.stringify(value);
 }
 
-function normalizeSkillFrontmatter(content) {
+export function normalizeSkillFrontmatter(content) {
 	return content.replace(/^description:\s+([^"'\[{\|>][^\r\n]*)$/m, (_match, description) => {
 		return `description: ${quoteYamlScalar(description.trim())}`;
 	});
