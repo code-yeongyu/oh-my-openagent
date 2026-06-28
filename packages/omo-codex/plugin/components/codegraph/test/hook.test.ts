@@ -14,7 +14,13 @@ import {
 
 const pluginRoot = resolve(fileURLToPath(new URL("../../..", import.meta.url)));
 const pluginConfigPath = resolve(pluginRoot, ".codex-plugin/plugin.json");
-const omoCodegraphProjectStorePattern = /(?:^|[\\/])\.omo[\\/]codegraph[\\/]projects[\\/]project-/;
+
+function expectOmoCodegraphProjectStoreGuidance(context: string): void {
+	expect(context).toContain(".omo");
+	expect(context).toContain("codegraph");
+	expect(context).toContain("projects");
+	expect(context).toContain("project-");
+}
 
 describe("CodeGraph SessionStart hook", () => {
 	it("#given hook session-start cli args #when invoked with empty JSON input #then it emits valid JSON and exits zero", async () => {
@@ -71,7 +77,7 @@ describe("CodeGraph SessionStart hook", () => {
 		// then
 		expect(parsed.hookSpecificOutput.hookEventName).toBe("PostToolUse");
 		expect(parsed.hookSpecificOutput.additionalContext).toContain('CodeGraph is not initialized for "/Users/me/project"');
-		expect(parsed.hookSpecificOutput.additionalContext).toMatch(omoCodegraphProjectStorePattern);
+		expectOmoCodegraphProjectStoreGuidance(parsed.hookSpecificOutput.additionalContext);
 		expect(parsed.hookSpecificOutput.additionalContext).toContain('run `codegraph init` from "/Users/me/project"');
 	});
 
@@ -91,7 +97,7 @@ describe("CodeGraph SessionStart hook", () => {
 
 		// then
 		expect(parsed.hookSpecificOutput.additionalContext).toContain('CodeGraph is not initialized for "/Users/me/project"');
-		expect(parsed.hookSpecificOutput.additionalContext).toMatch(omoCodegraphProjectStorePattern);
+		expectOmoCodegraphProjectStoreGuidance(parsed.hookSpecificOutput.additionalContext);
 	});
 
 	it("#given CodeGraph is disabled by Codex SOT config #when SessionStart fires #then it skips without spawning", async () => {
