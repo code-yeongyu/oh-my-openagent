@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, mock } from "bun:test"
 import type { TelemetryCaptureMessage, TelemetryTransportFactory } from "@oh-my-opencode/telemetry-core"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import * as posthogModule from "../../shared/posthog"
 import type * as runnerModuleType from "./runner"
 
@@ -97,6 +100,21 @@ function createThrowingTransportFactory(): TelemetryTransportFactory {
   })
 }
 
+function createRunConfigFixture(telemetry: boolean): string {
+  const directory = mkdtempSync(join(tmpdir(), "omo-run-telemetry-"))
+  const configDirectory = join(directory, ".opencode")
+  mkdirSync(configDirectory, { recursive: true })
+  writeFileSync(
+    join(configDirectory, "oh-my-openagent.jsonc"),
+    JSON.stringify({ telemetry }),
+  )
+  return directory
+}
+
+function removeRunConfigFixture(directory: string): void {
+  rmSync(directory, { recursive: true, force: true })
+}
+
 function resetTelemetrySeams(): void {
   posthogModule.__resetActivityStateProviderForTesting()
   posthogModule.__resetTransportFactoryForTesting()
@@ -112,6 +130,7 @@ describe("run telemetry isolation", () => {
   it("does not capture CLI telemetry when config disables telemetry", async () => {
     // given
     enableTelemetryEnv()
+    const directory = createRunConfigFixture(false)
     const capturedMessages: TelemetryCaptureMessage[] = []
     posthogModule.__setTransportFactoryForTesting(createCapturingTransportFactory(capturedMessages))
     posthogModule.__setActivityStateProviderForTesting(() => ({
@@ -120,12 +139,16 @@ describe("run telemetry isolation", () => {
     }))
     testPluginConfig = { telemetry: false }
 
-    // when
-    const result = await run({ message: "test" })
+    try {
+      // when
+      const result = await run({ directory, message: "test" })
 
-    // then
-    expect(result).toBe(0)
-    expect(capturedMessages).toHaveLength(0)
+      // then
+      expect(result).toBe(0)
+      expect(capturedMessages).toHaveLength(0)
+    } finally {
+      removeRunConfigFixture(directory)
+    }
   })
 
   it("does not crash CLI run when telemetry throws", async () => {
