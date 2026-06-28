@@ -1,0 +1,27 @@
+Focused stale cleanup regression:
+bun test packages/omo-opencode/src/features/background-agent/manager.test.ts -t "should clean stale-interrupted child session bookkeeping"
+PASS: BackgroundManager.checkAndInterruptStaleTasks > should clean stale-interrupted child session bookkeeping
+1 pass, 0 fail, 7 expect() calls
+
+Background-agent focused suite:
+bun test packages/omo-opencode/src/features/background-agent/manager.test.ts packages/omo-opencode/src/features/background-agent/task-poller.test.ts
+Final rerun: 234 pass, 0 fail, 707 expect() calls
+
+Typecheck:
+bun run typecheck:packages
+Completed successfully.
+
+No-excuse scan:
+bun run packages/shared-skills/skills/programming/scripts/typescript/check-no-excuse-rules.ts <changed files>
+Result: existing violations remain in manager.test.ts, manager.ts, and task-poller.ts. The reported issues are pre-existing broad-file violations such as non-null assertions and catch-without-narrowing in the oversized manager files; no new suppressions were added.
+
+Build:
+bun run build
+Result: failed before OpenCode bundle due unrelated deleted Codex files:
+error: Could not resolve: "./core.js"
+at packages/omo-codex/plugin/components/comment-checker/src/codex-hook.ts:11:8
+
+Archive command surface:
+unzip -o -d <dest> -- <archive>
+unzip -p -- <archive> <entry>
+Both commands completed successfully against throwaway archives under /tmp/opencode.
