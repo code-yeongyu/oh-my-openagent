@@ -52,8 +52,10 @@ exercises the surface; capture the artifact.
   2. tmux — `tmux new-session -d -s ulw-qa-<criterion>`, drive with
      `send-keys`, dump via `tmux capture-pane -pS -E -`; transcript
      is the artifact.
-  3. Browser use — use Chrome to drive the REAL page; if Chrome is
-     not available, download and use agent-browser
+  3. Browser use — in Codex, use `browser:control-in-app-browser`
+     first when available and no authenticated/persistent user browser
+     profile is required. Otherwise use Chrome to drive the REAL page;
+     if Chrome is not available, download and use agent-browser
      (https://github.com/vercel-labs/agent-browser). Capture action
      log + screenshot path. Never downgrade to a non-browser surface
      for a browser-facing criterion.
@@ -68,7 +70,8 @@ upfront: the literal command / API call / page action with its concrete
 inputs (URL, payload, keystrokes, selectors) and the single binary
 observable that decides PASS vs FAIL. "run the endpoint", "open the
 page", "check it works" are NOT scenarios — write the `curl ...`, the
-`send-keys ...`, the `page.click(...)`, the expected status/text.
+`send-keys ...`, the Browser plugin action, the `page.click(...)`, the
+expected status/text.
 
 Auxiliary surfaces (CLI stdout / DB state diff / parsed config dump)
 are first-class evidence for CLI- or data-shaped criteria; use a
@@ -77,11 +80,12 @@ printing the command, "should respond", and "looks correct" never
 count.
 
 For TUI visual QA, terminal transcripts alone are not enough when a
-visual surface is being evaluated. Capture the pane and render it with
+visual surface is being evaluated. In this repo, prefer
 `node script/qa/web-terminal-visual-qa.mjs --title "<surface>" --from-file <capture.txt> --evidence-dir <dir>`
-or use the helper's `--command` tmux-backed PTY connector when tmux is
-available. The evidence must include `terminal.png`, `terminal.txt`,
-`terminal.html`, and `metadata.json` with the cleanup receipt.
+or the helper's `--command` tmux-backed PTY connector when available.
+Outside this repo, capture equivalent browser/computer-use rendered
+terminal evidence: screenshot, plain transcript, rendered HTML or action
+log, and cleanup receipt.
 
 # Bootstrap (DO ALL FOUR BEFORE ANY OTHER WORK — NO SKIPPING)
 
