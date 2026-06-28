@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# allow: SIZE_OK - Single end-to-end marketplace install/upgrade scenario; split future additions by phase before expanding.
 # Task 16 e2e marketplace QA against real codex (plan: .omo/plans/codex-marketplace-bootstrap.md).
 # Usage: bash script/qa/codex-marketplace-e2e.sh 2>&1 | tee .omo/evidence/task-16-e2e.log
 # Traps this script must dodge (facts that live outside this repo):
