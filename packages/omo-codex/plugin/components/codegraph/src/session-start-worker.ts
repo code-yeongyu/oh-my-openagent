@@ -1,9 +1,9 @@
-import { execFile } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { extname, join } from "node:path";
+import { join } from "node:path";
 import { cwd as processCwd, env as processEnv, stderr as processStderr } from "node:process";
 
+import { ensureCodegraphProjectReady, runCodegraphCommand } from "@oh-my-opencode/codegraph-mcp";
 import { getCodexOmoConfig } from "../../../shared/src/config-loader.ts";
 import { buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
 import { evaluateCodegraphNodeSupport, type CodegraphNodeSupport } from "../../../../../utils/src/codegraph/node-support.ts";
@@ -13,29 +13,24 @@ import {
 	resolveCodegraphCommand,
 	type CodegraphCommandResolution,
 } from "../../../../../utils/src/codegraph/resolve.ts";
-import { ensureCodegraphGitignored, prepareCodegraphWorkspace } from "../../../../../utils/src/codegraph/workspace.ts";
 import { CODEGRAPH_VERSION } from "../../../../../utils/src/codegraph/version.ts";
 import type {
-	CodegraphCommandResult,
 	CodegraphConfig,
 	CodegraphSessionStartDeps,
 	CodegraphSessionStartOutcome,
 	SessionStartWorkerOptions,
 	WorkerAction,
 } from "./hook-types.js";
+export { resolveCodegraphProcessInvocation as resolveCodegraphCommandInvocation } from "@oh-my-opencode/codegraph-mcp";
 
 export const SESSION_START_CWD_ENV = "OMO_CODEGRAPH_SESSION_START_CWD";
 
-const COMMAND_TIMEOUT_MS = 60_000;
-const WINDOWS_CMD_EXTENSIONS = new Set([".bat", ".cmd"]);
 type CodegraphBootstrapConfig = CodegraphConfig & {
 	readonly trustedCodegraphInstallDir?: string;
 };
 
 const defaultDeps: CodegraphSessionStartDeps = {
-	ensureGitignored: ensureCodegraphGitignored,
 	ensureProvisioned: ensureCodegraphProvisioned,
-	prepareWorkspace: prepareCodegraphWorkspace,
 	resolveCommand: resolveCodegraphCommand,
 	runCommand: runCodegraphCommand,
 };
@@ -80,16 +75,22 @@ async function runBootstrap(
 			return finish("skipped-unsupported-node", { projectRoot }, logOutcome);
 		}
 
-		deps.prepareWorkspace(projectRoot, { homeDir });
-		deps.ensureGitignored(projectRoot);
 		const codegraphEnv = codegraphEnvForConfig(config, homeDir);
-		const status = await deps.runCommand(projectRoot, command.resolution.command, [...command.resolution.argsPrefix, "status", "--json"], { env: codegraphEnv, timeoutMs: COMMAND_TIMEOUT_MS });
-		const decision = decideStartupAction(status);
-		if (decision.kind === "skip") return finish("skipped-status", { error: decision.reason, projectRoot }, logOutcome);
+		const readiness = await ensureCodegraphProjectReady(
+			projectRoot,
+			config.auto_init !== false,
+			{
+				command: { argsPrefix: command.resolution.argsPrefix, command: command.resolution.command },
+				env: codegraphEnv,
+				homeDir,
+				run: deps.runCommand,
+			},
+		);
+		if (readiness.action === "skipped") {
+			return finish("skipped-status", { error: "codegraph is not initialized and auto_init is disabled", projectRoot }, logOutcome);
+		}
 
-		const actionArgs = command.resolution.argsPrefix.concat(decision.kind === "init" ? ["init"] : ["sync"]);
-		const action = await deps.runCommand(projectRoot, command.resolution.command, actionArgs, { env: codegraphEnv, timeoutMs: COMMAND_TIMEOUT_MS });
-		return finish(decision.kind === "init" ? "initialized" : "synced", { exitCode: action.exitCode, projectRoot, source: command.resolution.source, timedOut: action.timedOut }, logOutcome);
+		return finish(readiness.action, { exitCode: readiness.exitCode, projectRoot, source: command.resolution.source, timedOut: readiness.timedOut }, logOutcome);
 	} catch (error) {
 		return finish("failed", { error: error instanceof Error ? error.message : String(error), projectRoot }, logOutcome);
 	}
@@ -141,52 +142,6 @@ function codegraphStateExists(projectRoot: string): boolean {
 	return existsSync(join(projectRoot, ".codegraph"));
 }
 
-function decideStartupAction(status: CodegraphCommandResult): { readonly kind: "init" } | { readonly kind: "skip"; readonly reason: string } | { readonly kind: "sync" } {
-	if (status.timedOut) return { kind: "skip", reason: "status timed out" };
-	const text = `${status.stdout}\n${status.stderr ?? ""}`.toLowerCase();
-	if (text.includes("not initialized") || text.includes("uninitialized")) return { kind: "init" };
-	const initialized = jsonSaysInitialized(parseJson(status.stdout));
-	if (initialized === false) return { kind: "init" };
-	if (initialized === true) return { kind: "sync" };
-	if (status.exitCode !== 0) return { kind: "skip", reason: `status exited ${status.exitCode}` };
-	return { kind: "sync" };
-}
-
-function jsonSaysInitialized(value: unknown): boolean | undefined {
-	if (!isRecord(value)) return undefined;
-	const initialized = value["initialized"] ?? value["isInitialized"] ?? value["ready"];
-	if (typeof initialized === "boolean") return initialized;
-	const status = value["status"];
-	if (typeof status !== "string") return undefined;
-	const normalized = status.toLowerCase();
-	if (normalized.includes("not initialized") || normalized.includes("uninitialized")) return false;
-	if (normalized.includes("initialized") || normalized.includes("ready")) return true;
-	return undefined;
-}
-
-async function runCodegraphCommand(projectRoot: string, command: string, args: readonly string[], options: { readonly env: Record<string, string>; readonly timeoutMs: number }): Promise<CodegraphCommandResult> {
-	const invocation = resolveCodegraphCommandInvocation(command, args);
-	return new Promise((resolvePromise) => {
-		execFile(invocation.command, [...invocation.args], { cwd: projectRoot, encoding: "utf8", env: { ...process.env, ...options.env }, maxBuffer: 1024 * 1024, timeout: options.timeoutMs, windowsHide: true }, (error, stdout, stderr) => {
-			if (error === null) {
-				resolvePromise({ exitCode: 0, stderr: toOutputText(stderr), stdout: toOutputText(stdout), timedOut: false });
-				return;
-			}
-			resolvePromise({ exitCode: resolveExitCode(error), stderr: toOutputText(stderr), stdout: toOutputText(stdout), timedOut: error.killed === true });
-		});
-	});
-}
-
-export function resolveCodegraphCommandInvocation(
-	command: string,
-	args: readonly string[],
-	platform: NodeJS.Platform = process.platform,
-): { readonly args: readonly string[]; readonly command: string } {
-	if (platform !== "win32") return { args: [...args], command };
-	if (!WINDOWS_CMD_EXTENSIONS.has(extname(command).toLowerCase())) return { args: [...args], command };
-	return { args: ["/d", "/s", "/c", command, ...args], command: "cmd.exe" };
-}
-
 function appendOutcome(homeDir: string, outcome: CodegraphSessionStartOutcome): void {
 	const logDir = join(homeDir, ".omo", "codegraph");
 	mkdirSync(logDir, { recursive: true });
@@ -208,28 +163,6 @@ function provisionedBinFromInstallDir(installDir: string | undefined): string | 
 	return existsSync(candidate) ? candidate : null;
 }
 
-function resolveExitCode(error: Error): number {
-	if ("code" in error && typeof error.code === "number") return error.code;
-	return 1;
-}
-
-function toOutputText(value: string | Buffer): string {
-	return Buffer.isBuffer(value) ? value.toString("utf8") : value;
-}
-
 function resolveHomeDir(env: Record<string, string | undefined>): string {
 	return env["HOME"] ?? env["USERPROFILE"] ?? homedir();
-}
-
-function parseJson(text: string): unknown {
-	try {
-		return JSON.parse(text);
-	} catch (error) {
-		if (error instanceof SyntaxError) return undefined;
-		throw error;
-	}
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null;
 }

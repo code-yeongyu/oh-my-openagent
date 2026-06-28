@@ -8,7 +8,7 @@ describe("runCodegraphServe node support", () => {
 	it("#given Node is too new and no command resolves #when serving MCP #then the unsupported-node hint wins", async () => {
 		// given
 		const stderr: string[] = [];
-		const spawned: string[] = [];
+		let spawned = false;
 
 		// when
 		const exitCode = await runCodegraphServe({
@@ -17,16 +17,16 @@ describe("runCodegraphServe node support", () => {
 			nodeVersion: "26.3.0",
 			buildEnv: () => ({}),
 			resolve: () => ({ argsPrefix: [], command: "codegraph", exists: false, source: "path" }),
-			runProcess: (command: string) => {
-				spawned.push(command);
-				return Promise.resolve(0);
+			spawnServer: () => {
+				spawned = true;
+				throw new Error("CodeGraph server should not spawn");
 			},
 			stderr: { write: (chunk: string) => stderr.push(chunk) },
 		});
 
 		// then
 		expect(exitCode).toBe(0);
-		expect(spawned).toEqual([]);
+		expect(spawned).toBe(false);
 		expect(stderr).toHaveLength(1);
 		expect(stderr[0]).toContain("CodeGraph MCP skipped");
 		expect(stderr[0]).toContain("Node 26 is unsupported");

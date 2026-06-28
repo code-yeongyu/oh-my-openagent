@@ -27,9 +27,6 @@ describe("CodeGraph SessionStart worker Node support", () => {
 					ensureProvisioned: () => {
 						throw new Error("ensureProvisioned should not run on unsupported Node");
 					},
-					prepareWorkspace: () => {
-						throw new Error("prepareWorkspace should not run on unsupported Node");
-					},
 					runCommand: () => {
 						throw new Error("runCommand should not run on unsupported Node");
 					},
@@ -63,22 +60,14 @@ describe("CodeGraph SessionStart worker Node support", () => {
 				nodeVersion: "26.3.0",
 				logOutcome: (outcome) => outcomes.push(outcome),
 				deps: {
-					ensureGitignored: () => true,
 					ensureProvisioned: (options) => {
 						provisionCalls.push(options);
 						return Promise.resolve({ binPath, provisioned: true });
 					},
-					prepareWorkspace: () => ({
-						dataDir: join(homeDir, ".omo/codegraph/projects/test"),
-						dataRoot: join(homeDir, ".omo/codegraph"),
-						linked: true,
-						mode: "global-linked",
-						projectLink: join(workspace, ".codegraph"),
-					}),
 					resolveCommand: () => ({ argsPrefix: [], command: "/usr/local/bin/codegraph", exists: true, source: "path" }),
 					runCommand: (_projectRoot, command, args) => {
-						calls.push({ args, command });
-						return Promise.resolve({ exitCode: 0, stdout: calls.length === 1 ? '{"initialized":false}' : "", timedOut: false });
+						calls.push({ args: [...command.argsPrefix, ...args], command: command.command });
+						return Promise.resolve({ exitCode: 0, stdout: calls.length === 1 ? '{"initialized":false}' : "", stderr: "", timedOut: false });
 					},
 				},
 			});
@@ -115,21 +104,13 @@ describe("CodeGraph SessionStart worker Node support", () => {
 				nodeVersion: "26.3.0",
 				logOutcome: (outcome) => outcomes.push(outcome),
 				deps: {
-					ensureGitignored: () => true,
 					ensureProvisioned: () => {
 						throw new Error("provisioning should not run when bundled CodeGraph resolved");
 					},
-					prepareWorkspace: () => ({
-						dataDir: join(homeDir, ".omo/codegraph/projects/test"),
-						dataRoot: join(homeDir, ".omo/codegraph"),
-						linked: true,
-						mode: "global-linked",
-						projectLink: join(workspace, ".codegraph"),
-					}),
 					resolveCommand: () => ({ argsPrefix: ["codegraph.js"], command: nodeBin, exists: true, source: "bundled" }),
 					runCommand: (_projectRoot, command, args) => {
-						calls.push({ args, command });
-						return Promise.resolve({ exitCode: 0, stdout: calls.length === 1 ? '{"initialized":false}' : "", timedOut: false });
+						calls.push({ args: [...command.argsPrefix, ...args], command: command.command });
+						return Promise.resolve({ exitCode: 0, stdout: calls.length === 1 ? '{"initialized":false}' : "", stderr: "", timedOut: false });
 					},
 				},
 			});

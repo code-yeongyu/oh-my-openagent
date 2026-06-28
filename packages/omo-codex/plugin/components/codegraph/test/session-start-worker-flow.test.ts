@@ -13,7 +13,7 @@ describe("CodeGraph SessionStart worker flow", () => {
 			const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-win32-home-"));
 			const installDir = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-win32-install-"));
 			const binPath = join(installDir, "bin", "codegraph.cmd");
-			const calls: { readonly args: readonly string[]; readonly command: string; readonly env: Record<string, string> }[] = [];
+			const calls: { readonly args: readonly string[]; readonly command: string; readonly env: Record<string, string | undefined> }[] = [];
 			const outcomes: unknown[] = [];
 			try {
 				mkdirSync(join(installDir, "bin"), { recursive: true });
@@ -27,24 +27,16 @@ describe("CodeGraph SessionStart worker flow", () => {
 					env: { HOME: homeDir },
 					logOutcome: (outcome) => outcomes.push(outcome),
 					deps: {
-						ensureGitignored: () => true,
 						ensureProvisioned: () => {
 							throw new Error("provisioning should not run when install_dir binary exists");
 						},
-						prepareWorkspace: () => ({
-							dataDir: join(homeDir, ".omo/codegraph/projects/test"),
-							dataRoot: join(homeDir, ".omo/codegraph"),
-							linked: true,
-							mode: "global-linked",
-							projectLink: join(workspace, ".codegraph"),
-						}),
 						resolveCommand: (options) => {
 							const provisioned = options?.provisioned?.() ?? null;
 							return { argsPrefix: [], command: provisioned ?? "missing-codegraph", exists: provisioned !== null, source: provisioned === null ? "path" : "provisioned" };
 						},
-						runCommand: (_projectRoot, command, args, options) => {
-							calls.push({ args, command, env: options.env });
-							return Promise.resolve({ exitCode: 0, stdout: calls.length === 1 ? '{"initialized":false}' : "", timedOut: false });
+						runCommand: (_projectRoot, command, args, env) => {
+							calls.push({ args: [...command.argsPrefix, ...args], command: command.command, env });
+							return Promise.resolve({ exitCode: 0, stdout: calls.length === 1 ? '{"initialized":false}' : "", stderr: "", timedOut: false });
 						},
 					},
 				});
@@ -98,7 +90,7 @@ describe("CodeGraph SessionStart worker flow", () => {
 			// given
 			const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-status-"));
 			const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-status-home-"));
-			const calls: { readonly args: readonly string[]; readonly command: string; readonly env: Record<string, string> }[] = [];
+			const calls: { readonly args: readonly string[]; readonly command: string; readonly env: Record<string, string | undefined> }[] = [];
 			const outcomes: unknown[] = [];
 			try {
 				// when
@@ -109,19 +101,11 @@ describe("CodeGraph SessionStart worker flow", () => {
 					env: { HOME: homeDir },
 					logOutcome: (outcome) => outcomes.push(outcome),
 					deps: {
-						ensureGitignored: () => true,
 						ensureProvisioned: () => Promise.resolve({ binPath: "/tmp/codegraph", provisioned: true }),
-						prepareWorkspace: () => ({
-							dataDir: join(homeDir, ".omo/codegraph/projects/test"),
-							dataRoot: join(homeDir, ".omo/codegraph"),
-							linked: true,
-							mode: "global-linked",
-							projectLink: join(workspace, ".codegraph"),
-						}),
 						resolveCommand: () => ({ argsPrefix: [], command: "/tmp/codegraph", exists: true, source: "path" }),
-						runCommand: (_projectRoot, command, args, options) => {
-							calls.push({ args, command, env: options.env });
-							return Promise.resolve({ exitCode: 0, stdout: calls.length === 1 ? scenario.stdout : "", timedOut: false });
+						runCommand: (_projectRoot, command, args, env) => {
+							calls.push({ args: [...command.argsPrefix, ...args], command: command.command, env });
+							return Promise.resolve({ exitCode: 0, stdout: calls.length === 1 ? scenario.stdout : "", stderr: "", timedOut: false });
 						},
 					},
 				});
@@ -153,25 +137,11 @@ describe("CodeGraph SessionStart worker flow", () => {
 				env: { HOME: homeDir },
 				logOutcome: (outcome) => outcomes.push(outcome),
 				deps: {
-					ensureGitignored: () => {
-						calls.push("ensureGitignored");
-						return true;
-					},
 					ensureProvisioned: () => Promise.resolve({ binPath: "/tmp/codegraph", provisioned: true }),
-					prepareWorkspace: () => {
-						calls.push("prepareWorkspace");
-						return {
-							dataDir: join(homeDir, ".omo/codegraph/projects/test"),
-							dataRoot: join(homeDir, ".omo/codegraph"),
-							linked: true,
-							mode: "global-linked",
-							projectLink: join(workspace, ".codegraph"),
-						};
-					},
 					resolveCommand: () => ({ argsPrefix: [], command: "/tmp/codegraph", exists: true, source: "path" }),
 					runCommand: () => {
 						calls.push("runCommand");
-						return Promise.resolve({ exitCode: 0, stdout: '{"initialized":false}', timedOut: false });
+						return Promise.resolve({ exitCode: 0, stdout: '{"initialized":false}', stderr: "", timedOut: false });
 					},
 				},
 			});
@@ -203,19 +173,11 @@ describe("CodeGraph SessionStart worker flow", () => {
 				env: { HOME: homeDir },
 				logOutcome: (outcome) => outcomes.push(outcome),
 				deps: {
-					ensureGitignored: () => true,
 					ensureProvisioned: () => Promise.resolve({ binPath: "/tmp/codegraph", provisioned: true }),
-					prepareWorkspace: () => ({
-						dataDir: join(homeDir, ".omo/codegraph/projects/test"),
-						dataRoot: join(homeDir, ".omo/codegraph"),
-						linked: false,
-						mode: "in-project",
-						projectLink: join(workspace, ".codegraph"),
-					}),
 					resolveCommand: () => ({ argsPrefix: [], command: "/tmp/codegraph", exists: true, source: "path" }),
 					runCommand: (_projectRoot, command, args) => {
-						calls.push({ args, command });
-						return Promise.resolve({ exitCode: 0, stdout: calls.length === 1 ? '{"initialized":true}' : "", timedOut: false });
+						calls.push({ args: [...command.argsPrefix, ...args], command: command.command });
+						return Promise.resolve({ exitCode: 0, stdout: calls.length === 1 ? '{"initialized":true}' : "", stderr: "", timedOut: false });
 					},
 				},
 			});

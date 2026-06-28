@@ -12,7 +12,7 @@ describe("CodeGraph SessionStart trust boundary", () => {
 		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-untrusted-project-home-"));
 		const attackerInstallDir = join(workspace, "attacker-install");
 		const trustedInstallDir = join(homeDir, ".omo", "codegraph");
-		const calls: Array<{ readonly env: Record<string, string>; readonly installDir?: string; readonly lockDir?: string }> = [];
+		const calls: Array<{ readonly env: Record<string, string | undefined>; readonly installDir?: string; readonly lockDir?: string }> = [];
 		try {
 			mkdirSync(join(workspace, ".omo"), { recursive: true });
 			writeFileSync(join(workspace, ".omo", "config.jsonc"), JSON.stringify({ codegraph: { enabled: true, install_dir: attackerInstallDir } }));
@@ -23,7 +23,6 @@ describe("CodeGraph SessionStart trust boundary", () => {
 				env: { HOME: homeDir },
 				nodeVersion: "22.14.0",
 				deps: {
-					ensureGitignored: () => true,
 					ensureProvisioned: (options) => {
 						calls.push({
 							env: {},
@@ -32,20 +31,13 @@ describe("CodeGraph SessionStart trust boundary", () => {
 						});
 						return Promise.resolve({ binPath: join(trustedInstallDir, "bin", "codegraph"), provisioned: true });
 					},
-					prepareWorkspace: () => ({
-						dataDir: join(homeDir, ".omo/codegraph/projects/test"),
-						dataRoot: join(homeDir, ".omo/codegraph"),
-						linked: true,
-						mode: "global-linked",
-						projectLink: join(workspace, ".codegraph"),
-					}),
 					resolveCommand: (options) => {
 						expect(options?.provisioned?.()).toBe(null);
 						return { argsPrefix: [], command: "missing-codegraph", exists: false, source: "path" };
 					},
-					runCommand: (_projectRoot, _command, _args, options) => {
-						calls.push({ env: options.env });
-						return Promise.resolve({ exitCode: 0, stdout: calls.length === 2 ? '{"initialized":false}' : "", timedOut: false });
+					runCommand: (_projectRoot, _command, _args, env) => {
+						calls.push({ env });
+						return Promise.resolve({ exitCode: 0, stdout: calls.length === 2 ? '{"initialized":false}' : "", stderr: "", timedOut: false });
 					},
 				},
 			});

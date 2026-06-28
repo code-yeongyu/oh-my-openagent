@@ -10,7 +10,7 @@ describe("runCodegraphServe unavailable CodeGraph paths", () => {
 	it("#given CodeGraph is unresolved #when serving MCP #then exposes an empty facade with a skip hint", async () => {
 		// given
 		const stderr: string[] = [];
-		const spawned: string[] = [];
+		let spawned = false;
 
 		// when
 		const exitCode = await runCodegraphServe({
@@ -19,16 +19,16 @@ describe("runCodegraphServe unavailable CodeGraph paths", () => {
 			env: { PATH: "/bin" },
 			buildEnv: () => ({}),
 			resolve: () => ({ argsPrefix: [], command: "codegraph", exists: false, source: "path" }),
-			runProcess: (command: string) => {
-				spawned.push(command);
-				return Promise.resolve(0);
+			spawnServer: () => {
+				spawned = true;
+				throw new Error("CodeGraph server should not spawn");
 			},
 			stderr: { write: (chunk: string) => stderr.push(chunk) },
 		});
 
 		// then
 		expect(exitCode).toBe(0);
-		expect(spawned).toEqual([]);
+		expect(spawned).toBe(false);
 		expect(stderr).toEqual([
 			"CodeGraph MCP skipped: codegraph binary not found. Install CodeGraph or set OMO_CODEGRAPH_BIN.\n",
 		]);
@@ -37,7 +37,7 @@ describe("runCodegraphServe unavailable CodeGraph paths", () => {
 	it("#given an unsupported local Node #when serving MCP #then exposes an empty facade without spawning codegraph", async () => {
 		// given
 		const stderr: string[] = [];
-		const spawned: string[] = [];
+		let spawned = false;
 
 		// when
 		const exitCode = await runCodegraphServe({
@@ -46,16 +46,16 @@ describe("runCodegraphServe unavailable CodeGraph paths", () => {
 			nodeVersion: "26.3.0",
 			buildEnv: () => ({}),
 			resolve: () => ({ argsPrefix: [], command: "codegraph", exists: true, source: "path" }),
-			runProcess: (command: string) => {
-				spawned.push(command);
-				return Promise.resolve(0);
+			spawnServer: () => {
+				spawned = true;
+				throw new Error("CodeGraph server should not spawn");
 			},
 			stderr: { write: (chunk: string) => stderr.push(chunk) },
 		});
 
 		// then
 		expect(exitCode).toBe(0);
-		expect(spawned).toEqual([]);
+		expect(spawned).toBe(false);
 		expect(stderr).toHaveLength(1);
 		expect(stderr[0]).toContain("CodeGraph MCP skipped");
 		expect(stderr[0]).toContain("CODEGRAPH_ALLOW_UNSAFE_NODE");
@@ -64,7 +64,7 @@ describe("runCodegraphServe unavailable CodeGraph paths", () => {
 	it("#given OMO_CODEGRAPH_BIN points at a missing path #when serving MCP #then exposes an empty facade before spawn", async () => {
 		// given
 		const stderr: string[] = [];
-		const spawned: string[] = [];
+		let spawned = false;
 
 		// when
 		const exitCode = await runCodegraphServe({
@@ -72,16 +72,16 @@ describe("runCodegraphServe unavailable CodeGraph paths", () => {
 			buildEnv: () => ({}),
 			commandExists: () => false,
 			resolve: () => ({ argsPrefix: [], command: "/nonexistent", exists: true, source: "env" }),
-			runProcess: (command: string) => {
-				spawned.push(command);
-				return Promise.resolve(0);
+			spawnServer: () => {
+				spawned = true;
+				throw new Error("CodeGraph server should not spawn");
 			},
 			stderr: { write: (chunk: string) => stderr.push(chunk) },
 		});
 
 		// then
 		expect(exitCode).toBe(0);
-		expect(spawned).toEqual([]);
+		expect(spawned).toBe(false);
 		expect(stderr).toEqual([
 			"CodeGraph MCP skipped: codegraph binary not found. Install CodeGraph or set OMO_CODEGRAPH_BIN.\n",
 		]);
@@ -92,7 +92,7 @@ describe("runCodegraphServe unavailable CodeGraph paths", () => {
 		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-serve-disabled-home-"));
 		const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-serve-disabled-workspace-"));
 		const stderr: string[] = [];
-		const spawned: string[] = [];
+		let spawned = false;
 		try {
 			mkdirSync(join(homeDir, ".omo"), { recursive: true });
 			mkdirSync(join(workspace, ".omo"), { recursive: true });
@@ -104,16 +104,16 @@ describe("runCodegraphServe unavailable CodeGraph paths", () => {
 				...closedMcpStdio(),
 				cwd: workspace,
 				env: { HOME: homeDir },
-				runProcess: (command: string) => {
-					spawned.push(command);
-					return Promise.resolve(0);
+				spawnServer: () => {
+					spawned = true;
+					throw new Error("CodeGraph server should not spawn");
 				},
 				stderr: { write: (chunk: string) => stderr.push(chunk) },
 			});
 
 			// then
 			expect(exitCode).toBe(0);
-			expect(spawned).toEqual([]);
+			expect(spawned).toBe(false);
 			expect(stderr).toEqual([
 				"CodeGraph MCP skipped: disabled by OMO SOT config. Set [codex].codegraph.enabled=true to enable it.\n",
 			]);

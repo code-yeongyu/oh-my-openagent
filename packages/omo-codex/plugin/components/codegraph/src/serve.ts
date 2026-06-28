@@ -41,22 +41,10 @@ import { runUnavailableCodegraphMcpServer } from "./mcp-unavailable.js";
 import { SESSION_START_CWD_ENV } from "./session-start-worker.js";
 export { resolveCodegraphProcessInvocation };
 
-export type ServeStdio = "pipe";
-
-export interface CodegraphServeProcessOptions {
-	readonly cwd: string;
-	readonly env: Record<string, string | undefined>;
-	readonly input: Readable;
-	readonly output: Writable;
-	readonly stderr: CodegraphServeStderr;
-	readonly stdio: ServeStdio;
-}
-
-export type CodegraphServeProcessRunner = (command: string, args: readonly string[], options: CodegraphServeProcessOptions) => Promise<number>;
 export type CodegraphProvisioner = (options: EnsureCodegraphProvisionedOptions) => ReturnType<typeof ensureCodegraphProvisioned>;
 export type CodegraphServeStderr = { readonly write: (chunk: string) => void };
 
-interface RunCodegraphServeBaseOptions {
+export interface RunCodegraphServeOptions {
 	readonly buildEnv?: (options: { readonly homeDir: string }) => Record<string, string>;
 	readonly commandExists?: (filePath: string) => boolean;
 	readonly config?: CodexOmoConfig;
@@ -69,23 +57,10 @@ interface RunCodegraphServeBaseOptions {
 	readonly resolve?: (options: ResolveCodegraphCommandOptions) => ReturnType<typeof resolveCodegraphCommand>;
 	readonly stderr?: CodegraphServeStderr;
 	readonly ensureProvisioned?: CodegraphProvisioner;
-}
-
-export interface RunCodegraphServeDirectProcessOptions extends RunCodegraphServeBaseOptions {
-	readonly runCommand?: never;
-	readonly runProcess: CodegraphServeProcessRunner;
-	readonly spawnServer?: never;
-	readonly synchronizer?: never;
-}
-
-export interface RunCodegraphServeProxyOptions extends RunCodegraphServeBaseOptions {
 	readonly runCommand?: CodegraphCommandRunner;
-	readonly runProcess?: never;
 	readonly spawnServer?: CodegraphServerSpawner;
 	readonly synchronizer?: CodegraphProjectSynchronizer;
 }
-
-export type RunCodegraphServeOptions = RunCodegraphServeDirectProcessOptions | RunCodegraphServeProxyOptions;
 
 const CODEGRAPH_SKIP_HINT =
 	"CodeGraph MCP skipped: codegraph binary not found. Install CodeGraph or set OMO_CODEGRAPH_BIN.\n";
@@ -94,13 +69,7 @@ const CODEGRAPH_DISABLED_HINT =
 const CODEGRAPH_VERSION = "1.1.1";
 const PROJECT_CWD_ENV_KEYS = ["OMO_CODEGRAPH_PROJECT_CWD", SESSION_START_CWD_ENV, "PWD"] as const;
 
-class CodegraphServeOptionMixError extends Error {
-	override readonly name = "CodegraphServeOptionMixError";
-	constructor() { super("CodeGraph serve options cannot mix runProcess with shared proxy injectables"); }
-}
-
 export async function runCodegraphServe(options: RunCodegraphServeOptions = {}): Promise<number> {
-	rejectMixedServeOptions(options);
 	const env = options.env ?? processEnv;
 	const homeDir = options.homeDir ?? homedir();
 	const wrapperCwd = options.cwd ?? processCwd();
@@ -145,17 +114,6 @@ export async function runCodegraphServe(options: RunCodegraphServeOptions = {}):
 		...env,
 		...codegraphEnv,
 	};
-	if (isDirectProcessOptions(options)) {
-		return options.runProcess(resolution.command, [...resolution.argsPrefix, "serve", "--mcp"], {
-			cwd: projectCwd,
-			env: mergedEnv,
-			input: options.stdin ?? processStdin,
-			output: options.stdout ?? processStdout,
-			stderr: options.stderr ?? processStderr,
-			stdio: "pipe",
-		});
-	}
-
 	const command = { argsPrefix: resolution.argsPrefix, command: resolution.command };
 	return runCodegraphMcpProxy({
 		autoInit: codegraphConfig.auto_init !== false,
@@ -264,15 +222,4 @@ function isDirectInvocation(argvPath: string | undefined): boolean {
 	const moduleName = basename(modulePath);
 	if (moduleName !== "serve.js" && moduleName !== "serve.ts") return false;
 	return realpathSync(resolve(argvPath)) === realpathSync(modulePath);
-}
-
-function isDirectProcessOptions(options: RunCodegraphServeOptions): options is RunCodegraphServeDirectProcessOptions {
-	return options.runProcess !== undefined;
-}
-
-function rejectMixedServeOptions(options: RunCodegraphServeOptions): void {
-	if (!isDirectProcessOptions(options)) return;
-	if (options.runCommand !== undefined || options.spawnServer !== undefined || options.synchronizer !== undefined) {
-		throw new CodegraphServeOptionMixError();
-	}
 }

@@ -2,7 +2,9 @@ import { describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { PassThrough } from "node:stream";
 
+import type { CodegraphProjectSynchronizer, CodegraphServerSpawner } from "@oh-my-opencode/codegraph-mcp";
 import { runCodegraphSessionStartWorker } from "../src/hook.ts";
 import { runCodegraphServe } from "../src/serve.ts";
 
@@ -14,15 +16,17 @@ describe("CodeGraph provisioned launcher Node guard", () => {
 
 		// when
 		const exitCode = await runCodegraphServe({
+			...closedMcpStdio(),
 			env: {},
 			nodeVersion: "26.3.0",
 			buildEnv: () => ({}),
 			resolve: () => ({ argsPrefix: [], command: commandPath, exists: true, source: "provisioned" }),
-			runProcess: (command, args) => {
-				spawned.push({ args, command });
-				return Promise.resolve(0);
+			spawnServer: (_cwd, command) => {
+				spawned.push({ args: [...command.argsPrefix, "serve", "--mcp"], command: command.command });
+				return exitingServer(0);
 			},
 			stderr: { write: () => undefined },
+			synchronizer: readySynchronizer(),
 		});
 
 		// then
@@ -51,17 +55,9 @@ describe("CodeGraph provisioned launcher Node guard", () => {
 				env: { HOME: homeDir },
 				logOutcome: (outcome) => outcomes.push(outcome),
 				deps: {
-					ensureGitignored: () => true,
 					ensureProvisioned: () => {
 						throw new Error("provisioning should not run when install_dir binary exists");
 					},
-					prepareWorkspace: () => ({
-						dataDir: join(homeDir, ".omo/codegraph/projects/test"),
-						dataRoot: join(homeDir, ".omo/codegraph"),
-						linked: true,
-						mode: "global-linked",
-						projectLink: join(workspace, ".codegraph"),
-					}),
 					resolveCommand: (options) => {
 						const provisioned = options?.provisioned?.() ?? null;
 						return {
@@ -72,8 +68,8 @@ describe("CodeGraph provisioned launcher Node guard", () => {
 						};
 					},
 					runCommand: (_projectRoot, command, args) => {
-						calls.push({ args, command });
-						return Promise.resolve({ exitCode: 0, stdout: calls.length === 1 ? '{"initialized":false}' : "", timedOut: false });
+						calls.push({ args: [...command.argsPrefix, ...args], command: command.command });
+						return Promise.resolve({ exitCode: 0, stdout: calls.length === 1 ? '{"initialized":false}' : "", stderr: "", timedOut: false });
 					},
 				},
 			});
@@ -92,3 +88,28 @@ describe("CodeGraph provisioned launcher Node guard", () => {
 		}
 	});
 });
+
+function closedMcpStdio(): { readonly stdin: PassThrough; readonly stdout: PassThrough } {
+	const stdin = new PassThrough();
+	const stdout = new PassThrough();
+	stdout.resume();
+	stdin.end();
+	return { stdin, stdout };
+}
+
+function exitingServer(exitCode: number): ReturnType<CodegraphServerSpawner> {
+	return {
+		input: new PassThrough(),
+		output: new PassThrough(),
+		error: new PassThrough(),
+		terminate: () => undefined,
+		wait: () => Promise.resolve(exitCode),
+	};
+}
+
+function readySynchronizer(): CodegraphProjectSynchronizer {
+	return {
+		initialize: () => Promise.resolve(),
+		refresh: () => Promise.resolve(true),
+	};
+}

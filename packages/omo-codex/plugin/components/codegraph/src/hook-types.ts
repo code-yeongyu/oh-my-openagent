@@ -1,12 +1,15 @@
 import type { Readable } from "node:stream";
 
+import type {
+	CodegraphCommandResult as SharedCodegraphCommandResult,
+	CodegraphCommandRunner,
+} from "@oh-my-opencode/codegraph-mcp";
 import type { CodexOmoConfig as SharedCodexOmoConfig } from "../../../shared/src/config-loader.ts";
 import type { CodegraphProvisionResult as SharedCodegraphProvisionResult } from "../../../../../utils/src/codegraph/provision.ts";
 import type {
 	CodegraphCommandResolution,
 	ResolveCodegraphCommandOptions,
 } from "../../../../../utils/src/codegraph/resolve.ts";
-import type { CodegraphWorkspacePreparation as SharedCodegraphWorkspacePreparation } from "../../../../../utils/src/codegraph/workspace.ts";
 import type { CodegraphConfig as SharedCodegraphConfig } from "../../../../../utils/src/omo-config.ts";
 import type { CodegraphVersion } from "../../../../../utils/src/codegraph/version.ts";
 
@@ -34,18 +37,11 @@ export interface PostToolUseHookResult {
 	readonly exitCode: 0;
 }
 
-export interface CodegraphCommandResult {
-	readonly exitCode: number;
-	readonly stderr?: string;
-	readonly stdout: string;
-	readonly timedOut: boolean;
-}
-
 export type CodegraphConfig = Partial<SharedCodegraphConfig>;
 export type CodexOmoConfig = SharedCodexOmoConfig;
 export type OmoConfigSource = CodexOmoConfig["sources"][number];
+export type CodegraphCommandResult = SharedCodegraphCommandResult;
 export type CodegraphProvisionResult = SharedCodegraphProvisionResult;
-export type CodegraphWorkspacePreparation = SharedCodegraphWorkspacePreparation;
 
 export interface CodegraphSessionStartOutcome {
 	readonly action: WorkerAction;
@@ -57,16 +53,9 @@ export interface CodegraphSessionStartOutcome {
 }
 
 export interface CodegraphSessionStartDeps {
-	readonly ensureGitignored: (projectRoot: string) => boolean;
 	readonly ensureProvisioned: (options: { readonly installDir?: string; readonly lockDir: string; readonly version: CodegraphVersion }) => Promise<CodegraphProvisionResult>;
-	readonly prepareWorkspace: (projectRoot: string, options: { readonly homeDir: string }) => CodegraphWorkspacePreparation;
 	readonly resolveCommand: (options?: ResolveCodegraphCommandOptions) => CodegraphCommandResolution;
-	readonly runCommand: (
-		projectRoot: string,
-		command: string,
-		args: readonly string[],
-		options: { readonly env: Record<string, string>; readonly timeoutMs: number },
-	) => Promise<CodegraphCommandResult>;
+	readonly runCommand: CodegraphCommandRunner;
 }
 
 export interface SessionStartHookOptions {

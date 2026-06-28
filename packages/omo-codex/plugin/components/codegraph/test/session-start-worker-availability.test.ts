@@ -21,25 +21,11 @@ describe("CodeGraph SessionStart worker availability", () => {
 				nodeVersion: "22.14.0",
 				logOutcome: (outcome) => outcomes.push(outcome),
 				deps: {
-					ensureGitignored: () => {
-						calls.push("ensureGitignored");
-						return true;
-					},
 					ensureProvisioned: () => Promise.resolve({ error: "offline", provisioned: false }),
-					prepareWorkspace: () => {
-						calls.push("prepareWorkspace");
-						return {
-							dataDir: join(homeDir, ".omo/codegraph/projects/test"),
-							dataRoot: join(homeDir, ".omo/codegraph"),
-							linked: true,
-							mode: "global-linked",
-							projectLink: join(workspace, ".codegraph"),
-						};
-					},
 					resolveCommand: () => ({ argsPrefix: [], command: "codegraph", exists: false, source: "path" }),
 					runCommand: () => {
 						calls.push("runCommand");
-						return Promise.resolve({ exitCode: 0, stdout: "", timedOut: false });
+						return Promise.resolve({ exitCode: 0, stdout: "", stderr: "", timedOut: false });
 					},
 				},
 			});

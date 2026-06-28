@@ -7,24 +7,17 @@ import { fileURLToPath } from "node:url";
 const componentRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("runCodegraphServe option types", () => {
-	it("#given direct-process and proxy injectables are mixed #when typechecking serve options #then the public type rejects them", () => {
+	it("#given direct-process injection is used #when typechecking serve options #then the public type rejects it", () => {
 		// given
 		const probePath = join(componentRoot, ".serve-options-probe.ts");
 		writeFileSync(
 			probePath,
 			[
 				'import type { RunCodegraphServeOptions } from "./src/serve.ts";',
-				"const mixed: RunCodegraphServeOptions = {",
+				"const directProcess: RunCodegraphServeOptions = {",
 				"  runProcess: () => Promise.resolve(0),",
-				"  spawnServer: () => ({",
-				"    input: process.stdout,",
-				"    output: process.stdin,",
-				"    error: process.stdin,",
-				"    terminate: () => undefined,",
-				"    wait: () => Promise.resolve(0),",
-				"  }),",
 				"};",
-				"void mixed;",
+				"void directProcess;",
 			].join("\n"),
 		);
 
@@ -50,7 +43,7 @@ describe("runCodegraphServe option types", () => {
 
 			// then
 			expect(result.status).not.toBe(0);
-			expect(`${result.stdout}\n${result.stderr}`).toContain("RunCodegraphServeOptions");
+			expect(`${result.stdout}\n${result.stderr}`).toContain("runProcess");
 		} finally {
 			rmSync(probePath, { force: true });
 		}

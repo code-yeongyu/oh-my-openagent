@@ -22,7 +22,6 @@ export type {
 	CodegraphProvisionResult,
 	CodegraphSessionStartDeps,
 	CodegraphSessionStartOutcome,
-	CodegraphWorkspacePreparation,
 	CodexOmoConfig,
 	HookStdout,
 	OmoConfigSource,

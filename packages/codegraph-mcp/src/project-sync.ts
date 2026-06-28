@@ -5,7 +5,12 @@ import { ensureCodegraphGitignored, prepareCodegraphWorkspace } from "@oh-my-ope
 import { isPlainRecord } from "@oh-my-opencode/mcp-stdio-core"
 
 import { runCodegraphCommand } from "./process.js"
-import type { CodegraphCommandRunner, CodegraphCommandSpec, CodegraphProjectSynchronizer } from "./types.js"
+import type {
+  CodegraphCommandResult,
+  CodegraphCommandRunner,
+  CodegraphCommandSpec,
+  CodegraphProjectSynchronizer,
+} from "./types.js"
 
 export interface CreateProjectSynchronizerOptions {
   readonly command: CodegraphCommandSpec
@@ -13,6 +18,18 @@ export interface CreateProjectSynchronizerOptions {
   readonly homeDir: string
   readonly run?: CodegraphCommandRunner
 }
+
+export type CodegraphProjectReadyResult =
+  | {
+      readonly action: "initialized" | "synced"
+      readonly exitCode: number
+      readonly projectRoot: string
+      readonly timedOut: boolean
+    }
+  | {
+      readonly action: "skipped"
+      readonly projectRoot: string
+    }
 
 export class CodegraphProjectSyncError extends Error {
   readonly action: "init" | "status" | "sync"
@@ -27,25 +44,25 @@ export class CodegraphProjectSyncError extends Error {
 }
 
 export function createProjectSynchronizer(options: CreateProjectSynchronizerOptions): CodegraphProjectSynchronizer {
-  const run = options.run ?? runCodegraphCommand
   return {
     initialize: async (projectRoot, autoInit) => {
-      await ensureProjectReady(projectRoot, autoInit, options, run)
+      await ensureCodegraphProjectReady(projectRoot, autoInit, options)
     },
-    refresh: (projectPath, autoInit) => ensureProjectReady(projectPath, autoInit, options, run),
+    refresh: async (projectPath, autoInit) =>
+      (await ensureCodegraphProjectReady(projectPath, autoInit, options)).action !== "skipped",
   }
 }
 
-async function ensureProjectReady(
+export async function ensureCodegraphProjectReady(
   projectPath: string,
   autoInit: boolean,
   options: CreateProjectSynchronizerOptions,
-  run: CodegraphCommandRunner,
-): Promise<boolean> {
+): Promise<CodegraphProjectReadyResult> {
+  const run = options.run ?? runCodegraphCommand
   const indexedRoot = findCodegraphRoot(projectPath)
   const projectRoot = indexedRoot ?? resolve(projectPath)
   if (indexedRoot === null) {
-    if (!autoInit) return false
+    if (!autoInit) return { action: "skipped", projectRoot }
     prepareCodegraphWorkspace(projectRoot, { homeDir: options.homeDir })
     ensureCodegraphGitignored(projectRoot)
   }
@@ -54,13 +71,13 @@ async function ensureProjectReady(
   if (status.timedOut) throw new CodegraphProjectSyncError("status", projectRoot, "command timed out")
   const initialized = parseInitialized(status.stdout, status.stderr)
   if (initialized === false) {
-    if (!autoInit) return false
-    await runRequired("init", projectRoot, options, run)
-    return true
+    if (!autoInit) return { action: "skipped", projectRoot }
+    const result = await runRequired("init", projectRoot, options, run)
+    return { action: "initialized", exitCode: result.exitCode, projectRoot, timedOut: result.timedOut }
   }
   if (initialized === true) {
-    await runRequired("sync", projectRoot, options, run)
-    return true
+    const result = await runRequired("sync", projectRoot, options, run)
+    return { action: "synced", exitCode: result.exitCode, projectRoot, timedOut: result.timedOut }
   }
   const detail = status.stderr.trim() || `status exited ${status.exitCode}`
   throw new CodegraphProjectSyncError("status", projectRoot, detail)
@@ -81,9 +98,9 @@ async function runRequired(
   projectRoot: string,
   options: CreateProjectSynchronizerOptions,
   run: CodegraphCommandRunner,
-): Promise<void> {
+): Promise<CodegraphCommandResult> {
   const result = await run(projectRoot, options.command, [action], options.env)
-  if (result.exitCode === 0 && !result.timedOut) return
+  if (result.exitCode === 0 && !result.timedOut) return result
   const detail = result.timedOut ? "command timed out" : result.stderr.trim() || `exit code ${result.exitCode}`
   throw new CodegraphProjectSyncError(action, projectRoot, detail)
 }

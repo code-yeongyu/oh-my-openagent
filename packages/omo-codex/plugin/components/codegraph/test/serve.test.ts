@@ -2,8 +2,10 @@ import { describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { PassThrough } from "node:stream";
 import { fileURLToPath } from "node:url";
 
+import type { CodegraphProjectSynchronizer, CodegraphServerSpawner } from "@oh-my-opencode/codegraph-mcp";
 import { resolveCodegraphProcessInvocation, runCodegraphServe } from "../src/serve.ts";
 
 const componentRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -13,15 +15,15 @@ describe("runCodegraphServe", () => {
 		// given
 		const runCwd = componentRoot;
 		const calls: Array<{
-			readonly args: readonly string[];
-			readonly command: string;
+			readonly argsPrefix: readonly string[];
+			readonly commandPath: string;
 			readonly cwd: string;
 			readonly env: Record<string, string | undefined>;
-			readonly stdio: "pipe";
 		}> = [];
 
 		// when
 		const exitCode = await runCodegraphServe({
+			...closedMcpStdio(),
 			cwd: runCwd,
 			env: { CUSTOM: "keep", HOME: "/tmp/home" },
 			nodeVersion: "22.14.0",
@@ -33,23 +35,20 @@ describe("runCodegraphServe", () => {
 				DO_NOT_TRACK: "1",
 			}),
 			resolve: () => ({ argsPrefix: ["shim.js"], command: "node", exists: true, source: "bundled" }),
-			runProcess: (
-				command: string,
-				args: readonly string[],
-				options: { readonly cwd: string; readonly env: Record<string, string | undefined>; readonly stdio: "pipe" },
-			) => {
-				calls.push({ args, command, cwd: options.cwd, env: options.env, stdio: options.stdio });
-				return Promise.resolve(7);
+			spawnServer: (cwd, command, env) => {
+				calls.push({ argsPrefix: command.argsPrefix, commandPath: command.command, cwd, env });
+				return exitingServer(7);
 			},
 			stderr: { write: () => undefined },
+			synchronizer: readySynchronizer(),
 		});
 
 		// then
 		expect(exitCode).toBe(7);
 		expect(calls).toEqual([
 			{
-				args: ["shim.js", "serve", "--mcp"],
-				command: "node",
+				argsPrefix: ["shim.js"],
+				commandPath: "node",
 				cwd: resolve(runCwd),
 				env: {
 					CODEGRAPH_INSTALL_DIR: "/tmp/home/.omo/codegraph",
@@ -59,7 +58,6 @@ describe("runCodegraphServe", () => {
 					DO_NOT_TRACK: "1",
 					HOME: "/tmp/home",
 				},
-				stdio: "pipe",
 			},
 		]);
 	});
@@ -75,6 +73,7 @@ describe("runCodegraphServe", () => {
 
 			// when
 			const exitCode = await runCodegraphServe({
+				...closedMcpStdio(),
 				cwd: runCwd,
 				env: {
 					OMO_CODEGRAPH_PROJECT_CWD: join(tempRoot, "missing-project"),
@@ -84,11 +83,12 @@ describe("runCodegraphServe", () => {
 				nodeVersion: "22.14.0",
 				buildEnv: () => ({}),
 				resolve: () => ({ argsPrefix: [], command: "codegraph", exists: true, source: "env" }),
-				runProcess: (_command, _args, options) => {
-					calls.push({ cwd: options.cwd });
-					return Promise.resolve(0);
+				spawnServer: (cwd) => {
+					calls.push({ cwd });
+					return exitingServer(0);
 				},
 				stderr: { write: () => undefined },
+				synchronizer: readySynchronizer(),
 			});
 
 			// then
@@ -105,15 +105,17 @@ describe("runCodegraphServe", () => {
 
 		// when
 		const exitCode = await runCodegraphServe({
+			...closedMcpStdio(),
 			env: { CODEGRAPH_ALLOW_UNSAFE_NODE: "1" },
 			nodeVersion: "26.3.0",
 			buildEnv: () => ({}),
 			resolve: () => ({ argsPrefix: ["shim.js"], command: "node", exists: true, source: "bundled" }),
-			runProcess: (command: string) => {
-				spawned.push(command);
-				return Promise.resolve(0);
+			spawnServer: (_cwd, command) => {
+				spawned.push(command.command);
+				return exitingServer(0);
 			},
 			stderr: { write: () => undefined },
+			synchronizer: readySynchronizer(),
 		});
 
 		// then
@@ -128,15 +130,17 @@ describe("runCodegraphServe", () => {
 
 		// when
 		const exitCode = await runCodegraphServe({
+			...closedMcpStdio(),
 			env: { CODEGRAPH_NODE_BIN: nodeBin },
 			nodeVersion: "26.3.0",
 			buildEnv: () => ({}),
 			resolve: () => ({ argsPrefix: ["codegraph.js"], command: nodeBin, exists: true, source: "bundled" }),
-			runProcess: (command: string, args: readonly string[]) => {
-				spawned.push({ args, command });
-				return Promise.resolve(0);
+			spawnServer: (_cwd, command) => {
+				spawned.push({ args: [...command.argsPrefix, "serve", "--mcp"], command: command.command });
+				return exitingServer(0);
 			},
 			stderr: { write: () => undefined },
+			synchronizer: readySynchronizer(),
 		});
 
 		// then
@@ -151,16 +155,18 @@ describe("runCodegraphServe", () => {
 
 		// when
 		const exitCode = await runCodegraphServe({
+			...closedMcpStdio(),
 			env: { OMO_CODEGRAPH_BIN: commandPath },
 			nodeVersion: "26.3.0",
 			buildEnv: () => ({}),
 			commandExists: (candidate) => candidate === commandPath,
 			resolve: () => ({ argsPrefix: [], command: commandPath, exists: true, source: "env" }),
-			runProcess: (command: string, args: readonly string[]) => {
-				spawned.push({ args, command });
-				return Promise.resolve(0);
+			spawnServer: (_cwd, command) => {
+				spawned.push({ args: [...command.argsPrefix, "serve", "--mcp"], command: command.command });
+				return exitingServer(0);
 			},
 			stderr: { write: () => undefined },
+			synchronizer: readySynchronizer(),
 		});
 
 		// then
@@ -186,6 +192,7 @@ describe("runCodegraphServe", () => {
 
 				// when
 				const exitCode = await runCodegraphServe({
+					...closedMcpStdio(),
 					config: { codegraph: { enabled: true, install_dir: installDir }, sources: [], trustedCodegraphInstallDir: installDir, warnings: [] },
 					env: { HOME: "/tmp/home" },
 					nodeVersion: "22.14.0",
@@ -194,11 +201,12 @@ describe("runCodegraphServe", () => {
 						const provisioned = options.provisioned?.();
 						return { argsPrefix: [], command: provisioned ?? "missing", exists: provisioned !== null && provisioned !== undefined, source: "provisioned" };
 					},
-					runProcess: (command, args, options) => {
-						calls.push({ args, command, env: options.env });
-						return Promise.resolve(0);
+					spawnServer: (_cwd, command, env) => {
+						calls.push({ args: [...command.argsPrefix, "serve", "--mcp"], command: command.command, env });
+						return exitingServer(0);
 					},
 					stderr: { write: () => undefined },
+					synchronizer: readySynchronizer(),
 				});
 
 				// then
@@ -259,4 +267,29 @@ async function withProcessPlatform(platform: NodeJS.Platform, run: () => Promise
 	} finally {
 		if (descriptor !== undefined) Object.defineProperty(process, "platform", descriptor);
 	}
+}
+
+function closedMcpStdio(): { readonly stdin: PassThrough; readonly stdout: PassThrough } {
+	const stdin = new PassThrough();
+	const stdout = new PassThrough();
+	stdout.resume();
+	stdin.end();
+	return { stdin, stdout };
+}
+
+function exitingServer(exitCode: number): ReturnType<CodegraphServerSpawner> {
+	return {
+		input: new PassThrough(),
+		output: new PassThrough(),
+		error: new PassThrough(),
+		terminate: () => undefined,
+		wait: () => Promise.resolve(exitCode),
+	};
+}
+
+function readySynchronizer(): CodegraphProjectSynchronizer {
+	return {
+		initialize: () => Promise.resolve(),
+		refresh: () => Promise.resolve(true),
+	};
 }
