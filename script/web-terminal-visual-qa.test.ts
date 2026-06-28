@@ -110,6 +110,13 @@ describe("web terminal visual QA helper", () => {
     )
 
     // then
+    const textArtifact = rendered.text()
+    const textLines = textArtifact.split("\n")
+    expect(textLines).toContain("Authorization: Bearer [REDACTED]")
+    expect(textLines).toContain('{"headers":{"Authorization":"Bearer [REDACTED]"}}')
+    expect(textLines).toContain("{ headers: { Authorization: 'Bearer [REDACTED]' } }")
+    expect(textLines).toContain("{ headers: { 'authorization': 'Bearer [REDACTED]' } }")
+
     const combinedArtifacts = [rendered.text(), rendered.ansi(), rendered.html(), JSON.stringify(rendered.metadata())].join("\n")
     expect(combinedArtifacts).not.toContain("ghp_1234567890abcdefghijklmnop")
     expect(combinedArtifacts).not.toContain("jsonSecretToken1234567890")
