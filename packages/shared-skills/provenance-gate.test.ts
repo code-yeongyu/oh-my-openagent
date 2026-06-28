@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { materializeFrontendRefs } from "./scripts/materialize-frontend-refs.mjs";
+import { includedDesignpowersSkills } from "./scripts/designpowers-refs-manifest.mjs";
+import { materializeFrontendRefs, normalizeSkillFrontmatter } from "./scripts/materialize-frontend-refs.mjs";
 import { designOriginals, frontendSkillRoot, thirdPartyRelativePaths, upstreamsRoot } from "./scripts/frontend-refs-manifest.mjs";
 
 const repoRoot = join(import.meta.dir, "..", "..");
@@ -52,6 +53,24 @@ describe("DMCA provenance gate", () => {
 		for (const relPath of thirdParty) {
 			expect(existsSync(join(frontendSkillRoot, relPath))).toBe(true);
 		}
+	});
+
+	test("designpowers skills match upstream after frontmatter normalization", () => {
+		// given a materialize run from the inited designpowers submodule
+		const result = materializeFrontendRefs({ strict: false });
+		if (result.skipped) return;
+		const mismatches: string[] = [];
+
+		// then the shipped skill bodies have no drift beyond intentional YAML quoting
+		for (const skillName of includedDesignpowersSkills) {
+			const upstream = readFileSync(join(upstreamsRoot, "designpowers", "skills", skillName, "SKILL.md"), "utf8");
+			const materialized = readFileSync(
+				join(frontendSkillRoot, "references", "designpowers", "vendor", "skills", skillName, "SKILL.md"),
+				"utf8",
+			);
+			if (normalizeSkillFrontmatter(upstream) !== materialized) mismatches.push(skillName);
+		}
+		expect(mismatches).toEqual([]);
 	});
 
 	test("each ATTRIBUTION pin equals the live submodule HEAD", () => {
