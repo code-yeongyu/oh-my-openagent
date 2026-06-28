@@ -53,6 +53,20 @@ describe("configEntryToLoadedSkill", () => {
     expect(loaded?.definition.template).toContain("Use ./allowed.txt for context.")
   })
 
+  test("normalizes allowed-tools from config entries", () => {
+    //#given
+    const entry: SkillDefinition = {
+      template: "Use direct config skill.",
+      "allowed-tools": ["Read", " Write ", "", "Bash"],
+    }
+
+    //#when
+    const loaded = configEntryToLoadedSkill("direct-config-skill", entry, configDir)
+
+    //#then
+    expect(loaded?.allowedTools).toEqual(["Read", "Write", "Bash"])
+  })
+
   test("rejects absolute skill files outside configDir", () => {
     //#given
     const entry: SkillDefinition = { from: outsideSkillPath }
