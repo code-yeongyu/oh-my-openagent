@@ -62,8 +62,8 @@ describe("runCodegraphServe", () => {
 				stdio: "pipe",
 			},
 		]);
-		expect(calls[0]?.env.CUSTOM).toBeUndefined();
-		expect(calls[0]?.env.OPENAI_API_KEY).toBeUndefined();
+		expect(calls[0]?.env["CUSTOM"]).toBeUndefined();
+		expect(calls[0]?.env["OPENAI_API_KEY"]).toBeUndefined();
 	});
 
 	it("#given an unsupported local Node but the unsafe override is set #when serving MCP #then it still spawns codegraph", async () => {

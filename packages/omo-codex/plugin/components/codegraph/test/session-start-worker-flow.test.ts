@@ -157,8 +157,8 @@ describe("CodeGraph SessionStart worker flow", () => {
 		const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-env-"));
 		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-env-home-"));
 		const logPath = join(homeDir, "child-env.jsonl");
-		const originalOpenAiKey = process.env.OPENAI_API_KEY;
-		process.env.OPENAI_API_KEY = "sk-test-secret";
+		const originalOpenAiKey = process.env["OPENAI_API_KEY"];
+		process.env["OPENAI_API_KEY"] = "sk-test-secret";
 
 		try {
 			const fakeCodegraphScript = [
@@ -201,8 +201,8 @@ describe("CodeGraph SessionStart worker flow", () => {
 				{ install: join(homeDir, ".omo", "codegraph") },
 			]);
 		} finally {
-			if (originalOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
-			else process.env.OPENAI_API_KEY = originalOpenAiKey;
+			if (originalOpenAiKey === undefined) delete process.env["OPENAI_API_KEY"];
+			else process.env["OPENAI_API_KEY"] = originalOpenAiKey;
 			rmSync(workspace, { recursive: true, force: true });
 			rmSync(homeDir, { recursive: true, force: true });
 		}
