@@ -256,7 +256,7 @@ describe("resolveCompatibleModelSettings", () => {
       { name: "Grok", modelID: "grok-4.3", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: true },
       { name: "Kimi (kimi)", modelID: "kimi-k2.5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Kimi (k2)", modelID: "k2-v2", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
-      { name: "GLM", modelID: "glm-5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
+      { name: "GLM", modelID: "glm-5.2", expectedVariants: ["low", "medium", "high", "max"], hasReasoningEffort: true },
       { name: "Minimax", modelID: "minimax-m2.5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "DeepSeek", modelID: "deepseek-r2", expectedVariants: ["low", "medium", "high", "max"], hasReasoningEffort: true },
       { name: "Mistral", modelID: "mistral-large-next", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
@@ -361,6 +361,37 @@ describe("resolveCompatibleModelSettings", () => {
       }
     }
   })
+
+  test("GLM maps generic reasoningEffort levels to Z.AI high and max values", () => {
+    const cases = [
+      { requested: "low", expected: "high" },
+      { requested: "medium", expected: "high" },
+      { requested: "high", expected: "high" },
+      { requested: "xhigh", expected: "max" },
+      { requested: "max", expected: "max" },
+    ]
+
+    for (const { requested, expected } of cases) {
+      const result = resolveCompatibleModelSettings({
+        providerID: "zai-coding-plan",
+        modelID: "glm-5.2",
+        desired: { reasoningEffort: requested },
+      })
+
+      expect(result.reasoningEffort).toBe(expected)
+      expect(result.changes).toEqual(
+        requested === expected
+          ? []
+          : [{
+              field: "reasoningEffort",
+              from: requested,
+              to: expected,
+              reason: "unsupported-by-model-family",
+            }],
+      )
+    }
+  })
+
   test("DeepSeek keeps canonical high and max reasoningEffort values", () => {
     for (const reasoningEffort of ["high", "max"]) {
       const result = resolveCompatibleModelSettings({
