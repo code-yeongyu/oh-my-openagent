@@ -1,3 +1,5 @@
+// allow: SIZE_OK - Node installer config tests mirror the source installer matrix with one filesystem fixture; this release adds config cases and future edits should split by installer concern.
+
 import assert from "node:assert/strict";
 import { lstat, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

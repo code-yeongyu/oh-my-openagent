@@ -1,3 +1,5 @@
+// allow: SIZE_OK - rules sparkshell-awareness coverage validates one injected guidance contract; this release adds narrow prompt cases and future growth should split by guidance surface.
+
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

@@ -1,3 +1,5 @@
+// allow: SIZE_OK - migration scenarios share one temp Codex-home harness across legacy TOML shapes; this release only adds config cases and future additions should split by migration family.
+
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
