@@ -101,11 +101,44 @@ One cycle:
 4. Lead and members track progress with \`team_task_list\`, \`team_task_get\`, and \`team_status\`.
 5. When the **Closure Contract** below holds, the lead runs the **Closure Sequence** in the same turn. Loop to step 1 for the next phase.
 
+## Practical workflow rules
+
+Team members are signal-driven child sessions, not always-on workers. A member runs its prompt, then goes idle after the turn. For staged workflows, put an explicit WAIT condition in each member prompt:
+
+\`\`\`text
+WAIT for a direct message from lead saying "run-indexer".
+Do not start before that message. When it arrives:
+1. call team_task_list,
+2. claim the lowest unblocked task assigned to you,
+3. do the work,
+4. mark it completed,
+5. send lead a short closure-ready message.
+\`\`\`
+
+Use the parent session as the lead for complex workflows. A category-backed lead is another member session and can be flooded by startup messages before it has created the task graph.
+
+\`team_task_create\` creates pending tasks only. It has \`subject\`, \`description\`, and \`blockedBy\`; it does not accept \`owner\`. To assign work, either create the task and message the target member to claim it, or create the task and have the lead call \`team_task_update({ status: "in_progress", owner: "<member-name>" })\`.
+
+\`team_task_update({ status: "claimed" })\` always claims as the caller. Passing \`owner\` with \`status: "claimed"\` does not pre-claim for another member.
+
+Task state is forward-only:
+
+\`\`\`text
+pending -> claimed -> in_progress -> completed -> deleted
+pending -> in_progress -> completed -> deleted
+\`\`\`
+
+Reverse transitions are rejected. A task marked \`completed\` cannot go back to \`pending\`, \`claimed\`, or \`in_progress\`; delete and recreate it if the work must be retried. \`blockedBy\` dependencies unblock only when every listed blocker is \`completed\`.
+
+Only the current owner can move a task to a non-delete state. Cross-owner updates are rejected, so recovery plans should either keep ownership with the lead until a member actually starts, or have the owner send a blocker message and update their own task.
+
+Background member jobs can emit completion or idle notifications shortly after shutdown. Treat late notifications from already-deleted teams as cleanup lag unless \`team_list\` still shows an active run.
+
 ### Closure Contract
 
 A team is **closable** when ALL of the following hold, as observed by \`team_task_list({ teamRunId })\` and \`team_status({ teamRunId })\`:
 
-- Every task is in a terminal state: \`completed\` or \`failed\`. (No \`pending\`, no \`claimed\`, no \`in_progress\`.)
+- Every task is in a terminal state: \`completed\` or \`deleted\`. (No \`pending\`, no \`claimed\`, no \`in_progress\`.)
 - No outstanding \`team_shutdown_request\` is still awaiting approval.
 - The user has not asked you to keep the team open for follow-up.
 
@@ -124,7 +157,7 @@ If step 2 errors because a member is still active, re-run \`team_status\`. Use \
 
 ## Task ownership
 
-Any agent can set or change task ownership via \`team_task_update\` with the \`owner\` field. Members typically claim work by setting \`owner: "<their-name>"\` and \`status: "claimed"\` (or directly \`"in_progress"\`). The lead can also pre-assign work by creating tasks with \`owner\` set.
+Any participant can set task ownership via \`team_task_update\` with the \`owner\` field when moving a task into \`in_progress\`. Members typically claim work with \`status: "claimed"\`, which assigns ownership to the caller. \`team_task_create\` does not take \`owner\`.
 
 ## Automatic message delivery
 
