@@ -12,6 +12,14 @@ import {
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { handleSubagentCompletionAfter } from "./tool-execute-after-subagent-completion"
 
+type SessionGetInput = { readonly path: { readonly id: string } }
+type SessionGetResult = {
+  readonly data: { readonly parentID: string | undefined }
+  readonly error?: undefined
+  readonly request: Request
+  readonly response: Response
+}
+
 describe("handleSubagentCompletionAfter background_output incomplete reports", () => {
   const temporaryDirectories: string[] = []
 
@@ -21,12 +29,26 @@ describe("handleSubagentCompletionAfter background_output incomplete reports", (
     }
   })
 
+  function createSessionGetResult(parentID: string | undefined): SessionGetResult {
+    return {
+      data: { parentID },
+      error: undefined,
+      request: new Request("https://example.com/session"),
+      response: new Response(null, { status: 200 }),
+    }
+  }
+
   function createContext(): PluginInput {
     const directory = mkdtempSync(join(tmpdir(), "atlas-background-output-incomplete-"))
     temporaryDirectories.push(directory)
 
     return unsafeTestValue<PluginInput>({
-      client: {},
+      client: {
+        session: {
+          get: async (input: SessionGetInput) =>
+            createSessionGetResult(input.path.id === "ses_child" ? "ses_parent" : undefined),
+        },
+      },
       directory,
       worktree: directory,
       serverUrl: new URL("https://example.com"),
@@ -100,5 +122,21 @@ describe("handleSubagentCompletionAfter background_output incomplete reports", (
     expect(result.output).not.toContain("COMPLETION GATE")
     expect(result.output).not.toContain("SUBAGENT WORK COMPLETED")
     expect(result.collectCalls).toBe(0)
+  })
+
+  it("#given completed output contains a status-like table #when handled #then verification reminder is still appended", async () => {
+    const output = `Completed implementation.
+
+The generated report includes this markdown from the child process:
+
+| Field | Value |
+|-------|-------|
+| Status | **running** |
+`
+
+    const result = await runBackgroundOutput(output)
+
+    expect(result.output).toContain("VERIFICATION_REMINDER")
+    expect(result.collectCalls).toBe(1)
   })
 })
