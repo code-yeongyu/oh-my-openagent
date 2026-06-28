@@ -19,6 +19,7 @@ interface FileDiagnostic {
 
 export function collectFilesWithExtension(dir: string, extension: string, maxFiles: number): string[] {
 	const files: string[] = [];
+	const normalizedExtension = extension.toLowerCase();
 
 	function walk(currentDir: string): void {
 		if (files.length >= maxFiles) return;
@@ -48,7 +49,7 @@ export function collectFilesWithExtension(dir: string, extension: string, maxFil
 				if (!SKIP_DIRECTORIES.has(entry)) {
 					walk(fullPath);
 				}
-			} else if (stat.isFile() && effectiveExtension(fullPath) === extension) {
+			} else if (stat.isFile() && effectiveExtension(fullPath).toLowerCase() === normalizedExtension) {
 				files.push(fullPath);
 			}
 		}
