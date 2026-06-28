@@ -215,7 +215,7 @@ describe("CodeGraph SessionStart hook", () => {
 			const result = await executeCodegraphSessionStartHook({
 				config: { codegraph: { enabled: true }, sources: [], warnings: [] },
 				cwd: workspace,
-				env: { HOME: "/tmp/home", KEEP: "1" },
+				env: { HOME: "/tmp/home", KEEP: "1", OPENAI_API_KEY: "sk-test-secret" },
 				stdin: Readable.from(["{}"]),
 				stdout: { write: (chunk) => stdout.push(chunk) },
 				spawnWorker: (invocation) => spawned.push(invocation),
@@ -231,11 +231,12 @@ describe("CodeGraph SessionStart hook", () => {
 					command: process.execPath,
 					env: {
 						HOME: "/tmp/home",
-						KEEP: "1",
 						OMO_CODEGRAPH_SESSION_START_CWD: workspace,
 					},
 				},
 			]);
+			expect(spawned[0]?.env.OPENAI_API_KEY).toBeUndefined();
+			expect(spawned[0]?.env.KEEP).toBeUndefined();
 			expect(JSON.parse(stdout.join(""))).toEqual({
 				hookSpecificOutput: {
 					additionalContext: "LazyCodex CodeGraph bootstrap scheduled in background",

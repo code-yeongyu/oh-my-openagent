@@ -20,6 +20,41 @@ var CODEGRAPH_INSTALL_DIR_ENV = "CODEGRAPH_INSTALL_DIR";
 var CODEGRAPH_NO_DOWNLOAD_ENV = "CODEGRAPH_NO_DOWNLOAD";
 var CODEGRAPH_TELEMETRY_ENV = "CODEGRAPH_TELEMETRY";
 var DO_NOT_TRACK_ENV = "DO_NOT_TRACK";
+var SAFE_AMBIENT_ENV_KEYS = new Set([
+  "APPDATA",
+  "CI",
+  "CODEX_HOME",
+  "ComSpec",
+  "HOME",
+  "HOMEDRIVE",
+  "HOMEPATH",
+  "LANG",
+  "LC_ALL",
+  "LC_CTYPE",
+  "LOCALAPPDATA",
+  "PATH",
+  "PATHEXT",
+  "Path",
+  "SystemRoot",
+  "TEMP",
+  "TMP",
+  "TMPDIR",
+  "USERPROFILE",
+  "WINDIR",
+  "XDG_CACHE_HOME",
+  "XDG_CONFIG_HOME",
+  "XDG_DATA_HOME",
+  "XDG_STATE_HOME"
+]);
+var SAFE_CODEGRAPH_RUNTIME_ENV_KEYS = new Set([
+  "CODEGRAPH_ALLOW_UNSAFE_NODE",
+  "CODEGRAPH_BIN",
+  "CODEGRAPH_FAKE_LOG",
+  "CODEGRAPH_NODE_BIN",
+  "OMO_CODEGRAPH_BIN",
+  "OMO_CODEGRAPH_PROJECT_CWD",
+  "OMO_CODEGRAPH_SESSION_START_CWD"
+]);
 function buildCodegraphEnv(options = {}) {
   const homeDir = options.homeDir ?? homedir();
   return {
@@ -28,6 +63,26 @@ function buildCodegraphEnv(options = {}) {
     [CODEGRAPH_TELEMETRY_ENV]: "0",
     [DO_NOT_TRACK_ENV]: "1"
   };
+}
+function copyDefinedEnvKeys(output, input, allowedKeys) {
+  for (const key of allowedKeys) {
+    const value = input[key];
+    if (value !== undefined)
+      output[key] = value;
+  }
+}
+function copyDefinedEnv(output, input) {
+  for (const [key, value] of Object.entries(input)) {
+    if (value !== undefined)
+      output[key] = value;
+  }
+}
+function buildCodegraphChildEnv(options = {}) {
+  const env = {};
+  copyDefinedEnvKeys(env, options.ambientEnv ?? {}, SAFE_AMBIENT_ENV_KEYS);
+  copyDefinedEnvKeys(env, options.runtimeEnv ?? {}, SAFE_CODEGRAPH_RUNTIME_ENV_KEYS);
+  copyDefinedEnv(env, options.codegraphEnv ?? {});
+  return env;
 }
 
 // ../../../../utils/src/codegraph/node-support.ts
@@ -2097,6 +2152,7 @@ function requestedProtocolVersion(params) {
 // src/session-start-worker.ts
 var SESSION_START_CWD_ENV = "OMO_CODEGRAPH_SESSION_START_CWD";
 var WINDOWS_CMD_EXTENSIONS2 = new Set([".bat", ".cmd"]);
+var WINDOWS_NODE_SCRIPT_EXTENSIONS2 = new Set([".cjs", ".js", ".mjs"]);
 
 // src/serve.ts
 var CODEGRAPH_SKIP_HINT = `CodeGraph MCP skipped: codegraph binary not found. Install CodeGraph or set OMO_CODEGRAPH_BIN.
@@ -2144,10 +2200,7 @@ async function runCodegraphServe(options = {}) {
   }
   const runProcess = options.runProcess ?? runBridgedCodegraphProcess;
   const codegraphEnv = codegraphEnvForConfig(trustedInstallDir, homeDir, options.buildEnv);
-  const mergedEnv = {
-    ...env,
-    ...codegraphEnv
-  };
+  const mergedEnv = buildCodegraphChildEnv({ ambientEnv: env, codegraphEnv, runtimeEnv: env });
   return runProcess(resolution.command, [...resolution.argsPrefix, "serve", "--mcp"], {
     cwd: projectCwd,
     env: mergedEnv,

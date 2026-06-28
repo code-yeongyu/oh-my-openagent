@@ -5,7 +5,7 @@ import { cwd as processCwd, env as processEnv, stdin as processStdin, stdout as 
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
-import { buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
+import { buildCodegraphChildEnv, buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
 import { buildCodegraphInitGuidanceForToolResult } from "../../../../../utils/src/codegraph/guidance.ts";
 import { resolveCodegraphCommand } from "../../../../../utils/src/codegraph/resolve.ts";
 import { getCodexOmoConfig } from "../../../shared/src/config-loader.ts";
@@ -75,7 +75,11 @@ export async function executeCodegraphSessionStartHook(options: SessionStartHook
 	(options.spawnWorker ?? spawnDetachedWorker)({
 		args: [options.workerCliPath ?? defaultWorkerCliPath(), "hook", "session-start-worker"],
 		command: process.execPath,
-		env: { ...env, [SESSION_START_CWD_ENV]: projectRoot },
+		env: buildCodegraphChildEnv({
+			ambientEnv: env,
+			codegraphEnv: { [SESSION_START_CWD_ENV]: projectRoot },
+			runtimeEnv: env,
+		}),
 	});
 	writeHookJson(options.stdout ?? processStdout);
 	return { action: "spawned", exitCode: 0 };
@@ -95,11 +99,16 @@ async function isCodegraphProjectInitialized(options: {
 	if (!resolved.exists) return false;
 
 	const invocation = resolveCodegraphCommandInvocation(resolved.command, [...resolved.argsPrefix, "status", "--json"]);
-	const status = await runStatusProbe(options.projectRoot, invocation.command, invocation.args, {
+	const codegraphEnv = {
 		...buildCodegraphEnv({ homeDir: options.homeDir }),
 		...(options.trustedCodegraphInstallDir === undefined ? {} : { CODEGRAPH_INSTALL_DIR: options.trustedCodegraphInstallDir }),
-		...definedEnv(options.env),
-	});
+	};
+	const status = await runStatusProbe(
+		options.projectRoot,
+		invocation.command,
+		invocation.args,
+		buildCodegraphChildEnv({ ambientEnv: options.env, codegraphEnv, runtimeEnv: options.env }),
+	);
 	if (status.exitCode !== 0 || status.timedOut) return false;
 	return codegraphStatusSaysInitialized(status.stdout);
 }
@@ -117,7 +126,7 @@ function runStatusProbe(
 			{
 				cwd: projectRoot,
 				encoding: "utf8",
-				env: { ...process.env, ...env },
+				env,
 				maxBuffer: 1024 * 1024,
 				timeout: STATUS_PROBE_TIMEOUT_MS,
 				windowsHide: true,
@@ -142,10 +151,6 @@ function codegraphStatusSaysInitialized(stdout: string): boolean {
 	if (typeof status !== "string") return false;
 	const normalized = status.toLowerCase();
 	return (normalized.includes("initialized") || normalized.includes("ready")) && !normalized.includes("not initialized") && !normalized.includes("uninitialized");
-}
-
-function definedEnv(env: Record<string, string | undefined>): Record<string, string> {
-	return Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined));
 }
 
 function provisionedBinFromInstallDir(installDir: string | undefined): string | null {
