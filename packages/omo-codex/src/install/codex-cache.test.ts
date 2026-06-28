@@ -1,6 +1,8 @@
 /// <reference path="../../../../bun-test.d.ts" />
 /// <reference types="bun-types" />
 
+// allow: SIZE_OK - cache install tests share one managed Codex cache fixture; this release adds narrow context cleanup coverage and future additions should split by cache operation.
+
 import { describe, expect, test } from "bun:test"
 import { realpathSync } from "node:fs"
 import { mkdir, mkdtemp, readdir, readFile, readlink, rename, stat, symlink, writeFile } from "node:fs/promises"

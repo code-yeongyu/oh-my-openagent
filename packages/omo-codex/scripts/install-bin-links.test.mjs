@@ -1,3 +1,5 @@
+// allow: SIZE_OK - bin link installer tests share one cross-platform link fixture; this release adds narrow link cases and future additions should split by platform family.
+
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { chmod, lstat, mkdir, readFile, readlink, symlink, writeFile } from "node:fs/promises";
