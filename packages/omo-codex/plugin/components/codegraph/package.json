@@ -15,7 +15,7 @@
 	],
 	"scripts": {
 		"build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && bun build src/serve.ts --target node --format esm --outfile dist/serve.js && bun build src/cli.ts --target node --format esm --outfile dist/cli.js",
-		"test": "bun test test/*.test.ts",
+		"test": "bun test ./test/*.test.ts",
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
