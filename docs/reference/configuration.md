@@ -150,11 +150,26 @@ Here's a practical starting configuration:
 
 Override built-in agent settings. Available agents: `sisyphus`, `hephaestus`, `prometheus`, `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `atlas`, `sisyphus-junior`.
 
+These overrides belong in the OmO plugin config file (`oh-my-openagent.jsonc` or legacy `oh-my-opencode.jsonc`) under the plural `agents` key. Do not put OmO built-in agent model overrides in OpenCode's native `opencode.json` singular `agent` section: plugin-registered OmO agents are resolved by the plugin, and host-config aliases for those built-ins are filtered so stale OpenCode entries do not replace the plugin's resolved model.
+
 ```json
 {
   "agents": {
     "explore": { "model": "anthropic/claude-haiku-4-5", "temperature": 0.5 },
     "multimodal-looker": { "disable": true }
+  }
+}
+```
+
+For example, to move the research and consultant subagents off their defaults:
+
+```jsonc
+{
+  "agents": {
+    "explore": { "model": "opencode/big-pickle" },
+    "librarian": { "model": "opencode/big-pickle" },
+    "oracle": { "model": "opencode-go/glm-5.1" },
+    "multimodal-looker": { "model": "opencode-go/kimi-k2.6" }
   }
 }
 ```
