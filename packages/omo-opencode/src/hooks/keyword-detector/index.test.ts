@@ -66,7 +66,7 @@ describe("keyword-detector message transform", () => {
     return createPluginInputWithToast(async () => {})
   }
 
-  test("should prepend ultrawork message to text part", async () => {
+  test("should append ultrawork message after user text in text part", async () => {
     // given - a fresh ContextCollector and keyword-detector hook
     const collector = new ContextCollector()
     const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
@@ -79,11 +79,35 @@ describe("keyword-detector message transform", () => {
     // when - keyword detection runs
     await hook["chat.message"]({ sessionID }, output)
 
-    // then - message should be prepended to text part with separator and original text
+    // then - original user text comes first, mode instructions appended after separator
     const text = expectTextPartText(output.parts)
     expect(text).toContain("---")
     expect(text).toContain("do something")
     expect(text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+  })
+
+  test("should place user text before mode instructions so session title stays task-focused", async () => {
+    // given - ulw trigger with a concrete user task
+    const collector = new ContextCollector()
+    const sessionID = "title-order-test"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "ulw build the reporting dashboard" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - user text must appear before ULW instructions so OpenCode's title model
+    // generates a meaningful title from the task, not from "ULTRAWORK MODE ENABLED!"
+    const text = expectTextPartText(output.parts)
+    const userTextPos = text.indexOf("build the reporting dashboard")
+    const ulwInstructionsPos = text.indexOf("<ultrawork-mode>")
+    expect(userTextPos).toBeGreaterThan(-1)
+    expect(ulwInstructionsPos).toBeGreaterThan(-1)
+    expect(userTextPos).toBeLessThan(ulwInstructionsPos)
   })
 
   test("should leave search wording as plain user text", async () => {
