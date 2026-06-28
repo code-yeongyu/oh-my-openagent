@@ -889,7 +889,7 @@ Per product:
 
 | Product | Event name | Sources |
 |---------|-----------|---------|
-| Main plugin | `oh_my_openagent_daily_active` | Session start |
+| Main plugin | `omo_daily_active` | Plugin load (`plugin_loaded`) + `run` CLI (`run_started`) |
 | Codex CLI Light edition | `omo_codex_daily_active` | Installer (`install_completed`) + Codex `SessionStart` hook (`session_start`) |
 
 Opt-out:
@@ -907,6 +907,14 @@ export OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0
 ```
 
 The global flags (`OMO_DISABLE_POSTHOG`, `OMO_SEND_ANONYMOUS_TELEMETRY`) also suppress the Codex CLI Light edition telemetry.
+
+The main plugin can also opt out through config:
+
+```jsonc
+{
+  "telemetry": false
+}
+```
 
 See [Privacy Policy](../legal/privacy-policy.md) and [Terms of Service](../legal/terms-of-service.md).
 

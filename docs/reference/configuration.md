@@ -997,6 +997,18 @@ When enabled, OmO registers the hash-anchored `edit` tool and activates the `has
 | `strategies.supersede_writes.aggressive` | `false`    | Prune any write if ANY subsequent read exists                                        |
 | `strategies.purge_errors.turns`          | `5`        | Turns before pruning errored tool inputs                                             |
 
+### Telemetry
+
+```jsonc
+{
+  "telemetry": false
+}
+```
+
+| Option      | Default | Description                                                            |
+| ----------- | ------- | ---------------------------------------------------------------------- |
+| `telemetry` | `true`  | Enable anonymous daily-active telemetry. Set to `false` to disable it. |
+
 ---
 
 ## Reference
@@ -1007,7 +1019,7 @@ When enabled, OmO registers the hash-anchored `edit` tool and activates the `has
 | --------------------- | ----------------------------------------------------------------- |
 | `OPENCODE_CONFIG_DIR` | Override OpenCode config directory (useful for profile isolation) |
 | `OMO_SEND_ANONYMOUS_TELEMETRY` | Set to `0`, `false`, or `no` to disable anonymous telemetry |
-| `OMO_DISABLE_POSTHOG` | Legacy telemetry opt-out flag. Set to `1` or `true` to disable PostHog |
+| `OMO_DISABLE_POSTHOG` | Legacy telemetry opt-out flag. Set to `1`, `true`, or `yes` to disable PostHog |
 | `OMO_CODEX_DISABLE_POSTHOG` | Set to `1` or `true` to disable PostHog telemetry for the `omo-codex` adapter only. Does not affect oh-my-opencode telemetry |
 | `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY` | Set to `0`, `false`, or `no` to disable anonymous telemetry for `omo-codex` only |
 | `OMO_CODEX_GIT_BASH_PATH` | Native Windows Codex installs only. Absolute path to Git Bash, for example `C:\Program Files\Git\bin\bash.exe`, when `where bash` cannot find it |
