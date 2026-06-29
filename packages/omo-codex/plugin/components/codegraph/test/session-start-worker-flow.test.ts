@@ -164,6 +164,7 @@ describe("CodeGraph SessionStart worker flow", () => {
 		const outcomes: unknown[] = [];
 		try {
 			mkdirSync(join(workspace, ".codegraph"), { recursive: true });
+			writeFileSync(join(workspace, ".codegraph", "codegraph.db"), "");
 
 			// when
 			const result = await runCodegraphSessionStartWorker({

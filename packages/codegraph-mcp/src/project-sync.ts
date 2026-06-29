@@ -86,7 +86,7 @@ export async function ensureCodegraphProjectReady(
 export function findCodegraphRoot(startPath: string): string | null {
   let current = resolve(startPath)
   while (true) {
-    if (existsSync(join(current, ".codegraph"))) return current
+    if (existsSync(join(current, ".codegraph", "codegraph.db"))) return current
     const parent = dirname(current)
     if (parent === current) return null
     current = parent

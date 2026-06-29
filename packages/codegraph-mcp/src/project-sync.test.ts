@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -35,6 +35,7 @@ describe("CodeGraph project synchronizer", () => {
     const projectRoot = tempDirectory("omo-codegraph-sync-secondary-")
     const nested = join(projectRoot, "src", "nested")
     mkdirSync(join(projectRoot, ".codegraph"), { recursive: true })
+    writeFileSync(join(projectRoot, ".codegraph", "codegraph.db"), "")
     mkdirSync(nested, { recursive: true })
     const calls: Array<{ readonly args: readonly string[]; readonly cwd: string }> = []
     const synchronizer = createProjectSynchronizer({
@@ -73,6 +74,31 @@ describe("CodeGraph project synchronizer", () => {
 
     expect(refreshed).toBe(true)
     expect(calls).toEqual([["status", "--json"], ["init"]])
+  })
+
+  test("#given home has CodeGraph daemon state #when a fresh project under home is refreshed #then the project initializes instead of home", async () => {
+    const homeDir = tempDirectory("omo-codegraph-sync-home-root-")
+    const projectRoot = join(homeDir, "dev", "fresh-project")
+    mkdirSync(join(homeDir, ".codegraph", "daemons"), { recursive: true })
+    mkdirSync(projectRoot, { recursive: true })
+    const calls: Array<{ readonly args: readonly string[]; readonly cwd: string }> = []
+    const synchronizer = createProjectSynchronizer({
+      command: { argsPrefix: [], command: "/bin/codegraph" },
+      env: {},
+      homeDir,
+      run: (cwd, _command, args) => {
+        calls.push({ args: [...args], cwd })
+        return Promise.resolve(result(args[0] === "status" ? '{"initialized":false}' : ""))
+      },
+    })
+
+    const refreshed = await synchronizer.refresh(projectRoot, true)
+
+    expect(refreshed).toBe(true)
+    expect(calls).toEqual([
+      { args: ["status", "--json"], cwd: projectRoot },
+      { args: ["init"], cwd: projectRoot },
+    ])
   })
 })
 
