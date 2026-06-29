@@ -9425,7 +9425,7 @@ packages/omo-opencode/src/cli/run/events.test.ts:
 (pass) event handling > message.updated with camelCase sessionId sets hasReceivedMeaningfulWork [0.07ms]
 (pass) event handling > message.updated with user role does not set hasReceivedMeaningfulWork [0.08ms]
 
-  ⚙ read_file filePath=/src/index.ts  
+  ⚙ read_file filePath=/src/index.ts
 (pass) event handling > tool.execute sets hasReceivedMeaningfulWork [0.08ms]
 (pass) event handling > tool.execute from different session does not set hasReceivedMeaningfulWork [0.07ms]
 (pass) event handling > session.status with busy type sets mainSessionIdle to false [0.07ms]
