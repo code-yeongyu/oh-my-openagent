@@ -31,6 +31,27 @@ describe("download stats automation", () => {
     expect(events.filter((event) => event.properties.source === "npm")).toHaveLength(3)
   })
 
+  test("#given slurped GitHub release pages #when collected #then stats aggregate every page", async () => {
+    // given
+    const stats = await collectDownloadStats({
+      fetchJson: async () => ({ downloads: 1 }),
+      runGhApi: async () => [
+        [{ assets: [{ download_count: 4 }, { download_count: 6 }] }],
+        [{ assets: [{ download_count: 9 }] }],
+      ],
+    })
+
+    // when
+    const githubStat = stats.find((stat) => stat.source === "github_release")
+
+    // then
+    expect(githubStat).toEqual({
+      count: 19,
+      packageName: "code-yeongyu/oh-my-openagent",
+      source: "github_release",
+    })
+  })
+
   test("#given stats workflow #when inspected #then it is weekly manual and scopes POSTHOG_KEY to send only", async () => {
     // given
     const workflow = await readFile(".github/workflows/stats.yml", "utf8")
