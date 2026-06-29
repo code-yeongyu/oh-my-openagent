@@ -148,6 +148,12 @@ describe("Atlas final verification approval gate", () => {
       }
     })
 
+    Reflect.set(client.tui, "showToast", async () => ({
+      data: undefined,
+      request: new Request("http://localhost/tui/show-toast"),
+      response: new Response(),
+    }))
+
     return {
       directory: testDirectory,
       project: {} as AtlasHookContext["project"],
