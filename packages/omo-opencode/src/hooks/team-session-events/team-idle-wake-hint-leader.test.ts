@@ -28,6 +28,10 @@ type WakeHintPromptInput = {
 
 const temporaryDirectories: string[] = []
 const COMPLETION_CYCLE_COUNT = 6
+const immediatePromptGateOptions: Parameters<typeof createTeamIdleWakeHint>[2] = {
+  idleSettleMs: 0,
+  postDispatchHoldMs: 0,
+}
 
 async function createTemporaryBaseDir(): Promise<string> {
   const baseDir = await mkdtemp(path.join(tmpdir(), "team-leader-wake-hint-"))
@@ -115,7 +119,7 @@ describe("createTeamIdleWakeHint leader delivery", () => {
     const handler = createTeamIdleWakeHint({
       directory: "/tmp/project",
       client: { session: { promptAsync: promptAsyncSpy } },
-    }, config)
+    }, config, immediatePromptGateOptions)
 
     // when
     const completionBodies = Array.from(
