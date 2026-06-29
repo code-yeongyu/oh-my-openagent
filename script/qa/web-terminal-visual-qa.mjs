@@ -180,8 +180,15 @@ function runTmuxCommand(args) {
   const plain = spawnSync("tmux", ["capture-pane", "-p", "-S", "-", "-t", session], { encoding: "utf8" });
   const ansi = spawnSync("tmux", ["capture-pane", "-e", "-p", "-S", "-", "-t", session], { encoding: "utf8" });
   spawnSync("tmux", ["kill-session", "-t", session], { encoding: "utf8" });
+  const plainCapture = plain.status === 0 ? plain.stdout : "";
+  const ansiCapture = ansi.status === 0 ? ansi.stdout : "";
+  const captured = ansiCapture || plainCapture;
+  if (!captured || stripAnsi(captured).trim().length === 0) {
+    const detail = [plain.stderr || plain.stdout, ansi.stderr || ansi.stdout].filter(Boolean).join("; ");
+    throw new Error(`tmux capture was empty${detail ? `: ${detail}` : ""}`);
+  }
   return {
-    ansi: ansi.stdout || plain.stdout,
+    ansi: captured,
     cleanup: `cleanup: tmux kill-session -t ${shellQuote(session)}`,
     connector: "tmux-backed-pty",
   };
