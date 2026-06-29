@@ -1,0 +1,3 @@
+$ bun run packages/shared-skills/skills/programming/scripts/typescript/check-no-excuse-rules.ts <changed test files>
+No violations in 7 file(s).
+EXIT_CODE=0

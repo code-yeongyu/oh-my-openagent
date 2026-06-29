@@ -86,7 +86,7 @@ test("atomicWrite leaves no partial file when rename fails", async () => {
   })
 
   // then
-  expect(result).rejects.toThrow("rename failed")
+  await expect(result).rejects.toThrow("rename failed")
   expect(await readFile(targetPath, "utf8")).toBe("old content")
   expect(renameCalls).toHaveLength(1)
 
@@ -251,6 +251,6 @@ test("detects and reaps stale lock entries", async () => {
 
   // then
   expect(staleDetected).toBe(true)
-  expect(readFile(lockPath, "utf8")).rejects.toThrow()
+  await expect(readFile(lockPath, "utf8")).rejects.toThrow()
   await rm(rootDirectory, { recursive: true, force: true })
 })
