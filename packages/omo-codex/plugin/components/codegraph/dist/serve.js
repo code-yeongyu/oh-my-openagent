@@ -1043,7 +1043,7 @@ async function forwardClientToCodegraph(options, state) {
     const projectPath = projectPathFromToolCall(message.payload);
     if (projectPath !== null) {
       try {
-        const refreshed = await options.synchronizer.refresh(projectPath, false);
+        const refreshed = await options.synchronizer.refresh(projectPath, options.autoInit);
         if (!refreshed) {
           const parsed = isPlainRecord(message.payload) ? message.payload : {};
           writeStdioJsonRpcResponse(state.clientOutput, errorResponse(jsonRpcId(parsed["id"]), -32001, INCOMPLETE_REFRESH_MESSAGE), message.responseMode);
