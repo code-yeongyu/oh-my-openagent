@@ -142,7 +142,7 @@
       "model": "GPT 5.5 Medium"
     },
     "teamMode": {
-      "badge": "NEW · v4.0",
+      "badge": "v4.0+",
       "title": "Team Mode",
       "headline": "Multiple Agents. Side-by-Side. In Parallel.",
       "description": "A lead agent orchestrates a team of category-specialized members, all running in parallel and communicating through dedicated tools. Watch every member work simultaneously in tmux. Opt-in — flip team_mode.enabled and restart.",
