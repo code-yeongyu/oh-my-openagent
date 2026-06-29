@@ -19,6 +19,21 @@ describe("codex-process", () => {
     })
   })
 
+  test("#given Windows codex command #when resolving run command invocation #then uses cmd shim", () => {
+    // given
+    const command = "codex"
+    const args = ["exec", "doctor"] as const
+
+    // when
+    const invocation = resolveRunCommandInvocation(command, args, "win32")
+
+    // then
+    expect(invocation).toEqual({
+      command: "cmd.exe",
+      args: ["/d", "/s", "/c", "codex.cmd", "exec", "doctor"],
+    })
+  })
+
   test("#given non-Windows npm command #when resolving run command invocation #then preserves direct execution", () => {
     // given
     const command = "npm"
