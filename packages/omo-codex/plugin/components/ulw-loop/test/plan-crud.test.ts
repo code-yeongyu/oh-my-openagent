@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { ulwLoopBriefPath, ulwLoopGoalsPath, ulwLoopLedgerPath } from "../src/paths.js";
+import { ulwLoopBriefPath, ulwLoopGoalsPath, ulwLoopLedgerPath, ulwLoopSnapshotPath } from "../src/paths.js";
 import {
 	addUlwLoopGoal,
 	createUlwLoopPlan,
@@ -32,6 +32,10 @@ async function ledgerKinds(repoRoot: string): Promise<string[]> {
 		.split(/\r?\n/)
 		.filter(Boolean)
 		.map((line) => JSON.parse(line).kind);
+}
+
+async function readLatestSnapshot(repoRoot: string): Promise<string> {
+	return readFile(ulwLoopSnapshotPath(repoRoot), "utf8");
 }
 
 function criterion(status: UlwLoopSuccessCriterion["status"]): UlwLoopSuccessCriterion {
@@ -180,6 +184,17 @@ describe("addUlwLoopGoal", () => {
 
 		expect(await ledgerKinds(repoRoot)).toEqual(["plan_created", "goal_added"]);
 	});
+
+	it("#given a goal is added #when reading the resume snapshot #then it names the new goal next action", async () => {
+		const repoRoot = await makeRepo();
+		await createUlwLoopPlan(repoRoot, { brief: "Build auth" });
+
+		await addUlwLoopGoal(repoRoot, { title: "Add rate limit", objective: "Throttle login" });
+
+		const snapshot = await readLatestSnapshot(repoRoot);
+		expect(snapshot).toContain("- pending: 2");
+		expect(snapshot).toContain("Review and schedule G002-add-rate-limit: Add rate limit.");
+	});
 });
 
 describe("startNextUlwLoop", () => {
@@ -192,6 +207,17 @@ describe("startNextUlwLoop", () => {
 		expect(result.goal.id).toBe("G001-first");
 		expect(result.goal.status).toBe("in_progress");
 		expect(result.resumed).toBe(false);
+	});
+
+	it("#given a pending plan #when starting the next goal #then the resume snapshot names the active work", async () => {
+		const repoRoot = await makeRepo();
+		await createUlwLoopPlan(repoRoot, { brief: "- First\n- Second" });
+
+		await startNextUlwLoop(repoRoot, {});
+
+		const snapshot = await readLatestSnapshot(repoRoot);
+		expect(snapshot).toContain("G001-first: First (in_progress)");
+		expect(snapshot).toContain("Work on G001-first: First.");
 	});
 
 	it("resumes the in_progress goal when one exists", async () => {

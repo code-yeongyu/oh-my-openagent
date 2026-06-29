@@ -12,6 +12,16 @@ The `reason` is loaded from `directive.md` on every invocation and filled with c
 
 This pairs with the `start-work` skill at `plugin/skills/start-work/SKILL.md`. That skill writes `.omo/boulder.json` with Codex session ids prefixed as `codex:` so the hook can continue only its own active Codex session.
 
+## ULW Loop resume snapshots
+
+When an active `ulw-loop` run has a resume snapshot, the continuation hook may read `.omo/ulw-loop/<session-id>/snapshots/latest.md` under the active workspace and include its next action in the continuation directive. This gives a new Codex turn a minimal handoff after transcript context has been discarded.
+
+Snapshot lookup is deliberately limited. The hook only accepts a bounded markdown snapshot with the expected sections, a matching session id when present, and metadata paths that stay inside the workspace. Missing, malformed, oversized, out-of-workspace, or unsafe snapshots are ignored.
+
+Resume snapshots are data-minimized. They are intended to contain status summaries, short redacted evidence excerpts, changed-file summaries, and one next action. They must not be treated as raw transcripts or as storage for headers, cookies, API keys, patches, diffs, or captured evidence payloads.
+
+This is separate from `codex resume`. `codex resume` restores Codex conversation history; the snapshot bridge only gives the Stop hook enough local state to point at the next `ulw-loop` action when conversation history is not available.
+
 ## Counted plan checkboxes
 
 Only column-0 checkboxes under these sections are counted:

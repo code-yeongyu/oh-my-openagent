@@ -2,6 +2,14 @@ export const ULW_LOOP_DIR = ".omo/ulw-loop";
 export const ULW_LOOP_BRIEF = "brief.md";
 export const ULW_LOOP_GOALS = "goals.json";
 export const ULW_LOOP_LEDGER = "ledger.jsonl";
+export const ULW_LOOP_SNAPSHOTS = "snapshots";
+export const ULW_LOOP_LATEST_SNAPSHOT = "latest.md";
+export const SNAPSHOT_MAX_FILE_SIZE_BYTES = 32 * 1024;
+export const SNAPSHOT_MAX_PENDING_CRITERIA = 40;
+export const SNAPSHOT_MAX_EVIDENCE_ITEMS = 10;
+export const SNAPSHOT_MAX_EVIDENCE_EXCERPT_CHARS = 240;
+export const SNAPSHOT_MAX_CHANGED_FILES = 50;
+export const SNAPSHOT_MAX_CHANGED_FILE_LINE_CHARS = 120;
 
 export type UlwLoopStatus =
 	| "pending"
@@ -11,6 +19,16 @@ export type UlwLoopStatus =
 	| "blocked"
 	| "review_blocked"
 	| "needs_user_decision";
+
+export const ULW_LOOP_STATUSES = [
+	"pending",
+	"in_progress",
+	"complete",
+	"failed",
+	"blocked",
+	"review_blocked",
+	"needs_user_decision",
+] as const satisfies readonly UlwLoopStatus[];
 
 export type UlwLoopCodexGoalMode = "aggregate" | "per_story";
 

@@ -79,6 +79,10 @@ async function ledgerKinds(repo: string): Promise<string[]> {
 		.map((line) => JSON.parse(line).kind);
 }
 
+async function readLatestSnapshot(repo: string): Promise<string> {
+	return readFile(join(repo, ".omo/ulw-loop/snapshots/latest.md"), "utf8");
+}
+
 async function expectUlwLoopCode(action: () => Promise<unknown>, code: string): Promise<void> {
 	try {
 		await action();
@@ -125,6 +129,16 @@ describe("recordFinalReviewBlockers happy path", () => {
 			"happy",
 			"regression",
 		]);
+	});
+
+	it("#given final review blockers are recorded #when reading the resume snapshot #then it names the review-blocked next action", async () => {
+		const repo = await bootstrapRepo(finalPlan());
+
+		await recordFinalReviewBlockers(repo, validArgs);
+
+		const snapshot = await readLatestSnapshot(repo);
+		expect(snapshot).toContain("- review_blocked: 1");
+		expect(snapshot).toContain("G002 review blocked; work on G003.");
 	});
 });
 

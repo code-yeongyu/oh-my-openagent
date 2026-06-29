@@ -30,6 +30,10 @@ async function readLastLedgerEntry(repo: string): Promise<UlwLoopLedgerEntry> {
 	return JSON.parse(last);
 }
 
+async function readLatestSnapshot(repo: string): Promise<string> {
+	return readFile(join(repo, ".omo/ulw-loop/snapshots/latest.md"), "utf8");
+}
+
 function firstGoal(plan: UlwLoopPlan): UlwLoopItem {
 	const goal = plan.goals.at(0);
 	if (goal === undefined) throw new Error("expected goal");
@@ -117,6 +121,16 @@ describe("recordEvidence (status=pass)", () => {
 		const criterion = firstGoal(await readUlwLoopPlan(repo)).successCriteria.find((c) => c.id === "C001");
 		expect(criterion?.status).toBe("pass");
 	});
+
+	it("#given evidence is recorded #when reading the resume snapshot #then it includes criteria summary and evidence", async () => {
+		const repo = await bootstrapRepo(makePlan());
+
+		await recordEvidence(repo, { goalId: "G001", criterionId: "C001", status: "pass", evidence: "observable proof" });
+
+		const snapshot = await readLatestSnapshot(repo);
+		expect(snapshot).toContain("- pass: 1");
+		expect(snapshot).toContain("G001/C001 [pass] observable proof");
+	});
 });
 
 describe("recordEvidence (status=fail)", () => {
@@ -203,6 +217,19 @@ describe("markCriteriaPendingResetForGoal", () => {
 		await markCriteriaPendingResetForGoal(repo, "G001");
 
 		expect((await readLastLedgerEntry(repo)).kind).toBe("criteria_revised");
+	});
+
+	it("#given criteria are reset #when reading the resume snapshot #then it reflects pending criteria", async () => {
+		const goal = makeGoal({
+			successCriteria: [makeCriterion({ id: "C001", status: "pass", capturedEvidence: "old evidence" })],
+		});
+		const repo = await bootstrapRepo(makePlan({ goals: [goal] }));
+
+		await markCriteriaPendingResetForGoal(repo, "G001");
+
+		const snapshot = await readLatestSnapshot(repo);
+		expect(snapshot).toContain("- pending: 1");
+		expect(snapshot).not.toContain("old evidence");
 	});
 });
 

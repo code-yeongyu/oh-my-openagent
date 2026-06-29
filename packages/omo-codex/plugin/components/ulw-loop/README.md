@@ -23,6 +23,16 @@ Every subcommand below is implemented. Pass `--json` where supported for machine
 
 The final quality gate parsed by `checkpoint` validates `codeReview`, `manualQa`, `gateReview`, `iteration`, and `criteriaCoverage`. `criteriaCoverage` records the original intent, desired outcome, user-facing outcome review, pass counts, and covered adversarial classes.
 
+## Resume Snapshots
+
+`ulw-loop` writes a bounded resume snapshot at `.omo/ulw-loop/<session-id>/snapshots/latest.md` for session-scoped runs and `.omo/ulw-loop/snapshots/latest.md` for unscoped runs. The snapshot exists so a fresh Codex turn can resume the next `ulw-loop` action without rereading the prior transcript.
+
+The snapshot is a summary, not a transcript store. It includes the active goal, criteria status, short evidence excerpts, changed-file summaries, and a single next action. Raw ledger JSON, captured evidence fields, file contents, patches, diffs, and raw transcripts are intentionally omitted. Snapshot text is redacted and size-bounded before writing, so secret-like strings and prompt-injection text should not be used as resume context.
+
+Snapshot lookup is local and narrow: readers only trust `latest.md` inside the active workspace and, for session-scoped runs, under the matching session id. If a snapshot is missing, malformed, too large, outside the workspace, or contains unsafe text, resume code must fall back to the normal plan and Boulder state rather than treating it as authoritative.
+
+The snapshot complements `codex resume`; it does not replace Codex's transcript restoration. `codex resume` can restore conversation history, while `latest.md` provides a minimal repo-native handoff for deciding the next `ulw-loop` action when transcript context is unavailable or intentionally discarded.
+
 ## Codex Plugin
 
 This directory is a component of the aggregate `@sisyphuslabs/omo-codex-plugin` root. Plugin discovery (`.codex-plugin/plugin.json`) is owned by that aggregate root, not by this component. The component ships:
