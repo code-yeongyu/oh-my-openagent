@@ -21,7 +21,7 @@ export async function SubAgentsSection(): Promise<JSX.Element> {
           <p className="text-xl text-zinc-400">{t("agents.subtitle")}</p>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-5">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-4">
           {SUB_AGENT_KEYS.map((key) => {
             const style = AGENT_STYLES[key]
             const Icon = style.icon
@@ -56,7 +56,7 @@ export async function SubAgentsSection(): Promise<JSX.Element> {
             )
           })}
 
-          <div className="col-span-1 mt-4 md:col-span-2 lg:col-span-5">
+          <div className="col-span-1 mt-4 md:col-span-2 lg:col-span-4">
             <Card className="h-full overflow-hidden border-zinc-800 bg-zinc-900/30">
               <CardHeader>
                 <div className="mb-2 flex items-center gap-3">
