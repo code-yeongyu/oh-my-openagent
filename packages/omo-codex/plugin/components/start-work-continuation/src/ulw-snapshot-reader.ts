@@ -57,21 +57,17 @@ export function readUlwSnapshotSummary(
 	for (const candidate of snapshotCandidates(activeRoot, sessionId)) {
 		const summary = readSnapshotCandidate(candidate, activeRoot, fs);
 		if (summary !== null) return summary;
-		if (candidate.expectedSessionId !== null) return null;
 	}
 	return null;
 }
 
 function snapshotCandidates(cwd: string, sessionId: string): readonly SnapshotCandidate[] {
-	const scopedSessionId = stripCodexPrefix(sessionId);
-	if (scopedSessionId.length > 0) {
-		return [
-			{
-				path: join(cwd, ".omo", "ulw-loop", scopedSessionId, "snapshots", "latest.md"),
-				expectedSessionId: scopedSessionId,
-			},
-		];
-	}
+	const scopedSessionIds = scopedSnapshotSessionIds(sessionId);
+	if (scopedSessionIds.length > 0)
+		return scopedSessionIds.map((scopedSessionId) => ({
+			path: join(cwd, ".omo", "ulw-loop", scopedSessionId, "snapshots", "latest.md"),
+			expectedSessionId: scopedSessionId,
+		}));
 	return [{ path: join(cwd, ".omo", "ulw-loop", "snapshots", "latest.md"), expectedSessionId: null }];
 }
 
@@ -132,7 +128,7 @@ function metadataMatchesSession(metadata: ReadonlyMap<string, string>, expectedS
 	if (expectedSessionId === null) return !metadata.has("sessionid");
 	const metadataSessionId = metadata.get("sessionid");
 	if (metadataSessionId === undefined) return true;
-	return metadataSessionId === expectedSessionId || metadataSessionId === `codex:${expectedSessionId}`;
+	return scopedSnapshotSessionIds(metadataSessionId).includes(expectedSessionId);
 }
 
 function metadataPointsInsideWorkspace(metadata: ReadonlyMap<string, string>, activeRoot: string): boolean {
@@ -164,8 +160,41 @@ function normalizeMetadataKey(key: string): string {
 	return key.replaceAll(/\s+/g, "").toLowerCase();
 }
 
-function stripCodexPrefix(sessionId: string): string {
-	return sessionId.startsWith("codex:") ? sessionId.slice("codex:".length) : sessionId;
+function scopedSnapshotSessionIds(sessionId: string): readonly string[] {
+	const trimmed = sessionId.trim();
+	if (trimmed.length === 0) return [];
+
+	const withoutCodexPrefix = trimmed.startsWith("codex:") ? trimmed.slice("codex:".length) : trimmed;
+	return uniqueNonNull([
+		normalizeSnapshotSessionId(trimmed),
+		normalizeSnapshotSessionId(`codex:${withoutCodexPrefix}`),
+		normalizeSnapshotSessionId(withoutCodexPrefix),
+	]);
+}
+
+function normalizeSnapshotSessionId(sessionId: string): string | null {
+	const trimmed = sessionId.trim();
+	if (trimmed.length === 0) return null;
+	const pathSegments = trimmed
+		.split(/[\\/]+/)
+		.filter((segment) => segment.length > 0 && segment !== "." && segment !== "..");
+	const candidate = (pathSegments.length > 0 ? pathSegments.join("-") : trimmed)
+		.replace(/[^A-Za-z0-9._-]+/g, "-")
+		.replace(/-+/g, "-")
+		.replace(/^\.+/, "")
+		.replace(/^[.-]+|[.-]+$/g, "");
+	return candidate.length > 0 ? candidate : null;
+}
+
+function uniqueNonNull(values: readonly (string | null)[]): readonly string[] {
+	const seen = new Set<string>();
+	const unique: string[] = [];
+	for (const value of values) {
+		if (value === null || seen.has(value)) continue;
+		seen.add(value);
+		unique.push(value);
+	}
+	return unique;
 }
 
 function resolveActiveRoot(cwd: string, worktreePath: string | null): string {
