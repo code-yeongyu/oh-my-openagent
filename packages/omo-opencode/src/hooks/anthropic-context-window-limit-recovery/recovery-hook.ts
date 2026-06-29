@@ -106,7 +106,9 @@ export function createAnthropicContextWindowLimitRecoveryHook(
               duration: 3000,
             },
           })
-          .catch(() => {})
+          .catch((error) => {
+            dependencies.log("[auto-compact] Failed to show context-limit toast", { sessionID, error })
+          })
 
         clearSessionTimeout(pendingCompactionTimeoutBySession, sessionID)
 
@@ -178,8 +180,10 @@ export function createAnthropicContextWindowLimitRecoveryHook(
             variant: "warning" as const,
             duration: 3000,
           },
+          })
+        .catch((error) => {
+          dependencies.log("[auto-compact] Failed to show idle recovery toast", { sessionID, error })
         })
-        .catch(() => {})
 
       await dependencies.executeCompact(
         sessionID,

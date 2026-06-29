@@ -20,6 +20,7 @@ export function mergeConfigs(
     disabled_tools: mergeUniqueStrings(base.disabled_tools, override.disabled_tools),
     disabled_providers: mergeUniqueStringsCaseInsensitive(base.disabled_providers, override.disabled_providers),
     mcp_env_allowlist: override.mcp_env_allowlist ?? base.mcp_env_allowlist,
+    external_mcp_allowlist: deepMerge(base.external_mcp_allowlist, override.external_mcp_allowlist),
     claude_code: deepMerge(base.claude_code, override.claude_code),
   };
 }

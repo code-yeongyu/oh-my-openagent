@@ -60,6 +60,10 @@ export class ParentWakePendingQueue {
       if (notificationsChanged) {
         delete pendingWake.noReplyAdmittedAt
         delete pendingWake.noAssistantOutputRetryCount
+        pendingWake.deliveryState = { kind: "queued" }
+      }
+      if (!pendingWake.deliveryState || pendingWake.deliveryState.kind === "assistant-turn-started") {
+        pendingWake.deliveryState = { kind: "queued" }
       }
       return
     }
@@ -68,10 +72,11 @@ export class ParentWakePendingQueue {
       promptContext: resolvedPromptContext,
       notifications: [notification],
       shouldReply,
+      deliveryState: { kind: "queued" },
     })
   }
 
-  requeueWake(sessionID: string, latestWake: PendingParentWake): void {
+  requeueWake(sessionID: string, latestWake: PendingParentWake, reason: string): void {
     const pendingWake = this.pendingParentWakes.get(sessionID)
     if (pendingWake) {
       pendingWake.notifications = pendingWake.notifications.reduce(
@@ -80,6 +85,7 @@ export class ParentWakePendingQueue {
       )
       pendingWake.shouldReply = pendingWake.shouldReply || latestWake.shouldReply
       pendingWake.promptContext = latestWake.promptContext
+      pendingWake.deliveryState = { kind: "requeued", reason }
       pendingWake.noReplyAdmittedAt ??= latestWake.noReplyAdmittedAt
       pendingWake.toolCallDeferralStartedAt ??= latestWake.toolCallDeferralStartedAt
       pendingWake.allowEmptyAssistantTurnRetry ||= latestWake.allowEmptyAssistantTurnRetry
@@ -92,7 +98,9 @@ export class ParentWakePendingQueue {
       }
       return
     }
-    this.pendingParentWakes.set(sessionID, cloneParentWake(latestWake))
+    const requeuedWake = cloneParentWake(latestWake)
+    requeuedWake.deliveryState = { kind: "requeued", reason }
+    this.pendingParentWakes.set(sessionID, requeuedWake)
   }
 
   scheduleFlush(sessionID: string, operation: () => Promise<void>, delayMs?: number): void {

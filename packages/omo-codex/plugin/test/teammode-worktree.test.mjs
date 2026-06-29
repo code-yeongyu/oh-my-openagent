@@ -33,7 +33,7 @@ function initGitRepo(cwd, { baseBranch = "main" } = {}) {
 	git(cwd, "config", "user.name", "Teammode Test");
 	writeFileSync(join(cwd, "file.txt"), "base\n");
 	git(cwd, "add", "file.txt");
-	git(cwd, "commit", "-m", "base commit");
+	git(cwd, "commit", "-m", "Add base file");
 	return baseBranch;
 }
 
@@ -169,7 +169,7 @@ test("#given a member committed work in its worktree #when integrate --id A #the
 		const wtA = join(tempRoot, ".omo", "teams", "wt-int", "worktrees", "A");
 		writeFileSync(join(wtA, "alpha.txt"), "alpha work\n");
 		git(wtA, "add", "alpha.txt");
-		git(wtA, "commit", "-m", "alpha: add alpha.txt");
+		git(wtA, "commit", "-m", "Add alpha file");
 
 		runTeam(tempRoot, "integrate", "--team", "wt-int", "--id", "A");
 
@@ -193,10 +193,10 @@ test("#given two members edited the same line #when integrate hits the conflict 
 
 		const wtA = join(tempRoot, ".omo", "teams", "wt-conf", "worktrees", "A");
 		writeFileSync(join(wtA, "file.txt"), "A changed the line\n");
-		git(wtA, "commit", "-am", "A edits file.txt");
+		git(wtA, "commit", "-am", "Change file for member A");
 		const wtB = join(tempRoot, ".omo", "teams", "wt-conf", "worktrees", "B");
 		writeFileSync(join(wtB, "file.txt"), "B changed the line\n");
-		git(wtB, "commit", "-am", "B edits file.txt");
+		git(wtB, "commit", "-am", "Change file for member B");
 
 		runTeam(tempRoot, "integrate", "--team", "wt-conf", "--id", "A");
 		const conflict = runTeamRaw(tempRoot, "integrate", "--team", "wt-conf", "--id", "B");

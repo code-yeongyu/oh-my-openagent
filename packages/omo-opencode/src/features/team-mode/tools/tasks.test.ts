@@ -12,9 +12,17 @@ const mockClient = {} as OpencodeClient
 const createTaskMock = mock(async () => ({ id: "1", subject: "task one" } as Task))
 const listTasksMock = mock(async () => [{ id: "1", status: "pending" } as Task])
 const claimTaskMock = mock(async () => ({ id: "1", status: "claimed" } as Task))
-const updateTaskStatusMock = mock(async (_teamRunId: string, _taskId: string, status: Task["status"]) => ({
+const updateTaskStatusMock = mock(async (
+  _teamRunId: string,
+  _taskId: string,
+  status: Task["status"],
+  _owner: string,
+  _config: TeamModeConfig,
+  options?: { readonly metadata?: Record<string, unknown> },
+) => ({
   id: "1",
   status,
+  metadata: options?.metadata,
 } as Task))
 const getTaskMock = mock(async () => ({ id: "1", status: "completed" } as Task))
 const loadRuntimeStateMock = mock(async (): Promise<RuntimeState> => ({
@@ -149,5 +157,43 @@ describe("team task tools", () => {
 
     // then
     expect(result).rejects.toThrow("blocked by 2")
+  })
+
+  test("passes required output metadata through create and update", async () => {
+    // given
+    const config = createConfig()
+    const createTool = createTeamTaskCreateTool(config, mockClient, deps)
+    const updateTool = createTeamTaskUpdateTool(config, mockClient, deps)
+    const requiredOutputMetadata = {
+      requiredOutput: {
+        status: "missing",
+        reason: "closure artifact pending",
+      },
+    }
+    const satisfiedOutputMetadata = {
+      requiredOutput: {
+        status: "satisfied",
+      },
+    }
+
+    // when
+    await createTool.execute({
+      teamRunId: "team-run-1",
+      subject: "task one",
+      description: "desc",
+      metadata: requiredOutputMetadata,
+    }, createContext("member-session-a"))
+    const updated = JSON.parse(await updateTool.execute({
+      teamRunId: "team-run-1",
+      taskId: "1",
+      status: "completed",
+      owner: "member-a",
+      metadata: satisfiedOutputMetadata,
+    }, createContext("member-session-a")))
+
+    // then
+    expect(createTaskMock).toHaveBeenCalledWith("team-run-1", expect.objectContaining({ metadata: requiredOutputMetadata }), config)
+    expect(updateTaskStatusMock).toHaveBeenCalledWith("team-run-1", "1", "completed", "member-a", config, { metadata: satisfiedOutputMetadata })
+    expect(updated.task.metadata).toEqual(satisfiedOutputMetadata)
   })
 })

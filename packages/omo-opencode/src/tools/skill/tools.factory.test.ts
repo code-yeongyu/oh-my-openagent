@@ -199,4 +199,109 @@ describe("createSkillTool", () => {
     expect(skillTool.description).toContain("<name>/lazy-skill</name>")
     expect(skillTool.description).toContain("<name>/seeded-command</name>")
   })
+
+  it("uses compact item rows when compact description mode is requested", async () => {
+    // given
+    const verboseSkill: LoadedSkill = {
+      name: "verbose-skill",
+      definition: {
+        name: "verbose-skill",
+        description: "This skill has a long first sentence with operational details that should not be fully copied into compact mode. This second sentence should be omitted.",
+        template: "Verbose skill body",
+      },
+      scope: "config",
+    }
+    const command: CommandInfo = {
+      name: "verbose-command",
+      metadata: {
+        name: "verbose-command",
+        description: "This command description is intentionally long and should be shortened in compact mode.",
+      },
+      content: "Verbose command body",
+      scope: "project",
+    }
+
+    // when
+    const fullTool = await createSkillTool({
+      skills: [verboseSkill],
+      commands: [command],
+      includeSkillsInDescription: true,
+    })
+    const compactTool = await createSkillTool({
+      skills: [verboseSkill],
+      commands: [command],
+      includeSkillsInDescription: true,
+      descriptionMode: "compact",
+    })
+
+    // then
+    expect(compactTool.description.length).toBeLessThan(fullTool.description.length)
+    expect(compactTool.description).toContain("- skill verbose-skill [config]: This skill has a long first sentence")
+    expect(compactTool.description).toContain("- command /verbose-command [project]: This command description is intentionally long")
+    expect(compactTool.description).not.toContain("<description>")
+    expect(compactTool.description).not.toContain("This second sentence should be omitted")
+  })
+
+  it("lists compact skill trigger rules without expanding full skill details", async () => {
+    // given
+    const triggerSkill: LoadedSkill = {
+      name: "programming",
+      definition: {
+        name: "programming",
+        description: "MUST USE for editing TypeScript, Rust, Python, or Go files. This long operational detail belongs only in the full skill body. Triggers: write TypeScript, edit .ts files, strict types, TDD.",
+        template: "Full programming skill body with strict implementation instructions.",
+      },
+      scope: "user",
+    }
+
+    // when
+    const compactTool = await createSkillTool({
+      skills: [triggerSkill],
+      includeSkillsInDescription: true,
+      descriptionMode: "compact",
+    })
+
+    // then
+    expect(compactTool.description).toContain("- skill programming [user]: Triggers: write TypeScript, edit .ts files, strict types, TDD")
+    expect(compactTool.description).not.toContain("This long operational detail belongs only in the full skill body")
+    expect(compactTool.description).not.toContain("Full programming skill body with strict implementation instructions")
+  })
+
+  it("returns the full skill body after compact listing", async () => {
+    // given
+    const fullContentSkill: LoadedSkill = {
+      name: "programming",
+      definition: {
+        name: "programming",
+        description: "MUST USE for editing TypeScript. Triggers: write TypeScript, edit .ts files.",
+        template: "Full programming skill body with strict implementation instructions.",
+      },
+      scope: "user",
+    }
+    const compactTool = await createSkillTool({
+      skills: [fullContentSkill],
+      includeSkillsInDescription: true,
+      descriptionMode: "compact",
+    })
+
+    // when
+    const result = await compactTool.execute({ name: "programming" }, mockContext)
+
+    // then
+    expect(compactTool.description).not.toContain("Full programming skill body with strict implementation instructions")
+    expect(result).toContain("## Skill: programming")
+    expect(result).toContain("Full programming skill body with strict implementation instructions")
+  })
+
+  it("keeps unknown skill suggestions in compact mode", async () => {
+    // given
+    const compactTool = await createSkillTool({
+      skills: [createMockSkill("programming")],
+      includeSkillsInDescription: true,
+      descriptionMode: "compact",
+    })
+
+    // when / then
+    await expect(compactTool.execute({ name: "programmin" }, mockContext)).rejects.toThrow("Did you mean: programming")
+  })
 })

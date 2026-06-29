@@ -30,6 +30,7 @@ export class ParentWakeFlushRunner {
       await settleAfterSessionIdle()
 
       if (await this.isSessionActive(sessionID)) {
+        this.markPendingWakeRequeued(sessionID, "parent-became-active-after-idle-settle")
         this.schedulePendingParentWakeFlush(sessionID)
         log("[background-agent] Deferred parent wake because parent session became active after idle settle:", {
           sessionID,
@@ -46,6 +47,7 @@ export class ParentWakeFlushRunner {
       return
     }
     if (sessionActive) {
+      this.markPendingWakeRequeued(sessionID, "parent-session-active")
       this.schedulePendingParentWakeFlush(sessionID)
       log("[background-agent] Deferred parent wake because parent session is active:", {
         sessionID,
@@ -227,7 +229,7 @@ export class ParentWakeFlushRunner {
         hasRecordedPromptAfterDispatch: (wake) =>
           this.deps.sessionInspector.hasRecordedPromptMessageAfterDispatchedWake(sessionID, wake),
         trackDispatchedWake: (wake, dispatchedAt) => this.deps.dispatchedTracker.trackWake(sessionID, wake, dispatchedAt),
-        requeueWake: (wake) => this.requeueWake(sessionID, wake),
+        requeueWake: (wake, reason) => this.requeueWake(sessionID, wake, reason),
         scheduleFlush: (delayMs) => this.schedulePendingParentWakeFlush(sessionID, delayMs),
       })
     } finally {
@@ -265,7 +267,15 @@ export class ParentWakeFlushRunner {
     return this.deps.sessionInspector.shouldDeferForHistory(sessionID, wake)
   }
 
-  private requeueWake(sessionID: string, latestWake: PendingParentWake): void {
-    this.deps.pendingQueue.requeueWake(sessionID, latestWake)
+  private requeueWake(sessionID: string, latestWake: PendingParentWake, reason: string): void {
+    this.deps.pendingQueue.requeueWake(sessionID, latestWake, reason)
+  }
+
+  private markPendingWakeRequeued(sessionID: string, reason: string): void {
+    const wake = this.deps.pendingQueue.getWake(sessionID)
+    if (!wake) {
+      return
+    }
+    this.requeueWake(sessionID, wake, reason)
   }
 }

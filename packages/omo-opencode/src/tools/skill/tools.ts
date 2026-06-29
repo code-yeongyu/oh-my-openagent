@@ -23,7 +23,34 @@ import {
   loadedSkillToInfo,
   mergeNativeSkillInfos,
   mergeNativeSkills,
+  type NativeSkillMissResolution,
+  resolveNativeSkillOnMiss,
 } from "./native-skills"
+
+const CHECKED_SKILL_REGISTRIES = "OMO static, project, user, host-native"
+
+function assertNever(value: never): never {
+  throw new Error(`Unhandled skill miss diagnostic: ${String(value)}`)
+}
+
+function formatNativeRegistryResult(kind: NativeSkillMissResolution["kind"]): string {
+  switch (kind) {
+    case "resolved":
+      return "resolved"
+    case "disabled":
+      return "disabled by disabled_skills"
+    case "miss":
+      return "miss"
+    case "unavailable":
+      return "unavailable"
+    default:
+      return assertNever(kind)
+  }
+}
+
+function formatSkillMissDiagnostic(kind: NativeSkillMissResolution["kind"]): string {
+  return `Checked registries: ${CHECKED_SKILL_REGISTRIES}. Host-native registry result: ${formatNativeRegistryResult(kind)}.`
+}
 
 export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
   let cachedDescription: string | null = null
@@ -73,6 +100,7 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
     const skillInfos = publicSkills.map(loadedSkillToInfo)
     cachedDescription = formatCombinedDescription(skillInfos, commands, {
       includeSkills: options.includeSkillsInDescription,
+      mode: options.descriptionMode,
     })
     return cachedDescription
   }
@@ -98,6 +126,7 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
 
     cachedDescription = formatCombinedDescription(skillInfos, commandsForDescription, {
       includeSkills: options.includeSkillsInDescription,
+      mode: options.descriptionMode,
     })
     if (needsAsyncRefresh) {
       void buildDescription(true)
@@ -105,6 +134,7 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
   } else if (options.commands !== undefined) {
     cachedDescription = formatCombinedDescription([], options.commands, {
       includeSkills: options.includeSkillsInDescription,
+      mode: options.descriptionMode,
     })
   }
 
@@ -127,6 +157,7 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
       const commands = getCommands()
       cachedDescription = formatCombinedDescription(skills.map(loadedSkillToInfo), commands, {
         includeSkills: options.includeSkillsInDescription,
+        mode: options.descriptionMode,
       })
 
       const requestedName = args.name.replace(/^\//, "")
@@ -188,11 +219,52 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
         return await formatLoadedCommand(matchedCommand, args.user_message)
       }
 
+      const hostNativeResolution = await resolveNativeSkillOnMiss({
+        nativeSkills: options.nativeSkills,
+        name: requestedName,
+        disabledSkills: options.disabledSkills,
+      })
+
+      switch (hostNativeResolution.kind) {
+        case "resolved": {
+          const hostNativeSkill = hostNativeResolution.skill
+          await ctx?.ask({
+            permission: "skill",
+            patterns: [hostNativeSkill.name],
+            always: [hostNativeSkill.name],
+            metadata: {
+              skill: hostNativeSkill.name,
+            },
+          })
+
+          const body = await extractSkillBody(hostNativeSkill)
+          const dir = hostNativeSkill.path ? dirname(hostNativeSkill.path) : hostNativeSkill.resolvedPath || process.cwd()
+
+          return [
+            `## Skill: ${hostNativeSkill.name}`,
+            "",
+            `**Base directory**: ${dir}`,
+            "",
+            body,
+          ].join("\n")
+        }
+        case "disabled":
+          throw new Error(
+            `Skill or command "${args.name}" is disabled. ${formatSkillMissDiagnostic(hostNativeResolution.kind)}`
+          )
+        case "miss":
+        case "unavailable":
+          break
+        default:
+          return assertNever(hostNativeResolution)
+      }
+
       const partialMatches = findPartialMatches(skills, commands, requestedName)
+      const missDiagnostic = formatSkillMissDiagnostic(hostNativeResolution.kind)
 
       if (partialMatches.length > 0) {
         throw new Error(
-          `Skill or command "${args.name}" not found. Did you mean: ${partialMatches.join(", ")}?`
+          `Skill or command "${args.name}" not found. Did you mean: ${partialMatches.join(", ")}? ${missDiagnostic}`
         )
       }
 
@@ -201,7 +273,7 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
         ...commands.map((command) => `/${command.name}`),
       ].join(", ")
       throw new Error(
-        `Skill or command "${args.name}" not found. Available: ${available || "none"}`
+        `Skill or command "${args.name}" not found. Available: ${available || "none"}. ${missDiagnostic}`
       )
     },
   })

@@ -176,4 +176,51 @@ describe("codex-cache install", () => {
     },
     15000,
   )
+
+  test("#given Windows install cache path #when caching plugin #then final promoted MCP manifest has Git Bash transport id", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-git-bash-env-"))
+    const codexHome = join(root, "codex-home")
+    const sourceRoot = join(root, "plugin")
+    const gitBashPath = "C:\\Program Files\\Git\\bin\\bash.exe"
+    await mkdir(sourceRoot, { recursive: true })
+    await writeFile(join(sourceRoot, "package.json"), JSON.stringify({ name: "@scope/omo", version: "0.1.0" }))
+    await writeFile(
+      join(sourceRoot, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          codegraph: { args: ["./components/codegraph/dist/serve.js"] },
+          git_bash: { command: "node", args: ["./components/git-bash-mcp/dist/cli.js", "mcp"] },
+        },
+      }),
+    )
+
+    // when
+    const installed = await installCachedPlugin({
+      codexHome,
+      marketplaceName: "sisyphuslabs",
+      name: "omo",
+      sourcePath: sourceRoot,
+      version: "4.13.0",
+      platform: "win32",
+      env: { OMO_CODEX_GIT_BASH_PATH: gitBashPath },
+      runCommand: async () => undefined,
+    })
+
+    // then
+    const manifest = JSON.parse(await readFile(join(installed.path, ".mcp.json"), "utf8")) as {
+      readonly mcpServers: {
+        readonly codegraph: { readonly args: readonly string[] }
+        readonly git_bash: {
+          readonly env: {
+            readonly OMO_CODEX_GIT_BASH_PATH: string
+            readonly OMO_CODEX_GIT_BASH_MCP_TRANSPORT_ID: string
+          }
+        }
+      }
+    }
+    expect(manifest.mcpServers.git_bash.env.OMO_CODEX_GIT_BASH_PATH).toBe(gitBashPath)
+    expect(manifest.mcpServers.git_bash.env.OMO_CODEX_GIT_BASH_MCP_TRANSPORT_ID).toMatch(/^git-bash-[a-f0-9]{16}$/)
+    expect(manifest.mcpServers.codegraph.args[0]).toBe(join(installed.path, "components", "codegraph", "dist", "serve.js"))
+  })
 })

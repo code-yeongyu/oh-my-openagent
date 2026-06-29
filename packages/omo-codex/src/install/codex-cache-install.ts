@@ -5,8 +5,9 @@ import { removeCachedManagedNpmBinShims } from "./codex-cache-bins"
 import { fileExistsStrict, isPlainRecord } from "./codex-cache-fs"
 import { rewriteCachedPackageLocalFileDependencies } from "./codex-cache-local-dependencies"
 import { rewriteCachedManifestRoot, rewriteCachedMcpManifest } from "./codex-cache-mcp-manifest"
+import { stampGitBashMcpEnv } from "./codex-git-bash-mcp-env"
 import { assertHookCommandTargets } from "./codex-hook-targets"
-import type { InstalledPlugin, RunCommand } from "./types"
+import type { CodexInstallPlatform, InstalledPlugin, RunCommand } from "./types"
 
 type RenameDirectory = (fromPath: string, toPath: string) => Promise<void>
 
@@ -15,6 +16,8 @@ export async function installCachedPlugin(input: {
   readonly codexHome: string
   readonly marketplaceName: string
   readonly name: string
+  readonly env?: { readonly [key: string]: string | undefined }
+  readonly platform?: CodexInstallPlatform
   readonly renameDirectory?: RenameDirectory
   readonly sourcePath: string
   readonly version: string
@@ -37,6 +40,12 @@ export async function installCachedPlugin(input: {
     if (input.buildSource === false) await maybeRunNpmSyncSkills(tempPath, input.runCommand)
     await rewriteCachedMcpManifest(tempPath, input.sourcePath)
     await rewriteCachedManifestRoot(tempPath, tempPath, targetPath)
+    await stampGitBashMcpEnv({
+      pluginRoot: tempPath,
+      transportRoot: targetPath,
+      platform: input.platform ?? process.platform,
+      env: input.env ?? process.env,
+    })
     await assertHookCommandTargets(tempPath)
     await promoteDirectory(tempPath, targetPath, input.renameDirectory ?? rename)
   } catch (error) {

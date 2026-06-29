@@ -31,7 +31,8 @@ import {
 } from "../../shared/model-error-classifier"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
-import { setSessionTools } from "../../shared/session-tools-store"
+import { clearSessionPromptParams } from "../../shared/session-prompt-params-state"
+import { deleteSessionTools, setSessionTools } from "../../shared/session-tools-store"
 import { isInsideTmux } from "../../shared/tmux"
 import { clearSessionAgent, setSessionAgent, subagentSessions, updateSessionAgent } from "../claude-code-session-state"
 import { MESSAGE_STORAGE } from "../hook-message-injector"
@@ -106,6 +107,11 @@ import {
 } from "./subagent-spawn-limits"
 import { TaskHistory } from "./task-history"
 import { checkAndInterruptStaleTasks, pruneStaleTasksAndNotifications, type SessionStatusMap } from "./task-poller"
+import {
+  createTaskLifecycleController,
+  evaluateTodoCompletionPolicy,
+  type SessionCompletionMessage,
+} from "./task-lifecycle-controller"
 import { toBackgroundTaskSnapshots } from "./task-snapshot"
 import {
   archiveBackgroundTask,
@@ -269,6 +275,7 @@ export class BackgroundManager {
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
   private readonly parentWakeNotifier: ParentWakeNotifier
+  private readonly taskLifecycleController: ReturnType<typeof createTaskLifecycleController>
   private parentWakeTextDeltaBuffers: Map<string, string> = new Map()
   private observedOutputSessions: Set<string> = new Set()
   private observedIncompleteTodosBySession: Map<string, boolean> = new Map()
@@ -318,6 +325,28 @@ export class BackgroundManager {
         parentSessionActivityInProgressWindowMs: PARENT_WAKE_SESSION_ACTIVITY_IN_PROGRESS_WINDOW_MS,
       },
     )
+    this.taskLifecycleController = createTaskLifecycleController({
+      releaseConcurrency: (key) => this.concurrencyManager.release(key),
+      cleanupTerminalTask: (task) => {
+        removeTaskToastTracking(task.id)
+        const idleTimer = this.idleDeferralTimers.get(task.id)
+        if (idleTimer) {
+          clearTimeout(idleTimer)
+          this.idleDeferralTimers.delete(task.id)
+        }
+      },
+      recordHistory: (task) => this.taskHistory.record(task.parentSessionId, {
+        id: task.id,
+        sessionID: task.sessionId,
+        agent: task.agent,
+        description: task.description,
+        status: task.status,
+        category: task.category,
+        startedAt: task.startedAt,
+        completedAt: task.completedAt,
+      }),
+      logInvalidTransition: (event) => log("[background-agent] Invalid background task lifecycle transition:", event),
+    })
     this.registerProcessCleanup()
   }
 
@@ -791,7 +820,16 @@ export class BackgroundManager {
       return
     }
 
-    await input.onSessionCreated?.(sessionID)
+    if (input.onSessionCreated) {
+      try {
+        const sessionCreatedResult = input.onSessionCreated(sessionID)
+        void Promise.resolve(sessionCreatedResult).catch((error: unknown) => {
+          log("[background-agent] session-created callback failed:", error instanceof Error ? error : new Error(String(error)))
+        })
+      } catch (error) {
+        log("[background-agent] session-created callback failed:", error instanceof Error ? error : new Error(String(error)))
+      }
+    }
     this.settlePreStartDescendantReservation(task)
     subagentSessions.add(sessionID)
     setSessionAgent(sessionID, input.agent)
@@ -1514,14 +1552,47 @@ The fallback retry session is now created and can be inspected directly.
         (t) => t.status !== "completed" && t.status !== "cancelled"
       )
       const hasIncompleteTodos = incomplete.length > 0
-      this.observedIncompleteTodosBySession.set(sessionID, hasIncompleteTodos)
-      return hasIncompleteTodos
+      if (!hasIncompleteTodos) {
+        this.observedIncompleteTodosBySession.set(sessionID, false)
+        return false
+      }
+
+      const policy = await this.evaluateSessionTodoCompletionPolicy(sessionID)
+      const shouldBlockCompletion = policy.kind === "block"
+      this.observedIncompleteTodosBySession.set(sessionID, shouldBlockCompletion)
+      if (shouldBlockCompletion) {
+        log("[background-agent] Incomplete todos still block completion:", {
+          sessionID,
+          reason: policy.reason,
+        })
+      } else {
+        log("[background-agent] Treating incomplete todos as stale after final output:", { sessionID })
+      }
+      return shouldBlockCompletion
     } catch (error) {
+      const caughtError = error instanceof Error ? error : new Error(String(error))
       log("[background-agent] Failed to check session todos:", {
         sessionID,
-        error,
+        error: caughtError,
       })
       return false
+    }
+  }
+
+  private async evaluateSessionTodoCompletionPolicy(sessionID: string): Promise<ReturnType<typeof evaluateTodoCompletionPolicy>> {
+    try {
+      const response = await messagesInDirectory(this.client, {
+        path: { id: sessionID },
+      }, this.directory)
+      const messages = normalizeSDKResponse(response, [] as SessionCompletionMessage[], { preferResponseOnMissingData: true })
+      return evaluateTodoCompletionPolicy({ hasIncompleteTodos: true, messages })
+    } catch (error) {
+      const caughtError = error instanceof Error ? error : new Error(String(error))
+      log("[background-agent] Failed to evaluate todo completion policy:", {
+        sessionID,
+        error: caughtError,
+      })
+      return { kind: "block", reason: "no-final-output" }
     }
   }
 
@@ -1642,7 +1713,7 @@ The fallback retry session is now created and can be inspected directly.
       this.parentWakeNotifier.recordParentSessionActivity(sessionID)
 
       if (messageUpdatedInfoHasParentWakeOutput(info, role)) {
-        this.clearDispatchedParentWake(sessionID)
+        this.parentWakeNotifier.recordParentWakeAssistantTurnStarted(sessionID)
       }
 
       if (role === "tool") {
@@ -1692,7 +1763,7 @@ The fallback retry session is now created and can be inspected directly.
         && !isInternalWakePart
         && !holdDispatchedWakeForTextDelta
       if (hasParentWakeOutput) {
-        this.clearDispatchedParentWake(sessionID)
+        this.parentWakeNotifier.recordParentWakeAssistantTurnStarted(sessionID)
       }
       if (!isUserPart && !isInternalWakePart && !holdDispatchedWakeForTextDelta) {
         this.parentWakeNotifier.recordParentSessionActivity(sessionID)
@@ -2317,6 +2388,65 @@ The task was re-queued on a fallback model after a retryable failure.
     }
   }
 
+  private completeStaleInterruptedTask(task: BackgroundTask, errorMessage: string): void {
+    if (task.currentAttemptID) {
+      const finalized = finalizeAttempt(task, task.currentAttemptID, "cancelled", errorMessage)
+      if (finalized) return
+    }
+
+    task.status = "cancelled"
+    task.error = errorMessage
+    task.completedAt = new Date()
+  }
+
+  private clearTerminalTaskTimers(taskId: string): void {
+    const completionTimer = this.completionTimers.get(taskId)
+    if (completionTimer) {
+      clearTimeout(completionTimer)
+      this.completionTimers.delete(taskId)
+    }
+
+    const idleTimer = this.idleDeferralTimers.get(taskId)
+    if (idleTimer) {
+      clearTimeout(idleTimer)
+      this.idleDeferralTimers.delete(taskId)
+    }
+  }
+
+  private clearChildSessionBookkeeping(task: BackgroundTask): void {
+    const sessionID = task.sessionId
+    if (!sessionID) return
+
+    subagentSessions.delete(sessionID)
+    clearSessionAgent(sessionID)
+    clearDelegatedChildSessionBootstrap(sessionID)
+    SessionCategoryRegistry.remove(sessionID)
+    clearSessionPromptParams(sessionID)
+    deleteSessionTools(sessionID)
+    this.modelFallbackControllerAccessor?.clearSessionFallbackChain(sessionID)
+    this.clearSessionOutputObserved(sessionID)
+    this.clearSessionTodoObservation(sessionID)
+  }
+
+  private prepareStaleInterruptionNotification(task: BackgroundTask): void {
+    if (task.rootSessionId) {
+      this.unregisterRootDescendant(task.rootSessionId)
+    }
+
+    this.taskHistory.record(task.parentSessionId, { id: task.id, sessionID: task.sessionId, agent: task.agent, description: task.description, status: "cancelled", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
+    this.clearTerminalTaskTimers(task.id)
+    this.cleanupPendingByParent(task)
+    this.clearNotificationsForTask(task.id)
+    removeTaskToastTracking(task.id)
+    this.clearChildSessionBookkeeping(task)
+
+    if (task.parentSessionId) {
+      this.updateBackgroundTaskMarker(task.parentSessionId)
+    }
+
+    this.markForNotification(task)
+  }
+
   private clearTaskHistoryWhenParentTasksGone(parentSessionID: string | undefined): void {
     if (!parentSessionID) return
     if (this.getTasksByParentSession(parentSessionID).length > 0) return
@@ -2402,23 +2532,12 @@ The task was re-queued on a fallback model after a retryable failure.
       clearDelegatedChildSessionBootstrap(task.sessionId)
       SessionCategoryRegistry.remove(task.sessionId)
     }
-    if (task.currentAttemptID) {
-      finalizeAttempt(task, task.currentAttemptID, "cancelled", reason)
-    } else {
-      task.status = "cancelled"
-      task.completedAt = new Date()
-      if (reason) {
-        task.error = reason
-      }
+    const transition = this.taskLifecycleController.terminalize({ task, status: "cancelled", error: reason })
+    if (transition.kind === "unchanged") {
+      return false
     }
     if (wasRunning && task.rootSessionId) {
       this.unregisterRootDescendant(task.rootSessionId)
-    }
-    this.taskHistory.record(task.parentSessionId, { id: task.id, sessionID: task.sessionId, agent: task.agent, description: task.description, status: "cancelled", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
-
-    if (task.concurrencyKey) {
-      this.concurrencyManager.release(task.concurrencyKey)
-      task.concurrencyKey = undefined
     }
 
     const existingTimer = this.completionTimers.get(task.id)
@@ -2426,14 +2545,6 @@ The task was re-queued on a fallback model after a retryable failure.
       clearTimeout(existingTimer)
       this.completionTimers.delete(task.id)
     }
-
-    const idleTimer = this.idleDeferralTimers.get(task.id)
-    if (idleTimer) {
-      clearTimeout(idleTimer)
-      this.idleDeferralTimers.delete(task.id)
-    }
-
-    removeTaskToastTracking(task.id)
 
     // Update continuation marker for CLI run mode
     if (task.parentSessionId) {
@@ -2535,34 +2646,16 @@ The task was re-queued on a fallback model after a retryable failure.
       this.parentWakeNotifier.reserveNotificationPreparation(notificationParentSessionID)
     }
     try {
-      // Atomically mark as completed to prevent race conditions
-      if (task.currentAttemptID) {
-        finalizeAttempt(task, task.currentAttemptID, "completed")
-      } else {
-        task.status = "completed"
-        task.completedAt = new Date()
+      const transition = this.taskLifecycleController.terminalize({ task, status: "completed" })
+      if (transition.kind === "unchanged") {
+        return false
       }
-      this.taskHistory.record(task.parentSessionId, { id: task.id, sessionID: task.sessionId, agent: task.agent, description: task.description, status: "completed", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
 
       if (task.rootSessionId) {
         this.unregisterRootDescendant(task.rootSessionId)
       }
 
-      removeTaskToastTracking(task.id)
-
-      // Release concurrency BEFORE any async operations to prevent slot leaks
-      if (task.concurrencyKey) {
-        this.concurrencyManager.release(task.concurrencyKey)
-        task.concurrencyKey = undefined
-      }
-
       this.markForNotification(task)
-
-      const idleTimer = this.idleDeferralTimers.get(task.id)
-      if (idleTimer) {
-        clearTimeout(idleTimer)
-        this.idleDeferralTimers.delete(task.id)
-      }
 
       if (task.sessionId) {
         subagentSessions.delete(task.sessionId)
@@ -2888,6 +2981,8 @@ The task was re-queued on a fallback model after a retryable failure.
       concurrencyManager: this.concurrencyManager,
       notifyParentSession: (task) => this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)),
       sessionStatuses: allStatuses,
+      completeTask: (task, errorMessage) => this.completeStaleInterruptedTask(task, errorMessage),
+      onTaskInterrupted: (task) => this.prepareStaleInterruptionNotification(task),
     })
   }
 

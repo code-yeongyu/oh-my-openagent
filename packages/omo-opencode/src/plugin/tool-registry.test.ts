@@ -21,6 +21,20 @@ const delegateTaskTool = tool({
   },
 })
 
+const requiredArgs = {
+  target: tool.schema.string().describe("Required target value"),
+}
+
+function createVerboseTool() {
+  return tool({
+    description: "Read an extremely detailed tool description with multiple operational notes, usage caveats, edge-case reminders, and long examples. Compact mode should keep a short lead sentence only.",
+    args: requiredArgs,
+    async execute(): Promise<string> {
+      return "ok"
+    },
+  })
+}
+
 const syncSessionCreatedCallbacks: Array<
   ((event: { sessionID: string; parentID: string; title: string }) => Promise<void>) | undefined
 > = []
@@ -172,6 +186,85 @@ describe("#given task_system configuration", () => {
     expect(result.filteredTools).toHaveProperty("task_get")
     expect(result.filteredTools).toHaveProperty("task_list")
     expect(result.filteredTools).toHaveProperty("task_update")
+  })
+})
+
+describe("#given token_budget_mode compact", () => {
+  test("#when registry builds tools #then descriptions shrink and arg schemas are preserved", () => {
+    const verboseTool = createVerboseTool()
+    const fullDescriptionLength = verboseTool.description.length
+    const result = createToolRegistry({
+      ctx: { directory: "/tmp" } as Parameters<typeof createToolRegistry>[0]["ctx"],
+      pluginConfig: createPluginConfig({
+        experimental: { token_budget_mode: "compact" },
+      }),
+      managers: {
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+      } as Parameters<typeof createToolRegistry>[0]["managers"],
+      skillContext: {
+        mergedSkills: [],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+      toolFactories: {
+        ...toolFactories,
+        createGrepTools: mock(() => ({ verbose_probe: verboseTool })),
+      },
+    })
+
+    const compactTool = result.filteredTools.verbose_probe
+
+    expect(compactTool.description.length).toBeLessThan(fullDescriptionLength)
+    expect(compactTool.description).toContain("Read an extremely detailed tool description")
+    expect(compactTool.description).not.toContain("long examples")
+    expect(compactTool.args).toBe(requiredArgs)
+  })
+
+  test("#when registry builds the skill tool #then compact mode reaches the skill description builder", () => {
+    const createSkillToolCallsBefore = toolFactories.createSkillTool.mock.calls.length
+
+    createToolRegistry({
+      ctx: { directory: "/tmp" } as Parameters<typeof createToolRegistry>[0]["ctx"],
+      pluginConfig: createPluginConfig({
+        experimental: { token_budget_mode: "compact" },
+      }),
+      managers: {
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+      } as Parameters<typeof createToolRegistry>[0]["managers"],
+      skillContext: {
+        mergedSkills: [
+          {
+            name: "compact-skill",
+            description: "Compact mode should keep this skill visible inside the skill tool listing.",
+            scope: "project",
+          },
+        ],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+      toolFactories,
+    })
+
+    const skillToolOptions = toolFactories.createSkillTool.mock.calls[createSkillToolCallsBefore]?.[0]
+
+    expect(skillToolOptions).toMatchObject({
+      descriptionMode: "compact",
+      includeSkillsInDescription: true,
+      skills: [
+        {
+          name: "compact-skill",
+          description: "Compact mode should keep this skill visible inside the skill tool listing.",
+        },
+      ],
+    })
   })
 })
 

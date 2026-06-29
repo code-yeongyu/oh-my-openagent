@@ -121,7 +121,9 @@ export function createSessionHooks(args: {
                 duration: duration ?? 5000,
               },
             })
-            .catch(() => {})
+            .catch((error) => {
+              log("[model-fallback] Failed to show fallback toast", { error })
+            })
         },
         onApplied: enableFallbackTitle ? updateFallbackTitle : undefined,
         controllerAccessor: modelFallbackControllerAccessor,

@@ -200,6 +200,26 @@ describe("plugin bundled rules", () => {
 		expect(output).toBe("");
 	});
 
+	it("#given named bundled rule disabled in Codex TOML #when SessionStart runs #then only that rule is suppressed", async () => {
+		// given
+		const { root, pluginData } = makeFixture();
+		const codexHome = mkdtempSync(join(tmpdir(), "codex-rules-disabled-rule-home-"));
+		tempDirectories.push(codexHome);
+		writeFileSync(
+			join(codexHome, "config.toml"),
+			['[plugins."omo@sisyphuslabs".rules.hephaestus]', "enabled = false", ""].join("\n"),
+		);
+
+		// when
+		const output = await runSessionStartHook(sessionStartInput(root), {
+			pluginDataRoot: pluginData,
+			env: { ...BUNDLED_ONLY_ENV, CODEX_HOME: codexHome },
+		});
+
+		// then
+		expect(output).toBe("");
+	});
+
 	it("#given bundled static context dropped by compaction #when UserPromptSubmit runs after PostCompact #then it re-injects the bundled persona body in full", async () => {
 		// given
 		const { root, pluginData, bundledRulePath } = makeFixture();

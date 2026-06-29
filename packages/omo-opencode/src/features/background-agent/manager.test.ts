@@ -5,9 +5,12 @@ import * as sharedModule from "../../shared"
 import {
   clearAllDelegatedChildSessionBootstrap,
   getDelegatedChildSessionBootstrap,
+  registerDelegatedChildSessionBootstrap,
 } from "../../shared/delegated-child-session-bootstrap"
 import { dispatchInternalPrompt, releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
-import { clearSessionPromptParams, getSessionPromptParams } from "../../shared/session-prompt-params-state"
+import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { clearSessionPromptParams, getSessionPromptParams, setSessionPromptParams } from "../../shared/session-prompt-params-state"
+import { deleteSessionTools, getSessionTools, setSessionTools } from "../../shared/session-tools-store"
 import {
   getSessionAgent,
   registerAgentName,
@@ -28,6 +31,7 @@ afterAll(() => { mock.restore() })
 afterEach(() => {
   clearBackgroundTaskRegistryForTesting()
   releaseAllPromptAsyncReservationsForTesting()
+  SessionCategoryRegistry.clear()
 })
 
 const TASK_TTL_MS = 30 * 60 * 1000
@@ -434,6 +438,63 @@ describe("BackgroundManager tmux callback ordering", () => {
       resolveTmuxCallback()
       if (originalTmux === undefined) delete process.env.TMUX
       else process.env.TMUX = originalTmux
+      manager.shutdown()
+    }
+  })
+
+  test("starts promptAsync before launch session-created readiness resolves", async () => {
+    //#given
+    const events: string[] = []
+    let resolveReadiness: () => void = () => {}
+    const readiness = new Promise<void>((resolve) => {
+      resolveReadiness = resolve
+    })
+
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/tmp/test" } }),
+        create: async () => {
+          events.push("session.create")
+          return { data: { id: "ses_manager_readiness" } }
+        },
+        promptAsync: async () => {
+          events.push("promptAsync")
+          return { data: {} }
+        },
+        abort: async () => ({ data: {} }),
+      },
+    }
+
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput(client, "/tmp/test"),
+      enableParentSessionNotifications: false,
+    })
+
+    try {
+      //#when
+      await manager.launch({
+        description: "Slow readiness test",
+        prompt: "Do work",
+        agent: "general",
+        parentSessionId: "ses_parent",
+        parentMessageId: "msg_parent",
+        onSessionCreated: async () => {
+          events.push("readiness.start")
+          await readiness
+          events.push("readiness.end")
+        },
+      })
+      await new Promise((resolve) => setTimeout(resolve, 20))
+
+      //#then
+      expect(events).toContain("promptAsync")
+      expect(events).toContain("readiness.start")
+      expect(events).not.toContain("readiness.end")
+      const readinessIdx = events.indexOf("readiness.start")
+      const promptIdx = events.indexOf("promptAsync")
+      expect(readinessIdx < promptIdx).toBe(true)
+    } finally {
+      resolveReadiness()
       manager.shutdown()
     }
   })
@@ -5335,6 +5396,78 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     //#then
     expect(task.status).toBe("cancelled")
     expect(task.error).toContain("no activity")
+  })
+
+  test("should clean stale-interrupted child session bookkeeping", async () => {
+    //#given
+    clearAllDelegatedChildSessionBootstrap()
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const clearSessionFallbackChain = mock(() => {})
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput(client),
+      config: { messageStalenessTimeoutMs: 600_000 },
+      modelFallbackControllerAccessor: {
+        register: () => {},
+        setSessionFallbackChain: () => {},
+        getSessionFallbackChain: () => undefined,
+        clearSessionFallbackChain,
+      },
+    })
+    stubNotifyParentSession(manager)
+    const sessionID = "session-stale-cleanup"
+    const rootSessionID = "root-stale-cleanup"
+
+    const task = createMockTask({
+      id: "task-stale-cleanup",
+      sessionId: sessionID,
+      rootSessionId: rootSessionID,
+      parentSessionId: "parent-stale-cleanup",
+      status: "running",
+      startedAt: new Date(Date.now() - 15 * 60 * 1000),
+      progress: undefined,
+    })
+
+    getTaskMap(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
+    getRootDescendantCounts(manager).set(rootSessionID, 1)
+    registerDelegatedChildSessionBootstrap({
+      sessionID,
+      promptText: "retry stale cleanup",
+      category: "quick",
+    })
+    setSessionAgent(sessionID, "sisyphus-junior")
+    setSessionPromptParams(sessionID, { temperature: 0.2 })
+    setSessionTools(sessionID, { bash: true, task: false })
+    subagentSessions.add(sessionID)
+
+    try {
+      //#when
+      await manager["checkAndInterruptStaleTasks"]({ [sessionID]: { type: "running" } })
+
+      //#then
+      expect(task.status).toBe("cancelled")
+      expect(getRootDescendantCounts(manager).has(rootSessionID)).toBe(false)
+      expect(getPendingByParent(manager).has(task.parentSessionId)).toBe(false)
+      expect(getDelegatedChildSessionBootstrap(sessionID)).toBeUndefined()
+      expect(SessionCategoryRegistry.has(sessionID)).toBe(false)
+      expect(getSessionAgent(sessionID)).toBeUndefined()
+      expect(getSessionPromptParams(sessionID)).toBeUndefined()
+      expect(getSessionTools(sessionID)).toBeUndefined()
+      expect(clearSessionFallbackChain).toHaveBeenCalledWith(sessionID)
+      expect(subagentSessions.has(sessionID)).toBe(false)
+    } finally {
+      manager.shutdown()
+      clearAllDelegatedChildSessionBootstrap()
+      clearSessionPromptParams(sessionID)
+      deleteSessionTools(sessionID)
+      subagentSessions.delete(sessionID)
+    }
   })
 
   test("should interrupt task with no lastUpdate after messageStalenessTimeout", async () => {

@@ -11,6 +11,16 @@ export type NativeSkillEntry = {
   content: string
 }
 
+export type NativeSkillGetter = {
+  readonly get: (name: string) => NativeSkillEntry | undefined | Promise<NativeSkillEntry | undefined>
+}
+
+export type NativeSkillMissResolution =
+  | { readonly kind: "resolved"; readonly skill: LoadedSkill }
+  | { readonly kind: "disabled"; readonly name: string }
+  | { readonly kind: "miss" }
+  | { readonly kind: "unavailable" }
+
 export function loadedSkillToInfo(skill: LoadedSkill): SkillInfo {
   return {
     name: skill.name,
@@ -37,7 +47,7 @@ function nativeSkillScope(native: NativeSkillEntry): LoadedSkill["scope"] {
   return normalizeSkillName(native.name).startsWith(SHARED_SKILL_PREFIX) ? "shared" : "config"
 }
 
-function nativeSkillToLoadedSkill(native: NativeSkillEntry): LoadedSkill {
+export function nativeSkillToLoadedSkill(native: NativeSkillEntry): LoadedSkill {
   return {
     name: native.name,
     path: native.location,
@@ -98,6 +108,37 @@ export function mergeNativeSkillInfos(
       scope: nativeSkillScope(native),
     })
     knownNames.add(nativeName)
+  }
+}
+
+export async function resolveNativeSkillOnMiss(args: {
+  readonly nativeSkills: NativeSkillGetter | undefined
+  readonly name: string
+  readonly disabledSkills?: ReadonlySet<string>
+}): Promise<NativeSkillMissResolution> {
+  const { nativeSkills, name, disabledSkills } = args
+  if (!nativeSkills) return { kind: "unavailable" }
+
+  try {
+    const native = await nativeSkills.get(name)
+    if (!native) return { kind: "miss" }
+
+    const disabledSkillAliases = normalizeDisabledSkills(disabledSkills)
+    if (disabledSkillAliases && isDisabledSkillAlias(nativeSkillToAliasCheckSkill(native), disabledSkillAliases)) {
+      if ("all" in nativeSkills && typeof nativeSkills.all === "function") {
+        const listedNativeSkills = await nativeSkills.all()
+        const listedDisabledSkill = Array.isArray(listedNativeSkills)
+          ? listedNativeSkills.some((listedNative) => normalizeSkillName(listedNative.name) === normalizeSkillName(native.name))
+          : false
+        if (listedDisabledSkill) return { kind: "miss" }
+      }
+      return { kind: "disabled", name: native.name }
+    }
+
+    return { kind: "resolved", skill: nativeSkillToLoadedSkill(native) }
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
+    return { kind: "miss" }
   }
 }
 

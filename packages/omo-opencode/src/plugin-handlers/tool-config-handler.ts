@@ -1,8 +1,7 @@
 import type { OhMyOpenCodeConfig } from "../config";
-import { getAgentDisplayName, getAgentListDisplayName } from "../shared/agent-display-names";
 import { isTaskSystemEnabled } from "../shared";
-
-type AgentWithPermission = { permission?: Record<string, unknown> };
+import { agentByKey } from "./agent-permission-lookup";
+import { applyExternalMcpAllowlist, getExternalMcpDefaultToolDenials } from "./external-mcp-allowlist";
 
 const TASK_DENIED_SUBAGENT_KEYS = [
   "librarian",
@@ -23,16 +22,6 @@ function getConfigQuestionPermission(): string | null {
     if (error instanceof Error) return null;
     return null;
   }
-}
-
-function agentByKey(
-  agentResult: Record<string, unknown>,
-  key: string,
-  pluginConfig?: OhMyOpenCodeConfig,
-): AgentWithPermission | undefined {
-  return (agentResult[getAgentListDisplayName(key, pluginConfig?.agents)] ?? agentResult[getAgentDisplayName(key, pluginConfig?.agents)] ?? agentResult[key]) as
-    | AgentWithPermission
-    | undefined;
 }
 
 function denyTaskForAgent(
@@ -61,6 +50,7 @@ export function applyToolConfig(params: {
   params.config.tools = {
     ...(params.config.tools as Record<string, unknown>),
     "grep_app_*": false,
+    ...getExternalMcpDefaultToolDenials(),
     LspHover: false,
     LspCodeActions: false,
     LspCodeActionResolve: false,
@@ -91,6 +81,10 @@ export function applyToolConfig(params: {
   if (librarian) {
     librarian.permission = { ...librarian.permission, "grep_app_*": "allow" };
   }
+  applyExternalMcpAllowlist({
+    agentResult: params.agentResult,
+    pluginConfig: params.pluginConfig,
+  });
   const looker = agentByKey(params.agentResult, "multimodal-looker", params.pluginConfig);
   if (looker) {
     looker.permission = { ...looker.permission, task: "deny", look_at: "deny" };

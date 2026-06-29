@@ -109,7 +109,7 @@ describe("validateArchiveEntries", () => {
 // entries); these 3 tests are end-to-end integration tests that verify the
 // same logic on actual archive bytes. macOS and Linux runners have Python
 // installed and still run the full block.
-describe.skipIf(process.platform === "win32", "archive extraction preflight", () => {
+describe.skipIf(process.platform === "win32")("archive extraction preflight", () => {
 	it("rejects tar archives with traversal entries before extraction", async () => {
 		//#given
 		const rootDir = createTestDir()
@@ -175,6 +175,39 @@ describe.skipIf(process.platform === "win32", "archive extraction preflight", ()
 
 		//#then
 		expect(errorMessage).toMatch(/hard link target|path traversal/i)
+	})
+
+	it("rejects tar symlink traversal during preflight before extraction runs", async () => {
+		//#given
+		const rootDir = createTestDir()
+		const archivePath = join(rootDir, "malicious-symlink.tar.gz")
+		const destDir = join(rootDir, "dest")
+		mkdirSync(destDir, { recursive: true })
+		const scriptPath = writePythonScript(
+			rootDir,
+			"make-malicious-symlink-tar.py",
+			[
+				"import sys",
+				"import tarfile",
+				"with tarfile.open(sys.argv[1], 'w:gz') as archive:",
+				"    info = tarfile.TarInfo('bin/tool-link')",
+				"    info.type = tarfile.SYMTYPE",
+				"    info.linkname = '../../escape.txt'",
+				"    archive.addfile(info)",
+			].join("\n")
+		)
+		runPythonScript(scriptPath, [archivePath])
+
+		//#when
+		let errorMessage = ""
+		try {
+			await extractTarGz(archivePath, destDir, { args: ["true"] })
+		} catch (error) {
+			errorMessage = error instanceof Error ? error.message : String(error)
+		}
+
+		//#then
+		expect(errorMessage).toMatch(/symlink target|path traversal/i)
 	})
 
 	it("rejects zip archives with symlink escapes before extraction", async () => {

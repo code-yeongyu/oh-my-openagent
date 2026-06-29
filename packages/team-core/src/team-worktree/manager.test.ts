@@ -23,7 +23,7 @@ async function initGitRepo(): Promise<string> {
   Bun.spawnSync(["git", "add", "README.md"], { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" })
   Bun.spawnSync(["git", "config", "user.email", "test@example.com"], { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" })
   Bun.spawnSync(["git", "config", "user.name", "Test User"], { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" })
-  Bun.spawnSync(["git", "commit", "-m", "init"], { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" })
+  Bun.spawnSync(["git", "commit", "-m", "Init"], { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" })
   return repositoryRoot
 }
 

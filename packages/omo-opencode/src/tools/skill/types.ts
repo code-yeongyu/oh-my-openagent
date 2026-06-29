@@ -19,6 +19,8 @@ export interface SkillInfo {
   allowedTools?: string[]
 }
 
+export type SkillDescriptionMode = "full" | "compact"
+
 export interface SkillLoadOptions {
   /** When true, only load from OpenCode paths (.opencode/skills/, ~/.config/opencode/skills/) */
   opencodeOnly?: boolean
@@ -50,4 +52,5 @@ export interface SkillLoadOptions {
     dirs(): string[] | Promise<string[]>
   }
   includeSkillsInDescription?: boolean
+  descriptionMode?: SkillDescriptionMode
 }

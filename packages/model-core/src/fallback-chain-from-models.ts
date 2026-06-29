@@ -1,35 +1,7 @@
 import type { FallbackEntry } from "./model-requirements"
 import type { FallbackModelObject } from "./fallback-model-object"
 import { normalizeFallbackModels } from "./model-resolver"
-import { KNOWN_VARIANTS } from "./known-variants"
-
-function parseVariantFromModel(rawModel: string): { modelID: string; variant?: string } {
-  if (typeof rawModel !== "string") {
-    return { modelID: "" }
-  }
-  const trimmedModel = rawModel.trim()
-  if (!trimmedModel) {
-    return { modelID: "" }
-  }
-
-  const parenthesizedVariant = trimmedModel.match(/^(.*)\(([^()]+)\)\s*$/)
-  if (parenthesizedVariant) {
-    const modelID = parenthesizedVariant[1]?.trim() ?? ""
-    const variant = parenthesizedVariant[2]?.trim()
-    return variant ? { modelID, variant } : { modelID }
-  }
-
-  const spaceVariant = trimmedModel.match(/^(.*\S)\s+([a-z][a-z0-9_-]*)$/i)
-  if (spaceVariant) {
-    const modelID = spaceVariant[1]?.trim() ?? ""
-    const variant = spaceVariant[2]?.trim().toLowerCase()
-    if (variant && KNOWN_VARIANTS.has(variant)) {
-      return { modelID, variant }
-    }
-  }
-
-  return { modelID: trimmedModel }
-}
+import { parseModelRoute, parseVariantFromModelID } from "./model-string-parser"
 
 export function parseFallbackModelEntry(
   model: string,
@@ -40,13 +12,21 @@ export function parseFallbackModelEntry(
   const trimmed = model.trim()
   if (!trimmed) return undefined
 
-  const parts = trimmed.split("/")
-  const providerID =
-    parts.length >= 2 ? parts[0].trim() : (contextProviderID?.trim() || defaultProviderID)
-  const rawModelID = parts.length >= 2 ? parts.slice(1).join("/").trim() : trimmed
-  if (!providerID || !rawModelID) return undefined
+  const explicitRoute = parseModelRoute(trimmed)
+  if (explicitRoute) {
+    return {
+      providers: explicitRoute.providers,
+      model: explicitRoute.modelID,
+      variant: explicitRoute.variant,
+    }
+  }
 
-  const parsed = parseVariantFromModel(rawModelID)
+  if (trimmed.includes("/")) return undefined
+
+  const providerID = contextProviderID?.trim() || defaultProviderID
+  if (!providerID) return undefined
+
+  const parsed = parseVariantFromModelID(trimmed)
   if (!parsed.modelID) return undefined
 
   return {

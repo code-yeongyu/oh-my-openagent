@@ -29,6 +29,7 @@ import { starGitHubRepositories } from "./star-request"
 import { getNoModelProvidersWarning, hasAnyConfiguredProvider } from "./provider-availability"
 import { ensureTuiPluginEntry } from "./config-manager/add-tui-plugin-to-tui-config"
 import * as astGrepInstall from "./install-ast-grep-sg"
+import { resolveOpenCodeInstallModelInventory, type ModelInventory } from "./install-model-inventory"
 
 export async function runCliInstaller(args: InstallArgs, version: string): Promise<number> {
   const validation = validateNonTuiArgs(args)
@@ -118,7 +119,8 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     }
 
     printStep(step++, totalSteps, `Writing ${PLUGIN_NAME} configuration...`)
-    const omoResult = writeOmoConfig(config)
+    const modelInventory = await readInstallModelInventory()
+    const omoResult = writeOmoConfig(config, { inventory: modelInventory })
     if (!omoResult.success) {
       printError(`Failed: ${omoResult.error}`)
       return 1
@@ -192,6 +194,13 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   }
 
   return 0
+}
+
+async function readInstallModelInventory(): Promise<ModelInventory | undefined> {
+  const result = await resolveOpenCodeInstallModelInventory()
+  if (result.kind === "available") return result.inventory
+  printWarning(result.warning)
+  return undefined
 }
 
 async function maybePromptForGitHubStars(platform: InstallPlatform): Promise<void> {

@@ -71,6 +71,10 @@ task(subagent_type="explore", load_skills=[], prompt="Find auth implementations"
 background_output(task_id="bg_abc123")
 ```
 
+Background task lifecycle is guarded by a controller. A task terminalizes once, releases its model or provider concurrency slot once, records task history once, and runs terminal cleanup once. If a duplicate completion, cancellation, or error event arrives later, OMO logs the invalid transition and leaves the terminal task unchanged.
+
+Completion is still conservative. Final assistant text can complete a background task even if old internal todos remain pending, but fresh tool activity, a fresh in-progress assistant turn, or missing final output keeps the task running. Parent-session wakeups are also tracked: a reply-required wake is queued, dispatched, accepted by an assistant turn, or requeued with a diagnostic reason.
+
 #### Background Agent Work Directories
 
 Background agents inherit the session working directory from OpenCode and OMO when
@@ -125,6 +129,10 @@ Customize agent models, prompts, and permissions in `oh-my-opencode.jsonc`.
 ### Team Mode (experimental, OFF by default)
 
 Parallel multi-agent coordination modeled after Claude Code's experimental Agent Teams. Enable via `team_mode.enabled: true`. Exposes 12 `team_*` tools for spawning a lead + up to 8 members, a shared deferred-ack mailbox, a shared task list with file-locked claims, optional per-member git worktrees, and an optional tmux layout that streams each member's session output into dedicated panes.
+
+Team runs now expose explicit lifecycle and wake state through `team_status`. Messages to idle members either trigger one live wake or record a pending wake/error state for the lead to inspect. Closure is fail-closed: active members, non-terminal tasks, or missing required outputs block deletion until shutdown is requested, approved, and the required outputs are verifiable.
+
+The tmux visualization uses a backend boundary. The shipped backend remains tmux, keeps current pane behavior, and preserves OpenCode server auth in attached member panes. A missing or failing tmux backend does not change team task, mailbox, or shutdown rules.
 
 See the **[Team Mode Guide](../guide/team-mode.md)** for configuration, team spec format, lifecycle, bounds, and storage layout.
 
@@ -268,6 +276,8 @@ The plugin uses two independent fallback systems:
 
 - **model-fallback**: proactive model chain selection in chat params.
 - **runtime-fallback**: reactive recovery after runtime failures from provider/API behavior.
+
+Runtime fallback uses typed provider error classification before dispatching a retry. Retryable provider errors include rate limits, quota exhaustion, provider auto-retry signals, network errors, and service availability errors. Auth failures and unknown errors are treated as unsafe for retry unless their status code is explicitly configured and classified as safe. When a retry is allowed after an incomplete assistant turn, OMO routes the retry through the shared prompt gate so only one fallback prompt is dispatched.
 
 ### File-Based Prompts
 
@@ -666,6 +676,8 @@ AST-aware search and rewrite now lives in the `ast-grep` skill. Load it with the
 | ------------- | ------------------------------------------------------------------------------------------------------ |
 | **skill**     | Load and execute a skill or slash command by name. Returns detailed instructions with context applied. |
 | **skill_mcp** | Invoke MCP server operations from skill-embedded MCPs.                                                 |
+
+If an OMO skill lookup misses, the `skill` tool can pass through host-native OpenCode skills exposed by the host registry. Missing-skill errors name the checked source classes, including host-native skills, without printing private skill file bodies. In compact token-budget mode, the available-items listing keeps names and short triggers while the selected skill still expands to its full content when called.
 
 ### Session Tools
 

@@ -82,11 +82,14 @@ Hard-reject agents fail TeamSpec parsing because they cannot write mailbox state
 
 ## Lifecycle
 
-1. `team_create` — spawns team and member sessions.
+1. `team_create` starts a team run and member sessions.
 2. Lead delegates work via `team_send_message`, `team_task_create`.
 3. Members claim tasks (`team_task_update` with `status: "claimed"`), report back via `team_send_message`.
-4. `team_shutdown_request` → member or lead acks via `team_approve_shutdown` / `team_reject_shutdown`.
-5. `team_delete` — removes runtime state, worktrees, optional tmux layout.
+4. Messages to idle members trigger one live wake or record a pending/error wake state in `team_status`.
+5. `team_shutdown_request` asks a member to wrap up; lead acks via `team_approve_shutdown` / `team_reject_shutdown`.
+6. `team_delete` removes runtime state, worktrees, and optional tmux layout only after closure eligibility passes.
+
+Closure is fail-closed. A team can close when all tasks are terminal, required outputs are present, shutdown has been requested and approved where needed, and runtime resources can be deleted. Active members, blocked tasks, or unverifiable required outputs keep the team in a blocked status so the lead can inspect and fix the missing work instead of losing state.
 
 ## 12 tools
 
@@ -98,7 +101,7 @@ Hard-reject agents fail TeamSpec parsing because they cannot write mailbox state
 | `team_approve_shutdown` / `team_reject_shutdown` | Member or lead responds. |
 | `team_send_message` | Peer-to-peer mailbox; lead-only broadcast. |
 | `team_task_create` / `_list` / `_update` / `_get` | Shared task list. |
-| `team_status` | Aggregate runtime view. |
+| `team_status` | Aggregate runtime view, including member wake state, task state, shutdown state, and closure blockers. |
 | `team_list` | Declared + active teams. |
 
 ## Bounds (defaults)
@@ -117,7 +120,11 @@ Set `tmux_visualization: true`. Requires running inside a tmux session and tmux 
 
 When enabled, each member gets a dedicated tmux pane attached to that member's session via `opencode attach`. The pane runs the full interactive opencode TUI for the member so you can watch streaming output in real time. Panes start in each member worktree when configured, otherwise the repo root.
 
+The visualization layer uses a typed backend contract. The shipped backend is still tmux and preserves the current behavior, including forwarding `OPENCODE_SERVER_PASSWORD` and `OPENCODE_SERVER_USERNAME` into member panes while keeping those secrets out of the visible `opencode attach` command. The backend seam exists so a native terminal multiplexer can be added later without changing the Team Mode lifecycle or `team_*` tool contracts.
+
 `team_delete` closes the panes and tears down the team layout. Per-member shutdown closes just that pane and rebalances the remaining layout.
+
+Pane cleanup is best-effort and isolated from team state. If pane closure fails, Team Mode reports the cleanup error instead of silently deleting a team with active resources.
 
 ## What team mode does NOT do
 

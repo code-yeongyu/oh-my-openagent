@@ -2,12 +2,46 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { stampGitBashMcpEnv } from "./codex-git-bash-mcp-env"
 import { prepareGitBashForInstall, resolveGitBash } from "./git-bash"
 
 const PROGRAM_FILES_GIT_BASH = "C:\\Program Files\\Git\\bin\\bash.exe"
 const PROGRAM_FILES_X86_GIT_BASH = "C:\\Program Files (x86)\\Git\\bin\\bash.exe"
 
 describe("git-bash", () => {
+  test("#given same-worktree Windows plugin caches #when stamping Git Bash MCP env #then manifests keep distinct cache roots", async () => {
+    // given
+    const worktreeRoot = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-same-worktree-"))
+    const firstPluginRoot = join(worktreeRoot, "codex-a", "plugins", "cache", "sisyphuslabs", "omo", "4.13.0")
+    const secondPluginRoot = join(worktreeRoot, "codex-b", "plugins", "cache", "sisyphuslabs", "omo", "4.13.0")
+    await writeGitBashMcpManifest(firstPluginRoot)
+    await writeGitBashMcpManifest(secondPluginRoot)
+    const env = { OMO_CODEX_GIT_BASH_PATH: PROGRAM_FILES_GIT_BASH }
+
+    // when
+    const firstChanged = await stampGitBashMcpEnv({ pluginRoot: firstPluginRoot, platform: "win32", env })
+    const secondChanged = await stampGitBashMcpEnv({ pluginRoot: secondPluginRoot, platform: "win32", env })
+
+    // then
+    expect(firstChanged).toBe(true)
+    expect(secondChanged).toBe(true)
+    const first = await readMcpManifest(firstPluginRoot)
+    const second = await readMcpManifest(secondPluginRoot)
+    expect(first.mcpServers.git_bash.env.OMO_CODEX_GIT_BASH_PATH).toBe(PROGRAM_FILES_GIT_BASH)
+    expect(second.mcpServers.git_bash.env.OMO_CODEX_GIT_BASH_PATH).toBe(PROGRAM_FILES_GIT_BASH)
+    expect(first.mcpServers.git_bash.env.OMO_CODEX_GIT_BASH_MCP_TRANSPORT_ID).toMatch(/^git-bash-[a-f0-9]{16}$/)
+    expect(second.mcpServers.git_bash.env.OMO_CODEX_GIT_BASH_MCP_TRANSPORT_ID).toMatch(/^git-bash-[a-f0-9]{16}$/)
+    expect(first.mcpServers.git_bash.env.OMO_CODEX_GIT_BASH_MCP_TRANSPORT_ID).not.toBe(
+      second.mcpServers.git_bash.env.OMO_CODEX_GIT_BASH_MCP_TRANSPORT_ID,
+    )
+    expect(first.mcpServers.codegraph.args[0]).toBe(join(firstPluginRoot, "components", "codegraph", "dist", "serve.js"))
+    expect(second.mcpServers.codegraph.args[0]).toBe(join(secondPluginRoot, "components", "codegraph", "dist", "serve.js"))
+    expect(first.mcpServers.codegraph.args[0]).not.toBe(second.mcpServers.codegraph.args[0])
+  })
+
   test("#given non-Windows platform #when resolving Git Bash #then no preflight is required", () => {
     // given / when
     const result = resolveGitBash({
@@ -248,3 +282,30 @@ describe("git-bash", () => {
     expect(result).toEqual(missingResolution)
   })
 })
+
+async function writeGitBashMcpManifest(pluginRoot: string): Promise<void> {
+  await mkdir(pluginRoot, { recursive: true })
+  await writeFile(
+    join(pluginRoot, ".mcp.json"),
+    JSON.stringify({
+      mcpServers: {
+        codegraph: { args: ["./components/codegraph/dist/serve.js"] },
+        git_bash: { command: "node", args: ["./components/git-bash-mcp/dist/cli.js", "mcp"] },
+      },
+    }),
+  )
+}
+
+async function readMcpManifest(pluginRoot: string): Promise<{
+  readonly mcpServers: {
+    readonly codegraph: { readonly args: readonly string[] }
+    readonly git_bash: {
+      readonly env: {
+        readonly OMO_CODEX_GIT_BASH_PATH: string
+        readonly OMO_CODEX_GIT_BASH_MCP_TRANSPORT_ID: string
+      }
+    }
+  }
+}> {
+  return JSON.parse(await readFile(join(pluginRoot, ".mcp.json"), "utf8"))
+}

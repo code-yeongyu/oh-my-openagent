@@ -140,4 +140,77 @@ describe("aggregateStatus", () => {
     expect(result.concurrency.queuedOnSameModel).toBe(3)
     expect(result.concurrency.teamRunIdSpecific).toBe(4)
   })
+
+  test("#given all team tasks are terminal and workers are done #when aggregateStatus runs #then closure is eligible", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const teamRunId = await seedRuntimeState(baseDir, "team-closure-ready", "lead-ready", ["session-a", "session-b"])
+    const { loadRuntimeState: loadState, saveRuntimeState: saveState } = await import("../team-state-store/store")
+    const runtimeState = await loadState(teamRunId, config)
+    await saveState({
+      ...runtimeState,
+      status: "active",
+      members: runtimeState.members.map((member) => (
+        member.agentType === "leader"
+          ? member
+          : { ...member, status: member.name === "member-1" ? "completed" as const : "shutdown_approved" as const }
+      )),
+    }, config)
+    await createTask(teamRunId, createTaskInput({ subject: "done", status: "completed", owner: "member-1", claimedAt: Date.now() }), config)
+    await createTask(teamRunId, createTaskInput({ subject: "removed", status: "deleted", owner: "member-2", claimedAt: Date.now() }), config)
+
+    // when
+    const result = await aggregateStatus(teamRunId, config)
+
+    // then
+    expect(result.closureEligibility).toEqual({
+      state: "eligible",
+      reasons: [],
+      terminalTasks: 2,
+      activeTasks: 0,
+      blockedRequiredOutputs: [],
+    })
+  })
+
+  test("#given a terminal task records a failed required output #when aggregateStatus runs #then team status is blocked", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const teamRunId = await seedRuntimeState(baseDir, "team-output-blocked", "lead-blocked", ["session-a"])
+    const { loadRuntimeState: loadState, saveRuntimeState: saveState } = await import("../team-state-store/store")
+    const runtimeState = await loadState(teamRunId, config)
+    await saveState({
+      ...runtimeState,
+      status: "active",
+      members: runtimeState.members.map((member) => (
+        member.agentType === "leader" ? member : { ...member, status: "completed" as const }
+      )),
+    }, config)
+    const blockedTask = await createTask(teamRunId, createTaskInput({
+      subject: "write evidence",
+      status: "completed",
+      owner: "member-1",
+      claimedAt: Date.now(),
+      metadata: {
+        requiredOutput: {
+          status: "failed",
+          reason: "evidence file missing",
+        },
+      },
+    }), config)
+
+    // when
+    const result = await aggregateStatus(teamRunId, config)
+
+    // then
+    expect(result.status).toBe("blocked")
+    expect(result.closureEligibility.state).toBe("blocked")
+    expect(result.closureEligibility.blockedRequiredOutputs).toEqual([
+      { taskId: blockedTask.id, subject: "write evidence", reason: "evidence file missing" },
+    ])
+    expect(result.closureEligibility.reasons).toContain(`required output failed for task ${blockedTask.id}: evidence file missing`)
+  })
 })

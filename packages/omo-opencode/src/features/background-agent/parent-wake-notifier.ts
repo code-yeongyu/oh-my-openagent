@@ -39,7 +39,7 @@ export class ParentWakeNotifier {
           wake,
           dispatchedTracker: this.dispatchedTracker,
           sessionInspector: this.sessionInspector,
-          requeueWake: (latestWake) => this.requeueWake(sessionID, latestWake),
+          requeueWake: (latestWake) => this.requeueWake(sessionID, latestWake, "no-assistant-output"),
           scheduleFlush: () => this.schedulePendingParentWakeFlush(sessionID),
         }).catch((error: unknown) => {
           logParentWakeWindowRecoveryError(
@@ -79,6 +79,10 @@ export class ParentWakeNotifier {
 
   getDispatchedParentWakes(): Map<string, PendingParentWake> {
     return this.dispatchedTracker.getWakes()
+  }
+
+  getAssistantTurnStartedParentWakes(): Map<string, PendingParentWake> {
+    return this.dispatchedTracker.getAssistantTurnStartedWakes()
   }
 
   getDispatchedParentWakeTimers(): Map<string, ReturnType<typeof setTimeout>> {
@@ -124,6 +128,10 @@ export class ParentWakeNotifier {
     this.dispatchedTracker.clearWake(sessionID)
   }
 
+  recordParentWakeAssistantTurnStarted(sessionID: string): void {
+    this.dispatchedTracker.recordAssistantTurnStarted(sessionID)
+  }
+
   async requeueDispatchedParentWake(sessionID: string, reason: string): Promise<boolean> {
     const wake = this.dispatchedTracker.getWake(sessionID)
     if (!wake) {
@@ -142,7 +150,7 @@ export class ParentWakeNotifier {
     }
 
     this.dispatchedTracker.clearWake(sessionID)
-    this.requeueWake(sessionID, wake)
+    this.requeueWake(sessionID, wake, `prompt-failure:${reason}`)
     this.schedulePendingParentWakeFlush(sessionID)
     log("[background-agent] Requeued dispatched parent wake after prompt failure:", {
       sessionID,
@@ -159,7 +167,7 @@ export class ParentWakeNotifier {
 
     this.dispatchedTracker.clearWake(sessionID)
     wake.allowEmptyAssistantTurnRetry = true
-    this.requeueWake(sessionID, wake)
+    this.requeueWake(sessionID, wake, "empty-assistant-turn")
     this.schedulePendingParentWakeFlush(sessionID, 0)
     log("[background-agent] Requeued dispatched parent wake after empty assistant turn:", { sessionID })
     return true
@@ -179,8 +187,8 @@ export class ParentWakeNotifier {
     this.sessionInspector.shutdown()
   }
 
-  private requeueWake(sessionID: string, latestWake: PendingParentWake): void {
-    this.pendingQueue.requeueWake(sessionID, latestWake)
+  private requeueWake(sessionID: string, latestWake: PendingParentWake, reason: string): void {
+    this.pendingQueue.requeueWake(sessionID, latestWake, reason)
     this.onPendingWakeRequeued?.(sessionID)
   }
 

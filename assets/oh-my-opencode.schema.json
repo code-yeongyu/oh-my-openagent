@@ -88,6 +88,20 @@
         "type": "string"
       }
     },
+    "external_mcp_allowlist": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "hashline_edit": {
       "type": "boolean"
     },
@@ -6010,6 +6024,10 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 9007199254740991
+        },
+        "token_budget_mode": {
+          "type": "string",
+          "const": "compact"
         },
         "disable_live_parent_wake_routing": {
           "type": "boolean"

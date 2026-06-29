@@ -18,11 +18,16 @@ import {
 	resolveModelFromChain,
 } from "./fallback-chain-resolution"
 import { transformModelForProvider } from "./provider-model-id-transform"
+import { filterGeneratedConfigByInventory, type ModelInventory } from "./install-model-inventory"
 
 export type { GeneratedOmoConfig } from "./model-fallback-types"
 
 export const ULTIMATE_FALLBACK = "opencode/gpt-5-nano"
 const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
+
+export type GenerateModelConfigOptions = {
+  readonly inventory?: ModelInventory
+}
 
 type CompatibleFallbackSettings = {
   variant?: string
@@ -149,7 +154,7 @@ function attachAllFallbackModels<T extends AgentConfig | CategoryConfig>(
 
 
 
-export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
+export function generateModelConfig(config: InstallConfig, options: GenerateModelConfigOptions = {}): GeneratedOmoConfig {
   const avail = toProviderAvailability(config)
   const hasAnyProvider =
     avail.native.claude ||
@@ -277,9 +282,13 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     categories,
   }
 
-  return isOpenAiOnlyAvailability(avail)
+  const staticConfig = isOpenAiOnlyAvailability(avail)
     ? applyOpenAiOnlyModelCatalog(generatedConfig)
     : generatedConfig
+
+  return options.inventory === undefined
+    ? staticConfig
+    : filterGeneratedConfigByInventory(staticConfig, options.inventory)
 }
 
 export function shouldShowChatGPTOnlyWarning(config: InstallConfig): boolean {

@@ -1,11 +1,17 @@
 import { spawn } from "../runtime"
 import { readProcessStream } from "../process-stream-reader"
 
+const INFO_ZIP_MEMBER_PATTERN_METACHARS = /[\\*?\[\]]/g
+
+function escapeInfoZipMemberPattern(entryPath: string): string {
+	return entryPath.replace(INFO_ZIP_MEMBER_PATTERN_METACHARS, "\\$&")
+}
+
 export async function readZipSymlinkTarget(
 	archivePath: string,
 	entryPath: string
 ): Promise<string | undefined> {
-	const proc = spawn(["unzip", "-p", archivePath, "--", entryPath], {
+	const proc = spawn(["unzip", "-p", "--", archivePath, escapeInfoZipMemberPattern(entryPath)], {
 		stdout: "pipe",
 		stderr: "pipe",
 	})

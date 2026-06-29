@@ -2,7 +2,7 @@ import type { HookDeps } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
-import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, extractAutoRetrySignal, containsErrorContent } from "./error-classifier"
+import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, extractAutoRetrySignal, containsErrorContent, shouldAbortFailedAssistantTurnForFallback } from "./error-classifier"
 import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
@@ -188,8 +188,11 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         }
       }
 
-      if (classifyErrorType(error) === "quota_exceeded") {
-        await helpers.abortSessionRequest(sessionID, "message.updated.quota-fallback")
+      if (shouldAbortFailedAssistantTurnForFallback(error, config.retry_on_errors)) {
+        const abortSource = classifyErrorType(error) === "quota_exceeded"
+          ? "message.updated.quota-fallback"
+          : "message.updated.provider-fallback"
+        await helpers.abortSessionRequest(sessionID, abortSource)
         sessionRetryInFlight.delete(sessionID)
       }
 

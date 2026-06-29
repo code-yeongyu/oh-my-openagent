@@ -39,7 +39,7 @@ export async function extractTarGz(
   const entries = await listTarEntries(archivePath, options?.cwd)
   validateArchiveEntries(entries, destDir)
 
-  const args = options?.args ?? ["tar", "-xzf", archivePath, "-C", destDir];
+  const args = options?.args ?? ["tar", "-x", "-z", "-f", archivePath, "-C", destDir];
   const proc = spawn(args, {
     cwd: options?.cwd,
     stdout: "pipe",
@@ -75,7 +75,7 @@ export function ensureExecutable(binaryPath: string): void {
 }
 
 function parseTarEntry(line: string): ArchiveEntry | null {
-  const match = line.match(/^([^\s])\S*\s+\d+\s+\S+\s+\S+\s+\d+\s+\w+\s+\d+\s+(?:\d{2}:\d{2}|\d{4})\s+(.*)$/)
+  const match = line.match(/^([^\s])\S*\s+.*?(?:\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}|\w+\s+\d+\s+(?:\d{2}:\d{2}|\d{4}))\s+(.*)$/)
   if (!match) {
     return null
   }
@@ -101,7 +101,7 @@ function parseTarEntry(line: string): ArchiveEntry | null {
 }
 
 async function listTarEntries(archivePath: string, cwd?: string): Promise<ArchiveEntry[]> {
-  const proc = spawn(["tar", "-tvzf", archivePath], {
+  const proc = spawn(["tar", "-t", "-v", "-z", "-f", archivePath], {
     cwd,
     stdout: "pipe",
     stderr: "pipe",
@@ -126,6 +126,11 @@ async function listTarEntries(archivePath: string, cwd?: string): Promise<Archiv
     .split(/\r?\n/)
     .map(line => line.trim())
     .filter(Boolean)
-    .map(line => parseTarEntry(line))
-    .filter((entry): entry is ArchiveEntry => entry !== null)
+    .map(line => {
+      const entry = parseTarEntry(line)
+      if (!entry) {
+        throw new Error(`tar entry listing parse failed for ${archivePath}: ${line}`)
+      }
+      return entry
+    })
 }

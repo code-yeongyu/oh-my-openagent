@@ -20,7 +20,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 oqa_tui_smoke() {
   oqa_require opencode tmux jq sqlite3 || return 1
-  local before after realdb ver sess cap found="" i fails=0
+  local before after before_project after_project project_sql realdb ver sess cap found="" i fails=0
+  local opencode_bin opencode_cmd
+  opencode_bin="$(command -v opencode)"
+  printf -v opencode_cmd "%q" "$opencode_bin"
   # Capture the REAL DB path + count BEFORE isolation. We must read it with
   # sqlite3 directly: once oqa_mk_isolated_xdg exports XDG_DATA_HOME, `opencode
   # db` would resolve the empty sandbox DB instead of the real one.
@@ -29,12 +32,14 @@ oqa_tui_smoke() {
   ver="$(opencode --version 2>/dev/null | head -1 | tr -d '[:space:]')"
 
   oqa_mk_isolated_xdg
+  project_sql="$(oqa_sql_escape "$OQA_PROJ")"
+  before_project="$(sqlite3 "$realdb" "SELECT count(*) FROM session WHERE directory='$project_sql' OR path='$project_sql'" 2>/dev/null)"
   sess="oqa_tui_${$}_${RANDOM}"
   OQA_TMUX_SESSIONS+=("$sess")
   tmux new-session -d -s "$sess" -x 200 -y 50
   # launch the TUI inside the pane, carrying the isolated sandbox env
   tmux send-keys -t "$sess" \
-    "HOME='$HOME' OPENCODE_TEST_HOME='$OPENCODE_TEST_HOME' XDG_DATA_HOME='$XDG_DATA_HOME' XDG_CONFIG_HOME='$XDG_CONFIG_HOME' XDG_CACHE_HOME='$XDG_CACHE_HOME' XDG_STATE_HOME='$XDG_STATE_HOME' OPENCODE_DISABLE_AUTOUPDATE=1 OPENCODE_DISABLE_MODELS_FETCH=1 opencode '$OQA_PROJ'" Enter
+    "HOME='$HOME' OPENCODE_TEST_HOME='$OPENCODE_TEST_HOME' XDG_DATA_HOME='$XDG_DATA_HOME' XDG_CONFIG_HOME='$XDG_CONFIG_HOME' XDG_CACHE_HOME='$XDG_CACHE_HOME' XDG_STATE_HOME='$XDG_STATE_HOME' OPENCODE_DISABLE_AUTOUPDATE=1 OPENCODE_DISABLE_MODELS_FETCH=1 $opencode_cmd '$OQA_PROJ'" Enter
 
   # poll for a render marker (version string, composer placeholder, or footer)
   for ((i=0; i<50; i++)); do
@@ -71,10 +76,14 @@ oqa_tui_smoke() {
   fi
 
   after="$(sqlite3 "$realdb" "SELECT count(*) FROM session" 2>/dev/null)"
-  if [ "$before" = "$after" ]; then
-    oqa_pass "real DB untouched (session count $before unchanged)"
+  after_project="$(sqlite3 "$realdb" "SELECT count(*) FROM session WHERE directory='$project_sql' OR path='$project_sql'" 2>/dev/null)"
+  if [ "$before_project" = "0" ] && [ "$after_project" = "0" ]; then
+    oqa_pass "real DB untouched for isolated project $OQA_PROJ"
   else
-    oqa_log "FAIL: real DB session count changed $before -> $after"; fails=$((fails+1))
+    oqa_log "FAIL: real DB contains isolated project sessions $before_project -> $after_project"; fails=$((fails+1))
+  fi
+  if [ "$before" != "$after" ]; then
+    oqa_log "WARN: live DB total session count changed $before -> $after during smoke; isolated project check above is authoritative"
   fi
 
   [ "$fails" -eq 0 ] && { oqa_pass "tui-smoke"; return 0; }

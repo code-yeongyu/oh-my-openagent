@@ -9,6 +9,7 @@ import { isInteractiveBashEnabled } from "../interactive-bash-availability"
 import { filterDisabledTools } from "../shared/disabled-tools"
 import { log } from "../shared"
 import { normalizeToolArgSchemas } from "./normalize-tool-arg-schemas"
+import { compactToolDescriptions } from "./tool-description-compaction"
 import { createCoreTools } from "./tool-registry-core-tools"
 import { defaultToolRegistryFactories } from "./tool-registry-factories"
 import {
@@ -75,6 +76,10 @@ export function createToolRegistry(args: {
 
   for (const toolDefinition of Object.values(allTools)) {
     normalizeToolArgSchemas(toolDefinition)
+  }
+
+  if (pluginConfig.experimental?.token_budget_mode === "compact") {
+    compactToolDescriptions(allTools, { excludedToolNames: new Set(["skill"]) })
   }
 
   const filteredTools: ToolsRecord = filterDisabledTools(allTools, pluginConfig.disabled_tools)

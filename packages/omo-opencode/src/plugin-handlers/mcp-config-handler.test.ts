@@ -183,4 +183,23 @@ describe("applyMcpConfig", () => {
     expect(createBuiltinMcpsSpy).toHaveBeenCalledWith([], pluginConfig, { cwd: TEST_CTX.directory })
   })
 
+  test("keeps external MCP allowlist policy out of MCP server disabling", async () => {
+    //#given
+    createBuiltinMcpsSpy.mockReturnValue({
+      codegraph: { type: "local", command: ["codegraph", "serve", "--mcp"], enabled: true },
+    })
+    const config: Record<string, unknown> = { mcp: {} }
+    const pluginConfig = createPluginConfig({
+      external_mcp_allowlist: unsafeTestValue({ explore: ["codegraph_*"] }),
+    })
+
+    //#when
+    const { applyMcpConfig } = await import("./mcp-config-handler")
+    await applyMcpConfig({ config, ctx: TEST_CTX, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
+
+    //#then
+    const mergedMcp = config.mcp as Record<string, Record<string, unknown>>
+    expect(mergedMcp).toHaveProperty("codegraph")
+  })
+
 })

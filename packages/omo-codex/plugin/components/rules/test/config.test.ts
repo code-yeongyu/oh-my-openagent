@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { configFromEnvironment } from "../src/config.js";
 
@@ -19,4 +22,30 @@ describe("rules config", () => {
 			expect(config.enabledSources).toEqual([]);
 		});
 	}
+
+	it("#given Codex TOML rule disable switches #when parsing config #then disabled rule ids are normalized", () => {
+		// given
+		const codexHome = mkdtempSync(join(tmpdir(), "codex-rules-config-home-"));
+		try {
+			writeFileSync(
+				join(codexHome, "config.toml"),
+				[
+					'[plugins."omo@sisyphuslabs".rules.hephaestus]',
+					"enabled = false",
+					"",
+					'[plugins."omo@sisyphuslabs".rules."windows-git-bash"]',
+					"enabled = false",
+					"",
+				].join("\n"),
+			);
+
+			// when
+			const config = configFromEnvironment({ CODEX_HOME: codexHome });
+
+			// then
+			expect([...config.disabledRuleIds].sort()).toEqual(["hephaestus", "windows_git_bash"]);
+		} finally {
+			rmSync(codexHome, { recursive: true, force: true });
+		}
+	});
 });
