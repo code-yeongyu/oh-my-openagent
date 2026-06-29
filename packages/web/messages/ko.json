@@ -142,7 +142,7 @@
       "model": "GPT 5.5 Medium"
     },
     "teamMode": {
-      "badge": "NEW · v4.0",
+      "badge": "v4.0+",
       "title": "Team Mode",
       "headline": "여러 에이전트. 나란히. 병렬로.",
       "description": "리드 에이전트가 카테고리별 전문 멤버 팀을 지휘합니다. 모두 병렬로 동작하며 전용 도구로 실시간 통신합니다. tmux에서 모든 멤버가 동시에 작업하는 모습을 지켜보세요. 옵트인 — team_mode.enabled를 켜고 재시작하세요.",
