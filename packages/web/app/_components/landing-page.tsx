@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import type { JSX } from "react"
 import { ArchitectureSection } from "@/components/landing/sections/architecture"
 import { CtaSection } from "@/components/landing/sections/cta"
+import { EditionsSection } from "@/components/landing/sections/editions"
 import { HephaestusSection } from "@/components/landing/sections/hephaestus"
 import { HeroSection } from "@/components/landing/sections/hero"
 import { PrometheusAtlasSection } from "@/components/landing/sections/prometheus-atlas"
@@ -23,6 +24,7 @@ export async function LandingPage(): Promise<JSX.Element> {
       <link rel="preload" as="image" href="/images/hero.webp" fetchPriority="low" />
       <HeroSection />
       <UltraworkSection />
+      <EditionsSection />
       <SisyphusSection />
       <PrometheusAtlasSection />
       <HephaestusSection />
