@@ -42,6 +42,11 @@
 - Binary observable: command exited `0`.
 - Captured artifact: `.omo/evidence/20260629-prepublish-blocker-fixes/packaged-guidance/green-diff-check.txt`
 
+- Scenario: focused committed-range whitespace/error diff check after the fix commit.
+- Invocation: `{ printf 'Invocation: git diff --check origin/dev..HEAD\n'; if git diff --check origin/dev..HEAD; then printf 'exit_code=0\n'; else code=$?; printf 'exit_code=%s\n' "$code"; exit "$code"; fi; } > .omo/evidence/20260629-prepublish-blocker-fixes/packaged-guidance/green-commit-range-diff-check.txt 2>&1`
+- Binary observable: command exited `0`.
+- Captured artifact: `.omo/evidence/20260629-prepublish-blocker-fixes/packaged-guidance/green-commit-range-diff-check.txt`
+
 - Scenario: TypeScript no-excuse audit for changed test files.
 - Invocation: `test -f scripts/typescript/check-no-excuse-rules.ts && bun run scripts/typescript/check-no-excuse-rules.ts script/package-layout.test.ts script/publish-lazycodex-workflow.test.ts > .omo/evidence/20260629-prepublish-blocker-fixes/packaged-guidance/green-no-excuse-typescript.txt 2>&1 || printf 'scripts/typescript/check-no-excuse-rules.ts not present\n' > .omo/evidence/20260629-prepublish-blocker-fixes/packaged-guidance/green-no-excuse-typescript.txt`
 - Binary observable: script file was not present in this repository checkout; artifact records the unavailable audit. The enforced `bun run typecheck:script` and focused tests covered the changed TypeScript files.
