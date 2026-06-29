@@ -411,11 +411,12 @@ jobs:
 
           node packages/omo-codex/plugin/scripts/sync-version.mjs
           node packages/omo-codex/plugin/scripts/sync-hook-status-messages.mjs
+          npm --prefix packages/omo-codex/plugin install --package-lock-only --ignore-scripts --no-audit --fund=false
           bun install --lockfile-only
 
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git add package.json packages/oh-my-opencode-*/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/*.json packages/omo-codex/plugin/components/*/hooks/hooks.json bun.lock
+          git add package.json packages/oh-my-opencode-*/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/package-lock.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/*.json packages/omo-codex/plugin/components/*/hooks/hooks.json bun.lock
           git diff --cached --quiet || git commit -m "release: v${VERSION}"
           git push --force-with-lease origin "HEAD:${RELEASE_BRANCH}"
 
@@ -846,6 +847,7 @@ jobs:
 
           node packages/omo-codex/plugin/scripts/sync-version.mjs
           node packages/omo-codex/plugin/scripts/sync-hook-status-messages.mjs
+          npm --prefix packages/omo-codex/plugin install --package-lock-only --ignore-scripts --no-audit --fund=false
           bun install --lockfile-only
 
       - name: Commit version bump
@@ -855,7 +857,7 @@ jobs:
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git add package.json packages/oh-my-opencode-*/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/*.json packages/omo-codex/plugin/components/*/hooks/hooks.json bun.lock
+          git add package.json packages/oh-my-opencode-*/package.json packages/omo-codex/package.json packages/omo-codex/plugin/package.json packages/omo-codex/plugin/package-lock.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/components/*/package.json packages/omo-codex/plugin/hooks/*.json packages/omo-codex/plugin/components/*/hooks/hooks.json bun.lock
           git diff --cached --quiet || git commit -m "release: v${VERSION}"
 
       - name: Create release tag
