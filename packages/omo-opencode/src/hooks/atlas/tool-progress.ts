@@ -26,18 +26,70 @@ export function didToolMakeProgress(output: ToolProgressOutput): boolean {
   return !FAILURE_TITLE_PATTERN.test(title) && !FAILURE_OUTPUT_PATTERN.test(body)
 }
 
+function normalizeFingerprintPart(value: string): string {
+  return value
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .join("\n")
+    .trim()
+}
+
+function stableFingerprint(value: string): string {
+  let hash = 0x811c9dc5
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return `${value.length}:${(hash >>> 0).toString(16)}`
+}
+
+function getBashProgressFingerprint(output: ToolProgressOutput): string {
+  const title = normalizeFingerprintPart(output.title ?? "")
+  const body = normalizeFingerprintPart(output.output ?? "")
+  return stableFingerprint(`title:${title}\noutput:${body}`)
+}
+
 export function recordToolProgress(state: SessionState, now = Date.now()): void {
   state.awaitingToolProgressAfterContinuation = false
   state.iterationsSinceLastToolProgress = 0
   state.lastToolProgressAt = now
+  state.lastBashProgressFingerprint = undefined
   state.stalledContinuationReason = undefined
   state.stalledContinuationPlanPath = undefined
+}
+
+export function recordTangibleToolProgress(
+  state: SessionState,
+  toolName: string,
+  output: ToolProgressOutput,
+  now = Date.now(),
+): boolean {
+  const normalizedToolName = toolName.toLowerCase()
+  if (!isTangibleProgressTool(normalizedToolName) || !didToolMakeProgress(output)) {
+    return false
+  }
+
+  if (normalizedToolName !== "bash") {
+    recordToolProgress(state, now)
+    return true
+  }
+
+  const fingerprint = getBashProgressFingerprint(output)
+  if (state.lastBashProgressFingerprint === fingerprint) {
+    return false
+  }
+
+  recordToolProgress(state, now)
+  state.lastBashProgressFingerprint = fingerprint
+  return true
 }
 
 export function resetStallStateForPlanChange(state: SessionState, planPath: string): void {
   const previousPlanPath = state.activeContinuationPlanPath
   if (previousPlanPath === undefined) {
     state.activeContinuationPlanPath = planPath
+    state.lastBashProgressFingerprint = undefined
     return
   }
   if (previousPlanPath === planPath) {
@@ -47,6 +99,7 @@ export function resetStallStateForPlanChange(state: SessionState, planPath: stri
   state.activeContinuationPlanPath = planPath
   state.iterationsSinceLastToolProgress = 0
   state.awaitingToolProgressAfterContinuation = false
+  state.lastBashProgressFingerprint = undefined
   if (state.stalledContinuationReason && state.stalledContinuationPlanPath !== planPath) {
     state.stalledContinuationReason = undefined
     state.stalledContinuationPlanPath = undefined

@@ -2041,6 +2041,57 @@ session_id: ses_untrusted_999
       }
     })
 
+    test("#given repeated identical bash status output #when Atlas continuations repeat #then Atlas stalls instead of looping forever", async () => {
+      // given - a boulder plan whose continuation only repeats the same read-only status snapshot
+      const planPath = join(TEST_DIR, "repeated-bash-status-plan.md")
+      writeFileSync(planPath, "# Plan\n- [x] Task 8\n- [ ] Task 2\n- [ ] Task 3\n- [ ] Task 5")
+
+      writeBoulderState(TEST_DIR, {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "repeated-bash-status-plan",
+      })
+
+      const statusOutput = {
+        title: "Bash",
+        output: "T8 completed: 1\nT2/T3/T5/T1/T4/T6 open: 12\nPlan done: 1\nPlan remaining: 12",
+        metadata: {},
+      }
+      const mockInput = createMockPluginInput()
+      const hook = createTestAtlasHook(mockInput)
+
+      const originalDateNow = Date.now
+      let now = 0
+      Date.now = () => now
+
+      try {
+        // when - the first repeated status snapshot gets one retry budget, but identical repeats do not reset it forever
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await hook["tool.execute.after"]({ tool: "bash", sessionID: MAIN_SESSION_ID, callID: "status-1" }, statusOutput)
+        await flushMicrotasks()
+        now += 6000
+
+        for (let iteration = 2; iteration <= 4; iteration += 1) {
+          await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+          await hook["tool.execute.after"](
+            { tool: "bash", sessionID: MAIN_SESSION_ID, callID: `status-${iteration}` },
+            statusOutput,
+          )
+          await flushMicrotasks()
+          now += 6000
+        }
+
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await flushMicrotasks()
+
+        // then - Atlas stops after the no-progress threshold instead of accepting identical bash as fresh progress forever
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(4)
+      } finally {
+        Date.now = originalDateNow
+      }
+    })
+
     test("#given continuation makes tangible tool progress #when idle repeats #then no-progress stall counter resets", async () => {
       // given - boulder state with incomplete work and a successful edit between continuation turns
       const planPath = join(TEST_DIR, "progress-plan.md")

@@ -4,7 +4,7 @@ import { collectGitDiffStats, formatFileChanges } from "../../shared/git-worktre
 import { extractSessionIdFromMetadata } from "./subagent-session-id"
 import { handleDirectWorkToolAfter } from "./tool-execute-after-direct-work"
 import { handleSubagentCompletionAfter } from "./tool-execute-after-subagent-completion"
-import { didToolMakeProgress, isTangibleProgressTool, recordToolProgress } from "./tool-progress"
+import { recordTangibleToolProgress } from "./tool-progress"
 import type { PendingTaskRef, SessionState } from "./types"
 import type { ToolExecuteAfterInput, ToolExecuteAfterOutput } from "./types"
 
@@ -29,8 +29,8 @@ export function createToolExecuteAfterHandler(input: {
       return
     }
 
-    if (toolInput.sessionID && isTangibleProgressTool(toolInput.tool) && didToolMakeProgress(toolOutput)) {
-      recordToolProgress(getState(toolInput.sessionID))
+    if (toolInput.sessionID) {
+      recordTangibleToolProgress(getState(toolInput.sessionID), toolInput.tool, toolOutput)
     }
 
     if (!(await resolveIsCallerOrchestrator(toolInput.sessionID))) {
