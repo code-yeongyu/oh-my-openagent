@@ -21,6 +21,12 @@ Removed the Codex Light opt-in workflow selector runtime surface:
 - `07-codex-qa-common-self-check.txt`: codex-qa isolation harness passed and real `~/.codex/config.toml` was unchanged.
 - `08-codex-install-verify.txt`: isolated local install verification passed and real `~/.codex/config.toml` was unchanged.
 - `09-codex-app-server-drive-plugin.json`: isolated Codex app-server turn completed with plugin hooks firing; `userPromptSubmit` hooks are rules, ultrawork, and ulw-loop only.
+- `review-work-manual-qa.md`: manual QA matrix and adversarial cases for PR #5745.
+- `review-work-code-quality.md`: code-quality review with `omo:remove-ai-slops`, `omo:programming`, and `code-review` perspectives.
+- `review-work-security.md`: security review with no findings and no secret-bearing evidence.
+- `review-work-context-mining.md`: context search confirming no missed docs/changelog requirements and only test-only residual strings.
+- `notepad.md`: current-task notepad artifact.
+- `REVIEW_WORK_FINAL.md`: aggregate review-work verdict and Cubic skip recording.
 
 ## Residual Risk
 
