@@ -11,8 +11,8 @@ Plugin registration inside `opencode.json` prefers `oh-my-openagent`.
 
 All published packages expose the same compiled CLI with these bin entries:
 
-- `oh-my-opencode` (legacy name, still primary)
-- `oh-my-openagent` (renamed primary)
+- `oh-my-openagent` (preferred name)
+- `oh-my-opencode` (legacy compatibility name)
 - `omo` (short alias, recommended in docs and prompts)
 - `lazycodex-ai` (Light edition shortcut; `lazycodex-ai install` is equivalent to `omo install --platform=codex` unless `--platform` is explicitly overridden)
 
