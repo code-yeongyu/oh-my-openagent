@@ -16,6 +16,11 @@ const GitHubAssetSchema = z.object({
 const GitHubReleaseSchema = z.object({
   assets: z.array(GitHubAssetSchema),
 })
+const GitHubReleasesSchema = z.array(GitHubReleaseSchema)
+const GitHubReleasesPayloadSchema = z.union([
+  GitHubReleasesSchema,
+  z.array(GitHubReleasesSchema).transform((pages) => pages.flat()),
+])
 
 type DownloadSource = "npm" | "github_release"
 
@@ -55,7 +60,7 @@ async function defaultFetchJson(url: string): Promise<unknown> {
 }
 
 async function defaultRunGhApi(): Promise<unknown> {
-  const output = await $`gh api repos/${GITHUB_REPOSITORY}/releases --paginate`.text()
+  const output = await $`gh api repos/${GITHUB_REPOSITORY}/releases --paginate --slurp`.text()
   return JSON.parse(output)
 }
 
@@ -71,7 +76,7 @@ async function fetchNpmStat(packageName: string, fetchJson: StatsDeps["fetchJson
 }
 
 function readGitHubReleaseDownloadStat(releasesJson: unknown): DownloadStat {
-  const releases = z.array(GitHubReleaseSchema).parse(releasesJson)
+  const releases = GitHubReleasesPayloadSchema.parse(releasesJson)
   const count = releases.reduce(
     (total, release) =>
       total + release.assets.reduce((assetTotal, asset) => assetTotal + asset.download_count, 0),
