@@ -8603,7 +8603,8 @@ async function trustedHookStatesForPlugin(input) {
       continue;
     states.push(...trustedHookStatesForHooksFile({
       keySource: `${input.pluginName}@${input.marketplaceName}:${hookPath}`,
-      hooks: parsed.hooks
+      hooks: parsed.hooks,
+      platform: input.platform ?? process.platform
     }));
   }
   return states;
@@ -8631,20 +8632,28 @@ function trustedHookStatesForHooksFile(input) {
           continue;
         if (handler.async === true)
           continue;
-        if (typeof handler.command !== "string" || handler.command.trim() === "")
+        const command = commandForPlatform(handler, input.platform);
+        if (command === undefined || command.trim() === "")
           continue;
         const key = `${input.keySource}:${eventLabel}:${groupIndex}:${handlerIndex}`;
-        states.push({ key, trustedHash: commandHookHash(eventLabel, group.matcher, handler) });
+        states.push({ key, trustedHash: commandHookHash(eventLabel, group.matcher, handler, command) });
       }
     }
   }
   return states;
 }
-function commandHookHash(eventName, matcher, handler) {
+function commandForPlatform(handler, platform) {
+  if (typeof handler.command !== "string")
+    return;
+  if (platform === "win32" && typeof handler.commandWindows === "string")
+    return handler.commandWindows;
+  return handler.command;
+}
+function commandHookHash(eventName, matcher, handler, command) {
   const timeout = Math.max(Number(handler.timeout ?? 600), 1);
   const normalizedHandler = {
     type: "command",
-    command: handler.command,
+    command,
     timeout,
     async: false
   };
@@ -13582,6 +13591,7 @@ async function runCodexInstaller(options = {}) {
   }
   const trustedHookStates = (await Promise.all(installed.map((plugin) => trustedHookStatesForPlugin({
     marketplaceName: marketplace.name,
+    platform,
     pluginName: plugin.name,
     pluginRoot: plugin.path
   })))).flat();
