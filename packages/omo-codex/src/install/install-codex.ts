@@ -139,6 +139,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
       installed.map((plugin) =>
         trustedHookStatesForPlugin({
           marketplaceName: marketplace.name,
+          platform,
           pluginName: plugin.name,
           pluginRoot: plugin.path,
         }),
