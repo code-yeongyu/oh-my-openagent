@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test"
-import { PassThrough, Readable, type Writable, Writable as WritableStream } from "node:stream"
+import { PassThrough, Readable, type Writable } from "node:stream"
 
-import { isPlainRecord, jsonRpcId, type JsonRpcId } from "@oh-my-opencode/mcp-stdio-core"
+import {
+  backpressureServer,
+  earlyExitServer,
+  fakeLineServer,
+  fakeServer,
+} from "./proxy-test-fixtures.js"
 import { runCodegraphMcpProxy } from "./proxy.js"
 import type { CodegraphProjectSynchronizer, CodegraphServerHandle } from "./types.js"
 
@@ -11,6 +16,7 @@ type CapturedOutput = {
 }
 
 type ProxyRun = {
+  readonly autoInit?: boolean
   readonly input: Readable
   readonly output?: Writable
   readonly server: CodegraphServerHandle
@@ -88,7 +94,7 @@ describe("CodeGraph MCP proxy", () => {
         },
         refresh: async (projectPath, autoInit) => {
           events.push(`refreshed:${projectPath}`)
-          expect(autoInit).toBe(false)
+          expect(autoInit).toBe(true)
           return true
         },
       },
@@ -96,6 +102,27 @@ describe("CodeGraph MCP proxy", () => {
 
     expect(exitCode).toBe(0)
     expect(events).toEqual(["initial-ready", "refreshed:/repo/b", "forwarded"])
+    expect(forwarded.join("")).toContain('"projectPath":"/repo/b"')
+  })
+
+  test("#given auto-init disabled #when secondary projectPath is proxied #then refresh cannot initialize the target", async () => {
+    const events: string[] = []
+    const forwarded: string[] = []
+
+    await runProxy({
+      autoInit: false,
+      input: Readable.from([line(toolCall(2))]),
+      server: fakeServer(forwarded),
+      synchronizer: {
+        initialize: () => Promise.resolve(),
+        refresh: async (_projectPath, autoInit) => {
+          events.push(`auto-init:${String(autoInit)}`)
+          return true
+        },
+      },
+    })
+
+    expect(events).toEqual(["auto-init:false"])
     expect(forwarded.join("")).toContain('"projectPath":"/repo/b"')
   })
 
@@ -158,7 +185,7 @@ describe("CodeGraph MCP proxy", () => {
 
 function runProxy(options: ProxyRun): Promise<number> {
   return runCodegraphMcpProxy({
-    autoInit: true,
+    autoInit: options.autoInit ?? true,
     command: { argsPrefix: [], command: "/bin/codegraph" },
     cwd: "/repo/a",
     env: {},
@@ -215,79 +242,5 @@ function rejectionSynchronizer(result: "false" | "throw"): CodegraphProjectSynch
   return {
     initialize: () => Promise.resolve(),
     refresh: () => (result === "false" ? Promise.resolve(false) : Promise.reject(new Error("sync lock timed out"))),
-  }
-}
-
-function fakeServer(forwarded: string[]): CodegraphServerHandle {
-  const input = new PassThrough()
-  const output = new PassThrough()
-  input.on("data", (chunk: Buffer | string) => forwarded.push(String(chunk)))
-  input.on("finish", () => output.end())
-  return serverHandle(input, output, waitForFinish(input))
-}
-
-function fakeLineServer(forwarded: string[], mode: "same-order" | "reverse-two" = "same-order"): CodegraphServerHandle {
-  const input = new PassThrough()
-  const output = new PassThrough()
-  const ids: JsonRpcId[] = []
-  input.on("data", (chunk: Buffer | string) => {
-    for (const lineChunk of String(chunk).split("\n")) {
-      if (lineChunk.trim().length === 0) continue
-      forwarded.push(`${lineChunk}\n`)
-      if (!lineChunk.startsWith("{")) continue
-      ids.push(rpcIdFromLine(lineChunk))
-      if (mode === "same-order") output.write(line({ jsonrpc: "2.0", id: ids.at(-1) ?? null, result: { tools: [] } }))
-      if (mode === "reverse-two" && ids.length === 2) {
-        output.write(line({ jsonrpc: "2.0", id: ids[1] ?? null, result: { tools: [] } }))
-        output.write(line({ jsonrpc: "2.0", id: ids[0] ?? null, result: { tools: [] } }))
-      }
-    }
-  })
-  input.on("finish", () => output.end())
-  return serverHandle(input, output, waitForFinish(input))
-}
-
-function earlyExitServer(exitCode: number): CodegraphServerHandle {
-  const input = new PassThrough()
-  const output = new PassThrough()
-  output.end()
-  return serverHandle(input, output, Promise.resolve(exitCode))
-}
-
-function backpressureServer(forwarded: string[]): CodegraphServerHandle {
-  const input = new BackpressureWritable(forwarded)
-  const output = new PassThrough()
-  input.on("finish", () => output.end())
-  return serverHandle(input, output, waitForFinish(input))
-}
-
-function serverHandle(input: Writable, output: Readable, exit: Promise<number>): CodegraphServerHandle {
-  return {
-    input,
-    output,
-    error: new PassThrough(),
-    wait: () => exit,
-    terminate: () => input.destroy(),
-  }
-}
-
-function waitForFinish(input: Writable): Promise<number> {
-  return new Promise((resolve) => input.once("finish", () => resolve(0)))
-}
-
-function rpcIdFromLine(line: string): JsonRpcId {
-  const parsed: unknown = JSON.parse(line)
-  if (!isPlainRecord(parsed)) return null
-  return jsonRpcId(parsed["id"])
-}
-
-class BackpressureWritable extends WritableStream {
-  constructor(private readonly forwarded: string[]) {
-    super({ highWaterMark: 1 })
-  }
-
-  override _write(chunk: Buffer | string, _encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
-    this.forwarded.push(String(chunk))
-    queueMicrotask(callback)
   }
 }
