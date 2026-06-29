@@ -5,82 +5,210 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] (next-minor or 4.3.0)
+## [Unreleased]
+
+Nothing yet.
+
+## [4.14.0] - 2026-06-29
 
 ### Added
 
-- `default_mode` config auto-activates ultrawork and ralph loop without typing commands. Set it once in your plugin config and every new session starts in high-agency mode. (PR #4190)
-- Toast i18n with English and Chinese locales, backed by plugin config. UI messages now respect your language setting. (PR #3884)
-- `disabled_providers` config schema and helper. Block providers you do not use from appearing in model resolution and fallback chains. (PR #4031)
-- `plan-format-validator` hook warns when task labels in `.omo/plans/*.md` are malformed, catching plan syntax errors before execution. (PR #4221)
-- Prometheus gains spec-driven development framework awareness (OpenSpec, .specify). The planner now reads specification files and factors them into interview questions and task breakdowns. (PR #2307)
-- Per-agent skill filtering. Skills can declare `restrictedAgents` so only eligible agents see them in prompts and tool descriptions. (PR #2827)
-- `look_at` async refactor. Image analysis dispatches non-blocking and returns when ready, keeping the session responsive during multimodal work. (PR #4098)
-- `keyword-detector.enabled_expansions` config gives allowlist control over which keyword expansions fire. (PR #4084)
-- `doctor` CLI now warns when `oh-my-openagent/tui` is missing from `tui.json`, catching incomplete installs. (PR #4048)
-- `taskCleanupDelayMs` configurable for background tasks. Tune how long finished background task artifacts linger before cleanup. (PR #3241)
-- Per-agent `displayName` for i18n. Agents can present localized names in UI and logs. (PR #4081)
-- Grok family models registered with `reasoningEffort` support. (PR #4186)
-- CLI `setup` alias for `install`. Either command runs the interactive setup wizard. (PR #4174)
-- Codex CLI Light edition (`omo-codex`): one-command install via `bunx oh-my-openagent install --platform=codex` or the new `lazycodex` bin entry. Vendored Codex plugin namespace `omo` with rules, comment-checker, LSP, ultrawork, and ulw-loop components. Plugin lands in `~/.codex/plugins/cache/sisyphuslabs/omo/` and is enabled in `~/.codex/config.toml`. Idempotent installer (re-running is safe).
-- New `--platform <opencode|codex|both>` install flag (default `opencode`). Replaces the previous Codex-as-optional-addon model — `--platform=codex` installs only the Codex Light edition, `--platform=both` installs both editions in one run.
-- Three new bin entries: `omo` (short alias) and `lazycodex` (auto-defaults `--platform=codex`). Existing `oh-my-opencode` and `oh-my-openagent` continue to work unchanged.
-- New PostHog telemetry stream `omo_codex_daily_active` distinguishing omo-codex installations from omo-opencode. Independent opt-out via `OMO_CODEX_DISABLE_POSTHOG=1` or `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0`; global `OMO_DISABLE_POSTHOG` and `OMO_SEND_ANONYMOUS_TELEMETRY` still suppress both products.
-- omo-codex now reports true daily-active usage (DAU/WAU/MAU). A new Codex plugin component `telemetry` (`packages/omo-codex/plugin/components/telemetry/`) fires a single `omo_codex_daily_active` event with `reason: "session_start"` from every Codex `SessionStart` hook, with the same UTC-day deduplication, hashed installation identifier, and opt-out env vars as the install-time event. Identity constants stay byte-equivalent across the CLI installer and the plugin runtime via `packages/omo-codex/src/telemetry/cross-package-equivalence.test.ts`.
-- Triple-publish to npm: `oh-my-opencode`, `oh-my-openagent`, and the new `lazycodex` package with the same compiled CLI and four bin commands. See `docs/reference/lazycodex-npm-reservation.md` for the first-publish playbook.
+- Unified telemetry architecture across OpenCode and Codex editions. (PR #5668)
+- Coding Agent Sessions shared skill for finding and reconstructing agent sessions across harnesses. (PR #5600)
+- Atlas final-review verdict classification (approve/reject/missing). (PR #5605)
+- Web terminal visual evidence helper for QA. (PR #5534)
 
 ### Changed
 
-- Massive package layering refactor. Eight workspace packages extracted: `utils`, `hashline-core`, `model-core`, `rules-engine` (renamed from `rules-core`), `agents-md-core`, `ast-grep-core`, `comment-checker-core`, and `boulder-state`. This is the foundation for the multi-harness roadmap.
-- `model-core` now uses dependency injection, eliminating all `src/` back-imports from core packages. The host harness injects its snapshot fetcher, suggestion parser, and context-limit resolver.
-- `prompt-async-gate` split from a 779-line monolith into six focused sub-modules: reservations, queue, message state, dispatch runner, and a thin facade.
-- Additive OpenCode config directory discovery. The plugin now loads global agents and walks configs from both default and custom OpenCode config roots. (PR #3875)
-- `delegate_task` now supplies sensible defaults for `run_in_background` and `load_skills` instead of throwing when they are omitted. (PR #4121)
+- Named plugin server export for easier integration. (PR #5717)
+- Release prepublish size gates with documented exceptions. (PR #5718, #5722)
+- QA evidence redaction for auth headers and terminal secrets.
 
 ### Fixed
 
-- Background-agent session activity tracking and stale timeout. Missed polls are preserved on lookup errors, session stream activity is forwarded, and stale cancellation is deferred when activity is detected. (PR #4226, #4228, #4235)
-- Team-mode hard-rejects coordinator agents as subagent targets, preventing invalid team composition. (PR #4027)
-- Team-mode member errors now surface to the main agent instead of being swallowed. (PR #3923)
-- Team-mode port-0 fallback and silent layout skip resolved. (PR #3963)
-- Team-mode base directory initialization no longer crashes on Windows with `EPERM` / `ENOTSUP` / `EINVAL` from `chmod`. (PR #4023)
-- Team-mode config writes are now atomic through writable handles. (PR #3838)
-- Team-mode preserves team membership across model fallback switches. (PR #3898)
-- Team-mode `team_create` now validates hard-reject agents before accepting the request. (PR #3987)
-- Runtime-fallback synthetic continuation when session messages are empty, preventing silent failure on Git operations and other empty-history retries. (PR #3645)
-- Runtime-fallback recognizes more provider quota error names and patterns. (PR #3937)
-- Runtime-fallback marks OpenAI `server_error` patterns as retryable. (PR #3799)
-- Windows Git Bash / MSYS2 shell detection now runs before `PSModulePath` checks. (PR #3370)
-- Windows interceptor auth injection binding fixed. (PR #3499)
-- Windows powershell syntax fallback for non-interactive environments regardless of `SHELL` / `MSYSTEM`. (PR #3607)
-- WSL opencode binary detection in `doctor` now resolves the correct path. (PR #2991)
-- Tmux-subagent drains terminal probe replies during delegated pane startup. (PR #2887)
-- Tmux-subagent waits for session readiness before spawning the attach pane. (PR #0465)
-- Tmux-subagent skips layout enforcement when closing an isolated container pane. (PR #4100)
-- Skill-mcp-manager survives MCP reloads and disconnections. (PR #4099)
-- Skill-mcp-manager trusts explicit skill MCP environment variables. (PR #3995)
-- Slash-commands inject command content exactly once, removing duplicate injection. (PR #3724)
+- Atlas background output gate requires explicit gate for retrieval. (PR #5653)
+- TeamMode leader patience: waits calmly instead of rushing members. (PR #5613)
+- CodeGraph child process environment isolation. (PR #5667)
+- Windows Codex desktop install discovery-first flow. (PR #5618)
+- Context7 placeholder auth removed from Codex config. (PR #5593)
+- ULW loop context pressure scan limited to tail.
+- Visual QA CJK semantic line break detection. (PR #5522)
+
+## [4.13.0] - 2026-06-23
+
+### Added
+
+- TeamMode v2 script-driven model (complete rewrite with cross-platform controller script and worktree automation). (PR #5416, #5421)
+- Ultimate Browsing shared skill with tiered routing (insane-search, agent-reach, Chrome stealth). (PR #5469)
+- CodeGraph auto-init config to skip automatic `.codegraph` creation. (PR #5456)
+- Per-member thread titles in TeamMode named by role. (PR #5453)
+- ULW loop research work-shape branch with ledger-backed dedup and hypotheses. (PR #5467)
+- ULW loop quality gate schema rewrite with essential checkpoint criteria. (PR #5309)
+- Lazycodex update release notes included in auto-update. (PR #5477)
+- TeamMode members push constant updates by default. (PR #5487)
+- Cross-platform teammode controller script and merge-commit integration.
+
+### Changed
+
+- Venice provider neutralized in Hephaestus and deep model chains. (PR #5523)
+- Frontend design references materialized from submodules for DMCA compliance. (PR #5472)
+- LazyCodex steering mode defaults to on at install. (PR #5531)
+- CodeGraph cross-platform bundle and MCP handshake improvements. (PR #5475, #5496)
+- Provider exhaustion fallback policy for background tasks. (PR #5508)
+
+### Fixed
+
+- Ultimate Browsing cookie handling, template warnings, and forged module detection. (PR #5498, #5503)
+- TeamMode worktree-add idempotency on Windows 8.3 paths. (PR #5502)
+- TeamMode duplicate member name rejection. (PR #5501)
+- Runtime fallback timeout rearming after blocked escalation. (PR #5491)
+- Delegate-task silent parent wake retry bounding. (PR #5488)
+- Opencode run marker refresh after wake requeues. (PR #5500)
+- Sparkshell guidance contracts and command clarification. (PR #5504)
+- Skill MCP servers resolved from runtime config without deadlock. (PR #5482)
+
+### Removed
+
+- AST-grep MCP server and `ast-grep-mcp/core` packages replaced with `sg` binary provisioning via shared resolver. (PR #5313)
+
+## [4.12.1] - 2026-06-20
+
+### Added
+
+- Per-member thread titles named by role in TeamMode.
+
+### Changed
+
+- UltraResearch prefers cooperating team broadcasts.
+
+### Fixed
+
+- Codex thread title nudge shortened.
+- CodeGraph bootstrap on Node 26.
+- Thread title hook failures surfaced.
+- Packaged skills synced during Codex cache install.
+
+## [4.12.0] - 2026-06-20
+
+### Added
+
+- Skill rename: `frontend-ui-ux` to `frontend` (ported with full references and designpowers contract). (PR #5308)
+- Skill rename: `ultraresearch` to `ulw-research`. (PR #5518)
+- ULW plan becomes LLM-agnostic (collapsed per-LLM Prometheus prompts into one skill). (PR #5310)
+- Monitor tool relocated into `omo-opencode` with background command monitoring and ReDoS hardening. (PR #5315)
+- TUI sidebar panel with roster resolver, ULW loop reader, and runtime mirror manager. (PR #5325)
+- CodeGraph MCP serve wrapper and session bootstrap for both OpenCode and Codex. (PR #5322)
+- Shared agent setup/cleanup/qa-sandbox scripts for cross-harness dev env. (PR #5354)
+- `qa-docker.sh` for containerized OpenCode and Codex QA.
+
+### Changed
+
+- CI upgraded to Node.js 24 runtimes across all workflows. (PR #5352)
+- Master-targeting PRs auto-closed with friendly notice. (PR #5351)
+- PR and issue auto-labeling reworked to per-package model.
+- Build runs in parallel with checks.
+- Package layering refactor continued: `telemetry-core`, `team-core`, `delegate-core`, `skills-loader-core`, `claude-code-compat-core`, `tmux-core`, `mcp-client-core`, `openclaw-core`, `mcp-stdio-core`, `lsp-core` extracted.
+
+### Fixed
+
+- TUI sidebar quality: redacted active goals, safe background task titles, canonicalized paths. (PR #5349)
+- Prompt async gate virtualized waits in tests (watchdog, background wake, runtime fallback, todo continuation).
+- Delegate-task sync completion gated on direct children only.
+- Opencode plugin component load failures retried.
+- TeamMode composition invariants enforced.
+- ULW plan honors explicit ask and fork filter.
+- Sisyphus prompt rebuild for runtime model family.
+
+### Removed
+
+- Native `ast_grep` MCP server and `ast-grep-mcp/core` packages; replaced with shared `sg` resolver and skill. (PR #5313)
+
+## [4.11.1] - 2026-06-18
+
+### Added
+
+- GLM prompt variants and ultrawork GLM prompt routing.
+- Claude Fable-5 and Mythos-5 context limit recognition.
+
+### Changed
+
+- Programming skill: restored hard LOC gate, replaced absolute rule with code-smell review triggers.
+- Model-core normalizes non-Claude model version separators.
+
+### Fixed
+
+- Codex marketplace auto-update boundary preserved.
+- CodeGraph MCP path stamped during bootstrap.
+- CodeGraph startup hook output made valid.
+- Sparkshell context ranking documented, stops printing session context.
+- Start-work passes bare session id to SDK session.messages.
+- Background-agent schedules re-flush for reply-required wake after activity window.
+- Lazycodex codegraph missing binary provisioned during MCP serve.
+
+## [4.11.0] - 2026-06-17
+
+### Added
+
+- CodeGraph initialization: bootstrap on session start, register MCP, shared resolver and provisioning. (PR #5322)
+- TUI sidebar panel: state model, snapshot schema, roster resolver, ULW loop reader, mirror manager. (PR #5325)
+- Monitor tool: background command monitoring with ReDoS hardening. (PR #5315)
+- ULW plan LLM-agnostic skill. (PR #5310)
+- Lazycodex agent series and executor verify hook component. (PR #5305)
+- Frontend skill designpowers operating layer and web-ui-design skill. (PR #5541)
+- Visual QA clone fidelity reviewer and dual-harness dispatch. (PR #5307)
+- Shared agent setup/cleanup/qa-sandbox scripts for cross-harness dev env. (PR #5354)
+- Devcontainer and cross-harness dev env wiring. (PR #5354)
+- `default_mode` config auto-activates ultrawork and ralph loop without typing commands. (PR #4190)
+- Toast i18n with English and Chinese locales, backed by plugin config. (PR #3884)
+- `disabled_providers` config schema and helper. (PR #4031)
+- `plan-format-validator` hook warns on malformed task labels in `.omo/plans/*.md`. (PR #4221)
+- Prometheus gains spec-driven development framework awareness (OpenSpec, .specify). (PR #2307)
+- Per-agent skill filtering with `restrictedAgents`. (PR #2827)
+- `look_at` async refactor for non-blocking image analysis. (PR #4098)
+- `keyword-detector.enabled_expansions` allowlist. (PR #4084)
+- `taskCleanupDelayMs` configurable for background tasks. (PR #3241)
+- Per-agent `displayName` for i18n. (PR #4081)
+- Grok family models with `reasoningEffort` support. (PR #4186)
+- CLI `setup` alias for `install`. (PR #4174)
+- Codex CLI Light edition (`omo-codex`) with one-command install via `bunx oh-my-openagent install --platform=codex` or `lazycodex` bin entry. (PR #5354)
+- New `--platform <opencode|codex|both>` install flag.
+- New bin entries: `omo` (short alias) and `lazycodex` (auto-defaults `--platform=codex`).
+- PostHog telemetry stream `omo_codex_daily_active` for Codex edition.
+- Triple-publish to npm: `oh-my-opencode`, `oh-my-openagent`, and `lazycodex`.
+
+### Changed
+
+- Massive package layering refactor. Eight workspace packages extracted: `utils`, `hashline-core`, `model-core`, `rules-engine` (renamed from `rules-core`), `agents-md-core`, `ast-grep-core`, `comment-checker-core`, and `boulder-state`.
+- `model-core` uses dependency injection, eliminating all `src/` back-imports from core packages.
+- `prompt-async-gate` split from monolith into six focused sub-modules.
+- Additive OpenCode config directory discovery. (PR #3875)
+- `delegate_task` supplies sensible defaults for `run_in_background` and `load_skills`. (PR #4121)
+- CI reworked with Node 24, parallel build, per-package labeling.
+- Master-targeting PRs auto-closed.
+
+### Fixed
+
+- Background-agent session activity tracking and stale timeout. (PR #4226, #4228, #4235)
+- Team-mode hard-rejects coordinator agents, surfaces member errors, port-0 fallback, Windows base directory init, atomic config writes, preserves membership across fallback, validates agents. (PR #4027, #3923, #3963, #4023, #3838, #3898, #3987)
+- Runtime-fallback synthetic continuation, quota error recognition, OpenAI `server_error` retryable. (PR #3645, #3937, #3799)
+- Windows Git Bash / MSYS2 shell detection, powershell syntax fallback, WSL binary detection. (PR #3370, #3499, #3607, #2991)
+- Tmux-subagent terminal probe drain, session readiness wait, layout skip for isolated panes. (PR #2887, #0465, #4100)
+- Skill-mcp-manager survives reloads and disconnections, trusts explicit env vars. (PR #4099, #3995)
+- Slash-command duplicate injection removed. (PR #3724)
 - Hyperplan no longer fires on `.hpp` C++ header paths. (PR #4215)
-- Todo-continuation-enforcer stops looping after all todos are complete. (PR #4013)
-- `tool.definition` handler is now wired so `todo-description-override` actually fires. (PR #3705)
-- Model parsers guard against non-string input, preventing crashes on malformed capability data. (PR #4145)
-- `mcp_` prefix stripped from tool names before dispatch, fixing namespaced tool routing.
-- `prometheus-md-only` replaced the `SYSTEM DIRECTIVE` marker with an XML tag in external prompts. (PR #4036)
-- Shell `glob` and `grep` tolerate broken symlinks and non-fatal I/O warnings.
-- `chat-message` refreshes stale session-agent cache from explicit `input.agent`.
-- `delegate-task` defaults `run_in_background` and `load_skills` when omitted. (PR #4119)
-- Skill-loader supports unambiguous short skill names. (PR #4146)
-- Process-cleanup calls `process.exit()` after `SIGTERM` cleanup, ensuring graceful shutdown. (PR #4026)
+- Todo-continuation-enforcer stops looping after completion. (PR #4013)
+- `tool.definition` handler wired for `todo-description-override`. (PR #3705)
+- Model parsers guard against non-string input. (PR #4145)
+- `mcp_` prefix stripped from tool names before dispatch.
+- Shell `glob` and `grep` tolerate broken symlinks.
+- `delegate-task` defaults and per-agent skill restrictions. (PR #4119, #4121)
+- Process-cleanup graceful shutdown after `SIGTERM`. (PR #4026)
 
-### Fixed in this release gate
+### Documentation
 
-- Notepad-write-guard wired and extended to `.omo/notepads`, preventing accidental overwrites in the new workspace layout.
-- i18n `initI18n()` is now called in production startup, so locale settings actually take effect.
-- `start-work` session-plan-affinity now matches `.omo/plans/` correctly.
-- `default_mode` ultrawork + ralph loop initial turn now receives the ultrawork system prompt.
-- Multimodal-looker prompt tool allowlist is now consistent with the runtime tool allowlist.
-- `delegate-task` enforces per-agent skill restrictions declared by skills.
-- `model-core` restored OpenAI `server_error` retryable patterns, fixing a regression introduced during package extraction.
+- Added `ROADMAP.md` describing the package layering refactor and multi-harness direction.
+- PR merge policy documented: merge commits required, squash/rebase forbidden.
+- `prompt-async-gate-rfc.md` updated with `DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS` 250 to 2000 rationale.
 
 ## [4.2.3] - 2026-05-20
 
@@ -177,6 +305,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Delegated child-session early-failure fallback (BLOCKER-4)**: PR #3825's `fac90d69f` was reverted by PR #4044 because its own regression test failed on clean root `bun test`. The delegate-task fallback bug for empty session history remains unaddressed in v4.2.0. Reland targets v4.2.1 once the regression test is stabilized against post-#4032 schema and the new gate semantics. See `docs/reference/known-issues.md` for details and workaround.
 - **First-prompt watchdog supersession history (L16)**: PR #3952 was superseded by PR #4051 (rebased over #4007/factory refactor with `internallyAbortedSessions` threading). The supersession represents conflict resolution, not a feature pivot. The final watchdog logic shipped via #4051 + `a130fa70d` covers subagent first-prompt silence past 90 seconds with cleanup via session.deleted.
 
-[Unreleased]: https://github.com/code-yeongyu/oh-my-openagent/compare/v4.2.3...HEAD
+[Unreleased]: https://github.com/code-yeongyu/oh-my-openagent/compare/v4.14.0...HEAD
+[4.14.0]: https://github.com/code-yeongyu/oh-my-openagent/compare/v4.13.0...v4.14.0
+[4.13.0]: https://github.com/code-yeongyu/oh-my-openagent/compare/v4.12.1...v4.13.0
+[4.12.1]: https://github.com/code-yeongyu/oh-my-openagent/compare/v4.12.0...v4.12.1
+[4.12.0]: https://github.com/code-yeongyu/oh-my-openagent/compare/v4.11.1...v4.12.0
+[4.11.1]: https://github.com/code-yeongyu/oh-my-openagent/compare/v4.11.0...v4.11.1
+[4.11.0]: https://github.com/code-yeongyu/oh-my-openagent/compare/v4.2.3...v4.11.0
 [4.2.3]: https://github.com/code-yeongyu/oh-my-openagent/compare/v4.2.2...v4.2.3
 [4.2.0]: https://github.com/code-yeongyu/oh-my-openagent/compare/v4.1.2...v4.2.0
