@@ -105,6 +105,7 @@ describe("team-mode tool registry wiring", () => {
         createTeamApproveShutdownTool: mock(() => fakeTool),
         createTeamRejectShutdownTool: mock(() => fakeTool),
         createTeamSendMessageTool: mock(() => fakeTool),
+        createTeamReadMessagesTool: mock(() => fakeTool),
         createTeamTaskCreateTool: mock(() => fakeTool),
         createTeamTaskListTool: mock(() => fakeTool),
         createTeamTaskUpdateTool: mock(() => fakeTool),
@@ -118,9 +119,10 @@ describe("team-mode tool registry wiring", () => {
     expect(pluginConfig.team_mode?.enabled).toBe(true)
     expect(result.filteredTools).toHaveProperty("team_create")
     expect(result.filteredTools).toHaveProperty("team_send_message")
+    expect(result.filteredTools).toHaveProperty("team_read_messages")
     expect(result.filteredTools).toHaveProperty("team_task_create")
     expect(result.filteredTools).toHaveProperty("team_status")
-    expect(Object.keys(result.filteredTools).filter((toolName) => toolName.startsWith("team_"))).toHaveLength(12)
+    expect(Object.keys(result.filteredTools).filter((toolName) => toolName.startsWith("team_"))).toHaveLength(13)
   })
 
   test("passes ctx.client into every team tool factory", () => {
@@ -132,6 +134,7 @@ describe("team-mode tool registry wiring", () => {
     const createTeamApproveShutdownTool = mock(() => fakeTool)
     const createTeamRejectShutdownTool = mock(() => fakeTool)
     const createTeamSendMessageTool = mock(() => fakeTool)
+    const createTeamReadMessagesTool = mock(() => fakeTool)
     const createTeamTaskCreateTool = mock(() => fakeTool)
     const createTeamTaskListTool = mock(() => fakeTool)
     const createTeamTaskUpdateTool = mock(() => fakeTool)
@@ -178,6 +181,7 @@ describe("team-mode tool registry wiring", () => {
         createTeamApproveShutdownTool,
         createTeamRejectShutdownTool,
         createTeamSendMessageTool,
+        createTeamReadMessagesTool,
         createTeamTaskCreateTool,
         createTeamTaskListTool,
         createTeamTaskUpdateTool,
@@ -194,6 +198,7 @@ describe("team-mode tool registry wiring", () => {
     expect(createTeamApproveShutdownTool).toHaveBeenCalledWith(expect.anything(), client)
     expect(createTeamRejectShutdownTool).toHaveBeenCalledWith(expect.anything(), client)
     expect(createTeamSendMessageTool).toHaveBeenCalledWith(expect.anything(), client)
+    expect(createTeamReadMessagesTool).toHaveBeenCalledWith(expect.anything())
     expect(createTeamTaskCreateTool).toHaveBeenCalledWith(expect.anything(), client)
     expect(createTeamTaskListTool).toHaveBeenCalledWith(expect.anything(), client)
     expect(createTeamTaskUpdateTool).toHaveBeenCalledWith(expect.anything(), client)
