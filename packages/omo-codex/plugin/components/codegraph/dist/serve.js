@@ -911,7 +911,7 @@ async function ensureCodegraphProjectReady(projectPath, autoInit, options) {
 function findCodegraphRoot(startPath) {
   let current = resolve3(startPath);
   while (true) {
-    if (existsSync4(join6(current, ".codegraph")))
+    if (existsSync4(join6(current, ".codegraph", "codegraph.db")))
       return current;
     const parent = dirname2(current);
     if (parent === current)
