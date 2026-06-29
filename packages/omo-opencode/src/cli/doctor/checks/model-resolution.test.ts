@@ -318,10 +318,10 @@ describe("model-resolution check", () => {
       expect(issues).toHaveLength(0)
     })
 
-    it("does not warn for OpenCode Go Qwen Max overrides while snapshot data catches up", async () => {
+    it("does not warn for OpenCode Go Qwen Max overrides with snapshot-backed diagnostics from refreshed models.dev", async () => {
       const { collectCapabilityResolutionIssues, getModelResolutionInfoWithOverrides } = await import("./model-resolution")
 
-      // #given Qwen Max is configured for planner agents before the bundled snapshot has an exact entry
+      // #given Qwen Max is configured for planner agents with the refreshed snapshot
       const info = getModelResolutionInfoWithOverrides({
         agents: {
           prometheus: { model: "opencode-go/qwen3.7-max" },
@@ -332,10 +332,10 @@ describe("model-resolution check", () => {
       // #when collecting doctor capability issues
       const issues = collectCapabilityResolutionIssues(info)
 
-      // #then Qwen Max uses heuristic-backed diagnostics instead of the unknown compatibility fallback warning
+      // #then Qwen Max uses snapshot-backed diagnostics (models.dev now includes Qwen data)
       expect(issues).toHaveLength(0)
       const atlas = expectDefined(info.agents.find((agent) => agent.name === "atlas"), "atlas agent resolution")
-      expect(atlas.capabilityDiagnostics?.resolutionMode).toBe("heuristic-backed")
+      expect(atlas.capabilityDiagnostics?.resolutionMode).toBe("snapshot-backed")
     })
   })
 
