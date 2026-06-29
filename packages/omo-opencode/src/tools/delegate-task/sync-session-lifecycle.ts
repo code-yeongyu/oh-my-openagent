@@ -43,17 +43,14 @@ export async function registerSyncSessionSideEffects(input: {
       sessionID: input.sessionID,
       parentID: input.parentContext.sessionID,
     })
-    try {
-      await input.executorCtx.onSyncSessionCreated({
-        sessionID: input.sessionID,
-        parentID: input.parentContext.sessionID,
-        title: input.args.description,
-      })
-    } catch (error) {
+    void input.executorCtx.onSyncSessionCreated({
+      sessionID: input.sessionID,
+      parentID: input.parentContext.sessionID,
+      title: input.args.description,
+    }).catch((error) => {
       const message = error instanceof Error ? String(error) : String(error)
       log("[task] onSyncSessionCreated callback failed", { error: message })
-    }
-    await new Promise(resolve => setTimeout(resolve, 200))
+    })
   }
 }
 
