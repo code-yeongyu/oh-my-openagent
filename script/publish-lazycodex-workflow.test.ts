@@ -12,6 +12,10 @@ const webTerminalVisualQaRuntimePaths = [
   "script/qa/web-terminal-renderer.mjs",
   "script/qa/web-terminal-visual-qa.mjs",
 ] as const
+const packageGuidanceDocPaths = [
+  "docs/reference/github-attachment-upload.md",
+  "docs/reference/web-terminal-visual-qa.md",
+] as const
 
 function sliceWorkflowSection(workflow: string, startMarker: string, endMarker: string): string {
   const start = workflow.indexOf(startMarker)
@@ -229,7 +233,7 @@ describe("LazyCodex publish workflow", () => {
     const lazycodexStepDropsPlatformOptionalDeps = workflow.includes(".optionalDependencies = {}")
     const lazycodexStepDropsRuntimeDependencies = workflow.includes(".dependencies = {}")
     const lazycodexStepScopesPublishedFiles = workflow.includes(
-      '.files = ["dist/cli", "dist/cli-node", "script/qa/web-terminal-redaction.d.mts", "script/qa/web-terminal-redaction.mjs", "script/qa/web-terminal-renderer.mjs", "script/qa/web-terminal-visual-qa.mjs", "packages/omo-codex/scripts/install-local.mjs", "packages/omo-codex/scripts/install-dist", "packages/omo-codex/plugin", "packages/omo-codex/plugin/components/start-work-continuation/dist/cli.js", "packages/omo-codex/plugin/components/ulw-loop/dist/cli.js", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/lsp-daemon/package.json", "packages/lsp-daemon/dist", "packages/git-bash-mcp/dist", "packages/shared-skills/package.json", "packages/shared-skills/index.mjs", "packages/shared-skills/skills"]',
+      '.files = ["dist/cli", "dist/cli-node", "script/qa/web-terminal-redaction.d.mts", "script/qa/web-terminal-redaction.mjs", "script/qa/web-terminal-renderer.mjs", "script/qa/web-terminal-visual-qa.mjs", "docs/reference/github-attachment-upload.md", "docs/reference/web-terminal-visual-qa.md", "packages/omo-codex/scripts/install-local.mjs", "packages/omo-codex/scripts/install-dist", "packages/omo-codex/plugin", "packages/omo-codex/plugin/components/start-work-continuation/dist/cli.js", "packages/omo-codex/plugin/components/ulw-loop/dist/cli.js", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/lsp-daemon/package.json", "packages/lsp-daemon/dist", "packages/git-bash-mcp/dist", "packages/shared-skills/package.json", "packages/shared-skills/index.mjs", "packages/shared-skills/skills"]',
     )
     const publishLazycodexStep = sliceWorkflowSection(
       workflow,
@@ -238,6 +242,9 @@ describe("LazyCodex publish workflow", () => {
     )
     const missingWebTerminalRuntimePaths = webTerminalVisualQaRuntimePaths.filter(
       (runtimePath) => !publishLazycodexStep.includes(`"${runtimePath}"`),
+    )
+    const missingPackageGuidanceDocPaths = packageGuidanceDocPaths.filter(
+      (docPath) => !publishLazycodexStep.includes(`"${docPath}"`),
     )
     const publishMainJob = sliceWorkflowSection(workflow, "  publish-main:", "  publish-platform:")
     const lazycodexShipsRootCliDistAfterBuild =
@@ -258,6 +265,7 @@ describe("LazyCodex publish workflow", () => {
       "lazycodex npm package must ship the root CLI dist (omo runtime wrapper target), web-terminal QA helper runtime, the Node installer and Codex marketplace assets, and packages/lsp-daemon (lsp MCP arg target and components/lsp file: dependency — npm ci in the plugin cache hard-fails without it)",
     ).toBe(true)
     expect(missingWebTerminalRuntimePaths).toEqual([])
+    expect(missingPackageGuidanceDocPaths).toEqual([])
     expect(
       lazycodexShipsRootCliDistAfterBuild,
       "publish-main must build the root CLI dist before the lazycodex-ai publish step so dist/cli/index.js exists in the tarball",

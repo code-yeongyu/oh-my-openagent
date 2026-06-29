@@ -45,6 +45,8 @@
     "script/qa/web-terminal-redaction.mjs",
     "script/qa/web-terminal-renderer.mjs",
     "script/qa/web-terminal-visual-qa.mjs",
+    "docs/reference/github-attachment-upload.md",
+    "docs/reference/web-terminal-visual-qa.md",
     ".opencode/command",
     ".opencode/skills",
     ".agents/command",
