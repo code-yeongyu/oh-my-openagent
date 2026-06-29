@@ -142,7 +142,7 @@
       "model": "GPT 5.5 Medium"
     },
     "teamMode": {
-      "badge": "NEW · v4.0",
+      "badge": "v4.0+",
       "title": "Team Mode",
       "headline": "多个 Agent。并排运行。真正并行。",
       "description": "一个领导 Agent 协调一队按类别专业化的成员，全部并行运行，通过专用工具实时通信。在 tmux 中同时观察每个成员工作。选择性启用 — 翻转 team_mode.enabled 并重启。",

@@ -142,7 +142,7 @@
       "model": "GPT 5.5 Medium"
     },
     "teamMode": {
-      "badge": "NEW · v4.0",
+      "badge": "v4.0+",
       "title": "Team Mode",
       "headline": "複数のエージェント。横並び。並列で。",
       "description": "リードエージェントがカテゴリ特化のメンバーチームを統括します。全員が並列で動き、専用ツールでリアルタイムに通信。tmuxで全メンバーの作業を同時に観察できます。オプトイン — team_mode.enabledを切り替えて再起動。",
