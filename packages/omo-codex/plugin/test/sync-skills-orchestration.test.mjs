@@ -28,6 +28,11 @@ function patternFromParts(parts, flags) {
 	return new RegExp(parts.join(""), flags);
 }
 
+const multiAgentV2RoleGuidance =
+	"On `multi_agent_v2` sessions the same `agent_type` applies (the OMO installer exposes it) with `fork_turns` instead of `fork_context`.";
+const loadSkillsGuidance =
+	"When translating `load_skills=[...]`, include the requested skill names in the spawned agent's `message`.";
+
 test("#given synced aggregate Codex skills #when they contain OpenCode orchestration examples #then Codex tool compatibility guidance is injected", async () => {
 	// given
 	const opencodeOnlyToolPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/;
@@ -45,6 +50,8 @@ test("#given synced aggregate Codex skills #when they contain OpenCode orchestra
 			compatibilityIndex < content.search(opencodeOnlyToolPattern),
 			`${skillName} must explain Codex tool translation before OpenCode-only examples`,
 		);
+		assert.ok(content.includes(multiAgentV2RoleGuidance), `${skillName} missing multi_agent_v2 role guidance`);
+		assert.ok(content.includes(loadSkillsGuidance), `${skillName} missing load_skills guidance`);
 	}
 });
 
@@ -81,7 +88,7 @@ task(category="quick", prompt="verify")
 	assert.ok(compatibilityIndex < firstToolIndex);
 	assert.equal(adapted.match(/## Codex Harness Tool Compatibility/g)?.length, 1);
 	assert.doesNotMatch(adapted, /Older variant guidance/);
-	assert.doesNotMatch(adapted, /When translating `load_skills=\[\.\.\.\]`/);
+	assert.doesNotMatch(adapted, /name the skills inside the spawned agent's `message`/);
 	assert.match(adapted, /\n---\n\n## Next Section/);
 });
 
@@ -143,6 +150,25 @@ call_omo_agent(subagent_type="explore", prompt="inspect")
 	assert.match(adapted, /multi_agent_v1\.wait_agent/);
 	assert.doesNotMatch(adapted, /task_name/);
 	assert.doesNotMatch(adapted, /Obsolete generated compatibility prose/);
+});
+
+test("#given generated Codex compatibility guidance #when adapting a skill #then multi-agent role and load_skills guidance are both present", () => {
+	// given
+	const content = `---
+name: example
+---
+
+# Example Skill
+
+task(subagent_type="oracle", load_skills=["debugging"], prompt="verify")
+`;
+
+	// when
+	const adapted = insertCodexCompatibilityGuidance(content);
+
+	// then
+	assert.ok(adapted.includes(multiAgentV2RoleGuidance));
+	assert.ok(adapted.includes(loadSkillsGuidance));
 });
 
 test("#given generated guidance before a template export #when adapting a skill #then the export wrapper is preserved", () => {
