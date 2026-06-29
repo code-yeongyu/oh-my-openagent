@@ -63,6 +63,10 @@ export async function HeroSection(): Promise<JSX.Element> {
         <div className="w-full max-w-md">
           <InstallCommand command={t("hero.installCommand")} />
         </div>
+        <div className="w-full max-w-md">
+          <p className="mb-1 text-xs text-zinc-500">{t("hero.codexLabel")}</p>
+          <InstallCommand command={t("hero.codexInstallCommand")} />
+        </div>
 
         <div className="flex flex-col gap-4 sm:flex-row">
           <Link href="/docs#installation">
