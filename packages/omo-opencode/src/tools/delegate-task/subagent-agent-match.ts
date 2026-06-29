@@ -100,6 +100,7 @@ export async function resolveSubagentAgentMatch(
     matchedAgent = {
       name: DEFAULT_PLAN_FALLBACK_AGENT,
       mode: "subagent",
+      hidden: true,
     }
   }
 
