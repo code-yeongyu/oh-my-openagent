@@ -361,6 +361,30 @@ describe("resolveCompatibleModelSettings", () => {
       }
     }
   })
+
+  test("Qwen preserves provider-declared variants outside the generic ladder", () => {
+    const capabilities = getModelCapabilities({
+      providerID: "openai-compatible",
+      modelID: "qwen3.7-plus",
+      runtimeModel: {
+        variants: ["medium", "high", "xhigh", "max", "off"],
+      },
+    })
+
+    const result = resolveCompatibleModelSettings({
+      providerID: "openai-compatible",
+      modelID: "qwen3.7-plus",
+      desired: { variant: "off" },
+      capabilities,
+    })
+
+    expect(result).toEqual({
+      variant: "off",
+      reasoningEffort: undefined,
+      changes: [],
+    })
+  })
+
   test("DeepSeek keeps canonical high and max reasoningEffort values", () => {
     for (const reasoningEffort of ["high", "max"]) {
       const result = resolveCompatibleModelSettings({

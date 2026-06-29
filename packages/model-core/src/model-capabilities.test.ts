@@ -422,6 +422,28 @@ describe("getModelCapabilities", () => {
     })
   })
 
+  test("preserves runtime-declared Qwen variants beyond the generic heuristic", () => {
+    const result = getModelCapabilities({
+      providerID: "openai-compatible",
+      modelID: "qwen3.7-plus",
+      runtimeModel: {
+        variants: ["medium", "high", "xhigh", "max", "off"],
+      },
+      bundledSnapshot,
+    })
+
+    expect(result).toMatchObject({
+      canonicalModelID: "qwen3.7-plus",
+      family: "qwen",
+      variants: ["medium", "high", "xhigh", "max", "off"],
+    })
+    expect(result.diagnostics).toMatchObject({
+      resolutionMode: "heuristic-backed",
+      family: { source: "heuristic" },
+      variants: { source: "runtime" },
+    })
+  })
+
   test("keeps every built-in OmO requirement model snapshot-backed", () => {
     const bundledSnapshot = getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson)
     const requirementModels = new Set<string>()
