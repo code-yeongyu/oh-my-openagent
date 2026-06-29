@@ -124,18 +124,29 @@ describe("release and platform publish workflows", () => {
     expect(darwinVerifyStep).not.toContain("codesign")
   })
 
-  test("regenerates and commits bun.lock in the release version bump", () => {
+  test("regenerates and commits release lockfiles in the release version bump", () => {
     // #given
     const workflow = readFileSync(publishWorkflowPath, "utf8")
 
     // #when
+    const prepareStep = sliceWorkflowSection(workflow, "      - name: Prepare and merge release state before publishing", "      - name: Write job summary")
     const applyStep = sliceWorkflowSection(workflow, "      - name: Apply release version to source tree", "      - name: Commit version bump")
     const commitStep = sliceWorkflowSection(workflow, "      - name: Commit version bump", "      - name: Create release tag")
+    const codexLockfileCommand = "npm --prefix packages/omo-codex/plugin install --package-lock-only --ignore-scripts --no-audit --fund=false"
+    const codexLockfilePath = "packages/omo-codex/plugin/package-lock.json"
 
     // #then
+    expect(prepareStep).toContain(codexLockfileCommand)
+    expect(prepareStep.indexOf(codexLockfileCommand)).toBeGreaterThan(prepareStep.indexOf("node packages/omo-codex/plugin/scripts/sync-version.mjs"))
+    expect(prepareStep.indexOf("bun install --lockfile-only")).toBeGreaterThan(prepareStep.indexOf(codexLockfileCommand))
+    expect(prepareStep).toContain(codexLockfilePath)
     expect(applyStep).toContain("bun install --lockfile-only")
+    expect(applyStep).toContain(codexLockfileCommand)
+    expect(applyStep.indexOf(codexLockfileCommand)).toBeGreaterThan(applyStep.indexOf("node packages/omo-codex/plugin/scripts/sync-version.mjs"))
+    expect(applyStep.indexOf("bun install --lockfile-only")).toBeGreaterThan(applyStep.indexOf(codexLockfileCommand))
     expect(applyStep.indexOf("bun install --lockfile-only")).toBeGreaterThan(applyStep.indexOf("node packages/omo-codex/plugin/scripts/sync-version.mjs"))
     expect(commitStep).toContain(" bun.lock")
+    expect(commitStep).toContain(codexLockfilePath)
   })
 
   test("keeps the release tail safe to rerun after a tag exists", () => {
