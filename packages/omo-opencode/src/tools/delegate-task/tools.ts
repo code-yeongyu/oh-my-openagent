@@ -90,8 +90,6 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
 
       const runInBackground = delegateTaskArgs.run_in_background === true
 
-      const nativeSkillEntries = await loadNativeSkillEntries(options.nativeSkills)
-
       const { content: skillContent, contents: skillContents, error: skillError } = await resolveSkillContent(delegateTaskArgs.load_skills, {
         gitMasterConfig: options.gitMasterConfig,
         browserProvider: options.browserProvider,
@@ -100,11 +98,12 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         directory: options.directory,
         targetAgent: delegateTaskArgs.subagent_type,
         nativeSkills: options.nativeSkills,
-        nativeSkillEntries,
+        getLoadedSkills: options.getLoadedSkills,
       })
       if (skillError) {
         return skillError
       }
+      const nativeSkillEntries = await loadNativeSkillEntries(options.nativeSkills)
       const nativeSkillInfos = buildPromptNativeSkillInfos(
         availableSkills,
         nativeSkillEntries,

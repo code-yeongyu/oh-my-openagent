@@ -408,12 +408,24 @@ describe("sisyphus-task", () => {
           status: async () => ({ data: {} }),
         },
       }
+      const resolutionEvents: string[] = []
+      const getLoadedSkills = async () => []
+      const nativeSkills = {
+        all: mock(async () => {
+          resolutionEvents.push("native")
+          return []
+        }),
+        get: async () => undefined,
+        dirs: async () => [],
+      }
 
       const tool = createDelegateTask({
         manager: mockManager,
         client: mockClient,
         connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
         availableModelsOverride: createTestAvailableModels(),
+        nativeSkills,
+        getLoadedSkills,
       })
 
       const toolContext = {
@@ -423,9 +435,14 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
 
-      const resolveSkillContentSpy = spyOn(executor, "resolveSkillContent").mockResolvedValue({
-        content: "resolved skill content",
-        error: null,
+      const resolveSkillContentSpy = spyOn(executor, "resolveSkillContent").mockImplementation(async (_skills, options) => {
+        resolutionEvents.push("resolve")
+        expect(options.getLoadedSkills).toBe(getLoadedSkills)
+        expect(resolutionEvents).toEqual(["resolve"])
+        return {
+          content: "resolved skill content",
+          error: null,
+        }
       })
 
       const args: DelegateTaskArgsWithSerializedSkills = {
@@ -441,6 +458,7 @@ describe("sisyphus-task", () => {
 
       //#then
       expect(resolveSkillContentSpy).toHaveBeenCalledWith(["playwright", "git-master"], expect.any(Object))
+      expect(resolutionEvents).toEqual(["resolve", "native"])
     }, { timeout: 10000 })
 
     test("defaults to [] when load_skills is malformed JSON", async () => {
