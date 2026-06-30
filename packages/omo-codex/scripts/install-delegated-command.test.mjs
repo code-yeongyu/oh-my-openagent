@@ -75,9 +75,35 @@ test("#given a dry-run doctor #when delegating #then routes to the Codex LazyCod
 	// then
 	assert.equal(ran, false);
 	assert.match(logged, /^codex exec /);
+	assert.match(logged, /--sandbox danger-full-access/);
+	assert.doesNotMatch(logged, /--sandbox read-only/);
 	assert.match(logged, /Use \$omo:lcx-doctor/);
+	assert.match(logged, /LAZYCODEX_SOURCE_ROOT/);
+	assert.match(logged, /\$\{TMPDIR:-\/tmp\}\/lazycodex-sources/);
 	assert.match(logged, /Requested doctor arguments: --json/);
 	assert.doesNotMatch(logged, /oh-my-openagent omo doctor/);
+});
+
+test("#given doctor source-root override #when delegating #then passes it to the Codex workflow environment", async () => {
+	// given
+	const parsed = { kind: "command", command: "doctor", args: ["--source-root", "/var/tmp/lcx-sources", "--json"] };
+
+	// when
+	const invocation = buildDelegatedOmoInvocation(parsed);
+
+	// then
+	assert.equal(invocation.env?.LAZYCODEX_SOURCE_ROOT, "/var/tmp/lcx-sources");
+	assert.deepEqual(invocation.args.slice(0, 7), [
+		"exec",
+		"--ephemeral",
+		"--sandbox",
+		"danger-full-access",
+		"--skip-git-repo-check",
+		"--cd",
+		".",
+	]);
+	assert.match(invocation.args.at(-1), /Requested doctor arguments: --json/);
+	assert.doesNotMatch(invocation.args.at(-1), /--source-root/);
 });
 
 test("#given doctor recursion guard is active #when lazycodex doctor delegates #then rejects before launching Codex", async () => {

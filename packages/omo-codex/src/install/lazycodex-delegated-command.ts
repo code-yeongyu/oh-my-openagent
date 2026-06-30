@@ -10,6 +10,11 @@ export type DelegatedOmoInvocation = {
   readonly env?: Readonly<Record<string, string>>
 }
 
+type LazyCodexDoctorOptions = {
+  readonly args: readonly string[]
+  readonly sourceRoot?: string
+}
+
 export async function runDelegatedOmoCommand(
   parsed: LazyCodexDelegatedCommand,
   options: {
@@ -52,21 +57,23 @@ export function buildDelegatedOmoInvocation(parsed: LazyCodexDelegatedCommand): 
 }
 
 function buildLazyCodexDoctorInvocation(doctorArgs: readonly string[]): DelegatedOmoInvocation {
+  const doctorOptions = parseLazyCodexDoctorOptions(doctorArgs)
   return {
     command: "codex",
     args: [
       "exec",
       "--ephemeral",
       "--sandbox",
-      "read-only",
+      "danger-full-access",
       "--skip-git-repo-check",
       "--cd",
       ".",
-      buildLazyCodexDoctorPrompt(doctorArgs),
+      buildLazyCodexDoctorPrompt(doctorOptions.args),
     ],
     delegatesToOmo: false,
     env: {
       LAZYCODEX_DOCTOR_LCX_ACTIVE: "1",
+      ...(doctorOptions.sourceRoot === undefined ? {} : { LAZYCODEX_SOURCE_ROOT: doctorOptions.sourceRoot }),
     },
   }
 }
@@ -75,11 +82,39 @@ function buildLazyCodexDoctorPrompt(doctorArgs: readonly string[]): string {
   return [
     "Use $omo:lcx-doctor to diagnose this LazyCodex/Codex installation.",
     "This command is already the lazycodex doctor surface; never invoke lazycodex doctor from inside the doctor workflow.",
-    "Sync the latest LazyCodex and OpenAI Codex sources into /tmp, inventory the local installation,",
+    "Use the resolved source root from LAZYCODEX_SOURCE_ROOT when set; otherwise use ${TMPDIR:-/tmp}/lazycodex-sources.",
+    "Validate cached source checkouts before reuse, quarantine corrupt caches, and do not rely on /tmp/lazycodex-source.",
+    "Sync the latest LazyCodex and OpenAI Codex sources there, inventory the local installation,",
     "probe the Codex plugin/cache/hooks/MCP state, and report PASS/WARN/FAIL findings with evidence and remediations.",
     buildDoctorOutputInstruction(doctorArgs),
     doctorArgs.length > 0 ? `Requested doctor arguments: ${doctorArgs.join(" ")}` : "Requested doctor arguments: none",
   ].join(" ")
+}
+
+function parseLazyCodexDoctorOptions(doctorArgs: readonly string[]): LazyCodexDoctorOptions {
+  const args: string[] = []
+  let sourceRoot: string | undefined
+  let index = 0
+  while (index < doctorArgs.length) {
+    const arg = doctorArgs[index]
+    if (arg === "--source-root") {
+      const value = doctorArgs[index + 1]
+      if (typeof value !== "string" || value.trim().length === 0) throw new Error("--source-root requires a path")
+      sourceRoot = value
+      index += 2
+      continue
+    }
+    if (typeof arg === "string" && arg.startsWith("--source-root=")) {
+      const value = arg.slice("--source-root=".length)
+      if (value.trim().length === 0) throw new Error("--source-root requires a path")
+      sourceRoot = value
+      index += 1
+      continue
+    }
+    args.push(arg)
+    index += 1
+  }
+  return { args, sourceRoot }
 }
 
 function buildDoctorOutputInstruction(doctorArgs: readonly string[]): string {

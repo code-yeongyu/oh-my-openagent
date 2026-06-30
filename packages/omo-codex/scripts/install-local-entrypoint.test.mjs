@@ -98,7 +98,10 @@ test("#given dry-run doctor #when running the Node installer entrypoint #then pr
 
 	// then
 	assert.match(output, /^codex exec /);
+	assert.match(output, /--sandbox danger-full-access/);
+	assert.doesNotMatch(output, /--sandbox read-only/);
 	assert.match(output, /Use \$omo:lcx-doctor/);
+	assert.match(output, /\$\{TMPDIR:-\/tmp\}\/lazycodex-sources/);
 	assert.match(output, /Requested doctor arguments: --json/);
 	assert.match(output, /Return exactly one JSON object/);
 	assert.doesNotMatch(output, /oh-my-openagent omo doctor/);
