@@ -80,6 +80,13 @@ space). `{session_id}` is the leader's Codex session id when you can pass it via
 otherwise the script generates a stable handle. Re-running `init` is a safe no-op. Every mutating
 subcommand rewrites `guide.md`, so the manual always matches the current team.
 
+Mutating subcommands take a per-team state lock before reading and rewriting `team.json`. It is
+safe to run independent `add-member`, `bind-thread`, `set-status`, `archive`, `delete`, `guide`,
+and worktree mutation commands concurrently against the same team: they serialize and each command
+reads the latest committed state before writing. If a command reports that team state is locked,
+do not treat the intended mutation as complete; retry after the named command finishes, or inspect
+`.omo/teams/{session_id}/.team.lock/owner.json` if the previous command crashed.
+
 ## Create the team and its threads
 
 1. `init` the team, then `add-member` once per member.
