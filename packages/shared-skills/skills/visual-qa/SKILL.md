@@ -13,7 +13,7 @@ Verify a rendered UI against intent using objective script evidence plus two par
 - Use when output must match a mock, a baseline, or a stated design intent; when you suspect a regression; when CJK (Korean/Japanese/Chinese) text may clip, misalign, or wrap awkwardly; when a claimed design system might actually be a flat image; when a terminal layout may overflow or its borders may break.
 - Skip when there is no rendered surface (pure backend or library logic with no visual or terminal output). For broad post-implementation review use review-work; this skill is the visual specialist.
 
-In the commands below, `$SKILL_DIR` is this skill's own directory (the folder containing this SKILL.md). The bundled script lives at `scripts/cli.ts` inside it.
+In the commands below, `$SKILL_DIR` is this skill's own directory (the folder containing this SKILL.md). The bundled Node evidence CLI lives at `scripts/visual-qa.mjs` inside it; the TypeScript source in `scripts/cli.ts` is for development.
 
 ## Step 1 - Detect the surface
 
@@ -44,11 +44,11 @@ Every gate runs on captures produced AFTER the last edit to the rendered source.
 ### Web
 
 1. Capture a REFERENCE image: the user's mock/target, generated page snapshot, Figma export, source-site capture, or known-good baseline. Save as PNG. If the user provided overview text or annotations, save them next to the image and treat them as part of the reference packet.
-2. Capture the ACTUAL rendered screenshot at the same viewport size. In Codex, when `browser:control-in-app-browser` is available and the page does not need an authenticated user browser session, use that Browser plugin first for navigation, page state inspection, and screenshots. If it is unavailable or lacks the needed capture action, use the project's configured browser tooling (the playwright, agent-browser, or dev-browser skill). Save as PNG. If none is configured or available, install [agent-browser](https://github.com/vercel-labs/agent-browser) (`bun add -g agent-browser && agent-browser install`) and capture with it — see `$SKILL_DIR/references/agent-browser-setup.md` for the full setup, including how to shoot a fixed-viewport screenshot.
+2. Capture the ACTUAL rendered screenshot at the same viewport size. In Codex, when `browser:control-in-app-browser` is available and the page does not need an authenticated user browser session, use that Browser plugin first for navigation, page state inspection, and screenshots. If it is unavailable or lacks the needed capture action, use the project's configured browser tooling (the playwright, agent-browser, or dev-browser skill). Save as PNG. If none is configured or available, install [agent-browser](https://github.com/vercel-labs/agent-browser) (`npm install -g agent-browser && agent-browser install`) and capture with it — see `$SKILL_DIR/references/agent-browser-setup.md` for the full setup, including how to shoot a fixed-viewport screenshot.
 3. Run the diff and keep the JSON:
 
 ```
-bun "$SKILL_DIR/scripts/cli.ts" image-diff <reference.png> <actual.png>
+node "$SKILL_DIR/scripts/visual-qa.mjs" image-diff <reference.png> <actual.png>
 ```
 
 Key fields: `dimensionsMatch`, `diffRatio` (0..1), `similarityScore` (0..100), `alphaChannelIntact`, `hotspots[]` (grid regions ranked by `diffRatio`).
@@ -82,7 +82,7 @@ metadata with cleanup receipt.
 3. Run the check with the REAL terminal width and keep the JSON:
 
 ```
-bun "$SKILL_DIR/scripts/cli.ts" tui-check capture.txt --cols <N>
+node "$SKILL_DIR/scripts/visual-qa.mjs" tui-check capture.txt --cols <N>
 ```
 
 Key fields: `maxWidth`, `overflowLines[]`, `borderMisaligned`, `wideCharColumns[]`, `hasAnsi`.
@@ -245,7 +245,7 @@ Run this step IN ADDITION to Steps 1-4 when the original user task has a concret
 1. Pixel-perfect design-compare subagent (visual oracle). Dispatch a focused, read-only design-compare reviewer (recommend `gpt-5.5` with medium reasoning). It must crop/zoom BOTH the reference (target / Figma export / source-site screenshot / generated page snapshot) and the ACTUAL screenshot into matching regions and read them **pixel-by-pixel** - header, nav, each card, spacing, type ramp, color tokens - not at a glance. It must also compare the overview text or annotations against the rendered content and DOM text. Anchor every claim with the bundled tool:
 
 ```
-bun "$SKILL_DIR/scripts/cli.ts" image-diff <reference.png> <actual.png>
+node "$SKILL_DIR/scripts/visual-qa.mjs" image-diff <reference.png> <actual.png>
 ```
 
    It judges whether layout geometry, spacing, design tokens (color, type, radius, shadow), and the design itself are identical to the target, region by region. Anything off by more than rounding is a finding.

@@ -55,15 +55,20 @@ describe("run dispatch", () => {
 })
 
 describe("cli entry", () => {
-	test("#given the cli is spawned for image-diff #when it runs #then it prints JSON and exits zero", () => {
+	test("#given the Node bundle is spawned for image-diff without Bun on PATH #when it runs #then it prints JSON and exits zero", () => {
 		// given
 		const dir = tempDir()
 		const reference = join(dir, "reference.png")
 		const actual = join(dir, "actual.png")
 		writeFileSync(reference, encodeRgbaPng(2, 2, solidRgba(2, 2, [0, 0, 0, 255])))
 		writeFileSync(actual, encodeRgbaPng(2, 2, solidRgba(2, 2, [255, 255, 255, 255])))
+		const nodePath = Bun.which("node")
+		if (nodePath === null) throw new Error("node not found on PATH")
 		// when
-		const proc = Bun.spawnSync(["bun", join(import.meta.dir, "cli.ts"), "image-diff", reference, actual])
+		const proc = Bun.spawnSync({
+			cmd: [nodePath, join(import.meta.dir, "visual-qa.mjs"), "image-diff", reference, actual],
+			env: { ...process.env, PATH: "/usr/bin:/bin" },
+		})
 		// then
 		expect(proc.exitCode).toBe(0)
 		const parsed: Record<string, unknown> = JSON.parse(proc.stdout.toString())
