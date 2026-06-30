@@ -75,8 +75,8 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
 
   const buildDescription = async (force = false): Promise<string> => {
     if (!force && cachedDescription) return cachedDescription
-    const skills = await getSkills()
     const commands = getCommands()
+    const skills = await getSkills()
     // Exclude agent-restricted skills from the description: they must not be
     // visible to agents that are not their designated owner.  The execute-time
     // check already enforces the restriction at call time.
