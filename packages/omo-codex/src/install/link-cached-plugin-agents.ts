@@ -1,8 +1,26 @@
-import { copyFile, lstat, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises"
-import { basename, join } from "node:path"
+import { createHash } from "node:crypto"
+import { lstat, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises"
+import { basename, dirname, join } from "node:path"
 import { purgeRetiredManagedAgentFiles } from "./retired-managed-agent-purge"
 
 const MANIFEST_FILE = ".installed-agents.json"
+const AGENT_INSTALL_MANIFEST_FILE = "native-agents.json"
+
+interface AgentInstallManifestEntry {
+  readonly sha256: string
+}
+
+interface AgentInstallManifest {
+  readonly version: 1
+  readonly files: Record<string, AgentInstallManifestEntry>
+}
+
+interface ManagedAgentTomlWrite {
+  readonly fileName: string
+  readonly linkPath: string
+  readonly manifest: AgentInstallManifest
+  readonly target: string
+}
 
 export interface LinkedAgent {
   readonly name: string
@@ -62,22 +80,16 @@ export async function linkCachedPluginAgents(input: {
   }
   const agentsDir = join(input.codexHome, "agents")
   await mkdir(agentsDir, { recursive: true })
+  const agentInstallManifest = await readAgentInstallManifest(input.codexHome)
   const linked: LinkedAgent[] = []
   for (const agentPath of bundledAgents) {
     const agentFileName = basename(agentPath)
-    const agentName = agentNameFromToml(agentFileName)
     const linkPath = join(agentsDir, agentFileName)
-    await replaceWithCopy(linkPath, agentPath)
-    await restorePreservedReasoning({
-      agentName,
+    await writeManagedAgentToml({
+      fileName: agentFileName,
       linkPath,
+      manifest: agentInstallManifest,
       target: agentPath,
-      value: input.preservedReasoning?.get(agentName),
-    })
-    await restorePreservedServiceTier({
-      linkPath,
-      preserved: input.preservedServiceTier?.has(agentName) ?? false,
-      value: input.preservedServiceTier?.get(agentName) ?? null,
     })
     linked.push({ name: agentFileName, path: linkPath, target: agentPath })
   }
@@ -85,20 +97,8 @@ export async function linkCachedPluginAgents(input: {
     input.pluginRoot,
     linked.map((entry) => entry.path),
   )
+  await writeAgentInstallManifest(input.codexHome, agentInstallManifest)
   return linked
-}
-
-async function restorePreservedServiceTier(input: {
-  readonly linkPath: string
-  readonly preserved: boolean
-  readonly value: string | null
-}): Promise<void> {
-  if (!input.preserved) return
-  const content = await readFile(input.linkPath, "utf8")
-  if (extractServiceTier(content) === input.value) return
-  const replacement = replaceServiceTier(content, input.value)
-  if (!replacement.replaced) return
-  await writeFile(input.linkPath, replacement.content)
 }
 
 async function discoverBundledAgents(pluginRoot: string): Promise<readonly string[]> {
@@ -120,9 +120,9 @@ async function discoverBundledAgents(pluginRoot: string): Promise<readonly strin
   return agents
 }
 
-async function replaceWithCopy(linkPath: string, target: string): Promise<void> {
+async function replaceWithContent(linkPath: string, content: string): Promise<void> {
   await prepareReplacement(linkPath)
-  await copyFile(target, linkPath)
+  await writeFile(linkPath, content)
 }
 
 async function prepareReplacement(linkPath: string): Promise<void> {
@@ -140,19 +140,73 @@ async function writeManifest(pluginRoot: string, agentPaths: readonly string[]):
   await writeFile(manifestPath, `${JSON.stringify(payload, null, "\t")}\n`)
 }
 
-async function restorePreservedReasoning(input: {
-  readonly agentName: string
-  readonly linkPath: string
-  readonly target: string
-  readonly value: string | undefined
-}): Promise<void> {
-  if (input.value === undefined) return
-  const content = await readFile(input.target, "utf8")
-  const bundledEffort = extractReasoningEffort(content)
-  if (bundledEffort === input.value) return
-  const replacement = replaceReasoningEffort(content, input.value)
-  if (!replacement.replaced) return
-  await writeFile(input.linkPath, replacement.content)
+async function writeManagedAgentToml(input: ManagedAgentTomlWrite): Promise<void> {
+  const bundledContent = await readFile(input.target, "utf8")
+  const bundledHash = hashContent(bundledContent)
+  const existingContent = await readTextIfExists(input.linkPath)
+  const isRegularFileCopy = existingContent !== null && (await isRegularFile(input.linkPath))
+
+  if (existingContent === bundledContent && isRegularFileCopy) {
+    input.manifest.files[input.fileName] = { sha256: bundledHash }
+    return
+  }
+
+  if (existingContent !== null && isRegularFileCopy) {
+    const previousHash = input.manifest.files[input.fileName]?.sha256
+    const existingAgentName = extractAgentName(existingContent)
+    if (previousHash !== hashContent(existingContent) && existingAgentName === agentNameFromToml(input.fileName)) {
+      return
+    }
+  }
+
+  await replaceWithContent(input.linkPath, bundledContent)
+  input.manifest.files[input.fileName] = { sha256: bundledHash }
+}
+
+function hashContent(content: string): string {
+  return createHash("sha256").update(content).digest("hex")
+}
+
+function agentInstallManifestPath(codexHome: string): string {
+  return join(codexHome, ".omo", AGENT_INSTALL_MANIFEST_FILE)
+}
+
+async function readAgentInstallManifest(codexHome: string): Promise<AgentInstallManifest> {
+  const content = await readTextIfExists(agentInstallManifestPath(codexHome))
+  if (content === null) return { version: 1, files: {} }
+
+  try {
+    const parsed: unknown = JSON.parse(content)
+    if (!isRecord(parsed) || parsed["version"] !== 1 || !isRecord(parsed["files"])) {
+      return { version: 1, files: {} }
+    }
+
+    const files: Record<string, AgentInstallManifestEntry> = {}
+    for (const [fileName, entry] of Object.entries(parsed["files"])) {
+      if (!fileName.endsWith(".toml") || !isRecord(entry)) continue
+      const sha256 = entry["sha256"]
+      if (typeof sha256 === "string" && /^[0-9a-f]{64}$/i.test(sha256)) {
+        files[fileName] = { sha256: sha256.toLowerCase() }
+      }
+    }
+    return { version: 1, files }
+  } catch (error) {
+    if (error instanceof SyntaxError) return { version: 1, files: {} }
+    throw error
+  }
+}
+
+async function writeAgentInstallManifest(codexHome: string, manifest: AgentInstallManifest): Promise<void> {
+  const manifestPath = agentInstallManifestPath(codexHome)
+  await mkdir(dirname(manifestPath), { recursive: true })
+
+  const files: Record<string, AgentInstallManifestEntry> = {}
+  for (const fileName of Object.keys(manifest.files).sort()) {
+    const entry = manifest.files[fileName]
+    if (entry !== undefined) files[fileName] = entry
+  }
+
+  await writeFile(manifestPath, `${JSON.stringify({ version: 1, files }, null, 2)}\n`)
 }
 
 async function readTextIfExists(path: string): Promise<string | null> {
@@ -164,12 +218,21 @@ async function readTextIfExists(path: string): Promise<string | null> {
   }
 }
 
+async function isRegularFile(path: string): Promise<boolean> {
+  const entryStat = await lstat(path)
+  return entryStat.isFile() && !entryStat.isSymbolicLink()
+}
+
 function extractReasoningEffort(content: string): string | null {
   return extractTopLevelStringSetting(content, "model_reasoning_effort")
 }
 
 function extractServiceTier(content: string): string | null {
   return extractTopLevelStringSetting(content, "service_tier")
+}
+
+function extractAgentName(content: string): string | null {
+  return extractTopLevelStringSetting(content, "name")
 }
 
 function extractTopLevelStringSetting(content: string, key: string): string | null {
@@ -183,38 +246,6 @@ function extractTopLevelStringSetting(content: string, key: string): string | nu
   return null
 }
 
-function replaceReasoningEffort(content: string, value: string): { readonly content: string; readonly replaced: boolean } {
-  return replaceTopLevelStringSetting(content, "model_reasoning_effort", value, { insertIfMissing: false })
-}
-
-function replaceServiceTier(content: string, value: string | null): { readonly content: string; readonly replaced: boolean } {
-  return replaceTopLevelStringSetting(content, "service_tier", value, { insertIfMissing: true })
-}
-
-function replaceTopLevelStringSetting(
-  content: string,
-  key: string,
-  value: string | null,
-  options: { readonly insertIfMissing: boolean },
-): { readonly content: string; readonly replaced: boolean } {
-  const lines = content.split(/\n/)
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index]
-    if (line === undefined || isSectionHeader(line)) break
-    if (topLevelStringSettingRawValue(line, key) === undefined) continue
-    if (value === null) {
-      lines.splice(index, 1)
-      return { content: lines.join("\n"), replaced: true }
-    }
-    lines[index] = line.replace(/=\s*"(?:[^"\\]|\\.)*"/, `= ${JSON.stringify(value)}`)
-    return { content: lines.join("\n"), replaced: true }
-  }
-
-  if (value === null || !options.insertIfMissing) return { content, replaced: false }
-  lines.splice(topLevelInsertionIndex(lines), 0, `${key} = ${JSON.stringify(value)}`)
-  return { content: lines.join("\n"), replaced: true }
-}
-
 function topLevelStringSettingRawValue(line: string, key: string): string | undefined {
   const match = line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*("(?:[^"\\]|\\.)*")/)
   if (match === null) return undefined
@@ -222,16 +253,6 @@ function topLevelStringSettingRawValue(line: string, key: string): string | unde
   const rawValue = match[2]
   if (settingKey !== key || rawValue === undefined) return undefined
   return rawValue
-}
-
-function topLevelInsertionIndex(lines: readonly string[]): number {
-  const sectionIndex = lines.findIndex((line) => isSectionHeader(line))
-  const topLevelEnd = sectionIndex === -1 ? lines.length : sectionIndex
-  let insertionIndex = topLevelEnd
-  while (insertionIndex > 0 && lines[insertionIndex - 1] === "") {
-    insertionIndex -= 1
-  }
-  return insertionIndex
 }
 
 function isSectionHeader(line: string): boolean {
@@ -251,6 +272,10 @@ function parseJsonString(value: string): string | null {
     if (error instanceof Error) return null
     return null
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
 async function exists(path: string): Promise<boolean> {

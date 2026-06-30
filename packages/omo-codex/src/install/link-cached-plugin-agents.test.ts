@@ -102,6 +102,26 @@ describe("linkCachedPluginAgents", () => {
     expect(await readFile(join(agentsDir, "explorer.toml"), "utf8")).toBe('name = "explorer"\n')
   })
 
+  test("replaces matching legacy symlinks with regular files on unix", async () => {
+    // given
+    const { codexHome, pluginRoot } = await makeFixture()
+    const agentsDir = join(codexHome, "agents")
+    await mkdir(agentsDir, { recursive: true })
+    await symlink(
+      join(pluginRoot, "components", "ultrawork", "agents", "explorer.toml"),
+      join(agentsDir, "explorer.toml"),
+    )
+
+    // when
+    await linkCachedPluginAgents({ codexHome, pluginRoot, platform: "linux" })
+
+    // then
+    const linkStat = await lstat(join(agentsDir, "explorer.toml"))
+    expect(linkStat.isSymbolicLink()).toBe(false)
+    expect(linkStat.isFile()).toBe(true)
+    expect(await readFile(join(agentsDir, "explorer.toml"), "utf8")).toBe('name = "explorer"\n')
+  })
+
   test("overwrites stale copies on Windows", async () => {
     // given
     const { codexHome, pluginRoot } = await makeFixture()
@@ -140,6 +160,26 @@ describe("linkCachedPluginAgents", () => {
     const content = await readFile(join(agentsDir, "planner.toml"), "utf8")
     expect(content).toContain('model_reasoning_effort = "high"')
     expect(content).not.toContain('model_reasoning_effort = "xhigh"')
+    expect((await lstat(join(agentsDir, "planner.toml"))).isSymbolicLink()).toBe(false)
+  })
+
+  test("preserves customized installed agent model when reinstalling file copies", async () => {
+    // given
+    const { codexHome, pluginRoot } = await makeFixture()
+    const agentsDir = join(codexHome, "agents")
+    await mkdir(agentsDir, { recursive: true })
+    await writeFile(
+      join(pluginRoot, "components", "ulw-loop", "agents", "planner.toml"),
+      'name = "planner"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\n',
+    )
+    const customized = 'name = "planner"\nmodel = "custom-provider/planner"\nmodel_reasoning_effort = "xhigh"\n'
+    await writeFile(join(agentsDir, "planner.toml"), customized)
+
+    // when
+    await linkCachedPluginAgents({ codexHome, pluginRoot, platform: "linux" })
+
+    // then
+    expect(await readFile(join(agentsDir, "planner.toml"), "utf8")).toBe(customized)
     expect((await lstat(join(agentsDir, "planner.toml"))).isSymbolicLink()).toBe(false)
   })
 
@@ -221,6 +261,23 @@ describe("linkCachedPluginAgents", () => {
     expect(linked).toHaveLength(3)
     const entries = (await readdir(join(codexHome, "agents"))).sort()
     expect(entries).toEqual(["explorer.toml", "librarian.toml", "planner.toml"])
+  })
+
+  test("refreshes unmodified managed agent TOMLs when bundled defaults change", async () => {
+    // given
+    const { codexHome, pluginRoot } = await makeFixture()
+    const plannerPath = join(pluginRoot, "components", "ulw-loop", "agents", "planner.toml")
+    await writeFile(plannerPath, 'name = "planner"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\n')
+    await linkCachedPluginAgents({ codexHome, pluginRoot, platform: "linux" })
+    await writeFile(plannerPath, 'name = "planner"\nmodel = "gpt-5.6"\nmodel_reasoning_effort = "high"\n')
+
+    // when
+    await linkCachedPluginAgents({ codexHome, pluginRoot, platform: "linux" })
+
+    // then
+    expect(await readFile(join(codexHome, "agents", "planner.toml"), "utf8")).toBe(
+      'name = "planner"\nmodel = "gpt-5.6"\nmodel_reasoning_effort = "high"\n',
+    )
   })
 
   test("discovers TOMLs across multiple component agent directories", async () => {
