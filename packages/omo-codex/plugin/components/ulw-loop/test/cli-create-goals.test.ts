@@ -169,4 +169,20 @@ describe("ulwLoopCommand create-goals", () => {
 
 		expect(await readFile(join(testDir, ".omo/ulw-loop/manual-456/goals.json"), "utf8")).toContain("Manual scoped");
 	});
+
+	it("#given a valueless --session-id #when creating goals #then it fails and writes no plan", async () => {
+		const code = await ulwLoopCommand(["create-goals", "--session-id", "--brief", "- Alpha"]);
+
+		expect(code).toBe(1);
+		expect(err.join("")).toContain("--session-id requires a non-empty value");
+		await expect(readFile(join(testDir, ".omo/ulw-loop/goals.json"), "utf8")).rejects.toThrow();
+	});
+
+	it("#given an empty --session-id= #when creating goals #then it fails and writes no plan", async () => {
+		const code = await ulwLoopCommand(["create-goals", "--session-id=", "--brief", "- Alpha"]);
+
+		expect(code).toBe(1);
+		expect(err.join("")).toContain("--session-id requires a non-empty value");
+		await expect(readFile(join(testDir, ".omo/ulw-loop/goals.json"), "utf8")).rejects.toThrow();
+	});
 });
