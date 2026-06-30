@@ -1039,6 +1039,21 @@ Native Windows Codex installs bundle a `git_bash` MCP server and write `[plugins
 
 The installer discovers Git Bash with `OMO_CODEX_GIT_BASH_PATH`, standard Git for Windows locations, and PATH. If discovery fails, it prints manual install guidance and stops without running `winget` or changing system dependencies. The Light plugin also emits a fixed reminder before the first Codex shell-like `Bash` hook call in a Windows session, and resets that reminder after `PostCompact` so the first post-compaction shell call recommends `git_bash` again.
 
+### Codex Companion Plugin Compatibility
+
+LazyCodex can coexist with other Codex plugins, but if LazyCodex is your primary Codex workflow the `codex@openai-codex` companion plugin adds its own `SessionStart` and `Stop` lifecycle hooks. Those extra hooks can produce confusing Codex hook-failure banners even when the LazyCodex hooks are healthy.
+
+`lazycodex doctor` warns when `omo@sisyphuslabs` is enabled and the companion plugin is enabled, or when stale `[hooks.state."codex@openai-codex:..."]` SessionStart/Stop trust entries remain in `~/.codex/config.toml`. The doctor only reports this condition; it does not disable or delete another plugin for you.
+
+If LazyCodex is the primary workflow, disable the companion plugin explicitly:
+
+```toml
+[plugins."codex@openai-codex"]
+enabled = false
+```
+
+If doctor still warns afterward, remove the stale `[hooks.state."codex@openai-codex:..."]` SessionStart/Stop entries from the Codex config after making your own backup.
+
 ### Provider-Specific
 
 #### Google Auth
