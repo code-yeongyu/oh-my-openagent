@@ -9,8 +9,9 @@
 // this file stays the state concern only.
 
 import { randomUUID } from "node:crypto";
-import { lstat, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 
 export const LENSES = ["area", "ownership", "perspective"];
 export const MEMBER_STATUSES = ["pending", "active", "reported", "blocked", "archived"];
@@ -24,6 +25,8 @@ export function isUnderstaffed(team) {
 // A team dir is a single child of .omo/teams. This pattern alone blocks "/", "\", and a
 // leading "." so ".." and "a/b" can never name a team dir (the escape guard).
 const SESSION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+const LOCK_TIMEOUT_MS = Number.parseInt(process.env.OMO_TEAMMODE_LOCK_TIMEOUT_MS ?? "10000", 10);
+const LOCK_RETRY_MS = Number.parseInt(process.env.OMO_TEAMMODE_LOCK_RETRY_MS ?? "25", 10);
 
 function isoNow(now) {
 	return now ?? new Date().toISOString();
@@ -231,6 +234,65 @@ async function lstatOrNull(p) {
 		if (error && error.code === "ENOENT") return null;
 		throw error;
 	});
+}
+
+function positiveIntegerOrFallback(value, fallback) {
+	return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+async function readLockOwner(lockDir) {
+	return readFile(join(lockDir, "owner.json"), "utf8")
+		.then((content) => JSON.parse(content))
+		.catch(() => null);
+}
+
+async function describeLockOwner(lockDir) {
+	const owner = await readLockOwner(lockDir);
+	if (!owner || typeof owner !== "object") return "another team.mjs command";
+	const parts = [];
+	if (owner.command) parts.push(String(owner.command));
+	if (owner.pid) parts.push(`pid ${owner.pid}`);
+	if (owner.createdAt) parts.push(`since ${owner.createdAt}`);
+	return parts.length > 0 ? parts.join(", ") : "another team.mjs command";
+}
+
+export async function withTeamLock(dir, command, fn, options = {}) {
+	const timeoutMs = positiveIntegerOrFallback(options.timeoutMs ?? LOCK_TIMEOUT_MS, 10000);
+	const retryMs = positiveIntegerOrFallback(options.retryMs ?? LOCK_RETRY_MS, 25);
+	const lockDir = join(dir, ".team.lock");
+	const deadline = Date.now() + timeoutMs;
+	let acquired = false;
+	for (;;) {
+		try {
+			await mkdir(lockDir, { mode: 0o700 });
+			acquired = true;
+			await writeFile(
+				join(lockDir, "owner.json"),
+				`${JSON.stringify({ pid: process.pid, command, createdAt: new Date().toISOString() }, null, 2)}\n`,
+				{ encoding: "utf8", flag: "wx" },
+			);
+			break;
+		} catch (error) {
+			if (acquired) {
+				await rm(lockDir, { recursive: true, force: true });
+				throw error;
+			}
+			if (!error || error.code !== "EEXIST") throw error;
+			const st = await lstatOrNull(lockDir);
+			if (st?.isSymbolicLink()) throw new Error(`refused: team lock path is a symlink: ${lockDir}`);
+			if (st && !st.isDirectory()) throw new Error(`refused: team lock path is not a directory: ${lockDir}`);
+			if (Date.now() >= deadline) {
+				const owner = await describeLockOwner(lockDir);
+				throw new Error(`team state is locked by ${owner}; retry after that command completes`);
+			}
+			await delay(Math.min(retryMs, Math.max(1, deadline - Date.now())));
+		}
+	}
+	try {
+		return await fn();
+	} finally {
+		await rm(lockDir, { recursive: true, force: true });
+	}
 }
 
 // Create a directory chain refusing any symlinked component, so team state can never be
