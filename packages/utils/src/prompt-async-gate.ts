@@ -58,6 +58,11 @@ export {
   _setPromptGateMessagesFetchTimeoutMsForTesting,
 } from "./prompt-async-gate/timing"
 
+export {
+  getPromptReservation,
+  reservationSourceMatches,
+} from "./prompt-async-gate/reservations"
+
 export type {
   InternalPromptDispatchArgs,
   InternalPromptDispatchMode,
@@ -69,6 +74,54 @@ export type {
 type ObjectPathPromptInput = {
   readonly path?: { readonly id?: string } | string
   readonly [key: string]: unknown
+}
+
+const DIFFERENT_SOURCE_RELEASE_LOG_THROTTLE_MS = 30_000
+const DIFFERENT_SOURCE_RELEASE_LOG_MAX_ENTRIES = 1_024
+const differentSourceReleaseLogTimes = new Map<string, number>()
+
+function pruneDifferentSourceReleaseLogTimes(now: number): void {
+  for (const [key, loggedAt] of differentSourceReleaseLogTimes) {
+    if (now - loggedAt >= DIFFERENT_SOURCE_RELEASE_LOG_THROTTLE_MS) {
+      differentSourceReleaseLogTimes.delete(key)
+    }
+  }
+
+  const overflowCount = differentSourceReleaseLogTimes.size - DIFFERENT_SOURCE_RELEASE_LOG_MAX_ENTRIES
+  if (overflowCount <= 0) {
+    return
+  }
+
+  let removedCount = 0
+  for (const key of differentSourceReleaseLogTimes.keys()) {
+    differentSourceReleaseLogTimes.delete(key)
+    removedCount += 1
+    if (removedCount >= overflowCount) {
+      return
+    }
+  }
+}
+
+export function _getDifferentSourceReleaseLogThrottleSizeForTesting(): number {
+  return differentSourceReleaseLogTimes.size
+}
+
+function shouldLogDifferentSourceRelease(
+  sessionID: string,
+  source: string,
+  reservedBy: string,
+  now = Date.now(),
+): boolean {
+  pruneDifferentSourceReleaseLogTimes(now)
+
+  const key = `${sessionID}\u0000${source}\u0000${reservedBy}`
+  const lastLoggedAt = differentSourceReleaseLogTimes.get(key)
+  if (lastLoggedAt !== undefined && now - lastLoggedAt < DIFFERENT_SOURCE_RELEASE_LOG_THROTTLE_MS) {
+    return false
+  }
+  differentSourceReleaseLogTimes.set(key, now)
+  pruneDifferentSourceReleaseLogTimes(now)
+  return true
 }
 
 function hasObjectSessionPath(input: unknown): input is ObjectPathPromptInput & { readonly path: { readonly id: string } } {
@@ -301,6 +354,7 @@ export function releaseAllPromptAsyncReservationsForTesting(): void {
   clearPromptQueueStateForTesting()
   clearRecentPromptDispatchesForTesting()
   resetPromptGateTimingForTesting()
+  differentSourceReleaseLogTimes.clear()
 }
 
 export function isInternalPromptDispatchAccepted(result: InternalPromptDispatchResult): boolean {
@@ -319,11 +373,13 @@ export function releasePromptAsyncReservation(
 
   const expectedSource = options?.reservedBy ?? source
   if (!reservationSourceMatches(existing.source, expectedSource, options?.reservedByPrefix)) {
-    log("[prompt-async-gate] promptAsync reservation release skipped for different source", {
-      sessionID,
-      source,
-      reservedBy: existing.source,
-    })
+    if (shouldLogDifferentSourceRelease(sessionID, source, existing.source)) {
+      log("[prompt-async-gate] promptAsync reservation release skipped for different source", {
+        sessionID,
+        source,
+        reservedBy: existing.source,
+      })
+    }
     return false
   }
 

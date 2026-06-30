@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
+import { configureSharedSubunitLogger } from "./logger"
 import {
+  _getDifferentSourceReleaseLogThrottleSizeForTesting,
   _setPromptGateMessagesFetchTimeoutMsForTesting,
   dispatchInternalPrompt,
   releaseAllPromptAsyncReservationsForTesting,
@@ -22,6 +24,7 @@ async function waitForPromise<T>(promise: Promise<T>, label: string): Promise<T>
 describe("dispatchInternalPrompt", () => {
   afterEach(() => {
     // then
+    configureSharedSubunitLogger(undefined)
     _setPromptGateMessagesFetchTimeoutMsForTesting(undefined)
     releaseAllPromptAsyncReservationsForTesting()
   })
@@ -362,6 +365,7 @@ describe("dispatchInternalPrompt", () => {
 describe("dispatchInternalPrompt shared gate behavior", () => {
   afterEach(() => {
     // then
+    configureSharedSubunitLogger(undefined)
     _setPromptGateMessagesFetchTimeoutMsForTesting(undefined)
     releaseAllPromptAsyncReservationsForTesting()
   })
@@ -1135,6 +1139,86 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     expect(first.status).toBe("dispatched")
     expect(second).toEqual({ status: "queued", queuedBy: "team-live-delivery", position: 1 })
     expect(promptCalls).toBe(1)
+  })
+
+  test("#given repeated mismatched release attempts #when the same route spams release #then mismatch logs are throttled", async () => {
+    // given
+    const originalDateNow = Date.now
+    Date.now = () => 1_000
+    const logs: Array<{ readonly message: string; readonly data?: unknown }> = []
+    configureSharedSubunitLogger((message, data) => logs.push({ message, data }))
+    const client = {
+      session: {
+        promptAsync: async () => ({}),
+      },
+    }
+
+    try {
+      const first = await dispatchInternalPrompt({
+        mode: "async",
+        client,
+        sessionID: "ses_throttle_mismatch_release",
+        input: {
+          path: { id: "ses_throttle_mismatch_release" },
+          body: { parts: [{ type: "text", text: "hold" }] },
+        },
+        source: "model-suggestion-retry",
+        settleMs: 0,
+      })
+
+      // when
+      const firstRelease = releasePromptAsyncReservation("ses_throttle_mismatch_release", "ralph-loop")
+      const secondRelease = releasePromptAsyncReservation("ses_throttle_mismatch_release", "ralph-loop")
+      Date.now = () => 31_001
+      const thirdReleaseAfterThrottleWindow = releasePromptAsyncReservation("ses_throttle_mismatch_release", "ralph-loop")
+      const ownerRelease = releasePromptAsyncReservation("ses_throttle_mismatch_release", "model-suggestion-retry")
+
+      // then
+      const mismatchLogs = logs.filter((entry) => entry.message.includes("release skipped for different source"))
+      expect(first.status).toBe("dispatched")
+      expect(firstRelease).toBe(false)
+      expect(secondRelease).toBe(false)
+      expect(thirdReleaseAfterThrottleWindow).toBe(false)
+      expect(ownerRelease).toBe(true)
+      expect(mismatchLogs).toHaveLength(2)
+    } finally {
+      Date.now = originalDateNow
+    }
+  })
+
+  test("#given many unique mismatched release attempts #when the throttle cache fills #then old entries are pruned", async () => {
+    // given
+    const originalDateNow = Date.now
+    Date.now = () => 10_000
+    const client = {
+      session: {
+        promptAsync: async () => ({}),
+      },
+    }
+
+    try {
+      // when
+      for (let index = 0; index < 1_100; index += 1) {
+        const sessionID = `ses_throttle_bound_${index}`
+        await dispatchInternalPrompt({
+          mode: "async",
+          client,
+          sessionID,
+          input: {
+            path: { id: sessionID },
+            body: { parts: [{ type: "text", text: "hold" }] },
+          },
+          source: "model-suggestion-retry",
+          settleMs: 0,
+        })
+        releasePromptAsyncReservation(sessionID, "ralph-loop")
+      }
+
+      // then
+      expect(_getDifferentSourceReleaseLogThrottleSizeForTesting()).toBeLessThanOrEqual(1_024)
+    } finally {
+      Date.now = originalDateNow
+    }
   })
 
   test("#given a route family promptAsync hold #when the same family aborts another source #then the reservation is released", async () => {
