@@ -7,6 +7,7 @@ import {
   messageHasTerminalError,
   messageHasUnresolvedTool,
   messageHasWaitingTool,
+  messageHasInternalInitiatorMarker,
   messageIsSyntheticOrInternalUser,
   messageIsTerminalNoReplyUser,
   messageRole,
@@ -101,6 +102,9 @@ export function latestAssistantTurnBlocksInternalPrompt(messages: unknown[]): bo
           continue
         }
         if (!sawAssistantAfterLatestUser) {
+          if (messageHasInternalInitiatorMarker(message)) {
+            continue
+          }
           return true
         }
         continue

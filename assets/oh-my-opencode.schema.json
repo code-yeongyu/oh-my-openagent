@@ -91,6 +91,10 @@
     "hashline_edit": {
       "type": "boolean"
     },
+    "telemetry": {
+      "description": "Enable or disable anonymous telemetry. Default: enabled when omitted. Set to false to disable. Independent of codegraph.telemetry.",
+      "type": "boolean"
+    },
     "model_fallback": {
       "type": "boolean"
     },

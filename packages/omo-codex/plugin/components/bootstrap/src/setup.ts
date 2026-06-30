@@ -1,7 +1,5 @@
-import { execFile } from "node:child_process";
 import { copyFile, mkdir, readdir, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { promisify } from "node:util";
 
 // These relative imports resolve at BUILD time in the monorepo; esbuild
 // inlines the installer source modules into dist/cli.js so PLUGIN_ROOT ships
@@ -25,8 +23,6 @@ export const SETUP_MARKETPLACE_NAME = "sisyphuslabs";
 export const SETUP_PLUGIN_NAME = "omo";
 export const GIT_BASH_INSTALL_HINT = "winget install --id Git.Git -e --source winget";
 
-export type SetupRunCommand = (command: string, args: readonly string[], options: { cwd: string }) => Promise<unknown>;
-
 export interface WorkerSetupOptions {
 	readonly codexHome: string;
 	readonly env: Record<string, string | undefined>;
@@ -35,8 +31,6 @@ export interface WorkerSetupOptions {
 	readonly platform: NodeJS.Platform;
 	/** Timestamp used for bootstrap.log entries; the worker passes its run time. */
 	readonly now?: number;
-	/** Test seam: command runner for the win32 Git Bash auto-install. */
-	readonly runCommand?: SetupRunCommand;
 	/** Test seam: overrides Git Bash discovery (win32 only). */
 	readonly resolveGitBash?: () => GitBashResolution;
 }
@@ -68,10 +62,8 @@ async function resolveGitBashStep(options: WorkerSetupOptions, degraded: Bootstr
 	if (options.platform !== "win32") return false;
 	try {
 		const resolution = await prepareGitBashForInstall({
-			cwd: options.pluginRoot,
 			env: options.env,
 			platform: options.platform,
-			runCommand: options.runCommand ?? defaultRunCommand,
 			...(options.resolveGitBash === undefined ? {} : { resolveGitBash: options.resolveGitBash }),
 		});
 		if (resolution.found) return true;
@@ -211,10 +203,8 @@ async function linkComponentBinsStep(options: WorkerSetupOptions, degraded: Boot
 	await linkRuntimeWrapperStep(options, binDir, degraded);
 }
 
-// The marketplace payload intentionally ships without <pluginRoot>/dist/cli
-// (thin payload), so linkRootRuntimeBin returning null is the expected
-// degraded mode there: record the omo-cli ledger entry and log the same
-// warning install-local.mjs prints instead of leaving a broken `omo` link.
+// Older marketplace payloads may not have <pluginRoot>/dist/cli. Keep that
+// degraded path explicit instead of leaving a broken `omo` link.
 async function linkRuntimeWrapperStep(
 	options: WorkerSetupOptions,
 	binDir: string,
@@ -256,12 +246,6 @@ async function stampGitBashEnvStep(options: WorkerSetupOptions, degraded: Bootst
 			reason: `failed to stamp ${join(options.pluginRoot, ".mcp.json")}: ${errorMessage(error)}`,
 		});
 	}
-}
-
-const execFileAsync = promisify(execFile);
-
-async function defaultRunCommand(command: string, args: readonly string[], options: { cwd: string }): Promise<unknown> {
-	return execFileAsync(command, [...args], { cwd: options.cwd });
 }
 
 async function directoryNames(root: string): Promise<string[]> {

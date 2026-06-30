@@ -8,6 +8,8 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const sharedSkillsRoot = sharedSkillsRootPath();
 const skillsRoot = join(root, "skills");
 const sourceTestFilePattern = /\.test\.ts$/;
+const ignoredSkillSourceDirNames = new Set([".mypy_cache", ".omo", ".pytest_cache", ".ruff_cache", "__pycache__"]);
+const ignoredSkillSourceFileNames = new Set([".gitignore", ".npmignore", "pyrightconfig.json"]);
 const skillSources = [
 	["comment-checker", "components/comment-checker/skills/comment-checker"],
 	["lsp", "components/lsp/skills/lsp"],
@@ -18,6 +20,17 @@ const skillSources = [
 ];
 const componentSkillNames = new Set(skillSources.map(([name]) => name));
 const skillDisplayPrefix = "(OmO) ";
+
+function shouldCopySkillSource(source) {
+	const normalized = source.replaceAll("\\", "/");
+	const segments = normalized.split("/");
+	const name = segments.at(-1) ?? "";
+	if (segments.some((segment) => ignoredSkillSourceDirNames.has(segment))) return false;
+	if (ignoredSkillSourceFileNames.has(name)) return false;
+	if (sourceTestFilePattern.test(name) || name.endsWith(".pyc")) return false;
+	const scriptsIndex = segments.lastIndexOf("scripts");
+	return scriptsIndex === -1 || segments[scriptsIndex + 1] !== "tests";
+}
 
 const opencodeOnlyOrchestrationPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/;
 
@@ -37,12 +50,17 @@ This skill may include examples copied from the OpenCode harness. In Codex, do n
 
 Role-specific behavior must be described in a self-contained \`message\`. Use \`fork_context: false\` to start the child with only the initial prompt (no parent history); use \`fork_context: true\` only when full parent history is truly required. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's \`message\`. OMO installs these selectable agent roles into \`~/.codex/agents/\`: \`explorer\`, \`librarian\`, \`plan\`, \`momus\`, \`metis\`, \`lazycodex-code-reviewer\`, \`lazycodex-qa-executor\`, and \`lazycodex-gate-reviewer\` - pass the matching name as \`agent_type\` so the child gets that role's model and instructions. If the spawn tool exposes no \`agent_type\` parameter, omit it and describe the role inside \`message\`. If a code block below conflicts with this section, this section wins.
 
+On \`multi_agent_v2\` sessions the same \`agent_type\` applies (the OMO installer exposes it) with \`fork_turns\` instead of \`fork_context\`. If a code block below conflicts with this section, this section wins.
+
+When translating \`load_skills=[...]\`, include the requested skill names in the spawned agent's \`message\`. If a code block below conflicts with this section, this section wins.
+
 For work likely to exceed one wait cycle, require the child to send \`WORKING: <task> - <current phase>\` before long passes and \`BLOCKED: <reason>\` only when progress stops. A \`multi_agent_v1.wait_agent\` timeout only means no new mailbox update arrived. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly \`BLOCKED:\`, or no longer running.
 
 `;
 
 const codexCompatibilityEndMarkers = [
 	"For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A `multi_agent_v1.wait_agent` timeout only means no new mailbox update arrived. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running.\n\n",
+	"On `multi_agent_v2` sessions the same `agent_type` applies (the OMO installer exposes it) with `fork_turns` instead of `fork_context`. If a code block below conflicts with this section, this section wins.\n\n",
 	"Role-specific behavior must be described in a self-contained `message`. Use `fork_context: false` to start the child with only the initial prompt (no parent history); use `fork_context: true` only when full parent history is truly required. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
 	"When translating `load_skills=[...]`, include the requested skill names in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
 	"When translating `load_skills=[...]`, name the skills inside the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
@@ -219,7 +237,7 @@ async function syncSkills() {
 	for (const skillName of sharedSkillNames) {
 		if (componentSkillNames.has(skillName)) continue;
 		await cp(join(sharedSkillsRoot, skillName), join(skillsRoot, skillName), {
-			filter: (source) => !sourceTestFilePattern.test(source),
+			filter: shouldCopySkillSource,
 			recursive: true,
 		});
 		await adaptSkillForCodex(skillName);

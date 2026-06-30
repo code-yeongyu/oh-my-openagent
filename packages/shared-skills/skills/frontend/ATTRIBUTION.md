@@ -9,10 +9,12 @@ below. Modifications to the original files are noted where applicable.
 
 These third-party references are NOT committed to this repository. Each upstream is
 tracked as a pinned git submodule under `packages/shared-skills/upstreams/<name>`, and the
-build materializes the referenced files verbatim, path-mapped into this skill's
-`references/` tree, when packaging the published artifact. The `Pinned upstream commit`
-line in each section below records the exact submodule commit that the materialization
-reads.
+build materializes the referenced files path-mapped into this skill's `references/` tree,
+when packaging the published artifact. The file bodies are copied verbatim, except
+materialized `SKILL.md` frontmatter may normalize an unquoted single-line `description:`
+scalar into a JSON-quoted YAML string so Codex/OpenCode frontmatter parsing remains
+deterministic; the description text itself is unchanged. The `Pinned upstream commit` line
+in each section below records the exact submodule commit that the materialization reads.
 
 ---
 
@@ -63,11 +65,12 @@ The taste-skill files and image-generation skills under `frontend/references/des
 (`taste-skill.md`, `gpt-tasteskill.md`, `minimalist-skill.md`, `brutalist-skill.md`,
 `soft-skill.md`, `redesign-skill.md`, `image-to-code-skill.md`, `output-skill.md`,
 `stitch-skill.md`, `imagegen-frontend-web.md`, `imagegen-frontend-mobile.md`,
-`imagegen-brandkit.md`) are path-mapped verbatim copies of the per-skill `SKILL.md` files
-from the taste-skill project (each `skills/<name>/SKILL.md` is renamed to
+`imagegen-brandkit.md`) are path-mapped copies of the per-skill `SKILL.md` files from the
+taste-skill project (each `skills/<name>/SKILL.md` is renamed to
 `references/design/<name>.md`; `imagegen-brandkit.md` maps from `skills/brandkit/SKILL.md`).
 They are not committed here; the build materializes them from the pinned submodule under
-`packages/shared-skills/upstreams/taste-skill`.
+`packages/shared-skills/upstreams/taste-skill`. Only the allowed frontmatter description
+quoting normalization described above may alter these materialized `SKILL.md` files.
 
 - Source: https://github.com/Leonxlnx/taste-skill
 - Pinned upstream commit: 06d6028b5c623016c59ce8536f578e5a1127b499
@@ -143,13 +146,14 @@ SOFTWARE.
 ## 4. designpowers (Owl-Listener) — design operating-layer references
 
 The designpowers reference corpus under `frontend/references/designpowers/vendor/` is
-path-mapped verbatim from the designpowers project. It is not committed here; the build
+path-mapped from the designpowers project. It is not committed here; the build
 materializes the selected files from the pinned submodule under
 `packages/shared-skills/upstreams/designpowers`. The materialized set includes the
 upstream `LICENSE`, ten `agents/*.md` role-reference files, and selected
 `skills/*/SKILL.md` files. Bridge/state/router integration skills are intentionally
 excluded; see `frontend/references/designpowers/UPSTREAM.md` for the allowlist and
-exclusion list.
+exclusion list. Only the allowed frontmatter description quoting normalization described
+above may alter these materialized `SKILL.md` files.
 
 - Source: https://github.com/Owl-Listener/designpowers
 - Pinned upstream commit: cb00757da9d554591fa78d27aa1854d60a05c4f7

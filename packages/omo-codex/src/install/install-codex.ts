@@ -37,8 +37,6 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
   const gitBashResolution = await prepareGitBashForInstall({
     platform,
     env,
-    cwd: repoRoot,
-    runCommand,
     resolveGitBash: platform === "win32"
       ? (options.gitBashResolver ?? (() => resolveGitBashForCurrentProcess({ platform, env })))
       : undefined,
@@ -141,6 +139,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
       installed.map((plugin) =>
         trustedHookStatesForPlugin({
           marketplaceName: marketplace.name,
+          platform,
           pluginName: plugin.name,
           pluginRoot: plugin.path,
         }),

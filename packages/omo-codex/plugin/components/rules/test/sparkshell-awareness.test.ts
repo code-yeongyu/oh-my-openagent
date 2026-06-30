@@ -1,3 +1,5 @@
+// allow: SIZE_OK - rules sparkshell-awareness coverage validates one injected guidance contract; this release adds narrow prompt cases and future growth should split by guidance surface.
+
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -26,7 +28,8 @@ function normalizeGuidance(value: string): string {
 function expectSparkshellFirstContract(value: string): void {
 	const guidance = normalizeGuidance(value);
 
-	expect(guidance).toMatch(/`omo sparkshell <command>`[^.]*\bfirst\b/);
+	expect(value).toContain("`omo sparkshell <command> [args...]`");
+	expect(guidance).toMatch(/`omo sparkshell <command> \[args\.\.\.\]`[^.]*\bfirst\b/);
 	expect(guidance).toMatch(/\brepo inspection\b/);
 	expect(guidance).toMatch(/\bcli smoke tests\b/);
 	expect(guidance).toMatch(/\bgit\/history checks\b/);
@@ -34,11 +37,17 @@ function expectSparkshellFirstContract(value: string): void {
 	expect(guidance).toMatch(/\braw\b[^.]*`rg`\/`grep`\/`cat`\/`git`[^.]*\bfallbacks?\b/);
 	expect(guidance).toMatch(/\bsparkshell is unavailable\b/);
 	expect(guidance).toMatch(/\btoo narrow\b/);
+	expect(value).toContain("`omo sparkshell rg --files`");
+	expect(guidance).toMatch(/\bseparate argv tokens\b/);
+	expect(value).toContain("not `omo sparkshell 'rg --files'`");
+	expect(guidance).toMatch(/\bone executable name\b/);
 	expect(guidance).toMatch(/`omo sparkshell --shell '<command>'`[^.]*\bmetacharacters\b[^.]*\bpipelines\b/);
 	expect(guidance).toMatch(
 		/`omo sparkshell --tmux-pane <pane-id> --tail-lines 400`[^.]*\bonly\b[^.]*\binspect\b[^.]*\bexisting pane\b/,
 	);
-	expect(guidance).toMatch(/`omo sparkshell --tmux-pane <pane-id> --tail-lines 400`[^.]*\bnever\b[^.]*\blaunch ordinary commands\b/);
+	expect(guidance).toMatch(
+		/`omo sparkshell --tmux-pane <pane-id> --tail-lines 400`[^.]*\bnever\b[^.]*\blaunch ordinary commands\b/,
+	);
 	expect(guidance).not.toMatch(/\bprefer\b[^.]*\bbefore raw shell commands\b/);
 }
 

@@ -107,10 +107,10 @@ Critical path: Task 1 -> Task 2 -> Task 6
   - [ ] <verifiable condition with the exact command or assertion>
 
   QA scenarios (MANDATORY - task incomplete without these):
-  > Name the exact tool AND its exact invocation - not "verify it works". Browser use: use Chrome to drive the page; if Chrome is not available, download and use agent-browser (https://github.com/vercel-labs/agent-browser). Computer use: OS-level GUI automation for a non-browser desktop app.
+  > Name the exact tool AND its exact invocation - not "verify it works". Browser use: in Codex, use `browser:control-in-app-browser` first when available and no authenticated/persistent user browser profile is required; otherwise use Chrome to drive the page, or agent-browser (https://github.com/vercel-labs/agent-browser) when Chrome is unavailable. Computer use: OS-level GUI automation for a non-browser desktop app.
   ```
   Scenario: <happy path>
-    Tool:     <bash | curl | tmux | playwright(real Chrome) | agent-browser | computer-use>
+    Tool:     <bash | curl | tmux | browser:control-in-app-browser | playwright(real Chrome) | agent-browser | computer-use>
     Steps:    <exact command / API call / page action with concrete inputs - URL, payload, keystrokes, selectors>
     Expected: <concrete, binary pass/fail observable>
     Evidence: .omo/evidence/task-<N>-<slug>.<ext>

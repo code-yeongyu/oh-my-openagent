@@ -11,9 +11,12 @@ import {
   Zap,
   Route,
   HardDrive,
+  Globe,
+  Users,
+  FileImage,
 } from "lucide-react"
 
-export const SUB_AGENT_KEYS = ["oracle", "librarian", "explore", "metis", "momus"] as const
+export const SUB_AGENT_KEYS = ["oracle", "librarian", "explore", "metis", "momus", "atlas", "sisyphusJunior", "multimodalLooker"] as const
 export type SubAgentKey = (typeof SUB_AGENT_KEYS)[number]
 
 type AgentStyle = {
@@ -50,6 +53,19 @@ export const AGENT_STYLES: Readonly<Record<SubAgentKey, AgentStyle>> = {
     border: "border-zinc-800",
     bg: "bg-violet-400/5",
     icon: Check,
+  },
+  atlas: { color: "text-violet-300", border: "border-zinc-800", bg: "bg-violet-400/5", icon: Globe },
+  sisyphusJunior: {
+    color: "text-violet-300",
+    border: "border-zinc-800",
+    bg: "bg-violet-400/5",
+    icon: Users,
+  },
+  multimodalLooker: {
+    color: "text-violet-300",
+    border: "border-zinc-800",
+    bg: "bg-violet-400/5",
+    icon: FileImage,
   },
 }
 
@@ -88,7 +104,7 @@ export const CATEGORY_ROUTING = [
   { cat: "artistry", model: "Gemini 3.1 Pro" },
   { cat: "quick", model: "GPT 5.4 Mini" },
   { cat: "deep", model: "GPT 5.5 Medium" },
-  { cat: "writing", model: "Kimi K2.5" },
+  { cat: "writing", model: "Kimi K2.6" },
   { cat: "git", model: "Claude Haiku 4.5" },
 ] as const
 

@@ -4,6 +4,7 @@ import { checkSystem, gatherSystemInfo } from "./system"
 import { checkConfig } from "./config"
 import { checkTools, gatherToolsSummary } from "./tools"
 import { checkModels } from "./model-resolution"
+import { checkTelemetry } from "./telemetry"
 import { checkTeamMode } from "./team-mode"
 import { checkTuiPluginConfig } from "./tui-plugin-config"
 import { checkCodex, gatherCodexSummary } from "./codex"
@@ -42,6 +43,11 @@ export function getAllCheckDefinitions(): CheckDefinition[] {
       id: CHECK_IDS.MODELS,
       name: CHECK_NAMES[CHECK_IDS.MODELS],
       check: checkModels,
+    },
+    {
+      id: CHECK_IDS.TELEMETRY,
+      name: CHECK_NAMES[CHECK_IDS.TELEMETRY],
+      check: checkTelemetry,
     },
     {
       id: CHECK_IDS.TEAM_MODE,

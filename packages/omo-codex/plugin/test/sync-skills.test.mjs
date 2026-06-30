@@ -112,10 +112,22 @@ test("#given shared skill source tests #when aggregate Codex skills are synced #
 	const aggregateSkillsRoot = join(root, "skills");
 
 	// when
-	const visualQaFiles = await listSkillFiles(join(aggregateSkillsRoot, "visual-qa"));
+	const forbiddenFiles = [];
+	for (const skillName of expectedSkills) {
+		for (const file of await listSkillFiles(join(aggregateSkillsRoot, skillName))) {
+			const normalized = file.replaceAll("\\", "/");
+			const segments = normalized.split("/");
+			const scriptsIndex = segments.lastIndexOf("scripts");
+			const hasPythonTestDir = scriptsIndex !== -1 && segments[scriptsIndex + 1] === "tests";
+			const isSourceMetadata = normalized === ".gitignore" || normalized === ".npmignore" || normalized === "pyrightconfig.json";
+			if (normalized.endsWith(".test.ts") || hasPythonTestDir || segments.includes("__pycache__") || normalized.endsWith(".pyc") || isSourceMetadata) {
+				forbiddenFiles.push(`${skillName}/${normalized}`);
+			}
+		}
+	}
 
 	// then
-	assert.equal(visualQaFiles.some((file) => file.endsWith(".test.ts")), false);
+	assert.deepEqual(forbiddenFiles, []);
 });
 
 test("#given component skill sources #when aggregate Codex component skills are inspected #then generated copies have no hand-authored drift", async () => {
@@ -167,6 +179,20 @@ test("#given synced ulw-loop skill #when Codex hint metadata is inspected #then 
 	// then
 	assert.match(interfaceMetadata, /search_terms:/);
 	assert.match(interfaceMetadata, /- "ulw-loop"/);
+});
+
+test("#given synced legacy ultraresearch alias #when inspected #then it points users at ulw-research", async () => {
+	// given
+	const skillRoot = join(root, "skills", "ultraresearch");
+
+	// when
+	const skill = await readFile(join(skillRoot, "SKILL.md"), "utf8");
+	const interfaceMetadata = await readFile(join(skillRoot, "agents", "openai.yaml"), "utf8");
+
+	// then
+	assert.match(skill, /^---\r?\nname: ultraresearch\r?\n/m);
+	assert.match(skill, /legacy name for `ulw-research`/);
+	assert.match(interfaceMetadata, /display_name: "\(OmO\) ultraresearch"/);
 });
 
 test("#given synced git-master skill #when inspected #then commits and git history route through it", async () => {

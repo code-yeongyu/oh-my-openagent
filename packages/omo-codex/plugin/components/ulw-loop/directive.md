@@ -52,8 +52,10 @@ exercises the surface; capture the artifact.
   2. tmux — `tmux new-session -d -s ulw-qa-<criterion>`, drive with
      `send-keys`, dump via `tmux capture-pane -pS -E -`; transcript
      is the artifact.
-  3. Browser use — use Chrome to drive the REAL page; if Chrome is
-     not available, download and use agent-browser
+  3. Browser use — in Codex, use `browser:control-in-app-browser`
+     first when available and no authenticated/persistent user browser
+     profile is required. Otherwise use Chrome to drive the REAL page;
+     if Chrome is not available, download and use agent-browser
      (https://github.com/vercel-labs/agent-browser). Capture action
      log + screenshot path. Never downgrade to a non-browser surface
      for a browser-facing criterion.
@@ -68,7 +70,8 @@ upfront: the literal command / API call / page action with its concrete
 inputs (URL, payload, keystrokes, selectors) and the single binary
 observable that decides PASS vs FAIL. "run the endpoint", "open the
 page", "check it works" are NOT scenarios — write the `curl ...`, the
-`send-keys ...`, the `page.click(...)`, the expected status/text.
+`send-keys ...`, the Browser plugin action, the `page.click(...)`, the
+expected status/text.
 
 Auxiliary surfaces (CLI stdout / DB state diff / parsed config dump)
 are first-class evidence for CLI- or data-shaped criteria; use a
@@ -77,11 +80,12 @@ printing the command, "should respond", and "looks correct" never
 count.
 
 For TUI visual QA, terminal transcripts alone are not enough when a
-visual surface is being evaluated. Capture the pane and render it with
+visual surface is being evaluated. In this repo, prefer
 `node script/qa/web-terminal-visual-qa.mjs --title "<surface>" --from-file <capture.txt> --evidence-dir <dir>`
-or use the helper's `--command` tmux-backed PTY connector when tmux is
-available. The evidence must include `terminal.png`, `terminal.txt`,
-`terminal.html`, and `metadata.json` with the cleanup receipt.
+or the helper's `--command` tmux-backed PTY connector when available.
+Outside this repo, capture equivalent browser/computer-use rendered
+terminal evidence: screenshot, plain transcript, rendered HTML or action
+log, and cleanup receipt.
 
 # Bootstrap (DO ALL FOUR BEFORE ANY OTHER WORK — NO SKIPPING)
 
@@ -185,11 +189,16 @@ serialize only when one output strictly feeds the next.
   inactive/uninitialized, or cold-start unavailable, keep moving with
   Read/Grep/Glob/LSP and the ast-grep skill.
 - Repo-wide inspection, CLI smoke tests, git/history, bounded command
-  output → use `omo sparkshell <command>` first. Raw
+  output → use `omo sparkshell <command> [args...]` first. Pass ordinary
+  commands as executable and arguments in separate argv tokens, for
+  example `omo sparkshell rg --files`; not `omo sparkshell 'rg --files'`,
+  because the quoted string is treated as one executable name. Raw
   `rg`/`grep`/`cat`/`git` are fallbacks when Sparkshell is unavailable
-  or too narrow. `--shell` is only for shell metacharacters or
-  pipelines; `--tmux-pane` is only for inspecting an existing pane,
-  never for launching ordinary commands. Sparkshell is your default lens.
+  or too narrow. `--shell` is only for shell syntax such as
+  metacharacters, pipelines, redirects, command substitution, or
+  variable expansion; `--tmux-pane` is only for inspecting an existing
+  pane, never for launching ordinary commands. Sparkshell is your
+  default lens.
 - Symbols — definitions, references, rename impact, diagnostics →
   `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`,
   `lsp_diagnostics`. Use the LSP, not text search, for anything

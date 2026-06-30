@@ -1,3 +1,5 @@
+// allow: SIZE_OK - bin link installer tests share one cross-platform link fixture; this release adds narrow link cases and future additions should split by platform family.
+
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { chmod, lstat, mkdir, readFile, readlink, symlink, writeFile } from "node:fs/promises";
@@ -154,7 +156,10 @@ test("#given Windows platform #when linking cached plugin bins #then writes comm
 	assert.deepEqual(linked, [{ name: "alpha", path: join(binDir, "alpha.cmd"), target: join(pluginRoot, "dist", "cli.js") }]);
 	const shim = await readFile(join(binDir, "alpha.cmd"), "utf8");
 	assert.match(shim, /@echo off/);
-	assert.match(shim, new RegExp(`node "${join(pluginRoot, "dist", "cli.js").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" %\\*`));
+	assert.match(shim, /NODE_REPL_NODE_PATH/);
+	assert.match(shim, /"%OMO_NODE_BINARY%"/);
+	assert.match(shim, new RegExp(`"${join(pluginRoot, "dist", "cli.js").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" %\\*`));
+	assert.doesNotMatch(shim, new RegExp(`node "${join(pluginRoot, "dist", "cli.js").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" %\\*`));
 });
 
 test("#given existing custom Windows command shim #when linking bins #then rejects without overwriting", async () => {

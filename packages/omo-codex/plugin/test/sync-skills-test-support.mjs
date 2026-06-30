@@ -6,6 +6,7 @@ export const CONTEXT_PRESSURE_SKILL_BUDGET_BYTES = 25_000;
 
 export const expectedSkills = [
 	"ast-grep",
+	"coding-agent-sessions",
 	"comment-checker",
 	"debugging",
 	"frontend",
@@ -24,6 +25,7 @@ export const expectedSkills = [
 	"start-work",
 	"teammode",
 	"ultimate-browsing",
+	"ultraresearch",
 	"ulw-loop",
 	"ulw-plan",
 	"ulw-research",
@@ -41,6 +43,7 @@ export const componentSkillSources = [
 
 const codexCompatibilityEndMarkers = [
 	"For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A `multi_agent_v1.wait_agent` timeout only means no new mailbox update arrived. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running.\n\n",
+	"On `multi_agent_v2` sessions the same `agent_type` applies (the OMO installer exposes it) with `fork_turns` instead of `fork_context`. If a code block below conflicts with this section, this section wins.\n\n",
 	"Role-specific behavior must be described in a self-contained `message`. Use `fork_context: false` to start the child with only the initial prompt (no parent history); use `fork_context: true` only when full parent history is truly required. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
 	"When translating `load_skills=[...]`, include the requested skill names in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
 	"When translating `load_skills=[...]`, name the skills inside the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",

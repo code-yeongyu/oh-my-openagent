@@ -1,6 +1,8 @@
 /// <reference path="../../../../bun-test.d.ts" />
 /// <reference types="bun-types" />
 
+// allow: SIZE_OK - cache install tests share one managed Codex cache fixture; this release adds narrow context cleanup coverage and future additions should split by cache operation.
+
 import { describe, expect, test } from "bun:test"
 import { realpathSync } from "node:fs"
 import { mkdir, mkdtemp, readdir, readFile, readlink, rename, stat, symlink, writeFile } from "node:fs/promises"
@@ -447,7 +449,10 @@ describe("codex-cache", () => {
     expect(linked).toEqual([{ name: "omo-hook", path: join(binDir, "omo-hook.cmd"), target: join(pluginRoot, "dist", "cli.js") }])
     const commandShim = await readFile(join(binDir, "omo-hook.cmd"), "utf8")
     expect(commandShim).toContain("@echo off")
-    expect(commandShim).toContain(`node "${join(pluginRoot, "dist", "cli.js")}" %*`)
+    expect(commandShim).toContain("NODE_REPL_NODE_PATH")
+    expect(commandShim).toContain('"%OMO_NODE_BINARY%" "')
+    expect(commandShim).toContain(`"${join(pluginRoot, "dist", "cli.js")}" %*`)
+    expect(commandShim).not.toContain(`node "${join(pluginRoot, "dist", "cli.js")}" %*`)
   })
 
   test("rejects existing non-generated Windows command shims", async () => {

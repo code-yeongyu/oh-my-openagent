@@ -6,6 +6,7 @@ import {
   CODEGRAPH_NO_DOWNLOAD_ENV,
   CODEGRAPH_TELEMETRY_ENV,
   DO_NOT_TRACK_ENV,
+  buildCodegraphChildEnv,
   buildCodegraphEnv,
 } from "./codegraph/env"
 
@@ -25,5 +26,39 @@ describe("buildCodegraphEnv", () => {
       [DO_NOT_TRACK_ENV]: "1",
     })
     expect("CODEGRAPH_DIR" in result).toBe(false)
+  })
+
+  it("builds a child process env without ambient provider tokens", () => {
+    // given
+    const result = buildCodegraphChildEnv({
+      ambientEnv: {
+        ANTHROPIC_API_KEY: "anthropic-secret",
+        GITHUB_TOKEN: "github-secret",
+        HOME: "/Users/alice",
+        OPENAI_API_KEY: "openai-secret",
+        PATH: "/usr/local/bin:/usr/bin",
+      },
+      codegraphEnv: {
+        CODEGRAPH_INSTALL_DIR: "/Users/alice/.omo/codegraph",
+        CODEGRAPH_NO_DOWNLOAD: "1",
+      },
+      runtimeEnv: {
+        CODEGRAPH_FAKE_LOG: "/tmp/codegraph.log",
+        SLACK_BOT_TOKEN: "slack-secret",
+      },
+    })
+
+    // then
+    expect(result).toEqual({
+      CODEGRAPH_FAKE_LOG: "/tmp/codegraph.log",
+      CODEGRAPH_INSTALL_DIR: "/Users/alice/.omo/codegraph",
+      CODEGRAPH_NO_DOWNLOAD: "1",
+      HOME: "/Users/alice",
+      PATH: "/usr/local/bin:/usr/bin",
+    })
+    expect(result.OPENAI_API_KEY).toBeUndefined()
+    expect(result.ANTHROPIC_API_KEY).toBeUndefined()
+    expect(result.GITHUB_TOKEN).toBeUndefined()
+    expect(result.SLACK_BOT_TOKEN).toBeUndefined()
   })
 })

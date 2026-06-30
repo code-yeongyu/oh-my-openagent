@@ -167,11 +167,11 @@ The recommended `bunx`/`npx` invocation is `oh-my-openagent install` (or the ori
 
 ### Telemetry
 
-Anonymous telemetry is enabled by default to track active installations (DAU/WAU/MAU). For both products, a single event is sent **at most once per UTC day per machine** using a SHA256-hashed installation identifier (never the raw hostname), and PostHog person profiles are not created. The main plugin emits `oh_my_openagent_daily_active`; the Codex CLI Light edition emits `omo_codex_daily_active` from two sources (`install_completed` and `session_start`).
+Anonymous telemetry is enabled by default to track active installations (DAU/WAU/MAU). For both products, a single event is sent **at most once per UTC day per machine** using a SHA256-hashed installation identifier (never the raw hostname), and PostHog person profiles are not created. The main plugin emits `omo_daily_active` from plugin load (`plugin_loaded`) and CLI run (`run_started`) sources; the Codex CLI Light edition emits `omo_codex_daily_active` from two sources (`install_completed` and `session_start`).
 
 Opt out per product:
 
-- Main plugin: `OMO_DISABLE_POSTHOG=1` or `OMO_SEND_ANONYMOUS_TELEMETRY=0`
+- Main plugin: set `"telemetry": false` in oh-my-openagent config, `OMO_DISABLE_POSTHOG=1`, or `OMO_SEND_ANONYMOUS_TELEMETRY=0`
 - Codex CLI Light edition: `OMO_CODEX_DISABLE_POSTHOG=1` or `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` (the global flags also disable Codex)
 
 See [Privacy Policy](docs/legal/privacy-policy.md) and [Terms of Service](docs/legal/terms-of-service.md).

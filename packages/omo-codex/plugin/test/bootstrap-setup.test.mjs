@@ -205,21 +205,15 @@ test("#given an unwritable config.toml #when the worker setup runs #then it degr
 	});
 });
 
-test("#given win32 without Git Bash and auto-install skipped #when the worker setup runs #then it degrades instead of throwing and disables the git_bash MCP", async () => {
+test("#given win32 without Git Bash #when the worker setup runs #then it degrades instead of throwing and disables the git_bash MCP", async () => {
 	await withSetupFixture(async (fixture) => {
-		const commands = [];
 		const outcome = await runWorkerSetup(
 			setupOptions(fixture, {
-				env: { OMO_CODEX_SKIP_GIT_BASH_AUTO_INSTALL: "1" },
 				platform: "win32",
 				resolveGitBash: () => ({ checkedPaths: [], found: false, installHint: "install git bash" }),
-				runCommand: async (command, args) => {
-					commands.push([command, ...args]);
-				},
 			}),
 		);
 
-		assert.deepEqual(commands, []);
 		const gitBashEntries = outcome.degraded.filter((entry) => entry.component === "git-bash");
 		assert.equal(gitBashEntries.length, 1);
 		const config = await readConfig(fixture);

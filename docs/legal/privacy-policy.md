@@ -16,7 +16,7 @@ We collect limited non-personal information needed to operate and improve the Se
 
 When anonymous telemetry is enabled, the Application may collect a single anonymous usage event:
 
-- `omo_daily_active`, sent at most once per UTC day per machine when the plugin loads or when the `run` CLI is invoked, used to estimate daily, weekly, and monthly active installations
+- `omo_daily_active`, sent at most once per UTC day per machine when the plugin loads (`reason: "plugin_loaded"`) or when the `run` CLI is invoked (`reason: "run_started"`), used to estimate daily, weekly, and monthly active installations
 - `omo_codex_daily_active`, sent at most once per UTC day per machine when the `omo-codex` adapter is installed (`reason: "install_completed"`) or when its Codex plugin runtime fires on a Codex `SessionStart` hook (`reason: "session_start"`), with the same opt-out posture as `omo_daily_active`
 - Anonymous machine metadata bundled with that event, such as package version, plugin name, runtime, OS family, locale, and timezone
 - A pseudonymous installation identifier derived from a one-way hash of the local hostname
@@ -46,6 +46,8 @@ export OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0
 Global flags (`OMO_DISABLE_POSTHOG`, `OMO_SEND_ANONYMOUS_TELEMETRY`) suppress telemetry for both oh-my-openagent/oh-my-opencode and omo-codex.
 
 When telemetry is disabled, PostHog events are not sent.
+
+For the OpenCode plugin, telemetry can also be disabled in the oh-my-openagent config with `"telemetry": false`.
 
 ## 3. Third-Party Services
 

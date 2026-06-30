@@ -1,5 +1,7 @@
 /// <reference types="bun-types" />
 
+// allow: SIZE_OK - marketplace sync tests exercise one release payload fixture tree; this release adds narrow assertions and future additions should split by payload section.
+
 import { describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -115,6 +117,10 @@ async function writePluginFixture(sourceRoot: string, options: WritePluginFixtur
   await writeFile(join(sourceRoot, "packages", "lsp-tools-mcp", "dist", "cli.js"), "#!/usr/bin/env node\n")
   await mkdir(join(sourceRoot, "packages", "lsp-daemon", "dist"), { recursive: true })
   await writeFile(join(sourceRoot, "packages", "lsp-daemon", "dist", "cli.js"), "#!/usr/bin/env node\n")
+  await mkdir(join(sourceRoot, "dist", "cli"), { recursive: true })
+  await writeFile(join(sourceRoot, "dist", "cli", "index.js"), "#!/usr/bin/env node\n")
+  await mkdir(join(sourceRoot, "dist", "cli-node"), { recursive: true })
+  await writeFile(join(sourceRoot, "dist", "cli-node", "index.js"), "#!/usr/bin/env node\n")
   await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", "node_modules", "ignored"), { recursive: true })
   await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "node_modules", "ignored", "file.txt"), "ignored\n")
   await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", ".ulw", "evidence"), { recursive: true })
@@ -317,6 +323,8 @@ describe("sync-lazycodex-marketplace", () => {
     const lazycodexRoot = await mkdtemp(join(tmpdir(), "omo-sync-prev-lazycodex-"))
     await writePluginFixture(sourceRoot)
     await rm(join(sourceRoot, "packages", "lsp-daemon", "dist"), { recursive: true, force: true })
+    await rm(join(sourceRoot, "dist", "cli"), { recursive: true, force: true })
+    await rm(join(sourceRoot, "dist", "cli-node"), { recursive: true, force: true })
     await writeJson(join(sourceRoot, "packages", "omo-codex", "plugin", ".mcp.json"), {
       mcpServers: {
         git_bash: { command: "node", args: ["../../git-bash-mcp/dist/cli.js", "mcp"], cwd: "." },
@@ -334,6 +342,8 @@ describe("sync-lazycodex-marketplace", () => {
       daemonDistMissing = error instanceof Error
     }
     expect(daemonDistMissing).toBe(true)
+    await expectPathMissing(join(lazycodexRoot, "plugins", "omo", "dist", "cli", "index.js"))
+    await expectPathMissing(join(lazycodexRoot, "plugins", "omo", "dist", "cli-node", "index.js"))
     expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "lsp-tools-mcp", "dist", "cli.js"))).isFile()).toBe(true)
   })
 

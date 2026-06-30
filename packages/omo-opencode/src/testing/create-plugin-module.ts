@@ -31,6 +31,7 @@ import { log } from "../shared/logger"
 import { logLegacyPluginStartupWarning } from "../shared/log-legacy-plugin-startup-warning"
 import { migrateLegacyWorkspaceDirectory } from "../shared/legacy-workspace-migration"
 import { injectServerAuthIntoClient } from "../shared/opencode-server-auth"
+import { recordPluginTelemetry } from "../shared/posthog"
 import {
   initLiveServerRoute,
   setLiveParentWakeRoutingDisabled,
@@ -59,6 +60,7 @@ export type PluginModuleDeps = {
   setLiveParentWakeRoutingDisabled: typeof setLiveParentWakeRoutingDisabled
   warmLiveServerProbe: typeof warmLiveServerProbe
   loadPluginConfig: typeof loadPluginConfig
+  recordPluginTelemetry: typeof recordPluginTelemetry
   initI18n: typeof initI18n
   initializeOpenClaw: typeof initializeOpenClaw
   isTmuxIntegrationEnabled: typeof isTmuxIntegrationEnabled
@@ -89,6 +91,7 @@ const defaultPluginModuleDeps: PluginModuleDeps = {
   setLiveParentWakeRoutingDisabled,
   warmLiveServerProbe,
   loadPluginConfig,
+  recordPluginTelemetry,
   initI18n,
   initializeOpenClaw,
   isTmuxIntegrationEnabled,
@@ -128,6 +131,13 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     deps.injectServerAuthIntoClient(input.client)
 
     const pluginConfig = deps.loadPluginConfig(input.directory, input)
+    try {
+      deps.recordPluginTelemetry({ configEnabled: pluginConfig.telemetry })
+    } catch (error) {
+      deps.log("[posthog] plugin telemetry failed", {
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
     if (pluginConfig.tui?.sidebar?.enabled !== false) {
       try {
         ensureTuiPluginEntry()
