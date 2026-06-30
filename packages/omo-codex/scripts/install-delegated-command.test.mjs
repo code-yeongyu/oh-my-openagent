@@ -76,12 +76,51 @@ test("#given a dry-run doctor #when delegating #then routes to the Codex LazyCod
 	assert.equal(ran, false);
 	assert.match(logged, /^codex exec /);
 	assert.match(logged, /--sandbox danger-full-access/);
+	assert.doesNotMatch(logged, /--model/);
+	assert.doesNotMatch(logged, /gpt-5\.5-codex-mini/);
 	assert.doesNotMatch(logged, /--sandbox read-only/);
 	assert.match(logged, /Use \$omo:lcx-doctor/);
 	assert.match(logged, /LAZYCODEX_SOURCE_ROOT/);
 	assert.match(logged, /\$\{TMPDIR:-\/tmp\}\/lazycodex-sources/);
 	assert.match(logged, /Requested doctor arguments: --json/);
 	assert.doesNotMatch(logged, /oh-my-openagent omo doctor/);
+});
+
+test("#given doctor without model override #when delegating #then uses the configured Codex default model", async () => {
+	// given
+	const parsed = { kind: "command", command: "doctor", args: ["--json"] };
+
+	// when
+	const invocation = buildDelegatedOmoInvocation(parsed);
+
+	// then
+	assert.equal(invocation.command, "codex");
+	assert.equal(invocation.args.includes("--model"), false);
+	assert.equal(invocation.args.some((arg) => arg.includes("gpt-5.5-codex-mini")), false);
+});
+
+test("#given explicit doctor model override #when delegating #then passes only that model to Codex exec", async () => {
+	// given
+	const parsed = { kind: "command", command: "doctor", args: ["--model", "gpt-5.5", "--json"] };
+
+	// when
+	const invocation = buildDelegatedOmoInvocation(parsed);
+
+	// then
+	assert.equal(invocation.command, "codex");
+	assert.deepEqual(invocation.args.slice(0, 9), [
+		"exec",
+		"--ephemeral",
+		"--sandbox",
+		"danger-full-access",
+		"--skip-git-repo-check",
+		"--cd",
+		".",
+		"--model",
+		"gpt-5.5",
+	]);
+	assert.match(invocation.args.at(-1), /Requested doctor arguments: --json/);
+	assert.doesNotMatch(invocation.args.at(-1), /--model/);
 });
 
 test("#given doctor source-root override #when delegating #then passes it to the Codex workflow environment", async () => {

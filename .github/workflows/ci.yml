@@ -256,7 +256,11 @@ jobs:
 
           npx_doctor_output=$(npx -y lazycodex-ai@latest --dry-run doctor)
           echo "$npx_doctor_output"
-          if [ "$npx_doctor_output" != "npx --yes --package oh-my-openagent omo doctor" ]; then
+          if [[ "$npx_doctor_output" != codex\ exec\ * ]] ||
+             [[ "$npx_doctor_output" != *"--sandbox danger-full-access"* ]] ||
+             [[ "$npx_doctor_output" != *'Use $omo:lcx-doctor'* ]] ||
+             [[ "$npx_doctor_output" == *"--model"* ]] ||
+             [[ "$npx_doctor_output" == *"gpt-5.5-codex-mini"* ]]; then
             echo "::warning::lazycodex-ai doctor dry-run output changed: $npx_doctor_output"
           fi
 

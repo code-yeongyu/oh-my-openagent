@@ -265,6 +265,34 @@ describe("codex-cache", () => {
     expect((await stat(join(installed.path, "components", "rules", "dist", "cli.js"))).isFile()).toBe(true)
   })
 
+  test("#given packaged root CLI runtimes #when caching omo plugin #then root dist is materialized into the plugin cache", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-root-runtime-"))
+    const repoRoot = join(root, "repo")
+    const codexHome = join(root, "codex-home")
+    const sourceRoot = join(repoRoot, "packages", "omo-codex", "plugin")
+    await mkdir(sourceRoot, { recursive: true })
+    await mkdir(join(repoRoot, "dist", "cli"), { recursive: true })
+    await mkdir(join(repoRoot, "dist", "cli-node"), { recursive: true })
+    await writeFile(join(sourceRoot, "package.json"), JSON.stringify({ name: "@scope/omo", version: "0.1.0" }))
+    await writeFile(join(repoRoot, "dist", "cli", "index.js"), "console.log('omo')\n")
+    await writeFile(join(repoRoot, "dist", "cli-node", "index.js"), "console.log('omo node')\n")
+
+    // when
+    const installed = await installCachedPlugin({
+      codexHome,
+      marketplaceName: "sisyphuslabs",
+      name: "omo",
+      sourcePath: sourceRoot,
+      version: "0.1.0",
+      runCommand: async () => undefined,
+    })
+
+    // then
+    expect(await readFile(join(installed.path, "dist", "cli", "index.js"), "utf8")).toBe("console.log('omo')\n")
+    expect(await readFile(join(installed.path, "dist", "cli-node", "index.js"), "utf8")).toBe("console.log('omo node')\n")
+  })
+
   test("links cached plugin bins and stays idempotent", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-"))
