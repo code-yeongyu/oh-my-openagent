@@ -368,7 +368,7 @@ grep -A2 'omo@sisyphuslabs' ~/.codex/config.toml
 grep -E 'approval_policy|sandbox_mode|network_access' ~/.codex/config.toml
 
 # Component binaries linked?
-ls ~/.local/bin/ | grep -E '^(omo|omo-(comment-checker|git-bash-hook|lsp|rules|start-work-continuation|telemetry|ultrawork|ulw-loop))$'
+ls ~/.local/bin/ | grep -E '^(omo|ulw|ulw-loop|omo-(comment-checker|git-bash-hook|lsp|rules|start-work-continuation|telemetry|ultrawork|ulw-loop))$'
 
 # Codex CLI sees the plugin?
 codex --help
@@ -713,7 +713,7 @@ Skip this section if `--platform=opencode`. Otherwise, the user installed the **
 
 - **Plugin cache:** `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`
 - **Codex marketplace snapshot:** `~/.codex/.tmp/marketplaces/sisyphuslabs/` (local marketplace metadata and bundled source snapshot)
-- **Component binaries:** `lazycodex-executor-verify`, `omo-comment-checker`, `omo-git-bash-hook`, `omo-lsp`, `omo-rules`, `omo-start-work-continuation`, `omo-telemetry`, `omo-ulw-loop`, `omo-ultrawork` in `~/.local/bin` (or under `$CODEX_LOCAL_BIN_DIR` if set). The top-level `omo` command belongs to the shared oh-my-openagent launcher, not a Codex component.
+- **Component binaries:** `lazycodex-executor-verify`, `omo-comment-checker`, `omo-git-bash-hook`, `omo-lsp`, `omo-rules`, `omo-start-work-continuation`, `omo-telemetry`, `omo-ulw-loop`, `omo-ultrawork`, `ulw`, and `ulw-loop` in `~/.local/bin` (or under `$CODEX_LOCAL_BIN_DIR` if set). The top-level `omo` command belongs to the shared oh-my-openagent launcher, not a Codex component.
 - **Codex agent roles:** `~/.codex/agents/{lazycodex-clone-fidelity-reviewer,lazycodex-code-reviewer,lazycodex-executor,lazycodex-gate-reviewer,lazycodex-qa-executor,explorer,librarian,metis,momus,plan}.toml` copied from the bundled plugin snapshot, so they keep resolving when Codex prunes old plugin-cache versions or temporary marketplace state
 - **Codex config edits:** `~/.codex/config.toml` gained `[features] plugins = true`, `[features] plugin_hooks = true`, `[features.multi_agent_v2] max_concurrent_threads_per_session = 1000`, `[marketplaces.sisyphuslabs]` pointing at `~/.codex/plugins/cache/sisyphuslabs`, `[plugins."omo@sisyphuslabs"]`, plugin MCP policy blocks, SHA256-pinned `[hooks.state."omo@sisyphuslabs:..."]` entries, and optionally autonomous permission settings if accepted. If the installer cannot resolve a CodeGraph-compatible Node runtime, it writes the `codegraph` MCP policy as disabled while leaving `omo@sisyphuslabs` enabled.
 
