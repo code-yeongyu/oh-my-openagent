@@ -19,7 +19,7 @@ export function isOpenAiOnlyAvailability(availability: ProviderAvailability): bo
     !availability.native.gemini &&
     !availability.opencodeGo &&
     !availability.opencodeZen &&
-    !availability.copilot &&
+    availability.copilot === "no" &&
     !availability.zai &&
     !availability.kimiForCoding &&
     !availability.bailianCodingPlan &&

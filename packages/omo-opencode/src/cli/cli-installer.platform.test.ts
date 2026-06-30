@@ -48,7 +48,7 @@ function stubOpenCodeSuccess(): void {
     isMax20: false,
     hasOpenAI: false,
     hasGemini: false,
-    hasCopilot: false,
+    copilotTier: "no",
     hasCodex: false,
     hasOpencodeZen: false,
     hasZaiCodingPlan: false,

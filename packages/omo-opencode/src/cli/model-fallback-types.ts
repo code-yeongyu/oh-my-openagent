@@ -1,4 +1,5 @@
 import type { FallbackModelObject } from "../config/schema/fallback-models"
+import type { CopilotSubscription } from "./types"
 
 export interface ProviderAvailability {
 	native: {
@@ -7,7 +8,7 @@ export interface ProviderAvailability {
 		gemini: boolean
 	}
 	opencodeZen: boolean
-	copilot: boolean
+	copilot: CopilotSubscription
 	zai: boolean
 	kimiForCoding: boolean
 	opencodeGo: boolean

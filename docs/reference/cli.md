@@ -61,7 +61,7 @@ bunx oh-my-openagent install
 | `--claude <value>` | Claude subscription: `no`, `yes`, `max20` (Ultimate only) |
 | `--openai <value>` | OpenAI/ChatGPT subscription: `no`, `yes` (Ultimate only) |
 | `--gemini <value>` | Gemini integration: `no`, `yes` (Ultimate only) |
-| `--copilot <value>` | GitHub Copilot subscription: `no`, `yes` (Ultimate only) |
+| `--copilot <value>` | GitHub Copilot subscription tier: `no`, `student`, `pro`, `pro-plus` (Ultimate only). Each tier filters available models: `student` blocks Claude Opus/Sonnet and GPT-5.4/5.5; `pro` blocks Claude Opus, GPT-5.5, and GPT-5.4 nano; `pro-plus` has full access. |
 | `--opencode-zen <value>` | OpenCode Zen access: `no`, `yes` (Ultimate only) |
 | `--zai-coding-plan <value>` | Z.ai Coding Plan subscription: `no`, `yes` (Ultimate only) |
 | `--kimi-for-coding <value>` | Kimi For Coding subscription: `no`, `yes` (Ultimate only) |

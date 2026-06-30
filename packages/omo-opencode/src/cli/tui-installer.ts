@@ -37,7 +37,7 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
         isMax20: false,
         hasOpenAI: false,
         hasGemini: false,
-        hasCopilot: false,
+        copilotTier: "no" as const,
         hasCodex: false,
         hasOpencodeZen: false,
         hasZaiCodingPlan: false,
@@ -176,11 +176,11 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
 
   p.outro(color.green("oMoMoMoMo... Enjoy!"))
 
-  if (config.hasOpenCode && (config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
+  if (config.hasOpenCode && (config.hasClaude || config.hasGemini || config.copilotTier !== "no") && !args.skipAuth) {
     const providers: string[] = []
     if (config.hasClaude) providers.push(`Anthropic ${color.gray("→ Claude Pro/Max")}`)
     if (config.hasGemini) providers.push(`Google ${color.gray("→ Gemini")}`)
-    if (config.hasCopilot) providers.push(`GitHub ${color.gray("→ Copilot")}`)
+    if (config.copilotTier !== "no") providers.push(`GitHub ${color.gray("→ Copilot")}`)
 
     console.log()
     console.log(color.bold("Authenticate Your Providers"))

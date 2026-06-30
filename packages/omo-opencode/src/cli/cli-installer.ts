@@ -40,7 +40,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     }
     console.log()
     printInfo(
-      `Usage: bunx ${PUBLISHED_PACKAGE_NAME} install --no-tui --claude=<no|yes|max20> --gemini=<no|yes> --copilot=<no|yes>`,
+      `Usage: bunx ${PUBLISHED_PACKAGE_NAME} install --no-tui --claude=<no|yes|max20> --gemini=<no|yes> --copilot=<no|student|pro|pro-plus>`,
     )
     console.log()
     return 1
@@ -57,7 +57,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
         isMax20: false,
         hasOpenAI: false,
         hasGemini: false,
-        hasCopilot: false,
+        copilotTier: "no" as const,
         hasCodex: false,
         hasOpencodeZen: false,
         hasZaiCodingPlan: false,
@@ -181,12 +181,12 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   console.log(color.dim("oMoMoMoMo... Enjoy!"))
   console.log()
 
-  if (hasOpenCode && (config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
+  if (hasOpenCode && (config.hasClaude || config.hasGemini || config.copilotTier !== "no") && !args.skipAuth) {
     printBox(
       `Run ${color.cyan("opencode auth login")} and select your provider:\n` +
         (config.hasClaude ? `  ${SYMBOLS.bullet} Anthropic ${color.gray("→ Claude Pro/Max")}\n` : "") +
         (config.hasGemini ? `  ${SYMBOLS.bullet} Google ${color.gray("→ Gemini")}\n` : "") +
-        (config.hasCopilot ? `  ${SYMBOLS.bullet} GitHub ${color.gray("→ Copilot")}` : ""),
+        (config.copilotTier !== "no" ? `  ${SYMBOLS.bullet} GitHub ${color.gray("→ Copilot")}` : ""),
       "Authenticate Your Providers",
     )
   }

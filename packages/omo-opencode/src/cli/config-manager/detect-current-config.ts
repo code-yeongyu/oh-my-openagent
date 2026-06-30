@@ -1,10 +1,18 @@
 import { existsSync, readFileSync } from "node:fs"
 import { parseJsonc, LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "../../shared"
-import type { DetectedConfig } from "../types"
+import type { CopilotSubscription, DetectedConfig } from "../types"
 import { getOmoConfigPath } from "./config-context"
 import { detectConfigFormat } from "./opencode-config-format"
 import { parseOpenCodeConfigFileWithError } from "./parse-opencode-config-file"
 import { extractVersionFromPluginEntry } from "./version-compatibility"
+
+function detectCopilotTierFromConfig(configStr: string): CopilotSubscription {
+  const hasOpus = configStr.includes('"github-copilot/claude-opus')
+  if (hasOpus) return "pro-plus"
+  const hasCopilotModel = configStr.includes('"github-copilot/')
+  if (!hasCopilotModel) return "no"
+  return "pro"
+}
 
 function detectProvidersFromOmoConfig(): {
   hasOpenAI: boolean
@@ -116,7 +124,7 @@ export function detectCurrentConfig(): DetectedConfig {
     isMax20: true,
     hasOpenAI: true,
     hasGemini: false,
-    hasCopilot: false,
+    copilotTier: "no",
     hasCodex: false,
     hasOpencodeZen: true,
     hasZaiCodingPlan: false,
@@ -174,6 +182,16 @@ export function detectCurrentConfig(): DetectedConfig {
   result.hasMinimaxCnCodingPlan = hasMinimaxCnCodingPlan
   result.hasMinimaxCodingPlan = hasMinimaxCodingPlan
   result.hasVercelAiGateway = hasVercelAiGateway
+
+  const omoConfigPath = getOmoConfigPath()
+  if (existsSync(omoConfigPath)) {
+    try {
+      const content = readFileSync(omoConfigPath, "utf-8")
+      result.copilotTier = detectCopilotTierFromConfig(content)
+    } catch {
+      result.copilotTier = "no"
+    }
+  }
 
   return result
 }

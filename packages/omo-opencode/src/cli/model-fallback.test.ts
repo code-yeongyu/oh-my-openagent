@@ -15,7 +15,7 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
     isMax20: false,
     hasOpenAI: false,
     hasGemini: false,
-    hasCopilot: false,
+    copilotTier: "no",
     hasOpencodeZen: false,
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
@@ -40,7 +40,7 @@ describe("generateModelConfig", () => {
 
     test("downgrades unsupported GitHub Copilot GPT high-tier variants", () => {
       // #given only GitHub Copilot is available
-      const config = createConfig({ hasCopilot: true })
+      const config = createConfig({ copilotTier: "pro-plus" })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
@@ -67,6 +67,18 @@ describe("generateModelConfig", () => {
         ],
       })
     })
+
+    test("uses GitHub Copilot models with isMax20 flag", () => {
+      // #given GitHub Copilot is available with Max 20 plan
+      const config = createConfig({ copilotTier: "pro-plus", isMax20: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then should use higher capability models
+      expect(result).toMatchSnapshot()
+    })
+
     test("omits librarian when only ZAI is available", () => {
       // #given only ZAI is available
       const config = createConfig({ hasZaiCodingPlan: true })
@@ -111,6 +123,7 @@ describe("generateModelConfig", () => {
       // #given the Discord-reported non-TUI provider selection
       const config = createConfig({
         hasOpencodeZen: true,
+
         hasZaiCodingPlan: true,
       })
 
@@ -124,6 +137,100 @@ describe("generateModelConfig", () => {
       expect(JSON.stringify(result)).not.toContain("opencode/gpt-5.4-nano")
     })
 
+
+    test("uses OpenAI + Copilot combination", () => {
+      // #given OpenAI and Copilot are available
+      const config = createConfig({
+        hasOpenAI: true,
+        copilotTier: "pro-plus",
+      })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then should prefer OpenAI (native) over Copilot
+      expect(result).toMatchSnapshot()
+    })
+
+    test("uses Claude + ZAI combination (librarian uses ZAI)", () => {
+      // #given Claude and ZAI are available
+      const config = createConfig({
+        hasClaude: true,
+        hasZaiCodingPlan: true,
+      })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then should prefer Claude (native), librarian uses ZAI
+      expect(result).toMatchSnapshot()
+    })
+
+    test("uses Gemini + Claude combination (explore uses Gemini)", () => {
+      // #given Gemini and Claude are available
+      const config = createConfig({
+        hasGemini: true,
+        hasClaude: true,
+      })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then explore should use Gemini flash
+      expect(result).toMatchSnapshot()
+    })
+
+    test("uses all fallback providers together", () => {
+      // #given all fallback providers are available
+      const config = createConfig({
+        hasOpencodeZen: true,
+        copilotTier: "pro-plus",
+        hasZaiCodingPlan: true,
+      })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then should prefer OpenCode Zen, but librarian uses ZAI
+      expect(result).toMatchSnapshot()
+    })
+
+    test("uses all providers together", () => {
+      // #given all providers are available
+      const config = createConfig({
+        hasClaude: true,
+        hasOpenAI: true,
+        hasGemini: true,
+        hasOpencodeZen: true,
+        copilotTier: "pro-plus",
+        hasZaiCodingPlan: true,
+      })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then should prefer native providers, librarian uses ZAI
+      expect(result).toMatchSnapshot()
+    })
+
+    test("uses all providers with isMax20 flag", () => {
+      // #given all providers are available with Max 20 plan
+      const config = createConfig({
+        hasClaude: true,
+        hasOpenAI: true,
+        hasGemini: true,
+        hasOpencodeZen: true,
+        copilotTier: "pro-plus",
+        hasZaiCodingPlan: true,
+        isMax20: true,
+      })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then should use higher capability models
+      expect(result).toMatchSnapshot()
+    })
   })
 
   describe("explore agent special cases", () => {
@@ -174,7 +281,7 @@ describe("generateModelConfig", () => {
 
     test("explore uses gpt-5-mini when only Copilot available", () => {
       // #given only Copilot is available
-      const config = createConfig({ hasCopilot: true })
+      const config = createConfig({ copilotTier: "pro-plus" })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
@@ -279,7 +386,7 @@ describe("generateModelConfig", () => {
 
     test("Hephaestus falls back to Copilot GPT-5.5 when only Copilot is available", () => {
       // #given
-      const config = createConfig({ hasCopilot: true })
+      const config = createConfig({ copilotTier: "pro-plus" })
 
       // #when
       const result = generateModelConfig(config)
@@ -412,7 +519,7 @@ describe("generateModelConfig", () => {
         hasGemini: true,
         hasOpencodeZen: true,
         hasOpencodeGo: true,
-        hasCopilot: true,
+        copilotTier: "pro-plus",
         hasZaiCodingPlan: true,
         hasVercelAiGateway: true,
       })
@@ -573,7 +680,7 @@ describe("shouldShowChatGPTOnlyWarning", () => {
   const mixedProviderCases: Array<{ name: string; overrides: Partial<InstallConfig> }> = [
     { name: "Claude", overrides: { hasClaude: true } },
     { name: "Gemini", overrides: { hasGemini: true } },
-    { name: "Copilot", overrides: { hasCopilot: true } },
+    { name: "Copilot", overrides: { copilotTier: "pro-plus" } },
     { name: "OpenCode Zen", overrides: { hasOpencodeZen: true } },
     { name: "Z.ai Coding Plan", overrides: { hasZaiCodingPlan: true } },
     { name: "Kimi for Coding", overrides: { hasKimiForCoding: true } },

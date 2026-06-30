@@ -205,9 +205,18 @@ Map their answer to:
    - **yes** → `--gemini=yes`
    - **no** → `--gemini=no`
 
-4. **Do you have a GitHub Copilot Subscription?**
-   - **yes** → `--copilot=yes`
-   - **no** → `--copilot=no`
+4. **What GitHub Copilot subscription do you have?**
+   - **Student** (free, limited models) → `--copilot=student`
+   - **Pro** ($10/mo, full catalog minus premium) → `--copilot=pro`
+   - **Pro+** ($39/mo, adds Claude Opus 4.7/4.8, GPT-5.5) → `--copilot=pro-plus`
+   - **No Copilot** → `--copilot=no`
+
+   Models blocked by tier:
+   | Tier | Blocked models |
+   |------|---------------|
+   | **student** | Claude Opus, Claude Sonnet, GPT-5.4, GPT-5.5, GPT-5.4 nano |
+   | **pro** | Claude Opus, GPT-5.5, GPT-5.4 nano |
+   | **pro-plus** | (none — full access) |
 
 5. **Do you have access to OpenCode Zen (`opencode/` models)?**
    - **yes** → `--opencode-zen=yes`
@@ -294,7 +303,7 @@ bunx oh-my-openagent install \
   --platform=<opencode|codex|both> \
   [--claude=<yes|no|max20>] \
   [--gemini=<yes|no>] \
-  [--copilot=<yes|no>] \
+  [--copilot=<no|student|pro|pro-plus>] \
   [--openai=<yes|no>] \
   [--opencode-zen=<yes|no>] \
   [--zai-coding-plan=<yes|no>] \
@@ -309,9 +318,13 @@ bunx oh-my-openagent install \
 
 **Examples:**
 
-- OpenCode + Claude Max20 + ChatGPT + Gemini:
+- OpenCode + Claude Max20 + ChatGPT + Gemini + Copilot Pro:
   ```bash
-  bunx oh-my-openagent install --no-tui --platform=opencode --claude=max20 --openai=yes --gemini=yes --copilot=no
+  bunx oh-my-openagent install --no-tui --platform=opencode --claude=max20 --openai=yes --gemini=yes --copilot=pro
+  ```
+- Same but with Copilot Pro+ (adds Claude Opus via Copilot):
+  ```bash
+  bunx oh-my-openagent install --no-tui --platform=opencode --claude=max20 --openai=yes --gemini=yes --copilot=pro-plus
   ```
 - Codex only with recommended autonomous permissions:
   ```bash
@@ -320,6 +333,10 @@ bunx oh-my-openagent install \
 - Both harnesses with Claude only:
   ```bash
   bunx oh-my-openagent install --no-tui --platform=both --claude=yes --gemini=no --copilot=no --codex-autonomous
+  ```
+- OpenCode + Copilot Student (limited models):
+  ```bash
+  bunx oh-my-openagent install --no-tui --platform=opencode --claude=no --openai=no --gemini=no --copilot=student
   ```
 - OpenCode + Z.ai for Librarian:
   ```bash

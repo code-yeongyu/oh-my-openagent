@@ -15,7 +15,7 @@ const installConfig: InstallConfig = {
   isMax20: true,
   hasOpenAI: true,
   hasGemini: true,
-  hasCopilot: false,
+  copilotTier: "no",
   hasOpencodeZen: false,
   hasZaiCodingPlan: false,
   hasKimiForCoding: false,

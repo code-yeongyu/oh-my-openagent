@@ -90,7 +90,7 @@ program
   .option("--claude <value>", "Claude subscription: no, yes, max20")
   .option("--openai <value>", "OpenAI/ChatGPT subscription: no, yes (default: no)")
   .option("--gemini <value>", "Gemini integration: no, yes")
-  .option("--copilot <value>", "GitHub Copilot subscription: no, yes")
+  .option("--copilot <value>", "GitHub Copilot subscription: no, student, pro, pro-plus")
   .addOption(new Option("--platform <platform>", "Install target platform: opencode, codex, both").choices(["opencode", "codex", "both"]))
   .option("--opencode-zen <value>", "OpenCode Zen access: no, yes (default: no)")
   .option("--zai-coding-plan <value>", "Z.ai Coding Plan subscription: no, yes (default: no)")
@@ -109,7 +109,7 @@ Examples:
   $ npx lazycodex-ai install --no-tui
   $ bunx oh-my-opencode install --no-tui --platform=both --claude=max20 --openai=yes --gemini=yes --copilot=no
   $ omo install --platform=codex --codex-autonomous
-  $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
+  $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=pro-plus --opencode-zen=yes
 
 Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Bailian > MiniMax > Vercel):
   Claude        Native anthropic/ models (Opus, Sonnet, Haiku)
