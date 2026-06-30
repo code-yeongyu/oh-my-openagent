@@ -15,6 +15,7 @@ describe("plugin package metadata", () => {
 		const hooksJson = readHooksJson("hooks/hooks.json");
 		const mcpJson = readMcpJson(".mcp.json");
 		const cliSource = readTextFile("src/cli.ts");
+		const daemonCliPathSource = readTextFile("src/daemon-cli-path.ts");
 		const codexHookCliSource = readTextFile("src/codex-hook-cli.ts");
 		const codexHookSource = readTextFile("src/codex-hook.ts");
 		const sourceFiles = listDirectoryEntries("src");
@@ -43,8 +44,12 @@ describe("plugin package metadata", () => {
 		expect(lspServer?.command).toBe("node");
 		expect(lspServer?.args).toEqual(["../../../../lsp-daemon/dist/cli.js", "mcp"]);
 		expect(cliSource).not.toContain("./lazy-lsp-mcp.js");
-		expect(cliSource).toContain("@code-yeongyu/lsp-daemon/dist/cli.js");
+		expect(cliSource).toContain("resolveLspDaemonCliPath");
+		expect(daemonCliPathSource).toContain("@code-yeongyu/lsp-daemon/dist/cli.js");
+		expect(daemonCliPathSource).toContain("../../lsp-daemon/dist/cli.js");
+		expect(daemonCliPathSource).toContain("CODEX_LSP_DAEMON_VERSION");
 		expect(cliSource).not.toContain("../../../../../lsp-daemon/dist/cli.js");
+		expect(codexHookSource).toContain("ensureLspDaemonCliEnv");
 		expect(codexHookCliSource).toContain("@code-yeongyu/lsp-daemon");
 		expect(codexHookSource).toContain("@code-yeongyu/lsp-daemon");
 		expect(codexHookCliSource).not.toContain("../../../../../lsp-daemon");
