@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "../types";
-import { isGpt5_5Model } from "../types";
+import { isGlmModel, isGpt5_5Model } from "../types";
 import type {
   AvailableAgent,
   AvailableTool,
@@ -26,7 +26,7 @@ export class UnsupportedHephaestusModelError extends Error {
 
   constructor(model: string | undefined) {
     super(
-      `Hephaestus only supports GPT-5.3 Codex, GPT-5.4, and GPT-5.5 models; received ${model ?? "no model"}.`,
+      `Hephaestus only supports GPT-5.3 Codex, GPT-5.4, GPT-5.5, and GLM models; received ${model ?? "no model"}.`,
     );
     this.name = "UnsupportedHephaestusModelError";
     this.model = model;
@@ -40,7 +40,7 @@ function extractModelName(model: string): string {
 export function isHephaestusSupportedModel(model: string | undefined): boolean {
   if (!model) return false;
   const modelName = extractModelName(model);
-  return GPT_5_3_CODEX_RE.test(modelName) || GPT_5_4_RE.test(modelName) || GPT_5_5_RE.test(modelName);
+  return GPT_5_3_CODEX_RE.test(modelName) || GPT_5_4_RE.test(modelName) || GPT_5_5_RE.test(modelName) || isGlmModel(model);
 }
 
 function assertHephaestusSupportedModel(model: string | undefined): void {
@@ -149,7 +149,7 @@ export function createHephaestusAgent(
 
   return {
     description:
-      "Autonomous Deep Worker - goal-oriented execution with GPT Codex. Explores thoroughly before acting, uses explore/librarian agents for comprehensive context, completes tasks end-to-end. Inspired by AmpCode deep mode. (Hephaestus - OhMyOpenCode)",
+      "Autonomous Deep Worker - goal-oriented execution with GPT/GLM coding models. Explores thoroughly before acting, uses explore/librarian agents for comprehensive context, completes tasks end-to-end. Inspired by AmpCode deep mode. (Hephaestus - OhMyOpenCode)",
     mode: MODE,
     model,
     maxTokens: 32000,
