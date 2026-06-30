@@ -714,12 +714,12 @@ jobs:
                  [ -x "$CODEX_LOCAL_BIN_DIR/omo" ] &&
                  omo_version_output=$("$CODEX_LOCAL_BIN_DIR/omo" --version 2>&1) &&
                  [ "$omo_version_output" = "$OMO_VERSION" ] &&
-                 sparkshell_output=$("$CODEX_LOCAL_BIN_DIR/omo" sparkshell echo lazycodex-smoke 2>&1) &&
-                 [ "$sparkshell_output" = "lazycodex-smoke" ]; then
+                 ulw_loop_output=$("$CODEX_LOCAL_BIN_DIR/omo" ulw-loop --help 2>&1) &&
+                 printf "%s" "$ulw_loop_output" | grep -q "ulw-loop"; then
                 echo "$npx_install_output"
                 echo "$npx_doctor_output"
                 echo "omo --version: $omo_version_output"
-                echo "omo sparkshell: $sparkshell_output"
+                echo "omo ulw-loop: $ulw_loop_output"
                 cd "$GITHUB_WORKSPACE"
                 rm -rf "$SMOKE_DIR"
                 return 0

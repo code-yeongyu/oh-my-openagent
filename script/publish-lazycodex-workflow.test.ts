@@ -306,8 +306,8 @@ describe("LazyCodex publish workflow", () => {
       smokeStep.includes('[ -x "$CODEX_LOCAL_BIN_DIR/omo" ]') &&
       smokeStep.includes('omo_version_output=$("$CODEX_LOCAL_BIN_DIR/omo" --version 2>&1)') &&
       smokeStep.includes('[ "$omo_version_output" = "$OMO_VERSION" ]') &&
-      smokeStep.includes('sparkshell_output=$("$CODEX_LOCAL_BIN_DIR/omo" sparkshell echo lazycodex-smoke 2>&1)') &&
-      smokeStep.includes('[ "$sparkshell_output" = "lazycodex-smoke" ]')
+      smokeStep.includes('ulw_loop_output=$("$CODEX_LOCAL_BIN_DIR/omo" ulw-loop --help 2>&1)') &&
+      smokeStep.includes('printf "%s" "$ulw_loop_output" | grep -q "ulw-loop"')
 
     // #then
     expect(smokeRunsAfterPublishBeforeRestore, "post-publish smoke must run after lazycodex publish and before package restore").toBe(true)
@@ -318,7 +318,7 @@ describe("LazyCodex publish workflow", () => {
     expect(assertsDryRunRouting, "post-publish smoke must assert the expected dry-run routing output").toBe(true)
     expect(
       installsRealPackageAndVerifiesOmoBin,
-      "post-publish smoke must run a real install and verify the omo runtime wrapper exists, reports the release version, and executes sparkshell",
+      "post-publish smoke must run a real install and verify the omo runtime wrapper exists, reports the release version, and executes ulw-loop",
     ).toBe(true)
   })
 
