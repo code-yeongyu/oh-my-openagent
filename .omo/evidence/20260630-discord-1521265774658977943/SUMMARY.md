@@ -9,13 +9,13 @@ Change:
 - The guidance tells users to inspect `bun pm untrusted` and trust only the OMO package plus the known postinstall helper package.
 
 RED / reproduction evidence:
-- `red-system-doctor-trust.txt`: baseline doctor output lacked Bun trust guidance.
-- `red-system-doctor-trust-after-install.txt`: reproduced stale-version guidance after the simulated update/install state.
+- `red-system-doctor-trust.txt`: initial RED attempt captured the missing test dependency blocker before the behavioral reproduction could run.
+- `red-system-doctor-trust-after-install.txt`: behavioral RED reproduced the outdated-plugin fix text without Bun trust guidance after the simulated update/install state.
 
 GREEN evidence:
 - `doctor-tests-v5.txt`: focused doctor system test passed, including the new trust-guidance assertion.
 - `typecheck-v5.txt`: `bun run typecheck` exited 0.
-- `bun-test-full-v5.txt`: full `bun test` exited 0 with `10215 pass`, `2 skip`, `0 fail`.
+- `bun-test-full-v5.txt`: compact full `bun test` summary; stdout body intentionally omitted from the committed artifact while preserving counts, duration, and exit code.
 - LSP diagnostics on `system.ts` and `system.test.ts`: no diagnostics found.
 
 Manual QA:
