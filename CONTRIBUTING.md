@@ -179,7 +179,7 @@ oh-my-opencode/
 │   │       ├── features/        # feature modules (background-agent, skill-loader, tmux, MCP-OAuth, boulder-state, monitor, ...)
 │   │       ├── config/          # Zod v4 schema system
 │   │       ├── shared/          # Cross-cutting utilities
-│   │       ├── cli/             # CLI: install, run, doctor, mcp-oauth, boulder, sparkshell, ulw-loop (Commander.js)
+│   │       ├── cli/             # CLI: install, run, doctor, mcp-oauth, boulder, ulw-loop (Commander.js)
 │   │       ├── plugin/          # OpenCode hook handlers + 5-tier hook composition
 │   │       └── plugin-handlers/ # 6-phase config loading pipeline
 │   ├── omo-codex/               # Codex Light edition / lazycodex
