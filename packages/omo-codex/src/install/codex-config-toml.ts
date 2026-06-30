@@ -1,5 +1,6 @@
 import { mkdir, readFile } from "node:fs/promises"
 import { dirname } from "node:path"
+import { isNodeErrorWithCode } from "./codex-cache-fs"
 import { ensureAgentConfig, removeStaleManagedAgentBlocks } from "./codex-config-agents"
 import { writeFileAtomic } from "./codex-config-atomic-write"
 import { ensureFeatureEnabled } from "./codex-config-features"
@@ -35,7 +36,11 @@ export async function updateCodexConfig(input: {
 }): Promise<void> {
   await mkdir(dirname(input.configPath), { recursive: true })
   let config = ""
-  if (await exists(input.configPath)) config = await readFile(input.configPath, "utf8")
+  try {
+    config = await readFile(input.configPath, "utf8")
+  } catch (error) {
+    if (!(isNodeErrorWithCode(error) && error.code === "ENOENT")) throw error
+  }
 
   const pluginSet = new Set(input.pluginNames)
   for (const legacyMarketplaceName of legacyMarketplaceNames(input.marketplaceName)) {
@@ -72,14 +77,4 @@ export async function updateCodexConfig(input: {
   }
 
   await writeFileAtomic(input.configPath, `${config.trimEnd()}\n`)
-}
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    await readFile(path, "utf8")
-    return true
-  } catch (error) {
-    if (error instanceof Error) return false
-    return false
-  }
 }

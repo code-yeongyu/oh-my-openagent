@@ -4,7 +4,7 @@
 // allow: SIZE_OK - Codex TOML writer coverage shares parser/fixture helpers across migration edge cases; this release adds config regressions and future edits should split by table family.
 
 import { describe, expect, test } from "bun:test"
-import { lstat, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises"
+import { chmod, lstat, mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { updateCodexConfig } from "./codex-config-toml"
@@ -709,5 +709,51 @@ describe("codex-config-toml", () => {
     expect(content).toContain('[agents."review.agent"]')
     expect(content).toContain('config_file = "./agents/review.agent.toml"')
   })
+
+  test("#given a config path that exists but cannot be read as a file #when updating config #then surfaces the read error instead of overwriting from an empty config", async () => {
+    // given a config path that exists but is not a readable file (a directory makes readFile throw EISDIR cross-platform)
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-unreadable-dir-"))
+    const configPath = join(root, "config.toml")
+    await mkdir(configPath)
+    await writeFile(join(configPath, "keep.txt"), "user data")
+
+    // when updating config
+    // then the read error surfaces instead of overwriting from an empty config
+    await expect(
+      updateCodexConfig({
+        configPath,
+        repoRoot: "/repo/packages/omo-codex",
+        marketplaceName: "debug",
+        marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+        pluginNames: ["omo"],
+      }),
+    ).rejects.toThrow("EISDIR")
+  })
+
+  test.skipIf(process.platform === "win32")(
+    "#given an existing config file that cannot be read #when updating config #then rejects and preserves the original file",
+    async () => {
+      // given an existing config.toml that cannot be read (POSIX write-only permission)
+      const root = await mkdtemp(join(tmpdir(), "omo-codex-config-unreadable-file-"))
+      const configPath = join(root, "config.toml")
+      const original = '[user]\nimportant = "keep"\n'
+      await writeFile(configPath, original)
+      await chmod(configPath, 0o200)
+
+      // when updating config
+      // then it rejects and preserves the original content
+      await expect(
+        updateCodexConfig({
+          configPath,
+          repoRoot: "/repo/packages/omo-codex",
+          marketplaceName: "debug",
+          marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+          pluginNames: ["omo"],
+        }),
+      ).rejects.toThrow()
+      await chmod(configPath, 0o600)
+      expect(await readFile(configPath, "utf8")).toBe(original)
+    },
+  )
 
 })
