@@ -72,9 +72,9 @@ test("#given dry-run install flags #when running the Node installer entrypoint #
 	assert.equal(
 		output,
 		[
-			"npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous",
-			"npx --yes --package oh-my-openagent omo install --platform=claude-code --no-tui",
-			"npx --yes --package oh-my-openagent omo install --platform=gemini --no-tui",
+			"npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous",
+			"npx --yes oh-my-openagent@latest install --platform=claude-code --no-tui",
+			"npx --yes oh-my-openagent@latest install --platform=gemini --no-tui",
 		].join("\n"),
 	);
 });
@@ -94,9 +94,9 @@ test("#given dry-run install opt-out #when running the Node installer entrypoint
 	assert.equal(
 		output,
 		[
-			"npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --no-codex-autonomous",
-			"npx --yes --package oh-my-openagent omo install --platform=claude-code --no-tui",
-			"npx --yes --package oh-my-openagent omo install --platform=gemini --no-tui",
+			"npx --yes oh-my-openagent@latest install --platform=codex --no-tui --no-codex-autonomous",
+			"npx --yes oh-my-openagent@latest install --platform=claude-code --no-tui",
+			"npx --yes oh-my-openagent@latest install --platform=gemini --no-tui",
 		].join("\n"),
 	);
 });
@@ -113,7 +113,7 @@ test("#given explicit dry-run platform #when running the Node installer entrypoi
 	).trim();
 
 	// then
-	assert.equal(output, "npx --yes --package oh-my-openagent omo install --platform=gemini --no-tui");
+	assert.equal(output, "npx --yes oh-my-openagent@latest install --platform=gemini --no-tui");
 });
 
 test("#given dry-run doctor #when running the Node installer entrypoint #then prints Codex LazyCodex doctor workflow command", () => {

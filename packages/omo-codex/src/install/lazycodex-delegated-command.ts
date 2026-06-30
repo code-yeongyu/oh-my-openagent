@@ -70,7 +70,7 @@ function buildInstallInvocation(
   parsed: LazyCodexDelegatedCommand,
   target: LazyCodexInstallTarget,
 ): DelegatedOmoInvocation {
-  const args = ["--yes", "--package", "oh-my-openagent", "omo", parsed.command, `--platform=${target}`]
+  const args = ["--yes", "oh-my-openagent@latest", parsed.command, `--platform=${target}`]
   if (parsed.command === "install") {
     if (parsed.noTui) args.push("--no-tui")
     if (parsed.skipAuth) args.push("--skip-auth")
