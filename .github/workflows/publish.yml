@@ -706,11 +706,11 @@ jobs:
               mkdir -p "$HOME" "$CODEX_HOME" "$CODEX_LOCAL_BIN_DIR" "$SMOKE_DIR/cwd"
               cd "$SMOKE_DIR/cwd"
               expected_install_output="$(cat <<'EOF'
-npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous
-npx --yes --package oh-my-openagent omo install --platform=claude-code --no-tui
-npx --yes --package oh-my-openagent omo install --platform=gemini --no-tui
-EOF
-)"
+              npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous
+              npx --yes --package oh-my-openagent omo install --platform=claude-code --no-tui
+              npx --yes --package oh-my-openagent omo install --platform=gemini --no-tui
+              EOF
+              )"
 
               if npx_install_output=$(npx -y "$package_spec" --dry-run install --no-tui --codex-autonomous 2>&1) &&
                  npx_doctor_output=$(npx -y "$package_spec" --dry-run doctor 2>&1) &&
