@@ -65,7 +65,7 @@ Codex subagent reliability:
 - `.omo/ulw-loop/goals.json`: goals with embedded `successCriteria` per goal.
 - `.omo/ulw-loop/ledger.jsonl`: append-only audit trail.
 - Read artifacts before resuming, steering, or checkpointing.
-- After compaction or context loss, re-read brief + goals + ledger FIRST via `omo sparkshell cat .omo/ulw-loop/ledger.jsonl` (or direct paths), then `omo ulw-loop status --json`. Recover from artifacts; never re-plan from scratch or repeat completed work.
+- After compaction or context loss, re-read brief + goals + ledger FIRST, then `omo ulw-loop status --json`. Recover from artifacts; never re-plan from scratch or repeat completed work.
 - Never invent state outside `.omo/ulw-loop` artifacts or `omo ulw-loop status --json`.
 
 ## Bootstrap
