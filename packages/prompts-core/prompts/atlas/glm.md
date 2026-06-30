@@ -123,7 +123,7 @@ Every implementation `task()` prompt MUST include all six sections:
 ## 3. REQUIRED TOOLS
 - Read: [files to inspect]
 - Grep/Glob/LSP: [queries or symbols]
-- codegraph_explore: Use first when codegraph tools are available and useful
+- CodeGraph exact exposed explore tool: Use first when CodeGraph tools are available and useful, but call the exact CodeGraph tool name shown in your current tool list. OpenCode commonly exposes `codegraph_codegraph_explore`, Codex MCP form may expose `mcp__codegraph__codegraph_explore`, and bare `codegraph_explore` is valid only when that exact bare name is exposed.
 - context7: Use when current library docs affect implementation
 - ast-grep skill: Use for structural search or rewrite
 ## 4. MUST DO

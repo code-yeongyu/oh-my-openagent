@@ -45,16 +45,16 @@ TodoWrite([
 
 ### Fire Background Explore Agents IMMEDIATELY
 
-Don't wait-these run async while main session works. **Equip every agent with the code graph**: any task touching structure, entry points, dependencies, or hotspots MUST query `codegraph_*` (explore/search/callers/callees/impact) and `lsp_symbols` when present, and ground its claims in that data instead of guessing from conventions. Richer real-graph context per agent = a more accurate project map.
+Don't wait-these run async while main session works. **Equip every agent with the code graph**: any task touching structure, entry points, dependencies, or hotspots MUST query the exact CodeGraph tool names shown in the current tool list (explore/search/callers/callees/impact) and `lsp_symbols` when present, and ground its claims in that data instead of guessing from conventions. OpenCode commonly exposes names like `codegraph_codegraph_explore`, Codex MCP form may expose `mcp__codegraph__codegraph_explore`, and bare `codegraph_explore` is valid only when that exact bare name is exposed. Richer real-graph context per agent = a more accurate project map.
 
 ```
 // Fire all at once, collect results later
-task(subagent_type="explore", load_skills=[], description="Explore project structure", run_in_background=true, prompt="Project structure: map real layout via codegraph_explore/codegraph_files → REPORT deviations from standard patterns")
-task(subagent_type="explore", load_skills=[], description="Find entry points", run_in_background=true, prompt="Entry points: FIND main files, trace reach via codegraph_callees + lsp_symbols → REPORT non-standard organization")
+task(subagent_type="explore", load_skills=[], description="Explore project structure", run_in_background=true, prompt="Project structure: map real layout via the exact exposed CodeGraph explore/files tools (for example codegraph_codegraph_explore/codegraph_codegraph_files, mcp__codegraph__codegraph_explore/mcp__codegraph__codegraph_files, or bare names only if exposed) → REPORT deviations from standard patterns")
+task(subagent_type="explore", load_skills=[], description="Find entry points", run_in_background=true, prompt="Entry points: FIND main files, trace reach via the exact exposed CodeGraph callees tool + lsp_symbols → REPORT non-standard organization")
 task(subagent_type="explore", load_skills=[], description="Find conventions", run_in_background=true, prompt="Conventions: FIND config files (.eslintrc, pyproject.toml, .editorconfig) → REPORT project-specific rules")
 task(subagent_type="explore", load_skills=[], description="Find anti-patterns", run_in_background=true, prompt="Anti-patterns: FIND 'DO NOT', 'NEVER', 'ALWAYS', 'DEPRECATED' comments → LIST forbidden patterns")
 task(subagent_type="explore", load_skills=[], description="Explore build/CI", run_in_background=true, prompt="Build/CI: FIND .github/workflows, Makefile → REPORT non-standard patterns")
-task(subagent_type="explore", load_skills=[], description="Find test patterns", run_in_background=true, prompt="Test patterns: FIND test configs/structure; codegraph_callers on core modules to see what is covered → REPORT unique conventions")
+task(subagent_type="explore", load_skills=[], description="Find test patterns", run_in_background=true, prompt="Test patterns: FIND test configs/structure; exact exposed CodeGraph callers tool on core modules to see what is covered → REPORT unique conventions")
 ```
 
 <dynamic-agents>
@@ -125,8 +125,8 @@ Highest-signal source for the CODE MAP and the Symbol/Export/Reference scoring r
 - `lsp_symbols` scope="workspace", query by kind (class/interface/function) -> symbol inventory.
 - `lsp_find_references` on top exports (line/character from the symbols result) -> reference centrality.
 
-**codegraph** - when `codegraph_*` tools exist (check `codegraph_status`); a first-class peer to LSP, NOT a last resort:
-- `codegraph_explore` -> overview; `codegraph_callers`/`codegraph_callees`/`codegraph_impact` -> centrality + blast radius for the scoring matrix; `codegraph_search`/`codegraph_files` -> symbol/file inventory.
+**codegraph** - when CodeGraph tools exist (check the exact exposed status tool, for example `codegraph_codegraph_status`, `mcp__codegraph__codegraph_status`, or bare `codegraph_status` only if exposed); a first-class peer to LSP, NOT a last resort:
+- Use the exact exposed CodeGraph tool names: explore -> overview; callers/callees/impact -> centrality + blast radius for the scoring matrix; search/files -> symbol/file inventory.
 
 Only if NEITHER exists: explore agents + the ast-grep skill (`sg`), and mark centrality unmeasured in the CODE MAP.
 

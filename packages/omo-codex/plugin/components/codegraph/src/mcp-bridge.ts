@@ -33,7 +33,7 @@ const CODEGRAPH_NODE_INCLUDE_CODE_DESCRIPTION =
 	"Symbol mode: include leaf-symbol source when available. Container symbols such as classes, interfaces, structs, enums, modules, and namespaces intentionally return structural outlines with members; request a specific member symbol or use file mode with symbolsOnly=false plus offset/limit for source.";
 
 const CODEGRAPH_CONTAINER_OUTLINE_GUIDANCE =
-	"Container symbols intentionally return structural outlines with members. For source, request a specific member symbol or call codegraph_node in file mode with symbolsOnly=false plus offset/limit around the symbol location.";
+	"Container symbols intentionally return structural outlines with members. For source, request a specific member symbol or call the exact exposed CodeGraph node tool in file mode with symbolsOnly=false plus offset/limit around the symbol location.";
 
 export async function runBridgedCodegraphProcess(
 	command: string,

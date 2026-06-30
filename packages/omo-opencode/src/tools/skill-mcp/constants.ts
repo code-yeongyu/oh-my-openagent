@@ -4,14 +4,14 @@ export const SKILL_MCP_DESCRIPTION = `Invoke MCP server operations from skill-em
 
 export const BUILTIN_MCP_TOOL_HINTS: Record<string, string[]> = {
   codegraph: [
-    "codegraph_status",
-    "codegraph_explore",
-    "codegraph_search",
-    "codegraph_node",
-    "codegraph_callers",
-    "codegraph_callees",
-    "codegraph_impact",
-    "codegraph_files",
+    "codegraph_codegraph_status",
+    "codegraph_codegraph_explore",
+    "codegraph_codegraph_search",
+    "codegraph_codegraph_node",
+    "codegraph_codegraph_callers",
+    "codegraph_codegraph_callees",
+    "codegraph_codegraph_impact",
+    "codegraph_codegraph_files",
   ],
   context7: ["context7_resolve-library-id", "context7_query-docs"],
   websearch: ["websearch_web_search_exa"],
