@@ -7,7 +7,7 @@
 
 This reference is derived from a live capture of `https://aside.com/` on 2026-06-30, plus a reconnaissance pass following `JCodesMore/ai-website-cloner-template` at commit `8dd9cb47dde0d49fec06ee1d69bedd04840f3c95`.
 
-Evidence artifacts for the source capture were written under `.omo/evidence/20260630-aside-frontend-reference/`:
+Reviewer-run evidence artifacts for the source capture were written under `.omo/evidence/20260630-aside-frontend-reference/`:
 
 - `aside-live-extraction.json`
 - `aside-home.png`
@@ -16,13 +16,27 @@ Evidence artifacts for the source capture were written under `.omo/evidence/2026
 - `cloner-tablet-768.png`
 - `cloner-mobile-390.png`
 
+Those `.omo/evidence` files are local review artifacts, not shipped package assets. Downstream agents should recapture the live site when fidelity to the current Aside page matters. This file carries the stable, reviewer-visible digest from that capture.
+
+### Reviewer-Visible Capture Digest
+
+- **Source page:** `https://aside.com/`
+- **Source metadata:** title indicated a browser built to do real work; description framed it as a browser that completes complex work across sites, accounts, and history.
+- **Template source:** `JCodesMore/ai-website-cloner-template` at commit `8dd9cb47dde0d49fec06ee1d69bedd04840f3c95`; the template was used as a local reconnaissance workflow, not copied into this repo.
+- **Screenshots captured:** live page at 1440px wide; reconstructed reconnaissance screenshots at 1440px, 768px, and 390px widths.
+- **Page topology:** compact nav, centered hero, sky/cloud hero wash, large browser-product frame, explanatory intro band, capability sections, benchmark tabs, password/security sections, blue closing CTA band, dense footer.
+- **Extracted type signals:** `displayFont` for hero and section display; Geist for body/UI; Geist Mono available for technical specimens.
+- **Extracted scale signals:** H1 around 48px / 52px with slight negative tracking; body 16px / 24px; UI labels around 14px / 20px.
+- **Extracted surface signals:** white page canvas, ink text around `#090b0c`, soft gray controls around `#f5f5f5`, black-opacity dividers, pill trust badge, rounded/squircle CTA buttons, product-frame shadows.
+- **Responsive observations:** desktop preserves full nav and large browser frame; tablet narrows the product frame; mobile crops/stacks the frame while keeping the hero and CTA visible.
+
 Do not treat this file as a license to copy Aside's logo, product screenshots, copy, or proprietary assets. Use it as a token and layout reference for original AI-browser, agent-workflow, and product-app surfaces.
 
 ## 1. Visual Theme & Atmosphere
 
-Aside's current site reads as a bright, high-confidence product application rather than a dark developer landing page. The canvas is mostly white with hairline black dividers, dense product UI, and large custom display headlines. It feels closer to a native app launch page than a SaaS template: crisp, controlled, and built around the promise that the browser itself can do real work.
+Aside's current site reads as a bright, high-confidence product application rather than a dark developer landing page. The canvas is mostly white with hairline black dividers, dense product UI, large custom display headlines, and pale sky-blue atmospheric bands in the hero and final CTA. It feels closer to a native app launch page than a SaaS template: crisp, controlled, and built around the promise that the browser itself can do real work.
 
-The signature move is the contrast between calm white space and dense browser-product framing. The page opens with a centered hero, a small Y Combinator trust pill, and a large browser/app visual. Below that, sections use full-width bands, thin separators, and app-like capability cards instead of decorative feature-card grids. The tone is practical and confident: precise controls, product screenshots, benchmark pills, password/memory/security stories, and compact navigation.
+The signature move is the contrast between calm white space, a gentle cloud-like blue wash, and dense browser-product framing. The page opens with a centered hero, a small Y Combinator trust pill, and a large browser/app visual. Below that, sections use full-width bands, thin separators, and app-like capability cards instead of decorative feature-card grids. The tone is practical and confident: precise controls, product screenshots, benchmark pills, password/memory/security stories, and compact navigation.
 
 Rounded elements should feel like soft squircles, not generic `rounded-2xl` blobs. Live capture shows very large pill radii for trust badges and hero CTAs, medium squircle radii around compact action buttons, and square rhythm for structural section boundaries. Depth is created by product frames, soft shadows, white/black opacity borders, and layered screenshot surfaces, not by colorful background decoration.
 
@@ -46,6 +60,8 @@ Rounded elements should feel like soft squircles, not generic `rounded-2xl` blob
 ### Accent Use
 
 Aside's live capture does not rely on one dominant neon accent. Accents come from product imagery, benchmark pills, subtle icon color, and carefully placed dark controls. If a project needs a brand color, keep it secondary to the black/white/gray product-app system and apply it only to small signals.
+
+The current page does use pale cyan/sky-blue atmosphere in large image-backed bands. Treat that as an optional Aside signature for AI-browser launches: soft, airy, and product-framing, not a generic blue gradient background.
 
 ## 3. Typography Rules
 
@@ -152,7 +168,7 @@ This is the key Aside-inspired primitive.
 - Use hairline borders and product-frame shadows as the primary elevation language.
 - Prefer subtle neutral shadow over colored glows.
 - Layer product screenshots or UI panels to create depth.
-- Keep broad backgrounds flat white unless a product visual needs a light atmospheric wash.
+- Keep broad backgrounds flat white unless a product visual, hero, or closing CTA needs the current Aside-like pale sky-blue atmospheric wash.
 
 ### Motion
 
@@ -184,7 +200,7 @@ Every primitive must define default, hover, active, focus-visible, disabled, loa
 - Don't copy Aside's logo, text, screenshots, or proprietary product assets.
 - Don't replace the product-browser focal object with flat geometric decoration.
 - Don't make the page a purple-blue gradient SaaS layout.
-- Don't use sky blue as a giant primary CTA color unless the actual project brand calls for it.
+- Don't use saturated sky blue as a giant primary CTA color; if using Aside's current atmosphere, keep it pale, cloud-like, and subordinate to the product frame.
 - Don't over-round every component equally; distinguish pills, squircles, and structural edges.
 - Don't hide visual QA behind tests. Aside-like work needs screenshots at mobile, tablet, and desktop widths.
 

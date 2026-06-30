@@ -54,7 +54,7 @@ From [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill).
 
 ## Layer B — Design Systems (70)
 
-From [VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md), based on [Google Stitch DESIGN.md format](https://stitch.withgoogle.com/docs/design-md/overview/). Each file captures one website's complete visual language: color palette, typography, components, layout principles, depth, do/don't, responsive behavior, and an agent prompt guide.
+Most Layer B files are materialized from [VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md), based on [Google Stitch DESIGN.md format](https://stitch.withgoogle.com/docs/design-md/overview/). Project-original entries such as `aside.md` are listed here only when `ATTRIBUTION.md` and `frontend-refs-manifest.mjs` mark them as original. Each file captures one website's complete visual language: color palette, typography, components, layout principles, depth, do/don't, responsive behavior, and an agent prompt guide.
 
 ### How to use
 
@@ -79,7 +79,7 @@ Each file ships with: visual theme, hex color palette + semantic roles, full typ
 | `voltagent.md` | AI agent framework. Void-black canvas, emerald accent, terminal-native. |
 | `x.ai.md` | Elon Musk's AI lab. Stark monochrome, futuristic minimalism. |
 
-### Developer Tools & IDEs (9)
+### Developer Tools & IDEs (8)
 
 | File | Aesthetic |
 |---|---|
