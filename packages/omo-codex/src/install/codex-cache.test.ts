@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test"
 import { realpathSync } from "node:fs"
 import { mkdir, mkdtemp, readdir, readFile, readlink, rename, stat, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { basename, join, relative, sep } from "node:path"
+import { basename, dirname, join, relative, sep } from "node:path"
 import { installCachedPlugin, linkCachedPluginBins, rewriteCachedMcpManifest } from "./codex-cache"
 
 describe("codex-cache", () => {
@@ -202,6 +202,39 @@ describe("codex-cache", () => {
       }),
     ).rejects.toThrow(/removed sparkshell/i)
     await expect(stat(join(codexHome, "plugins", "cache", "debug", "omo", "0.1.0"))).rejects.toThrow()
+  })
+
+  test("#given stale sparkshell guidance in component prompt surfaces #when caching plugin #then cache promotion is rejected", async () => {
+    // given
+    const promptCases = [
+      join("components", "ulw-loop", "agents", "planner.toml"),
+      join("components", "ulw-loop", "bundled-rules", "rules.md"),
+      join("components", "ulw-loop", "hooks", "session-start.json"),
+      join("components", "ulw-loop", "skills", "ulw-loop", "references", "full-workflow.md"),
+    ]
+
+    for (const promptCase of promptCases) {
+      const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-component-sparkshell-"))
+      const codexHome = join(root, "codex-home")
+      const sourceRoot = join(root, "plugin")
+      const stalePrompt = join(sourceRoot, promptCase)
+      await mkdir(dirname(stalePrompt), { recursive: true })
+      await writeFile(join(sourceRoot, "package.json"), JSON.stringify({ name: "@scope/omo", version: "0.1.0" }))
+      await writeFile(stalePrompt, "After compaction, run `omo sparkshell cat .omo/ulw-loop/ledger.jsonl` first.\n")
+
+      // when / then
+      await expect(
+        installCachedPlugin({
+          codexHome,
+          marketplaceName: "debug",
+          name: "omo",
+          sourcePath: sourceRoot,
+          version: "0.1.0",
+          runCommand: async () => undefined,
+        }),
+      ).rejects.toThrow(/removed sparkshell/i)
+      await expect(stat(join(codexHome, "plugins", "cache", "debug", "omo", "0.1.0"))).rejects.toThrow()
+    }
   })
 
   test("#given existing cache #when npm install fails #then previous active cache is preserved", async () => {
