@@ -59,7 +59,6 @@ export const installMarketplaceLocally = generatedInstaller.installMarketplaceLo
 export const resolveCodexInstallerBinDir = generatedInstaller.resolveCodexInstallerBinDir;
 export const PASSTHROUGH_COMMANDS = generatedInstaller.PASSTHROUGH_COMMANDS;
 export const buildDelegatedOmoInvocation = generatedInstaller.buildDelegatedOmoInvocation;
-export const buildDelegatedOmoInvocations = generatedInstaller.buildDelegatedOmoInvocations;
 export const formatLazyCodexInstallHelp = generatedInstaller.formatLazyCodexInstallHelp;
 export const parseLazyCodexInstallCliArgs = generatedInstaller.parseLazyCodexInstallCliArgs;
 export const runDelegatedOmoCommand = generatedInstaller.runDelegatedOmoCommand;

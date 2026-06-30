@@ -705,12 +705,7 @@ jobs:
               export CODEX_LOCAL_BIN_DIR="$SMOKE_DIR/bin"
               mkdir -p "$HOME" "$CODEX_HOME" "$CODEX_LOCAL_BIN_DIR" "$SMOKE_DIR/cwd"
               cd "$SMOKE_DIR/cwd"
-              expected_install_output="$(cat <<'EOF'
-              npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous
-              npx --yes oh-my-openagent@latest install --platform=claude-code --no-tui
-              npx --yes oh-my-openagent@latest install --platform=gemini --no-tui
-              EOF
-              )"
+              expected_install_output="npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous"
               expected_doctor_output_prefix="codex exec "
 
               if npx_install_output=$(npx -y "$package_spec" --dry-run install --no-tui --codex-autonomous 2>&1) &&
@@ -720,7 +715,7 @@ jobs:
                  case "$npx_doctor_output" in *"--sandbox danger-full-access"*) true ;; *) false ;; esac &&
                  case "$npx_doctor_output" in *'Use $omo:lcx-doctor'*) true ;; *) false ;; esac &&
                  case "$npx_doctor_output" in *"--model"*|*"gpt-5.5-codex-mini"*) false ;; *) true ;; esac &&
-                 npx -y "$package_spec" install --platform=codex --no-tui --codex-autonomous &&
+                 npx -y "$package_spec" install --no-tui --codex-autonomous &&
                  [ -x "$CODEX_LOCAL_BIN_DIR/omo" ] &&
                  omo_version_output=$("$CODEX_LOCAL_BIN_DIR/omo" --version 2>&1) &&
                  [ "$omo_version_output" = "$OMO_VERSION" ] &&

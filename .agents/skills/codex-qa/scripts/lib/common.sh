@@ -116,7 +116,7 @@ cqa_install_local_omo() {
   fi
   local installer="$repo/packages/omo-codex/scripts/install-local.mjs"
   [ -f "$installer" ] || { cqa_fail "installer not found: $installer"; return 1; }
-  node "$installer" install --platform=codex >"$CQA_HOME_ROOT/install.log" 2>&1
+  node "$installer" install >"$CQA_HOME_ROOT/install.log" 2>&1
 }
 
 # Teardown everything the helpers created. Safe to call multiple times.

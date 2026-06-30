@@ -145,13 +145,12 @@ test("#given doctor source-root override #when delegating #then passes it to the
 	assert.doesNotMatch(invocation.args.at(-1), /--source-root/);
 });
 
-test("#given dry-run install without explicit platform #when delegating #then logs Windows-safe direct package commands", async () => {
+test("#given dry-run install without explicit platform #when delegating #then logs one Windows-safe Codex install command", async () => {
 	// given
 	const parsed = {
 		kind: "command",
 		command: "install",
 		dryRun: true,
-		targets: ["codex", "claude-code", "gemini"],
 		noTui: true,
 		skipAuth: false,
 		autonomousPermissions: true,
@@ -172,38 +171,6 @@ test("#given dry-run install without explicit platform #when delegating #then lo
 	// then
 	assert.deepEqual(logged, [
 		"npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous",
-		"npx --yes oh-my-openagent@latest install --platform=claude-code --no-tui",
-		"npx --yes oh-my-openagent@latest install --platform=gemini --no-tui",
-	]);
-});
-
-test("#given explicit non-Codex platform plus Codex-only flag #when delegating #then filters the Codex-only flag", async () => {
-	// given
-	const parsed = {
-		kind: "command",
-		command: "install",
-		dryRun: true,
-		targets: ["claude-code"],
-		noTui: true,
-		skipAuth: true,
-		autonomousPermissions: true,
-		repoRoot: undefined,
-		args: [],
-	};
-	const logged = [];
-
-	// when
-	await runDelegatedOmoCommand(parsed, {
-		cwd: "/tmp/project",
-		log: (line) => {
-			logged.push(line);
-		},
-		runCommand: async () => {},
-	});
-
-	// then
-	assert.deepEqual(logged, [
-		"npx --yes oh-my-openagent@latest install --platform=claude-code --no-tui --skip-auth",
 	]);
 });
 test("#given doctor recursion guard is active #when lazycodex doctor delegates #then rejects before launching Codex", async () => {

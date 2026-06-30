@@ -13720,9 +13720,7 @@ function codexMarketplaceSource(marketplaceRoot) {
 }
 
 // packages/omo-codex/src/install/lazycodex-cli-args.ts
-var LAZYCODEX_INSTALL_TARGETS = ["codex", "claude-code", "gemini"];
-var ALL_PLATFORM_ALIASES = new Set(["all", "all-platforms", "multi", "*"]);
-var LAZYCODEX_INSTALL_TARGET_SET = new Set(LAZYCODEX_INSTALL_TARGETS);
+var CODEX_ONLY_ERROR = "lazycodex-ai installs the Codex Light edition only. Use the omo installer for OpenCode or both-platform installs.";
 var PASSTHROUGH_COMMANDS = new Set([
   "doctor",
   "cleanup",
@@ -13734,24 +13732,14 @@ var PASSTHROUGH_COMMANDS = new Set([
 ]);
 function parseLazyCodexInstallCliArgs(argv) {
   const args = [...argv];
-  if (args.length === 0) {
-    return {
-      kind: "install",
-      targets: [...LAZYCODEX_INSTALL_TARGETS],
-      noTui: false,
-      skipAuth: false,
-      autonomousPermissions: undefined,
-      repoRoot: undefined
-    };
-  }
+  if (args.length === 0)
+    return { kind: "install", autonomousPermissions: undefined, repoRoot: undefined };
   let repoRoot;
   let command;
   let dryRun = false;
   let noTui = false;
   let skipAuth = false;
   let autonomousPermissions;
-  let allPlatforms = false;
-  const platforms = [];
   let index = 0;
   while (index < args.length) {
     const arg = args[index];
@@ -13784,19 +13772,10 @@ function parseLazyCodexInstallCliArgs(argv) {
       index += 1;
       continue;
     }
-    if (arg === "--all-platforms") {
-      allPlatforms = true;
-      index += 1;
-      continue;
-    }
     if (arg === "--platform") {
       const platform = readOptionValue(args, index, "--platform");
-      const parsedPlatform = parseInstallTarget(platform);
-      if (parsedPlatform === "all") {
-        allPlatforms = true;
-      } else {
-        platforms.push(parsedPlatform);
-      }
+      if (platform !== "codex")
+        throw new Error(CODEX_ONLY_ERROR);
       index += 2;
       continue;
     }
@@ -13804,12 +13783,8 @@ function parseLazyCodexInstallCliArgs(argv) {
       const platform = arg.slice("--platform=".length);
       if (platform.trim().length === 0)
         throw new Error("--platform requires a value");
-      const parsedPlatform = parseInstallTarget(platform);
-      if (parsedPlatform === "all") {
-        allPlatforms = true;
-      } else {
-        platforms.push(parsedPlatform);
-      }
+      if (platform !== "codex")
+        throw new Error(CODEX_ONLY_ERROR);
       index += 1;
       continue;
     }
@@ -13847,33 +13822,18 @@ function parseLazyCodexInstallCliArgs(argv) {
     }
     throw new Error(`Unsupported lazycodex-ai install option: ${String(arg)}`);
   }
-  const targets = resolveInstallTargets(platforms, allPlatforms);
   if (!dryRun)
-    return { kind: "install", targets, noTui, skipAuth, autonomousPermissions, repoRoot };
+    return { kind: "install", autonomousPermissions, repoRoot };
   return {
     kind: "command",
     command: command ?? "install",
     dryRun,
-    targets,
     noTui,
     skipAuth,
     autonomousPermissions,
     repoRoot,
     args: []
   };
-}
-function parseInstallTarget(platform) {
-  const normalized = platform.trim();
-  if (ALL_PLATFORM_ALIASES.has(normalized))
-    return "all";
-  if (LAZYCODEX_INSTALL_TARGET_SET.has(normalized))
-    return normalized;
-  throw new Error(`Unsupported lazycodex-ai install platform: ${platform} (expected codex, claude-code, gemini, or all)`);
-}
-function resolveInstallTargets(platforms, allPlatforms) {
-  if (allPlatforms || platforms.length === 0)
-    return [...LAZYCODEX_INSTALL_TARGETS];
-  return [...new Set(platforms)];
 }
 function parseUpdateArgs(args, startIndex, initialDryRun, initialRepoRoot) {
   let dryRun = initialDryRun;
@@ -13914,7 +13874,6 @@ function formatLazyCodexInstallHelp() {
   const passthrough = [...PASSTHROUGH_COMMANDS].sort().join(", ");
   return [
     "Usage: lazycodex-ai install [--no-tui] [--codex-autonomous|--no-codex-autonomous] [--repo-root <path>]",
-    "       lazycodex-ai install [--platform codex|claude-code|gemini|all] [--all-platforms]",
     "       lazycodex-ai uninstall [--project <path>]",
     "       lazycodex-ai update [--dry-run] [--repo-root <path>]",
     "       lazycodex-ai doctor [--source-root <path>] [--model <model>] [--json|--status|--verbose]",
@@ -13936,55 +13895,36 @@ async function runDelegatedOmoCommand(parsed, options) {
   if (parsed.command === "doctor" && process.env.LAZYCODEX_DOCTOR_LCX_ACTIVE === "1") {
     throw new Error("Refusing recursive lazycodex doctor invocation from inside $omo:lcx-doctor");
   }
-  const invocations = buildDelegatedOmoInvocations(parsed);
+  const invocation = buildDelegatedOmoInvocation(parsed);
   if (parsed.dryRun) {
-    for (const invocation of invocations) {
-      options.log(formatShellCommand(invocation.command, invocation.args));
-    }
+    options.log(formatShellCommand(invocation.command, invocation.args));
     return;
   }
-  for (const invocation of invocations) {
-    const env3 = invocation.delegatesToOmo ? { ...process.env, OMO_INVOCATION_NAME: "omo", ...invocation.env } : { ...process.env, ...invocation.env };
-    await options.runCommand(invocation.command, invocation.args, { cwd: options.cwd, env: env3 });
-  }
+  const env3 = invocation.delegatesToOmo ? { ...process.env, OMO_INVOCATION_NAME: "omo", ...invocation.env } : { ...process.env, ...invocation.env };
+  await options.runCommand(invocation.command, invocation.args, { cwd: options.cwd, env: env3 });
 }
 function buildDelegatedOmoInvocation(parsed) {
-  const invocation = buildDelegatedOmoInvocations(parsed)[0];
-  if (invocation === undefined) {
-    throw new Error("No delegated omo invocation was built");
-  }
-  return invocation;
-}
-function buildDelegatedOmoInvocations(parsed) {
   if (parsed.command === "doctor")
-    return [buildLazyCodexDoctorInvocation(parsed.args)];
+    return buildLazyCodexDoctorInvocation(parsed.args);
   if (parsed.command === "install") {
-    const targets = parsed.targets ?? LAZYCODEX_INSTALL_TARGETS;
-    return targets.map((target) => buildInstallInvocation(parsed, target));
+    const args2 = ["--yes", "oh-my-openagent@latest", parsed.command, "--platform=codex"];
+    if (parsed.noTui)
+      args2.push("--no-tui");
+    if (parsed.skipAuth)
+      args2.push("--skip-auth");
+    if (parsed.autonomousPermissions !== false)
+      args2.push("--codex-autonomous");
+    if (parsed.autonomousPermissions === false)
+      args2.push("--no-codex-autonomous");
+    if (parsed.repoRoot)
+      args2.push(`--repo-root=${parsed.repoRoot}`);
+    return { command: "npx", args: args2, delegatesToOmo: true };
   }
   const args = ["--yes", "--package", "oh-my-openagent", "omo", parsed.command];
   if (parsed.command === "cleanup") {
     args.push("--platform=codex", ...parsed.args);
   } else {
     args.push(...parsed.args);
-  }
-  return [{ command: "npx", args, delegatesToOmo: true }];
-}
-function buildInstallInvocation(parsed, target) {
-  const args = ["--yes", "oh-my-openagent@latest", parsed.command, `--platform=${target}`];
-  if (parsed.command === "install") {
-    if (parsed.noTui)
-      args.push("--no-tui");
-    if (parsed.skipAuth)
-      args.push("--skip-auth");
-    if (target === "codex") {
-      if (parsed.autonomousPermissions !== false)
-        args.push("--codex-autonomous");
-      if (parsed.autonomousPermissions === false)
-        args.push("--no-codex-autonomous");
-      if (parsed.repoRoot)
-        args.push(`--repo-root=${parsed.repoRoot}`);
-    }
   }
   return { command: "npx", args, delegatesToOmo: true };
 }
@@ -14402,39 +14342,23 @@ async function runLazyCodexInstallLocalCli(input) {
         input.log(`node ${input.entrypointPath} install --repo-root=${parsed.repoRoot}`);
         return 0;
       }
-      const result = await installMarketplaceLocally({
+      const result2 = await installMarketplaceLocally({
         repoRoot: resolve11(parsed.repoRoot),
         autonomousPermissions: true,
         env: input.env
       });
-      input.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`);
+      input.log(`Installed ${result2.installed.length} plugin(s) from ${result2.marketplaceName}.`);
       return 0;
     }
     return runLazyCodexManualUpdate({ env: input.env, dryRun: parsed.dryRun, log: input.log, invokedPath: input.invokedPath });
   }
   const repoRoot = parsed.repoRoot ? resolve11(parsed.repoRoot) : input.defaultRepoRoot;
-  if (parsed.targets.includes("codex")) {
-    const result = await installMarketplaceLocally({
-      repoRoot,
-      autonomousPermissions: parsed.autonomousPermissions,
-      env: input.env
-    });
-    input.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`);
-  }
-  const delegatedTargets = parsed.targets.filter((target) => target !== "codex");
-  if (delegatedTargets.length > 0) {
-    await runDelegatedOmoCommand({
-      kind: "command",
-      command: "install",
-      dryRun: false,
-      targets: delegatedTargets,
-      noTui: parsed.noTui,
-      skipAuth: parsed.skipAuth,
-      autonomousPermissions: parsed.autonomousPermissions,
-      repoRoot: undefined,
-      args: []
-    }, { cwd: input.cwd, log: input.log, runCommand: defaultRunCommand });
-  }
+  const result = await installMarketplaceLocally({
+    repoRoot,
+    autonomousPermissions: parsed.autonomousPermissions,
+    env: input.env
+  });
+  input.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`);
   return 0;
 }
 export {
@@ -14454,7 +14378,6 @@ export {
   installCachedPlugin,
   formatLazyCodexInstallHelp,
   findMissingHookCommandTargets,
-  buildDelegatedOmoInvocations,
   buildDelegatedOmoInvocation,
   assertHookCommandTargets,
   PASSTHROUGH_COMMANDS

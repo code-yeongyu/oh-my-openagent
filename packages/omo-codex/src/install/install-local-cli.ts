@@ -17,7 +17,7 @@ export { stampGitBashMcpEnv } from "./codex-git-bash-mcp-env"
 export { assertHookCommandTargets, findMissingHookCommandTargets } from "./codex-hook-targets"
 export { repairNearestProjectLocalCodexArtifacts } from "./codex-project-local-cleanup"
 export { PASSTHROUGH_COMMANDS, formatLazyCodexInstallHelp, parseLazyCodexInstallCliArgs } from "./lazycodex-cli-args"
-export { buildDelegatedOmoInvocation, buildDelegatedOmoInvocations, runDelegatedOmoCommand } from "./lazycodex-delegated-command"
+export { buildDelegatedOmoInvocation, runDelegatedOmoCommand } from "./lazycodex-delegated-command"
 
 export async function installMarketplaceLocally(options: CodexInstallOptions = {}): Promise<CodexInstallResult> {
   return runCodexInstaller(options)
@@ -73,31 +73,11 @@ export async function runLazyCodexInstallLocalCli(input: {
   }
 
   const repoRoot = parsed.repoRoot ? resolve(parsed.repoRoot) : input.defaultRepoRoot
-  if (parsed.targets.includes("codex")) {
-    const result = await installMarketplaceLocally({
-      repoRoot,
-      autonomousPermissions: parsed.autonomousPermissions,
-      env: input.env,
-    })
-    input.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`)
-  }
-
-  const delegatedTargets = parsed.targets.filter((target) => target !== "codex")
-  if (delegatedTargets.length > 0) {
-    await runDelegatedOmoCommand(
-      {
-        kind: "command",
-        command: "install",
-        dryRun: false,
-        targets: delegatedTargets,
-        noTui: parsed.noTui,
-        skipAuth: parsed.skipAuth,
-        autonomousPermissions: parsed.autonomousPermissions,
-        repoRoot: undefined,
-        args: [],
-      },
-      { cwd: input.cwd, log: input.log, runCommand: defaultRunCommand },
-    )
-  }
+  const result = await installMarketplaceLocally({
+    repoRoot,
+    autonomousPermissions: parsed.autonomousPermissions,
+    env: input.env,
+  })
+  input.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`)
   return 0
 }
