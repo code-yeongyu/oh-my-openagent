@@ -93,5 +93,23 @@ test("#given lcx-doctor skill #when inspected #then aggregate hook validation fo
 	assert.match(skill, /manifest declares a `hooks` array/);
 	assert.match(skill, /validate every direct hook path declared by the manifest/);
 	assert.match(skill, /`hooks\/hooks\.json` only when the manifest declares it/);
+	assert.match(skill, /do not require retired paths such as `components\/workflow-selector`/);
+	assert.match(skill, /`hooks\/user-prompt-submit-selecting-lazycodex-workflow\.json` unless the current manifest declares them/);
 	assert.doesNotMatch(skill, /Plugin payload present and non-empty: `hooks\/hooks\.json`/);
+});
+
+test("#given lcx-doctor skill #when inspected #then runtime probes and materialized payloads distinguish expected rewrites from missing files", async () => {
+	// given
+	const skill = await readSkill("lcx-doctor");
+
+	// then
+	assert.match(skill, /manifest-declared runtime payload/);
+	assert.match(skill, /`dist\/cli\/index\.js` and `dist\/cli-node\/index\.js`/);
+	assert.match(skill, /install-time materialization rewrites as expected/);
+	assert.match(skill, /absolute `\.mcp\.json` runtime paths/);
+	assert.match(skill, /Missing or zero-byte rewritten targets are FAIL/);
+	assert.match(skill, /Use the configured Codex default model/);
+	assert.match(skill, /unless the user explicitly passed a model override/);
+	assert.match(skill, /never force a guessed\/rejected model such as `gpt-5\.5-codex-mini`/);
+	assert.doesNotMatch(skill, /--model gpt-5\.5-codex-mini/);
 });

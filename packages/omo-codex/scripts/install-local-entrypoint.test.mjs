@@ -128,6 +128,8 @@ test("#given dry-run doctor #when running the Node installer entrypoint #then pr
 	// then
 	assert.match(output, /^codex exec /);
 	assert.match(output, /--sandbox danger-full-access/);
+	assert.doesNotMatch(output, /--model/);
+	assert.doesNotMatch(output, /gpt-5\.5-codex-mini/);
 	assert.doesNotMatch(output, /--sandbox read-only/);
 	assert.match(output, /Use \$omo:lcx-doctor/);
 	assert.match(output, /\$\{TMPDIR:-\/tmp\}\/lazycodex-sources/);

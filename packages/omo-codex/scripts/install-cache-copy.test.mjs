@@ -138,6 +138,34 @@ test("#given npm creates workspace bin shims in the cache #when caching plugin #
 	assert.equal(await readFile(join(installed.path, "node_modules", ".bin", "other-tool.cmd"), "utf8"), "@echo off\r\necho preserved\r\n");
 });
 
+test("#given packaged root CLI runtimes #when caching omo plugin #then root dist is materialized into the plugin cache", async () => {
+	// given
+	const root = await makeTempDir();
+	const repoRoot = join(root, "repo");
+	const codexHome = join(root, "codex-home");
+	const sourceRoot = join(repoRoot, "packages", "omo-codex", "plugin");
+	await mkdir(sourceRoot, { recursive: true });
+	await mkdir(join(repoRoot, "dist", "cli"), { recursive: true });
+	await mkdir(join(repoRoot, "dist", "cli-node"), { recursive: true });
+	await writeFile(join(sourceRoot, "package.json"), JSON.stringify({ name: "@scope/omo", version: "0.1.0" }));
+	await writeFile(join(repoRoot, "dist", "cli", "index.js"), "console.log('omo')\n");
+	await writeFile(join(repoRoot, "dist", "cli-node", "index.js"), "console.log('omo node')\n");
+
+	// when
+	const installed = await installCachedPlugin({
+		codexHome,
+		marketplaceName: "sisyphuslabs",
+		name: "omo",
+		sourcePath: sourceRoot,
+		version: "0.1.0",
+		runCommand: async () => {},
+	});
+
+	// then
+	assert.equal(await readFile(join(installed.path, "dist", "cli", "index.js"), "utf8"), "console.log('omo')\n");
+	assert.equal(await readFile(join(installed.path, "dist", "cli-node", "index.js"), "utf8"), "console.log('omo node')\n");
+});
+
 test("#given existing cache #when npm install fails #then previous active cache is preserved", async () => {
 	// given
 	const root = await makeTempDir();

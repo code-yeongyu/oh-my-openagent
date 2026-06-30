@@ -232,7 +232,7 @@ export function formatLazyCodexInstallHelp(): string {
     "       lazycodex-ai install [--platform codex|claude-code|gemini|all] [--all-platforms]",
     "       lazycodex-ai uninstall [--project <path>]",
     "       lazycodex-ai update [--dry-run] [--repo-root <path>]",
-    "       lazycodex-ai doctor [--source-root <path>] [--json|--status|--verbose]",
+    "       lazycodex-ai doctor [--source-root <path>] [--model <model>] [--json|--status|--verbose]",
     "       lazycodex-ai version",
     "       lazycodex-ai <command> [args...]",
     "",

@@ -32,6 +32,7 @@ export async function installCachedPlugin(input: {
     await copyDirectory(input.sourcePath, tempPath)
     await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath)
     await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath })
+    await copyRootRuntimeDists({ pluginRoot: tempPath, sourcePath: input.sourcePath })
     await maybeRunNpmInstall(tempPath, input.runCommand, ["ci", "--omit=dev"])
     await removeCachedManagedNpmBinShims(tempPath)
     if (input.buildSource === false) await maybeRunNpmSyncSkills(tempPath, input.runCommand)
@@ -110,4 +111,24 @@ function shouldCopyPluginPath(path: string, root: string): boolean {
   if (relative === "") return true
   const parts = relative.split(sep)
   return !parts.some((part) => part === ".git" || part === "node_modules")
+}
+
+async function copyRootRuntimeDists(input: { readonly pluginRoot: string; readonly sourcePath: string }): Promise<void> {
+  const repoRoot = repoRootForCodexPluginSource(input.sourcePath)
+  if (repoRoot === null) return
+  for (const runtimePath of ["dist/cli", "dist/cli-node"] as const) {
+    const sourcePath = join(repoRoot, runtimePath)
+    if (!(await fileExistsStrict(join(sourcePath, "index.js")))) continue
+    await mkdir(dirname(join(input.pluginRoot, runtimePath)), { recursive: true })
+    await cp(sourcePath, join(input.pluginRoot, runtimePath), { recursive: true })
+  }
+}
+
+function repoRootForCodexPluginSource(sourcePath: string): string | null {
+  const codexPackageRoot = dirname(sourcePath)
+  const packagesRoot = dirname(codexPackageRoot)
+  if (basename(sourcePath) !== "plugin") return null
+  if (basename(codexPackageRoot) !== "omo-codex") return null
+  if (basename(packagesRoot) !== "packages") return null
+  return dirname(packagesRoot)
 }

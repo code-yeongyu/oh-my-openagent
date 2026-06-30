@@ -12,6 +12,7 @@ export type DelegatedOmoInvocation = {
 
 type LazyCodexDoctorOptions = {
   readonly args: readonly string[]
+  readonly model?: string
   readonly sourceRoot?: string
 }
 
@@ -85,18 +86,20 @@ function buildInstallInvocation(
 
 function buildLazyCodexDoctorInvocation(doctorArgs: readonly string[]): DelegatedOmoInvocation {
   const doctorOptions = parseLazyCodexDoctorOptions(doctorArgs)
+  const codexArgs = [
+    "exec",
+    "--ephemeral",
+    "--sandbox",
+    "danger-full-access",
+    "--skip-git-repo-check",
+    "--cd",
+    ".",
+  ]
+  if (doctorOptions.model !== undefined) codexArgs.push("--model", doctorOptions.model)
+  codexArgs.push(buildLazyCodexDoctorPrompt(doctorOptions.args))
   return {
     command: "codex",
-    args: [
-      "exec",
-      "--ephemeral",
-      "--sandbox",
-      "danger-full-access",
-      "--skip-git-repo-check",
-      "--cd",
-      ".",
-      buildLazyCodexDoctorPrompt(doctorOptions.args),
-    ],
+    args: codexArgs,
     delegatesToOmo: false,
     env: {
       LAZYCODEX_DOCTOR_LCX_ACTIVE: "1",
@@ -120,10 +123,25 @@ function buildLazyCodexDoctorPrompt(doctorArgs: readonly string[]): string {
 
 function parseLazyCodexDoctorOptions(doctorArgs: readonly string[]): LazyCodexDoctorOptions {
   const args: string[] = []
+  let model: string | undefined
   let sourceRoot: string | undefined
   let index = 0
   while (index < doctorArgs.length) {
     const arg = doctorArgs[index]
+    if (arg === "--model") {
+      const value = doctorArgs[index + 1]
+      if (typeof value !== "string" || value.trim().length === 0) throw new Error("--model requires a value")
+      model = value
+      index += 2
+      continue
+    }
+    if (typeof arg === "string" && arg.startsWith("--model=")) {
+      const value = arg.slice("--model=".length)
+      if (value.trim().length === 0) throw new Error("--model requires a value")
+      model = value
+      index += 1
+      continue
+    }
     if (arg === "--source-root") {
       const value = doctorArgs[index + 1]
       if (typeof value !== "string" || value.trim().length === 0) throw new Error("--source-root requires a path")
@@ -141,7 +159,7 @@ function parseLazyCodexDoctorOptions(doctorArgs: readonly string[]): LazyCodexDo
     args.push(arg)
     index += 1
   }
-  return { args, sourceRoot }
+  return { args, ...(model === undefined ? {} : { model }), ...(sourceRoot === undefined ? {} : { sourceRoot }) }
 }
 
 function buildDoctorOutputInstruction(doctorArgs: readonly string[]): string {

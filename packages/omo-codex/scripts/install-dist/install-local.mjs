@@ -7440,6 +7440,7 @@ async function installCachedPlugin(input) {
     await copyDirectory(input.sourcePath, tempPath);
     await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath);
     await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath });
+    await copyRootRuntimeDists({ pluginRoot: tempPath, sourcePath: input.sourcePath });
     await maybeRunNpmInstall(tempPath, input.runCommand, ["ci", "--omit=dev"]);
     await removeCachedManagedNpmBinShims(tempPath);
     if (input.buildSource === false)
@@ -7521,6 +7522,29 @@ function shouldCopyPluginPath(path, root) {
     return true;
   const parts = relative4.split(sep5);
   return !parts.some((part) => part === ".git" || part === "node_modules");
+}
+async function copyRootRuntimeDists(input) {
+  const repoRoot = repoRootForCodexPluginSource(input.sourcePath);
+  if (repoRoot === null)
+    return;
+  for (const runtimePath of ["dist/cli", "dist/cli-node"]) {
+    const sourcePath = join11(repoRoot, runtimePath);
+    if (!await fileExistsStrict(join11(sourcePath, "index.js")))
+      continue;
+    await mkdir3(dirname4(join11(input.pluginRoot, runtimePath)), { recursive: true });
+    await cp2(sourcePath, join11(input.pluginRoot, runtimePath), { recursive: true });
+  }
+}
+function repoRootForCodexPluginSource(sourcePath) {
+  const codexPackageRoot = dirname4(sourcePath);
+  const packagesRoot = dirname4(codexPackageRoot);
+  if (basename3(sourcePath) !== "plugin")
+    return null;
+  if (basename3(codexPackageRoot) !== "omo-codex")
+    return null;
+  if (basename3(packagesRoot) !== "packages")
+    return null;
+  return dirname4(packagesRoot);
 }
 // packages/omo-codex/src/install/codex-cache-prune.ts
 import { lstat as lstat4, readdir as readdir3, rm as rm4, stat as stat3 } from "node:fs/promises";
@@ -8115,7 +8139,7 @@ function ensureMarketplaceBlock(config, marketplaceName, source) {
 }
 
 // packages/omo-codex/src/install/codex-config-permissions.ts
-var AUTONOMOUS_FEATURES = ["multi_agent", "child_agents_md", "unified_exec", "goals"];
+var AUTONOMOUS_FEATURES = ["multi_agent", "unified_exec", "goals"];
 function ensureAutonomousPermissions(config) {
   let next = replaceOrInsertRootSetting(config, "approval_policy", JSON.stringify("never"));
   next = replaceOrInsertRootSetting(next, "sandbox_mode", JSON.stringify("danger-full-access"));
@@ -8535,7 +8559,6 @@ async function updateCodexConfig(input) {
   config = ensureFeatureEnabled(config, "plugins");
   config = ensureFeatureEnabled(config, "plugin_hooks");
   config = ensureFeatureEnabled(config, "multi_agent");
-  config = ensureFeatureEnabled(config, "child_agents_md");
   config = removeUnsupportedCodexMultiAgentModeConfig(config);
   config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(input.repoRoot));
   config = ensureCodexMultiAgentV2Config(config);
@@ -13894,7 +13917,7 @@ function formatLazyCodexInstallHelp() {
     "       lazycodex-ai install [--platform codex|claude-code|gemini|all] [--all-platforms]",
     "       lazycodex-ai uninstall [--project <path>]",
     "       lazycodex-ai update [--dry-run] [--repo-root <path>]",
-    "       lazycodex-ai doctor [--source-root <path>] [--json|--status|--verbose]",
+    "       lazycodex-ai doctor [--source-root <path>] [--model <model>] [--json|--status|--verbose]",
     "       lazycodex-ai version",
     "       lazycodex-ai <command> [args...]",
     "",
@@ -13967,18 +13990,21 @@ function buildInstallInvocation(parsed, target) {
 }
 function buildLazyCodexDoctorInvocation(doctorArgs) {
   const doctorOptions = parseLazyCodexDoctorOptions(doctorArgs);
+  const codexArgs = [
+    "exec",
+    "--ephemeral",
+    "--sandbox",
+    "danger-full-access",
+    "--skip-git-repo-check",
+    "--cd",
+    "."
+  ];
+  if (doctorOptions.model !== undefined)
+    codexArgs.push("--model", doctorOptions.model);
+  codexArgs.push(buildLazyCodexDoctorPrompt(doctorOptions.args));
   return {
     command: "codex",
-    args: [
-      "exec",
-      "--ephemeral",
-      "--sandbox",
-      "danger-full-access",
-      "--skip-git-repo-check",
-      "--cd",
-      ".",
-      buildLazyCodexDoctorPrompt(doctorOptions.args)
-    ],
+    args: codexArgs,
     delegatesToOmo: false,
     env: {
       LAZYCODEX_DOCTOR_LCX_ACTIVE: "1",
@@ -14000,10 +14026,27 @@ function buildLazyCodexDoctorPrompt(doctorArgs) {
 }
 function parseLazyCodexDoctorOptions(doctorArgs) {
   const args = [];
+  let model;
   let sourceRoot;
   let index = 0;
   while (index < doctorArgs.length) {
     const arg = doctorArgs[index];
+    if (arg === "--model") {
+      const value = doctorArgs[index + 1];
+      if (typeof value !== "string" || value.trim().length === 0)
+        throw new Error("--model requires a value");
+      model = value;
+      index += 2;
+      continue;
+    }
+    if (typeof arg === "string" && arg.startsWith("--model=")) {
+      const value = arg.slice("--model=".length);
+      if (value.trim().length === 0)
+        throw new Error("--model requires a value");
+      model = value;
+      index += 1;
+      continue;
+    }
     if (arg === "--source-root") {
       const value = doctorArgs[index + 1];
       if (typeof value !== "string" || value.trim().length === 0)
@@ -14023,7 +14066,7 @@ function parseLazyCodexDoctorOptions(doctorArgs) {
     args.push(arg);
     index += 1;
   }
-  return { args, sourceRoot };
+  return { args, ...model === undefined ? {} : { model }, ...sourceRoot === undefined ? {} : { sourceRoot } };
 }
 function buildDoctorOutputInstruction(doctorArgs) {
   if (doctorArgs.includes("--json")) {
