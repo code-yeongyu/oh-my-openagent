@@ -320,13 +320,14 @@ describe("LazyCodex publish workflow", () => {
       smokeStep.includes('npx -y "$package_spec" --dry-run doctor') &&
       smokeStep.includes('expected_install_output="$(cat <<\'EOF\'') &&
       smokeStep.includes('expected_doctor_output_prefix="codex exec ') &&
-      smokeStep.includes("npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous") &&
-      smokeStep.includes("npx --yes --package oh-my-openagent omo install --platform=claude-code --no-tui") &&
-      smokeStep.includes("npx --yes --package oh-my-openagent omo install --platform=gemini --no-tui") &&
+      smokeStep.includes("npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous") &&
+      smokeStep.includes("npx --yes oh-my-openagent@latest install --platform=claude-code --no-tui") &&
+      smokeStep.includes("npx --yes oh-my-openagent@latest install --platform=gemini --no-tui") &&
       smokeStep.includes('case "$npx_doctor_output" in "$expected_doctor_output_prefix"*) true ;; *) false ;; esac') &&
       smokeStep.includes('case "$npx_doctor_output" in *"--sandbox danger-full-access"*) true ;; *) false ;; esac') &&
       smokeStep.includes("Use $omo:lcx-doctor") &&
-      smokeStep.includes('case "$npx_doctor_output" in *"--model"*|*"gpt-5.5-codex-mini"*) false ;; *) true ;; esac')
+      smokeStep.includes('case "$npx_doctor_output" in *"--model"*|*"gpt-5.5-codex-mini"*) false ;; *) true ;; esac') &&
+      !smokeStep.includes("npx --yes --package oh-my-openagent omo install")
     const installsRealPackageAndVerifiesOmoBin =
       smokeStep.includes('npx -y "$package_spec" install --platform=codex --no-tui --codex-autonomous') &&
       smokeStep.includes('[ -x "$CODEX_LOCAL_BIN_DIR/omo" ]') &&

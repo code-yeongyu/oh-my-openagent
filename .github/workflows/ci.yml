@@ -250,7 +250,7 @@ jobs:
 
           npx_install_output=$(npx -y lazycodex-ai@latest --dry-run install --no-tui --codex-autonomous)
           echo "$npx_install_output"
-          if [ "$npx_install_output" != "npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous" ]; then
+          if [ "$npx_install_output" != "npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous" ]; then
             echo "::warning::lazycodex-ai install dry-run output changed: $npx_install_output"
           fi
 

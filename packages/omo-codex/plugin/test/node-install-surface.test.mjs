@@ -25,5 +25,6 @@ test("#given Codex Light install docs #when inspected #then lazycodex is npm-fir
 	for (const [path, text] of docs) {
 		assert.match(text, /\bnpx lazycodex-ai install\b/, `${path} should document the Node/npm install command`);
 		assert.doesNotMatch(text, /\bbunx lazycodex-ai\b/, `${path} should not require Bun for lazycodex`);
+		assert.doesNotMatch(text, /npx\s+--package\s+oh-my-openagent\s+omo\s+install/, `${path} should not recommend the Windows-broken --package install command`);
 	}
 });
