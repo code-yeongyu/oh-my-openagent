@@ -225,7 +225,7 @@ async function linkRuntimeWrapperStep(
 			reason: "marketplace payload has no dist/cli",
 		});
 		await appendBootstrapLog(options.pluginData, options.now ?? Date.now(), "omo-cli-degraded", {
-			warning: `Warning: skipped the omo runtime wrapper because ${cliPath} is missing; omo sparkshell/ulw-loop commands will be unavailable until a package shipping dist/cli is installed`,
+			warning: `Warning: skipped the omo runtime wrapper because ${cliPath} is missing; omo ulw-loop commands will be unavailable until a package shipping dist/cli is installed`,
 		});
 	} catch (error) {
 		degraded.push({

@@ -232,7 +232,7 @@ test("#given a legacy payload without root CLI dist #when the worker setup runs 
 		assert.ok(
 			warning.includes("skipped the omo runtime wrapper because ") &&
 				warning.includes(`${join("dist", "cli", "index.js")} is missing; `) &&
-				warning.includes("omo sparkshell/ulw-loop commands will be unavailable until a package shipping dist/cli is installed"),
+				warning.includes("omo ulw-loop commands will be unavailable until a package shipping dist/cli is installed"),
 			`bootstrap.log must carry the install-local warning text, got: ${log}`,
 		);
 	});

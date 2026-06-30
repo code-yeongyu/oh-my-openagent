@@ -95,7 +95,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
       if (runtimeLink !== null) log(`Linked ${runtimeLink.name} -> ${runtimeLink.target}`)
       else
         log(
-          `Warning: skipped the omo runtime wrapper because ${join(repoRoot, "dist", "cli", "index.js")} is missing; omo sparkshell/ulw-loop commands will be unavailable until a package shipping dist/cli is installed`,
+          `Warning: skipped the omo runtime wrapper because ${join(repoRoot, "dist", "cli", "index.js")} is missing; omo ulw-loop commands will be unavailable until a package shipping dist/cli is installed`,
         )
     }
     pluginSources.push({ name: entry.name, sourcePath })
