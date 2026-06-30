@@ -1,4 +1,9 @@
-const CODEX_ONLY_ERROR = "lazycodex-ai installs the Codex Light edition only. Use the omo installer for OpenCode or both-platform installs."
+export const LAZYCODEX_INSTALL_TARGETS = ["codex", "claude-code", "gemini"] as const
+
+export type LazyCodexInstallTarget = (typeof LAZYCODEX_INSTALL_TARGETS)[number]
+
+const ALL_PLATFORM_ALIASES = new Set(["all", "all-platforms", "multi", "*"])
+const LAZYCODEX_INSTALL_TARGET_SET = new Set<string>(LAZYCODEX_INSTALL_TARGETS)
 
 export const PASSTHROUGH_COMMANDS: ReadonlySet<string> = new Set([
   "doctor",
@@ -11,13 +16,21 @@ export const PASSTHROUGH_COMMANDS: ReadonlySet<string> = new Set([
 ] as const)
 
 export type LazyCodexInstallCliArgs =
-  | { readonly kind: "install"; readonly autonomousPermissions: boolean | undefined; readonly repoRoot: string | undefined }
+  | {
+      readonly kind: "install"
+      readonly targets: readonly LazyCodexInstallTarget[]
+      readonly noTui: boolean
+      readonly skipAuth: boolean
+      readonly autonomousPermissions: boolean | undefined
+      readonly repoRoot: string | undefined
+    }
   | { readonly kind: "help" }
   | { readonly kind: "version" }
   | {
       readonly kind: "command"
       readonly command: string
       readonly dryRun: boolean
+      readonly targets?: readonly LazyCodexInstallTarget[]
       readonly noTui?: boolean
       readonly skipAuth?: boolean
       readonly autonomousPermissions?: boolean
@@ -28,7 +41,16 @@ export type LazyCodexInstallCliArgs =
 
 export function parseLazyCodexInstallCliArgs(argv: readonly string[]): LazyCodexInstallCliArgs {
   const args = [...argv]
-  if (args.length === 0) return { kind: "install", autonomousPermissions: undefined, repoRoot: undefined }
+  if (args.length === 0) {
+    return {
+      kind: "install",
+      targets: [...LAZYCODEX_INSTALL_TARGETS],
+      noTui: false,
+      skipAuth: false,
+      autonomousPermissions: undefined,
+      repoRoot: undefined,
+    }
+  }
 
   let repoRoot: string | undefined
   let command: "install" | undefined
@@ -36,6 +58,8 @@ export function parseLazyCodexInstallCliArgs(argv: readonly string[]): LazyCodex
   let noTui = false
   let skipAuth = false
   let autonomousPermissions: boolean | undefined
+  let allPlatforms = false
+  const platforms: LazyCodexInstallTarget[] = []
   let index = 0
   while (index < args.length) {
     const arg = args[index]
@@ -66,16 +90,31 @@ export function parseLazyCodexInstallCliArgs(argv: readonly string[]): LazyCodex
       index += 1
       continue
     }
+    if (arg === "--all-platforms") {
+      allPlatforms = true
+      index += 1
+      continue
+    }
     if (arg === "--platform") {
       const platform = readOptionValue(args, index, "--platform")
-      if (platform !== "codex") throw new Error(CODEX_ONLY_ERROR)
+      const parsedPlatform = parseInstallTarget(platform)
+      if (parsedPlatform === "all") {
+        allPlatforms = true
+      } else {
+        platforms.push(parsedPlatform)
+      }
       index += 2
       continue
     }
     if (typeof arg === "string" && arg.startsWith("--platform=")) {
       const platform = arg.slice("--platform=".length)
       if (platform.trim().length === 0) throw new Error("--platform requires a value")
-      if (platform !== "codex") throw new Error(CODEX_ONLY_ERROR)
+      const parsedPlatform = parseInstallTarget(platform)
+      if (parsedPlatform === "all") {
+        allPlatforms = true
+      } else {
+        platforms.push(parsedPlatform)
+      }
       index += 1
       continue
     }
@@ -112,18 +151,37 @@ export function parseLazyCodexInstallCliArgs(argv: readonly string[]): LazyCodex
     throw new Error(`Unsupported lazycodex-ai install option: ${String(arg)}`)
   }
 
-  if (!dryRun) return { kind: "install", autonomousPermissions, repoRoot }
+  const targets = resolveInstallTargets(platforms, allPlatforms)
+  if (!dryRun) return { kind: "install", targets, noTui, skipAuth, autonomousPermissions, repoRoot }
 
   return {
     kind: "command",
     command: command ?? "install",
     dryRun,
+    targets,
     noTui,
     skipAuth,
     autonomousPermissions,
     repoRoot,
     args: [],
   }
+}
+
+function parseInstallTarget(platform: string): LazyCodexInstallTarget | "all" {
+  const normalized = platform.trim()
+  if (ALL_PLATFORM_ALIASES.has(normalized)) return "all"
+  if (LAZYCODEX_INSTALL_TARGET_SET.has(normalized)) return normalized as LazyCodexInstallTarget
+  throw new Error(
+    `Unsupported lazycodex-ai install platform: ${platform} (expected codex, claude-code, gemini, or all)`,
+  )
+}
+
+function resolveInstallTargets(
+  platforms: readonly LazyCodexInstallTarget[],
+  allPlatforms: boolean,
+): readonly LazyCodexInstallTarget[] {
+  if (allPlatforms || platforms.length === 0) return [...LAZYCODEX_INSTALL_TARGETS]
+  return [...new Set(platforms)]
 }
 
 function parseUpdateArgs(
@@ -171,6 +229,7 @@ export function formatLazyCodexInstallHelp(): string {
   const passthrough = [...PASSTHROUGH_COMMANDS].sort().join(", ")
   return [
     "Usage: lazycodex-ai install [--no-tui] [--codex-autonomous|--no-codex-autonomous] [--repo-root <path>]",
+    "       lazycodex-ai install [--platform codex|claude-code|gemini|all] [--all-platforms]",
     "       lazycodex-ai uninstall [--project <path>]",
     "       lazycodex-ai update [--dry-run] [--repo-root <path>]",
     "       lazycodex-ai doctor [--source-root <path>] [--json|--status|--verbose]",
