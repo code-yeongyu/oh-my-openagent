@@ -68,7 +68,7 @@ node "<skill-root>/scripts/team.mjs" set-status   --team <session_id> --id A --s
 node "<skill-root>/scripts/team.mjs" worktree-add    --team <session_id> --id A [--base-branch <branch>]
 node "<skill-root>/scripts/team.mjs" worktree-remove --team <session_id> --id A [--force]
 node "<skill-root>/scripts/team.mjs" integrate       --team <session_id> [--id A]
-node "<skill-root>/scripts/team.mjs" archive      --team <session_id> [--id A]
+node "<skill-root>/scripts/team.mjs" archive      --team <session_id> [--id A] [--note "<...>"]
 node "<skill-root>/scripts/team.mjs" delete       --team <session_id> [--force]
 node "<skill-root>/scripts/team.mjs" status       --team <session_id>
 ```
@@ -183,12 +183,17 @@ result against that todo's acceptance criteria before you integrate.
 
 DISBAND the team the moment it is no longer needed. A team exists only to do its work; once that
 work is done, or the user no longer wants it, do not leave it lying around - archive every member,
-then delete the team state. A finished team that is never disbanded is a leak.
+then delete the team state only after archival evidence is clean or preserved. A finished team that
+is never disbanded is a leak.
 
 - `archive` closes the team: notify each active member, copy anything useful into `artifacts/`,
-  archive each member thread with `codex_app.set_thread_archived`, then `archive` flips the team
-  and all members to archived. If a thread-archive tool is unavailable, record that in the team log
-  and tell the user - never pretend a member was archived.
+  then try to archive each member thread with `codex_app.set_thread_archived`. Treat Codex App
+  failures such as "Ambiguous Codex thread id" or a thread id that is ambiguous across hosts as an
+  app-thread archival blocker, not as a team-state blocker: record the failure in the team log,
+  tell the user which member thread was not proven archived, and continue the team-state archive
+  with `archive --note "<blocker>"`. Never pretend a member thread was archived. Do not delete the
+  team state after an app-thread archival blocker unless the evidence has been copied elsewhere or
+  the user explicitly accepts that evidence loss.
 - `delete` removes `.omo/teams/{session_id}` and refuses while the team is unarchived or any member
   is still active unless `--force`.
 - When the work wraps up, land it the way the user asked: `integrate --team <id>` for a direct merge
