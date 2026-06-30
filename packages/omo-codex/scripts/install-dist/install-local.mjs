@@ -6603,7 +6603,6 @@ function posixRuntimeWrapper(cliPath, codexHome, binDir, nodeCliPath) {
     "#!/bin/sh",
     `# ${RUNTIME_WRAPPER_MARKER}`,
     `export CODEX_HOME="\${CODEX_HOME:-${escapedCodexHome}}"`,
-    'export OMO_SPARKSHELL_APP_SERVER_SOCKET="${OMO_SPARKSHELL_APP_SERVER_SOCKET:-$CODEX_HOME/app-server-control/app-server-control.sock}"',
     'if [ "$1" = "ulw-loop" ] && [ -x "' + escapedUlwLoopBin + '" ]; then',
     "  shift",
     '  exec "' + escapedUlwLoopBin + '" "$@"',
@@ -6645,7 +6644,6 @@ function windowsRuntimeWrapper(cliPath, codexHome, binDir, nodeCliPath) {
     "@echo off",
     `rem ${RUNTIME_WRAPPER_MARKER}`,
     `if not defined CODEX_HOME set "CODEX_HOME=${codexHome}"`,
-    'if not defined OMO_SPARKSHELL_APP_SERVER_SOCKET set "OMO_SPARKSHELL_APP_SERVER_SOCKET=%CODEX_HOME%\\app-server-control\\app-server-control.sock"',
     ...windowsNodeDiscoveryLines(),
     `if "%~1"=="ulw-loop" if exist "${ulwLoopBin}" (`,
     "  shift /1",
@@ -13554,7 +13552,7 @@ async function runCodexInstaller(options = {}) {
       if (runtimeLink !== null)
         log2(`Linked ${runtimeLink.name} -> ${runtimeLink.target}`);
       else
-        log2(`Warning: skipped the omo runtime wrapper because ${join31(repoRoot, "dist", "cli", "index.js")} is missing; omo sparkshell/ulw-loop commands will be unavailable until a package shipping dist/cli is installed`);
+        log2(`Warning: skipped the omo runtime wrapper because ${join31(repoRoot, "dist", "cli", "index.js")} is missing; omo ulw-loop commands will be unavailable until a package shipping dist/cli is installed`);
     }
     pluginSources.push({ name: entry.name, sourcePath });
     installed.push(plugin);
