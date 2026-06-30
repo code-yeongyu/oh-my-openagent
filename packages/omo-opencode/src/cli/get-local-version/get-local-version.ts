@@ -33,14 +33,16 @@ export async function getLocalVersion(
 
     const pluginInfo = findPluginEntry(directory)
     if (pluginInfo?.isPinned) {
+      const actualVersion = getCachedVersion()
+      const isMismatch = actualVersion !== null && actualVersion !== pluginInfo.pinnedVersion
       const info: VersionInfo = {
-        currentVersion: pluginInfo.pinnedVersion,
+        currentVersion: isMismatch ? actualVersion : pluginInfo.pinnedVersion,
         latestVersion: null,
         isUpToDate: false,
         isLocalDev: false,
         isPinned: true,
         pinnedVersion: pluginInfo.pinnedVersion,
-        status: "pinned",
+        status: isMismatch ? "pinned-mismatch" : "pinned",
       }
 
       console.log(options.json ? formatJsonOutput(info) : formatVersionOutput(info))
