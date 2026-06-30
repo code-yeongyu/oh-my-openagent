@@ -186,10 +186,16 @@ SOFTWARE.
 
 ## 5. Project-original files
 
-`frontend/SKILL.md`, `frontend/references/design/README.md`, `_INDEX.md`,
+`frontend/SKILL.md`, `frontend/references/design/README.md`, `_INDEX.md`, `aside.md`,
 `design-system-architecture.md`, `react-dev-tooling-skill.md`,
 `frontend/references/perfection/README.md`, `react-perf-tooling.md`, and
 `frontend/scripts/perfection/lighthouse-audit.py` are original to this project and require
 no third-party attribution. The perfection docs and script only invoke third-party tools
 (react-scan, react-doctor, react-grab, playwright-lighthouse, lighthouse, chrome-launcher)
 at runtime; no source from those tools is vendored, so their licenses are not carried here.
+
+`frontend/references/design/aside.md` is a project-original synthesis from live browser
+capture evidence and a local reconnaissance run following the MIT-licensed
+`JCodesMore/ai-website-cloner-template` workflow; it is not copied from Aside or from the
+template. Aside names, trademarks, product text, and visual assets remain the property of
+their respective owners and are referenced only for descriptive design-analysis purposes.
