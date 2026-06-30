@@ -13971,7 +13971,7 @@ function buildDelegatedOmoInvocations(parsed) {
   return [{ command: "npx", args, delegatesToOmo: true }];
 }
 function buildInstallInvocation(parsed, target) {
-  const args = ["--yes", "--package", "oh-my-openagent", "omo", parsed.command, `--platform=${target}`];
+  const args = ["--yes", "oh-my-openagent@latest", parsed.command, `--platform=${target}`];
   if (parsed.command === "install") {
     if (parsed.noTui)
       args.push("--no-tui");
