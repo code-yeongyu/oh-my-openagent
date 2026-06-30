@@ -705,12 +705,18 @@ jobs:
               export CODEX_LOCAL_BIN_DIR="$SMOKE_DIR/bin"
               mkdir -p "$HOME" "$CODEX_HOME" "$CODEX_LOCAL_BIN_DIR" "$SMOKE_DIR/cwd"
               cd "$SMOKE_DIR/cwd"
+              expected_install_output="$(cat <<'EOF'
+              npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous
+              npx --yes --package oh-my-openagent omo install --platform=claude-code --no-tui
+              npx --yes --package oh-my-openagent omo install --platform=gemini --no-tui
+              EOF
+              )"
 
               if npx_install_output=$(npx -y "$package_spec" --dry-run install --no-tui --codex-autonomous 2>&1) &&
                  npx_doctor_output=$(npx -y "$package_spec" --dry-run doctor 2>&1) &&
-                 [ "$npx_install_output" = "npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous" ] &&
+                 [ "$npx_install_output" = "$expected_install_output" ] &&
                  [ "$npx_doctor_output" = "npx --yes --package oh-my-openagent omo doctor" ] &&
-                 npx -y "$package_spec" install --no-tui --codex-autonomous &&
+                 npx -y "$package_spec" install --platform=codex --no-tui --codex-autonomous &&
                  [ -x "$CODEX_LOCAL_BIN_DIR/omo" ] &&
                  omo_version_output=$("$CODEX_LOCAL_BIN_DIR/omo" --version 2>&1) &&
                  [ "$omo_version_output" = "$OMO_VERSION" ] &&

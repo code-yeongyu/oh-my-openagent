@@ -1,5 +1,5 @@
 import type { RunCommand } from "./types"
-import type { LazyCodexInstallCliArgs } from "./lazycodex-cli-args"
+import { LAZYCODEX_INSTALL_TARGETS, type LazyCodexInstallTarget, type LazyCodexInstallCliArgs } from "./lazycodex-cli-args"
 
 export type LazyCodexDelegatedCommand = Extract<LazyCodexInstallCliArgs, { readonly kind: "command" }>
 
@@ -26,32 +26,59 @@ export async function runDelegatedOmoCommand(
   if (parsed.command === "doctor" && process.env.LAZYCODEX_DOCTOR_LCX_ACTIVE === "1") {
     throw new Error("Refusing recursive lazycodex doctor invocation from inside $omo:lcx-doctor")
   }
-  const invocation = buildDelegatedOmoInvocation(parsed)
+  const invocations = buildDelegatedOmoInvocations(parsed)
   if (parsed.dryRun) {
-    options.log(formatShellCommand(invocation.command, invocation.args))
+    for (const invocation of invocations) {
+      options.log(formatShellCommand(invocation.command, invocation.args))
+    }
     return
   }
-  const env = invocation.delegatesToOmo
-    ? { ...process.env, OMO_INVOCATION_NAME: "omo", ...invocation.env }
-    : { ...process.env, ...invocation.env }
-  await options.runCommand(invocation.command, invocation.args, { cwd: options.cwd, env })
+  for (const invocation of invocations) {
+    const env = invocation.delegatesToOmo
+      ? { ...process.env, OMO_INVOCATION_NAME: "omo", ...invocation.env }
+      : { ...process.env, ...invocation.env }
+    await options.runCommand(invocation.command, invocation.args, { cwd: options.cwd, env })
+  }
 }
 
 export function buildDelegatedOmoInvocation(parsed: LazyCodexDelegatedCommand): DelegatedOmoInvocation {
-  if (parsed.command === "doctor") return buildLazyCodexDoctorInvocation(parsed.args)
+  const invocation = buildDelegatedOmoInvocations(parsed)[0]
+  if (invocation === undefined) {
+    throw new Error("No delegated omo invocation was built")
+  }
+  return invocation
+}
+
+export function buildDelegatedOmoInvocations(parsed: LazyCodexDelegatedCommand): readonly DelegatedOmoInvocation[] {
+  if (parsed.command === "doctor") return [buildLazyCodexDoctorInvocation(parsed.args)]
+
+  if (parsed.command === "install") {
+    const targets = parsed.targets ?? LAZYCODEX_INSTALL_TARGETS
+    return targets.map((target) => buildInstallInvocation(parsed, target))
+  }
 
   const args = ["--yes", "--package", "oh-my-openagent", "omo", parsed.command]
-  if (parsed.command === "install") {
-    args.push("--platform=codex")
-    if (parsed.noTui) args.push("--no-tui")
-    if (parsed.skipAuth) args.push("--skip-auth")
-    if (parsed.autonomousPermissions !== false) args.push("--codex-autonomous")
-    if (parsed.autonomousPermissions === false) args.push("--no-codex-autonomous")
-    if (parsed.repoRoot) args.push(`--repo-root=${parsed.repoRoot}`)
-  } else if (parsed.command === "cleanup") {
+  if (parsed.command === "cleanup") {
     args.push("--platform=codex", ...parsed.args)
   } else {
     args.push(...parsed.args)
+  }
+  return [{ command: "npx", args, delegatesToOmo: true }]
+}
+
+function buildInstallInvocation(
+  parsed: LazyCodexDelegatedCommand,
+  target: LazyCodexInstallTarget,
+): DelegatedOmoInvocation {
+  const args = ["--yes", "--package", "oh-my-openagent", "omo", parsed.command, `--platform=${target}`]
+  if (parsed.command === "install") {
+    if (parsed.noTui) args.push("--no-tui")
+    if (parsed.skipAuth) args.push("--skip-auth")
+    if (target === "codex") {
+      if (parsed.autonomousPermissions !== false) args.push("--codex-autonomous")
+      if (parsed.autonomousPermissions === false) args.push("--no-codex-autonomous")
+      if (parsed.repoRoot) args.push(`--repo-root=${parsed.repoRoot}`)
+    }
   }
   return { command: "npx", args, delegatesToOmo: true }
 }
