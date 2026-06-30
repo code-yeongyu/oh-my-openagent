@@ -1,0 +1,22 @@
+Command: bash /tmp/ralph-real-hook-probe.sh
+Working directory: /home/renekris/Development/oh-my-openagent
+
+Terminal result:
+PASS: observed message.part.delta hitting plugin event hook surface
+first_delta={"type":"message.part.delta","sessionID":"ses_0e515b7dbffeqeewkVW1sTyr86"}
+real_db_sessions=3046->3046 sandbox_sessions=1
+
+Isolation receipt, redacted:
+real_db=/home/renekris/.local/share/opencode/opencode.db before=3046
+sandbox=<isolated-xdg>/proj
+session_id=ses_0e515b7dbffeqeewkVW1sTyr86
+after=3046 sandbox_db=<isolated-xdg>/data/opencode/opencode.db sandbox_sessions=1
+
+Selected SSE event stream lines, redacted to the hook-relevant event:
+data: {"type":"message.part.delta","properties":{"sessionID":"ses_0e515b7dbffeqeewkVW1sTyr86","messageID":"msg_f1aea49ce001pmUYLSvknEXgVy","partID":"prt_f1aea5810001og4AjD17s1NXYL","field":"text","delta":"fake response 1"}}
+
+Redactions applied:
+- replaced transient sandbox paths with <isolated-xdg>
+- omitted localhost ports and fake provider plumbing logs
+- omitted unrelated server/SSE lifecycle noise
+- no auth headers, passwords, tokens, or real provider credentials included
