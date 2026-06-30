@@ -157,7 +157,15 @@ function extractPluginRootPaths(command: string): string[] {
 }
 
 function isPluginRuntimePathArg(arg: string): boolean {
-  return (arg.startsWith("./") || arg.startsWith("../")) && arg.endsWith("/dist/cli.js")
+  const normalized = arg.split("\\").join("/")
+  return (
+    normalized.endsWith(".js") &&
+    normalized.includes("/dist/") &&
+    (normalized.startsWith("./") ||
+      normalized.startsWith("../") ||
+      normalized.startsWith("components/") ||
+      normalized.startsWith("/"))
+  )
 }
 
 interface BundleFileCheckOptions {

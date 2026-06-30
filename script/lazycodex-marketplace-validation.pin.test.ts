@@ -144,6 +144,31 @@ describe("lazycodex marketplace validation guards", () => {
     }
   })
 
+  test("#given a plugin-local MCP runtime path is missing #when validating the plugin bundle #then the target is rejected", async () => {
+    // given
+    const pluginRoot = await mkdtemp(join(tmpdir(), "omo-marketplace-codegraph-runtime-"))
+    await writeRootCliRuntime(pluginRoot)
+    await writePluginMcpManifest(pluginRoot, {
+      mcpServers: {
+        codegraph: {
+          command: "node",
+          args: ["components/codegraph/dist/serve.js"],
+          cwd: ".",
+        },
+      },
+    })
+
+    try {
+      // when
+      const validated = validateLazycodexPluginBundle(pluginRoot)
+
+      // then
+      await expect(validated).rejects.toThrow("missing MCP runtime path for codegraph: components/codegraph/dist/serve.js")
+    } finally {
+      await rm(pluginRoot, { recursive: true, force: true })
+    }
+  })
+
   test("#given an array mcpServers manifest #when validating the plugin bundle #then the manifest is rejected", async () => {
     // given
     const pluginRoot = await mkdtemp(join(tmpdir(), "omo-marketplace-array-manifest-"))
