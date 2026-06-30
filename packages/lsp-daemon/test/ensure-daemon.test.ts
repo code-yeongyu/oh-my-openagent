@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { DaemonUnreachableError, type EnsureDaemonDeps, ensureDaemonRunning } from "../src/ensure-daemon.js";
+import {
+	DaemonUnreachableError,
+	type EnsureDaemonDeps,
+	ensureDaemonRunning,
+	resolveDaemonCliPath,
+} from "../src/ensure-daemon.js";
 import type { LockHandle } from "../src/lock.js";
 import { daemonPaths } from "../src/paths.js";
 
@@ -47,6 +52,16 @@ function makeHarness(config: { probeQueue: boolean[]; lockAvailable: boolean; on
 }
 
 describe("ensureDaemonRunning", () => {
+	it("#given explicit daemon CLI env #when resolving spawn target #then uses that path", () => {
+		expect(resolveDaemonCliPath({ CODEX_LSP_DAEMON_CLI: "/tmp/omo-lsp-daemon-cli.js" })).toBe(
+			"/tmp/omo-lsp-daemon-cli.js",
+		);
+	});
+
+	it("#given blank daemon CLI env #when resolving spawn target #then falls back to bundled cli", () => {
+		expect(resolveDaemonCliPath({ CODEX_LSP_DAEMON_CLI: "  " })).toMatch(/cli\.js$/);
+	});
+
 	it("#given daemon already reachable #when ensure #then does not lock or spawn", async () => {
 		const { deps, counts } = makeHarness({ probeQueue: [true], lockAvailable: true });
 		await ensureDaemonRunning(PATHS, deps);

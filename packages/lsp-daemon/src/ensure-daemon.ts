@@ -11,6 +11,7 @@ import type { DaemonPaths } from "./paths.js";
 const PROBE_TIMEOUT_MS = 500;
 const DEFAULT_READY_TIMEOUT_MS = 5_000;
 const DEFAULT_POLL_INTERVAL_MS = 100;
+const CODEX_LSP_DAEMON_CLI_ENV = "CODEX_LSP_DAEMON_CLI";
 
 export class DaemonUnreachableError extends Error {
 	constructor(socketPath: string) {
@@ -97,7 +98,7 @@ export function spawnDaemonProcess(paths: DaemonPaths): void {
 	mkdirSync(dirname(paths.log), { recursive: true });
 	const logFd = openSync(paths.log, "a");
 	try {
-		const cliPath = fileURLToPath(new URL("./cli.js", import.meta.url));
+		const cliPath = resolveDaemonCliPath();
 		const child = spawn(execPath, [cliPath, "daemon"], {
 			detached: true,
 			stdio: ["ignore", logFd, logFd],
@@ -106,6 +107,12 @@ export function spawnDaemonProcess(paths: DaemonPaths): void {
 	} finally {
 		closeSync(logFd);
 	}
+}
+
+export function resolveDaemonCliPath(env: NodeJS.ProcessEnv = process.env): string {
+	const override = env[CODEX_LSP_DAEMON_CLI_ENV]?.trim();
+	if (override) return override;
+	return fileURLToPath(new URL("./cli.js", import.meta.url));
 }
 
 export function defaultEnsureDaemonDeps(): EnsureDaemonDeps {
@@ -118,8 +125,7 @@ export function defaultEnsureDaemonDeps(): EnsureDaemonDeps {
 		spawnDaemon: (paths) => spawnDaemonProcess(paths),
 		sleep: (ms) =>
 			new Promise((resolve) => {
-				const timer = setTimeout(resolve, ms);
-				timer.unref?.();
+				setTimeout(resolve, ms);
 			}),
 		now: () => Date.now(),
 	};
