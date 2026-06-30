@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, rename, rm } from "node:fs/promises"
+import { cp, mkdir, readFile, readdir, rename, rm } from "node:fs/promises"
 import { basename, dirname, join, sep } from "node:path"
 import { copyBundledMcpRuntimeDists } from "./codex-cache-bundled-mcps"
 import { removeCachedManagedNpmBinShims } from "./codex-cache-bins"
@@ -36,6 +36,7 @@ export async function installCachedPlugin(input: {
     await maybeRunNpmInstall(tempPath, input.runCommand, ["ci", "--omit=dev"])
     await removeCachedManagedNpmBinShims(tempPath)
     if (input.buildSource === false) await maybeRunNpmSyncSkills(tempPath, input.runCommand)
+    await assertNoRemovedSparkshellPromptReferences(tempPath)
     await rewriteCachedMcpManifest(tempPath, input.sourcePath)
     await rewriteCachedManifestRoot(tempPath, tempPath, targetPath)
     await assertHookCommandTargets(tempPath)
@@ -111,6 +112,54 @@ function shouldCopyPluginPath(path: string, root: string): boolean {
   if (relative === "") return true
   const parts = relative.split(sep)
   return !parts.some((part) => part === ".git" || part === "node_modules")
+}
+
+const removedSparkshellReferencePattern = /\b(?:sparkshell|spark[-_\s]+shell)\b/i
+const removedSparkshellPromptSurfaceDirs = new Set([".codex-plugin", "agents", "bundled-rules", "hooks", "skills"])
+const removedSparkshellPromptSurfaceFiles = new Set(["directive.md", "plugin.json"])
+const removedSparkshellTextFilePattern = /\.(?:json|md|toml|ya?ml)$/i
+
+async function assertNoRemovedSparkshellPromptReferences(pluginRoot: string): Promise<void> {
+  for (const filePath of await listRemovedSparkshellPromptSurfaceFiles(pluginRoot, "")) {
+    const content = await readFile(join(pluginRoot, filePath), "utf8")
+    if (!removedSparkshellReferencePattern.test(content)) continue
+    throw new Error(`removed sparkshell reference found in Codex plugin prompt surface: ${filePath}`)
+  }
+}
+
+async function listRemovedSparkshellPromptSurfaceFiles(pluginRoot: string, relativeDirectory: string): Promise<readonly string[]> {
+  const directory = relativeDirectory === "" ? pluginRoot : join(pluginRoot, relativeDirectory)
+  const entries = await readdir(directory, { withFileTypes: true })
+  const files: string[] = []
+  for (const entry of entries) {
+    const relativePath = relativeDirectory === "" ? entry.name : join(relativeDirectory, entry.name)
+    if (entry.isDirectory()) {
+      if (shouldDescendIntoRemovedSparkshellPromptSurface(relativePath)) {
+        files.push(...(await listRemovedSparkshellPromptSurfaceFiles(pluginRoot, relativePath)))
+      }
+      continue
+    }
+    if (shouldCheckRemovedSparkshellPromptFile(relativePath)) files.push(relativePath)
+  }
+  return files.sort()
+}
+
+function shouldDescendIntoRemovedSparkshellPromptSurface(relativePath: string): boolean {
+  const parts = relativePath.split(sep)
+  if (parts.some((part) => part === ".git" || part === "dist" || part === "node_modules")) return false
+  if (parts[0] === "components") {
+    if (parts.length <= 2) return true
+    return removedSparkshellPromptSurfaceDirs.has(parts[2])
+  }
+  return removedSparkshellPromptSurfaceDirs.has(parts[0])
+}
+
+function shouldCheckRemovedSparkshellPromptFile(relativePath: string): boolean {
+  if (!removedSparkshellTextFilePattern.test(relativePath)) return false
+  const parts = relativePath.split(sep)
+  const fileName = parts.at(-1) ?? ""
+  if (parts[0] === "components" && parts.length === 3) return removedSparkshellPromptSurfaceFiles.has(fileName)
+  return removedSparkshellPromptSurfaceDirs.has(parts[0])
 }
 
 async function copyRootRuntimeDists(input: { readonly pluginRoot: string; readonly sourcePath: string }): Promise<void> {

@@ -5907,7 +5907,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "4.14.0",
+    version: "4.14.1",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -6880,7 +6880,7 @@ async function existingNonSymlink(path) {
   }
 }
 // packages/omo-codex/src/install/codex-cache-install.ts
-import { cp as cp2, mkdir as mkdir3, readFile as readFile7, rename, rm as rm3 } from "node:fs/promises";
+import { cp as cp2, mkdir as mkdir3, readFile as readFile7, readdir as readdir3, rename, rm as rm3 } from "node:fs/promises";
 import { basename as basename3, dirname as dirname4, join as join11, sep as sep5 } from "node:path";
 
 // packages/omo-codex/src/install/codex-cache-bundled-mcps.ts
@@ -7445,6 +7445,7 @@ async function installCachedPlugin(input) {
     await removeCachedManagedNpmBinShims(tempPath);
     if (input.buildSource === false)
       await maybeRunNpmSyncSkills(tempPath, input.runCommand);
+    await assertNoRemovedSparkshellPromptReferences(tempPath);
     await rewriteCachedMcpManifest(tempPath, input.sourcePath);
     await rewriteCachedManifestRoot(tempPath, tempPath, targetPath);
     await assertHookCommandTargets(tempPath);
@@ -7523,6 +7524,55 @@ function shouldCopyPluginPath(path, root) {
   const parts = relative4.split(sep5);
   return !parts.some((part) => part === ".git" || part === "node_modules");
 }
+var removedSparkshellReferencePattern = /\b(?:sparkshell|spark[-_\s]+shell)\b/i;
+var removedSparkshellPromptSurfaceDirs = new Set([".codex-plugin", "agents", "bundled-rules", "hooks", "skills"]);
+var removedSparkshellPromptSurfaceFiles = new Set(["directive.md", "plugin.json"]);
+var removedSparkshellTextFilePattern = /\.(?:json|md|toml|ya?ml)$/i;
+async function assertNoRemovedSparkshellPromptReferences(pluginRoot) {
+  for (const filePath of await listRemovedSparkshellPromptSurfaceFiles(pluginRoot, "")) {
+    const content = await readFile7(join11(pluginRoot, filePath), "utf8");
+    if (!removedSparkshellReferencePattern.test(content))
+      continue;
+    throw new Error(`removed sparkshell reference found in Codex plugin prompt surface: ${filePath}`);
+  }
+}
+async function listRemovedSparkshellPromptSurfaceFiles(pluginRoot, relativeDirectory) {
+  const directory = relativeDirectory === "" ? pluginRoot : join11(pluginRoot, relativeDirectory);
+  const entries = await readdir3(directory, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const relativePath = relativeDirectory === "" ? entry.name : join11(relativeDirectory, entry.name);
+    if (entry.isDirectory()) {
+      if (shouldDescendIntoRemovedSparkshellPromptSurface(relativePath)) {
+        files.push(...await listRemovedSparkshellPromptSurfaceFiles(pluginRoot, relativePath));
+      }
+      continue;
+    }
+    if (shouldCheckRemovedSparkshellPromptFile(relativePath))
+      files.push(relativePath);
+  }
+  return files.sort();
+}
+function shouldDescendIntoRemovedSparkshellPromptSurface(relativePath) {
+  const parts = relativePath.split(sep5);
+  if (parts.some((part) => part === ".git" || part === "dist" || part === "node_modules"))
+    return false;
+  if (parts[0] === "components") {
+    if (parts.length <= 2)
+      return true;
+    return removedSparkshellPromptSurfaceDirs.has(parts[2]);
+  }
+  return removedSparkshellPromptSurfaceDirs.has(parts[0]);
+}
+function shouldCheckRemovedSparkshellPromptFile(relativePath) {
+  if (!removedSparkshellTextFilePattern.test(relativePath))
+    return false;
+  const parts = relativePath.split(sep5);
+  const fileName = parts.at(-1) ?? "";
+  if (parts[0] === "components" && parts.length === 3)
+    return removedSparkshellPromptSurfaceFiles.has(fileName);
+  return removedSparkshellPromptSurfaceDirs.has(parts[0]);
+}
 async function copyRootRuntimeDists(input) {
   const repoRoot = repoRootForCodexPluginSource(input.sourcePath);
   if (repoRoot === null)
@@ -7547,7 +7597,7 @@ function repoRootForCodexPluginSource(sourcePath) {
   return dirname4(packagesRoot);
 }
 // packages/omo-codex/src/install/codex-cache-prune.ts
-import { lstat as lstat4, readdir as readdir3, rm as rm4, stat as stat3 } from "node:fs/promises";
+import { lstat as lstat4, readdir as readdir4, rm as rm4, stat as stat3 } from "node:fs/promises";
 import { join as join12 } from "node:path";
 async function pruneMarketplaceCache(input) {
   const cacheRoot = join12(input.codexHome, "plugins", "cache", input.marketplaceName);
@@ -7575,11 +7625,11 @@ async function pruneMarketplacePluginCaches(input) {
 }
 async function readCacheEntries(path) {
   const emptyEntries = [];
-  return readCacheRoot(path, () => readdir3(path, { withFileTypes: true }), emptyEntries);
+  return readCacheRoot(path, () => readdir4(path, { withFileTypes: true }), emptyEntries);
 }
 async function readCacheEntryNames(path) {
   const emptyNames = [];
-  return readCacheRoot(path, () => readdir3(path), emptyNames);
+  return readCacheRoot(path, () => readdir4(path), emptyNames);
 }
 async function readCacheRoot(path, readEntries, fallback) {
   try {
@@ -8741,7 +8791,7 @@ function toCodexResolution(resolution) {
 }
 
 // packages/omo-codex/src/install/link-cached-plugin-agents.ts
-import { copyFile, lstat as lstat7, mkdir as mkdir6, readFile as readFile13, readdir as readdir4, rm as rm6, writeFile as writeFile6 } from "node:fs/promises";
+import { copyFile, lstat as lstat7, mkdir as mkdir6, readFile as readFile13, readdir as readdir5, rm as rm6, writeFile as writeFile6 } from "node:fs/promises";
 import { basename as basename5, join as join19 } from "node:path";
 
 // packages/omo-codex/src/install/retired-managed-agent-purge.ts
@@ -8809,7 +8859,7 @@ async function capturePreservedAgentReasoning(input) {
   if (!await exists4(agentsDir))
     return new Map;
   const preserved = new Map;
-  const agentEntries = await readdir4(agentsDir, { withFileTypes: true });
+  const agentEntries = await readdir5(agentsDir, { withFileTypes: true });
   for (const entry of agentEntries) {
     if (!entry.name.endsWith(".toml"))
       continue;
@@ -8827,7 +8877,7 @@ async function capturePreservedAgentServiceTier(input) {
   if (!await exists4(agentsDir))
     return new Map;
   const preserved = new Map;
-  const agentEntries = await readdir4(agentsDir, { withFileTypes: true });
+  const agentEntries = await readdir5(agentsDir, { withFileTypes: true });
   for (const entry of agentEntries) {
     if (!entry.name.endsWith(".toml"))
       continue;
@@ -8884,7 +8934,7 @@ async function discoverBundledAgents(pluginRoot) {
   const componentsRoot = join19(pluginRoot, "components");
   if (!await exists4(componentsRoot))
     return [];
-  const componentEntries = await readdir4(componentsRoot, { withFileTypes: true });
+  const componentEntries = await readdir5(componentsRoot, { withFileTypes: true });
   const agents = [];
   for (const entry of componentEntries) {
     if (!entry.isDirectory())
@@ -8892,7 +8942,7 @@ async function discoverBundledAgents(pluginRoot) {
     const agentsRoot = join19(componentsRoot, entry.name, "agents");
     if (!await exists4(agentsRoot))
       continue;
-    const agentEntries = await readdir4(agentsRoot, { withFileTypes: true });
+    const agentEntries = await readdir5(agentsRoot, { withFileTypes: true });
     for (const file2 of agentEntries) {
       if (!file2.isFile() || !file2.name.endsWith(".toml"))
         continue;
@@ -9199,7 +9249,7 @@ function shouldCopyMarketplaceSourcePath(path, root) {
 }
 
 // packages/omo-codex/src/install/lazycodex-version-stamp.ts
-import { readdir as readdir5, readFile as readFile15, writeFile as writeFile8 } from "node:fs/promises";
+import { readdir as readdir6, readFile as readFile15, writeFile as writeFile8 } from "node:fs/promises";
 import { join as join22 } from "node:path";
 async function readDistributionManifest(repoRoot) {
   try {
@@ -9292,7 +9342,7 @@ async function stampHookStatusMessages(path, version) {
 async function stampComponentVersions(input) {
   let entries;
   try {
-    entries = await readdir5(join22(input.pluginRoot, "components"));
+    entries = await readdir6(join22(input.pluginRoot, "components"));
   } catch (error) {
     if (error instanceof Error)
       return;
@@ -9555,7 +9605,7 @@ function formatUnknownError(error) {
 }
 
 // packages/omo-codex/src/install/lsp-daemon-reaper.ts
-import { readFile as readFile17, readdir as readdir6, rm as rm8 } from "node:fs/promises";
+import { readFile as readFile17, readdir as readdir7, rm as rm8 } from "node:fs/promises";
 import { connect } from "node:net";
 import { join as join24 } from "node:path";
 async function reapLspDaemons(codexHome, deps = {}) {
@@ -9565,7 +9615,7 @@ async function reapLspDaemons(codexHome, deps = {}) {
   const reaped = [];
   let entries;
   try {
-    entries = await readdir6(daemonRoot);
+    entries = await readdir7(daemonRoot);
   } catch {
     return reaped;
   }

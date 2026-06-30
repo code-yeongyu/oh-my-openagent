@@ -178,6 +178,32 @@ describe("codex-cache", () => {
     expect(await readFile(join(installed.path, "package-lock.json"), "utf8")).toBe(lockfile)
   })
 
+  test("#given stale sparkshell guidance in prompt surfaces #when caching plugin #then cache promotion is rejected", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-sparkshell-"))
+    const codexHome = join(root, "codex-home")
+    const sourceRoot = join(root, "plugin")
+    await mkdir(join(sourceRoot, "skills", "ulw-loop", "references"), { recursive: true })
+    await writeFile(join(sourceRoot, "package.json"), JSON.stringify({ name: "@scope/omo", version: "0.1.0" }))
+    await writeFile(
+      join(sourceRoot, "skills", "ulw-loop", "references", "full-workflow.md"),
+      "After compaction, run `omo sparkshell cat .omo/ulw-loop/ledger.jsonl` first.\n",
+    )
+
+    // when / then
+    await expect(
+      installCachedPlugin({
+        codexHome,
+        marketplaceName: "debug",
+        name: "omo",
+        sourcePath: sourceRoot,
+        version: "0.1.0",
+        runCommand: async () => undefined,
+      }),
+    ).rejects.toThrow(/removed sparkshell/i)
+    await expect(stat(join(codexHome, "plugins", "cache", "debug", "omo", "0.1.0"))).rejects.toThrow()
+  })
+
   test("#given existing cache #when npm install fails #then previous active cache is preserved", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-install-fail-"))
