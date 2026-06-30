@@ -307,6 +307,50 @@ describe("look-at tool", () => {
   })
 
   describe("createLookAt model passthrough", () => {
+    test("#given current model supports native vision #when look_at executes #then it skips multimodal-looker delegation", async () => {
+      setVisionCapableModelsCache(new Map([["openai/gpt-5.5", { providerID: "openai", modelID: "gpt-5.5" }]]))
+
+      const createSession = mock(async () => {
+        throw new Error("look_at should not create a multimodal-looker session")
+      })
+
+      const mockClient = {
+        session: {
+          messages: async () => ({
+            data: [
+              {
+                id: "parent-message",
+                info: {
+                  role: "assistant",
+                  model: { providerID: "openai", modelID: "gpt-5.5" },
+                  time: { created: 1 },
+                },
+              },
+            ],
+          }),
+          get: async () => ({ data: { directory: "/project" } }),
+          create: createSession,
+          prompt: async () => ({}),
+        },
+      }
+
+      const tool = createLookAt(unsafeTestValue({
+        client: mockClient,
+        directory: "/project",
+      }))
+
+      const result = await tool.execute(
+        { file_path: "/test/file.png", goal: "analyze image" },
+        createToolContext(),
+      )
+
+      expect(createSession).not.toHaveBeenCalled()
+      expect(result).toContain("native vision")
+      expect(result).toContain("Read")
+      expect(result).toContain("/test/file.png")
+      expect(result).not.toContain("multimodal-looker")
+    })
+
     // given multimodal-looker agent has resolved model info
     // when LookAt tool executed
     // then model info should be passed to sync prompt
