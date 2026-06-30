@@ -158,7 +158,10 @@ function shouldCheckRemovedSparkshellPromptFile(relativePath: string): boolean {
   if (!removedSparkshellTextFilePattern.test(relativePath)) return false
   const parts = relativePath.split(sep)
   const fileName = parts.at(-1) ?? ""
-  if (parts[0] === "components" && parts.length === 3) return removedSparkshellPromptSurfaceFiles.has(fileName)
+  if (parts[0] === "components") {
+    if (parts.length === 3) return removedSparkshellPromptSurfaceFiles.has(fileName)
+    return parts.length > 3 && removedSparkshellPromptSurfaceDirs.has(parts[2])
+  }
   return removedSparkshellPromptSurfaceDirs.has(parts[0])
 }
 
