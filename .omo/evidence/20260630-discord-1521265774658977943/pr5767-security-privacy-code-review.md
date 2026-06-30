@@ -8,11 +8,13 @@ Initial verdict:
 
 Initial blocker:
 - `discord-sanitized-summary.md` included a full Discord message URL plus guild/channel metadata and a channel name.
+- It also included report access-method metadata that was not needed for review.
 
 Follow-up resolution:
 - Removed the full Discord URL.
 - Removed guild/channel identifiers.
 - Removed the channel name.
+- Removed access-method metadata.
 - Kept only a sanitized statement that the issue came from a private Discord report supplied by the requester.
 
 Non-blocking checks from review:

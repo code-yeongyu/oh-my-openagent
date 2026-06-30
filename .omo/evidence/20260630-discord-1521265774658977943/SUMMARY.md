@@ -1,7 +1,7 @@
 # QA Evidence Summary
 
 Issue source:
-- Private Discord report supplied by the requester; raw content and Discord URL/channel metadata intentionally omitted.
+- Private Discord report supplied by the requester; raw content, Discord URL/channel metadata, and access metadata intentionally omitted.
 - Sanitized issue summary: `discord-sanitized-summary.md`.
 
 Change:
@@ -18,6 +18,7 @@ GREEN evidence:
 - `bun-test-full-v5.txt`: compact full `bun test` summary; stdout body intentionally omitted from the committed artifact while preserving counts, duration, and exit code.
 - `build-v3.txt`: `bun run build` exited 0 and records command, timestamps, git head, and dirty-state.
 - `opencode-qa-common-self-check.txt` and `opencode-qa-cli-probe.txt`: explicit opencode-qa harness and CLI availability proof.
+- `pr5770-privacy-rescan-v2.txt`: follow-up privacy scan after removing access metadata; records zero matches without printing private identifiers.
 - LSP diagnostics on `system.ts` and `system.test.ts`: no diagnostics found.
 
 Manual QA:
@@ -27,5 +28,5 @@ Manual QA:
 - Cleanup: removed `/tmp/omo-doctor-trust-rerun-v3-Kvd7vG`.
 
 Omitted:
-- Raw Discord message text, message URL, guild/channel identifiers, and channel name were not copied into artifacts or PR text.
+- Raw Discord message text, message URL, guild/channel identifiers, channel name, and access metadata were not copied into artifacts or PR text.
 - Earlier intermediate wrapper attempts remain on disk but are not part of the committed evidence set.

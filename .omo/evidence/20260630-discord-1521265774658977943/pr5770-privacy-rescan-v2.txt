@@ -1,0 +1,13 @@
+command=privacy marker class scan over target evidence directory; exact private marker values omitted
+timestamp_start=2026-06-30T05:01:35Z
+git_head_before=e6e1df93eb4047dc0b38f9e1fc412f9f41b64457
+git_status_before=
+ M .omo/evidence/20260630-discord-1521265774658977943/SUMMARY.md
+ M .omo/evidence/20260630-discord-1521265774658977943/discord-sanitized-summary.md
+ M .omo/evidence/20260630-discord-1521265774658977943/post-merge-evidence-metadata.txt
+ M .omo/evidence/20260630-discord-1521265774658977943/pr5767-security-privacy-code-review.md
+public_marker_classes=discord_message_locator,channel_path,channel_name,access_metadata_label,url_label
+public_marker_scan=PASS zero matches
+private_identifier_scan=PASS zero matches; exact values omitted
+timestamp_end=2026-06-30T05:01:35Z
+privacy_rescan_exit=0

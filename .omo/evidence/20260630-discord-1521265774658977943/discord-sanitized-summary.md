@@ -2,8 +2,7 @@
 
 Source:
 - Private Discord report supplied by the requester.
-- Access method: logged-in browser session opened the referenced report.
-- Raw Discord content, guild/channel identifiers, message URL, and channel name are intentionally not copied here.
+- Raw Discord content, guild/channel identifiers, message URL, channel name, and access metadata are intentionally not copied here.
 
 Issue summary:
 - `omo doctor` can report the loaded OpenCode plugin as outdated after an update attempt.
