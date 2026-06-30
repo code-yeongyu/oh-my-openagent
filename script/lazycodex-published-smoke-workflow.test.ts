@@ -31,9 +31,17 @@ describe("published LazyCodex smoke workflow", () => {
     const removedStrictInstallGate = !workflow.includes(
       'test "$npx_install_output" = "npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous"',
     )
+    const expectsWindowsSafeInstallShape = workflow.includes(
+      '"npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous"',
+    )
+    const rejectsLegacyInstallShape = !workflow.includes(
+      '"npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous"',
+    )
     const removedStrictDoctorGate = !workflow.includes(
       'test "$npx_doctor_output" = "npx --yes --package oh-my-openagent omo doctor"',
     )
+    const keepsDoctorAsCodexWorkflow = workflow.includes('case "$npx_doctor_output" in') &&
+      workflow.includes("codex\\ exec*) ;;")
 
     // #then
     expect(hasSmokeJob, "CI must expose a published LazyCodex registry smoke job").toBe(true)
@@ -45,6 +53,9 @@ describe("published LazyCodex smoke workflow", () => {
     expect(warnsOnInstallMismatch, "publish workflow must warn instead of failing when lazycodex install output changes").toBe(true)
     expect(warnsOnDoctorMismatch, "publish workflow must warn instead of failing when lazycodex doctor output changes").toBe(true)
     expect(removedStrictInstallGate, "publish workflow must not use the strict lazycodex install equality gate").toBe(true)
+    expect(expectsWindowsSafeInstallShape, "published smoke must expect the Windows-safe direct package install command").toBe(true)
+    expect(rejectsLegacyInstallShape, "published smoke must not expect the Windows-broken --package omo install command").toBe(true)
     expect(removedStrictDoctorGate, "publish workflow must not use the strict lazycodex doctor equality gate").toBe(true)
+    expect(keepsDoctorAsCodexWorkflow, "published smoke must keep doctor routed through the Codex workflow").toBe(true)
   })
 })
