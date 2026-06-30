@@ -1,0 +1,13 @@
+Manual QA: OpenCode native skill loading through OmO skill surfaces
+Started: 2026-06-30T05:04:23Z
+opencode_version: 1.17.8
+real_db_path: /Users/yeongyu/.local/share/opencode/opencode.db
+real_db_sessions_before: 5737
+isolated_server_url: http://127.0.0.1:50820
+isolated_project: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/oqa-xdg.XXXXXX.sBooluwiGL/proj
+isolated_home: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/oqa-xdg.XXXXXX.sBooluwiGL/home
+isolated_xdg_config: /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/oqa-xdg.XXXXXX.sBooluwiGL/config
+real_db_sessions_after: 5737
+real_db_isolation: unchanged
+bun_skill_tool_exit: 0
+Finished: 2026-06-30T05:04:24Z

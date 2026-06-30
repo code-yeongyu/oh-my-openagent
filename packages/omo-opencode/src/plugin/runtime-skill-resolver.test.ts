@@ -1,6 +1,9 @@
-import { describe, it, expect } from "bun:test"
-import { createRuntimeSkillsResolver, type RuntimeHostSkills } from "./runtime-skill-resolver"
+import { describe, it, expect, mock } from "bun:test"
+import { createNativeSkillsAccessor, createRuntimeSkillsResolver, type RuntimeHostSkills } from "./runtime-skill-resolver"
 import type { LoadedSkill } from "../features/opencode-skill-loader/types"
+import type { SkillLoadOptions } from "../tools/skill/types"
+
+import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 
 function skill(name: string, mcp?: Record<string, unknown>): LoadedSkill {
   return {
@@ -120,5 +123,146 @@ describe("createRuntimeSkillsResolver", () => {
 
     // then
     expect(result).toBe(base)
+  })
+})
+
+describe("createNativeSkillsAccessor", () => {
+  it("#given current OpenCode exposes app.skills #when native skills are loaded #then normal OpenCode skills are returned", async () => {
+    const appSkills = mock(async (_parameters: unknown) => ({
+      data: [
+        {
+          name: "customize-opencode",
+          location: "<built-in>",
+          content: "Use OpenCode config schemas.",
+        },
+        {
+          name: "project-skill",
+          description: "Project skill from .agents",
+          location: "/tmp/project/.agents/skills/project-skill/SKILL.md",
+          content: "Project skill body",
+        },
+      ],
+    }))
+
+    const nativeSkills = createNativeSkillsAccessor(unsafeTestValue({
+      directory: "/tmp/project",
+      client: { app: { skills: appSkills } },
+    }))
+
+    expect(nativeSkills).toBeDefined()
+    expect(await nativeSkills?.all()).toEqual([
+      {
+        name: "customize-opencode",
+        description: "",
+        location: "<built-in>",
+        content: "Use OpenCode config schemas.",
+      },
+      {
+        name: "project-skill",
+        description: "Project skill from .agents",
+        location: "/tmp/project/.agents/skills/project-skill/SKILL.md",
+        content: "Project skill body",
+      },
+    ])
+    expect(await nativeSkills?.get("project-skill")).toEqual({
+      name: "project-skill",
+      description: "Project skill from .agents",
+      location: "/tmp/project/.agents/skills/project-skill/SKILL.md",
+      content: "Project skill body",
+    })
+    expect(await nativeSkills?.dirs()).toEqual(["/tmp/project/.agents/skills/project-skill"])
+    expect(appSkills.mock.calls[0]?.[0]).toEqual({ directory: "/tmp/project" })
+  })
+
+  it("#given app.skills needs the generated SDK query shape #when direct loading has no data #then it falls back to query.directory", async () => {
+    const appSkills = mock(async (parameters: unknown) => {
+      if (parameters && typeof parameters === "object" && "query" in parameters) {
+        return {
+          data: [{
+            name: "query-shape-skill",
+            description: "Older generated SDK shape",
+            location: "/tmp/project/.opencode/skills/query-shape-skill/SKILL.md",
+            content: "Query shape body",
+          }],
+        }
+      }
+      return { data: [] }
+    })
+
+    const nativeSkills = createNativeSkillsAccessor(unsafeTestValue({
+      directory: "/tmp/project",
+      client: { app: { skills: appSkills } },
+    }))
+
+    expect(await nativeSkills?.all()).toEqual([{
+      name: "query-shape-skill",
+      description: "Older generated SDK shape",
+      location: "/tmp/project/.opencode/skills/query-shape-skill/SKILL.md",
+      content: "Query shape body",
+    }])
+    expect(appSkills.mock.calls[1]?.[0]).toEqual({ query: { directory: "/tmp/project" } })
+  })
+
+  it("#given app.skills throws #when native skills are loaded #then it degrades to an empty accessor result", async () => {
+    const appSkills = mock(async () => {
+      throw new Error("skill endpoint unavailable")
+    })
+
+    const nativeSkills = createNativeSkillsAccessor(unsafeTestValue({
+      directory: "/tmp/project",
+      client: { app: { skills: appSkills } },
+    }))
+
+    expect(await nativeSkills?.all()).toEqual([])
+    expect(await nativeSkills?.get("missing")).toBeUndefined()
+    expect(await nativeSkills?.dirs()).toEqual([])
+  })
+
+  it("#given a legacy PluginInput.skills accessor #when native skills are requested #then it is preferred over app.skills", async () => {
+    const legacySkills: NonNullable<SkillLoadOptions["nativeSkills"]> = {
+      all() {
+        return [{
+          name: "legacy-skill",
+          description: "Legacy native skill",
+          location: "/tmp/legacy/skills/legacy-skill/SKILL.md",
+          content: "Legacy body",
+        }]
+      },
+      get(name: string) {
+        return name === "legacy-skill"
+          ? {
+            name: "legacy-skill",
+            description: "Legacy native skill",
+            location: "/tmp/legacy/skills/legacy-skill/SKILL.md",
+            content: "Legacy body",
+          }
+          : undefined
+      },
+      dirs() {
+        return ["/tmp/legacy/skills/legacy-skill"]
+      },
+    }
+    const appSkills = mock(async () => ({
+      data: [{
+        name: "app-skill",
+        description: "App skill",
+        location: "/tmp/app/skills/app-skill/SKILL.md",
+        content: "App body",
+      }],
+    }))
+
+    const nativeSkills = createNativeSkillsAccessor(unsafeTestValue({
+      directory: "/tmp/project",
+      client: { app: { skills: appSkills } },
+      skills: legacySkills,
+    }))
+
+    expect(await nativeSkills?.all()).toEqual([{
+      name: "legacy-skill",
+      description: "Legacy native skill",
+      location: "/tmp/legacy/skills/legacy-skill/SKILL.md",
+      content: "Legacy body",
+    }])
+    expect(appSkills).not.toHaveBeenCalled()
   })
 })

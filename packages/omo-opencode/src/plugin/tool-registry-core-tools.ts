@@ -1,5 +1,4 @@
 import type { ToolDefinition } from "@opencode-ai/plugin"
-import type { SkillLoadOptions } from "../tools/skill/types"
 import type { AvailableCategory } from "../agents/dynamic-agent-prompt-builder"
 import type { OhMyOpenCodeConfig } from "../config"
 import type { Managers } from "../create-managers"
@@ -12,7 +11,7 @@ import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
 import { log } from "../shared"
 import { getSisyphusJuniorModelOverride } from "./tool-registry-team-tools"
 import { createSkillContext } from "./skill-context"
-import { createRuntimeSkillsResolver, readRuntimeHostSkills } from "./runtime-skill-resolver"
+import { createNativeSkillsAccessor, createRuntimeSkillsResolver, readRuntimeHostSkills } from "./runtime-skill-resolver"
 
 export function createCoreTools(args: {
   readonly ctx: PluginContext
@@ -35,6 +34,7 @@ export function createCoreTools(args: {
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
     (agent) => agent.toLowerCase() === "multimodal-looker",
   )
+  const nativeSkills = createNativeSkillsAccessor(ctx)
   const delegateTask = factories.createDelegateTask({
     manager: managers.backgroundManager,
     client: ctx.client,
@@ -48,7 +48,7 @@ export function createCoreTools(args: {
     teamModeEnabled: pluginConfig.team_mode?.enabled ?? false,
     availableCategories,
     availableSkills: skillContext.availableSkills,
-    nativeSkills: "skills" in ctx ? (ctx as { skills: SkillLoadOptions["nativeSkills"] }).skills : undefined,
+    nativeSkills,
     sisyphusAgentConfig: pluginConfig.sisyphus_agent,
     syncPollTimeoutMs: pluginConfig.background_task?.syncPollTimeoutMs,
     modelFallbackControllerAccessor: managers.modelFallbackControllerAccessor,
@@ -109,7 +109,7 @@ export function createCoreTools(args: {
     browserProvider: skillContext.browserProvider,
     disabledSkills: skillContext.disabledSkills,
     teamModeEnabled: pluginConfig.team_mode?.enabled ?? false,
-    nativeSkills: "skills" in ctx ? (ctx as { skills: SkillLoadOptions["nativeSkills"] }).skills : undefined,
+    nativeSkills,
     pluginsEnabled: pluginConfig.claude_code?.plugins ?? true,
     enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
     includeSkillsInDescription: true,

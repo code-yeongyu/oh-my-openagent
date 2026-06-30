@@ -1,5 +1,6 @@
 import { describe, expect, mock, test } from "bun:test"
 import { tool } from "@opencode-ai/plugin"
+import type { DelegateTaskToolOptions } from "../tools/delegate-task/types"
 import type { SkillLoadOptions } from "../tools/skill/types"
 import type { ToolRegistryFactories } from "./tool-registry-factories"
 
@@ -14,17 +15,20 @@ const fakeTool = tool({
   },
 })
 
-function createFactories(createSkillTool: (options: SkillLoadOptions) => typeof fakeTool): ToolRegistryFactories {
+function createFactories(args: {
+  readonly createSkillTool: (options: SkillLoadOptions) => typeof fakeTool
+  readonly createDelegateTask?: (options: DelegateTaskToolOptions) => typeof fakeTool
+}): ToolRegistryFactories {
   return {
     createBackgroundTools: () => ({}),
     createCallOmoAgent: () => fakeTool,
     createLookAt: () => fakeTool,
     createSkillMcpTool: () => fakeTool,
-    createSkillTool,
+    createSkillTool: args.createSkillTool,
     createGrepTools: () => ({}),
     createGlobTools: () => ({}),
     createSessionManagerTools: () => ({}),
-    createDelegateTask: () => fakeTool,
+    createDelegateTask: args.createDelegateTask ?? (() => fakeTool),
     discoverCommandsSync: () => [],
     interactive_bash: fakeTool,
     createTaskCreateTool: () => fakeTool,
@@ -72,11 +76,72 @@ describe("#given disabled native skills in the registry skill context", () => {
         disabledSkills,
       },
       availableCategories: [],
-      factories: createFactories(createSkillTool),
+      factories: createFactories({ createSkillTool }),
     })
 
     // then
     expect(createSkillTool).toHaveBeenCalledTimes(1)
     expect(createSkillTool.mock.calls[0]?.[0].disabledSkills).toBe(disabledSkills)
+  })
+
+  test("#given current OpenCode exposes skills through the app skill endpoint #when core tools register the skill tool #then the skill tool can load native skills", async () => {
+    // given
+    const createSkillTool = mock((options: SkillLoadOptions) => fakeTool)
+    const createDelegateTask = mock((options: DelegateTaskToolOptions) => fakeTool)
+    const appSkills = mock(async () => ({
+      data: [
+        {
+          name: "customize-opencode",
+          description: "Built-in OpenCode config skill",
+          location: "<built-in>",
+          content: "Use OpenCode config schemas.",
+        },
+      ],
+    }))
+
+    // when
+    createCoreTools({
+      ctx: unsafeTestValue({
+        directory: "/tmp/project",
+        client: {
+          app: {
+            skills: appSkills,
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({
+        disabled_agents: ["multimodal-looker"],
+      }),
+      managers: unsafeTestValue({
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+        modelFallbackControllerAccessor: {},
+      }),
+      skillContext: {
+        mergedSkills: [],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+      factories: createFactories({ createSkillTool, createDelegateTask }),
+    })
+
+    // then
+    const nativeSkills = createSkillTool.mock.calls[0]?.[0].nativeSkills
+    const delegateNativeSkills = createDelegateTask.mock.calls[0]?.[0].nativeSkills
+    expect(nativeSkills).toBeDefined()
+    expect(delegateNativeSkills).toBe(nativeSkills)
+    const loaded = await nativeSkills?.all()
+    expect(appSkills).toHaveBeenCalledWith({ directory: "/tmp/project" })
+    expect(loaded).toEqual([
+      {
+        name: "customize-opencode",
+        description: "Built-in OpenCode config skill",
+        location: "<built-in>",
+        content: "Use OpenCode config schemas.",
+      },
+    ])
   })
 })

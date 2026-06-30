@@ -1,0 +1,32 @@
+[
+  {
+    "name": "claude-normal-skill",
+    "description": "Skill from project .claude normal path",
+    "location": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/oqa-xdg.XXXXXX.sBooluwiGL/proj/.claude/skills/claude-normal-skill/SKILL.md",
+    "content_preview": "CLAUDE_NORMAL_SKILL_BODY_FROM_PROJECT_CLAUDE\n"
+  },
+  {
+    "name": "config-normal-skill",
+    "description": "Skill from isolated OpenCode config skills path",
+    "location": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/oqa-xdg.XXXXXX.sBooluwiGL/config/opencode/skills/config-normal-skill/SKILL.md",
+    "content_preview": "CONFIG_NORMAL_SKILL_BODY_FROM_XDG_CONFIG\n"
+  },
+  {
+    "name": "customize-opencode",
+    "description": "Use ONLY when the user is editing or creating opencode's own configuration: opencode.json, opencode.jsonc, files under .opencode/, or files under ~/.config/opencode/. Also use when creating or fixing opencode agents, subagents, skills, plugins, MCP servers, or permission rules. Do not use for the user's own application code, or for any project that is not configuring opencode itself.",
+    "location": "<built-in>",
+    "content_preview": "<!--\n  Built-in skill. Name and description are registered in code at\n  packages/core/src/plugin/skill.ts\n  and CUSTOMIZ"
+  },
+  {
+    "name": "global-normal-skill",
+    "description": "Skill from isolated HOME .agents normal path",
+    "location": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/oqa-xdg.XXXXXX.sBooluwiGL/home/.agents/skills/global-normal-skill/SKILL.md",
+    "content_preview": "GLOBAL_NORMAL_SKILL_BODY_FROM_HOME_AGENTS\n"
+  },
+  {
+    "name": "user-normal-skill",
+    "description": "User skill from project .agents normal path",
+    "location": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/oqa-xdg.XXXXXX.sBooluwiGL/proj/.agents/skills/user-normal-skill/SKILL.md",
+    "content_preview": "USER_NORMAL_SKILL_BODY_FROM_PROJECT_AGENTS\n"
+  }
+]

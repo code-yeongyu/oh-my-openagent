@@ -1,0 +1,15 @@
+{
+  "nativeSkillNames": [
+    "claude-normal-skill",
+    "config-normal-skill",
+    "customize-opencode",
+    "global-normal-skill",
+    "user-normal-skill"
+  ],
+  "skillToolLoadedUserSkill": true,
+  "skillToolBaseDirectory": "/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/oqa-xdg.XXXXXX.sBooluwiGL/proj/.agents/skills/user-normal-skill",
+  "delegateLoadedGlobalSkill": true,
+  "permissionPatterns": [
+    "user-normal-skill"
+  ]
+}
