@@ -16,6 +16,11 @@ const GUIDANCE_FILES = [
   "packages/prompts-core/prompts/atlas/glm.md",
   "packages/shared-skills/skills/ulw-plan/SKILL.md",
   "packages/shared-skills/skills/init-deep/SKILL.md",
+  "packages/omo-codex/plugin/components/ultrawork/directive.md",
+  "packages/omo-codex/plugin/components/ultrawork/skills/ulw-plan/SKILL.md",
+  "packages/omo-codex/plugin/components/ulw-loop/directive.md",
+  "packages/omo-codex/plugin/skills/ulw-plan/SKILL.md",
+  "packages/omo-codex/plugin/skills/init-deep/SKILL.md",
 ] as const
 
 const REQUIRED_GUIDANCE = [
@@ -26,7 +31,7 @@ const REQUIRED_GUIDANCE = [
 ] as const
 
 describe("CodeGraph tool guidance", () => {
-  test("#given source prompts and shared skills #when CodeGraph guidance is inspected #then it names harness-exposed tools", async () => {
+  test("#given source prompts and installed skill guidance #when CodeGraph guidance is inspected #then it names harness-exposed tools", async () => {
     const offenders: string[] = []
 
     for (const filePath of GUIDANCE_FILES) {
