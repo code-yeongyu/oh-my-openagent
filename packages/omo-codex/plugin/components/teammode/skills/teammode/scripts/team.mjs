@@ -35,6 +35,7 @@ import {
 	setMemberStatus,
 	setMemberWorktree,
 	teamExists,
+	withTeamLock,
 	writeGuideAtomic,
 	writeTeamAtomic,
 } from "./team-state.mjs";
@@ -82,57 +83,71 @@ async function persist(team, dir) {
 	await writeGuideAtomic(team, buildGuide(team), dir);
 }
 
+async function mutateTeam(cwd, sessionId, command, fn) {
+	const dir = await assertSafeTeamDir(cwd, sessionId);
+	return withTeamLock(dir, command, async () => {
+		const team = await readTeam(dir);
+		return fn(team, dir);
+	});
+}
+
 const handlers = {
 	async init(cwd, flags) {
 		const teamName = requireFlag(flags, "name");
 		const sessionName = requireFlag(flags, "session-name");
 		const sessionId = typeof flags.session === "string" ? flags.session : `team-${randomUUID().slice(0, 8)}`;
 		const dir = await ensureTeamDir(cwd, sessionId);
-		if (await teamExists(dir)) {
-			process.stdout.write(`exists: ${dir} (left untouched; re-init is a safe no-op)\n`);
-			return;
-		}
-		const team = buildTeam({
-			teamName,
-			sessionName,
-			sessionId,
-			dir,
-			worktreeEnabled: flags.worktree === true,
-			baseBranch: typeof flags["base-branch"] === "string" ? flags["base-branch"] : "dev",
+		await withTeamLock(dir, "init", async () => {
+			if (await teamExists(dir)) {
+				process.stdout.write(`exists: ${dir} (left untouched; re-init is a safe no-op)\n`);
+				return;
+			}
+			const team = buildTeam({
+				teamName,
+				sessionName,
+				sessionId,
+				dir,
+				worktreeEnabled: flags.worktree === true,
+				baseBranch: typeof flags["base-branch"] === "string" ? flags["base-branch"] : "dev",
+			});
+			await persist(team, dir);
+			process.stdout.write(`created: ${dir}\n`);
+			process.stdout.write(`team.json + guide.md written; artifacts/ ready. session id: ${sessionId}\n`);
+			process.stdout.write(`next: add-member --team ${sessionId} --id A --name "<short role>" --focus "<part/ownership/perspective>" --lens area|ownership|perspective --deliverable "<...>"\n`);
 		});
-		await persist(team, dir);
-		process.stdout.write(`created: ${dir}\n`);
-		process.stdout.write(`team.json + guide.md written; artifacts/ ready. session id: ${sessionId}\n`);
-		process.stdout.write(`next: add-member --team ${sessionId} --id A --name "<short role>" --focus "<part/ownership/perspective>" --lens area|ownership|perspective --deliverable "<...>"\n`);
 	},
 
 	async "add-member"(cwd, flags) {
 		const sessionId = requireFlag(flags, "team");
-		const { dir, team } = await loadTeam(cwd, sessionId);
 		const memberId = requireFlag(flags, "id").trim();
-		addMember(team, {
+		const memberInput = {
 			id: memberId,
 			name: typeof flags.name === "string" ? flags.name : null,
 			focus: requireFlag(flags, "focus"),
 			lens: requireFlag(flags, "lens"),
 			deliverable: typeof flags.deliverable === "string" ? flags.deliverable : "",
 			branch: typeof flags.branch === "string" ? flags.branch : null,
+		};
+		const { team, member } = await mutateTeam(cwd, sessionId, "add-member", async (team, dir) => {
+			addMember(team, memberInput);
+			await persist(team, dir);
+			return { team, member: team.members.find((m) => m.id === memberId) };
 		});
-		await persist(team, dir);
-		const member = team.members.find((m) => m.id === memberId);
 		process.stdout.write(`added member ${memberId} to team ${sessionId}.\n\nSend this as the new thread's first message (title the thread "${member.threadTitle}"):\n---\n${buildMemberPrompt(team, memberId)}\n---\n`);
 	},
 
 	async "bind-thread"(cwd, flags) {
 		const sessionId = requireFlag(flags, "team");
-		const { dir, team } = await loadTeam(cwd, sessionId);
-		bindThread(team, {
+		const input = {
 			id: requireFlag(flags, "id"),
 			threadId: requireFlag(flags, "thread"),
 			cwd: typeof flags.cwd === "string" ? flags.cwd : null,
 			worktreePath: typeof flags["worktree-path"] === "string" ? flags["worktree-path"] : null,
+		};
+		await mutateTeam(cwd, sessionId, "bind-thread", async (team, dir) => {
+			bindThread(team, input);
+			await persist(team, dir);
 		});
-		await persist(team, dir);
 		process.stdout.write(`bound member ${flags.id} to thread ${flags.thread}.\n`);
 	},
 
@@ -144,25 +159,29 @@ const handlers = {
 
 	async "set-status"(cwd, flags) {
 		const sessionId = requireFlag(flags, "team");
-		const { dir, team } = await loadTeam(cwd, sessionId);
-		setMemberStatus(team, {
+		const input = {
 			id: requireFlag(flags, "id"),
 			status: requireFlag(flags, "status"),
 			note: typeof flags.note === "string" ? flags.note : "",
+		};
+		await mutateTeam(cwd, sessionId, "set-status", async (team, dir) => {
+			setMemberStatus(team, input);
+			await persist(team, dir);
 		});
-		await persist(team, dir);
 		process.stdout.write(`member ${flags.id} -> ${flags.status}\n`);
 	},
 
 	async "worktree-add"(cwd, flags) {
 		const sessionId = requireFlag(flags, "team");
-		const { dir, team } = await loadTeam(cwd, sessionId);
-		const member = memberOrThrow(team, requireFlag(flags, "id"));
-		const result = addMemberWorktree(cwd, team, member, {
-			baseBranch: typeof flags["base-branch"] === "string" ? flags["base-branch"] : null,
+		const memberId = requireFlag(flags, "id");
+		const baseBranch = typeof flags["base-branch"] === "string" ? flags["base-branch"] : null;
+		const { member, result } = await mutateTeam(cwd, sessionId, "worktree-add", async (team, dir) => {
+			const member = memberOrThrow(team, memberId);
+			const result = addMemberWorktree(cwd, team, member, { baseBranch });
+			setMemberWorktree(team, { id: member.id, path: result.path, branch: result.branch });
+			await persist(team, dir);
+			return { member, result };
 		});
-		setMemberWorktree(team, { id: member.id, path: result.path, branch: result.branch });
-		await persist(team, dir);
 		const note = result.created ? "" : " (already exists)";
 		const thread = member.threadId
 			? `\nMember thread: ${codexThreadLink(member.threadId)}\nTell that member to: cd "${result.path}"`
@@ -174,11 +193,15 @@ const handlers = {
 
 	async "worktree-remove"(cwd, flags) {
 		const sessionId = requireFlag(flags, "team");
-		const { dir, team } = await loadTeam(cwd, sessionId);
-		const member = memberOrThrow(team, requireFlag(flags, "id"));
-		removeMemberWorktree(cwd, team, member, { force: flags.force === true });
-		clearMemberWorktree(team, { id: member.id });
-		await persist(team, dir);
+		const memberId = requireFlag(flags, "id");
+		const force = flags.force === true;
+		const member = await mutateTeam(cwd, sessionId, "worktree-remove", async (team, dir) => {
+			const member = memberOrThrow(team, memberId);
+			removeMemberWorktree(cwd, team, member, { force });
+			clearMemberWorktree(team, { id: member.id });
+			await persist(team, dir);
+			return member;
+		});
 		process.stdout.write(`removed worktree for member ${member.id}\n`);
 	},
 
@@ -208,25 +231,30 @@ const handlers = {
 
 	async archive(cwd, flags) {
 		const sessionId = requireFlag(flags, "team");
-		const { dir, team } = await loadTeam(cwd, sessionId);
-		archive(team, {
+		const input = {
 			id: typeof flags.id === "string" ? flags.id : null,
 			note: typeof flags.note === "string" ? flags.note : "",
+		};
+		await mutateTeam(cwd, sessionId, "archive", async (team, dir) => {
+			archive(team, input);
+			await persist(team, dir);
 		});
-		await persist(team, dir);
 		process.stdout.write(flags.id ? `archived member ${flags.id}\n` : `archived team ${sessionId} and closed all members\n`);
 	},
 
 	async delete(cwd, flags) {
 		const sessionId = requireFlag(flags, "team");
-		const { dir, team } = await loadTeam(cwd, sessionId);
-		const active = team.members.filter((m) => m.status !== "archived");
-		if (flags.force !== true && (team.status !== "archived" || active.length > 0)) {
-			throw new Error(
-				`refused: team "${sessionId}" is not archived or still has ${active.length} active member(s). Archive first, or pass --force to delete anyway.`,
-			);
-		}
-		await rm(dir, { recursive: true, force: true });
+		const dir = await assertSafeTeamDir(cwd, sessionId);
+		await withTeamLock(dir, "delete", async () => {
+			const team = await readTeam(dir);
+			const active = team.members.filter((m) => m.status !== "archived");
+			if (flags.force !== true && (team.status !== "archived" || active.length > 0)) {
+				throw new Error(
+					`refused: team "${sessionId}" is not archived or still has ${active.length} active member(s). Archive first, or pass --force to delete anyway.`,
+				);
+			}
+			await rm(dir, { recursive: true, force: true });
+		});
 		process.stdout.write(`deleted team state: ${dir}\n`);
 	},
 
@@ -247,9 +275,11 @@ const handlers = {
 
 	async guide(cwd, flags) {
 		const sessionId = requireFlag(flags, "team");
-		const { dir, team } = await loadTeam(cwd, sessionId);
-		await writeGuideAtomic(team, buildGuide(team), dir);
-		process.stdout.write(`${team.paths.guide}\n`);
+		const guidePath = await mutateTeam(cwd, sessionId, "guide", async (team, dir) => {
+			await writeGuideAtomic(team, buildGuide(team), dir);
+			return team.paths.guide;
+		});
+		process.stdout.write(`${guidePath}\n`);
 	},
 };
 
