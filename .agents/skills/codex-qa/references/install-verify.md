@@ -10,7 +10,7 @@ contained.
 export CODEX_HOME="$(mktemp -d)/codex"; mkdir -p "$CODEX_HOME"   # must exist first
 export OMO_DISABLE_POSTHOG=1 OMO_CODEX_DISABLE_POSTHOG=1
 export OMO_CODEX_PROJECT="$(mktemp -d)/project"                  # keep project-local cleanup off your tree
-node packages/omo-codex/scripts/install-local.mjs install --platform=codex
+node packages/omo-codex/scripts/install-local.mjs install
 ```
 
 `cqa_install_local_omo` wraps this (logs to `$CQA_HOME_ROOT/install.log`).

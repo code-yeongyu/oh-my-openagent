@@ -57,7 +57,7 @@ test("#given lazycodex runs through an npm bin symlink #when running the Node in
 	}
 });
 
-test("#given dry-run install flags #when running the Node installer entrypoint #then prints every supported agent platform command", () => {
+test("#given dry-run install flags #when running the Node installer entrypoint #then prints delegated autonomous codex install command", () => {
 	// given
 	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
 
@@ -69,14 +69,7 @@ test("#given dry-run install flags #when running the Node installer entrypoint #
 	).trim();
 
 	// then
-	assert.equal(
-		output,
-		[
-			"npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous",
-			"npx --yes oh-my-openagent@latest install --platform=claude-code --no-tui",
-			"npx --yes oh-my-openagent@latest install --platform=gemini --no-tui",
-		].join("\n"),
-	);
+	assert.equal(output, "npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous");
 });
 
 test("#given dry-run install opt-out #when running the Node installer entrypoint #then preserves existing Codex permission settings", () => {
@@ -91,29 +84,21 @@ test("#given dry-run install opt-out #when running the Node installer entrypoint
 	).trim();
 
 	// then
-	assert.equal(
-		output,
-		[
-			"npx --yes oh-my-openagent@latest install --platform=codex --no-tui --no-codex-autonomous",
-			"npx --yes oh-my-openagent@latest install --platform=claude-code --no-tui",
-			"npx --yes oh-my-openagent@latest install --platform=gemini --no-tui",
-		].join("\n"),
-	);
+	assert.equal(output, "npx --yes oh-my-openagent@latest install --platform=codex --no-tui --no-codex-autonomous");
 });
 
-test("#given explicit dry-run platform #when running the Node installer entrypoint #then prints only that platform command", () => {
+test("#given explicit non-Codex dry-run platform #when running the Node installer entrypoint #then rejects it", () => {
 	// given
 	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
 
-	// when
-	const output = execFileSync(
-		process.execPath,
-		[scriptPath, "--dry-run", "install", "--platform=gemini", "--no-tui", "--codex-autonomous"],
-		{ encoding: "utf8" },
-	).trim();
-
-	// then
-	assert.equal(output, "npx --yes oh-my-openagent@latest install --platform=gemini --no-tui");
+	// when/then
+	assert.throws(
+		() =>
+			execFileSync(process.execPath, [scriptPath, "--dry-run", "install", "--platform=gemini", "--no-tui"], {
+				encoding: "utf8",
+			}),
+		/lazycodex-ai installs the Codex Light edition only/,
+	);
 });
 
 test("#given dry-run doctor #when running the Node installer entrypoint #then prints Codex LazyCodex doctor workflow command", () => {

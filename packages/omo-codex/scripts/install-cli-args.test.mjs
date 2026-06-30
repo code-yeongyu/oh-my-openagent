@@ -13,66 +13,20 @@ test("#given lazycodex install flags #when parsing Node installer argv #then kee
 	// then
 	assert.deepEqual(parsed, {
 		kind: "install",
-		targets: ["codex"],
-		noTui: true,
-		skipAuth: false,
 		autonomousPermissions: true,
 		repoRoot: undefined,
 	});
 });
 
-test("#given default lazycodex install #when parsing Node installer argv #then targets every supported agent platform", () => {
+test("#given unsupported OpenCode platform override #when parsing Node installer argv #then rejects the Bun-backed path", () => {
 	// given
-	const argv = ["install"];
+	const argv = ["install", "--platform=both"];
 
 	// when
-	const parsed = parseLazyCodexInstallCliArgs(argv);
+	const parse = () => parseLazyCodexInstallCliArgs(argv);
 
 	// then
-	assert.deepEqual(parsed, {
-		kind: "install",
-		targets: ["codex", "claude-code", "gemini"],
-		noTui: false,
-		skipAuth: false,
-		autonomousPermissions: undefined,
-		repoRoot: undefined,
-	});
-});
-
-test("#given all-platform aliases #when parsing Node installer argv #then expands to every supported agent platform", () => {
-	// given
-	const argv = ["install", "--platform=all", "--all-platforms"];
-
-	// when
-	const parsed = parseLazyCodexInstallCliArgs(argv);
-
-	// then
-	assert.deepEqual(parsed, {
-		kind: "install",
-		targets: ["codex", "claude-code", "gemini"],
-		noTui: false,
-		skipAuth: false,
-		autonomousPermissions: undefined,
-		repoRoot: undefined,
-	});
-});
-
-test("#given explicit non-Codex platform override #when parsing Node installer argv #then keeps a single target", () => {
-	// given
-	const argv = ["install", "--platform", "gemini", "--no-tui"];
-
-	// when
-	const parsed = parseLazyCodexInstallCliArgs(argv);
-
-	// then
-	assert.deepEqual(parsed, {
-		kind: "install",
-		targets: ["gemini"],
-		noTui: true,
-		skipAuth: false,
-		autonomousPermissions: undefined,
-		repoRoot: undefined,
-	});
+	assert.throws(parse, /lazycodex-ai installs the Codex Light edition only/);
 });
 
 test("#given missing platform value #when parsing Node installer argv #then rejects the incomplete option", () => {
@@ -96,9 +50,6 @@ test("#given repo root equals option #when parsing Node installer argv #then kee
 	// then
 	assert.deepEqual(parsed, {
 		kind: "install",
-		targets: ["codex", "claude-code", "gemini"],
-		noTui: false,
-		skipAuth: false,
 		autonomousPermissions: undefined,
 		repoRoot: "/tmp/project",
 	});
@@ -173,7 +124,6 @@ test("#given dry-run install with codex autonomy flags #when parsing Node instal
 		kind: "command",
 		command: "install",
 		dryRun: true,
-		targets: ["codex", "claude-code", "gemini"],
 		noTui: true,
 		skipAuth: false,
 		autonomousPermissions: true,

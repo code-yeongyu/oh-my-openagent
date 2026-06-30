@@ -14,7 +14,7 @@ All published packages expose the same compiled CLI with these bin entries:
 - `oh-my-openagent` (preferred name)
 - `oh-my-opencode` (legacy compatibility name)
 - `omo` (short alias, recommended in docs and prompts)
-- `lazycodex-ai` (Light installer shortcut; `lazycodex-ai install` dispatches the Codex, Claude Code, and Gemini targets by default unless `--platform` is explicitly narrowed)
+- `lazycodex-ai` (Light edition shortcut; `lazycodex-ai install` is equivalent to `omo install --platform=codex`; any explicit `--platform` value must be `codex`)
 
 ## Basic Usage
 
@@ -71,9 +71,9 @@ bunx oh-my-openagent install
 | `--no-codex-autonomous` | Leave existing Codex permission settings unchanged when installing Light or Both |
 | `--skip-auth` | Skip authentication setup hints |
 
-When using the published `lazycodex-ai` package, `install` defaults to the LazyCodex agent targets `codex`, `claude-code`, and `gemini`. Pass `--platform=codex`, `--platform=claude-code`, or `--platform=gemini` to install only one target; pass `--platform=all` or `--all-platforms` to request the default set explicitly. The Codex target uses marketplace `sisyphuslabs` and plugin `omo`, enabled as `omo@sisyphuslabs`, with the marketplace source set to the local built cache under `~/.codex/plugins/cache/sisyphuslabs`.
+When using the `lazycodex-ai` bin alias, `install` defaults to `--platform=codex`. `lazycodex-ai` is only the npm/bin alias; `lazycodex` is the marketplace repository name. The Codex config uses marketplace `sisyphuslabs` and plugin `omo`, enabled as `omo@sisyphuslabs`, with the marketplace source set to the local built cache under `~/.codex/plugins/cache/sisyphuslabs`.
 
-On the shared `omo` CLI, `--platform` still means `opencode`, `codex`, or `both`. Subscription flags (`--claude`, `--openai`, etc.) only apply when the shared CLI platform is `opencode` or `both`; they are rejected under `--platform=codex` because the Light edition does not write OpenCode model config. `--codex-autonomous` and `--no-codex-autonomous` only affect installs where the selected target includes Codex, and `lazycodex-ai` filters those Codex-only flags out of non-Codex target commands.
+Subscription flags (`--claude`, `--openai`, etc.) only apply when `--platform` is `opencode` or `both`. They are rejected under `--platform=codex` because the Light edition does not write OpenCode model config. `--codex-autonomous` and `--no-codex-autonomous` only affect installs where the selected platform includes Codex.
 
 ### Telemetry and opt-out
 

@@ -318,18 +318,18 @@ describe("LazyCodex publish workflow", () => {
       smokeStep.includes('export CODEX_LOCAL_BIN_DIR="$SMOKE_DIR/bin"')
     const assertsDryRunRouting = smokeStep.includes('npx -y "$package_spec" --dry-run install --no-tui --codex-autonomous') &&
       smokeStep.includes('npx -y "$package_spec" --dry-run doctor') &&
-      smokeStep.includes('expected_install_output="$(cat <<\'EOF\'') &&
+      smokeStep.includes('expected_install_output="npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous"') &&
       smokeStep.includes('expected_doctor_output_prefix="codex exec ') &&
       smokeStep.includes("npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous") &&
-      smokeStep.includes("npx --yes oh-my-openagent@latest install --platform=claude-code --no-tui") &&
-      smokeStep.includes("npx --yes oh-my-openagent@latest install --platform=gemini --no-tui") &&
       smokeStep.includes('case "$npx_doctor_output" in "$expected_doctor_output_prefix"*) true ;; *) false ;; esac') &&
       smokeStep.includes('case "$npx_doctor_output" in *"--sandbox danger-full-access"*) true ;; *) false ;; esac') &&
       smokeStep.includes("Use $omo:lcx-doctor") &&
       smokeStep.includes('case "$npx_doctor_output" in *"--model"*|*"gpt-5.5-codex-mini"*) false ;; *) true ;; esac') &&
-      !smokeStep.includes("npx --yes --package oh-my-openagent omo install")
+      !smokeStep.includes("npx --yes --package oh-my-openagent omo install") &&
+      !smokeStep.includes("--platform=claude-code") &&
+      !smokeStep.includes("--platform=gemini")
     const installsRealPackageAndVerifiesOmoBin =
-      smokeStep.includes('npx -y "$package_spec" install --platform=codex --no-tui --codex-autonomous') &&
+      smokeStep.includes('npx -y "$package_spec" install --no-tui --codex-autonomous') &&
       smokeStep.includes('[ -x "$CODEX_LOCAL_BIN_DIR/omo" ]') &&
       smokeStep.includes('omo_version_output=$("$CODEX_LOCAL_BIN_DIR/omo" --version 2>&1)') &&
       smokeStep.includes('[ "$omo_version_output" = "$OMO_VERSION" ]') &&
