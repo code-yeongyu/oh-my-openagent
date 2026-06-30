@@ -3,7 +3,6 @@ import type { Command } from "commander"
 import { boulder } from "./boulder"
 import { codexUlwLoop } from "./codex-ulw-loop"
 import { refreshModelCapabilities } from "./refresh-model-capabilities"
-import { runSparkShell } from "./sparkshell"
 import { PLUGIN_NAME } from "../shared"
 import packageJson from "../../../../package.json" with { type: "json" }
 
@@ -22,17 +21,6 @@ export function configureRuntimeCommands(program: Command): void {
         sourceUrl: options.sourceUrl,
         json: options.json ?? false,
       })
-      process.exit(exitCode)
-    })
-
-  program
-    .command("sparkshell [args...]")
-    .allowUnknownOption()
-    .passThroughOptions()
-    .helpOption(false)
-    .description("Run Sparkshell shell-native inspection with explicit raw fallback")
-    .action(async (args: string[] = []) => {
-      const exitCode = await runSparkShell(args)
       process.exit(exitCode)
     })
 

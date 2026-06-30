@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -120,6 +120,54 @@ test("#given representative component hook payloads #when executed through dist 
 			assert.equal(result.stderr, "", `${hookCase.name} stderr`);
 			hookCase.assertOutput(result.stdout);
 		}
+	} finally {
+		rmSync(tempRoot, { recursive: true, force: true });
+	}
+});
+
+test("#given bundled LSP hook CLI in installed layout #when diagnostics run #then it spawns sibling daemon target", () => {
+	const tempRoot = mkdtempSync(join(tmpdir(), "omo-codex-lsp-installed-"));
+	try {
+		const lspDist = join(tempRoot, "components", "lsp", "dist");
+		const daemonDist = join(tempRoot, "components", "lsp-daemon", "dist");
+		const daemonDir = join(tempRoot, "daemon");
+		const invocationLog = join(tempRoot, "fake-daemon-invocations.jsonl");
+		mkdirSync(lspDist, { recursive: true });
+		mkdirSync(daemonDist, { recursive: true });
+		mkdirSync(join(tempRoot, "src"), { recursive: true });
+		writeFileSync(join(tempRoot, "package.json"), JSON.stringify({ type: "module" }));
+		writeFileSync(join(lspDist, "cli.js"), readFileSync(componentCliPath("lsp"), "utf8"));
+		writeFileSync(join(daemonDist, "package.json"), JSON.stringify({ type: "module", version: "0.1.0" }));
+		writeFakeLspDaemonCli(join(daemonDist, "cli.js"));
+		const editedFile = join(tempRoot, "src", "broken.c");
+		writeFileSync(editedFile, "int main(void) { return missing_symbol; }\n");
+
+		const result = spawnSync(process.execPath, [join(lspDist, "cli.js"), "hook", "post-tool-use"], {
+			cwd: tempRoot,
+			encoding: "utf8",
+			env: hookEnv(tempRoot, {
+				CODEX_LSP_DAEMON_DIR: daemonDir,
+				FAKE_LSP_DAEMON_LOG: invocationLog,
+			}),
+			input: JSON.stringify({
+				session_id: "bundled-lsp-hook",
+				tool_name: "Edit",
+				tool_input: { file_path: editedFile },
+				tool_response: { ok: true },
+			}),
+			timeout: HOOK_CLI_TEST_TIMEOUT_MS,
+		});
+
+		const daemonInvocations = existsSync(invocationLog) ? readFileSync(invocationLog, "utf8") : "";
+		const failureContext = `stdout: ${result.stdout}\nstderr: ${result.stderr}\ndaemon log: ${daemonInvocations}`;
+		assert.equal(result.status, 0, failureContext);
+		assert.equal(result.stderr, "", failureContext);
+		assert.notEqual(result.stdout, "", failureContext);
+		const parsed = JSON.parse(result.stdout);
+		assert.equal(parsed.decision, "block");
+		assert.match(parsed.reason, /error\[fake\] \(1\) at 1:1: Missing fake symbol\./);
+		assert.deepEqual(daemonInvocations.trim().split("\n").map(JSON.parse), [["daemon"]]);
+		assert.equal(existsSync(join(daemonDir, "v0.1.0", "daemon.log")), true);
 	} finally {
 		rmSync(tempRoot, { recursive: true, force: true });
 	}
@@ -274,6 +322,56 @@ function smokeImportComponent(component, event) {
 	} finally {
 		rmSync(tempRoot, { recursive: true, force: true });
 	}
+}
+
+function writeFakeLspDaemonCli(path) {
+	writeFileSync(
+		path,
+		[
+			"#!/usr/bin/env node",
+			'import { createHash } from "node:crypto";',
+			'import { appendFileSync, mkdirSync, readdirSync, unlinkSync } from "node:fs";',
+			'import { tmpdir } from "node:os";',
+			'import { dirname, join } from "node:path";',
+			'import { createServer } from "node:net";',
+			"",
+			"appendFileSync(process.env.FAKE_LSP_DAEMON_LOG, `${JSON.stringify(process.argv.slice(2))}\\n`);",
+			"const baseDir = process.env.CODEX_LSP_DAEMON_DIR;",
+			'const versionDirName = readdirSync(baseDir).find((entry) => entry.startsWith("v")) ?? "v0";',
+			"const version = versionDirName.slice(1);",
+			"const dir = join(baseDir, versionDirName);",
+			'const naturalSocket = join(dir, "daemon.sock");',
+			'const digest = createHash("sha256").update(dir).digest("hex").slice(0, 16);',
+			"const socketPath = process.platform === \"win32\"",
+			"\t? `\\\\\\\\.\\\\pipe\\\\omo-lsp-${version}-${digest}`",
+			"\t: naturalSocket.length < 100 ? naturalSocket : join(tmpdir(), `omo-lsp-${version}-${digest}.sock`);",
+			"if (process.platform !== \"win32\") {",
+			"\tmkdirSync(dirname(socketPath), { recursive: true });",
+			"\ttry { unlinkSync(socketPath); } catch {}",
+			"}",
+			"const server = createServer((socket) => {",
+			'\tlet raw = "";',
+			'\tsocket.setEncoding("utf8");',
+			'\tsocket.on("data", (chunk) => {',
+			"\t\traw += chunk;",
+			'\t\tif (!raw.includes("\\n")) return;',
+			"\t\tconst request = JSON.parse(raw.trim());",
+			"\t\tconst response = {",
+			'\t\t\tjsonrpc: "2.0",',
+			"\t\t\tid: request.id,",
+			"\t\t\tresult: {",
+			'\t\t\t\tcontent: [{ type: "text", text: "error[fake] (1) at 1:1: Missing fake symbol." }],',
+			"\t\t\t},",
+			"\t\t};",
+			'\t\tsocket.end(`${JSON.stringify(response)}\\n`);',
+			"\t\tserver.close(() => process.exit(0));",
+			"\t});",
+			"});",
+			"server.listen(socketPath);",
+			"setTimeout(() => process.exit(1), 10000).unref();",
+			"",
+		].join("\n"),
+	);
 }
 
 function hookEnv(tempRoot, extraEnv = {}) {

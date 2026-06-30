@@ -7,12 +7,21 @@ import { fileURLToPath } from "node:url"
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url))
 const commandRoots = [".opencode/command", ".agents/command"] as const
 const skillRoots = [".opencode/skills", ".agents/skills"] as const
-const codexHookComponentRuntimePaths = [
+const codexMaterializedRuntimePayloadPaths = [
+  "dist/cli/index.js",
+  "dist/cli-node/index.js",
+  "packages/omo-codex/plugin/components/bootstrap/dist/cli.js",
+  "packages/omo-codex/plugin/components/bootstrap/scripts/bootstrap.ps1",
+  "packages/omo-codex/plugin/components/bootstrap/scripts/node-dispatch.ps1",
+  "packages/omo-codex/plugin/components/codegraph/dist/cli.js",
+  "packages/omo-codex/plugin/components/codegraph/dist/serve.js",
   "packages/omo-codex/plugin/components/comment-checker/dist/cli.js",
   "packages/omo-codex/plugin/components/git-bash/dist/cli.js",
+  "packages/omo-codex/plugin/components/lazycodex-executor-verify/dist/cli.js",
   "packages/omo-codex/plugin/components/lsp/dist/cli.js",
   "packages/omo-codex/plugin/components/rules/dist/cli.js",
   "packages/omo-codex/plugin/components/start-work-continuation/dist/cli.js",
+  "packages/omo-codex/plugin/components/teammode/dist/cli.js",
   "packages/omo-codex/plugin/components/telemetry/dist/cli.js",
   "packages/omo-codex/plugin/components/ultrawork/dist/cli.js",
   "packages/omo-codex/plugin/components/ulw-loop/dist/cli.js",
@@ -188,9 +197,9 @@ describe("published package layout", () => {
     expect(packedObsoleteForks).toEqual([])
   }, packDryRunTimeoutMs)
 
-  test("#given Codex hook component runtimes #when packing package #then every hook command target ships", async () => {
+  test("#given Codex materialized runtime payloads #when packing package #then every current payload target ships", async () => {
     // given
-    const expectedRuntimePaths = codexHookComponentRuntimePaths
+    const expectedRuntimePaths = codexMaterializedRuntimePayloadPaths
 
     // when
     const packedPaths = await packDryRunPaths()

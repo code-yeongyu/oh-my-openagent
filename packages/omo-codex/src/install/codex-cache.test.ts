@@ -265,6 +265,34 @@ describe("codex-cache", () => {
     expect((await stat(join(installed.path, "components", "rules", "dist", "cli.js"))).isFile()).toBe(true)
   })
 
+  test("#given packaged root CLI runtimes #when caching omo plugin #then root dist is materialized into the plugin cache", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-root-runtime-"))
+    const repoRoot = join(root, "repo")
+    const codexHome = join(root, "codex-home")
+    const sourceRoot = join(repoRoot, "packages", "omo-codex", "plugin")
+    await mkdir(sourceRoot, { recursive: true })
+    await mkdir(join(repoRoot, "dist", "cli"), { recursive: true })
+    await mkdir(join(repoRoot, "dist", "cli-node"), { recursive: true })
+    await writeFile(join(sourceRoot, "package.json"), JSON.stringify({ name: "@scope/omo", version: "0.1.0" }))
+    await writeFile(join(repoRoot, "dist", "cli", "index.js"), "console.log('omo')\n")
+    await writeFile(join(repoRoot, "dist", "cli-node", "index.js"), "console.log('omo node')\n")
+
+    // when
+    const installed = await installCachedPlugin({
+      codexHome,
+      marketplaceName: "sisyphuslabs",
+      name: "omo",
+      sourcePath: sourceRoot,
+      version: "0.1.0",
+      runCommand: async () => undefined,
+    })
+
+    // then
+    expect(await readFile(join(installed.path, "dist", "cli", "index.js"), "utf8")).toBe("console.log('omo')\n")
+    expect(await readFile(join(installed.path, "dist", "cli-node", "index.js"), "utf8")).toBe("console.log('omo node')\n")
+  })
+
   test("links cached plugin bins and stays idempotent", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-"))
@@ -296,7 +324,15 @@ describe("codex-cache", () => {
     await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: "@scope/omo" }))
     await writeFile(
       join(componentRoot, "package.json"),
-      JSON.stringify({ name: "@scope/ulw-loop", bin: { omo: "dist/cli.js", "omo-ulw-loop": "dist/cli.js" } }),
+      JSON.stringify({
+        name: "@scope/ulw-loop",
+        bin: {
+          omo: "dist/cli.js",
+          "omo-ulw-loop": "dist/cli.js",
+          ulw: "dist/cli.js",
+          "ulw-loop": "dist/cli.js",
+        },
+      }),
     )
     await writeFile(join(componentRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
 
@@ -304,9 +340,15 @@ describe("codex-cache", () => {
     const linked = await linkCachedPluginBins({ binDir, pluginRoot, platform: "linux" })
 
     // then
-    expect(linked).toEqual([{ name: "omo-ulw-loop", path: join(binDir, "omo-ulw-loop"), target: join(componentRoot, "dist", "cli.js") }])
+    expect(linked).toEqual([
+      { name: "omo-ulw-loop", path: join(binDir, "omo-ulw-loop"), target: join(componentRoot, "dist", "cli.js") },
+      { name: "ulw", path: join(binDir, "ulw"), target: join(componentRoot, "dist", "cli.js") },
+      { name: "ulw-loop", path: join(binDir, "ulw-loop"), target: join(componentRoot, "dist", "cli.js") },
+    ])
     await expect(readlink(join(binDir, "omo"))).rejects.toThrow()
     expect(await readlink(join(binDir, "omo-ulw-loop"))).toBe(join(componentRoot, "dist", "cli.js"))
+    expect(await readlink(join(binDir, "ulw"))).toBe(join(componentRoot, "dist", "cli.js"))
+    expect(await readlink(join(binDir, "ulw-loop"))).toBe(join(componentRoot, "dist", "cli.js"))
   })
 
   test("#given stale managed ulw-loop omo symlink #when linking cached plugin bins #then removes it", async () => {

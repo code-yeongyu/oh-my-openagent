@@ -40,7 +40,7 @@ async function withBinLinkFixture(run) {
 // Mirrors the Codex marketplace store layout: each plugin version is installed
 // under its own root and old version dirs are deleted on upgrade
 // (core-plugins store.rs), which is why stale bin links MUST be re-pointed.
-async function writeVersionedRoot(root, version, { withRuntimeCli = false } = {}) {
+async function writeVersionedRoot(root, version, { withRuntimeCli = false, withUlwLoopAliases = false } = {}) {
 	const pluginRoot = join(root, "store", "omo", version);
 	await mkdir(join(pluginRoot, ".codex-plugin"), { recursive: true });
 	await writeFile(
@@ -83,6 +83,22 @@ async function writeVersionedRoot(root, version, { withRuntimeCli = false } = {}
 		`${JSON.stringify({ bin: { [COMPONENT_BIN_NAME]: "./dist/cli.js" }, name: "@sisyphuslabs/toolbox" })}\n`,
 	);
 	await writeFile(join(componentRoot, "dist", "cli.js"), "#!/usr/bin/env node\nconsole.log('toolbox');\n");
+	if (withUlwLoopAliases) {
+		const ulwLoopRoot = join(pluginRoot, "components", "ulw-loop");
+		await mkdir(join(ulwLoopRoot, "dist"), { recursive: true });
+		await writeFile(
+			join(ulwLoopRoot, "package.json"),
+			`${JSON.stringify({
+				bin: {
+					"omo-ulw-loop": "./dist/cli.js",
+					ulw: "./dist/cli.js",
+					"ulw-loop": "./dist/cli.js",
+				},
+				name: "@sisyphuslabs/ulw-loop",
+			})}\n`,
+		);
+		await writeFile(join(ulwLoopRoot, "dist", "cli.js"), "#!/usr/bin/env node\nconsole.log('ulw-loop');\n");
+	}
 	if (withRuntimeCli) {
 		await mkdir(join(pluginRoot, "dist", "cli"), { recursive: true });
 		await writeFile(join(pluginRoot, "dist", "cli", "index.js"), "console.log('omo');\n");
@@ -232,7 +248,7 @@ test("#given a legacy payload without root CLI dist #when the worker setup runs 
 		assert.ok(
 			warning.includes("skipped the omo runtime wrapper because ") &&
 				warning.includes(`${join("dist", "cli", "index.js")} is missing; `) &&
-				warning.includes("omo sparkshell/ulw-loop commands will be unavailable until a package shipping dist/cli is installed"),
+				warning.includes("omo ulw-loop commands will be unavailable until a package shipping dist/cli is installed"),
 			`bootstrap.log must carry the install-local warning text, got: ${log}`,
 		);
 	});
@@ -264,5 +280,25 @@ test("#given a payload shipping dist/cli #when the worker setup runs with no bin
 			const shim = await readFile(join(defaultBinDir, `${COMPONENT_BIN_NAME}.cmd`), "utf8");
 			assert.ok(shim.includes(join(pluginRoot, "components", "toolbox", "dist", "cli.js")));
 		}
+	});
+});
+
+test("#given ulw-loop aliases in the plugin payload #when worker setup links bins #then public ULW commands point at the current component without adding SessionStart hooks", async () => {
+	await withBinLinkFixture(async (fixture) => {
+		const pluginRoot = await writeVersionedRoot(fixture.root, "1.0.0", { withUlwLoopAliases: true });
+
+		await runWorkerSetup(setupOptions(fixture, pluginRoot));
+
+		const targets = await symlinkTargets(fixture.binDir);
+		const ulwLoopCli = join(pluginRoot, "components", "ulw-loop", "dist", "cli.js");
+		assert.equal(targets.get("omo-ulw-loop"), ulwLoopCli);
+		assert.equal(targets.get("ulw"), ulwLoopCli);
+		assert.equal(targets.get("ulw-loop"), ulwLoopCli);
+		const hooks = JSON.parse(await readFile(join(pluginRoot, "hooks", "hooks.json"), "utf8"));
+		const sessionStartCommands = hooks.hooks.SessionStart.flatMap((group) => group.hooks)
+			.filter((hook) => hook.type === "command")
+			.map((hook) => hook.command)
+			.filter((command) => command.includes("components/bootstrap/dist/cli.js"));
+		assert.equal(sessionStartCommands.length, 1);
 	});
 });

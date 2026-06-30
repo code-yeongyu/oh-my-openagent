@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { daemonBaseDir, daemonPaths, resolveDaemonVersion } from "../src/paths.js";
+import { daemonBaseDir, daemonPaths, resolveDaemonVersion, resolveDaemonVersionFromEnv } from "../src/paths.js";
 
 const stampScript = fileURLToPath(new URL("../scripts/stamp-dist-version.mjs", import.meta.url));
 const packageManifest = JSON.parse(
@@ -41,6 +41,12 @@ describe("daemon paths", () => {
 		expect(paths.pid).toBe(join("/d", "v1.2.3", "daemon.pid"));
 	});
 
+	it("#given daemon version env #when daemonPaths resolves version #then uses it for socket coordination", () => {
+		const paths = daemonPaths({ CODEX_LSP_DAEMON_DIR: "/d", CODEX_LSP_DAEMON_VERSION: "7.8.9" });
+		expect(paths.version).toBe("7.8.9");
+		expect(paths.dir).toBe(join("/d", "v7.8.9"));
+	});
+
 	it("#given a very long base dir #when daemonPaths #then falls back to a short tmp socket", () => {
 		const longDir = `/${"x".repeat(120)}`;
 		const paths = daemonPaths({ CODEX_LSP_DAEMON_DIR: longDir }, "1.0.0");
@@ -55,6 +61,14 @@ describe("daemon paths", () => {
 });
 
 describe("resolveDaemonVersion injection", () => {
+	it("#given daemon version env #when resolving env version #then trims and returns it", () => {
+		expect(resolveDaemonVersionFromEnv({ CODEX_LSP_DAEMON_VERSION: " 7.8.9 " })).toBe("7.8.9");
+	});
+
+	it("#given blank daemon version env #when resolving env version #then returns null", () => {
+		expect(resolveDaemonVersionFromEnv({ CODEX_LSP_DAEMON_VERSION: "  " })).toBeNull();
+	});
+
 	it("#given injected require returning a version for ./package.json #when resolving version #then returns the sibling-first result", () => {
 		const fake = (id: string): unknown => {
 			if (id === "./package.json") return { version: "9.9.9" };

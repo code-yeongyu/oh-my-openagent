@@ -6603,10 +6603,9 @@ function posixRuntimeWrapper(cliPath, codexHome, binDir, nodeCliPath) {
     "#!/bin/sh",
     `# ${RUNTIME_WRAPPER_MARKER}`,
     `export CODEX_HOME="\${CODEX_HOME:-${escapedCodexHome}}"`,
-    'export OMO_SPARKSHELL_APP_SERVER_SOCKET="${OMO_SPARKSHELL_APP_SERVER_SOCKET:-$CODEX_HOME/app-server-control/app-server-control.sock}"',
     'if [ "$1" = "ulw-loop" ] && [ -x "' + escapedUlwLoopBin + '" ]; then',
     "  shift",
-    '  exec "' + escapedUlwLoopBin + '" "$@"',
+    '  exec "' + escapedUlwLoopBin + '" ulw-loop "$@"',
     "fi",
     `if [ "\${OMO_RUNTIME:-}" = "node" ] && [ -f "${nodeCli}" ]; then`,
     `  exec node "${nodeCli}" "$@"`,
@@ -6645,11 +6644,10 @@ function windowsRuntimeWrapper(cliPath, codexHome, binDir, nodeCliPath) {
     "@echo off",
     `rem ${RUNTIME_WRAPPER_MARKER}`,
     `if not defined CODEX_HOME set "CODEX_HOME=${codexHome}"`,
-    'if not defined OMO_SPARKSHELL_APP_SERVER_SOCKET set "OMO_SPARKSHELL_APP_SERVER_SOCKET=%CODEX_HOME%\\app-server-control\\app-server-control.sock"',
     ...windowsNodeDiscoveryLines(),
     `if "%~1"=="ulw-loop" if exist "${ulwLoopBin}" (`,
     "  shift /1",
-    `  "${ulwLoopBin}" %*`,
+    `  "${ulwLoopBin}" ulw-loop %*`,
     "  exit /b %ERRORLEVEL%",
     ")",
     `if "%OMO_RUNTIME%"=="node" if defined OMO_NODE_BINARY if exist "${nodeCliPath}" (`,
@@ -7442,6 +7440,7 @@ async function installCachedPlugin(input) {
     await copyDirectory(input.sourcePath, tempPath);
     await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath);
     await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath });
+    await copyRootRuntimeDists({ pluginRoot: tempPath, sourcePath: input.sourcePath });
     await maybeRunNpmInstall(tempPath, input.runCommand, ["ci", "--omit=dev"]);
     await removeCachedManagedNpmBinShims(tempPath);
     if (input.buildSource === false)
@@ -7523,6 +7522,29 @@ function shouldCopyPluginPath(path, root) {
     return true;
   const parts = relative4.split(sep5);
   return !parts.some((part) => part === ".git" || part === "node_modules");
+}
+async function copyRootRuntimeDists(input) {
+  const repoRoot = repoRootForCodexPluginSource(input.sourcePath);
+  if (repoRoot === null)
+    return;
+  for (const runtimePath of ["dist/cli", "dist/cli-node"]) {
+    const sourcePath = join11(repoRoot, runtimePath);
+    if (!await fileExistsStrict(join11(sourcePath, "index.js")))
+      continue;
+    await mkdir3(dirname4(join11(input.pluginRoot, runtimePath)), { recursive: true });
+    await cp2(sourcePath, join11(input.pluginRoot, runtimePath), { recursive: true });
+  }
+}
+function repoRootForCodexPluginSource(sourcePath) {
+  const codexPackageRoot = dirname4(sourcePath);
+  const packagesRoot = dirname4(codexPackageRoot);
+  if (basename3(sourcePath) !== "plugin")
+    return null;
+  if (basename3(codexPackageRoot) !== "omo-codex")
+    return null;
+  if (basename3(packagesRoot) !== "packages")
+    return null;
+  return dirname4(packagesRoot);
 }
 // packages/omo-codex/src/install/codex-cache-prune.ts
 import { lstat as lstat4, readdir as readdir3, rm as rm4, stat as stat3 } from "node:fs/promises";
@@ -8117,7 +8139,7 @@ function ensureMarketplaceBlock(config, marketplaceName, source) {
 }
 
 // packages/omo-codex/src/install/codex-config-permissions.ts
-var AUTONOMOUS_FEATURES = ["multi_agent", "child_agents_md", "unified_exec", "goals"];
+var AUTONOMOUS_FEATURES = ["multi_agent", "unified_exec", "goals"];
 function ensureAutonomousPermissions(config) {
   let next = replaceOrInsertRootSetting(config, "approval_policy", JSON.stringify("never"));
   next = replaceOrInsertRootSetting(next, "sandbox_mode", JSON.stringify("danger-full-access"));
@@ -8537,7 +8559,6 @@ async function updateCodexConfig(input) {
   config = ensureFeatureEnabled(config, "plugins");
   config = ensureFeatureEnabled(config, "plugin_hooks");
   config = ensureFeatureEnabled(config, "multi_agent");
-  config = ensureFeatureEnabled(config, "child_agents_md");
   config = removeUnsupportedCodexMultiAgentModeConfig(config);
   config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(input.repoRoot));
   config = ensureCodexMultiAgentV2Config(config);
@@ -13554,7 +13575,7 @@ async function runCodexInstaller(options = {}) {
       if (runtimeLink !== null)
         log2(`Linked ${runtimeLink.name} -> ${runtimeLink.target}`);
       else
-        log2(`Warning: skipped the omo runtime wrapper because ${join31(repoRoot, "dist", "cli", "index.js")} is missing; omo sparkshell/ulw-loop commands will be unavailable until a package shipping dist/cli is installed`);
+        log2(`Warning: skipped the omo runtime wrapper because ${join31(repoRoot, "dist", "cli", "index.js")} is missing; omo ulw-loop commands will be unavailable until a package shipping dist/cli is installed`);
     }
     pluginSources.push({ name: entry.name, sourcePath });
     installed.push(plugin);
@@ -13855,6 +13876,7 @@ function formatLazyCodexInstallHelp() {
     "Usage: lazycodex-ai install [--no-tui] [--codex-autonomous|--no-codex-autonomous] [--repo-root <path>]",
     "       lazycodex-ai uninstall [--project <path>]",
     "       lazycodex-ai update [--dry-run] [--repo-root <path>]",
+    "       lazycodex-ai doctor [--source-root <path>] [--model <model>] [--json|--status|--verbose]",
     "       lazycodex-ai version",
     "       lazycodex-ai <command> [args...]",
     "",
@@ -13884,20 +13906,22 @@ async function runDelegatedOmoCommand(parsed, options) {
 function buildDelegatedOmoInvocation(parsed) {
   if (parsed.command === "doctor")
     return buildLazyCodexDoctorInvocation(parsed.args);
-  const args = ["--yes", "--package", "oh-my-openagent", "omo", parsed.command];
   if (parsed.command === "install") {
-    args.push("--platform=codex");
+    const args2 = ["--yes", "oh-my-openagent@latest", parsed.command, "--platform=codex"];
     if (parsed.noTui)
-      args.push("--no-tui");
+      args2.push("--no-tui");
     if (parsed.skipAuth)
-      args.push("--skip-auth");
+      args2.push("--skip-auth");
     if (parsed.autonomousPermissions !== false)
-      args.push("--codex-autonomous");
+      args2.push("--codex-autonomous");
     if (parsed.autonomousPermissions === false)
-      args.push("--no-codex-autonomous");
+      args2.push("--no-codex-autonomous");
     if (parsed.repoRoot)
-      args.push(`--repo-root=${parsed.repoRoot}`);
-  } else if (parsed.command === "cleanup") {
+      args2.push(`--repo-root=${parsed.repoRoot}`);
+    return { command: "npx", args: args2, delegatesToOmo: true };
+  }
+  const args = ["--yes", "--package", "oh-my-openagent", "omo", parsed.command];
+  if (parsed.command === "cleanup") {
     args.push("--platform=codex", ...parsed.args);
   } else {
     args.push(...parsed.args);
@@ -13905,21 +13929,26 @@ function buildDelegatedOmoInvocation(parsed) {
   return { command: "npx", args, delegatesToOmo: true };
 }
 function buildLazyCodexDoctorInvocation(doctorArgs) {
+  const doctorOptions = parseLazyCodexDoctorOptions(doctorArgs);
+  const codexArgs = [
+    "exec",
+    "--ephemeral",
+    "--sandbox",
+    "danger-full-access",
+    "--skip-git-repo-check",
+    "--cd",
+    "."
+  ];
+  if (doctorOptions.model !== undefined)
+    codexArgs.push("--model", doctorOptions.model);
+  codexArgs.push(buildLazyCodexDoctorPrompt(doctorOptions.args));
   return {
     command: "codex",
-    args: [
-      "exec",
-      "--ephemeral",
-      "--sandbox",
-      "read-only",
-      "--skip-git-repo-check",
-      "--cd",
-      ".",
-      buildLazyCodexDoctorPrompt(doctorArgs)
-    ],
+    args: codexArgs,
     delegatesToOmo: false,
     env: {
-      LAZYCODEX_DOCTOR_LCX_ACTIVE: "1"
+      LAZYCODEX_DOCTOR_LCX_ACTIVE: "1",
+      ...doctorOptions.sourceRoot === undefined ? {} : { LAZYCODEX_SOURCE_ROOT: doctorOptions.sourceRoot }
     }
   };
 }
@@ -13927,11 +13956,57 @@ function buildLazyCodexDoctorPrompt(doctorArgs) {
   return [
     "Use $omo:lcx-doctor to diagnose this LazyCodex/Codex installation.",
     "This command is already the lazycodex doctor surface; never invoke lazycodex doctor from inside the doctor workflow.",
-    "Sync the latest LazyCodex and OpenAI Codex sources into /tmp, inventory the local installation,",
+    "Use the resolved source root from LAZYCODEX_SOURCE_ROOT when set; otherwise use ${TMPDIR:-/tmp}/lazycodex-sources.",
+    "Validate cached source checkouts before reuse, quarantine corrupt caches, and do not rely on /tmp/lazycodex-source.",
+    "Sync the latest LazyCodex and OpenAI Codex sources there, inventory the local installation,",
     "probe the Codex plugin/cache/hooks/MCP state, and report PASS/WARN/FAIL findings with evidence and remediations.",
     buildDoctorOutputInstruction(doctorArgs),
     doctorArgs.length > 0 ? `Requested doctor arguments: ${doctorArgs.join(" ")}` : "Requested doctor arguments: none"
   ].join(" ");
+}
+function parseLazyCodexDoctorOptions(doctorArgs) {
+  const args = [];
+  let model;
+  let sourceRoot;
+  let index = 0;
+  while (index < doctorArgs.length) {
+    const arg = doctorArgs[index];
+    if (arg === "--model") {
+      const value = doctorArgs[index + 1];
+      if (typeof value !== "string" || value.trim().length === 0)
+        throw new Error("--model requires a value");
+      model = value;
+      index += 2;
+      continue;
+    }
+    if (typeof arg === "string" && arg.startsWith("--model=")) {
+      const value = arg.slice("--model=".length);
+      if (value.trim().length === 0)
+        throw new Error("--model requires a value");
+      model = value;
+      index += 1;
+      continue;
+    }
+    if (arg === "--source-root") {
+      const value = doctorArgs[index + 1];
+      if (typeof value !== "string" || value.trim().length === 0)
+        throw new Error("--source-root requires a path");
+      sourceRoot = value;
+      index += 2;
+      continue;
+    }
+    if (typeof arg === "string" && arg.startsWith("--source-root=")) {
+      const value = arg.slice("--source-root=".length);
+      if (value.trim().length === 0)
+        throw new Error("--source-root requires a path");
+      sourceRoot = value;
+      index += 1;
+      continue;
+    }
+    args.push(arg);
+    index += 1;
+  }
+  return { args, ...model === undefined ? {} : { model }, ...sourceRoot === undefined ? {} : { sourceRoot } };
 }
 function buildDoctorOutputInstruction(doctorArgs) {
   if (doctorArgs.includes("--json")) {

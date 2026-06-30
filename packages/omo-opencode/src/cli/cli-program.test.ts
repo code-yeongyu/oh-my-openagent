@@ -96,7 +96,7 @@ test("program configures explicit '-h, --help' help option for consistent help-f
   expect(programBlock?.[1]).toContain('.helpOption("-h, --help", "Display help for command")')
 })
 
-test("program registers sparkshell as a runtime command", async () => {
+test("program registers runtime commands", async () => {
   // given
   const cliProgramSource = await readFile(
     path.resolve(import.meta.dir, "cli-program.ts"),

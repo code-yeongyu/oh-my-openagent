@@ -3,7 +3,7 @@
 		"by": "lazycodex-code-reviewer",
 		"recommendation": "APPROVE",
 		"codeQualityStatus": "CLEAR",
-		"reportPath": "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/code-review.md",
+		"reportPath": "test/fixtures/artifacts/code-review.md",
 		"evidence": "Reviewed changed validator, type contract, and tests; no blocking code-quality issues remain.",
 		"blockers": []
 	},
@@ -68,38 +68,38 @@
 				"id": "artifact-cli-pass",
 				"kind": "cli-transcript",
 				"description": "CLI transcript for valid quality gate acceptance.",
-				"path": "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/cli-pass.txt"
+				"path": "test/fixtures/artifacts/cli-pass.txt"
 			},
 			{
 				"id": "artifact-cli-reject",
 				"kind": "log",
 				"description": "Log proving malformed quality gate rejection.",
-				"path": "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/rejection.txt"
+				"path": "test/fixtures/artifacts/rejection.txt"
 			},
 			{
 				"id": "artifact-http-dump",
 				"kind": "http-dump",
 				"description": "HTTP dump for quality gate endpoint validation.",
-				"path": "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/http-dump.txt"
+				"path": "test/fixtures/artifacts/http-dump.txt"
 			},
 			{
 				"id": "artifact-browser-shot",
 				"kind": "screenshot",
 				"description": "Browser screenshot captured for the quality gate scenario.",
-				"path": "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/browser-screenshot.txt"
+				"path": "test/fixtures/artifacts/browser-screenshot.txt"
 			},
 			{
 				"id": "artifact-data-diff",
 				"kind": "data-diff",
 				"description": "Data diff proving stale-state compatibility.",
-				"path": "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/data-diff.txt"
+				"path": "test/fixtures/artifacts/data-diff.txt"
 			}
 		]
 	},
 	"gateReview": {
 		"by": "lazycodex-gate-reviewer",
 		"recommendation": "APPROVE",
-		"reportPath": "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/gate-review.md",
+		"reportPath": "test/fixtures/artifacts/gate-review.md",
 		"evidence": "Rechecked reviewer reports, manual QA artifacts, and criteria coverage; gate is approved.",
 		"blockers": []
 	},

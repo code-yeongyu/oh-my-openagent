@@ -16,6 +16,25 @@ const packageGuidanceDocPaths = [
   "docs/reference/github-attachment-upload.md",
   "docs/reference/web-terminal-visual-qa.md",
 ] as const
+const lazycodexRuntimePayloadPaths = [
+  "dist/cli",
+  "dist/cli-node",
+  "packages/omo-codex/plugin/components/bootstrap/dist/cli.js",
+  "packages/omo-codex/plugin/components/bootstrap/scripts/bootstrap.ps1",
+  "packages/omo-codex/plugin/components/bootstrap/scripts/node-dispatch.ps1",
+  "packages/omo-codex/plugin/components/codegraph/dist/cli.js",
+  "packages/omo-codex/plugin/components/codegraph/dist/serve.js",
+  "packages/omo-codex/plugin/components/comment-checker/dist/cli.js",
+  "packages/omo-codex/plugin/components/git-bash/dist/cli.js",
+  "packages/omo-codex/plugin/components/lazycodex-executor-verify/dist/cli.js",
+  "packages/omo-codex/plugin/components/lsp/dist/cli.js",
+  "packages/omo-codex/plugin/components/rules/dist/cli.js",
+  "packages/omo-codex/plugin/components/start-work-continuation/dist/cli.js",
+  "packages/omo-codex/plugin/components/teammode/dist/cli.js",
+  "packages/omo-codex/plugin/components/telemetry/dist/cli.js",
+  "packages/omo-codex/plugin/components/ultrawork/dist/cli.js",
+  "packages/omo-codex/plugin/components/ulw-loop/dist/cli.js",
+] as const
 
 function sliceWorkflowSection(workflow: string, startMarker: string, endMarker: string): string {
   const start = workflow.indexOf(startMarker)
@@ -232,13 +251,13 @@ describe("LazyCodex publish workflow", () => {
     const lazycodexStepDropsLifecycleScripts = workflow.includes(".scripts = {}")
     const lazycodexStepDropsPlatformOptionalDeps = workflow.includes(".optionalDependencies = {}")
     const lazycodexStepDropsRuntimeDependencies = workflow.includes(".dependencies = {}")
-    const lazycodexStepScopesPublishedFiles = workflow.includes(
-      '.files = ["dist/cli", "dist/cli-node", "script/qa/web-terminal-redaction.d.mts", "script/qa/web-terminal-redaction.mjs", "script/qa/web-terminal-renderer.mjs", "script/qa/web-terminal-visual-qa.mjs", "docs/reference/github-attachment-upload.md", "docs/reference/web-terminal-visual-qa.md", "packages/omo-codex/scripts/install-local.mjs", "packages/omo-codex/scripts/install-dist", "packages/omo-codex/plugin", "packages/omo-codex/plugin/components/start-work-continuation/dist/cli.js", "packages/omo-codex/plugin/components/ulw-loop/dist/cli.js", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/lsp-daemon/package.json", "packages/lsp-daemon/dist", "packages/git-bash-mcp/dist", "packages/shared-skills/package.json", "packages/shared-skills/index.mjs", "packages/shared-skills/skills"]',
-    )
     const publishLazycodexStep = sliceWorkflowSection(
       workflow,
       "      - name: Publish lazycodex-ai",
       "      - name: Smoke test published lazycodex-ai",
+    )
+    const missingLazycodexRuntimePayloadPaths = lazycodexRuntimePayloadPaths.filter(
+      (runtimePath) => !publishLazycodexStep.includes(`"${runtimePath}"`),
     )
     const missingWebTerminalRuntimePaths = webTerminalVisualQaRuntimePaths.filter(
       (runtimePath) => !publishLazycodexStep.includes(`"${runtimePath}"`),
@@ -261,7 +280,7 @@ describe("LazyCodex publish workflow", () => {
     expect(lazycodexStepDropsPlatformOptionalDeps, "lazycodex publish step must not install Bun-backed platform launchers").toBe(true)
     expect(lazycodexStepDropsRuntimeDependencies, "lazycodex publish step must not install OpenCode CLI runtime dependencies").toBe(true)
     expect(
-      lazycodexStepScopesPublishedFiles,
+      missingLazycodexRuntimePayloadPaths.length === 0,
       "lazycodex npm package must ship the root CLI dist (omo runtime wrapper target), web-terminal QA helper runtime, the Node installer and Codex marketplace assets, and packages/lsp-daemon (lsp MCP arg target and components/lsp file: dependency — npm ci in the plugin cache hard-fails without it)",
     ).toBe(true)
     expect(missingWebTerminalRuntimePaths).toEqual([])
@@ -299,15 +318,23 @@ describe("LazyCodex publish workflow", () => {
       smokeStep.includes('export CODEX_LOCAL_BIN_DIR="$SMOKE_DIR/bin"')
     const assertsDryRunRouting = smokeStep.includes('npx -y "$package_spec" --dry-run install --no-tui --codex-autonomous') &&
       smokeStep.includes('npx -y "$package_spec" --dry-run doctor') &&
-      smokeStep.includes("npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous") &&
-      smokeStep.includes("npx --yes --package oh-my-openagent omo doctor")
+      smokeStep.includes('expected_install_output="npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous"') &&
+      smokeStep.includes('expected_doctor_output_prefix="codex exec ') &&
+      smokeStep.includes("npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous") &&
+      smokeStep.includes('case "$npx_doctor_output" in "$expected_doctor_output_prefix"*) true ;; *) false ;; esac') &&
+      smokeStep.includes('case "$npx_doctor_output" in *"--sandbox danger-full-access"*) true ;; *) false ;; esac') &&
+      smokeStep.includes("Use $omo:lcx-doctor") &&
+      smokeStep.includes('case "$npx_doctor_output" in *"--model"*|*"gpt-5.5-codex-mini"*) false ;; *) true ;; esac') &&
+      !smokeStep.includes("npx --yes --package oh-my-openagent omo install") &&
+      !smokeStep.includes("--platform=claude-code") &&
+      !smokeStep.includes("--platform=gemini")
     const installsRealPackageAndVerifiesOmoBin =
       smokeStep.includes('npx -y "$package_spec" install --no-tui --codex-autonomous') &&
       smokeStep.includes('[ -x "$CODEX_LOCAL_BIN_DIR/omo" ]') &&
       smokeStep.includes('omo_version_output=$("$CODEX_LOCAL_BIN_DIR/omo" --version 2>&1)') &&
       smokeStep.includes('[ "$omo_version_output" = "$OMO_VERSION" ]') &&
-      smokeStep.includes('sparkshell_output=$("$CODEX_LOCAL_BIN_DIR/omo" sparkshell echo lazycodex-smoke 2>&1)') &&
-      smokeStep.includes('[ "$sparkshell_output" = "lazycodex-smoke" ]')
+      smokeStep.includes('ulw_loop_output=$("$CODEX_LOCAL_BIN_DIR/omo" ulw-loop --help 2>&1)') &&
+      smokeStep.includes('printf "%s" "$ulw_loop_output" | grep -q "ulw-loop"')
 
     // #then
     expect(smokeRunsAfterPublishBeforeRestore, "post-publish smoke must run after lazycodex publish and before package restore").toBe(true)
@@ -318,7 +345,7 @@ describe("LazyCodex publish workflow", () => {
     expect(assertsDryRunRouting, "post-publish smoke must assert the expected dry-run routing output").toBe(true)
     expect(
       installsRealPackageAndVerifiesOmoBin,
-      "post-publish smoke must run a real install and verify the omo runtime wrapper exists, reports the release version, and executes sparkshell",
+      "post-publish smoke must run a real install and verify the omo runtime wrapper exists, reports the release version, and executes ulw-loop",
     ).toBe(true)
   })
 
