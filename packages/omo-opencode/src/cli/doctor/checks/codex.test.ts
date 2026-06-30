@@ -73,6 +73,8 @@ describe("codex doctor checks", () => {
     expect(summary.config.pluginEnabled).toBe(true)
     expect(summary.config.pluginsFeatureEnabled).toBe(true)
     expect(summary.config.pluginHooksFeatureEnabled).toBe(true)
+    expect(summary.config.companionPluginEnabled).toBe(false)
+    expect(summary.config.companionLifecycleHookStateEvents).toEqual([])
     expect(summary.linkedBins).toEqual(["omo", "omo-rules"])
   })
 
@@ -216,8 +218,61 @@ describe("codex doctor checks", () => {
     expect(result.details).toContain("Plugin: omo@4.7.5")
     expect(result.details).toContain("Distribution: lazycodex-ai@4.7.5")
     expect(result.details).toContain("Enabled plugin: omo@sisyphuslabs")
+    expect(result.details).toContain("Companion plugin: none")
     expect(result.details).toContain("Linked bins: omo, omo-rules")
     expect(result.details).toContain("Agents: plan")
+  })
+
+  test("#given LazyCodex is primary and Codex Companion lifecycle hooks are configured #when checking Codex doctor #then warns without disabling anything", async () => {
+    // given
+    const { codexHome, binDir } = await createInstalledCodexHome()
+    await writeFile(
+      join(codexHome, "config.toml"),
+      [
+        "[features]",
+        "plugins = true",
+        "plugin_hooks = true",
+        "",
+        "[marketplaces.sisyphuslabs]",
+        `source = "${join(codexHome, "plugins", "cache", "sisyphuslabs")}"`,
+        "",
+        '[plugins."omo@sisyphuslabs"]',
+        "enabled = true",
+        "",
+        '[plugins."codex@openai-codex"]',
+        "enabled = true",
+        "",
+        '[hooks.state."codex@openai-codex:hooks/hooks.json:session_start:0:0"]',
+        'trusted_hash = "sha256:session"',
+        "",
+        "[hooks.state.'codex@openai-codex:hooks/hooks.json:stop:0:0']",
+        'trusted_hash = "sha256:stop"',
+      ].join("\n"),
+    )
+
+    // when
+    const result = await checkCodex({
+      codexHome,
+      binDir,
+      detectCodexInstallation: async () => ({ found: true, source: "cli", path: "/usr/local/bin/codex" }),
+    })
+    const summary = await gatherCodexSummary({
+      codexHome,
+      binDir,
+      detectCodexInstallation: async () => ({ found: true, source: "cli", path: "/usr/local/bin/codex" }),
+    })
+
+    // then
+    expect(result.status).toBe("warn")
+    expect(summary.config.companionPluginEnabled).toBe(true)
+    expect(summary.config.companionLifecycleHookStateEvents).toEqual(["session_start", "stop"])
+    expect(result.details).toContain("Companion plugin: codex@openai-codex enabled (SessionStart, Stop hook trust)")
+    const issue = result.issues.find((entry) => entry.title === "Codex Companion lifecycle hooks may conflict with LazyCodex")
+    expect(issue).toBeDefined()
+    expect(issue?.severity).toBe("warning")
+    expect(issue?.description).toContain("codex@openai-codex is enabled")
+    expect(issue?.description).toContain("SessionStart, Stop")
+    expect(issue?.fix).toContain('[plugins."codex@openai-codex"] enabled = false')
   })
 
   test("#given a stamped plugin bundle #when gathering Codex summary #then it reports the installer version and stamped state", async () => {

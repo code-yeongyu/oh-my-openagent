@@ -101,6 +101,8 @@ describe("formatDefault", () => {
         pluginEnabled: true,
         pluginsFeatureEnabled: true,
         pluginHooksFeatureEnabled: true,
+        companionPluginEnabled: false,
+        companionLifecycleHookStateEvents: [],
       },
       linkedBins: ["omo"],
       agents: ["plan"],
