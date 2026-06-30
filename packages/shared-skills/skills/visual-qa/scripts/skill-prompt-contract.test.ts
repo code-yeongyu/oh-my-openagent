@@ -98,7 +98,7 @@ describe("visual-qa skill prompt contract", () => {
 			const web = sectionBetween(fixture.text, "### Web", "### TUI")
 
 			expect(web, fixture.label).toContain("agent-browser")
-			expect(fixture.text, fixture.label).toContain("bun add -g agent-browser")
+			expect(fixture.text, fixture.label).toContain("npm install -g agent-browser")
 			expect(fixture.text, fixture.label).toContain("https://github.com/vercel-labs/agent-browser")
 			expect(fixture.text, fixture.label).toContain("references/agent-browser-setup.md")
 		}
@@ -108,10 +108,18 @@ describe("visual-qa skill prompt contract", () => {
 		expect(existsSync(referencesPath)).toBe(true)
 		const doc = readFileSync(referencesPath, "utf8")
 
-		expect(doc).toContain("bun add -g agent-browser")
+		expect(doc).toContain("npm install -g agent-browser")
 		expect(doc).toContain("agent-browser install")
 		expect(doc).toContain("https://github.com/vercel-labs/agent-browser")
 		expect(doc).toContain("agent-browser --help")
+	})
+
+	test("#given the visual QA evidence commands #when documented #then they use the Node bundle, not a Bun-only TypeScript launcher", () => {
+		for (const fixture of fixtures()) {
+			expect(fixture.text, fixture.label).toContain('node "$SKILL_DIR/scripts/visual-qa.mjs" image-diff')
+			expect(fixture.text, fixture.label).toContain('node "$SKILL_DIR/scripts/visual-qa.mjs" tui-check')
+			expect(fixture.text, fixture.label).not.toContain('bun "$SKILL_DIR/scripts/cli.ts"')
+		}
 	})
 
 	test("#given a concrete visual target #when in reference-fidelity mode #then dual pixel + code-fidelity verification loops until both pass", () => {
