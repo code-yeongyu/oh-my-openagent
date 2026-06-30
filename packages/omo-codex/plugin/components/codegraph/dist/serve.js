@@ -2022,6 +2022,9 @@ class CodegraphBridgeStdioError extends Error {
     this.streamName = streamName;
   }
 }
+var CODEGRAPH_NODE_DESCRIPTION = "Inspect one named symbol or file. In symbol mode, includeCode=true includes leaf-symbol source when available. Container symbols such as classes, interfaces, structs, enums, modules, and namespaces return structural outlines with member lists by design. For container source, request a specific member symbol or use file mode with symbolsOnly=false plus offset/limit.";
+var CODEGRAPH_NODE_INCLUDE_CODE_DESCRIPTION = "Symbol mode: include leaf-symbol source when available. Container symbols such as classes, interfaces, structs, enums, modules, and namespaces intentionally return structural outlines with members; request a specific member symbol or use file mode with symbolsOnly=false plus offset/limit for source.";
+var CODEGRAPH_CONTAINER_OUTLINE_GUIDANCE = "Container symbols intentionally return structural outlines with members. For source, request a specific member symbol or call codegraph_node in file mode with symbolsOnly=false plus offset/limit around the symbol location.";
 async function runBridgedCodegraphProcess(command, args, options) {
   const invocation = resolveServeProcessInvocation(command, args);
   const child = spawn(invocation.command, invocation.args, {
@@ -2035,7 +2038,7 @@ async function runBridgedCodegraphProcess(command, args, options) {
     throw new CodegraphBridgeStdioError("stdin");
   if (childOutput === null)
     throw new CodegraphBridgeStdioError("stdout");
-  const responseModes = new Map;
+  const pendingResponses = new Map;
   let defaultResponseMode = "framed";
   const childExit = new Promise((resolveExit, reject) => {
     child.once("error", reject);
@@ -2048,10 +2051,10 @@ async function runBridgedCodegraphProcess(command, args, options) {
     });
   });
   const bridgeDone = Promise.all([
-    forwardClientToCodegraph(options.input, childInput, responseModes, (mode) => {
+    forwardClientToCodegraph(options.input, childInput, pendingResponses, (mode) => {
       defaultResponseMode = mode;
     }),
-    forwardCodegraphToClient(childOutput, options.output, responseModes, () => defaultResponseMode)
+    forwardCodegraphToClient(childOutput, options.output, pendingResponses, () => defaultResponseMode)
   ]);
   const destroyChildPipes = () => {
     childInput.destroy();
@@ -2060,7 +2063,7 @@ async function runBridgedCodegraphProcess(command, args, options) {
   childExit.then(destroyChildPipes, destroyChildPipes);
   return Promise.race([childExit, bridgeDone.then(() => childExit)]);
 }
-async function forwardClientToCodegraph(input, childInput, responseModes, setDefaultResponseMode) {
+async function forwardClientToCodegraph(input, childInput, pendingResponses, setDefaultResponseMode) {
   for await (const message of readStdioJsonRpcMessages(input)) {
     if (message.kind === "parse_error") {
       continue;
@@ -2068,23 +2071,29 @@ async function forwardClientToCodegraph(input, childInput, responseModes, setDef
     const responseMode = message.responseMode;
     setDefaultResponseMode(responseMode);
     const key = responseModeKey(message.payload);
-    if (key !== null)
-      responseModes.set(key, responseMode);
+    if (key !== null) {
+      pendingResponses.set(key, {
+        method: jsonRpcMethod(message.payload),
+        responseMode,
+        toolName: jsonRpcToolName(message.payload)
+      });
+    }
     await writeLine(childInput, JSON.stringify(message.payload));
   }
   childInput.end();
 }
-async function forwardCodegraphToClient(childOutput, output, responseModes, defaultResponseMode) {
+async function forwardCodegraphToClient(childOutput, output, pendingResponses, defaultResponseMode) {
   for await (const message of readStdioJsonRpcMessages(childOutput)) {
     if (message.kind === "parse_error") {
       writeStdioJsonRpcResponse(output, errorResponse(null, -32700, "Parse error", message.message), defaultResponseMode());
       continue;
     }
     const key = responseModeKey(message.payload);
-    const responseMode = key === null ? defaultResponseMode() : responseModes.get(key) ?? defaultResponseMode();
+    const pendingResponse = key === null ? undefined : pendingResponses.get(key);
+    const responseMode = pendingResponse?.responseMode ?? defaultResponseMode();
     if (key !== null)
-      responseModes.delete(key);
-    writeStdioJsonRpcResponse(output, message.payload, responseMode);
+      pendingResponses.delete(key);
+    writeStdioJsonRpcResponse(output, clarifyCodegraphResponse(message.payload, pendingResponse), responseMode);
   }
 }
 function responseModeKey(payload) {
@@ -2092,6 +2101,110 @@ function responseModeKey(payload) {
     return null;
   const id = jsonRpcId(payload["id"]);
   return `${typeof id}:${String(id)}`;
+}
+function jsonRpcMethod(payload) {
+  if (!isPlainRecord(payload))
+    return null;
+  const method = payload["method"];
+  return typeof method === "string" ? method : null;
+}
+function jsonRpcToolName(payload) {
+  if (jsonRpcMethod(payload) !== "tools/call" || !isPlainRecord(payload))
+    return null;
+  const params = payload["params"];
+  if (!isPlainRecord(params))
+    return null;
+  const name = params["name"];
+  return typeof name === "string" ? name : null;
+}
+function clarifyCodegraphResponse(payload, pendingResponse) {
+  if (pendingResponse?.method === "tools/list")
+    return clarifyCodegraphToolsList(payload);
+  if (pendingResponse?.method === "tools/call" && pendingResponse.toolName === "codegraph_node") {
+    return clarifyCodegraphNodeCallResult(payload);
+  }
+  return payload;
+}
+function clarifyCodegraphToolsList(payload) {
+  if (!isPlainRecord(payload))
+    return payload;
+  const result = payload["result"];
+  if (!isPlainRecord(result) || !Array.isArray(result["tools"]))
+    return payload;
+  let changed = false;
+  const tools = result["tools"].map((tool) => {
+    if (!isPlainRecord(tool) || tool["name"] !== "codegraph_node")
+      return tool;
+    if (!hasCodegraphNodeContractMetadata(tool))
+      return tool;
+    changed = true;
+    return clarifyCodegraphNodeTool(tool);
+  });
+  if (!changed)
+    return payload;
+  return { ...payload, result: { ...result, tools } };
+}
+function clarifyCodegraphNodeTool(tool) {
+  const clarified = {
+    ...tool,
+    description: CODEGRAPH_NODE_DESCRIPTION
+  };
+  const inputSchema = tool["inputSchema"];
+  if (isPlainRecord(inputSchema))
+    clarified["inputSchema"] = clarifyCodegraphNodeInputSchema(inputSchema);
+  return clarified;
+}
+function hasCodegraphNodeContractMetadata(tool) {
+  if (typeof tool["description"] === "string")
+    return true;
+  const inputSchema = tool["inputSchema"];
+  if (!isPlainRecord(inputSchema))
+    return false;
+  const properties = inputSchema["properties"];
+  return isPlainRecord(properties) && isPlainRecord(properties["includeCode"]);
+}
+function clarifyCodegraphNodeInputSchema(inputSchema) {
+  const properties = inputSchema["properties"];
+  if (!isPlainRecord(properties))
+    return inputSchema;
+  const includeCode = properties["includeCode"];
+  if (!isPlainRecord(includeCode))
+    return inputSchema;
+  return {
+    ...inputSchema,
+    properties: {
+      ...properties,
+      includeCode: {
+        ...includeCode,
+        description: CODEGRAPH_NODE_INCLUDE_CODE_DESCRIPTION
+      }
+    }
+  };
+}
+function clarifyCodegraphNodeCallResult(payload) {
+  if (!isPlainRecord(payload))
+    return payload;
+  const result = payload["result"];
+  if (!isPlainRecord(result) || !Array.isArray(result["content"]))
+    return payload;
+  let changed = false;
+  const content = result["content"].map((item) => {
+    if (!isPlainRecord(item) || item["type"] !== "text" || typeof item["text"] !== "string")
+      return item;
+    const text = clarifyContainerOutlineGuidance(item["text"]);
+    if (text === item["text"])
+      return item;
+    changed = true;
+    return { ...item, text };
+  });
+  if (!changed)
+    return payload;
+  return { ...payload, result: { ...result, content } };
+}
+function clarifyContainerOutlineGuidance(text) {
+  if (!text.includes("Structural outline only"))
+    return text;
+  return text.replace(/Structural outline only[^\n]*(?:\n[^\n]*(?:Read|read)[^\n]*)?/g, CODEGRAPH_CONTAINER_OUTLINE_GUIDANCE);
 }
 async function writeLine(output, line) {
   if (output.write(`${line}
