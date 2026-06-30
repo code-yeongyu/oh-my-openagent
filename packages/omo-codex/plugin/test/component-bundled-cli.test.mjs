@@ -158,12 +158,15 @@ test("#given bundled LSP hook CLI in installed layout #when diagnostics run #the
 			timeout: HOOK_CLI_TEST_TIMEOUT_MS,
 		});
 
-		assert.equal(result.status, 0, `stderr: ${result.stderr}`);
-		assert.equal(result.stderr, "");
+		const daemonInvocations = existsSync(invocationLog) ? readFileSync(invocationLog, "utf8") : "";
+		const failureContext = `stdout: ${result.stdout}\nstderr: ${result.stderr}\ndaemon log: ${daemonInvocations}`;
+		assert.equal(result.status, 0, failureContext);
+		assert.equal(result.stderr, "", failureContext);
+		assert.notEqual(result.stdout, "", failureContext);
 		const parsed = JSON.parse(result.stdout);
 		assert.equal(parsed.decision, "block");
 		assert.match(parsed.reason, /error\[fake\] \(1\) at 1:1: Missing fake symbol\./);
-		assert.deepEqual(readFileSync(invocationLog, "utf8").trim().split("\n").map(JSON.parse), [["daemon"]]);
+		assert.deepEqual(daemonInvocations.trim().split("\n").map(JSON.parse), [["daemon"]]);
 		assert.equal(existsSync(join(daemonDir, "v0.1.0", "daemon.log")), true);
 	} finally {
 		rmSync(tempRoot, { recursive: true, force: true });
@@ -339,9 +342,13 @@ function writeFakeLspDaemonCli(path) {
 			"const dir = join(baseDir, versionDirName);",
 			'const naturalSocket = join(dir, "daemon.sock");',
 			'const digest = createHash("sha256").update(dir).digest("hex").slice(0, 16);',
-			"const socketPath = naturalSocket.length < 100 ? naturalSocket : join(tmpdir(), `omo-lsp-${version}-${digest}.sock`);",
-			"mkdirSync(dirname(socketPath), { recursive: true });",
-			"try { unlinkSync(socketPath); } catch {}",
+			"const socketPath = process.platform === \"win32\"",
+			"\t? `\\\\\\\\.\\\\pipe\\\\omo-lsp-${version}-${digest}`",
+			"\t: naturalSocket.length < 100 ? naturalSocket : join(tmpdir(), `omo-lsp-${version}-${digest}.sock`);",
+			"if (process.platform !== \"win32\") {",
+			"\tmkdirSync(dirname(socketPath), { recursive: true });",
+			"\ttry { unlinkSync(socketPath); } catch {}",
+			"}",
 			"const server = createServer((socket) => {",
 			'\tlet raw = "";',
 			'\tsocket.setEncoding("utf8");',
