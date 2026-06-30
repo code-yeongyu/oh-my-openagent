@@ -7,15 +7,64 @@ import {
 	getRuntimeRetryActivitySessionID,
 	isAbortError,
 } from "./event-handler-activity"
-import { handleIdleEvent, type EventHandlerRuntime } from "./event-handler-idle"
+import {
+	getVerificationSessionID,
+	handleIdleEvent,
+	matchesLoopSession,
+	type EventHandlerRuntime,
+} from "./event-handler-idle"
 import { handleRuntimeErrorEvent } from "./event-handler-runtime-error"
 import type { RalphLoopEventHandlerOptions } from "./event-handler-types"
-import { releasePromptAsyncReservation } from "../shared/prompt-async-gate"
+import {
+	getPromptReservation,
+	releasePromptAsyncReservation,
+	reservationSourceMatches,
+} from "../shared/prompt-async-gate"
 import { handleDeletedLoopSession, handleErroredLoopSession } from "./session-event-handler"
+
+const RALPH_LOOP_PROMPT_RESERVATION_SOURCE = "ralph-loop" as const
+const RALPH_LOOP_PROMPT_RESERVATION_PREFIX = "ralph-loop:" as const
 
 type RalphLoopEvent = {
 	readonly type: string
 	readonly properties?: unknown
+}
+
+function hasRalphOwnedPromptReservation(sessionID: string): boolean {
+	const reservation = getPromptReservation(sessionID)
+	return reservation !== undefined
+		&& reservationSourceMatches(
+			reservation.source,
+			RALPH_LOOP_PROMPT_RESERVATION_SOURCE,
+			RALPH_LOOP_PROMPT_RESERVATION_PREFIX,
+		)
+}
+
+function releaseRalphPromptReservation(sessionID: string): void {
+	releasePromptAsyncReservation(sessionID, RALPH_LOOP_PROMPT_RESERVATION_SOURCE, {
+		reservedBy: RALPH_LOOP_PROMPT_RESERVATION_SOURCE,
+		reservedByPrefix: RALPH_LOOP_PROMPT_RESERVATION_PREFIX,
+	})
+}
+
+function clearRuntimeRetryActivity(
+	runtime: EventHandlerRuntime,
+	sessionID: string,
+	options: { readonly releaseReservation: boolean },
+): void {
+	runtime.runtimeErrorRetriedSessions.delete(sessionID)
+	if (options.releaseReservation) {
+		releaseRalphPromptReservation(sessionID)
+	}
+	runtime.recentHandledSyntheticIdleAt.delete(sessionID)
+}
+
+function forgetNonLoopRuntimeRetryActivity(
+	runtime: EventHandlerRuntime,
+	sessionID: string,
+): void {
+	runtime.runtimeErrorRetriedSessions.delete(sessionID)
+	runtime.recentHandledSyntheticIdleAt.delete(sessionID)
 }
 
 export function createRalphLoopEventHandlerImpl(
@@ -32,9 +81,37 @@ export function createRalphLoopEventHandlerImpl(
 		const props = isRecord(event.properties) ? event.properties : undefined
 		const runtimeRetryActivitySessionID = getRuntimeRetryActivitySessionID(event.type, props)
 		if (runtimeRetryActivitySessionID) {
-			runtime.runtimeErrorRetriedSessions.delete(runtimeRetryActivitySessionID)
-			releasePromptAsyncReservation(runtimeRetryActivitySessionID, "ralph-loop")
-			runtime.recentHandledSyntheticIdleAt.delete(runtimeRetryActivitySessionID)
+			const hasRuntimeRetryMarker = runtime.runtimeErrorRetriedSessions.has(runtimeRetryActivitySessionID)
+			const hasRalphReservation = hasRalphOwnedPromptReservation(runtimeRetryActivitySessionID)
+			if (!hasRuntimeRetryMarker && !hasRalphReservation) {
+				return
+			}
+
+			const state = options.loopState.getState()
+			if (!state?.active) {
+				if (hasRuntimeRetryMarker || hasRalphReservation) {
+					clearRuntimeRetryActivity(runtime, runtimeRetryActivitySessionID, {
+						releaseReservation: hasRalphReservation,
+					})
+				}
+				return
+			}
+
+			const verificationSessionID = getVerificationSessionID(state)
+			const match = matchesLoopSession(state, runtimeRetryActivitySessionID, verificationSessionID)
+			if (!match.parent && !match.verification) {
+				forgetNonLoopRuntimeRetryActivity(runtime, runtimeRetryActivitySessionID)
+				return
+			}
+			if (hasRuntimeRetryMarker) {
+				clearRuntimeRetryActivity(runtime, runtimeRetryActivitySessionID, {
+					releaseReservation: hasRalphReservation,
+				})
+			} else if (hasRalphReservation) {
+				clearRuntimeRetryActivity(runtime, runtimeRetryActivitySessionID, {
+					releaseReservation: true,
+				})
+			}
 		}
 
 		if (event.type === "session.idle") {
