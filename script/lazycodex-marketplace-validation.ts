@@ -1,5 +1,5 @@
 import { readFile, readdir, realpath, stat } from "node:fs/promises"
-import { basename, dirname, join, resolve, sep } from "node:path"
+import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path"
 import { isPlainRecord } from "@oh-my-opencode/utils"
 
 export interface ValidateLazycodexPluginBundleOptions {
@@ -164,7 +164,7 @@ function isPluginRuntimePathArg(arg: string): boolean {
     (normalized.startsWith("./") ||
       normalized.startsWith("../") ||
       normalized.startsWith("components/") ||
-      normalized.startsWith("/"))
+      normalized.startsWith("/") || isAbsolute(arg))
   )
 }
 
