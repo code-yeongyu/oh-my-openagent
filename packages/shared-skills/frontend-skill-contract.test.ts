@@ -32,3 +32,22 @@ describe("frontend skill concrete-reference contract", () => {
 		expect(axioms).toContain("pixels, copy, component structure, and responsive intent")
 	})
 })
+
+describe("frontend skill Aside reference contract", () => {
+	test("#given an Aside-style AI browser brief #when routing design references #then Aside is discoverable and provenance-backed", async () => {
+		const skillText = await Bun.file(frontendSkillPath).text()
+		const indexText = await Bun.file(new URL("./skills/frontend/references/design/_INDEX.md", import.meta.url)).text()
+		const designReadmeText = await Bun.file(new URL("./skills/frontend/references/design/README.md", import.meta.url)).text()
+		const asideText = await Bun.file(new URL("./skills/frontend/references/design/aside.md", import.meta.url)).text()
+
+		expect(skillText).toContain("design/aside.md")
+		expect(skillText).toContain("Aside-style AI browser")
+		expect(indexText).toContain("`aside.md`")
+		expect(indexText).toContain("AI browser / agentic browser / product-app launch")
+		expect(designReadmeText).toContain("Aside-style browser agent")
+		expect(asideText).toContain("## Provenance")
+		expect(asideText).toContain("https://aside.com/")
+		expect(asideText).toContain("JCodesMore/ai-website-cloner-template")
+		expect(asideText).toContain("Do not treat this file as a license to copy")
+	})
+})

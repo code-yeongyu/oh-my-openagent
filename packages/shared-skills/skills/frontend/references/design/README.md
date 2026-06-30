@@ -16,9 +16,9 @@ Two things ship flat most often, and both read as "clean but generic": the **her
 The library lives flat in this directory (`references/design/`, max depth 1) and has two conceptual layers, and **most non-trivial tasks load one from each layer**:
 
 - **Layer A — taste skills (12 files):** how to execute. Discipline, motion physics, spacing rules, anti-slop guardrails, output completeness. Filenames end in `-skill.md` or start with `imagegen-`.
-- **Layer B — design systems (69 files):** what it should look like. Concrete color/type/component tokens for one specific brand aesthetic. Filenames are brand names (`claude.md`, `notion.md`, `stripe.md`, …).
+- **Layer B — design systems (70 files):** what it should look like. Concrete color/type/component tokens for one specific brand aesthetic. Filenames are brand names (`aside.md`, `claude.md`, `notion.md`, `stripe.md`, ...).
 
-A combined directory of all 81 reference files is at `_INDEX.md`. **Read that index before loading anything** unless the routing is obvious — it has the full mood-mapping and stacking rules in one place.
+A combined directory of all 83 reference files is at `_INDEX.md`. **Read that index before loading anything** unless the routing is obvious — it has the full mood-mapping and stacking rules in one place.
 
 ## Open Design Library
 
@@ -94,7 +94,7 @@ Run through this in order and stop at the first match. Do not skip — earlier r
 
 ### Step 1 — Did the user name a specific brand or site?
 
-Phrasings: "make it look like Linear", "Stripe-style buttons", "Notion-feel sidebar", "like {brand}'s landing page", or pasting a screenshot of a known brand site.
+Phrasings: "make it look like Linear", "Stripe-style buttons", "Notion-feel sidebar", "Aside-style browser agent", "like {brand}'s landing page", or pasting a screenshot of a known brand site.
 
 **Action:** Open `_INDEX.md`, find the brand under "Layer B — Design Systems", then load `<brand>.md`. Use it as the project's design system source of truth (color hex values, type scale, component specs, do/don'ts).
 
@@ -201,6 +201,7 @@ Once references are loaded, before writing any UI code:
 | User asks for... | Load these |
 |---|---|
 | "Build me a landing page" (no other info) | `_INDEX.md` shortlist → exactly one Layer B reference + `taste-skill.md` |
+| "Build me an Aside-style AI browser / agent page" | `aside.md` + `taste-skill.md` |
 | "Build me a Linear-style landing page" | `linear.app.md` + `taste-skill.md` |
 | "Make it Notion-like and minimal" | `notion.md` + `minimalist-skill.md` |
 | "Premium SaaS hero, like Stripe" | `stripe.md` + `soft-skill.md` |

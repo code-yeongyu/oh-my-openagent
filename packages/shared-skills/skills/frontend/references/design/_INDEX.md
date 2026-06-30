@@ -3,7 +3,7 @@
 All reference files live flat in this directory. Three layers:
 - **Layer 0 — design system architecture** (1 file): the mandatory gate. Defines `DESIGN.md` structure, creation workflow, validation rules. Always loaded by Phase 0 when no design system exists.
 - **Layer A — taste skills** (12 files): how to execute. Discipline, motion, spacing, anti-slop, output completeness.
-- **Layer B — design systems** (69 files): what it should look like. Brand-specific color/type/component tokens.
+- **Layer B — design systems** (70 files): what it should look like. Brand-specific color/type/component tokens.
 
 **Phase 0 runs first** (check/create `DESIGN.md`), then most non-trivial tasks load **one Layer A + one Layer B** together. See the routing flow in the sibling `README.md`.
 
@@ -52,9 +52,9 @@ From [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill).
 
 ---
 
-## Layer B — Design Systems (71)
+## Layer B — Design Systems (70)
 
-From [VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md), based on [Google Stitch DESIGN.md format](https://stitch.withgoogle.com/docs/design-md/overview/). Each file captures one website's complete visual language: color palette, typography, components, layout principles, depth, do/don't, responsive behavior, and an agent prompt guide.
+Most Layer B files are materialized from [VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md), based on [Google Stitch DESIGN.md format](https://stitch.withgoogle.com/docs/design-md/overview/). Project-original entries such as `aside.md` are listed here only when `ATTRIBUTION.md` and `frontend-refs-manifest.mjs` mark them as original. Each file captures one website's complete visual language: color palette, typography, components, layout principles, depth, do/don't, responsive behavior, and an agent prompt guide.
 
 ### How to use
 
@@ -83,6 +83,7 @@ Each file ships with: visual theme, hex color palette + semantic roles, full typ
 
 | File | Aesthetic |
 |---|---|
+| `aside.md` | AI browser agent. Bright product-app marketing, custom display type, soft squircle controls, browser-product framing. |
 | `cursor.md` | AI-first code editor. Sleek dark interface, gradient accents. |
 | `expo.md` | React Native platform. Dark theme, tight letter-spacing, code-centric. |
 | `lovable.md` | AI full-stack builder. Playful gradients, friendly dev aesthetic. |
@@ -183,6 +184,7 @@ Each file ships with: visual theme, hex color palette + semantic roles, full typ
 - **"Brutal / Swiss / industrial"** → `nike.md`, `bugatti.md`, `vodafone.md`
 - **"Dark cinematic"** → `runwayml.md`, `elevenlabs.md`, `superhuman.md`, `shopify.md`
 - **"Terminal / developer-native"** → `vercel.md`, `warp.md`, `voltagent.md`, `ollama.md`
+- **"AI browser / agentic browser / product-app launch"** → `aside.md`, `raycast.md`, `superhuman.md`
 - **"Warm / approachable / soft"** → `airbnb.md`, `notion.md`, `intercom.md`, `mastercard.md`
 - **"Data-dense / dashboard"** → `sentry.md`, `kraken.md`, `posthog.md`, `clickhouse.md`
 - **"Bold / sporty / monochrome punch"** → `nike.md`, `uber.md`, `tesla.md`, `binance.md`
