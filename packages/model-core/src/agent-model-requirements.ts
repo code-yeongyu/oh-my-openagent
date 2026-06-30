@@ -36,8 +36,13 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "gpt-5.5",
         variant: "medium",
       },
+      {
+        providers: ["zai-coding-plan", "opencode", "bailian-coding-plan", "vercel"],
+        model: "glm-5",
+        variant: "medium",
+      },
     ],
-    requiresProvider: ["openai", "github-copilot", "opencode", "vercel"],
+    requiresProvider: ["openai", "github-copilot", "opencode", "vercel", "zai-coding-plan", "bailian-coding-plan"],
     requiresAnyModel: true,
   },
   oracle: {
