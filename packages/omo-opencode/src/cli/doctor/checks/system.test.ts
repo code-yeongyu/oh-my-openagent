@@ -2,12 +2,13 @@
 
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { rmSync } from "node:fs"
+import type { PathLike } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { PLUGIN_NAME } from "../../../shared"
 import type { PluginInfo } from "./system-plugin"
 import type { OpenCodeBinaryInfo } from "./system-binary"
-import { checkSystem, gatherSystemInfo } from "./system"
+import { checkSystem } from "./system"
 
 const mockFindOpenCodeBinary = mock<() => Promise<OpenCodeBinaryInfo | null>>(async () => ({
   binary: "opencode",
@@ -32,7 +33,7 @@ const mockGetLoadedPluginVersion = mock(() => ({
 }))
 const mockGetLatestPluginVersion = mock(async (_currentVersion: string | null) => null as string | null)
 const mockGetSuggestedInstallTag = mock(() => "latest")
-const mockConfigExists = mock((_path: string) => true)
+const mockConfigExists = mock((_path: PathLike) => true)
 const mockReadConfigFile = mock((_path: string) => "{}")
 const mockParseConfigContent = mock((_content: string) => ({}))
 
@@ -155,7 +156,7 @@ describe("system check", () => {
       expect(mismatchIssue?.fix).toBe('Reinstall: cd "/Users/test/Library/Caches/opencode with spaces" && bun install')
     })
 
-    it("uses the loaded version channel for update fix command", async () => {
+    it("includes Bun postinstall trust guidance in the update fix command", async () => {
       //#given
       mockGetLoadedPluginVersion.mockReturnValue({
         cacheDir: "/Users/test/Library/Caches/opencode with spaces",
@@ -176,7 +177,9 @@ describe("system check", () => {
       //#then
       const outdatedIssue = result.issues.find((issue) => issue.title === "Loaded plugin is outdated")
       expect(outdatedIssue?.fix).toBe(
-        'Update: cd "/Users/test/Library/Caches/opencode with spaces" && bun add oh-my-opencode@canary'
+        'Update: cd "/Users/test/Library/Caches/opencode with spaces" && bun add oh-my-opencode@canary\n' +
+          'If Bun reports blocked postinstalls, inspect them: cd "/Users/test/Library/Caches/opencode with spaces" && bun pm untrusted\n' +
+          'Then trust only OMO-related packages from that list: cd "/Users/test/Library/Caches/opencode with spaces" && bun pm trust oh-my-opencode @code-yeongyu/comment-checker'
       )
     })
   })
