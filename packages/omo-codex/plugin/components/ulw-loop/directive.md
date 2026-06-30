@@ -154,8 +154,8 @@ artifact path the moment it happens. Update `## Now` and
 is your durable memory and it OUTLIVES the context window. After any
 compaction or context loss (a `Context compacted` notice, a summarized
 history, or you no longer see your own earlier steps), STOP and re-read
-the WHOLE notepad FIRST — `omo sparkshell cat "$NOTE"`, or read the path
-directly — before any other action, then resume from `## Now`. Recover
+the WHOLE notepad FIRST before any other action, then resume from
+`## Now`. Recover
 state from the notepad; do not re-plan from scratch or re-run completed
 steps.
 
@@ -189,16 +189,8 @@ serialize only when one output strictly feeds the next.
   inactive/uninitialized, or cold-start unavailable, keep moving with
   Read/Grep/Glob/LSP and the ast-grep skill.
 - Repo-wide inspection, CLI smoke tests, git/history, bounded command
-  output → use `omo sparkshell <command> [args...]` first. Pass ordinary
-  commands as executable and arguments in separate argv tokens, for
-  example `omo sparkshell rg --files`; not `omo sparkshell 'rg --files'`,
-  because the quoted string is treated as one executable name. Raw
-  `rg`/`grep`/`cat`/`git` are fallbacks when Sparkshell is unavailable
-  or too narrow. `--shell` is only for shell syntax such as
-  metacharacters, pipelines, redirects, command substitution, or
-  variable expansion; `--tmux-pane` is only for inspecting an existing
-  pane, never for launching ordinary commands. Sparkshell is your
-  default lens.
+  output → use native shell commands directly: `rg`, `rg --files`,
+  `cat`, and `git`. Narrow huge output before reading it.
 - Symbols — definitions, references, rename impact, diagnostics →
   `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`,
   `lsp_diagnostics`. Use the LSP, not text search, for anything
