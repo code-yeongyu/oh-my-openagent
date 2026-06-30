@@ -299,10 +299,13 @@ describe("LazyCodex publish workflow", () => {
       smokeStep.includes('export CODEX_LOCAL_BIN_DIR="$SMOKE_DIR/bin"')
     const assertsDryRunRouting = smokeStep.includes('npx -y "$package_spec" --dry-run install --no-tui --codex-autonomous') &&
       smokeStep.includes('npx -y "$package_spec" --dry-run doctor') &&
+      smokeStep.includes('expected_install_output="$(cat <<\'EOF\'') &&
       smokeStep.includes("npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous") &&
+      smokeStep.includes("npx --yes --package oh-my-openagent omo install --platform=claude-code --no-tui") &&
+      smokeStep.includes("npx --yes --package oh-my-openagent omo install --platform=gemini --no-tui") &&
       smokeStep.includes("npx --yes --package oh-my-openagent omo doctor")
     const installsRealPackageAndVerifiesOmoBin =
-      smokeStep.includes('npx -y "$package_spec" install --no-tui --codex-autonomous') &&
+      smokeStep.includes('npx -y "$package_spec" install --platform=codex --no-tui --codex-autonomous') &&
       smokeStep.includes('[ -x "$CODEX_LOCAL_BIN_DIR/omo" ]') &&
       smokeStep.includes('omo_version_output=$("$CODEX_LOCAL_BIN_DIR/omo" --version 2>&1)') &&
       smokeStep.includes('[ "$omo_version_output" = "$OMO_VERSION" ]') &&
