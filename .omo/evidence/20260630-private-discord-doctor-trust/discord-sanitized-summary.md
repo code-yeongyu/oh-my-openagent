@@ -1,9 +1,8 @@
 # Discord Report - Sanitized Summary
 
 Source:
-- URL: https://discord.com/channels/1452487457085063218/1490539106797621259/1521265774658977943
-- Access method: `aside repl` opened the logged-in Discord web app and loaded the linked message in `#general-ko`.
-- Raw Discord content is intentionally not copied here.
+- Private Discord report supplied by the requester.
+- Raw Discord content, guild/channel identifiers, message URL, channel name, and access metadata are intentionally not copied here.
 
 Issue summary:
 - `omo doctor` can report the loaded OpenCode plugin as outdated after an update attempt.
