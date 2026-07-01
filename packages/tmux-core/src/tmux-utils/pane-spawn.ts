@@ -4,7 +4,8 @@ import type { runTmuxCommand as RunTmuxCommand } from "../runner"
 import type { SplitDirection } from "./environment"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
-import { buildPaneAuthEnvironmentArgs, buildTmuxPlaceholderCommand } from "./pane-command"
+import { buildPaneAuthEnvironmentArgs, buildTmuxAttachCommand, buildTmuxPlaceholderCommand } from "./pane-command"
+import { isCmuxCompatEnvironment as _isCmuxCompatEnvironment } from "../cmux-detect"
 
 export type SpawnTmuxPaneDeps = {
 	readonly log: (message: string, data?: unknown) => void
@@ -12,6 +13,7 @@ export type SpawnTmuxPaneDeps = {
 	readonly isInsideTmux: typeof isInsideTmux
 	readonly isServerRunning: typeof isServerRunning
 	readonly getTmuxPath: () => Promise<string | null | undefined>
+	readonly isCmuxCompatEnvironment: () => boolean
 }
 
 async function resolveSpawnTmuxPaneDeps(deps?: Partial<SpawnTmuxPaneDeps>): Promise<SpawnTmuxPaneDeps> {
@@ -23,6 +25,7 @@ async function resolveSpawnTmuxPaneDeps(deps?: Partial<SpawnTmuxPaneDeps>): Prom
 		isInsideTmux,
 		isServerRunning,
 		getTmuxPath: async () => null,
+		isCmuxCompatEnvironment: _isCmuxCompatEnvironment,
 		...deps,
 	}
 }
@@ -72,7 +75,9 @@ export async function spawnTmuxPane(
 
 	log("[spawnTmuxPane] all checks passed, spawning...")
 
-	const placeholderCmd = buildTmuxPlaceholderCommand(description)
+	const initialCmd = deps.isCmuxCompatEnvironment()
+		? buildTmuxAttachCommand(serverUrl, sessionId, _directory)
+		: buildTmuxPlaceholderCommand(description)
 	const authEnvArgs = buildPaneAuthEnvironmentArgs()
 
 	const args = [
@@ -84,7 +89,7 @@ export async function spawnTmuxPane(
 		"#{pane_id}",
 		...(targetPaneId ? ["-t", targetPaneId] : []),
 		...authEnvArgs,
-		placeholderCmd,
+		initialCmd,
 	]
 
 	const result = await runTmuxCommand(tmux, args)
