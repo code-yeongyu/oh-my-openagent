@@ -465,20 +465,68 @@ describe("codex-cache", () => {
     const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-stale-ulw-bin-"))
     const pluginRoot = join(root, "plugin")
     const componentRoot = join(pluginRoot, "components", "rules")
+    const ulwLoopRoot = join(pluginRoot, "components", "ulw-loop")
     const binDir = join(root, "bin")
     const oldTarget = join(root, "codex-home", "plugins", "cache", "sisyphuslabs", "omo", "9.9.9", "components", "ulw-loop", "dist", "cli.js")
     await mkdir(join(componentRoot, "dist"), { recursive: true })
+    await mkdir(join(ulwLoopRoot, "dist"), { recursive: true })
     await mkdir(binDir, { recursive: true })
     await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: "@scope/omo" }))
     await writeFile(join(componentRoot, "package.json"), JSON.stringify({ name: "@scope/rules", bin: { "omo-rules": "dist/cli.js" } }))
+    await writeFile(join(ulwLoopRoot, "package.json"), JSON.stringify({ name: "@scope/ulw-loop", bin: { ulw: "dist/cli.js" } }))
     await writeFile(join(componentRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
+    await writeFile(join(ulwLoopRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
     await symlink(oldTarget, join(binDir, "ulw"))
 
     // when
     await linkCachedPluginBins({ binDir, pluginRoot, platform: "linux" })
 
     // then
-    await expect(readlink(join(binDir, "ulw"))).rejects.toThrow()
+    expect(await readlink(join(binDir, "ulw"))).toBe(join(ulwLoopRoot, "dist", "cli.js"))
+    expect(await readlink(join(binDir, "omo-rules"))).toBe(join(componentRoot, "dist", "cli.js"))
+  })
+
+  test("#given dangling symlink points at another cached plugin #when linking cached plugin bins #then preserves it", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-other-plugin-bin-"))
+    const pluginRoot = join(root, "plugin")
+    const componentRoot = join(pluginRoot, "components", "rules")
+    const binDir = join(root, "bin")
+    const otherTarget = join(root, "codex-home", "plugins", "cache", "sisyphuslabs", "other-plugin", "9.9.9", "components", "tool", "dist", "cli.js")
+    await mkdir(join(componentRoot, "dist"), { recursive: true })
+    await mkdir(binDir, { recursive: true })
+    await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: "@scope/omo" }))
+    await writeFile(join(componentRoot, "package.json"), JSON.stringify({ name: "@scope/rules", bin: { "omo-rules": "dist/cli.js" } }))
+    await writeFile(join(componentRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
+    await symlink(otherTarget, join(binDir, "other-tool"))
+
+    // when
+    await linkCachedPluginBins({ binDir, pluginRoot, platform: "linux" })
+
+    // then
+    expect(await readlink(join(binDir, "other-tool"))).toBe(otherTarget)
+    expect(await readlink(join(binDir, "omo-rules"))).toBe(join(componentRoot, "dist", "cli.js"))
+  })
+
+  test("#given non-managed bin points at deleted omo cache payload #when linking cached plugin bins #then preserves the user symlink", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-user-omo-shaped-bin-"))
+    const pluginRoot = join(root, "plugin")
+    const componentRoot = join(pluginRoot, "components", "rules")
+    const binDir = join(root, "bin")
+    const userTarget = join(root, "codex-home", "plugins", "cache", "sisyphuslabs", "omo", "9.9.9", "components", "rules", "dist", "cli.js")
+    await mkdir(join(componentRoot, "dist"), { recursive: true })
+    await mkdir(binDir, { recursive: true })
+    await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: "@scope/omo" }))
+    await writeFile(join(componentRoot, "package.json"), JSON.stringify({ name: "@scope/rules", bin: { "omo-rules": "dist/cli.js" } }))
+    await writeFile(join(componentRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
+    await symlink(userTarget, join(binDir, "user-tool"))
+
+    // when
+    await linkCachedPluginBins({ binDir, pluginRoot, platform: "linux" })
+
+    // then
+    expect(await readlink(join(binDir, "user-tool"))).toBe(userTarget)
     expect(await readlink(join(binDir, "omo-rules"))).toBe(join(componentRoot, "dist", "cli.js"))
   })
 

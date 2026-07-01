@@ -6531,9 +6531,12 @@ function isNodeErrorWithCode(error) {
 }
 
 // packages/omo-codex/src/install/codex-cache-dangling-bins.ts
-async function removeDanglingManagedComponentBins(binDir, platform) {
+async function removeDanglingManagedComponentBins(binDir, platform, managedBinNames) {
   const entries = await readdir(binDir, { withFileTypes: true });
   for (const entry of entries) {
+    const binName = managedBinNameForEntry(entry.name, platform);
+    if (binName === null || !managedBinNames.has(binName))
+      continue;
     const linkPath = join2(binDir, entry.name);
     if (platform === "win32") {
       await removeDanglingGeneratedCommandShim(linkPath);
@@ -6541,6 +6544,11 @@ async function removeDanglingManagedComponentBins(binDir, platform) {
     }
     await removeDanglingManagedSymlink(linkPath);
   }
+}
+function managedBinNameForEntry(name, platform) {
+  if (platform === "win32")
+    return name.endsWith(".cmd") ? name.slice(0, -4) : null;
+  return name;
 }
 async function removeDanglingManagedSymlink(linkPath) {
   try {
@@ -6591,12 +6599,13 @@ function extractCommandShimTarget(content) {
 function isManagedComponentBinTarget(target) {
   const parts = target.split(/[\\/]+/);
   const suffix = parts.slice(-4);
-  return suffix[0] === "components" && suffix[2] === "dist" && suffix[3] === "cli.js" && (hasPluginCachePrefix(parts, parts.length - 4) || hasOmoCodexPluginPrefix(parts, parts.length - 4));
+  return suffix[0] === "components" && suffix[2] === "dist" && suffix[3] === "cli.js" && (hasOmoPluginCachePrefix(parts, parts.length - 4) || hasOmoCodexPluginPrefix(parts, parts.length - 4));
 }
-function hasPluginCachePrefix(parts, endExclusive) {
-  for (let index = 0;index < endExclusive - 1; index += 1) {
-    if (parts[index] === "plugins" && parts[index + 1] === "cache")
-      return true;
+function hasOmoPluginCachePrefix(parts, endExclusive) {
+  for (let index = 0;index < endExclusive - 4; index += 1) {
+    if (parts[index] === "plugins" && parts[index + 1] === "cache" && parts[index + 2] === "sisyphuslabs" && parts[index + 3] === "omo") {
+      return index + 4 < endExclusive;
+    }
   }
   return false;
 }
@@ -6652,9 +6661,9 @@ function isManagedLegacyComponentTarget(target, component) {
   const parts = target.split(/[\\/]+/);
   const suffixStart = parts.length - 4;
   const suffix = parts.slice(-4);
-  return suffix[0] === "components" && suffix[1] === component && suffix[2] === "dist" && suffix[3] === "cli.js" && (hasPluginCachePrefix2(parts, suffixStart) || hasOmoCodexPluginPrefix2(parts, suffixStart));
+  return suffix[0] === "components" && suffix[1] === component && suffix[2] === "dist" && suffix[3] === "cli.js" && (hasPluginCachePrefix(parts, suffixStart) || hasOmoCodexPluginPrefix2(parts, suffixStart));
 }
-function hasPluginCachePrefix2(parts, endExclusive) {
+function hasPluginCachePrefix(parts, endExclusive) {
   for (let index = 0;index < endExclusive - 1; index += 1) {
     if (parts[index] === "plugins" && parts[index + 1] === "cache")
       return true;
@@ -6769,7 +6778,7 @@ async function linkCachedPluginBins(input) {
   const platform = input.platform ?? process.platform;
   await mkdir(input.binDir, { recursive: true });
   await removeLegacyCodexComponentBins(input.binDir, platform);
-  await removeDanglingManagedComponentBins(input.binDir, platform);
+  await removeDanglingManagedComponentBins(input.binDir, platform, new Set(binLinks.map((link) => link.name)));
   const linked = [];
   for (const link of binLinks) {
     const linkPath = await linkCachedPluginBin(input.binDir, link, platform);

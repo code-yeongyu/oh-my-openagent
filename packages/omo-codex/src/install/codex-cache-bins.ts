@@ -19,7 +19,11 @@ export async function linkCachedPluginBins(input: {
   const platform = input.platform ?? process.platform
   await mkdir(input.binDir, { recursive: true })
   await removeLegacyCodexComponentBins(input.binDir, platform)
-  await removeDanglingManagedComponentBins(input.binDir, platform)
+  await removeDanglingManagedComponentBins(
+    input.binDir,
+    platform,
+    new Set(binLinks.map((link) => link.name)),
+  )
   const linked: Array<{ name: string; path: string; target: string }> = []
   for (const link of binLinks) {
     const linkPath = await linkCachedPluginBin(input.binDir, link, platform)

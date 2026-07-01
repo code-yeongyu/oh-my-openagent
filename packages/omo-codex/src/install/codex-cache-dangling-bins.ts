@@ -5,9 +5,15 @@ import { isNodeErrorWithCode } from "./codex-cache-fs"
 
 type LinkPlatform = NodeJS.Platform
 
-export async function removeDanglingManagedComponentBins(binDir: string, platform: LinkPlatform): Promise<void> {
+export async function removeDanglingManagedComponentBins(
+  binDir: string,
+  platform: LinkPlatform,
+  managedBinNames: ReadonlySet<string>,
+): Promise<void> {
   const entries = await readdir(binDir, { withFileTypes: true })
   for (const entry of entries) {
+    const binName = managedBinNameForEntry(entry.name, platform)
+    if (binName === null || !managedBinNames.has(binName)) continue
     const linkPath = join(binDir, entry.name)
     if (platform === "win32") {
       await removeDanglingGeneratedCommandShim(linkPath)
@@ -15,6 +21,11 @@ export async function removeDanglingManagedComponentBins(binDir: string, platfor
     }
     await removeDanglingManagedSymlink(linkPath)
   }
+}
+
+function managedBinNameForEntry(name: string, platform: LinkPlatform): string | null {
+  if (platform === "win32") return name.endsWith(".cmd") ? name.slice(0, -4) : null
+  return name
 }
 
 async function removeDanglingManagedSymlink(linkPath: string): Promise<void> {
@@ -66,13 +77,20 @@ function isManagedComponentBinTarget(target: string): boolean {
     suffix[0] === "components" &&
     suffix[2] === "dist" &&
     suffix[3] === "cli.js" &&
-    (hasPluginCachePrefix(parts, parts.length - 4) || hasOmoCodexPluginPrefix(parts, parts.length - 4))
+    (hasOmoPluginCachePrefix(parts, parts.length - 4) || hasOmoCodexPluginPrefix(parts, parts.length - 4))
   )
 }
 
-function hasPluginCachePrefix(parts: readonly string[], endExclusive: number): boolean {
-  for (let index = 0; index < endExclusive - 1; index += 1) {
-    if (parts[index] === "plugins" && parts[index + 1] === "cache") return true
+function hasOmoPluginCachePrefix(parts: readonly string[], endExclusive: number): boolean {
+  for (let index = 0; index < endExclusive - 4; index += 1) {
+    if (
+      parts[index] === "plugins" &&
+      parts[index + 1] === "cache" &&
+      parts[index + 2] === "sisyphuslabs" &&
+      parts[index + 3] === "omo"
+    ) {
+      return index + 4 < endExclusive
+    }
   }
   return false
 }
