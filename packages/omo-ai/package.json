@@ -3,6 +3,15 @@
   "version": "4.15.0",
   "description": "OMO senpi adapter package skeleton.",
   "type": "module",
+  "files": [
+    "package.json",
+    "src/**/*",
+    "senpi/**/*",
+    "senpi/.codex-plugin/**/*",
+    "senpi/components/**/dist/cli.js",
+    "test/**/*",
+    "tsconfig.json"
+  ],
   "bin": {
     "omo-ai": "./src/cli/index.mjs"
   },

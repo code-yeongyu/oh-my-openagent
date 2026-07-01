@@ -40,6 +40,26 @@ function requireRecord(
 }
 
 describe("omo-ai package skeleton", () => {
+  it("declares an npm files policy that preserves ignored senpi component CLI shims", () => {
+    // Given: Senpi component shims live under dist directories ignored by the repository.
+    const packageManifest = readJsonObject(join(packageRoot, "package.json"));
+    const requiredPackageFiles = [
+      "package.json",
+      "src/**/*",
+      "senpi/**/*",
+      "senpi/.codex-plugin/**/*",
+      "senpi/components/**/dist/cli.js",
+      "test/**/*",
+      "tsconfig.json",
+    ] as const;
+
+    // When: the package files allowlist is inspected.
+    const packageFiles = requireStringArray(packageManifest, "files");
+
+    // Then: npm pack has an explicit path for the ignored component CLI shims.
+    expect(packageFiles).toEqual(requiredPackageFiles);
+  });
+
   it("declares the senpi package workspace and manifest when the skeleton is present", () => {
     // Given: the root workspace manifest and the expected senpi adapter package path.
     const rootPackage = readJsonObject(join(repositoryRoot, "package.json"));
