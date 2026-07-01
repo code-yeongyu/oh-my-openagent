@@ -20,9 +20,17 @@ export function normalizeSkillFrontmatter(content) {
 	});
 }
 
+export function isSkillMarkdownSourcePath(sourcePath) {
+	const normalizedPath = sourcePath.replaceAll("\\", "/");
+	return normalizedPath === "SKILL.md" || normalizedPath.endsWith("/SKILL.md");
+}
+
 function materializedContent(relTarget, sourcePath) {
 	const content = readFileSync(sourcePath, "utf8");
-	if (relTarget.endsWith("/SKILL.md")) return normalizeSkillFrontmatter(content);
+	const isDesignpowersSkillReference = relTarget.startsWith("references/designpowers/vendor/skills/")
+		&& relTarget.endsWith("/reference.md")
+		&& isSkillMarkdownSourcePath(sourcePath);
+	if (relTarget.endsWith("/SKILL.md") || isDesignpowersSkillReference) return normalizeSkillFrontmatter(content);
 	return content;
 }
 

@@ -55,6 +55,26 @@ test("#given synced aggregate Codex skills #when inspected #then component and s
 	}
 });
 
+test("#given reference-only designpowers frontend files #when synced for Codex #then nested SKILL.md files are not packaged", async () => {
+	// given
+	const frontendReferencesRoot = join(root, "skills", "frontend", "references");
+	const designpowersVendorSkillsRoot = join(frontendReferencesRoot, "designpowers", "vendor", "skills");
+
+	// when
+	const nestedSkillFiles = (await listSkillFiles(frontendReferencesRoot))
+		.map((file) => file.replaceAll("\\", "/"))
+		.filter((file) => file.endsWith("/SKILL.md") || file === "SKILL.md")
+		.sort();
+	const designpowersReferenceFiles = (await listSkillFiles(designpowersVendorSkillsRoot))
+		.map((file) => file.replaceAll("\\", "/"))
+		.filter((file) => file.endsWith("/reference.md"))
+		.sort();
+
+	// then
+	assert.deepEqual(nestedSkillFiles, []);
+	assert.equal(designpowersReferenceFiles.length, 27);
+});
+
 test("#given aggregate Codex skills #when source wiring is inspected #then shared skills are imported from the shared-skills package", async () => {
 	// given
 	const pluginPackageJson = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
