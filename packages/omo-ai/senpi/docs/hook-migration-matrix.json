@@ -1,0 +1,191 @@
+[
+  {
+    "sourceHook": "post-compact-resetting-git-bash-mcp-reminder.json",
+    "status": "deferred",
+    "senpiEvent": null,
+    "component": "git-bash",
+    "command": null,
+    "matcher": "manual|auto",
+    "reason": "Deferred until omo-ai declares a Senpi Git Bash MCP component surface and trust/install flow."
+  },
+  {
+    "sourceHook": "post-compact-resetting-lsp-diagnostics-cache.json",
+    "status": "ported",
+    "senpiEvent": "PostCompact",
+    "component": "lsp",
+    "command": "node \"${PLUGIN_ROOT}/components/lsp/dist/cli.js\" hook post-compact",
+    "matcher": "manual|auto",
+    "reason": "Senpi supports PostCompact command hooks."
+  },
+  {
+    "sourceHook": "post-compact-resetting-project-rule-cache.json",
+    "status": "ported",
+    "senpiEvent": "PostCompact",
+    "component": "rules",
+    "command": "node \"${PLUGIN_ROOT}/components/rules/dist/cli.js\" hook post-compact",
+    "matcher": "manual|auto",
+    "reason": "Senpi supports PostCompact command hooks."
+  },
+  {
+    "sourceHook": "post-tool-use-checking-codegraph-init-guidance.json",
+    "status": "deferred",
+    "senpiEvent": null,
+    "component": "codegraph",
+    "command": null,
+    "matcher": "^(codegraph[._].*|mcp__codegraph__.*)$",
+    "reason": "Deferred until omo-ai declares a Senpi CodeGraph component/MCP surface."
+  },
+  {
+    "sourceHook": "post-tool-use-checking-comments.json",
+    "status": "ported",
+    "senpiEvent": "PostToolUse",
+    "component": "comment-checker",
+    "command": "node \"${PLUGIN_ROOT}/components/comment-checker/dist/cli.js\" hook post-tool-use",
+    "matcher": "^(apply_patch|write|Write|edit|Edit|multi_edit|multiedit|MultiEdit)$",
+    "reason": "Senpi supports PostToolUse command hooks with tool matchers."
+  },
+  {
+    "sourceHook": "post-tool-use-checking-lsp-diagnostics.json",
+    "status": "ported",
+    "senpiEvent": "PostToolUse",
+    "component": "lsp",
+    "command": "node \"${PLUGIN_ROOT}/components/lsp/dist/cli.js\" hook post-tool-use",
+    "matcher": "^(apply_patch|write|Write|edit|Edit|multi_edit|multiedit|MultiEdit)$",
+    "reason": "Senpi supports PostToolUse command hooks with tool matchers."
+  },
+  {
+    "sourceHook": "post-tool-use-checking-thread-title-hygiene.json",
+    "status": "deferred",
+    "senpiEvent": null,
+    "component": "teammode",
+    "command": null,
+    "matcher": "^(create_thread|codex_app\\.create_thread)$",
+    "reason": "Deferred because the matcher targets Codex thread tools that are not a Senpi hook/tool surface."
+  },
+  {
+    "sourceHook": "post-tool-use-matching-project-rules.json",
+    "status": "ported",
+    "senpiEvent": "PostToolUse",
+    "component": "rules",
+    "command": "node \"${PLUGIN_ROOT}/components/rules/dist/cli.js\" hook post-tool-use",
+    "matcher": "^apply_patch$",
+    "reason": "Senpi supports PostToolUse command hooks with tool matchers."
+  },
+  {
+    "sourceHook": "pre-tool-use-enforcing-unlimited-goal-budget.json",
+    "status": "deferred",
+    "senpiEvent": null,
+    "component": "ulw-loop",
+    "command": null,
+    "matcher": "^create_goal$",
+    "reason": "Deferred because create_goal is a Codex goal-management tool surface, not a Senpi hook target."
+  },
+  {
+    "sourceHook": "pre-tool-use-recommending-git-bash-mcp.json",
+    "status": "deferred",
+    "senpiEvent": null,
+    "component": "git-bash",
+    "command": null,
+    "matcher": "^Bash$",
+    "reason": "Deferred until omo-ai declares a Senpi Git Bash MCP component surface and install guidance."
+  },
+  {
+    "sourceHook": "session-start-checking-auto-update.json",
+    "status": "deferred",
+    "senpiEvent": null,
+    "component": "auto-update",
+    "command": null,
+    "matcher": "^startup$",
+    "reason": "Deferred because omo-ai v1 must not implement installer/settings/trust behavior yet."
+  },
+  {
+    "sourceHook": "session-start-checking-bootstrap-provisioning.json",
+    "status": "deferred",
+    "senpiEvent": null,
+    "component": "bootstrap",
+    "command": null,
+    "matcher": null,
+    "reason": "Deferred because omo-ai v1 must not implement installer/settings/trust behavior yet."
+  },
+  {
+    "sourceHook": "session-start-checking-codegraph-bootstrap.json",
+    "status": "deferred",
+    "senpiEvent": null,
+    "component": "codegraph",
+    "command": null,
+    "matcher": null,
+    "reason": "Deferred until omo-ai declares a Senpi CodeGraph component/MCP surface."
+  },
+  {
+    "sourceHook": "session-start-loading-project-rules.json",
+    "status": "ported",
+    "senpiEvent": "SessionStart",
+    "component": "rules",
+    "command": "node \"${PLUGIN_ROOT}/components/rules/dist/cli.js\" hook session-start",
+    "matcher": null,
+    "reason": "Senpi supports SessionStart command hooks."
+  },
+  {
+    "sourceHook": "session-start-recording-session-telemetry.json",
+    "status": "ported",
+    "senpiEvent": "SessionStart",
+    "component": "telemetry",
+    "command": "node \"${PLUGIN_ROOT}/components/telemetry/dist/cli.js\" hook session-start",
+    "matcher": null,
+    "reason": "Senpi supports SessionStart command hooks."
+  },
+  {
+    "sourceHook": "stop-checking-start-work-continuation.json",
+    "status": "ported",
+    "senpiEvent": "Stop",
+    "component": "start-work-continuation",
+    "command": "node \"${PLUGIN_ROOT}/components/start-work-continuation/dist/cli.js\" hook stop",
+    "matcher": null,
+    "reason": "Senpi supports Stop command hooks for top-level session completion."
+  },
+  {
+    "sourceHook": "subagent-stop-checking-start-work-continuation.json",
+    "status": "unsupported-v1",
+    "senpiEvent": null,
+    "component": "start-work-continuation",
+    "command": null,
+    "matcher": null,
+    "reason": "Senpi v1 explicitly does not support SubagentStop and this must not be emulated with Stop."
+  },
+  {
+    "sourceHook": "subagent-stop-verifying-lazycodex-executor-evidence.json",
+    "status": "unsupported-v1",
+    "senpiEvent": null,
+    "component": "lazycodex-executor-verify",
+    "command": null,
+    "matcher": "^lazycodex-executor$",
+    "reason": "Senpi v1 explicitly does not support SubagentStop and this must not be emulated with Stop."
+  },
+  {
+    "sourceHook": "user-prompt-submit-checking-ultrawork-trigger.json",
+    "status": "ported",
+    "senpiEvent": "UserPromptSubmit",
+    "component": "ultrawork",
+    "command": "node \"${PLUGIN_ROOT}/components/ultrawork/dist/cli.js\" hook user-prompt-submit",
+    "matcher": null,
+    "reason": "Senpi supports UserPromptSubmit command hooks."
+  },
+  {
+    "sourceHook": "user-prompt-submit-checking-ulw-loop-steering.json",
+    "status": "ported",
+    "senpiEvent": "UserPromptSubmit",
+    "component": "ulw-loop",
+    "command": "node \"${PLUGIN_ROOT}/components/ulw-loop/dist/cli.js\" hook user-prompt-submit",
+    "matcher": null,
+    "reason": "Senpi supports UserPromptSubmit command hooks."
+  },
+  {
+    "sourceHook": "user-prompt-submit-loading-project-rules.json",
+    "status": "ported",
+    "senpiEvent": "UserPromptSubmit",
+    "component": "rules",
+    "command": "node \"${PLUGIN_ROOT}/components/rules/dist/cli.js\" hook user-prompt-submit",
+    "matcher": null,
+    "reason": "Senpi supports UserPromptSubmit command hooks."
+  }
+]

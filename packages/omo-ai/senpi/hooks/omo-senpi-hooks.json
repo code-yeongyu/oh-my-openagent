@@ -1,0 +1,129 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/components/rules/dist/cli.js\" hook session-start",
+            "timeout": 10,
+            "statusMessage": "(OmO) Loading Project Rules"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/components/telemetry/dist/cli.js\" hook session-start",
+            "timeout": 5,
+            "statusMessage": "(OmO) Recording Session Telemetry"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/components/rules/dist/cli.js\" hook user-prompt-submit",
+            "timeout": 10,
+            "statusMessage": "(OmO) Loading Project Rules"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/components/ultrawork/dist/cli.js\" hook user-prompt-submit",
+            "timeout": 5,
+            "statusMessage": "(OmO) Checking Ultrawork Trigger"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/components/ulw-loop/dist/cli.js\" hook user-prompt-submit",
+            "timeout": 10,
+            "statusMessage": "(OmO) Checking Ulw-Loop Steering"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/components/comment-checker/dist/cli.js\" hook post-tool-use",
+            "timeout": 30,
+            "statusMessage": "(OmO) Checking Comments"
+          }
+        ],
+        "matcher": "^(apply_patch|write|Write|edit|Edit|multi_edit|multiedit|MultiEdit)$"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/components/rules/dist/cli.js\" hook post-tool-use",
+            "timeout": 10,
+            "statusMessage": "(OmO) Matching Project Rules"
+          }
+        ],
+        "matcher": "^apply_patch$"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/components/lsp/dist/cli.js\" hook post-tool-use",
+            "timeout": 60,
+            "statusMessage": "(OmO) Checking LSP Diagnostics"
+          }
+        ],
+        "matcher": "^(apply_patch|write|Write|edit|Edit|multi_edit|multiedit|MultiEdit)$"
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/components/lsp/dist/cli.js\" hook post-compact",
+            "timeout": 5,
+            "statusMessage": "(OmO) Resetting LSP Diagnostics Cache"
+          }
+        ],
+        "matcher": "manual|auto"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/components/rules/dist/cli.js\" hook post-compact",
+            "timeout": 10,
+            "statusMessage": "(OmO) Resetting Project Rule Cache"
+          }
+        ],
+        "matcher": "manual|auto"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/components/start-work-continuation/dist/cli.js\" hook stop",
+            "timeout": 10,
+            "statusMessage": "(OmO) Checking Start-Work Continuation"
+          }
+        ]
+      }
+    ]
+  }
+}
