@@ -42,12 +42,43 @@ function formatSlashCommand(command: CommandInfo): string {
   return lines.join("\n")
 }
 
+/**
+ * Removes path-alias duplicates from a skill list before injection.
+ *
+ * When the same logical skill is registered under both a qualified path
+ * (e.g. `shared/debugging`) and a bare short name (`debugging`), only the
+ * qualified name is kept in the description.  The execution-time matcher in
+ * `skill-matcher.ts` already resolves bare short names to their qualified
+ * counterpart, so callers do not lose the ability to invoke the skill by its
+ * short name — they just won't see the redundant alias in the tool description.
+ */
+export function deduplicatePathAliasedSkills(skills: SkillInfo[]): SkillInfo[] {
+  // Build a set of all short names (last path segment) that also have a
+  // qualified (multi-segment) variant in the list.
+  const qualifiedShortNames = new Set<string>()
+  for (const skill of skills) {
+    const parts = skill.name.split("/")
+    if (parts.length > 1) {
+      const shortName = parts[parts.length - 1]
+      if (shortName) qualifiedShortNames.add(shortName)
+    }
+  }
+
+  // Suppress bare entries whose name exactly matches a qualified short name.
+  return skills.filter((skill) => {
+    if (!skill.name.includes("/") && qualifiedShortNames.has(skill.name)) {
+      return false
+    }
+    return true
+  })
+}
+
 export function formatCombinedDescription(
   skills?: SkillInfo[],
   commands?: CommandInfo[],
   options: CombinedDescriptionOptions = {}
 ): string {
-  const availableSkills = options.includeSkills ? skills ?? [] : []
+  const availableSkills = options.includeSkills ? deduplicatePathAliasedSkills(skills ?? []) : []
   const availableCommands = commands ?? []
 
   if (availableSkills.length === 0 && availableCommands.length === 0) {
