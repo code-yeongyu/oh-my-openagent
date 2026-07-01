@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, utimes, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, symlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -303,9 +303,20 @@ function marketplaceCheckEnv(root, pluginRoot, spawnLogPath, extra = {}) {
 }
 
 test("#given marketplace plugin root without install snapshot #when running check #then skips npx update with marketplace-flow log and upgrade notice", async () => {
-	const { root, pluginRoot } = await makeStorePluginRoot("lazycodex-auto-update-marketplace-");
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-auto-update-marketplace-"));
+	const codexHome = join(root, "codex-home");
+	const pluginRoot = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "1.0.0");
 	const spawnLogPath = join(root, "spawn.log");
-	const env = marketplaceCheckEnv(root, pluginRoot, spawnLogPath);
+	await mkdir(join(codexHome, "plugins", "cache", "sisyphuslabs", ".agents", "plugins"), { recursive: true });
+	await mkdir(pluginRoot, { recursive: true });
+	await writeFile(
+		join(codexHome, "plugins", "cache", "sisyphuslabs", ".agents", "plugins", "marketplace.json"),
+		JSON.stringify({
+			name: "sisyphuslabs",
+			plugins: [{ name: "omo", source: { source: "local", path: "./omo/1.0.0" } }],
+		}),
+	);
+	const env = marketplaceCheckEnv(root, pluginRoot, spawnLogPath, { CODEX_HOME: codexHome });
 
 	const result = await runAutoUpdateCheck({ env, now: 123_456 });
 
@@ -327,6 +338,43 @@ test("#given marketplace plugin root without install snapshot #when running chec
 			kind: "marketplace-flow",
 		},
 	]);
+});
+
+test("#given marketplace flow with stale local cache state #when running check #then starts npx repair instead of marketplace skip", async () => {
+	const { root, pluginRoot } = await makeStorePluginRoot("lazycodex-auto-update-marketplace-repair-");
+	const spawnLogPath = join(root, "spawn.log");
+	const binDir = join(root, "bin");
+	const codexHome = join(root, "codex-home");
+	const missingCachedCli = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "1.0.1", "components", "ulw-loop", "dist", "cli.js");
+	await mkdir(join(codexHome, "plugins", "cache", "sisyphuslabs", ".agents", "plugins"), { recursive: true });
+	await mkdir(binDir, { recursive: true });
+	await writeFile(
+		join(codexHome, "plugins", "cache", "sisyphuslabs", ".agents", "plugins", "marketplace.json"),
+		JSON.stringify({
+			name: "sisyphuslabs",
+			plugins: [{ name: "omo", source: { source: "local", path: "./omo/1.0.1" } }],
+		}),
+	);
+	await symlink(missingCachedCli, join(binDir, "ulw"));
+	const env = marketplaceCheckEnv(root, pluginRoot, spawnLogPath, {
+		CODEX_HOME: codexHome,
+		CODEX_LOCAL_BIN_DIR: binDir,
+	});
+
+	const result = await runAutoUpdateCheck({ env, now: 123_456 });
+
+	assert.equal(result.started, true);
+	assert.equal(result.status, 0);
+	assert.equal(await readFile(spawnLogPath, "utf8"), "ok");
+	assert.equal(result.notices.length, 1);
+	assert.match(result.notices[0], /repair/i);
+	assert.match(result.notices[0], /stale local LazyCodex cache/i);
+	assert.match(result.notices[0], /Repair command/);
+	const logEntries = (await readFile(env.LAZYCODEX_AUTO_UPDATE_LOG_PATH, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
+	assert.equal(logEntries[0].event, "started");
+	assert.equal(logEntries[0].kind, "marketplace-local-repair");
+	assert.match(logEntries[0].repairReasons.join("\n"), /cached marketplace manifest points to missing omo payload/);
+	assert.match(logEntries[0].repairReasons.join("\n"), /ulw/);
 });
 
 test("#given install snapshot at plugin root #when running check #then npx update behavior is unchanged", async () => {

@@ -25,6 +25,17 @@ export function formatMarketplaceFlowNotice({ updateContext, releaseNotes }) {
 	].join(" ");
 }
 
+export function formatMarketplaceRepairStartedNotice({ pendingNotice, releaseNotes, command, args, repairReasons }) {
+	const reasons = repairReasons.length > 0 ? repairReasons.join("; ") : "stale local LazyCodex cache state was detected";
+	return [
+		`[LazyCodex] Auto-update repair started in the background: v${pendingNotice.fromVersion} -> v${pendingNotice.toVersion}.`,
+		`Detected stale local LazyCodex cache/bin state: ${reasons}.`,
+		`Repair command: \`${command} ${args.join(" ")}\`.`,
+		"Tell the user, in the user's preferred tone, that LazyCodex found a broken local cache or command link and started a reinstall repair; recommend starting a new Codex session after it completes.",
+		formatReleaseNotesForNotice({ version: pendingNotice.toVersion, releaseNotes }),
+	].join(" ");
+}
+
 export async function resolveReleaseNotes({ env, latestVersion }) {
 	const override = env.LAZYCODEX_RELEASE_NOTES?.trim();
 	if (override) return truncateReleaseNotes(override);

@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, lstatSync, readFileSync, readdirSync, readlinkSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { detectInstallFlow, resolveInstallSnapshotPath } from "./install-flow.mjs";
@@ -9,6 +10,8 @@ import { resolveSpawnInvocation } from "./spawn-command.mjs";
 const DEFAULT_UPDATE_COMMAND = "npx";
 const DEFAULT_UPDATE_ARGS = ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--codex-autonomous"];
 const DEFAULT_LATEST_VERSION_TIMEOUT_MS = 1_500;
+const SISYPHUS_MARKETPLACE_NAME = "sisyphuslabs";
+const OMO_PLUGIN_NAME = "omo";
 
 export function resolveLazyCodexUpdatePlan({ currentVersion, latestVersion, command = DEFAULT_UPDATE_COMMAND, args = DEFAULT_UPDATE_ARGS } = {}) {
 	const current = parseVersion(currentVersion);
@@ -36,6 +39,16 @@ export function resolveArgs(env) {
 
 export function detectAutoUpdateInstallFlow(env) {
 	return detectInstallFlow({ pluginRoot: resolveAutoUpdatePluginRoot(env), env });
+}
+
+export function detectMarketplaceLocalRepair(env = {}) {
+	const codexHome = resolveCodexHome(env);
+	const marketplaceRoot = join(codexHome, "plugins", "cache", SISYPHUS_MARKETPLACE_NAME);
+	const reasons = [
+		...missingCachedMarketplaceSources(marketplaceRoot),
+		...missingManagedBinTargets({ env, marketplaceRoot }),
+	];
+	return { needsRepair: reasons.length > 0, reasons };
 }
 
 export function resolveCurrentVersion(env) {
@@ -120,6 +133,86 @@ function resolveAutoUpdatePluginRoot(env) {
 	return dirname(dirname(fileURLToPath(import.meta.url)));
 }
 
+function resolveCodexHome(env) {
+	return resolve(env.CODEX_HOME?.trim() || join(resolveHome(env), ".codex"));
+}
+
+function resolveHome(env) {
+	return env.HOME?.trim() || homedir();
+}
+
+function resolveInstallerBinDir(env, codexHome) {
+	if (env.CODEX_LOCAL_BIN_DIR?.trim()) return resolve(env.CODEX_LOCAL_BIN_DIR.trim());
+	const home = resolveHome(env);
+	const defaultCodexHome = resolve(home, ".codex");
+	const resolvedCodexHome = resolve(codexHome);
+	return resolvedCodexHome === defaultCodexHome ? resolve(home, ".local", "bin") : join(resolvedCodexHome, "bin");
+}
+
+function missingCachedMarketplaceSources(marketplaceRoot) {
+	const manifest = readJsonObject(join(marketplaceRoot, ".agents", "plugins", "marketplace.json"));
+	if (manifest === undefined || !Array.isArray(manifest.plugins)) return [];
+	const reasons = [];
+	for (const plugin of manifest.plugins) {
+		if (!isPlainRecord(plugin) || plugin.name !== OMO_PLUGIN_NAME) continue;
+		const localPath = localMarketplaceSourcePath(plugin.source);
+		if (localPath === undefined) continue;
+		const resolvedPath = resolve(marketplaceRoot, localPath);
+		if (!isPathInside(resolvedPath, marketplaceRoot)) {
+			reasons.push(`cached marketplace manifest points outside the local LazyCodex cache: ${localPath}`);
+			continue;
+		}
+		if (!existsSync(resolvedPath)) {
+			reasons.push(`cached marketplace manifest points to missing omo payload: ${localPath}`);
+		}
+	}
+	return reasons;
+}
+
+function missingManagedBinTargets({ env, marketplaceRoot }) {
+	const binDir = resolveInstallerBinDir(env, resolveCodexHome(env));
+	let names;
+	try {
+		names = readdirSync(binDir);
+	} catch (error) {
+		if (error instanceof Error && "code" in error && error.code === "ENOENT") return [];
+		throw error;
+	}
+	const reasons = [];
+	for (const name of names) {
+		const linkPath = join(binDir, name);
+		let target;
+		try {
+			if (!lstatSync(linkPath).isSymbolicLink()) continue;
+			const linkTarget = readlinkSync(linkPath);
+			target = isAbsolute(linkTarget) ? linkTarget : resolve(dirname(linkPath), linkTarget);
+		} catch (error) {
+			if (error instanceof Error && "code" in error && error.code === "ENOENT") continue;
+			throw error;
+		}
+		if (!isManagedCachedComponentTarget(target, marketplaceRoot) || existsSync(target)) continue;
+		reasons.push(`managed bin ${name} points to missing local LazyCodex payload: ${target}`);
+	}
+	return reasons;
+}
+
+function localMarketplaceSourcePath(source) {
+	if (!isPlainRecord(source)) return undefined;
+	return source.source === "local" && typeof source.path === "string" ? source.path : undefined;
+}
+
+function isManagedCachedComponentTarget(target, marketplaceRoot) {
+	if (!isPathInside(target, marketplaceRoot)) return false;
+	const parts = target.split(/[\\/]+/);
+	const suffix = parts.slice(-4);
+	return suffix[0] === "components" && suffix[2] === "dist" && suffix[3] === "cli.js";
+}
+
+function isPathInside(path, root) {
+	const relativePath = relative(resolve(root), resolve(path));
+	return relativePath === "" || (!relativePath.startsWith("..") && !isAbsolute(relativePath));
+}
+
 function readVersionManifest(path) {
 	try {
 		const parsed = JSON.parse(readFileSync(path, "utf8"));
@@ -130,4 +223,18 @@ function readVersionManifest(path) {
 		if (error instanceof Error) return undefined;
 		throw error;
 	}
+}
+
+function readJsonObject(path) {
+	try {
+		const parsed = JSON.parse(readFileSync(path, "utf8"));
+		return isPlainRecord(parsed) ? parsed : undefined;
+	} catch (error) {
+		if (error instanceof Error) return undefined;
+		throw error;
+	}
+}
+
+function isPlainRecord(value) {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
