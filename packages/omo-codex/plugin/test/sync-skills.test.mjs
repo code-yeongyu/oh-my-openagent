@@ -85,6 +85,7 @@ test("#given shared skill package source #when aggregate Codex shared skills are
 	// when / then
 	for (const skillName of sharedSkillNames) {
 		if (componentSkillNames.has(skillName)) continue;
+		if (!expectedSkills.includes(skillName)) continue;
 		const sharedContent = await readFile(join(sharedSkillsRoot, skillName, "SKILL.md"), "utf8");
 		const aggregateContent = await readFile(join(aggregateSkillsRoot, skillName, "SKILL.md"), "utf8");
 		assert.equal(
@@ -181,18 +182,13 @@ test("#given synced ulw-loop skill #when Codex hint metadata is inspected #then 
 	assert.match(interfaceMetadata, /- "ulw-loop"/);
 });
 
-test("#given synced legacy ultraresearch alias #when inspected #then it points users at ulw-research", async () => {
+test("#given synced aggregate Codex skills #when legacy ultraresearch alias is inspected #then it is not packaged", async () => {
 	// given
 	const skillRoot = join(root, "skills", "ultraresearch");
 
-	// when
-	const skill = await readFile(join(skillRoot, "SKILL.md"), "utf8");
-	const interfaceMetadata = await readFile(join(skillRoot, "agents", "openai.yaml"), "utf8");
-
 	// then
-	assert.match(skill, /^---\r?\nname: ultraresearch\r?\n/m);
-	assert.match(skill, /legacy name for `ulw-research`/);
-	assert.match(interfaceMetadata, /display_name: "\(OmO\) ultraresearch"/);
+	await assert.rejects(readFile(join(skillRoot, "SKILL.md"), "utf8"), { code: "ENOENT" });
+	await assert.rejects(readFile(join(skillRoot, "agents", "openai.yaml"), "utf8"), { code: "ENOENT" });
 });
 
 test("#given synced git-master skill #when inspected #then commits and git history route through it", async () => {

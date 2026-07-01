@@ -25,7 +25,6 @@ export const expectedSkills = [
 	"start-work",
 	"teammode",
 	"ultimate-browsing",
-	"ultraresearch",
 	"ulw-loop",
 	"ulw-plan",
 	"ulw-research",
