@@ -150,10 +150,11 @@ path-mapped from the designpowers project. It is not committed here; the build
 materializes the selected files from the pinned submodule under
 `packages/shared-skills/upstreams/designpowers`. The materialized set includes the
 upstream `LICENSE`, ten `agents/*.md` role-reference files, and selected
-`skills/*/SKILL.md` files. Bridge/state/router integration skills are intentionally
+`skills/*/SKILL.md` files renamed to `vendor/skills/*/reference.md` so they remain
+reference documents instead of nested skill entrypoints. Bridge/state/router integration skills are intentionally
 excluded; see `frontend/references/designpowers/UPSTREAM.md` for the allowlist and
 exclusion list. Only the allowed frontmatter description quoting normalization described
-above may alter these materialized `SKILL.md` files.
+above may alter these materialized `reference.md` files.
 
 - Source: https://github.com/Owl-Listener/designpowers
 - Pinned upstream commit: cb00757da9d554591fa78d27aa1854d60a05c4f7
