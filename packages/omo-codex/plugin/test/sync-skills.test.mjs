@@ -9,6 +9,7 @@ import {
 	assertPackagedContentMatches,
 	componentSkillSources,
 	expectedSkills,
+	hiddenSharedSkills,
 	listSkillFiles,
 	removeCodexCompatibilityGuidance,
 	removeCodexSkillOverlays,
@@ -85,7 +86,7 @@ test("#given shared skill package source #when aggregate Codex shared skills are
 	// when / then
 	for (const skillName of sharedSkillNames) {
 		if (componentSkillNames.has(skillName)) continue;
-		if (!expectedSkills.includes(skillName)) continue;
+		if (hiddenSharedSkills.includes(skillName)) continue;
 		const sharedContent = await readFile(join(sharedSkillsRoot, skillName, "SKILL.md"), "utf8");
 		const aggregateContent = await readFile(join(aggregateSkillsRoot, skillName, "SKILL.md"), "utf8");
 		assert.equal(
@@ -146,7 +147,7 @@ test("#given component skill sources #when aggregate Codex component skills are 
 			const sourceContent = await readFile(join(sourceDir, relativePath), "utf8");
 			const aggregateContent = await readFile(join(aggregateDir, relativePath), "utf8");
 			assert.equal(
-				removeCodexCompatibilityGuidance(aggregateContent),
+				removeCodexSkillOverlays(skillName, removeCodexCompatibilityGuidance(aggregateContent)),
 				removeCodexCompatibilityGuidance(sourceContent),
 				`${skillName}/${relativePath} drifted from its component skill source`,
 			);
@@ -184,11 +185,16 @@ test("#given synced ulw-loop skill #when Codex hint metadata is inspected #then 
 
 test("#given synced aggregate Codex skills #when legacy ultraresearch alias is inspected #then it is not packaged", async () => {
 	// given
-	const skillRoot = join(root, "skills", "ultraresearch");
+	const skillsRoot = join(root, "skills");
+	const skillRoot = join(skillsRoot, "ultraresearch");
 
 	// then
 	await assert.rejects(readFile(join(skillRoot, "SKILL.md"), "utf8"), { code: "ENOENT" });
 	await assert.rejects(readFile(join(skillRoot, "agents", "openai.yaml"), "utf8"), { code: "ENOENT" });
+	for (const file of await listSkillFiles(skillsRoot)) {
+		const content = await readFile(join(skillsRoot, file), "utf8");
+		assert.doesNotMatch(content, /ultraresearch/i, `${file} must not expose ultraresearch`);
+	}
 });
 
 test("#given synced git-master skill #when inspected #then commits and git history route through it", async () => {

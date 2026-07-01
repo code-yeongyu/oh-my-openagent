@@ -165,6 +165,25 @@ prefixes when identity is needed.
 `;
 
 function applyCodexSkillOverlays(skillName, content) {
+	if (skillName === "ulw-loop") {
+		return content.replace("`ulw-research` (legacy alias: `ultraresearch`)", "`ulw-research`");
+	}
+	if (skillName === "ulw-research") {
+		return content
+			.replace(
+				", the legacy alias 'ultraresearch', any 'ulw' research wording,",
+				", any 'ulw' research wording,",
+			)
+			.replace(
+				'the legacy alias "ultraresearch" (also `/ultraresearch`, `$ultraresearch`), ',
+				"",
+			)
+			.replace(
+				"answer those normally, and mention that `ulw-research` is available (legacy alias: `ultraresearch`) when a question would clearly benefit from it.",
+				"answer those normally, and mention that `ulw-research` is available when a question would clearly benefit from it.",
+			)
+			.replace("# Ultraresearch Synthesis: <query>", "# ULW-Research Synthesis: <query>");
+	}
 	if (skillName === "start-work") {
 		return content
 			.replace(startWorkOriginalCompletion, startWorkCodexCompletion)
@@ -216,6 +235,14 @@ async function adaptSkillForCodex(skillName) {
 	const adapted = applyCodexSkillOverlays(skillName, insertCodexCompatibilityGuidance(content));
 	if (adapted !== content) {
 		await writeFile(skillPath, adapted, "utf8");
+	}
+	if (skillName === "ulw-loop") {
+		const workflowPath = join(skillsRoot, skillName, "references", "full-workflow.md");
+		const workflow = await readFile(workflowPath, "utf8");
+		const adaptedWorkflow = applyCodexSkillOverlays(skillName, workflow);
+		if (adaptedWorkflow !== workflow) {
+			await writeFile(workflowPath, adaptedWorkflow, "utf8");
+		}
 	}
 	await writeCodexSkillDisplayMetadata(skillName);
 }
