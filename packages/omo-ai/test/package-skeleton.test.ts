@@ -83,6 +83,7 @@ describe("omo-ai package skeleton", () => {
     expect(requireRecord(packageManifest, "scripts")["postinstall"]).toBe(
       "node ./src/install/postinstall.mjs",
     );
+    expect(requireRecord(packageManifest, "scripts")["test"]).toBe("bun test ./test");
     expect(requireRecord(packageManifest, "pi")).toEqual({
       hooks: "./senpi/hooks",
       skills: "./senpi/skills",

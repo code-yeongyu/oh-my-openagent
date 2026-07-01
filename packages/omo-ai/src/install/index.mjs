@@ -30,6 +30,7 @@ function mutateSenpiInstall(options) {
   const updatedAt = options.updatedAt ?? new Date().toISOString();
   const backupPaths = [];
   const settings = readJsonObject(context.paths.settingsPath, {});
+  const trustState = readJsonObject(context.paths.hooksStatePath, emptyHookTrustState());
   const nextSettings = options.action === "uninstall"
     ? removePackageEntry(settings, context.packageRoot, context.agentDir)
     : ensurePackageEntry(settings, context.packageRoot, context.agentDir);
@@ -41,7 +42,6 @@ function mutateSenpiInstall(options) {
     writeJsonObject(context.paths.settingsPath, nextSettings);
   }
 
-  const trustState = readJsonObject(context.paths.hooksStatePath, emptyHookTrustState());
   const nextTrustState = options.action === "uninstall"
     ? removeOmoTrustEntries(trustState, context)
     : ensureOmoTrustEntries(trustState, context, updatedAt);
@@ -74,9 +74,12 @@ function ensurePackageEntry(settings, packageRoot, agentDir) {
 }
 
 function removePackageEntry(settings, packageRoot, agentDir) {
-  const packages = Array.isArray(settings.packages) ? settings.packages : [];
+  if (!Array.isArray(settings.packages)) {
+    return settings;
+  }
+  const packages = settings.packages;
   const nextPackages = packages.filter((entry) => !packageSourceMatches(entry, packageRoot, agentDir));
-  if (nextPackages.length === packages.length && Array.isArray(settings.packages)) {
+  if (nextPackages.length === packages.length) {
     return settings;
   }
   return { ...settings, packages: nextPackages };

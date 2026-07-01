@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { isRecord } from "./json-file.mjs";
 
 export const OMO_AI_PACKAGE_VERSION = "4.15.0";
+export const SENPI_CONFIG_DIR_NAME = ".senpi";
 
 export const OMO_PACKAGE_FILTERS = {
   extensions: ["senpi/extensions/**/*"],
@@ -36,7 +37,7 @@ export function resolveAgentDir(env = process.env) {
   if (configured && configured.trim() !== "") {
     return expandTilde(configured);
   }
-  return join(homedir(), ".pi", "agent");
+  return join(homedir(), SENPI_CONFIG_DIR_NAME, "agent");
 }
 
 export function senpiPaths(packageRoot, agentDir) {
