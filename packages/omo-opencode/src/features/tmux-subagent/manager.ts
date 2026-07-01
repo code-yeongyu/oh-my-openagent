@@ -1086,12 +1086,11 @@ export class TmuxSessionManager {
 
       this.sessions.set(
         sessionId,
-        // TODO(#5809): isolated-window/session paths do not support eager cmux attach yet.
-        // cmux attach for isolated paths requires native cmux window management — out of scope.
         createTrackedSession({
           sessionId,
           paneId: result.spawnedPaneId,
           description: deferred.title,
+          attachActivated: isCmuxCompatEnvironment(),
         }),
       )
       this.removeDeferredSession(sessionId)
