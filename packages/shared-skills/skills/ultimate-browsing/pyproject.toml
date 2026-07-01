@@ -1,0 +1,19 @@
+[project]
+name = "insane-search-engine"
+version = "0.1.0"
+description = "insane-search Tier-1 fetch engine — WAF bypass, TLS impersonation, Playwright fallback. Ships with the ultimate-browsing skill."
+requires-python = ">=3.11"
+dependencies = [
+    # Hard requirement: TLS-impersonation fetcher powering the probe/grid phase.
+    "curl-cffi>=0.7",
+    # Soft: needed to load waf_profiles.yaml (in-code defaults are used otherwise).
+    "PyYAML>=6.0",
+    # Soft: needed only when a --selector positive-proof is passed.
+    "beautifulsoup4>=4.12",
+]
+
+[tool.uv]
+# The engine is not installed as a distributable package; uv only manages its
+# runtime dependencies. `uv run -m engine <url>` executes the local
+# `engine/` directory as a module against the provisioned venv.
+package = false

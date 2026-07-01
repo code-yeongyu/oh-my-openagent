@@ -39,9 +39,22 @@ Read the matching reference before acting: [`references/insane-search/README.md`
 **When**: content extraction, blocked-URL bypass, media metadata — no browser UI needed.
 **Why first**: ~10x faster than a browser, no process spin-up; handles most "fetch this blocked page" requests via curl_cffi TLS impersonation, yt-dlp (1858 sites), Jina Reader, official public APIs, mobile URL transforms, and a Playwright real-Chrome fallback. The engine lives **inside this skill** at `engine/` and is invoked as a module.
 
+**Prerequisite: `uv`.** The engine's Python dependencies (`curl_cffi`, `PyYAML`, `beautifulsoup4`) are declared in `pyproject.toml` and are provisioned automatically by `uv` on the first run. If `uv` is not installed:
+
+```bash
+# macOS / Linux:
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# Homebrew alternative:
+brew install uv
+# Windows PowerShell:
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+See <https://docs.astral.sh/uv/getting-started/installation/> for other options.
+
 ```bash
 # Core command — auto-detects WAF, runs the full fetch grid (run from the skill dir):
-python3 -m engine "https://example.com/blocked-page"
+uv run -m engine "https://example.com/blocked-page"
 #   add --selector "<CSS>" for positive-proof validation, --device auto|desktop|mobile,
 #   --trace to inspect every attempt, --json for machine-readable output.
 
@@ -126,7 +139,7 @@ CLOAK_CDP_PORT=9242              # CloakBrowser CDP port (default 9242)
 AGENT_BROWSER_USER_AGENT="..."   # override UA to hide HeadlessChrome
 AGENT_BROWSER_HEADED=1           # show the browser window
 # agent-reach auth: set the channel-specific env vars from each tool's docs only if you have access
-# insane-search needs no env vars — it auto-installs deps on first run
+# insane-search needs no env vars — Python deps are provisioned automatically by `uv` (see the Tier 1 prerequisites)
 ```
 
 ## Anti-patterns
