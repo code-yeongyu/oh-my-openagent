@@ -19,6 +19,7 @@ const skillSources = [
 	["ulw-plan", "components/ultrawork/skills/ulw-plan"],
 ];
 const componentSkillNames = new Set(skillSources.map(([name]) => name));
+const codexHiddenSharedSkillNames = new Set(["ultraresearch"]);
 const skillDisplayPrefix = "(OmO) ";
 
 function shouldCopySkillSource(source) {
@@ -236,6 +237,7 @@ async function syncSkills() {
 
 	for (const skillName of sharedSkillNames) {
 		if (componentSkillNames.has(skillName)) continue;
+		if (codexHiddenSharedSkillNames.has(skillName)) continue;
 		await cp(join(sharedSkillsRoot, skillName), join(skillsRoot, skillName), {
 			filter: shouldCopySkillSource,
 			recursive: true,
