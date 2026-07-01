@@ -5,6 +5,6 @@ export const LOOP_FRESH_MS = 120_000
 export const POLL_INTERVAL_MS = 1_000
 export const HEARTBEAT_MS = 2_000
 export const WRITE_DEBOUNCE_MS = 250
-export const MAX_AGENTS = 24
+export const MAX_AGENTS = 12
 export const MAX_JOBS = 12
 export const LABEL_MAX = 24
