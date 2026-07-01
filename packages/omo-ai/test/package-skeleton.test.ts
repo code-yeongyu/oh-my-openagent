@@ -57,11 +57,11 @@ describe("omo-ai package skeleton", () => {
     expect(packageManifest["version"]).toBe("4.15.0");
     expect(packageManifest["type"]).toBe("module");
     expect(requireRecord(packageManifest, "bin")).toEqual({
-      "omo-ai": "./src/cli/index.ts",
+      "omo-ai": "./src/cli/index.mjs",
     });
     expect(requireStringArray(packageManifest, "keywords")).toContain("pi-package");
     expect(requireRecord(packageManifest, "scripts")["postinstall"]).toBe(
-      "bun run ./src/install/postinstall.ts",
+      "node ./src/install/postinstall.mjs",
     );
     expect(requireRecord(packageManifest, "pi")).toEqual({
       hooks: "./senpi/hooks",

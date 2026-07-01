@@ -1,0 +1,148 @@
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { describe, expect, it } from "bun:test";
+import {
+  agentFile,
+  cleanupAgentFixture,
+  createAgentFixture,
+  createEmptyAgentFixture,
+  expectedHookRecords,
+  isRecord,
+  packageEntries,
+  packageRoot,
+  parseStdoutJson,
+  postinstallPath,
+  readJsonObject,
+  runCli,
+  runNode,
+} from "./installer-test-support";
+
+describe("omo-ai senpi installer CLI", () => {
+  it("repairs settings and hook trust idempotently when an isolated agent dir is provided", () => {
+    // Given: an existing senpi agent dir with duplicate OMO package entries and unrelated trust.
+    const agentDir = createAgentFixture();
+    const settingsPath = agentFile(agentDir, "settings.json");
+    const hooksStatePath = agentFile(agentDir, "hooks-state.json");
+
+    try {
+      // When: repair is run through the Node-runnable CLI surface.
+      const first = runCli(["repair", "--json"], agentDir);
+      const firstReport = parseStdoutJson(first.stdout);
+      const settings = readJsonObject(settingsPath);
+      const trustState = readJsonObject(hooksStatePath);
+      const hooks = trustState["hooks"];
+      if (!isRecord(hooks)) {
+        throw new TypeError("hooks-state hooks must be an object");
+      }
+      const expectedRecords = expectedHookRecords(String(firstReport["updatedAt"]));
+
+      // Then: exactly one local package entry and exact OMO trust entries are written.
+      expect(first.status).toBe(0);
+      expect(first.stderr).toBe("");
+      expect(firstReport["packageEntryCount"]).toBe(1);
+      expect(firstReport["omoTrustEntryCount"]).toBe(expectedRecords.length);
+      expect(firstReport["problems"]).toEqual([]);
+      expect(firstReport["settingsPath"]).toBe(settingsPath);
+      expect(firstReport["hooksStatePath"]).toBe(hooksStatePath);
+      expect(firstReport["packageRoot"]).toBe(packageRoot);
+      expect(firstReport["payloadRoot"]).toBe(join(packageRoot, "senpi"));
+      expect(packageEntries(settings)).toEqual([
+        {
+          source: packageRoot,
+          extensions: ["senpi/extensions/**/*"],
+          skills: ["senpi/skills/**/*.md"],
+          prompts: ["senpi/prompts/**/*.md"],
+          hooks: ["senpi/hooks/omo-senpi-hooks.json"],
+        },
+      ]);
+      for (const record of expectedRecords) {
+        expect(hooks[record.id]).toEqual(record.entry);
+      }
+      expect(hooks["hk_unrelated"] !== undefined).toBe(true);
+      expect(String(firstReport["backupPaths"])).toContain(`${settingsPath}.bak.`);
+      expect(String(firstReport["backupPaths"])).toContain(`${hooksStatePath}.bak.`);
+      expect(dirname(String(firstReport["settingsPath"]))).toBe(agentDir);
+
+      // When: repair runs again against already-correct files.
+      const second = runCli(["repair", "--json"], agentDir);
+      const secondReport = parseStdoutJson(second.stdout);
+
+      // Then: it is a no-op with no extra backups or duplicate entries.
+      expect(second.status).toBe(0);
+      expect(secondReport["packageEntryCount"]).toBe(1);
+      expect(secondReport["omoTrustEntryCount"]).toBe(expectedRecords.length);
+      expect(secondReport["backupPaths"]).toEqual([]);
+      expect(packageEntries(readJsonObject(settingsPath)).length).toBe(1);
+    } finally {
+      cleanupAgentFixture(agentDir);
+    }
+  });
+
+  it("reports doctor JSON and uninstalls only OMO-owned state", () => {
+    // Given: an isolated agent dir repaired by omo-ai.
+    const agentDir = createAgentFixture();
+    const settingsPath = agentFile(agentDir, "settings.json");
+    const hooksStatePath = agentFile(agentDir, "hooks-state.json");
+
+    try {
+      const repair = runCli(["repair", "--json"], agentDir);
+      expect(repair.status).toBe(0);
+
+      // When: doctor and uninstall are run through the Node CLI.
+      const doctor = runCli(["doctor", "--json"], agentDir);
+      const doctorReport = parseStdoutJson(doctor.stdout);
+      const uninstall = runCli(["uninstall", "--json"], agentDir);
+      const uninstallReport = parseStdoutJson(uninstall.stdout);
+      const settings = readJsonObject(settingsPath);
+      const trustState = readJsonObject(hooksStatePath);
+      const hooks = trustState["hooks"];
+
+      // Then: doctor is clean, and uninstall removes only OMO-owned entries.
+      expect(doctor.status).toBe(0);
+      expect(doctorReport["ok"]).toBe(true);
+      expect(doctorReport["problems"]).toEqual([]);
+      expect(doctorReport["missingTrustEntries"]).toEqual([]);
+      expect(uninstall.status).toBe(0);
+      expect(uninstallReport["packageEntryCount"]).toBe(0);
+      expect(uninstallReport["omoTrustEntryCount"]).toBe(0);
+      expect(packageEntries(settings)).toEqual([]);
+      expect(settings["model"]).toBe("keep-me");
+      expect(isRecord(hooks) ? Object.keys(hooks) : []).toEqual(["hk_unrelated"]);
+      expect(String(uninstallReport["backupPaths"])).toContain(`${settingsPath}.bak.`);
+      expect(String(uninstallReport["backupPaths"])).toContain(`${hooksStatePath}.bak.`);
+    } finally {
+      cleanupAgentFixture(agentDir);
+    }
+  });
+
+  it("exposes Node-runnable package bin, version, postinstall, and PI agent-dir override surfaces", () => {
+    // Given: the npm package manifest and an isolated PI_CODING_AGENT_DIR.
+    const agentDir = createEmptyAgentFixture();
+    const manifest = readJsonObject(agentFile(packageRoot, "package.json"));
+
+    try {
+      // When: version and postinstall run with Node, without Bun.
+      const version = runCli(["version"], agentDir);
+      const flagVersion = runCli(["--version"], agentDir);
+      const postinstall = runNode(postinstallPath, [], agentDir, packageRoot);
+
+      // Then: public npm install surfaces are Node-runnable and use the override path.
+      expect(isRecord(manifest["bin"]) ? manifest["bin"]["omo-ai"] : undefined).toBe(
+        "./src/cli/index.mjs",
+      );
+      expect(isRecord(manifest["scripts"]) ? manifest["scripts"]["postinstall"] : undefined).toBe(
+        "node ./src/install/postinstall.mjs",
+      );
+      expect(version.status).toBe(0);
+      expect(version.stdout.trim()).toBe("omo-ai 4.15.0");
+      expect(flagVersion.status).toBe(0);
+      expect(flagVersion.stdout.trim()).toBe("omo-ai 4.15.0");
+      expect(postinstall.status).toBe(0);
+      expect(postinstall.stderr.trim()).toBe("");
+      expect(existsSync(agentFile(agentDir, "settings.json"))).toBe(true);
+      expect(packageEntries(readJsonObject(agentFile(agentDir, "settings.json"))).length).toBe(1);
+    } finally {
+      cleanupAgentFixture(agentDir);
+    }
+  });
+});

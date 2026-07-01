@@ -4,7 +4,7 @@
   "description": "OMO senpi adapter package skeleton.",
   "type": "module",
   "bin": {
-    "omo-ai": "./src/cli/index.ts"
+    "omo-ai": "./src/cli/index.mjs"
   },
   "exports": {
     ".": {
@@ -26,7 +26,7 @@
   },
   "types": "./src/index.ts",
   "scripts": {
-    "postinstall": "bun run ./src/install/postinstall.ts",
+    "postinstall": "node ./src/install/postinstall.mjs",
     "test": "bun test test/**/*.test.ts",
     "typecheck": "tsgo --noEmit -p tsconfig.json"
   },
