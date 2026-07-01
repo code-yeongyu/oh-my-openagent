@@ -165,9 +165,6 @@ prefixes when identity is needed.
 `;
 
 function applyCodexSkillOverlays(skillName, content) {
-	if (skillName === "ulw-loop") {
-		return content.replace("`ulw-research` (legacy alias: `ultraresearch`)", "`ulw-research`");
-	}
 	if (skillName === "ulw-research") {
 		return content
 			.replace(
