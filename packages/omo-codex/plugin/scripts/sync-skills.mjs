@@ -233,14 +233,6 @@ async function adaptSkillForCodex(skillName) {
 	if (adapted !== content) {
 		await writeFile(skillPath, adapted, "utf8");
 	}
-	if (skillName === "ulw-loop") {
-		const workflowPath = join(skillsRoot, skillName, "references", "full-workflow.md");
-		const workflow = await readFile(workflowPath, "utf8");
-		const adaptedWorkflow = applyCodexSkillOverlays(skillName, workflow);
-		if (adaptedWorkflow !== workflow) {
-			await writeFile(workflowPath, adaptedWorkflow, "utf8");
-		}
-	}
 	await writeCodexSkillDisplayMetadata(skillName);
 }
 
