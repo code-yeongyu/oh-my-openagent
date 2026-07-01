@@ -26,6 +26,7 @@
     "packages/skills-loader-core",
     "packages/agents-md-core",
     "packages/shared-skills",
+    "packages/omo-ai",
     "packages/omo-codex",
     "packages/omo-opencode"
   ],
