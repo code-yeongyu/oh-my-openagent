@@ -241,7 +241,7 @@ describe("senpi hook payload migration", () => {
     for (const entry of portedEntries) {
       expect(entry?.status).toBe("ported");
       expect(entry?.senpiEvent === null).toBe(false);
-      expect(entry?.command).toContain("${PLUGIN_ROOT}/components/");
+      expect(entry?.command).toContain("${PLUGIN_ROOT}/senpi/components/");
     }
   });
 

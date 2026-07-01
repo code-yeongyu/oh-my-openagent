@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "bun:test";
@@ -143,6 +144,55 @@ describe("omo-ai senpi installer CLI", () => {
       expect(packageEntries(readJsonObject(agentFile(agentDir, "settings.json"))).length).toBe(1);
     } finally {
       cleanupAgentFixture(agentDir);
+    }
+  });
+
+  it("runs doctor JSON when the npm bin is invoked through a symlink", () => {
+    // Given: npm global install invokes the package bin through a symlinked executable path.
+    const agentDir = createEmptyAgentFixture();
+    const binDir = createEmptyAgentFixture();
+    const globalModulesDir = agentFile(binDir, "lib/node_modules");
+    const linkedPackageRoot = join(globalModulesDir, "omo-ai");
+    const symlinkedBin = agentFile(binDir, "omo-ai");
+
+    try {
+      const mkdir = spawnSync("mkdir", ["-p", globalModulesDir], {
+        encoding: "utf8",
+      });
+      expect(mkdir.status).toBe(0);
+      const packageLink = spawnSync("ln", ["-s", packageRoot, linkedPackageRoot], {
+        encoding: "utf8",
+      });
+      expect(packageLink.status).toBe(0);
+      const binLink = spawnSync("ln", ["-s", join(linkedPackageRoot, "src/cli/index.mjs"), symlinkedBin], {
+        encoding: "utf8",
+      });
+      expect(binLink.status).toBe(0);
+      const repair = runCli(["repair", "--json"], agentDir);
+      expect(repair.status).toBe(0);
+
+      // When: the symlinked global bin is invoked with Node.
+      const doctor = spawnSync("node", [symlinkedBin, "doctor", "--json"], {
+        cwd: packageRoot,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          OMO_AI_SENPI_AGENT_DIR: agentDir,
+          PI_CODING_AGENT_DIR: agentDir,
+          SENPI_CODING_AGENT_DIR: agentDir,
+        },
+      });
+
+      // Then: the CLI main runs and emits the doctor report instead of exiting silently.
+      expect(doctor.status).toBe(0);
+      expect(doctor.stderr.trim()).toBe("");
+      expect(doctor.stdout.length > 0).toBe(true);
+      const report = parseStdoutJson(doctor.stdout.trim());
+      expect(report["action"]).toBe("doctor");
+      expect(report["ok"]).toBe(true);
+    } finally {
+      cleanupAgentFixture(agentDir);
+      cleanupAgentFixture(binDir);
     }
   });
 });

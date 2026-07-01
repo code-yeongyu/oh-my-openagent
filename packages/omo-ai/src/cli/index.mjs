@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { doctorSenpiInstall } from "../doctor/index.mjs";
 import { repairSenpiInstall, uninstallSenpiInstall } from "../install/index.mjs";
 import { OMO_AI_PACKAGE_VERSION } from "../senpi-compat/package-root.mjs";
@@ -65,6 +67,11 @@ function printHelp() {
   console.log("Usage: omo-ai <doctor|repair|uninstall|version> [--json]");
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+function isMainModule() {
+  const invokedPath = process.argv[1];
+  return invokedPath !== undefined && realpathSync(fileURLToPath(import.meta.url)) === realpathSync(invokedPath);
+}
+
+if (isMainModule()) {
   process.exitCode = main();
 }
