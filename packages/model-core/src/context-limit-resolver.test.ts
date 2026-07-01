@@ -148,6 +148,24 @@ describe("resolveActualContextLimit", () => {
     })).toBe(1_000_000)
   })
 
+  it("returns GA 1M for claude-sonnet-5 without explicit 1M mode", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    expect(resolveActualContextLimit("anthropic", "claude-sonnet-5", {
+      anthropicContext1MEnabled: false,
+    })).toBe(1_000_000)
+  })
+
+  it("returns GA 1M for claude-sonnet-5 on google-vertex-anthropic", () => {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    expect(resolveActualContextLimit("google-vertex-anthropic", "claude-sonnet-5", {
+      anthropicContext1MEnabled: false,
+    })).toBe(1_000_000)
+  })
+
   it("returns GA 1M for claude-opus-4-8", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
