@@ -11,6 +11,7 @@ export const designOriginals = [
 	"README.md",
 	"_INDEX.md",
 	"aside.md",
+	"clone-from-url.md",
 	"design-system-architecture.md",
 	"react-dev-tooling-skill.md",
 ];

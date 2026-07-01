@@ -89,6 +89,16 @@ Key fields: `maxWidth`, `overflowLines[]`, `borderMisaligned`, `wideCharColumns[
 
 This JSON (diff ratio, similarity score, hotspots or overflow lines, border alignment, wide-char columns, alpha) is REFERENCE evidence to aim the reviewers. It is not the verdict by itself.
 
+### Motion and interaction capture
+
+Static screenshots miss what moves. For every interactive element and every animated region, do NOT settle for a single resting frame — capture the motion as evidence:
+
+- **Interaction states:** drive the real browser to each state before capturing. Hover the element, focus it, click/press it, and for scroll-driven surfaces scroll to trigger the effect. Capture three frames per transition: **rest** (before), **mid-transition** (~100ms in, to prove the animation exists and is smooth), and **settled** (after it completes).
+- **Entrance and scroll motion:** capture scroll-triggered reveals and any load animation as a short frame sequence (start, mid, end), not one frame. A reveal that never fires, janks, or lands in the wrong place is a defect only the sequence exposes.
+- **Reference clones:** when the reference site has its own motion, capture the reference's motion the same way and compare it to the actual — timing, easing feel, and end state.
+
+**Animation is never an excuse to skip or pass a region.** A high `diffRatio` caused by an in-flight animation is **never a valid excuse** to dismiss a defect or wave a region through. Compare **settled state to settled state** for pixel fidelity, and separately verify the motion against the **reference's own motion** (or, with no reference, against the stated intent). "The pixels differ because it animates" is a reason to capture the settled frame and the motion properly — not a reason to pass.
+
 ## Step 3 - Dispatch two read-only QA subagents in parallel
 
 This independent review is REQUIRED before any "done" claim. Do not self-review inside the main agent and call the UI verified - a self-graded pass is the failure mode this step exists to stop. Dispatch it yourself, every time, without waiting to be told. Give each reviewer the captures for every enumerated page from Step 2, not a sample, and tell it the page count so it can confirm none were skipped.
@@ -135,6 +145,7 @@ CHECK EACH:
 5. Responsive and resize behavior across viewport sizes (web) or terminal resize (TUI).
 6. Do the user-intended FEATURES actually work: interactions, states, navigation (web); input handling, resize, scroll (TUI)? Trace the code paths.
 7. Reference packet coverage: every reference page, state, viewport, and annotated requirement is implemented or explicitly marked out of scope by the user. Missing copy, missing overview content, swapped hierarchy, or unimplemented reference states are BLOCKING.
+8. Slop animation: flag motion that signals nothing. A hover-without-action (a hover that produces no state change or affordance), motion on a non-interactive element, or a decorative micro-animation with no informational purpose is slop and a REVISE finding. Motion must map to a real interaction, state, or affordance; the hero may carry one signature moment, nothing else earns decoration.
 
 OUTPUT:
 VERDICT: PASS | REVISE | FAIL
