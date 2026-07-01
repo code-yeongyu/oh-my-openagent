@@ -18,6 +18,14 @@ $ find packages/shared-skills/skills/frontend/references/designpowers/vendor/ski
 27
 ```
 
+### Materialized skill reference file count
+
+```sh
+$ find packages/shared-skills/skills/frontend/references/designpowers/vendor/skills -name reference.md | wc -l | tr -d ' '
+27
+$ find packages/shared-skills/skills/frontend/references/designpowers/vendor/skills -name SKILL.md
+```
+
 ### Materialized agent file count
 
 ```sh
@@ -66,7 +74,7 @@ const rawMismatches = [];
 const normalizedMismatches = [];
 for (const name of includedDesignpowersSkills) {
   const upstream = readFileSync(join("packages/shared-skills/upstreams/designpowers/skills", name, "SKILL.md"), "utf8");
-  const materialized = readFileSync(join("packages/shared-skills/skills/frontend/references/designpowers/vendor/skills", name, "SKILL.md"), "utf8");
+  const materialized = readFileSync(join("packages/shared-skills/skills/frontend/references/designpowers/vendor/skills", name, "reference.md"), "utf8");
   if (upstream !== materialized) rawMismatches.push(name);
   if (normalizeSkillFrontmatter(upstream) !== materialized) normalizedMismatches.push(name);
 }
@@ -84,6 +92,6 @@ The 27 raw mismatches are expected frontmatter-only `description:` quoting chang
 ### Excluded-router hard invocation absent
 
 ```sh
-$ for f in packages/shared-skills/skills/frontend/references/designpowers/vendor/skills/*/SKILL.md; do if rg -q 'MUST invoke the `using-designpowers` skill FIRST|invoke the `using-designpowers` skill FIRST' "$f"; then echo "$f"; exit 1; fi; done
+$ for f in packages/shared-skills/skills/frontend/references/designpowers/vendor/skills/*/reference.md; do if rg -q 'MUST invoke the `using-designpowers` skill FIRST|invoke the `using-designpowers` skill FIRST' "$f"; then echo "$f"; exit 1; fi; done
 exit=0
 ```

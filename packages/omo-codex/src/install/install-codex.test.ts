@@ -12,6 +12,20 @@ const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ?
 
 const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
 
+async function listRelativeFiles(root: string, prefix = ""): Promise<string[]> {
+  const entries = await readdir(join(root, prefix), { withFileTypes: true })
+  const files: string[] = []
+  for (const entry of entries) {
+    const relativePath = prefix.length > 0 ? join(prefix, entry.name) : entry.name
+    if (entry.isDirectory()) {
+      files.push(...(await listRelativeFiles(root, relativePath)))
+    } else {
+      files.push(relativePath.replaceAll("\\", "/"))
+    }
+  }
+  return files.sort()
+}
+
 function formatTomlString(value: string): string {
   return JSON.stringify(value)
 }
@@ -159,6 +173,14 @@ describe("install-codex", () => {
       expect(rootSkillNames).toContain("ulw-plan")
       expect(rootSkillNames).toContain("ulw-loop")
       expect(rootSkillNames).not.toContain("planing-prometheustic")
+      const installedSkillFiles = await listRelativeFiles(join(pluginPath ?? "", "skills"))
+      const nestedReferenceSkillFiles = installedSkillFiles.filter((file) => file.startsWith("frontend/references/") && file.endsWith("/SKILL.md"))
+      const designpowersReferenceFiles = installedSkillFiles.filter((file) =>
+        /^frontend\/references\/designpowers\/vendor\/skills\/[^/]+\/reference\.md$/.test(file)
+      )
+      expect(installedSkillFiles).toContain("frontend/SKILL.md")
+      expect(nestedReferenceSkillFiles).toEqual([])
+      expect(designpowersReferenceFiles).toHaveLength(27)
     }
     expect((await stat(join(pluginPath ?? "", "components", "ultrawork", "skills", "ulw-plan"))).isDirectory()).toBe(true)
     expect((await stat(join(pluginPath ?? "", "components", "ulw-loop", "skills", "ulw-loop"))).isDirectory()).toBe(true)
