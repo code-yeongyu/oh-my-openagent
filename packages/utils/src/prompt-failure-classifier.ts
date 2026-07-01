@@ -20,7 +20,6 @@ export function isAmbiguousPromptDispatchFailure(error: unknown): boolean {
     message.includes("unexpected eof")
     || message.includes("json parse error")
     || message.includes("unexpected end of json input")
-    || message.includes("timed out")
   )
 }
 
