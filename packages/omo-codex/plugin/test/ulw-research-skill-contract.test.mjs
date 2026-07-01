@@ -77,7 +77,11 @@ test("#given ulw-research description #when activation policy is inspected #then
 	for (const copy of await readUlwResearchCopies()) {
 		const description = frontmatterDescription(copy.content);
 		assert.match(description, /ulw-research/i, `${copy.label}: description must name the ulw-research trigger`);
-		assert.match(description, /ultraresearch/i, `${copy.label}: description must preserve ultraresearch discoverability`);
+		if (copy.label === "shared") {
+			assert.match(description, /ultraresearch/i, `${copy.label}: description must preserve ultraresearch discoverability`);
+		} else {
+			assert.doesNotMatch(description, /ultraresearch/i, `${copy.label}: description must not expose ultraresearch`);
+		}
 		assert.match(description, /\bulw\b/i, `${copy.label}: description must preserve ulw discoverability`);
 		assert.match(description, /explicit/i, `${copy.label}: description must gate activation on explicit demand`);
 		assert.match(
@@ -87,6 +91,20 @@ test("#given ulw-research description #when activation policy is inspected #then
 		);
 		assert.match(description, /\bresearch\b/i, `${copy.label}: description must name the research trigger`);
 	}
+});
+
+test("#given packaged ulw-research skill #when scanned for legacy aliases #then ultraresearch is not exposed", async () => {
+	const packaged = (await readUlwResearchCopies()).find((copy) => copy.label === "packaged");
+	assert.notEqual(packaged, undefined, "packaged copy not found");
+	assert.doesNotMatch(packaged.content, /ultraresearch/i, "packaged ulw-research must not expose ultraresearch");
+});
+
+test("#given packaged ulw-research skill #when Codex guidance is inspected #then compatibility guidance is preserved", async () => {
+	const packaged = (await readUlwResearchCopies()).find((copy) => copy.label === "packaged");
+	assert.notEqual(packaged, undefined, "packaged copy not found");
+	assert.match(packaged.content, /## Codex Harness Tool Compatibility/);
+	assert.match(packaged.content, /multi_agent_v1\.spawn_agent/);
+	assert.match(packaged.content, /multi_agent_v1\.wait_agent/);
 });
 
 test("#given ulw-research body #when authority is inspected #then it takes precedence over exploration-bounding instructions", async () => {
