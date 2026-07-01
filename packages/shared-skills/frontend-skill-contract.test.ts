@@ -51,3 +51,46 @@ describe("frontend skill Aside reference contract", () => {
 		expect(asideText).toContain("Do not treat this file as a license to copy")
 	})
 })
+
+describe("frontend skill live-URL clone contract", () => {
+	test("#given a live site or URL reference #when routing implementation #then it drives a browser runtime extraction into a design-system contract", async () => {
+		const text = await Bun.file(frontendSkillPath).text()
+		const workflow = sectionBetween(text, "## Design System and Component Workflow", "## Ruleset 1")
+
+		expect(workflow).toContain("Static visual reference")
+		expect(workflow).toContain("Live site or URL")
+		expect(workflow).toContain("references/design/clone-from-url.md")
+		expect(workflow).toContain("getComputedStyle")
+		expect(workflow).toContain("default/hover/focus/active")
+		expect(workflow).toContain("transitions and keyframes")
+		expect(workflow).toContain("DESIGN.md")
+		expect(workflow).toContain("reference-fidelity")
+	})
+
+	test("#given the embedded cloner #when the reference file exists #then it is project-original with MIT template provenance", async () => {
+		const clonePath = new URL("./skills/frontend/references/design/clone-from-url.md", import.meta.url)
+		const cloneText = await Bun.file(clonePath).text()
+
+		expect(cloneText).toContain("getComputedStyle")
+		expect(cloneText).toContain("## Provenance")
+		expect(cloneText).toContain("JCodesMore/ai-website-cloner-template")
+		expect(cloneText).toContain("Do not treat this file as a license to copy")
+	})
+
+	test("#given expressive greenfield with no reference #when routing #then it defaults to seeded imagen concept drafts", async () => {
+		const text = await Bun.file(frontendSkillPath).text()
+		const workflow = sectionBetween(text, "## Design System and Component Workflow", "## Ruleset 1")
+
+		expect(workflow).toContain("imagen concept drafts")
+		expect(workflow).toContain("seeded with the loaded")
+	})
+
+	test("#given any frontend design task #when defining done #then visual QA is bound and slop animation is forbidden", async () => {
+		const text = await Bun.file(frontendSkillPath).text()
+		const axioms = sectionBetween(text, "## Shared axioms", "## When to load something else instead")
+
+		expect(axioms).toContain("Slop animation")
+		expect(axioms).toContain("hover")
+		expect(axioms.toLowerCase()).toContain("visual-qa")
+	})
+})

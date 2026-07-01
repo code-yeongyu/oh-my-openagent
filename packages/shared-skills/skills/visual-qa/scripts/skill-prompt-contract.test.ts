@@ -252,3 +252,45 @@ describe("visual-qa skill exhaustive-coverage and review-gate contract", () => {
 		}
 	})
 })
+
+describe("visual-qa motion capture and slop-animation contract", () => {
+	test("#given an animated or interactive surface #when capturing #then rest, mid-transition and settled frames are driven and captured", () => {
+		for (const fixture of fixtures()) {
+			const motion = sectionBetween(fixture.text, "### Motion and interaction capture", "## Step 3")
+			const lower = motion.toLowerCase()
+
+			expect(lower, fixture.label).toContain("rest")
+			expect(lower, fixture.label).toContain("mid-transition")
+			expect(lower, fixture.label).toContain("settled")
+			expect(lower, fixture.label).toContain("hover")
+			expect(lower, fixture.label).toContain("focus")
+			expect(lower, fixture.label).toContain("click")
+			expect(lower, fixture.label).toContain("scroll-triggered")
+			expect(lower, fixture.label).toContain("load animation")
+		}
+	})
+
+	test("#given animation-induced pixel diff #when judging fidelity #then it is never an excuse to dismiss a defect", () => {
+		for (const fixture of fixtures()) {
+			const motion = sectionBetween(fixture.text, "### Motion and interaction capture", "## Step 3")
+			const lower = motion.toLowerCase()
+
+			expect(lower, fixture.label).toContain("never a valid excuse")
+			expect(lower, fixture.label).toContain("settled state to settled state")
+			expect(lower, fixture.label).toContain("reference's own motion")
+		}
+	})
+
+	test("#given meaningless motion #when reviewing #then Pass A flags slop animation, especially hover-without-action", () => {
+		for (const fixture of fixtures()) {
+			const passA = sectionBetween(fixture.text, "### Pass A", "### Pass B")
+			const checkBlock = sectionBetween(passA, "CHECK EACH:", "OUTPUT:")
+			const lower = checkBlock.toLowerCase()
+
+			expect(lower, fixture.label).toContain("slop animation")
+			expect(lower, fixture.label).toContain("non-interactive")
+			expect(lower, fixture.label).toContain("no state change")
+			expect(lower, fixture.label).toContain("hover-without-action")
+		}
+	})
+})
