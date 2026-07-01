@@ -22,6 +22,8 @@ export function inspectSenpiInstall(options = {}) {
   const context = createContext(options);
   const settings = readJsonObject(context.paths.settingsPath, {});
   const trustState = readJsonObject(context.paths.hooksStatePath, emptyHookTrustState());
+  assertSettingsShape(settings, context.paths.settingsPath);
+  assertTrustStateShape(trustState, context.paths.hooksStatePath);
   return createReport(context, settings, trustState, [], options.updatedAt ?? new Date().toISOString(), "doctor");
 }
 
@@ -31,6 +33,8 @@ function mutateSenpiInstall(options) {
   const backupPaths = [];
   const settings = readJsonObject(context.paths.settingsPath, {});
   const trustState = readJsonObject(context.paths.hooksStatePath, emptyHookTrustState());
+  assertSettingsShape(settings, context.paths.settingsPath);
+  assertTrustStateShape(trustState, context.paths.hooksStatePath);
   const nextSettings = options.action === "uninstall"
     ? removePackageEntry(settings, context.packageRoot, context.agentDir)
     : ensurePackageEntry(settings, context.packageRoot, context.agentDir);
@@ -54,6 +58,18 @@ function mutateSenpiInstall(options) {
   }
 
   return createReport(context, nextSettings, nextTrustState, backupPaths, updatedAt, options.action);
+}
+
+function assertSettingsShape(settings, path) {
+  if ("packages" in settings && !Array.isArray(settings.packages)) {
+    throw new TypeError(`${path} packages must be an array when present.`);
+  }
+}
+
+function assertTrustStateShape(trustState, path) {
+  if ("hooks" in trustState && !isRecord(trustState.hooks)) {
+    throw new TypeError(`${path} hooks must be a JSON object when present.`);
+  }
 }
 
 function createContext(options) {

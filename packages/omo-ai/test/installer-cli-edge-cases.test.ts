@@ -85,6 +85,57 @@ describe("omo-ai senpi installer CLI malformed files and defaults", () => {
     }
   });
 
+  it("fails repair before mutating files when settings packages are not an array", () => {
+    const agentDir = createEmptyAgentFixture();
+    const settingsPath = agentFile(agentDir, "settings.json");
+    const originalSettings = `${JSON.stringify({ packages: "bad", model: "keep-me" }, null, 2)}\n`;
+    writeFileSync(settingsPath, originalSettings, "utf8");
+
+    try {
+      const repair = runCli(["repair", "--json"], agentDir);
+      const report = parseStdoutJson(repair.stdout);
+      const settingsBackups = readdirSync(agentDir).filter((name) => name.startsWith("settings.json.bak."));
+
+      expect(repair.status).toBe(1);
+      expect(repair.stderr).toBe("");
+      expect(report["ok"]).toBe(false);
+      expect(String(report["problems"])).toContain("packages must be an array");
+      expect(readFileSync(settingsPath, "utf8")).toBe(originalSettings);
+      expect(settingsBackups).toEqual([]);
+      expect(existsSync(agentFile(agentDir, "hooks-state.json"))).toBe(false);
+    } finally {
+      cleanupAgentFixture(agentDir);
+    }
+  });
+
+  it("fails repair before mutating settings when hook trust hooks are not an object", () => {
+    const agentDir = createEmptyAgentFixture();
+    const settingsPath = agentFile(agentDir, "settings.json");
+    const hooksStatePath = agentFile(agentDir, "hooks-state.json");
+    const originalSettings = `${JSON.stringify({ packages: [], model: "keep-me" }, null, 2)}\n`;
+    const originalHookState = `${JSON.stringify({ version: 1, hooks: [] }, null, 2)}\n`;
+    writeFileSync(settingsPath, originalSettings, "utf8");
+    writeFileSync(hooksStatePath, originalHookState, "utf8");
+
+    try {
+      const repair = runCli(["repair", "--json"], agentDir);
+      const report = parseStdoutJson(repair.stdout);
+      const settingsBackups = readdirSync(agentDir).filter((name) => name.startsWith("settings.json.bak."));
+      const hooksBackups = readdirSync(agentDir).filter((name) => name.startsWith("hooks-state.json.bak."));
+
+      expect(repair.status).toBe(1);
+      expect(repair.stderr).toBe("");
+      expect(report["ok"]).toBe(false);
+      expect(String(report["problems"])).toContain("hooks must be a JSON object");
+      expect(readFileSync(settingsPath, "utf8")).toBe(originalSettings);
+      expect(readFileSync(hooksStatePath, "utf8")).toBe(originalHookState);
+      expect(settingsBackups).toEqual([]);
+      expect(hooksBackups).toEqual([]);
+    } finally {
+      cleanupAgentFixture(agentDir);
+    }
+  });
+
   it("keeps fresh uninstall as a no-op without creating settings", () => {
     // Given: an empty isolated agent dir.
     const agentDir = createEmptyAgentFixture();
