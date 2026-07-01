@@ -2,7 +2,7 @@
 
 > **HOLD THE FUCK UP. THIS ENTIRE GODDAMN CODEBASE IS BEING RIPPED APART AND REBUILT RIGHT NOW. A MASSIVE MULTI-HARNESS AGENT OS REFACTOR IS IN PROGRESS — WE ARE RESTRUCTURING EVERYTHING TO SUPPORT MULTIPLE AGENT HARNESSES (OPENCODE, CODEX, PI, AND OTHERS). DO NOT TRUST THE STRUCTURE BELOW AS STABLE. READ THE [ROADMAP](./ROADMAP.md) BEFORE YOU TOUCH ANYTHING OR SO HELP ME GOD.**
 
-**Generated:** 2026-06-17 | **Commit:** 437922bc0 | **Branch:** dev | **Release:** v4.10.0
+**Generated:** 2026-06-29 | **Commit:** c4336cceb | **Branch:** dev | **Release:** v4.14.0
 
 ## STOP. QA IS MANDATORY. NON-NEGOTIABLE. EVERY SINGLE TIME YOU TOUCH AN OPENCODE- OR CODEX-CONNECTED COMPONENT.
 
@@ -28,16 +28,17 @@ This is repeated on purpose, because it is the single most ignored rule in this 
 
 ### EVIDENCE: record it under `.omo/evidence/` or it DID NOT HAPPEN
 
-**WRITE EVERY QA ARTIFACT TO `.omo/evidence/<YYYYMMDD>-<short-slug>/`** (the existing evidence dir; one subfolder per change, keep it ORGANIZED). For EVERY change you MUST record, in plain files:
-- **WHY THERE IS NO REGRESSION:** before/after, the isolation proof (session-count unchanged), and the EXACT commands you ran with their output.
-- **PROOF THAT EVERY INTENDED CHANGE LANDED:** the new behavior OBSERVED on the real harness, not merely asserted.
-- The QA case(s) run, the tmux capture(s), and the isolation receipts.
+**WRITE EVERY QA ARTIFACT TO `.omo/evidence/<YYYYMMDD>-<short-slug>/`** (the existing evidence dir; one subfolder per change, keep it ORGANIZED). For EVERY change you MUST record reviewer-readable plain files:
+- **WHAT WAS TESTED:** the command or manual action, the surface driven, and the behavior it was meant to prove.
+- **WHAT WAS OBSERVED:** the before/after or new behavior, isolation proof such as unchanged session counts, and the artifact path for the exact captured output.
+- **WHY IT IS ENOUGH:** how the evidence covers the intended behavior and remaining regression risk.
+- **WHAT WAS OMITTED:** redact or summarize raw secret-bearing logs, env dumps, tokens, auth headers, and private credentials instead of copying them.
 
 **NO EVIDENCE FILE == NO QA == NO COMMIT == NO PUSH.** ALWAYS. EVERY TIME. NO EXCEPTIONS.
 
 ## DEFAULT WORKFLOW — how to take on any task
 
-Unless the user EXPLICITLY says otherwise, or the task is an urgent must-fix-now hotfix, deliver every change through the **`work-with-pr`** skill: it works in an isolated git worktree, implements with evidence-bound manual QA, opens a detailed English PR, runs the verification loop, and merges. Do NOT hand-commit normal work straight to `dev`.
+Unless the user EXPLICITLY says otherwise, or the task is an urgent must-fix-now hotfix, deliver every change through the **`work-with-pr`** skill: it works in an isolated git worktree, implements with evidence-bound manual QA, opens a reviewer-readable English PR (what changed, why, observed behavior, QA/evidence, residual risk), runs the verification loop, and merges. Do NOT hand-commit normal work straight to `dev`.
 
 - **QA is the evidence gate, scoped to what you touched.** A change under `packages/omo-opencode/` MUST run the **`opencode-qa`** skill; a change under `packages/omo-codex/` (lazycodex) MUST run the **`codex-qa`** skill (see the QA section above for each). Run the matching skill, and treat its captured output (written under `.omo/evidence/`) as the QA evidence `work-with-pr` requires. A change touching both runs both.
 - **Conflicts → `smart-rebase`.** If the worktree branch conflicts with its base, resolve it with the **`smart-rebase`** skill, then re-run the scoped QA. Never hand-resolve by force-pushing shared history.
@@ -61,11 +62,11 @@ oh-my-opencode/                      # workspace root (no root src/ — it moved
 │   │       ├── create-{managers,tools,hooks}.ts  # 4 managers / ToolRegistry / 5-tier hook composition
 │   │       ├── agents/              # 11 agent factories (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker, Sisyphus-Junior)
 │   │       ├── hooks/               # 53-60 lifecycle hooks across 60 dirs (incl. zauc-mocks sort-order hack + team-session-events/)
-│   │       ├── tools/               # 13 native tool dirs; LSP served via a built-in MCP, ast-grep via the bundled skill
-│   │       ├── features/            # 22 feature modules (team-mode, background-agent, skill-mcp-manager, opencode-skill-loader, mcp-oauth, claude-code-plugin-loader, boulder-state, …)
+│   │       ├── tools/               # 14 native tool dirs; LSP served via a built-in MCP, ast-grep via the bundled skill
+│   │       ├── features/            # 23 feature modules (team-mode, background-agent, skill-mcp-manager, opencode-skill-loader, mcp-oauth, claude-code-plugin-loader, boulder-state, …)
 │   │       ├── shared/              # cross-cutting utilities; logger → oh-my-opencode.log in os.tmpdir() (50 MB cap, .1/.2 backups)
-│   │       ├── config/             # Zod v4 schema system (32 schema files)
-│   │       ├── cli/                 # Commander.js CLI: install, run, doctor, mcp-oauth, boulder, sparkshell, ulw-loop
+│   │       ├── config/             # Zod v4 schema system (36 schema files)
+│   │       ├── cli/                 # Commander.js CLI: install, run, doctor, mcp-oauth, boulder, ulw-loop
 │   │       ├── mcp/                 # 5 built-in MCPs (3 remote + local stdio lsp + codegraph)
 │   │       ├── plugin/ plugin-handlers/  # OpenCode hook handlers + 6-phase config loading pipeline
 │   │       ├── openclaw/            # Bidirectional Discord/Telegram/HTTP/shell integration + reply listener daemon
@@ -187,11 +188,11 @@ oh-my-openagent ships in two editions of one product. **Ultimate** = this OpenCo
 - **Alias mechanics:** root `package.json` maps `lazycodex-ai` to `bin/oh-my-opencode.js` (1 of 5 bin aliases: `oh-my-opencode`, `oh-my-openagent`, `omo`, `lazycodex`, `lazycodex-ai`, all the same compiled CLI). `bunx lazycodex-ai install` is exactly `bunx oh-my-openagent install --platform=codex`. Routing: `packages/omo-opencode/src/cli/cli-program.ts` (`lazycodex`/`lazycodex-ai` default platform to codex), `bin/platform.js` (both resolve the `oh-my-openagent` platform family). `packages/omo-opencode/src/cli/star-request.ts` stars both repos. The bare `lazycodex` npm name was unpublished 2026-05-30; the live npm package is `lazycodex-ai`.
 - **Disambiguation:** `publish.yml` republishes this repo's CLI under the npm name `lazycodex-ai` (name/version rewrite). The bare `lazycodex` npm name was unpublished 2026-05-30 and is no longer installable. `lazycodex` (without `-ai`) now refers only to the `code-yeongyu/lazycodex` GitHub repository that hosts the marketplace bundle, not an npm package. Both this repo's publish target and the `code-yeongyu/lazycodex` repo's package resolve to `lazycodex-ai` on npm, so their release versions must stay coordinated.
 - **Components (8):** `comment-checker`, `git-bash`, `lsp`, `rules`, `start-work-continuation`, `telemetry`, `ultrawork`, `ulw-loop`, wired to Codex events `SessionStart`/`UserPromptSubmit`/`PreToolUse`/`PostToolUse`/`PostCompact`/`Stop`/`SubagentStop`. No agent orchestration, no `team_*`, no built-in MCPs beyond LSP, no hashline.
-- **Install:** `bunx oh-my-openagent install --platform=codex` (or `bunx lazycodex-ai install`, or `--platform=both`) copies the plugin to `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, writes a local marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`, copies bundled agent TOMLs into `~/.codex/agents/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, links component CLIs into `~/.local/bin`. Windows: Git Bash preflight (`winget install --id Git.Git`). Installer source lives in [`packages/omo-codex/src/install/`](packages/omo-codex/src/install/); `packages/omo-codex/scripts/install*.mjs` are generated/bundled Node entrypoints that keep the published CLI paths stable.
+- **Install:** `bunx oh-my-openagent install --platform=codex` (or `bunx lazycodex-ai install`, or `--platform=both`) copies the plugin to `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, writes a local marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`, copies bundled agent TOMLs into `~/.codex/agents/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, links the root `omo` runtime wrapper plus component CLIs into `~/.local/bin`. Windows: Git Bash preflight (`winget install --id Git.Git`). Installer source lives in [`packages/omo-codex/src/install/`](packages/omo-codex/src/install/); `packages/omo-codex/scripts/install*.mjs` are generated/bundled Node entrypoints that keep the published CLI paths stable.
 - **Deploy / publish** ([`.github/workflows/publish.yml`](.github/workflows/publish.yml), manual dispatch):
   - `publish_lazycodex` (default **true**) publishes the npm alias `lazycodex-ai`: rewrites root `package.json` name to `lazycodex-ai` + version to the release + optionalDeps `oh-my-opencode-*` to `oh-my-openagent-*`, skips when `registry.npmjs.org/lazycodex-ai/${VERSION}` exists, publishes `--access public --provenance --tag latest`, then restores `package.json`. (The bare `lazycodex` npm name was unpublished 2026-05-30; `lazycodex-ai` is the live package.)
 - Codex marketplace sync is **automatic for every stable release** (no manual toggle; the old `sync_lazycodex_marketplace` input was removed). The release-job steps are gated on `needs.release-metadata.outputs.dist_tag == ''` (stable only; prereleases skip) and require secret `LAZYCODEX_SYNC_TOKEN` (enforced up-front by the `preflight-trust` token check, also gated on stable). They check out `code-yeongyu/lazycodex`, build the plugin + lsp-tools-mcp + lsp-daemon + git-bash-mcp, run [`script/sync-lazycodex-marketplace.ts`](script/sync-lazycodex-marketplace.ts) `<source-root> <lazycodex-root>`, then `git push origin HEAD:main`.
-- **Sync mechanism is file copy + commit push, NOT a git subtree:** `marketplace.json` to `.agents/plugins/marketplace.json`; `plugin/` to `plugins/omo/`; bundles LSP/Git Bash MCP runtime dists to `plugins/omo/components/*/dist/`; rewrites `.mcp.json` paths; validates via `script/lazycodex-marketplace-validation.ts`. Root `package.json` `files` ships `packages/omo-codex/{marketplace.json,plugin,plugin/.codex-plugin,scripts}`. First-publish playbook: [`docs/reference/lazycodex-npm-reservation.md`](docs/reference/lazycodex-npm-reservation.md). CI gate: `bun run test:codex` (ci.yml `codex-compatibility`, ubuntu/macos/windows).
+- **Sync mechanism is file copy + commit push, NOT a git subtree:** `marketplace.json` to `.agents/plugins/marketplace.json`; `plugin/` to `plugins/omo/`; bundles LSP/Git Bash MCP runtime dists to `plugins/omo/components/*/dist/`; bundles root CLI runtimes to `plugins/omo/dist/cli` and `plugins/omo/dist/cli-node`; rewrites `.mcp.json` paths; validates via `script/lazycodex-marketplace-validation.ts`. Root `package.json` `files` ships `dist/cli`, `dist/cli-node`, and `packages/omo-codex/{marketplace.json,plugin,plugin/.codex-plugin,scripts}`. First-publish playbook: [`docs/reference/lazycodex-npm-reservation.md`](docs/reference/lazycodex-npm-reservation.md). CI gate: `bun run test:codex` (ci.yml `codex-compatibility`, ubuntu/macos/windows).
 - **Telemetry:** event `omo_codex_daily_active` (once per UTC day per machine, id `sha256("omo-codex:"+hostname)`); opt-out `OMO_CODEX_DISABLE_POSTHOG=1` / `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` (global flags also disable). Full internals: [`packages/omo-codex/AGENTS.md`](packages/omo-codex/AGENTS.md).
 
 ## MULTI-LEVEL CONFIG

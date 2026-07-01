@@ -11,6 +11,7 @@ const upstreams = [
 	{ name: "open-design", path: "packages/shared-skills/upstreams/open-design" },
 	{ name: "taste-skill", path: "packages/shared-skills/upstreams/taste-skill" },
 	{ name: "ui-ux-pro-max", path: "packages/shared-skills/upstreams/ui-ux-pro-max" },
+	{ name: "designpowers", path: "packages/shared-skills/upstreams/designpowers" },
 ];
 
 function submoduleHead(relPath) {

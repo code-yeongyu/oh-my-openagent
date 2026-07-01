@@ -30,8 +30,26 @@
       "monthlyDownloads": "月度 {count}+ 下载",
       "lifecycleHooks": "{count}+ 生命周期 Hooks",
       "installCommand": "bunx oh-my-openagent install",
+      "codexInstallCommand": "npx lazycodex-ai install",
+      "codexLabel": "Codex CLI 版本",
       "getStarted": "开始使用",
       "viewOnGitHub": "在 GitHub 上查看"
+    },
+    "editions": {
+      "title": "两个版本，一个大脑",
+      "subtitle": "同一个编排引擎。选择你的 harness。",
+      "ultimate": {
+        "name": "Ultimate",
+        "platform": "OpenCode",
+        "description": "完整插件，包含 11 个 Agent、Team Mode、后台任务、3-tier MCP、60+ 生命周期 Hook。",
+        "install": "bunx oh-my-openagent install"
+      },
+      "light": {
+        "name": "Light",
+        "platform": "Codex CLI",
+        "description": "8 个组件 — comment-checker、git-bash、LSP、rules、start-work-continuation、telemetry、ultrawork、ulw-loop — 接入 Codex 事件。",
+        "install": "npx lazycodex-ai install"
+      }
     },
     "ulw": {
       "badge": "魔法咒语",
@@ -142,7 +160,7 @@
       "model": "GPT 5.5 Medium"
     },
     "teamMode": {
-      "badge": "NEW · v4.0",
+      "badge": "v4.0+",
       "title": "Team Mode",
       "headline": "多个 Agent。并排运行。真正并行。",
       "description": "一个领导 Agent 协调一队按类别专业化的成员，全部并行运行，通过专用工具实时通信。在 tmux 中同时观察每个成员工作。选择性启用 — 翻转 team_mode.enabled 并重启。",
@@ -180,7 +198,7 @@
     },
     "agents": {
       "title": "Specialized Agents",
-      "subtitle": "五个专用 Agent 覆盖常见任务，外加按需动态构建的 Agent 系统。",
+      "subtitle": "八个专用 Agent 覆盖常见任务，外加按需动态构建的 Agent 系统。",
       "oracle": {
         "name": "Oracle",
         "role": "Architecture Consultant",
@@ -210,6 +228,24 @@
         "role": "Plan Reviewer",
         "model": "GPT 5.5 xHigh",
         "description": "严苛验证。只有当计划无懈可击时才批准。"
+      },
+      "atlas": {
+        "name": "Atlas",
+        "role": "并行任务执行者",
+        "model": "Claude Opus 4.7",
+        "description": "编排多步骤计划，跟踪依赖关系。委派给专家并独立验证。"
+      },
+      "sisyphusJunior": {
+        "name": "Sisyphus-Junior",
+        "role": "专注任务执行者",
+        "model": "Per-category",
+        "description": "与 Sisyphus 相同的纪律，不委派。端到端执行单个任务，带有证据绑定 QA。"
+      },
+      "multimodalLooker": {
+        "name": "Multimodal-Looker",
+        "role": "媒体分析",
+        "model": "Claude Sonnet 4.6",
+        "description": "从 PDF、图片和图表中提取信息。无需完整阅读即可快速摘要。"
       },
       "dynamicSystem": {
         "name": "Dynamic Agent",

@@ -1,0 +1,3 @@
+## code-yeongyu/fix-stats-pagination-parse...origin/dev
+ M script/stats.test.ts
+ M script/stats.ts

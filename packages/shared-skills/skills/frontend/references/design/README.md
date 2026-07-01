@@ -3,6 +3,12 @@
 
 You are an elite frontend design engineer. Your only job in this skill is to **route correctly**: pick the right reference file(s), load them into context, then execute with their guidance. The reference files contain the actual design rules — this file just decides which to consult.
 
+## The bar
+
+You are not done when it is clean and correct. You are done when a senior product designer at Linear, Stripe, or Supabase would ship it: surfaces read as real materials (depth, light, layering), color carries a story and a ramp, type has personality, and motion has intent. **Correct-but-flat is a failure, not a finish.** The most common way this skill fails is effort drain: the build, lint, file-size, and test gates eat all the attention and the surface ships at the floor. Spend on the surface like it is the deliverable, because for an expressive brief it is. When you render and find only bug-level issues, you are not done — you are at the start of the part that separates good from generic.
+
+Two things ship flat most often, and both read as "clean but generic": the **hero's focal object** and the **atmosphere**. Render the focal object as a real, lit, dimensional thing — a generated bitmap (imagegen) for a product/brand/object hero, or CSS/SVG art that carries light, shadow, gradient, and depth. Flat geometric primitives (plain circles and rounded rects) for a brand hero are the flat trap. Give the background depth too — gradient, glow, layered light, an atmospheric band, or a real image — not one flat fill. Glass is only one material: a dark glossy brand wants tint+blur+rim+sheen+glow, a bright playful brand wants gradient fills+soft depth shadows+a lit focal object. Pick what the brand calls for, but it must have dimension.
+
 ## Why route at all
 
 `taste-skill.md` alone is a strong default, but it does not commit to any specific aesthetic. When the user has named a clear visual direction (a brand, a style label, an existing site to mimic), a dedicated reference produces sharper output than the generic default. Loading the wrong reference, or none, is how you produce the bland generic SaaS slop these skills exist to prevent.
@@ -10,9 +16,9 @@ You are an elite frontend design engineer. Your only job in this skill is to **r
 The library lives flat in this directory (`references/design/`, max depth 1) and has two conceptual layers, and **most non-trivial tasks load one from each layer**:
 
 - **Layer A — taste skills (12 files):** how to execute. Discipline, motion physics, spacing rules, anti-slop guardrails, output completeness. Filenames end in `-skill.md` or start with `imagegen-`.
-- **Layer B — design systems (69 files):** what it should look like. Concrete color/type/component tokens for one specific brand aesthetic. Filenames are brand names (`claude.md`, `notion.md`, `stripe.md`, …).
+- **Layer B — design systems (70 files):** what it should look like. Concrete color/type/component tokens for one specific brand aesthetic. Filenames are brand names (`aside.md`, `claude.md`, `notion.md`, `stripe.md`, ...).
 
-A combined directory of all 81 reference files is at `_INDEX.md`. **Read that index before loading anything** unless the routing is obvious — it has the full mood-mapping and stacking rules in one place.
+A combined directory of all 83 reference files is at `_INDEX.md`. **Read that index before loading anything** unless the routing is obvious — it has the full mood-mapping and stacking rules in one place.
 
 ## Open Design Library
 
@@ -28,14 +34,16 @@ Before touching any UI code, before routing to any reference, before even thinki
 
 **Search for it:** Look at project root, then `docs/`, then `src/`. Any file named `DESIGN.md`, `design-system.md`, or `design-tokens.md`.
 
-#### If NO design system exists → CREATE ONE FIRST
+#### If NO design system exists → RUN THE TRIAGE
 
 1. Read `design-system-architecture.md` — it defines the exact structure.
-2. Explore the project: what is the product domain? Who are the users? What feeling should it evoke?
-3. If the project has existing UI code, **extract** the implicit system (colors, fonts, spacing already in use) rather than inventing from scratch.
-4. If the project is greenfield, **ask the user one question**: "What should this feel like?" — or infer from context.
-5. Write `DESIGN.md` at project root following the 7-section structure from the reference.
-6. **Do not proceed to any component implementation until `DESIGN.md` exists and is committed to context.**
+2. Identify the branch: greenfield setup, existing UI with implicit patterns/components, or existing UI with no reusable component layer.
+3. **Greenfield setup:** if the user gave no concrete visual reference, use `_INDEX.md` to shortlist 2-3 plausible Layer B references, then deeply load exactly one Layer A style skill and one Layer B brand/design-system reference; use `open-design` only when the curated set has no fit. Treat those references as source material, not mood labels: extract tokens, layout grammar, component anatomy, interaction states, motion, and taste decisions into `DESIGN.md`, then recombine them into project-specific primitives. Customize for the user's product and content, but do not freestyle past the selected references; never copy logos, trademarked assets, or brand-specific copy.
+   - **Commit a distinctive direction BEFORE extracting tokens.** In 1-2 sentences, name the atmosphere, the signature material, the color story, and the one moment a visitor will remember. For an expressive brief, sketch 2-3 genuinely different directions and pick the boldest one you can defend with the loaded reference; do not average them, because the average IS the generic default this skill exists to beat. A locked, never-revisited one-shot decision is how a page ends up flat.
+   - **The reference's distinctive material MUST survive extraction (expressive briefs).** The common failure is loading a rich reference and then distilling it into a generic dark-SaaS token set. Your `DESIGN.md` must carry the *non-default* decisions forward and name which reference each came from: the actual elevation recipe (the specific layers that make a surface read as glass/glossy, not a single blur), a multi-stop perceptual color ramp (not one brand hex reused at varied opacity), the explicit display/body/mono type choices, and one signature interaction. Self-check before writing code: if your `DESIGN.md` could describe any generic dark SaaS, you flattened the reference — go back and put the specific material in.
+4. **Existing UI with implicit patterns/components:** extract the colors, typography, spacing, primitives, states, and motion already in use. Write `DESIGN.md` to codify what exists before changing UI code.
+5. **Existing UI with no reusable component layer:** STOP and ask whether to preserve the current style with copy-nearby edits or extract a `DESIGN.md` plus reusable components first. Do not silently choose the cheaper path or the larger refactor.
+6. **Do not proceed to product screens until `DESIGN.md` exists, Section 5 names the reusable primitives and their states, and each primitive plus required state passes mobile/tablet/desktop visual QA in a component showcase or equivalent state harness.**
 
 #### If YES design system exists → READ IT, FOLLOW IT
 
@@ -86,7 +94,7 @@ Run through this in order and stop at the first match. Do not skip — earlier r
 
 ### Step 1 — Did the user name a specific brand or site?
 
-Phrasings: "make it look like Linear", "Stripe-style buttons", "Notion-feel sidebar", "like {brand}'s landing page", or pasting a screenshot of a known brand site.
+Phrasings: "make it look like Linear", "Stripe-style buttons", "Notion-feel sidebar", "Aside-style browser agent", "like {brand}'s landing page", or pasting a screenshot of a known brand site.
 
 **Action:** Open `_INDEX.md`, find the brand under "Layer B — Design Systems", then load `<brand>.md`. Use it as the project's design system source of truth (color hex values, type scale, component specs, do/don'ts).
 
@@ -94,17 +102,22 @@ Phrasings: "make it look like Linear", "Stripe-style buttons", "Notion-feel side
 
 If the user names a brand not in the index, fall back to Step 2 + a mood-based shortcut from the index.
 
-### Step 2 — Did the user describe a clear style/mood?
+### Step 2 — Read the brief's ambition, THEN map style/mood
 
-Map their phrasing to one taste-skill style file:
+Decide the lane by **ambition first** — this is what your output gets judged on, and the wrong read is how a high-craft request ships clean-but-flat:
+
+- **Expressive brief** — any surface-ambition signal: "glossy", "glassy", "liquid glass", "premium", "luxe", "startup-grade", "brand-grade", "make it beautiful / pretty / wow", or a named product company to feel like. The page is a showcase and rich material IS the deliverable. Commit to a high-craft Layer A (`soft-skill` or `gpt-tasteskill`) and ALWAYS pair a high-craft Layer B exemplar (`supabase`, `linear.app`, `vercel`, `stripe`) as the token source. This lane OVERRIDES any default "keep it quiet / utilitarian" instinct.
+- **Operational brief** — internal tool, dashboard, admin, "just make it usable". Restraint is correct here and `taste-skill` is the right default.
+
+Do NOT let an expressive brief fall through to `taste-skill`. Then map the phrasing:
 
 | User says... | Load |
 |---|---|
 | "minimal", "clean", "Notion-like", "Linear-like", "editorial", "boring is good" | `minimalist-skill.md` |
 | "brutalist", "raw", "Swiss", "experimental", "industrial", "anti-design", "unstyled" | `brutalist-skill.md` |
-| "premium", "luxury", "calm", "expensive", "spa", "wellness", "boutique", "elegant" | `soft-skill.md` |
+| "premium", "luxury", "calm", "expensive", "elegant", "spa", "boutique", "glossy", "glassy", "liquid glass", "startup-grade", "make it beautiful/pretty" | `soft-skill.md` + a high-craft Layer B (`supabase` / `linear.app` / `vercel` / `stripe`) |
 | "Awwwards-level", "wow factor", "magnetic", "scroll-triggered", "high-variance", "cinematic", "make it crazy" | `gpt-tasteskill.md` |
-| Nothing specific — just "make a good UI" | `taste-skill.md` (default all-rounder) |
+| Neutral or operational — internal tool, dashboard, admin, "just make it usable" with no surface ambition | `taste-skill.md` as Layer A, plus the greenfield `_INDEX.md` shortlist → exactly one Layer B reference |
 
 You may also load a brand DESIGN.md from Layer B as a *concrete reference* if the user's mood maps cleanly (see the "Mood-based shortcuts" section in `_INDEX.md`).
 
@@ -118,11 +131,13 @@ Do NOT use this for greenfield work — the audit phase is wasted effort there.
 
 ### Step 4 — Is this an image-first workflow?
 
-Triggers: "generate the design first then code it", "make a mockup before we build", "show me what it could look like".
+Triggers: "generate the design first then code it", "make a mockup before we build", "show me what it could look like" — AND, by default, any expressive greenfield brief (glossy / premium / wow / brand-grade) with no user-supplied reference.
 
 **Action:** Load both:
 - `image-to-code-skill.md` (the workflow: generate → analyze → implement)
 - `imagegen-frontend-web.md` for web, or `imagegen-frontend-mobile.md` for mobile screens
+
+For an expressive greenfield brief, default to generating **2-3 imagen concept drafts**, each prompt **seeded with the loaded Layer A + Layer B tokens** (palette, type, signature material) so the drafts inherit the reference's taste instead of generic priors. Pick the strongest, then treat the chosen draft as the reference-fidelity contract for `/visual-qa`.
 
 If the user wants only the imagery (no code), load only the imagegen file.
 
@@ -181,12 +196,14 @@ Once references are loaded, before writing any UI code:
 7. **Match the project's existing patterns FIRST.** If the codebase already uses CSS Modules, don't introduce Tailwind. If it uses styled-components, don't introduce CSS-in-JS variants. The references guide *style*, not *infrastructure*.
 8. **All tokens trace back to `DESIGN.md`.** No orphan hex codes, no magic px values. If you need a new token, update `DESIGN.md` first.
 9. **New reusable patterns (used 2+ times) get documented back into `DESIGN.md` Section 5.**
+10. **No generic-default drift (expressive briefs).** The shipped CSS must use the `DESIGN.md` material, not the model's priors. Load the declared fonts (do not silently fall back to Inter or system fonts), build elevated surfaces from the declared multi-layer recipe (not a lone `backdrop-filter: blur`), and color from the ramp stops (not one tint at varied opacity). Grep your styles before QA: finding `Inter`, a single blur on "glass", or one brand hex reused everywhere means you regressed to priors — fix it before declaring done.
 
 ## Quick lookup table — most common requests
 
 | User asks for... | Load these |
 |---|---|
-| "Build me a landing page" (no other info) | `taste-skill.md` |
+| "Build me a landing page" (no other info) | `_INDEX.md` shortlist → exactly one Layer B reference + `taste-skill.md` |
+| "Build me an Aside-style AI browser / agent page" | `aside.md` + `taste-skill.md` |
 | "Build me a Linear-style landing page" | `linear.app.md` + `taste-skill.md` |
 | "Make it Notion-like and minimal" | `notion.md` + `minimalist-skill.md` |
 | "Premium SaaS hero, like Stripe" | `stripe.md` + `soft-skill.md` |
@@ -200,36 +217,14 @@ Once references are loaded, before writing any UI code:
 
 ## Phase Final — Design QA (MANDATORY, runs after implementation)
 
-After implementation is complete, **before declaring the task done**, run a real browser-based Design QA.
+Before declaring the task done, verify the rendered UI. **The verification authority is `/visual-qa`, not a hand-rolled checklist here.** Run `/visual-qa`: it captures every page and breakpoint (375 / 768 / 1280px) on fresh evidence, drives and inspects interaction states (hover/focus/active) and motion (transitions, scroll-triggered, load), runs the dual-oracle pass, and loops until an independent reviewer passes. For a concrete reference or clone, run it in reference-fidelity mode.
 
-### Why
+This skill adds only the design-taste judgments `/visual-qa` cannot make for you:
 
-Code that "looks correct" in an editor is not verified. Colors render differently, spacing collapses, fonts fail to load, responsive breakpoints break, states are missing. The only way to know is to SEE it in a real browser.
+1. **Two kinds of failure count equally — fix both, then re-check.** Defects: clipping, wrong font, missing state, jank. Flatness: a surface that reads generic next to the loaded reference. When the render is bug-free but flat, you are NOT done — RAISE the design: deepen the material layering, give the color a real perceptual ramp (multiple stops / OKLCH, not one tint at varied opacity), render the hero focal object as real dimensional material (a generated bitmap, or real light/shadow/gradient/depth — never flat geometric primitives), and add the one signature moment. Patching only bugs while the surface stays at the floor is the single most common way this skill ships clean-but-generic work.
+2. **Motion serves meaning; slop animation is forbidden.** Every interactive element must communicate its affordance and state changes — but a hover that changes nothing, motion on a non-interactive element, or a decorative micro-animation with no informational purpose is slop. Do not add it, and treat any you find as a defect. The hero may carry one signature moment; the rest of the surface earns motion only where it signals interaction or state.
 
-### How
-
-1. **Launch the app** in a real browser (use `agent-browser` skill or the project's dev server + screenshot tool).
-2. **Take screenshots** at key breakpoints: mobile (375px), tablet (768px), desktop (1280px).
-3. **Walk the design system checklist** visually:
-   - [ ] Colors match `DESIGN.md` palette — no off-brand colors visible
-   - [ ] Typography hierarchy is clear — headings, body, captions are visually distinct
-   - [ ] Spacing rhythm feels consistent — no cramped or floating elements
-   - [ ] Interactive states work — hover every button, focus every input, toggle every switch
-   - [ ] Empty, loading, and error states exist and look intentional
-   - [ ] Dark mode (if declared in `DESIGN.md`) works completely
-   - [ ] No layout overflow, no horizontal scroll on mobile
-   - [ ] Motion/animation feels smooth — no jank, no missing transitions
-4. **If anything fails**, fix it and re-check. Do not report "done" with visual bugs.
-5. **If you cannot launch a browser** (e.g. no dev server, CI-only environment), state this explicitly and list what you would check. Never silently skip QA.
-
-### QA Report
-
-After passing QA, write a short summary:
-- Breakpoints tested
-- States verified (hover, focus, disabled, loading, error, empty)
-- Design system compliance: all tokens traced back to `DESIGN.md`
-- Issues found and fixed during QA
-- Screenshot evidence (attach or describe)
+Report "done" only when `/visual-qa` has passed on fresh evidence AND neither a visual bug nor a floor-level or slop-laden surface remains.
 
 
 ## Final notes

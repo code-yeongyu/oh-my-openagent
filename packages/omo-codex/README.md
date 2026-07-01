@@ -35,14 +35,14 @@ npx lazycodex-ai install --no-tui --codex-autonomous
 
 To install **both** the Ultimate edition (OpenCode plugin) and the Light edition (this package) at once, use `--platform=both`.
 
-The installer copies the built plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, writes the local marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`, copies bundled agent TOMLs into `~/.codex/agents/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, and registers the `sisyphuslabs` marketplace from the local built cache. `lazycodex-ai` is the npm/bin alias and `lazycodex` is the marketplace repository; the marketplace identity remains `sisyphuslabs`.
+The installer copies the built plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, writes the local marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`, copies bundled agent TOMLs into `~/.codex/agents/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, writes the valid `[features.multi_agent_v2]` limit table without enabling MultiAgentV2, and registers the `sisyphuslabs` marketplace from the local built cache. If an older config used `[features] multi_agent_v2 = false`, the installer preserves that explicit disable as table-form `enabled = false`. `lazycodex-ai` is the npm/bin alias and `lazycodex` is the marketplace repository; the marketplace identity remains `sisyphuslabs`.
 
 To remove managed Codex Light state, run `npx lazycodex-ai uninstall`. The backward-compatible alias is `npx lazycodex-ai cleanup`. Uninstall removes managed `sisyphuslabs` cache/marketplace directories, strips OMO marketplace/plugin/hook-state config blocks with a backup, removes managed agent TOML files from `~/.codex/agents/`, and repairs the known project-local legacy `.codex/config.toml` conflict while leaving project-owned `.codex` files in place.
 
 The Codex plugin bundle includes Context7 as a default MCP in its `.mcp.json`, using the hosted `https://mcp.context7.com/mcp` endpoint. The installer enables the `omo@sisyphuslabs` plugin MCP policy for Context7 while leaving any existing user-level `[mcp_servers.context7]` block untouched.
 The same plugin-scoped MCP manifest also bundles `grep_app`, `git_bash`, `lsp`, and `codegraph`. The ast-grep capability ships as the `ast-grep` skill and provisions `sg` into the Codex runtime. `git_bash` is enabled only on Windows by default. `codegraph` is enabled only when the installer can resolve a supported local Node runtime for CodeGraph; unsupported runtimes disable that MCP policy while keeping `omo@sisyphuslabs` enabled.
 
-Native Windows installs prepare Git Bash before the installer mutates `~/.codex/`. If `bash.exe` is not already discoverable, the installer first tries the same best-effort install command shown here, then resolves Git Bash again:
+Native Windows installs discover Git Bash before the installer mutates `~/.codex/`. The installer checks `OMO_CODEX_GIT_BASH_PATH`, standard Git for Windows locations such as `C:\Program Files\Git\bin\bash.exe`, and then PATH. If Git Bash is still missing, it prints the install guidance shown here and stops without running `winget` or changing system dependencies:
 
 ```powershell
 winget install --id Git.Git -e --source winget
@@ -58,8 +58,6 @@ setx OMO_CODEX_GIT_BASH_PATH "C:\Program Files\Git\bin\bash.exe"
 ```powershell
 $env:OMO_CODEX_GIT_BASH_PATH = "C:\Program Files\Git\bin\bash.exe"
 ```
-
-Set `OMO_CODEX_SKIP_GIT_BASH_AUTO_INSTALL=1` to skip the best-effort `winget install --id Git.Git -e --source winget` attempt and keep the explicit install guidance path.
 
 The installer does not write a global Codex shell config. On Windows it enables the plugin MCP policy for `git_bash`; on non-Windows it keeps the manifest bundled but writes `enabled = false` for that MCP server. The Git Bash hook injects fixed guidance before the first Codex shell-like `Bash` hook call in a session, and again before the first shell-like call after `PostCompact`, recommending `git_bash` before built-in `exec_command`.
 

@@ -83,7 +83,7 @@ describe("Sisyphus runtime prompt family reconciliation (#5297/#5316)", () => {
 
   test("#given the full system-transform handler #when runtime model is non-GPT #then the GPT body is reconciled end-to-end", async () => {
     const baked = registerGptSisyphus()
-    const handler = createSystemTransformHandler(undefined, undefined, {})
+    const handler = createSystemTransformHandler()
     const output = { system: [baked] }
 
     await handler(

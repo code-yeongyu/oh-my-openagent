@@ -44,6 +44,14 @@ const CODEGRAPH_PACKAGE = "@colbymchenry/codegraph"
 const CODEGRAPH_ENV_BIN = "OMO_CODEGRAPH_BIN"
 const CODEGRAPH_LEGACY_ENV_BIN = "CODEGRAPH_BIN"
 const CODEGRAPH_NODE_CANDIDATES = ["node24", "node22", "node20", "node"] as const
+const CODEGRAPH_NODE_PATH_CANDIDATES = [
+  "/opt/homebrew/opt/node@24/bin/node",
+  "/opt/homebrew/opt/node@22/bin/node",
+  "/opt/homebrew/opt/node@20/bin/node",
+  "/usr/local/opt/node@24/bin/node",
+  "/usr/local/opt/node@22/bin/node",
+  "/usr/local/opt/node@20/bin/node",
+] as const
 const requireFromHere = createRequire(import.meta.url)
 
 function defaultRequireResolve(specifier: string): string {
@@ -111,6 +119,7 @@ function defaultNodeRuntime(
   const candidates = [
     ...(isNodeExecutableName(process.execPath) ? [process.execPath] : []),
     ...CODEGRAPH_NODE_CANDIDATES.map((commandName) => which(commandName)).filter((candidate) => candidate !== null),
+    ...CODEGRAPH_NODE_PATH_CANDIDATES.filter((candidate) => fileExists(candidate)),
   ]
   const seen = new Set<string>()
   for (const candidate of candidates) {

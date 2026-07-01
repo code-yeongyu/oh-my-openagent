@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { ULW_LOOP_SUBCOMMANDS } from "../src/cli-commands.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -59,16 +60,19 @@ describe("package.json", () => {
 		expect((pkg["engines"] as Record<string, unknown>)["node"]).toBe(">=20.0.0");
 	});
 
-	it("#given package metadata #when bin is inspected #then exposes the omo-ulw-loop binary pointing at dist/cli.js", async () => {
+	it("#given package metadata #when bin is inspected #then exposes the ULW loop binaries pointing at dist/cli.js", async () => {
 		const pkg = await readJson("package.json") as Record<string, unknown>;
 		const bin = pkg["bin"] as Record<string, string>;
 		expect(bin["omo-ulw-loop"]).toBe("./dist/cli.js");
+		expect(bin["ulw"]).toBe("./dist/cli.js");
+		expect(bin["ulw-loop"]).toBe("./dist/cli.js");
 	});
 
 	it("ships the expected files for npm publish", async () => {
 		const pkg = await readJson("package.json") as Record<string, unknown>;
 		const files = pkg["files"] as readonly string[];
 		expect(files).toContain("dist");
+		expect(files).toContain("directive.md");
 		expect(files).toContain("hooks");
 		expect(files).toContain("skills");
 		expect(files).not.toContain(".codex-plugin");
@@ -90,6 +94,7 @@ describe("hooks/hooks.json", () => {
 		expect(command).toContain(`$${"{PLUGIN_ROOT}"}`);
 		expect(command).toContain("dist/cli.js");
 		expect(command).toContain("hook user-prompt-submit");
+		expect(command).toContain("--with-ultrawork");
 	});
 
 	it("#given ulw-loop component is enabled #when hooks are inspected #then create_goal PreToolUse guard is registered", async () => {
@@ -198,5 +203,38 @@ describe("source LOC budget", () => {
 			}).length;
 			expect(pure, `${file} pure LOC`).toBeLessThanOrEqual(250);
 		}
+	});
+});
+
+describe("README implementation contract", () => {
+	it("#given the README #when subcommands are inspected #then every implemented CLI subcommand is documented", async () => {
+		const readme = await readText("README.md");
+
+		for (const subcommand of ULW_LOOP_SUBCOMMANDS) {
+			expect(readme, `README documents \`omo ulw-loop ${subcommand}\``).toContain(`omo ulw-loop ${subcommand}`);
+		}
+	});
+
+	it("#given the README #when stale scaffold language is checked #then it is absent", async () => {
+		const readme = await readText("README.md");
+
+		expect(readme).not.toMatch(/scaffold only/i);
+		expect(readme).not.toMatch(/Wave 1/i);
+		expect(readme).not.toMatch(/lands in later waves/i);
+	});
+
+	it("#given the README #when hooks are described #then both hook channels are documented", async () => {
+		const readme = await readText("README.md");
+
+		expect(readme).toContain("UserPromptSubmit");
+		expect(readme).toContain("user-prompt-submit");
+		expect(readme).toContain("PreToolUse");
+		expect(readme).toContain("pre-tool-use");
+	});
+
+	it("#given the README #when the quality gate is described #then criteriaCoverage is named", async () => {
+		const readme = await readText("README.md");
+
+		expect(readme).toContain("criteriaCoverage");
 	});
 });

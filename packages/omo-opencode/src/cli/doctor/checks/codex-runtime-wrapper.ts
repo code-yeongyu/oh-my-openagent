@@ -31,7 +31,7 @@ export async function checkCodexRuntimeWrapper(deps: CodexRuntimeWrapperDoctorDe
         description: `Generated omo runtime wrapper at ${wrapperPath} points to missing target ${targetPath}.`,
         fix: `Run: ${REINSTALL_COMMAND}`,
         severity: "warning",
-        affects: ["omo sparkshell", "ulw-loop"],
+        affects: ["ulw-loop"],
       })
     }
   }

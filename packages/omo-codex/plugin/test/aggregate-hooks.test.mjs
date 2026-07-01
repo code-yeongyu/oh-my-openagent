@@ -107,6 +107,7 @@ test("#given aggregate hook commands #when inspected #then commands stay Node-ba
 	// then
 	assert(!commands.some((command) => /\bpython3?\b/i.test(command)));
 	assert(commands.includes('node "${PLUGIN_ROOT}/components/ultrawork/dist/cli.js" hook user-prompt-submit'));
+	assert(!commands.some((command) => command.includes("components/workflow-selector/")));
 	assert(commands.every((command) => command.startsWith("node ")));
 	assert(commands.every((command) => !command.includes("\\")));
 });
@@ -158,6 +159,28 @@ test("#given aggregate OMO plugin is enabled #when hooks are inspected #then she
 	assert.match(text, /components\/ulw-loop\/dist\/cli\.js/);
 	assert.match(text, /hook pre-tool-use/);
 	assert.deepEqual(preToolUseGroups.map((group) => group.matcher), ["^Bash$", "^create_goal$"]);
+});
+
+test("#given aggregate OMO plugin has a dedicated ultrawork trigger #when hooks are inspected #then ulw-loop does not duplicate ultrawork injection", async () => {
+	// given
+	const commandHooks = await readAggregateCommandHooks();
+
+	// when
+	const ulwLoopUserPromptHooks = commandHooks.filter(
+		(hook) =>
+			hook.eventName === "UserPromptSubmit" &&
+			hook.handler.command === 'node "${PLUGIN_ROOT}/components/ulw-loop/dist/cli.js" hook user-prompt-submit',
+	);
+	const ultraworkUserPromptHooks = commandHooks.filter(
+		(hook) =>
+			hook.eventName === "UserPromptSubmit" &&
+			hook.handler.command === 'node "${PLUGIN_ROOT}/components/ultrawork/dist/cli.js" hook user-prompt-submit',
+	);
+
+	// then
+	assert.equal(ulwLoopUserPromptHooks.length, 1);
+	assert.equal(ultraworkUserPromptHooks.length, 1);
+	assert(ulwLoopUserPromptHooks.every((hook) => !hook.handler.command.includes("--with-ultrawork")));
 });
 
 test("#given aggregate SessionStart hooks #when inspected #then LazyCodex auto-update is registered", async () => {

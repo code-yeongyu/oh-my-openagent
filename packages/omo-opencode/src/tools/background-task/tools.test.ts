@@ -1,5 +1,7 @@
 /// <reference types="bun-types" />
 
+// allow: SIZE_OK - background task tool tests share one tool-definition harness; this release adds narrow regressions and future behavior should split by output/cancel command family.
+
 import { describe, test, expect } from "bun:test"
 import { createBackgroundCancel, createBackgroundOutput } from "./tools"
 import type { BackgroundManager, BackgroundTask } from "../../features/background-agent"
@@ -206,11 +208,11 @@ describe("background_output full_session", () => {
     expect(output).toContain("since_message_id not found")
   })
 
-  test("caps message_limit at 100", async () => {
+  test("caps message_limit at 200", async () => {
     // #given
     const task = createTask()
     const manager = createMockManager(task)
-    const messages = Array.from({ length: 120 }, (_, index) => ({
+    const messages = Array.from({ length: 250 }, (_, index) => ({
       id: `m${index}`,
       info: {
         role: "assistant",
@@ -225,11 +227,11 @@ describe("background_output full_session", () => {
     const output = await tool.execute({
       task_id: "task-1",
       full_session: true,
-      message_limit: 200,
+      message_limit: 300,
     }, mockContext)
 
     // #then
-    expect(output).toContain("Returned: 100")
+    expect(output).toContain("Returned: 200")
     expect(output).toContain("Has more: true")
   })
 

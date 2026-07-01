@@ -6,7 +6,7 @@ import {
 import type { TelemetryDiagnosticInput } from "@oh-my-opencode/telemetry-core"
 
 import { log } from "./logger"
-import { CACHE_DIR_NAME } from "./plugin-identity"
+import { createOpencodeTelemetryProductConfig } from "./telemetry-product-identity"
 
 type PostHogActivityCaptureState = {
   dayUTC: string
@@ -14,7 +14,7 @@ type PostHogActivityCaptureState = {
 }
 
 function getPostHogActivityStateDir(): string {
-  return resolveTelemetryStateDir({ cacheDirName: CACHE_DIR_NAME })
+  return resolveTelemetryStateDir(createOpencodeTelemetryProductConfig())
 }
 
 function logActivityStateDiagnostic(input: TelemetryDiagnosticInput): void {

@@ -55,7 +55,7 @@ export async function run(options: RunOptions): Promise<number> {
   const resolvedAgent = resolveRunAgent(options, pluginConfig)
   const abortController = new AbortController()
 
-  const posthog = createCliPostHog()
+  const posthog = createCliPostHog({ configEnabled: pluginConfig.telemetry })
   const distinctId = getPostHogDistinctId()
   try {
     posthog.trackActive(distinctId, "run_started")

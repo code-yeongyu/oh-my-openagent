@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { materializeFrontendRefs } from "./scripts/materialize-frontend-refs.mjs";
+import { includedDesignpowersSkills } from "./scripts/designpowers-refs-manifest.mjs";
+import { materializeFrontendRefs, normalizeSkillFrontmatter } from "./scripts/materialize-frontend-refs.mjs";
 import { designOriginals, frontendSkillRoot, thirdPartyRelativePaths, upstreamsRoot } from "./scripts/frontend-refs-manifest.mjs";
 
 const repoRoot = join(import.meta.dir, "..", "..");
@@ -37,7 +38,9 @@ describe("DMCA provenance gate", () => {
 		// then nothing tracked is a third-party path; only section-4 originals remain
 		const committedThirdParty = tracked.filter((relPath) => {
 			if (keptDesign.has(relPath)) return false;
-			return relPath.startsWith("references/design/") || relPath.startsWith("references/ui-ux-db/");
+			return relPath.startsWith("references/design/")
+				|| relPath.startsWith("references/ui-ux-db/")
+				|| relPath.startsWith("references/designpowers/vendor/");
 		});
 		expect(committedThirdParty).toEqual([]);
 	});
@@ -52,12 +55,30 @@ describe("DMCA provenance gate", () => {
 		}
 	});
 
+	test("designpowers skills match upstream after frontmatter normalization", () => {
+		// given a materialize run from the inited designpowers submodule
+		const result = materializeFrontendRefs({ strict: false });
+		if (result.skipped) return;
+		const mismatches: string[] = [];
+
+		// then the shipped skill bodies have no drift beyond intentional YAML quoting
+		for (const skillName of includedDesignpowersSkills) {
+			const upstream = readFileSync(join(upstreamsRoot, "designpowers", "skills", skillName, "SKILL.md"), "utf8");
+			const materialized = readFileSync(
+				join(frontendSkillRoot, "references", "designpowers", "vendor", "skills", skillName, "SKILL.md"),
+				"utf8",
+			);
+			if (normalizeSkillFrontmatter(upstream) !== materialized) mismatches.push(skillName);
+		}
+		expect(mismatches).toEqual([]);
+	});
+
 	test("each ATTRIBUTION pin equals the live submodule HEAD", () => {
 		// given the ATTRIBUTION pins (optionally overridden by a fixture)
 		const attributionPath = process.env.ATTRIBUTION_OVERRIDE ?? join(repoRoot, attributionRel);
 		const attribution = readFileSync(attributionPath, "utf8");
 		const pins = [...attribution.matchAll(/Pinned upstream commit:\s*([0-9a-f]{40})/g)].map((match) => match[1]);
-		const heads = ["open-design", "taste-skill", "ui-ux-pro-max"].map((name) => submoduleHead(name));
+		const heads = ["open-design", "taste-skill", "ui-ux-pro-max", "designpowers"].map((name) => submoduleHead(name));
 		// then every recorded pin matches a live submodule HEAD
 		for (const head of heads) {
 			expect(pins).toContain(head);

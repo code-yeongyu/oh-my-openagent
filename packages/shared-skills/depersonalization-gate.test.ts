@@ -8,9 +8,9 @@ import { runDepersonalizationGate } from "./depersonalization-gate.mjs";
 const here = dirname(fileURLToPath(import.meta.url));
 
 describe("#given the vendored shared skills #when the de-personalization gate runs", () => {
-	test("#then the cleaned ultimate-browsing + ultraresearch tree has zero violations", async () => {
+	test("#then the cleaned ultimate-browsing + ulw-research tree has zero violations", async () => {
 		// given
-		const scanDirs = [join(here, "skills", "ultimate-browsing"), join(here, "skills", "ultraresearch")];
+		const scanDirs = [join(here, "skills", "ultimate-browsing"), join(here, "skills", "ulw-research")];
 		// when
 		const violations = await runDepersonalizationGate(scanDirs, here);
 		// then

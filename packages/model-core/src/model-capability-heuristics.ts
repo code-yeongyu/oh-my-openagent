@@ -46,6 +46,10 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
     variants: ["low", "medium", "high"],
   },
   {
+    family: "qwen",
+    includes: ["qwen"],
+  },
+  {
     family: "grok",
     includes: ["grok"],
     variants: ["low", "medium", "high"],

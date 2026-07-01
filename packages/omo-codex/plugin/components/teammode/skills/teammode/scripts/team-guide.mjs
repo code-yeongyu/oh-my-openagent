@@ -5,8 +5,12 @@
 // writes it once at team creation, and every member thread is told to READ it instead of
 // receiving the rules inline each turn.
 
+export function codexThreadLink(threadId) {
+	return `codex://threads/${threadId}`;
+}
+
 function memberLine(member) {
-	const thread = member.threadId ? ` | thread ${member.threadId}` : " | thread not created yet";
+	const thread = member.threadId ? ` | thread ${member.threadId} (${codexThreadLink(member.threadId)})` : " | thread not created yet";
 	const wt = member.worktree?.path ? ` | worktree ${member.worktree.path}` : "";
 	const name = member.name ? ` "${member.name}"` : "";
 	const title = member.threadTitle ? ` | thread title \`${member.threadTitle}\`` : "";
@@ -23,13 +27,23 @@ that is a coordination signal: mark yourself \`blocked\` and tell the leader at 
 	}
 	const lines = team.members
 		.filter((m) => m.worktree?.path || m.worktree?.branch)
-		.map((m) => `- **${m.id}**: worktree \`${m.worktree.path ?? "(assign with bind-thread --cwd)"}\` on branch \`${m.worktree.branch ?? team.worktree.baseBranch}\``);
+		.map((m) => {
+			const thread = m.threadId ? `; thread ${codexThreadLink(m.threadId)}` : "";
+			return `- **${m.id}**: worktree \`${m.worktree.path ?? "(assign with bind-thread --cwd)"}\` on branch \`${m.worktree.branch ?? team.worktree.baseBranch}\`${thread}`;
+		});
 	return `## Worktrees (ISOLATION IS ON - this is not optional for you)
 
 This team runs each member in its own git worktree branched off \`${team.worktree.baseBranch}\`.
 **You MUST work only inside your own worktree.** The very first thing you do is \`cd\` into it;
 every edit, command, and commit happens there. Never touch another member's worktree, and
 never edit files outside your assigned scope. Commit your work so the leader can integrate it.
+Before editing, verify that your assigned worktree exists and contains repo files. If the path is
+missing, empty, or does not look like a git worktree/repository yet, send \`BLOCKED: worktree not ready\`
+to the leader and wait instead of editing any parent checkout or empty directory.
+
+If Codex returns only \`pendingWorktreeId\` while the leader is creating a worktree-backed member
+thread, the thread is not ready yet. The leader must wait until Codex surfaces a real thread id,
+then bind that real id and send the bootstrap.
 
 ${lines.length ? lines.join("\n") : "- (worktree paths are assigned as threads are bound; read team.json for yours)"}`;
 }
@@ -71,6 +85,8 @@ coordinate with each other, but the leader owns the final decision and integrati
 - **Reach the leader and your peers with \`codex_app.send_message_to_thread\` - not by narrating in
   your own thread, where no one reads it.** The address book is in team.json: the leader thread id
   is \`leader.sessionId\`, and each peer thread id is its \`members[].threadId\`.
+- **When you mention a Codex thread, include its app link too:** \`codex://threads/<threadId>\`.
+  These links are the fastest way for the leader to reopen worktree-backed member threads.
 - **Push a short message at each of these moments - never batch them into one report at the end:**
   - to the **leader**: every finding or decision, every file or sub-task you finish, a
     \`WORKING: <focus> - <phase>\` heartbeat every few tool calls so you never look stale, a
@@ -78,7 +94,9 @@ coordinate with each other, but the leader owns the final decision and integrati
   - to a **peer**: the instant you learn anything that touches their slice - a shared finding, a
     changed assumption, an interface they depend on. When unsure who owns it, send it to the leader.
 - **Going quiet is the only failure.** Many small lean messages beat one end-of-work dump; keep
-  every message short.
+  every message short. Your heartbeats are what let the leader relax and leave you to work: a leader
+  who can see your progress has no reason to interrupt you, while silence forces it to break in and
+  ask where things stand. Frequent lean updates buy you uninterrupted focus.
 
 ## Artifacts (how you hand work off)
 
@@ -103,10 +121,19 @@ export function buildMemberPrompt(team, id) {
 	if (!member) throw new Error(`no member with id "${id}"`);
 	const guide = team.paths?.guide ?? ".omo/teams/<session_id>/guide.md";
 	const teamJson = team.paths?.team ?? ".omo/teams/<session_id>/team.json";
-	const where = member.cwd ? `Work inside \`${member.cwd}\`.` : "Work from the repository root unless your manual assigns a worktree.";
+	const where = member.cwd
+		? `Work inside \`${member.cwd}\`.`
+		: team.worktree?.enabled
+			? "Wait for the leader to bind your worktree cwd before editing."
+			: "Work from the repository root unless your manual assigns a worktree.";
+	const threadLink = member.threadId ? `\nYour Codex thread link is ${codexThreadLink(member.threadId)}. Include it when reporting handoffs or worktree status.` : "";
+	const readiness =
+		team.worktree?.enabled
+			? "\nBefore editing, verify that your assigned worktree exists and contains repo files. If this prompt arrived before your Codex worktree checkout is ready, or the path is missing, empty, or not a git worktree/repository yet, report `BLOCKED: worktree not ready` to the leader and wait."
+			: "";
 	return `You are member ${member.id}${member.name ? ` (${member.name})` : ""} of team ${team.teamName} - owner of: ${member.focus}. Your thread title is \`${member.threadTitle}\`.
 FIRST read your field manual at \`${guide}\`, then the team state at \`${teamJson}\`; they define your scope, deliverable, the leader, the artifacts directory, and the communication rules.
-${where}
+${where}${threadLink}${readiness}
 Communicate with the team and leader in English; reply to the end user in the user's own language.
 Start now. Push updates to the leader and relevant peers with \`codex_app.send_message_to_thread\` as you work - findings, \`WORKING:\` heartbeats, and \`BLOCKED:\` the instant you stall - never just one report at the end.`;
 }

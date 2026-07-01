@@ -12,7 +12,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 const DEFAULT_SCAN_DIRS = [
 	join(here, "skills", "ultimate-browsing"),
-	join(here, "skills", "ultraresearch"),
+	join(here, "skills", "ulw-research"),
 ];
 
 // Frozen deny list: personal identity + credential literals only.

@@ -9,7 +9,7 @@ import type {
 import type { CodegraphWorkspacePreparation as SharedCodegraphWorkspacePreparation } from "../../../../../utils/src/codegraph/workspace.ts";
 import type { CodegraphConfig as SharedCodegraphConfig } from "../../../../../utils/src/omo-config.ts";
 
-export type SessionStartAction = "skipped-disabled" | "spawned";
+export type SessionStartAction = "skipped-disabled" | "skipped-initialized" | "spawned";
 export type PostToolUseAction = "emitted-guidance" | "skipped";
 export type WorkerAction = "failed" | "initialized" | "skipped-disabled" | "skipped-status" | "skipped-unavailable" | "skipped-unsupported-node" | "synced";
 
@@ -74,6 +74,12 @@ export interface SessionStartHookOptions {
 	readonly cwd?: string;
 	readonly env?: Record<string, string | undefined>;
 	readonly spawnWorker?: (invocation: WorkerSpawnInvocation) => void;
+	readonly statusProbe?: (options: {
+		readonly env: Record<string, string | undefined>;
+		readonly homeDir: string;
+		readonly projectRoot: string;
+		readonly trustedCodegraphInstallDir?: string;
+	}) => Promise<boolean>;
 	readonly stdin?: Readable & { readonly isTTY?: boolean };
 	readonly stdout?: HookStdout;
 	readonly workerCliPath?: string;

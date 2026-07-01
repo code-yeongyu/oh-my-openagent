@@ -1,11 +1,11 @@
 ---
 name: work-with-pr
-description: "Full PR lifecycle in an isolated git worktree: implement via the ulw-loop skill with mandatory evidence-bound manual QA → detailed English PR → verification loop (CI + review-work reviewers + Cubic, where Cubic is skipped only when its quota is exhausted) → merge by default → worktree cleanup. Decomposes one task into the smallest atomic, independently-mergeable PRs and builds the independent ones concurrently via a worktree per PR driven by parallel subagents or a team. Unbounded loop: any failing gate sends you back to fix-and-re-QA inside the worktree. Use whenever implementation work needs to land as a PR. Triggers: 'create a PR', 'implement and PR', 'work on this and make a PR', 'implement issue', 'land this as a PR', 'split into atomic PRs', 'parallel PRs', 'work-with-pr', 'PR workflow', 'implement end to end', even when user just says 'implement X' if the context implies PR delivery."
+description: "Full PR lifecycle in a fresh task-owned git worktree: implement via the ulw-loop skill with mandatory evidence-bound manual QA → reviewer-readable English PR → verification loop (CI + review-work reviewers + Cubic, where Cubic is skipped only when its quota is exhausted) → merge by default → worktree cleanup. Decomposes one task into the smallest atomic, independently-mergeable PRs and builds the independent ones concurrently via one worktree per PR driven by parallel subagents or a team. Unbounded loop: any failing gate sends you back to fix-and-re-QA inside that PR's worktree. Use whenever implementation work needs to land as a PR. Triggers: 'create a PR', 'implement and PR', 'work on this and make a PR', 'implement issue', 'land this as a PR', 'split into atomic PRs', 'parallel PRs', 'work-with-pr', 'PR workflow', 'implement end to end', even when user just says 'implement X' if the context implies PR delivery."
 ---
 
 # Work With PR — Full PR Lifecycle
 
-You are executing a complete PR lifecycle: from isolated worktree setup, through `ulw-loop`-driven implementation with evidence-bound manual QA, PR creation, and an unbounded verification loop until the PR is merged. The loop has three gates — CI, review-work, and Cubic — and a failing gate sends you back into the worktree to fix and re-QA. You keep cycling until every active gate passes at once.
+You are executing a complete PR lifecycle: from fresh task-owned worktree setup, through `ulw-loop`-driven implementation with evidence-bound manual QA, PR creation, and an unbounded verification loop until the PR is merged. The loop has three gates — CI, review-work, and Cubic — and a failing gate sends you back into that PR's worktree to fix and re-QA. You keep cycling until every active gate passes at once.
 
 **The unit of delivery is the smallest PR that compiles, passes, and stands on its own — not "one task, one PR."** A single task routinely splits into several atomic PRs; the lifecycle below describes ONE of them, so apply it to each, and build the independent ones concurrently (Phase 0).
 
@@ -15,7 +15,7 @@ You are executing a complete PR lifecycle: from isolated worktree setup, through
 Phase 0: Setup         → Split into atomic PRs, then branch + worktree per PR (parallel when independent)
 Phase 1: Implement     → Drive the work through the ulw-loop skill:
                          evidence-bound manual QA per success criterion, atomic commits
-Phase 2: PR Creation   → Push, create a detailed English PR targeting dev
+Phase 2: PR Creation   → Push, create a reviewer-readable English PR targeting dev
 Phase 3: Verify Loop   → Unbounded iteration; a failing gate routes back to Phase 1:
   ├─ Gate A: CI         → gh pr checks (bun test, typecheck, build)
   ├─ Gate B: review-work → 5-agent parallel review (the reviewer subagents)
@@ -30,7 +30,7 @@ Phase 4: Merge         → Auto-merge by default; wait until actually merged, th
 
 ## Phase 0: Setup
 
-Create an isolated worktree so the user's main working directory stays clean — the user may have uncommitted work, and a branch checkout would destroy it. Isolation also makes parallelism cheap: one worktree per PR, so several build at once without colliding.
+Create a fresh isolated worktree for each PR before implementation or review work starts. The user's main working directory is read-only context — it may have uncommitted work, and a branch checkout would destroy it. Isolation also makes parallelism cheap: one worktree per PR, so several build at once without colliding.
 
 <setup>
 
@@ -137,7 +137,9 @@ Fix any failure before pushing; each fix is its own atomic commit.
 git push -u origin "$BRANCH_NAME"
 ```
 
-Write the PR body in English, detailed enough that a reviewer understands the change without reading the diff. The Verification section is where the manual-QA evidence from Phase 1 earns its place — cite what you actually drove and where the artifact lives, not just that tests passed.
+Write the PR body in English for a human reviewer who has not followed the implementation thread. It must explain the work in plain terms, group changes by reviewer-relevant area instead of dumping files, and make QA evidence auditable without forcing the reviewer to guess what each log proves. Cite sanitized artifacts; do not paste raw secret-bearing logs, env dumps, tokens, auth headers, or private credentials into the PR.
+
+If the PR body needs screenshots or terminal PNGs, follow `docs/reference/github-attachment-upload.md`: upload via GitHub user attachments from an authenticated web session, include only the final `https://github.com/user-attachments/assets/<uuid>` URLs, and never commit temporary images, use release assets, use external hosts, or log cookies/tokens.
 
 ```bash
 gh pr create \
@@ -146,14 +148,20 @@ gh pr create \
   --title "$PR_TITLE" \
   --body "$(cat <<'EOF'
 ## Summary
-[2-4 sentences: what this PR does, why it's needed, and the approach taken]
+[2-4 sentences in plain language: what changed, why it changed, and how observable behavior is different after this PR.]
 
 ## Changes
-[Bullet list of key changes, grouped by area; enough that a reviewer can map each bullet to the diff]
+[Group bullets by reviewer-relevant area, not by file. Each bullet should say what changed and how a reviewer can map it to the diff.]
 
-## Verification
-**Automated:** `bun run typecheck` ✅ · `bun test` ✅ · `bun run build` ✅
-**Manual QA:** [per success criterion — the channel driven (tmux/HTTP/browser/GUI), what you observed, and the evidence artifact path]
+## QA & Evidence
+For each automated command or manual QA action:
+- **What was tested:** [command or surface driven, with the behavior it was meant to prove]
+- **Observed result:** [actual result, including before/after when relevant]
+- **Artifact:** [`path/to/sanitized-log-or-report`]
+- **Why sufficient:** [which risk or success criterion this evidence covers]
+
+## Risks & Residuals
+[Map each meaningful risk to the evidence above and state the conclusion: mitigated, accepted, or blocked. Include unavailable gates here with the concrete reason.]
 
 ## Related Issues
 [Link to issue if applicable]

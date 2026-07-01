@@ -39,6 +39,13 @@ type RootCommandOptions = {
   readonly platform?: InstallArgs["platform"]
 }
 
+type DoctorCommandOptions = {
+  readonly status?: boolean
+  readonly verbose?: boolean
+  readonly json?: boolean
+  readonly platform?: DoctorOptions["target"]
+}
+
 export function resolveInstallArgs(
   options: InstallCommandOptions,
   invocationName: string | undefined = process.env.OMO_INVOCATION_NAME,
@@ -220,18 +227,22 @@ program
   .option("--status", "Show compact system dashboard")
   .option("--verbose", "Show detailed diagnostic information")
   .option("--json", "Output results in JSON format")
+  .addOption(new Option("--platform <platform>", "Doctor target platform: opencode, codex").choices(["opencode", "codex"]))
   .addHelpText("after", `
 Examples:
   $ bunx oh-my-opencode doctor            # Show problems only
   $ bunx oh-my-opencode doctor --status   # Compact dashboard
   $ bunx oh-my-opencode doctor --verbose  # Deep diagnostics
   $ bunx oh-my-opencode doctor --json     # JSON output
+  $ omo doctor --platform=codex           # Codex/LazyCodex diagnostics only
 `)
-  .action(async (options) => {
+  .action(async (options: DoctorCommandOptions) => {
+    const rootOptions = program.opts<RootCommandOptions>()
+    const rootDoctorPlatform = rootOptions.platform === "opencode" || rootOptions.platform === "codex" ? rootOptions.platform : undefined
     const mode = options.status ? "status" : options.verbose ? "verbose" : "default"
     const doctorOptions: DoctorOptions = {
       mode,
-      json: options.json ?? false, target: resolveDoctorTarget(process.env.OMO_INVOCATION_NAME),
+      json: options.json ?? false, target: resolveDoctorTarget(process.env.OMO_INVOCATION_NAME, options.platform ?? rootDoctorPlatform),
     }
     const exitCode = await doctor(doctorOptions)
     process.exit(exitCode)

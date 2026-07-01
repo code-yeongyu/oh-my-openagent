@@ -55,6 +55,7 @@ export async function runMcpStdioServer(
 	await runJsonRpcStdioServer({
 		input,
 		output,
+		idleTimeoutMs: 0,
 		handler: handleLspMcpRequest,
 		handlerOptions: undefined,
 	});

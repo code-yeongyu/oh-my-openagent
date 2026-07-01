@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { designOriginals, thirdPartyRelativePaths } from "./scripts/frontend-refs-manifest.mjs";
 
 const repoRoot = join(import.meta.dir, "..", "..");
 const frontendSkillRel = "packages/shared-skills/skills/frontend";
+const frontendGitignorePath = join(repoRoot, frontendSkillRel, ".gitignore");
 
 function trackedFrontendReferenceFiles(): string[] {
 	const output = execFileSync("git", ["ls-files", `${frontendSkillRel}/references/`], {
@@ -36,18 +38,34 @@ describe("frontend third-party manifest partition", () => {
 		}
 	});
 
+	test("unignores every project-original design file", () => {
+		// then future original design docs cannot drift out of the committed tree
+		const gitignore = readFileSync(frontendGitignorePath, "utf8");
+		for (const name of designOriginals as string[]) {
+			expect(gitignore).toContain(`!references/design/${name}`);
+		}
+	});
+
 	test("no ui-ux-db file is committed", () => {
 		// then the entire ui-ux-db tree is submodule-sourced, never committed
 		const trackedUiUxDb = [...tracked].filter((relPath) => relPath.startsWith("references/ui-ux-db/"));
 		expect(trackedUiUxDb).toEqual([]);
 	});
 
-	test("third-party manifest covers design brand, taste-skill, and ui-ux-db", () => {
+	test("no designpowers vendor file is committed", () => {
+		// then the materialized designpowers corpus is submodule-sourced, never committed
+		const trackedDesignpowersVendor = [...tracked].filter((relPath) => relPath.startsWith("references/designpowers/vendor/"));
+		expect(trackedDesignpowersVendor).toEqual([]);
+	});
+
+	test("third-party manifest covers design brand, taste-skill, ui-ux-db, and designpowers", () => {
 		// given the manifest partition
 		const designCount = thirdParty.filter((relPath) => relPath.startsWith("references/design/")).length;
 		const uiUxDbCount = thirdParty.filter((relPath) => relPath.startsWith("references/ui-ux-db/")).length;
-		// then both reference families are represented
+		const designpowersCount = thirdParty.filter((relPath) => relPath.startsWith("references/designpowers/vendor/")).length;
+		// then each reference family is represented
 		expect(designCount).toBeGreaterThanOrEqual(81);
 		expect(uiUxDbCount).toBeGreaterThanOrEqual(28);
+		expect(designpowersCount).toBeGreaterThanOrEqual(38);
 	});
 });
