@@ -7,6 +7,8 @@ interface CombinedDescriptionOptions {
   includeSkills?: boolean
 }
 
+const SHARED_DERIVED_BUILTIN_COMMANDS = new Set(["refactor", "remove-ai-slops", "start-work"])
+
 function formatSkillCommand(skill: SkillInfo): string {
   const lines = [
     "  <command>",
@@ -42,35 +44,69 @@ function formatSlashCommand(command: CommandInfo): string {
   return lines.join("\n")
 }
 
-/**
- * Removes path-alias duplicates from a skill list before injection.
- *
- * When the same logical skill is registered under both a qualified path
- * (e.g. `shared/debugging`) and a bare short name (`debugging`), only the
- * qualified name is kept in the description.  The execution-time matcher in
- * `skill-matcher.ts` already resolves bare short names to their qualified
- * counterpart, so callers do not lose the ability to invoke the skill by its
- * short name — they just won't see the redundant alias in the tool description.
- */
+function shortSkillName(name: string): string {
+  const parts = name.split("/")
+  return parts[parts.length - 1] ?? name
+}
+
+function normalizeSkillName(name: string): string {
+  return name.toLowerCase()
+}
+
+function normalizeSkillLocation(location: string | undefined): string | undefined {
+  if (!location) return undefined
+  let normalized = location.replaceAll("\\", "/").replace(/\/+$/, "")
+  const lower = normalized.toLowerCase()
+  if (lower.endsWith("/skill.md")) {
+    normalized = normalized.slice(0, -"/SKILL.md".length)
+  } else if (lower.endsWith(".md")) {
+    normalized = normalized.slice(0, normalized.lastIndexOf("/"))
+  }
+  return normalized.toLowerCase()
+}
+
+function hasSameSource(qualified: SkillInfo, bare: SkillInfo): boolean {
+  const qualifiedLocation = normalizeSkillLocation(qualified.location)
+  const bareLocation = normalizeSkillLocation(bare.location)
+  return Boolean(qualifiedLocation && bareLocation && qualifiedLocation === bareLocation)
+}
+
 export function deduplicatePathAliasedSkills(skills: SkillInfo[]): SkillInfo[] {
-  // Build a set of all short names (last path segment) that also have a
-  // qualified (multi-segment) variant in the list.
-  const qualifiedShortNames = new Set<string>()
+  const qualifiedByShortName = new Map<string, SkillInfo[]>()
   for (const skill of skills) {
-    const parts = skill.name.split("/")
-    if (parts.length > 1) {
-      const shortName = parts[parts.length - 1]
-      if (shortName) qualifiedShortNames.add(shortName)
-    }
+    if (!skill.name.includes("/")) continue
+    const shortName = normalizeSkillName(shortSkillName(skill.name))
+    const matches = qualifiedByShortName.get(shortName) ?? []
+    matches.push(skill)
+    qualifiedByShortName.set(shortName, matches)
   }
 
-  // Suppress bare entries whose name exactly matches a qualified short name.
   return skills.filter((skill) => {
-    if (!skill.name.includes("/") && qualifiedShortNames.has(skill.name)) {
-      return false
-    }
+    if (skill.name.includes("/")) return true
+    const qualifiedMatches = qualifiedByShortName.get(normalizeSkillName(skill.name))
+    if (!qualifiedMatches) return true
+    if (qualifiedMatches.some((qualified) => hasSameSource(qualified, skill))) return false
     return true
   })
+}
+
+function shouldSuppressBuiltinCommandAlias(command: CommandInfo, skills: SkillInfo[]): boolean {
+  if (command.scope !== "builtin") return false
+  if (command.name.includes("/")) return false
+  const normalizedCommandName = normalizeSkillName(command.name)
+  if (!SHARED_DERIVED_BUILTIN_COMMANDS.has(normalizedCommandName)) return false
+
+  return skills.some((skill) => {
+    if (!skill.name.includes("/")) return false
+    return normalizeSkillName(shortSkillName(skill.name)) === normalizedCommandName
+  })
+}
+
+function deduplicateCommandsForPathAliasedSkills(
+  commands: CommandInfo[],
+  skills: SkillInfo[],
+): CommandInfo[] {
+  return commands.filter((command) => !shouldSuppressBuiltinCommandAlias(command, skills))
 }
 
 export function formatCombinedDescription(
@@ -79,7 +115,7 @@ export function formatCombinedDescription(
   options: CombinedDescriptionOptions = {}
 ): string {
   const availableSkills = options.includeSkills ? deduplicatePathAliasedSkills(skills ?? []) : []
-  const availableCommands = commands ?? []
+  const availableCommands = deduplicateCommandsForPathAliasedSkills(commands ?? [], availableSkills)
 
   if (availableSkills.length === 0 && availableCommands.length === 0) {
     if ((skills?.length ?? 0) > 0) {
