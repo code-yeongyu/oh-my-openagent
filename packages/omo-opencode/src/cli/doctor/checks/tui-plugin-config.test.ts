@@ -26,6 +26,14 @@ function writeTuiConfig(plugins: string[]): void {
   )
 }
 
+function writeTuiConfigRaw(plugins: unknown[]): void {
+  writeFileSync(
+    join(testConfigDir, "tui.json"),
+    JSON.stringify({ plugin: plugins }, null, 2) + "\n",
+    "utf-8",
+  )
+}
+
 function createPackageJson(packageName: string, exportsValue: Record<string, unknown> = { ".": "./dist/index.js" }): string {
   return JSON.stringify({ name: packageName, exports: exportsValue }, null, 2) + "\n"
 }
@@ -80,6 +88,22 @@ describe("tui-plugin-config check", () => {
     expect(result.status).toBe("pass")
     expect(result.issues).toHaveLength(0)
     expect(result.name).toBe("TUI Plugin")
+  })
+
+  it("passes when tui.json pairs our entry with a tuple third-party plugin entry", async () => {
+    //#given opencode.json has the server entry, the installed package exports ./tui,
+    //#      and tui.json has our string entry plus a valid tuple plugin entry
+    //#      of the form [pathOrPackage, options]
+    writeInstalledPackage(PLUGIN_NAME, { ".": "./dist/index.js", "./tui": "./dist/tui.js" })
+    writeOpenCodeConfig([PLUGIN_NAME])
+    writeTuiConfigRaw([PLUGIN_NAME, ["./local-tui-plugin.tsx", { label: "custom" }]])
+
+    //#when running the check
+    const result = await checkTuiPluginConfig()
+
+    //#then the tuple entry is ignored and our string entry still registers the plugin
+    expect(result.status).toBe("pass")
+    expect(result.issues).toHaveLength(0)
   })
 
   it("passes after ensureTuiPluginEntry adds the missing package TUI entry", async () => {

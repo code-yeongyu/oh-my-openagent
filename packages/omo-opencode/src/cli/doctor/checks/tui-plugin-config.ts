@@ -140,7 +140,7 @@ export function detectServerPluginRegistration(): ServerPluginInfo {
 
   try {
     const parsed = parseJsonc<OpenCodeConfigShape>(readFileSync(configPath, "utf-8"))
-    const plugins = parsed.plugin ?? []
+    const plugins = (parsed.plugin ?? []).filter((entry): entry is string => typeof entry === "string")
     const serverEntry = plugins.find(isServerPluginEntry)
     return {
       registered: serverEntry !== undefined,
@@ -172,7 +172,7 @@ export function detectTuiPluginRegistration(): TuiPluginInfo {
 
   try {
     const parsed = parseJsonc<TuiConfigShape>(readFileSync(tuiJsonPath, "utf-8"))
-    const plugins = parsed.plugin ?? []
+    const plugins = (parsed.plugin ?? []).filter((entry): entry is string => typeof entry === "string")
     return {
       registered: plugins.some(isTuiPluginEntry),
       configPath: tuiJsonPath,
