@@ -31,6 +31,8 @@ export const expectedSkills = [
 	"visual-qa",
 ];
 
+export const hiddenSharedSkills = ["ultraresearch"];
+
 export const componentSkillSources = [
 	["comment-checker", "components/comment-checker/skills/comment-checker"],
 	["lsp", "components/lsp/skills/lsp"],
@@ -91,6 +93,25 @@ const reviewWorkCodexGatePattern =
 	/\nWhen `review-work` is used as a final implementation, PR, or `\$start-work`\ngate, it is blocking\. A timeout, missing deliverable, ack-only response,\nexplicit `BLOCKED:`, or inconclusive lane is not a pass\. Treat that lane as\nfailed, investigate the underlying uncertainty with the `debugging` skill when\nruntime behavior may be wrong, fix with evidence, and rerun the affected lane\nbefore claiming completion, creating or handing off a PR, or merging\.\n\nWhen reviewing a PR or branch, collect diff, file contents, and verification\nresults from a dedicated review worktree attached to that branch\. Never\ncheckout, test, or edit the review branch in the main worktree\.\n\nReview evidence must be safe to share\. Redact or mask secrets and sensitive\nuser data before including evidence in logs, PR bodies, or handoffs\. Never\ninclude raw tokens, credentials, auth headers, cookies, API keys, env dumps,\nprivate logs, or PII; summarize with lengths, hashes, and short non-sensitive\nprefixes when identity is needed\.\n/;
 
 export function removeCodexSkillOverlays(skillName, content) {
+	if (skillName === "ulw-loop") {
+		return content.replace("`ulw-research` without hesitation", "`ulw-research` (legacy alias: `ultraresearch`) without hesitation");
+	}
+	if (skillName === "ulw-research") {
+		return content
+			.replace(
+				", any 'ulw' research wording,",
+				", the legacy alias 'ultraresearch', any 'ulw' research wording,",
+			)
+			.replace(
+				"the word \"ulw-research\" (also `/ulw-research`, `$ulw-research`), ",
+				"the word \"ulw-research\" (also `/ulw-research`, `$ulw-research`), the legacy alias \"ultraresearch\" (also `/ultraresearch`, `$ultraresearch`), ",
+			)
+			.replace(
+				"answer those normally, and mention that `ulw-research` is available when a question would clearly benefit from it.",
+				"answer those normally, and mention that `ulw-research` is available (legacy alias: `ultraresearch`) when a question would clearly benefit from it.",
+			)
+			.replace("# ULW-Research Synthesis: <query>", "# Ultraresearch Synthesis: <query>");
+	}
 	if (skillName === "start-work") {
 		return content
 			.replace(startWorkCodexCompletion, startWorkOriginalCompletion)
