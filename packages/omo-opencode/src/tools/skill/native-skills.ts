@@ -15,7 +15,7 @@ export function loadedSkillToInfo(skill: LoadedSkill): SkillInfo {
   return {
     name: skill.name,
     description: skill.definition.description || "",
-    location: skill.path,
+    location: skill.path ?? skill.resolvedPath,
     scope: skill.scope,
     license: skill.license,
     compatibility: skill.compatibility,
