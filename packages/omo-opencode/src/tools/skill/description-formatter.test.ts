@@ -29,6 +29,13 @@ function localSkill(name: string, description = "local desc"): SkillInfo {
   })
 }
 
+function userSkill(name: string, description = "user desc"): SkillInfo {
+  return makeSkill(name, description, {
+    scope: "user",
+    location: `/home/.agents/skills/${name}/SKILL.md`,
+  })
+}
+
 function makeCommand(
   name: string,
   description = "command desc",
@@ -165,6 +172,29 @@ describe("deduplicatePathAliasedSkills", () => {
       "shared/refactor:full refactor instructions",
     ])
   })
+
+  it("suppresses known shared-derived opencode bare skills even when the wrapper has no location", () => {
+    const skills = [
+      sharedSkill("remove-ai-slops", "full cleanup instructions"),
+      makeSkill("remove-ai-slops", "short cleanup wrapper", { scope: "opencode", location: undefined }),
+    ]
+    const result = deduplicatePathAliasedSkills(skills)
+    expect(result.map((s) => `${s.name}:${s.description}`)).toEqual([
+      "shared/remove-ai-slops:full cleanup instructions",
+    ])
+  })
+
+  it("keeps distinct user bare skills when a shared skill has the same short name", () => {
+    const skills = [
+      sharedSkill("start-work", "full start-work instructions"),
+      userSkill("start-work", "local start-work workflow"),
+    ]
+    const result = deduplicatePathAliasedSkills(skills)
+    expect(result.map((s) => `${s.name}:${s.description}`)).toEqual([
+      "shared/start-work:full start-work instructions",
+      "start-work:local start-work workflow",
+    ])
+  })
 })
 
 describe("formatCombinedDescription with path-alias deduplication", () => {
@@ -219,5 +249,24 @@ describe("formatCombinedDescription with path-alias deduplication", () => {
     expect(result).toContain("\n    <name>/refactor</name>")
     expect(result).toContain("full refactor skill")
     expect(result).toContain("project refactor command")
+  })
+
+  it("keeps builtin commands when the matching qualified skill is not shared-derived", () => {
+    const skills: SkillInfo[] = [
+      makeSkill("project/refactor", "project refactor skill", {
+        scope: "project",
+        location: "/repo/.agents/skills/project/refactor/SKILL.md",
+      }),
+    ]
+    const commands: CommandInfo[] = [
+      makeCommand("refactor", "builtin refactor command"),
+    ]
+
+    const result = formatCombinedDescription(skills, commands, { includeSkills: true })
+
+    expect(result).toContain("<name>/project/refactor</name>")
+    expect(result).toContain("\n    <name>/refactor</name>")
+    expect(result).toContain("project refactor skill")
+    expect(result).toContain("builtin refactor command")
   })
 })

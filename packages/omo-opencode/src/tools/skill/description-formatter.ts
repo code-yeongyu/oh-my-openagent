@@ -71,6 +71,30 @@ function hasSameSource(qualified: SkillInfo, bare: SkillInfo): boolean {
   return Boolean(qualifiedLocation && bareLocation && qualifiedLocation === bareLocation)
 }
 
+function hasSharedSkillSource(skill: SkillInfo, shortName: string): boolean {
+  const location = normalizeSkillLocation(skill.location)
+  return location?.endsWith(`/shared-skills/skills/${shortName}`) ?? false
+}
+
+function isSharedDerivedQualifiedSkill(skill: SkillInfo, shortName: string): boolean {
+  if (!skill.name.includes("/")) return false
+  if (normalizeSkillName(shortSkillName(skill.name)) !== shortName) return false
+  if (skill.scope === "shared") return true
+
+  return hasSharedSkillSource(skill, shortName)
+}
+
+function isSuppressibleSharedDerivedBareSkill(
+  qualified: SkillInfo,
+  bare: SkillInfo,
+  shortName: string,
+): boolean {
+  if (!isSharedDerivedQualifiedSkill(qualified, shortName)) return false
+  if (bare.scope !== "builtin" && bare.scope !== "opencode") return false
+  if (hasSharedSkillSource(bare, shortName)) return true
+  return bare.location === undefined && SHARED_DERIVED_BUILTIN_COMMANDS.has(shortName)
+}
+
 export function deduplicatePathAliasedSkills(skills: SkillInfo[]): SkillInfo[] {
   const qualifiedByShortName = new Map<string, SkillInfo[]>()
   for (const skill of skills) {
@@ -86,6 +110,13 @@ export function deduplicatePathAliasedSkills(skills: SkillInfo[]): SkillInfo[] {
     const qualifiedMatches = qualifiedByShortName.get(normalizeSkillName(skill.name))
     if (!qualifiedMatches) return true
     if (qualifiedMatches.some((qualified) => hasSameSource(qualified, skill))) return false
+    if (qualifiedMatches.some((qualified) => isSuppressibleSharedDerivedBareSkill(
+      qualified,
+      skill,
+      normalizeSkillName(skill.name),
+    ))) {
+      return false
+    }
     return true
   })
 }
@@ -96,10 +127,7 @@ function shouldSuppressBuiltinCommandAlias(command: CommandInfo, skills: SkillIn
   const normalizedCommandName = normalizeSkillName(command.name)
   if (!SHARED_DERIVED_BUILTIN_COMMANDS.has(normalizedCommandName)) return false
 
-  return skills.some((skill) => {
-    if (!skill.name.includes("/")) return false
-    return normalizeSkillName(shortSkillName(skill.name)) === normalizedCommandName
-  })
+  return skills.some((skill) => isSharedDerivedQualifiedSkill(skill, normalizedCommandName))
 }
 
 function deduplicateCommandsForPathAliasedSkills(
