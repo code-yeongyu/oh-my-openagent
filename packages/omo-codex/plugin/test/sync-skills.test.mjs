@@ -30,6 +30,13 @@ function excludeGeneratedSkillMetadata(files) {
 	return files.filter((file) => !generatedSkillMetadataFiles.has(file.replaceAll("\\", "/")));
 }
 
+async function assertNoLegacyResearchAliasInTree(rootDir, label) {
+	for (const file of await listSkillFiles(rootDir)) {
+		const content = await readFile(join(rootDir, file), "utf8");
+		assert.doesNotMatch(content, /ultraresearch/i, `${label}/${file} must not expose ultraresearch`);
+	}
+}
+
 test("#given synced aggregate Codex skills #when inspected #then component and shared skills are present", async () => {
 	// given
 	const skillsRoot = join(root, "skills");
@@ -183,7 +190,7 @@ test("#given synced ulw-loop skill #when Codex hint metadata is inspected #then 
 	assert.match(interfaceMetadata, /- "ulw-loop"/);
 });
 
-test("#given synced aggregate Codex skills #when legacy ultraresearch alias is inspected #then it is not packaged", async () => {
+test("#given shipped Codex skill payloads #when legacy ultraresearch alias is inspected #then it is not packaged", async () => {
 	// given
 	const skillsRoot = join(root, "skills");
 	const skillRoot = join(skillsRoot, "ultraresearch");
@@ -191,9 +198,9 @@ test("#given synced aggregate Codex skills #when legacy ultraresearch alias is i
 	// then
 	await assert.rejects(readFile(join(skillRoot, "SKILL.md"), "utf8"), { code: "ENOENT" });
 	await assert.rejects(readFile(join(skillRoot, "agents", "openai.yaml"), "utf8"), { code: "ENOENT" });
-	for (const file of await listSkillFiles(skillsRoot)) {
-		const content = await readFile(join(skillsRoot, file), "utf8");
-		assert.doesNotMatch(content, /ultraresearch/i, `${file} must not expose ultraresearch`);
+	await assertNoLegacyResearchAliasInTree(skillsRoot, "skills");
+	for (const [skillName, sourcePath] of componentSkillSources) {
+		await assertNoLegacyResearchAliasInTree(join(root, sourcePath), `components/${skillName}`);
 	}
 });
 
