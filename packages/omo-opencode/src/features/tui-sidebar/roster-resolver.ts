@@ -68,8 +68,12 @@ function toModelResolutionConfig(config: OhMyOpenCodeConfig): OmoConfig {
 export function resolveRoster(directory: string): RosterRow[] {
   try {
     const config = validatePluginConfig(directory).config
+    const configuredAgents = new Set(Object.keys(config.agents ?? {}))
+    const configuredCategories = new Set(Object.keys(config.categories ?? {}))
     const resolution = getModelResolutionInfoWithOverrides(toModelResolutionConfig(config))
-    return [...resolution.agents, ...resolution.categories]
+    const filteredAgents = resolution.agents.filter((a) => configuredAgents.has(a.name))
+    const filteredCategories = resolution.categories.filter((c) => configuredCategories.has(c.name))
+    return [...filteredAgents, ...filteredCategories]
       .map(toRosterRow)
       .sort((left, right) => left.label.localeCompare(right.label))
   } catch (error) {
