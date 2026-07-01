@@ -131,11 +131,13 @@ Do NOT use this for greenfield work — the audit phase is wasted effort there.
 
 ### Step 4 — Is this an image-first workflow?
 
-Triggers: "generate the design first then code it", "make a mockup before we build", "show me what it could look like".
+Triggers: "generate the design first then code it", "make a mockup before we build", "show me what it could look like" — AND, by default, any expressive greenfield brief (glossy / premium / wow / brand-grade) with no user-supplied reference.
 
 **Action:** Load both:
 - `image-to-code-skill.md` (the workflow: generate → analyze → implement)
 - `imagegen-frontend-web.md` for web, or `imagegen-frontend-mobile.md` for mobile screens
+
+For an expressive greenfield brief, default to generating **2-3 imagen concept drafts**, each prompt **seeded with the loaded Layer A + Layer B tokens** (palette, type, signature material) so the drafts inherit the reference's taste instead of generic priors. Pick the strongest, then treat the chosen draft as the reference-fidelity contract for `/visual-qa`.
 
 If the user wants only the imagery (no code), load only the imagegen file.
 
@@ -215,39 +217,14 @@ Once references are loaded, before writing any UI code:
 
 ## Phase Final — Design QA (MANDATORY, runs after implementation)
 
-After implementation is complete, **before declaring the task done**, run a real browser-based Design QA.
+Before declaring the task done, verify the rendered UI. **The verification authority is `/visual-qa`, not a hand-rolled checklist here.** Run `/visual-qa`: it captures every page and breakpoint (375 / 768 / 1280px) on fresh evidence, drives and inspects interaction states (hover/focus/active) and motion (transitions, scroll-triggered, load), runs the dual-oracle pass, and loops until an independent reviewer passes. For a concrete reference or clone, run it in reference-fidelity mode.
 
-### Why
+This skill adds only the design-taste judgments `/visual-qa` cannot make for you:
 
-Code that "looks correct" in an editor is not verified. Colors render differently, spacing collapses, fonts fail to load, responsive breakpoints break, states are missing. The only way to know is to SEE it in a real browser.
+1. **Two kinds of failure count equally — fix both, then re-check.** Defects: clipping, wrong font, missing state, jank. Flatness: a surface that reads generic next to the loaded reference. When the render is bug-free but flat, you are NOT done — RAISE the design: deepen the material layering, give the color a real perceptual ramp (multiple stops / OKLCH, not one tint at varied opacity), render the hero focal object as real dimensional material (a generated bitmap, or real light/shadow/gradient/depth — never flat geometric primitives), and add the one signature moment. Patching only bugs while the surface stays at the floor is the single most common way this skill ships clean-but-generic work.
+2. **Motion serves meaning; slop animation is forbidden.** Every interactive element must communicate its affordance and state changes — but a hover that changes nothing, motion on a non-interactive element, or a decorative micro-animation with no informational purpose is slop. Do not add it, and treat any you find as a defect. The hero may carry one signature moment; the rest of the surface earns motion only where it signals interaction or state.
 
-### How
-
-1. **Launch the app** in a real browser (use `agent-browser` skill or the project's dev server + screenshot tool).
-2. **Take screenshots** at key breakpoints: mobile (375px), tablet (768px), desktop (1280px).
-3. **Walk the design system checklist** visually:
-   - [ ] Colors match `DESIGN.md` palette — no off-brand colors visible
-   - [ ] Typography hierarchy is clear — headings, body, captions are visually distinct
-   - [ ] Spacing rhythm feels consistent — no cramped or floating elements
-   - [ ] Interactive states work — hover every button, focus every input, toggle every switch
-   - [ ] Empty, loading, and error states exist and look intentional
-   - [ ] Dark mode (if declared in `DESIGN.md`) works completely
-   - [ ] No layout overflow, no horizontal scroll on mobile
-   - [ ] Motion/animation feels smooth — no jank, no missing transitions
-   - [ ] (Expressive brief) Surfaces AND the hero focal object read as real, dimensional material — not flat fills or flat geometric primitives. Use the brand's material: glass = tint+backdrop saturate+rim+sheen+glow; bright/playful = gradient fills+soft depth shadows+a lit focal object. The hero focal object is a generated bitmap, or carries real light/shadow/gradient/depth.
-   - [ ] (Expressive brief) Brand color is a perceptual ramp (multiple stops / OKLCH), not one tint reused at different opacities
-   - [ ] (Expressive brief) Every interactive element has a visible hover AND active/pressed micro-interaction, and the hero carries one signature moment
-4. **Two kinds of failure count equally — fix both, then re-check.** Defects: clipping, wrong font, missing state, jank. Flatness: a surface that reads generic next to the loaded reference. When the render is bug-free but flat, you are NOT done — RAISE the design: deepen the material layering, give the color real depth and a ramp, add the signature interaction. Patching only bugs while the surface stays at the floor is the single most common way this skill ships clean-but-generic work. Do not report "done" with visual bugs OR a floor-level surface.
-5. **If you cannot launch a browser** (e.g. no dev server, CI-only environment), state this explicitly and list what you would check. Never silently skip QA.
-
-### QA Report
-
-After passing QA, write a short summary:
-- Breakpoints tested
-- States verified (hover, focus, disabled, loading, error, empty)
-- Design system compliance: all tokens traced back to `DESIGN.md`
-- Issues found and fixed during QA
-- Screenshot evidence (attach or describe)
+Report "done" only when `/visual-qa` has passed on fresh evidence AND neither a visual bug nor a floor-level or slop-laden surface remains.
 
 
 ## Final notes
