@@ -1,5 +1,3 @@
-export type DoctorStatus = "stub";
+import type { SenpiInstallOptions, SenpiInstallReport } from "../install/index.ts";
 
-export function getDoctorStatus(): DoctorStatus {
-  return "stub";
-}
+export declare function doctorSenpiInstall(options?: SenpiInstallOptions): SenpiInstallReport;

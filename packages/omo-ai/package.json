@@ -22,11 +22,11 @@
     },
     "./doctor": {
       "types": "./src/doctor/index.ts",
-      "import": "./src/doctor/index.ts"
+      "import": "./src/doctor/index.mjs"
     },
     "./install": {
       "types": "./src/install/index.ts",
-      "import": "./src/install/index.ts"
+      "import": "./src/install/index.mjs"
     },
     "./senpi-compat": {
       "types": "./src/senpi-compat/index.ts",

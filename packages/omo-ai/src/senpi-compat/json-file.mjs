@@ -11,7 +11,7 @@ export function readJsonObject(path, fallback) {
   }
   const parsed = JSON.parse(readFileSync(path, "utf8"));
   if (!isRecord(parsed)) {
-    return structuredClone(fallback);
+    throw new TypeError(`${path} must contain a JSON object.`);
   }
   return parsed;
 }
