@@ -8,6 +8,7 @@ import { decideSpawnActions, type SessionMapping } from "./decision-engine"
 import { executeActions, type ExecuteActionsResult } from "./action-executor"
 import type { SessionCreatedEvent } from "./session-created-event"
 import { createTrackedSession } from "./tracked-session-state"
+import { isCmuxCompatEnvironment } from "../../shared/tmux/cmux-detect"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -159,6 +160,7 @@ export async function handleSessionCreated(
         sessionId,
         paneId: result.spawnedPaneId,
         description: title,
+        attachActivated: isCmuxCompatEnvironment(),
       }),
     )
 
