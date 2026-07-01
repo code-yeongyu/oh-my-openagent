@@ -199,3 +199,10 @@ capture evidence and a local reconnaissance run following the MIT-licensed
 `JCodesMore/ai-website-cloner-template` workflow; it is not copied from Aside or from the
 template. Aside names, trademarks, product text, and visual assets remain the property of
 their respective owners and are referenced only for descriptive design-analysis purposes.
+
+`frontend/references/design/clone-from-url.md` is a project-original runtime-extraction
+workflow guide. Its browser + `getComputedStyle` clone approach follows the same
+MIT-licensed `JCodesMore/ai-website-cloner-template` clone-website workflow that `aside.md`
+cites; no source from that template is copied. It carries no third-party attribution beyond
+that lineage note, and it grants no license to copy any target site's trademarks, brand
+assets, or proprietary copy.
