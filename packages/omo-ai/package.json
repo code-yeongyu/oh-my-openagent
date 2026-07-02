@@ -45,10 +45,18 @@
     "pi-package"
   ],
   "pi": {
-    "hooks": "./senpi/hooks",
-    "skills": "./senpi/skills",
-    "prompts": "./senpi/prompts",
-    "extensions": "./senpi/extensions"
+    "hooks": [
+      "./senpi/hooks"
+    ],
+    "skills": [
+      "./senpi/skills"
+    ],
+    "prompts": [
+      "./senpi/prompts"
+    ],
+    "extensions": [
+      "./senpi/extensions"
+    ]
   },
   "license": "SUL-1.0",
   "devDependencies": {

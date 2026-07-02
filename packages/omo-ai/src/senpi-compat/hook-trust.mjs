@@ -3,6 +3,7 @@ import { readJsonObject, isRecord } from "./json-file.mjs";
 
 const TRUST_STATE_VERSION = 1;
 const DEFAULT_HOOK_TIMEOUT_SECONDS = 60;
+const TRUSTED_HOOK_SCOPES = ["global", "plugin"];
 
 export function emptyHookTrustState() {
   return { version: TRUST_STATE_VERSION, hooks: {} };
@@ -13,13 +14,6 @@ export function expectedOmoHookTrustRecords(paths, options = {}) {
   const platform = options.platform ?? process.platform;
   const payload = readJsonObject(paths.hooksManifestPath, { hooks: {} });
   const hooks = isRecord(payload.hooks) ? payload.hooks : {};
-  const source = {
-    scope: "global",
-    sourcePath: paths.hooksManifestPath,
-    pluginRoot: "",
-    manifestPath: "",
-  };
-  const sourceHash = sourceKeyHash(source);
   const records = [];
   for (const [event, groups] of Object.entries(hooks)) {
     if (!Array.isArray(groups)) {
@@ -35,28 +29,37 @@ export function expectedOmoHookTrustRecords(paths, options = {}) {
           return;
         }
         const platformCommand = selectedCommand(hook, platform);
-        const id = `hk_${sourceHash}_${event}_${groupIndex}_${handlerIndex}`;
-        const trustedHash = hashCommandHook({ event, hook, matcher, sourceHash, platformCommand });
-        records.push({
-          id,
-          stableEntry: {
-            enabled: true,
-            trustedHash,
-            scope: "global",
+        for (const scope of TRUSTED_HOOK_SCOPES) {
+          const source = {
+            scope,
             sourcePath: paths.hooksManifestPath,
-            ...(matcher === undefined ? {} : { matcher }),
-            commandPreview: platformCommand,
-          },
-          entry: {
-            enabled: true,
-            trustedHash,
-            scope: "global",
-            sourcePath: paths.hooksManifestPath,
-            ...(matcher === undefined ? {} : { matcher }),
-            commandPreview: platformCommand,
-            updatedAt,
-          },
-        });
+            pluginRoot: "",
+            manifestPath: "",
+          };
+          const sourceHash = sourceKeyHash(source);
+          const id = `hk_${sourceHash}_${event}_${groupIndex}_${handlerIndex}`;
+          const trustedHash = hashCommandHook({ event, hook, matcher, sourceHash, platformCommand });
+          records.push({
+            id,
+            stableEntry: {
+              enabled: true,
+              trustedHash,
+              scope,
+              sourcePath: paths.hooksManifestPath,
+              ...(matcher === undefined ? {} : { matcher }),
+              commandPreview: platformCommand,
+            },
+            entry: {
+              enabled: true,
+              trustedHash,
+              scope,
+              sourcePath: paths.hooksManifestPath,
+              ...(matcher === undefined ? {} : { matcher }),
+              commandPreview: platformCommand,
+              updatedAt,
+            },
+          });
+        }
       });
     });
   }

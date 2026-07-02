@@ -10,6 +10,8 @@ const hooksPath = join(packageRoot, "senpi/hooks/omo-senpi-hooks.json");
 
 type HookCommand = {
   readonly command: string;
+  readonly component: string;
+  readonly runnerPath: string;
   readonly targetPath: string;
 };
 
@@ -47,13 +49,18 @@ function readGroupCommands(group: unknown): readonly string[] {
 }
 
 function resolveHookCommand(command: string): HookCommand {
-  const match = command.match(/^node "\$\{PLUGIN_ROOT\}\/(.+?)" hook [a-z-]+$/);
+  const match = command.match(
+    /^node "\$\{SENPI_HOOK_SOURCE%\/hooks\/omo-senpi-hooks\.json\}\/components\/run-hook\.mjs" ([a-z0-9-]+) hook [a-z-]+$/,
+  );
   if (match === null || match[1] === undefined) {
     throw new TypeError(`unsupported hook command shape: ${command}`);
   }
+  const component = match[1];
   return {
     command,
-    targetPath: join(packageRoot, match[1]),
+    component,
+    runnerPath: join(packageRoot, "senpi/components/run-hook.mjs"),
+    targetPath: join(packageRoot, "senpi/components", component, "dist/cli.js"),
   };
 }
 
@@ -63,37 +70,37 @@ describe("senpi component hook shims", () => {
     const commands = readHookCommands();
 
     // When: every command target is resolved against the package root.
-    const missingTargets = commands.filter((command) => !existsSync(command.targetPath));
+    const missingTargets = commands.filter((command) =>
+      !existsSync(command.runnerPath) || !existsSync(command.targetPath)
+    );
 
     // Then: commands use the package-owned senpi component tree and every target exists.
     expect(commands.length).toBe(11);
     expect(
       commands.every((command) =>
-        command.command.includes("${PLUGIN_ROOT}/senpi/components/"),
+        command.command.includes("${SENPI_HOOK_SOURCE%/hooks/omo-senpi-hooks.json}/components/run-hook.mjs"),
       ),
     ).toBe(true);
     expect(missingTargets).toEqual([]);
   });
 
   it("runs a packaged senpi component hook command and records a safe marker", () => {
-    // Given: the installed hook command receives PLUGIN_ROOT and PLUGIN_DATA from Senpi.
+    // Given: the installed hook command receives Senpi's hook-source environment.
     const pluginData = mkdtempSync(join(tmpdir(), "omo-ai-component-marker-"));
-    const command = readHookCommands().find((candidate) =>
-      candidate.command.includes("/rules/dist/cli.js"),
-    );
+    const command = readHookCommands().find((candidate) => candidate.component === "rules");
 
     try {
       if (command === undefined) {
         throw new TypeError("rules hook command must exist");
       }
 
-      // When: the component command is run through Node with a temp PLUGIN_DATA.
-      const result = spawnSync("node", [command.targetPath, "hook", "session-start"], {
+      // When: the package hook runner is run with Senpi's hook-source environment.
+      const result = spawnSync("node", [command.runnerPath, "rules", "hook", "session-start"], {
         cwd: packageRoot,
         encoding: "utf8",
         env: {
           ...process.env,
-          PLUGIN_ROOT: packageRoot,
+          SENPI_HOOK_SOURCE: hooksPath,
           PLUGIN_DATA: pluginData,
         },
       });

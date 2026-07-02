@@ -33,13 +33,15 @@ type ExpectedHookRecord = {
   readonly entry: {
     readonly enabled: true;
     readonly trustedHash: string;
-    readonly scope: "global";
+    readonly scope: "global" | "plugin";
     readonly sourcePath: string;
     readonly matcher?: string;
     readonly commandPreview: string;
     readonly updatedAt: string;
   };
 };
+
+const trustedHookScopes = ["global", "plugin"] as const;
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -184,7 +186,9 @@ export function expectedHookRecords(updatedAt: string): readonly ExpectedHookRec
       }
       const matcher = typeof group["matcher"] === "string" ? group["matcher"] : undefined;
       group["hooks"].forEach((hook, handlerIndex) => {
-        records.push(readExpectedHookRecord(event, groupIndex, hook, handlerIndex, matcher));
+        for (const scope of trustedHookScopes) {
+          records.push(readExpectedHookRecord(scope, event, groupIndex, hook, handlerIndex, matcher));
+        }
       });
     });
   }
@@ -192,6 +196,7 @@ export function expectedHookRecords(updatedAt: string): readonly ExpectedHookRec
 }
 
 function readExpectedHookRecord(
+  scope: "global" | "plugin",
   event: string,
   groupIndex: number,
   hook: unknown,
@@ -201,7 +206,7 @@ function readExpectedHookRecord(
   if (!isCommandHook(hook)) {
     throw new TypeError(`${event} hook must be a command hook`);
   }
-  const sourceKeyHash = sha256Hex(["global", hooksPath, "", ""].join("\0")).slice(0, 12);
+  const sourceKeyHash = sha256Hex([scope, hooksPath, "", ""].join("\0")).slice(0, 12);
   const id = `hk_${sourceKeyHash}_${event}_${groupIndex}_${handlerIndex}`;
   const platformCommand = process.platform === "win32" && hook.commandWindows
     ? hook.commandWindows
@@ -225,7 +230,7 @@ function readExpectedHookRecord(
     entry: {
       enabled: true,
       trustedHash,
-      scope: "global",
+      scope,
       sourcePath: hooksPath,
       ...(matcher === undefined ? {} : { matcher }),
       commandPreview: platformCommand,

@@ -85,10 +85,10 @@ describe("omo-ai package skeleton", () => {
     );
     expect(requireRecord(packageManifest, "scripts")["test"]).toBe("bun test ./test");
     expect(requireRecord(packageManifest, "pi")).toEqual({
-      hooks: "./senpi/hooks",
-      skills: "./senpi/skills",
-      prompts: "./senpi/prompts",
-      extensions: "./senpi/extensions",
+      hooks: ["./senpi/hooks"],
+      skills: ["./senpi/skills"],
+      prompts: ["./senpi/prompts"],
+      extensions: ["./senpi/extensions"],
     });
   });
 
