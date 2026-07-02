@@ -29,7 +29,7 @@ const mcpPackagePaths: readonly string[] = [
   "packages/lsp-daemon",
   "packages/lsp-tools-mcp",
 ] as const
-const adapterPackagePaths: readonly string[] = ["packages/omo-codex", "packages/omo-opencode"] as const
+const adapterPackagePaths: readonly string[] = ["packages/omo-ai", "packages/omo-codex", "packages/omo-opencode"] as const
 const skillPackagePaths: readonly string[] = ["packages/shared-skills"] as const
 const shimSourceRoots: readonly string[] = ["packages/omo-opencode/src", "packages/omo-codex/src"] as const
 const reExportShimFirstLinePattern = /^export (\*|\{).*from ["'](@oh-my-opencode\/[^/"']+)/
@@ -222,8 +222,9 @@ describe("package registration audit", () => {
     const actualTypecheckPaths = extractTypecheckPackagePaths(root.scripts["typecheck:packages"] ?? "").filter(
       isRootManagedTypecheckPackage,
     )
+    const expectedDevDependencyNameSet = new Set(expectedDevDependencyNames)
     const actualDevDependencyNames = Object.entries(root.devDependencies)
-      .filter((entry) => entry[1] === "workspace:*" && entry[0].startsWith("@oh-my-opencode/"))
+      .filter((entry) => entry[1] === "workspace:*" && expectedDevDependencyNameSet.has(entry[0]))
       .map((entry) => entry[0])
       .toSorted()
 

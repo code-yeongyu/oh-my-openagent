@@ -50,6 +50,7 @@
         "@types/picomatch": "^4.0.3",
         "@typescript/native-preview": "7.0.0-dev.20260518.1",
         "bun-types": "1.3.14",
+        "omo-ai": "workspace:*",
         "typescript": "^6.0.3",
       },
       "optionalDependencies": {

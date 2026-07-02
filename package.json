@@ -185,6 +185,7 @@
     "@oh-my-opencode/shared-skills": "workspace:*",
     "@oh-my-opencode/telemetry-core": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
+    "omo-ai": "workspace:*",
     "@typescript/native-preview": "7.0.0-dev.20260518.1",
     "@types/js-yaml": "^4.0.9",
     "@types/picomatch": "^4.0.3",
