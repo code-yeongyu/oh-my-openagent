@@ -1,3 +1,5 @@
+import packageManifest from "../../package.json";
+
 export type SenpiPackagePaths = {
   readonly hooks: "./senpi/hooks";
   readonly skills: "./senpi/skills";
@@ -5,7 +7,7 @@ export type SenpiPackagePaths = {
   readonly extensions: "./senpi/extensions";
 };
 
-export const OMO_AI_PACKAGE_VERSION = "4.15.0";
+export const OMO_AI_PACKAGE_VERSION = packageManifest.version;
 
 export const SENPI_PACKAGE_PATHS = {
   hooks: "./senpi/hooks",

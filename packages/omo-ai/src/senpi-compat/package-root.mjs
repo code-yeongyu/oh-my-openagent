@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isRecord } from "./json-file.mjs";
 
-export const OMO_AI_PACKAGE_VERSION = "4.15.0";
+export const OMO_AI_PACKAGE_VERSION = readPackageVersion(findPackageRoot(import.meta.url));
 export const SENPI_CONFIG_DIR_NAME = ".senpi";
 
 export const OMO_PACKAGE_FILTERS = {
@@ -48,6 +48,15 @@ export function senpiPaths(packageRoot, agentDir) {
     settingsPath: join(agentDir, "settings.json"),
     hooksStatePath: join(agentDir, "hooks-state.json"),
   };
+}
+
+function readPackageVersion(packageRoot) {
+  const manifestPath = join(packageRoot, "package.json");
+  const parsed = JSON.parse(readFileSync(manifestPath, "utf8"));
+  if (!isRecord(parsed) || typeof parsed.version !== "string") {
+    throw new Error(`${manifestPath} must declare a package version.`);
+  }
+  return parsed.version;
 }
 
 function expandTilde(input) {

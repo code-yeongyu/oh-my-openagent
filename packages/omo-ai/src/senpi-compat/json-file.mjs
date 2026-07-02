@@ -9,7 +9,13 @@ export function readJsonObject(path, fallback) {
   if (!existsSync(path)) {
     return structuredClone(fallback);
   }
-  const parsed = JSON.parse(readFileSync(path, "utf8"));
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(path, "utf8"));
+  } catch (error) {
+    const originalMessage = error instanceof Error ? error.message : String(error);
+    throw new SyntaxError(`${path} contains invalid JSON. Original parse error: ${originalMessage}`);
+  }
   if (!isRecord(parsed)) {
     throw new TypeError(`${path} must contain a JSON object.`);
   }

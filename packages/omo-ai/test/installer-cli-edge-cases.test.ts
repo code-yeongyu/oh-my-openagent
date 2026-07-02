@@ -26,12 +26,13 @@ describe("omo-ai senpi installer CLI malformed files and defaults", () => {
       const report = parseStdoutJson(repair.stdout);
       const settingsBackups = readdirSync(agentDir).filter((name) => name.startsWith("settings.json.bak."));
 
-      // Then: the structured JSON error is returned with no backup or hook-state side effect.
+      // Then: the structured JSON error is deterministic and returned with no backup or hook-state side effect.
       expect(repair.status).toBe(1);
       expect(repair.stderr).toBe("");
       expect(report["ok"]).toBe(false);
       expect(Array.isArray(report["problems"])).toBe(true);
-      expect(String(report["problems"])).toContain("JSON Parse error");
+      expect(String(report["problems"])).toContain(`${settingsPath} contains invalid JSON`);
+      expect(String(report["problems"])).toContain("Original parse error:");
       expect(readFileSync(settingsPath, "utf8")).toBe("{ malformed json");
       expect(settingsBackups).toEqual([]);
       expect(existsSync(agentFile(agentDir, "hooks-state.json"))).toBe(false);

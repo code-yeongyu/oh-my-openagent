@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { isAbsolute, resolve } from "node:path";
 import { backupIfPresent, isRecord, jsonEqual, readJsonObject, writeJsonObject } from "../senpi-compat/json-file.mjs";
 import {
@@ -135,7 +136,7 @@ function resolvePackageSource(source, baseDir) {
     return resolve(source);
   }
   if (source.startsWith("~/")) {
-    return resolve(process.env.HOME ?? "", source.slice(2));
+    return resolve(process.env.HOME || process.env.USERPROFILE || homedir(), source.slice(2));
   }
   return resolve(baseDir, source);
 }
