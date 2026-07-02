@@ -152,6 +152,16 @@
       "name": "@oh-my-opencode/model-core",
       "version": "0.1.0",
     },
+    "packages/omo-ai": {
+      "name": "omo-ai",
+      "version": "4.15.0",
+      "bin": {
+        "omo-ai": "./src/cli/index.mjs",
+      },
+      "devDependencies": {
+        "bun-types": "1.3.14",
+      },
+    },
     "packages/omo-codex": {
       "name": "@oh-my-opencode/omo-codex",
       "version": "4.15.0",
@@ -682,6 +692,8 @@
     "object-assign": ["object-assign@4.1.1", "", {}, "sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg=="],
 
     "object-inspect": ["object-inspect@1.13.4", "", {}, "sha512-W67iLl4J2EXEGTbfeHCffrjDfitvLANg0UlX3wFUUSTx92KXRFegMHUVgSqE+wvhAbi4WqjGg9czysTV2Epbew=="],
+
+    "omo-ai": ["omo-ai@workspace:packages/omo-ai"],
 
     "on-finished": ["on-finished@2.4.1", "", { "dependencies": { "ee-first": "1.1.1" } }, "sha512-oVlzkg3ENAhCk2zdv7IJwd/QUD4z2RxRwpkcGY8psCVcCYZNq4wYnVWALHM+brtuJjePWiYF/ClmuDr8Ch5+kg=="],
 
