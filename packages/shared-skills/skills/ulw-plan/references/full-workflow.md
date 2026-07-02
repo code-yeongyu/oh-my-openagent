@@ -36,7 +36,7 @@ Make ONE judgment and follow ONE reference. Review modifiers are not routing sig
 - CLEAR -> `intent-clear.md`: run the **two filters** on every candidate question; ask only surviving forks (owner-decisions), with WHY.
 - UNCLEAR -> `intent-unclear.md`: research maximally, adopt announced best-practice defaults, do not ask the user extra questions.
 
-If a draft/plan already exists and the user asks for high-accuracy review, high-accuracy planning, or to make the plan more accurate, do not reroute from scratch unless the scope changed. Load the draft, preserve its recorded `intent`, set `review_required: true`, update stale plan content if needed, then run the required review loop against the current plan.
+If a draft/plan already exists and the user says a review modifier - even appended to an otherwise unrelated follow-up question - or asks to make the plan more accurate, do not reroute from scratch unless the scope changed. Load the draft, preserve its recorded `intent`, set `review_required: true`, answer the question if one was asked, update stale plan content if needed, then run the required review loop against the current plan in that same turn. A more rigorous answer is not a substitute for the review.
 
 Both paths record `intent`, `review_required`, and decisions to `.omo/drafts/<slug>.md` as they go - long sessions outlive your context, and plan generation reads the draft, not your memory.
 

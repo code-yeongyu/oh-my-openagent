@@ -15,9 +15,12 @@ Outcome-first: explore a lot, ask few sharp questions - or none, when the intent
 
 ## INTENT ROUTING - pick ONE intent reference
 
-Before routing, parse review modifiers separately. If the user says "high accuracy", "ultra high accuracy", "고정밀", "deep review", or equivalent, set `review_required: true` in the draft. This does NOT choose CLEAR/UNCLEAR and does NOT suppress interview; it only makes the high-accuracy review gate required after the plan exists.
+**Review modifiers are a gate trigger, not a style cue.** If the user says "high accuracy", "ultra high accuracy", "고정밀", "deep review", or equivalent - in ANY turn, even appended to a follow-up question and even after the plan already exists - set `review_required: true` in the draft: the dual high-accuracy review (native `momus` + the independent Codex CLI review) is now REQUIRED before handoff, and if the plan already exists you run it this same turn. Answering the current question more carefully does NOT satisfy it. This does NOT choose CLEAR/UNCLEAR and does NOT suppress interview.
 
-After grounding, make ONE judgment, record `intent: clear|unclear` plus `review_required`, and load ONE intent reference (you ALSO read `references/full-workflow.md` for the shared mechanics - see below). The test keys on whether the desired **OUTCOME** is clear, NOT on request length.
+After grounding, make ONE judgment, record `intent: clear|unclear` plus `review_required`, **ANNOUNCE both to the user in one line**, then load ONE intent reference (you ALSO read `references/full-workflow.md` for the shared mechanics - see below). The test keys on whether the desired **OUTCOME** is clear, NOT on request length. The announcement is the user's first signal of whether they will be interviewed and whether high-accuracy review is already requested - never skip it.
+
+> "Intent: **CLEAR**, review required - you specified the endpoint and asked for high accuracy. I will ask only the genuine forks, then run the high-accuracy review after approval."
+> "Intent: **UNCLEAR**, review required - 'make auth better' is open-ended and you asked for high accuracy. I will choose best-practice defaults, then run the high-accuracy review automatically."
 
 - **OVERRIDE - explicit ask wins:** if the user explicitly asks to be questioned or interviewed ("ask me", "interview me", "why aren't you asking me" - in any language), route **CLEAR**, run the interview, and turn the adopt-default filter OFF: the user has claimed the forks, so every surviving one is ASKED, not defaulted. This beats the OUTCOME test below, even on a fuzzy brief.
 - **CLEAR** - the user knows the outcome; the only open items are preferences/tradeoffs the repo cannot answer (genuine owner-decisions). Read **`references/intent-clear.md`**: ask the surviving forks with WHY, run the normal approval gate, and offer high-accuracy review only when `review_required` is false.
