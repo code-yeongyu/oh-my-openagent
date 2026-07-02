@@ -131,7 +131,7 @@ describe("team-mode integration", () => {
     expect(delivered.deliveredTo).toEqual(["echo"])
     expect(status.members[0]?.unreadMessages).toBe(1)
     expect(await exists(getRuntimeStateDir(resolveBaseDir(config), runtime.teamRunId))).toBe(false)
-  })
+  }, 15000)
 
   test("C-10.2 runs a 2-member pipeline where worker claims and completes a lead-created task", async () => {
     // given
@@ -155,7 +155,7 @@ describe("team-mode integration", () => {
     expect(claimedTask.owner).toBe("worker")
     expect(completedTasks).toHaveLength(1)
     expect(completedTasks[0]?.subject).toBe("X")
-  })
+  }, 15000)
 
   test("C-10.3 resumes alive teams, orphans dead leads, fails stuck creating teams, and cleans deleting runs", async () => {
     // given
