@@ -23,7 +23,7 @@
 |------|---------|------------|
 | `task` | `createDelegateTask` | description, prompt, category, subagent_type, run_in_background, session_id, load_skills, command |
 
-**8 Built-in Categories**: visual-engineering, ultrabrain, deep, artistry, quick, unspecified-low, unspecified-high, writing
+**13 Built-in Categories**: visual-engineering, ultrabrain, deep, artistry, quick, unspecified-low, unspecified-high, writing, deepseek-pro, deepseek-flash, secondary-reasoning, mechanical-coding, bulk-maintenance
 
 ### Agent Invocation (1)
 
@@ -99,6 +99,11 @@
 | unspecified-low | claude-sonnet-4-6 | Moderate effort |
 | unspecified-high | claude-opus-4-6 max | High effort |
 | writing | gemini-3-flash | Documentation |
+| deepseek-pro | deepseek-v4-pro high | Active secondary reasoning/coding |
+| deepseek-flash | deepseek-v4-flash medium | Fast mechanical lane |
+| secondary-reasoning | deepseek-v4-pro high | Bounded secondary reasoning |
+| mechanical-coding | deepseek-v4-flash medium | Mechanical code edits |
+| bulk-maintenance | deepseek-v4-flash medium | Repetitive maintenance |
 
 ## HOW TO ADD A TOOL
 

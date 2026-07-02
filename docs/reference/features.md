@@ -117,6 +117,11 @@ By combining these two concepts, you can generate optimal agents through `task`.
 | `unspecified-low`    | `anthropic/claude-sonnet-4-6`   | Tasks that don't fit other categories, low effort required                                                                  |
 | `unspecified-high`   | `anthropic/claude-opus-4-6` (max) | Tasks that don't fit other categories, high effort required                                                               |
 | `writing`            | `google/gemini-3-flash`         | Documentation, prose, technical writing                                                                                     |
+| `deepseek-pro`       | `deepseek/deepseek-v4-pro` (high) | Active secondary reasoning and coding for bounded implementation, constrained debugging, tests, and analysis               |
+| `deepseek-flash`     | `deepseek/deepseek-v4-flash` (medium) | Fast active secondary lane for repetitive, mechanical, low-risk, or high-volume work                                  |
+| `secondary-reasoning` | `deepseek/deepseek-v4-pro` (high) | Cost-conscious reasoning for bounded problems, known-module debugging, and planned implementation                         |
+| `mechanical-coding`  | `deepseek/deepseek-v4-flash` (medium) | Mechanical edits, simple migrations, formatting, rename sweeps, boilerplate, and small fixes                          |
+| `bulk-maintenance`   | `deepseek/deepseek-v4-flash` (medium) | Repetitive hygiene, documentation cleanup, lint-style edits, generated small tests, and batch transforms              |
 
 ### Usage
 

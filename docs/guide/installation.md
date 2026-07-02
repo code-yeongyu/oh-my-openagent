@@ -98,7 +98,7 @@ Spawn a subagent to handle installation and report back - to save context.
 Based on user's answers, run the CLI installer with appropriate flags:
 
 ```bash
-bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--openai=<yes|no>] [--opencode-go=<yes|no>] [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>]
+bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--openai=<yes|no>] [--opencode-go=<yes|no>] [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>] [--preset foundationstart]
 ```
 
 **Examples:**
@@ -116,6 +116,7 @@ The CLI will:
 
 - Register the plugin in `opencode.json`
 - Configure agent models based on subscription flags
+- Optionally append FoundationStart startup guidance to the core relay agents when `--preset foundationstart` is used
 - Show which auth steps are needed
 
 ### Step 3: Verify Setup
@@ -133,6 +134,64 @@ bunx oh-my-opencode doctor
 ```
 
 This checks system, config, tools, and model resolution, including legacy package name warnings and compatibility-fallback diagnostics.
+
+### FoundationStart preset scope
+
+`--preset foundationstart` is meant for FoundationStart-style workspaces.
+
+Default workspace root:
+
+- `C:\OpenCodeWorkingFolder`
+
+To target a different workspace root, set this before running install:
+
+```bash
+FOUNDATIONSTART_WORKSPACE_ROOT=/path/to/your/workspace
+```
+
+### Maintainer packaged smoke validation
+
+To verify the **packaged** FoundationStart preset path instead of only the workspace implementation, run:
+
+```bash
+bun run smoke:foundationstart-preset
+```
+
+This builds the package, packs it, installs it into a disposable smoke root, runs `install --preset foundationstart`, runs `doctor --json`, and records provenance/report output under:
+
+- `C:\OpenCodeWorkingFolder\simulations\oh-my-openagent-packaged-smoke`
+
+To verify that the **packaged build** also contains the delayed provider-warning behavior and no longer ships the legacy warning text, run:
+
+```bash
+bun run smoke:provider-warning
+```
+
+This reuses the packaged smoke root and writes a second report confirming the installed package contains the delayed-warning state machine and the new warning text, plus focused workspace runtime tests for the same warning path.
+
+### Claude-mem adapter smoke validation
+
+After enabling `claude_mem` in your plugin config, you can run a non-live adapter smoke check:
+
+```bash
+bun run smoke:claude-mem-adapter --output-root "C:\OpenCodeWorkingFolder\.sisyphus\evidence" --windows-path "C:\Temp\Claude Mem Test"
+```
+
+This does **not** require live provider credentials by default. It verifies:
+
+- config parsing
+- workspace-scoped runtime layout
+- capability surface (`search`, `timeline`, `get_observations`)
+- Windows-style path handling
+- degraded-mode launch contract (`launch-required` instead of fake success)
+
+Use this together with:
+
+```bash
+bunx oh-my-opencode doctor
+```
+
+The doctor command checks the host environment/config generally. The dedicated claude-mem smoke command is the precise adapter verification path in wave 1.
 
 ### Step 4: Configure Authentication
 

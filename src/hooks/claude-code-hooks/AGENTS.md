@@ -6,6 +6,12 @@
 
 ~2110 LOC across 19 files. Provides Claude Code settings.json compatibility layer. Parses CC permission rules and maps CC hooks (PreToolUse, PostToolUse) to OpenCode hooks.
 
+## Migration status
+
+- This module remains an internal compatibility shim during the ChatGPT/Codex-first migration.
+- Public/default-facing discovery now prefers generic `code-hooks` paths and aliases.
+- Do not rename or remove this module until compatibility aliases and downstream callers are proven stable.
+
 ## WHAT IT DOES
 
 1. Parses Claude Code `settings.json` permission format

@@ -303,6 +303,11 @@ task({ category: "quick", prompt: "..." }); // "Just get it done fast"
 | `unspecified-low`    | Claude Sonnet 4.6      | Tasks that don't fit other categories, low effort           |
 | `unspecified-high`   | Claude Opus 4.6 (max)  | Tasks that don't fit other categories, high effort          |
 | `writing`            | Gemini 3 Flash         | Documentation, prose, technical writing                     |
+| `deepseek-pro`       | DeepSeek V4 Pro (high) | Active secondary reasoning and bounded coding               |
+| `deepseek-flash`     | DeepSeek V4 Flash      | Fast mechanical, repetitive, low-risk work                  |
+| `secondary-reasoning` | DeepSeek V4 Pro       | Cost-conscious bounded reasoning and known-module debugging |
+| `mechanical-coding`  | DeepSeek V4 Flash      | Mechanical edits, boilerplate, simple migrations            |
+| `bulk-maintenance`   | DeepSeek V4 Flash      | Repetitive maintenance, cleanup, predictable transforms     |
 
 ### Skills: Domain-Specific Instructions
 

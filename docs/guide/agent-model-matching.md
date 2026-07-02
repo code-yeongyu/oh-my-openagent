@@ -130,6 +130,8 @@ Principle-driven, explicit reasoning, deep technical capability. Best for agents
 | -------------------- | ------------------------------------------------------------------------------------------------------------ |
 | **Gemini 3.1 Pro**   | Excels at visual/frontend tasks. Different reasoning style. Default for `visual-engineering` and `artistry`. |
 | **Gemini 3 Flash**   | Fast. Good for doc search and light tasks.                                                                   |
+| **DeepSeek V4 Pro**  | Cost-conscious active secondary reasoning and coding. Good for bounded implementation, constrained debugging, tests, and code analysis. |
+| **DeepSeek V4 Flash** | Fast active secondary lane for mechanical edits, repetitive cleanup, boilerplate, simple tests, and predictable maintenance. |
 | **Grok Code Fast 1** | Blazing fast code grep. Default for Explore agent.                                                           |
 | **MiniMax M2.7**     | Fast and smart. Used in OpenCode Go and OpenCode Zen utility fallback chains. |
 | **MiniMax M2.7 Highspeed** | High-speed OpenCode catalog entry used in utility fallback chains that prefer the fastest available MiniMax path. |
@@ -177,6 +179,11 @@ When agents delegate work, they don't pick a model name — they pick a **catego
 | `unspecified-high`   | General complex work       | anthropic\|github-copilot\|opencode/claude-opus-4-6 (max) → openai\|github-copilot\|opencode/gpt-5.4 (high) → zai-coding-plan\|opencode/glm-5 → kimi-for-coding/k2p5 → opencode-go/glm-5 → opencode/kimi-k2.5 → opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k2.5 |
 | `unspecified-low`    | General standard work      | anthropic\|github-copilot\|opencode/claude-sonnet-4-6 → openai\|opencode/gpt-5.3-codex (medium) → opencode-go/kimi-k2.5 → google\|github-copilot\|opencode/gemini-3-flash → opencode-go/minimax-m2.7 |
 | `writing`            | Text, docs, prose          | google\|github-copilot\|opencode/gemini-3-flash → opencode-go/kimi-k2.5 → anthropic\|github-copilot\|opencode/claude-sonnet-4-6 → opencode-go/minimax-m2.7 |
+| `deepseek-pro`       | Secondary reasoning/coding | deepseek/deepseek-v4-pro (high) → deepseek/deepseek-v4-flash (high) → openai/gpt-5.5 (medium) |
+| `deepseek-flash`     | Mechanical/repetitive work | deepseek/deepseek-v4-flash (medium) → deepseek/deepseek-v4-pro (medium) → github-copilot/gpt-5-mini |
+| `secondary-reasoning` | Bounded reasoning         | deepseek/deepseek-v4-pro (high) → openai/gpt-5.5 (medium) |
+| `mechanical-coding`  | Mechanical code edits      | deepseek/deepseek-v4-flash (medium) → deepseek/deepseek-v4-pro (medium) |
+| `bulk-maintenance`   | Repetitive maintenance     | deepseek/deepseek-v4-flash (medium) → deepseek/deepseek-v4-pro (medium) |
 
 See the [Orchestration System Guide](./orchestration.md) for how agents dispatch tasks to categories.
 

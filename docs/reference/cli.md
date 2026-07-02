@@ -56,6 +56,7 @@ bunx oh-my-opencode install
 | `--zai-coding-plan <no\|yes>` | Z.ai Coding Plan subscription |
 | `--kimi-for-coding <no\|yes>` | Kimi for Coding subscription |
 | `--opencode-go <no\|yes>` | OpenCode Go subscription |
+| `--preset <name>` | Optional installer preset, currently `foundationstart` (workspace-root configurable via `FOUNDATIONSTART_WORKSPACE_ROOT`) |
 | `--skip-auth` | Skip authentication setup hints |
 
 ---
@@ -69,6 +70,7 @@ The doctor command detects common issues including:
 - Configuration file validity and JSONC parsing errors
 - Model resolution and fallback chain verification
 - Missing or misconfigured MCP servers
+- General prerequisite validation before running optional adapter smoke checks such as `bun run smoke:claude-mem-adapter`
 ### Usage
 
 ```bash
@@ -120,6 +122,15 @@ Models
 
 Summary: 10 passed, 1 warning, 0 failed
 ```
+
+For the native `claude-mem` adapter, pair doctor with the dedicated non-live smoke check:
+
+```bash
+bunx oh-my-opencode doctor
+bun run smoke:claude-mem-adapter --output-root "C:\OpenCodeWorkingFolder\.sisyphus\evidence" --windows-path "C:\Temp\Claude Mem Test"
+```
+
+Wave-1 note: doctor is the general host health command; the claude-mem smoke command is the adapter-specific verification path.
 ---
 
 ## run
