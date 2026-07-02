@@ -320,8 +320,9 @@ Principle-driven, explicit reasoning, deep technical capability. Best for agents
 | -------------------- | ------------------------------------------------------------------------------------------------------------ |
 | **Gemini 3.1 Pro**   | Excels at visual/frontend tasks. Different reasoning style. Default for `visual-engineering` and `artistry`. |
 | **Gemini 3 Flash**   | Fast. Good for doc search and light tasks.                                                                   |
-| **GPT-5.4 Mini Fast** | Default for Explore and Librarian agents. Blazing-fast reasoning-capable mini model. |
-| **MiniMax M3**       | Latest MiniMax flagship. Primary MiniMax fallback in OpenCode Go utility chains, ahead of M2.7. |
+| **DeepSeek V4 Pro**  | Cost-conscious active secondary reasoning and coding. Good for bounded implementation, constrained debugging, tests, and code analysis. |
+| **DeepSeek V4 Flash** | Fast active secondary lane for mechanical edits, repetitive cleanup, boilerplate, simple tests, and predictable maintenance. |
+| **Grok Code Fast 1** | Blazing fast code grep. Default for Explore agent.                                                           |
 | **MiniMax M2.7**     | Fast and smart. Used in OpenCode Go and OpenCode Zen utility fallback chains. |
 | **MiniMax M2.7 Highspeed** | High-speed OpenCode catalog entry used in utility fallback chains that prefer the fastest available MiniMax path. |
 
@@ -359,16 +360,21 @@ You don't need to configure them. The system includes them so it degrades gracef
 
 When agents delegate work, they don't pick a model name — they pick a **category**. The category maps to the right model automatically.
 
-| Category | Used For | Default Model | Fallback Chain |
-|---|---|---|---|
-| `visual-engineering` | Frontend, UI, CSS, design | `google/gemini-3.1-pro` (high) | Gemini → `zai-coding-plan/glm-5` → `claude-opus-4-7` (max) → `opencode-go/glm-5.1` → `kimi-for-coding/k2p5` |
-| `artistry` | Creative, novel approaches | `google/gemini-3.1-pro` (high) | Gemini → `claude-opus-4-7` (max) → `gpt-5.5` |
-| `ultrabrain` | Maximum reasoning needed | `openai/gpt-5.5` (xhigh) | GPT-5.5 xhigh → `gemini-3.1-pro` (high) → `claude-opus-4-7` (max) → `opencode-go/glm-5.1` |
-| `deep` | Deep coding, complex logic | `openai/gpt-5.5` (medium) | GPT-5.5 → `claude-opus-4-7` (max) → `gemini-3.1-pro` (high) |
-| `quick` | Simple, fast tasks | `openai/gpt-5.4-mini` | GPT-5.4-mini → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `gemini-3-flash` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` → `opencode/gpt-5-nano` |
-| `unspecified-high` | General complex work | `anthropic/claude-opus-4-7` (max) | Opus → `gpt-5.5` (high) → `zai-coding-plan/glm-5` → `kimi-for-coding/k2p5` → `opencode-go/glm-5.1` → `opencode/kimi-k2.5` → `moonshotai/kimi-k2.5` |
-| `unspecified-low` | General standard work | `anthropic/claude-sonnet-4-6` | Sonnet → `gpt-5.5-codex` (medium) → `opencode-go/kimi-k2.6` → `google/gemini-3-flash` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` |
-| `writing` | Text, docs, prose | `kimi-for-coding/k2p5` | `gemini-3-flash` → `opencode-go/kimi-k2.6` → `claude-sonnet-4-6` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` |
+| Category             | When Used                  | Fallback Chain                               |
+| -------------------- | -------------------------- | -------------------------------------------- |
+| `visual-engineering` | Frontend, UI, CSS, design  | google\|github-copilot\|opencode/gemini-3.1-pro (high) → zai-coding-plan\|opencode/glm-5 → anthropic\|github-copilot\|opencode/claude-opus-4-6 (max) → opencode-go/glm-5 → kimi-for-coding/k2p5 |
+| `ultrabrain`         | Maximum reasoning needed   | openai\|opencode/gpt-5.4 (xhigh) → google\|github-copilot\|opencode/gemini-3.1-pro (high) → anthropic\|github-copilot\|opencode/claude-opus-4-6 (max) → opencode-go/glm-5 |
+| `deep`               | Deep coding, complex logic | openai\|github-copilot\|venice\|opencode/gpt-5.4 (medium) → anthropic\|github-copilot\|opencode/claude-opus-4-6 (max) → google\|github-copilot\|opencode/gemini-3.1-pro (high) |
+| `artistry`           | Creative, novel approaches | google\|github-copilot\|opencode/gemini-3.1-pro (high) → anthropic\|github-copilot\|opencode/claude-opus-4-6 (max) → openai\|github-copilot\|opencode/gpt-5.4 |
+| `quick`              | Simple, fast tasks         | openai\|github-copilot\|opencode/gpt-5.4-mini → anthropic\|github-copilot\|opencode/claude-haiku-4-5 → google\|github-copilot\|opencode/gemini-3-flash → opencode-go/minimax-m2.7 → opencode/gpt-5-nano |
+| `unspecified-high`   | General complex work       | anthropic\|github-copilot\|opencode/claude-opus-4-6 (max) → openai\|github-copilot\|opencode/gpt-5.4 (high) → zai-coding-plan\|opencode/glm-5 → kimi-for-coding/k2p5 → opencode-go/glm-5 → opencode/kimi-k2.5 → opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k2.5 |
+| `unspecified-low`    | General standard work      | anthropic\|github-copilot\|opencode/claude-sonnet-4-6 → openai\|opencode/gpt-5.3-codex (medium) → opencode-go/kimi-k2.5 → google\|github-copilot\|opencode/gemini-3-flash → opencode-go/minimax-m2.7 |
+| `writing`            | Text, docs, prose          | google\|github-copilot\|opencode/gemini-3-flash → opencode-go/kimi-k2.5 → anthropic\|github-copilot\|opencode/claude-sonnet-4-6 → opencode-go/minimax-m2.7 |
+| `deepseek-pro`       | Secondary reasoning/coding | deepseek/deepseek-v4-pro (high) → deepseek/deepseek-v4-flash (high) → openai/gpt-5.5 (medium) |
+| `deepseek-flash`     | Mechanical/repetitive work | deepseek/deepseek-v4-flash (medium) → deepseek/deepseek-v4-pro (medium) → github-copilot/gpt-5-mini |
+| `secondary-reasoning` | Bounded reasoning         | deepseek/deepseek-v4-pro (high) → openai/gpt-5.5 (medium) |
+| `mechanical-coding`  | Mechanical code edits      | deepseek/deepseek-v4-flash (medium) → deepseek/deepseek-v4-pro (medium) |
+| `bulk-maintenance`   | Repetitive maintenance     | deepseek/deepseek-v4-flash (medium) → deepseek/deepseek-v4-pro (medium) |
 
 See the [Orchestration System Guide](./orchestration.md) for how agents dispatch tasks to categories.
 

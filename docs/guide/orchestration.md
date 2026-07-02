@@ -318,15 +318,21 @@ task({ category: "quick", prompt: "..." }); // "Just get it done fast"
 
 ### Delegate-Task Categories
 
-`task(category="...")` supports these category names in user-facing orchestration:
-
-`visual-engineering`, `artistry`, `ultrabrain`, `deep`, `quick`, `unspecified-low`, `unspecified-high`, `writing`, `quick-rust`, `quick-zig`, `git`
-
-Notes:
-
-- Built-in defaults are defined in `packages/omo-opencode/src/tools/delegate-task/*-categories.ts` and `packages/omo-opencode/src/shared/model-requirements.ts`
-- Projects/users can extend categories via config; additional category names may appear in your session prompt
-- Regardless of category name, category dispatch goes through Sisyphus-Junior
+| Category             | Model                  | When to Use                                                 |
+| -------------------- | ---------------------- | ----------------------------------------------------------- |
+| `visual-engineering` | Gemini 3.1 Pro         | Frontend, UI/UX, design, styling, animation                 |
+| `ultrabrain`         | GPT-5.4 (xhigh)        | Deep logical reasoning, complex architecture decisions      |
+| `artistry`           | Gemini 3.1 Pro (high)  | Highly creative or artistic tasks, novel ideas              |
+| `quick`              | GPT-5.4 Mini           | Trivial tasks - single file changes, typo fixes             |
+| `deep`               | GPT-5.4 (medium)       | Goal-oriented autonomous problem-solving, thorough research |
+| `unspecified-low`    | Claude Sonnet 4.6      | Tasks that don't fit other categories, low effort           |
+| `unspecified-high`   | Claude Opus 4.6 (max)  | Tasks that don't fit other categories, high effort          |
+| `writing`            | Gemini 3 Flash         | Documentation, prose, technical writing                     |
+| `deepseek-pro`       | DeepSeek V4 Pro (high) | Active secondary reasoning and bounded coding               |
+| `deepseek-flash`     | DeepSeek V4 Flash      | Fast mechanical, repetitive, low-risk work                  |
+| `secondary-reasoning` | DeepSeek V4 Pro       | Cost-conscious bounded reasoning and known-module debugging |
+| `mechanical-coding`  | DeepSeek V4 Flash      | Mechanical edits, boilerplate, simple migrations            |
+| `bulk-maintenance`   | DeepSeek V4 Flash      | Repetitive maintenance, cleanup, predictable transforms     |
 
 ### Skills: Domain-Specific Instructions
 

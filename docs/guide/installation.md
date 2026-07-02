@@ -289,20 +289,7 @@ $env:OMO_CODEX_GIT_BASH_PATH = "C:\Program Files\Git\bin\bash.exe"
 Run with the platform flag and the subscription flags you collected in Step 0:
 
 ```bash
-bunx oh-my-openagent install \
-  --no-tui \
-  --platform=<opencode|codex|both> \
-  [--claude=<yes|no|max20>] \
-  [--gemini=<yes|no>] \
-  [--copilot=<yes|no>] \
-  [--openai=<yes|no>] \
-  [--opencode-zen=<yes|no>] \
-  [--zai-coding-plan=<yes|no>] \
-  [--opencode-go=<yes|no>] \
-  [--kimi-for-coding=<yes|no>] \
-  [--vercel-ai-gateway=<yes|no>] \
-  [--codex-autonomous|--no-codex-autonomous] \
-  [--skip-auth]
+bunx oh-my-opencode install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--openai=<yes|no>] [--opencode-go=<yes|no>] [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>] [--preset foundationstart]
 ```
 
 `--platform` defaults to `opencode` if omitted. Subscription flags only apply when `--platform` is `opencode` or `both`. They are rejected under `--platform=codex` because the Light edition does not write OpenCode model config. `--codex-autonomous` only has an effect when the selected platform includes Codex.
@@ -332,7 +319,10 @@ bunx oh-my-openagent install \
 
 **About the `lazycodex-ai` bin name.** `lazycodex-ai` is the npm package and bin alias for the Codex Light Node installer. `lazycodex` (without the `-ai` suffix) is the GitHub repository that hosts the marketplace bundle. `lazycodex-ai install` does not require Bun. The Codex marketplace name is `sisyphuslabs`, and the plugin name is `omo`.
 
-**What the installer does:**
+- Register the plugin in `opencode.json`
+- Configure agent models based on subscription flags
+- Optionally append FoundationStart startup guidance to the core relay agents when `--preset foundationstart` is used
+- Show which auth steps are needed
 
 | Platform | Writes |
 |----------|--------|
@@ -381,7 +371,65 @@ where bash
 
 If any of these come back empty, re-run `npx lazycodex-ai install` — the installer is idempotent and will recompute hook trust hashes.
 
-### Step 4: Configure authentication
+### FoundationStart preset scope
+
+`--preset foundationstart` is meant for FoundationStart-style workspaces.
+
+Default workspace root:
+
+- `C:\OpenCodeWorkingFolder`
+
+To target a different workspace root, set this before running install:
+
+```bash
+FOUNDATIONSTART_WORKSPACE_ROOT=/path/to/your/workspace
+```
+
+### Maintainer packaged smoke validation
+
+To verify the **packaged** FoundationStart preset path instead of only the workspace implementation, run:
+
+```bash
+bun run smoke:foundationstart-preset
+```
+
+This builds the package, packs it, installs it into a disposable smoke root, runs `install --preset foundationstart`, runs `doctor --json`, and records provenance/report output under:
+
+- `C:\OpenCodeWorkingFolder\simulations\oh-my-openagent-packaged-smoke`
+
+To verify that the **packaged build** also contains the delayed provider-warning behavior and no longer ships the legacy warning text, run:
+
+```bash
+bun run smoke:provider-warning
+```
+
+This reuses the packaged smoke root and writes a second report confirming the installed package contains the delayed-warning state machine and the new warning text, plus focused workspace runtime tests for the same warning path.
+
+### Claude-mem adapter smoke validation
+
+After enabling `claude_mem` in your plugin config, you can run a non-live adapter smoke check:
+
+```bash
+bun run smoke:claude-mem-adapter --output-root "C:\OpenCodeWorkingFolder\.sisyphus\evidence" --windows-path "C:\Temp\Claude Mem Test"
+```
+
+This does **not** require live provider credentials by default. It verifies:
+
+- config parsing
+- workspace-scoped runtime layout
+- capability surface (`search`, `timeline`, `get_observations`)
+- Windows-style path handling
+- degraded-mode launch contract (`launch-required` instead of fake success)
+
+Use this together with:
+
+```bash
+bunx oh-my-opencode doctor
+```
+
+The doctor command checks the host environment/config generally. The dedicated claude-mem smoke command is the precise adapter verification path in wave 1.
+
+### Step 4: Configure Authentication
 
 #### Codex CLI
 

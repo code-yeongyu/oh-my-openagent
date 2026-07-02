@@ -47,7 +47,7 @@ Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `sr
 | `team_status` | Full team run status (members, tasks, mailbox) |
 | `team_list` | List declared + active teams |
 
-## DELEGATION CATEGORIES (built-in 8)
+## DELEGATION CATEGORIES (built-in 13)
 
 `task` (delegate) selects model by category. Default category models live in provider-specific files under `src/tools/delegate-task/` and aggregate via `BUILTIN_CATEGORIES` in `builtin-categories.ts`. Authoritative fallback chains in [`src/shared/model-requirements.ts`](../shared/model-requirements.ts) `CATEGORY_MODEL_REQUIREMENTS`.
 
@@ -61,6 +61,11 @@ Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `sr
 | `unspecified-low` | anthropic/claude-sonnet-4-6 | anthropic-categories.ts | Moderate effort fallback |
 | `unspecified-high` | anthropic/claude-opus-4-7 (variant: max) | anthropic-categories.ts | High effort fallback |
 | `writing` | kimi-for-coding/k2p5 (default) → gemini-3-flash (first fallback) | kimi-categories.ts | Documentation, prose |
+| `deepseek-pro` | deepseek/deepseek-v4-pro (variant: high) | delegate-task/ | Active secondary reasoning and coding |
+| `deepseek-flash` | deepseek/deepseek-v4-flash (variant: medium) | delegate-task/ | Mechanical/repetitive work |
+| `secondary-reasoning` | deepseek/deepseek-v4-pro (variant: high) | delegate-task/ | Bounded reasoning |
+| `mechanical-coding` | deepseek/deepseek-v4-flash (variant: medium) | delegate-task/ | Mechanical code edits |
+| `bulk-maintenance` | deepseek/deepseek-v4-flash (variant: medium) | delegate-task/ | Repetitive maintenance |
 
 User-defined categories declared in `categories: { ... }` config override and extend this set.
 
