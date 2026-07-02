@@ -12,7 +12,7 @@ import { createKeywordDetectorHook } from "../hooks/keyword-detector"
 import { createStartWorkHook } from "../hooks/start-work"
 import { getAgentListDisplayName } from "../shared/agent-display-names"
 import { getOmoOpenCodeCacheDir, getOpenCodeCacheDir } from "../shared/data-path"
-import { OMO_INTERNAL_INITIATOR_MARKER } from "../shared/internal-initiator-marker"
+import { OMO_INTERNAL_INITIATOR_MARKER, OMO_INTERNAL_INITIATOR_METADATA_KEY } from "../shared/internal-initiator-marker"
 import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state"
 import { createChatMessageHandler } from "./chat-message"
 import type { PluginContext } from "./types"
@@ -126,7 +126,14 @@ describe("createChatMessageHandler - synthetic/internal messages", () => {
     const handler = createChatMessageHandler(args)
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: `/commit\n${OMO_INTERNAL_INITIATOR_MARKER}` }],
+      parts: [
+        {
+          type: "text",
+          text: `/commit\n${OMO_INTERNAL_INITIATOR_MARKER}`,
+          synthetic: true,
+          metadata: { [OMO_INTERNAL_INITIATOR_METADATA_KEY]: true },
+        },
+      ],
     }
 
     // when
