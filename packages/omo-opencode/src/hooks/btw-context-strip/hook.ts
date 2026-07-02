@@ -148,22 +148,16 @@ function removeMessagesInPlace(messages: MessageWithParts[], stripIndices: Set<n
   }
 }
 
-function stripMarkedMessagesOnly(output: BtwContextStripOutput, isMarked: BtwMarkerPredicate): void {
+function applyFailClosedStrip(output: BtwContextStripOutput, isMarked: BtwMarkerPredicate): void {
   try {
     if (!Array.isArray(output.messages)) {
       return
     }
 
-    const stripIndices = new Set<number>()
-    for (let index = 0; index < output.messages.length; index += 1) {
-      if (isMarkedFailClosed(output.messages[index], isMarked)) {
-        stripIndices.add(index)
-      }
-    }
-
+    const stripIndices = computeFailClosedStripIndices(output.messages, isMarked)
     removeMessagesInPlace(output.messages, stripIndices)
   } catch (error) {
-    log("[btw-context-strip] fail-closed marker-only strip failed", { error: String(error) })
+    log("[btw-context-strip] fail-closed strip failed", { error: String(error) })
   }
 }
 
@@ -188,7 +182,7 @@ export function createBtwContextStripHook(isMarked: BtwMarkerPredicate) {
       removeMessagesInPlace(output.messages, safeStripIndices)
     } catch (error) {
       log("[btw-context-strip] unexpected strip failure", { error: String(error) })
-      stripMarkedMessagesOnly(output, isMarked)
+      applyFailClosedStrip(output, isMarked)
     }
   }
 }

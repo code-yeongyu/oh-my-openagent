@@ -284,4 +284,34 @@ describe("createBtwContextStripHook", () => {
       })
     })
   })
+
+  describe("#given the main strip path throws after computing strip indices", () => {
+    describe("#when the fail-closed fallback runs", () => {
+      it("#then still strips the /btw answer so the private secret cannot leak", async () => {
+        const opening = buildUserMessage("public opening")
+        const pair = buildBtwPair(TEST_MARKER, SECRET)
+        const followUp = buildUserMessage("continue publicly")
+        const messages = [opening, pair.btwUser, pair.btwAnswer, followUp]
+        let firstSpliceThrows = true
+        Object.defineProperty(messages, "splice", {
+          configurable: true,
+          writable: true,
+          value(...args: [number, number]) {
+            if (firstSpliceThrows) {
+              firstSpliceThrows = false
+              throw new Error("forced main-path failure")
+            }
+            return Array.prototype.splice.apply(this, args)
+          },
+        })
+        const output = { messages }
+
+        await createBtwContextStripHook(isMarked)(undefined, output)
+
+        expect(payload(output.messages)).not.toContain(SECRET)
+        expect(payload(output.messages)).not.toContain(TEST_MARKER)
+        expect(output.messages).toEqual([opening, followUp])
+      })
+    })
+  })
 })

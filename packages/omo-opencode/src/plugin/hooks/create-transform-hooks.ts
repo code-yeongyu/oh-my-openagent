@@ -97,15 +97,15 @@ export function createTransformHooks(args: {
       )
     : null
 
-  const btwContextStrip = isHookEnabled("btw-context-strip")
-    ? safeCreateHook(
-        "btw-context-strip",
-        () => ({
-          "experimental.chat.messages.transform": createBtwContextStripHook(isBtwMarked),
-        }),
-        { enabled: safeHookEnabled },
-      )
-    : null
+  // btw-context-strip is a fail-closed safety strip; it ignores disabled_hooks so a marked
+  // /btw question or answer can never leak into a later model-request payload.
+  const btwContextStrip = safeCreateHook(
+    "btw-context-strip",
+    () => ({
+      "experimental.chat.messages.transform": createBtwContextStripHook(isBtwMarked),
+    }),
+    { enabled: safeHookEnabled },
+  )
 
   const toolPairValidator = isHookEnabled("tool-pair-validator")
     ? safeCreateHook(
