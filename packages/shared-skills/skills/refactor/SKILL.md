@@ -40,6 +40,12 @@ Performs intelligent, deterministic refactoring with full codebase awareness. Un
 
 ---
 
+## Epistemic workflow
+
+Treat every refactor claim as a claim until expected truth, observed reality, and the diff are visible in evidence. Use independent observation or review when error cost is high, size verification economics to that cost, and close fixes only on cause disappearance with baseline characterization, failing-first proof, runtime truth, or real-surface proof.
+
+---
+
 # PHASE 0: INTENT GATE (MANDATORY FIRST STEP)
 
 **BEFORE ANY ACTION, classify and validate the request.**

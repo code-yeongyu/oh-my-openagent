@@ -14,6 +14,12 @@ The rest of this file is a map. **The knowledge is in `references/`.** This file
 
 ---
 
+## Epistemic workflow
+
+Treat every diagnosis claim as a claim until expected truth, observed reality, and the diff are visible in evidence. Use independent observation or review when error cost is high, size verification economics to that cost, and close fixes only on cause disappearance with baseline characterization, failing-first proof, runtime truth, or real-surface proof.
+
+---
+
 # 🚨 READ THE REFERENCES. THIS IS NOT OPTIONAL.
 
 > **This skill is intentionally small.** Ninety percent of what you need to know lives in `references/`. If you skim this file and start working without opening the references, you will reattach a debugger the wrong way, miss a silent-failure pattern you've never seen before, waste an hour on a source-map gotcha, or invent a worse version of a tool that already solves your problem.

@@ -18,6 +18,12 @@ The core safety invariant: **behavior is locked by green tests before a single l
 
 ---
 
+## Epistemic workflow
+
+Treat every cleanup claim as a claim until expected truth, observed reality, and the diff are visible in evidence. Use independent observation or review when error cost is high, size verification economics to that cost, and close fixes only on cause disappearance with baseline characterization, failing-first proof, runtime truth, or real-surface proof.
+
+---
+
 ## Categories (what counts as slop)
 
 The agent looks for these nine categories. The first three are stylistic, the next three are structural, the next two are about hidden cost, and the last is about behavior coverage.
