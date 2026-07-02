@@ -41,6 +41,22 @@ async function runPostToolUseHook() {
   }
 
   const input = await readHookInput();
+  if (input === null) {
+    const reason =
+      "Invalid LSP hook input: malformed PostToolUse JSON on stdin. Blocking because LSP diagnostics are available but the edited file path could not be trusted.";
+    const output = {
+      decision: "block",
+      reason,
+      hookSpecificOutput: {
+        hookEventName: "PostToolUse",
+        additionalContext: reason,
+      },
+    };
+
+    process.stdout.write(`${JSON.stringify(output)}\n`);
+    return;
+  }
+
   const filePaths = extractEditedFilePaths(input);
   if (filePaths.length === 0) {
     return;
@@ -70,8 +86,11 @@ async function readHookInput() {
   try {
     const parsed = JSON.parse(raw);
     return isRecord(parsed) ? parsed : {};
-  } catch {
-    return {};
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return null;
+    }
+    throw error;
   }
 }
 

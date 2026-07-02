@@ -103,6 +103,45 @@ describe("senpi component LSP hook shims", () => {
     }
   });
 
+  it("blocks malformed LSP hook stdin without requiring an edited file path", () => {
+    // Given: the LSP hook receives malformed non-empty stdin while diagnostics are configured.
+    const pluginData = mkdtempSync(join(tmpdir(), "omo-ai-lsp-malformed-"));
+    const command = readHookCommands().find((candidate) => candidate.component === "lsp");
+
+    try {
+      if (command === undefined) {
+        throw new TypeError("lsp hook command must exist");
+      }
+
+      // When: the packaged component CLI runs the PostToolUse hook with invalid JSON.
+      const result = spawnSync("sh", ["-c", 'printf "%s" "$HOOK_INPUT" | node "$HOOK_TARGET" hook post-tool-use'], {
+        cwd: packageRoot,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          HOOK_INPUT: "{not-json",
+          HOOK_TARGET: command.targetPath,
+          PLUGIN_DATA: pluginData,
+          OMO_AI_LSP_DIAGNOSTICS_TEXT: "error[test] (1) at 1:1: deterministic diagnostics",
+        },
+      });
+      const output = JSON.parse(result.stdout);
+
+      // Then: malformed input fails closed as a Senpi blocking response without needing a file path.
+      expect(result.status).toBe(0);
+      expect(result.stderr.trim()).toBe("");
+      expect(output["decision"]).toBe("block");
+      expect(output["hookSpecificOutput"]["hookEventName"]).toBe("PostToolUse");
+      const reason = String(output["reason"]);
+      const additionalContext = String(output["hookSpecificOutput"]["additionalContext"]);
+      expect(/malformed|invalid/i.test(reason)).toBe(true);
+      expect(/malformed|invalid/i.test(additionalContext)).toBe(true);
+      expect(reason.includes("after editing")).toBe(false);
+    } finally {
+      rmSync(pluginData, { recursive: true, force: true });
+    }
+  });
+
   it("extracts edited paths from common Senpi and Codex hook payload shapes", () => {
     // Given: Senpi/Codex PostToolUse payloads can name edited files in several places.
     const command = readHookCommands().find((candidate) => candidate.component === "lsp");
