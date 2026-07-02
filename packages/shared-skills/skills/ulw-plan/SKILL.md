@@ -15,7 +15,7 @@ Outcome-first: explore a lot, ask few sharp questions - or none, when the intent
 
 ## INTENT ROUTING - pick ONE intent reference
 
-Before routing, parse review modifiers separately. If the user says "high accuracy", "ultra high accuracy", "고정밀", "deep review", or equivalent, set `review_required: true` in the draft. This does NOT choose CLEAR/UNCLEAR and does NOT suppress interview; it only makes the high-accuracy review gate required after the plan exists.
+**Review modifiers are a gate trigger, not a style cue.** If the user says "high accuracy", "ultra high accuracy", "고정밀", "deep review", or equivalent - in ANY turn, even appended to a follow-up question and even after the plan already exists - set `review_required: true` in the draft: the dual high-accuracy review (native `momus` + the independent Oracle review) is now REQUIRED before handoff, and if the plan already exists you run it this same turn. Answering the current question more carefully does NOT satisfy it. This does NOT choose CLEAR/UNCLEAR and does NOT suppress interview.
 
 After grounding, make ONE judgment, record `intent: clear|unclear` plus `review_required`, **ANNOUNCE both to the user in one line**, then load ONE intent reference (you ALSO read `references/full-workflow.md` for the shared mechanics - see below). The test keys on whether the desired **OUTCOME** is clear, NOT on request length. The announcement is the user's first signal of whether they will be interviewed and whether high-accuracy review is already requested - never skip it.
 
