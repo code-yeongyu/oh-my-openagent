@@ -86,6 +86,26 @@ export function runNode(
   };
 }
 
+export function createDefaultHomeEnv(homeDir: string): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = {
+    ...process.env,
+    HOME: homeDir,
+    USERPROFILE: homeDir,
+  };
+
+  if (process.platform === "win32") {
+    const drive = /^[A-Za-z]:/.exec(homeDir)?.[0] ?? "";
+    env["HOMEDRIVE"] = drive;
+    const homePath = drive === "" ? homeDir : homeDir.slice(drive.length);
+    env["HOMEPATH"] = homePath.startsWith("\\") ? homePath : `\\${homePath}`;
+  }
+
+  delete env["OMO_AI_SENPI_AGENT_DIR"];
+  delete env["PI_CODING_AGENT_DIR"];
+  delete env["SENPI_CODING_AGENT_DIR"];
+  return env;
+}
+
 export function parseStdoutJson(stdout: string): Record<string, unknown> {
   const parsed: unknown = JSON.parse(stdout);
   if (!isRecord(parsed)) {

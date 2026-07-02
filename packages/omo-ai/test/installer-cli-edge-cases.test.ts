@@ -6,6 +6,7 @@ import {
   agentFile,
   cleanupAgentFixture,
   cliPath,
+  createDefaultHomeEnv,
   createEmptyAgentFixture,
   packageRoot,
   parseStdoutJson,
@@ -165,13 +166,10 @@ describe("omo-ai senpi installer CLI malformed files and defaults", () => {
     const expectedAgentDir = join(homeDir, ".senpi", "agent");
 
     try {
-      const env: Record<string, string | undefined> = { ...process.env, HOME: homeDir };
-      delete env["OMO_AI_SENPI_AGENT_DIR"];
-      delete env["PI_CODING_AGENT_DIR"];
-      delete env["SENPI_CODING_AGENT_DIR"];
+      const env = createDefaultHomeEnv(homeDir);
 
-      // When: repair runs through the Node CLI with only HOME configured.
-      const repair = spawnSync("node", [cliPath, "repair", "--json"], {
+      // When: repair runs through the Node CLI with only default-home variables configured.
+      const repair = spawnSync(process.execPath, [cliPath, "repair", "--json"], {
         cwd: packageRoot,
         encoding: "utf8",
         env,

@@ -77,8 +77,8 @@ describe("omo-ai senpi installer CLI package surfaces", () => {
     expect(doctorProbe.stdout.trim()).toBe("function");
   });
 
-  it("runs doctor JSON when the npm bin is invoked through a symlink", () => {
-    // Given: npm global install invokes the package bin through a symlinked executable path.
+  it("runs doctor JSON when the npm bin is invoked through npm-style links", () => {
+    // Given: npm global install invokes the package bin through a linked package/bin path.
     const agentDir = createEmptyAgentFixture();
     const binDir = createEmptyAgentFixture();
     const globalModulesDir = agentFile(binDir, "lib/node_modules");
@@ -86,23 +86,12 @@ describe("omo-ai senpi installer CLI package surfaces", () => {
     const symlinkedBin = agentFile(binDir, "omo-ai");
 
     try {
-      const mkdir = spawnSync("mkdir", ["-p", globalModulesDir], {
-        encoding: "utf8",
-      });
-      expect(mkdir.status).toBe(0);
-      const packageLink = spawnSync("ln", ["-s", packageRoot, linkedPackageRoot], {
-        encoding: "utf8",
-      });
-      expect(packageLink.status).toBe(0);
-      const binLink = spawnSync("ln", ["-s", join(linkedPackageRoot, "src/cli/index.mjs"), symlinkedBin], {
-        encoding: "utf8",
-      });
-      expect(binLink.status).toBe(0);
+      const invokedBin = createLinkedNpmBin(globalModulesDir, linkedPackageRoot, symlinkedBin);
       const repair = runCli(["repair", "--json"], agentDir);
       expect(repair.status).toBe(0);
 
-      // When: the symlinked global bin is invoked with Node.
-      const doctor = spawnSync("node", [symlinkedBin, "doctor", "--json"], {
+      // When: the npm-style global bin is invoked with Node.
+      const doctor = spawnSync(process.execPath, [invokedBin, "doctor", "--json"], {
         cwd: packageRoot,
         encoding: "utf8",
         env: {
@@ -126,3 +115,34 @@ describe("omo-ai senpi installer CLI package surfaces", () => {
     }
   });
 });
+
+function createLinkedNpmBin(globalModulesDir: string, linkedPackageRoot: string, symlinkedBin: string): string {
+  const setup = spawnSync(
+    process.execPath,
+    [
+      "-e",
+      `
+const { mkdirSync, symlinkSync } = require("node:fs");
+const { join } = require("node:path");
+const [globalModulesDir, packageRoot, linkedPackageRoot, symlinkedBin] = process.argv.slice(1);
+mkdirSync(globalModulesDir, { recursive: true });
+symlinkSync(packageRoot, linkedPackageRoot, process.platform === "win32" ? "junction" : "dir");
+const target = join(linkedPackageRoot, "src/cli/index.mjs");
+if (process.platform === "win32") {
+  console.log(target);
+  process.exit(0);
+}
+symlinkSync(target, symlinkedBin, "file");
+console.log(symlinkedBin);
+`,
+      globalModulesDir,
+      packageRoot,
+      linkedPackageRoot,
+      symlinkedBin,
+    ],
+    { encoding: "utf8" },
+  );
+  expect(setup.status).toBe(0);
+  expect(setup.stderr.trim()).toBe("");
+  return setup.stdout.trim();
+}
