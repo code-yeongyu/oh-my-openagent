@@ -55,20 +55,17 @@ bunx oh-my-openagent install
 ### Options
 
 | Option | Description |
-| --- | --- |
-| `--no-tui` | Run in non-interactive mode (requires all needed options) |
-| `--platform <value>` | Install target edition: `opencode` (Ultimate, default), `codex` (Light), or `both` |
-| `--claude <value>` | Claude subscription: `no`, `yes`, `max20` (Ultimate only) |
-| `--openai <value>` | OpenAI/ChatGPT subscription: `no`, `yes` (Ultimate only) |
-| `--gemini <value>` | Gemini integration: `no`, `yes` (Ultimate only) |
-| `--copilot <value>` | GitHub Copilot subscription: `no`, `yes` (Ultimate only) |
-| `--opencode-zen <value>` | OpenCode Zen access: `no`, `yes` (Ultimate only) |
-| `--zai-coding-plan <value>` | Z.ai Coding Plan subscription: `no`, `yes` (Ultimate only) |
-| `--kimi-for-coding <value>` | Kimi For Coding subscription: `no`, `yes` (Ultimate only) |
-| `--opencode-go <value>` | OpenCode Go subscription: `no`, `yes` (Ultimate only) |
-| `--vercel-ai-gateway <value>` | Vercel AI Gateway: `no`, `yes` (Ultimate only) |
-| `--codex-autonomous` | Configure Codex with `approval_policy = "never"`, `sandbox_mode = "danger-full-access"`, and `network_access = "enabled"` when installing Light or Both |
-| `--no-codex-autonomous` | Leave existing Codex permission settings unchanged when installing Light or Both |
+| ------ | ----------- |
+| `--no-tui` | Run in non-interactive mode without TUI |
+| `--claude <no\|yes\|max20>` | Claude subscription mode |
+| `--openai <no\|yes>` | OpenAI / ChatGPT subscription |
+| `--gemini <no\|yes>` | Gemini integration |
+| `--copilot <no\|yes>` | GitHub Copilot subscription |
+| `--opencode-zen <no\|yes>` | OpenCode Zen access |
+| `--zai-coding-plan <no\|yes>` | Z.ai Coding Plan subscription |
+| `--kimi-for-coding <no\|yes>` | Kimi for Coding subscription |
+| `--opencode-go <no\|yes>` | OpenCode Go subscription |
+| `--preset <name>` | Optional installer preset, currently `foundationstart` (workspace-root configurable via `FOUNDATIONSTART_WORKSPACE_ROOT`) |
 | `--skip-auth` | Skip authentication setup hints |
 
 When using the `lazycodex-ai` bin alias, `install` defaults to `--platform=codex`. `lazycodex-ai` is only the npm/bin alias; `lazycodex` is the marketplace repository name. The Codex config uses marketplace `sisyphuslabs` and plugin `omo`, enabled as `omo@sisyphuslabs`, with the marketplace source set to the local built cache under `~/.codex/plugins/cache/sisyphuslabs`.
@@ -121,6 +118,12 @@ The command removes the managed `sisyphuslabs` plugin cache and marketplace snap
 
 Diagnoses your environment and configuration. Checks are grouped into four categories: **System**, **Config**, **Tools**, and **Models**.
 
+The doctor command detects common issues including:
+- Legacy plugin entry references in `opencode.json` (warns when `oh-my-opencode` is still used instead of `oh-my-openagent`)
+- Configuration file validity and JSONC parsing errors
+- Model resolution and fallback chain verification
+- Missing or misconfigured MCP servers
+- General prerequisite validation before running optional adapter smoke checks such as `bun run smoke:claude-mem-adapter`
 ### Usage
 
 ```bash
@@ -140,6 +143,38 @@ bunx oh-my-openagent doctor
 - The current minimum OpenCode version check is `>= 1.4.0`.
 - The doctor command warns when legacy plugin registration (`oh-my-opencode`) is still present in `opencode.json`.
 
+┌──────────────────────────────────────────────────┐
+│  Oh-My-OpenAgent Doctor                           │
+└──────────────────────────────────────────────────┘
+
+System
+  ✓ OpenCode version: 1.0.155 (>= 1.0.150)
+  ✓ Plugin registered in opencode.json
+
+Config
+  ✓ oh-my-opencode.jsonc is valid
+  ✓ Model resolution: all agents have valid fallback chains
+  ⚠ categories.visual-engineering: using default model
+
+Tools
+  ✓ AST-Grep available
+  ✓ LSP servers configured
+
+Models
+  ✓ 11 agents, 8 categories, 0 overrides
+  ⚠ Some configured models rely on compatibility fallback
+
+Summary: 10 passed, 1 warning, 0 failed
+```
+
+For the native `claude-mem` adapter, pair doctor with the dedicated non-live smoke check:
+
+```bash
+bunx oh-my-opencode doctor
+bun run smoke:claude-mem-adapter --output-root "C:\OpenCodeWorkingFolder\.sisyphus\evidence" --windows-path "C:\Temp\Claude Mem Test"
+```
+
+Wave-1 note: doctor is the general host health command; the claude-mem smoke command is the adapter-specific verification path.
 ---
 
 ## run

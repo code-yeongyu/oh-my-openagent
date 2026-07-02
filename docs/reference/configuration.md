@@ -305,8 +305,13 @@ Domain-specific model delegation used by the `task()` tool. When Sisyphus delega
 | `artistry`           | `google/gemini-3.1-pro` (high)  | Creative/unconventional approaches             |
 | `quick`              | `openai/gpt-5.4-mini`           | Trivial tasks, typo fixes, single-file changes |
 | `unspecified-low`    | `anthropic/claude-sonnet-4-6`   | General tasks, low effort                      |
-| `unspecified-high`   | `anthropic/claude-opus-4-7` (max) | General tasks, high effort                   |
-| `writing`            | `kimi-for-coding/k2p5`          | Documentation, prose, technical writing        |
+| `unspecified-high`   | `anthropic/claude-opus-4-6` (max) | General tasks, high effort                   |
+| `writing`            | `google/gemini-3-flash`         | Documentation, prose, technical writing        |
+| `deepseek-pro`       | `deepseek/deepseek-v4-pro` (high) | Active secondary reasoning and coding        |
+| `deepseek-flash`     | `deepseek/deepseek-v4-flash` (medium) | Fast active secondary mechanical lane    |
+| `secondary-reasoning` | `deepseek/deepseek-v4-pro` (high) | Cost-conscious bounded reasoning           |
+| `mechanical-coding`  | `deepseek/deepseek-v4-flash` (medium) | Mechanical code edits and small fixes     |
+| `bulk-maintenance`   | `deepseek/deepseek-v4-flash` (medium) | Repetitive maintenance and cleanup       |
 
 > **Note**: Built-in category defaults are available automatically. User-defined category config merges over the built-in defaults or adds custom categories.
 
@@ -382,7 +387,21 @@ Capability data comes from provider runtime metadata first. OmO also ships bundl
 
 #### Category Provider Chains
 
-This table documents the first entry of each hardcoded provider fallback chain, not the built-in category default shown above. For example, `writing` defaults to `kimi-for-coding/k2p5`, while its provider fallback chain starts with Gemini.
+| Category               | Default Model       | Provider Priority                                              |
+| ---------------------- | ------------------- | -------------------------------------------------------------- |
+| **visual-engineering** | `gemini-3.1-pro`    | `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `zai-coding-plan\|opencode/glm-5` → `anthropic\|github-copilot\|opencode/claude-opus-4-6 (max)` → `opencode-go/glm-5` → `kimi-for-coding/k2p5` |
+| **ultrabrain**         | `gpt-5.4`           | `openai\|opencode/gpt-5.4 (xhigh)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode/claude-opus-4-6 (max)` → `opencode-go/glm-5` |
+| **deep**               | `gpt-5.4`           | `openai\|github-copilot\|venice\|opencode/gpt-5.4 (medium)` → `anthropic\|github-copilot\|opencode/claude-opus-4-6 (max)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` |
+| **artistry**           | `gemini-3.1-pro`    | `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode/claude-opus-4-6 (max)` → `openai\|github-copilot\|opencode/gpt-5.4` |
+| **quick**              | `gpt-5.4-mini`      | `openai\|github-copilot\|opencode/gpt-5.4-mini` → `anthropic\|github-copilot\|opencode/claude-haiku-4-5` → `google\|github-copilot\|opencode/gemini-3-flash` → `opencode-go/minimax-m2.7` → `opencode/gpt-5-nano` |
+| **unspecified-low**    | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `openai\|opencode/gpt-5.3-codex (medium)` → `opencode-go/kimi-k2.5` → `google\|github-copilot\|opencode/gemini-3-flash` → `opencode-go/minimax-m2.7` |
+| **unspecified-high**   | `claude-opus-4-6`   | `anthropic\|github-copilot\|opencode/claude-opus-4-6 (max)` → `openai\|github-copilot\|opencode/gpt-5.4 (high)` → `zai-coding-plan\|opencode/glm-5` → `kimi-for-coding/k2p5` → `opencode-go/glm-5` → `opencode/kimi-k2.5` → `opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k2.5` |
+| **writing**            | `gemini-3-flash`    | `google\|github-copilot\|opencode/gemini-3-flash` → `opencode-go/kimi-k2.5` → `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `opencode-go/minimax-m2.7` |
+| **deepseek-pro**       | `deepseek-v4-pro`   | `deepseek/deepseek-v4-pro (high)` → `deepseek/deepseek-v4-flash (high)` → `openai/gpt-5.5 (medium)` |
+| **deepseek-flash**     | `deepseek-v4-flash` | `deepseek/deepseek-v4-flash (medium)` → `deepseek/deepseek-v4-pro (medium)` → `github-copilot/gpt-5-mini` |
+| **secondary-reasoning** | `deepseek-v4-pro`  | `deepseek/deepseek-v4-pro (high)` → `openai/gpt-5.5 (medium)` |
+| **mechanical-coding**  | `deepseek-v4-flash` | `deepseek/deepseek-v4-flash (medium)` → `deepseek/deepseek-v4-pro (medium)` |
+| **bulk-maintenance**   | `deepseek-v4-flash` | `deepseek/deepseek-v4-flash (medium)` → `deepseek/deepseek-v4-pro (medium)` |
 
 | Category               | Provider Chain Primary | Provider Priority                                           |
 | ---------------------- | ------------------- | -------------------------------------------------------------- |
@@ -628,6 +647,71 @@ Built-in MCPs (enabled by default): `websearch` (Exa AI), `context7` (library do
 ```json
 { "disabled_mcps": ["websearch", "context7", "grep_app", "lsp"] }
 ```
+
+### Claude Mem Adapter
+
+Enable the native `claude-mem` adapter to expose upstream memory tools through the existing `skill_mcp` path.
+
+```jsonc
+{
+  "claude_mem": {
+    "enabled": true,
+    "command": "bunx",
+    "args": ["claude-mem", "mcp"],
+    "data_dir": ".opencode/claude-mem/data",
+    "port": 37777,
+    "auto_start": false,
+    "startup_timeout_ms": 15000,
+    "supported_version_range": "^12.1.0",
+    "env_allowlist": ["ANTHROPIC_API_KEY"],
+    "env_overrides": {}
+  }
+}
+```
+
+Wave-1 behavior:
+
+- Disabled by default.
+- Uses a workspace-scoped runtime/data directory.
+- Exposes only `search`, `timeline`, and `get_observations`.
+- Reuses a healthy runtime on the configured endpoint when present.
+- Degrades cleanly on missing Bun, missing command, unsupported version, invalid data dir, or unhealthy occupied-port collisions.
+
+Wave-1 exclusions:
+
+- no direct Claude hook embedding
+- no per-session memory isolation promise
+- no viewer/admin endpoint exposure
+- no generic multi-provider memory abstraction
+
+| Option | Default | Description |
+| ------ | ------- | ----------- |
+| `enabled` | `false` | Enable the adapter for this workspace/config scope |
+| `command` | - | Command used to launch the upstream MCP/runtime boundary |
+| `args` | `[]` | Arguments passed to the command |
+| `cwd` | workspace root | Working directory for the launched process |
+| `port` | `37777` | Expected worker/MCP health endpoint port |
+| `data_dir` | workspace-managed `.opencode/claude-mem/data` | Workspace-scoped runtime state directory |
+| `auto_start` | `false` | Keep false in wave 1 unless you explicitly want immediate startup on first capability demand |
+| `startup_timeout_ms` | `15000` | Time budget for startup/health establishment |
+| `supported_version_range` | `^12.1.0` | Supported upstream `claude-mem` major/range contract |
+| `env_allowlist` | `[]` | Extra env vars allowed into the spawned runtime |
+| `env_overrides` | `{}` | Explicit env overrides passed to the runtime |
+
+Notes:
+
+- `isolation_scope` is fixed to workspace scope in wave 1 and is not user-tunable.
+- Keep `command` explicit when enabling the adapter. The host will not guess an arbitrary external runtime.
+- Paths with spaces are supported; use normal JSON strings, for example `"C:\\Temp\\Claude Mem Test"`.
+
+Validation and smoke verification:
+
+```bash
+bunx oh-my-opencode doctor
+bun run smoke:claude-mem-adapter --output-root "C:\OpenCodeWorkingFolder\.sisyphus\evidence" --windows-path "C:\Temp\Claude Mem Test"
+```
+
+`doctor` validates the host environment/config surface generally. The dedicated adapter smoke command validates the non-live claude-mem wiring and Windows-style path handling.
 
 ### LSP
 
