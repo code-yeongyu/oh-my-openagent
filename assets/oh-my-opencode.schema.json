@@ -32,6 +32,7 @@
       "items": {
         "type": "string",
         "enum": [
+          "claude-mem",
           "playwright",
           "agent-browser",
           "dev-browser",
@@ -5228,6 +5229,88 @@
         "additionalProperties": false
       }
     },
+    "claude_mem": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "args": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cwd": {
+          "type": "string",
+          "minLength": 1
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "data_dir": {
+          "type": "string",
+          "minLength": 1
+        },
+        "auto_start": {
+          "default": false,
+          "type": "boolean"
+        },
+        "startup_timeout_ms": {
+          "default": 15000,
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "supported_version_range": {
+          "default": "^12.1.0",
+          "type": "string",
+          "pattern": "^\\^\\d+\\.\\d+\\.\\d+$"
+        },
+        "env_allowlist": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "env_overrides": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "isolation_scope": {
+          "default": "workspace",
+          "type": "string",
+          "const": "workspace"
+        }
+      },
+      "required": [
+        "enabled",
+        "args",
+        "auto_start",
+        "startup_timeout_ms",
+        "supported_version_range",
+        "env_allowlist",
+        "env_overrides",
+        "isolation_scope"
+      ],
+      "additionalProperties": false
+    },
     "claude_code": {
       "type": "object",
       "properties": {
@@ -5563,6 +5646,53 @@
           }
         }
       ]
+    },
+    "delegate": {
+      "default": {
+        "max_shown_skills": 8,
+        "include_global_skills_in_prompt": false
+      },
+      "type": "object",
+      "properties": {
+        "max_shown_skills": {
+          "default": 8,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "include_global_skills_in_prompt": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "max_shown_skills",
+        "include_global_skills_in_prompt"
+      ],
+      "additionalProperties": false
+    },
+    "tool_output_max_tokens_default": {
+      "default": 8000,
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "webfetch_max_tokens": {
+      "default": 4000,
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "todo_continuation_top_k": {
+      "default": 3,
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "token_regression_margin": {
+      "default": 0.1,
+      "type": "number",
+      "minimum": 0
     },
     "ralph_loop": {
       "type": "object",
@@ -6069,6 +6199,11 @@
     }
   },
   "required": [
+    "delegate",
+    "tool_output_max_tokens_default",
+    "webfetch_max_tokens",
+    "todo_continuation_top_k",
+    "token_regression_margin",
     "git_master"
   ],
   "additionalProperties": false
