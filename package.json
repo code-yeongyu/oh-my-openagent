@@ -111,7 +111,7 @@
     "build:model-capabilities": "bun run script/build-model-capabilities.ts",
     "clean": "rm -rf dist",
     "prepack": "bun run build:materialize-frontend",
-    "prepare": "bun run build",
+    "prepare": "husky && bun run build",
     "postinstall": "node postinstall.mjs",
     "prepublishOnly": "bun run clean && bun run build:lsp-tools-mcp && bun run build:lsp-daemon && bun run build",
     "test:model-capabilities": "bun test packages/model-core/src/model-capability-aliases.test.ts packages/model-core/src/model-capability-guardrails.test.ts packages/model-core/src/model-capabilities.test.ts packages/omo-opencode/src/cli/doctor/checks/model-resolution.test.ts --bail",
@@ -163,31 +163,33 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@oh-my-opencode/git-bash-mcp": "workspace:*",
-    "@oh-my-opencode/lsp-core": "workspace:*",
-    "@oh-my-opencode/mcp-stdio-core": "workspace:*",
-    "@oh-my-opencode/mcp-client-core": "workspace:*",
     "@oh-my-opencode/agents-md-core": "workspace:*",
     "@oh-my-opencode/boulder-state": "workspace:*",
     "@oh-my-opencode/claude-code-compat-core": "workspace:*",
-    "@oh-my-opencode/skills-loader-core": "workspace:*",
     "@oh-my-opencode/comment-checker-core": "workspace:*",
     "@oh-my-opencode/delegate-core": "workspace:*",
+    "@oh-my-opencode/git-bash-mcp": "workspace:*",
     "@oh-my-opencode/hashline-core": "workspace:*",
-    "@oh-my-opencode/tmux-core": "workspace:*",
-    "@oh-my-opencode/team-core": "workspace:*",
-    "@oh-my-opencode/openclaw-core": "workspace:*",
+    "@oh-my-opencode/lsp-core": "workspace:*",
+    "@oh-my-opencode/mcp-client-core": "workspace:*",
+    "@oh-my-opencode/mcp-stdio-core": "workspace:*",
     "@oh-my-opencode/model-core": "workspace:*",
     "@oh-my-opencode/omo-codex": "workspace:*",
+    "@oh-my-opencode/openclaw-core": "workspace:*",
     "@oh-my-opencode/prompts-core": "workspace:*",
     "@oh-my-opencode/rules-engine": "workspace:*",
     "@oh-my-opencode/shared-skills": "workspace:*",
+    "@oh-my-opencode/skills-loader-core": "workspace:*",
+    "@oh-my-opencode/team-core": "workspace:*",
     "@oh-my-opencode/telemetry-core": "workspace:*",
+    "@oh-my-opencode/tmux-core": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
-    "@typescript/native-preview": "7.0.0-dev.20260518.1",
     "@types/js-yaml": "^4.0.9",
     "@types/picomatch": "^4.0.3",
+    "@typescript/native-preview": "7.0.0-dev.20260518.1",
     "bun-types": "1.3.14",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.7",
     "typescript": "^6.0.3"
   },
   "optionalDependencies": {
@@ -213,5 +215,10 @@
   },
   "trustedDependencies": [
     "@code-yeongyu/comment-checker"
-  ]
+  ],
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "biome check --write --no-errors-on-unmatched"
+    ]
+  }
 }
