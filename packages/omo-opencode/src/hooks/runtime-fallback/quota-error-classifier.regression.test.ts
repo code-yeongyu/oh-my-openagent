@@ -20,6 +20,21 @@ describe("runtime-fallback quota error regressions", () => {
     expect(retryable).toBe(true)
   })
 
+  test("classifies OpenCode Go free usage exhaustion as quota_exceeded", () => {
+    //#given
+    const error = {
+      message: "Free usage exceeded, subscribe to Go",
+    }
+
+    //#when
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
+
   test("treats HTTP 402 payment required as fallback-eligible", () => {
     //#given
     const error = { statusCode: 402, message: "Payment Required" }

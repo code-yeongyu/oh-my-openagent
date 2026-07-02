@@ -112,6 +112,7 @@ export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErr
     /resource.?exhausted/i.test(message) ||
     /out\s+of\s+credits?/i.test(message) ||
     /payment.?required/i.test(message) ||
+    /free\s+usage\s+exceeded/i.test(message) ||
     /usage\s+limit/i.test(message) ||
     /credit\s+balance.*too\s+low/i.test(message) ||
     /limit\s+exhausted/i.test(message) ||
