@@ -54,6 +54,17 @@ export interface FallbackResult {
   maxAttemptsReached?: boolean
 }
 
+export type AutoRetryDispatchOutcome =
+  | {
+      readonly accepted: true
+      readonly status: "dispatched" | "queued" | "possibly-accepted"
+    }
+  | {
+      readonly accepted: false
+      readonly status: "blocked" | "invalid-model" | "failed"
+      readonly reason: string
+    }
+
 export interface RuntimeFallbackOptions {
   config?: RuntimeFallbackConfig
   pluginConfig?: OhMyOpenCodeConfig

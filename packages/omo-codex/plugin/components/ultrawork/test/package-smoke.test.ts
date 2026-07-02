@@ -49,23 +49,23 @@ describe("codex ultrawork package metadata", () => {
 		expect(guidance).toContain("structural");
 	});
 
-	it("#given explorer guidance #when inspected #then starts codebase inspection with Sparkshell", () => {
+	it("#given explorer guidance #when inspected #then starts codebase inspection with native search", () => {
 		// given
 		const explorer = readTextFile("agents/explorer.toml");
+		const directive = readTextFile("directive.md");
 
 		// when
 		const guidance = explorer.toLowerCase();
-		const sparkshellIndex = guidance.indexOf("omo sparkshell <command>");
+		const repoInspectionIndex = guidance.indexOf("repo-wide inspection");
 		const lspIndex = guidance.indexOf("lsp_goto_definition");
 		const structuralIndex = guidance.indexOf("ast-grep");
 
 		// then
-		expect(sparkshellIndex).toBeGreaterThanOrEqual(0);
-		expect(lspIndex).toBeGreaterThan(sparkshellIndex);
-		expect(structuralIndex).toBeGreaterThan(sparkshellIndex);
-		expect(guidance).toContain("prefer `omo sparkshell <command>` before raw shell commands");
-		expect(guidance).toContain("--shell '<command>'");
-		expect(guidance).toContain("--tmux-pane");
+		expect(repoInspectionIndex).toBeGreaterThanOrEqual(0);
+		expect(lspIndex).toBeGreaterThan(repoInspectionIndex);
+		expect(structuralIndex).toBeGreaterThan(repoInspectionIndex);
+		expect(explorer).toContain("`rg`, `rg --files`, `cat`, and `git`");
+		expect(directive).toContain("`rg`, `rg --files`,");
 	});
 
 	it("#given librarian guidance #when inspected #then names the packaged research MCP surfaces", () => {

@@ -8,6 +8,7 @@ import {
 	findSpawnAgentCallsWithoutForkContextFalse,
 	root,
 } from "./aggregate-plugin-fixture.mjs";
+import { listSkillFiles } from "./sync-skills-test-support.mjs";
 
 test("#given synced skills with Codex compatibility guidance #when spawn_agent is documented #then invalid role parameters are absent", async () => {
 	const skillsDir = join(root, "skills");
@@ -64,4 +65,26 @@ test("#given long-running orchestration prompts #when waiting on child agents #t
 	}
 
 	assert.deepEqual(missingLivenessGuidance, []);
+});
+
+test("#given packaged Codex prompt surfaces #when inspected #then removed sparkshell guidance is absent", async () => {
+	const promptRoots = [
+		join(root, "skills"),
+		join(root, "components", "rules", "bundled-rules"),
+		join(root, "components", "ultrawork", "agents"),
+		join(root, "components", "ulw-loop", "skills"),
+	];
+	const promptFilePattern = /\.(?:json|md|toml|ya?ml)$/i;
+	const removedSparkshellPattern = /\b(?:sparkshell|spark[-_\s]+shell)\b/i;
+	const matches = [];
+
+	for (const promptRoot of promptRoots) {
+		for (const relativePath of await listSkillFiles(promptRoot)) {
+			if (!promptFilePattern.test(relativePath)) continue;
+			const content = await readFile(join(promptRoot, relativePath), "utf8");
+			if (removedSparkshellPattern.test(content)) matches.push(`${promptRoot}/${relativePath}`);
+		}
+	}
+
+	assert.deepEqual(matches, []);
 });

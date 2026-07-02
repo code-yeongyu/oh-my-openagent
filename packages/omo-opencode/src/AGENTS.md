@@ -1,6 +1,6 @@
 # src/ — Plugin Source
 
-**Generated:** 2026-06-08
+**Generated:** 2026-06-23
 
 ## STOP. THIS IS THE OPENCODE PLUGIN. QA IS MANDATORY. EVERY SINGLE TIME YOU CHANGE ANYTHING HERE.
 
@@ -109,8 +109,8 @@ Total: 53 base, 60 with team-mode. Each tier produces an object whose values are
 |--------|---------|---------------|
 | `agents/` | 11 agent factories + dynamic prompt builder | yes (+ atlas, hephaestus, prometheus, sisyphus, sisyphus-junior, builtin-agents) |
 | `hooks/` | 53-60 lifecycle hooks across 60 dirs | yes (+ atlas, anthropic-context-window-limit-recovery, auto-update-checker, claude-code-hooks, comment-checker, compaction-context-injector, keyword-detector, ralph-loop, rules-injector, runtime-fallback, todo-continuation-enforcer) |
-| `tools/` | 13 native tool dirs (+1 shared utilities dir); LSP + AST-grep moved to built-in MCPs | yes (+ background-task, call-omo-agent, delegate-task, hashline-edit, look-at, skill) |
-| `features/` | 22 feature modules (some now shimming `team-core`, `tmux-core`, `skills-loader-core`, `mcp-client-core`, and `claude-code-compat-core`) | yes (+ 11 sub-AGENTS.md including builtin-skills, team-mode, background-agent, claude-code-*) |
+| `tools/` | 14 native tool dirs (+1 shared utilities dir); LSP + AST-grep moved to built-in MCPs | yes (+ background-task, call-omo-agent, delegate-task, hashline-edit, look-at, skill) |
+| `features/` | 23 feature modules (some now shimming `team-core`, `tmux-core`, `skills-loader-core`, `mcp-client-core`, and `claude-code-compat-core`) | yes (+ 11 sub-AGENTS.md including builtin-skills, team-mode, background-agent, claude-code-*) |
 | `shared/` | Cross-cutting adapter utilities plus shims over extracted Core packages, barrel-exported | yes |
 | `cli/` | Commander.js CLI: install, run, doctor, mcp-oauth, boulder | yes (+ config-manager, doctor, run) |
 | `plugin/` | 12 OpenCode hook handlers + hook composition | yes |
@@ -118,7 +118,7 @@ Total: 53 base, 60 with team-mode. Each tier produces an object whose values are
 | `plugin-handlers/` | 6-phase config loading pipeline | yes |
 | `openclaw/` | Bidirectional Discord/Telegram/HTTP integration | yes |
 | `__tests__/` | Plugin-level integration tests + perf fixtures | — |
-| `mcp/` | 4 built-in MCPs (3 remote + local stdio lsp) | yes |
+| `mcp/` | 5 built-in MCPs (3 remote + local stdio lsp + codegraph) | yes |
 | `testing/` | Test utilities + `create-plugin-module.ts` | — |
 | `help/` | CLI help schema definitions (acp, doctor, sandbox, status) | — |
 | `locales/` | i18n strings (en, zh): toasts + model-fallback labels | — |

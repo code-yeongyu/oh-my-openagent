@@ -45,6 +45,7 @@ export function createChatMessageHandler(deps: HookDeps) {
     }
 
     if (
+      config.restore_primary_after_cooldown &&
       state.currentModel !== state.originalModel &&
       !state.pendingFallbackModel &&
       !isModelInCooldown(state.originalModel, state, config.cooldown_seconds)

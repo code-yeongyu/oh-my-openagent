@@ -1,19 +1,26 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { lstat, mkdir, mkdtemp, readdir, readFile, readlink, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, sep } from "node:path";
+import { dirname, join, sep } from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 
 const CLI_URL = new URL("../components/bootstrap/dist/cli.js", import.meta.url);
 const { runBootstrapWorker, runWorkerSetup } = await import(CLI_URL.href);
 
 const MARKETPLACE_SOURCE_LINE = 'source = "https://github.com/code-yeongyu/lazycodex.git"';
 const COMPONENT_BIN_NAME = "omo-toolbox";
+const execFileAsync = promisify(execFile);
 const OMO_CLI_DEGRADED_ENTRY = {
 	component: "omo-cli",
 	hint: "use npx lazycodex-ai for the omo CLI",
 	reason: "marketplace payload has no dist/cli",
 };
+
+function escapeRegExp(value) {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 async function withBinLinkFixture(run) {
 	const root = await mkdtemp(join(tmpdir(), "omo-bootstrap-binlinks-"));
@@ -33,7 +40,7 @@ async function withBinLinkFixture(run) {
 // Mirrors the Codex marketplace store layout: each plugin version is installed
 // under its own root and old version dirs are deleted on upgrade
 // (core-plugins store.rs), which is why stale bin links MUST be re-pointed.
-async function writeVersionedRoot(root, version, { withRuntimeCli = false } = {}) {
+async function writeVersionedRoot(root, version, { withRuntimeCli = false, withUlwLoopAliases = false } = {}) {
 	const pluginRoot = join(root, "store", "omo", version);
 	await mkdir(join(pluginRoot, ".codex-plugin"), { recursive: true });
 	await writeFile(
@@ -76,9 +83,27 @@ async function writeVersionedRoot(root, version, { withRuntimeCli = false } = {}
 		`${JSON.stringify({ bin: { [COMPONENT_BIN_NAME]: "./dist/cli.js" }, name: "@sisyphuslabs/toolbox" })}\n`,
 	);
 	await writeFile(join(componentRoot, "dist", "cli.js"), "#!/usr/bin/env node\nconsole.log('toolbox');\n");
+	if (withUlwLoopAliases) {
+		const ulwLoopRoot = join(pluginRoot, "components", "ulw-loop");
+		await mkdir(join(ulwLoopRoot, "dist"), { recursive: true });
+		await writeFile(
+			join(ulwLoopRoot, "package.json"),
+			`${JSON.stringify({
+				bin: {
+					"omo-ulw-loop": "./dist/cli.js",
+					ulw: "./dist/cli.js",
+					"ulw-loop": "./dist/cli.js",
+				},
+				name: "@sisyphuslabs/ulw-loop",
+			})}\n`,
+		);
+		await writeFile(join(ulwLoopRoot, "dist", "cli.js"), "#!/usr/bin/env node\nconsole.log('ulw-loop');\n");
+	}
 	if (withRuntimeCli) {
 		await mkdir(join(pluginRoot, "dist", "cli"), { recursive: true });
 		await writeFile(join(pluginRoot, "dist", "cli", "index.js"), "console.log('omo');\n");
+		await mkdir(join(pluginRoot, "dist", "cli-node"), { recursive: true });
+		await writeFile(join(pluginRoot, "dist", "cli-node", "index.js"), "console.log('omo node runtime');\n");
 	}
 	return pluginRoot;
 }
@@ -196,14 +221,18 @@ test("#given platform win32 #when the worker setup links bins #then component bi
 		assert.deepEqual(outcome.degraded, []);
 		const shim = await readFile(join(fixture.binDir, `${COMPONENT_BIN_NAME}.cmd`), "utf8");
 		assert.match(shim, /@echo off/);
-		assert.ok(shim.includes(`node "${join(pluginRoot, "components", "toolbox", "dist", "cli.js")}"`));
+		const componentEntrypoint = join(pluginRoot, "components", "toolbox", "dist", "cli.js");
+		assert.match(shim, /NODE_REPL_NODE_PATH/);
+		assert.match(shim, /"%OMO_NODE_BINARY%"/);
+		assert.match(shim, new RegExp(`"${escapeRegExp(componentEntrypoint)}" %\\*`));
+		assert.doesNotMatch(shim, new RegExp(`node "${escapeRegExp(componentEntrypoint)}" %\\*`));
 		const wrapper = await readFile(join(fixture.binDir, "omo.cmd"), "utf8");
 		assert.ok(wrapper.includes(join(pluginRoot, "dist", "cli", "index.js")));
 		await assert.rejects(() => lstat(join(fixture.binDir, COMPONENT_BIN_NAME)), "win32 must not leave posix symlinks behind");
 	});
 });
 
-test("#given a marketplace payload without dist/cli #when the worker setup runs #then it records the degraded omo-cli entry, logs the skip warning, and leaves no broken or omo link", async () => {
+test("#given a legacy payload without root CLI dist #when the worker setup runs #then it records degraded omo-cli and leaves no broken link", async () => {
 	await withBinLinkFixture(async (fixture) => {
 		const pluginRoot = await writeVersionedRoot(fixture.root, "1.0.0");
 
@@ -219,7 +248,7 @@ test("#given a marketplace payload without dist/cli #when the worker setup runs 
 		assert.ok(
 			warning.includes("skipped the omo runtime wrapper because ") &&
 				warning.includes(`${join("dist", "cli", "index.js")} is missing; `) &&
-				warning.includes("omo sparkshell/ulw-loop commands will be unavailable until a package shipping dist/cli is installed"),
+				warning.includes("omo ulw-loop commands will be unavailable until a package shipping dist/cli is installed"),
 			`bootstrap.log must carry the install-local warning text, got: ${log}`,
 		);
 	});
@@ -234,17 +263,42 @@ test("#given a payload shipping dist/cli #when the worker setup runs with no bin
 		assert.deepEqual(outcome.degraded, []);
 		const defaultBinDir = join(fixture.codexHome, "bin");
 		const wrapperName = process.platform === "win32" ? "omo.cmd" : "omo";
-		const wrapper = await readFile(join(defaultBinDir, wrapperName), "utf8");
+		const wrapperPath = join(defaultBinDir, wrapperName);
+		const wrapper = await readFile(wrapperPath, "utf8");
 		assert.ok(wrapper.includes(join(pluginRoot, "dist", "cli", "index.js")));
 		if (process.platform !== "win32") {
-			assert.ok((await stat(join(defaultBinDir, "omo"))).mode & 0o111, "the posix omo wrapper must be executable");
+			assert.ok((await stat(wrapperPath)).mode & 0o111, "the posix omo wrapper must be executable");
 			assert.equal(
 				await readlink(join(defaultBinDir, COMPONENT_BIN_NAME)),
 				join(pluginRoot, "components", "toolbox", "dist", "cli.js"),
 			);
+			const result = await execFileAsync(wrapperPath, ["--version"], {
+				env: { ...process.env, OMO_RUNTIME: "node", PATH: `${dirname(process.execPath)}:/usr/bin:/bin` },
+			});
+			assert.match(result.stdout, /omo node runtime/);
 		} else {
 			const shim = await readFile(join(defaultBinDir, `${COMPONENT_BIN_NAME}.cmd`), "utf8");
 			assert.ok(shim.includes(join(pluginRoot, "components", "toolbox", "dist", "cli.js")));
 		}
+	});
+});
+
+test("#given ulw-loop aliases in the plugin payload #when worker setup links bins #then public ULW commands point at the current component without adding SessionStart hooks", async () => {
+	await withBinLinkFixture(async (fixture) => {
+		const pluginRoot = await writeVersionedRoot(fixture.root, "1.0.0", { withUlwLoopAliases: true });
+
+		await runWorkerSetup(setupOptions(fixture, pluginRoot));
+
+		const targets = await symlinkTargets(fixture.binDir);
+		const ulwLoopCli = join(pluginRoot, "components", "ulw-loop", "dist", "cli.js");
+		assert.equal(targets.get("omo-ulw-loop"), ulwLoopCli);
+		assert.equal(targets.get("ulw"), ulwLoopCli);
+		assert.equal(targets.get("ulw-loop"), ulwLoopCli);
+		const hooks = JSON.parse(await readFile(join(pluginRoot, "hooks", "hooks.json"), "utf8"));
+		const sessionStartCommands = hooks.hooks.SessionStart.flatMap((group) => group.hooks)
+			.filter((hook) => hook.type === "command")
+			.map((hook) => hook.command)
+			.filter((command) => command.includes("components/bootstrap/dist/cli.js"));
+		assert.equal(sessionStartCommands.length, 1);
 	});
 });

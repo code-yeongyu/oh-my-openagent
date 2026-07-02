@@ -10,6 +10,7 @@ export function createAbortSessionRequest(deps: HookDeps) {
     if (
       source === "session.status.retry-signal" ||
       source === "message.updated.retry-signal" ||
+      source === "message.updated.quota-fallback" ||
       source === "session.timeout"
     ) {
       deps.internallyAbortedSessions.add(sessionID)

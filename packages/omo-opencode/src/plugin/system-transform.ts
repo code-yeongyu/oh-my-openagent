@@ -1,27 +1,21 @@
 import type { DefaultModeConfig } from "../config/schema/default-mode"
-import {
-  getSparkShellRuntimeAwareness,
-  hasSparkShellRuntimeAwareness,
-} from "../shared/sparkshell-awareness"
+import { reconcileSisyphusRuntimePrompt } from "../agents/sisyphus-runtime-prompt-reconciler"
 
 const ULTRAWORK_MODE_TAG = "<ultrawork-mode>"
 
 export function createSystemTransformHandler(
   defaultMode?: DefaultModeConfig,
   getUltraworkMessage?: (agentName?: string, modelID?: string) => string,
-  env: Readonly<Record<string, string | undefined>> = process.env,
 ): (
   input: { sessionID?: string; model: { id: string; providerID: string; [key: string]: unknown } },
   output: { system: string[] },
 ) => Promise<void> {
   return async (input, output): Promise<void> => {
-    const sparkshellAwareness = getSparkShellRuntimeAwareness(env)
-    if (
-      sparkshellAwareness.length > 0 &&
-      !output.system.some(hasSparkShellRuntimeAwareness)
-    ) {
-      output.system.push(sparkshellAwareness)
-    }
+    // The Sisyphus prompt body is model-family-specific and baked at registration
+    // from the *configured* model in oh-my-openagent.jsonc. This per-request hook
+    // is the only seam that knows the model actually selected at runtime, so
+    // rebuild the whole body for the runtime model family here (issue #5297).
+    reconcileSisyphusRuntimePrompt(output.system, input.model?.id)
 
     if (!defaultMode?.ultrawork || !getUltraworkMessage) return
 

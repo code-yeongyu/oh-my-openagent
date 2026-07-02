@@ -1,3 +1,7 @@
+/// <reference types="bun-types" />
+
+// allow: SIZE_OK - PostHog telemetry tests share one client/env fixture; this release adds telemetry config regressions and future additions should split by capture path.
+
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import type {
   TelemetryCaptureMessage,
@@ -216,6 +220,45 @@ describe("posthog disable env var parsing", () => {
       expect(captured).toHaveLength(0)
     })
   }
+
+  it("keeps OMO_SEND_ANONYMOUS_TELEMETRY=yes enabled for env compatibility", async () => {
+    // given
+    process.env.OMO_SEND_ANONYMOUS_TELEMETRY = "yes"
+    process.env.POSTHOG_API_KEY = "test-api-key"
+    const captured: CapturedPostHogMessage[] = []
+    const posthogModule = usePostHogModule(await importPostHogModule())
+    posthogModule.__setTransportFactoryForTesting(createCapturingTransportFactory(captured))
+    posthogModule.__setActivityStateProviderForTesting(() => ({
+      dayUTC: "2026-04-18",
+      captureDaily: true,
+    }))
+    const client = posthogModule.createCliPostHog()
+
+    // when
+    client.trackActive("distinct-cli", "run_started")
+
+    // then
+    expect(captured).toHaveLength(1)
+  })
+
+  it("treats configEnabled false as disabled", async () => {
+    // given
+    enableTelemetryEnv()
+    const captured: CapturedPostHogMessage[] = []
+    const posthogModule = usePostHogModule(await importPostHogModule())
+    posthogModule.__setTransportFactoryForTesting(createCapturingTransportFactory(captured))
+    posthogModule.__setActivityStateProviderForTesting(() => ({
+      dayUTC: "2026-04-18",
+      captureDaily: true,
+    }))
+    const client = posthogModule.createCliPostHog({ configEnabled: false })
+
+    // when
+    client.trackActive("distinct-cli", "run_started")
+
+    // then
+    expect(captured).toHaveLength(0)
+  })
 })
 
 describe("posthog trackActive emission contract", () => {
@@ -263,12 +306,13 @@ describe("posthog trackActive emission contract", () => {
     expect(dailyEvent?.event).toBe("omo_daily_active")
     expect(dailyEvent?.distinctId).toBe("distinct-cli")
     const properties = dailyEvent.properties ?? {}
-    const expectedPropertyKeys = ["$os", "$os_version", "$process_person_profile", "ci", "cpu_count", "cpu_model", "day_utc", "locale", "os_arch", "os_type", "package_name", "package_version", "platform", "plugin_name", "reason", "runtime", "runtime_version", "shell", "source", "terminal", "timezone", "total_memory_gb"]
+    const expectedPropertyKeys = ["$os", "$os_version", "$process_person_profile", "ci", "cpu_count", "cpu_model", "day_utc", "locale", "os_arch", "os_type", "package_name", "package_version", "platform", "plugin_name", "product_name", "reason", "runtime", "runtime_version", "shell", "source", "terminal", "timezone", "total_memory_gb"]
     expect(Object.keys(properties).sort()).toEqual(expectedPropertyKeys.sort())
     expect(properties).toMatchObject({
       platform: "oh-my-opencode",
       package_name: "oh-my-openagent",
       plugin_name: "oh-my-openagent",
+      product_name: "oh-my-openagent",
       source: "cli",
       $os: "linux",
       $os_version: "6.8.0-test",
@@ -303,5 +347,32 @@ describe("posthog trackActive emission contract", () => {
     const emittedEvents = captured.map((message) => message.event)
     expect(emittedEvents).not.toContain("omo_daily_active")
     expect(emittedEvents).not.toContain("omo_hourly_active")
+  })
+
+  it("records plugin load telemetry with the plugin_loaded reason", async () => {
+    // given
+    enableTelemetryEnv()
+    const captured: CapturedPostHogMessage[] = []
+    const posthogModule = usePostHogModule(await importPostHogModule())
+    posthogModule.__setTransportFactoryForTesting(createCapturingTransportFactory(captured))
+    posthogModule.__setActivityStateProviderForTesting(() => ({
+      dayUTC: "2026-04-18",
+      captureDaily: true,
+    }))
+
+    // when
+    posthogModule.recordPluginTelemetry({ configEnabled: true })
+
+    // then
+    expect(captured).toHaveLength(1)
+    const [dailyEvent] = captured
+    if (!dailyEvent) {
+      throw new Error("Expected plugin telemetry event")
+    }
+    expect(dailyEvent.event).toBe("omo_daily_active")
+    expect(dailyEvent.properties).toMatchObject({
+      reason: "plugin_loaded",
+      source: "plugin",
+    })
   })
 })

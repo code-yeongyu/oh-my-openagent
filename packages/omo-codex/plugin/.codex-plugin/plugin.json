@@ -1,6 +1,6 @@
 {
 	"name": "omo",
-	"version": "4.11.1",
+	"version": "4.15.1",
 	"description": "One Codex plugin namespace for Yeongyu's local Codex components.",
 	"author": {
 		"name": "Yeongyu Kim",
@@ -32,7 +32,9 @@
 		"./hooks/pre-tool-use-enforcing-unlimited-goal-budget.json",
 		"./hooks/post-tool-use-checking-comments.json",
 		"./hooks/post-tool-use-checking-lsp-diagnostics.json",
+		"./hooks/post-tool-use-checking-codegraph-init-guidance.json",
 		"./hooks/post-tool-use-matching-project-rules.json",
+		"./hooks/post-tool-use-checking-thread-title-hygiene.json",
 		"./hooks/post-compact-resetting-git-bash-mcp-reminder.json",
 		"./hooks/post-compact-resetting-project-rule-cache.json",
 		"./hooks/post-compact-resetting-lsp-diagnostics-cache.json",

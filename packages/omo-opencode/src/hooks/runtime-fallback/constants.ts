@@ -16,6 +16,7 @@ export const DEFAULT_CONFIG: Required<RuntimeFallbackConfig> = {
   cooldown_seconds: 60,
   timeout_seconds: 30,
   notify_on_fallback: true,
+  restore_primary_after_cooldown: false,
 }
 
 /**

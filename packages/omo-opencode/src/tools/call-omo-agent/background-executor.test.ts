@@ -254,4 +254,31 @@ describe("executeBackground", () => {
     if (!launchArgs) throw new Error("Expected launch arguments")
     expect(launchArgs.agent).toBe("explore")
   })
+
+  test("does not advertise background_output CTA in launch return (issue #5221)", async () => {
+    //#given - a successful launch
+    launchMock.mockResolvedValueOnce({
+      id: "test-task-id",
+      sessionId: "ses-call-omo-cta",
+      description: "Test task",
+      agent: "test-agent",
+      status: "pending",
+    })
+    getTaskMock.mockReturnValueOnce({
+      id: "test-task-id",
+      sessionId: "ses-call-omo-cta",
+      description: "Test task",
+      agent: "test-agent",
+      status: "pending",
+    })
+
+    //#when
+    const result = await executeBackground(testArgs, testContext, mockManager, mockClient)
+
+    //#then - no polling CTA, but anti-polling instruction preserved
+    expect(result).not.toContain("Use `background_output` with task_id=")
+    expect(result).not.toContain("to check.")
+    expect(result).toContain("Do NOT call background_output now")
+    expect(result).toContain("<system-reminder>")
+  })
 })

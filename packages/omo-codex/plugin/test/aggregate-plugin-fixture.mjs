@@ -68,7 +68,7 @@ export function collectCommandHooks(hooks, source) {
 			}
 			group.hooks.forEach((handler, handlerIndex) => {
 				if (typeof handler !== "object" || handler === null || handler.type !== "command") return;
-				commandHooks.push({ source, eventName, groupIndex, handlerIndex, handler });
+				commandHooks.push({ source, eventName, groupIndex, handlerIndex, matcher: group.matcher, handler });
 			});
 		});
 	}

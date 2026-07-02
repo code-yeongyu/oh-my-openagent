@@ -33,6 +33,14 @@
       "types": "./src/classify-path-environment.ts",
       "import": "./src/classify-path-environment.ts"
     },
+    "./codegraph": {
+      "types": "./src/codegraph/index.ts",
+      "import": "./src/codegraph/index.ts"
+    },
+    "./codegraph/resolve": {
+      "types": "./src/codegraph/resolve.ts",
+      "import": "./src/codegraph/resolve.ts"
+    },
     "./command-executor": {
       "types": "./src/command-executor.ts",
       "import": "./src/command-executor.ts"

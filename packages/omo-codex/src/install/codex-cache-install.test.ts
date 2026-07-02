@@ -8,37 +8,41 @@ import { join } from "node:path"
 import { installCachedPlugin } from "./codex-cache"
 
 describe("codex-cache install", () => {
-  test("#given source plugin has development-only directories #when caching plugin #then writes only the plugin payload under the versioned cache", async () => {
-    // given
-    const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-layout-"))
-    const codexHome = join(root, "codex-home")
-    const sourceRoot = join(root, "plugin")
-    await mkdir(join(sourceRoot, ".git", "objects"), { recursive: true })
-    await mkdir(join(sourceRoot, "node_modules", "left-pad"), { recursive: true })
-    await mkdir(join(sourceRoot, "components", "rules", "node_modules", "debug"), { recursive: true })
-    await writeFile(join(sourceRoot, "package.json"), JSON.stringify({ name: "@scope/omo", version: "0.1.0" }))
-    await writeFile(join(sourceRoot, ".git", "HEAD"), "ref: refs/heads/dev\n")
-    await writeFile(join(sourceRoot, "node_modules", "left-pad", "package.json"), "{}")
-    await writeFile(join(sourceRoot, "components", "rules", "node_modules", "debug", "package.json"), "{}")
-    await writeFile(join(sourceRoot, "components", "rules", "payload.txt"), "payload\n")
+  test(
+    "#given source plugin has development-only directories #when caching plugin #then writes only the plugin payload under the versioned cache",
+    async () => {
+      // given
+      const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-layout-"))
+      const codexHome = join(root, "codex-home")
+      const sourceRoot = join(root, "plugin")
+      await mkdir(join(sourceRoot, ".git", "objects"), { recursive: true })
+      await mkdir(join(sourceRoot, "node_modules", "left-pad"), { recursive: true })
+      await mkdir(join(sourceRoot, "components", "rules", "node_modules", "debug"), { recursive: true })
+      await writeFile(join(sourceRoot, "package.json"), JSON.stringify({ name: "@scope/omo", version: "0.1.0" }))
+      await writeFile(join(sourceRoot, ".git", "HEAD"), "ref: refs/heads/dev\n")
+      await writeFile(join(sourceRoot, "node_modules", "left-pad", "package.json"), "{}")
+      await writeFile(join(sourceRoot, "components", "rules", "node_modules", "debug", "package.json"), "{}")
+      await writeFile(join(sourceRoot, "components", "rules", "payload.txt"), "payload\n")
 
-    // when
-    const installed = await installCachedPlugin({
-      codexHome,
-      marketplaceName: "debug",
-      name: "omo",
-      sourcePath: sourceRoot,
-      version: "0.1.0",
-      runCommand: async () => undefined,
-    })
+      // when
+      const installed = await installCachedPlugin({
+        codexHome,
+        marketplaceName: "debug",
+        name: "omo",
+        sourcePath: sourceRoot,
+        version: "0.1.0",
+        runCommand: async () => undefined,
+      })
 
-    // then
-    expect(installed.path).toBe(join(codexHome, "plugins", "cache", "debug", "omo", "0.1.0"))
-    expect(await readFile(join(installed.path, "components", "rules", "payload.txt"), "utf8")).toBe("payload\n")
-    await expect(stat(join(installed.path, ".git"))).rejects.toThrow()
-    await expect(stat(join(installed.path, "node_modules"))).rejects.toThrow()
-    await expect(stat(join(installed.path, "components", "rules", "node_modules"))).rejects.toThrow()
-  })
+      // then
+      expect(installed.path).toBe(join(codexHome, "plugins", "cache", "debug", "omo", "0.1.0"))
+      expect(await readFile(join(installed.path, "components", "rules", "payload.txt"), "utf8")).toBe("payload\n")
+      await expect(stat(join(installed.path, ".git"))).rejects.toThrow()
+      await expect(stat(join(installed.path, "node_modules"))).rejects.toThrow()
+      await expect(stat(join(installed.path, "components", "rules", "node_modules"))).rejects.toThrow()
+    },
+    15000,
+  )
 
   test("#given source plugin references missing hook command target #when caching plugin #then previous active cache is preserved", async () => {
     // given
@@ -77,4 +81,99 @@ describe("codex-cache install", () => {
     expect(await readFile(join(cacheRoot, "package.json"), "utf8")).toBe(JSON.stringify({ name: "@scope/omo-old", version: "0.0.9" }))
     expect(await readdir(join(codexHome, "plugins", "cache", "debug", "omo"))).toEqual(["0.1.0"])
   })
+
+  test("#given npm creates workspace bin shims in the cache #when caching plugin #then plugin-owned shims are removed", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-npm-bin-"))
+    const codexHome = join(root, "codex-home")
+    const sourceRoot = join(root, "plugin")
+    const componentRoot = join(sourceRoot, "components", "ulw-loop")
+    await mkdir(join(componentRoot, "dist"), { recursive: true })
+    await writeFile(
+      join(sourceRoot, "package.json"),
+      JSON.stringify({
+        name: "@scope/omo",
+        version: "0.1.0",
+        workspaces: ["components/ulw-loop"],
+      }),
+    )
+    await writeFile(
+      join(componentRoot, "package.json"),
+      JSON.stringify({
+        name: "@code-yeongyu/codex-ulw-loop",
+        version: "0.1.0",
+        bin: { "omo-ulw-loop": "dist/cli.js" },
+      }),
+    )
+    await writeFile(join(componentRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
+
+    // when
+    const installed = await installCachedPlugin({
+      codexHome,
+      marketplaceName: "debug",
+      name: "omo",
+      sourcePath: sourceRoot,
+      version: "0.1.0",
+      runCommand: async (_command, args, options) => {
+        if (args.join(" ") !== "ci --omit=dev") return
+        const npmBinDir = join(options.cwd, "node_modules", ".bin")
+        await mkdir(npmBinDir, { recursive: true })
+        await writeFile(join(npmBinDir, "omo-ulw-loop"), "#!/bin/sh\nnode ../@code-yeongyu/codex-ulw-loop/dist/cli.js \"$@\"\n")
+        await writeFile(
+          join(npmBinDir, "omo-ulw-loop.cmd"),
+          '@echo off\r\nnode "%~dp0\\..\\@code-yeongyu\\codex-ulw-loop\\dist\\cli.js" %*\r\n',
+        )
+        await writeFile(join(npmBinDir, "other-tool.cmd"), "@echo off\r\necho preserved\r\n")
+      },
+    })
+
+    // then
+    await expect(stat(join(installed.path, "node_modules", ".bin", "omo-ulw-loop"))).rejects.toThrow()
+    await expect(stat(join(installed.path, "node_modules", ".bin", "omo-ulw-loop.cmd"))).rejects.toThrow()
+    expect(await readFile(join(installed.path, "node_modules", ".bin", "other-tool.cmd"), "utf8")).toBe("@echo off\r\necho preserved\r\n")
+  })
+
+  test(
+    "#given packaged plugin has stale aggregate skills #when caching plugin #then syncs skills after production dependencies install",
+    async () => {
+      // given
+      const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-skills-"))
+      const codexHome = join(root, "codex-home")
+      const sourceRoot = join(root, "plugin")
+      const commands: string[] = []
+      await mkdir(join(sourceRoot, "scripts"), { recursive: true })
+      await mkdir(join(sourceRoot, "skills", "ulw-plan"), { recursive: true })
+      await writeFile(join(sourceRoot, "skills", "ulw-plan", "SKILL.md"), "---\nname: ulw-plan\n---\n")
+      await writeFile(
+        join(sourceRoot, "package.json"),
+        JSON.stringify({
+          name: "@scope/omo",
+          version: "0.1.0",
+          scripts: { "sync:skills": "node scripts/sync-skills.mjs" },
+        }),
+      )
+
+      // when
+      const installed = await installCachedPlugin({
+        buildSource: false,
+        codexHome,
+        marketplaceName: "debug",
+        name: "omo",
+        sourcePath: sourceRoot,
+        version: "0.1.0",
+        runCommand: async (command, args, options) => {
+          commands.push(`${command} ${args.join(" ")}`)
+          if (command === "npm" && args.join(" ") === "run sync:skills") {
+            await mkdir(join(options.cwd, "skills", "ulw-research"), { recursive: true })
+            await writeFile(join(options.cwd, "skills", "ulw-research", "SKILL.md"), "---\nname: ulw-research\n---\n")
+          }
+        },
+      })
+
+      // then
+      expect(commands).toEqual(["npm ci --omit=dev", "npm run sync:skills"])
+      expect(await readFile(join(installed.path, "skills", "ulw-research", "SKILL.md"), "utf8")).toContain("name: ulw-research")
+    },
+    15000,
+  )
 })

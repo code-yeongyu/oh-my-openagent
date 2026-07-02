@@ -5,6 +5,18 @@ import type { SteerUlwLoopResult, UlwLoopSteeringChildGoal, UlwLoopSteeringMutat
 import { ULW_LOOP_STEERING_MUTATION_KINDS, ULW_LOOP_SUCCESS_CRITERION_USER_MODELS, UlwLoopError } from "./types.js";
 
 const SOURCES = ["user_prompt_submit", "finding", "cli"] as const satisfies readonly UlwLoopSteeringSource[];
+const STEERING_KIND_HELP = [
+	`Allowed --kind values: ${ULW_LOOP_STEERING_MUTATION_KINDS.join(", ")}`,
+	"Kind-specific required flags:",
+	"  add_subgoal: --title, --objective, --evidence, --rationale",
+	"  split_subgoal: --goal-id, --children, --evidence, --rationale",
+	"  reorder_pending: --order, --evidence, --rationale",
+	"  revise_pending_wording: --goal-id, --title or --objective, --evidence, --rationale",
+	"  revise_criterion: --goal-id, --criterion-id, one of --scenario/--expected-evidence/--user-model, --evidence, --rationale",
+	"  annotate_ledger: --evidence, --rationale",
+	"  mark_blocked_superseded: --goal-id, optional --replacements, --evidence, --rationale",
+	"Example: omo ulw-loop steer --kind annotate_ledger --evidence \"observed behavior\" --rationale \"why this changes the plan\" --json",
+].join("\n");
 
 export type CliSteeringProposal = UlwLoopSteeringProposal & { readonly goalId?: string; readonly scenario?: string; readonly expectedEvidence?: string; readonly userModel?: UlwLoopSuccessCriterionUserModel };
 
@@ -12,6 +24,7 @@ function isKind(value: string | undefined): value is UlwLoopSteeringMutationKind
 function isSource(value: string | undefined): value is UlwLoopSteeringSource { return value !== undefined && SOURCES.some((source) => source === value); }
 function isModel(value: string): value is UlwLoopSuccessCriterionUserModel { return ULW_LOOP_SUCCESS_CRITERION_USER_MODELS.some((model) => model === value); }
 function fail(message: string, code: string, details: Record<string, unknown>): never { throw new UlwLoopError(message, code, { details }); }
+function kindMessage(prefix: string): string { return `${prefix}\n\n${STEERING_KIND_HELP}`; }
 function text(value: string | undefined, field: string): string | undefined { if (value === undefined) return undefined; const trimmed = value.trim(); if (trimmed.length > 0) return trimmed; return fail(`Empty ${field}.`, "ULW_LOOP_STEERING_FIELD_EMPTY", { field }); }
 function required(argv: readonly string[], flag: string): string { const value = text(readValue(argv, flag), flag); return value ?? fail(`Missing ${flag}.`, "ULW_LOOP_STEERING_FIELD_REQUIRED", { flag }); }
 function requiredGoal(argv: readonly string[]): string { const value = text(parseGoalArg(argv), "--goal-id"); return value ?? fail("Missing --goal-id.", "ULW_LOOP_GOAL_ID_REQUIRED", { flag: "--goal-id" }); }
@@ -22,7 +35,7 @@ function objectText(value: object, key: string): string | undefined { const cand
 export function parseSteeringKind(argv: readonly string[]): UlwLoopSteeringMutationKind {
 	const value = readValue(argv, "--kind");
 	if (isKind(value)) return value;
-	return value === undefined ? fail("Missing --kind.", "ULW_LOOP_STEERING_KIND_REQUIRED", { flag: "--kind" }) : fail(`Invalid --kind: ${value}.`, "ULW_LOOP_STEERING_KIND_INVALID", { value, expected: ULW_LOOP_STEERING_MUTATION_KINDS });
+	return value === undefined ? fail(kindMessage("Missing --kind."), "ULW_LOOP_STEERING_KIND_REQUIRED", { flag: "--kind", expected: ULW_LOOP_STEERING_MUTATION_KINDS, usage: STEERING_KIND_HELP }) : fail(kindMessage(`Invalid --kind: ${value}.`), "ULW_LOOP_STEERING_KIND_INVALID", { value, expected: ULW_LOOP_STEERING_MUTATION_KINDS, usage: STEERING_KIND_HELP });
 }
 
 export function parseSteeringSource(argv: readonly string[]): UlwLoopSteeringSource {

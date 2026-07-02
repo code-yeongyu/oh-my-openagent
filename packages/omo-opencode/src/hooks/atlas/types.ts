@@ -56,4 +56,6 @@ export interface SessionState {
   stalledContinuationPlanPath?: string
   /** The plan path the in-progress no-tool-progress counter is keyed to. Changes here reset the counter. */
   activeContinuationPlanPath?: string
+  /** Top-level task keys whose completion gate already fired, used to suppress repeat 4-phase reminders. */
+  verifiedTaskKeys?: Set<string>
 }

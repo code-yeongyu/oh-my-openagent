@@ -25,6 +25,7 @@ const AGGREGATE_EXPECTED_LABELS = new Map([
 	["hooks/hooks.json:PreToolUse:1:0", "Enforcing Unlimited Goal Budget"],
 	["hooks/hooks.json:PostToolUse:0:0", "Checking Comments"],
 	["hooks/hooks.json:PostToolUse:0:1", "Checking LSP Diagnostics"],
+	["hooks/hooks.json:PostToolUse:0:2", "Checking CodeGraph Init Guidance"],
 	["hooks/hooks.json:PostToolUse:1:0", "Matching Project Rules"],
 	["hooks/hooks.json:PostCompact:0:0", "Resetting Git Bash MCP Reminder"],
 	["hooks/hooks.json:PostCompact:1:0", "Resetting Project Rule Cache"],

@@ -1,7 +1,6 @@
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
-import { setContinuationMarkerSource } from "../../features/run-continuation-state"
 import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
 import {
   dispatchInternalPrompt,
@@ -51,6 +50,7 @@ import {
   type BackgroundTaskNotificationTask,
   buildBackgroundTaskNotificationText,
 } from "./background-task-notification-template"
+import { writeBackgroundTaskMarker } from "./background-task-marker"
 import {
   findNearestMessageExcludingCompaction,
   resolvePromptContextFromSessionMessages,
@@ -307,6 +307,8 @@ export class BackgroundManager {
         client: this.client,
         directory: this.directory,
         enqueueNotificationForParent: this.enqueueNotificationForParent.bind(this),
+        onPendingWakeRequeued: (sessionID) => this.updateBackgroundTaskMarker(sessionID),
+        onScheduledFlushSettled: (sessionID) => this.updateBackgroundTaskMarker(sessionID),
       },
       {
         pendingRetryMs: PENDING_PARENT_WAKE_RETRY_MS,
@@ -1108,28 +1110,27 @@ The fallback retry session is now created and can be inspected directly.
    * would report false between the status flip and the wake landing in the pending map.
    */
   hasPendingParentWake(sessionID: string): boolean {
+    return this.hasUndeliveredParentWake(sessionID) || this.parentWakeNotifier.getDispatchedParentWakes().has(sessionID)
+  }
+
+  private hasUndeliveredParentWake(sessionID: string): boolean {
     return (
       this.parentWakeNotifier.hasNotificationPreparation(sessionID) ||
       this.parentWakeNotifier.getPendingParentWakes().has(sessionID) ||
       this.parentWakeNotifier.getPendingParentWakeTimers().has(sessionID) ||
-      this.parentWakeNotifier.hasInFlightParentWakeDispatch(sessionID) ||
-      this.parentWakeNotifier.getDispatchedParentWakes().has(sessionID)
+      this.parentWakeNotifier.hasInFlightParentWakeDispatch(sessionID)
     )
   }
 
   private updateBackgroundTaskMarker(parentSessionID: string): void {
     const tasks = this.getTasksByParentSession(parentSessionID)
     const activeTasks = tasks.filter(t => t.status === "running" || t.status === "pending")
-    if (activeTasks.length > 0) {
-      setContinuationMarkerSource(
-        this.directory, parentSessionID, "background-task", "active",
-        `${activeTasks.length} background task(s) active`,
-      )
-    } else {
-      setContinuationMarkerSource(
-        this.directory, parentSessionID, "background-task", "idle",
-      )
-    }
+    writeBackgroundTaskMarker({
+      directory: this.directory,
+      parentSessionID,
+      activeTaskCount: activeTasks.length,
+      hasUndeliveredParentWake: this.hasUndeliveredParentWake(parentSessionID),
+    })
   }
 
   getAllDescendantTasks(sessionID: string): BackgroundTask[] {
@@ -1998,6 +1999,7 @@ The fallback retry session is now created and can be inspected directly.
     const releaseNotificationPreparation = (): void => {
       if (notificationParentSessionID) {
         this.parentWakeNotifier.releaseNotificationPreparation(notificationParentSessionID)
+        this.updateBackgroundTaskMarker(notificationParentSessionID)
       }
     }
 
@@ -2718,6 +2720,7 @@ The task was re-queued on a fallback model after a retryable failure.
     } finally {
       if (notificationParentSessionID) {
         this.parentWakeNotifier.releaseNotificationPreparation(notificationParentSessionID)
+        this.updateBackgroundTaskMarker(notificationParentSessionID)
       }
     }
   }
@@ -2921,10 +2924,15 @@ The task was re-queued on a fallback model after a retryable failure.
     delayMs?: number,
   ): void {
     this.parentWakeNotifier.queuePendingParentWake(sessionID, notification, promptContext, shouldReply, delayMs)
+    this.updateBackgroundTaskMarker(sessionID)
   }
 
   private async flushPendingParentWake(sessionID: string): Promise<void> {
-    await this.parentWakeNotifier.flushPendingParentWake(sessionID)
+    try {
+      await this.parentWakeNotifier.flushPendingParentWake(sessionID)
+    } finally {
+      this.updateBackgroundTaskMarker(sessionID)
+    }
   }
 
   private hasRunningTasks(): boolean {

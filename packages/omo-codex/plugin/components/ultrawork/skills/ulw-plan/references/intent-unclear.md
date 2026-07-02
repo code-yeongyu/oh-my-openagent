@@ -26,7 +26,7 @@ Fold a contrarian self-grill into the Metis spawn: challenge the single highest-
 </default_selection>
 
 <high_accuracy_auto>
-Because the human did not steer, adversarial review SUBSTITUTES for the interview you skipped - this is what catches a bad default. After the plan is written, run Metis gap analysis (always) AND the dual high-accuracy review (both Momus passes; see `full-workflow.md`) AUTOMATICALLY - no "do you want a review?" question. Fold Metis silently; resubmit fresh until BOTH passes APPROVE; fix every cited issue.
+Because the human did not steer, adversarial review SUBSTITUTES for the interview you skipped - this is what catches a bad default. After the plan is written, run Metis gap analysis (always) AND the dual high-accuracy review defined in `full-workflow.md` AUTOMATICALLY - no "do you want a review?" question. Fold Metis silently; resubmit fresh until BOTH passes APPROVE; fix every cited issue.
 
 TRIVIAL-TIER GUARD: if Classify sized the work Trivial, the auto-Momus loop is SUPPRESSED (Metis still runs once) - a vague-but-tiny request ("clean this up") must not trigger the full adversarial loop. UNCLEAR raises the research-plus-default posture; it does not override the Trivial cost guard for Momus.
 </high_accuracy_auto>

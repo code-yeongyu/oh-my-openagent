@@ -1,0 +1,2 @@
+$ git diff --check origin/dev..HEAD
+EXIT_CODE=0
