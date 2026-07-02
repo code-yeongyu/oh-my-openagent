@@ -58,6 +58,7 @@ test("#given planning and execution workflows #when inspected #then they carry t
 	const workflowCopies = [
 		await readSkillCopy("shared:ulw-plan/SKILL.md", join(sharedRoot, "ulw-plan", "SKILL.md")),
 		await readSkillCopy("shared:ulw-plan/full-workflow.md", join(sharedRoot, "ulw-plan", "references", "full-workflow.md")),
+		await readSkillCopy("shared:ulw-plan/scaffold-plan.mjs", join(sharedRoot, "ulw-plan", "scripts", "scaffold-plan.mjs")),
 		await readSkillCopy(
 			"component:ulw-plan/SKILL.md",
 			join(pluginRoot, "components", "ultrawork", "skills", "ulw-plan", "SKILL.md"),
@@ -66,8 +67,13 @@ test("#given planning and execution workflows #when inspected #then they carry t
 			"component:ulw-plan/full-workflow.md",
 			join(pluginRoot, "components", "ultrawork", "skills", "ulw-plan", "references", "full-workflow.md"),
 		),
+		await readSkillCopy(
+			"component:ulw-plan/scaffold-plan.mjs",
+			join(pluginRoot, "components", "ultrawork", "skills", "ulw-plan", "scripts", "scaffold-plan.mjs"),
+		),
 		await readSkillCopy("packaged:ulw-plan/SKILL.md", join(pluginRoot, "skills", "ulw-plan", "SKILL.md")),
 		await readSkillCopy("packaged:ulw-plan/full-workflow.md", join(pluginRoot, "skills", "ulw-plan", "references", "full-workflow.md")),
+		await readSkillCopy("packaged:ulw-plan/scaffold-plan.mjs", join(pluginRoot, "skills", "ulw-plan", "scripts", "scaffold-plan.mjs")),
 		await readSkillCopy(
 			"component:ulw-loop/full-workflow.md",
 			join(pluginRoot, "components", "ulw-loop", "skills", "ulw-loop", "references", "full-workflow.md"),
