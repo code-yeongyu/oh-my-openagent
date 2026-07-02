@@ -90,7 +90,27 @@ export function missingTrustEntryIds(hooks, records) {
 }
 
 export function isOmoOwnedTrustEntry(id, entry, recordsById, hooksManifestPath) {
-  return recordsById.has(id) || (isRecord(entry) && entry.sourcePath === hooksManifestPath);
+  if (recordsById.has(id)) {
+    return true;
+  }
+  if (!isRecord(entry)) {
+    return false;
+  }
+  if (entry.sourcePath === hooksManifestPath) {
+    return true;
+  }
+  if (typeof entry.sourcePath !== "string" || typeof entry.commandPreview !== "string") {
+    return false;
+  }
+  const sourcePath = entry.sourcePath.replaceAll("\\", "/");
+  const commandPreview = entry.commandPreview.replaceAll("\\", "/");
+  return (
+    sourcePath.endsWith("/senpi/hooks/omo-senpi-hooks.json") &&
+    (
+      commandPreview.includes("components/run-hook.mjs") ||
+      /(?:^|[^\w.-])senpi\/components\/[^/\s"']+\/dist\/cli\.js(?:$|[^\w.-])/.test(commandPreview)
+    )
+  );
 }
 
 function hashCommandHook(input) {

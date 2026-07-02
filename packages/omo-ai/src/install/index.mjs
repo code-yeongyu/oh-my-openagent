@@ -27,6 +27,27 @@ export function inspectSenpiInstall(options = {}) {
   return createReport(context, settings, trustState, [], options.updatedAt ?? new Date().toISOString(), "doctor");
 }
 
+export function ensureOmoHookTrust(options = {}) {
+  const context = createContext(options);
+  const updatedAt = options.updatedAt ?? new Date().toISOString();
+  const settings = readJsonObject(context.paths.settingsPath, {});
+  const trustState = readJsonObject(context.paths.hooksStatePath, emptyHookTrustState());
+  assertSettingsShape(settings, context.paths.settingsPath);
+  assertTrustStateShape(trustState, context.paths.hooksStatePath);
+
+  const backupPaths = [];
+  const nextTrustState = ensureOmoTrustEntries(trustState, context, updatedAt);
+  if (!jsonEqual(trustState, nextTrustState)) {
+    const backupPath = backupIfPresent(context.paths.hooksStatePath);
+    if (backupPath) {
+      backupPaths.push(backupPath);
+    }
+    writeJsonObject(context.paths.hooksStatePath, nextTrustState);
+  }
+
+  return createReport(context, settings, nextTrustState, backupPaths, updatedAt, "trust");
+}
+
 function mutateSenpiInstall(options) {
   const context = createContext(options);
   const updatedAt = options.updatedAt ?? new Date().toISOString();
@@ -156,7 +177,12 @@ function createReport(context, settings, trustState, backupPaths, updatedAt, act
   const missingTrustEntries = missingTrustEntryIds(hooks, records);
   const omoTrustEntryCount = countTrustedOmoEntries(hooks, records);
   const problems = [];
-  if (packageEntryCount !== 1 && action !== "uninstall") {
+  const hasPackageEntryProblem = action === "repair"
+    ? packageEntryCount !== 1
+    : action === "doctor"
+      ? packageEntryCount > 1
+      : false;
+  if (hasPackageEntryProblem) {
     problems.push(`Expected exactly one omo-ai package entry, found ${packageEntryCount}.`);
   }
   if (missingTrustEntries.length > 0 && action !== "uninstall") {

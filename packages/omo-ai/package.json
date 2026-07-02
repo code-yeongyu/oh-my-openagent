@@ -13,7 +13,8 @@
     "tsconfig.json"
   ],
   "bin": {
-    "omo-ai": "./src/cli/index.mjs"
+    "omo-ai": "./src/cli/index.mjs",
+    "omoai": "./src/cli/omoai.mjs"
   },
   "exports": {
     ".": {

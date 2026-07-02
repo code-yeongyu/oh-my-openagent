@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const repositoryRoot = join(import.meta.dir, "../../..");
@@ -37,6 +37,18 @@ function requireRecord(
     throw new TypeError(`${key} must be a JSON object`);
   }
   return value;
+}
+
+function listMarkdownFiles(root: string): readonly string[] {
+  return readdirSync(root)
+    .flatMap((entryName) => {
+      const entryPath = join(root, entryName);
+      if (statSync(entryPath).isDirectory()) {
+        return listMarkdownFiles(entryPath);
+      }
+      return entryName.endsWith(".md") ? [entryPath] : [];
+    })
+    .sort();
 }
 
 describe("omo-ai package skeleton", () => {
@@ -78,6 +90,7 @@ describe("omo-ai package skeleton", () => {
     expect(packageManifest["type"]).toBe("module");
     expect(requireRecord(packageManifest, "bin")).toEqual({
       "omo-ai": "./src/cli/index.mjs",
+      omoai: "./src/cli/omoai.mjs",
     });
     expect(requireStringArray(packageManifest, "keywords")).toContain("pi-package");
     expect(requireRecord(packageManifest, "scripts")["postinstall"]).toBe(
@@ -116,5 +129,17 @@ describe("omo-ai package skeleton", () => {
 
     // Then: the skeleton has a tracked placeholder for every required area.
     expect(missingDirectories).toEqual([]);
+  });
+
+  it("keeps the senpi skills directory free of placeholder markdown skills", () => {
+    // Given: Senpi parses package skill files from senpi/skills/**/*.md.
+    const skillsDirectory = join(packageRoot, "senpi/skills");
+
+    // When: the packaged skills directory is inspected.
+    const markdownSkillFiles = listMarkdownFiles(skillsDirectory);
+
+    // Then: the empty skeleton directory is tracked without a README.md that Senpi parses as a skill.
+    expect(existsSync(join(skillsDirectory, ".gitkeep"))).toBe(true);
+    expect(markdownSkillFiles).toEqual([]);
   });
 });

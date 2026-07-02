@@ -14,6 +14,7 @@ declare module "node:fs" {
     path: string,
     options: { readonly recursive: boolean; readonly force: boolean },
   ): void;
+  export function statSync(path: string): { isDirectory(): boolean };
   export function writeFileSync(path: string, data: string, encoding: "utf8"): void;
 }
 

@@ -6,7 +6,6 @@ import {
   cleanupAgentFixture,
   createAgentFixture,
   createEmptyAgentFixture,
-  expectedHookRecords,
   isRecord,
   packageEntries,
   packageRoot,
@@ -14,6 +13,7 @@ import {
   readJsonObject,
   runCli,
 } from "./installer-test-support";
+import { expectedHookRecords } from "./installer-hook-trust-test-support";
 
 describe("omo-ai senpi installer CLI repair and uninstall", () => {
   it("repairs settings and hook trust idempotently when an isolated agent dir is provided", () => {
@@ -56,6 +56,16 @@ describe("omo-ai senpi installer CLI repair and uninstall", () => {
       for (const record of expectedRecords) {
         expect(hooks[record.id]).toEqual(record.entry);
       }
+      expect(hooks["hk_stale_omo_direct_component"]).toBe(undefined);
+      const expectedRecordIds = new Set(expectedRecords.map((record) => record.id));
+      expect(
+        Object.entries(hooks).some(([id, entry]) => {
+          return isRecord(entry) &&
+            !expectedRecordIds.has(id) &&
+            typeof entry["sourcePath"] === "string" &&
+            entry["sourcePath"].includes("packages/omo-ai/senpi/hooks/omo-senpi-hooks.json");
+        }),
+      ).toBe(false);
       expect(hooks["hk_unrelated"] !== undefined).toBe(true);
       expect(String(firstReport["backupPaths"])).toContain(`${settingsPath}.bak.`);
       expect(String(firstReport["backupPaths"])).toContain(`${hooksStatePath}.bak.`);
