@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { accessSync, constants, realpathSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { findPackageRoot } from "../senpi-compat/package-root.mjs";
@@ -82,11 +82,8 @@ function resolveWindowsPathCommand(command, env) {
   for (const dir of pathDirs) {
     for (const ext of pathExts) {
       const candidate = join(dir, `${command}${ext}`);
-      try {
-        accessSync(candidate, constants.F_OK);
+      if (existsSync(candidate)) {
         return candidate;
-      } catch {
-        // Keep searching PATH.
       }
     }
   }
