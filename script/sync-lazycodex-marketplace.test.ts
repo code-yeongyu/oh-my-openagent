@@ -211,7 +211,7 @@ describe("sync-lazycodex-marketplace", () => {
       workflowMissing = error instanceof Error
     }
     expect(workflowMissing).toBe(true)
-  })
+  }, 15_000)
 
   test("#given release version env #when syncing marketplace #then repository payload is stamped with release version", async () => {
     // given

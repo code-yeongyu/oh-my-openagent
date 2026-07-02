@@ -8,7 +8,6 @@ import { DEFAULT_SERVER_PORT, findAvailablePort, getAvailableServerPort, isPortA
 
 const DEFAULT_HOSTNAME = "127.0.0.1"
 const MAX_PORT_ATTEMPTS = 20
-const EXHAUSTED_PORT_COUNT = MAX_PORT_ATTEMPTS + 1
 const CONTIGUOUS_SEARCH_WINDOW = 256
 const CONTIGUOUS_SEARCH_SEEDS = 8
 
@@ -18,6 +17,11 @@ type TimeoutProbeResult = {
   closeCallCount: number
   isAvailable: boolean
   server: Server | undefined
+}
+
+type BlockedRangeProbeResult = {
+  errorMessage: string | undefined
+  probedPorts: number[]
 }
 
 function getRequiredPropertyDescriptor(target: object, propertyName: string): PropertyDescriptor {
@@ -295,6 +299,51 @@ async function runTimedOutAvailabilityProbe(port: number): Promise<TimeoutProbeR
   }
 }
 
+async function runBlockedRangeAvailabilityProbe(startPort: number): Promise<BlockedRangeProbeResult> {
+  const listenDescriptor = getRequiredPropertyDescriptor(Server.prototype, "listen")
+  const closeDescriptor = getRequiredPropertyDescriptor(Server.prototype, "close")
+  const probedPorts: number[] = []
+  let errorMessage: string | undefined
+
+  Object.defineProperty(Server.prototype, "listen", {
+    configurable: true,
+    value: function listenWithBlockedRange(this: Server, requestedPort: number): Server {
+      if (requestedPort >= startPort && requestedPort < startPort + MAX_PORT_ATTEMPTS) {
+        probedPorts.push(requestedPort)
+        queueMicrotask(() => {
+          this.emit("error", Object.assign(new Error(`mocked port ${requestedPort} unavailable`), { code: "EADDRINUSE" }))
+        })
+        return this
+      }
+
+      queueMicrotask(() => this.emit("listening"))
+      return this
+    },
+  })
+  Object.defineProperty(Server.prototype, "close", {
+    configurable: true,
+    value: function closeMockedServer(this: Server, callback?: (error?: Error) => void): Server {
+      queueMicrotask(() => callback?.())
+      return this
+    },
+  })
+
+  try {
+    try {
+      await findAvailablePort(startPort)
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error
+      }
+      errorMessage = error.message
+    }
+    return { errorMessage, probedPorts }
+  } finally {
+    Object.defineProperty(Server.prototype, "listen", listenDescriptor)
+    Object.defineProperty(Server.prototype, "close", closeDescriptor)
+  }
+}
+
 describe("port-utils", () => {
   beforeAll(() => {
     trackedServers.clear()
@@ -404,20 +453,12 @@ describe("port-utils", () => {
     })
 
     test("#when every attempted port is blocked #then throws", async () => {
-      const startPort = await findContiguousAvailableStart(EXHAUSTED_PORT_COUNT)
-      await startConsecutiveBlockers(startPort, EXHAUSTED_PORT_COUNT)
+      const startPort = 40_000
 
-      let errorMessage: string | undefined
-      try {
-        await findAvailablePort(startPort)
-      } catch (error) {
-        if (!(error instanceof Error)) {
-          throw error
-        }
-        errorMessage = error.message
-      }
+      const { errorMessage, probedPorts } = await runBlockedRangeAvailabilityProbe(startPort)
 
       expect(errorMessage).toBe(`No available port found in range ${startPort}-${startPort + MAX_PORT_ATTEMPTS - 1}`)
+      expect(probedPorts).toEqual(Array.from({ length: MAX_PORT_ATTEMPTS }, (_, offset) => startPort + offset))
     })
   })
 
