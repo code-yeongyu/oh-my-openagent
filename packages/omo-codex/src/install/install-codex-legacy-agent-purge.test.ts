@@ -5,11 +5,8 @@ import { describe, expect, test } from "bun:test"
 import { lstat, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { runCodexInstaller } from "./install-codex"
-
-const INSTALL_CODEX_LEGACY_AGENT_PURGE_TIMEOUT_MS = 20_000
-
-const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
+import { updateCodexConfig } from "./codex-config-toml"
+import { purgeRetiredManagedAgentFiles } from "./retired-managed-agent-purge"
 
 const LEGACY_MANAGED_ULTRAWORK_REVIEWER_TOML = `name = "codex-ultrawork-reviewer"
 description = "Strict ultrawork verification reviewer. Use after full QA evidence to audit the diff, goal, and scenario evidence before declaring done."
@@ -35,10 +32,9 @@ Be concise, specific, and strict."""
 `
 
 describe("install-codex legacy agent purge", () => {
-  test("#given retired managed reviewer artifacts and user agents #when installing omo #then purges only managed legacy reviewer artifacts", async () => {
+  test("#given retired managed reviewer artifacts and user agents #when cleaning legacy agents #then purges only managed legacy reviewer artifacts", async () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-retired-reviewer-"))
-    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-retired-reviewer-"))
     const agentsDir = join(codexHome, "agents")
     await mkdir(agentsDir, { recursive: true })
     await writeFile(
@@ -56,7 +52,7 @@ describe("install-codex legacy agent purge", () => {
     await writeFile(join(agentsDir, "user-custom.toml"), 'name = "user-custom"\nmodel = "gpt-5.5"\n')
 
     // when
-    await runCodexInstaller({ codexHome, binDir, repoRoot: process.cwd(), astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
+    await runLegacyAgentCleanup({ codexHome })
 
     // then
     const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
@@ -64,12 +60,11 @@ describe("install-codex legacy agent purge", () => {
     expect(configContent).not.toContain('config_file = "./agents/codex-ultrawork-reviewer.toml"')
     expect(await pathExists(join(agentsDir, "codex-ultrawork-reviewer.toml"))).toBe(false)
     expect(await readFile(join(agentsDir, "user-custom.toml"), "utf8")).toBe('name = "user-custom"\nmodel = "gpt-5.5"\n')
-  }, { timeout: INSTALL_CODEX_LEGACY_AGENT_PURGE_TIMEOUT_MS })
+  })
 
-  test("#given custom file using retired reviewer filename #when installing omo #then preserves the unproven user TOML", async () => {
+  test("#given custom file using retired reviewer filename #when cleaning legacy agents #then preserves the unproven user TOML", async () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-custom-reviewer-"))
-    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-custom-reviewer-"))
     const agentsDir = join(codexHome, "agents")
     const customReviewer = 'name = "codex-ultrawork-reviewer"\ndescription = "My local reviewer override"\n'
     await mkdir(agentsDir, { recursive: true })
@@ -80,14 +75,30 @@ describe("install-codex legacy agent purge", () => {
     await writeFile(join(agentsDir, "codex-ultrawork-reviewer.toml"), customReviewer)
 
     // when
-    await runCodexInstaller({ codexHome, binDir, repoRoot: process.cwd(), astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
+    await runLegacyAgentCleanup({ codexHome })
 
     // then
     const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
     expect(configContent).not.toContain("[agents.codex-ultrawork-reviewer]")
     expect(await readFile(join(agentsDir, "codex-ultrawork-reviewer.toml"), "utf8")).toBe(customReviewer)
-  }, { timeout: INSTALL_CODEX_LEGACY_AGENT_PURGE_TIMEOUT_MS })
+  })
 })
+
+async function runLegacyAgentCleanup(input: { readonly codexHome: string }): Promise<void> {
+  await purgeRetiredManagedAgentFiles({ codexHome: input.codexHome })
+  await updateCodexConfig({
+    configPath: join(input.codexHome, "config.toml"),
+    repoRoot: join(process.cwd(), "packages", "omo-codex"),
+    marketplaceName: "sisyphuslabs",
+    marketplaceSource: {
+      sourceType: "git",
+      source: "https://github.com/code-yeongyu/lazycodex.git",
+      ref: "main",
+    },
+    pluginNames: ["omo"],
+    agentConfigs: [],
+  })
+}
 
 async function pathExists(path: string): Promise<boolean> {
   try {
