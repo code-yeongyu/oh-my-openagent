@@ -157,7 +157,8 @@ function applyFailClosedStrip(output: BtwContextStripOutput, isMarked: BtwMarker
     const stripIndices = computeFailClosedStripIndices(output.messages, isMarked)
     removeMessagesInPlace(output.messages, stripIndices)
   } catch (error) {
-    log("[btw-context-strip] fail-closed strip failed", { error: String(error) })
+    log("[btw-context-strip] fail-closed strip failed, clearing all messages", { error: String(error) })
+    output.messages.length = 0
   }
 }
 

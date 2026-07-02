@@ -314,4 +314,25 @@ describe("createBtwContextStripHook", () => {
       })
     })
   })
+
+  describe("#given computeFailClosedStripIndices itself throws (B3-v2 fallback)", () => {
+    describe("#when the fail-closed fallback cannot compute trusted strip indices", () => {
+      it("#then clears all messages when index computation fails in applyFailClosedStrip", async () => {
+        const opening = buildUserMessage("public opening")
+        Object.defineProperty(opening, "parts", {
+          configurable: true,
+          get() {
+            throw new Error("forced index-computation failure")
+          },
+        })
+        const messages = [opening, buildAssistantMessage(SECRET)]
+        const neverMarked: BtwMarkerPredicate = () => false
+        const output = { messages }
+
+        await createBtwContextStripHook(neverMarked)(undefined, output)
+
+        expect(output.messages).toHaveLength(0)
+      })
+    })
+  })
 })
