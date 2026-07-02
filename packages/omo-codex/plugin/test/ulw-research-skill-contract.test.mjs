@@ -245,22 +245,22 @@ test("#given ulw-research default swarm #when team guidance is inspected #then t
 	}
 });
 
-test("#given ulw-research non-code verification #when the gate is inspected #then a claim ledger / verified-claims data-flow-lock exists", async () => {
+test("#given ulw-research non-code verification #when the gate is inspected #then a claim graph / verified-claims data-flow-lock exists", async () => {
 	for (const copy of await readUlwResearchCopies()) {
 		assert.match(
 			copy.content,
-			/claim ledger|verified-claims/i,
-			`${copy.label}: body must define the non-code claim-ledger verification gate`,
+			/claim graph|verified-claims/i,
+			`${copy.label}: body must define the non-code claim-graph verification gate`,
 		);
 	}
 });
 
-test("#given ulw-research claim ledger #when ownership is inspected #then workers never write the ledger / verified-claims artifact", async () => {
+test("#given ulw-research claim graph #when ownership is inspected #then workers never write the graph / verified-claims artifact", async () => {
 	for (const copy of await readUlwResearchCopies()) {
 		assert.doesNotMatch(
 			copy.content,
-			/worker[^.]*\b(?:write|append|create)s?\b[^.]*(?:ledger|verified-claims)/i,
-			`${copy.label}: workers must not be instructed to write/append/create the ledger or verified-claims`,
+			/worker[^.]*\b(?:write|append|create)s?\b[^.]*(?:claim[- ]graph|verified-claims)/i,
+			`${copy.label}: workers must not be instructed to write/append/create the claim graph or verified-claims`,
 		);
 	}
 });

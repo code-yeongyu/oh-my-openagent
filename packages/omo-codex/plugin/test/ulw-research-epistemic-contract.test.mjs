@@ -38,10 +38,17 @@ test("#given ulw-research epistemic instrumentation #when the research contract 
 		assert.match(section, /intent-diff\.md/i, `${copy.label}: body must require an intent-vs-reality diff artifact`);
 		assert.match(section, /expected truth/i, `${copy.label}: intent diff must record expected truth`);
 		assert.match(section, /observed reality/i, `${copy.label}: intent diff must record observed reality`);
-		assert.match(section, /diff/i, `${copy.label}: intent diff must record the gap`);
+		assert.match(section, /diff, violated invariant/i, `${copy.label}: intent diff must record the diff gap field and violated invariant`);
 		assert.match(section, /claim-graph\.md/i, `${copy.label}: body must require a claim graph`);
 		assert.match(section, /independent observation groups/i, `${copy.label}: claim graph must track independent observation groups`);
 		assert.match(section, /convergence status/i, `${copy.label}: claim graph must track convergence status`);
+		const claimGraphBullet = section.split("\n").find((line) => line.includes("`claim-graph.md`"));
+		assert.notEqual(claimGraphBullet, undefined, `${copy.label}: claim graph bullet must exist`);
+		assert.match(claimGraphBullet, /single claim store/i, `${copy.label}: claim graph must be the single claim store`);
+		assert.match(claimGraphBullet, /risk tier/i, `${copy.label}: claim graph nodes must carry a risk tier`);
+		assert.match(claimGraphBullet, /counter-search/i, `${copy.label}: claim graph nodes must carry the counter-search result`);
+		assert.match(claimGraphBullet, /primary source/i, `${copy.label}: claim graph nodes must carry primary source backing`);
+		assert.match(claimGraphBullet, /verified-claims/i, `${copy.label}: cleared nodes must feed the verified-claims digest`);
 		assert.match(section, /observation-manifest\.md/i, `${copy.label}: body must require an observation manifest`);
 		assert.match(section, /observer group/i, `${copy.label}: observation manifest must record observer groups`);
 		assert.match(section, /independence basis/i, `${copy.label}: observation manifest must record independence basis`);
@@ -77,5 +84,15 @@ test("#given ulw-research observation instrumentation #when worker ownership is 
 			/worker[^.]*\b(?:write|append|create)s?\b[^.]*(?:intent-diff|observation-manifest|claim-graph|verification-economics|cause-disappearance)/i,
 			`${copy.label}: workers must not write instrumentation artifacts directly`,
 		);
+	}
+});
+
+test("#given the claim graph as the single claim store #when the retired ledger is scanned #then claim-ledger is gone and the gate lives on graph nodes", async () => {
+	for (const copy of await readUlwResearchCopies()) {
+		assert.doesNotMatch(copy.content, /claim[- ]ledger/i, `${copy.label}: the retired claim-ledger artifact must not appear`);
+		const phase3b = markdownSection(copy.content, "## Phase 3b — Lock non-code claims through the claim graph", "## Phase 4 — Synthesize");
+		assert.match(phase3b, /claim-graph\.md/i, `${copy.label}: the gate must record outcomes on claim-graph nodes`);
+		assert.match(phase3b, /verified-claims/i, `${copy.label}: the verified-claims allowlist digest must survive the merge`);
+		assert.match(phase3b, /sole allowlist/i, `${copy.label}: the data-flow-lock must stay self-enforcing`);
 	}
 });
