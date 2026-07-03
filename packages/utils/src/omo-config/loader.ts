@@ -48,6 +48,7 @@ type MutableOmoConfig = {
 const CODEGRAPH_SETTING_KEYS: readonly CodegraphSettingKey[] = [
   "auto_provision",
   "enabled",
+  "excluded_roots",
   "install_dir",
   "telemetry",
   "watch_debounce_ms",
@@ -112,6 +113,11 @@ function isKnownHarnessBlockKey(key: string): boolean {
 }
 
 function validateCodegraphValue(key: CodegraphSettingKey, value: unknown): string | null {
+  if (key === "excluded_roots") {
+    return Array.isArray(value) && value.every((entry) => typeof entry === "string")
+      ? null
+      : "must be an array of strings"
+  }
   if (key === "install_dir") return typeof value === "string" ? null : "must be a string"
   if (key === "watch_debounce_ms") {
     return typeof value === "number" && Number.isFinite(value) && value >= 0
@@ -128,6 +134,11 @@ function setCodegraphSetting(config: MutableCodegraphConfig, key: CodegraphSetti
       return
     case "enabled":
       if (typeof value === "boolean") config.enabled = value
+      return
+    case "excluded_roots":
+      if (Array.isArray(value) && value.every((entry) => typeof entry === "string")) {
+        config.excluded_roots = value
+      }
       return
     case "install_dir":
       if (typeof value === "string") config.install_dir = value
