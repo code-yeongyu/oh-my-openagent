@@ -237,8 +237,17 @@ describe("codex ultrawork hook", () => {
 		const directive = parsed.hookSpecificOutput.additionalContext;
 		expect(directive).toMatch(/A silent wait is not a child-state transition/);
 		expect(directive).toMatch(/must not by itself\s+trigger `TASK STILL ACTIVE`/);
+		expect(directive).toMatch(/TASK STILL ACTIVE:[\s\S]*only to a running child/);
+		expect(directive).toMatch(/explicitly reported `BLOCKED:`/);
+		expect(directive).toMatch(/do not\s+send another followup/);
 		expect(directive).not.toMatch(/After two silent waits/);
 		expect(directive).not.toMatch(/After four silent/);
+		expect(directive).not.toMatch(
+			/Fallback only when the child is completed without the\s+deliverable, ack-only, or no longer running/,
+		);
+		expect(directive).not.toMatch(
+			/TASK STILL ACTIVE:[^\n]*only when\s*\n\s*the child has completed without the deliverable/,
+		);
 	});
 
 	it("#given directive #when inspected #then hardens Codex subagent assignment ambiguity", () => {

@@ -275,11 +275,14 @@ review passes, and `BLOCKED: <reason>` only when it cannot progress.
 Track spawned agent names locally. Use `multi_agent_v1.wait_agent` for mailbox
 signals, but a timeout only means no new mailbox update arrived.
 Treat a running child as alive and keep doing independent root work.
-Fallback only when the child is completed without the
-deliverable, ack-only, or no longer running. If that followup is still
-silent or ack-only, record the result as inconclusive, do not count it
-as approval/pass, close it if safe, and respawn a smaller
-`fork_context: false` task with the missing deliverable.
+Send `TASK STILL ACTIVE: return <deliverable> or BLOCKED: <reason>` only
+to a running child when a targeted followup can still recover the lane.
+Fallback only when the child has completed without the deliverable,
+explicitly reported `BLOCKED:`, is no longer running, or responded
+ack-only after a targeted followup. In fallback, record the result as
+inconclusive, do not count it as approval/pass, close it if safe, and
+respawn a smaller `fork_context: false` task with the missing
+deliverable.
 
 # Subagent-dependent transition barrier
 Do not mark an `update_plan` step `completed` while an active child owns
@@ -290,15 +293,15 @@ that feed the plan have returned or been closed as inconclusive.
 Do not write the final answer, PR handoff, or completion summary while
 active child agents remain open. Use short `multi_agent_v1.wait_agent` cycles.
 A silent wait is not a child-state transition and must not by itself
-trigger `TASK STILL ACTIVE`, `close_agent`, or a respawn. Send
-`TASK STILL ACTIVE: return <deliverable> or BLOCKED: <reason>` only when
-the child has completed without the deliverable, responded ack-only
-after a targeted followup, explicitly reported `BLOCKED:`, or is no
-longer running. If no final status or completion signal exists, treat
-the child as still active and continue independent root work. Close the
-lane as inconclusive and respawn smaller only after one of those
-non-running or non-delivering states is observed and the deliverable is
-still required.
+trigger `TASK STILL ACTIVE`, `close_agent`, or a respawn. If no final
+status or completion signal exists, treat the child as still active and
+continue independent root work. Send `TASK STILL ACTIVE: return
+<deliverable> or BLOCKED: <reason>` only to a running child when a
+targeted followup can still recover the lane. When the child has
+completed without the deliverable, explicitly reported `BLOCKED:`, is no
+longer running, or responded ack-only after a targeted followup, do not
+send another followup; record the lane as inconclusive and respawn
+smaller only if the deliverable is still required.
 
 # Verification gate (TRIGGERED, NOT OPTIONAL)
 
