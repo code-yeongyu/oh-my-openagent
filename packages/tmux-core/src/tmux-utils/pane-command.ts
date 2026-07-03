@@ -2,10 +2,14 @@ import { shellEscapeForDoubleQuotedCommand } from "@oh-my-opencode/utils"
 
 const TMUX_COMMAND_SHELL = "/bin/sh"
 
+function shellSingleQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`
+}
+
 export function buildTmuxAttachCommand(serverUrl: string, sessionId: string, directory: string = process.cwd()): string {
   const escapedUrl = shellEscapeForDoubleQuotedCommand(serverUrl)
   const escapedSessionId = shellEscapeForDoubleQuotedCommand(sessionId)
-  const escapedDirectory = shellEscapeForDoubleQuotedCommand(directory || process.cwd())
+  const escapedDirectory = shellEscapeForDoubleQuotedCommand(shellSingleQuote(directory || process.cwd()))
   return `${TMUX_COMMAND_SHELL} -c "opencode attach ${escapedUrl} --session ${escapedSessionId} --dir ${escapedDirectory}"`
 }
 

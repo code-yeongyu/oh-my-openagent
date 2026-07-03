@@ -27,6 +27,22 @@ describe("buildTmuxAttachCommand", () => {
     expect(cmd).toContain('\\"')
     expect(cmd).toContain("\\$")
   })
+
+  it("quotes directory paths with spaces for the inner shell", () => {
+    const cmd = buildTmuxAttachCommand(
+      "http://localhost:3000",
+      "ses_abc123",
+      "/Users/me/Library/Mobile Documents/project",
+    )
+
+    expect(cmd).toContain("--dir '/Users/me/Library/Mobile Documents/project'")
+  })
+
+  it("quotes directory paths with apostrophes for the inner shell", () => {
+    const cmd = buildTmuxAttachCommand("http://localhost:3000", "ses_abc123", "/tmp/Bob's Project")
+
+    expect(cmd).toContain("--dir '/tmp/Bob'\\\\''s Project'")
+  })
 })
 
 describe("buildTmuxPlaceholderCommand", () => {
