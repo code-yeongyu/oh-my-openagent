@@ -34,6 +34,7 @@ const forbiddenSourcePatterns: readonly ForbiddenSourcePattern[] = [
   { pattern: /packages\/omo-codex\/plugin/ },
   { pattern: /packages\/omo-senpi\/plugin/ },
   { pattern: /@earendil-works\/pi-/ },
+  { pattern: /@mariozechner\/pi-/ },
   { pattern: /plugin\/components/ },
   {
     pattern: /\b(?:SessionStart|UserPromptSubmit|PreToolUse|PostToolUse|PostCompact|Stop|SubagentStop)\b/,
