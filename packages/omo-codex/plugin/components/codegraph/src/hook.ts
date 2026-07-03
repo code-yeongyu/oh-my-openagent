@@ -8,6 +8,10 @@ import { fileURLToPath } from "node:url";
 import { buildCodegraphChildEnv, buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
 import { buildCodegraphInitGuidanceForToolResult } from "../../../../../utils/src/codegraph/guidance.ts";
 import { resolveCodegraphCommand } from "../../../../../utils/src/codegraph/resolve.ts";
+import {
+	pruneDeadCodegraphProjectStores,
+	shouldExcludeCodegraphProject,
+} from "../../../../../utils/src/codegraph/workspace.ts";
 import { getCodexOmoConfig } from "../../../shared/src/config-loader.ts";
 import { resolveCodegraphCommandInvocation, SESSION_START_CWD_ENV } from "./session-start-worker.js";
 import type {
@@ -57,9 +61,18 @@ export async function executeCodegraphSessionStartHook(options: SessionStartHook
 	const projectRoot = resolveProjectRoot(input, options.cwd ?? processCwd());
 	const homeDir = resolveHomeDir(env);
 	const config = options.config ?? getCodexOmoConfig({ cwd: projectRoot, env, homeDir });
+	pruneCodegraphProjectStoresBestEffort(homeDir);
 
 	if (config.codegraph?.enabled === false) {
 		return { action: "skipped-disabled", exitCode: 0 };
+	}
+	const excludedRoots = config.codegraph?.excluded_roots;
+	const exclusion = shouldExcludeCodegraphProject(projectRoot, {
+		homeDir,
+		...(excludedRoots === undefined ? {} : { excludedRoots }),
+	});
+	if (exclusion.excluded) {
+		return { action: "skipped-excluded", exitCode: 0 };
 	}
 
 	const isInitialized = await (options.statusProbe ?? isCodegraphProjectInitialized)({
@@ -191,6 +204,13 @@ function writeHookJson(stdout: HookStdout): void {
 		},
 	};
 	stdout.write(`${JSON.stringify(output)}\n`);
+}
+
+function pruneCodegraphProjectStoresBestEffort(homeDir: string): void {
+	try {
+		pruneDeadCodegraphProjectStores({ homeDir });
+	} catch {
+	}
 }
 
 function spawnDetachedWorker(invocation: WorkerSpawnInvocation): void {
