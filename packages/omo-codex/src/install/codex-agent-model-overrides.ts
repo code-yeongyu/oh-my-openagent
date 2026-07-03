@@ -150,8 +150,9 @@ function replaceTopLevelStringSetting(content: string, key: string, value: strin
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index]
     if (line === undefined || isSectionHeader(line)) break
-    if (topLevelStringSettingRawValue(line, key) === undefined) continue
-    lines[index] = line.replace(/=\s*("(?:[^"\\]|\\.)*"|'[^']*')/, `= ${JSON.stringify(value)}`)
+    const replacement = replaceTopLevelSettingLine(line, key, value)
+    if (replacement === null) continue
+    lines[index] = replacement
     return lines.join("\n")
   }
 
@@ -159,12 +160,12 @@ function replaceTopLevelStringSetting(content: string, key: string, value: strin
   return lines.join("\n")
 }
 
-function topLevelStringSettingRawValue(line: string, key: string): string | undefined {
-  const match = stripTomlLineComment(line).trim().match(/^([A-Za-z0-9_]+)\s*=\s*("(?:[^"\\]|\\.)*"|'[^']*')/)
+function replaceTopLevelSettingLine(line: string, key: string, value: string): string | null {
+  const match = stripTomlLineComment(line).trim().match(/^([A-Za-z0-9_]+)\s*=/)
   const settingKey = match?.[1]
-  const rawValue = match?.[2]
-  if (settingKey !== key || rawValue === undefined) return undefined
-  return rawValue
+  if (settingKey !== key) return null
+  const indent = line.match(/^\s*/)?.[0] ?? ""
+  return `${indent}${key} = ${JSON.stringify(value)}`
 }
 
 function topLevelInsertionIndex(lines: readonly string[]): number {

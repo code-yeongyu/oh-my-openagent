@@ -60,6 +60,21 @@ describe("applyCodexAgentModelOverride", () => {
       'name = "plan"\nmodel = "gpt-5.4-mini"\nmodel_reasoning_effort = "low"\nservice_tier = "priority"\n\n[tools]\nallowed = ["Read"]\n',
     )
   })
+
+  test("replaces existing top-level non-string settings instead of appending duplicate keys", () => {
+    const updated = applyCodexAgentModelOverride(
+      'name = "plan"\nmodel = 1\nmodel_reasoning_effort = false\nservice_tier = ["fast"]\n\n[tools]\nmodel = 2\n',
+      {
+        model: "gpt-5.4-mini",
+        modelReasoningEffort: "low",
+        serviceTier: "priority",
+      },
+    )
+
+    expect(updated).toBe(
+      'name = "plan"\nmodel = "gpt-5.4-mini"\nmodel_reasoning_effort = "low"\nservice_tier = "priority"\n\n[tools]\nmodel = 2\n',
+    )
+  })
 })
 
 describe("unknownCodexAgentModelOverrideWarnings", () => {

@@ -185,6 +185,7 @@ describe("linkCachedPluginAgents", () => {
     expect(content).toContain('model = "gpt-5.4-mini"')
     expect(content).toContain('model_reasoning_effort = "low"')
     expect(content).toContain('service_tier = "priority"')
+    expect(content).not.toContain('model = "gpt-5.5"')
     expect(content).not.toContain('model_reasoning_effort = "high"')
     expect(content).not.toContain('service_tier = "fast"')
   })

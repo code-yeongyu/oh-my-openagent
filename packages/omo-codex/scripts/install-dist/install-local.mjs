@@ -8877,9 +8877,10 @@ function replaceTopLevelStringSetting(content, key, value) {
     const line = lines[index];
     if (line === undefined || isSectionHeader3(line))
       break;
-    if (topLevelStringSettingRawValue(line, key) === undefined)
+    const replacement = replaceTopLevelSettingLine(line, key, value);
+    if (replacement === null)
       continue;
-    lines[index] = line.replace(/=\s*("(?:[^"\\]|\\.)*"|'[^']*')/, `= ${JSON.stringify(value)}`);
+    lines[index] = replacement;
     return lines.join(`
 `);
   }
@@ -8887,13 +8888,13 @@ function replaceTopLevelStringSetting(content, key, value) {
   return lines.join(`
 `);
 }
-function topLevelStringSettingRawValue(line, key) {
-  const match = stripTomlLineComment2(line).trim().match(/^([A-Za-z0-9_]+)\s*=\s*("(?:[^"\\]|\\.)*"|'[^']*')/);
+function replaceTopLevelSettingLine(line, key, value) {
+  const match = stripTomlLineComment2(line).trim().match(/^([A-Za-z0-9_]+)\s*=/);
   const settingKey = match?.[1];
-  const rawValue = match?.[2];
-  if (settingKey !== key || rawValue === undefined)
-    return;
-  return rawValue;
+  if (settingKey !== key)
+    return null;
+  const indent = line.match(/^\s*/)?.[0] ?? "";
+  return `${indent}${key} = ${JSON.stringify(value)}`;
 }
 function topLevelInsertionIndex(lines) {
   const sectionIndex = lines.findIndex((line) => isSectionHeader3(line));
@@ -9353,7 +9354,7 @@ function extractTopLevelStringSetting(content, key) {
   for (const line of content.split(/\n/)) {
     if (isSectionHeader4(line))
       return null;
-    const rawValue = topLevelStringSettingRawValue2(line, key);
+    const rawValue = topLevelStringSettingRawValue(line, key);
     if (rawValue === undefined)
       continue;
     const parsed = parseJsonString2(rawValue);
@@ -9374,7 +9375,7 @@ function replaceTopLevelStringSetting2(content, key, value, options) {
     const line = lines[index];
     if (line === undefined || isSectionHeader4(line))
       break;
-    if (topLevelStringSettingRawValue2(line, key) === undefined)
+    if (topLevelStringSettingRawValue(line, key) === undefined)
       continue;
     if (value === null) {
       lines.splice(index, 1);
@@ -9391,7 +9392,7 @@ function replaceTopLevelStringSetting2(content, key, value, options) {
   return { content: lines.join(`
 `), replaced: true };
 }
-function topLevelStringSettingRawValue2(line, key) {
+function topLevelStringSettingRawValue(line, key) {
   const match = line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*("(?:[^"\\]|\\.)*")/);
   if (match === null)
     return;
