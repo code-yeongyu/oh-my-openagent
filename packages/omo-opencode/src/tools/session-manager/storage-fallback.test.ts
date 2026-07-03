@@ -222,22 +222,39 @@ describe("session-manager storage fallback", () => {
     expect(todos[0].content).toBe("Fallback todo")
   })
 
-  test("#given unreachable SDK list error #when sessionExists runs #then falls back to file existence", async () => {
+  test("#given unreachable SDK messages error #when sessionExists runs #then falls back to file existence", async () => {
     createSessionMessage("ses_file", "msg_001", 1_000)
-    mockClient.session.list.mockImplementation(() => Promise.reject(createSdkUnavailableError("ETIMEDOUT while connecting")))
+    mockClient.session.messages.mockImplementation(() => Promise.reject(createSdkUnavailableError("ETIMEDOUT while connecting")))
 
     const exists = await storage.sessionExists("ses_file")
 
     expect(exists).toBe(true)
   })
 
-  test("#given empty SDK session list #when sessionExists runs #then falls back to file existence", async () => {
+  test("#given empty SDK messages response #when sessionExists runs #then falls back to file existence", async () => {
     createSessionMessage("ses_file", "msg_001", 1_000)
-    mockClient.session.list.mockImplementation(() => Promise.resolve({ data: [] }))
+    mockClient.session.messages.mockImplementation(() => Promise.resolve({ data: [] }))
 
     const exists = await storage.sessionExists("ses_file")
 
     expect(exists).toBe(true)
+  })
+
+  test("#given session is absent from scoped SDK list but messages are readable by id #when sessionExists runs #then confirms existence by id", async () => {
+    mockClient.session.list.mockImplementation(() => Promise.resolve({ data: [] }))
+    mockClient.session.messages.mockImplementation((request: { path: { id: string } }) => {
+      expect(request.path.id).toBe("ses_sqlite_scoped_out")
+      return Promise.resolve({
+        data: [
+          { info: { id: "msg_sdk", role: "user", time: { created: 1_000 } }, parts: [] },
+        ],
+      })
+    })
+
+    const exists = await storage.sessionExists("ses_sqlite_scoped_out")
+
+    expect(exists).toBe(true)
+    expect(mockClient.session.messages).toHaveBeenCalledWith({ path: { id: "ses_sqlite_scoped_out" } })
   })
 
   test("#given semantic SDK error #when readSessionMessages runs #then rethrows instead of hiding bug", async () => {
@@ -246,13 +263,15 @@ describe("session-manager storage fallback", () => {
     await expect(storage.readSessionMessages("ses_missing")).rejects.toThrow("session not found")
   })
 
-  test("#given SDK list fails transiently then recovers #when sessionExists runs #then retries SDK and avoids false-negative file fallback", async () => {
-    // given a pure-sqlite session present in the SDK but absent from file storage
+  test("#given SDK messages fail transiently then recover #when sessionExists runs #then retries SDK and avoids false-negative file fallback", async () => {
+    // given a pure-sqlite session present by SDK id lookup but absent from file storage
     let attempts = 0
-    mockClient.session.list.mockImplementation(() => {
+    mockClient.session.messages.mockImplementation(() => {
       attempts += 1
       if (attempts === 1) return Promise.reject(createSdkUnavailableError("fetch failed"))
-      return Promise.resolve({ data: [{ id: "ses_sqlite_only" }] })
+      return Promise.resolve({
+        data: [{ info: { id: "msg_sdk", role: "user", time: { created: 5_000 } }, parts: [] }],
+      })
     })
 
     // when sessionExists hits a single transient SDK failure
