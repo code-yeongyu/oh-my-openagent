@@ -1,0 +1,14 @@
+bun test v1.3.14 (0d9b296a)
+
+test/neutralization-source.test.ts:
+(pass) omo-pi network surface neutralization > package-manager update disables self-update before any network or installer plan [0.11ms]
+(pass) omo-pi network surface neutralization > bootstrap self-update is disabled without removing package-manager commands [0.06ms]
+(pass) omo-pi network surface neutralization > latest-version fetch is unreachable and changelog URLs point at omo [0.05ms]
+(pass) omo-pi network surface neutralization > install telemetry ping is removed [0.27ms]
+(pass) omo-pi network surface neutralization > cosmetic release URL points at the omo repository [0.04ms]
+
+ 5 pass
+ 0 fail
+ 23 expect() calls
+Ran 5 tests across 1 file. [11.00ms]
+rc=0

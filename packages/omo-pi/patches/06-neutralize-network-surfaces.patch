@@ -1,0 +1,362 @@
+diff --git a/coding-agent/src/cli.ts b/coding-agent/src/cli.ts
+index 7953429c2..3ed8b2469 100644
+--- a/coding-agent/src/cli.ts
++++ b/coding-agent/src/cli.ts
+@@ -4,7 +4,6 @@ import { existsSync } from "node:fs";
+ import { join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { APP_NAME, getPackageDir, VERSION } from "./config.ts";
+-import { handleBootstrapSelfUpdate } from "./self-update-bootstrap.ts";
+ 
+ process.title = APP_NAME;
+ process.env.PI_CODING_AGENT = "true";
+@@ -61,9 +60,9 @@ if (isRootCommand(args) && (args.includes("--version") || args.includes("-v")))
+ }
+ 
+ if (isMissingBundledWorkspaceDependencies(getPackageDir())) {
+-	if (await handleBootstrapSelfUpdate(args)) {
+-		process.exit();
+-	}
++	// omo-pi: self-update disabled
++	console.log("omoai self-update is managed by the omo repo - reinstall from a new tarball");
++	process.exit();
+ }
+ 
+ process.exitCode = await runFullCli();
+diff --git a/coding-agent/src/config.ts b/coding-agent/src/config.ts
+index b6fc7d91c..01801bf75 100644
+--- a/coding-agent/src/config.ts
++++ b/coding-agent/src/config.ts
+@@ -333,7 +333,7 @@ export function getSelfUpdateUnavailableInstruction(
+ 	const method = detectInstallMethod();
+ 	const target = normalizeSelfUpdatePackageTarget(updatePackageTarget);
+ 	if (method === "bun-binary") {
+-		return `Download from: https://github.com/code-yeongyu/senpi/releases/latest`;
++		return `Download from: https://github.com/code-yeongyu/oh-my-openagent/releases/latest`;
+ 	}
+ 	const command = getSelfUpdateCommandForMethod(method, packageName, target, npmCommand);
+ 	if (command) {
+diff --git a/coding-agent/src/modes/interactive/interactive-mode.ts b/coding-agent/src/modes/interactive/interactive-mode.ts
+index 088c2e9d2..250914ca6 100644
+--- a/coding-agent/src/modes/interactive/interactive-mode.ts
++++ b/coding-agent/src/modes/interactive/interactive-mode.ts
+@@ -90,7 +90,6 @@ import { formatMissingSessionCwdPrompt, MissingSessionCwdError } from "../../cor
+ import { type SessionEntry, SessionManager, sessionEntryToContextMessages } from "../../core/session-manager.ts";
+ import { BUILTIN_SLASH_COMMANDS } from "../../core/slash-commands.ts";
+ import type { SourceInfo } from "../../core/source-info.ts";
+-import { isInstallTelemetryEnabled } from "../../core/telemetry.ts";
+ import type { TruncationResult } from "../../core/tools/truncate.ts";
+ import { hasTrustRequiringProjectResources, ProjectTrustStore } from "../../core/trust-manager.ts";
+ import { getChangelogPath, getNewEntries, normalizeChangelogLinks, parseChangelog } from "../../utils/changelog.ts";
+@@ -98,7 +97,6 @@ import { copyToClipboard } from "../../utils/clipboard.ts";
+ import { extensionForImageMimeType, readClipboardImage } from "../../utils/clipboard-image.ts";
+ import { parseGitUrl } from "../../utils/git.ts";
+ import { getCwdRelativePath } from "../../utils/paths.ts";
+-import { getPiUserAgent } from "../../utils/pi-user-agent.ts";
+ import { killTrackedDetachedChildren } from "../../utils/shell.ts";
+ import { checkForNewPiVersion, getReleaseChangelogUrl } from "../../utils/version-check.ts";
+ import { abortedErrorLabel } from "./aborted-error-label.ts";
+@@ -1034,22 +1032,9 @@ export class InteractiveMode {
+ 	}
+ 
+ 	private reportInstallTelemetry(version: string): void {
+-		if (process.env.PI_OFFLINE) {
+-			return;
+-		}
+-
+-		if (!isInstallTelemetryEnabled(this.settingsManager)) {
+-			return;
+-		}
+-
+-		void fetch(`https://pi.dev/api/report-install?version=${encodeURIComponent(version)}`, {
+-			headers: {
+-				"User-Agent": getPiUserAgent(version),
+-			},
+-			signal: AbortSignal.timeout(5000),
+-		})
+-			.then(() => undefined)
+-			.catch(() => undefined);
++		void version;
++		// omo-pi: install telemetry disabled
++		return;
+ 	}
+ 
+ 	private getMarkdownThemeWithSettings(): MarkdownTheme {
+diff --git a/coding-agent/src/package-manager-cli.ts b/coding-agent/src/package-manager-cli.ts
+index 7bc973d2c..6a1e8945f 100644
+--- a/coding-agent/src/package-manager-cli.ts
++++ b/coding-agent/src/package-manager-cli.ts
+@@ -1,54 +1,18 @@
+-import { Markdown, type MarkdownTheme } from "@earendil-works/pi-tui";
+ import chalk from "chalk";
+ import { selectConfig } from "./cli/config-selector.ts";
+ import { createProjectTrustContext } from "./cli/project-trust.ts";
+-import {
+-	APP_NAME,
+-	CONFIG_DIR_NAME,
+-	detectInstallMethod,
+-	getAgentDir,
+-	getPackageDir,
+-	getSelfUpdateCommand,
+-	getSelfUpdateUnavailableInstruction,
+-	PACKAGE_NAME,
+-	type SelfUpdateCommand,
+-	type SelfUpdatePackageTarget,
+-	VERSION,
+-} from "./config.ts";
++import { APP_NAME, CONFIG_DIR_NAME, getAgentDir } from "./config.ts";
+ import type { ExtensionFactory } from "./core/extensions/types.ts";
+ import { DefaultPackageManager } from "./core/package-manager.ts";
+ import { type AppMode, resolveProjectTrusted } from "./core/project-trust.ts";
+ import { DefaultResourceLoader } from "./core/resource-loader.ts";
+ import { SettingsManager } from "./core/settings-manager.ts";
+ import { hasTrustRequiringProjectResources, ProjectTrustStore } from "./core/trust-manager.ts";
+-import { spawnProcess } from "./utils/child-process.ts";
+-import { getLatestPiRelease, isNewerPackageVersion } from "./utils/version-check.ts";
+-import {
+-	cleanupWindowsSelfUpdateQuarantine,
+-	quarantineWindowsNativeDependencies,
+-} from "./utils/windows-self-update.ts";
+ 
+ export type PackageCommand = "install" | "remove" | "update" | "list";
+ 
+ type UpdateTarget = { type: "all" } | { type: "self" } | { type: "extensions"; source?: string };
+ 
+-const SELF_UPDATE_NOTE_MARKDOWN_THEME: MarkdownTheme = {
+-	heading: (text) => chalk.bold(chalk.yellow(text)),
+-	link: (text) => chalk.cyan(text),
+-	linkUrl: (text) => chalk.dim(text),
+-	code: (text) => chalk.yellow(text),
+-	codeBlock: (text) => chalk.dim(text),
+-	codeBlockBorder: (text) => chalk.dim(text),
+-	quote: (text) => chalk.dim(text),
+-	quoteBorder: (text) => chalk.dim(text),
+-	hr: (text) => chalk.dim(text),
+-	listBullet: (text) => chalk.yellow(text),
+-	bold: (text) => chalk.bold(text),
+-	italic: (text) => chalk.italic(text),
+-	strikethrough: (text) => chalk.strikethrough(text),
+-	underline: (text) => chalk.underline(text),
+-};
+-
+ interface PackageCommandOptions {
+ 	command: PackageCommand;
+ 	source?: string;
+@@ -346,121 +310,6 @@ function parsePackageCommand(args: string[]): PackageCommandOptions | undefined
+ 	};
+ }
+ 
+-function updateTargetIncludesSelf(target: UpdateTarget): boolean {
+-	return target.type === "all" || target.type === "self";
+-}
+-
+-function updateTargetIncludesExtensions(target: UpdateTarget): boolean {
+-	return target.type === "all" || target.type === "extensions";
+-}
+-
+-function printSelfUpdateUnavailable(
+-	npmCommand?: string[],
+-	updatePackageTarget: SelfUpdatePackageTarget = PACKAGE_NAME,
+-): void {
+-	console.error(`error: ${APP_NAME} cannot self-update this installation.`);
+-	console.error(getSelfUpdateUnavailableInstruction(PACKAGE_NAME, npmCommand, updatePackageTarget));
+-
+-	const entrypoint = process.argv[1];
+-	if (entrypoint) {
+-		console.error("");
+-		console.error(`Location of ${APP_NAME} executable: ${entrypoint}`);
+-	}
+-}
+-
+-function printSelfUpdateFallback(command: SelfUpdateCommand): void {
+-	console.error(chalk.dim(`If this keeps failing, run this command yourself: ${command.display}`));
+-}
+-
+-function printSelfUpdateNote(note: string): void {
+-	const trimmedNote = note.trim();
+-	if (!trimmedNote) {
+-		return;
+-	}
+-
+-	console.log();
+-	console.log(chalk.bold(chalk.yellow("Update note")));
+-	try {
+-		const width = Math.max(20, process.stdout.columns ?? 80);
+-		const renderedLines = new Markdown(trimmedNote, 0, 0, SELF_UPDATE_NOTE_MARKDOWN_THEME)
+-			.render(width)
+-			.map((line) => line.trimEnd());
+-		console.log(renderedLines.join("\n"));
+-	} catch {
+-		console.log(trimmedNote);
+-	}
+-	console.log();
+-}
+-
+-interface SelfUpdatePlan {
+-	packageName: string;
+-	installSpec: string;
+-	version: string;
+-	shouldRun: boolean;
+-	note?: string;
+-}
+-
+-async function getSelfUpdatePlan(force: boolean): Promise<SelfUpdatePlan> {
+-	let latestRelease: Awaited<ReturnType<typeof getLatestPiRelease>>;
+-	try {
+-		latestRelease = await getLatestPiRelease(VERSION);
+-	} catch (error: unknown) {
+-		const message = error instanceof Error ? error.message : String(error);
+-		throw new Error(`Could not determine latest ${APP_NAME} version: ${message}`);
+-	}
+-	if (!latestRelease) {
+-		throw new Error(`Could not determine latest ${APP_NAME} version.`);
+-	}
+-
+-	const packageName = latestRelease.packageName ?? PACKAGE_NAME;
+-	const installSpec = `${packageName}@${latestRelease.version}`;
+-	if (force || packageName !== PACKAGE_NAME || isNewerPackageVersion(latestRelease.version, VERSION)) {
+-		return {
+-			packageName,
+-			installSpec,
+-			version: latestRelease.version,
+-			...(latestRelease.note ? { note: latestRelease.note } : {}),
+-			shouldRun: true,
+-		};
+-	}
+-
+-	console.log(chalk.green(`${APP_NAME} is already up to date (v${VERSION})`));
+-	return { packageName, installSpec, version: latestRelease.version, shouldRun: false };
+-}
+-
+-async function runSelfUpdate(command: SelfUpdateCommand): Promise<void> {
+-	console.log(chalk.dim(`Updating ${APP_NAME} with ${command.display}...`));
+-	for (const step of command.steps ?? [command]) {
+-		await new Promise<void>((resolve, reject) => {
+-			const child = spawnProcess(step.command, step.args, {
+-				stdio: "inherit",
+-			});
+-			child.on("error", (error) => {
+-				reject(error);
+-			});
+-			child.on("close", (code, signal) => {
+-				if (code === 0) {
+-					resolve();
+-				} else if (signal) {
+-					reject(new Error(`${step.display} terminated by signal ${signal}`));
+-				} else {
+-					reject(new Error(`${step.display} exited with code ${code ?? "unknown"}`));
+-				}
+-			});
+-		});
+-	}
+-}
+-
+-function prepareWindowsNpmSelfUpdate(): void {
+-	if (process.platform !== "win32") {
+-		return;
+-	}
+-
+-	const packageDir = getPackageDir();
+-	cleanupWindowsSelfUpdateQuarantine(packageDir);
+-	quarantineWindowsNativeDependencies(packageDir);
+-}
+-
+ function parseProjectTrustOverride(args: readonly string[]): boolean | undefined {
+ 	let trustOverride: boolean | undefined;
+ 	for (const arg of args) {
+@@ -703,62 +552,8 @@ export async function handlePackageCommand(
+ 			}
+ 
+ 			case "update": {
+-				const target = options.updateTarget ?? { type: "self" };
+-				if (options.showExtensionsSkippedNote) {
+-					console.log(
+-						chalk.dim(`Extensions are skipped. Run ${APP_NAME} update --extensions to update extensions.`),
+-					);
+-				}
+-				if (updateTargetIncludesExtensions(target)) {
+-					const updateSource = target.type === "extensions" ? target.source : undefined;
+-					await packageManager.update(updateSource);
+-					if (updateSource) {
+-						console.log(chalk.green(`Updated ${updateSource}`));
+-					} else {
+-						console.log(chalk.green("Updated packages"));
+-					}
+-				}
+-				if (updateTargetIncludesSelf(target)) {
+-					const selfUpdatePlan = await getSelfUpdatePlan(options.force);
+-					if (!selfUpdatePlan.shouldRun) {
+-						return true;
+-					}
+-					const installMethod = detectInstallMethod();
+-					if (process.platform === "win32" && installMethod !== "npm" && installMethod !== "pnpm") {
+-						console.error(
+-							chalk.red(`${APP_NAME} self-update on Windows is only supported for npm and pnpm installs.`),
+-						);
+-						console.error(chalk.dim(`Detected install method: ${installMethod}. Update ${APP_NAME} manually.`));
+-						process.exitCode = 1;
+-						return true;
+-					}
+-					const selfUpdateTarget = {
+-						packageName: selfUpdatePlan.packageName,
+-						installSpec: selfUpdatePlan.installSpec,
+-					};
+-					const selfUpdateCommand = getSelfUpdateCommand(PACKAGE_NAME, selfUpdateNpmCommand, selfUpdateTarget);
+-					if (!selfUpdateCommand) {
+-						printSelfUpdateUnavailable(selfUpdateNpmCommand, selfUpdateTarget);
+-						process.exitCode = 1;
+-						return true;
+-					}
+-					if (selfUpdatePlan.note) {
+-						printSelfUpdateNote(selfUpdatePlan.note);
+-					}
+-					try {
+-						if (installMethod === "npm") {
+-							prepareWindowsNpmSelfUpdate();
+-						}
+-						await runSelfUpdate(selfUpdateCommand);
+-					} catch (error: unknown) {
+-						const message = error instanceof Error ? error.message : "Unknown package command error";
+-						console.error(chalk.red(`Error: ${message}`));
+-						printSelfUpdateFallback(selfUpdateCommand);
+-						process.exitCode = 1;
+-						return true;
+-					}
+-					console.log(chalk.green(`Updated ${APP_NAME} from ${VERSION} to ${selfUpdatePlan.version}`));
+-				}
++				// omo-pi: self-update disabled
++				console.log(chalk.yellow("omoai self-update is managed by the omo repo - reinstall from a new tarball"));
+ 				return true;
+ 			}
+ 		}
+diff --git a/coding-agent/src/utils/version-check.ts b/coding-agent/src/utils/version-check.ts
+index 3555c83f5..b2556e887 100644
+--- a/coding-agent/src/utils/version-check.ts
++++ b/coding-agent/src/utils/version-check.ts
+@@ -4,7 +4,7 @@ import { getPiUserAgent } from "./pi-user-agent.ts";
+ 
+ const LATEST_VERSION_URL = `https://registry.npmjs.org/${encodeURIComponent(PACKAGE_NAME)}/latest`;
+ const DEFAULT_VERSION_CHECK_TIMEOUT_MS = 10000;
+-const RELEASE_CHANGELOG_BASE_URL = "https://github.com/code-yeongyu/senpi/blob";
++const RELEASE_CHANGELOG_BASE_URL = "https://github.com/code-yeongyu/oh-my-openagent";
+ const RELEASE_CHANGELOG_PATH = "packages/coding-agent/CHANGELOG.md";
+ 
+ export interface LatestPiRelease {
+@@ -33,13 +33,16 @@ export function isNewerPackageVersion(candidateVersion: string, currentVersion:
+ export function getReleaseChangelogUrl(version: string): string {
+ 	const trimmedVersion = version.trim();
+ 	const tag = trimmedVersion.startsWith("v") ? trimmedVersion : `v${trimmedVersion}`;
+-	return `${RELEASE_CHANGELOG_BASE_URL}/${tag}/${RELEASE_CHANGELOG_PATH}`;
++	return `${RELEASE_CHANGELOG_BASE_URL}/blob/${tag}/${RELEASE_CHANGELOG_PATH}`;
+ }
+ 
+ export async function getLatestPiRelease(
+ 	currentVersion: string,
+ 	options: { timeoutMs?: number } = {},
+ ): Promise<LatestPiRelease | undefined> {
++	// omo-pi: version-check disabled
++	return undefined;
++
+ 	if (process.env.PI_SKIP_VERSION_CHECK || process.env.PI_OFFLINE) return undefined;
+ 
+ 	const response = await fetch(LATEST_VERSION_URL, {

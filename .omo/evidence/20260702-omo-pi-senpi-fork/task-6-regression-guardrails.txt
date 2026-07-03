@@ -1,0 +1,3 @@
+report-install-count=0
+PACKAGE-COMMANDS-AND-VERSION-OK
+rc=0

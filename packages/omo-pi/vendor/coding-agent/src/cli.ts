@@ -4,7 +4,6 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { APP_NAME, getPackageDir, VERSION } from "./config.ts";
-import { handleBootstrapSelfUpdate } from "./self-update-bootstrap.ts";
 
 process.title = APP_NAME;
 process.env.PI_CODING_AGENT = "true";
@@ -61,9 +60,9 @@ if (isRootCommand(args) && (args.includes("--version") || args.includes("-v"))) 
 }
 
 if (isMissingBundledWorkspaceDependencies(getPackageDir())) {
-	if (await handleBootstrapSelfUpdate(args)) {
-		process.exit();
-	}
+	// omo-pi: self-update disabled
+	console.log("omoai self-update is managed by the omo repo - reinstall from a new tarball");
+	process.exit();
 }
 
 process.exitCode = await runFullCli();

@@ -4,7 +4,7 @@ import { getPiUserAgent } from "./pi-user-agent.ts";
 
 const LATEST_VERSION_URL = `https://registry.npmjs.org/${encodeURIComponent(PACKAGE_NAME)}/latest`;
 const DEFAULT_VERSION_CHECK_TIMEOUT_MS = 10000;
-const RELEASE_CHANGELOG_BASE_URL = "https://github.com/code-yeongyu/senpi/blob";
+const RELEASE_CHANGELOG_BASE_URL = "https://github.com/code-yeongyu/oh-my-openagent";
 const RELEASE_CHANGELOG_PATH = "packages/coding-agent/CHANGELOG.md";
 
 export interface LatestPiRelease {
@@ -33,13 +33,16 @@ export function isNewerPackageVersion(candidateVersion: string, currentVersion: 
 export function getReleaseChangelogUrl(version: string): string {
 	const trimmedVersion = version.trim();
 	const tag = trimmedVersion.startsWith("v") ? trimmedVersion : `v${trimmedVersion}`;
-	return `${RELEASE_CHANGELOG_BASE_URL}/${tag}/${RELEASE_CHANGELOG_PATH}`;
+	return `${RELEASE_CHANGELOG_BASE_URL}/blob/${tag}/${RELEASE_CHANGELOG_PATH}`;
 }
 
 export async function getLatestPiRelease(
 	currentVersion: string,
 	options: { timeoutMs?: number } = {},
 ): Promise<LatestPiRelease | undefined> {
+	// omo-pi: version-check disabled
+	return undefined;
+
 	if (process.env.PI_SKIP_VERSION_CHECK || process.env.PI_OFFLINE) return undefined;
 
 	const response = await fetch(LATEST_VERSION_URL, {
