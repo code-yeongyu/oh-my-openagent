@@ -1,22 +1,29 @@
 #!/usr/bin/env node
 
 // components/codegraph/src/cli.ts
-import { realpathSync as realpathSync3 } from "node:fs";
-import { basename as basename5, resolve as resolve4 } from "node:path";
-import { stderr as processStderr3 } from "node:process";
+import { realpathSync as realpathSync5 } from "node:fs";
+import { basename as basename5, resolve as resolve5 } from "node:path";
+import { stderr as processStderr4 } from "node:process";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 
 // components/codegraph/src/hook.ts
 import { execFile as execFile3, spawn } from "node:child_process";
-import { homedir as homedir9 } from "node:os";
-import { join as join8 } from "node:path";
-import { cwd as processCwd2, env as processEnv2, stdin as processStdin, stdout as processStdout } from "node:process";
+import { homedir as homedir11 } from "node:os";
+import { join as join11 } from "node:path";
+import {
+  cwd as processCwd2,
+  env as processEnv2,
+  stderr as processStderr2,
+  stdin as processStdin,
+  stdout as processStdout
+} from "node:process";
 import { fileURLToPath } from "node:url";
 
 // ../../utils/src/codegraph/env.ts
 import { homedir } from "node:os";
 import { join } from "node:path";
 var CODEGRAPH_INSTALL_DIR_ENV = "CODEGRAPH_INSTALL_DIR";
+var CODEGRAPH_NO_DAEMON_ENV = "CODEGRAPH_NO_DAEMON";
 var CODEGRAPH_NO_DOWNLOAD_ENV = "CODEGRAPH_NO_DOWNLOAD";
 var CODEGRAPH_TELEMETRY_ENV = "CODEGRAPH_TELEMETRY";
 var DO_NOT_TRACK_ENV = "DO_NOT_TRACK";
@@ -50,6 +57,7 @@ var SAFE_CODEGRAPH_RUNTIME_ENV_KEYS = new Set([
   "CODEGRAPH_ALLOW_UNSAFE_NODE",
   "CODEGRAPH_BIN",
   "CODEGRAPH_FAKE_LOG",
+  "CODEGRAPH_NO_DAEMON",
   "CODEGRAPH_NODE_BIN",
   "OMO_CODEGRAPH_BIN",
   "OMO_CODEGRAPH_PROJECT_CWD",
@@ -59,6 +67,7 @@ function buildCodegraphEnv(options = {}) {
   const homeDir = options.homeDir ?? homedir();
   return {
     [CODEGRAPH_INSTALL_DIR_ENV]: join(homeDir, ".omo", "codegraph"),
+    [CODEGRAPH_NO_DAEMON_ENV]: "1",
     [CODEGRAPH_NO_DOWNLOAD_ENV]: "1",
     [CODEGRAPH_TELEMETRY_ENV]: "0",
     [DO_NOT_TRACK_ENV]: "1"
@@ -86,22 +95,15 @@ function buildCodegraphChildEnv(options = {}) {
 }
 
 // ../../utils/src/codegraph/guidance.ts
-import { homedir as homedir3 } from "node:os";
+import { homedir as homedir5 } from "node:os";
 
 // ../../utils/src/codegraph/workspace.ts
+import { appendFileSync, existsSync as existsSync2, lstatSync as lstatSync2, mkdirSync, realpathSync as realpathSync3, readFileSync as readFileSync2, statSync, symlinkSync } from "node:fs";
+import { join as join5 } from "node:path";
+
+// ../../utils/src/codegraph/paths.ts
 import { createHash } from "node:crypto";
-import {
-  appendFileSync,
-  existsSync,
-  lstatSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  realpathSync,
-  rmSync,
-  statSync,
-  symlinkSync
-} from "node:fs";
+import { realpathSync } from "node:fs";
 import { homedir as homedir2 } from "node:os";
 import { basename, join as join2, resolve } from "node:path";
 function sanitizeBase(value) {
@@ -111,13 +113,23 @@ function sanitizeBase(value) {
 function codegraphDataRoot(homeDir) {
   return join2(homeDir, ".omo", "codegraph");
 }
+function canonicalizeCodegraphPath(path) {
+  const resolved = resolve(path);
+  try {
+    return realpathSync(resolved);
+  } catch (error) {
+    if (error instanceof Error)
+      return resolved;
+    throw error;
+  }
+}
 function workspaceStorageName(workspace) {
-  const resolved = resolve(workspace);
+  const resolved = canonicalizeCodegraphPath(workspace);
   const hash = createHash("sha256").update(resolved).digest("hex").slice(0, 16);
   return `${sanitizeBase(basename(resolved))}-${hash}`;
 }
 function resolveCodegraphWorkspacePaths(workspace, options = {}) {
-  const resolvedWorkspace = resolve(workspace);
+  const resolvedWorkspace = canonicalizeCodegraphPath(workspace);
   const dataRoot = codegraphDataRoot(options.homeDir ?? homedir2());
   return {
     dataDir: join2(dataRoot, "projects", workspaceStorageName(resolvedWorkspace)),
@@ -125,6 +137,118 @@ function resolveCodegraphWorkspacePaths(workspace, options = {}) {
     projectLink: join2(resolvedWorkspace, ".codegraph")
   };
 }
+
+// ../../utils/src/codegraph/store.ts
+import { existsSync, lstatSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { homedir as homedir3 } from "node:os";
+import { join as join3 } from "node:path";
+var CODEGRAPH_PROJECT_SOURCE_METADATA_FILE = "source.json";
+var CODEGRAPH_PROJECT_SOURCE_METADATA_VERSION = 1;
+function writeCodegraphSourceMetadata(dataDir, sourceDir) {
+  writeFileSync(join3(dataDir, CODEGRAPH_PROJECT_SOURCE_METADATA_FILE), `${JSON.stringify({ sourceDir, version: CODEGRAPH_PROJECT_SOURCE_METADATA_VERSION }, null, 2)}
+`);
+}
+function readRecordedSourceDir(projectDir) {
+  const metadataPath = join3(projectDir, CODEGRAPH_PROJECT_SOURCE_METADATA_FILE);
+  if (!existsSync(metadataPath))
+    return null;
+  try {
+    const parsed = JSON.parse(readFileSync(metadataPath, "utf8"));
+    if (typeof parsed !== "object" || parsed === null)
+      return null;
+    const sourceDir = parsed.sourceDir;
+    return typeof sourceDir === "string" && sourceDir.trim().length > 0 ? sourceDir : null;
+  } catch {
+    return null;
+  }
+}
+function recordedSourceIsMissing(projectDir) {
+  const sourceDir = readRecordedSourceDir(projectDir);
+  return sourceDir !== null && !existsSync(sourceDir);
+}
+function pruneDeadCodegraphProjectStores(options = {}) {
+  const projectsDir = join3(codegraphDataRoot(options.homeDir ?? homedir3()), "projects");
+  const removed = [];
+  if (!existsSync(projectsDir))
+    return { remainingBytes: 0, removed };
+  for (const entry of readdirSync(projectsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory())
+      continue;
+    const projectDir = join3(projectsDir, entry.name);
+    if (!recordedSourceIsMissing(projectDir))
+      continue;
+    rmSync(projectDir, { force: true, recursive: true });
+    removed.push(projectDir);
+  }
+  return { remainingBytes: 0, removed };
+}
+
+// ../../utils/src/codegraph/exclusion.ts
+import { realpathSync as realpathSync2 } from "node:fs";
+import { homedir as homedir4 } from "node:os";
+import { isAbsolute, join as join4, resolve as resolve2 } from "node:path";
+var POSIX_DEFAULT_EXCLUDED_ROOTS = ["/tmp", "/private/tmp"];
+function expandHome(path, homeDir) {
+  if (path === "~")
+    return homeDir;
+  if (path.startsWith("~/") || path.startsWith("~\\"))
+    return join4(homeDir, path.slice(2));
+  return path;
+}
+function realpathIfPossible(path) {
+  try {
+    return realpathSync2(path);
+  } catch (error) {
+    if (error instanceof Error)
+      return resolve2(path);
+    throw error;
+  }
+}
+function resolveConfiguredRoot(path, homeDir) {
+  const expanded = expandHome(path, homeDir);
+  return realpathIfPossible(isAbsolute(expanded) ? expanded : join4(homeDir, expanded));
+}
+function normalizeForComparison(path, platform) {
+  const normalized = path.replaceAll("\\", "/").replace(/\/+$/, "");
+  return platform === "win32" ? normalized.toLowerCase() : normalized;
+}
+function pathIsWithin(path, root, platform) {
+  const candidate = normalizeForComparison(path, platform);
+  const normalizedRoot = normalizeForComparison(root, platform);
+  return candidate === normalizedRoot || candidate.startsWith(`${normalizedRoot}/`);
+}
+function hasOmoPathSegment(path) {
+  return path.split(/[\\/]+/).includes(".omo");
+}
+function defaultExcludedRoots(platform) {
+  return platform === "win32" ? [] : POSIX_DEFAULT_EXCLUDED_ROOTS;
+}
+function shouldExcludeCodegraphProject(workspace, options = {}) {
+  const platform = options.platform ?? process.platform;
+  const homeDir = options.homeDir ?? homedir4();
+  const resolvedWorkspace = realpathIfPossible(resolve2(workspace));
+  if (hasOmoPathSegment(resolvedWorkspace)) {
+    return { excluded: true, matchedRoot: ".omo", reason: "omo-state" };
+  }
+  for (const root of defaultExcludedRoots(platform)) {
+    const resolvedRoot = realpathIfPossible(resolve2(root));
+    if (pathIsWithin(resolvedWorkspace, resolvedRoot, platform)) {
+      return { excluded: true, matchedRoot: root, reason: "tmp-root" };
+    }
+  }
+  for (const root of options.excludedRoots ?? []) {
+    const trimmedRoot = root.trim();
+    if (trimmedRoot.length === 0)
+      continue;
+    const resolvedRoot = resolveConfiguredRoot(trimmedRoot, homeDir);
+    if (pathIsWithin(resolvedWorkspace, resolvedRoot, platform)) {
+      return { excluded: true, matchedRoot: root, reason: "custom-root" };
+    }
+  }
+  return { excluded: false };
+}
+
+// ../../utils/src/codegraph/workspace.ts
 function fallbackResult(dataRoot, projectLink, reason) {
   return { dataDir: projectLink, dataRoot, linked: false, mode: "in-place-fallback", projectLink, reason };
 }
@@ -134,20 +258,21 @@ function isSameFilesystem(workspace, dataRoot, override) {
   return statSync(workspace).dev === statSync(dataRoot).dev;
 }
 function ensureInPlaceFallback(projectLink) {
-  if (!existsSync(projectLink))
+  if (!existsSync2(projectLink))
     mkdirSync(projectLink, { recursive: true });
 }
 function prepareCodegraphWorkspace(workspace, options = {}) {
-  const resolvedWorkspace = resolve(workspace);
+  const resolvedWorkspace = canonicalizeCodegraphPath(workspace);
   const { dataDir, dataRoot, projectLink } = resolveCodegraphWorkspacePaths(resolvedWorkspace, options);
   try {
     mkdirSync(dataDir, { recursive: true });
-    if (existsSync(projectLink)) {
-      const linkStat = lstatSync(projectLink);
+    writeCodegraphSourceMetadata(dataDir, resolvedWorkspace);
+    if (existsSync2(projectLink)) {
+      const linkStat = lstatSync2(projectLink);
       if (!linkStat.isSymbolicLink()) {
         return { dataDir: projectLink, dataRoot, linked: false, mode: "in-project", projectLink };
       }
-      if (realpathSync(projectLink) === realpathSync(dataDir)) {
+      if (realpathSync3(projectLink) === realpathSync3(dataDir)) {
         return { dataDir, dataRoot, linked: true, mode: "global-linked", projectLink };
       }
       return fallbackResult(dataRoot, projectLink, "existing .codegraph symlink points outside OMO store");
@@ -164,19 +289,20 @@ function prepareCodegraphWorkspace(workspace, options = {}) {
     try {
       ensureInPlaceFallback(projectLink);
     } catch (fallbackError) {
-      return fallbackResult(dataRoot, projectLink, `${reason}; fallback failed: ${String(fallbackError)}`);
+      const fallbackReason = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+      return fallbackResult(dataRoot, projectLink, `${reason}; fallback failed: ${fallbackReason}`);
     }
     return fallbackResult(dataRoot, projectLink, reason);
   }
 }
 function ensureCodegraphGitignored(workspace) {
-  const gitDir = join2(workspace, ".git");
-  if (!existsSync(gitDir))
+  const gitDir = join5(workspace, ".git");
+  if (!existsSync2(gitDir))
     return false;
-  const excludePath = join2(gitDir, "info", "exclude");
+  const excludePath = join5(gitDir, "info", "exclude");
   try {
-    mkdirSync(join2(gitDir, "info"), { recursive: true });
-    const existing = existsSync(excludePath) ? readFileSync(excludePath, "utf8") : "";
+    mkdirSync(join5(gitDir, "info"), { recursive: true });
+    const existing = existsSync2(excludePath) ? readFileSync2(excludePath, "utf8") : "";
     if (existing.split(/\r?\n/).includes(".codegraph"))
       return true;
     appendFileSync(excludePath, `${existing.endsWith(`
@@ -210,7 +336,7 @@ function getCodegraphUninitializedProject(input) {
 }
 function buildCodegraphInitGuidance(projectPath, options = {}) {
   const { dataDir, dataRoot, projectLink } = resolveCodegraphWorkspacePaths(projectPath, {
-    homeDir: options.homeDir ?? homedir3()
+    homeDir: options.homeDir ?? homedir5()
   });
   const displayProjectPath = formatDisplayPath(projectPath);
   const displayProjectLink = formatDisplayPath(projectLink);
@@ -278,15 +404,15 @@ function isRecord(value) {
 }
 
 // ../../utils/src/codegraph/resolve.ts
-import { existsSync as existsSync2 } from "node:fs";
-import { homedir as homedir4 } from "node:os";
+import { existsSync as existsSync3 } from "node:fs";
+import { homedir as homedir6 } from "node:os";
 import { spawnSync } from "node:child_process";
-import { basename as basename2, dirname, join as join4 } from "node:path";
+import { basename as basename2, dirname, join as join7 } from "node:path";
 import { createRequire } from "node:module";
 
 // ../../utils/src/runtime/which.ts
 import { accessSync, constants } from "node:fs";
-import { delimiter, join as join3 } from "node:path";
+import { delimiter, join as join6 } from "node:path";
 var runtime = globalThis;
 function isUnsafeCommandName(commandName) {
   if (commandName.includes("/") || commandName.includes("\\"))
@@ -341,7 +467,7 @@ function bunWhich(commandName) {
     return null;
   for (const pathEntry of pathEntries) {
     for (const candidateName of candidateNames) {
-      const candidatePath = join3(pathEntry, candidateName);
+      const candidatePath = join6(pathEntry, candidateName);
       if (isExecutable(candidatePath))
         return candidatePath;
     }
@@ -460,8 +586,8 @@ function defaultNodeRuntime(env, fileExists, which, nodeVersion) {
 function defaultProvisionedBin(homeDir, fileExists) {
   const binaryName = process.platform === "win32" ? "codegraph.cmd" : "codegraph";
   const candidates = [
-    join4(homeDir, ".omo", "codegraph", "bin", binaryName),
-    join4(homeDir, ".omo", "codegraph", "node-servers", "node_modules", ".bin", binaryName)
+    join7(homeDir, ".omo", "codegraph", "bin", binaryName),
+    join7(homeDir, ".omo", "codegraph", "node-servers", "node_modules", ".bin", binaryName)
   ];
   return candidates.find((candidate) => fileExists(candidate)) ?? null;
 }
@@ -469,7 +595,7 @@ function resolveBundledShim(requireResolve, fileExists) {
   try {
     const packageJson = requireResolve(`${CODEGRAPH_PACKAGE}/package.json`);
     const packageRoot = dirname(packageJson);
-    const candidates = [join4(packageRoot, "bin", "codegraph.js"), join4(packageRoot, "npm-shim.js")];
+    const candidates = [join7(packageRoot, "bin", "codegraph.js"), join7(packageRoot, "npm-shim.js")];
     return candidates.find((candidate) => fileExists(candidate)) ?? null;
   } catch (error) {
     if (error instanceof Error)
@@ -485,7 +611,7 @@ function resolveBundledShim(requireResolve, fileExists) {
 }
 function resolveCodegraphCommand(options = {}) {
   const env = options.env ?? process.env;
-  const fileExists = options.fileExists ?? existsSync2;
+  const fileExists = options.fileExists ?? existsSync3;
   const configuredBin = env[CODEGRAPH_ENV_BIN]?.trim() || env[CODEGRAPH_LEGACY_ENV_BIN]?.trim();
   if (configuredBin !== undefined && configuredBin.length > 0) {
     return { argsPrefix: [], command: configuredBin, exists: fileExists(configuredBin), source: "env" };
@@ -497,7 +623,7 @@ function resolveCodegraphCommand(options = {}) {
   if (bundled !== null && runtime2 !== null) {
     return { argsPrefix: [bundled], command: runtime2, exists: true, source: "bundled" };
   }
-  const provisioned = options.provisioned?.() ?? defaultProvisionedBin(options.homeDir ?? homedir4(), fileExists);
+  const provisioned = options.provisioned?.() ?? defaultProvisionedBin(options.homeDir ?? homedir6(), fileExists);
   if (provisioned !== null && fileExists(provisioned)) {
     return { argsPrefix: [], command: provisioned, exists: true, source: "provisioned" };
   }
@@ -511,11 +637,14 @@ function resolveCodegraphCommand(options = {}) {
 }
 
 // shared/src/config-loader.ts
-import { homedir as homedir6 } from "node:os";
+import { homedir as homedir8 } from "node:os";
 
 // ../../utils/src/omo-config/loader.ts
-import { existsSync as existsSync4, readFileSync as readFileSync2 } from "node:fs";
-import { homedir as homedir5 } from "node:os";
+import { existsSync as existsSync5 } from "node:fs";
+import { homedir as homedir7 } from "node:os";
+
+// ../../utils/src/omo-config/body.ts
+import { readFileSync as readFileSync3 } from "node:fs";
 
 // ../../utils/src/deep-merge.ts
 var DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
@@ -1393,127 +1522,13 @@ var HARNESS_IDS = ["codex", "opencode", "omo"];
 var SETTING_HARNESS_SUPPORT = {
   "codegraph.auto_provision": HARNESS_IDS,
   "codegraph.enabled": HARNESS_IDS,
+  "codegraph.excluded_roots": ["codex"],
   "codegraph.install_dir": HARNESS_IDS,
   "codegraph.telemetry": HARNESS_IDS,
   "codegraph.watch_debounce_ms": ["opencode", "omo"]
 };
 
-// ../../utils/src/omo-config/env-overrides.ts
-var CODEGRAPH_ENV_KEYS = [
-  ["auto_provision", "AUTO_PROVISION", "boolean"],
-  ["enabled", "ENABLED", "boolean"],
-  ["install_dir", "INSTALL_DIR", "string"],
-  ["telemetry", "TELEMETRY", "boolean"],
-  ["watch_debounce_ms", "WATCH_DEBOUNCE_MS", "number"]
-];
-function parseBooleanEnv(value) {
-  const normalized = value.trim().toLowerCase();
-  if (["1", "true", "yes", "on"].includes(normalized))
-    return true;
-  if (["0", "false", "no", "off"].includes(normalized))
-    return false;
-  return null;
-}
-function parseEnvValue(value, kind) {
-  if (kind === "boolean")
-    return parseBooleanEnv(value);
-  if (kind === "number") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-  }
-  return value;
-}
-function setCodegraphSetting(config, key, value) {
-  switch (key) {
-    case "auto_provision":
-      if (typeof value === "boolean")
-        config.auto_provision = value;
-      return;
-    case "enabled":
-      if (typeof value === "boolean")
-        config.enabled = value;
-      return;
-    case "install_dir":
-      if (typeof value === "string")
-        config.install_dir = value;
-      return;
-    case "telemetry":
-      if (typeof value === "boolean")
-        config.telemetry = value;
-      return;
-    case "watch_debounce_ms":
-      if (typeof value === "number")
-        config.watch_debounce_ms = value;
-      return;
-  }
-}
-function buildEnvOverrides(harness, env, warnings, merge) {
-  let config = {};
-  for (const prefix of ["OMO", harness.toUpperCase()]) {
-    const codegraph = {};
-    for (const [settingKey, envSuffix, kind] of CODEGRAPH_ENV_KEYS) {
-      const envKey = `${prefix}_CODEGRAPH_${envSuffix}`;
-      const rawValue = env[envKey];
-      if (rawValue === undefined)
-        continue;
-      const parsed = parseEnvValue(rawValue, kind);
-      if (parsed === null) {
-        warnings.push(`${envKey} has invalid ${kind} value "${rawValue}"`);
-        continue;
-      }
-      setCodegraphSetting(codegraph, settingKey, parsed);
-    }
-    if (Object.keys(codegraph).length > 0) {
-      config = merge(config, { codegraph });
-    }
-  }
-  return config;
-}
-
-// ../../utils/src/omo-config/resolve.ts
-import { existsSync as existsSync3 } from "node:fs";
-import { dirname as dirname2, isAbsolute, join as join5, relative, resolve as resolve2 } from "node:path";
-function containsPath(parent, child) {
-  const pathToChild = relative(parent, child);
-  return pathToChild === "" || !pathToChild.startsWith("..") && !isAbsolute(pathToChild);
-}
-function findProjectConfigPathsNearestFirst(cwd, homeDir) {
-  const startDir = resolve2(cwd);
-  const stopBeforeDir = containsPath(resolve2(homeDir), startDir) ? resolve2(homeDir) : null;
-  const paths = [];
-  let currentDir = startDir;
-  while (true) {
-    if (stopBeforeDir !== null && currentDir === stopBeforeDir)
-      break;
-    const configPath = join5(currentDir, ".omo", "config.jsonc");
-    if (existsSync3(configPath)) {
-      paths.push(configPath);
-    }
-    const parentDir = dirname2(currentDir);
-    if (parentDir === currentDir)
-      break;
-    currentDir = parentDir;
-  }
-  return paths;
-}
-function resolveOmoConfigPaths(options) {
-  const globalPath = join5(resolve2(options.homeDir), ".omo", "config.jsonc");
-  const projectPathsFarthestFirst = findProjectConfigPathsNearestFirst(options.cwd, options.homeDir).reverse();
-  return [
-    { path: globalPath, scope: "global" },
-    ...projectPathsFarthestFirst.map((path) => ({ path, scope: "project" }))
-  ];
-}
-function toMissingSource(candidate) {
-  return {
-    exists: false,
-    loaded: false,
-    path: candidate.path,
-    scope: candidate.scope
-  };
-}
-
-// ../../utils/src/omo-config/loader.ts
+// ../../utils/src/omo-config/body.ts
 var BUILT_IN_DEFAULTS = {
   codegraph: {
     auto_provision: true,
@@ -1525,6 +1540,7 @@ var HARNESS_BLOCK_KEYS = HARNESS_IDS.map((harness) => `[${harness}]`);
 var CODEGRAPH_SETTING_KEYS = [
   "auto_provision",
   "enabled",
+  "excluded_roots",
   "install_dir",
   "telemetry",
   "watch_debounce_ms"
@@ -1563,7 +1579,7 @@ function mergeCodegraphConfig(base, override) {
   for (const key of CODEGRAPH_SETTING_KEYS) {
     if (!hasOwn(merged, key))
       continue;
-    setCodegraphSetting2(codegraph, key, merged[key]);
+    setCodegraphSetting(codegraph, key, merged[key]);
   }
   return Object.keys(codegraph).length > 0 ? codegraph : undefined;
 }
@@ -1580,6 +1596,9 @@ function isKnownHarnessBlockKey(key) {
   return HARNESS_BLOCK_KEYS.includes(key);
 }
 function validateCodegraphValue(key, value) {
+  if (key === "excluded_roots") {
+    return Array.isArray(value) && value.every((entry) => typeof entry === "string") ? null : "must be an array of strings";
+  }
   if (key === "install_dir")
     return typeof value === "string" ? null : "must be a string";
   if (key === "watch_debounce_ms") {
@@ -1587,7 +1606,7 @@ function validateCodegraphValue(key, value) {
   }
   return typeof value === "boolean" ? null : "must be a boolean";
 }
-function setCodegraphSetting2(config, key, value) {
+function setCodegraphSetting(config, key, value) {
   switch (key) {
     case "auto_provision":
       if (typeof value === "boolean")
@@ -1596,6 +1615,11 @@ function setCodegraphSetting2(config, key, value) {
     case "enabled":
       if (typeof value === "boolean")
         config.enabled = value;
+      return;
+    case "excluded_roots":
+      if (Array.isArray(value) && value.every((entry) => typeof entry === "string")) {
+        config.excluded_roots = value;
+      }
       return;
     case "install_dir":
       if (typeof value === "string")
@@ -1627,7 +1651,7 @@ function normalizeCodegraphSection(section, pathPrefix, warnings) {
       warnings.push(`${pathPrefix}.${key} ${error}`);
       continue;
     }
-    setCodegraphSetting2(codegraph, key, value);
+    setCodegraphSetting(codegraph, key, value);
   }
   return codegraph;
 }
@@ -1662,7 +1686,7 @@ function normalizeActiveHarnessBlock(value, harness, pathPrefix, warnings) {
 }
 function loadConfigFile(path, harness) {
   try {
-    const content = readFileSync2(path, "utf-8");
+    const content = readFileSync3(path, "utf-8");
     const parsed = parseJsoncSafe(content);
     if (parsed.errors.length > 0) {
       return {
@@ -1706,15 +1730,137 @@ function validateHarnessApplicability(config, harness) {
   }
   return warnings;
 }
+
+// ../../utils/src/omo-config/env-overrides.ts
+var CODEGRAPH_ENV_KEYS = [
+  ["auto_provision", "AUTO_PROVISION", "boolean"],
+  ["enabled", "ENABLED", "boolean"],
+  ["install_dir", "INSTALL_DIR", "string"],
+  ["telemetry", "TELEMETRY", "boolean"],
+  ["watch_debounce_ms", "WATCH_DEBOUNCE_MS", "number"]
+];
+function parseBooleanEnv(value) {
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized))
+    return true;
+  if (["0", "false", "no", "off"].includes(normalized))
+    return false;
+  return null;
+}
+function parseEnvValue(value, kind) {
+  if (kind === "boolean")
+    return parseBooleanEnv(value);
+  if (kind === "number") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  }
+  return value;
+}
+function setCodegraphSetting2(config, key, value) {
+  switch (key) {
+    case "auto_provision":
+      if (typeof value === "boolean")
+        config.auto_provision = value;
+      return;
+    case "enabled":
+      if (typeof value === "boolean")
+        config.enabled = value;
+      return;
+    case "excluded_roots":
+      if (Array.isArray(value) && value.every((entry) => typeof entry === "string")) {
+        config.excluded_roots = value;
+      }
+      return;
+    case "install_dir":
+      if (typeof value === "string")
+        config.install_dir = value;
+      return;
+    case "telemetry":
+      if (typeof value === "boolean")
+        config.telemetry = value;
+      return;
+    case "watch_debounce_ms":
+      if (typeof value === "number")
+        config.watch_debounce_ms = value;
+      return;
+  }
+}
+function buildEnvOverrides(harness, env, warnings, merge) {
+  let config = {};
+  for (const prefix of ["OMO", harness.toUpperCase()]) {
+    const codegraph = {};
+    for (const [settingKey, envSuffix, kind] of CODEGRAPH_ENV_KEYS) {
+      const envKey = `${prefix}_CODEGRAPH_${envSuffix}`;
+      const rawValue = env[envKey];
+      if (rawValue === undefined)
+        continue;
+      const parsed = parseEnvValue(rawValue, kind);
+      if (parsed === null) {
+        warnings.push(`${envKey} has invalid ${kind} value "${rawValue}"`);
+        continue;
+      }
+      setCodegraphSetting2(codegraph, settingKey, parsed);
+    }
+    if (Object.keys(codegraph).length > 0) {
+      config = merge(config, { codegraph });
+    }
+  }
+  return config;
+}
+
+// ../../utils/src/omo-config/resolve.ts
+import { existsSync as existsSync4 } from "node:fs";
+import { dirname as dirname2, isAbsolute as isAbsolute2, join as join8, relative, resolve as resolve3 } from "node:path";
+function containsPath(parent, child) {
+  const pathToChild = relative(parent, child);
+  return pathToChild === "" || !pathToChild.startsWith("..") && !isAbsolute2(pathToChild);
+}
+function findProjectConfigPathsNearestFirst(cwd, homeDir) {
+  const startDir = resolve3(cwd);
+  const stopBeforeDir = containsPath(resolve3(homeDir), startDir) ? resolve3(homeDir) : null;
+  const paths = [];
+  let currentDir = startDir;
+  while (true) {
+    if (stopBeforeDir !== null && currentDir === stopBeforeDir)
+      break;
+    const configPath = join8(currentDir, ".omo", "config.jsonc");
+    if (existsSync4(configPath)) {
+      paths.push(configPath);
+    }
+    const parentDir = dirname2(currentDir);
+    if (parentDir === currentDir)
+      break;
+    currentDir = parentDir;
+  }
+  return paths;
+}
+function resolveOmoConfigPaths(options) {
+  const globalPath = join8(resolve3(options.homeDir), ".omo", "config.jsonc");
+  const projectPathsFarthestFirst = findProjectConfigPathsNearestFirst(options.cwd, options.homeDir).reverse();
+  return [
+    { path: globalPath, scope: "global" },
+    ...projectPathsFarthestFirst.map((path) => ({ path, scope: "project" }))
+  ];
+}
+function toMissingSource(candidate) {
+  return {
+    exists: false,
+    loaded: false,
+    path: candidate.path,
+    scope: candidate.scope
+  };
+}
+
+// ../../utils/src/omo-config/loader.ts
 function loadOmoConfig(options) {
   const cwd = options.cwd ?? process.cwd();
-  const homeDir = options.homeDir ?? process.env["HOME"] ?? process.env["USERPROFILE"] ?? homedir5();
+  const homeDir = options.homeDir ?? process.env["HOME"] ?? process.env["USERPROFILE"] ?? homedir7();
   const env = options.env ?? process.env;
   let config = BUILT_IN_DEFAULTS;
   const sources = [];
   const warnings = [];
   for (const candidate of resolveOmoConfigPaths({ cwd, homeDir })) {
-    if (!existsSync4(candidate.path)) {
+    if (!existsSync5(candidate.path)) {
       if (candidate.scope === "global") {
         sources.push(toMissingSource(candidate));
       }
@@ -1762,23 +1908,23 @@ function getCodexOmoConfig(options = {}) {
 }
 function resolveHomeDir(options) {
   const env = options.env ?? process.env;
-  return options.homeDir ?? env["HOME"] ?? env["USERPROFILE"] ?? homedir6();
+  return options.homeDir ?? env["HOME"] ?? env["USERPROFILE"] ?? homedir8();
 }
 
 // components/codegraph/src/session-start-worker.ts
 import { execFile as execFile2 } from "node:child_process";
-import { appendFileSync as appendFileSync2, existsSync as existsSync6, mkdirSync as mkdirSync2 } from "node:fs";
-import { homedir as homedir8 } from "node:os";
-import { extname, join as join7 } from "node:path";
+import { appendFileSync as appendFileSync2, existsSync as existsSync7, mkdirSync as mkdirSync2 } from "node:fs";
+import { homedir as homedir10 } from "node:os";
+import { extname, join as join10 } from "node:path";
 import { cwd as processCwd, env as processEnv, execPath as processExecPath, stderr as processStderr } from "node:process";
 
 // ../../utils/src/codegraph/provision.ts
 import { createHash as createHash2, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { chmod, mkdir, readdir, readFile, rename, rm, rmdir, stat, writeFile } from "node:fs/promises";
-import { existsSync as existsSync5 } from "node:fs";
-import { homedir as homedir7, hostname } from "node:os";
-import { basename as basename3, join as join6 } from "node:path";
+import { existsSync as existsSync6 } from "node:fs";
+import { homedir as homedir9, hostname } from "node:os";
+import { basename as basename3, join as join9 } from "node:path";
 import { promisify } from "node:util";
 
 // ../../utils/src/codegraph/manifest.ts
@@ -1827,10 +1973,10 @@ function platformKey() {
   return `${process.platform}-${process.arch}`;
 }
 function markerPath(installDir, version) {
-  return join6(installDir, ".provisioned", `codegraph-${version}.json`);
+  return join9(installDir, ".provisioned", `codegraph-${version}.json`);
 }
 function defaultInstallDir() {
-  return join6(homedir7(), ".omo", "codegraph");
+  return join9(homedir9(), ".omo", "codegraph");
 }
 function sha256(bytes) {
   return createHash2("sha256").update(bytes).digest("hex");
@@ -1850,7 +1996,7 @@ async function removeEmptyDirectory(path) {
   }
 }
 function sleep(ms) {
-  return new Promise((resolve3) => setTimeout(resolve3, ms));
+  return new Promise((resolve4) => setTimeout(resolve4, ms));
 }
 async function defaultDownloader(asset, timeoutMs = DEFAULT_DOWNLOAD_TIMEOUT_MS) {
   const response = await fetch(asset.url, { signal: AbortSignal.timeout(timeoutMs) });
@@ -1864,7 +2010,7 @@ function forcedBadChecksumOptions(options) {
   const key = options.platformKey ?? platformKey();
   return {
     downloader: async () => new TextEncoder().encode("checksum mismatch"),
-    installDir: options.installDir ?? join6(options.lockDir, "codegraph-force-bad-checksum"),
+    installDir: options.installDir ?? join9(options.lockDir, "codegraph-force-bad-checksum"),
     manifest: {
       assets: {
         [key]: { executableName: process.platform === "win32" ? "codegraph.cmd" : "codegraph", sha256: "0000", url: "memory://bad" }
@@ -1875,13 +2021,13 @@ function forcedBadChecksumOptions(options) {
   };
 }
 async function readMarker(path) {
-  if (!existsSync5(path))
+  if (!existsSync6(path))
     return null;
   try {
     const raw = JSON.parse(await readFile(path, "utf8"));
     if (typeof raw === "object" && raw !== null && "binPath" in raw) {
       const value = raw.binPath;
-      return typeof value === "string" && existsSync5(value) ? value : null;
+      return typeof value === "string" && existsSync6(value) ? value : null;
     }
     return null;
   } catch (error) {
@@ -1892,7 +2038,7 @@ async function readMarker(path) {
 }
 async function acquireLock(lockPath, waitMs, staleMs) {
   const startedAt = Date.now();
-  await mkdir(join6(lockPath, ".."), { recursive: true });
+  await mkdir(join9(lockPath, ".."), { recursive: true });
   while (Date.now() - startedAt <= waitMs) {
     try {
       await mkdir(lockPath);
@@ -1917,24 +2063,24 @@ async function installExtractedBundle(extractDir, installDir, executableName) {
   const roots = await readdir(extractDir);
   if (roots.length !== 1)
     throw new Error(`CodeGraph archive should contain one root directory, found ${roots.length}`);
-  const bundleDir = join6(extractDir, roots[0] ?? "");
+  const bundleDir = join9(extractDir, roots[0] ?? "");
   const bundleEntries = await readdir(bundleDir);
   await mkdir(installDir, { recursive: true });
   for (const entry of bundleEntries) {
-    await rm(join6(installDir, entry), { force: true, recursive: true });
-    await rename(join6(bundleDir, entry), join6(installDir, entry));
+    await rm(join9(installDir, entry), { force: true, recursive: true });
+    await rename(join9(bundleDir, entry), join9(installDir, entry));
   }
-  const destination = join6(installDir, "bin", executableName);
-  if (!existsSync5(destination))
+  const destination = join9(installDir, "bin", executableName);
+  if (!existsSync6(destination))
     throw new Error(`CodeGraph archive did not contain bin/${executableName}`);
   await chmod(destination, 493);
   return destination;
 }
 async function installAsset(layout) {
   const { asset, downloader, installDir, version } = layout;
-  const stagingDir = join6(installDir, ".staging", randomUUID());
-  const archivePath = join6(stagingDir, basename3(asset.url));
-  const extractDir = join6(stagingDir, "extract");
+  const stagingDir = join9(installDir, ".staging", randomUUID());
+  const archivePath = join9(stagingDir, basename3(asset.url));
+  const extractDir = join9(stagingDir, "extract");
   try {
     await mkdir(extractDir, { recursive: true });
     const bytes = await downloader(asset);
@@ -1948,13 +2094,13 @@ async function installAsset(layout) {
     await writeFile(archivePath, bytes);
     await extractTarGz(archivePath, extractDir);
     const destination = await installExtractedBundle(extractDir, installDir, asset.executableName);
-    await mkdir(join6(installDir, ".provisioned"), { recursive: true });
+    await mkdir(join9(installDir, ".provisioned"), { recursive: true });
     await writeFile(markerPath(installDir, version), `${JSON.stringify({ binPath: destination, version })}
 `);
     return destination;
   } finally {
     await rm(stagingDir, { force: true, recursive: true });
-    await removeEmptyDirectory(join6(installDir, ".staging"));
+    await removeEmptyDirectory(join9(installDir, ".staging"));
   }
 }
 async function ensureCodegraphProvisioned(options) {
@@ -1967,7 +2113,7 @@ async function ensureCodegraphProvisioned(options) {
   const existing = await readMarker(marker);
   if (existing !== null)
     return { binPath: existing, provisioned: true };
-  const lockPath = join6(options.lockDir, `codegraph-${hostname()}.lock`);
+  const lockPath = join9(options.lockDir, `codegraph-${hostname()}.lock`);
   const release = await acquireLock(lockPath, options.lockWaitMs ?? DEFAULT_LOCK_WAIT_MS, options.lockStaleMs ?? DEFAULT_LOCK_STALE_MS);
   if (release === null)
     return { error: "timed out waiting for codegraph provisioning lock", provisioned: false };
@@ -2057,8 +2203,8 @@ async function resolveOrProvisionCommand(deps, config, env, homeDir, nodeSupport
     return { kind: "unsupported-node" };
   if (config.auto_provision === false)
     return { error: "codegraph binary unavailable and auto_provision is disabled", kind: "unavailable", source: resolved.source };
-  const installDir = trustedInstallDir ?? join7(homeDir, ".omo", "codegraph");
-  const provisioned = await deps.ensureProvisioned({ installDir, lockDir: join7(installDir, ".locks"), version: CODEGRAPH_VERSION });
+  const installDir = trustedInstallDir ?? join10(homeDir, ".omo", "codegraph");
+  const provisioned = await deps.ensureProvisioned({ installDir, lockDir: join10(installDir, ".locks"), version: CODEGRAPH_VERSION });
   if (!provisioned.provisioned || provisioned.binPath === undefined) {
     return { error: provisioned.error ?? "provisioning did not produce a binary", kind: "unavailable", source: resolved.source };
   }
@@ -2126,9 +2272,9 @@ function resolveCodegraphCommandInvocation(command, args, platform = process.pla
   return { args: ["/d", "/s", "/c", command, ...args], command: "cmd.exe" };
 }
 function appendOutcome(homeDir, outcome) {
-  const logDir = join7(homeDir, ".omo", "codegraph");
+  const logDir = join10(homeDir, ".omo", "codegraph");
   mkdirSync2(logDir, { recursive: true });
-  appendFileSync2(join7(logDir, "session-start.jsonl"), `${JSON.stringify({ ...outcome, timestamp: new Date().toISOString() })}
+  appendFileSync2(join10(logDir, "session-start.jsonl"), `${JSON.stringify({ ...outcome, timestamp: new Date().toISOString() })}
 `);
 }
 function safeLogOutcome(logOutcome, outcome) {
@@ -2145,8 +2291,8 @@ function safeLogOutcome(logOutcome, outcome) {
 function provisionedBinFromInstallDir(installDir) {
   if (installDir === undefined)
     return null;
-  const candidate = join7(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
-  return existsSync6(candidate) ? candidate : null;
+  const candidate = join10(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
+  return existsSync7(candidate) ? candidate : null;
 }
 function resolveExitCode(error) {
   if ("code" in error && typeof error.code === "number")
@@ -2157,7 +2303,7 @@ function toOutputText(value) {
   return Buffer.isBuffer(value) ? value.toString("utf8") : value;
 }
 function resolveHomeDir2(env) {
-  return env["HOME"] ?? env["USERPROFILE"] ?? homedir8();
+  return env["HOME"] ?? env["USERPROFILE"] ?? homedir10();
 }
 function parseJson(text) {
   try {
@@ -2187,8 +2333,17 @@ async function executeCodegraphSessionStartHook(options = {}) {
   const projectRoot = resolveProjectRoot(input, options.cwd ?? processCwd2());
   const homeDir = resolveHomeDir3(env);
   const config = options.config ?? getCodexOmoConfig({ cwd: projectRoot, env, homeDir });
+  pruneCodegraphProjectStoresBestEffort(homeDir);
   if (config.codegraph?.enabled === false) {
     return { action: "skipped-disabled", exitCode: 0 };
+  }
+  const excludedRoots = config.codegraph?.excluded_roots;
+  const exclusion = shouldExcludeCodegraphProject(projectRoot, {
+    homeDir,
+    ...excludedRoots === undefined ? {} : { excludedRoots }
+  });
+  if (exclusion.excluded) {
+    return { action: "skipped-excluded", exitCode: 0 };
   }
   const isInitialized = await (options.statusProbe ?? isCodegraphProjectInitialized)({
     env,
@@ -2263,7 +2418,7 @@ function codegraphStatusSaysInitialized(stdout) {
 function provisionedBinFromInstallDir2(installDir) {
   if (installDir === undefined)
     return null;
-  return join8(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
+  return join11(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
 }
 async function executeCodegraphPostToolUseHook(options = {}) {
   const env = options.env ?? processEnv2;
@@ -2299,12 +2454,29 @@ function writeHookJson(stdout) {
   stdout.write(`${JSON.stringify(output)}
 `);
 }
+function pruneCodegraphProjectStoresBestEffort(homeDir) {
+  try {
+    pruneDeadCodegraphProjectStores({ homeDir });
+  } catch (error) {
+    if (error instanceof Error) {
+      writeDebugLog(`CodeGraph cache GC skipped: ${error.message}`);
+      return;
+    }
+    throw error;
+  }
+}
+function writeDebugLog(message) {
+  if (processEnv2["OMO_CODEGRAPH_DEBUG"] !== "1")
+    return;
+  processStderr2.write(`${message}
+`);
+}
 function spawnDetachedWorker(invocation) {
   const child = spawn(invocation.command, [...invocation.args], { detached: true, env: invocation.env, stdio: "ignore" });
   child.unref();
 }
 function resolveHomeDir3(env) {
-  return env["HOME"] ?? env["USERPROFILE"] ?? homedir9();
+  return env["HOME"] ?? env["USERPROFILE"] ?? homedir11();
 }
 function resolveExitCode2(error) {
   if ("code" in error && typeof error.code === "number")
@@ -2347,14 +2519,14 @@ function defaultWorkerCliPath() {
 }
 
 // components/codegraph/src/serve.ts
-import { existsSync as existsSync7, realpathSync as realpathSync2 } from "node:fs";
-import { homedir as homedir10 } from "node:os";
-import { basename as basename4, join as join9, resolve as resolve3 } from "node:path";
+import { existsSync as existsSync8, realpathSync as realpathSync4 } from "node:fs";
+import { homedir as homedir12 } from "node:os";
+import { basename as basename4, join as join12, resolve as resolve4 } from "node:path";
 import {
   cwd as processCwd3,
   env as processEnv3,
   stdin as processStdin2,
-  stderr as processStderr2,
+  stderr as processStderr3,
   stdout as processStdout2
 } from "node:process";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
@@ -2834,17 +3006,27 @@ var CODEGRAPH_SKIP_HINT = `CodeGraph MCP skipped: codegraph binary not found. In
 `;
 var CODEGRAPH_DISABLED_HINT = `CodeGraph MCP skipped: disabled by OMO SOT config. Set [codex].codegraph.enabled=true to enable it.
 `;
+var CODEGRAPH_EXCLUDED_HINT = `CodeGraph MCP skipped: project excluded by OMO CodeGraph policy.
+`;
 var CODEGRAPH_VERSION2 = "1.0.1";
 var PROJECT_CWD_ENV_KEYS = ["OMO_CODEGRAPH_PROJECT_CWD", SESSION_START_CWD_ENV, "PWD"];
 async function runCodegraphServe(options = {}) {
   const env = options.env ?? processEnv3;
-  const homeDir = options.homeDir ?? homedir10();
+  const homeDir = options.homeDir ?? homedir12();
   const wrapperCwd = options.cwd ?? processCwd3();
   const projectCwd = resolveProjectCwd(env, wrapperCwd);
   const config = options.config ?? getCodexOmoConfig({ cwd: projectCwd, env, homeDir });
   const codegraphConfig = config.codegraph ?? {};
   if (codegraphConfig.enabled === false) {
     return runUnavailableMcp(CODEGRAPH_DISABLED_HINT, options);
+  }
+  const excludedRoots = codegraphConfig.excluded_roots;
+  const exclusion = shouldExcludeCodegraphProject(projectCwd, {
+    homeDir,
+    ...excludedRoots === undefined ? {} : { excludedRoots }
+  });
+  if (exclusion.excluded) {
+    return runUnavailableMcp(CODEGRAPH_EXCLUDED_HINT, options);
   }
   const trustedInstallDir = config.trustedCodegraphInstallDir;
   const resolutionOptions = {
@@ -2854,7 +3036,7 @@ async function runCodegraphServe(options = {}) {
   };
   let resolution = options.resolve?.(resolutionOptions) ?? resolveCodegraphCommand(resolutionOptions);
   const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
-  if (!resolution.exists || shouldSkipResolvedCommand(resolution, options.commandExists ?? existsSync7)) {
+  if (!resolution.exists || shouldSkipResolvedCommand(resolution, options.commandExists ?? existsSync8)) {
     if (resolution.source === "path" && !nodeSupport.supported) {
       return runUnavailableMcp(buildCodegraphNodeSkipHint(nodeSupport), options);
     }
@@ -2881,12 +3063,12 @@ async function runCodegraphServe(options = {}) {
     env: mergedEnv,
     input: options.stdin ?? processStdin2,
     output: options.stdout ?? processStdout2,
-    stderr: options.stderr ?? processStderr2,
+    stderr: options.stderr ?? processStderr3,
     stdio: "pipe"
   });
 }
 async function runUnavailableMcp(reason, options) {
-  (options.stderr ?? processStderr2).write(reason);
+  (options.stderr ?? processStderr3).write(reason);
   await runUnavailableCodegraphMcpServer({
     input: options.stdin ?? processStdin2,
     output: options.stdout ?? processStdout2,
@@ -2900,10 +3082,10 @@ async function provisionMissingCodegraph(options) {
     return null;
   if (options.config.auto_provision === false)
     return null;
-  const installDir = options.trustedInstallDir ?? join9(options.homeDir, ".omo", "codegraph");
+  const installDir = options.trustedInstallDir ?? join12(options.homeDir, ".omo", "codegraph");
   const result = await options.ensureProvisioned({
     installDir,
-    lockDir: join9(installDir, ".locks"),
+    lockDir: join12(installDir, ".locks"),
     version: CODEGRAPH_VERSION2
   });
   if (!result.provisioned || result.binPath === undefined)
@@ -2921,7 +3103,7 @@ function looksLikePath2(command) {
   return command.includes("/") || command.includes("\\");
 }
 function codegraphEnvForConfig2(trustedInstallDir, homeDir, buildEnv) {
-  const env = buildEnv?.({ homeDir }) ?? buildCodegraphEnv({ homeDir });
+  const env = { ...buildEnv?.({ homeDir }) ?? buildCodegraphEnv({ homeDir }), [CODEGRAPH_NO_DAEMON_ENV]: "1" };
   return trustedInstallDir === undefined ? env : { ...env, CODEGRAPH_INSTALL_DIR: trustedInstallDir };
 }
 function resolveProjectCwd(env, fallback) {
@@ -2929,24 +3111,24 @@ function resolveProjectCwd(env, fallback) {
     const candidate = env[key]?.trim();
     if (candidate === undefined || candidate.length === 0)
       continue;
-    const resolved = resolve3(candidate);
-    if (existsSync7(resolved))
+    const resolved = resolve4(candidate);
+    if (existsSync8(resolved))
       return resolved;
   }
-  return resolve3(fallback);
+  return resolve4(fallback);
 }
 function provisionedBinFromInstallDir3(installDir) {
   if (installDir === undefined)
     return null;
-  const candidate = join9(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
-  return existsSync7(candidate) ? candidate : null;
+  const candidate = join12(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
+  return existsSync8(candidate) ? candidate : null;
 }
 async function runCodegraphServeCli() {
   process.exitCode = await runCodegraphServe();
 }
 if (isDirectInvocation(process.argv[1])) {
   runCodegraphServeCli().catch((error) => {
-    processStderr2.write(`${error instanceof Error ? error.stack ?? error.message : String(error)}
+    processStderr3.write(`${error instanceof Error ? error.stack ?? error.message : String(error)}
 `);
     process.exitCode = 1;
   });
@@ -2958,7 +3140,7 @@ function isDirectInvocation(argvPath) {
   const moduleName = basename4(modulePath);
   if (moduleName !== "serve.js" && moduleName !== "serve.ts")
     return false;
-  return realpathSync2(resolve3(argvPath)) === realpathSync2(modulePath);
+  return realpathSync4(resolve4(argvPath)) === realpathSync4(modulePath);
 }
 
 // components/codegraph/src/cli.ts
@@ -2991,7 +3173,7 @@ async function runCodegraphCli(options = {}) {
 }
 if (isDirectInvocation2(process.argv[1])) {
   runCodegraphCli().catch((error) => {
-    processStderr3.write(`${error instanceof Error ? error.stack ?? error.message : String(error)}
+    processStderr4.write(`${error instanceof Error ? error.stack ?? error.message : String(error)}
 `);
     process.exitCode = 1;
   });
@@ -3003,7 +3185,7 @@ function isDirectInvocation2(argvPath) {
   const moduleName = basename5(modulePath);
   if (moduleName !== "cli.js" && moduleName !== "cli.ts")
     return false;
-  return realpathSync3(resolve4(argvPath)) === realpathSync3(modulePath);
+  return realpathSync5(resolve5(argvPath)) === realpathSync5(modulePath);
 }
 export {
   runCodegraphCli

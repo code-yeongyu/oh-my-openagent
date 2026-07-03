@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto"
+import { realpathSync } from "node:fs"
 import { homedir } from "node:os"
 import { basename, join, resolve } from "node:path"
 
@@ -17,8 +18,18 @@ export function codegraphDataRoot(homeDir: string): string {
   return join(homeDir, ".omo", "codegraph")
 }
 
+export function canonicalizeCodegraphPath(path: string): string {
+  const resolved = resolve(path)
+  try {
+    return realpathSync(resolved)
+  } catch (error) {
+    if (error instanceof Error) return resolved
+    throw error
+  }
+}
+
 function workspaceStorageName(workspace: string): string {
-  const resolved = resolve(workspace)
+  const resolved = canonicalizeCodegraphPath(workspace)
   const hash = createHash("sha256").update(resolved).digest("hex").slice(0, 16)
   return `${sanitizeBase(basename(resolved))}-${hash}`
 }
@@ -27,7 +38,7 @@ export function resolveCodegraphWorkspacePaths(
   workspace: string,
   options: { readonly homeDir?: string } = {},
 ): CodegraphWorkspacePaths {
-  const resolvedWorkspace = resolve(workspace)
+  const resolvedWorkspace = canonicalizeCodegraphPath(workspace)
   const dataRoot = codegraphDataRoot(options.homeDir ?? homedir())
   return {
     dataDir: join(dataRoot, "projects", workspaceStorageName(resolvedWorkspace)),

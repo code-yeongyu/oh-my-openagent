@@ -27,8 +27,9 @@ function expandHome(path: string, homeDir: string): string {
 function realpathIfPossible(path: string): string {
   try {
     return realpathSync(path)
-  } catch {
-    return resolve(path)
+  } catch (error) {
+    if (error instanceof Error) return resolve(path)
+    throw error
   }
 }
 

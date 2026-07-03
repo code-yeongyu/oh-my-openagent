@@ -1,7 +1,7 @@
 import { appendFileSync, existsSync, lstatSync, mkdirSync, realpathSync, readFileSync, statSync, symlinkSync } from "node:fs"
-import { join, resolve } from "node:path"
+import { join } from "node:path"
 
-import { resolveCodegraphWorkspacePaths, type CodegraphWorkspacePaths } from "./paths"
+import { canonicalizeCodegraphPath, resolveCodegraphWorkspacePaths, type CodegraphWorkspacePaths } from "./paths"
 import { writeCodegraphSourceMetadata } from "./store"
 
 export {
@@ -10,7 +10,13 @@ export {
   type CodegraphProjectExclusionReason,
   shouldExcludeCodegraphProject,
 } from "./exclusion"
-export { codegraphDataRoot, resolveCodegraphWorkspacePaths, sanitizeBase, type CodegraphWorkspacePaths } from "./paths"
+export {
+  canonicalizeCodegraphPath,
+  codegraphDataRoot,
+  resolveCodegraphWorkspacePaths,
+  sanitizeBase,
+  type CodegraphWorkspacePaths,
+} from "./paths"
 export {
   type PruneCodegraphStoreOptions,
   type PruneCodegraphStoreResult,
@@ -57,7 +63,7 @@ export function prepareCodegraphWorkspace(
   workspace: string,
   options: PrepareCodegraphWorkspaceOptions = {},
 ): CodegraphWorkspacePreparation {
-  const resolvedWorkspace = resolve(workspace)
+  const resolvedWorkspace = canonicalizeCodegraphPath(workspace)
   const { dataDir, dataRoot, projectLink }: CodegraphWorkspacePaths = resolveCodegraphWorkspacePaths(
     resolvedWorkspace,
     options,

@@ -1,7 +1,18 @@
 import { describe, expect, it } from "bun:test"
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readlinkSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { join } from "node:path"
 
 import {
   ensureCodegraphGitignored,
@@ -48,7 +59,7 @@ describe("prepareCodegraphWorkspace", () => {
     expect(result.linked).toBe(true)
     expect(readlinkSync(join(workspace, ".codegraph"))).toContain(join(homeDir, ".omo", "codegraph", "projects"))
     expect(JSON.parse(readFileSync(join(result.dataDir, "source.json"), "utf8"))).toEqual({
-      sourceDir: resolve(workspace),
+      sourceDir: realpathSync(workspace),
       version: 1,
     })
 

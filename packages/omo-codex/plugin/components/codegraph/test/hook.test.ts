@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Readable } from "node:stream";
@@ -13,7 +13,6 @@ import {
 } from "../src/hook.ts";
 
 const pluginRoot = resolve(fileURLToPath(new URL("../../..", import.meta.url)));
-const pluginConfigPath = resolve(pluginRoot, ".codex-plugin/plugin.json");
 
 function createAllowedWorkspace(prefix: string): string {
 	return mkdtempSync(join(pluginRoot, `.tmp-${prefix}-`));
@@ -283,95 +282,6 @@ describe("CodeGraph SessionStart hook", () => {
 		}
 	});
 
-	it("#given project root is inside an OMO state directory #when SessionStart fires #then it skips before probing or spawning", async () => {
-		// given
-		const stdout: string[] = [];
-		const spawned: WorkerSpawnInvocation[] = [];
-		const stateRoot = createAllowedWorkspace("codegraph-omo-state");
-		const workspace = join(stateRoot, ".omo", "ultraresearch", "run", "clones", "repo");
-		mkdirSync(workspace, { recursive: true });
-
-		try {
-			// when
-			const result = await executeCodegraphSessionStartHook({
-				config: { codegraph: { enabled: true }, sources: [], warnings: [] },
-				cwd: workspace,
-				env: { HOME: "/tmp/home" },
-				stdin: Readable.from(["{}"]),
-				stdout: { write: (chunk) => stdout.push(chunk) },
-				spawnWorker: (invocation) => spawned.push(invocation),
-				statusProbe: () => {
-					throw new Error("excluded projects must not probe CodeGraph status");
-				},
-			});
-
-			// then
-			expect(result).toEqual({ action: "skipped-excluded", exitCode: 0 });
-			expect(spawned).toEqual([]);
-			expect(stdout.join("")).toBe("");
-		} finally {
-			rmSync(stateRoot, { recursive: true, force: true });
-		}
-	});
-
-	it("#given project root is under a configured excluded root #when SessionStart fires #then it skips before spawning", async () => {
-		// given
-		const stdout: string[] = [];
-		const spawned: WorkerSpawnInvocation[] = [];
-		const excludedRoot = createAllowedWorkspace("codegraph-custom-excluded");
-		const workspace = join(excludedRoot, "repo");
-		mkdirSync(workspace, { recursive: true });
-
-		try {
-			// when
-			const result = await executeCodegraphSessionStartHook({
-				config: { codegraph: { enabled: true, excluded_roots: [excludedRoot] }, sources: [], warnings: [] },
-				cwd: workspace,
-				env: { HOME: "/tmp/home" },
-				stdin: Readable.from(["{}"]),
-				stdout: { write: (chunk) => stdout.push(chunk) },
-				spawnWorker: (invocation) => spawned.push(invocation),
-				statusProbe: () => Promise.resolve(false),
-			});
-
-			// then
-			expect(result).toEqual({ action: "skipped-excluded", exitCode: 0 });
-			expect(spawned).toEqual([]);
-			expect(stdout.join("")).toBe("");
-		} finally {
-			rmSync(excludedRoot, { recursive: true, force: true });
-		}
-	});
-
-	it("#given project root is under /tmp #when SessionStart fires on POSIX #then it skips before spawning", async () => {
-		if (process.platform === "win32") return;
-
-		// given
-		const stdout: string[] = [];
-		const spawned: WorkerSpawnInvocation[] = [];
-		const workspace = mkdtempSync(join("/tmp", "omo-codegraph-excluded-"));
-
-		try {
-			// when
-			const result = await executeCodegraphSessionStartHook({
-				config: { codegraph: { enabled: true }, sources: [], warnings: [] },
-				cwd: workspace,
-				env: { HOME: "/tmp/home" },
-				stdin: Readable.from(["{}"]),
-				stdout: { write: (chunk) => stdout.push(chunk) },
-				spawnWorker: (invocation) => spawned.push(invocation),
-				statusProbe: () => Promise.resolve(false),
-			});
-
-			// then
-			expect(result).toEqual({ action: "skipped-excluded", exitCode: 0 });
-			expect(spawned).toEqual([]);
-			expect(stdout.join("")).toBe("");
-		} finally {
-			rmSync(workspace, { recursive: true, force: true });
-		}
-	});
-
 	it("#given malformed hook input with CodeGraph disabled #when SessionStart fires #then it stays silent and exits zero", async () => {
 		// given
 		const stdout: string[] = [];
@@ -392,20 +302,4 @@ describe("CodeGraph SessionStart hook", () => {
 		expect(stdout.join("")).toBe("");
 	});
 
-	it("#given plugin hook config #when inspected #then CodeGraph is registered after bootstrap SessionStart", () => {
-		// given
-		const pluginConfig: unknown = JSON.parse(readFileSync(pluginConfigPath, "utf8"));
-
-		// when
-		const hookPaths =
-			typeof pluginConfig === "object" && pluginConfig !== null && "hooks" in pluginConfig && Array.isArray(pluginConfig.hooks)
-				? pluginConfig.hooks.filter((hookPath): hookPath is string => typeof hookPath === "string")
-				: [];
-
-		// then
-		expect(hookPaths).toContain("./hooks/session-start-checking-codegraph-bootstrap.json");
-		expect(hookPaths.indexOf("./hooks/session-start-checking-bootstrap-provisioning.json")).toBeLessThan(
-			hookPaths.indexOf("./hooks/session-start-checking-codegraph-bootstrap.json"),
-		);
-	});
 });

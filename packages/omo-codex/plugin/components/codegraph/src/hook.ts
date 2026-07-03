@@ -1,7 +1,13 @@
 import { execFile, spawn } from "node:child_process";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { cwd as processCwd, env as processEnv, stdin as processStdin, stdout as processStdout } from "node:process";
+import {
+	cwd as processCwd,
+	env as processEnv,
+	stderr as processStderr,
+	stdin as processStdin,
+	stdout as processStdout,
+} from "node:process";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
@@ -209,8 +215,18 @@ function writeHookJson(stdout: HookStdout): void {
 function pruneCodegraphProjectStoresBestEffort(homeDir: string): void {
 	try {
 		pruneDeadCodegraphProjectStores({ homeDir });
-	} catch {
+	} catch (error) {
+		if (error instanceof Error) {
+			writeDebugLog(`CodeGraph cache GC skipped: ${error.message}`);
+			return;
+		}
+		throw error;
 	}
+}
+
+function writeDebugLog(message: string): void {
+	if (processEnv["OMO_CODEGRAPH_DEBUG"] !== "1") return;
+	processStderr.write(`${message}\n`);
 }
 
 function spawnDetachedWorker(invocation: WorkerSpawnInvocation): void {
