@@ -18,6 +18,7 @@ REQUIRED NOW:
 - Ask Oracle to verify whether the original task is actually complete
 - Include the original task in the Oracle request
 - Explicitly tell Oracle to review skeptically and critically, and to look for reasons the task may still be incomplete or wrong
+- In your Oracle request, explicitly instruct Oracle to end its reply with the exact line <promise>VERIFIED</promise> if and only if the task is genuinely complete and correct, and to omit that token otherwise. The system detects verification solely by this token in Oracle's session, so Oracle MUST be told to emit it.
 - The system will inspect the Oracle session directly for the verification result
 - If Oracle does not verify, continue fixing the task and do not consider it complete
 
@@ -34,6 +35,7 @@ REQUIRED NOW:
 - Do not claim completion early or argue with the failed verification
 - After fixing the remaining issues, request Oracle review again using task(subagent_type="oracle", load_skills=[], run_in_background=false, ...)
 - Include the original task in the Oracle request and tell Oracle to review skeptically and critically
+- In your Oracle request, explicitly instruct Oracle to end its reply with the exact line <promise>VERIFIED</promise> if and only if the task is genuinely complete and correct, and to omit that token otherwise. The system detects verification solely by this token in Oracle's session, so Oracle MUST be told to emit it.
 - Only when the work is ready for review again, output: <promise>{{PROMISE}}</promise>
 
 Original task:
