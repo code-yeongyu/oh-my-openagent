@@ -46,7 +46,7 @@ Unless the user EXPLICITLY says otherwise, or the task is an urgent must-fix-now
 
 ## OVERVIEW
 
-OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 11 agents, 54-62 lifecycle hooks (base / +monitor / +team-mode) across 61 dirs, 12-35 registry tools (gated by config flags including team-mode; +6 `lsp_*` tools served via the built-in lsp MCP), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), Boulder feature (boulder-state work tracking + cli/boulder subcommand), configurable agent ordering, and Claude Code compatibility.
+OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 17 agents, 54-62 lifecycle hooks (base / +monitor / +team-mode) across 61 dirs, 12-35 registry tools (gated by config flags including team-mode; +6 `lsp_*` tools served via the built-in lsp MCP), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), Boulder feature (boulder-state work tracking + cli/boulder subcommand), configurable agent ordering, and Claude Code compatibility.
 
 **The package layering refactor moved the entire plugin out of root `src/` into [`packages/omo-opencode/src/`](packages/omo-opencode/src/AGENTS.md)** (a 100% git rename — there is NO root `src/` anymore). That adapter tree is now the OpenCode-facing shim over 18 Core packages + 3 MCP packages + the Codex adapter. Build entry: `packages/omo-opencode/src/index.ts`, a thin wrapper that delegates to `packages/omo-opencode/src/testing/create-plugin-module.ts` `createPluginModule()` → staged plugin init (see INITIALIZATION FLOW). Ships in two editions of one product: **Ultimate** (omo for OpenCode, this plugin = `packages/omo-opencode/`) and **Light** (omo for Codex CLI = [`packages/omo-codex/`](packages/omo-codex/AGENTS.md), distributed as the `lazycodex` alias; see CODEX LIGHT EDITION below).
 
@@ -60,7 +60,7 @@ oh-my-opencode/                      # workspace root (no root src/ — it moved
 │   │       ├── index.ts             # Plugin entry; thin wrapper re-exporting createPluginModule() from src/testing/
 │   │       ├── plugin-interface.ts  # 12 OpenCode hook handlers (+2 wired in testing/create-plugin-module.ts)
 │   │       ├── create-{managers,tools,hooks}.ts  # 4 managers / ToolRegistry / 5-tier hook composition
-│   │       ├── agents/              # 11 agents, 10 createXXXAgent factories (Prometheus special-cased via plugin-handlers/prometheus-agent-config-builder.ts)
+│   │       ├── agents/              # 17 agents, 16 createXXXAgent factories (Prometheus special-cased via plugin-handlers/prometheus-agent-config-builder.ts)
 │   │       ├── hooks/               # 54-62 lifecycle hooks across 61 dirs (incl. 5 zauc-* mock dirs + shared/ + team-session-events/)
 │   │       ├── tools/               # 14 native tool dirs; LSP served via a built-in MCP, ast-grep via the bundled skill
 │   │       ├── features/            # 23 feature modules (team-mode, background-agent, skill-mcp-manager, opencode-skill-loader, mcp-oauth, claude-code-plugin-loader, boulder-state, …)
@@ -176,11 +176,48 @@ Teams live as directories under `~/.omo/teams/{name}/config.json` (user) or `<pr
 **Member eligibility** (from [`AGENT_ELIGIBILITY_REGISTRY`](packages/omo-opencode/src/features/team-mode/types.ts)):
 - `eligible`: sisyphus, atlas, sisyphus-junior
 - `conditional`: hephaestus (lacks `teammate: "allow"` permission by default — apply D-36 in `tool-config-handler.ts` or use `subagent_type: "sisyphus"` instead)
-- `hard-reject`: oracle, librarian, explore, multimodal-looker, metis, momus, prometheus (rejected at parse — use `task`/delegate-task)
+- `hard-reject`: oracle, librarian, explore, multimodal-looker, security-orchestrator, security-recon, security-scanner, security-validator, security-deduper, security-prover, metis, momus, prometheus (rejected at parse — use `task`/delegate-task)
 
 **Storage layout** (`~/.omo/teams/{name}/`): `config.json` (spec), `state.json` (runtime), `mailbox/` (messages), `tasklist.jsonl` (tasks), `worktrees/` (per-member git worktrees).
 
 **Implementation:** [`packages/omo-opencode/src/features/team-mode/`](packages/omo-opencode/src/features/team-mode/AGENTS.md). User docs: [`docs/guide/team-mode.md`](docs/guide/team-mode.md).
+
+## SECURITY RESEARCH PIPELINE
+
+The built-in security agents implement an MDASH-style staged pipeline for authorized security research. This is an agent orchestration design, not a new CodeGraph engine design. Do not port CodeGraph adapter parity, CFG/dataflow, graph partitioning, Datalog, GPU, or LSP-server roadmap items into this repo from external planning docs unless the user explicitly asks for CodeGraph work.
+
+Pipeline roles:
+
+| Stage | Agent | Purpose |
+|-------|-------|---------|
+| Prepare / orchestrate | `security-orchestrator` | Scope the target, sequence the stages, and enforce stage gates. |
+| Recon | `security-recon` | Map authorized domains, subdomains, routes, binaries, versions, dependencies, prior reports, public writeups, and bug classes. |
+| Scan | `security-scanner` | Generate source-backed vulnerability hypotheses by bug class: BAC, IDOR, SSRF, XSS, hardcoded secrets, framework routing mistakes, CVE patterns, and AI/tool logic flaws. |
+| Validate | `security-validator` | Run adversarial pro/con review of each hypothesis for reachability, preconditions, false-positive risk, and severity by actual exploitability. |
+| Dedup | `security-deduper` | Collapse semantically identical findings by root cause while preserving affected instances and evidence. |
+| Prove | `security-prover` | Build or run the smallest safe PoC for one validated finding at a time, preferably in `/tmp`, fixtures, staging, or a caller-approved evidence directory. |
+
+Stage gates:
+
+- **Prepare before scan:** scanners need a target inventory and authorization boundary.
+- **Validate before prove:** provers only act on one validated or `needs-proof` finding.
+- **Prove one lead at a time:** choose the most severe, scoped, and reproducible lead.
+- **Stop on scope drift:** new domains, accounts, credentials, hosts, third-party systems, or destructive behavior require explicit user authorization before continuing.
+- **Evidence over volume:** prefer one graph/source/runtime-backed lead over many generic warnings.
+
+Knowledge inputs to fold into recon and scan:
+
+- Prior disclosed reports, bounty writeups, public PoCs, project advisories, and recurring bug classes for the target or technology.
+- Exact dependency, infrastructure, framework, database, and server versions. Download or inspect the matching version when local scope and licensing permit.
+- Bug-class corpora and weakness taxonomies as grounding material. They produce hypotheses only; every finding still needs current target evidence.
+
+Safety and evidence contract:
+
+- Work only on targets, repos, binaries, domains, hosts, and credentials the caller explicitly says are authorized.
+- Do not exfiltrate, persist, or print secrets. Redact tokens, cookies, auth headers, private keys, customer data, and raw credential dumps.
+- Do not perform destructive, availability-impacting, persistence, lateral-movement, stealth, or post-exploitation actions.
+- Every stage result should state scope, findings or verdicts, evidence, next-stage handoff, and omitted secret-bearing details.
+- The pipeline is for legitimate validation and remediation. It should make exploitability more certain, not make abuse easier.
 
 ## CODEX LIGHT EDITION (omo-codex / lazycodex)
 

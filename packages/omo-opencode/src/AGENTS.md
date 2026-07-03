@@ -107,7 +107,7 @@ Total: 53 base, 60 with team-mode. Each tier produces an object whose values are
 
 | Subdir | Purpose | Has AGENTS.md |
 |--------|---------|---------------|
-| `agents/` | 11 agent factories + dynamic prompt builder | yes (+ atlas, hephaestus, prometheus, sisyphus, sisyphus-junior, builtin-agents) |
+| `agents/` | 16 agent factories + dynamic prompt builder (Prometheus is special-cased) | yes (+ atlas, hephaestus, prometheus, sisyphus, sisyphus-junior, builtin-agents, security-pipeline) |
 | `hooks/` | 53-60 lifecycle hooks across 60 dirs | yes (+ atlas, anthropic-context-window-limit-recovery, auto-update-checker, claude-code-hooks, comment-checker, compaction-context-injector, keyword-detector, ralph-loop, rules-injector, runtime-fallback, todo-continuation-enforcer) |
 | `tools/` | 14 native tool dirs (+1 shared utilities dir); LSP + AST-grep moved to built-in MCPs | yes (+ background-task, call-omo-agent, delegate-task, hashline-edit, look-at, skill) |
 | `features/` | 23 feature modules (some now shimming `team-core`, `tmux-core`, `skills-loader-core`, `mcp-client-core`, and `claude-code-compat-core`) | yes (+ 11 sub-AGENTS.md including builtin-skills, team-mode, background-agent, claude-code-*) |

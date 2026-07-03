@@ -1,15 +1,15 @@
 ---
 name: agents-directory
-description: Developer reference for all 11 Oh My OpenAgent agent definitions, factory patterns, tool restrictions, and model routing.
+description: Developer reference for all 17 Oh My OpenAgent agent definitions, factory patterns, tool restrictions, and model routing.
 ---
 
-# src/agents/ — 11 Agent Definitions
+# src/agents/ — 17 Agent Definitions
 
 **Generated:** 2026-05-15
 
 ## OVERVIEW
 
-11 built-in agents. Type enum: [`src/config/schema/agent-names.ts`](../config/schema/agent-names.ts) `BuiltinAgentNameSchema`. 10 of them register via [`builtin-agents.ts`](builtin-agents.ts) `agentSources` record (factory functions). **Prometheus is special-cased** — it has no `createPrometheusAgent` factory; instead [`prometheus-agent-config-builder.ts`](../plugin-handlers/prometheus-agent-config-builder.ts) constructs its config directly during `agent-config-handler` Phase 3.
+17 built-in agents. Type enum: [`src/config/schema/agent-names.ts`](../config/schema/agent-names.ts) `BuiltinAgentNameSchema`. 16 of them register via [`builtin-agents.ts`](builtin-agents.ts) `agentSources` record (factory functions). **Prometheus is special-cased** — it has no `createPrometheusAgent` factory; instead [`prometheus-agent-config-builder.ts`](../plugin-handlers/prometheus-agent-config-builder.ts) constructs its config directly during `agent-config-handler` Phase 3.
 
 All factories follow `createXXXAgent(model) → AgentConfig`. Each carries a static `mode` property (`AgentFactory` type in [`src/agents/types.ts`](types.ts)). Composed via `buildAgent()`.
 
@@ -25,6 +25,12 @@ Modes verified from each agent file's `const MODE: AgentMode = ...` and (for Pro
 | **Librarian** | gpt-5.4-mini-fast | 0.1 | subagent | qwen3.5-plus → minimax-m2.7-highspeed → minimax-m3 → minimax-m2.7 → claude-haiku-4-5 → gpt-5.4-nano | External docs/code search |
 | **Explore** | gpt-5.4-mini-fast | 0.1 | subagent | qwen3.5-plus → minimax-m2.7-highspeed → minimax-m3 → minimax-m2.7 → claude-haiku-4-5 → gpt-5.4-nano | Contextual grep |
 | **Multimodal-Looker** | gpt-5.5 medium | 0.1 | subagent | kimi-k2.6 → glm-4.6v → gpt-5-nano | PDF/image analysis |
+| **Security-Orchestrator** | gpt-5.5 high | 0.1 | subagent | claude-opus-4-7 max → gemini-3.1-pro high → glm-5.1 | Authorized security pipeline coordinator |
+| **Security-Recon** | gpt-5.4-mini-fast | 0.1 | subagent | qwen3.5-plus → minimax-m2.7-highspeed → minimax-m3 → MiniMax-M3 → minimax-m2.7 → claude-haiku-4-5 → gpt-5.4-nano | Authorized attack-surface and prior-report mapping |
+| **Security-Scanner** | gpt-5.5 medium | 0.1 | subagent | claude-sonnet-4-6 → qwen3.5-plus → minimax-m3 → MiniMax-M3 | Bug-class-specific vulnerability hypothesis generation |
+| **Security-Validator** | gpt-5.5 high | 0.1 | subagent | gemini-3.1-pro high → claude-opus-4-7 max → glm-5.1 | Adversarial reachability and exploitability validation |
+| **Security-Deduper** | gpt-5.4-mini-fast | 0.1 | subagent | qwen3.5-plus → minimax-m2.7-highspeed → minimax-m3 → MiniMax-M3 → gpt-5.4-nano | Finding normalization by root cause |
+| **Security-Prover** | gpt-5.5 high | 0.1 | subagent | claude-opus-4-7 max → gemini-3.1-pro high → glm-5.1 | Minimal safe PoC proof for one validated finding |
 | **Metis** | claude-sonnet-4-6 | **0.3** | subagent | claude-opus-4-7 max → gpt-5.5 high → glm-5.1 → k2p5 | Pre-planning consultant |
 | **Momus** | gpt-5.5 xhigh | 0.1 | subagent | claude-opus-4-7 max → gemini-3.1-pro high → glm-5.1 | Plan reviewer |
 | **Atlas** | claude-sonnet-4-6 | 0.1 | primary | kimi-k2.6 → gpt-5.5 medium → minimax-m3 → minimax-m2.7 | Todo-list orchestrator |
@@ -41,6 +47,12 @@ Defined in [`src/shared/agent-tool-restrictions.ts`](../shared/agent-tool-restri
 | Librarian | write, edit, task, call_omo_agent |
 | Explore | write, edit, task, call_omo_agent |
 | Multimodal-Looker | ALL except read |
+| Security-Orchestrator | write, edit, apply_patch |
+| Security-Recon | write, edit, apply_patch, task, call_omo_agent |
+| Security-Scanner | write, edit, apply_patch, task, call_omo_agent |
+| Security-Validator | write, edit, apply_patch, task, call_omo_agent |
+| Security-Deduper | write, edit, apply_patch, task, call_omo_agent |
+| Security-Prover | edit, apply_patch, task, call_omo_agent |
 | Atlas | task, call_omo_agent |
 | Momus | write, edit, task |
 | Prometheus | enforces `.md`-only writes via `prometheus-md-only` hook (path-based, not tool-based) |
@@ -53,7 +65,7 @@ Authoritative registry: [`AGENT_ELIGIBILITY_REGISTRY`](../features/team-mode/typ
 |---------|--------|
 | `eligible` | sisyphus, atlas, sisyphus-junior |
 | `conditional` | hephaestus (lacks `teammate: "allow"` permission by default — see D-36 / `tool-config-handler.ts`; use `subagent_type: "sisyphus"` instead) |
-| `hard-reject` | oracle, librarian, explore, multimodal-looker, metis, momus, prometheus (each with a specific rejection message) |
+| `hard-reject` | oracle, librarian, explore, multimodal-looker, security-orchestrator, security-recon, security-scanner, security-validator, security-deduper, security-prover, metis, momus, prometheus (each with a specific rejection message) |
 
 Read-only agents are rejected at TeamSpec parse time. For those, the lead delegates via `task` (delegate-task) instead. See [`team-mode/AGENTS.md`](../features/team-mode/AGENTS.md).
 
@@ -70,12 +82,13 @@ agents/
 ├── librarian.ts                               # External search
 ├── explore.ts                                 # Codebase grep
 ├── multimodal-looker.ts                       # Vision/PDF
+├── security-pipeline.ts                       # Security Orchestrator/Recon/Scanner/Validator/Deduper/Prover
 ├── metis.ts                                   # Pre-planning
 ├── momus.ts                                   # Plan review
 ├── atlas/agent.ts                             # Todo orchestrator
 ├── prometheus/                                # Strategic planner prompt router; prompt content in packages/prompts-core/prompts/prometheus/
 ├── types.ts                                   # BuiltinAgentName, AgentMode, AgentConfig
-├── builtin-agents.ts                          # agentSources registry (10 → 11 with sisyphus-junior)
+├── builtin-agents.ts                          # agentSources registry for the 16 factory-backed built-ins
 ├── builtin-agents/                            # maybeCreateXXXConfig conditional factories + general-agents.ts + available-skills.ts
 ├── agent-builder.ts                           # buildAgent() composition
 ├── utils.ts                                   # agent utilities
@@ -106,7 +119,7 @@ Model resolution: 4-step pipeline → override → category-default → provider
 Definition (from [`src/agents/types.ts`](types.ts)):
 
 - **`primary`** — respects user's UI-selected model. Used by: sisyphus, hephaestus, atlas, prometheus.
-- **`subagent`** — uses own fallback chain, ignores UI selection. Used by: oracle, librarian, explore, multimodal-looker, metis, momus, sisyphus-junior.
+- **`subagent`** — uses own fallback chain, ignores UI selection. Used by: oracle, librarian, explore, multimodal-looker, security-orchestrator, security-recon, security-scanner, security-validator, security-deduper, security-prover, metis, momus, sisyphus-junior.
 - **`all`** — declared in the type for OpenCode compatibility but no built-in agent currently uses it.
 
 ## CANONICAL ORDER
