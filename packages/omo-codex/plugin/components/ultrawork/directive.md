@@ -289,10 +289,16 @@ as inconclusive. Do not generate a plan before spawned research lanes
 that feed the plan have returned or been closed as inconclusive.
 Do not write the final answer, PR handoff, or completion summary while
 active child agents remain open. Use short `multi_agent_v1.wait_agent` cycles.
-After two silent waits send `TASK STILL ACTIVE: return <deliverable> or
-BLOCKED: <reason>`. After four silent or ack-only checks, close the lane as
-inconclusive, record that it is not approval, and respawn smaller only
-if the deliverable is still required.
+A silent wait is not a child-state transition and must not by itself
+trigger `TASK STILL ACTIVE`, `close_agent`, or a respawn. Send
+`TASK STILL ACTIVE: return <deliverable> or BLOCKED: <reason>` only when
+the child has completed without the deliverable, responded ack-only
+after a targeted followup, explicitly reported `BLOCKED:`, or is no
+longer running. If no final status or completion signal exists, treat
+the child as still active and continue independent root work. Close the
+lane as inconclusive and respawn smaller only after one of those
+non-running or non-delivering states is observed and the deliverable is
+still required.
 
 # Verification gate (TRIGGERED, NOT OPTIONAL)
 
