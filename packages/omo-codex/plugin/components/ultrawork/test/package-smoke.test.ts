@@ -31,6 +31,7 @@ describe("codex ultrawork package metadata", () => {
 		expect(scripts["test"]).toBe("vitest --run");
 		expect(packageFiles).toContain("dist");
 		expect(packageFiles).toContain("directive.md");
+		expect(packageFiles).toContain("skills");
 		expect(packageFiles).not.toContain("hooks/ultrawork-detector.py");
 		expect(cliSource.startsWith("#!/usr/bin/env node")).toBe(true);
 		expect(hookCommands).toContain(`node "${pluginRoot}/dist/cli.js" hook user-prompt-submit`);

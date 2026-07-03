@@ -17,6 +17,7 @@ const skillSources = [
 	["teammode", "components/teammode/skills/teammode"],
 	["ulw-loop", "components/ulw-loop/skills/ulw-loop"],
 	["ulw-plan", "components/ultrawork/skills/ulw-plan"],
+	["ultrawork", "components/ultrawork/skills/ultrawork"],
 ];
 const componentSkillNames = new Set(skillSources.map(([name]) => name));
 const codexHiddenSharedSkillNames = new Set(["ultraresearch"]);

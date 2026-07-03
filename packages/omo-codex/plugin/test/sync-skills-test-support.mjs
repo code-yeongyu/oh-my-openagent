@@ -25,6 +25,7 @@ export const expectedSkills = [
 	"start-work",
 	"teammode",
 	"ultimate-browsing",
+	"ultrawork",
 	"ulw-loop",
 	"ulw-plan",
 	"ulw-research",
@@ -40,6 +41,7 @@ export const componentSkillSources = [
 	["teammode", "components/teammode/skills/teammode"],
 	["ulw-loop", "components/ulw-loop/skills/ulw-loop"],
 	["ulw-plan", "components/ultrawork/skills/ulw-plan"],
+	["ultrawork", "components/ultrawork/skills/ultrawork"],
 ];
 
 const codexCompatibilityEndMarkers = [
