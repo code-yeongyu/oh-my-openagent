@@ -127,10 +127,20 @@ export async function withEnvAsync<T>(patch: Record<string, string | undefined>,
 export function createTempOmoBin(stdout = activeStatus()): { dir: string; bin: string; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), "omo-senpi-ulw-loop-"))
   const bin = join(dir, process.platform === "win32" ? "omo.cmd" : "omo")
+  const runner = join(dir, "omo-runner.cjs")
+  writeFileSync(
+    runner,
+    [
+      "const { realpathSync, writeFileSync } = require('node:fs')",
+      `writeFileSync(${JSON.stringify(join(dir, "cwd.txt"))}, realpathSync(process.cwd()))`,
+      `process.stdout.write(${JSON.stringify(`${stdout}\n`)})`,
+      "",
+    ].join("\n"),
+  )
   const script =
     process.platform === "win32"
-      ? `@echo off\r\ncd > "${join(dir, "cwd.txt")}"\r\necho ${stdout.replace(/"/g, '\\"')}\r\n`
-      : `#!/bin/sh\npwd > '${join(dir, "cwd.txt")}'\nprintf '%s\\n' '${stdout.replace(/'/g, "'\\''")}'\n`
+      ? `@echo off\r\n"${process.execPath}" "${runner}"\r\n`
+      : `#!/bin/sh\n'${process.execPath.replace(/'/g, "'\\''")}' '${runner.replace(/'/g, "'\\''")}'\n`
   writeFileSync(bin, script)
   chmodSync(bin, 0o755)
   return {

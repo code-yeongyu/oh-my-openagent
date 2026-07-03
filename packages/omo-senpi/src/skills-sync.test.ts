@@ -72,7 +72,9 @@ describe("OMO Senpi scoped skill sync", () => {
 
   test("#given synced skill files #when scanned #then no Codex or multi-agent harness guidance survives", () => {
     const files = listFiles(skillsRoot)
-    expect(files.map((file) => relative(skillsRoot, file)).sort()).toContain("ulw-loop/references/full-workflow.md")
+    expect(files.map((file) => toPortablePath(relative(skillsRoot, file))).sort()).toContain(
+      "ulw-loop/references/full-workflow.md",
+    )
 
     const leaks = files.flatMap((file) => {
       const content = readFileSync(file, "utf8")
@@ -82,3 +84,7 @@ describe("OMO Senpi scoped skill sync", () => {
     expect(leaks).toEqual([])
   })
 })
+
+function toPortablePath(path: string): string {
+  return path.replaceAll("\\", "/")
+}

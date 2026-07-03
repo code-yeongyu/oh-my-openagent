@@ -86,6 +86,7 @@ describe("omo-senpi comment-checker binary resolver", () => {
 
     // then
     expect(resolved).toBe(pathBinary)
-    expect(resolutionOrder).toEqual(["package-api", "path:comment-checker"])
+    const expectedPathCandidate = process.platform === "win32" ? "comment-checker.exe" : "comment-checker"
+    expect(resolutionOrder).toEqual(["package-api", `path:${expectedPathCandidate}`])
   })
 })
