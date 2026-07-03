@@ -846,13 +846,13 @@ describe("skill tool - nativeSkills integration", () => {
             {
               name: "opencode/customize-opencode",
               description: "Qualified OpenCode customize entry",
-              location: "/opencode/customize-opencode.md",
+              location: "<built-in>",
               content: "Qualified OpenCode customize body",
             },
             {
               name: "customize-opencode",
               description: "Customize OpenCode",
-              location: "/opencode/customize-opencode.md",
+              location: "<built-in>",
               content: "Customize OpenCode body",
             },
           ]
