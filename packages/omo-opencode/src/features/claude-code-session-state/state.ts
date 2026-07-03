@@ -5,6 +5,7 @@ export const syncSubagentSessions = new Set<string>()
 export const handedBackSyncSessions = new Set<string>()
 
 let _mainSessionID: string | undefined
+const ultraworkActivatedSessions = new Set<string>()
 
 export function setMainSession(id: string | undefined) {
   _mainSessionID = id
@@ -12,6 +13,14 @@ export function setMainSession(id: string | undefined) {
 
 export function getMainSessionID(): string | undefined {
   return _mainSessionID
+}
+
+export function markUltraworkSessionActive(sessionID: string): void {
+  ultraworkActivatedSessions.add(sessionID)
+}
+
+export function isUltraworkSessionActive(sessionID: string | undefined): boolean {
+  return typeof sessionID === "string" && ultraworkActivatedSessions.has(sessionID)
 }
 
 const registeredAgentNames = new Set<string>()
@@ -80,6 +89,7 @@ export function _resetForTesting(): void {
   syncSubagentSessions.clear()
   handedBackSyncSessions.clear()
   sessionAgentMap.clear()
+  ultraworkActivatedSessions.clear()
   registeredAgentNames.clear()
   registeredAgentAliases.clear()
 }

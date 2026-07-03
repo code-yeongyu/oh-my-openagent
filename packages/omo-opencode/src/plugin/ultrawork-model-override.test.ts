@@ -58,6 +58,7 @@ describe("detectUltrawork", () => {
 
 describe("resolveUltraworkOverride", () => {
   beforeEach(async () => {
+    sessionStateModule._resetForTesting()
     await loadFreshUltraworkModelOverrideModule()
   })
 
@@ -88,6 +89,21 @@ describe("resolveUltraworkOverride", () => {
 
     //#then
     expect(result).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7", variant: "max" })
+  })
+
+  test("should keep resolving override on keyword-less follow-up after session activation", () => {
+    //#given
+    const config = createConfig("sisyphus", { model: "anthropic/claude-opus-4-7", variant: "max" })
+    const activationOutput = createOutput("ulw refactor the auth module")
+    const followUpOutput = createOutput("and also add error handling")
+
+    //#when
+    const activation = resolveUltraworkOverride(config, "sisyphus", activationOutput, "ses_ulw")
+    const followUp = resolveUltraworkOverride(config, "sisyphus", followUpOutput, "ses_ulw")
+
+    //#then
+    expect(activation).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7", variant: "max" })
+    expect(followUp).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7", variant: "max" })
   })
 
   test("should return null when no keyword detected", () => {
@@ -242,6 +258,7 @@ describe("applyUltraworkModelOverrideOnMessage", () => {
   let dbOverrideSpy: ReturnType<typeof spyOn>
 
   beforeEach(async () => {
+    sessionStateModule._resetForTesting()
     logSpy = spyOn(sharedModule, "log")
     logSpy.mockImplementation(() => {})
     dbOverrideSpy = spyOn(dbOverrideModule, "scheduleDeferredModelOverride")
@@ -250,6 +267,7 @@ describe("applyUltraworkModelOverrideOnMessage", () => {
   })
 
   afterEach(() => {
+    sessionStateModule._resetForTesting()
     logSpy?.mockRestore()
     dbOverrideSpy?.mockRestore()
   })
