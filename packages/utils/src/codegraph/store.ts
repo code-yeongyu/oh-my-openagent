@@ -60,9 +60,16 @@ function readRecordedSourceDir(projectDir: string): string | null {
     if (typeof parsed !== "object" || parsed === null) return null
     const sourceDir = (parsed as { readonly sourceDir?: unknown }).sourceDir
     return typeof sourceDir === "string" && sourceDir.trim().length > 0 ? sourceDir : null
-  } catch {
-    return null
+  } catch (error) {
+    if (isNonFatalSourceMetadataError(error)) return null
+    throw error
   }
+}
+
+function isNonFatalSourceMetadataError(error: unknown): boolean {
+  if (error instanceof SyntaxError) return true
+  const code = typeof error === "object" && error !== null && "code" in error ? (error as { readonly code?: unknown }).code : undefined
+  return typeof code === "string" && ["EACCES", "ENOENT", "ENOTDIR", "EPERM"].includes(code)
 }
 
 function recordedSourceIsMissing(projectDir: string): boolean {
