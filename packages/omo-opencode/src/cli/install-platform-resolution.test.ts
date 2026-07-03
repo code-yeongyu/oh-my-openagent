@@ -48,6 +48,17 @@ describe("install platform resolution", () => {
     expect(args.platform).toBe("both")
   })
 
+  test("resolves explicit --platform=senpi", () => {
+    // given
+    const invocationName = "omo"
+
+    // when
+    const args = resolveInstallArgs({ tui: true, platform: "senpi" }, invocationName)
+
+    // then
+    expect(args.platform).toBe("senpi")
+  })
+
   test("resolves explicit --platform=opencode", () => {
     // given
     const invocationName = "omo"
@@ -102,7 +113,7 @@ describe("install platform resolution", () => {
     // then
     expect(installBlock).not.toBeNull()
     expect(installBlock?.[1]).toContain('new Option("--platform <platform>"')
-    expect(installBlock?.[1]).toContain('.choices(["opencode", "codex", "both"])')
+    expect(installBlock?.[1]).toContain('.choices(["opencode", "codex", "both", "senpi"])')
     expect(installBlock?.[1]).toContain("--codex-autonomous")
     expect(installBlock?.[1]).toContain("--no-codex-autonomous")
   })
@@ -117,7 +128,7 @@ describe("install platform resolution", () => {
     // then
     expect(rootBlock).not.toBeNull()
     expect(rootBlock?.[1]).toContain('new Option("--platform <platform>"')
-    expect(rootBlock?.[1]).toContain('.choices(["opencode", "codex", "both"])')
+    expect(rootBlock?.[1]).toContain('.choices(["opencode", "codex", "both", "senpi"])')
     expect(rootBlock?.[1]).toContain(".hideHelp()")
   })
 })

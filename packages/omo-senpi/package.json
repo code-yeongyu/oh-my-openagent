@@ -10,8 +10,8 @@
 			"import": "./src/index.ts"
 		},
 		"./install": {
-			"types": "./src/index.ts",
-			"import": "./src/index.ts"
+			"types": "./src/install/index.ts",
+			"import": "./src/install/index.ts"
 		},
 		"./extension": {
 			"types": "./src/index.ts",
