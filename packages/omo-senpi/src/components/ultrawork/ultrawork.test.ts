@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, it } from "bun:test"
-import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { readFileSync, writeFileSync } from "node:fs"
 import { resolve } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
@@ -9,7 +9,6 @@ import type { ComponentContext, ComponentLogger } from "../../extension/types"
 import { createUltraworkComponent } from "./index"
 import { FORBIDDEN_DIRECTIVE_TOKENS, SENPI_ULTRAWORK_DIRECTIVE } from "./generated-directive"
 
-const evidenceRoot = resolve(".omo/evidence/omo-senpi-adapter/task-4")
 const generatedDirectivePath = resolve("packages/omo-senpi/src/components/ultrawork/generated-directive.ts")
 
 function createTestContext(pi: FakeExtensionAPI): ComponentContext {
@@ -152,11 +151,11 @@ describe("omo-senpi ultrawork component", () => {
 
   it("#given generated directive #when embed script runs check #then passes without drift", () => {
     // given
-    expect(existsSync(evidenceRoot)).toBe(true)
+    const command = ["node", "packages/omo-senpi/plugin/scripts/embed-directive.mjs", "--check"]
 
     // when
     const result = Bun.spawnSync({
-      cmd: ["node", "packages/omo-senpi/plugin/scripts/embed-directive.mjs", "--check"],
+      cmd: command,
       stdout: "pipe",
       stderr: "pipe",
     })
