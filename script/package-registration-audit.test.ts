@@ -1,3 +1,4 @@
+// allow: SIZE_OK - single-purpose package registration audit keeps workspace graph fixtures and invariant checks together.
 import { existsSync } from "node:fs"
 import { readdir, readFile } from "node:fs/promises"
 import { join, relative } from "node:path"
