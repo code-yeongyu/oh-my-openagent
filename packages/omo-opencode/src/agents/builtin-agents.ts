@@ -13,6 +13,20 @@ import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
 import { createSisyphusJuniorAgentWithOverrides } from "./sisyphus-junior"
+import {
+  createSecurityDeduperAgent,
+  createSecurityOrchestratorAgent,
+  createSecurityProverAgent,
+  createSecurityReconAgent,
+  createSecurityScannerAgent,
+  createSecurityValidatorAgent,
+  securityDeduperPromptMetadata,
+  securityOrchestratorPromptMetadata,
+  securityProverPromptMetadata,
+  securityReconPromptMetadata,
+  securityScannerPromptMetadata,
+  securityValidatorPromptMetadata,
+} from "./security-pipeline"
 import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
 import {
   fetchAvailableModels,
@@ -36,6 +50,12 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   librarian: createLibrarianAgent,
   explore: createExploreAgent,
   "multimodal-looker": createMultimodalLookerAgent,
+  "security-orchestrator": createSecurityOrchestratorAgent,
+  "security-recon": createSecurityReconAgent,
+  "security-scanner": createSecurityScannerAgent,
+  "security-validator": createSecurityValidatorAgent,
+  "security-deduper": createSecurityDeduperAgent,
+  "security-prover": createSecurityProverAgent,
   metis: createMetisAgent,
   momus: createMomusAgent,
   // Note: Atlas is handled specially in createBuiltinAgents()
@@ -53,6 +73,12 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   librarian: LIBRARIAN_PROMPT_METADATA,
   explore: EXPLORE_PROMPT_METADATA,
   "multimodal-looker": MULTIMODAL_LOOKER_PROMPT_METADATA,
+  "security-orchestrator": securityOrchestratorPromptMetadata,
+  "security-recon": securityReconPromptMetadata,
+  "security-scanner": securityScannerPromptMetadata,
+  "security-validator": securityValidatorPromptMetadata,
+  "security-deduper": securityDeduperPromptMetadata,
+  "security-prover": securityProverPromptMetadata,
   metis: metisPromptMetadata,
   momus: momusPromptMetadata,
   atlas: atlasPromptMetadata,
