@@ -1,10 +1,11 @@
 import { describe, expect, it } from "bun:test"
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 import { SENPI_LOADER_ALIASES } from "../plugin/scripts/build-extension.mjs"
 
-const packageRoot = new URL("..", import.meta.url).pathname
+const packageRoot = fileURLToPath(new URL("..", import.meta.url))
 const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 
 const EXPECTED_SENPI_LOADER_ALIASES = [
