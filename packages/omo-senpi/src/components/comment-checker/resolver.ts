@@ -1,6 +1,6 @@
-import { existsSync } from "node:fs"
+import { accessSync, constants, existsSync } from "node:fs"
 import { createRequire } from "node:module"
-import { isAbsolute } from "node:path"
+import { delimiter, isAbsolute, join } from "node:path"
 
 import { COMMENT_CHECKER_ENV_KEY, COMMENT_CHECKER_PACKAGE_NAME } from "./constants"
 import type { SenpiCommentCheckerBinaryResolverOptions } from "./types"
@@ -24,8 +24,29 @@ export function resolveSenpiCommentCheckerBinary(options: SenpiCommentCheckerBin
   }
 
   const binaryName = (options.platform ?? process.platform) === "win32" ? "comment-checker.exe" : "comment-checker"
-  const pathLookup = options.pathLookup ?? Bun.which
+  const pathLookup = options.pathLookup ?? findExecutableOnPath
   return pathLookup(binaryName) ?? null
+}
+
+function findExecutableOnPath(binaryName: string): string | null {
+  const pathValue = process.env.PATH
+  if (!pathValue) return null
+  for (const directory of pathValue.split(delimiter)) {
+    if (!directory) continue
+    const candidate = join(directory, binaryName)
+    if (isExecutableFile(candidate)) return candidate
+  }
+  return null
+}
+
+function isExecutableFile(path: string): boolean {
+  if (!existsSync(path)) return false
+  try {
+    accessSync(path, constants.X_OK)
+    return true
+  } catch {
+    return false
+  }
 }
 
 interface PackageApiBinaryResolverInput {

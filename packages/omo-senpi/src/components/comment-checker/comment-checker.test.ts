@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, it } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
@@ -18,6 +18,12 @@ import {
 type TextBlock = { type: "text"; text: string }
 type ToolResultPatch = { content?: TextBlock[] }
 type RecordingLogger = ComponentLogger & { entries: Array<{ level: string; message: string; details?: unknown }> }
+type BoundSessionManager = {
+  readonly sessionId: string
+  readonly sessionFile: string
+  getSessionId(this: BoundSessionManager): string
+  getSessionFile(this: BoundSessionManager): string
+}
 
 const tempRoots: string[] = []
 
@@ -60,6 +66,24 @@ function createContext(cwd: string): Record<string, unknown> {
         return "session-1"
       },
     },
+  }
+}
+
+function createBoundSessionContext(cwd: string): Record<string, unknown> {
+  const sessionManager: BoundSessionManager = {
+    sessionId: "session-1",
+    sessionFile: "/tmp/transcript.jsonl",
+    getSessionId() {
+      return this.sessionId
+    },
+    getSessionFile() {
+      return this.sessionFile
+    },
+  }
+
+  return {
+    cwd,
+    sessionManager,
   }
 }
 
@@ -113,6 +137,16 @@ async function registerWithFakeRunner(options: {
 }
 
 describe("omo-senpi comment-checker component", () => {
+  it("#given built Senpi runs under Node #when inspecting runtime sources #then comment-checker has no Bun global dependency", () => {
+    // given
+    const runnerSource = readFileSync(new URL("./runner.ts", import.meta.url), "utf8")
+    const resolverSource = readFileSync(new URL("./resolver.ts", import.meta.url), "utf8")
+
+    // then
+    expect(runnerSource).not.toMatch(/\bBun\b/)
+    expect(resolverSource).not.toMatch(/\bBun\b/)
+  })
+
   it("#given OMO_COMMENT_CHECKER_BIN and other candidates #when resolving binary #then env var wins first", () => {
     // given
     const cwd = createTempCwd()
@@ -251,6 +285,20 @@ describe("omo-senpi comment-checker component", () => {
     expect(filePath).toBe(resolve(cwd, "src/example.ts"))
     expect(calls[0]?.hookInput.cwd).toBe(cwd)
     expect(calls[0]?.hookInput.tool_name).toBe("edit")
+  })
+
+  it("#given bound Senpi session manager #when tool_result dispatches #then runner receives session metadata", async () => {
+    // given
+    const cwd = createTempCwd()
+    const { pi, calls } = await registerWithFakeRunner()
+
+    // when
+    await pi.dispatch("tool_result", createToolResultEvent(), createBoundSessionContext(cwd))
+
+    // then
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.hookInput.session_id).toBe("session-1")
+    expect(calls[0]?.hookInput.transcript_path).toBe("/tmp/transcript.jsonl")
   })
 
   it("#given successful write result #when tool_result dispatches #then runner receives the written file", async () => {
