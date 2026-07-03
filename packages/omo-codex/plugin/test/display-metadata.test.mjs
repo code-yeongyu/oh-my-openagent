@@ -7,6 +7,7 @@ import { readJson, root } from "./aggregate-plugin-fixture.mjs";
 
 const hookSlugPattern = /^\.\/hooks\/[a-z0-9]+(?:-[a-z0-9]+)*\.json$/;
 const displayNamePrefix = "(OmO) ";
+const ignoredSkillMetadataDirNames = new Set(["agents"]);
 
 async function exists(path) {
 	try {
@@ -42,7 +43,7 @@ async function collectSkillDirs(dir) {
 	}
 	const entries = await readdir(dir, { withFileTypes: true });
 	for (const entry of entries) {
-		if (!entry.isDirectory()) continue;
+		if (!entry.isDirectory() || ignoredSkillMetadataDirNames.has(entry.name)) continue;
 		skillDirs.push(...(await collectSkillDirs(join(dir, entry.name))));
 	}
 	return skillDirs;

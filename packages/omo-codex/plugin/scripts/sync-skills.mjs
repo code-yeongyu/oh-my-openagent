@@ -21,6 +21,7 @@ const skillSources = [
 const componentSkillNames = new Set(skillSources.map(([name]) => name));
 const codexHiddenSharedSkillNames = new Set(["ultraresearch"]);
 const skillDisplayPrefix = "(OmO) ";
+const ignoredSkillMetadataDirNames = new Set(["agents"]);
 
 function shouldCopySkillSource(source) {
 	const normalized = source.replaceAll("\\", "/");
@@ -228,11 +229,9 @@ async function writeCodexSkillDisplayMetadata(skillDir) {
 async function writeNestedSkillDisplayMetadata(skillDir) {
 	const entries = await readdir(skillDir, { withFileTypes: true });
 	for (const entry of entries) {
-		if (!entry.isDirectory()) continue;
+		if (!entry.isDirectory() || ignoredSkillMetadataDirNames.has(entry.name)) continue;
 		const childDir = join(skillDir, entry.name);
-		const childSkillPath = join(childDir, "SKILL.md");
 		try {
-			await readFile(childSkillPath, "utf8");
 			await writeCodexSkillDisplayMetadata(childDir);
 		} catch (error) {
 			if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
