@@ -45,6 +45,18 @@ export const AGENT_NAME_MAP: Record<string, string> = {
   librarian: "librarian",
   explore: "explore",
   "multimodal-looker": "multimodal-looker",
+  "Security Orchestrator": "security-orchestrator",
+  "security-orchestrator": "security-orchestrator",
+  "Security Recon": "security-recon",
+  "security-recon": "security-recon",
+  "Security Scanner": "security-scanner",
+  "security-scanner": "security-scanner",
+  "Security Validator": "security-validator",
+  "security-validator": "security-validator",
+  "Security Deduper": "security-deduper",
+  "security-deduper": "security-deduper",
+  "Security Prover": "security-prover",
+  "security-prover": "security-prover",
 }
 
 export const BUILTIN_AGENT_NAMES = new Set([
@@ -58,6 +70,14 @@ export const BUILTIN_AGENT_NAMES = new Set([
   "prometheus", // was "Prometheus - Plan Builder"
   "atlas", // was "Atlas"
   "build",
+  "hephaestus",
+  "sisyphus-junior",
+  "security-orchestrator",
+  "security-recon",
+  "security-scanner",
+  "security-validator",
+  "security-deduper",
+  "security-prover",
 ])
 
 export function migrateAgentNames(

@@ -73,6 +73,12 @@ export const AgentOverridesSchema = z.object({
   librarian: AgentOverrideConfigSchema.optional(),
   explore: AgentOverrideConfigSchema.optional(),
   "multimodal-looker": AgentOverrideConfigSchema.optional(),
+  "security-orchestrator": AgentOverrideConfigSchema.optional(),
+  "security-recon": AgentOverrideConfigSchema.optional(),
+  "security-scanner": AgentOverrideConfigSchema.optional(),
+  "security-validator": AgentOverrideConfigSchema.optional(),
+  "security-deduper": AgentOverrideConfigSchema.optional(),
+  "security-prover": AgentOverrideConfigSchema.optional(),
   atlas: AgentOverrideConfigSchema.optional(),
 }).catchall(AgentOverrideConfigSchema.optional())
 

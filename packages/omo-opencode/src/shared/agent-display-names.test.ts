@@ -134,6 +134,15 @@ describe("getAgentDisplayName", () => {
     expect(result).toBe("multimodal-looker")
   })
 
+  it("returns display names for security pipeline agents", () => {
+    expect(getAgentDisplayName("security-orchestrator")).toBe("Security Orchestrator")
+    expect(getAgentDisplayName("security-recon")).toBe("Security Recon")
+    expect(getAgentDisplayName("security-scanner")).toBe("Security Scanner")
+    expect(getAgentDisplayName("security-validator")).toBe("Security Validator")
+    expect(getAgentDisplayName("security-deduper")).toBe("Security Deduper")
+    expect(getAgentDisplayName("security-prover")).toBe("Security Prover")
+  })
+
   it("preserves CJK display-name overrides verbatim", () => {
     expect(getAgentDisplayName("sisyphus", { sisyphus: { displayName: "Sisyphus - 主脑" } })).toBe("Sisyphus - 主脑")
     expect(getAgentDisplayName("hephaestus", { hephaestus: { displayName: "헤파이스토스" } })).toBe("헤파이스토스")
@@ -187,6 +196,8 @@ describe("getAgentConfigKey", () => {
     expect(getAgentConfigKey("Metis - Plan Consultant")).toBe("metis")
     expect(getAgentConfigKey("Momus - Plan Critic")).toBe("momus")
     expect(getAgentConfigKey("Sisyphus-Junior")).toBe("sisyphus-junior")
+    expect(getAgentConfigKey("Security Orchestrator")).toBe("security-orchestrator")
+    expect(getAgentConfigKey("Security Prover")).toBe("security-prover")
   })
 
   it("resolves atlas even when the UI ordering prefix is present", () => {
@@ -274,6 +285,12 @@ describe("AGENT_DISPLAY_NAMES", () => {
       librarian: "librarian",
       explore: "explore",
       "multimodal-looker": "multimodal-looker",
+      "security-orchestrator": "Security Orchestrator",
+      "security-recon": "Security Recon",
+      "security-scanner": "Security Scanner",
+      "security-validator": "Security Validator",
+      "security-deduper": "Security Deduper",
+      "security-prover": "Security Prover",
       "council-member": "council-member",
     }
 

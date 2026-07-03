@@ -23,6 +23,12 @@ export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   librarian: "librarian",
   explore: "explore",
   "multimodal-looker": "multimodal-looker",
+  "security-orchestrator": "Security Orchestrator",
+  "security-recon": "Security Recon",
+  "security-scanner": "Security Scanner",
+  "security-validator": "Security Validator",
+  "security-deduper": "Security Deduper",
+  "security-prover": "Security Prover",
   "council-member": "council-member",
 }
 

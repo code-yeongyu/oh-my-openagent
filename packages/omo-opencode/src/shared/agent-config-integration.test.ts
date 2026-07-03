@@ -86,7 +86,24 @@ describe("Agent Config Integration", () => {
   describe("Display name resolution", () => {
     test("returns correct display names for all builtin agents", () => {
       // given - lowercase config keys
-      const agents = ["sisyphus", "hephaestus", "prometheus", "atlas", "metis", "momus", "oracle", "librarian", "explore", "multimodal-looker"]
+      const agents = [
+        "sisyphus",
+        "hephaestus",
+        "prometheus",
+        "atlas",
+        "metis",
+        "momus",
+        "oracle",
+        "librarian",
+        "explore",
+        "multimodal-looker",
+        "security-orchestrator",
+        "security-recon",
+        "security-scanner",
+        "security-validator",
+        "security-deduper",
+        "security-prover",
+      ]
 
       // when - display names are requested
       const displayNames = agents.map((agent) => getAgentDisplayName(agent))
@@ -102,6 +119,12 @@ describe("Agent Config Integration", () => {
       expect(displayNames).toContain("librarian")
       expect(displayNames).toContain("explore")
       expect(displayNames).toContain("multimodal-looker")
+      expect(displayNames).toContain("Security Orchestrator")
+      expect(displayNames).toContain("Security Recon")
+      expect(displayNames).toContain("Security Scanner")
+      expect(displayNames).toContain("Security Validator")
+      expect(displayNames).toContain("Security Deduper")
+      expect(displayNames).toContain("Security Prover")
     })
 
     test("handles lowercase keys case-insensitively", () => {
@@ -146,7 +169,24 @@ describe("Agent Config Integration", () => {
 
     test("model requirements include all builtin agents", () => {
       // given - expected builtin agents
-      const expectedAgents = ["sisyphus", "hephaestus", "prometheus", "atlas", "metis", "momus", "oracle", "librarian", "explore", "multimodal-looker"]
+      const expectedAgents = [
+        "sisyphus",
+        "hephaestus",
+        "prometheus",
+        "atlas",
+        "metis",
+        "momus",
+        "oracle",
+        "librarian",
+        "explore",
+        "multimodal-looker",
+        "security-orchestrator",
+        "security-recon",
+        "security-scanner",
+        "security-validator",
+        "security-deduper",
+        "security-prover",
+      ]
 
       // when - checking AGENT_MODEL_REQUIREMENTS
       const agentKeys = Object.keys(AGENT_MODEL_REQUIREMENTS)

@@ -5907,7 +5907,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "4.15.0",
+    version: "4.15.1",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -12984,7 +12984,15 @@ var BUILTIN_AGENT_NAMES = new Set([
   "momus",
   "prometheus",
   "atlas",
-  "build"
+  "build",
+  "hephaestus",
+  "sisyphus-junior",
+  "security-orchestrator",
+  "security-recon",
+  "security-scanner",
+  "security-validator",
+  "security-deduper",
+  "security-prover"
 ]);
 // packages/utils/src/migration/model-versions.ts
 var CURRENT_USER_SELECTABLE_MODELS = new Set([

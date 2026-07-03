@@ -98,3 +98,14 @@ describe("migrateAgentNames with parenthesized aliases", () => {
     expect(migrated["Hephaestus (Deep Agent)"]).toBeUndefined()
   })
 })
+
+describe("security pipeline agent aliases", () => {
+  test("maps security pipeline display names to canonical config keys", () => {
+    expect(AGENT_NAME_MAP["Security Orchestrator"]).toBe("security-orchestrator")
+    expect(AGENT_NAME_MAP["Security Recon"]).toBe("security-recon")
+    expect(AGENT_NAME_MAP["Security Scanner"]).toBe("security-scanner")
+    expect(AGENT_NAME_MAP["Security Validator"]).toBe("security-validator")
+    expect(AGENT_NAME_MAP["Security Deduper"]).toBe("security-deduper")
+    expect(AGENT_NAME_MAP["Security Prover"]).toBe("security-prover")
+  })
+})

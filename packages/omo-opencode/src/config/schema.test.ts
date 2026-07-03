@@ -701,6 +701,53 @@ describe("Sisyphus-Junior agent override", () => {
       expect(result.data.agents?.momus?.category).toBe("quick")
     }
   })
+
+  test("schema accepts security pipeline agent overrides", () => {
+    // given
+    const config = {
+      agents: {
+        "security-orchestrator": {
+          model: "openai/gpt-5.5",
+          variant: "high",
+        },
+        "security-recon": {
+          category: "quick",
+        },
+        "security-scanner": {
+          temperature: 0.2,
+        },
+        "security-validator": {
+          reasoningEffort: "high",
+        },
+        "security-deduper": {
+          prompt_append: "Cluster by root cause.",
+        },
+        "security-prover": {
+          tools: {
+            write: true,
+            edit: false,
+          },
+        },
+      },
+    }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.agents?.["security-orchestrator"]?.variant).toBe("high")
+      expect(result.data.agents?.["security-recon"]?.category).toBe("quick")
+      expect(result.data.agents?.["security-scanner"]?.temperature).toBe(0.2)
+      expect(result.data.agents?.["security-validator"]?.reasoningEffort).toBe("high")
+      expect(result.data.agents?.["security-deduper"]?.prompt_append).toBe("Cluster by root cause.")
+      expect(result.data.agents?.["security-prover"]?.tools).toEqual({
+        write: true,
+        edit: false,
+      })
+    }
+  })
 })
 
 describe("BrowserAutomationProviderSchema", () => {
