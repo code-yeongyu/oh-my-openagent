@@ -1919,6 +1919,24 @@ function resolveHomeDir(options) {
   return options.homeDir ?? env["HOME"] ?? env["USERPROFILE"] ?? homedir8();
 }
 
+// components/codegraph/src/cache-gc.ts
+var NON_FATAL_GC_ERROR_CODES = new Set(["EACCES", "EBUSY", "ENOENT", "ENOTEMPTY", "ENOTDIR", "EPERM"]);
+function pruneCodegraphProjectStoresBestEffort(homeDir, options = {}) {
+  try {
+    (options.prune ?? pruneDeadCodegraphProjectStores)({ homeDir });
+  } catch (error) {
+    if (!isNonFatalCodegraphGcError(error))
+      throw error;
+    options.debugLog?.(`CodeGraph cache GC skipped: ${error.message}`);
+  }
+}
+function isNonFatalCodegraphGcError(error) {
+  if (!(error instanceof Error))
+    return false;
+  const code = typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
+  return typeof code === "string" && NON_FATAL_GC_ERROR_CODES.has(code);
+}
+
 // components/codegraph/src/session-start-worker.ts
 import { execFile as execFile2 } from "node:child_process";
 import { appendFileSync as appendFileSync2, existsSync as existsSync7, mkdirSync as mkdirSync2 } from "node:fs";
@@ -2341,7 +2359,7 @@ async function executeCodegraphSessionStartHook(options = {}) {
   const projectRoot = resolveProjectRoot(input, options.cwd ?? processCwd2());
   const homeDir = resolveHomeDir3(env);
   const config = options.config ?? getCodexOmoConfig({ cwd: projectRoot, env, homeDir });
-  pruneCodegraphProjectStoresBestEffort(homeDir);
+  pruneCodegraphProjectStoresBestEffort(homeDir, { debugLog: writeDebugLog });
   if (config.codegraph?.enabled === false) {
     return { action: "skipped-disabled", exitCode: 0 };
   }
@@ -2461,17 +2479,6 @@ function writeHookJson(stdout) {
   };
   stdout.write(`${JSON.stringify(output)}
 `);
-}
-function pruneCodegraphProjectStoresBestEffort(homeDir) {
-  try {
-    pruneDeadCodegraphProjectStores({ homeDir });
-  } catch (error) {
-    if (error instanceof Error) {
-      writeDebugLog(`CodeGraph cache GC skipped: ${error.message}`);
-      return;
-    }
-    throw error;
-  }
 }
 function writeDebugLog(message) {
   if (processEnv2["OMO_CODEGRAPH_DEBUG"] !== "1")

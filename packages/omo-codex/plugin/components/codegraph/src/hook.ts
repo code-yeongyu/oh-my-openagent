@@ -14,11 +14,9 @@ import { fileURLToPath } from "node:url";
 import { buildCodegraphChildEnv, buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
 import { buildCodegraphInitGuidanceForToolResult } from "../../../../../utils/src/codegraph/guidance.ts";
 import { resolveCodegraphCommand } from "../../../../../utils/src/codegraph/resolve.ts";
-import {
-	pruneDeadCodegraphProjectStores,
-	shouldExcludeCodegraphProject,
-} from "../../../../../utils/src/codegraph/workspace.ts";
+import { shouldExcludeCodegraphProject } from "../../../../../utils/src/codegraph/workspace.ts";
 import { getCodexOmoConfig } from "../../../shared/src/config-loader.ts";
+import { pruneCodegraphProjectStoresBestEffort } from "./cache-gc.js";
 import { resolveCodegraphCommandInvocation, SESSION_START_CWD_ENV } from "./session-start-worker.js";
 import type {
 	HookStdout,
@@ -67,7 +65,7 @@ export async function executeCodegraphSessionStartHook(options: SessionStartHook
 	const projectRoot = resolveProjectRoot(input, options.cwd ?? processCwd());
 	const homeDir = resolveHomeDir(env);
 	const config = options.config ?? getCodexOmoConfig({ cwd: projectRoot, env, homeDir });
-	pruneCodegraphProjectStoresBestEffort(homeDir);
+	pruneCodegraphProjectStoresBestEffort(homeDir, { debugLog: writeDebugLog });
 
 	if (config.codegraph?.enabled === false) {
 		return { action: "skipped-disabled", exitCode: 0 };
@@ -210,18 +208,6 @@ function writeHookJson(stdout: HookStdout): void {
 		},
 	};
 	stdout.write(`${JSON.stringify(output)}\n`);
-}
-
-function pruneCodegraphProjectStoresBestEffort(homeDir: string): void {
-	try {
-		pruneDeadCodegraphProjectStores({ homeDir });
-	} catch (error) {
-		if (error instanceof Error) {
-			writeDebugLog(`CodeGraph cache GC skipped: ${error.message}`);
-			return;
-		}
-		throw error;
-	}
 }
 
 function writeDebugLog(message: string): void {
