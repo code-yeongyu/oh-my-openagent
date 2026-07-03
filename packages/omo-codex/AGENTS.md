@@ -1,6 +1,6 @@
 # packages/omo-codex/ - Codex CLI Light Edition (lazycodex)
 
-**Generated:** 2026-05-31
+**Generated:** 2026-07-03
 
 ## STOP. THIS IS THE CODEX EDITION. QA IS MANDATORY. EVERY SINGLE TIME. INSTALL THE LOCAL BUILD INTO AN ISOLATED `CODEX_HOME`.
 
@@ -35,14 +35,18 @@
 | `marketplace.json` | Codex marketplace manifest. Declares marketplace `sisyphuslabs`, single installable plugin `omo`. |
 | `MARKETPLACE.md` | Native Codex marketplace notes for `sisyphuslabs` / `omo`. |
 | `index.d.ts` | Type barrel re-exporting `src/`. |
-| `plugin/` | Vendored Codex plugin namespace `omo`; pkg `@sisyphuslabs/omo-codex-plugin` (dep `@oh-my-opencode/shared-skills`). Holds `.codex-plugin/plugin.json` (brandColor `#7C3AED`), `hooks/hooks.json` (aggregate event wiring), `components/` (8 workspaces), generated aggregate `skills/`, `.mcp.json`. |
+| `plugin/` | Vendored Codex plugin namespace `omo`; pkg `@sisyphuslabs/omo-codex-plugin` (dep `@oh-my-opencode/shared-skills`). Holds `.codex-plugin/plugin.json` (brandColor `#7C3AED`), `hooks/hooks.json` (aggregate event wiring), `components/` (11 workspaces + bootstrap + test-support), generated aggregate `skills/` (gitignored, built by sync-skills), `.mcp.json`. |
 | `scripts/` | Generated/bundled Node ESM install entrypoints and parity tests. Published paths such as `scripts/install-local.mjs` stay stable while source lives in `src/install/`. |
 | `src/` | TypeScript runtime consumed by the CLI: `install/` (Codex cache install, config mutation, agent links, local marketplace snapshot, cleanup, routing) + `telemetry/`. |
 | `tsconfig.json` | Bun-targeted strict config; included in root `typecheck:packages`. |
 
-## COMPONENTS (8)
+## COMPONENTS (11 live workspaces + 2 special dirs)
 
-`comment-checker`, `git-bash`, `lsp`, `rules`, `start-work-continuation`, `telemetry`, `ultrawork`, `ulw-loop`. Each is an isolated workspace under `plugin/components/<name>/` with its own `AGENTS.md` + `hooks/hooks.json` when it owns hook behavior. The root plugin build runs `plugin/scripts/sync-skills.mjs` to generate the aggregate `plugin/skills/` directory from shared skills plus component-local skills. Wired to Codex lifecycle events `SessionStart` / `UserPromptSubmit` / `PreToolUse` / `PostToolUse` / `PostCompact` / `Stop` / `SubagentStop`. Implementations originate from `code-yeongyu/codex-{rules,comment-checker,lsp,ultrawork,ulw-loop,start-work-continuation}`.
+Per `plugin/package.json` `workspaces[]`: `codegraph`, `comment-checker`, `git-bash`, `lazycodex-executor-verify`, `lsp`, `rules`, `start-work-continuation`, `teammode`, `telemetry`, `ultrawork`, `ulw-loop`. Special cases: `bootstrap` (runtime provisioner with its own package.json, deliberately OUTSIDE the workspaces array — built standalone by `plugin/scripts/build-components.mjs`) and `test-support` (test helper dir, no package.json, not a component). `workflow-selector` was removed 2026-06-29 (only an untracked `dist/` residue may linger locally). Each component is an isolated workspace under `plugin/components/<name>/` with its own `AGENTS.md` + `hooks/hooks.json` when it owns hook behavior. Wired to Codex lifecycle events `SessionStart` / `UserPromptSubmit` / `PreToolUse` / `PostToolUse` / `PostCompact` / `Stop` / `SubagentStop`. Older components originate from `code-yeongyu/codex-{rules,comment-checker,lsp,ultrawork,ulw-loop,start-work-continuation}`; `codegraph`, `teammode`, `bootstrap`, `lazycodex-executor-verify` are repo-native.
+
+**sync-skills pipeline** (`plugin/scripts/sync-skills.mjs`, run by the plugin build): wipes `plugin/skills/` → copies 7 COMPONENT skills first (`comment-checker`, `lsp`, `rules`, `teammode`, `ulw-loop`, `ulw-plan`, `ultrawork` from `plugin/components/*/skills/*`; same-named shared skills are skipped) → copies shared skills EXCEPT `ultraresearch` (hidden via `codexHiddenSharedSkillNames`) → `adaptSkillForCodex()` inserts Codex Harness Tool Compatibility guidance, applies overlays (`start-work` / `review-work` / `ulw-research`), and writes `agents/openai.yaml` display metadata with the `(OmO) ` prefix.
+
+**Ultrawork skill pointer:** the ultrawork `UserPromptSubmit` hook injects a compact `<ultrawork-mode>` pointer (<4096 bytes; Codex App truncates large hook output) directing the model to read the full directive from the bundled `ultrawork` skill; full-directive fallback when the skills tree is absent. Mirror copy in `ulw-loop/src/ultrawork-skill-pointer.ts`; byte-identity pinned by `plugin/test/ultrawork-skill-pointer.test.mjs`.
 
 ## INSTALL (mechanics)
 
