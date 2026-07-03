@@ -1,15 +1,17 @@
 import { describe, expect, it } from "bun:test";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
+import { fileURLToPath } from "node:url";
 
 import { runCodegraphServe } from "../src/serve.ts";
+
+const componentRoot = realpathSync(fileURLToPath(new URL("..", import.meta.url)));
 
 describe("runCodegraphServe MCP protocol bridge", () => {
 	it("#given Codex framed stdio and a newline-json CodeGraph child #when listing tools #then it bridges frames and serves from the project cwd", async () => {
 		// given
-		const tempRoot = mkdtempSync(join(tmpdir(), "omo-codegraph-bridge-"));
+		const tempRoot = mkdtempSync(join(componentRoot, ".tmp-codegraph-bridge-"));
 		const projectRoot = join(tempRoot, "project");
 		const pluginCacheRoot = join(tempRoot, "plugin-cache");
 		const fakeCodegraph = join(tempRoot, "codegraph-fake.cjs");
@@ -96,7 +98,7 @@ describe("runCodegraphServe MCP protocol bridge", () => {
 
 	it("#given old upstream codegraph_node metadata and container outline guidance #when bridging #then it exposes the corrected LazyCodex contract", async () => {
 		// given
-		const tempRoot = mkdtempSync(join(tmpdir(), "omo-codegraph-contract-"));
+		const tempRoot = mkdtempSync(join(componentRoot, ".tmp-codegraph-contract-"));
 		const projectRoot = join(tempRoot, "project");
 		const fakeCodegraph = join(tempRoot, "codegraph-contract-fake.cjs");
 		const childLog = join(tempRoot, "child.log");

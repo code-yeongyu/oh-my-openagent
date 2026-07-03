@@ -36,7 +36,7 @@ describe("CodeGraph SessionStart hook", () => {
 			// when
 			const exitCode = await runCodegraphCli({
 				argv: ["node", "cli.js", "hook", "session-start"],
-				cwd: mkdtempSync(join(tmpdir(), "omo-codegraph-hook-workspace-")),
+				cwd: createAllowedWorkspace("codegraph-hook-workspace"),
 				env: { HOME: homeDir },
 				stdin: Readable.from(["{}"]),
 				stdout: { write: (chunk) => stdout.push(chunk) },
