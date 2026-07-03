@@ -217,14 +217,15 @@ describe("CodeGraph workspace helpers", () => {
     const excludedRoot = join(homeDir, "research-cache")
     const excludedWorkspace = join(excludedRoot, "repo")
     const allowedWorkspace = join(homeDir, "research-cache-sibling", "repo")
+    const options = { excludedRoots: ["~/research-cache"], homeDir, platform: "win32" as const }
 
     // then
-    expect(shouldExcludeCodegraphProject(excludedWorkspace, { excludedRoots: ["~/research-cache"], homeDir })).toEqual({
+    expect(shouldExcludeCodegraphProject(excludedWorkspace, options)).toEqual({
       excluded: true,
       matchedRoot: "~/research-cache",
       reason: "custom-root",
     })
-    expect(shouldExcludeCodegraphProject(allowedWorkspace, { excludedRoots: ["~/research-cache"], homeDir })).toEqual({
+    expect(shouldExcludeCodegraphProject(allowedWorkspace, options)).toEqual({
       excluded: false,
     })
   })
