@@ -112,6 +112,22 @@ A detached worker finishes the install in the background (the `sg` download is t
 - It does not run the npx self-update for healthy marketplace-managed installs. The auto-update hook logs the skip and surfaces this guidance instead: "Auto-update skipped: this LazyCodex install is managed by the Codex plugin marketplace, so the npx self-update was not started. Tell the user to upgrade with `codex plugin marketplace upgrade sisyphuslabs`, and that Codex will ask them to re-approve hooks after the upgrade." If the hook detects stale local marketplace cache/bin state (for example, a local manifest or managed `ulw` link points at a deleted payload), it may start the npx installer as a local repair and ask you to restart the Codex session afterward.
 - It never persists anything under the Codex-managed plugin cache directory itself; all bootstrap state lives in the plugin data dir above.
 
+**Managed agent model overrides.** LazyCodex copies its bundled Codex agent role TOMLs into `$CODEX_HOME/agents/` on install and bootstrap. To keep model choices durable across upgrades without editing those managed files by hand, create `$CODEX_HOME/omo.toml`:
+
+```toml
+[agents.plan]
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
+service_tier = "priority"
+
+[agents.explorer]
+model = "gpt-5.4-mini"
+model_reasoning_effort = "low"
+service_tier = "fast"
+```
+
+Only `model`, `model_reasoning_effort`, and `service_tier` are supported, and only for LazyCodex-managed agent names that are bundled by the installed `omo` plugin. Unknown agent tables or unsupported fields are reported as non-fatal warnings by the installer or bootstrap worker; they do not create or mutate arbitrary user-owned Codex agent files.
+
 **Upgrading — and recovering hook approval:**
 
 1. Run `codex plugin marketplace upgrade sisyphuslabs`.

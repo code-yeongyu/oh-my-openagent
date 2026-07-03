@@ -36,7 +36,7 @@ test(
 		const result = await installMarketplaceLocally({
 			repoRoot,
 			codexHome,
-			platform: "linux",
+			platform: process.platform,
 			runCommand: async () => {},
 			log: () => {},
 		});
@@ -84,7 +84,7 @@ test(
 		const result = await installMarketplaceLocally({
 			repoRoot,
 			codexHome,
-			platform: "linux",
+			platform: process.platform,
 			runCommand: async () => {},
 			log: () => {},
 		});
@@ -119,7 +119,7 @@ test("#given local sisyphuslabs install #when temporary marketplace snapshot is 
 	await installMarketplaceLocally({
 		repoRoot,
 		codexHome,
-		platform: "linux",
+		platform: process.platform,
 		runCommand: async () => {},
 		log: () => {},
 	});
@@ -153,7 +153,7 @@ test(
 		await installMarketplaceLocally({
 			repoRoot,
 			codexHome,
-			platform: "linux",
+			platform: process.platform,
 			runCommand: async () => {},
 			log: () => {},
 		});
@@ -188,14 +188,14 @@ test(
 		await installMarketplaceLocally({
 			repoRoot,
 			codexHome,
-			platform: "linux",
+			platform: process.platform,
 			runCommand: async () => {},
 			log: () => {},
 		});
 		await installMarketplaceLocally({
 			repoRoot,
 			codexHome,
-			platform: "linux",
+			platform: process.platform,
 			runCommand: async () => {},
 			log: () => {},
 		});
@@ -203,6 +203,86 @@ test(
 		assert.equal(
 			await readFile(join(codexHome, "agents", "plan.toml"), "utf8"),
 			'name = "plan"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\n',
+		);
+	},
+);
+
+test(
+	"#given CODEX_HOME omo.toml agent overrides #when installing locally #then managed agent TOMLs receive those settings",
+	async () => {
+		const repoRoot = await makeTempDir();
+		const codexHome = await makeTempDir();
+		const codexPackageRoot = join(repoRoot, "packages", "omo-codex");
+		const pluginRoot = join(codexPackageRoot, "plugin");
+		const agentsRoot = join(pluginRoot, "components", "ultrawork", "agents");
+
+		await writeJson(join(codexPackageRoot, "marketplace.json"), {
+			name: "sisyphuslabs",
+			plugins: [{ name: "omo", source: "./plugins/omo" }],
+		});
+		await writePluginAt(pluginRoot, "omo", "0.1.0");
+		await mkdir(agentsRoot, { recursive: true });
+		await writeFile(
+			join(agentsRoot, "plan.toml"),
+			'name = "plan"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\nservice_tier = "fast"\n',
+		);
+		await writeFile(
+			join(codexHome, "omo.toml"),
+			'[agents.plan]\nmodel = "gpt-5.4-mini"\nmodel_reasoning_effort = "low"\nservice_tier = "priority"\n',
+		);
+
+		await installMarketplaceLocally({
+			repoRoot,
+			codexHome,
+			platform: process.platform,
+			runCommand: async () => {},
+			log: () => {},
+		});
+
+		const installedPlan = await readFile(join(codexHome, "agents", "plan.toml"), "utf8");
+		assert.ok(installedPlan.includes('model = "gpt-5.4-mini"'));
+		assert.ok(installedPlan.includes('model_reasoning_effort = "low"'));
+		assert.ok(installedPlan.includes('service_tier = "priority"'));
+		assert.equal(installedPlan.includes('model = "gpt-5.5"'), false);
+		assert.equal(installedPlan.includes('model_reasoning_effort = "xhigh"'), false);
+	},
+);
+
+test(
+	"#given CODEX_HOME omo.toml has an unknown agent #when installing locally #then installer logs a non-fatal warning",
+	async () => {
+		const repoRoot = await makeTempDir();
+		const codexHome = await makeTempDir();
+		const codexPackageRoot = join(repoRoot, "packages", "omo-codex");
+		const pluginRoot = join(codexPackageRoot, "plugin");
+		const agentsRoot = join(pluginRoot, "components", "ultrawork", "agents");
+		const logs = [];
+
+		await writeJson(join(codexPackageRoot, "marketplace.json"), {
+			name: "sisyphuslabs",
+			plugins: [{ name: "omo", source: "./plugins/omo" }],
+		});
+		await writePluginAt(pluginRoot, "omo", "0.1.0");
+		await mkdir(agentsRoot, { recursive: true });
+		await writeFile(join(agentsRoot, "plan.toml"), 'name = "plan"\nmodel = "gpt-5.5"\n');
+		await writeFile(
+			join(codexHome, "omo.toml"),
+			'[agents.codex-ultrawork-reviewer]\nmodel = "gpt-5.4-mini"\n',
+		);
+
+		await installMarketplaceLocally({
+			repoRoot,
+			codexHome,
+			platform: process.platform,
+			runCommand: async () => {},
+			log: (line) => logs.push(line),
+		});
+
+		assert.equal(await readFile(join(codexHome, "agents", "plan.toml"), "utf8"), 'name = "plan"\nmodel = "gpt-5.5"\n');
+		assert.ok(
+			logs.some((line) =>
+				line.includes("[agents.codex-ultrawork-reviewer] does not match a LazyCodex-managed Codex agent; override skipped"),
+			),
 		);
 	},
 );
@@ -230,7 +310,7 @@ test(
 		await installMarketplaceLocally({
 			repoRoot,
 			codexHome,
-			platform: "linux",
+			platform: process.platform,
 			runCommand: async () => {},
 			log: () => {},
 		});
@@ -238,7 +318,7 @@ test(
 		await installMarketplaceLocally({
 			repoRoot,
 			codexHome,
-			platform: "linux",
+			platform: process.platform,
 			runCommand: async () => {},
 			log: () => {},
 		});
@@ -275,7 +355,7 @@ test(
 		await installMarketplaceLocally({
 			repoRoot,
 			codexHome,
-			platform: "linux",
+			platform: process.platform,
 			runCommand: async () => {},
 			log: () => {},
 		});
@@ -283,7 +363,7 @@ test(
 		await installMarketplaceLocally({
 			repoRoot,
 			codexHome,
-			platform: "linux",
+			platform: process.platform,
 			runCommand: async () => {},
 			log: () => {},
 		});
@@ -316,7 +396,7 @@ test(
 		await installMarketplaceLocally({
 			repoRoot,
 			codexHome,
-			platform: "linux",
+			platform: process.platform,
 			runCommand: async () => {},
 			log: () => {},
 		});
@@ -324,7 +404,7 @@ test(
 		await installMarketplaceLocally({
 			repoRoot,
 			codexHome,
-			platform: "linux",
+			platform: process.platform,
 			runCommand: async () => {},
 			log: () => {},
 		});
