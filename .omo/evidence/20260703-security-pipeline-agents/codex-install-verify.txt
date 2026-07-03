@@ -1,0 +1,7 @@
+installing local omo into /tmp/cqa-home.EonOs3/codex ...
+PASS: plugin cache present (4.15.1)
+PASS: config.toml enables omo@sisyphuslabs
+PASS: component bins linked in sandbox (9 bins)
+PASS: agent TOMLs linked in sandbox
+PASS: real ~/.codex/config.toml unchanged (b64fc9d9ee4496a40c27721cb8bd74e69994387d)
+PASS: install-verify

@@ -1,0 +1,22 @@
+Sisyphus - ultraworker
+Hephaestus - Deep Agent
+Prometheus - Plan Builder
+Metis - Plan Consultant
+Momus - Plan Critic
+Security Deduper
+Security Orchestrator
+Security Prover
+Security Recon
+Security Scanner
+Security Validator
+Sisyphus-Junior
+build
+compaction
+explore
+general
+librarian
+multimodal-looker
+oracle
+plan
+summary
+title

@@ -1,0 +1,146 @@
+installing local omo build into /tmp/cqa-home.R7o1kN/codex (this builds the plugin)...
+{
+  "ok": true,
+  "turnStatus": "completed",
+  "assistantText": "Hello from the codex-qa mock model.",
+  "threadId": "019f26d7-d0c5-71f0-b30e-88bf0b0bf9ae",
+  "turnId": "019f26d7-d412-7dc1-8e16-61b6ff55c92b",
+  "expectHook": [
+    "sessionStart",
+    "userPromptSubmit"
+  ],
+  "missingHooks": [],
+  "failedHooks": [],
+  "hooks": [
+    {
+      "method": "hook/started",
+      "eventName": "sessionStart",
+      "status": "running",
+      "source": "plugin",
+      "runId": "session-start:0:/tmp/cqa-home.R7o1kN/codex/plugins/cache/sisyphuslabs/omo/4.15.1/hooks/session-start-loading-project-rules.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "sessionStart",
+      "status": "running",
+      "source": "plugin",
+      "runId": "session-start:1:/tmp/cqa-home.R7o1kN/codex/plugins/cache/sisyphuslabs/omo/4.15.1/hooks/session-start-recording-session-telemetry.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "sessionStart",
+      "status": "running",
+      "source": "plugin",
+      "runId": "session-start:2:/tmp/cqa-home.R7o1kN/codex/plugins/cache/sisyphuslabs/omo/4.15.1/hooks/session-start-checking-auto-update.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "sessionStart",
+      "status": "running",
+      "source": "plugin",
+      "runId": "session-start:3:/tmp/cqa-home.R7o1kN/codex/plugins/cache/sisyphuslabs/omo/4.15.1/hooks/session-start-checking-bootstrap-provisioning.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "sessionStart",
+      "status": "running",
+      "source": "plugin",
+      "runId": "session-start:4:/tmp/cqa-home.R7o1kN/codex/plugins/cache/sisyphuslabs/omo/4.15.1/hooks/session-start-checking-codegraph-bootstrap.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "sessionStart",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "session-start:0:/tmp/cqa-home.R7o1kN/codex/plugins/cache/sisyphuslabs/omo/4.15.1/hooks/session-start-loading-project-rules.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "sessionStart",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "session-start:1:/tmp/cqa-home.R7o1kN/codex/plugins/cache/sisyphuslabs/omo/4.15.1/hooks/session-start-recording-session-telemetry.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "sessionStart",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "session-start:2:/tmp/cqa-home.R7o1kN/codex/plugins/cache/sisyphuslabs/omo/4.15.1/hooks/session-start-checking-auto-update.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "sessionStart",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "session-start:3:/tmp/cqa-home.R7o1kN/codex/plugins/cache/sisyphuslabs/omo/4.15.1/hooks/session-start-checking-bootstrap-provisioning.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "sessionStart",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "session-start:4:/tmp/cqa-home.R7o1kN/codex/plugins/cache/sisyphuslabs/omo/4.15.1/hooks/session-start-checking-codegraph-bootstrap.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "userPromptSubmit",
+      "status": "running",
+      "source": "plugin",
+      "runId": "user-prompt-submit:5:/tmp/cqa-home.R7o1kN/codex/plugins/cache/sisyphuslabs/omo/4.15.1/hooks/user-prompt-submit-loading-project-rules.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "userPromptSubmit",
+      "status": "running",
+      "source": "plugin",
+      "runId": "user-prompt-submit:6:/tmp/cqa-home.R7o1kN/codex/plugins/cache/sisyphuslabs/omo/4.15.1/hooks/user-prompt-submit-checking-ultrawork-trigger.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "userPromptSubmit",
+      "status": "running",
+      "source": "plugin",
+      "runId": "user-prompt-submit:7:/tmp/cqa-home.R7o1kN/codex/plugins/cache/sisyphuslabs/omo/4.15.1/hooks/user-prompt-submit-checking-ulw-loop-steering.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "userPromptSubmit",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "user-prompt-submit:5:/tmp/cqa-home.R7o1kN/codex/plugins/cache/sisyphuslabs/omo/4.15.1/hooks/user-prompt-submit-loading-project-rules.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "userPromptSubmit",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "user-prompt-submit:6:/tmp/cqa-home.R7o1kN/codex/plugins/cache/sisyphuslabs/omo/4.15.1/hooks/user-prompt-submit-checking-ultrawork-trigger.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "userPromptSubmit",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "user-prompt-submit:7:/tmp/cqa-home.R7o1kN/codex/plugins/cache/sisyphuslabs/omo/4.15.1/hooks/user-prompt-submit-checking-ulw-loop-steering.json"
+    },
+    {
+      "method": "hook/started",
+      "eventName": "stop",
+      "status": "running",
+      "source": "plugin",
+      "runId": "stop:18:/tmp/cqa-home.R7o1kN/codex/plugins/cache/sisyphuslabs/omo/4.15.1/hooks/stop-checking-start-work-continuation.json"
+    },
+    {
+      "method": "hook/completed",
+      "eventName": "stop",
+      "status": "completed",
+      "source": "plugin",
+      "runId": "stop:18:/tmp/cqa-home.R7o1kN/codex/plugins/cache/sisyphuslabs/omo/4.15.1/hooks/stop-checking-start-work-continuation.json"
+    }
+  ],
+  "stderrTail": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"/tmp\" (codex_home: AbsolutePathBuf(\"/tmp/cqa-home.R7o1kN/codex\"))\n"
+}
+PASS: real ~/.codex/config.toml unchanged (b64fc9d9ee4496a40c27721cb8bd74e69994387d)
+PASS: app-server turn completed; assistant text: Hello from the codex-qa mock model.
+PASS: hooks fired: sessionStart, stop, userPromptSubmit

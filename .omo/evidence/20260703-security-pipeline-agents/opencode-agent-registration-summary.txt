@@ -1,0 +1,12 @@
+OpenCode local plugin agent registration QA
+plugin_url=file:///home/cole/WebstormProjects/forks/oh-my-bugs-wt/feature/security-pipeline-agents/dist/index.js
+agent_endpoint=http://127.0.0.1:56947/agent?directory=/home/cole/WebstormProjects/forks/oh-my-bugs-wt/feature/security-pipeline-agents
+real_db_path=/home/cole/.local/share/opencode/opencode.db
+real_db_sessions_before=11403
+real_db_sessions_after=11403
+found: Security Orchestrator
+found: Security Recon
+found: Security Scanner
+found: Security Validator
+found: Security Deduper
+found: Security Prover
