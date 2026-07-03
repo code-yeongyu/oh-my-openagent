@@ -1,0 +1,6 @@
+SCENARIO: legacy senpi migration disabled
+INVOCATION: node inspect migration source ordering
+BINARY_OBSERVABLE: stdout contains MIGRATION-DEAD and rc = 0
+MIGRATION-DEAD
+RC=0
+CLEANUP: read-only source inspection; no process/tmux/browser/port/container/temp dir remains.

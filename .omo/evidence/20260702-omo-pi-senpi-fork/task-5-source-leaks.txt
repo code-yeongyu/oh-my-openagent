@@ -1,0 +1,12 @@
+SCENARIO: scoped legacy source leak scan
+INVOCATION: node assert zero scoped old literals
+BINARY_OBSERVABLE: stdout contains SOURCE-LEAKS-CLEAN and rc = 0
+hooks .senpi/hooks.json: 0
+websearch .pi/websearch.json: 0
+legacy package-manager project .pi reads: 0
+legacy package-manager dirs: 0
+old TUI debug log: 0
+old TUI crash log: 0
+SOURCE-LEAKS-CLEAN
+RC=0
+CLEANUP: read-only source inspection; no process/tmux/browser/port/container/temp dir remains.

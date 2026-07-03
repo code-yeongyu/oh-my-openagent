@@ -1,0 +1,7 @@
+SCENARIO: regression guardrails
+INVOCATION: node assert loader omo-pi aliases and protocol names
+BINARY_OBSERVABLE: stdout contains REGRESSION-GUARDRAILS-OK and rc = 0
+omo-pi alias count: 2
+REGRESSION-GUARDRAILS-OK
+RC=0
+CLEANUP: read-only source inspection; no process/tmux/browser/port/container/temp dir remains.

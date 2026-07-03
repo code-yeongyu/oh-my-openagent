@@ -19,7 +19,8 @@ function isRootCommand(args: readonly string[]): boolean {
 }
 
 function isPackageManagerInstall(packageDir: string): boolean {
-	return packageDir.replace(/\\/g, "/").includes("/node_modules/@code-yeongyu/senpi");
+	const normalized = packageDir.replace(/\\/g, "/");
+	return normalized.includes("/node_modules/@code-yeongyu/senpi") || normalized.includes("/node_modules/omo-pi");
 }
 
 function isMissingBundledWorkspaceDependencies(packageDir: string): boolean {

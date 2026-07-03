@@ -56,6 +56,9 @@ function migratePathPreservingExisting(oldPath: string, newPath: string, label: 
 }
 
 export function migrateLegacySenpiDirs(cwd: string): void {
+	// omo-pi: legacy migration disabled
+	return;
+
 	if (CONFIG_DIR_NAME === ".pi") return;
 
 	const homeDir = os.homedir();

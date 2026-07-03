@@ -1,0 +1,6 @@
+SCENARIO: piconfig rebrand contract
+INVOCATION: node parse package.json and assert piConfig/bin
+BINARY_OBSERVABLE: stdout contains REBRAND-OK and rc = 0
+REBRAND-OK
+RC=0
+CLEANUP: read-only node parse; no process/tmux/browser/port/container/temp dir remains.

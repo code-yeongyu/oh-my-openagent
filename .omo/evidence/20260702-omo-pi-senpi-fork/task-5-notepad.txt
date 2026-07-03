@@ -1,0 +1,12 @@
+Task 5 omo-pi rebrand notepad
+
+Tier: LIGHT - scoped rebrand over listed vendored files, patch, and source guard tests; no new layer or external service.
+Skills:
+- git-master: required for commit/status/history discipline.
+- commit: required for atomic staging/commit workflow.
+Success criteria:
+- Source guard test fails red before production edits, then passes green after rebrand.
+- Explicit artifacts prove piConfig/bin, migration no-op, source leak absence, sync cleanliness, alias/protocol guardrails, and cleanup receipts.
+
+Patch notes: production rebrand edit applied; required legacy migration marker comment retained exactly as user-specified.
+Self-review: diff matches Task 5 owned files; evidence covers red, green, config, migration, leak scan, sync, and guardrails. LIGHT tier held because no new runtime layer or external integration was added.

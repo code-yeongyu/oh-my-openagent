@@ -2,6 +2,7 @@ import { access, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+import { CONFIG_DIR_NAME } from "../../../../../config.ts";
 import { isAllowedProviderBaseUrl } from "./provider-endpoints.ts";
 import type {
 	CodexSearchMode,
@@ -254,9 +255,9 @@ async function fileExists(path: string): Promise<boolean> {
 export async function loadWebsearchConfig(options: ConfigLoadOptions): Promise<ConfigLoadResult> {
 	const home = options.homeDir ?? homedir();
 	const paths = [
-		join(options.cwd, ".pi", "websearch.json"),
+		join(options.cwd, CONFIG_DIR_NAME, "websearch.json"),
 		join(home, "websearch.json"),
-		join(home, ".pi", "websearch.json"),
+		join(home, CONFIG_DIR_NAME, "websearch.json"),
 	];
 
 	for (const path of paths) {

@@ -1,0 +1,294 @@
+diff --git a/coding-agent/package.json b/coding-agent/package.json
+index 5d0c59af3..33a3b9eeb 100644
+--- a/coding-agent/package.json
++++ b/coding-agent/package.json
+@@ -4,11 +4,11 @@
+ 	"description": "Coding agent CLI with read, bash, edit, write tools and session management",
+ 	"type": "module",
+ 	"piConfig": {
+-		"name": "senpi",
+-		"configDir": ".senpi"
++		"name": "omoai",
++		"configDir": ".omo"
+ 	},
+ 	"bin": {
+-		"senpi": "dist/cli.js"
++		"omoai": "dist/cli.js"
+ 	},
+ 	"main": "./dist/index.js",
+ 	"types": "./dist/index.d.ts",
+diff --git a/coding-agent/src/cli.ts b/coding-agent/src/cli.ts
+index f8e85ebd2..7953429c2 100644
+--- a/coding-agent/src/cli.ts
++++ b/coding-agent/src/cli.ts
+@@ -19,7 +19,8 @@ function isRootCommand(args: readonly string[]): boolean {
+ }
+ 
+ function isPackageManagerInstall(packageDir: string): boolean {
+-	return packageDir.replace(/\\/g, "/").includes("/node_modules/@code-yeongyu/senpi");
++	const normalized = packageDir.replace(/\\/g, "/");
++	return normalized.includes("/node_modules/@code-yeongyu/senpi") || normalized.includes("/node_modules/omo-pi");
+ }
+ 
+ function isMissingBundledWorkspaceDependencies(packageDir: string): boolean {
+diff --git a/coding-agent/src/core/agent-session.ts b/coding-agent/src/core/agent-session.ts
+index 2c74172de..1a02fd056 100644
+--- a/coding-agent/src/core/agent-session.ts
++++ b/coding-agent/src/core/agent-session.ts
+@@ -35,6 +35,7 @@ import {
+ 	streamSimple,
+ } from "@earendil-works/pi-ai/compat";
+ import { getThemeByName, theme } from "../modes/interactive/theme/theme.ts";
++import { CONFIG_DIR_NAME } from "../config.ts";
+ import { stripFrontmatter } from "../utils/frontmatter.ts";
+ import { resolvePath } from "../utils/paths.ts";
+ import { sleep } from "../utils/sleep.ts";
+@@ -2785,7 +2786,7 @@ export class AgentSession {
+ 						globalHooksPath: `${this._cwd}/hooks.json`,
+ 						preSessionHookSourcePaths: [],
+ 						projectHookSourcePaths: [],
+-						projectHooksPath: `${this._cwd}/.senpi/hooks.json`,
++						projectHooksPath: `${this._cwd}/${CONFIG_DIR_NAME}/hooks.json`,
+ 						runtimeHookSourcePaths: [],
+ 					},
+ 				getSystemPromptOptions: () => this._baseSystemPromptOptions,
+diff --git a/coding-agent/src/core/extensions/builtin/hooks/config-loader.ts b/coding-agent/src/core/extensions/builtin/hooks/config-loader.ts
+index 89b5dedeb..f99770d6b 100644
+--- a/coding-agent/src/core/extensions/builtin/hooks/config-loader.ts
++++ b/coding-agent/src/core/extensions/builtin/hooks/config-loader.ts
+@@ -1,4 +1,5 @@
+ import { diagnostic } from "./diagnostics.ts";
++import { CONFIG_DIR_NAME } from "../../../../config.ts";
+ import { parseHookConfig } from "./schema.ts";
+ import type { HookDiagnostic, HookSourceMetadata, ParsedHookConfig } from "./types.ts";
+ 
+@@ -90,7 +91,7 @@ function createSourceCandidates(options: HookConfigLoaderOptions): SourceCandida
+ 		});
+ 	}
+ 	candidates.push(
+-		fileSource("project", options.projectHooksPath ?? `${options.cwd}/.senpi/hooks.json`, "pre-session"),
++		fileSource("project", options.projectHooksPath ?? `${options.cwd}/${CONFIG_DIR_NAME}/hooks.json`, "pre-session"),
+ 	);
+ 	candidates.push(...fileSources("project", options.projectHookSourcePaths, "pre-session"));
+ 	candidates.push(...fileSources("plugin", options.preSessionHookSourcePaths, "pre-session"));
+diff --git a/coding-agent/src/core/extensions/builtin/hooks/index.ts b/coding-agent/src/core/extensions/builtin/hooks/index.ts
+index 67e345a39..5dfbd0de3 100644
+--- a/coding-agent/src/core/extensions/builtin/hooks/index.ts
++++ b/coding-agent/src/core/extensions/builtin/hooks/index.ts
+@@ -1,4 +1,5 @@
+ import { existsSync, readFileSync } from "node:fs";
++import { CONFIG_DIR_NAME } from "../../../../config.ts";
+ import type { BeforeAgentStartEventResult, ExtensionAPI, ExtensionContext, LoadedHookSources } from "../../types.ts";
+ import { registerHooksCommand } from "./command.ts";
+ import { loadHookConfigSources } from "./config-loader.ts";
+@@ -268,7 +269,7 @@ function fallbackHookSources(cwd: string): LoadedHookSources {
+ 		globalHooksPath: `${cwd}/hooks.json`,
+ 		preSessionHookSourcePaths: [],
+ 		projectHookSourcePaths: [],
+-		projectHooksPath: `${cwd}/.senpi/hooks.json`,
++		projectHooksPath: `${cwd}/${CONFIG_DIR_NAME}/hooks.json`,
+ 		runtimeHookSourcePaths: [],
+ 	};
+ }
+diff --git a/coding-agent/src/core/extensions/builtin/websearch/index.ts b/coding-agent/src/core/extensions/builtin/websearch/index.ts
+index f9bb6cae4..1e2eee1c8 100644
+--- a/coding-agent/src/core/extensions/builtin/websearch/index.ts
++++ b/coding-agent/src/core/extensions/builtin/websearch/index.ts
+@@ -1,5 +1,6 @@
+ import type { ExtensionAPI, ExtensionContext } from "../../types.ts";
+ 
++import { CONFIG_DIR_NAME } from "../../../../config.ts";
+ import { loadWebsearchConfig } from "./websearch/config.ts";
+ import { createWebSearchTool } from "./websearch/tool.ts";
+ import type { ConfigLoadResult, WebsearchConfig } from "./websearch/types.ts";
+@@ -29,7 +30,7 @@ export default function (pi: ExtensionAPI): void {
+ 	let state: ConfigLoadResult = {
+ 		ok: false,
+ 		reason: "missing_config",
+-		message: "Missing websearch config. Create .pi/websearch.json or ~/.pi/websearch.json before starting pi.",
++		message: `Missing websearch config. Create ${CONFIG_DIR_NAME}/websearch.json or ~/${CONFIG_DIR_NAME}/websearch.json before starting omoai.`,
+ 	};
+ 
+ 	function providerLabel(provider: WebsearchConfig["providers"][number]): string {
+diff --git a/coding-agent/src/core/extensions/builtin/websearch/websearch/config.ts b/coding-agent/src/core/extensions/builtin/websearch/websearch/config.ts
+index 1e93323f8..7605335ef 100644
+--- a/coding-agent/src/core/extensions/builtin/websearch/websearch/config.ts
++++ b/coding-agent/src/core/extensions/builtin/websearch/websearch/config.ts
+@@ -2,6 +2,7 @@ import { access, readFile } from "node:fs/promises";
+ import { homedir } from "node:os";
+ import { join } from "node:path";
+ 
++import { CONFIG_DIR_NAME } from "../../../../../config.ts";
+ import { isAllowedProviderBaseUrl } from "./provider-endpoints.ts";
+ import type {
+ 	CodexSearchMode,
+@@ -254,9 +255,9 @@ async function fileExists(path: string): Promise<boolean> {
+ export async function loadWebsearchConfig(options: ConfigLoadOptions): Promise<ConfigLoadResult> {
+ 	const home = options.homeDir ?? homedir();
+ 	const paths = [
+-		join(options.cwd, ".pi", "websearch.json"),
++		join(options.cwd, CONFIG_DIR_NAME, "websearch.json"),
+ 		join(home, "websearch.json"),
+-		join(home, ".pi", "websearch.json"),
++		join(home, CONFIG_DIR_NAME, "websearch.json"),
+ 	];
+ 
+ 	for (const path of paths) {
+diff --git a/coding-agent/src/core/extensions/builtin/websearch/websearch/tool.ts b/coding-agent/src/core/extensions/builtin/websearch/websearch/tool.ts
+index 487545401..19a39076d 100644
+--- a/coding-agent/src/core/extensions/builtin/websearch/websearch/tool.ts
++++ b/coding-agent/src/core/extensions/builtin/websearch/websearch/tool.ts
+@@ -1,4 +1,5 @@
+ import { Type } from "typebox";
++import { CONFIG_DIR_NAME } from "../../../../../config.ts";
+ import { defineTool } from "../../../types.ts";
+ 
+ import { buildNativeEntry, type NativeModelInfo, type NativeModelRegistry } from "./native.ts";
+@@ -119,5 +120,5 @@ export function createWebSearchTool(getConfig: ConfigProvider): WebSearchTool {
+ export const web_search = createWebSearchTool(() => ({
+ 	ok: false,
+ 	reason: "missing_config",
+-	message: "Missing websearch config. Create .pi/websearch.json or ~/.pi/websearch.json before starting pi.",
++	message: `Missing websearch config. Create ${CONFIG_DIR_NAME}/websearch.json or ~/${CONFIG_DIR_NAME}/websearch.json before starting omoai.`,
+ }));
+diff --git a/coding-agent/src/core/extensions/loader.ts b/coding-agent/src/core/extensions/loader.ts
+index 029e108c3..36ab5e40b 100644
+--- a/coding-agent/src/core/extensions/loader.ts
++++ b/coding-agent/src/core/extensions/loader.ts
+@@ -66,6 +66,7 @@ const VIRTUAL_MODULES: Record<string, unknown> = {
+ 	"@mariozechner/pi-ai/oauth": _bundledPiAiOauth,
+ 	"@mariozechner/pi-coding-agent": _bundledPiCodingAgent,
+ 	"@code-yeongyu/senpi": _bundledPiCodingAgent,
++	"omo-pi": _bundledPiCodingAgent,
+ };
+ 
+ const require = createRequire(import.meta.url);
+@@ -150,6 +151,7 @@ function getAliases(): Record<string, string> {
+ 		"@earendil-works/pi-ai/compat": piAiCompatEntry,
+ 		"@earendil-works/pi-ai/oauth": piAiOauthEntry,
+ 		"@code-yeongyu/senpi": piCodingAgentEntry,
++		"omo-pi": piCodingAgentEntry,
+ 		"@mariozechner/pi-coding-agent": piCodingAgentEntry,
+ 		"@mariozechner/pi-agent-core": piAgentCoreEntry,
+ 		"@mariozechner/pi-tui": piTuiEntry,
+diff --git a/coding-agent/src/core/package-manager.ts b/coding-agent/src/core/package-manager.ts
+index 08e277a3e..125192505 100644
+--- a/coding-agent/src/core/package-manager.ts
++++ b/coding-agent/src/core/package-manager.ts
+@@ -2295,14 +2295,6 @@ export class DefaultPackageManager implements PackageManager {
+ 			themes: join(projectBaseDir, "themes"),
+ 			hooks: join(projectBaseDir, "hooks"),
+ 		};
+-		const legacyProjectBaseDir = join(this.cwd, ".pi");
+-		const legacyProjectDirs = {
+-			extensions: join(legacyProjectBaseDir, "extensions"),
+-			skills: join(legacyProjectBaseDir, "skills"),
+-			prompts: join(legacyProjectBaseDir, "prompts"),
+-			themes: join(legacyProjectBaseDir, "themes"),
+-			hooks: join(legacyProjectBaseDir, "hooks"),
+-		};
+ 		const userAgentsSkillsDir = join(getHomeDir(), ".agents", "skills");
+ 		const projectTrusted = this.settingsManager.isProjectTrusted();
+ 		const projectAgentsSkillDirs = projectTrusted
+@@ -2324,7 +2316,6 @@ export class DefaultPackageManager implements PackageManager {
+ 		};
+ 
+ 		if (projectTrusted) {
+-			// Project extensions from .pi/
+ 			addResources(
+ 				"extensions",
+ 				collectAutoExtensionEntries(projectDirs.extensions),
+@@ -2333,7 +2324,6 @@ export class DefaultPackageManager implements PackageManager {
+ 				projectBaseDir,
+ 			);
+ 
+-			// Project skills from .pi/
+ 			addResources(
+ 				"skills",
+ 				collectAutoSkillEntries(projectDirs.skills, "pi"),
+@@ -2383,49 +2373,6 @@ export class DefaultPackageManager implements PackageManager {
+ 			);
+ 		}
+ 
+-		if (resolve(legacyProjectBaseDir) !== resolve(projectBaseDir)) {
+-			const legacyProjectMetadata: PathMetadata = {
+-				...projectMetadata,
+-				baseDir: legacyProjectBaseDir,
+-			};
+-
+-			addResources(
+-				"extensions",
+-				collectAutoExtensionEntries(legacyProjectDirs.extensions),
+-				legacyProjectMetadata,
+-				projectOverrides.extensions,
+-				legacyProjectBaseDir,
+-			);
+-			addResources(
+-				"skills",
+-				collectAutoSkillEntries(legacyProjectDirs.skills, "pi"),
+-				legacyProjectMetadata,
+-				projectOverrides.skills,
+-				legacyProjectBaseDir,
+-			);
+-			addResources(
+-				"prompts",
+-				collectAutoPromptEntries(legacyProjectDirs.prompts),
+-				legacyProjectMetadata,
+-				projectOverrides.prompts,
+-				legacyProjectBaseDir,
+-			);
+-			addResources(
+-				"themes",
+-				collectAutoThemeEntries(legacyProjectDirs.themes),
+-				legacyProjectMetadata,
+-				projectOverrides.themes,
+-				legacyProjectBaseDir,
+-			);
+-			addResources(
+-				"hooks",
+-				collectFiles(legacyProjectDirs.hooks, FILE_PATTERNS.hooks),
+-				legacyProjectMetadata,
+-				projectOverrides.hooks,
+-				legacyProjectBaseDir,
+-			);
+-		}
+-
+ 		// User extensions from ~/.pi/agent/
+ 		addResources(
+ 			"extensions",
+diff --git a/coding-agent/src/legacy-senpi-dir-migration.ts b/coding-agent/src/legacy-senpi-dir-migration.ts
+index d1fc8eb2e..e2e5dfb09 100644
+--- a/coding-agent/src/legacy-senpi-dir-migration.ts
++++ b/coding-agent/src/legacy-senpi-dir-migration.ts
+@@ -56,6 +56,9 @@ function migratePathPreservingExisting(oldPath: string, newPath: string, label:
+ }
+ 
+ export function migrateLegacySenpiDirs(cwd: string): void {
++	// omo-pi: legacy migration disabled
++	return;
++
+ 	if (CONFIG_DIR_NAME === ".pi") return;
+ 
+ 	const homeDir = os.homedir();
+diff --git a/tui/src/tui.ts b/tui/src/tui.ts
+index 4e716fa10..6045153ce 100644
+--- a/tui/src/tui.ts
++++ b/tui/src/tui.ts
+@@ -1534,7 +1534,7 @@ export class TUI extends Container {
+ 		const debugRedraw = process.env.PI_DEBUG_REDRAW === "1";
+ 		const logRedraw = (reason: string): void => {
+ 			if (!debugRedraw) return;
+-			const logPath = path.join(os.homedir(), ".senpi", "agent", "senpi-debug.log");
++			const logPath = path.join(os.homedir(), ".omo", "agent", "omoai-debug.log");
+ 			const msg = `[${new Date().toISOString()}] fullRender: ${reason} (prev=${this.previousLines.length}, new=${newLines.length}, height=${height})\n`;
+ 			fs.appendFileSync(logPath, msg);
+ 		};
+@@ -1799,7 +1799,7 @@ export class TUI extends Container {
+ 			buffer += "\x1b[2K"; // Clear current line
+ 			if (!isImage && visibleWidth(line) > width) {
+ 				// Log all lines to crash file for debugging
+-				const crashLogPath = path.join(os.homedir(), ".senpi", "agent", "senpi-crash.log");
++				const crashLogPath = path.join(os.homedir(), ".omo", "agent", "omoai-crash.log");
+ 				const crashData = [
+ 					`Crash at ${new Date().toISOString()}`,
+ 					`Terminal width: ${width}`,

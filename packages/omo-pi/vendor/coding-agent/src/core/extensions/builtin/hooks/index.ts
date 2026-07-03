@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import { CONFIG_DIR_NAME } from "../../../../config.ts";
 import type { BeforeAgentStartEventResult, ExtensionAPI, ExtensionContext, LoadedHookSources } from "../../types.ts";
 import { registerHooksCommand } from "./command.ts";
 import { loadHookConfigSources } from "./config-loader.ts";
@@ -268,7 +269,7 @@ function fallbackHookSources(cwd: string): LoadedHookSources {
 		globalHooksPath: `${cwd}/hooks.json`,
 		preSessionHookSourcePaths: [],
 		projectHookSourcePaths: [],
-		projectHooksPath: `${cwd}/.senpi/hooks.json`,
+		projectHooksPath: `${cwd}/${CONFIG_DIR_NAME}/hooks.json`,
 		runtimeHookSourcePaths: [],
 	};
 }

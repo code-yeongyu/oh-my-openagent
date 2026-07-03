@@ -1,0 +1,8 @@
+SCENARIO: patch round-trip sync check
+INVOCATION: node packages/omo-pi/scripts/sync-senpi.mjs --check
+BINARY_OBSERVABLE: stdout contains SYNC-CLEAN and rc = 0
+Using local senpi object 653a6af13812c55b2da6c49e982e0dcf16406d51
+SYNC-CLEAN
+RC=0
+SYNC-ROUNDTRIP-OK
+CLEANUP: sync check used temporary internal state only; no process/tmux/browser/port/container/temp dir remains.

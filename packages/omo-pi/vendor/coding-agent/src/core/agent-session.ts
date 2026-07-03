@@ -35,6 +35,7 @@ import {
 	streamSimple,
 } from "@earendil-works/pi-ai/compat";
 import { getThemeByName, theme } from "../modes/interactive/theme/theme.ts";
+import { CONFIG_DIR_NAME } from "../config.ts";
 import { stripFrontmatter } from "../utils/frontmatter.ts";
 import { resolvePath } from "../utils/paths.ts";
 import { sleep } from "../utils/sleep.ts";
@@ -2785,7 +2786,7 @@ export class AgentSession {
 						globalHooksPath: `${this._cwd}/hooks.json`,
 						preSessionHookSourcePaths: [],
 						projectHookSourcePaths: [],
-						projectHooksPath: `${this._cwd}/.senpi/hooks.json`,
+						projectHooksPath: `${this._cwd}/${CONFIG_DIR_NAME}/hooks.json`,
 						runtimeHookSourcePaths: [],
 					},
 				getSystemPromptOptions: () => this._baseSystemPromptOptions,

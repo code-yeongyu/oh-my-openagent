@@ -1534,7 +1534,7 @@ export class TUI extends Container {
 		const debugRedraw = process.env.PI_DEBUG_REDRAW === "1";
 		const logRedraw = (reason: string): void => {
 			if (!debugRedraw) return;
-			const logPath = path.join(os.homedir(), ".senpi", "agent", "senpi-debug.log");
+			const logPath = path.join(os.homedir(), ".omo", "agent", "omoai-debug.log");
 			const msg = `[${new Date().toISOString()}] fullRender: ${reason} (prev=${this.previousLines.length}, new=${newLines.length}, height=${height})\n`;
 			fs.appendFileSync(logPath, msg);
 		};
@@ -1799,7 +1799,7 @@ export class TUI extends Container {
 			buffer += "\x1b[2K"; // Clear current line
 			if (!isImage && visibleWidth(line) > width) {
 				// Log all lines to crash file for debugging
-				const crashLogPath = path.join(os.homedir(), ".senpi", "agent", "senpi-crash.log");
+				const crashLogPath = path.join(os.homedir(), ".omo", "agent", "omoai-crash.log");
 				const crashData = [
 					`Crash at ${new Date().toISOString()}`,
 					`Terminal width: ${width}`,

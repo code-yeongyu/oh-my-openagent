@@ -2295,14 +2295,6 @@ export class DefaultPackageManager implements PackageManager {
 			themes: join(projectBaseDir, "themes"),
 			hooks: join(projectBaseDir, "hooks"),
 		};
-		const legacyProjectBaseDir = join(this.cwd, ".pi");
-		const legacyProjectDirs = {
-			extensions: join(legacyProjectBaseDir, "extensions"),
-			skills: join(legacyProjectBaseDir, "skills"),
-			prompts: join(legacyProjectBaseDir, "prompts"),
-			themes: join(legacyProjectBaseDir, "themes"),
-			hooks: join(legacyProjectBaseDir, "hooks"),
-		};
 		const userAgentsSkillsDir = join(getHomeDir(), ".agents", "skills");
 		const projectTrusted = this.settingsManager.isProjectTrusted();
 		const projectAgentsSkillDirs = projectTrusted
@@ -2324,7 +2316,6 @@ export class DefaultPackageManager implements PackageManager {
 		};
 
 		if (projectTrusted) {
-			// Project extensions from .pi/
 			addResources(
 				"extensions",
 				collectAutoExtensionEntries(projectDirs.extensions),
@@ -2333,7 +2324,6 @@ export class DefaultPackageManager implements PackageManager {
 				projectBaseDir,
 			);
 
-			// Project skills from .pi/
 			addResources(
 				"skills",
 				collectAutoSkillEntries(projectDirs.skills, "pi"),
@@ -2380,49 +2370,6 @@ export class DefaultPackageManager implements PackageManager {
 				projectMetadata,
 				projectOverrides.hooks,
 				projectBaseDir,
-			);
-		}
-
-		if (resolve(legacyProjectBaseDir) !== resolve(projectBaseDir)) {
-			const legacyProjectMetadata: PathMetadata = {
-				...projectMetadata,
-				baseDir: legacyProjectBaseDir,
-			};
-
-			addResources(
-				"extensions",
-				collectAutoExtensionEntries(legacyProjectDirs.extensions),
-				legacyProjectMetadata,
-				projectOverrides.extensions,
-				legacyProjectBaseDir,
-			);
-			addResources(
-				"skills",
-				collectAutoSkillEntries(legacyProjectDirs.skills, "pi"),
-				legacyProjectMetadata,
-				projectOverrides.skills,
-				legacyProjectBaseDir,
-			);
-			addResources(
-				"prompts",
-				collectAutoPromptEntries(legacyProjectDirs.prompts),
-				legacyProjectMetadata,
-				projectOverrides.prompts,
-				legacyProjectBaseDir,
-			);
-			addResources(
-				"themes",
-				collectAutoThemeEntries(legacyProjectDirs.themes),
-				legacyProjectMetadata,
-				projectOverrides.themes,
-				legacyProjectBaseDir,
-			);
-			addResources(
-				"hooks",
-				collectFiles(legacyProjectDirs.hooks, FILE_PATTERNS.hooks),
-				legacyProjectMetadata,
-				projectOverrides.hooks,
-				legacyProjectBaseDir,
 			);
 		}
 

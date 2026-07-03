@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "../../types.ts";
 
+import { CONFIG_DIR_NAME } from "../../../../config.ts";
 import { loadWebsearchConfig } from "./websearch/config.ts";
 import { createWebSearchTool } from "./websearch/tool.ts";
 import type { ConfigLoadResult, WebsearchConfig } from "./websearch/types.ts";
@@ -29,7 +30,7 @@ export default function (pi: ExtensionAPI): void {
 	let state: ConfigLoadResult = {
 		ok: false,
 		reason: "missing_config",
-		message: "Missing websearch config. Create .pi/websearch.json or ~/.pi/websearch.json before starting pi.",
+		message: `Missing websearch config. Create ${CONFIG_DIR_NAME}/websearch.json or ~/${CONFIG_DIR_NAME}/websearch.json before starting omoai.`,
 	};
 
 	function providerLabel(provider: WebsearchConfig["providers"][number]): string {

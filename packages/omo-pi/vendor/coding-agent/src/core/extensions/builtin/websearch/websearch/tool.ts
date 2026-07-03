@@ -1,4 +1,5 @@
 import { Type } from "typebox";
+import { CONFIG_DIR_NAME } from "../../../../../config.ts";
 import { defineTool } from "../../../types.ts";
 
 import { buildNativeEntry, type NativeModelInfo, type NativeModelRegistry } from "./native.ts";
@@ -119,5 +120,5 @@ export function createWebSearchTool(getConfig: ConfigProvider): WebSearchTool {
 export const web_search = createWebSearchTool(() => ({
 	ok: false,
 	reason: "missing_config",
-	message: "Missing websearch config. Create .pi/websearch.json or ~/.pi/websearch.json before starting pi.",
+	message: `Missing websearch config. Create ${CONFIG_DIR_NAME}/websearch.json or ~/${CONFIG_DIR_NAME}/websearch.json before starting omoai.`,
 }));

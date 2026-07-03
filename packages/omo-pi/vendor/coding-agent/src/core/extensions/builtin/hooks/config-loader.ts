@@ -1,4 +1,5 @@
 import { diagnostic } from "./diagnostics.ts";
+import { CONFIG_DIR_NAME } from "../../../../config.ts";
 import { parseHookConfig } from "./schema.ts";
 import type { HookDiagnostic, HookSourceMetadata, ParsedHookConfig } from "./types.ts";
 
@@ -90,7 +91,7 @@ function createSourceCandidates(options: HookConfigLoaderOptions): SourceCandida
 		});
 	}
 	candidates.push(
-		fileSource("project", options.projectHooksPath ?? `${options.cwd}/.senpi/hooks.json`, "pre-session"),
+		fileSource("project", options.projectHooksPath ?? `${options.cwd}/${CONFIG_DIR_NAME}/hooks.json`, "pre-session"),
 	);
 	candidates.push(...fileSources("project", options.projectHookSourcePaths, "pre-session"));
 	candidates.push(...fileSources("plugin", options.preSessionHookSourcePaths, "pre-session"));

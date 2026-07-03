@@ -1,0 +1,21 @@
+SCENARIO: rebrand-source green rerun by orchestrator
+INVOCATION: cd packages/omo-pi && bun test test/rebrand-source.test.ts
+BINARY_OBSERVABLE: rc = 0
+bun test v1.3.14 (0d9b296a)
+
+test/rebrand-source.test.ts:
+(pass) omo-pi source rebrand > coding-agent package exposes omoai with .omo config [0.12ms]
+(pass) omo-pi source rebrand > TUI log files use the omoai .omo namespace [0.08ms]
+(pass) omo-pi source rebrand > hook defaults derive project hooks from CONFIG_DIR_NAME [0.14ms]
+(pass) omo-pi source rebrand > legacy senpi migration is disabled before rename work [0.05ms]
+(pass) omo-pi source rebrand > CLI and extension loader expose omo-pi aliases [0.07ms]
+(pass) omo-pi source rebrand > websearch config points users to CONFIG_DIR_NAME instead of .pi [0.09ms]
+(pass) omo-pi source rebrand > package manager does not auto-discover legacy project .pi resources [0.09ms]
+
+ 7 pass
+ 0 fail
+ 26 expect() calls
+Ran 7 tests across 1 file. [18.00ms]
+RC=0
+GREEN-OK
+CLEANUP: package-local bun test exited; no process/tmux/browser/port/container/temp dir remains.
