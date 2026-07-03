@@ -3,6 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { Readable, Writable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
 import { resolveServeProcessInvocation, runCodegraphServe } from "../src/serve.ts";
@@ -54,6 +55,7 @@ describe("runCodegraphServe", () => {
 				cwd: resolve(runCwd),
 				env: {
 					CODEGRAPH_INSTALL_DIR: "/tmp/home/.omo/codegraph",
+					CODEGRAPH_NO_DAEMON: "1",
 					CODEGRAPH_NO_DOWNLOAD: "1",
 					CODEGRAPH_TELEMETRY: "0",
 					DO_NOT_TRACK: "1",
@@ -176,6 +178,7 @@ describe("runCodegraphServe", () => {
 						command: binPath,
 						env: {
 							CODEGRAPH_INSTALL_DIR: installDir,
+							CODEGRAPH_NO_DAEMON: "1",
 							CODEGRAPH_NO_DOWNLOAD: "1",
 							CODEGRAPH_TELEMETRY: "0",
 							DO_NOT_TRACK: "1",
@@ -187,6 +190,47 @@ describe("runCodegraphServe", () => {
 				rmSync(tempRoot, { recursive: true, force: true });
 			}
 		});
+	});
+
+	it("#given project cwd is under a configured excluded root #when serving MCP #then it exposes an unavailable stub without spawning CodeGraph", async () => {
+		// given
+		const excludedRoot = mkdtempSync(join(componentRoot, ".tmp-codegraph-excluded-"));
+		const projectRoot = join(excludedRoot, "repo");
+		const stderr: string[] = [];
+		const stdout: string[] = [];
+		const calls: string[] = [];
+		mkdirSync(projectRoot, { recursive: true });
+
+		try {
+			// when
+			const exitCode = await runCodegraphServe({
+				config: { codegraph: { enabled: true, excluded_roots: [excludedRoot] }, sources: [], warnings: [] },
+				cwd: projectRoot,
+				env: { HOME: "/tmp/home" },
+				homeDir: "/tmp/home",
+				nodeVersion: "22.14.0",
+				resolve: () => ({ argsPrefix: [], command: "/tmp/codegraph", exists: true, source: "path" }),
+				runProcess: () => {
+					calls.push("spawned");
+					return Promise.resolve(0);
+				},
+				stderr: { write: (chunk) => stderr.push(chunk) },
+				stdin: Readable.from([]),
+				stdout: new Writable({
+					write: (chunk, _encoding, callback) => {
+						stdout.push(String(chunk));
+						callback();
+					},
+				}),
+			});
+
+			// then
+			expect(exitCode).toBe(0);
+			expect(calls).toEqual([]);
+			expect(stderr.join("")).toContain("CodeGraph MCP skipped: project excluded");
+		} finally {
+			rmSync(excludedRoot, { recursive: true, force: true });
+		}
 	});
 
 	it("#given Windows OMO_CODEGRAPH_BIN is a Node script #when resolving serve invocation #then Node executes the script path", () => {
