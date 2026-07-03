@@ -216,6 +216,36 @@ export const AGENT_ELIGIBILITY_REGISTRY: Readonly<Record<string, {
     rejectionMessage:
       "Agent 'multimodal-looker' has read-only tool access (only 'read' allowed). Cannot write to mailbox as team member.",
   },
+  "security-orchestrator": {
+    verdict: "hard-reject",
+    rejectionMessage:
+      "Agent 'security-orchestrator' is a security pipeline coordinator, not a mailbox teammate. Use delegate-task with subagent_type: 'security-orchestrator' from a normal session instead.",
+  },
+  "security-recon": {
+    verdict: "hard-reject",
+    rejectionMessage:
+      "Agent 'security-recon' is read-only security recon. Cannot write to mailbox as team member. Use delegate-task with subagent_type: 'security-recon' instead.",
+  },
+  "security-scanner": {
+    verdict: "hard-reject",
+    rejectionMessage:
+      "Agent 'security-scanner' is read-only vulnerability scanning. Cannot write to mailbox as team member. Use delegate-task with subagent_type: 'security-scanner' instead.",
+  },
+  "security-validator": {
+    verdict: "hard-reject",
+    rejectionMessage:
+      "Agent 'security-validator' is read-only adversarial validation. Cannot write to mailbox as team member. Use delegate-task with subagent_type: 'security-validator' instead.",
+  },
+  "security-deduper": {
+    verdict: "hard-reject",
+    rejectionMessage:
+      "Agent 'security-deduper' is read-only finding normalization. Cannot write to mailbox as team member. Use delegate-task with subagent_type: 'security-deduper' instead.",
+  },
+  "security-prover": {
+    verdict: "hard-reject",
+    rejectionMessage:
+      "Agent 'security-prover' is a scoped PoC specialist, not a mailbox teammate. Use delegate-task with subagent_type: 'security-prover' for one authorized proof at a time.",
+  },
   metis: {
     verdict: "hard-reject",
     rejectionMessage:
@@ -237,7 +267,7 @@ export const AGENT_ELIGIBILITY_REGISTRY: Readonly<Record<string, {
 
 /**
  * §V.3 member validation error messages live in member-parser.ts.
- * Includes: "Unknown subagent_type '<name>'. Available ELIGIBLE agents: sisyphus, atlas, sisyphus-junior, hephaestus (if D-36 applied). Use delegate-task for read-only agents like oracle, librarian, explore, metis, momus, multimodal-looker."
+ * Includes: "Unknown subagent_type '<name>'. Available ELIGIBLE agents: sisyphus, atlas, sisyphus-junior, hephaestus (if D-36 applied). Use delegate-task for read-only or specialist agents like oracle, librarian, explore, metis, momus, multimodal-looker, security-orchestrator, security-recon, security-scanner, security-validator, security-deduper, security-prover."
  */
 
 const parseMemberBase = createParseMember(MemberSchema, AGENT_ELIGIBILITY_REGISTRY)

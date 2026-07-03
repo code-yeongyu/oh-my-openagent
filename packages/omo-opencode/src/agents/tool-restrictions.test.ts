@@ -9,6 +9,14 @@ import { createMetisAgent } from "./metis"
 import { createAtlasAgent } from "./atlas"
 import { createSisyphusAgent } from "./sisyphus"
 import { createHephaestusAgent } from "./hephaestus"
+import {
+  createSecurityDeduperAgent,
+  createSecurityOrchestratorAgent,
+  createSecurityProverAgent,
+  createSecurityReconAgent,
+  createSecurityScannerAgent,
+  createSecurityValidatorAgent,
+} from "./security-pipeline"
 import { getAgentToolRestrictions } from "../shared/agent-tool-restrictions"
 
 const TEST_MODEL = "anthropic/claude-sonnet-4-5"
@@ -39,6 +47,12 @@ describe("read-only agent tool restrictions", () => {
       "metis",
       "momus",
       "multimodal-looker",
+      "security-orchestrator",
+      "security-recon",
+      "security-scanner",
+      "security-validator",
+      "security-deduper",
+      "security-prover",
       "sisyphus-junior",
       "custom-worker",
     ]
@@ -192,6 +206,62 @@ describe("read-only agent tool restrictions", () => {
       // then
       expect(permission["task"]).toBeUndefined()
       expect(permission["call_omo_agent"]).toBeUndefined()
+    })
+  })
+
+  describe("Security pipeline agents", () => {
+    test("read-only security stages deny file-writing tools", () => {
+      // given
+      const agents = [
+        createSecurityReconAgent(TEST_MODEL),
+        createSecurityScannerAgent(TEST_MODEL),
+        createSecurityValidatorAgent(TEST_MODEL),
+        createSecurityDeduperAgent(TEST_MODEL),
+      ]
+
+      // when / then
+      for (const agent of agents) {
+        const permission = agent.permission as Record<string, string>
+        for (const tool of FILE_WRITE_TOOLS) {
+          expect(permission[tool]).toBe("deny")
+        }
+        expect(permission.task).toBe("deny")
+        expect(permission.call_omo_agent).toBe("deny")
+      }
+    })
+
+    test("orchestrator can delegate but cannot write files", () => {
+      // given
+      const agent = createSecurityOrchestratorAgent(TEST_MODEL)
+
+      // when
+      const permission = agent.permission as Record<string, string>
+      const sessionRestrictions = getAgentToolRestrictions("security-orchestrator")
+
+      // then
+      for (const tool of FILE_WRITE_TOOLS) {
+        expect(permission[tool]).toBe("deny")
+      }
+      expect(permission.task).toBeUndefined()
+      expect(sessionRestrictions.task).toBeUndefined()
+    })
+
+    test("prover can write PoC files but cannot edit source or delegate", () => {
+      // given
+      const agent = createSecurityProverAgent(TEST_MODEL)
+
+      // when
+      const permission = agent.permission as Record<string, string>
+      const sessionRestrictions = getAgentToolRestrictions("security-prover")
+
+      // then
+      expect(permission.write).toBeUndefined()
+      expect(permission.edit).toBe("deny")
+      expect(permission.apply_patch).toBe("deny")
+      expect(permission.task).toBe("deny")
+      expect(sessionRestrictions.write).toBeUndefined()
+      expect(sessionRestrictions.edit).toBe(false)
+      expect(sessionRestrictions.task).toBe(false)
     })
   })
 

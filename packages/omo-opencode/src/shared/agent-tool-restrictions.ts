@@ -54,6 +54,45 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
     read: true,
   },
 
+  "security-orchestrator": {
+    write: false,
+    edit: false,
+  },
+
+  "security-recon": {
+    write: false,
+    edit: false,
+    task: false,
+    call_omo_agent: false,
+  },
+
+  "security-scanner": {
+    write: false,
+    edit: false,
+    task: false,
+    call_omo_agent: false,
+  },
+
+  "security-validator": {
+    write: false,
+    edit: false,
+    task: false,
+    call_omo_agent: false,
+  },
+
+  "security-deduper": {
+    write: false,
+    edit: false,
+    task: false,
+    call_omo_agent: false,
+  },
+
+  "security-prover": {
+    edit: false,
+    task: false,
+    call_omo_agent: false,
+  },
+
   "sisyphus-junior": {
     task: false,
   },

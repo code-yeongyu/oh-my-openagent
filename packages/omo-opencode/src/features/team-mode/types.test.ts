@@ -102,7 +102,7 @@ describe("team-mode types", () => {
     } catch (error) {
       // then
       expect(error instanceof Error ? error.message : String(error)).toBe(
-        "Unknown subagent_type 'foobar'. Available ELIGIBLE agents: sisyphus, atlas, sisyphus-junior, hephaestus (if D-36 applied). Use delegate-task for read-only agents like oracle, librarian, explore, metis, momus, multimodal-looker.",
+        "Unknown subagent_type 'foobar'. Available ELIGIBLE agents: sisyphus, atlas, sisyphus-junior, hephaestus (if D-36 applied). Use delegate-task for read-only or specialist agents like oracle, librarian, explore, metis, momus, multimodal-looker, security-orchestrator, security-recon, security-scanner, security-validator, security-deduper, security-prover.",
       )
     }
   })
@@ -125,6 +125,30 @@ describe("team-mode types", () => {
       [
         "multimodal-looker",
         "Agent 'multimodal-looker' has read-only tool access (only 'read' allowed). Cannot write to mailbox as team member.",
+      ],
+      [
+        "security-orchestrator",
+        "Agent 'security-orchestrator' is a security pipeline coordinator, not a mailbox teammate. Use delegate-task with subagent_type: 'security-orchestrator' from a normal session instead.",
+      ],
+      [
+        "security-recon",
+        "Agent 'security-recon' is read-only security recon. Cannot write to mailbox as team member. Use delegate-task with subagent_type: 'security-recon' instead.",
+      ],
+      [
+        "security-scanner",
+        "Agent 'security-scanner' is read-only vulnerability scanning. Cannot write to mailbox as team member. Use delegate-task with subagent_type: 'security-scanner' instead.",
+      ],
+      [
+        "security-validator",
+        "Agent 'security-validator' is read-only adversarial validation. Cannot write to mailbox as team member. Use delegate-task with subagent_type: 'security-validator' instead.",
+      ],
+      [
+        "security-deduper",
+        "Agent 'security-deduper' is read-only finding normalization. Cannot write to mailbox as team member. Use delegate-task with subagent_type: 'security-deduper' instead.",
+      ],
+      [
+        "security-prover",
+        "Agent 'security-prover' is a scoped PoC specialist, not a mailbox teammate. Use delegate-task with subagent_type: 'security-prover' for one authorized proof at a time.",
       ],
       [
         "metis",
@@ -262,8 +286,8 @@ describe("team-mode types", () => {
     )
 
     // then
-    expect(entries).toHaveLength(11)
-    expect(verdictCounts).toEqual({ eligible: 3, conditional: 1, "hard-reject": 7 })
+    expect(entries).toHaveLength(17)
+    expect(verdictCounts).toEqual({ eligible: 3, conditional: 1, "hard-reject": 13 })
     expect(AGENT_ELIGIBILITY_REGISTRY.hephaestus.rejectionMessage).toBe(
       "Agent 'hephaestus' lacks teammate permission. Either apply D-36 (add teammate: \"allow\" in tool-config-handler.ts) or use subagent_type: \"sisyphus\" instead.",
     )
@@ -278,6 +302,24 @@ describe("team-mode types", () => {
     )
     expect(AGENT_ELIGIBILITY_REGISTRY["multimodal-looker"].rejectionMessage).toBe(
       "Agent 'multimodal-looker' has read-only tool access (only 'read' allowed). Cannot write to mailbox as team member.",
+    )
+    expect(AGENT_ELIGIBILITY_REGISTRY["security-orchestrator"].rejectionMessage).toBe(
+      "Agent 'security-orchestrator' is a security pipeline coordinator, not a mailbox teammate. Use delegate-task with subagent_type: 'security-orchestrator' from a normal session instead.",
+    )
+    expect(AGENT_ELIGIBILITY_REGISTRY["security-recon"].rejectionMessage).toBe(
+      "Agent 'security-recon' is read-only security recon. Cannot write to mailbox as team member. Use delegate-task with subagent_type: 'security-recon' instead.",
+    )
+    expect(AGENT_ELIGIBILITY_REGISTRY["security-scanner"].rejectionMessage).toBe(
+      "Agent 'security-scanner' is read-only vulnerability scanning. Cannot write to mailbox as team member. Use delegate-task with subagent_type: 'security-scanner' instead.",
+    )
+    expect(AGENT_ELIGIBILITY_REGISTRY["security-validator"].rejectionMessage).toBe(
+      "Agent 'security-validator' is read-only adversarial validation. Cannot write to mailbox as team member. Use delegate-task with subagent_type: 'security-validator' instead.",
+    )
+    expect(AGENT_ELIGIBILITY_REGISTRY["security-deduper"].rejectionMessage).toBe(
+      "Agent 'security-deduper' is read-only finding normalization. Cannot write to mailbox as team member. Use delegate-task with subagent_type: 'security-deduper' instead.",
+    )
+    expect(AGENT_ELIGIBILITY_REGISTRY["security-prover"].rejectionMessage).toBe(
+      "Agent 'security-prover' is a scoped PoC specialist, not a mailbox teammate. Use delegate-task with subagent_type: 'security-prover' for one authorized proof at a time.",
     )
     expect(AGENT_ELIGIBILITY_REGISTRY.metis.rejectionMessage).toBe(
       "Agent 'metis' is read-only (pre-planning consultant). Cannot write to mailbox as team member. Use delegate-task for pre-planning analysis instead.",
