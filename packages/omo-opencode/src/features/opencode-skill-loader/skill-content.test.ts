@@ -10,6 +10,7 @@ import {
 	resolveMultipleSkills,
 	resolveSkillContentAsync,
 	resolveMultipleSkillsAsync,
+	type SkillResolutionOptions,
 } from "./skill-content"
 
 function createNestedSkill(baseDir: string, namespace: string, name: string, content: string): void {
@@ -19,20 +20,38 @@ function createNestedSkill(baseDir: string, namespace: string, name: string, con
 	writeFileSync(join(dir, "SKILL.md"), yaml)
 }
 
+function createProjectSkill(baseDir: string, name: string, content: string): void {
+	const dir = join(baseDir, ".opencode", "skills", name)
+	mkdirSync(dir, { recursive: true })
+	const yaml = `---\nname: ${name}\ndescription: ${name} fixture skill\n---\n${content}`
+	writeFileSync(join(dir, "SKILL.md"), yaml)
+}
+
 let originalEnv: Record<string, string | undefined>
 let testConfigDir: string
 
+function isolatedOptions(options: SkillResolutionOptions = {}): SkillResolutionOptions {
+	return { ...options, directory: testConfigDir }
+}
+
 beforeEach(() => {
 	clearSkillCache()
-	originalEnv = {
-		CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
-		OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
-	}
-	const unique = `skill-content-test-${Date.now()}-${Math.random().toString(16).slice(2)}`
-	testConfigDir = join(tmpdir(), unique)
-	process.env.CLAUDE_CONFIG_DIR = testConfigDir
-	process.env.OPENCODE_CONFIG_DIR = testConfigDir
-})
+		originalEnv = {
+			CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
+			HOME: process.env.HOME,
+			OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
+		}
+		const unique = `skill-content-test-${Date.now()}-${Math.random().toString(16).slice(2)}`
+		testConfigDir = join(tmpdir(), unique)
+		process.env.CLAUDE_CONFIG_DIR = testConfigDir
+		process.env.HOME = testConfigDir
+		process.env.OPENCODE_CONFIG_DIR = testConfigDir
+		createProjectSkill(
+			testConfigDir,
+			"git-master",
+			"Use this skill when the user asks you to operate on Git history.\n\n## Mode Gate\n\nFixture git workflow."
+		)
+	})
 
 afterEach(() => {
 	clearSkillCache()
@@ -79,7 +98,7 @@ describe("resolveSkillContent", () => {
 
 	it("should return null for disabled skill", () => {
 		// given: frontend skill disabled
-		const options = { disabledSkills: new Set(["frontend"]) }
+		const options = isolatedOptions({ disabledSkills: new Set(["frontend"]) })
 
 		// when: resolving content for disabled skill
 		const result = resolveSkillContent("frontend", options)
@@ -145,7 +164,7 @@ describe("resolveMultipleSkills", () => {
 	it("should treat disabled skills as not found", () => {
 		// #given: frontend disabled, playwright not disabled
 		const skillNames = ["frontend", "playwright"]
-		const options = { disabledSkills: new Set(["frontend"]) }
+		const options = isolatedOptions({ disabledSkills: new Set(["frontend"]) })
 
 		// #when: resolving multiple skills with disabled one
 		const result = resolveMultipleSkills(skillNames, options)
@@ -174,18 +193,19 @@ describe("resolveSkillContentAsync", () => {
 	it("should return template for builtin skill async", async () => {
 		// given: builtin skill 'frontend'
 		// when: resolving content async
-		const options = { disabledSkills: new Set(["frontend"]) }
+		const options = isolatedOptions({ disabledSkills: new Set(["frontend"]) })
 		const result = await resolveSkillContentAsync("git-master", options)
 
 		// then: returns template string
 		expect(result).not.toBeNull()
 		expect(typeof result).toBe("string")
-		expect(result).toContain("Git Master Agent")
+		expect(result).toContain("Use this skill when the user asks you to operate on Git history")
+		expect(result).toContain("## Mode Gate")
 	})
 
 	it("should return null for disabled skill async", async () => {
 		// given: frontend disabled
-		const options = { disabledSkills: new Set(["frontend"]) }
+		const options = isolatedOptions({ disabledSkills: new Set(["frontend"]) })
 
 		// when: resolving content async for disabled skill
 		const result = await resolveSkillContentAsync("frontend", options)
@@ -199,7 +219,7 @@ describe("resolveSkillContentAsync", () => {
 		createNestedSkill(testConfigDir, "toolkit", "systematic-debugging", "Short name test content")
 
 		// when: resolving by short name
-		const result = await resolveSkillContentAsync("systematic-debugging")
+		const result = await resolveSkillContentAsync("systematic-debugging", isolatedOptions())
 
 		// then: finds the nested skill
 		expect(result).not.toBeNull()
@@ -212,7 +232,7 @@ describe("resolveSkillContentAsync", () => {
 		createNestedSkill(testConfigDir, "utils", "nested-debug", "utils content")
 
 		// when: resolving by ambiguous short name
-		const result = await resolveSkillContentAsync("nested-debug")
+		const result = await resolveSkillContentAsync("nested-debug", isolatedOptions())
 
 		// then: ambiguous => null
 		expect(result).toBeNull()
@@ -227,7 +247,7 @@ describe("resolveSkillContentAsync", () => {
 		writeFileSync(join(exactDir, "SKILL.md"), "---\nname: debugging\ndescription: exact debugging\n---\nexact match content")
 
 		// when: resolving by name "debugging"
-		const result = await resolveSkillContentAsync("debugging")
+		const result = await resolveSkillContentAsync("debugging", isolatedOptions())
 
 		// then: prefers exact match over the nested one
 		expect(result).not.toBeNull()
@@ -239,7 +259,7 @@ describe("resolveSkillContentAsync", () => {
 		createNestedSkill(testConfigDir, "toolkit", "systematic-debugging", "case insensitive match")
 
 		// when: resolving by uppercase short name
-		const result = await resolveSkillContentAsync("Systematic-Debugging")
+		const result = await resolveSkillContentAsync("Systematic-Debugging", isolatedOptions())
 
 		// then: finds it case-insensitively
 		expect(result).not.toBeNull()
@@ -253,13 +273,14 @@ describe("resolveMultipleSkillsAsync", () => {
 		const skillNames = ["playwright", "git-master"]
 
 		// when: resolving multiple skills async
-		const result = await resolveMultipleSkillsAsync(skillNames)
+		const result = await resolveMultipleSkillsAsync(skillNames, isolatedOptions())
 
 		// then: all builtin skills resolved
 		expect(result.resolved.size).toBe(2)
 		expect(result.notFound).toEqual([])
 		expect(result.resolved.get("playwright")).toContain("Playwright Browser Automation")
-		expect(result.resolved.get("git-master")).toContain("Git Master Agent")
+		expect(result.resolved.get("git-master")).toContain("Use this skill when the user asks you to operate on Git history")
+		expect(result.resolved.get("git-master")).toContain("## Mode Gate")
 	})
 
 	it("should handle partial success with non-existent skills async", async () => {
@@ -267,7 +288,7 @@ describe("resolveMultipleSkillsAsync", () => {
 		const skillNames = ["playwright", "nonexistent-skill-12345"]
 
 		// when: resolving multiple skills async
-		const result = await resolveMultipleSkillsAsync(skillNames)
+		const result = await resolveMultipleSkillsAsync(skillNames, isolatedOptions())
 
 		// then: existing skills resolved, non-existing in notFound
 		expect(result.resolved.size).toBe(1)
@@ -278,7 +299,7 @@ describe("resolveMultipleSkillsAsync", () => {
 	it("should treat disabled skills as not found async", async () => {
 		// #given: frontend disabled
 		const skillNames = ["frontend", "playwright"]
-		const options = { disabledSkills: new Set(["frontend"]) }
+		const options = isolatedOptions({ disabledSkills: new Set(["frontend"]) })
 
 		// #when: resolving multiple skills async with disabled one
 		const result = await resolveMultipleSkillsAsync(skillNames, options)
@@ -292,13 +313,13 @@ describe("resolveMultipleSkillsAsync", () => {
 	it("should NOT inject watermark when both options are disabled", async () => {
 		// given: git-master skill with watermark disabled
 		const skillNames = ["git-master"]
-		const options = {
+		const options = isolatedOptions({
 			gitMasterConfig: {
 				commit_footer: false,
 				include_co_authored_by: false,
 				git_env_prefix: "GIT_MASTER=1",
 			},
-		}
+		})
 
 		// when: resolving with git-master config
 		const result = await resolveMultipleSkillsAsync(skillNames, options)
@@ -314,13 +335,13 @@ describe("resolveMultipleSkillsAsync", () => {
 	it("should inject watermark when enabled (default)", async () => {
 		// given: git-master skill with default config (watermark enabled)
 		const skillNames = ["git-master"]
-		const options = {
+		const options = isolatedOptions({
 			gitMasterConfig: {
 				commit_footer: true,
 				include_co_authored_by: true,
 				git_env_prefix: "GIT_MASTER=1",
 			},
-		}
+		})
 
 		// when: resolving with git-master config
 		const result = await resolveMultipleSkillsAsync(skillNames, options)
@@ -335,13 +356,13 @@ describe("resolveMultipleSkillsAsync", () => {
 	it("should inject only footer when co-author is disabled", async () => {
 		// given: git-master skill with only footer enabled
 		const skillNames = ["git-master"]
-		const options = {
+		const options = isolatedOptions({
 			gitMasterConfig: {
 				commit_footer: true,
 				include_co_authored_by: false,
 				git_env_prefix: "GIT_MASTER=1",
 			},
-		}
+		})
 
 		// when: resolving with git-master config
 		const result = await resolveMultipleSkillsAsync(skillNames, options)
@@ -357,7 +378,7 @@ describe("resolveMultipleSkillsAsync", () => {
 		const skillNames = ["git-master"]
 
 		// when: resolving without any gitMasterConfig
-		const result = await resolveMultipleSkillsAsync(skillNames)
+		const result = await resolveMultipleSkillsAsync(skillNames, isolatedOptions())
 
 		// then: watermark is injected (default is ON)
 		expect(result.resolved.size).toBe(1)
@@ -369,13 +390,13 @@ describe("resolveMultipleSkillsAsync", () => {
 	it("should inject only co-author when footer is disabled", async () => {
 		// given: git-master skill with only co-author enabled
 		const skillNames = ["git-master"]
-		const options = {
+		const options = isolatedOptions({
 			gitMasterConfig: {
 				commit_footer: false,
 				include_co_authored_by: true,
 				git_env_prefix: "GIT_MASTER=1",
 			},
-		}
+		})
 
 		// when: resolving with git-master config
 		const result = await resolveMultipleSkillsAsync(skillNames, options)
@@ -390,13 +411,13 @@ describe("resolveMultipleSkillsAsync", () => {
 		// given: git-master skill with custom string footer
 		const skillNames = ["git-master"]
 		const customFooter = "Custom footer from my team"
-		const options = {
+		const options = isolatedOptions({
 			gitMasterConfig: {
 				commit_footer: customFooter,
 				include_co_authored_by: false,
 				git_env_prefix: "GIT_MASTER=1",
 			},
-		}
+		})
 
 		// when: resolving with custom footer config
 		const result = await resolveMultipleSkillsAsync(skillNames, options)
@@ -410,13 +431,13 @@ describe("resolveMultipleSkillsAsync", () => {
 	it("should use default Sisyphus footer when commit_footer is boolean true", async () => {
 		// given: git-master skill with boolean true footer
 		const skillNames = ["git-master"]
-		const options = {
+		const options = isolatedOptions({
 			gitMasterConfig: {
 				commit_footer: true,
 				include_co_authored_by: false,
 				git_env_prefix: "GIT_MASTER=1",
 			},
-		}
+		})
 
 		// when: resolving with boolean true footer config
 		const result = await resolveMultipleSkillsAsync(skillNames, options)
@@ -443,7 +464,7 @@ describe("resolveMultipleSkillsAsync", () => {
 		createNestedSkill(testConfigDir, "toolkit", "systematic-debugging", "short name resolved")
 
 		// when: mixing short name with full builtin name
-		const result = await resolveMultipleSkillsAsync(["systematic-debugging", "playwright"])
+		const result = await resolveMultipleSkillsAsync(["systematic-debugging", "playwright"], isolatedOptions())
 
 		// then: both resolved
 		expect(result.resolved.size).toBe(2)
@@ -458,7 +479,7 @@ describe("resolveMultipleSkillsAsync", () => {
 		createNestedSkill(testConfigDir, "utils", "nested-debug", "utils content")
 
 		// when: resolving ambiguous short name with builtin
-		const result = await resolveMultipleSkillsAsync(["nested-debug", "playwright"])
+		const result = await resolveMultipleSkillsAsync(["nested-debug", "playwright"], isolatedOptions())
 
 		// then: ambiguous short name not found, playwright resolved
 		expect(result.resolved.size).toBe(1)
@@ -474,7 +495,7 @@ describe("resolveMultipleSkillsAsync", () => {
 		createNestedSkill(testConfigDir, "toolkit", "debugging", "nested content")
 
 		// when: resolving "debugging" in batch
-		const result = await resolveMultipleSkillsAsync(["debugging", "playwright"])
+		const result = await resolveMultipleSkillsAsync(["debugging", "playwright"], isolatedOptions())
 
 		// then: exact match wins
 		expect(result.resolved.size).toBe(2)

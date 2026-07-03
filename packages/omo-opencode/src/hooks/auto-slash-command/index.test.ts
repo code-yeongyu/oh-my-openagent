@@ -108,7 +108,7 @@ describe("createAutoSlashCommandHook", () => {
 
     it("should not modify message when command not found", async () => {
       // given a slash command that doesn't exist
-      const hook = createAutoSlashCommandHook()
+      const hook = createAutoSlashCommandHook({ skills: [] })
       const sessionID = `test-session-notfound-${Date.now()}`
       const input = createMockInput(sessionID)
       const output = createMockOutput("/nonexistent-command args")

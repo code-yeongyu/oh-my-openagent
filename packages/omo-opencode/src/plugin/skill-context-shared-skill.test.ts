@@ -88,6 +88,7 @@ async function createPluginWiredSkillTool(args: {
   const skillContext = await createSkillContext({
     directory: args.directory,
     pluginConfig,
+    homeDirectory: args.directory,
   })
 
   return createSkillTool({
@@ -118,6 +119,7 @@ async function expectMixedCaseBlockedSkillFiltered(args: {
   const skillContext = await createSkillContext({
     directory: args.directory,
     pluginConfig,
+    homeDirectory: args.directory,
   })
   const systemContent = buildSystemContent({
     agentsContext: "base",
@@ -172,13 +174,16 @@ describe("plugin-wired shared skill aliases", () => {
   let testDirectory: string
   let originalOpenCodeConfigDir: string | undefined
   let originalClaudeConfigDir: string | undefined
+  let originalHome: string | undefined
 
   beforeEach(() => {
     testDirectory = mkdtempSync(join(tmpdir(), "omo-plugin-shared-skill-"))
     originalOpenCodeConfigDir = process.env.OPENCODE_CONFIG_DIR
     originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
+    originalHome = process.env.HOME
     process.env.OPENCODE_CONFIG_DIR = join(testDirectory, "isolated-opencode-config")
     process.env.CLAUDE_CONFIG_DIR = join(testDirectory, "isolated-claude-config")
+    process.env.HOME = testDirectory
 
     writeSkill(
       join(testDirectory, ".opencode", "skills", "ulw-plan"),
@@ -204,6 +209,11 @@ describe("plugin-wired shared skill aliases", () => {
       delete process.env.CLAUDE_CONFIG_DIR
     } else {
       process.env.CLAUDE_CONFIG_DIR = originalClaudeConfigDir
+    }
+    if (originalHome === undefined) {
+      delete process.env.HOME
+    } else {
+      process.env.HOME = originalHome
     }
     rmSync(testDirectory, { recursive: true, force: true })
   })

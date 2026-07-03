@@ -10,6 +10,7 @@ import {
 	resolveMultipleSkills,
 	resolveSkillContentAsync,
 	resolveMultipleSkillsAsync,
+	type SkillResolutionOptions,
 } from "./skill-content"
 import { getAllSkills } from "./skill-discovery"
 import { matchSkillByName } from "../../tools/skill/skill-matcher"
@@ -20,6 +21,14 @@ function createNestedSkill(baseDir: string, namespace: string, name: string, con
 	mkdirSync(dir, { recursive: true })
 	const yaml = `---\nname: ${name}\ndescription: ${namespace}/${name} skill\n---\n${content}`
 	writeFileSync(join(dir, "SKILL.md"), yaml)
+}
+
+function createProjectSkill(baseDir: string, name: string, content: string): string {
+	const dir = join(baseDir, ".opencode", "skills", name)
+	mkdirSync(dir, { recursive: true })
+	const yaml = `---\nname: ${name}\ndescription: ${name} fixture skill\n---\n${content}`
+	writeFileSync(join(dir, "SKILL.md"), yaml)
+	return dir
 }
 
 function createLoadedSkill(name: string, scope: LoadedSkill["scope"]): LoadedSkill {
@@ -33,17 +42,28 @@ function createLoadedSkill(name: string, scope: LoadedSkill["scope"]): LoadedSki
 let originalEnv: Record<string, string | undefined>
 let testConfigDir: string
 
+function isolatedOptions(options: SkillResolutionOptions = {}): SkillResolutionOptions {
+	return { ...options, directory: testConfigDir }
+}
+
 beforeEach(() => {
 	clearSkillCache()
-	originalEnv = {
-		CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
-		OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
-	}
-	const unique = `skill-content-test-${Date.now()}-${Math.random().toString(16).slice(2)}`
-	testConfigDir = join(tmpdir(), unique)
-	process.env.CLAUDE_CONFIG_DIR = testConfigDir
-	process.env.OPENCODE_CONFIG_DIR = testConfigDir
-})
+		originalEnv = {
+			CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
+			HOME: process.env.HOME,
+			OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
+		}
+		const unique = `skill-content-test-${Date.now()}-${Math.random().toString(16).slice(2)}`
+		testConfigDir = join(tmpdir(), unique)
+		process.env.CLAUDE_CONFIG_DIR = testConfigDir
+		process.env.HOME = testConfigDir
+		process.env.OPENCODE_CONFIG_DIR = testConfigDir
+		createProjectSkill(
+			testConfigDir,
+			"git-master",
+			"Use this skill when the user asks you to operate on Git history.\n\n## Mode Gate\n\nFixture git workflow."
+		)
+	})
 
 afterEach(() => {
 	clearSkillCache()
@@ -60,18 +80,19 @@ describe("resolveSkillContentAsync", () => {
 	it("should return template for builtin skill async", async () => {
 		// given: builtin skill 'frontend'
 		// when: resolving content async
-		const options = { disabledSkills: new Set(["frontend"]) }
+		const options = isolatedOptions({ disabledSkills: new Set(["frontend"]) })
 		const result = await resolveSkillContentAsync("git-master", options)
 
 		// then: returns template string
 		expect(result).not.toBeNull()
 		expect(typeof result).toBe("string")
-		expect(result).toContain("Git Master Agent")
+		expect(result).toContain("Use this skill when the user asks you to operate on Git history")
+		expect(result).toContain("## Mode Gate")
 	})
 
 	it("should return null for disabled skill async", async () => {
 		// given: frontend disabled
-		const options = { disabledSkills: new Set(["frontend"]) }
+		const options = isolatedOptions({ disabledSkills: new Set(["frontend"]) })
 
 		// when: resolving content async for disabled skill
 		const result = await resolveSkillContentAsync("frontend", options)
@@ -82,7 +103,7 @@ describe("resolveSkillContentAsync", () => {
 
 	it("#given the shared ulw-plan canonical alias is disabled #when resolving it async #then it does not fall back to the plain shared alias", async () => {
 		// given
-		const options = { directory: testConfigDir, disabledSkills: new Set(["shared/ulw-plan"]) }
+		const options = isolatedOptions({ disabledSkills: new Set(["shared/ulw-plan"]) })
 
 		// when
 		const result = await resolveSkillContentAsync("shared/ulw-plan", options)
@@ -93,7 +114,7 @@ describe("resolveSkillContentAsync", () => {
 
 	it("#given the shared ulw-plan canonical alias is disabled #when matching against all skills #then no shared fallback match remains", async () => {
 		// given
-		const options = { directory: testConfigDir, disabledSkills: new Set(["shared/ulw-plan"]) }
+		const options = isolatedOptions({ disabledSkills: new Set(["shared/ulw-plan"]) })
 
 		// when
 		const skills = await getAllSkills(options)
@@ -123,7 +144,7 @@ describe("resolveSkillContentAsync", () => {
 			join(localSkillDir, "SKILL.md"),
 			"---\nname: ulw-plan\ndescription: Local ulw-plan override\n---\nlocal ulw-plan body"
 		)
-		const options = { directory: testConfigDir, disabledSkills: new Set(["shared/ulw-plan"]) }
+		const options = isolatedOptions({ disabledSkills: new Set(["shared/ulw-plan"]) })
 
 		// when
 		const result = await resolveSkillContentAsync("ulw-plan", options)
@@ -134,7 +155,7 @@ describe("resolveSkillContentAsync", () => {
 
 	it("#given the plain ulw-plan name is disabled #when resolving the shared canonical alias #then the shared alias is disabled too", async () => {
 		// given
-		const options = { directory: testConfigDir, disabledSkills: new Set(["ulw-plan"]) }
+		const options = isolatedOptions({ disabledSkills: new Set(["ulw-plan"]) })
 
 		// when
 		const result = await resolveSkillContentAsync("shared/ulw-plan", options)
@@ -148,7 +169,7 @@ describe("resolveSkillContentAsync", () => {
 		createNestedSkill(testConfigDir, "toolkit", "systematic-debugging", "Short name test content")
 
 		// when: resolving by short name
-		const result = await resolveSkillContentAsync("systematic-debugging")
+		const result = await resolveSkillContentAsync("systematic-debugging", isolatedOptions())
 
 		// then: finds the nested skill
 		expect(result).not.toBeNull()
@@ -161,7 +182,7 @@ describe("resolveSkillContentAsync", () => {
 		createNestedSkill(testConfigDir, "utils", "nested-debug", "utils content")
 
 		// when: resolving by ambiguous short name
-		const result = await resolveSkillContentAsync("nested-debug")
+		const result = await resolveSkillContentAsync("nested-debug", isolatedOptions())
 
 		// then: ambiguous => null
 		expect(result).toBeNull()
@@ -176,7 +197,7 @@ describe("resolveSkillContentAsync", () => {
 		writeFileSync(join(exactDir, "SKILL.md"), "---\nname: debugging\ndescription: exact debugging\n---\nexact match content")
 
 		// when: resolving by name "debugging"
-		const result = await resolveSkillContentAsync("debugging")
+		const result = await resolveSkillContentAsync("debugging", isolatedOptions())
 
 		// then: prefers exact match over the nested one
 		expect(result).not.toBeNull()
@@ -188,14 +209,14 @@ describe("resolveSkillContentAsync", () => {
 		createNestedSkill(testConfigDir, "toolkit", "systematic-debugging", "case insensitive match")
 
 		// when: resolving by uppercase short name
-		const result = await resolveSkillContentAsync("Systematic-Debugging")
+		const result = await resolveSkillContentAsync("Systematic-Debugging", isolatedOptions())
 
 		// then: finds it case-insensitively
 		expect(result).not.toBeNull()
 		expect(result).toContain("case insensitive match")
 	})
 
-	it("#given the shared ulw-plan skill source #when OpenCode skills are resolved #then ulw-plan is path-backed with workflow resources", async () => {
+	it("#given a fixture ulw-plan skill source #when OpenCode skills are resolved #then ulw-plan is path-backed with workflow resources", async () => {
 		// given
 		const requiredResourcePaths = [
 			"references/full-workflow.md",
@@ -203,9 +224,15 @@ describe("resolveSkillContentAsync", () => {
 			"references/intent-unclear.md",
 			"scripts/scaffold-plan.mjs",
 		]
+		const fixtureDir = createProjectSkill(testConfigDir, "ulw-plan", "fixture ulw-plan body")
+		for (const relativePath of requiredResourcePaths) {
+			const resourcePath = join(fixtureDir, relativePath)
+			mkdirSync(join(resourcePath, ".."), { recursive: true })
+			writeFileSync(resourcePath, "fixture resource")
+		}
 
 		// when
-		const skills = await getAllSkills({ directory: testConfigDir })
+		const skills = await getAllSkills(isolatedOptions())
 		const skill = skills.find((candidate) => candidate.name === "ulw-plan")
 
 		// then
@@ -218,7 +245,8 @@ describe("resolveSkillContentAsync", () => {
 		if (!skill.path || !skill.resolvedPath) {
 			throw new Error("ulw-plan skill is not path-backed")
 		}
-		expect(skill.path.replaceAll("\\", "/").endsWith("packages/shared-skills/skills/ulw-plan/SKILL.md")).toBe(true)
+		expect(skill.path).toBe(join(fixtureDir, "SKILL.md"))
+		expect(skill.resolvedPath).toBe(fixtureDir)
 		for (const relativePath of requiredResourcePaths) {
 			expect(existsSync(join(skill.resolvedPath, relativePath))).toBe(true)
 		}

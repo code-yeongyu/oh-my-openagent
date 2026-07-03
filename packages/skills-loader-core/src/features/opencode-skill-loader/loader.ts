@@ -68,6 +68,7 @@ export async function loadGlobalAgentsSkills(homeDirectory: string = homedir()):
 export interface DiscoverSkillsOptions {
   includeClaudeCodePaths?: boolean
   directory?: string
+  homeDirectory?: string
 }
 
 export function createSharedCanonicalAliases(skills: LoadedSkill[]): LoadedSkill[] {
@@ -109,7 +110,7 @@ export async function discoverAllSkills(directory?: string): Promise<LoadedSkill
 }
 
 export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promise<LoadedSkill[]> {
-  const { includeClaudeCodePaths = true, directory } = options
+  const { includeClaudeCodePaths = true, directory, homeDirectory } = options
 
   const [opencodeProjectSkills, opencodeGlobalSkills, sharedSkills] = await Promise.all([
     discoverOpencodeProjectSkills(directory),
@@ -130,7 +131,7 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
     discoverProjectClaudeSkills(directory),
     discoverUserClaudeSkills(),
     discoverProjectAgentsSkills(directory),
-    discoverGlobalAgentsSkills(),
+    discoverGlobalAgentsSkills(homeDirectory),
   ])
 
   return deduplicateSkillsByName([

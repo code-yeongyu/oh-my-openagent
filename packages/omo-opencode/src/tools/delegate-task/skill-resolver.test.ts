@@ -1,3 +1,6 @@
+/// <reference path="../../../../../bun-test.d.ts" />
+/// <reference types="bun-types" />
+
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -6,9 +9,22 @@ import { resolveSkillContent } from "./skill-resolver"
 import { clearSkillCache } from "../../features/opencode-skill-loader/skill-discovery"
 
 const TEST_DIR = join(tmpdir(), `skill-resolver-test-${Date.now()}`)
+const ORIGINAL_ENV = {
+  CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
+  HOME: process.env.HOME,
+  OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
+}
 
 function makeNativeSkill(name: string, description: string, content: string) {
   return { name, description, location: `/fake/native/${name}/SKILL.md`, content }
+}
+
+function restoreEnv(name: "CLAUDE_CONFIG_DIR" | "HOME" | "OPENCODE_CONFIG_DIR", value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name]
+    return
+  }
+  process.env[name] = value
 }
 
 function makeLoadedSkill(name: string, content: string) {
@@ -36,10 +52,16 @@ describe("resolveSkillContent — nativeSkills integration", () => {
   beforeEach(() => {
     clearSkillCache()
     mkdirSync(TEST_DIR, { recursive: true })
+    process.env.CLAUDE_CONFIG_DIR = join(TEST_DIR, "claude-config")
+    process.env.HOME = TEST_DIR
+    process.env.OPENCODE_CONFIG_DIR = join(TEST_DIR, "opencode-config")
   })
 
   afterEach(() => {
     clearSkillCache()
+    restoreEnv("CLAUDE_CONFIG_DIR", ORIGINAL_ENV.CLAUDE_CONFIG_DIR)
+    restoreEnv("HOME", ORIGINAL_ENV.HOME)
+    restoreEnv("OPENCODE_CONFIG_DIR", ORIGINAL_ENV.OPENCODE_CONFIG_DIR)
     rmSync(TEST_DIR, { recursive: true, force: true })
   })
 
@@ -230,6 +252,8 @@ describe("resolveSkillContent — nativeSkills integration", () => {
     // when
     const result = await resolveSkillContent(["ulw-plan"], {
       directory: TEST_DIR,
+      homeDirectory: TEST_DIR,
+      browserProvider: "playwright",
       disabledSkills: new Set(["shared/ulw-plan"]),
     })
 
@@ -244,6 +268,8 @@ describe("resolveSkillContent — nativeSkills integration", () => {
     // when
     const result = await resolveSkillContent(["shared/ulw-plan"], {
       directory: TEST_DIR,
+      homeDirectory: TEST_DIR,
+      browserProvider: "playwright",
       disabledSkills: new Set(["ulw-plan"]),
     })
 

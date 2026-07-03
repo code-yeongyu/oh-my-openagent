@@ -22,6 +22,7 @@ type ResolveSkillContentOptions = {
   disabledSkills?: Set<string>
   teamModeEnabled?: boolean
   directory?: string
+  homeDirectory?: string
   targetAgent?: string
   nativeSkills?: DelegateTaskToolOptions["nativeSkills"]
   nativeSkillEntries?: NativeSkillEntry[]
@@ -96,6 +97,7 @@ export async function resolveSkillContent(
     unfilteredDiscoveredSkills = await discoverSkills({
       includeClaudeCodePaths: true,
       directory: options.directory,
+      homeDirectory: options.homeDirectory,
     })
     return unfilteredDiscoveredSkills
   }
@@ -140,6 +142,7 @@ export async function resolveSkillContent(
       const fallback = await discoverSkills({
         includeClaudeCodePaths: true,
         directory: options.directory,
+        homeDirectory: options.homeDirectory,
       })
       available = fallback.map((s) => s.name).join(", ")
     }
