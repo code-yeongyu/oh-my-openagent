@@ -66,8 +66,9 @@ function normalizeSkillLocation(location: string | undefined): string | undefine
 }
 
 function isOpenCodeInjectedNativeSkill(skill: SkillInfo): boolean {
+  if (skill.scope !== "config") return false
   const location = skill.location?.replaceAll("\\", "/").toLowerCase()
-  return location?.startsWith("/opencode/") ?? false
+  return location === "<built-in>" || (location?.startsWith("/opencode/") ?? false)
 }
 
 function hasSameSource(qualified: SkillInfo, bare: SkillInfo): boolean {

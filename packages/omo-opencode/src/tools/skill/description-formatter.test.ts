@@ -36,11 +36,14 @@ function userSkill(name: string, description = "user desc"): SkillInfo {
   })
 }
 
-function opencodeNativeSkill(name: string, description = "opencode native desc"): SkillInfo {
-  const shortName = name.split("/").at(-1) ?? name
+function opencodeNativeSkill(
+  name: string,
+  description = "opencode native desc",
+  location = "<built-in>",
+): SkillInfo {
   return makeSkill(name, description, {
     scope: "config",
-    location: `/opencode/${shortName}.md`,
+    location,
   })
 }
 
@@ -201,6 +204,38 @@ describe("deduplicatePathAliasedSkills", () => {
     expect(result.map((s) => `${s.name}:${s.description}`)).toEqual([
       "shared/start-work:full start-work instructions",
       "start-work:local start-work workflow",
+    ])
+  })
+
+  it("keeps OpenCode native bare skills exposed with built-in sentinel locations", () => {
+    const skills = [
+      opencodeNativeSkill("opencode/customize-opencode", "Qualified OpenCode customize entry"),
+      opencodeNativeSkill("customize-opencode", "Customize OpenCode"),
+    ]
+
+    const result = deduplicatePathAliasedSkills(skills)
+
+    expect(result.map((s) => `${s.name}:${s.description}`)).toEqual([
+      "opencode/customize-opencode:Qualified OpenCode customize entry",
+      "customize-opencode:Customize OpenCode",
+    ])
+  })
+
+  it("keeps OpenCode native bare skills exposed with legacy /opencode locations", () => {
+    const skills = [
+      opencodeNativeSkill(
+        "opencode/customize-opencode",
+        "Qualified OpenCode customize entry",
+        "/opencode/customize-opencode.md",
+      ),
+      opencodeNativeSkill("customize-opencode", "Customize OpenCode", "/opencode/customize-opencode.md"),
+    ]
+
+    const result = deduplicatePathAliasedSkills(skills)
+
+    expect(result.map((s) => `${s.name}:${s.description}`)).toEqual([
+      "opencode/customize-opencode:Qualified OpenCode customize entry",
+      "customize-opencode:Customize OpenCode",
     ])
   })
 })
