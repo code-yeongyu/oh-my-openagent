@@ -310,6 +310,14 @@ function parsePackageCommand(args: string[]): PackageCommandOptions | undefined 
 	};
 }
 
+function updateTargetIncludesSelf(target: UpdateTarget): boolean {
+	return target.type === "all" || target.type === "self";
+}
+
+function updateTargetIncludesExtensions(target: UpdateTarget): boolean {
+	return target.type === "all" || target.type === "extensions";
+}
+
 function parseProjectTrustOverride(args: readonly string[]): boolean | undefined {
 	let trustOverride: boolean | undefined;
 	for (const arg of args) {
@@ -552,8 +560,25 @@ export async function handlePackageCommand(
 			}
 
 			case "update": {
-				// omo-pi: self-update disabled
-				console.log(chalk.yellow("omoai self-update is managed by the omo repo - reinstall from a new tarball"));
+				const target = options.updateTarget ?? { type: "self" };
+				if (options.showExtensionsSkippedNote) {
+					console.log(
+						chalk.dim(`Extensions are skipped. Run ${APP_NAME} update --extensions to update extensions.`),
+					);
+				}
+				if (updateTargetIncludesExtensions(target)) {
+					const updateSource = target.type === "extensions" ? target.source : undefined;
+					await packageManager.update(updateSource);
+					if (updateSource) {
+						console.log(chalk.green(`Updated ${updateSource}`));
+					} else {
+						console.log(chalk.green("Updated packages"));
+					}
+				}
+				if (updateTargetIncludesSelf(target)) {
+					// omo-pi: self-update disabled
+					console.log(chalk.yellow("omoai self-update is managed by the omo repo - reinstall from a new tarball"));
+				}
 				return true;
 			}
 		}

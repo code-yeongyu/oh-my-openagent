@@ -1,3 +1,5 @@
 report-install-count=0
 PACKAGE-COMMANDS-AND-VERSION-OK
+EXTENSION-UPDATE-PATH-OK
 rc=0
+cleanup: no runtime resources spawned

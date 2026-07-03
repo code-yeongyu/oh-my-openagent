@@ -1,4 +1,6 @@
-packages/omo-pi/vendor/coding-agent/src/package-manager-cli.ts:556:				console.log(chalk.yellow("omoai self-update is managed by the omo repo - reinstall from a new tarball"));
-packages/omo-pi/vendor/coding-agent/src/cli.ts:64:	console.log("omoai self-update is managed by the omo repo - reinstall from a new tarball");
+packages/omo-pi/vendor/coding-agent/src/package-manager-cli.ts: extension update remains before self-update no-op
+packages/omo-pi/vendor/coding-agent/src/cli.ts: bootstrap self-update is disabled
 SELFUPDATE-DEAD
+SELFUPDATE-DEAD-EXTENSIONS-LIVE
 rc=0
+cleanup: no runtime resources spawned

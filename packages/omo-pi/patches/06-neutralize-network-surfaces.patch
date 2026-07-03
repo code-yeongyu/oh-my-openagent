@@ -83,7 +83,7 @@ index 088c2e9d2..250914ca6 100644
  
  	private getMarkdownThemeWithSettings(): MarkdownTheme {
 diff --git a/coding-agent/src/package-manager-cli.ts b/coding-agent/src/package-manager-cli.ts
-index 7bc973d2c..6a1e8945f 100644
+index 7bc973d2c..ef0d50a94 100644
 --- a/coding-agent/src/package-manager-cli.ts
 +++ b/coding-agent/src/package-manager-cli.ts
 @@ -1,54 +1,18 @@
@@ -142,18 +142,10 @@ index 7bc973d2c..6a1e8945f 100644
  interface PackageCommandOptions {
  	command: PackageCommand;
  	source?: string;
-@@ -346,121 +310,6 @@ function parsePackageCommand(args: string[]): PackageCommandOptions | undefined
- 	};
+@@ -354,113 +318,6 @@ function updateTargetIncludesExtensions(target: UpdateTarget): boolean {
+ 	return target.type === "all" || target.type === "extensions";
  }
  
--function updateTargetIncludesSelf(target: UpdateTarget): boolean {
--	return target.type === "all" || target.type === "self";
--}
--
--function updateTargetIncludesExtensions(target: UpdateTarget): boolean {
--	return target.type === "all" || target.type === "extensions";
--}
--
 -function printSelfUpdateUnavailable(
 -	npmCommand?: string[],
 -	updatePackageTarget: SelfUpdatePackageTarget = PACKAGE_NAME,
@@ -264,26 +256,10 @@ index 7bc973d2c..6a1e8945f 100644
  function parseProjectTrustOverride(args: readonly string[]): boolean | undefined {
  	let trustOverride: boolean | undefined;
  	for (const arg of args) {
-@@ -703,62 +552,8 @@ export async function handlePackageCommand(
- 			}
- 
- 			case "update": {
--				const target = options.updateTarget ?? { type: "self" };
--				if (options.showExtensionsSkippedNote) {
--					console.log(
--						chalk.dim(`Extensions are skipped. Run ${APP_NAME} update --extensions to update extensions.`),
--					);
--				}
--				if (updateTargetIncludesExtensions(target)) {
--					const updateSource = target.type === "extensions" ? target.source : undefined;
--					await packageManager.update(updateSource);
--					if (updateSource) {
--						console.log(chalk.green(`Updated ${updateSource}`));
--					} else {
--						console.log(chalk.green("Updated packages"));
--					}
--				}
--				if (updateTargetIncludesSelf(target)) {
+@@ -719,45 +576,8 @@ export async function handlePackageCommand(
+ 					}
+ 				}
+ 				if (updateTargetIncludesSelf(target)) {
 -					const selfUpdatePlan = await getSelfUpdatePlan(options.force);
 -					if (!selfUpdatePlan.shouldRun) {
 -						return true;
@@ -323,12 +299,11 @@ index 7bc973d2c..6a1e8945f 100644
 -						return true;
 -					}
 -					console.log(chalk.green(`Updated ${APP_NAME} from ${VERSION} to ${selfUpdatePlan.version}`));
--				}
-+				// omo-pi: self-update disabled
-+				console.log(chalk.yellow("omoai self-update is managed by the omo repo - reinstall from a new tarball"));
++					// omo-pi: self-update disabled
++					console.log(chalk.yellow("omoai self-update is managed by the omo repo - reinstall from a new tarball"));
+ 				}
  				return true;
  			}
- 		}
 diff --git a/coding-agent/src/utils/version-check.ts b/coding-agent/src/utils/version-check.ts
 index 3555c83f5..b2556e887 100644
 --- a/coding-agent/src/utils/version-check.ts

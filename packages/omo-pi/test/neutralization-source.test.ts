@@ -25,10 +25,15 @@ describe("omo-pi network surface neutralization", () => {
 		const markerIndex = indexAfter(source, "// omo-pi: self-update disabled", caseIndex);
 		const messageIndex = indexAfter(source, disabledSelfUpdateMessage, markerIndex);
 		const returnIndex = indexAfter(source, "return true;", messageIndex);
+		const extensionPredicateIndex = indexAfter(source, "updateTargetIncludesExtensions(target)", caseIndex);
+		const extensionUpdateIndex = indexAfter(source, "await packageManager.update(updateSource)", extensionPredicateIndex);
+		const selfPredicateIndex = indexAfter(source, "updateTargetIncludesSelf(target)", extensionUpdateIndex);
 		const planIndex = source.indexOf("getSelfUpdatePlan", caseIndex);
 		const latestIndex = source.indexOf("getLatestPiRelease", caseIndex);
 		const runIndex = source.indexOf("runSelfUpdate", caseIndex);
 
+		expect(extensionUpdateIndex).toBeLessThan(selfPredicateIndex);
+		expect(selfPredicateIndex).toBeLessThan(markerIndex);
 		for (const index of [planIndex, latestIndex, runIndex]) {
 			if (index >= 0) {
 				expect(markerIndex).toBeLessThan(index);

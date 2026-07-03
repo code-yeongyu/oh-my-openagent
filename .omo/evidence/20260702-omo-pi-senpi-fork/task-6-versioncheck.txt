@@ -1,2 +1,3 @@
 VERSIONCHECK-DEAD
 rc=0
+cleanup: no runtime resources spawned
