@@ -1,3 +1,7 @@
+import { spawn } from "node:child_process"
+import { accessSync, constants, existsSync } from "node:fs"
+import { delimiter, join } from "node:path"
+
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 
 const STATUS_ARGS = ["ulw-loop", "status", "--json"] as const
@@ -96,10 +100,7 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
 function resolveOmoBin(): string | null {
   const envBin = process.env.OMO_BIN?.trim()
   if (envBin) return envBin
-  const result = Bun.spawnSync(["which", "omo"], { stdout: "pipe", stderr: "pipe" })
-  if (result.exitCode !== 0) return null
-  const resolved = result.stdout.toString("utf8").trim()
-  return resolved.length > 0 ? resolved : null
+  return findExecutableOnPath("omo")
 }
 
 async function runOmoCommand(
@@ -107,13 +108,23 @@ async function runOmoCommand(
   args: readonly string[],
   options: { cwd: string },
 ): Promise<{ code: number; stdout: string }> {
-  const process = Bun.spawn([bin, ...args], {
-    cwd: options.cwd,
-    stdout: "pipe",
-    stderr: "pipe",
+  return new Promise((resolve) => {
+    const child = spawn(bin, [...args], {
+      cwd: options.cwd,
+      stdio: ["ignore", "pipe", "pipe"],
+    })
+
+    const stdoutChunks: Buffer[] = []
+    child.stdout.on("data", (chunk) => {
+      stdoutChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)))
+    })
+    child.on("error", () => {
+      resolve({ code: 1, stdout: Buffer.concat(stdoutChunks).toString("utf8") })
+    })
+    child.on("close", (code) => {
+      resolve({ code: code ?? 1, stdout: Buffer.concat(stdoutChunks).toString("utf8") })
+    })
   })
-  const [stdout, code] = await Promise.all([new Response(process.stdout).text(), process.exited])
-  return { code, stdout }
 }
 
 async function readActiveStatus(
@@ -170,6 +181,41 @@ function cwdFromContext(value: unknown): string {
   return process.cwd()
 }
 
+function findExecutableOnPath(command: string): string | null {
+  const pathValue = process.env.PATH
+  if (!pathValue) return null
+  for (const directory of pathValue.split(delimiter)) {
+    if (!directory) continue
+    for (const candidate of executableCandidates(directory, command)) {
+      if (isExecutableFile(candidate)) return candidate
+    }
+  }
+  return null
+}
+
+function executableCandidates(directory: string, command: string): string[] {
+  if (process.platform !== "win32") return [join(directory, command)]
+  const extensions = (process.env.PATHEXT || ".COM;.EXE;.BAT;.CMD")
+    .split(";")
+    .filter((extension) => extension.length > 0)
+  return [join(directory, command), ...extensions.map((extension) => join(directory, `${command}${extension.toLowerCase()}`))]
+}
+
+function isExecutableFile(file: string): boolean {
+  if (!existsSync(file)) return false
+  try {
+    accessSync(file, constants.X_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+export const __testInternals = {
+  resolveOmoBin,
+  runOmoCommand,
 }

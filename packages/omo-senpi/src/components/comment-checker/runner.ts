@@ -1,4 +1,6 @@
+import { spawn } from "node:child_process"
 import { existsSync } from "node:fs"
+import { Readable } from "node:stream"
 
 import {
   runCommentChecker,
@@ -15,10 +17,16 @@ export async function defaultRunCommentChecker(input: RunCommentCheckerInput): P
 }
 
 function spawnCommentChecker(args: readonly string[]): SpawnProcess {
-  const subprocess = Bun.spawn([...args], {
-    stdin: "pipe",
-    stdout: "pipe",
-    stderr: "pipe",
+  const [command, ...commandArgs] = args
+  if (command === undefined) {
+    throw new Error("comment-checker command is required")
+  }
+  const subprocess = spawn(command, commandArgs, {
+    stdio: ["pipe", "pipe", "pipe"],
+  })
+  const exited = new Promise<number>((resolve) => {
+    subprocess.on("error", () => resolve(1))
+    subprocess.on("close", (code) => resolve(code ?? 1))
   })
   return {
     stdin: {
@@ -29,9 +37,9 @@ function spawnCommentChecker(args: readonly string[]): SpawnProcess {
         subprocess.stdin.end()
       },
     },
-    stdout: subprocess.stdout,
-    stderr: subprocess.stderr,
-    exited: subprocess.exited,
+    stdout: Readable.toWeb(subprocess.stdout),
+    stderr: Readable.toWeb(subprocess.stderr),
+    exited,
     kill(signal) {
       subprocess.kill(signal)
     },

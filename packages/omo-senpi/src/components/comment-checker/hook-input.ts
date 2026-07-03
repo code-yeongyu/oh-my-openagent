@@ -111,13 +111,13 @@ export function parseToolResultContext(value: unknown): ToolResultContextLike {
     sessionManager: {
       getSessionId: isUnknownFunction(getSessionIdValue)
         ? () => {
-            const sessionId = getSessionIdValue()
+            const sessionId = getSessionIdValue.call(sessionManager)
             return getString(sessionId) ?? "unknown"
           }
         : undefined,
       getSessionFile: isUnknownFunction(getSessionFileValue)
         ? () => {
-            const sessionFile = getSessionFileValue()
+            const sessionFile = getSessionFileValue.call(sessionManager)
             return getString(sessionFile)
           }
         : undefined,
