@@ -27,6 +27,6 @@
 		"check": "npm run build && npm test",
 		"sync:hooks": "node scripts/sync-hook-status-messages.mjs",
 		"sync:skills": "node scripts/sync-skills.mjs",
-		"test": "node --test test/*.test.mjs"
+		"test": "node scripts/run-node-test-files.mjs"
 	}
 }
