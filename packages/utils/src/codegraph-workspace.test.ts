@@ -1,11 +1,12 @@
 import { describe, expect, it } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
 import {
   ensureCodegraphGitignored,
   prepareCodegraphWorkspace,
+  pruneDeadCodegraphProjectStores,
   pruneCodegraphStore,
   sanitizeBase,
   shouldExcludeCodegraphProject,
@@ -185,6 +186,38 @@ describe("CodeGraph workspace helpers", () => {
     rmSync(homeDir, { force: true, recursive: true })
   })
 
+  it("prunes dead project stores without recursively sizing cache contents", () => {
+    if (process.platform === "win32") return
+
+    // given
+    const homeDir = tempDir("home")
+    const liveSource = tempDir("live-source")
+    const deadSource = tempDir("dead-source")
+    mkdirSync(liveSource, { recursive: true })
+    mkdirSync(deadSource, { recursive: true })
+    const liveProject = prepareCodegraphWorkspace(liveSource, { homeDir })
+    const deadProject = prepareCodegraphWorkspace(deadSource, { homeDir })
+    const unreadableCacheDir = join(liveProject.dataDir, "huge-cache")
+    mkdirSync(unreadableCacheDir, { recursive: true })
+    chmodSync(unreadableCacheDir, 0)
+    rmSync(deadSource, { force: true, recursive: true })
+
+    try {
+      // when
+      const result = pruneDeadCodegraphProjectStores({ homeDir })
+
+      // then
+      expect(result.removed).toContain(deadProject.dataDir)
+      expect(result.removed).not.toContain(liveProject.dataDir)
+      expect(existsSync(deadProject.dataDir)).toBe(false)
+      expect(existsSync(liveProject.dataDir)).toBe(true)
+    } finally {
+      if (existsSync(unreadableCacheDir)) chmodSync(unreadableCacheDir, 0o700)
+      rmSync(liveSource, { force: true, recursive: true })
+      rmSync(homeDir, { force: true, recursive: true })
+    }
+  })
+
   it("excludes POSIX tmp roots and OMO state directories from CodeGraph projects", () => {
     // given
     const tmpWorkspace = process.platform === "win32" ? null : mkdtempSync(join("/tmp", "omo-codegraph-excluded-"))
@@ -223,6 +256,24 @@ describe("CodeGraph workspace helpers", () => {
     expect(shouldExcludeCodegraphProject(excludedWorkspace, options)).toEqual({
       excluded: true,
       matchedRoot: "~/research-cache",
+      reason: "custom-root",
+    })
+    expect(shouldExcludeCodegraphProject(allowedWorkspace, options)).toEqual({
+      excluded: false,
+    })
+  })
+
+  it("resolves relative custom excluded roots from the configured home directory", () => {
+    // given
+    const homeDir = tempDir("home")
+    const excludedWorkspace = join(homeDir, "research-cache", "repo")
+    const allowedWorkspace = join(homeDir, "other-cache", "repo")
+    const options = { excludedRoots: ["research-cache"], homeDir, platform: "win32" as const }
+
+    // then
+    expect(shouldExcludeCodegraphProject(excludedWorkspace, options)).toEqual({
+      excluded: true,
+      matchedRoot: "research-cache",
       reason: "custom-root",
     })
     expect(shouldExcludeCodegraphProject(allowedWorkspace, options)).toEqual({

@@ -13,7 +13,7 @@ import {
   symlinkSync,
 } from "node:fs"
 import { homedir } from "node:os"
-import { basename, join, resolve } from "node:path"
+import { basename, isAbsolute, join, resolve } from "node:path"
 
 export type CodegraphWorkspaceMode = "global-linked" | "in-place-fallback" | "in-project"
 export type CodegraphProjectExclusionReason = "custom-root" | "omo-state" | "tmp-root"
@@ -109,6 +109,11 @@ function expandHome(path: string, homeDir: string): string {
   return path
 }
 
+function resolveConfiguredRoot(path: string, homeDir: string): string {
+  const expanded = expandHome(path, homeDir)
+  return realpathIfPossible(isAbsolute(expanded) ? expanded : join(homeDir, expanded))
+}
+
 function realpathIfPossible(path: string): string {
   try {
     return realpathSync(path)
@@ -158,7 +163,7 @@ export function shouldExcludeCodegraphProject(
   for (const root of options.excludedRoots ?? []) {
     const trimmedRoot = root.trim()
     if (trimmedRoot.length === 0) continue
-    const resolvedRoot = realpathIfPossible(resolve(expandHome(trimmedRoot, homeDir)))
+    const resolvedRoot = resolveConfiguredRoot(trimmedRoot, homeDir)
     if (pathIsWithin(resolvedWorkspace, resolvedRoot, platform)) {
       return { excluded: true, matchedRoot: root, reason: "custom-root" }
     }
@@ -310,12 +315,19 @@ export function pruneCodegraphStore(options: PruneCodegraphStoreOptions): PruneC
 }
 
 export function pruneDeadCodegraphProjectStores(options: { readonly homeDir?: string } = {}): PruneCodegraphStoreResult {
-  return pruneCodegraphStore({
-    ...(options.homeDir === undefined ? {} : { homeDir: options.homeDir }),
-    maxAgeDays: Number.POSITIVE_INFINITY,
-    maxBytes: Number.POSITIVE_INFINITY,
-    pruneMissingSources: true,
-  })
+  const projectsDir = join(codegraphDataRoot(options.homeDir ?? homedir()), "projects")
+  const removed: string[] = []
+  if (!existsSync(projectsDir)) return { remainingBytes: 0, removed }
+
+  for (const entry of readdirSync(projectsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const projectDir = join(projectsDir, entry.name)
+    if (!recordedSourceIsMissing(projectDir)) continue
+    rmSync(projectDir, { force: true, recursive: true })
+    removed.push(projectDir)
+  }
+
+  return { remainingBytes: 0, removed }
 }
 
 export function ensureCodegraphGitignored(workspace: string): boolean {
