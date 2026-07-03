@@ -125,6 +125,64 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     })
   })
 
+  test("security orchestrator, validator, and prover use high-reasoning fallback profiles", () => {
+    // given
+    const highReasoningAgents = [
+      "security-orchestrator",
+      "security-validator",
+      "security-prover",
+    ] as const
+
+    // when / then
+    for (const agentName of highReasoningAgents) {
+      const requirement = AGENT_MODEL_REQUIREMENTS[agentName]
+      const primary = requirement.fallbackChain[0]
+
+      expect(primary).toEqual({
+        providers: ["openai", "github-copilot", "opencode", "vercel"],
+        model: "gpt-5.5",
+        variant: "high",
+      })
+      expect(requirement.fallbackChain.some((entry) => entry.model === "claude-opus-4-7")).toBe(true)
+      expect(requirement.fallbackChain.some((entry) => entry.model === "gemini-3.1-pro")).toBe(true)
+    }
+  })
+
+  test("security recon and deduper use fast high-volume fallback profiles", () => {
+    // given
+    const fastAgents = ["security-recon", "security-deduper"] as const
+
+    // when / then
+    for (const agentName of fastAgents) {
+      const requirement = AGENT_MODEL_REQUIREMENTS[agentName]
+      const primary = requirement.fallbackChain[0]
+
+      expect(primary).toEqual({ providers: ["openai"], model: "gpt-5.4-mini-fast" })
+      expect(requirement.fallbackChain.some((entry) => entry.model === "qwen3.5-plus")).toBe(true)
+      expect(requirement.fallbackChain.some((entry) => entry.model === "MiniMax-M3")).toBe(true)
+    }
+  })
+
+  test("security scanner uses medium reasoning before cheaper scanning fallbacks", () => {
+    // given
+    const scanner = AGENT_MODEL_REQUIREMENTS["security-scanner"]
+
+    // when
+    const primary = scanner.fallbackChain[0]
+    const sonnetFallback = scanner.fallbackChain[1]
+
+    // then
+    expect(primary).toEqual({
+      providers: ["openai", "github-copilot", "opencode", "vercel"],
+      model: "gpt-5.5",
+      variant: "medium",
+    })
+    expect(sonnetFallback).toEqual({
+      providers: ["anthropic", "github-copilot", "opencode", "vercel"],
+      model: "claude-sonnet-4-6",
+    })
+  })
+
   test("prometheus has claude-opus-4-7 as primary", () => {
     // given
     const prometheus = AGENT_MODEL_REQUIREMENTS["prometheus"]
