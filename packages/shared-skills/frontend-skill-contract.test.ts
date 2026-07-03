@@ -87,8 +87,11 @@ describe("frontend skill live-URL clone contract", () => {
 
 	test("#given any frontend design task #when defining done #then visual QA is bound and slop animation is forbidden", async () => {
 		const text = await Bun.file(frontendSkillPath).text()
+		const earlyPrompt = text.slice(0, 1400)
 		const axioms = sectionBetween(text, "## Shared axioms", "## When to load something else instead")
 
+		expect(earlyPrompt).toContain("Non-negotiable completion gate")
+		expect(earlyPrompt).toContain("run `/visual-qa`")
 		expect(axioms).toContain("Slop animation")
 		expect(axioms).toContain("hover")
 		expect(axioms.toLowerCase()).toContain("visual-qa")
