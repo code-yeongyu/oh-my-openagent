@@ -9,11 +9,16 @@ import { fileURLToPath } from "node:url"
 const WORKSPACE_ROOT = resolve(import.meta.dir, "../../../..")
 const MARKDOWN_REFERENCE_DEFINITION_RE = /^ {0,3}\[([^\]\n]+)\]:\s+(\S+)/
 const MAINTAINER_LOCAL_PATH_RE = /file:\/\/\/(?:Users|home)\/|(?:^|[\s(`'"])(?:\/Users|\/home)\//
+const OMO_PI_FENCED_PATH_PREFIXES = ["packages/omo-pi/vendor/", "packages/omo-pi/test-dist/"] as const
+
+function isAuditedMarkdownPath(relativePath: string): boolean {
+  return !OMO_PI_FENCED_PATH_PREFIXES.some((prefix) => relativePath.startsWith(prefix))
+}
 
 function collectMarkdownFiles(): string[] {
   const output = Bun.spawnSync(["git", "ls-files", "*.md"], { cwd: WORKSPACE_ROOT, stdout: "pipe" })
   expect(output.exitCode).toBe(0)
-  return output.stdout.toString("utf-8").trim().split("\n").filter(Boolean).map((filePath) => resolve(WORKSPACE_ROOT, filePath))
+  return output.stdout.toString("utf-8").trim().split("\n").filter(Boolean).filter(isAuditedMarkdownPath).map((filePath) => resolve(WORKSPACE_ROOT, filePath))
 }
 
 function stripFencedCodeBlocks(markdown: string): string {
@@ -142,6 +147,12 @@ function collectMaintainerLocalPathLines(markdown: string): number[] {
 }
 
 describe("markdown local link audit", () => {
+  test("#given omo-pi fenced trees #when collecting markdown candidates #then only vendored and generated paths are skipped", () => {
+    expect(isAuditedMarkdownPath("packages/omo-pi/vendor/coding-agent/CHANGELOG.md")).toBe(false)
+    expect(isAuditedMarkdownPath("packages/omo-pi/test-dist/README.md")).toBe(false)
+    expect(isAuditedMarkdownPath("packages/omo-pi/README.md")).toBe(true)
+  })
+
   test("#given external markdown links #when resolving targets #then http and https links are ignored", () => {
     expect(resolveMarkdownTarget("docs/AGENTS.md", "http://example.com/readme.md")).toBeUndefined()
     expect(resolveMarkdownTarget("docs/AGENTS.md", "https://example.com/readme.md")).toBeUndefined()

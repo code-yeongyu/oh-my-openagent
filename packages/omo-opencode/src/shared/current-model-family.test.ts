@@ -9,9 +9,11 @@ const LEGACY_GPT_MODEL_RE = /gpt-5(?:\.|-)(?:2|3)(?![-\s]codex(?:\b|-|\.|_))(?:\
 const ALLOWED_LEGACY_REFERENCES = new Set([
   "packages/omo-opencode/src/generated/model-capabilities.generated.json",
 ])
+const OMO_PI_FENCED_PATH_PREFIXES = ["packages/omo-pi/vendor/", "packages/omo-pi/test-dist/"] as const
 
 function isActiveSurface(path: string): boolean {
   if (!ACTIVE_SURFACE_EXTENSIONS.test(path)) return false
+  if (OMO_PI_FENCED_PATH_PREFIXES.some((prefix) => path.startsWith(prefix))) return false
   if (path.includes("/node_modules/")) return false
   if (path.includes("/dist/")) return false
   if (path.startsWith("packages/lsp-tools-mcp/")) return false
@@ -24,6 +26,12 @@ function isActiveSurface(path: string): boolean {
 }
 
 describe("current model family references", () => {
+  test("#given omo-pi fenced trees #when classifying active surfaces #then vendored and generated paths are skipped exactly", () => {
+    expect(isActiveSurface("packages/omo-pi/vendor/ai/src/models.ts")).toBe(false)
+    expect(isActiveSurface("packages/omo-pi/test-dist/output.md")).toBe(false)
+    expect(isActiveSurface("packages/omo-pi/src/index.ts")).toBe(true)
+  })
+
   test("#given active repo surfaces #when scanned for legacy GPT models #then they use the GPT-5.5 family", async () => {
     // given
     const grepResult = Bun.spawnSync(["git", "grep", "-l", "-I", "-i", "-P", LEGACY_GPT_MODEL_RE.source, "--", "."], {

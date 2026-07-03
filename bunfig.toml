@@ -1,6 +1,6 @@
 [test]
 preload = ["./test-setup.ts"]
-pathIgnorePatterns = ["packages/web/**", "packages/lsp-tools-mcp/**", "packages/lsp-daemon/**", "packages/omo-codex/plugin/**", "packages/omo-codex/scripts/**", "packages/shared-skills/upstreams/**"]
+pathIgnorePatterns = ["packages/web/**", "packages/lsp-tools-mcp/**", "packages/lsp-daemon/**", "packages/omo-codex/plugin/**", "packages/omo-codex/scripts/**", "packages/shared-skills/upstreams/**", "packages/omo-pi/vendor/**", "packages/omo-pi/test-dist/**"]
 
 [loader]
 ".md" = "text"
