@@ -1,6 +1,6 @@
 # shared-skills — Cross-Harness SKILL.md Bundle (Skills)
 
-**Generated:** 2026-06-17
+**Generated:** 2026-07-03
 
 ## OVERVIEW
 
@@ -18,9 +18,15 @@ Per-skill layout: `SKILL.md` (YAML frontmatter `name:` + single-line `descriptio
 skills/ (source)
   ├─ build:shared-skills-assets (root) → cp -R skills dist/skills          # literal copy, no transform
   ├─ skills-loader-core → loadSkillsFromDir(sharedSkillsRootPath(), scope:"shared")   # OpenCode runtime
-  └─ omo-codex/plugin/scripts/sync-skills.mjs → plugin/skills/             # copy + adaptSkillForCodex()
-        (inserts Codex Harness Tool Compatibility sections; overlays start-work/review-work;
-         filters out tests, caches, and source metadata) → ships to ~/.codex/.../skills/
+  └─ omo-codex/plugin/scripts/sync-skills.mjs → plugin/skills/             # the only transformer
+        1. copies 7 omo-codex COMPONENT skills FIRST (comment-checker, lsp, rules, teammode,
+           ulw-loop, ulw-plan, ultrawork from plugin/components/*/skills/*); same-named shared
+           skills are skipped → ulw-plan/ultrawork in Codex come from components, NOT from here
+        2. copies remaining shared skills EXCEPT ultraresearch (codexHiddenSharedSkillNames)
+        3. adaptSkillForCodex(): inserts Codex Harness Tool Compatibility sections; overlays
+           start-work/review-work/ulw-research; writes agents/openai.yaml display metadata
+           with the "(OmO) " prefix; filters out tests, caches, and source metadata
+        → ships to ~/.codex/.../skills/
 ```
 
 ## FRONTEND THIRD-PARTY REFS — SUBMODULE-ONLY + BUILD-MATERIALIZE (DMCA-safe)
@@ -53,4 +59,6 @@ upstreams/{open-design,taste-skill,ui-ux-pro-max,designpowers}   # pinned submod
 - **Test files, caches, and source metadata are excluded** when Codex copies skills.
 - **`lcx-` prefix = Codex-only** (no OpenCode counterpart). Frontmatter has NO `location:` field (unlike `.agents/skills/`).
 - **Packaging is pinned** by `omo-opencode/src/shared-skills-package.test.ts` (workspace inclusion + `files` entries + every skill parses).
+- **Skill CONTENT is pinned by contract tests** — edit a skill and its contract test together: `frontend-skill-contract.test.ts` (concrete-reference / Aside provenance / live-URL clone via getComputedStyle / seeded imagen drafts / slop-animation ban), `skills/visual-qa/scripts/skill-prompt-contract.test.ts` (motion capture, CJK, Node `visual-qa.mjs` bundle — not `bun cli.ts`), `depersonalization-gate.test.ts` (personal tokens scrubbed from ultimate-browsing + ulw-research), `frontend-thirdparty-manifest.test.ts`, `upstreams.test.ts`, plus Codex-side `omo-codex/plugin/test/ulw-research-epistemic-contract.test.mjs` (claim-graph is the single claim store; "claim ledger" wording is banned) and `omo-codex/plugin/components/ulw-loop/test/skill-contract.test.ts`.
+- **ulw-plan is dual-maintained by hand** (here AND `omo-codex/plugin/components/ultrawork/skills/ulw-plan/`) — sync-skills does NOT copy the shared version to Codex; keep both in step.
 - Parent: [`packages/AGENTS.md`](../AGENTS.md).
