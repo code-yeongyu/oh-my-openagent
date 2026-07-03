@@ -1,0 +1,43 @@
+Scenario: Workspace resolves and audit passes
+Command: bun install --frozen-lockfile
+
+  tui.js  2.0 MB  (entry point)
+
+$ bun run build:materialize-frontend && rm -rf dist/skills && cp -R packages/shared-skills/skills dist/skills
+$ node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict
+[materialize] wrote 147 frontend reference files from submodules
+$ bun run script/patch-node-require-shim.ts
+Patched Node/Electron require shim in dist/index.js
+Bundled 836 modules in 33ms
+
+  index.js  2.99 MB  (entry point)
+
+$ bun run script/build-cli-node.ts
+built dist/cli-node (1 output)
+$ bun run script/build-codex-install.ts
+$ bun run script/build-schema.ts
+Generating JSON Schema...
+✓ JSON Schema generated: assets/oh-my-opencode.schema.json
+
+Checked 496 installs across 536 packages (no changes) [12.61s]
+rc1=0
+Command: bun test script/package-registration-audit.test.ts
+bun test v1.3.14 (0d9b296a)
+
+script/package-registration-audit.test.ts:
+(pass) package registration audit > #given managed packages #when root registration is audited #then workspaces typecheck and dev deps stay aligned [1.55ms]
+(pass) package registration audit > #given shared extraction guard #when audited #then every core package is covered [0.27ms]
+(pass) package registration audit > #given package test scripts #when nested tests exist #then recursive globs are registered [4.06ms]
+(pass) package registration audit > #given package dependencies #when ROADMAP layers are checked #then reverse edges stay at zero [0.88ms]
+(pass) package registration audit > #given exact re-export shim scan #when inventory docs are checked #then total targets and every path are present [85.16ms]
+
+ 5 pass
+ 0 fail
+ 10 expect() calls
+Ran 5 tests across 1 file. [150.00ms]
+rc2=0
+Command: cleanup packages/omo-codex postinstall churn
+packages/omo-codex/plugin/components/codegraph/dist/serve.js
+packages/omo-codex/scripts/install-dist/install-local.mjs
+omo_codex_remaining=0
+CLEAN

@@ -29,7 +29,7 @@ const mcpPackagePaths: readonly string[] = [
   "packages/lsp-daemon",
   "packages/lsp-tools-mcp",
 ] as const
-const adapterPackagePaths: readonly string[] = ["packages/omo-codex", "packages/omo-opencode"] as const
+const adapterPackagePaths: readonly string[] = ["packages/omo-codex", "packages/omo-opencode", "packages/omo-pi"] as const
 const skillPackagePaths: readonly string[] = ["packages/shared-skills"] as const
 const shimSourceRoots: readonly string[] = ["packages/omo-opencode/src", "packages/omo-codex/src"] as const
 const reExportShimFirstLinePattern = /^export (\*|\{).*from ["'](@oh-my-opencode\/[^/"']+)/

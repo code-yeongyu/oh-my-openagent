@@ -1,0 +1,15 @@
+Scenario: Dependency mirror is in sync
+Command: cd packages/omo-pi && bun test test/dep-mirror.test.ts
+bun test v1.3.14 (0d9b296a)
+
+test/dep-mirror.test.ts:
+(pass) package dependency blocks mirror vendored senpi manifests [52.56ms]
+
+ 1 pass
+ 0 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [59.00ms]
+rc1=0
+Command: cd packages/omo-pi && node scripts/mirror-deps.mjs --check
+DEPS-IN-SYNC
+rc2=0
