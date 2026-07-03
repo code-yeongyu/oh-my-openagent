@@ -8523,8 +8523,12 @@ function readBooleanSetting(sectionText, key) {
 async function updateCodexConfig(input) {
   await mkdir5(dirname6(input.configPath), { recursive: true });
   let config = "";
-  if (await exists(input.configPath))
+  try {
     config = await readFile10(input.configPath, "utf8");
+  } catch (error) {
+    if (!(isNodeErrorWithCode(error) && error.code === "ENOENT"))
+      throw error;
+  }
   const pluginSet = new Set(input.pluginNames);
   for (const legacyMarketplaceName of legacyMarketplaceNames(input.marketplaceName)) {
     config = removeMarketplaceBlock(config, legacyMarketplaceName);
@@ -8559,16 +8563,6 @@ async function updateCodexConfig(input) {
   await writeFileAtomic(input.configPath, `${config.trimEnd()}
 `);
 }
-async function exists(path) {
-  try {
-    await readFile10(path, "utf8");
-    return true;
-  } catch (error) {
-    if (error instanceof Error)
-      return false;
-    return false;
-  }
-}
 
 // packages/omo-codex/src/install/codex-hook-trust.ts
 import { createHash } from "node:crypto";
@@ -8588,7 +8582,7 @@ var EVENT_LABELS = new Map([
 ]);
 async function trustedHookStatesForPlugin(input) {
   const manifestPath = join17(input.pluginRoot, ".codex-plugin", "plugin.json");
-  if (!await exists2(manifestPath))
+  if (!await exists(manifestPath))
     return [];
   const manifest = JSON.parse(await readFile11(manifestPath, "utf8"));
   if (!isPlainRecord(manifest))
@@ -8596,7 +8590,7 @@ async function trustedHookStatesForPlugin(input) {
   const states = [];
   for (const hookPath of hookManifestPaths2(manifest.hooks)) {
     const hooksPath = join17(input.pluginRoot, hookPath);
-    if (!await exists2(hooksPath))
+    if (!await exists(hooksPath))
       continue;
     const parsed = JSON.parse(await readFile11(hooksPath, "utf8"));
     if (!isPlainRecord(parsed) || !isPlainRecord(parsed.hooks))
@@ -8679,7 +8673,7 @@ function canonicalJson(value) {
 function stripDotSlash2(value) {
   return value.startsWith("./") ? value.slice(2) : value;
 }
-async function exists2(path) {
+async function exists(path) {
   try {
     await readFile11(path, "utf8");
     return true;
@@ -8738,11 +8732,11 @@ var RETIRED_MANAGED_AGENT_FILES = [
 ];
 async function purgeRetiredManagedAgentFiles(input) {
   const agentsDir = join18(input.codexHome, "agents");
-  if (!await exists3(agentsDir))
+  if (!await exists2(agentsDir))
     return;
   for (const retiredAgent of RETIRED_MANAGED_AGENT_FILES) {
     const agentPath = join18(agentsDir, retiredAgent.fileName);
-    if (!await exists3(agentPath))
+    if (!await exists2(agentPath))
       continue;
     const agentStat = await lstat6(agentPath);
     if (agentStat.isDirectory() && !agentStat.isSymbolicLink())
@@ -8765,7 +8759,7 @@ async function readTextIfExists(path) {
     throw error;
   }
 }
-async function exists3(path) {
+async function exists2(path) {
   try {
     await lstat6(path);
     return true;
@@ -8785,7 +8779,7 @@ function nodeErrorCode(error) {
 var MANIFEST_FILE = ".installed-agents.json";
 async function capturePreservedAgentReasoning(input) {
   const agentsDir = join19(input.codexHome, "agents");
-  if (!await exists4(agentsDir))
+  if (!await exists3(agentsDir))
     return new Map;
   const preserved = new Map;
   const agentEntries = await readdir4(agentsDir, { withFileTypes: true });
@@ -8803,7 +8797,7 @@ async function capturePreservedAgentReasoning(input) {
 }
 async function capturePreservedAgentServiceTier(input) {
   const agentsDir = join19(input.codexHome, "agents");
-  if (!await exists4(agentsDir))
+  if (!await exists3(agentsDir))
     return new Map;
   const preserved = new Map;
   const agentEntries = await readdir4(agentsDir, { withFileTypes: true });
@@ -8861,7 +8855,7 @@ async function restorePreservedServiceTier(input) {
 }
 async function discoverBundledAgents(pluginRoot) {
   const componentsRoot = join19(pluginRoot, "components");
-  if (!await exists4(componentsRoot))
+  if (!await exists3(componentsRoot))
     return [];
   const componentEntries = await readdir4(componentsRoot, { withFileTypes: true });
   const agents = [];
@@ -8869,7 +8863,7 @@ async function discoverBundledAgents(pluginRoot) {
     if (!entry.isDirectory())
       continue;
     const agentsRoot = join19(componentsRoot, entry.name, "agents");
-    if (!await exists4(agentsRoot))
+    if (!await exists3(agentsRoot))
       continue;
     const agentEntries = await readdir4(agentsRoot, { withFileTypes: true });
     for (const file2 of agentEntries) {
@@ -8886,7 +8880,7 @@ async function replaceWithCopy(linkPath, target) {
   await copyFile(target, linkPath);
 }
 async function prepareReplacement(linkPath) {
-  if (!await exists4(linkPath))
+  if (!await exists3(linkPath))
     return;
   const entryStat = await lstat7(linkPath);
   if (entryStat.isDirectory() && !entryStat.isSymbolicLink()) {
@@ -9005,7 +8999,7 @@ function parseJsonString(value) {
     return null;
   }
 }
-async function exists4(path) {
+async function exists3(path) {
   try {
     await lstat7(path);
     return true;
@@ -9419,7 +9413,7 @@ async function findProjectLocalCodexConfigs(startDirectory, codexHome) {
         configPathsFromCwd.push(configPath);
       }
     }
-    if (await exists5(join23(current, ".git"))) {
+    if (await exists4(join23(current, ".git"))) {
       return configPathsFromCwd.length === 0 ? null : {
         projectRoot: current,
         configPaths: [...configPathsFromCwd].reverse(),
@@ -9500,7 +9494,7 @@ async function maybeLstat(path) {
     throw error;
   }
 }
-async function exists5(path) {
+async function exists4(path) {
   return await maybeLstat(path) !== null;
 }
 function nodeErrorCode3(error) {
