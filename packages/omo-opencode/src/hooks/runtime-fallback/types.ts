@@ -77,9 +77,13 @@ export interface RuntimeFallbackHook {
   dispose?: () => void
 }
 
+export type RuntimeFallbackResolvedConfig =
+  Required<Omit<RuntimeFallbackConfig, "reserved_retry_attempts" | "reserved_retry_base_delay_ms">> &
+  Pick<RuntimeFallbackConfig, "reserved_retry_attempts" | "reserved_retry_base_delay_ms">
+
 export interface HookDeps {
   ctx: RuntimeFallbackPluginInput
-  config: Required<RuntimeFallbackConfig>
+  config: RuntimeFallbackResolvedConfig
   options: RuntimeFallbackOptions | undefined
   pluginConfig: OhMyOpenCodeConfig | undefined
   sessionStates: Map<string, FallbackState>
