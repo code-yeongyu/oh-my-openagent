@@ -20,6 +20,7 @@ import * as configDir from "../shared/opencode-config-dir"
 import * as permissionCompat from "../shared/permission-compat"
 import * as modelResolver from "../shared/model-resolver"
 import * as configErrors from "../shared/config-errors"
+import { isAgentRegistered } from "../features/claude-code-session-state"
 import * as agentPriorityOrder from "./agent-priority-order"
 import * as prometheusAgentConfigBuilder from "./prometheus-agent-config-builder"
 import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
@@ -42,6 +43,7 @@ function createPluginConfig(overrides: Partial<OhMyOpenCodeConfig> = {}): OhMyOp
 }
 
 let setAdditionalAllowedMcpEnvVarsSpy: ReturnType<typeof spyOn> | undefined
+let loadBuiltinCommandsSpy: ReturnType<typeof spyOn> | undefined
 
 beforeEach(async () => {
   mock.restore()
@@ -57,7 +59,7 @@ beforeEach(async () => {
   spyOn(commandLoader, unsafeTestValue("loadOpencodeGlobalCommands")).mockResolvedValue({})
   spyOn(commandLoader, unsafeTestValue("loadOpencodeProjectCommands")).mockResolvedValue({})
 
-  spyOn(builtinCommands, unsafeTestValue("loadBuiltinCommands")).mockReturnValue({})
+  loadBuiltinCommandsSpy = spyOn(builtinCommands, unsafeTestValue("loadBuiltinCommands")).mockReturnValue({})
 
   spyOn(skillLoader, unsafeTestValue("loadUserSkills")).mockResolvedValue({})
   spyOn(skillLoader, unsafeTestValue("loadProjectSkills")).mockResolvedValue({})
@@ -114,6 +116,7 @@ afterEach(() => {
   ;(unsafeTestValue(commandLoader.loadOpencodeGlobalCommands))?.mockRestore?.()
   ;(unsafeTestValue(commandLoader.loadOpencodeProjectCommands))?.mockRestore?.()
   ;(unsafeTestValue(builtinCommands.loadBuiltinCommands))?.mockRestore?.()
+  loadBuiltinCommandsSpy = undefined
   ;(unsafeTestValue(skillLoader.loadUserSkills))?.mockRestore?.()
   ;(unsafeTestValue(skillLoader.loadProjectSkills))?.mockRestore?.()
   ;(unsafeTestValue(skillLoader.loadOpencodeGlobalSkills))?.mockRestore?.()
@@ -1502,7 +1505,7 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
 })
 
 describe("command agent routing coherence", () => {
-  test("keeps start-work aligned with the exported Atlas list key opencode matches exactly", async () => {
+  test("loads builtin commands after Atlas is registered for start-work routing", async () => {
     //#given
     const createBuiltinAgentsMock = unsafeTestValue<{
       mockResolvedValue: (value: Record<string, unknown>) => void
@@ -1510,16 +1513,6 @@ describe("command agent routing coherence", () => {
     createBuiltinAgentsMock.mockResolvedValue({
       sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
       atlas: { name: "atlas", prompt: "test", mode: "primary" },
-    })
-    ;(unsafeTestValue<{
-      mockReturnValue: (value: Record<string, unknown>) => void
-    }>(builtinCommands.loadBuiltinCommands)).mockReturnValue({
-      "start-work": {
-        name: "start-work",
-        description: "(builtin) Start work",
-        template: "template",
-        agent: "atlas",
-      },
     })
     const pluginConfig = createPluginConfig({})
     const config: Record<string, unknown> = {
@@ -1540,9 +1533,14 @@ describe("command agent routing coherence", () => {
 
     //#then
     const agentConfig = config.agent as Record<string, unknown>
-    const commandConfig = config.command as Record<string, { agent?: string }>
+    const loadBuiltinCommandsMock = unsafeTestValue<{
+      mock: { calls: Parameters<typeof builtinCommands.loadBuiltinCommands>[] }
+    }>(loadBuiltinCommandsSpy)
+    const loadBuiltinCommandsCall = loadBuiltinCommandsMock.mock.calls.at(-1)
     expect(Object.keys(agentConfig)).toContain(getAgentListDisplayName("atlas"))
-    expect(commandConfig["start-work"]?.agent).toBe(getAgentListDisplayName("atlas"))
+    expect(isAgentRegistered("atlas")).toBe(true)
+    expect(loadBuiltinCommandsCall?.[1]?.useRegisteredAgents).toBe(true)
+    expect(loadBuiltinCommandsCall?.[1]?.teamModeEnabled).toBe(false)
   })
 })
 
