@@ -36,6 +36,14 @@ function userSkill(name: string, description = "user desc"): SkillInfo {
   })
 }
 
+function opencodeNativeSkill(name: string, description = "opencode native desc"): SkillInfo {
+  const shortName = name.split("/").at(-1) ?? name
+  return makeSkill(name, description, {
+    scope: "config",
+    location: `/opencode/${shortName}.md`,
+  })
+}
+
 function makeCommand(
   name: string,
   description = "command desc",
@@ -268,5 +276,21 @@ describe("formatCombinedDescription with path-alias deduplication", () => {
     expect(result).toContain("\n    <name>/refactor</name>")
     expect(result).toContain("project refactor skill")
     expect(result).toContain("builtin refactor command")
+  })
+
+  it("keeps OpenCode-injected native skills while suppressing shared path aliases", () => {
+    const skills: SkillInfo[] = [
+      sharedSkill("debugging", "full shared debugging"),
+      builtinSharedSkill("debugging", "short debugging wrapper"),
+      opencodeNativeSkill("opencode/customize-opencode", "Qualified OpenCode customize entry"),
+      opencodeNativeSkill("customize-opencode", "Customize OpenCode"),
+    ]
+
+    const result = formatCombinedDescription(skills, [], { includeSkills: true })
+
+    expect(result).toContain("<name>/shared/debugging</name>")
+    expect(result).not.toContain("\n    <name>/debugging</name>")
+    expect(result).toContain("<name>/customize-opencode</name>")
+    expect(result).toContain("Customize OpenCode")
   })
 })

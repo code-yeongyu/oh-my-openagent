@@ -813,6 +813,65 @@ describe("skill tool - nativeSkills integration", () => {
     expect(tool.description).toContain("native-visible-skill")
   })
 
+  it("keeps OpenCode-injected native skills in the description while suppressing shared path aliases", () => {
+    //#given
+    const sharedDebuggingSkill: LoadedSkill = {
+      name: "shared/debugging",
+      path: "/repo/packages/shared-skills/skills/debugging/SKILL.md",
+      resolvedPath: "/repo/packages/shared-skills/skills/debugging",
+      definition: {
+        name: "shared/debugging",
+        description: "Full shared debugging instructions",
+        template: "Full shared debugging body",
+      },
+      scope: "shared",
+    }
+    const bareDebuggingAlias: LoadedSkill = {
+      name: "debugging",
+      path: "/repo/packages/shared-skills/skills/debugging",
+      resolvedPath: "/repo/packages/shared-skills/skills/debugging",
+      definition: {
+        name: "debugging",
+        description: "Short debugging wrapper",
+        template: "Short debugging body",
+      },
+      scope: "builtin",
+    }
+    const tool = createSkillTool({
+      skills: [sharedDebuggingSkill, bareDebuggingAlias],
+      includeSkillsInDescription: true,
+      nativeSkills: {
+        all() {
+          return [
+            {
+              name: "opencode/customize-opencode",
+              description: "Qualified OpenCode customize entry",
+              location: "/opencode/customize-opencode.md",
+              content: "Qualified OpenCode customize body",
+            },
+            {
+              name: "customize-opencode",
+              description: "Customize OpenCode",
+              location: "/opencode/customize-opencode.md",
+              content: "Customize OpenCode body",
+            },
+          ]
+        },
+        get() { return undefined },
+        dirs() { return [] },
+      },
+    })
+
+    //#when
+    const description = tool.description
+
+    //#then
+    expect(description).toContain("<name>/shared/debugging</name>")
+    expect(description).not.toContain("\n    <name>/debugging</name>")
+    expect(description).toContain("<name>/customize-opencode</name>")
+    expect(description).toContain("Customize OpenCode")
+  })
+
   it("merges native skills exposed by PluginInput.skills.all()", async () => {
     //#given
     const tool = createSkillTool({

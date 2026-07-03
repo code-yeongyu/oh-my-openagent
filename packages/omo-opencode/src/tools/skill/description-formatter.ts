@@ -65,6 +65,11 @@ function normalizeSkillLocation(location: string | undefined): string | undefine
   return normalized.toLowerCase()
 }
 
+function isOpenCodeInjectedNativeSkill(skill: SkillInfo): boolean {
+  const location = skill.location?.replaceAll("\\", "/").toLowerCase()
+  return location?.startsWith("/opencode/") ?? false
+}
+
 function hasSameSource(qualified: SkillInfo, bare: SkillInfo): boolean {
   const qualifiedLocation = normalizeSkillLocation(qualified.location)
   const bareLocation = normalizeSkillLocation(bare.location)
@@ -109,6 +114,7 @@ export function deduplicatePathAliasedSkills(skills: SkillInfo[]): SkillInfo[] {
     if (skill.name.includes("/")) return true
     const qualifiedMatches = qualifiedByShortName.get(normalizeSkillName(skill.name))
     if (!qualifiedMatches) return true
+    if (isOpenCodeInjectedNativeSkill(skill)) return true
     if (qualifiedMatches.some((qualified) => hasSameSource(qualified, skill))) return false
     if (qualifiedMatches.some((qualified) => isSuppressibleSharedDerivedBareSkill(
       qualified,
