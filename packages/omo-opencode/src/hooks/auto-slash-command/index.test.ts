@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { clearCommandLoaderCache } from "../../features/claude-code-command-loader"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 // Import real shared module to avoid mock leaking to other test files
@@ -14,6 +15,23 @@ import type {
 } from "./types"
 
 type AutoSlashCommandModule = typeof import("./hook")
+
+const ulwLoopSkillPath = fileURLToPath(
+  new URL("../../../../omo-codex/plugin/components/ulw-loop/skills/ulw-loop/SKILL.md", import.meta.url),
+)
+
+function asLoadedSkill(name: "ulw-loop"): LoadedSkill {
+  return {
+    name,
+    path: ulwLoopSkillPath,
+    definition: {
+      name,
+      description: "Goal-like loop that uses ultrawork mode to decompose work into systematic, evidence-bound steps.",
+      template: readFileSync(ulwLoopSkillPath, "utf8"),
+    },
+    scope: "builtin",
+  }
+}
 
 function createMockInput(sessionID: string, messageID?: string): AutoSlashCommandHookInput {
   return {
@@ -373,7 +391,7 @@ describe("createAutoSlashCommandHook", () => {
 
     it("should inject template for known builtin commands like ulw-loop", async () => {
       //#given
-      const hook = createAutoSlashCommandHook()
+      const hook = createAutoSlashCommandHook({ skills: [asLoadedSkill("ulw-loop")] })
       const input = createCommandInput("ulw-loop", '"Ship feature" --strategy=continue')
       const output = createCommandOutput("original")
 
@@ -383,7 +401,7 @@ describe("createAutoSlashCommandHook", () => {
       //#then
       expect(output.parts[0].text).toContain("<auto-slash-command>")
       expect(output.parts[0].text).toContain("/ulw-loop Command")
-      expect(output.parts[0].text).toContain("<user-task>")
+      expect(output.parts[0].text).toContain("Use the ulw-loop CLI state under `.omo/ulw-loop`")
       expect(output.parts[0].text).toContain('"Ship feature" --strategy=continue')
     })
 
