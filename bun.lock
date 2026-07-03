@@ -205,6 +205,7 @@
         "@oh-my-opencode/prompts-core": "workspace:*",
         "@oh-my-opencode/telemetry-core": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
+        "vscode-jsonrpc": "^8.2.1",
       },
       "devDependencies": {
         "@code-yeongyu/senpi": "2026.7.3",

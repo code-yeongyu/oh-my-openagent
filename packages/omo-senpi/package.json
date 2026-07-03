@@ -27,7 +27,8 @@
 		"@oh-my-opencode/utils": "workspace:*",
 		"@oh-my-opencode/comment-checker-core": "workspace:*",
 		"@oh-my-opencode/telemetry-core": "workspace:*",
-		"@oh-my-opencode/prompts-core": "workspace:*"
+		"@oh-my-opencode/prompts-core": "workspace:*",
+		"vscode-jsonrpc": "^8.2.1"
 	},
 	"peerDependencies": {
 		"@code-yeongyu/senpi": "*"
