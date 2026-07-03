@@ -1,4 +1,5 @@
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types";
+import { getConfigNotices } from "./lsp/config-loader.js";
 import { disposeDefaultLspManager, getLspManager } from "./lsp/manager-default.js";
 import {
 	appendPostEditDiagnostics,
@@ -35,6 +36,10 @@ export function createLspComponent(): OmoSenpiComponent {
 		register(pi, ctx) {
 			registerLspFlags(pi);
 			if (ctx.config.getFlag(LSP_TOOLS_ENABLED_FLAG) === false) return;
+
+			for (const notice of getConfigNotices()) {
+				ctx.logger.warn("omo-senpi ignored untrusted project-local LSP command", notice);
+			}
 
 			const installedServers = getAllServers().filter((server) => server.installed && !server.disabled);
 			if (installedServers.length === 0) {

@@ -20,8 +20,21 @@ interface ConfigJson {
 
 type ConfigSource = "project" | "user";
 
+const PROJECT_LSP_COMMAND_TRUST_ENV_KEYS = [
+	"OMO_SENPI_TRUST_PROJECT_LSP_COMMANDS",
+	"SENPI_TRUST_PROJECT_LSP_COMMANDS",
+] as const;
+const TRUSTED_BOOLEAN_VALUES = new Set(["1", "true", "yes", "on"]);
+
 export interface ServerWithSource extends ResolvedServer {
 	source: "project" | "user" | "builtin";
+}
+
+export interface ConfigNotice {
+	kind: "untrusted_project_lsp_command";
+	serverId: string;
+	configPath: string;
+	trustEnvKeys: readonly string[];
 }
 
 export function getConfigPaths(): { project: string; user: string } {
@@ -60,6 +73,14 @@ function parseStringRecord(value: unknown): Record<string, string> | undefined {
 		parsed[key] = entry;
 	}
 	return parsed;
+}
+
+export function isProjectLspCommandConfigTrusted(env: NodeJS.ProcessEnv = process.env): boolean {
+	for (const key of PROJECT_LSP_COMMAND_TRUST_ENV_KEYS) {
+		const value = env[key]?.trim().toLowerCase();
+		if (value !== undefined && TRUSTED_BOOLEAN_VALUES.has(value)) return true;
+	}
+	return false;
 }
 
 function parseLspEntry(value: unknown): LspEntry | null {
@@ -112,6 +133,7 @@ export function getMergedServers(): ServerWithSource[] {
 	const servers: ServerWithSource[] = [];
 	const disabled = new Set<string>();
 	const seen = new Set<string>();
+	const projectCommandsTrusted = isProjectLspCommandConfigTrusted();
 
 	const sources: ConfigSource[] = ["project", "user"];
 
@@ -127,6 +149,7 @@ export function getMergedServers(): ServerWithSource[] {
 
 			if (seen.has(id)) continue;
 			if (!entry.command || !entry.extensions) continue;
+			if (source === "project" && !projectCommandsTrusted) continue;
 
 			servers.push({
 				id,
@@ -164,6 +187,25 @@ export function getMergedServers(): ServerWithSource[] {
 		}
 		return b.priority - a.priority;
 	});
+}
+
+export function getConfigNotices(): ConfigNotice[] {
+	const paths = getConfigPaths();
+	const configs = loadAllConfigs();
+	const project = configs.get("project");
+	if (!project?.lsp || isProjectLspCommandConfigTrusted()) return [];
+
+	const notices: ConfigNotice[] = [];
+	for (const [serverId, entry] of Object.entries(project.lsp)) {
+		if (entry.disabled || !entry.command) continue;
+		notices.push({
+			kind: "untrusted_project_lsp_command",
+			serverId,
+			configPath: paths.project,
+			trustEnvKeys: PROJECT_LSP_COMMAND_TRUST_ENV_KEYS,
+		});
+	}
+	return notices;
 }
 
 export function getDisabledServerIds(): Set<string> {
