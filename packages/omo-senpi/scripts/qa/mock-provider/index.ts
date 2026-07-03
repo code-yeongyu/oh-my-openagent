@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// allow: SIZE_OK - one-process manual QA mock provider keeps SSE, health, and chat endpoints in one launched fixture.
 declare const process: {
   argv: string[]
   cwd(): string
