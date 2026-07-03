@@ -158,9 +158,17 @@ function readRecordedSourceDir(projectDir) {
       return null;
     const sourceDir = parsed.sourceDir;
     return typeof sourceDir === "string" && sourceDir.trim().length > 0 ? sourceDir : null;
-  } catch {
-    return null;
+  } catch (error) {
+    if (isNonFatalSourceMetadataError(error))
+      return null;
+    throw error;
   }
+}
+function isNonFatalSourceMetadataError(error) {
+  if (error instanceof SyntaxError)
+    return true;
+  const code = typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
+  return typeof code === "string" && ["EACCES", "ENOENT", "ENOTDIR", "EPERM"].includes(code);
 }
 function recordedSourceIsMissing(projectDir) {
   const sourceDir = readRecordedSourceDir(projectDir);

@@ -229,6 +229,31 @@ describe("CodeGraph workspace helpers", () => {
     }
   })
 
+  it("ignores malformed source metadata while pruning valid dead project stores", () => {
+    // given
+    const homeDir = tempDir("home")
+    const liveSource = tempDir("live-source")
+    const deadSource = tempDir("dead-source")
+    mkdirSync(liveSource, { recursive: true })
+    mkdirSync(deadSource, { recursive: true })
+    const malformedProject = prepareCodegraphWorkspace(liveSource, { homeDir })
+    const deadProject = prepareCodegraphWorkspace(deadSource, { homeDir })
+    writeFileSync(join(malformedProject.dataDir, "source.json"), "{")
+    rmSync(deadSource, { force: true, recursive: true })
+
+    // when
+    const result = pruneDeadCodegraphProjectStores({ homeDir })
+
+    // then
+    expect(result.removed).toContain(deadProject.dataDir)
+    expect(result.removed).not.toContain(malformedProject.dataDir)
+    expect(existsSync(deadProject.dataDir)).toBe(false)
+    expect(existsSync(malformedProject.dataDir)).toBe(true)
+
+    rmSync(liveSource, { force: true, recursive: true })
+    rmSync(homeDir, { force: true, recursive: true })
+  })
+
   it("excludes POSIX tmp roots and OMO state directories from CodeGraph projects", () => {
     // given
     const tmpWorkspace = process.platform === "win32" ? null : mkdtempSync(join("/tmp", "omo-codegraph-excluded-"))
