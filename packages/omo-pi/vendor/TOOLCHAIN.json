@@ -1,0 +1,22 @@
+{
+  "senpiSha": "653a6af13812c55b2da6c49e982e0dcf16406d51",
+  "packageName": "senpi-monorepo",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sandbox-runtime": "0.0.26",
+    "@biomejs/biome": "2.4.16",
+    "@types/node": "25.9.1",
+    "@typescript/native-preview": "7.0.0-dev.20260604.1",
+    "esbuild": "0.28.1",
+    "husky": "9.1.7",
+    "jiti": "2.7.0",
+    "shx": "0.4.0",
+    "tsx": "4.22.1",
+    "typescript": "6.0.3"
+  },
+  "dependencies": {
+    "get-east-asian-width": "1.6.0"
+  }
+}

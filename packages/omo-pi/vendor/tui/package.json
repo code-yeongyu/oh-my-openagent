@@ -1,0 +1,48 @@
+{
+	"name": "@earendil-works/pi-tui",
+	"private": true,
+	"version": "2026.7.2",
+	"description": "Terminal User Interface library with differential rendering for efficient text-based applications",
+	"type": "module",
+	"main": "dist/index.js",
+	"scripts": {
+		"clean": "shx rm -rf dist",
+		"build": "tsgo -p tsconfig.build.json",
+		"test": "node --test --import tsx test/*.test.ts",
+		"prepublishOnly": "npm run clean && npm run build"
+	},
+	"files": [
+		"dist/**/*",
+		"native/win32/prebuilds/**/*.node",
+		"native/darwin/prebuilds/**/*.node",
+		"README.md"
+	],
+	"keywords": [
+		"tui",
+		"terminal",
+		"ui",
+		"text-editor",
+		"differential-rendering",
+		"typescript",
+		"cli"
+	],
+	"author": "Mario Zechner",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/earendil-works/pi.git",
+		"directory": "packages/tui"
+	},
+	"engines": {
+		"node": ">=24.0.0"
+	},
+	"types": "./dist/index.d.ts",
+	"dependencies": {
+		"get-east-asian-width": "1.6.0",
+		"marked": "18.0.5"
+	},
+	"devDependencies": {
+		"@xterm/headless": "5.5.0",
+		"chalk": "5.6.2"
+	}
+}

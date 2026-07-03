@@ -1,0 +1,6 @@
+{
+  "description": "Reconnect returns authoritative snapshot plus new stream and must not claim exact replay of lost deltas.",
+  "externalMethod": "resume",
+  "appServerMethods": ["thread/resume", "thread/read", "thread/turns/list", "thread/turns/items/list"],
+  "claim": "snapshot-plus-new-stream"
+}

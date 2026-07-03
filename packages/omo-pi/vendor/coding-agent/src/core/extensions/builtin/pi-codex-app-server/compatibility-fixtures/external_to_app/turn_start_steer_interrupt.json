@@ -1,0 +1,13 @@
+{
+  "description": "Turn lifecycle maps to app-server turn APIs and preserves expected-turn guard semantics.",
+  "externalMethods": ["turn/start", "turn/steer", "turn/interrupt"],
+  "appServerMethods": ["turn/start", "turn/steer", "turn/interrupt"],
+  "authoritativeIds": ["appThreadId", "appTurnId"],
+  "correlationOnly": ["externalMessageId", "externalTurnId"],
+  "routingPolicy": {
+    "turn/start": "inject bound app-server thread_id and pass externalMessageId as client_user_message_id",
+    "turn/steer": "inject bound app-server thread_id and preserve appTurnId as expected_turn_id",
+    "turn/interrupt": "inject bound app-server thread_id and preserve appTurnId as turn_id"
+  },
+  "tombstonePolicy": "reject turn routing for tombstoned external sessions with invalid-session-state"
+}

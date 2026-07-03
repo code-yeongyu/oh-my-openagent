@@ -1,0 +1,1 @@
+No runtime process, socket, port, tmux session, browser context, container, or temp dir is created by PR-001 contract fixtures.

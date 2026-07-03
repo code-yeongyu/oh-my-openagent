@@ -1,0 +1,99 @@
+{
+	"name": "@earendil-works/pi-ai",
+	"private": true,
+	"version": "2026.7.2",
+	"description": "Unified LLM API with automatic model discovery and provider configuration",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"sideEffects": [
+		"./dist/compat.js",
+		"./dist/images.js",
+		"./dist/providers/images/register-builtins.js"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./compat": {
+			"types": "./dist/compat.d.ts",
+			"import": "./dist/compat.js"
+		},
+		"./providers/*": {
+			"types": "./dist/providers/*.d.ts",
+			"import": "./dist/providers/*.js"
+		},
+		"./api/*": {
+			"types": "./dist/api/*.d.ts",
+			"import": "./dist/api/*.js"
+		},
+		"./oauth": {
+			"types": "./dist/oauth.d.ts",
+			"import": "./dist/oauth.js"
+		},
+		"./bedrock-provider": {
+			"types": "./dist/bedrock-provider.d.ts",
+			"import": "./dist/bedrock-provider.js"
+		}
+	},
+	"bin": {
+		"pi-ai": "./dist/cli.js"
+	},
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"scripts": {
+		"clean": "shx rm -rf dist",
+		"generate-models": "tsx scripts/generate-models.ts",
+		"generate-image-models": "tsx scripts/generate-image-models.ts",
+		"build": "tsgo -p tsconfig.build.json",
+		"dev": "tsgo -p tsconfig.build.json --watch --preserveWatchOutput",
+		"dev:tsc": "tsgo -p tsconfig.build.json --watch --preserveWatchOutput",
+		"test": "vitest --run",
+		"prepublishOnly": "shx rm -rf dist && tsx scripts/generate-models.ts && tsx scripts/generate-image-models.ts && tsgo -p tsconfig.build.json && shx chmod +x dist/cli.js"
+	},
+	"dependencies": {
+		"@anthropic-ai/sdk": "0.91.1",
+		"@aws-sdk/client-bedrock-runtime": "3.1048.0",
+		"@google/genai": "1.52.0",
+		"@mistralai/mistralai": "2.2.6",
+		"@opentelemetry/api": "1.9.0",
+		"@smithy/node-http-handler": "4.7.3",
+		"@smithy/types": "4.8.0",
+		"chalk": "5.6.2",
+		"http-proxy-agent": "7.0.2",
+		"https-proxy-agent": "7.0.6",
+		"openai": "6.26.0",
+		"partial-json": "0.1.7",
+		"proxy-from-env": "1.1.0",
+		"typebox": "1.1.38",
+		"yaml": "2.9.0"
+	},
+	"keywords": [
+		"ai",
+		"llm",
+		"openai",
+		"anthropic",
+		"gemini",
+		"bedrock",
+		"unified",
+		"api"
+	],
+	"author": "Mario Zechner",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/earendil-works/pi.git",
+		"directory": "packages/ai"
+	},
+	"engines": {
+		"node": ">=24.0.0"
+	},
+	"devDependencies": {
+		"@types/node": "25.9.1",
+		"canvas": "3.2.3",
+		"vitest": "4.1.9"
+	}
+}

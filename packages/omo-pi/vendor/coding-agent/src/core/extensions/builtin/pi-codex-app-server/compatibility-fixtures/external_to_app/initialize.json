@@ -1,0 +1,14 @@
+{
+  "description": "External initialize must negotiate opaque notification and callback relay before app-server initialize.",
+  "externalMethod": "initialize",
+  "requiredCapabilities": ["opaqueNotifications", "opaqueCallbacks"],
+  "appServerMethods": ["initialize", "initialized"],
+  "idPolicy": "external request ids are correlation only",
+  "appServerCapabilityFields": [
+    "experimentalApi",
+    "requestAttestation",
+    "mcpServerOpenaiFormElicitation",
+    "optOutNotificationMethods"
+  ],
+  "notificationOptOutPolicy": "route only the negotiated intersection of external notificationOptOuts and app-server optOutNotificationMethods"
+}

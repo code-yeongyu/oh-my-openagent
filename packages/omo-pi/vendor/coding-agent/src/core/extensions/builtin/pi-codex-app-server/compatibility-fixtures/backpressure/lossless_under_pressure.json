@@ -1,0 +1,6 @@
+{
+  "description": "Lossless transcript and terminal events survive pressure; best-effort progress may drop only with a lag event.",
+  "lossless": ["item/agentMessage/delta", "item/completed", "turn/completed", "serverRequest/resolved"],
+  "bestEffort": ["item/commandExecution/outputDelta", "process/outputDelta", "item/mcpToolCall/progress"],
+  "requiredBeforeNextLossless": "lag"
+}

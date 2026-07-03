@@ -1,0 +1,6 @@
+{
+  "description": "Unknown or unsupported current app-server surfaces must use an opaque envelope instead of being dropped.",
+  "externalMethod": "appServer/event",
+  "fallbackMethod": "appServer/futureMethod",
+  "streamClass": "lossless"
+}

@@ -1,0 +1,34 @@
+{
+  "description": "Session lifecycle maps to thread lifecycle while preserving app-server thread and session ids.",
+  "externalMethods": [
+    "session/new",
+    "session/resume",
+    "session/fork",
+    "session/list",
+    "session/read",
+    "session/archive",
+    "session/delete",
+    "session/unsubscribe"
+  ],
+  "appServerMethods": [
+    "thread/start",
+    "thread/resume",
+    "thread/fork",
+    "thread/list",
+    "thread/read",
+    "thread/archive",
+    "thread/delete",
+    "thread/unsubscribe"
+  ],
+  "authoritativeIds": ["appThreadId", "appSessionId"],
+  "duplicateBindingPolicy": {
+    "externalSessionId": "reject without replacing the existing binding",
+    "appThreadId": "reject when already bound to a different external session",
+    "adapterCode": "duplicate-routing-id"
+  },
+  "closePolicy": {
+    "session/archive": "tombstone after app-server success",
+    "session/delete": "tombstone after app-server success",
+    "session/unsubscribe": "unsubscribe without tombstoning"
+  }
+}

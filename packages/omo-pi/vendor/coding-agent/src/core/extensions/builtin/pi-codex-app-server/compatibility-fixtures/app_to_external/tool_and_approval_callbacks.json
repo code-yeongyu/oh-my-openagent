@@ -1,0 +1,14 @@
+{
+  "description": "Privileged callbacks are delivered losslessly and are never auto-approved.",
+  "appServerMethods": [
+    "item/commandExecution/requestApproval",
+    "item/fileChange/requestApproval",
+    "item/permissions/requestApproval",
+    "item/tool/requestUserInput",
+    "mcpServer/elicitation/request",
+    "item/tool/call",
+    "serverRequest/resolved"
+  ],
+  "streamClass": "lossless",
+  "forbiddenBehavior": "auto-approval"
+}

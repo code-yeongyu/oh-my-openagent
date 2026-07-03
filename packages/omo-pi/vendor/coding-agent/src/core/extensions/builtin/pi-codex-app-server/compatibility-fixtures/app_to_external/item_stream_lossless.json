@@ -1,0 +1,12 @@
+{
+  "description": "Text, plan, reasoning, item completion, and turn completion are lossless stream classes.",
+  "appServerMethods": [
+    "item/started",
+    "item/agentMessage/delta",
+    "item/plan/delta",
+    "item/reasoning/summaryTextDelta",
+    "item/completed",
+    "turn/completed"
+  ],
+  "streamClass": "lossless"
+}
