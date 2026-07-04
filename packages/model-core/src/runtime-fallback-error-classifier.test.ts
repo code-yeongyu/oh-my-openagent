@@ -145,6 +145,19 @@ describe("runtime fallback error classifier", () => {
     expect(retryable).toEqual(cases.map(({ expected }) => expected))
   })
 
+  test("treats free usage exceeded messages as retryable runtime fallback errors", () => {
+    //#given
+    const error = { message: "Free usage exceeded, subscribe to Go" }
+
+    //#when
+    const retryable = isRuntimeFallbackRetryableError(error, DEFAULT_RETRY_CODES)
+    const type = classifyRuntimeFallbackError(error)
+
+    //#then
+    expect(retryable).toBe(true)
+    expect(type).toBeUndefined()
+  })
+
   test("extracts provider auto-retry signals from status summary or details", () => {
     //#given
     const retryInfo = {
