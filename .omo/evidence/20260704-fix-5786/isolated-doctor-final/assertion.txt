@@ -1,0 +1,1 @@
+PASS isolated doctor tuple proof
