@@ -65,6 +65,7 @@ export async function runLazyCodexInstallLocalCli(input: {
         repoRoot: resolve(parsed.repoRoot),
         autonomousPermissions: true,
         env: input.env,
+        log: createWarningLog(input.log),
       })
       input.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`)
       return 0
@@ -77,7 +78,14 @@ export async function runLazyCodexInstallLocalCli(input: {
     repoRoot,
     autonomousPermissions: parsed.autonomousPermissions,
     env: input.env,
+    log: createWarningLog(input.log),
   })
   input.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`)
   return 0
+}
+
+function createWarningLog(log: (line: string) => void): (line: string) => void {
+  return (line) => {
+    if (line.startsWith("Warning:")) log(line)
+  }
 }

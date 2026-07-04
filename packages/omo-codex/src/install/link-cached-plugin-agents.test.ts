@@ -86,6 +86,8 @@ describe("linkCachedPluginAgents", () => {
   })
 
   test("replaces stale broken symlinks with regular files on unix", async () => {
+    if (process.platform === "win32") return
+
     // given
     const { codexHome, pluginRoot } = await makeFixture()
     const agentsDir = join(codexHome, "agents")
@@ -141,6 +143,51 @@ describe("linkCachedPluginAgents", () => {
     expect(content).toContain('model_reasoning_effort = "high"')
     expect(content).not.toContain('model_reasoning_effort = "xhigh"')
     expect((await lstat(join(agentsDir, "planner.toml"))).isSymbolicLink()).toBe(false)
+  })
+
+  test("overlays configured model settings after compatibility preservation", async () => {
+    // given
+    const { codexHome, pluginRoot } = await makeFixture()
+    const agentsDir = join(codexHome, "agents")
+    await mkdir(agentsDir, { recursive: true })
+    await writeFile(
+      join(pluginRoot, "components", "ulw-loop", "agents", "planner.toml"),
+      'name = "planner"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\n',
+    )
+    await writeFile(
+      join(agentsDir, "planner.toml"),
+      'name = "planner"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "high"\nservice_tier = "fast"\n',
+    )
+    const preservedReasoning = await capturePreservedAgentReasoning({ codexHome })
+    const preservedServiceTier = await capturePreservedAgentServiceTier({ codexHome })
+
+    // when
+    await linkCachedPluginAgents({
+      codexHome,
+      pluginRoot,
+      platform: "linux",
+      preservedReasoning,
+      preservedServiceTier,
+      agentModelOverrides: new Map([
+        [
+          "planner",
+          {
+            model: "gpt-5.4-mini",
+            modelReasoningEffort: "low",
+            serviceTier: "priority",
+          },
+        ],
+      ]),
+    })
+
+    // then
+    const content = await readFile(join(agentsDir, "planner.toml"), "utf8")
+    expect(content).toContain('model = "gpt-5.4-mini"')
+    expect(content).toContain('model_reasoning_effort = "low"')
+    expect(content).toContain('service_tier = "priority"')
+    expect(content).not.toContain('model = "gpt-5.5"')
+    expect(content).not.toContain('model_reasoning_effort = "high"')
+    expect(content).not.toContain('service_tier = "fast"')
   })
 
   test("preserves removed installed agent service tier when reinstalling file copies", async () => {

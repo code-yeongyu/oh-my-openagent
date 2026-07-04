@@ -186,6 +186,43 @@ test("#given user-tuned reasoning and service tier on an installed agent #when a
 	});
 });
 
+test("#given CODEX_HOME omo.toml model overrides #when the worker setup runs #then managed agents receive those settings", async () => {
+	await withSetupFixture(async (fixture) => {
+		await writeFile(
+			join(fixture.codexHome, "omo.toml"),
+			'[agents.explorer]\nmodel = "gpt-5.4-mini"\nmodel_reasoning_effort = "low"\nservice_tier = "priority"\n',
+		);
+
+		const outcome = await runWorkerSetup(setupOptions(fixture));
+
+		assert.deepEqual(outcome.degraded, []);
+		const linked = await readFile(join(fixture.codexHome, "agents", "explorer.toml"), "utf8");
+		assert.match(linked, /model = "gpt-5\.4-mini"/);
+		assert.match(linked, /model_reasoning_effort = "low"/);
+		assert.match(linked, /service_tier = "priority"/);
+	});
+});
+
+test("#given CODEX_HOME omo.toml names an unknown agent #when the worker setup runs #then setup degrades non-fatally", async () => {
+	await withSetupFixture(async (fixture) => {
+		await writeFile(
+			join(fixture.codexHome, "omo.toml"),
+			'[agents.codex-ultrawork-reviewer]\nmodel = "gpt-5.4-mini"\n',
+		);
+
+		const outcome = await runWorkerSetup(setupOptions(fixture));
+
+		const agentWarnings = outcome.degraded.filter((entry) => entry.component === "agents");
+		assert.equal(agentWarnings.length, 1);
+		assert.match(
+			agentWarnings[0].reason,
+			/\[agents\.codex-ultrawork-reviewer\] does not match a LazyCodex-managed Codex agent; override skipped/,
+		);
+		const linked = await readFile(join(fixture.codexHome, "agents", "explorer.toml"), "utf8");
+		assert.equal(linked, BUNDLED_EXPLORER_TOML);
+	});
+});
+
 test("#given an unwritable config.toml #when the worker setup runs #then it degrades naming config.toml and leaves the file untouched", async () => {
 	await withSetupFixture(async (fixture) => {
 		const configPath = join(fixture.codexHome, "config.toml");

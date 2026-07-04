@@ -5,6 +5,7 @@ import { installCachedPlugin, linkCachedPluginBins, linkRootRuntimeBin, pruneMar
 import { writeCachedMarketplaceManifest } from "./codex-cached-marketplace-manifest"
 import { shouldBuildSourcePackages } from "./codex-package-layout"
 import { updateCodexConfig } from "./codex-config-toml"
+import { readCodexAgentModelOverrides, unknownCodexAgentModelOverrideWarnings } from "./codex-agent-model-overrides"
 import { trustedHookStatesForPlugin } from "./codex-hook-trust"
 import { prepareGitBashForInstall, resolveGitBashForCurrentProcess } from "./git-bash"
 import { capturePreservedAgentReasoning, capturePreservedAgentServiceTier, linkCachedPluginAgents } from "./link-cached-plugin-agents"
@@ -112,6 +113,8 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
 
   const preservedReasoning = await capturePreservedAgentReasoning({ codexHome })
   const preservedServiceTier = await capturePreservedAgentServiceTier({ codexHome })
+  const agentModelOverrides = await readCodexAgentModelOverrides({ codexHome })
+  const lazyCodexManagedAgentNames = new Set<string>()
   const agentSourceRoots = await agentSourceRootsForInstall({
     codexHome,
     marketplace,
@@ -120,18 +123,31 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
   })
   for (const plugin of installed) {
     const pluginRoot = agentSourceRoots.get(plugin.name) ?? plugin.path
+    const acceptsAgentModelOverrides = isLazyCodexManagedPlugin({ marketplaceName: marketplace.name, pluginName: plugin.name })
     const agentLinks = await linkCachedPluginAgents({
       codexHome,
       pluginRoot,
       platform,
       preservedReasoning,
       preservedServiceTier,
+      agentModelOverrides: acceptsAgentModelOverrides ? agentModelOverrides.agents : undefined,
     })
     for (const link of agentLinks) {
       log(`Linked agent ${link.name} -> ${link.target}`)
       const agentName = agentNameFromToml(link.name)
+      if (acceptsAgentModelOverrides) lazyCodexManagedAgentNames.add(agentName)
       agentConfigs.set(agentName, { name: agentName, configFile: `./agents/${link.name}` })
     }
+  }
+  for (const warning of [
+    ...agentModelOverrides.warnings,
+    ...unknownCodexAgentModelOverrideWarnings({
+      configuredAgents: agentModelOverrides.agents.keys(),
+      knownAgentNames: lazyCodexManagedAgentNames,
+      sourcePath: agentModelOverrides.configPath,
+    }),
+  ]) {
+    log(`Warning: ${warning}`)
   }
 
   const trustedHookStates = (
@@ -269,4 +285,11 @@ function isRepoRootWithCodexPlugin(repoRoot: string): boolean {
 
 function codexMarketplaceSource(marketplaceRoot: string): CodexMarketplaceSource {
   return { sourceType: "local", source: marketplaceRoot }
+}
+
+function isLazyCodexManagedPlugin(input: {
+  readonly marketplaceName: string
+  readonly pluginName: string
+}): boolean {
+  return input.marketplaceName === "sisyphuslabs" && input.pluginName === "omo"
 }

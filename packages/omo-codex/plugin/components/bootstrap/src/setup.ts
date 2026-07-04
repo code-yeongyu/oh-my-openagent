@@ -9,6 +9,10 @@ import {
 	capturePreservedAgentServiceTier,
 	linkCachedPluginAgents,
 } from "../../../../src/install/link-cached-plugin-agents.ts";
+import {
+	readCodexAgentModelOverrides,
+	unknownCodexAgentModelOverrideWarnings,
+} from "../../../../src/install/codex-agent-model-overrides.ts";
 import { linkCachedPluginBins, linkRootRuntimeBin } from "../../../../src/install/codex-cache-bins.ts";
 import { updateCodexConfig } from "../../../../src/install/codex-config-toml.ts";
 import { stampGitBashMcpEnv } from "../../../../src/install/codex-git-bash-mcp-env.ts";
@@ -93,16 +97,34 @@ async function linkBundledAgentsStep(options: WorkerSetupOptions): Promise<Agent
 		await stageBundledAgents(options.pluginRoot, stageRoot);
 		const preservedReasoning = await capturePreservedAgentReasoning({ codexHome: options.codexHome });
 		const preservedServiceTier = await capturePreservedAgentServiceTier({ codexHome: options.codexHome });
+		const agentModelOverrides = await readCodexAgentModelOverrides({ codexHome: options.codexHome });
 		const linked = await linkCachedPluginAgents({
 			codexHome: options.codexHome,
 			pluginRoot: stageRoot,
 			preservedReasoning,
 			preservedServiceTier,
+			agentModelOverrides: agentModelOverrides.agents,
 		});
 		const agentConfigs = linked
 			.map((link) => ({ configFile: `./agents/${link.name}`, name: agentNameFromToml(link.name) }))
 			.sort((left, right) => left.name.localeCompare(right.name));
-		return { agentConfigs, degraded: [] };
+		const managedAgentNames = new Set(agentConfigs.map((agent) => agent.name));
+		const warnings = [
+			...agentModelOverrides.warnings,
+			...unknownCodexAgentModelOverrideWarnings({
+				configuredAgents: agentModelOverrides.agents.keys(),
+				knownAgentNames: managedAgentNames,
+				sourcePath: agentModelOverrides.configPath,
+			}),
+		];
+		return {
+			agentConfigs,
+			degraded: warnings.map((warning) => ({
+				component: "agents",
+				hint: BOOTSTRAP_DOCTOR_HINT,
+				reason: warning,
+			})),
+		};
 	} catch (error) {
 		return {
 			agentConfigs: [],
