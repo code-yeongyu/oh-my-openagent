@@ -34,8 +34,13 @@ export async function updateCodexConfig(input: {
   readonly preserveMarketplaceSource?: boolean
 }): Promise<void> {
   await mkdir(dirname(input.configPath), { recursive: true })
-  let config = ""
-  if (await exists(input.configPath)) config = await readFile(input.configPath, "utf8")
+  let config: string
+  try {
+    config = await readFile(input.configPath, "utf8")
+  } catch (error) {
+    if (!isMissingFileError(error)) throw error
+    config = ""
+  }
 
   const pluginSet = new Set(input.pluginNames)
   for (const legacyMarketplaceName of legacyMarketplaceNames(input.marketplaceName)) {
@@ -73,12 +78,6 @@ export async function updateCodexConfig(input: {
   await writeFileAtomic(input.configPath, `${config.trimEnd()}\n`)
 }
 
-async function exists(path: string): Promise<boolean> {
-  try {
-    await readFile(path, "utf8")
-    return true
-  } catch (error) {
-    if (error instanceof Error) return false
-    return false
-  }
+function isMissingFileError(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "ENOENT"
 }
