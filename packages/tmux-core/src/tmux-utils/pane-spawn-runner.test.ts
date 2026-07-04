@@ -53,7 +53,7 @@ function getRunTmuxCommandCall(index: number): [string, string[]] {
 
 function getSplitWindowCommand(): string {
 	const firstCall = getRunTmuxCommandCall(0)
-	const splitCommand = firstCall[1][8]
+	const splitCommand = firstCall[1].at(-1)
 	if (splitCommand === undefined) {
 		throw new Error("Expected split-window command")
 	}
