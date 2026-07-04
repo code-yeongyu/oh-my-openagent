@@ -230,6 +230,60 @@ describe("omo-senpi lsp component", () => {
     expect(widgetCalls).toEqual([{ key: "omo-senpi-lsp", content: undefined, placement: "belowEditor" }])
   })
 
+  it("#given a context with updateToolHookStatus #when post-edit diagnostics run #then the live status label is reported", async () => {
+    // given
+    const statuses: string[] = []
+    const event = {
+      type: "tool_result",
+      toolCallId: "write-1",
+      toolName: "write",
+      input: { path: "src/clean.ts" },
+      content: [{ type: "text", text: "Wrote file successfully." }],
+      isError: false,
+    }
+
+    // when
+    await handlePostEditDiagnosticsToolResult(
+      event,
+      {
+        updateToolHookStatus(message: string) {
+          statuses.push(message)
+        },
+      },
+      async () => "No diagnostics found",
+    )
+
+    // then
+    expect(statuses).toEqual(["(OmO) Checking LSP Diagnostics"])
+  })
+
+  it("#given a non-mutation tool result #when the post-edit handler runs #then no live status is reported", async () => {
+    // given
+    const statuses: string[] = []
+    const event = {
+      type: "tool_result",
+      toolCallId: "bash-1",
+      toolName: "bash",
+      input: { command: "ls" },
+      content: [{ type: "text", text: "ok" }],
+      isError: false,
+    }
+
+    // when
+    await handlePostEditDiagnosticsToolResult(
+      event,
+      {
+        updateToolHookStatus(message: string) {
+          statuses.push(message)
+        },
+      },
+      async () => "No diagnostics found",
+    )
+
+    // then
+    expect(statuses).toEqual([])
+  })
+
   it("#given post-edit diagnostics are clean #when a write tool result arrives #then no diagnostics are injected", async () => {
     // given
     const event = {
