@@ -1,7 +1,7 @@
 import { join, resolve } from "node:path"
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
-import { installCachedPlugin, linkCachedPluginBins, linkRootRuntimeBin, pruneMarketplaceCache, pruneMarketplacePluginCaches } from "./codex-cache"
+import { installCachedPlugin, linkCachedPluginBins, linkRootRuntimeBin, pruneMarketplaceCache, pruneMarketplacePluginCaches, pruneMarketplacePluginVersions } from "./codex-cache"
 import { writeCachedMarketplaceManifest } from "./codex-cached-marketplace-manifest"
 import { shouldBuildSourcePackages } from "./codex-package-layout"
 import { updateCodexConfig } from "./codex-config-toml"
@@ -152,6 +152,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     marketplaceName: marketplace.name,
     keepPluginNames: marketplace.plugins.map((plugin) => plugin.name),
   })
+  await pruneMarketplacePluginVersions({ codexHome, marketplaceName: marketplace.name, plugins: installed })
   for (const legacyMarketplaceName of legacyCacheMarketplaces(marketplace.name)) {
     await pruneMarketplacePluginCaches({
       codexHome,
