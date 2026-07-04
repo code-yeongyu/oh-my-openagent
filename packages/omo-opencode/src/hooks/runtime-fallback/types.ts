@@ -77,9 +77,7 @@ export interface RuntimeFallbackHook {
   dispose?: () => void
 }
 
-export type RuntimeFallbackResolvedConfig =
-  Required<Omit<RuntimeFallbackConfig, "reserved_retry_attempts" | "reserved_retry_base_delay_ms">> &
-  Pick<RuntimeFallbackConfig, "reserved_retry_attempts" | "reserved_retry_base_delay_ms">
+export type RuntimeFallbackResolvedConfig = Required<RuntimeFallbackConfig>
 
 export interface HookDeps {
   ctx: RuntimeFallbackPluginInput
