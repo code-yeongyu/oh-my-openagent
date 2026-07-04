@@ -58,6 +58,13 @@ export async function handleDetectedCompletion(
 			directory,
 			apiTimeoutMs,
 		})
+		if (promptResult.status === "deferred") {
+			log(`[${HOOK_NAME}] Deferred ultrawork verification prompt`, {
+				sessionID,
+				reason: promptResult.reason,
+			})
+			return
+		}
 		if (promptResult.status === "rejected") {
 			log(`[${HOOK_NAME}] Failed to inject ultrawork verification prompt`, {
 				sessionID,
