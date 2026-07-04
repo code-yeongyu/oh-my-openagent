@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
 import { restoreModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
 
-const executeStopHooks = mock(async (context: { parentSessionId?: string }) => ({
+const executeStopHooks = mock(async (context: { parentSessionId?: string; transcriptPath?: string }) => ({
   block: false,
   observedParentSessionId: context.parentSessionId,
 }))
@@ -105,5 +105,32 @@ describe("createSessionEventHandler retry behavior", () => {
       null,
       {},
     )
+  })
+
+  test("#given a parentless idle session #when stop hooks execute #then the context carries the session transcript path", async () => {
+    //#given
+    const handler = createSessionEventHandler(
+      {
+        directory: "/repo",
+        client: {
+          session: {
+            get: async () => ({ data: {} }),
+            prompt: async () => undefined,
+          },
+        },
+      } as never,
+      {},
+    )
+
+    //#when
+    await handler({
+      event: { type: "session.idle", properties: { sessionID: "ses_retry_transcript" } },
+    })
+
+    //#then
+    expect(executeStopHooks).toHaveBeenCalledTimes(1)
+    const stopContext = executeStopHooks.mock.calls[0]?.[0]
+    const { getTranscriptPath } = await import("../transcript")
+    expect(stopContext?.transcriptPath).toBe(getTranscriptPath("ses_retry_transcript"))
   })
 })

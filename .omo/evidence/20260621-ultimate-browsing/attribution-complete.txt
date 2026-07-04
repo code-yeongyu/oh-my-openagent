@@ -1,0 +1,4 @@
+cloakbrowser OK
+agent-browser OK
+MIT OK
+Apache OK

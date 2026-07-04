@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, mock, spyOn } from "bun:test"
 
-import * as logger from "../logger"
+import * as logger from "@oh-my-opencode/utils"
 
 type TarZipEntryListingModule = typeof import("./tar-zip-entry-listing")
 
@@ -12,8 +12,15 @@ function createTarFileLine(fileName: string): string {
 	return `-rw-r--r-- 1 user group 123 Jan 01 12:34 ${fileName}`
 }
 
-function getWarnedUnparsedLines(logSpy: ReturnType<typeof spyOn>): string[] {
-	return logSpy.mock.calls.flatMap(([message, data]) => {
+type LogSpy = {
+	readonly mock: {
+		readonly calls: readonly (readonly unknown[])[]
+	}
+}
+
+function getWarnedUnparsedLines(logSpy: LogSpy): string[] {
+	return logSpy.mock.calls.flatMap((call) => {
+		const [message, data] = call
 		if (
 			message !== "warning: unparsed tar listing line" ||
 			typeof data !== "object" ||

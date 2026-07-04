@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import * as p from "@clack/prompts"
+import { ULTIMATE_FALLBACK } from "./model-fallback"
 import * as prompts from "./tui-install-prompts"
 import type { DetectedConfig, InstallConfig, InstallPlatform } from "./types"
 
@@ -49,7 +50,7 @@ describe("promptInstallPlatform", () => {
     mock.restore()
   })
 
-  test("offers OpenCode, Codex, and Both choices", async () => {
+  test("offers OpenCode, Codex, Both, and Senpi choices", async () => {
     // given
     const selectSpy = spyOn(p, "select").mockResolvedValue("opencode")
 
@@ -65,6 +66,7 @@ describe("promptInstallPlatform", () => {
         { value: "opencode" },
         { value: "codex" },
         { value: "both" },
+        { value: "senpi" },
       ],
     })
   })
@@ -85,6 +87,7 @@ describe("promptInstallPlatform", () => {
         { value: "opencode" },
         { value: "codex" },
         { value: "both" },
+        { value: "senpi" },
       ],
     })
   })
@@ -119,6 +122,23 @@ describe("promptInstallConfig platform branching", () => {
     expect(selectSpy).not.toHaveBeenCalled()
   })
 
+  test("skips OpenCode questions when the user selects senpi", async () => {
+    // given
+    const selectSpy = spyOn(p, "select").mockResolvedValue("no")
+
+    // when
+    const config = await prompts.promptInstallConfig(createDetectedConfig(), "senpi")
+
+    // then
+    expect(config).toMatchObject({
+      platform: "senpi",
+      hasOpenCode: false,
+      hasCodex: false,
+      hasSenpi: true,
+    } satisfies Partial<InstallConfig>)
+    expect(selectSpy).not.toHaveBeenCalled()
+  })
+
   test.each([
     ["opencode", false],
     ["both", true],
@@ -136,6 +156,22 @@ describe("promptInstallConfig platform branching", () => {
       expect(selectSpy).toHaveBeenCalledTimes(12)
     },
   )
+
+  test("Claude subscription No option hint uses ultimate fallback", async () => {
+    // given
+    const selectSpy = spyOn(p, "select").mockResolvedValue("no")
+
+    // when
+    await prompts.promptInstallConfig(createDetectedConfig(), "opencode")
+
+    // then
+    const firstCall = selectSpy.mock.calls[0]?.[0]
+    expect(firstCall?.message).toBe("Do you have a Claude Pro/Max subscription?")
+    const options = firstCall?.options as Array<{ value: string; hint?: string }>
+    const noOption = options?.find((o) => o.value === "no")
+    expect(noOption?.hint).toContain(ULTIMATE_FALLBACK)
+    expect(noOption?.hint).not.toContain("big-pickle")
+  })
 
   test("uses explicit Codex autonomous override without asking", async () => {
     // given

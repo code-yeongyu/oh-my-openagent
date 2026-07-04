@@ -3,6 +3,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, test } from "bun:test"
 import { checkCodex, gatherCodexSummary } from "./codex"
+import { checkCodexRuntimeWrapper } from "./codex-runtime-wrapper"
 
 async function createPlatformBin(binDir: string, name: string, target: string): Promise<void> {
   if (process.platform === "win32") {
@@ -72,6 +73,8 @@ describe("codex doctor checks", () => {
     expect(summary.config.pluginEnabled).toBe(true)
     expect(summary.config.pluginsFeatureEnabled).toBe(true)
     expect(summary.config.pluginHooksFeatureEnabled).toBe(true)
+    expect(summary.config.companionPluginEnabled).toBe(false)
+    expect(summary.config.companionLifecycleHookStateEvents).toEqual([])
     expect(summary.linkedBins).toEqual(["omo", "omo-rules"])
   })
 
@@ -172,6 +175,31 @@ describe("codex doctor checks", () => {
     expect(result.issues.map((issue) => issue.title)).toContain("omo runtime command is not linked")
   })
 
+  test("#given generated omo wrapper points at a deleted runtime target #when checking runtime wrapper #then warns with reinstall guidance", async () => {
+    // given
+    const { codexHome, binDir, pluginRoot } = await createInstalledCodexHome()
+    const wrapperPath = join(binDir, process.platform === "win32" ? "omo.cmd" : "omo")
+    await rm(wrapperPath)
+    const missingCliPath = join(pluginRoot, "dist", "cli", "index.js")
+    await writeFile(
+      wrapperPath,
+      process.platform === "win32"
+        ? ["@echo off", "rem OMO_GENERATED_RUNTIME_WRAPPER", `"%%BUN_BINARY%%" "${missingCliPath}" %%*`, ""].join("\r\n")
+        : ["#!/bin/sh", "# OMO_GENERATED_RUNTIME_WRAPPER", `exec "$BUN_BINARY" "${missingCliPath}" "$@"`, ""].join("\n"),
+    )
+
+    // when
+    const result = await checkCodexRuntimeWrapper({ codexHome, binDir })
+
+    // then
+    expect(result.status).toBe("warn")
+    const issue = result.issues.find((entry) => entry.title === "omo runtime wrapper target is missing")
+    expect(issue).toBeDefined()
+    expect(issue?.severity).toBe("warning")
+    expect(issue?.description).toContain(missingCliPath)
+    expect(issue?.fix).toContain("npx --yes lazycodex-ai@latest install --no-tui")
+  })
+
   test("#given installed LazyCodex #when checking Codex doctor #then details include Codex-specific health surfaces", async () => {
     // given
     const { codexHome, binDir } = await createInstalledCodexHome()
@@ -190,8 +218,61 @@ describe("codex doctor checks", () => {
     expect(result.details).toContain("Plugin: omo@4.7.5")
     expect(result.details).toContain("Distribution: lazycodex-ai@4.7.5")
     expect(result.details).toContain("Enabled plugin: omo@sisyphuslabs")
+    expect(result.details).toContain("Companion plugin: none")
     expect(result.details).toContain("Linked bins: omo, omo-rules")
     expect(result.details).toContain("Agents: plan")
+  })
+
+  test("#given LazyCodex is primary and Codex Companion lifecycle hooks are configured #when checking Codex doctor #then warns without disabling anything", async () => {
+    // given
+    const { codexHome, binDir } = await createInstalledCodexHome()
+    await writeFile(
+      join(codexHome, "config.toml"),
+      [
+        "[features]",
+        "plugins = true",
+        "plugin_hooks = true",
+        "",
+        "[marketplaces.sisyphuslabs]",
+        `source = "${join(codexHome, "plugins", "cache", "sisyphuslabs")}"`,
+        "",
+        '[plugins."omo@sisyphuslabs"]',
+        "enabled = true",
+        "",
+        '[plugins."codex@openai-codex"]',
+        "enabled = true",
+        "",
+        '[hooks.state."codex@openai-codex:hooks/hooks.json:session_start:0:0"]',
+        'trusted_hash = "sha256:session"',
+        "",
+        "[hooks.state.'codex@openai-codex:hooks/hooks.json:stop:0:0']",
+        'trusted_hash = "sha256:stop"',
+      ].join("\n"),
+    )
+
+    // when
+    const result = await checkCodex({
+      codexHome,
+      binDir,
+      detectCodexInstallation: async () => ({ found: true, source: "cli", path: "/usr/local/bin/codex" }),
+    })
+    const summary = await gatherCodexSummary({
+      codexHome,
+      binDir,
+      detectCodexInstallation: async () => ({ found: true, source: "cli", path: "/usr/local/bin/codex" }),
+    })
+
+    // then
+    expect(result.status).toBe("warn")
+    expect(summary.config.companionPluginEnabled).toBe(true)
+    expect(summary.config.companionLifecycleHookStateEvents).toEqual(["session_start", "stop"])
+    expect(result.details).toContain("Companion plugin: codex@openai-codex enabled (SessionStart, Stop hook trust)")
+    const issue = result.issues.find((entry) => entry.title === "Codex Companion lifecycle hooks may conflict with LazyCodex")
+    expect(issue).toBeDefined()
+    expect(issue?.severity).toBe("warning")
+    expect(issue?.description).toContain("codex@openai-codex is enabled")
+    expect(issue?.description).toContain("SessionStart, Stop")
+    expect(issue?.fix).toContain('[plugins."codex@openai-codex"] enabled = false')
   })
 
   test("#given a stamped plugin bundle #when gathering Codex summary #then it reports the installer version and stamped state", async () => {

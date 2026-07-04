@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { getLocale, initI18n, t } from "../shared/i18n"
+import { PLUGIN_NAME } from "../shared"
 import { createPluginModule } from "./create-plugin-module"
+
+const sourcePlugin = new URL("../index.ts", import.meta.url).href
 
 const mockInitConfigContext = mock(() => {})
 const mockDetectExternalSkillPlugin = mock(() => ({ detected: false, pluginName: null, allPlugins: [] }))
@@ -133,6 +139,66 @@ describe("createPluginModule()", () => {
     })
   })
 
+  describe("#given OpenCode server config is present", () => {
+    it("#then startup self-heals the matching TUI plugin entry", async () => {
+      // given
+      const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+      const configDir = mkdtempSync(join(tmpdir(), "omo-server-tui-entry-"))
+      process.env.OPENCODE_CONFIG_DIR = configDir
+      writeFileSync(join(configDir, "opencode.json"), JSON.stringify({ plugin: [PLUGIN_NAME] }), "utf-8")
+
+      try {
+        const pluginModule = createTestPluginModule()
+        mockLoadPluginConfig.mockReturnValue({})
+
+        // when
+        await pluginModule.server({
+          directory: "/tmp/project",
+          client: {},
+        } as Parameters<typeof pluginModule.server>[0])
+
+        // then
+        expect(readFileSync(join(configDir, "tui.json"), "utf-8")).toContain(`"${PLUGIN_NAME}"`)
+      } finally {
+        rmSync(configDir, { recursive: true, force: true })
+        if (originalConfigDir === undefined) {
+          delete process.env.OPENCODE_CONFIG_DIR
+        } else {
+          process.env.OPENCODE_CONFIG_DIR = originalConfigDir
+        }
+      }
+    })
+
+    it("#given sidebar is disabled #then startup does not write a TUI plugin entry", async () => {
+      // given
+      const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+      const configDir = mkdtempSync(join(tmpdir(), "omo-server-tui-disabled-"))
+      process.env.OPENCODE_CONFIG_DIR = configDir
+      writeFileSync(join(configDir, "opencode.json"), JSON.stringify({ plugin: [PLUGIN_NAME] }), "utf-8")
+
+      try {
+        const pluginModule = createTestPluginModule()
+        mockLoadPluginConfig.mockReturnValue({ tui: { sidebar: { enabled: false } } })
+
+        // when
+        await pluginModule.server({
+          directory: "/tmp/project",
+          client: {},
+        } as Parameters<typeof pluginModule.server>[0])
+
+        // then
+        expect(() => readFileSync(join(configDir, "tui.json"), "utf-8")).toThrow()
+      } finally {
+        rmSync(configDir, { recursive: true, force: true })
+        if (originalConfigDir === undefined) {
+          delete process.env.OPENCODE_CONFIG_DIR
+        } else {
+          process.env.OPENCODE_CONFIG_DIR = originalConfigDir
+        }
+      }
+    })
+  })
+
   describe("#given bundled security skills are enabled", () => {
     it("#then startup exposes them through a runtime skill source URL", async () => {
       // given
@@ -233,7 +299,7 @@ describe("createPluginModule()", () => {
       // given
       const pluginModule = createTestPluginModule()
       const duplicatePlugins = [
-        "file:///Users/yeongyu/local-workspaces/omo/src/index.ts",
+        sourcePlugin,
         "oh-my-openagent@latest",
       ]
       mockDetectDuplicateOmoPlugin.mockReturnValue({

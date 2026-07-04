@@ -9,11 +9,11 @@ Bundled Codex agent role TOMLs in `agents/` are installed into `CODEX_HOME/agent
 | Mandate | Behavior |
 |---|---|
 | Goal + binding success criteria | Call `create_goal` (or open with a `# Goal` block) listing the deliverable + **3+ realistic QA scenarios** (happy path, edge cases, adjacent-surface regression). Each scenario MUST name which **Manual-QA channel** it will use. "Tests pass" is supporting signal, NEVER completion proof. |
-| Manual-QA channels (TESTS ALONE NEVER PROVE DONE) | A dedicated top-level section enumerates the **four** channels you can use to verify a criterion in reality: **(1) HTTP call** (`curl -i` / Playwright APIRequestContext), **(2) tmux** (`tmux new-session` + `send-keys` + `capture-pane`), **(3) Browser use** (Playwright / puppeteer / Chromium driving the real page), **(4) Computer use** (OS-level GUI automation against the running app). Every criterion picks one channel, builds a real-usage scenario, runs it, and captures the artifact — every time. Aux surfaces (CLI stdout / DB diff / parsed config) only count for genuinely CLI- or data-shaped criteria. |
+| Manual-QA channels (TESTS ALONE NEVER PROVE DONE) | A dedicated top-level section enumerates the **four** channels you can use to verify a criterion in reality: **(1) HTTP call** (`curl -i` / Playwright APIRequestContext), **(2) tmux** (`tmux new-session` + `send-keys` + `capture-pane`), **(3) Browser use** (in Codex, `browser:control-in-app-browser` first when no authenticated/persistent browser profile is needed; otherwise Playwright / puppeteer / Chromium driving the real page), **(4) Computer use** (OS-level GUI automation against the running app). Every criterion picks one channel, builds a real-usage scenario, runs it, and captures the artifact — every time. Aux surfaces (CLI stdout / DB diff / parsed config) only count for genuinely CLI- or data-shaped criteria. |
 | Surface + paired cleanup | Execution loop step 4 (**SURFACE-AS-SCENARIO**) runs the chosen channel scenario end-to-end. Step 5 (**CLEANUP, PAIRED**) tears down every QA-spawned process / tmux session / browser context / container / port / temp dir, with a one-line receipt appended to the notepad. Leftover state → NOT done. |
 | Durable /tmp notepad | `mktemp -t ulw-$(date +%Y%m%d-%H%M%S).XXXXXX.md` with sections `Plan`, `Success criteria + QA scenarios`, `Now`, `Todo`, `Findings`, `Learnings`. **Append**, never rewrite. |
 | Obsessive atomic todos | Every action — even one-line edits, `ls`, single test runs — becomes a todo. Format: `path: <action> for <criterion> — verify by <check>`. One in_progress at a time, mark completed immediately. |
-| ChatGPT-compatible high-reasoning verification gate | Triggered automatically on user-requested rigor, 3+ files, 20+ turns, 30+ minutes, or refactor/migration/perf/security work. Use the bundled `codex-ultrawork-reviewer` agent role when available. Reviewer verdict is **binding**: no "false positive", no minimising, no arguing. Loop until **unconditional** approval. "Looks good but..." = REJECTION. |
+| ChatGPT-compatible high-reasoning verification gate | Triggered automatically on user-requested rigor, 3+ files, 20+ turns, 30+ minutes, or refactor/migration/perf/security work. Use `lazycodex-code-reviewer`, `lazycodex-qa-executor`, and `lazycodex-gate-reviewer` when selectable roles are available. Reviewer verdict is **binding**: no "false positive", no minimising, no arguing. Loop until **unconditional** approval. "Looks good but..." = REJECTION. |
 
 The directive is currently 10,951 chars / 231 lines and follows the GPT-5.5 prompting structure (Role / Goal / Manual-QA channels / Bootstrap / Execution loop / Verification gate / Commits / Constraints / Output / Stop rules).
 
@@ -33,9 +33,9 @@ The installer copies the plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/0.
 node ${PLUGIN_ROOT}/dist/cli.js hook user-prompt-submit
 ```
 
-Codex passes the prompt payload on stdin. When the pattern `\b(?:ultrawork|ulw)\b` (case-insensitive) matches, the hook writes the directive to stdout — Codex injects non-JSON stdout as `additional_context` for the next turn. Otherwise the hook writes nothing and exits 0. Malformed input also exits 0 to never block the turn.
+Codex passes the prompt payload on stdin. When the pattern `(?:ultrawork|ulw)` (case-insensitive) matches, the hook emits a compact bootstrap pointer instead of the full directive: the pointer mandates the `ULTRAWORK MODE ENABLED!` opener, an immediate `create_goal` call with `objective` only, and reading the full directive from the bundled `ultrawork` skill (`<plugin root>/skills/ultrawork/SKILL.md`, resolved to an absolute path at runtime). Keeping the injected payload small guarantees Codex App's hook-output truncation can never drop the `create_goal` bootstrap (issue #5828). When the skill file is not present (for example the standalone component install without the plugin skills tree), the hook falls back to emitting the full directive. Otherwise the hook writes nothing and exits 0. Malformed input also exits 0 to never block the turn.
 
-If a prior `UserPromptSubmit` hook output in transcript JSONL already contains `<ultrawork-mode>`, the hook suppresses itself so the same directive is not injected repeatedly. Plain transcript text containing `<ultrawork-mode>` is ignored unless it comes from hook output.
+If a prior `UserPromptSubmit` hook output in transcript JSONL already contains `<ultrawork-mode>`, the hook suppresses itself so the same bootstrap is not injected repeatedly. Plain transcript text containing `<ultrawork-mode>` is ignored unless it comes from hook output.
 
 Bundled agent role TOMLs in `agents/` ship to `CODEX_HOME/agents/` at install time, not via a runtime hook. The installer writes regular file copies on Linux, macOS, and Windows. For the public marketplace, the source is the installed-marketplace snapshot, not the versioned plugin cache, so agent role configs remain valid when Codex replaces `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/` during auto-update or removes temporary marketplace state. Both code paths overwrite stale files and write a `.installed-agents.json` manifest next to the source root for clean uninstall tracking.
 
@@ -47,7 +47,7 @@ npm run build
 echo "$PAYLOAD" | node dist/cli.js hook user-prompt-submit | head -3
 ```
 
-Expect `<ultrawork-mode>` ... directive body.
+Expect `<ultrawork-mode>` ... bootstrap pointer naming `skills/ultrawork/SKILL.md` (or the full directive body when the plugin skills tree is absent).
 
 ## Agent role smoke test
 

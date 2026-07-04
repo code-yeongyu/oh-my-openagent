@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { updateCodexConfig } from "./install/config.mjs";
+import { updateCodexConfig } from "./install-dist/install-local.mjs";
 
 test("#given windows platform with Git Bash enabled #when updating config #then enables git_bash plugin mcp policy", async () => {
 	// given
@@ -88,4 +88,27 @@ test("#given non-windows platforms #when updating config #then disables git_bash
 		assert.match(content, /\[plugins\."omo@sisyphuslabs"\.mcp_servers\.git_bash\]/);
 		assert.match(content, /\[plugins\."omo@sisyphuslabs"\.mcp_servers\.git_bash\][\s\S]*?enabled = false/);
 	}
+});
+
+test("#given CodeGraph MCP disabled by installer policy #when updating config #then disables only codegraph plugin mcp policy", async () => {
+	// given
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-config-codegraph-disabled-"));
+	const configPath = join(root, "config.toml");
+
+	// when
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "sisyphuslabs",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex/cache/sisyphuslabs" },
+		pluginNames: ["omo"],
+		platform: "darwin",
+		codegraphMcpEnabled: false,
+	});
+
+	// then
+	const content = await readFile(configPath, "utf8");
+	assert.match(content, /\[plugins\."omo@sisyphuslabs"\][\s\S]*?enabled = true/);
+	assert.match(content, /\[plugins\."omo@sisyphuslabs"\.mcp_servers\.codegraph\][\s\S]*?enabled = false/);
+	assert.match(content, /\[plugins\."omo@sisyphuslabs"\.mcp_servers\.context7\][\s\S]*?enabled = true/);
 });

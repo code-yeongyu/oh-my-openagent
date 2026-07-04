@@ -1,5 +1,16 @@
+/// <reference types="bun-types" />
+
+// allow: SIZE_OK - adapter prompt-gate tests mirror the shared state machine fixture; this release adds narrow regressions and future edits should split by gate state.
+
 import { describe, expect, test } from "bun:test"
+import {
+  OMO_INTERNAL_INITIATOR_MARKER,
+  OMO_INTERNAL_NOREPLY_MARKER,
+} from "../internal-initiator-marker"
 import { latestAssistantTurnBlocksInternalPrompt } from "./pending-tool-turn"
+
+const NOREPLY_TAIL_TEXT = `notification\n${OMO_INTERNAL_INITIATOR_MARKER}\n${OMO_INTERNAL_NOREPLY_MARKER}`
+const REPLY_EXPECTING_TAIL_TEXT = `continue\n${OMO_INTERNAL_INITIATOR_MARKER}`
 
 describe("latestAssistantTurnBlocksInternalPrompt", () => {
   test("#given completed assistant question tool has no real user answer #when checking prompt safety #then internal prompts stay blocked", () => {
@@ -196,7 +207,7 @@ describe("latestAssistantTurnBlocksInternalPrompt", () => {
     expect(blocks).toBe(false)
   })
 
-  test("#given latest message is an internal continuation user turn #when checking prompt safety #then internal prompts stay blocked", () => {
+  test("#given completed assistant is followed by an orphaned reply-required internal wake #when checking prompt safety #then internal prompts are admitted", () => {
     // given
     const messages = [
       {
@@ -220,7 +231,7 @@ describe("latestAssistantTurnBlocksInternalPrompt", () => {
     const blocks = latestAssistantTurnBlocksInternalPrompt(messages)
 
     // then
-    expect(blocks).toBe(true)
+    expect(blocks).toBe(false)
   })
 
   test("#given internal continuation gets only an empty unknown assistant turn #when checking prompt safety #then internal prompts stay blocked", () => {
@@ -282,5 +293,112 @@ describe("latestAssistantTurnBlocksInternalPrompt", () => {
 
     // then
     expect(blocks).toBe(false)
+  })
+
+  test("#given a completed assistant is followed by a noReply notification tail #when checking prompt safety #then internal prompts are not blocked", () => {
+    // given
+    const messages = [
+      {
+        info: {
+          role: "assistant",
+          finish: "stop",
+          time: { created: 1000, completed: 2000 },
+        },
+        parts: [{ type: "text", text: "done with the work" }],
+      },
+      {
+        info: {
+          role: "user",
+          time: { created: 3000 },
+        },
+        parts: [{ type: "text", text: NOREPLY_TAIL_TEXT, synthetic: true }],
+      },
+    ]
+
+    // when
+    const blocks = latestAssistantTurnBlocksInternalPrompt(messages)
+
+    // then
+    expect(blocks).toBe(false)
+  })
+
+  test("#given a completed assistant is followed by several stacked noReply notification tails #when checking prompt safety #then internal prompts are not blocked", () => {
+    // given
+    const messages = [
+      {
+        info: {
+          role: "assistant",
+          finish: "stop",
+          time: { created: 1000, completed: 2000 },
+        },
+        parts: [{ type: "text", text: "fired the background tasks" }],
+      },
+      {
+        info: { role: "user", time: { created: 3000 } },
+        parts: [{ type: "text", text: NOREPLY_TAIL_TEXT, synthetic: true }],
+      },
+      {
+        info: { role: "user", time: { created: 4000 } },
+        parts: [{ type: "text", text: NOREPLY_TAIL_TEXT, synthetic: true }],
+      },
+    ]
+
+    // when
+    const blocks = latestAssistantTurnBlocksInternalPrompt(messages)
+
+    // then
+    expect(blocks).toBe(false)
+  })
+
+  test("#given a reply-expecting internal tail sits behind a noReply tail after completion #when checking prompt safety #then internal prompts are admitted", () => {
+    // given
+    const messages = [
+      {
+        info: {
+          role: "assistant",
+          finish: "stop",
+          time: { created: 1000, completed: 2000 },
+        },
+        parts: [{ type: "text", text: "working" }],
+      },
+      {
+        info: { role: "user", time: { created: 3000 } },
+        parts: [{ type: "text", text: REPLY_EXPECTING_TAIL_TEXT, synthetic: true }],
+      },
+      {
+        info: { role: "user", time: { created: 4000 } },
+        parts: [{ type: "text", text: NOREPLY_TAIL_TEXT, synthetic: true }],
+      },
+    ]
+
+    // when
+    const blocks = latestAssistantTurnBlocksInternalPrompt(messages)
+
+    // then
+    expect(blocks).toBe(false)
+  })
+
+  test("#given an actively waiting assistant sits behind a noReply tail #when checking prompt safety #then internal prompts stay blocked", () => {
+    // given
+    const messages = [
+      {
+        info: {
+          role: "assistant",
+          finish: "tool-calls",
+          time: { created: 1000 },
+        },
+        parts: [{ type: "tool", tool: "bash", state: { status: "running" } }],
+      },
+      {
+        info: { role: "user", time: { created: 3000 } },
+        parts: [{ type: "text", text: NOREPLY_TAIL_TEXT, synthetic: true }],
+      },
+    ]
+
+    // when
+    const blocks = latestAssistantTurnBlocksInternalPrompt(messages)
+
+    // then
+    expect(blocks).toBe(true)
   })
 })

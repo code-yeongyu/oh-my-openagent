@@ -1,0 +1,377 @@
+COMMAND: bun run --cwd packages/omo-codex/plugin check
+
+$ bun run build && npm test
+$ node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/sync-skills.mjs && node scripts/build-components.mjs
+Synced OMO Codex manifests to version 4.10.0 (0 updated)
+Using bundled lsp-tools-mcp dist
+Using bundled lsp-daemon dist
+Using bundled ast-grep-mcp dist
+Using bundled git-bash-mcp dist
+Building components/comment-checker
+
+> @code-yeongyu/codex-comment-checker@4.10.0 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 11 modules in 4ms
+
+  cli.js  19.23 KB  (entry point)
+
+Bundling components/comment-checker/dist/cli.js
+Bundled 11 modules in 3ms
+
+  cli.js  19.40 KB  (entry point)
+
+Building components/git-bash
+
+> @sisyphuslabs/codex-git-bash-hook@4.10.0 build
+> tsc -p tsconfig.build.json
+
+Bundling components/git-bash/dist/cli.js
+Bundled 2 modules in 2ms
+
+  cli.js  5.75 KB  (entry point)
+
+Building components/lazycodex-executor-verify
+
+> @code-yeongyu/codex-lazycodex-executor-verify@4.10.0 build
+> tsc -p tsconfig.build.json
+
+Bundling components/lazycodex-executor-verify/dist/cli.js
+Bundled 5 modules in 3ms
+
+  cli.js  8.26 KB  (entry point)
+
+Building components/rules
+
+> @code-yeongyu/codex-rules@4.10.0 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 52 modules in 5ms
+
+  cli.js  159.1 KB  (entry point)
+
+Bundling components/rules/dist/cli.js
+Bundled 52 modules in 5ms
+
+  cli.js  159.32 KB  (entry point)
+
+Building components/lsp
+
+> @code-yeongyu/codex-lsp@4.10.0 prebuild
+> node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs
+
+
+> @code-yeongyu/codex-lsp@4.10.0 build
+> node scripts/clean-dist.mjs && tsc -p tsconfig.build.json
+
+Bundling components/lsp/dist/cli.js
+Bundled 6 modules in 4ms
+
+  cli.js  124.72 KB  (entry point)
+
+Building components/telemetry
+
+> @code-yeongyu/codex-telemetry@4.10.0 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js && bun build src/posthog.ts --target node --format esm --outfile dist/posthog.js
+
+Bundled 78 modules in 6ms
+
+  cli.js  204.83 KB  (entry point)
+
+Bundled 76 modules in 5ms
+
+  posthog.js  202.41 KB  (entry point)
+
+Bundling components/telemetry/dist/cli.js
+Bundled 78 modules in 5ms
+
+  cli.js  204.57 KB  (entry point)
+
+Building components/start-work-continuation
+
+> @code-yeongyu/codex-start-work-continuation@4.10.0 build
+> node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 16 modules in 3ms
+
+  cli.js  14.14 KB  (entry point)
+
+Bundling components/start-work-continuation/dist/cli.js
+Bundled 16 modules in 3ms
+
+  cli.js  14.32 KB  (entry point)
+
+Building components/ulw-loop
+
+> @code-yeongyu/codex-ulw-loop@4.10.0 build
+> tsc -p tsconfig.build.json
+
+Bundling components/ulw-loop/dist/cli.js
+Bundled 28 modules in 3ms
+
+  cli.js  107.52 KB  (entry point)
+
+Building components/ultrawork
+
+> @code-yeongyu/codex-ultrawork@4.10.0 build
+> node scripts/sync-directive.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
+
+Bundled 3 modules in 2ms
+
+  cli.js  5.24 KB  (entry point)
+
+Bundling components/ultrawork/dist/cli.js
+Bundled 3 modules in 2ms
+
+  cli.js  5.34 KB  (entry point)
+
+Building components/bootstrap (standalone)
+
+> @sisyphuslabs/codex-bootstrap@4.10.0 build
+> node scripts/build.mjs
+
+Resolving dependencies
+Resolved, downloaded and extracted [2]
+Saved lockfile
+
+  dist/cli.js  103.7kb
+
+⚡ Done in 11ms
+Bundling components/bootstrap/dist/cli.js
+Bundled 36 modules in 5ms
+
+  cli.js  106.58 KB  (entry point)
+
+
+> @sisyphuslabs/omo-codex-plugin@4.10.0 test
+> node --test test/*.test.mjs
+
+✔ #given bundled Codex agents #when components/ultrawork/agents directory is scanned #then planner support TOMLs are present and match expected schema keys (11.452917ms)
+✔ #given planner agent prompt #when inspected #then generated artifacts stay under .omo (1.191875ms)
+✔ #given lazycodex agent prompts #when inspected #then each role pins model effort and evidence discipline (4.0985ms)
+✔ #given LazyCodex reviewer prompts #when inspected #then anti-slop review coverage is required (1.2315ms)
+✔ #given aggregate plugin build script #when inspected #then generated assets run before workspace builds (6.370208ms)
+✔ #given omo-codex package build script #when inspected #then delegates to the aggregate plugin package (1.298958ms)
+✔ #given isolated components #when hooks are inspected #then commands stay inside component roots (6.519792ms)
+✔ #given aggregate SubagentStop hooks #when inspected #then start-work and LazyCodex executor verifier are separate groups (2.307208ms)
+✔ #given aggregate PostCompact hooks #when hooks are inspected #then LSP diagnostics cache reset is registered (1.367875ms)
+✔ #given aggregate hook commands #when inspected #then every command exposes a Codex status message (1.896292ms)
+✔ #given aggregate hook commands #when inspected #then commands stay Node-based and platform-neutral (0.635ms)
+✔ #given component hook commands #when inspected #then standalone packages expose Codex status messages (18.301ms)
+✔ #given hook status messages #when inspected #then labels describe OMO responsibilities instead of the hook runner (5.488375ms)
+✔ #given aggregate OMO plugin is enabled #when hooks are inspected #then shell guidance and ulw-loop guard are registered (1.131375ms)
+✔ #given aggregate SessionStart hooks #when inspected #then LazyCodex auto-update is registered (1.502459ms)
+✔ #given aggregate plugin packaging #when inspected #then hooks and compatibility sentinels stay Python-free (1.102416ms)
+✔ #given aggregate plugin manifest #when inspected #then it owns the omo namespace (3.941375ms)
+✔ #given aggregate plugin metadata #when inspected #then ulw-loop is the public loop name (1.084375ms)
+✔ #given component directories #when scanned #then only intentional resource roots declare plugin manifests (5.263125ms)
+✔ #given aggregate MCP config #when inspected #then code MCPs reference package runtimes without package names (6.771917ms)
+✔ #given package-level MCP CLIs #when package metadata is inspected #then bin names use the omo prefix (1.833125ms)
+✔ #given bundled model catalog #when inspected #then default verifier and worker roles are pinned (4.625167ms)
+✔ #given bundled model catalog #when inspected #then no role or managed preset uses pure GPT-5.4 (1.101458ms)
+✔ #given Codex-facing orchestration surfaces #when inspected #then retired ChatGPT-account model names are not recommended (3.342084ms)
+✔ #given synced skills with Codex compatibility guidance #when spawn_agent is documented #then invalid role parameters are absent (20.128542ms)
+✔ #given synced skills and bundled rules #when role-specific agents are spawned #then they set fork_context=false (10.551625ms)
+✔ #given long-running orchestration prompts #when waiting on child agents #then parent liveness is surfaced (3.956458ms)
+✔ test/aggregate.test.mjs (52.982417ms)
+✔ #given a newer version #when resolving auto update plan #then plan carries current and latest versions (1.317958ms)
+✔ #given a newer version #when waited update succeeds #then returns update-started notice and persists pendingNotice (71.965ms)
+✔ #given completed pending update #when startup check is throttled #then emits completed notice and clears pendingNotice (8.351042ms)
+✔ #given incomplete pending update #when startup check runs #then no notice and pendingNotice retained (4.742917ms)
+✔ #given waited update fails #then no notice and no pendingNotice (60.79925ms)
+✔ #given malformed pendingNotice toVersion #when check runs #then pendingNotice dropped silently (11.442125ms)
+✔ #given completed pending update #when hook session-start runs as CLI #then prints one SessionStart JSON line (126.832625ms)
+✔ #given lazycodex is up to date #when running check #then persists checked success state (15.784125ms)
+✔ #given auto update is disabled #when resolving plan #then no command is scheduled (0.78225ms)
+✔ #given stale state #when resolving plan #then installer update command is scheduled (1.085833ms)
+✔ #given Windows npm shims #when resolving spawn commands #then cmd shims are used (0.114125ms)
+✔ #given current version #when resolving update plan #then skips installer (0.052375ms)
+✔ #given latest version is newer #when resolving update plan #then schedules installer (0.065958ms)
+✔ #given current version is a prerelease of latest #when resolving update plan #then schedules stable installer (0.048084ms)
+✔ #given malformed latest version #when resolving update plan #then fails closed without scheduling (0.045708ms)
+✔ #given current version #when resolving auto update plan #then no command is scheduled (0.147167ms)
+✔ #given recent state #when resolving plan #then update is throttled (0.065041ms)
+✔ #given installed lazycodex version snapshot #when resolving auto update plan #then uses distribution version (5.122833ms)
+✔ #given test command override #when running check #then records state and launches command (75.439041ms)
+✔ #given failed waited update #when retry window passes #then next update is not blocked by success throttle (140.513416ms)
+✔ #given active lock #when running check #then skips concurrent update (6.817208ms)
+✔ #given stale lock #when running check #then removes lock and runs update (59.320333ms)
+✔ #given marketplace plugin root without install snapshot #when running check #then skips npx update with marketplace-flow log and upgrade notice (2.144583ms)
+✔ #given install snapshot at plugin root #when running check #then npx update behavior is unchanged (48.137792ms)
+✔ #given marketplace skip already recorded #when next session is within interval #then throttled without repeated notice (1.269458ms)
+✔ #given unreadable install snapshot #when running check #then conservatively keeps npx flow and logs unknown detection (44.632083ms)
+✔ #given install flow fixtures #when detecting install flow #then discriminates on the install snapshot (0.57ms)
+✔ #given workspace tree without install snapshot #when detecting install flow #then stays npx-local (1.15725ms)
+✔ #given snapshot path that is not a regular file #when detecting install flow #then reports unknown (0.340416ms)
+✔ #given LAZYCODEX_INSTALLED_VERSION_PATH override #when detecting install flow #then honors the override path (0.506041ms)
+✔ #given throttled updater and stale Codex config #when running check #then config migration still runs (1.715125ms)
+✔ #given two versioned plugin roots #when the worker setup runs against each in turn #then bin links re-point to the new root and none resolve under the old (85.249625ms)
+✔ #given a completed v1 marker #when the worker runs against a v2 root #then the version change re-runs setup and re-points stale links (77.894667ms)
+✔ #given platform win32 #when the worker setup links bins #then component bins become .cmd shims and the omo wrapper is omo.cmd (52.626416ms)
+✔ #given a marketplace payload without dist/cli #when the worker setup runs #then it records the degraded omo-cli entry, logs the skip warning, and leaves no broken or omo link (29.8915ms)
+✔ #given a payload shipping dist/cli #when the worker setup runs with no bin-dir override #then the omo wrapper lands in <codexHome>/bin without a degraded entry (21.95175ms)
+✔ #given every hooks.json under the plugin #when handlers are inspected #then no entry opts into unsupported async execution (68.475333ms)
+✔ #given aggregate and component hook manifests #when command targets are resolved #then every command and commandWindows target exists (21.225334ms)
+✔ #given the bootstrap component #when its SessionStart registration is inspected #then aggregate and component entries declare both platform commands (0.999667ms)
+✔ #given the built bootstrap bundle #when its module references are inspected #then it depends on Node built-ins only (1.012667ms)
+✔ #given a fresh PLUGIN_DATA #when the session-start hook runs #then it spawns the detached worker and emits the restart notice (12.422125ms)
+✔ #given a completed marker for the current version #when the hook runs #then it exits 0 silently without spawning (7.459167ms)
+✔ #given a marker stamped for an older plugin version #when the hook runs #then the version bump re-spawns the worker (7.204208ms)
+✔ #given a fresh bootstrap lock held by another process #when the hook runs #then it exits 0 without spawning (5.864958ms)
+✔ #given a stale bootstrap lock #when the hook runs #then it spawns anyway (6.111834ms)
+✔ #given PLUGIN_DATA or PLUGIN_ROOT missing #when the hook runs #then it exits 0 silently (2.935541ms)
+✔ #given an unreadable plugin version manifest #when the hook runs #then it exits 0 without spawning (4.621959ms)
+✔ #given the public hook runner #when every branch resolves #then it always returns exit code 0 (3.70875ms)
+✔ #given a fresh state #when the worker runs #then steps execute and the versioned success marker is persisted (13.409875ms)
+✔ #given a marker written between hook and worker start #when the worker re-checks under lock #then it honors the marker (TOCTOU) (11.294375ms)
+✔ #given both locks already held #when the worker starts #then it is refused without writing state (8.117708ms)
+✔ #given throwing and degraded steps #when the worker runs #then degraded reasons are persisted and the worker still exits cleanly (12.297917ms)
+✔ #given a completed marker #when the worker runs with --once #then the marker is bypassed and steps run again (9.941333ms)
+✔ #given --only sg #when the worker runs #then only the matching step executes (15.85225ms)
+✔ #given worker CLI flags #when parsed #then --codex-home/--once/--only/--manifest-dir are recognized and unknown flags throw (0.261625ms)
+✔ #given a missing plugin version in the worker #when it runs #then it records a degraded state instead of crashing (10.340917ms)
+✔ #given bootstrap.ps1 #when the download preamble is inspected #then it forces TLS 1.2 on ServicePointManager (3.644916ms)
+✔ #given bootstrap.ps1 #when scanned for pwsh-7-only syntax #then Windows PowerShell 5.1 can parse every line (1.871917ms)
+✔ #given bootstrap.ps1 #when environment writes are scanned #then no Machine-scope target appears (0.667167ms)
+✔ #given bootstrap.ps1 #when execution policy mutations are scanned #then Set-ExecutionPolicy is never invoked (0.899125ms)
+✔ #given bootstrap.ps1 #when the final executable statement is located #then it is `exit 0` so sessions are never blocked (0.808667ms)
+✔ #given bootstrap.ps1 #when every character is inspected #then the script is ASCII-only for cp949-safe consoles (1.552708ms)
+✔ #given the aggregate and bootstrap component hook manifests #when commandWindows entries are read #then the bootstrap SessionStart hook launches bootstrap.ps1 (1.809459ms)
+✔ #given a marketplace-flow CODEX_HOME #when the worker setup runs #then config gains plugin, hook-state, and agent blocks without permissions keys (45.396375ms)
+✔ #given an existing git marketplace source #when the worker setup runs #then the [marketplaces.sisyphuslabs] block stays byte-identical (29.207291ms)
+✔ #given a completed first run #when the worker setup runs again #then config.toml is byte-identical (idempotent) (79.842625ms)
+✔ #given bootstrap-managed staging #when agents are linked #then nothing is persisted under PLUGIN_ROOT (26.229333ms)
+✔ #given user-tuned reasoning and service tier on an installed agent #when agents are re-linked #then both are preserved (22.257458ms)
+✔ #given an unwritable config.toml #when the worker setup runs #then it degrades naming config.toml and leaves the file untouched (8.402334ms)
+✔ #given win32 without Git Bash and auto-install skipped #when the worker setup runs #then it degrades instead of throwing and disables the git_bash MCP (11.605083ms)
+✔ #given win32 with Git Bash and OMO_CODEX_GIT_BASH_PATH #when the worker setup runs #then git_bash is enabled and the MCP env is stamped (9.545666ms)
+✔ #given the shipped plugin model catalog #when the worker setup stamps reasoning config #then the bundled fallback has not drifted from it (7.523ms)
+✔ #given the default worker step list #when the worker runs end to end #then the setup step updates config and records a success marker (7.79ms)
+✔ #given aggregate component package metadata #when bin names are inspected #then local component CLIs use the OMO prefix (8.485209ms)
+✔ #given component CLI sources #when usage text is inspected #then user-facing command names use OMO names (3.14425ms)
+✔ #given required component CLI contracts #when workspaces are inspected #then every contract component is covered (4.190833ms)
+✔ #given built workspace component CLIs #when import specifiers are inspected #then each CLI is self-contained except node builtins (7.331375ms)
+✔ #given built workspace component CLIs #when dynamically imported with hook argv and empty stdin #then each CLI loads without external module resolution (542.664084ms)
+✔ #given representative component hook payloads #when executed through dist CLI contract #then current hook behavior is preserved (499.3695ms)
+✔ #given malformed comment-checker stdin #when executed through dist CLI contract #then it exits successfully without output (52.830125ms)
+✔ #given aggregate hook manifest #when command hooks are inspected #then component CLI invocation contract is unchanged (0.820292ms)
+✔ #given hook status label #when formatting #then prefixes LazyCodex with current version (3.406666ms)
+✔ #given hook status label with blank version #when formatting #then prefixes LazyCodex with local version (0.118875ms)
+✔ #given loose legacy status label #when normalizing #then removes OMO wording and title-cases label (0.854875ms)
+✔ #given LazyCodex appears inside hook label #when normalizing #then product casing is preserved (0.912417ms)
+✔ #given MCP appears inside hook label #when normalizing #then protocol casing is preserved (0.124458ms)
+✔ #given aggregate comment-checker hook #when status is inspected #then it uses LazyCodex comments label (1.321625ms)
+✔ #given aggregate and component hooks #when status messages are inspected #then all use the LazyCodex formatter (18.050375ms)
+✔ #given aggregate build scripts #when inspected #then component CLIs are bundled with Bun (2.924708ms)
+✔ #given aggregate build scripts #when inspected #then npm subprocesses resolve on Windows (1.511292ms)
+✔ #given synced lcx-report-bug skill #when inspected #then it files LazyCodex bug issues with generated labels (3.59025ms)
+✔ #given synced lcx-contribute-bug-fix skill #when inspected #then it delivers LazyCodex fixes as issues and upstream fixes as fork PRs (0.980166ms)
+✔ #given synced lcx-doctor skill #when inspected #then it diagnoses installs against latest /tmp sources without mutating them (1.414ms)
+✔ #given complete bug-fix evidence #when creating a PR body #then required LazyCodex sections and label are emitted (1.192917ms)
+✔ #given missing bug-fix evidence #when creating a PR body #then the script rejects the incomplete payload (0.218ms)
+✔ #given a JSON payload path #when running the PR body script #then markdown is written to the requested file (59.46125ms)
+✔ #given the installed cache layout #when running build-lsp-tools #then uses the bundled dist and exits 0 (79.794417ms)
+✔ #given the installed cache layout #when running build-lsp-daemon #then uses the bundled dist and exits 0 (63.79875ms)
+lsp-tools-mcp package metadata is missing at <TMP> build packages/lsp-tools-mcp before codex-lsp
+probed: <TMP> <TMP>
+✔ #given neither layout #when running build-lsp-tools #then fails listing every probed path (59.17625ms)
+✔ #given the repo sibling layout with fresh outputs #when running build-lsp-tools #then exits 0 without building (55.269583ms)
+✔ #given aggregate MCP config #when inspected #then registers research and structural-search MCPs (3.27675ms)
+✔ #given stale root reasoning config #when ensuring config #then replaces stale values without duplicate keys (1.070584ms)
+✔ #given section settings reuse managed root keys #when ensuring config #then section settings are preserved (0.122542ms)
+✔ #given project .codex is a symlink #when migrating #then project config is skipped (17.890125ms)
+✔ #given project config.toml is a symlink #when migrating #then project config is skipped (6.745958ms)
+✔ #given global and project-local stale Codex configs #when migrating #then both configs are forced to current defaults (7.029875ms)
+✔ #given model catalog is unavailable and stale 272k config #when migrating #then fallback catalog still upgrades it (4.363709ms)
+✔ #given model catalog is malformed and stale config #when migrating #then fallback catalog still upgrades it (30.442834ms)
+✔ #given user-customized Codex model config #when migrating #then user values are preserved (4.199333ms)
+✔ #given managed config state is malformed #when migrating #then migration ignores stale state safely (6.310375ms)
+✔ #given managed config state path has surrounding whitespace #when migrating #then trimmed state path is used (4.254584ms)
+✔ #given managed catalog state #when catalog version advances #then only previously managed config is updated (9.774084ms)
+✔ #given config already matches current catalog #when catalog version advances for role-only changes #then managed state is preserved (4.657666ms)
+✔ #given multi_agent_v2 enabled #when forcing disable #then flips the flag to false (0.2795ms)
+✔ #given no multi_agent_v2 section #when forcing disable #then appends a disabled section (0.294917ms)
+✔ #given multi_agent_v2 section without enabled key #when forcing disable #then inserts enabled = false (0.0775ms)
+✔ #given [features] boolean shorthand multi_agent_v2 = true #when forcing disable #then removes it and appends a disabled section (0.156625ms)
+✔ #given multi_agent_v2 enabled #when forcing disable #then annotates the managed section with the upstream issue and opt-out (0.097625ms)
+✔ #given no multi_agent_v2 section #when forcing disable #then annotates the appended section (0.0715ms)
+✔ #given an annotated managed section #when forcing disable runs again #then does not duplicate the comment (0.046375ms)
+✔ #given [features] boolean shorthand multi_agent_v2 = false #when forcing disable #then returns config unchanged (0.030208ms)
+✔ #given multi_agent_v2 already disabled #when forcing disable #then returns config unchanged (0.026417ms)
+✔ #given global config without multi_agent_v2 section #when full migration runs #then writes a disabled section on disk (4.330083ms)
+✔ #given global config with forced multi_agent_v2 #when full migration runs #then disables it on disk (3.104709ms)
+✔ #given enabled = true with an inline comment #when forcing disable #then flips to false and preserves the comment (0.17ms)
+✔ #given a section header with an inline comment #when forcing disable #then patches in place without duplicating the table (0.052875ms)
+✔ #given an already-guarded commented config #when re-running #then output is byte-identical (0.04975ms)
+✔ #given user-disabled with an inline comment #when forcing disable #then returns config unchanged (0.026542ms)
+✔ #given [features] shorthand true with an inline comment #when forcing disable #then removes the shorthand and appends one disabled table (0.0635ms)
+✔ #given a following section header with an inline comment #when inserting enabled=false #then does not leak into the next section (0.065542ms)
+✔ #given Codex Light install docs #when inspected #then lazycodex is npm-first and Bun-free (5.150209ms)
+✔ payload-equivalence: #given telemetry-core and component shim #when session_start is captured #then payload schema matches telemetry-core (49.116208ms)
+✔ payload-equivalence: #given built telemetry CLI #when inspected #then telemetry-core is bundled without runtime package imports (2.121334ms)
+✔ #given the scaffold script and the workflow reference #when compared #then every plan header the script emits is documented in full-workflow.md (no drift) (4.542ms)
+✔ #given buildPlanSkeleton #when intent is unclear #then the human TL;DR leads the plan and surfaces the decisions veto block (0.366ms)
+✔ #given buildPlanSkeleton #when intent is clear #then it surfaces a decisions-to-sanity-check block instead (0.115583ms)
+✔ #given resolveSafeOmoPath #when the target escapes .omo or the workspace #then it is refused (the script never escapes .omo) (0.331083ms)
+✔ #given parseArgs #when the slug is missing or unsafe #then it throws, and valid flags parse (0.194458ms)
+✔ #given an already-scaffolded plan #when the script is re-run plain #then it is a no-op that preserves appended todos (resume-safe, no crash, no clobber) (8.96925ms)
+✔ #given a hand-edited plan #when --reset is used #then it refuses without --force and overwrites with --force (29.2015ms)
+✔ #given start-work skill without selectable plan #when inspected #then bootstraps ulw-plan before execution (4.068833ms)
+✔ #given packaged start-work completion surfaces #when inspected #then global review and debugging gate blocks completion (1.0345ms)
+✔ #given start-work skill #when echo discipline is inspected #then the ultraqa class list is enumerated once and the budget holds (0.910375ms)
+✔ #given start-work continuation hook #when inspected #then it remains Boulder-only without planning bootstrap logic (0.861042ms)
+✔ #given source package versions and component without hooks #when hook status messages sync #then source versions are preserved (17.14175ms)
+✔ #given release version override #when hook status messages sync #then aggregate hooks use release version (8.777458ms)
+✔ #given synced aggregate Codex skills #when they contain OpenCode orchestration examples #then Codex tool compatibility guidance is injected (13.595333ms)
+✔ #given late variant Codex compatibility guidance #when adapting a skill #then it is moved without duplication (0.301291ms)
+✔ #given early custom Codex compatibility guidance #when adapting a skill #then it is preserved exactly (0.057583ms)
+✔ #given early generated stale Codex compatibility guidance #when adapting a skill #then it is replaced (0.095333ms)
+✔ #given generated guidance before a template export #when adapting a skill #then the export wrapper is preserved (0.060291ms)
+✔ #given synced aggregate Codex skills #when they describe background orchestration #then liveness is framed as progress rather than timeout failure (9.042ms)
+✔ #given review-work skill #when some lanes do not finish #then aggregate result remains bounded (0.527625ms)
+✔ #given synced aggregate Codex skills #when inspected #then component and shared skills are present (11.988792ms)
+✔ #given aggregate Codex skills #when source wiring is inspected #then shared skills are imported from the shared-skills package (2.306542ms)
+✔ #given shared skill package source #when aggregate Codex shared skills are inspected #then generated copies have no hand-authored drift (6.851458ms)
+✔ #given shared skill source tests #when aggregate Codex skills are synced #then source tests are not packaged (0.451042ms)
+✔ #given component skill sources #when aggregate Codex component skills are inspected #then generated copies have no hand-authored drift (4.258042ms)
+✔ #given synced ulw-loop skill #when Codex hint metadata is inspected #then ulw-loop surfaces the ulw-loop alias (0.438917ms)
+✔ #given synced ulw-loop skill #when Codex hint metadata is inspected #then ulw-loop remains discoverable as an alias (0.224083ms)
+✔ #given synced git-master skill #when inspected #then commits and git history route through it (0.452667ms)
+✔ #given synced ulw-loop skill #when worker guidance is inspected #then context-hygiene guidance matches the source (0.582416ms)
+✔ #given packaged start-work skill #when inspected #then no-plan bootstrap and adversarial verification contracts are shipped (1.70875ms)
+✔ #given packaged ulw-plan skill #when inspected #then dynamic multi-agent planning contracts are shipped (1.665875ms)
+✔ #given context-pressure-prone skills #when bundled for Codex #then the eagerly loaded payload stays budgeted (0.509166ms)
+✔ #given LAZYCODEX_RELEASE_VERSION env #when resolving authoritative version #then the env value wins (0.646958ms)
+✔ #given no env override #when resolving authoritative version #then root package.json version is used (2.952584ms)
+✔ #given drifted Codex manifests #when syncing version from root #then all versioned manifests match and version-less files are left alone (7.477167ms)
+✔ #given already coherent manifests #when syncing again #then nothing is rewritten (4.443084ms)
+✔ #given ultraresearch skill #when scanned for non-English content #then it contains no Hangul (3.319416ms)
+✔ #given ultraresearch description #when activation policy is inspected #then it gates on explicit research demands only (0.737834ms)
+✔ #given ultraresearch body #when authority is inspected #then it takes precedence over exploration-bounding instructions (0.73525ms)
+✔ #given ultraresearch worker protocol #when EXPAND flow is inspected #then markers travel as message text and workers never write files (0.752333ms)
+✔ #given ultraresearch journaling #when ownership is inspected #then the orchestrator owns the session journal (1.151375ms)
+✔ #given ultraresearch expansion loop #when stop rules are inspected #then convergence rules and a depth cap are stated (0.552333ms)
+✔ #given ultraresearch under ultrawork #when coexistence is inspected #then marker and done-definition conflicts are resolved (0.562541ms)
+✔ #given ultraresearch worker sizing #when spawn guidance is inspected #then capable-model and high-effort routing is stated (0.705333ms)
+✔ #given ulw-plan skill #when inspected #then it is a Codex-native planner that defers the deep workflow to its reference (3.325083ms)
+✔ #given ulw-plan skill #when the planning gate is inspected #then it explores first and waits for explicit user approval instead of auto-transitioning (0.453084ms)
+✔ #given ulw-plan skill #when the execution gate is inspected #then plan mode is sticky, execution needs an explicit start, and the high-accuracy ask is mandatory (0.487542ms)
+✔ #given ulw-plan full workflow reference #when the delivery phase is inspected #then it mandates the start-or-high-accuracy question and forbids self-started execution (0.363375ms)
+✔ #given ulw-plan full workflow reference #when inspected #then it documents the approval gate and .omo plan output with Codex-native tools only (0.356875ms)
+✔ #given ulw-plan approval gate #when inspected #then it is a durable decision rule that ends the approval loop (lazycodex #48) (0.431375ms)
+✔ #given ulw-plan skill #when intent routing is inspected #then it splits clear vs unclear into two references with the on-the-fence tie-break (0.303625ms)
+✔ #given ulw-plan skill #when the generator mandate is inspected #then it runs the cross-platform scaffold script and appends, never hand-building (0.732958ms)
+✔ #given the unclear-intent reference #when inspected #then it forbids interrogation, auto-runs high accuracy, and suppresses it on Trivial (0.344291ms)
+✔ #given the clear-intent reference #when inspected #then it asks the surviving forks with WHY and keeps Momus optional (0.256958ms)
+✔ #given the plan template in full-workflow #when inspected #then the human TL;DR leads above the AI detail and the script is the source (0.401625ms)
+✔ #given the high-accuracy review #when inspected #then it is a dual Momus where both passes must return OKAY (0.23725ms)
+ℹ tests 217
+ℹ suites 0
+ℹ pass 217
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1273.125042
+
+EXIT_CODE=0

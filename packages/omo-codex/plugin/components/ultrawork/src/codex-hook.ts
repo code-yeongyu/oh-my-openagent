@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 
-import { ULTRAWORK_DIRECTIVE } from "./directive.js";
+import { buildUltraworkAdditionalContext, type UltraworkAdditionalContextOptions } from "./skill-pointer.js";
 
-const ULTRAWORK_PATTERN = /\b(?:ultrawork|ulw)\b/i;
+const ULTRAWORK_CURRENT_PROMPT_PATTERN = /(?:ultrawork|ulw)/i;
 const ULTRAWORK_DIRECTIVE_MARKER = "<ultrawork-mode>";
 const TRANSCRIPT_SEARCH_BYTES = 512_000;
 const CONTEXT_PRESSURE_MARKERS = [
@@ -28,12 +28,14 @@ interface UserPromptSubmitHookOutput {
 	};
 }
 
-export function runUserPromptSubmitHook(input: unknown): string {
+export function runUserPromptSubmitHook(input: unknown, options: UltraworkAdditionalContextOptions = {}): string {
 	if (!isCodexUserPromptSubmitInput(input)) return "";
 	if (isContextPressureRecoveryPrompt(input.prompt)) return "";
 	if (hasUltraworkDirectiveAlreadyInTranscript(input.transcript_path)) return "";
 	if (isContextPressureTranscript(input.transcript_path)) return "";
-	return isUltraworkPrompt(input.prompt) ? formatAdditionalContextOutput(ULTRAWORK_DIRECTIVE) : "";
+	return isUltraworkPrompt(input.prompt)
+		? formatAdditionalContextOutput(buildUltraworkAdditionalContext(options))
+		: "";
 }
 
 function hasUltraworkDirectiveAlreadyInTranscript(transcriptPath: string | null | undefined): boolean {
@@ -80,7 +82,7 @@ function readTranscriptTail(transcriptPath: string): string {
 }
 
 export function isUltraworkPrompt(prompt: string): boolean {
-	return ULTRAWORK_PATTERN.test(prompt);
+	return ULTRAWORK_CURRENT_PROMPT_PATTERN.test(prompt);
 }
 
 function isContextPressureRecoveryPrompt(prompt: string): boolean {
@@ -91,7 +93,7 @@ function isContextPressureRecoveryPrompt(prompt: string): boolean {
 function isContextPressureTranscript(transcriptPath: string | null | undefined): boolean {
 	if (transcriptPath === undefined || transcriptPath === null) return false;
 	try {
-		return isContextPressureRecoveryPrompt(readFileSync(transcriptPath, "utf8"));
+		return isContextPressureRecoveryPrompt(readTranscriptTail(transcriptPath));
 	} catch (error) {
 		if (error instanceof Error) return false;
 		throw error;

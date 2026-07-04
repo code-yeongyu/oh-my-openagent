@@ -23,18 +23,12 @@ export type ContinuationHooks = {
   atlasHook: ReturnType<typeof createAtlasHook> | null
 }
 
-type SessionRecovery = {
-  setOnAbortCallback: (callback: (sessionID: string) => void) => void
-  setOnRecoveryCompleteCallback: (callback: (sessionID: string) => void) => void
-} | null
-
 export function createContinuationHooks(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
   isHookEnabled: (hookName: HookName) => boolean
   safeHookEnabled: boolean
   backgroundManager: BackgroundManager
-  sessionRecovery: SessionRecovery
 }): ContinuationHooks {
   const {
     ctx,
@@ -42,7 +36,6 @@ export function createContinuationHooks(args: {
     isHookEnabled,
     safeHookEnabled,
     backgroundManager,
-    sessionRecovery,
   } = args
 
   const safeHook = <T>(hookName: HookName, factory: () => T): T | null =>
@@ -76,29 +69,6 @@ export function createContinuationHooks(args: {
     ? safeHook("unstable-agent-babysitter", () =>
         createUnstableAgentBabysitter({ ctx, backgroundManager, pluginConfig }))
     : null
-
-  if (sessionRecovery) {
-    const onAbortCallbacks: Array<(sessionID: string) => void> = []
-    const onRecoveryCompleteCallbacks: Array<(sessionID: string) => void> = []
-
-    if (todoContinuationEnforcer) {
-      onAbortCallbacks.push(todoContinuationEnforcer.markRecovering)
-      onRecoveryCompleteCallbacks.push(todoContinuationEnforcer.markRecoveryComplete)
-    }
-
-
-    if (onAbortCallbacks.length > 0) {
-      sessionRecovery.setOnAbortCallback((sessionID: string) => {
-        for (const callback of onAbortCallbacks) callback(sessionID)
-      })
-    }
-
-    if (onRecoveryCompleteCallbacks.length > 0) {
-      sessionRecovery.setOnRecoveryCompleteCallback((sessionID: string) => {
-        for (const callback of onRecoveryCompleteCallbacks) callback(sessionID)
-      })
-    }
-  }
 
   const backgroundNotificationHook = isHookEnabled("background-notification")
     ? safeHook("background-notification", () => createBackgroundNotificationHook(backgroundManager))

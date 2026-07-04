@@ -6,6 +6,7 @@ import { join } from "node:path";
 const requireFromHere = createRequire(import.meta.url);
 
 const MAX_SOCKET_PATH_LENGTH = 100;
+const CODEX_LSP_DAEMON_VERSION_ENV = "CODEX_LSP_DAEMON_VERSION";
 
 export interface DaemonPaths {
 	version: string;
@@ -16,13 +17,14 @@ export interface DaemonPaths {
 	log: string;
 }
 
-export function resolveDaemonVersion(): string {
-	try {
-		const pkg = requireFromHere("../package.json") as { version?: unknown };
-		return typeof pkg.version === "string" && pkg.version.length > 0 ? pkg.version : "0";
-	} catch {
-		return "0";
+export function resolveDaemonVersion(requireFn: (id: string) => unknown = requireFromHere): string {
+	for (const candidate of ["./package.json", "../package.json"]) {
+		try {
+			const pkg = requireFn(candidate) as { version?: unknown };
+			if (typeof pkg.version === "string" && pkg.version.length > 0) return pkg.version;
+		} catch {}
 	}
+	return "0";
 }
 
 export function daemonBaseDir(env: NodeJS.ProcessEnv = process.env): string {
@@ -37,7 +39,7 @@ export function daemonBaseDir(env: NodeJS.ProcessEnv = process.env): string {
 
 export function daemonPaths(
 	env: NodeJS.ProcessEnv = process.env,
-	version: string = resolveDaemonVersion(),
+	version: string = resolveDaemonVersionFromEnv(env) ?? resolveDaemonVersion(),
 ): DaemonPaths {
 	const dir = join(daemonBaseDir(env), `v${version}`);
 	return {
@@ -48,6 +50,11 @@ export function daemonPaths(
 		pid: join(dir, "daemon.pid"),
 		log: join(dir, "daemon.log"),
 	};
+}
+
+export function resolveDaemonVersionFromEnv(env: NodeJS.ProcessEnv = process.env): string | null {
+	const version = env[CODEX_LSP_DAEMON_VERSION_ENV]?.trim();
+	return version && version.length > 0 ? version : null;
 }
 
 function resolveSocketPath(dir: string, version: string): string {

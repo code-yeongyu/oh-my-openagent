@@ -9,7 +9,7 @@ This command includes examples for the OpenCode harness. In Codex, do not call O
 | \`call_omo_agent(subagent_type="explore", ...)\` | \`spawn_agent(agent_type="explorer", task_name="...", message="...")\` |
 | \`call_omo_agent(subagent_type="librarian", ...)\` | \`spawn_agent(agent_type="librarian", task_name="...", message="...")\` |
 | \`task(subagent_type="plan", ...)\` | \`spawn_agent(agent_type="plan", task_name="...", message="...")\` |
-| \`task(subagent_type="oracle", ...)\` | \`spawn_agent(agent_type="codex-ultrawork-reviewer", task_name="...", message="...")\` |
+| \`task(subagent_type="oracle", ...)\` | \`multi_agent_v1.spawn_agent({"message":"TASK: act as a rigorous reviewer. ...","agent_type":"lazycodex-gate-reviewer","fork_context":false})\` |
 | \`task(category="...", ...)\` | \`spawn_agent(agent_type="worker", task_name="...", message="...")\` |
 | \`background_output(task_id="...")\` | \`wait_agent(...)\` to wait for subagent completion and mailbox updates |
 | \`team_*(...)\` | Use Codex native subagents plus \`send_message\`, \`followup_task\`, \`wait_agent\`, and \`close_agent\` |
@@ -178,23 +178,14 @@ LspWorkspaceSymbols(filePath, query="[target_symbol]")  // Search by name
 lsp_diagnostics(filePath)  // Errors, warnings before we start
 \`\`\`
 
-### AST-Grep for Pattern Analysis:
+### AST-Grep Skill for Pattern Analysis:
 
-\`\`\`typescript
+\`\`\`bash
 // Find structural patterns
-ast_grep_search(
-  pattern="function $NAME($$$) { $$$ }",  // or relevant pattern
-  lang="typescript",  // or relevant language
-  paths=["src/"]
-)
+python3 scripts/ast_grep_helper.py search 'function $NAME($$$) { $$$ }' --lang ts src/
 
-// Preview refactoring (DRY RUN)
-ast_grep_replace(
-  pattern="[old_pattern]",
-  rewrite="[new_pattern]",
-  lang="[language]",
-  dryRun=true  // ALWAYS preview first
-)
+# Preview refactoring first
+sg --pattern '[old_pattern]' --rewrite '[new_pattern]' --lang ts src/
 \`\`\`
 
 ### Grep for Text Patterns:

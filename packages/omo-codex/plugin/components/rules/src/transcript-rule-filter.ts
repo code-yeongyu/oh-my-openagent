@@ -1,4 +1,4 @@
-import type { LoadedRule } from "./rules/types.js";
+import type { LoadedRule } from "@oh-my-opencode/rules-engine/engine";
 import type { TranscriptSearchOptions } from "./transcript-search.js";
 import { readTranscriptSearchText } from "./transcript-search.js";
 

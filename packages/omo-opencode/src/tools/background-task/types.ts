@@ -13,6 +13,7 @@ export interface BackgroundOutputArgs {
   message_limit?: number
   since_message_id?: string
   include_tool_results?: boolean
+  from_end?: boolean
   thinking_max_chars?: number
 }
 

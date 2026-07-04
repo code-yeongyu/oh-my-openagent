@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test"
 
-import { isProviderAvailable, toProviderAvailability } from "./provider-availability"
+import { ULTIMATE_FALLBACK } from "./model-fallback"
+import {
+	getNoModelProvidersWarning,
+	hasAnyConfiguredProvider,
+	isProviderAvailable,
+	toProviderAvailability,
+} from "./provider-availability"
 import type { InstallConfig } from "./types"
 
 function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
@@ -34,5 +40,16 @@ describe("provider availability", () => {
     // #when / #then
     expect(isProviderAvailable("bailian-coding-plan", availability)).toBe(true)
     expect(isProviderAvailable("minimax-coding-plan", availability)).toBe(false)
+  })
+
+  test("installer warning copy uses ultimate fallback constant", () => {
+    expect(getNoModelProvidersWarning()).toBe(
+      `No model providers configured. Using ${ULTIMATE_FALLBACK} as fallback.`,
+    )
+  })
+
+  test("hasAnyConfiguredProvider treats Bailian-only config as configured", () => {
+    expect(hasAnyConfiguredProvider(createConfig({ hasBailianCodingPlan: true }))).toBe(true)
+    expect(hasAnyConfiguredProvider(createConfig())).toBe(false)
   })
 })

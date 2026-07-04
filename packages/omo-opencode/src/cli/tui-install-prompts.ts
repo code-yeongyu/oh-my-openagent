@@ -7,6 +7,7 @@ import type {
   InstallPlatform,
 } from "./types"
 import { detectedToInitialValues } from "./install-validators"
+import { ULTIMATE_FALLBACK } from "./model-fallback"
 
 async function selectOrCancel<TValue extends Readonly<string | boolean | number>>(params: {
   message: string
@@ -34,6 +35,7 @@ export async function promptInstallPlatform(
     { value: "opencode", label: "OpenCode", hint: "Install OpenCode plugin only" },
     { value: "codex", label: "Codex", hint: "Install Codex harness adapter only" },
     { value: "both", label: "Both", hint: "Install OpenCode plugin and Codex adapter" },
+    { value: "senpi", label: "Senpi", hint: "Install Senpi harness adapter only" },
   ]
 
   return selectOrCancel<InstallPlatform>({
@@ -50,6 +52,7 @@ export async function promptInstallConfig(
 ): Promise<InstallConfig | null> {
   const hasOpenCode = platform === "opencode" || platform === "both"
   const hasCodex = platform === "codex" || platform === "both"
+  const hasSenpi = platform === "senpi"
   const codexAutonomous = await resolveCodexAutonomous(hasCodex, codexAutonomousOverride)
   if (codexAutonomous === null) return null
 
@@ -63,6 +66,7 @@ export async function promptInstallConfig(
       hasGemini: false,
       hasCopilot: false,
       hasCodex,
+      hasSenpi,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
@@ -80,7 +84,7 @@ export async function promptInstallConfig(
   const claude = await selectOrCancel<ClaudeSubscription>({
     message: "Do you have a Claude Pro/Max subscription?",
     options: [
-      { value: "no", label: "No", hint: "Will use opencode/big-pickle as fallback" },
+      { value: "no", label: "No", hint: `Will use ${ULTIMATE_FALLBACK} as fallback` },
       { value: "yes", label: "Yes (standard)", hint: "Claude Opus 4.5 for orchestration" },
       { value: "max20", label: "Yes (max20 mode)", hint: "Full power with Claude Sonnet 4.6 for Librarian" },
     ],
@@ -207,6 +211,7 @@ export async function promptInstallConfig(
     hasGemini: gemini === "yes",
     hasCopilot: copilot === "yes",
     hasCodex,
+    hasSenpi,
     hasOpencodeZen: opencodeZen === "yes",
     hasZaiCodingPlan: zaiCodingPlan === "yes",
     hasKimiForCoding: kimiForCoding === "yes",

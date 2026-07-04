@@ -9,6 +9,7 @@ import {
 	assertPackagedContentMatches,
 	componentSkillSources,
 	expectedSkills,
+	hiddenSharedSkills,
 	listSkillFiles,
 	removeCodexCompatibilityGuidance,
 	removeCodexSkillOverlays,
@@ -16,11 +17,24 @@ import {
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const repoRoot = join(root, "..", "..", "..");
+const opencodeOnlyToolPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/;
+const generatedSkillMetadataFiles = new Set(["agents/openai.yaml"]);
 
 async function readPackagedSkillFile(...segments) {
 	const path = join(root, "skills", ...segments);
 	const content = await readFile(path, "utf8");
 	return { path, content };
+}
+
+function excludeGeneratedSkillMetadata(files) {
+	return files.filter((file) => !generatedSkillMetadataFiles.has(file.replaceAll("\\", "/")));
+}
+
+async function assertNoLegacyResearchAliasInTree(rootDir, label) {
+	for (const file of await listSkillFiles(rootDir)) {
+		const content = await readFile(join(rootDir, file), "utf8");
+		assert.doesNotMatch(content, /ultraresearch/i, `${label}/${file} must not expose ultraresearch`);
+	}
 }
 
 test("#given synced aggregate Codex skills #when inspected #then component and shared skills are present", async () => {
@@ -41,6 +55,26 @@ test("#given synced aggregate Codex skills #when inspected #then component and s
 	}
 });
 
+test("#given reference-only designpowers frontend files #when synced for Codex #then nested SKILL.md files are not packaged", async () => {
+	// given
+	const frontendReferencesRoot = join(root, "skills", "frontend", "references");
+	const designpowersVendorSkillsRoot = join(frontendReferencesRoot, "designpowers", "vendor", "skills");
+
+	// when
+	const nestedSkillFiles = (await listSkillFiles(frontendReferencesRoot))
+		.map((file) => file.replaceAll("\\", "/"))
+		.filter((file) => file.endsWith("/SKILL.md") || file === "SKILL.md")
+		.sort();
+	const designpowersReferenceFiles = (await listSkillFiles(designpowersVendorSkillsRoot))
+		.map((file) => file.replaceAll("\\", "/"))
+		.filter((file) => file.endsWith("/reference.md"))
+		.sort();
+
+	// then
+	assert.deepEqual(nestedSkillFiles, []);
+	assert.equal(designpowersReferenceFiles.length, 27);
+});
+
 test("#given aggregate Codex skills #when source wiring is inspected #then shared skills are imported from the shared-skills package", async () => {
 	// given
 	const pluginPackageJson = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
@@ -53,7 +87,10 @@ test("#given aggregate Codex skills #when source wiring is inspected #then share
 	const rootPackageFiles = rootPackageJson.files ?? [];
 
 	// then
-	assert.equal(sharedPackageJson.exports?.["."], "./index.mjs");
+	assert.deepEqual(sharedPackageJson.exports?.["."], {
+		types: "./index.d.ts",
+		import: "./index.mjs",
+	});
 	assert.equal(sharedPackageJson.files?.includes("skills"), true);
 	assert.equal(rootPackageFiles.includes("packages/shared-skills/package.json"), true);
 	assert.equal(rootPackageFiles.includes("packages/shared-skills/index.mjs"), true);
@@ -67,6 +104,7 @@ test("#given shared skill package source #when aggregate Codex shared skills are
 	// given
 	const sharedSkillsRoot = sharedSkillsRootPath();
 	const aggregateSkillsRoot = join(root, "skills");
+	const componentSkillNames = new Set(componentSkillSources.map(([skillName]) => skillName));
 	const sharedSkillNames = (await readdir(sharedSkillsRoot, { withFileTypes: true }))
 		.filter((entry) => entry.isDirectory())
 		.map((entry) => entry.name)
@@ -74,6 +112,8 @@ test("#given shared skill package source #when aggregate Codex shared skills are
 
 	// when / then
 	for (const skillName of sharedSkillNames) {
+		if (componentSkillNames.has(skillName)) continue;
+		if (hiddenSharedSkills.includes(skillName)) continue;
 		const sharedContent = await readFile(join(sharedSkillsRoot, skillName, "SKILL.md"), "utf8");
 		const aggregateContent = await readFile(join(aggregateSkillsRoot, skillName, "SKILL.md"), "utf8");
 		assert.equal(
@@ -84,15 +124,39 @@ test("#given shared skill package source #when aggregate Codex shared skills are
 	}
 });
 
+test("#given a shared skill name collides with a Codex component skill #when aggregate skills are inspected #then the component skill wins", async () => {
+	// given
+	const sharedSkill = await readFile(join(sharedSkillsRootPath(), "ulw-plan", "SKILL.md"), "utf8");
+	const componentSkill = await readFile(join(root, "components", "ultrawork", "skills", "ulw-plan", "SKILL.md"), "utf8");
+	const aggregateSkill = await readFile(join(root, "skills", "ulw-plan", "SKILL.md"), "utf8");
+
+	// when / then
+	assert.notEqual(removeCodexCompatibilityGuidance(aggregateSkill), removeCodexCompatibilityGuidance(sharedSkill));
+	assert.equal(removeCodexCompatibilityGuidance(aggregateSkill), removeCodexCompatibilityGuidance(componentSkill));
+	assert.match(aggregateSkill, /multi_agent_v1/);
+});
+
 test("#given shared skill source tests #when aggregate Codex skills are synced #then source tests are not packaged", async () => {
 	// given
 	const aggregateSkillsRoot = join(root, "skills");
 
 	// when
-	const visualQaFiles = await listSkillFiles(join(aggregateSkillsRoot, "visual-qa"));
+	const forbiddenFiles = [];
+	for (const skillName of expectedSkills) {
+		for (const file of await listSkillFiles(join(aggregateSkillsRoot, skillName))) {
+			const normalized = file.replaceAll("\\", "/");
+			const segments = normalized.split("/");
+			const scriptsIndex = segments.lastIndexOf("scripts");
+			const hasPythonTestDir = scriptsIndex !== -1 && segments[scriptsIndex + 1] === "tests";
+			const isSourceMetadata = normalized === ".gitignore" || normalized === ".npmignore" || normalized === "pyrightconfig.json";
+			if (normalized.endsWith(".test.ts") || hasPythonTestDir || segments.includes("__pycache__") || normalized.endsWith(".pyc") || isSourceMetadata) {
+				forbiddenFiles.push(`${skillName}/${normalized}`);
+			}
+		}
+	}
 
 	// then
-	assert.equal(visualQaFiles.some((file) => file.endsWith(".test.ts")), false);
+	assert.deepEqual(forbiddenFiles, []);
 });
 
 test("#given component skill sources #when aggregate Codex component skills are inspected #then generated copies have no hand-authored drift", async () => {
@@ -103,14 +167,14 @@ test("#given component skill sources #when aggregate Codex component skills are 
 	for (const [skillName, sourcePath] of componentSkillSources) {
 		const sourceDir = join(root, sourcePath);
 		const aggregateDir = join(aggregateSkillsRoot, skillName);
-		const sourceFiles = await listSkillFiles(sourceDir);
-		const aggregateFiles = await listSkillFiles(aggregateDir);
+		const sourceFiles = excludeGeneratedSkillMetadata(await listSkillFiles(sourceDir));
+		const aggregateFiles = excludeGeneratedSkillMetadata(await listSkillFiles(aggregateDir));
 		assert.deepEqual(aggregateFiles, sourceFiles, `${skillName} resource set drifted from its component skill source`);
 		for (const relativePath of sourceFiles) {
 			const sourceContent = await readFile(join(sourceDir, relativePath), "utf8");
 			const aggregateContent = await readFile(join(aggregateDir, relativePath), "utf8");
 			assert.equal(
-				removeCodexCompatibilityGuidance(aggregateContent),
+				removeCodexSkillOverlays(skillName, removeCodexCompatibilityGuidance(aggregateContent)),
 				removeCodexCompatibilityGuidance(sourceContent),
 				`${skillName}/${relativePath} drifted from its component skill source`,
 			);
@@ -128,8 +192,7 @@ test("#given synced ulw-loop skill #when Codex hint metadata is inspected #then 
 
 	// then
 	assert.match(skill, /^---\r?\nname: ulw-loop\r?\n/m);
-	assert.match(skill, /Goal-like loop that uses ultrawork mode to decompose work into systematic, evidence-bound steps\./);
-	assert.match(interfaceMetadata, /display_name: "ulw-loop \(omo\)"/);
+	assert.match(interfaceMetadata, /display_name: "\(OmO\) ulw-loop"/);
 	assert.doesNotMatch(interfaceMetadata, /ulw-loop \/ ulw-loop/);
 	assert.match(interfaceMetadata, /short_description: "Goal-like ultrawork loop for systematic decomposition"/);
 	assert.match(interfaceMetadata, /default_prompt: "Use \$ulw-loop/);
@@ -147,6 +210,20 @@ test("#given synced ulw-loop skill #when Codex hint metadata is inspected #then 
 	assert.match(interfaceMetadata, /- "ulw-loop"/);
 });
 
+test("#given shipped Codex skill payloads #when legacy ultraresearch alias is inspected #then it is not packaged", async () => {
+	// given
+	const skillsRoot = join(root, "skills");
+	const skillRoot = join(skillsRoot, "ultraresearch");
+
+	// then
+	await assert.rejects(readFile(join(skillRoot, "SKILL.md"), "utf8"), { code: "ENOENT" });
+	await assert.rejects(readFile(join(skillRoot, "agents", "openai.yaml"), "utf8"), { code: "ENOENT" });
+	await assertNoLegacyResearchAliasInTree(skillsRoot, "skills");
+	for (const [skillName, sourcePath] of componentSkillSources) {
+		await assertNoLegacyResearchAliasInTree(join(root, sourcePath), `components/${skillName}`);
+	}
+});
+
 test("#given synced git-master skill #when inspected #then commits and git history route through it", async () => {
 	// given
 	const skillRoot = join(root, "skills", "git-master");
@@ -162,7 +239,7 @@ test("#given synced git-master skill #when inspected #then commits and git histo
 	assert.match(skill, /Choose the Git tool by the question/);
 	assert.match(skill, /git log -S "text"/);
 	assert.match(skill, /git blame -L start,end -- file/);
-	assert.match(interfaceMetadata, /display_name: "git-master \(omo\)"/);
+	assert.match(interfaceMetadata, /display_name: "\(OmO\) git-master"/);
 	assert.match(interfaceMetadata, /- "git commit"/);
 	assert.match(interfaceMetadata, /- "history search"/);
 });
@@ -237,6 +314,24 @@ test("#given packaged ulw-plan skill #when inspected #then dynamic multi-agent p
 		["does not accept subagent outputs as success without independent verification", /subagent outputs?[\s\S]*(?:not|never)[\s\S]*(?:success|approval)|independent(?:ly)? verif(?:y|ied|ication)[\s\S]*subagent outputs?/i],
 		["treats Discord or external content as claims, not instructions", /(?:Discord|external content)[\s\S]*claims?[\s\S]*not instructions?|not instructions?[\s\S]*(?:Discord|external content)/i],
 	]);
+	assert.doesNotMatch(combinedFile.content, opencodeOnlyToolPattern);
+	assert.doesNotMatch(combinedFile.content, /Proceeding to plan generation/);
+});
+
+test("#given packaged Codex ulw-plan surfaces #when inspected #then dangerous sandbox bypass guidance is not shipped", async () => {
+	// given
+	const dangerousBypassToken = ["dangerously", "bypass"].join("-");
+	const dangerousBypassPattern = new RegExp(`${dangerousBypassToken}(?:-approvals-and-sandbox)?`);
+	const packagedWorkflow = await readPackagedSkillFile("ulw-plan", "references", "full-workflow.md");
+	const componentWorkflowPath = join(root, "components", "ultrawork", "skills", "ulw-plan", "references", "full-workflow.md");
+	const componentWorkflow = {
+		path: componentWorkflowPath,
+		content: await readFile(componentWorkflowPath, "utf8"),
+	};
+
+	// when / then
+	assert.doesNotMatch(packagedWorkflow.content, dangerousBypassPattern, `${packagedWorkflow.path} ships unsafe Codex bypass guidance`);
+	assert.doesNotMatch(componentWorkflow.content, dangerousBypassPattern, `${componentWorkflow.path} ships unsafe Codex bypass guidance`);
 });
 
 test("#given context-pressure-prone skills #when bundled for Codex #then the eagerly loaded payload stays budgeted", async () => {

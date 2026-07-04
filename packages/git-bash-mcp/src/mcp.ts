@@ -1,4 +1,6 @@
 import type { Readable, Writable } from "node:stream";
+import { errorResponse, isPlainRecord, jsonRpcId, runJsonRpcStdioServer, successResponse } from "@oh-my-opencode/mcp-stdio-core";
+import type { JsonRpcResponse, McpLifecycleLog } from "@oh-my-opencode/mcp-stdio-core";
 import { resolveGitBash, resolveGitBashForCurrentProcess, type GitBashResolution } from "./git-bash-resolver";
 import { runGitBashCommand, type GitBashRunResult, type RunGitBashCommand } from "./runner";
 
@@ -12,6 +14,7 @@ const EXEC_COMMAND_TIMEOUT_ENV_KEYS = [
 ] as const;
 
 export interface GitBashMcpOptions {
+  readonly lifecycleLog?: McpLifecycleLog;
   readonly platform?: string;
   readonly env?: { readonly [key: string]: string | undefined };
   readonly exists?: (path: string) => boolean;
@@ -20,21 +23,7 @@ export interface GitBashMcpOptions {
   readonly defaultTimeoutMs?: number;
 }
 
-export type JsonRpcResponse =
-  | {
-      readonly jsonrpc: "2.0";
-      readonly id: string | number | null;
-      readonly result: Record<string, unknown>;
-    }
-  | {
-      readonly jsonrpc: "2.0";
-      readonly id: string | number | null;
-      readonly error: {
-        readonly code: number;
-        readonly message: string;
-        readonly data?: unknown;
-      };
-    };
+export type { JsonRpcResponse };
 
 interface ToolDefinition {
   readonly name: string;
@@ -43,9 +32,9 @@ interface ToolDefinition {
 }
 
 export async function handleGitBashMcpRequest(input: unknown, options: GitBashMcpOptions = {}): Promise<JsonRpcResponse | undefined> {
-  if (!isRecord(input)) return errorResponse(null, -32600, "Invalid Request");
-  const id = jsonRpcId(input.id);
-  const method = typeof input.method === "string" ? input.method : null;
+  if (!isPlainRecord(input)) return errorResponse(null, -32600, "Invalid Request");
+  const id = jsonRpcId(input["id"]);
+  const method = typeof input["method"] === "string" ? input["method"] : null;
 
   if (method === "initialize") {
     const protocolVersion = protocolVersionFromInput(input) ?? "2024-11-05";
@@ -59,9 +48,9 @@ export async function handleGitBashMcpRequest(input: unknown, options: GitBashMc
   if (method === "tools/list") return successResponse(id, { tools: toolsForOptions(options) });
 
   if (method === "tools/call") {
-    const params = isRecord(input.params) ? input.params : {};
-    const name = typeof params.name === "string" ? params.name : "";
-    const args = isRecord(params.arguments) ? params.arguments : {};
+    const params = isPlainRecord(input["params"]) ? input["params"] : {};
+    const name = typeof params["name"] === "string" ? params["name"] : "";
+    const args = isPlainRecord(params["arguments"]) ? params["arguments"] : {};
     return await callTool(id, name, args, options);
   }
 
@@ -73,19 +62,15 @@ export async function handleGitBashMcpRequest(input: unknown, options: GitBashMc
 export async function runMcpStdioServer(input: Readable, output: Writable, options: GitBashMcpOptions = {}): Promise<void> {
   if (!canRunGitBash(options)) return;
 
-  let buffer = "";
-  for await (const chunk of input) {
-    buffer += String(chunk);
-    while (true) {
-      const lineEnd = buffer.indexOf("\n");
-      if (lineEnd === -1) break;
-      const line = buffer.slice(0, lineEnd).trim();
-      buffer = buffer.slice(lineEnd + 1);
-      if (line.length === 0) continue;
-      const response = await handleGitBashMcpRequest(parseJsonRpcLine(line), options);
-      if (response !== undefined) output.write(`${JSON.stringify(response)}\n`);
-    }
-  }
+  await runJsonRpcStdioServer({
+    input,
+    output,
+    handler: handleGitBashMcpRequest,
+    handlerOptions: options,
+    idleTimeoutMs: 0,
+    log: options.lifecycleLog,
+    parseErrorResponse: () => errorResponse(null, -32601, "Method not found"),
+  });
 }
 
 async function callTool(id: string | number | null, name: string, args: Record<string, unknown>, options: GitBashMcpOptions): Promise<JsonRpcResponse> {
@@ -120,7 +105,7 @@ async function runToolResponse(id: string | number | null, args: Record<string, 
   }
 }
 
-function toolsForOptions(options: GitBashMcpOptions): readonly ToolDefinition[] {
+function toolsForOptions(options: GitBashMcpOptions): ToolDefinition[] {
   const sharedTools: ToolDefinition[] = [
     {
       name: "which_bash",
@@ -215,14 +200,6 @@ function toolResponse(id: string | number | null, text: string, isError = false)
   return successResponse(id, { content: [{ type: "text", text }], isError });
 }
 
-function successResponse(id: string | number | null, result: Record<string, unknown>): JsonRpcResponse {
-  return { jsonrpc: "2.0", id, result };
-}
-
-function errorResponse(id: string | number | null, code: number, message: string, data?: unknown): JsonRpcResponse {
-  return { jsonrpc: "2.0", id, error: data === undefined ? { code, message } : { code, message, data } };
-}
-
 function parseWorkdir(args: Record<string, unknown>): string | undefined | null {
   const value = args.workdir ?? args.cwd;
   if (value === undefined) return undefined;
@@ -254,23 +231,7 @@ function normalizeTimeoutMs(value: unknown): number | null {
 }
 
 function protocolVersionFromInput(input: Record<string, unknown>): string | null {
-  if (!isRecord(input.params)) return null;
-  return typeof input.params.protocolVersion === "string" ? input.params.protocolVersion : null;
-}
-
-function parseJsonRpcLine(line: string): unknown {
-  try {
-    const parsed: unknown = JSON.parse(line);
-    return parsed;
-  } catch (error) {
-    return { jsonrpc: "2.0", id: null, method: null, parseError: error instanceof Error ? error.message : String(error) };
-  }
-}
-
-function jsonRpcId(value: unknown): string | number | null {
-  return typeof value === "string" || typeof value === "number" || value === null ? value : null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  if (!isPlainRecord(input["params"])) return null;
+  const params = input["params"];
+  return typeof params["protocolVersion"] === "string" ? params["protocolVersion"] : null;
 }

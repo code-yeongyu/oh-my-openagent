@@ -1,13 +1,33 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+/// <reference types="bun-types" />
 
-type CapturedPostHogMessage = {
-  distinctId: string
-  event: string
-  properties?: Record<string, unknown>
-}
+// allow: SIZE_OK - PostHog telemetry tests share one client/env fixture; this release adds telemetry config regressions and future additions should split by capture path.
+
+import { afterEach, beforeEach, describe, expect, it } from "bun:test"
+import type {
+  TelemetryCaptureMessage,
+  TelemetryTransportFactory,
+  TelemetryTransportOptions,
+} from "@oh-my-opencode/telemetry-core"
+
+type CapturedPostHogMessage = TelemetryCaptureMessage
+type PostHogModule = Awaited<ReturnType<typeof importPostHogModule>>
+
+let activePostHogModule: PostHogModule | null = null
 
 async function importPostHogModule(): Promise<typeof import("./posthog")> {
   return import(`./posthog?test=${Date.now()}-${Math.random()}`)
+}
+
+function usePostHogModule(posthogModule: PostHogModule): PostHogModule {
+  activePostHogModule = posthogModule
+  return posthogModule
+}
+
+function resetPostHogModuleTestSeams(): void {
+  activePostHogModule?.__resetActivityStateProviderForTesting()
+  activePostHogModule?.__resetOsProviderForTesting()
+  activePostHogModule?.__resetTransportFactoryForTesting()
+  activePostHogModule = null
 }
 
 function enableTelemetryEnv(): void {
@@ -23,25 +43,28 @@ function clearTelemetryEnv(): void {
   delete process.env.POSTHOG_HOST
 }
 
-function mockPostHogNode(capturedMessages: CapturedPostHogMessage[]): void {
-  mock.module("posthog-node", () => ({
-    PostHog: class {
-      capture(message: CapturedPostHogMessage): void {
+function createCapturingTransportFactory(
+  capturedMessages: CapturedPostHogMessage[],
+  capturedOptions: TelemetryTransportOptions[] = [],
+): TelemetryTransportFactory {
+  return (_apiKey, options) => {
+    capturedOptions.push(options)
+    return {
+      capture: (message) => {
         capturedMessages.push(message)
-      }
-      async shutdown(): Promise<void> {}
-    },
-  }))
+      },
+      shutdown: async () => undefined,
+    }
+  }
 }
 
 describe("posthog client creation", () => {
   beforeEach(() => {
-    mock.restore()
     clearTelemetryEnv()
   })
 
   afterEach(() => {
-    mock.restore()
+    resetPostHogModuleTestSeams()
     clearTelemetryEnv()
   })
 
@@ -49,19 +72,14 @@ describe("posthog client creation", () => {
     // given
     enableTelemetryEnv()
 
-    mock.module("posthog-node", () => ({
-      PostHog: class {
-        constructor() {
-          throw new Error("posthog init failed")
-        }
-      },
-    }))
-
-    const { createCliPostHog, createPluginPostHog } = await importPostHogModule()
+    const posthogModule = usePostHogModule(await importPostHogModule())
+    posthogModule.__setTransportFactoryForTesting(() => {
+      throw new Error("posthog init failed")
+    })
 
     // when
-    const cliPostHog = createCliPostHog()
-    const pluginPostHog = createPluginPostHog()
+    const cliPostHog = posthogModule.createCliPostHog()
+    const pluginPostHog = posthogModule.createPluginPostHog()
 
     // then
     expect(() => cliPostHog.trackActive("cli", "run_started")).not.toThrow()
@@ -77,14 +95,8 @@ describe("posthog client creation", () => {
     process.env.OMO_SEND_ANONYMOUS_TELEMETRY = "1"
     process.env.POSTHOG_API_KEY = "test-api-key"
 
-    mock.module("posthog-node", () => ({
-      PostHog: class {
-        capture() {}
-        async shutdown() {}
-      },
-    }))
-
-    const posthogModule = await importPostHogModule()
+    const posthogModule = usePostHogModule(await importPostHogModule())
+    posthogModule.__setTransportFactoryForTesting(createCapturingTransportFactory([]))
     posthogModule.__setOsProviderForTesting({
       arch: () => "x64",
       cpus: () => {
@@ -103,29 +115,21 @@ describe("posthog client creation", () => {
     // then
     expect(() => pluginPostHog.trackActive("plugin", "run_started")).not.toThrow()
     expect(await pluginPostHog.shutdown()).toBeUndefined()
-    posthogModule.__resetOsProviderForTesting()
   })
 
   it("passes the strict PostHog constructor options for both clients", async () => {
     // given
     enableTelemetryEnv()
-    const capturedOptions: Array<Record<string, unknown>> = []
+    const capturedOptions: TelemetryTransportOptions[] = []
 
-    mock.module("posthog-node", () => ({
-      PostHog: class {
-        constructor(_apiKey: string, options: Record<string, unknown>) {
-          capturedOptions.push(options)
-        }
-        capture() {}
-        async shutdown() {}
-      },
-    }))
-
-    const { createCliPostHog, createPluginPostHog } = await importPostHogModule()
+    const posthogModule = usePostHogModule(await importPostHogModule())
+    posthogModule.__setTransportFactoryForTesting(
+      createCapturingTransportFactory([], capturedOptions),
+    )
 
     // when
-    createCliPostHog()
-    createPluginPostHog()
+    posthogModule.createCliPostHog()
+    posthogModule.createPluginPostHog()
 
     // then
     expect(capturedOptions).toHaveLength(2)
@@ -140,16 +144,32 @@ describe("posthog client creation", () => {
       })
     }
   })
+
+  it("constructs clients through the configured telemetry transport", async () => {
+    // given
+    enableTelemetryEnv()
+    const capturedOptions: TelemetryTransportOptions[] = []
+    const posthogModule = usePostHogModule(await importPostHogModule())
+    posthogModule.__setTransportFactoryForTesting(
+      createCapturingTransportFactory([], capturedOptions),
+    )
+
+    // when
+    posthogModule.createCliPostHog()
+    posthogModule.createPluginPostHog()
+
+    // then
+    expect(capturedOptions).toHaveLength(2)
+  })
 })
 
 describe("posthog disable env var parsing", () => {
   beforeEach(() => {
-    mock.restore()
     clearTelemetryEnv()
   })
 
   afterEach(() => {
-    mock.restore()
+    resetPostHogModuleTestSeams()
     clearTelemetryEnv()
   })
 
@@ -161,8 +181,8 @@ describe("posthog disable env var parsing", () => {
       process.env.OMO_DISABLE_POSTHOG = value
       process.env.POSTHOG_API_KEY = "test-api-key"
       const captured: CapturedPostHogMessage[] = []
-      mockPostHogNode(captured)
-      const posthogModule = await importPostHogModule()
+      const posthogModule = usePostHogModule(await importPostHogModule())
+      posthogModule.__setTransportFactoryForTesting(createCapturingTransportFactory(captured))
       posthogModule.__setActivityStateProviderForTesting(() => ({
         dayUTC: "2026-04-18",
         captureDaily: true,
@@ -174,7 +194,6 @@ describe("posthog disable env var parsing", () => {
 
       // then
       expect(captured).toHaveLength(0)
-      posthogModule.__resetActivityStateProviderForTesting()
     })
   }
 
@@ -186,8 +205,8 @@ describe("posthog disable env var parsing", () => {
       process.env.OMO_SEND_ANONYMOUS_TELEMETRY = value
       process.env.POSTHOG_API_KEY = "test-api-key"
       const captured: CapturedPostHogMessage[] = []
-      mockPostHogNode(captured)
-      const posthogModule = await importPostHogModule()
+      const posthogModule = usePostHogModule(await importPostHogModule())
+      posthogModule.__setTransportFactoryForTesting(createCapturingTransportFactory(captured))
       posthogModule.__setActivityStateProviderForTesting(() => ({
         dayUTC: "2026-04-18",
         captureDaily: true,
@@ -199,23 +218,56 @@ describe("posthog disable env var parsing", () => {
 
       // then
       expect(captured).toHaveLength(0)
-      posthogModule.__resetActivityStateProviderForTesting()
     })
   }
+
+  it("keeps OMO_SEND_ANONYMOUS_TELEMETRY=yes enabled for env compatibility", async () => {
+    // given
+    process.env.OMO_SEND_ANONYMOUS_TELEMETRY = "yes"
+    process.env.POSTHOG_API_KEY = "test-api-key"
+    const captured: CapturedPostHogMessage[] = []
+    const posthogModule = usePostHogModule(await importPostHogModule())
+    posthogModule.__setTransportFactoryForTesting(createCapturingTransportFactory(captured))
+    posthogModule.__setActivityStateProviderForTesting(() => ({
+      dayUTC: "2026-04-18",
+      captureDaily: true,
+    }))
+    const client = posthogModule.createCliPostHog()
+
+    // when
+    client.trackActive("distinct-cli", "run_started")
+
+    // then
+    expect(captured).toHaveLength(1)
+  })
+
+  it("treats configEnabled false as disabled", async () => {
+    // given
+    enableTelemetryEnv()
+    const captured: CapturedPostHogMessage[] = []
+    const posthogModule = usePostHogModule(await importPostHogModule())
+    posthogModule.__setTransportFactoryForTesting(createCapturingTransportFactory(captured))
+    posthogModule.__setActivityStateProviderForTesting(() => ({
+      dayUTC: "2026-04-18",
+      captureDaily: true,
+    }))
+    const client = posthogModule.createCliPostHog({ configEnabled: false })
+
+    // when
+    client.trackActive("distinct-cli", "run_started")
+
+    // then
+    expect(captured).toHaveLength(0)
+  })
 })
 
 describe("posthog trackActive emission contract", () => {
-  let resetActivityStateProvider: (() => void) | null = null
-
   beforeEach(() => {
-    mock.restore()
     clearTelemetryEnv()
   })
 
   afterEach(() => {
-    resetActivityStateProvider?.()
-    resetActivityStateProvider = null
-    mock.restore()
+    resetPostHogModuleTestSeams()
     clearTelemetryEnv()
   })
 
@@ -223,13 +275,21 @@ describe("posthog trackActive emission contract", () => {
     // given
     enableTelemetryEnv()
     const captured: CapturedPostHogMessage[] = []
-    mockPostHogNode(captured)
-    const posthogModule = await importPostHogModule()
+    const posthogModule = usePostHogModule(await importPostHogModule())
+    posthogModule.__setTransportFactoryForTesting(createCapturingTransportFactory(captured))
+    posthogModule.__setOsProviderForTesting({
+      arch: () => "arm64",
+      cpus: () => [{ model: "Test CPU" }],
+      hostname: () => "test-host",
+      platform: () => "linux",
+      release: () => "6.8.0-test",
+      totalmem: () => 16 * 1024 * 1024 * 1024,
+      type: () => "Linux",
+    })
     posthogModule.__setActivityStateProviderForTesting(() => ({
       dayUTC: "2026-04-18",
       captureDaily: true,
     }))
-    resetActivityStateProvider = posthogModule.__resetActivityStateProviderForTesting
     const client = posthogModule.createCliPostHog()
 
     // when
@@ -245,24 +305,38 @@ describe("posthog trackActive emission contract", () => {
     }
     expect(dailyEvent?.event).toBe("omo_daily_active")
     expect(dailyEvent?.distinctId).toBe("distinct-cli")
-    expect(dailyEvent.properties?.day_utc).toBe("2026-04-18")
-    expect(dailyEvent.properties?.reason).toBe("run_started")
-    expect(dailyEvent.properties?.source).toBe("cli")
-    expect(dailyEvent.properties?.$process_person_profile).toBe(false)
-    expect(Object.prototype.hasOwnProperty.call(dailyEvent.properties ?? {}, "hour_utc")).toBe(false)
+    const properties = dailyEvent.properties ?? {}
+    const expectedPropertyKeys = ["$os", "$os_version", "$process_person_profile", "ci", "cpu_count", "cpu_model", "day_utc", "locale", "os_arch", "os_type", "package_name", "package_version", "platform", "plugin_name", "product_name", "reason", "runtime", "runtime_version", "shell", "source", "terminal", "timezone", "total_memory_gb"]
+    expect(Object.keys(properties).sort()).toEqual(expectedPropertyKeys.sort())
+    expect(properties).toMatchObject({
+      platform: "oh-my-opencode",
+      package_name: "oh-my-openagent",
+      plugin_name: "oh-my-openagent",
+      product_name: "oh-my-openagent",
+      source: "cli",
+      $os: "linux",
+      $os_version: "6.8.0-test",
+      os_arch: "arm64",
+      os_type: "Linux",
+      cpu_count: 1,
+      cpu_model: "Test CPU",
+      total_memory_gb: 16,
+      $process_person_profile: false,
+      day_utc: "2026-04-18",
+      reason: "run_started",
+    })
   })
 
   it("emits nothing and never omo_hourly_active when captureDaily is false", async () => {
     // given
     enableTelemetryEnv()
     const captured: CapturedPostHogMessage[] = []
-    mockPostHogNode(captured)
-    const posthogModule = await importPostHogModule()
+    const posthogModule = usePostHogModule(await importPostHogModule())
+    posthogModule.__setTransportFactoryForTesting(createCapturingTransportFactory(captured))
     posthogModule.__setActivityStateProviderForTesting(() => ({
       dayUTC: "2026-04-18",
       captureDaily: false,
     }))
-    resetActivityStateProvider = posthogModule.__resetActivityStateProviderForTesting
     const client = posthogModule.createPluginPostHog()
 
     // when
@@ -273,5 +347,32 @@ describe("posthog trackActive emission contract", () => {
     const emittedEvents = captured.map((message) => message.event)
     expect(emittedEvents).not.toContain("omo_daily_active")
     expect(emittedEvents).not.toContain("omo_hourly_active")
+  })
+
+  it("records plugin load telemetry with the plugin_loaded reason", async () => {
+    // given
+    enableTelemetryEnv()
+    const captured: CapturedPostHogMessage[] = []
+    const posthogModule = usePostHogModule(await importPostHogModule())
+    posthogModule.__setTransportFactoryForTesting(createCapturingTransportFactory(captured))
+    posthogModule.__setActivityStateProviderForTesting(() => ({
+      dayUTC: "2026-04-18",
+      captureDaily: true,
+    }))
+
+    // when
+    posthogModule.recordPluginTelemetry({ configEnabled: true })
+
+    // then
+    expect(captured).toHaveLength(1)
+    const [dailyEvent] = captured
+    if (!dailyEvent) {
+      throw new Error("Expected plugin telemetry event")
+    }
+    expect(dailyEvent.event).toBe("omo_daily_active")
+    expect(dailyEvent.properties).toMatchObject({
+      reason: "plugin_loaded",
+      source: "plugin",
+    })
   })
 })

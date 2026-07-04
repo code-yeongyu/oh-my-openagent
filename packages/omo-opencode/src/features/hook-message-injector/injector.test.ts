@@ -1,3 +1,5 @@
+// allow: SIZE_OK - hook injector tests share one transcript/session harness for duplicate-injection cases; this release adds narrow regressions and future growth should split by trigger route.
+
 import { describe, it, expect, beforeEach, afterEach, vi } from "bun:test"
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -149,6 +151,21 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
 
     const result = await findNearestMessageWithFieldsFromSDK(unsafeTestValue(mockClient), "ses_123")
 
+    expect(result).toBeNull()
+  })
+
+  it("returns null when the SDK returns a non-array messages payload", async () => {
+    // given
+    const mockClient = {
+      session: {
+        messages: async () => ({ info: { agent: "sisyphus" } }),
+      },
+    }
+
+    // when
+    const result = await findNearestMessageWithFieldsFromSDK(unsafeTestValue(mockClient), "ses_123")
+
+    // then
     expect(result).toBeNull()
   })
 
@@ -314,6 +331,21 @@ describe("findFirstMessageWithAgentFromSDK", () => {
 
     const result = await findFirstMessageWithAgentFromSDK(unsafeTestValue(mockClient), "ses_123")
 
+    expect(result).toBeNull()
+  })
+
+  it("returns null when the SDK returns a non-array messages payload", async () => {
+    // given
+    const mockClient = {
+      session: {
+        messages: async () => ({ info: { agent: "sisyphus" } }),
+      },
+    }
+
+    // when
+    const result = await findFirstMessageWithAgentFromSDK(unsafeTestValue(mockClient), "ses_123")
+
+    // then
     expect(result).toBeNull()
   })
 })

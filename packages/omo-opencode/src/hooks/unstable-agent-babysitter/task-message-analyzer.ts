@@ -1,3 +1,4 @@
+import { isRecord } from "@oh-my-opencode/utils"
 import type { BackgroundTask } from "../../features/background-agent"
 import { normalizeAgentForPrompt } from "../../shared/agent-display-names"
 
@@ -22,9 +23,7 @@ function hasData(value: unknown): value is { data?: unknown } {
   return typeof value === "object" && value !== null && "data" in value
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
+
 
 export function getMessageInfo(value: unknown): MessageInfo | undefined {
   if (!isRecord(value)) return undefined

@@ -1,6 +1,7 @@
-import { createInterface } from "node:readline";
-
-import { handleLspMcpRequest, type JsonRpcId, type JsonRpcResponse } from "@code-yeongyu/lsp-tools-mcp/dist/mcp.js";
+import type { Readable, Writable } from "node:stream";
+import { jsonRpcId, runJsonRpcStdioServer, successResponse } from "@oh-my-opencode/mcp-stdio-core";
+import { isPlainRecord } from "@oh-my-opencode/mcp-stdio-core/record";
+import { handleLspMcpRequest, type JsonRpcId, type JsonRpcResponse } from "@oh-my-opencode/lsp-core/mcp";
 
 import {
 	type CallToolOptions,
@@ -11,8 +12,8 @@ import {
 import { type DaemonPaths, daemonPaths } from "./paths.js";
 
 export interface ProxyOptions {
-	input?: NodeJS.ReadableStream;
-	output?: NodeJS.WritableStream;
+	input?: Readable;
+	output?: Writable;
 	paths?: DaemonPaths;
 	context?: DaemonToolContext;
 	ensure?: CallToolOptions["ensure"];
@@ -31,54 +32,30 @@ export async function runMcpStdioProxy(options: ProxyOptions = {}): Promise<void
 	const context = options.context ?? currentRequestContext();
 	const callOptions: CallToolOptions = { paths, context, ...(options.ensure ? { ensure: options.ensure } : {}) };
 
-	const lines = createInterface({ input, crlfDelay: Number.POSITIVE_INFINITY });
-	for await (const line of lines) {
-		if (!line.trim()) continue;
-		try {
-			const response = await handleLine(line, callOptions);
-			if (response) output.write(`${JSON.stringify(response)}\n`);
-		} catch (error) {
+	await runJsonRpcStdioServer({
+		input,
+		output,
+		idleTimeoutMs: 0,
+		handler: handleProxyRequest,
+		handlerOptions: callOptions,
+		onHandlerError: (error: unknown) => {
 			process.stderr.write(`[lsp-daemon] proxy error: ${error instanceof Error ? error.message : String(error)}\n`);
-		}
-	}
+		},
+	});
 }
 
-async function handleLine(line: string, callOptions: CallToolOptions): Promise<JsonRpcResponse | undefined> {
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(line);
-	} catch (error) {
-		return parseErrorResponse(error);
-	}
-
+async function handleProxyRequest(parsed: unknown, callOptions: CallToolOptions): Promise<JsonRpcResponse | undefined> {
 	const toolCall = asToolCall(parsed);
 	if (!toolCall) return handleLspMcpRequest(parsed);
 
 	const result = await callToolViaDaemon(toolCall.name, toolCall.args, callOptions);
-	return {
-		jsonrpc: "2.0",
-		id: toolCall.id,
-		result: { content: result.content, isError: result.isError ?? false, details: result.details },
-	};
+	return successResponse(toolCall.id, { content: result.content, isError: result.isError ?? false, details: result.details });
 }
 
 function asToolCall(parsed: unknown): ToolCall | null {
-	if (!isRecord(parsed) || parsed["method"] !== "tools/call") return null;
+	if (!isPlainRecord(parsed) || parsed["method"] !== "tools/call") return null;
 	const params = parsed["params"];
-	if (!isRecord(params) || typeof params["name"] !== "string") return null;
+	if (!isPlainRecord(params) || typeof params["name"] !== "string") return null;
 	const args = params["arguments"];
-	return { id: jsonRpcId(parsed["id"]), name: params["name"], args: isRecord(args) ? args : {} };
-}
-
-function jsonRpcId(value: unknown): JsonRpcId {
-	return typeof value === "string" || typeof value === "number" || value === null ? value : null;
-}
-
-function parseErrorResponse(error: unknown): JsonRpcResponse {
-	const message = error instanceof Error ? error.message : String(error);
-	return { jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error", data: message } };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
+	return { id: jsonRpcId(parsed["id"]), name: params["name"], args: isPlainRecord(args) ? args : {} };
 }

@@ -1,4 +1,5 @@
 import {
+  chmodSync,
   closeSync,
   type fsyncSync as FsyncSync,
   openSync,
@@ -12,10 +13,18 @@ import { tolerantFsyncSync } from "./tolerant-fsync"
 export function writeFileAtomically(
   filePath: string,
   content: string,
-  deps: { fsyncSync?: typeof FsyncSync } = {},
+  deps: {
+    fsyncSync?: typeof FsyncSync
+    mode?: number
+    beforeRenameSync?: (tempPath: string) => void
+  } = {},
 ): void {
   const tempPath = `${filePath}.tmp`
-  writeFileSync(tempPath, content, "utf-8")
+  const mode = deps.mode
+  writeFileSync(tempPath, content, { encoding: "utf-8", mode })
+  if (mode !== undefined) {
+    chmodSync(tempPath, mode)
+  }
   const tempFileDescriptor = openSync(tempPath, "r+")
   try {
     tolerantFsyncSync(tempFileDescriptor, `writeFileAtomically:${filePath}`, deps.fsyncSync)
@@ -24,6 +33,7 @@ export function writeFileAtomically(
   }
 
   try {
+    deps.beforeRenameSync?.(tempPath)
     renameSync(tempPath, filePath)
   } catch (error) {
     const isWindows = process.platform === "win32"
@@ -37,5 +47,8 @@ export function writeFileAtomically(
     } else {
       throw error
     }
+  }
+  if (mode !== undefined) {
+    chmodSync(filePath, mode)
   }
 }

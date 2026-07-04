@@ -38,12 +38,6 @@ const EXACT_ALIAS_RULES: ReadonlyArray<ExactAliasRule> = [
     canonicalModelID: "k2p5",
     rationale: "Kimi for Coding exposes k2pb while the bundled capabilities snapshot uses the canonical k2p5 ID.",
   },
-  {
-    aliasModelID: "claude-opus-4.7",
-    ruleID: "claude-opus-dotted-version-alias",
-    canonicalModelID: "claude-opus-4-7",
-    rationale: "GitHub Copilot exposes Claude Opus 4.7 with dotted version syntax while the snapshot uses dashed syntax.",
-  },
 ]
 
 const EXACT_ALIAS_RULES_BY_MODEL: ReadonlyMap<string, ExactAliasRule> = new Map(

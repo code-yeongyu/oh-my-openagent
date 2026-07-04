@@ -1,12 +1,15 @@
-import type { CheckDefinition } from "../types"
-import { CHECK_IDS, CHECK_NAMES } from "../constants"
+import type { CheckDefinition } from "../framework/types"
+import { CHECK_IDS, CHECK_NAMES } from "../framework/constants"
 import { checkSystem, gatherSystemInfo } from "./system"
 import { checkConfig } from "./config"
 import { checkTools, gatherToolsSummary } from "./tools"
 import { checkModels } from "./model-resolution"
+import { checkTelemetry } from "./telemetry"
 import { checkTeamMode } from "./team-mode"
 import { checkTuiPluginConfig } from "./tui-plugin-config"
 import { checkCodex, gatherCodexSummary } from "./codex"
+import { CODEX_COMPONENTS_CHECK_ID, CODEX_COMPONENTS_CHECK_NAME, checkCodexComponents } from "./codex-components"
+import { checkCodexRuntimeWrapper } from "./codex-runtime-wrapper"
 
 export type { CheckDefinition }
 export * from "./model-resolution-types"
@@ -42,6 +45,11 @@ export function getAllCheckDefinitions(): CheckDefinition[] {
       check: checkModels,
     },
     {
+      id: CHECK_IDS.TELEMETRY,
+      name: CHECK_NAMES[CHECK_IDS.TELEMETRY],
+      check: checkTelemetry,
+    },
+    {
       id: CHECK_IDS.TEAM_MODE,
       name: CHECK_NAMES[CHECK_IDS.TEAM_MODE],
       check: checkTeamMode,
@@ -56,6 +64,16 @@ export function getCodexCheckDefinitions(): CheckDefinition[] {
       name: CHECK_NAMES[CHECK_IDS.CODEX],
       check: checkCodex,
       critical: true,
+    },
+    {
+      id: CODEX_COMPONENTS_CHECK_ID,
+      name: CODEX_COMPONENTS_CHECK_NAME,
+      check: checkCodexComponents,
+    },
+    {
+      id: "codex-runtime-wrapper",
+      name: "codex-runtime-wrapper",
+      check: checkCodexRuntimeWrapper,
     },
   ]
 }

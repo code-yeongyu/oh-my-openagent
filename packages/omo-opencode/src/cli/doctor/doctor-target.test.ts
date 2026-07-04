@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { resolveDoctorTarget } from "./doctor-target"
+import { resolveDoctorTarget } from "./framework/doctor-target"
 
 describe("resolveDoctorTarget", () => {
   test("#given lazycodex invocation #when resolving doctor target #then selects Codex diagnostics", () => {
@@ -30,6 +30,22 @@ describe("resolveDoctorTarget", () => {
 
     // when
     const target = resolveDoctorTarget(invocationName)
+
+    // then
+    expect(target).toBe("opencode")
+  })
+
+  test("#given explicit codex platform #when resolving doctor target #then selects Codex diagnostics", () => {
+    // given / when
+    const target = resolveDoctorTarget("omo", "codex")
+
+    // then
+    expect(target).toBe("codex")
+  })
+
+  test("#given explicit opencode platform from lazycodex invocation #when resolving doctor target #then explicit platform wins", () => {
+    // given / when
+    const target = resolveDoctorTarget("lazycodex-ai", "opencode")
 
     // then
     expect(target).toBe("opencode")

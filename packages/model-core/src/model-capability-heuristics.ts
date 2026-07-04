@@ -46,6 +46,10 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
     variants: ["low", "medium", "high"],
   },
   {
+    family: "qwen",
+    includes: ["qwen"],
+  },
+  {
     family: "grok",
     includes: ["grok"],
     variants: ["low", "medium", "high"],
@@ -82,7 +86,7 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
   {
     family: "deepseek",
     includes: ["deepseek"],
-    variants: ["low", "medium", "high"],
+    variants: ["low", "medium", "high", "max"],
     reasoningEfforts: ["high", "max"],
     reasoningEffortAliases: {
       low: "high",

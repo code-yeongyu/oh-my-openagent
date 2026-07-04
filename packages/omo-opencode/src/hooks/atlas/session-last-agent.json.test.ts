@@ -113,4 +113,118 @@ describe("getLastAgentFromSession JSON backend", () => {
     // then
     expect(result).toBe("sisyphus-junior")
   })
+
+  test("uses SDK messages when JSON message directory lookup fails", async () => {
+    // given
+    const sessionID = "ses_json_missing_message_dir"
+    const missingMessageDir = join(TEST_MESSAGE_STORAGE, sessionID)
+    rmSync(missingMessageDir, { recursive: true, force: true })
+    const client = {
+      session: {
+        messages: async () => ({
+          data: [
+            { id: "msg_0001", info: { agent: "sisyphus", time: { created: 100 } } },
+            { id: "msg_0002", info: { agent: "atlas", time: { created: 200 } } },
+          ],
+        }),
+      },
+    }
+
+    const { getLastAgentFromSession } = await importFreshSessionLastAgentModule()
+
+    // when
+    const result = await getLastAgentFromSession(sessionID, client, {
+      isSqliteBackend: () => false,
+      getMessageDir: () => missingMessageDir,
+    })
+
+    // then
+    expect(result).toBe("atlas")
+  })
+
+  test("prefers SDK messages over JSON storage when a client is available", async () => {
+    // given
+    const sessionID = "ses_json_sdk_preferred"
+    const messageDir = createTempMessageDir(sessionID)
+    writeFileSync(join(messageDir, "msg_0001.json"), JSON.stringify({
+      agent: "sisyphus",
+      time: { created: 300 },
+    }), "utf-8")
+    const client = {
+      session: {
+        messages: async () => ({
+          data: [
+            { id: "msg_0001", info: { agent: "atlas", time: { created: 100 } } },
+          ],
+        }),
+      },
+    }
+
+    const { getLastAgentFromSession } = await importFreshSessionLastAgentModule()
+
+    // when
+    const result = await getLastAgentFromSession(sessionID, client, {
+      isSqliteBackend: () => false,
+      getMessageDir: (targetSessionID: string) => join(TEST_MESSAGE_STORAGE, targetSessionID),
+    })
+
+    // then
+    expect(result).toBe("atlas")
+  })
+
+  test("prefers top-level SDK agent over conflicting JSON storage when info.agent is absent", async () => {
+    // given
+    const sessionID = "ses_json_sdk_top_level_agent"
+    const messageDir = createTempMessageDir(sessionID)
+    writeFileSync(join(messageDir, "msg_0001.json"), JSON.stringify({
+      agent: "sisyphus",
+      time: { created: 300 },
+    }), "utf-8")
+    const client = {
+      session: {
+        messages: async () => ({
+          data: [
+            { id: "msg_0001", agent: "Atlas", info: { time: { created: 100 } } },
+          ],
+        }),
+      },
+    }
+
+    const { getLastAgentFromSession } = await importFreshSessionLastAgentModule()
+
+    // when
+    const result = await getLastAgentFromSession(sessionID, client, {
+      isSqliteBackend: () => false,
+      getMessageDir: (targetSessionID: string) => join(TEST_MESSAGE_STORAGE, targetSessionID),
+    })
+
+    // then
+    expect(result).toBe("atlas")
+  })
+
+  test("falls back to JSON storage when SDK messages have no agent", async () => {
+    // given
+    const sessionID = "ses_json_after_empty_sdk"
+    const messageDir = createTempMessageDir(sessionID)
+    writeFileSync(join(messageDir, "msg_0001.json"), JSON.stringify({
+      agent: "sisyphus",
+      time: { created: 100 },
+    }), "utf-8")
+    const client = {
+      session: {
+        messages: async () => ({ data: [] }),
+      },
+    }
+
+    const { getLastAgentFromSession } = await importFreshSessionLastAgentModule()
+
+    // when
+    const result = await getLastAgentFromSession(sessionID, client, {
+      isSqliteBackend: () => false,
+      getMessageDir: (targetSessionID: string) => join(TEST_MESSAGE_STORAGE, targetSessionID),
+    })
+
+    // then
+    expect(result).toBe("sisyphus")
+  })
 })

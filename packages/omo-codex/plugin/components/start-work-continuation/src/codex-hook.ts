@@ -7,7 +7,7 @@ export function runStopHook(input: unknown, fs: ReadonlyFileSystem): string {
 	if (!isStopInput(input)) return "";
 	if (input.stop_hook_active) return "";
 	if (transcriptHasContextPressureMarker(input.transcript_path, fs)) return "";
-	const state = readContinuationState(input.cwd, input.session_id, fs);
+	const state = readContinuationState(input.cwd, input.session_id);
 	if (state === null) return "";
 	return JSON.stringify({
 		decision: "block",
