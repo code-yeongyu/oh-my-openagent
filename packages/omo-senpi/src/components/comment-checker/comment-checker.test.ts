@@ -62,6 +62,46 @@ describe("omo-senpi comment-checker component", () => {
     ])
   })
 
+  it("#given a context with updateToolHookStatus #when the check runs #then the live status label is reported once", async () => {
+    // given
+    const cwd = createTempCwd()
+    const { pi, calls } = await registerWithFakeRunner()
+    const statuses: string[] = []
+    const context = {
+      ...createContext(cwd),
+      updateToolHookStatus(message: string) {
+        statuses.push(message)
+      },
+    }
+
+    // when
+    await pi.dispatch("tool_result", createToolResultEvent(), context)
+
+    // then
+    expect(calls).toHaveLength(1)
+    expect(statuses).toEqual(["(OmO) Checking Comments"])
+  })
+
+  it("#given a non-mutation tool result #when tool_result dispatches #then no live status is reported", async () => {
+    // given
+    const cwd = createTempCwd()
+    const { pi, calls } = await registerWithFakeRunner()
+    const statuses: string[] = []
+    const context = {
+      ...createContext(cwd),
+      updateToolHookStatus(message: string) {
+        statuses.push(message)
+      },
+    }
+
+    // when
+    await pi.dispatch("tool_result", createToolResultEvent({ toolName: "bash" }), context)
+
+    // then
+    expect(calls).toHaveLength(0)
+    expect(statuses).toEqual([])
+  })
+
   it("#given successful edit result #when tool_result dispatches #then runner receives the right absolute path", async () => {
     // given
     const cwd = createTempCwd()

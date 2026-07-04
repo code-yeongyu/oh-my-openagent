@@ -30,11 +30,15 @@ interface DiagnosticBlock {
 	diagnostics: string;
 }
 
+export function shouldRunPostEditDiagnostics(event: ToolResultLike): boolean {
+	return !event.isError && MUTATION_TOOL_NAMES.has(event.toolName);
+}
+
 export async function appendPostEditDiagnostics(
 	event: ToolResultLike,
 	runDiagnostics: DiagnosticsRunner,
 ): Promise<PostEditDiagnosticsResult | undefined> {
-	if (event.isError || !MUTATION_TOOL_NAMES.has(event.toolName)) return undefined;
+	if (!shouldRunPostEditDiagnostics(event)) return undefined;
 
 	const filePaths = extractMutatedFilePaths(event);
 	if (filePaths.length === 0) return undefined;

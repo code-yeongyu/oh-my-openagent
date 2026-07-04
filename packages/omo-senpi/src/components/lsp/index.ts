@@ -1,9 +1,11 @@
+import { reportToolHookStatus } from "../../extension/tool-hook-status";
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types";
 import { getConfigNotices } from "./lsp/config-loader.js";
 import { disposeDefaultLspManager, getLspManager } from "./lsp/manager-default.js";
 import {
 	appendPostEditDiagnostics,
 	POST_EDIT_DIAGNOSTICS_WIDGET_KEY,
+	shouldRunPostEditDiagnostics,
 	syncPostEditDiagnosticsWidget,
 	type DiagnosticsRunner,
 	type ToolResultLike,
@@ -92,6 +94,9 @@ export async function handlePostEditDiagnosticsToolResult(
 	runDiagnostics: DiagnosticsRunner = runLspDiagnosticsForPostEdit,
 ): Promise<ToolResultHandlerResult | undefined> {
 	if (!isToolResultLike(event)) return undefined;
+	if (shouldRunPostEditDiagnostics(event)) {
+		reportToolHookStatus(ctx, "(OmO) Checking LSP Diagnostics");
+	}
 	const result = await appendPostEditDiagnostics(event, runDiagnostics);
 	syncPostEditDiagnosticsWidget((key, content, options) => {
 		if (isWidgetContext(ctx)) {

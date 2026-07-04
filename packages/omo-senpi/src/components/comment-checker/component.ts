@@ -1,5 +1,6 @@
 import { isAbsolute, resolve } from "node:path"
 
+import { reportToolHookStatus } from "../../extension/tool-hook-status"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { COMMENT_CHECKER_FEEDBACK_HEADER } from "./constants"
 import { parseToolResultContext, parseToolResultEvent, toHookInput } from "./hook-input"
@@ -66,6 +67,7 @@ export function createCommentCheckerComponent(options: CommentCheckerComponentOp
           return undefined
         }
 
+        reportToolHookStatus(eventContext, "(OmO) Checking Comments")
         const result = await check({
           binaryPath: resolvedBinaryPath,
           hookInput: toHookInput(event, toolContext, absolutePath),
