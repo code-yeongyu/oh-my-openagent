@@ -4,6 +4,8 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { buildTmuxAttachCommand, buildTmuxPlaceholderCommand } from "./pane-command"
 
+const itWithUnixShell = it.skipIf(process.platform === "win32")
+
 function createFakeOpencodeBin(tempDir: string): string {
   const binDir = join(tempDir, "bin")
   const opencodePath = join(binDir, "opencode")
@@ -52,26 +54,29 @@ describe("buildTmuxAttachCommand", () => {
     }
   })
 
-  it("#given serverUrl shell metacharacters #when generated command runs through the shell #then serverUrl stays one literal argument", () => {
-    const tempDir = mkdtempSync(join(tmpdir(), "omo tmux command "))
+  itWithUnixShell(
+    "#given serverUrl shell metacharacters #when generated command runs through the shell #then serverUrl stays one literal argument",
+    () => {
+      const tempDir = mkdtempSync(join(tmpdir(), "omo tmux command "))
 
-    try {
-      const binDir = createFakeOpencodeBin(tempDir)
-      const serverUrl = "http://localhost:3000$(whoami);rm -rf /"
-      const cmd = buildTmuxAttachCommand(serverUrl, "ses_abc123")
+      try {
+        const binDir = createFakeOpencodeBin(tempDir)
+        const serverUrl = "http://localhost:3000$(whoami);rm -rf /"
+        const cmd = buildTmuxAttachCommand(serverUrl, "ses_abc123")
 
-      expect(runCommandWithFakeOpencode(cmd, binDir)).toEqual([
-        "attach",
-        serverUrl,
-        "--session",
-        "ses_abc123",
-        "--dir",
-        process.cwd(),
-      ])
-    } finally {
-      rmSync(tempDir, { recursive: true, force: true })
-    }
-  })
+        expect(runCommandWithFakeOpencode(cmd, binDir)).toEqual([
+          "attach",
+          serverUrl,
+          "--session",
+          "ses_abc123",
+          "--dir",
+          process.cwd(),
+        ])
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true })
+      }
+    },
+  )
 
   it("escapes session id shell metacharacters", () => {
     const cmd = buildTmuxAttachCommand("http://localhost:3000", 'ses_abc"$(whoami)"')
