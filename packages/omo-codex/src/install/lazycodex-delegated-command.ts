@@ -10,6 +10,12 @@ export type DelegatedOmoInvocation = {
   readonly env?: Readonly<Record<string, string>>
 }
 
+type LazyCodexDoctorOptions = {
+  readonly args: readonly string[]
+  readonly model?: string
+  readonly sourceRoot?: string
+}
+
 export async function runDelegatedOmoCommand(
   parsed: LazyCodexDelegatedCommand,
   options: {
@@ -35,15 +41,18 @@ export async function runDelegatedOmoCommand(
 export function buildDelegatedOmoInvocation(parsed: LazyCodexDelegatedCommand): DelegatedOmoInvocation {
   if (parsed.command === "doctor") return buildLazyCodexDoctorInvocation(parsed.args)
 
-  const args = ["--yes", "--package", "oh-my-openagent", "omo", parsed.command]
   if (parsed.command === "install") {
-    args.push("--platform=codex")
+    const args = ["--yes", "oh-my-openagent@latest", parsed.command, "--platform=codex"]
     if (parsed.noTui) args.push("--no-tui")
     if (parsed.skipAuth) args.push("--skip-auth")
     if (parsed.autonomousPermissions !== false) args.push("--codex-autonomous")
     if (parsed.autonomousPermissions === false) args.push("--no-codex-autonomous")
     if (parsed.repoRoot) args.push(`--repo-root=${parsed.repoRoot}`)
-  } else if (parsed.command === "cleanup") {
+    return { command: "npx", args, delegatesToOmo: true }
+  }
+
+  const args = ["--yes", "--package", "oh-my-openagent", "omo", parsed.command]
+  if (parsed.command === "cleanup") {
     args.push("--platform=codex", ...parsed.args)
   } else {
     args.push(...parsed.args)
@@ -52,21 +61,25 @@ export function buildDelegatedOmoInvocation(parsed: LazyCodexDelegatedCommand): 
 }
 
 function buildLazyCodexDoctorInvocation(doctorArgs: readonly string[]): DelegatedOmoInvocation {
+  const doctorOptions = parseLazyCodexDoctorOptions(doctorArgs)
+  const codexArgs = [
+    "exec",
+    "--ephemeral",
+    "--sandbox",
+    "danger-full-access",
+    "--skip-git-repo-check",
+    "--cd",
+    ".",
+  ]
+  if (doctorOptions.model !== undefined) codexArgs.push("--model", doctorOptions.model)
+  codexArgs.push(buildLazyCodexDoctorPrompt(doctorOptions.args))
   return {
     command: "codex",
-    args: [
-      "exec",
-      "--ephemeral",
-      "--sandbox",
-      "read-only",
-      "--skip-git-repo-check",
-      "--cd",
-      ".",
-      buildLazyCodexDoctorPrompt(doctorArgs),
-    ],
+    args: codexArgs,
     delegatesToOmo: false,
     env: {
       LAZYCODEX_DOCTOR_LCX_ACTIVE: "1",
+      ...(doctorOptions.sourceRoot === undefined ? {} : { LAZYCODEX_SOURCE_ROOT: doctorOptions.sourceRoot }),
     },
   }
 }
@@ -75,11 +88,54 @@ function buildLazyCodexDoctorPrompt(doctorArgs: readonly string[]): string {
   return [
     "Use $omo:lcx-doctor to diagnose this LazyCodex/Codex installation.",
     "This command is already the lazycodex doctor surface; never invoke lazycodex doctor from inside the doctor workflow.",
-    "Sync the latest LazyCodex and OpenAI Codex sources into /tmp, inventory the local installation,",
+    "Use the resolved source root from LAZYCODEX_SOURCE_ROOT when set; otherwise use ${TMPDIR:-/tmp}/lazycodex-sources.",
+    "Validate cached source checkouts before reuse, quarantine corrupt caches, and do not rely on /tmp/lazycodex-source.",
+    "Sync the latest LazyCodex and OpenAI Codex sources there, inventory the local installation,",
     "probe the Codex plugin/cache/hooks/MCP state, and report PASS/WARN/FAIL findings with evidence and remediations.",
     buildDoctorOutputInstruction(doctorArgs),
     doctorArgs.length > 0 ? `Requested doctor arguments: ${doctorArgs.join(" ")}` : "Requested doctor arguments: none",
   ].join(" ")
+}
+
+function parseLazyCodexDoctorOptions(doctorArgs: readonly string[]): LazyCodexDoctorOptions {
+  const args: string[] = []
+  let model: string | undefined
+  let sourceRoot: string | undefined
+  let index = 0
+  while (index < doctorArgs.length) {
+    const arg = doctorArgs[index]
+    if (arg === "--model") {
+      const value = doctorArgs[index + 1]
+      if (typeof value !== "string" || value.trim().length === 0) throw new Error("--model requires a value")
+      model = value
+      index += 2
+      continue
+    }
+    if (typeof arg === "string" && arg.startsWith("--model=")) {
+      const value = arg.slice("--model=".length)
+      if (value.trim().length === 0) throw new Error("--model requires a value")
+      model = value
+      index += 1
+      continue
+    }
+    if (arg === "--source-root") {
+      const value = doctorArgs[index + 1]
+      if (typeof value !== "string" || value.trim().length === 0) throw new Error("--source-root requires a path")
+      sourceRoot = value
+      index += 2
+      continue
+    }
+    if (typeof arg === "string" && arg.startsWith("--source-root=")) {
+      const value = arg.slice("--source-root=".length)
+      if (value.trim().length === 0) throw new Error("--source-root requires a path")
+      sourceRoot = value
+      index += 1
+      continue
+    }
+    args.push(arg)
+    index += 1
+  }
+  return { args, ...(model === undefined ? {} : { model }), ...(sourceRoot === undefined ? {} : { sourceRoot }) }
 }
 
 function buildDoctorOutputInstruction(doctorArgs: readonly string[]): string {

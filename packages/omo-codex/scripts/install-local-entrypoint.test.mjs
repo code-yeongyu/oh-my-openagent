@@ -69,7 +69,7 @@ test("#given dry-run install flags #when running the Node installer entrypoint #
 	).trim();
 
 	// then
-	assert.equal(output, "npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous");
+	assert.equal(output, "npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous");
 });
 
 test("#given dry-run install opt-out #when running the Node installer entrypoint #then preserves existing Codex permission settings", () => {
@@ -84,7 +84,21 @@ test("#given dry-run install opt-out #when running the Node installer entrypoint
 	).trim();
 
 	// then
-	assert.equal(output, "npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --no-codex-autonomous");
+	assert.equal(output, "npx --yes oh-my-openagent@latest install --platform=codex --no-tui --no-codex-autonomous");
+});
+
+test("#given explicit non-Codex dry-run platform #when running the Node installer entrypoint #then rejects it", () => {
+	// given
+	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
+
+	// when/then
+	assert.throws(
+		() =>
+			execFileSync(process.execPath, [scriptPath, "--dry-run", "install", "--platform=gemini", "--no-tui"], {
+				encoding: "utf8",
+			}),
+		/lazycodex-ai installs the Codex Light edition only/,
+	);
 });
 
 test("#given dry-run doctor #when running the Node installer entrypoint #then prints Codex LazyCodex doctor workflow command", () => {
@@ -98,7 +112,12 @@ test("#given dry-run doctor #when running the Node installer entrypoint #then pr
 
 	// then
 	assert.match(output, /^codex exec /);
+	assert.match(output, /--sandbox danger-full-access/);
+	assert.doesNotMatch(output, /--model/);
+	assert.doesNotMatch(output, /gpt-5\.5-codex-mini/);
+	assert.doesNotMatch(output, /--sandbox read-only/);
 	assert.match(output, /Use \$omo:lcx-doctor/);
+	assert.match(output, /\$\{TMPDIR:-\/tmp\}\/lazycodex-sources/);
 	assert.match(output, /Requested doctor arguments: --json/);
 	assert.match(output, /Return exactly one JSON object/);
 	assert.doesNotMatch(output, /oh-my-openagent omo doctor/);

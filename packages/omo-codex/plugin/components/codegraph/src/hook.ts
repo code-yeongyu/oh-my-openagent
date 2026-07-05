@@ -1,12 +1,15 @@
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { homedir } from "node:os";
+import { join } from "node:path";
 import { cwd as processCwd, env as processEnv, stdin as processStdin, stdout as processStdout } from "node:process";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
+import { buildCodegraphChildEnv, buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
 import { buildCodegraphInitGuidanceForToolResult } from "../../../../../utils/src/codegraph/guidance.ts";
+import { resolveCodegraphCommand } from "../../../../../utils/src/codegraph/resolve.ts";
 import { getCodexOmoConfig } from "../../../shared/src/config-loader.ts";
-import { SESSION_START_CWD_ENV } from "./session-start-worker.js";
+import { resolveCodegraphCommandInvocation, SESSION_START_CWD_ENV } from "./session-start-worker.js";
 import type {
 	HookStdout,
 	PostToolUseHookOptions,
@@ -38,6 +41,7 @@ export type {
 export { resolveCodegraphCommandInvocation, runCodegraphSessionStartWorker } from "./session-start-worker.js";
 
 export const CODEGRAPH_SESSION_START_NOTICE = "LazyCodex CodeGraph bootstrap scheduled in background";
+const STATUS_PROBE_TIMEOUT_MS = 2_000;
 
 export async function runCodegraphSessionStartHook(options: SessionStartHookOptions = {}): Promise<number> {
 	return (await executeCodegraphSessionStartHook(options)).exitCode;
@@ -58,13 +62,100 @@ export async function executeCodegraphSessionStartHook(options: SessionStartHook
 		return { action: "skipped-disabled", exitCode: 0 };
 	}
 
+	const isInitialized = await (options.statusProbe ?? isCodegraphProjectInitialized)({
+		env,
+		homeDir,
+		projectRoot,
+		...(config.trustedCodegraphInstallDir === undefined ? {} : { trustedCodegraphInstallDir: config.trustedCodegraphInstallDir }),
+	});
+	if (isInitialized) {
+		return { action: "skipped-initialized", exitCode: 0 };
+	}
+
 	(options.spawnWorker ?? spawnDetachedWorker)({
 		args: [options.workerCliPath ?? defaultWorkerCliPath(), "hook", "session-start-worker"],
 		command: process.execPath,
-		env: { ...env, [SESSION_START_CWD_ENV]: projectRoot },
+		env: buildCodegraphChildEnv({
+			ambientEnv: env,
+			codegraphEnv: { [SESSION_START_CWD_ENV]: projectRoot },
+			runtimeEnv: env,
+		}),
 	});
 	writeHookJson(options.stdout ?? processStdout);
 	return { action: "spawned", exitCode: 0 };
+}
+
+async function isCodegraphProjectInitialized(options: {
+	readonly env: Record<string, string | undefined>;
+	readonly homeDir: string;
+	readonly projectRoot: string;
+	readonly trustedCodegraphInstallDir?: string;
+}): Promise<boolean> {
+	const resolved = resolveCodegraphCommand({
+		env: options.env,
+		homeDir: options.homeDir,
+		provisioned: () => provisionedBinFromInstallDir(options.trustedCodegraphInstallDir),
+	});
+	if (!resolved.exists) return false;
+
+	const invocation = resolveCodegraphCommandInvocation(resolved.command, [...resolved.argsPrefix, "status", "--json"]);
+	const codegraphEnv = {
+		...buildCodegraphEnv({ homeDir: options.homeDir }),
+		...(options.trustedCodegraphInstallDir === undefined ? {} : { CODEGRAPH_INSTALL_DIR: options.trustedCodegraphInstallDir }),
+	};
+	const status = await runStatusProbe(
+		options.projectRoot,
+		invocation.command,
+		invocation.args,
+		buildCodegraphChildEnv({ ambientEnv: options.env, codegraphEnv, runtimeEnv: options.env }),
+	);
+	if (status.exitCode !== 0 || status.timedOut) return false;
+	return codegraphStatusSaysInitialized(status.stdout);
+}
+
+function runStatusProbe(
+	projectRoot: string,
+	command: string,
+	args: readonly string[],
+	env: Record<string, string>,
+): Promise<{ readonly exitCode: number; readonly stdout: string; readonly timedOut: boolean }> {
+	return new Promise((resolveProbe) => {
+		execFile(
+			command,
+			[...args],
+			{
+				cwd: projectRoot,
+				encoding: "utf8",
+				env,
+				maxBuffer: 1024 * 1024,
+				timeout: STATUS_PROBE_TIMEOUT_MS,
+				windowsHide: true,
+			},
+			(error, stdout) => {
+				if (error === null) {
+					resolveProbe({ exitCode: 0, stdout: toOutputText(stdout), timedOut: false });
+					return;
+				}
+				resolveProbe({ exitCode: resolveExitCode(error), stdout: toOutputText(stdout), timedOut: error.killed === true });
+			},
+		);
+	});
+}
+
+function codegraphStatusSaysInitialized(stdout: string): boolean {
+	const parsed = parseJson(stdout);
+	if (!isRecord(parsed)) return false;
+	const initialized = parsed["initialized"] ?? parsed["isInitialized"] ?? parsed["ready"];
+	if (typeof initialized === "boolean") return initialized;
+	const status = parsed["status"];
+	if (typeof status !== "string") return false;
+	const normalized = status.toLowerCase();
+	return (normalized.includes("initialized") || normalized.includes("ready")) && !normalized.includes("not initialized") && !normalized.includes("uninitialized");
+}
+
+function provisionedBinFromInstallDir(installDir: string | undefined): string | null {
+	if (installDir === undefined) return null;
+	return join(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
 }
 
 export async function executeCodegraphPostToolUseHook(options: PostToolUseHookOptions = {}): Promise<PostToolUseHookResult> {
@@ -109,6 +200,15 @@ function spawnDetachedWorker(invocation: WorkerSpawnInvocation): void {
 
 function resolveHomeDir(env: Record<string, string | undefined>): string {
 	return env["HOME"] ?? env["USERPROFILE"] ?? homedir();
+}
+
+function resolveExitCode(error: Error): number {
+	if ("code" in error && typeof error.code === "number") return error.code;
+	return 1;
+}
+
+function toOutputText(value: string | Buffer): string {
+	return Buffer.isBuffer(value) ? value.toString("utf8") : value;
 }
 
 function resolveProjectRoot(input: unknown, fallback: string): string {

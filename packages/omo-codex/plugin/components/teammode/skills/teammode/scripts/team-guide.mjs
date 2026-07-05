@@ -94,7 +94,9 @@ coordinate with each other, but the leader owns the final decision and integrati
   - to a **peer**: the instant you learn anything that touches their slice - a shared finding, a
     changed assumption, an interface they depend on. When unsure who owns it, send it to the leader.
 - **Going quiet is the only failure.** Many small lean messages beat one end-of-work dump; keep
-  every message short.
+  every message short. Your heartbeats are what let the leader relax and leave you to work: a leader
+  who can see your progress has no reason to interrupt you, while silence forces it to break in and
+  ask where things stand. Frequent lean updates buy you uninterrupted focus.
 
 ## Artifacts (how you hand work off)
 

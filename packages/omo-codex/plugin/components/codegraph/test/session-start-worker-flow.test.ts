@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -79,6 +79,20 @@ describe("CodeGraph SessionStart worker flow", () => {
 		});
 	});
 
+	it("#given Windows CodeGraph resolves to a Node script #when default worker runner builds invocation #then Node executes it", () => {
+		// given
+		const command = "C:\\Users\\test\\.omo\\codegraph\\bin\\codegraph.cjs";
+
+		// when
+		const invocation = resolveCodegraphCommandInvocation(command, ["status", "--json"], "win32");
+
+		// then
+		expect(invocation).toEqual({
+			args: [command, "status", "--json"],
+			command: process.execPath,
+		});
+	});
+
 	it("#given non-Windows codegraph command #when default worker runner builds invocation #then it executes directly", () => {
 		// given
 		const command = "/home/test/.omo/codegraph/bin/codegraph";
@@ -135,6 +149,62 @@ describe("CodeGraph SessionStart worker flow", () => {
 				rmSync(workspace, { recursive: true, force: true });
 				rmSync(homeDir, { recursive: true, force: true });
 			}
+		}
+	});
+
+	it("#given ambient provider tokens #when default worker runner spawns CodeGraph #then child env only gets safe and controlled variables", async () => {
+		// given
+		const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-env-"));
+		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-env-home-"));
+		const logPath = join(homeDir, "child-env.jsonl");
+		const originalOpenAiKey = process.env["OPENAI_API_KEY"];
+		process.env["OPENAI_API_KEY"] = "sk-test-secret";
+
+		try {
+			const fakeCodegraphScript = [
+				"const fs = require('node:fs');",
+				`fs.appendFileSync(${JSON.stringify(logPath)}, JSON.stringify({install:process.env.CODEGRAPH_INSTALL_DIR,openai:process.env.OPENAI_API_KEY}) + '\\n');`,
+				"process.stdout.write('{\"initialized\":true}');",
+			].join("");
+
+			// when
+			const result = await runCodegraphSessionStartWorker({
+				config: { codegraph: { enabled: true }, sources: [], warnings: [] },
+				cwd: workspace,
+				env: { HOME: homeDir },
+				logOutcome: () => undefined,
+				nodeVersion: "22.14.0",
+				deps: {
+					ensureGitignored: () => true,
+					ensureProvisioned: () => {
+						throw new Error("provisioning should not run when command is resolved");
+					},
+					prepareWorkspace: () => ({
+						dataDir: join(homeDir, ".omo/codegraph/projects/test"),
+						dataRoot: join(homeDir, ".omo/codegraph"),
+						linked: true,
+						mode: "global-linked",
+						projectLink: join(workspace, ".codegraph"),
+					}),
+					resolveCommand: () => ({ argsPrefix: ["-e", fakeCodegraphScript], command: process.execPath, exists: true, source: "bundled" }),
+				},
+			});
+
+			// then
+			expect(result).toEqual({ action: "synced" });
+			const captured = readFileSync(logPath, "utf8")
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line));
+			expect(captured).toEqual([
+				{ install: join(homeDir, ".omo", "codegraph") },
+				{ install: join(homeDir, ".omo", "codegraph") },
+			]);
+		} finally {
+			if (originalOpenAiKey === undefined) delete process.env["OPENAI_API_KEY"];
+			else process.env["OPENAI_API_KEY"] = originalOpenAiKey;
+			rmSync(workspace, { recursive: true, force: true });
+			rmSync(homeDir, { recursive: true, force: true });
 		}
 	});
 });

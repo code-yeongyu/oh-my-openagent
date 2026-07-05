@@ -1,6 +1,6 @@
 # src/plugin/ — 12 OpenCode Hook Handlers + Hook Composition
 
-**Generated:** 2026-06-08
+**Generated:** 2026-07-03
 
 ## OVERVIEW
 
@@ -11,7 +11,7 @@ Core glue layer. Files assemble the 12 OpenCode hook handlers wired into `Plugin
 | File | OpenCode Hook | Purpose |
 |------|---------------|---------|
 | `config.ts` | `config` | 6-phase config loading pipeline (delegates to `plugin-handlers/`) |
-| `tool-registry.ts` | `tool` | 20–39 tools assembled with config gates (team-mode +12, task system +4, hashline +1, interactive_bash +1, look_at +1) |
+| `tool-registry.ts` | `tool` | 12–35 tools assembled with config gates (team-mode +12, monitor +4, task system +4, hashline +1, interactive_bash +1, look_at +1); split across `tool-registry-{core-tools,team-tools,gated-tools}.ts` |
 | `tool-definition.ts` | `tool.definition` | Per-tool definition transform (applies todo-description-override) |
 | `chat-message.ts` | `chat.message` | First-message variant resolution, session setup, keyword detection trigger |
 | `chat-params.ts` | `chat.params` | Anthropic effort, think mode, runtime fallback model override |
@@ -31,10 +31,10 @@ Core glue layer. Files assemble the 12 OpenCode hook handlers wired into `Plugin
 | File | Tier | Count |
 |------|------|-------|
 | `create-session-hooks.ts` | Session | 24 |
-| `create-tool-guard-hooks.ts` | Tool Guard | 17 |
-| `create-transform-hooks.ts` | Transform | 5 |
+| `create-tool-guard-hooks.ts` | Tool Guard | 18 (incl. `team-tool-gating`, null unless team_mode) |
+| `create-transform-hooks.ts` | Transform | 7 slots (2 team-gated, 1 monitor-gated; incl. `contextInjectorMessagesTransform` from `features/context-injector`) |
 | `create-skill-hooks.ts` | Skill | 2 |
-| `create-core-hooks.ts` | Aggregator | Session + Guard + Transform = 46 |
+| `create-core-hooks.ts` | Aggregator | Session + Guard + Transform = 49 slots |
 
 `createContinuationHooks()` (7) lives in `src/create-hooks.ts` next to `createCoreHooks()` and `createSkillHooks()`.
 
@@ -52,6 +52,7 @@ Core glue layer. Files assemble the 12 OpenCode hook handlers wired into `Plugin
 | `ultrawork-db-model-override.ts` | DB-level model override for ultrawork |
 | `config-handler.ts` | Runtime config loading and caching |
 | `normalize-tool-arg-schemas.ts` | Coerce tool arg schemas into a normalized shape |
+| `native-skills.ts` | Native-skill loader (`createNativeSkills` / `getPluginInputNativeSkills`) feeding lazy `getLoadedSkills` discovery in skill/delegate tools |
 
 ## TOOL REGISTRATION GATES
 

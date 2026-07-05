@@ -53,6 +53,9 @@ test("#given a bound team #when the member field manual renders #then it gives c
 		// then - an explicit peer-notify rule so cross-cutting findings are pushed, not siloed
 		assert.match(guide, /to a \*\*peer\*\*/, "guide must have an explicit peer-notify rule");
 		assert.match(guide, /touches their slice/, "guide must trigger peer messages on slice-touching findings");
+		// then - the reassurance WHY that ties the two halves together: frequent reporting is what earns
+		// uninterrupted focus, so the leader has no reason to interrupt a member who keeps it informed
+		assert.match(guide, /uninterrupted focus/i, "guide must tell members frequent updates buy uninterrupted focus from the leader");
 		// then - the end-only directive that previously won is gone (it licensed batch-at-the-end reporting)
 		assert.doesNotMatch(guide, /the moment your work is complete/, "the standalone end-only report directive must be removed");
 	} finally {
@@ -84,4 +87,21 @@ test("#given the leader-facing SKILL.md #when it describes communication #then i
 	// then - the --session requirement is stated WITH its reason (member->leader push needs a real leader thread)
 	assert.match(skill, /--session <your own thread id>/, "SKILL.md must require init --session <your own thread id>");
 	assert.match(skill, /stuck polling|cannot report to you/i, "SKILL.md must explain why --session matters");
+});
+
+// The leader (a GPT-5.5 main session) over-polls when nothing reframes silence as work: real jobdori
+// run 019f07a6- fired 6 leader->child pings, 4 pure "WORKING CHECK"/"NUDGE" nags that interrupted the
+// child mid-slice. The member guide already mandates frequent reporting; the missing half is telling the
+// leader to WAIT. These tests pin that the leader-facing skill reframes quiet-as-working and gates any
+// outbound ping behind concrete decision rules instead of letting anxiety drive a barrage.
+test("#given the leader-facing SKILL.md #when it covers waiting on members #then it reframes a quiet member as working and gates leader pings behind decision rules", () => {
+	const skill = readFileSync(join(root, "components", "teammode", "skills", "teammode", "SKILL.md"), "utf8");
+
+	// then - a quiet member between heartbeats is reframed as working, not a stall to chase
+	// (\s+ tolerates markdown line-wrapping between the two words)
+	assert.match(skill, /working,\s+not stalled/i, "SKILL.md must reframe a quiet member as working, not stalled");
+	// then - outbound leader messages are gated behind explicit decision rules, not anxiety
+	assert.match(skill, /Message a member only when/i, "SKILL.md must gate leader pings behind a concrete decision rule");
+	// then - the anti-pattern nag pings the real run produced are named as what NOT to send
+	assert.match(skill, /are you\s+done\?/i, "SKILL.md must name the 'are you done?' style nag as forbidden");
 });

@@ -14,6 +14,7 @@ import {
 import {
 	compareVersions,
 	defaultRunCommandForManualUpdate,
+	detectMarketplaceLocalRepair,
 	detectAutoUpdateInstallFlow,
 	parsePositiveInteger,
 	parseVersion,
@@ -23,7 +24,12 @@ import {
 	resolveLatestVersion,
 	resolveLazyCodexUpdatePlan,
 } from "./auto-update-plan.mjs";
-import { formatMarketplaceFlowNotice, formatUpdateStartedNotice, resolveReleaseNotes } from "./auto-update-release-notes.mjs";
+import {
+	formatMarketplaceFlowNotice,
+	formatMarketplaceRepairStartedNotice,
+	formatUpdateStartedNotice,
+	resolveReleaseNotes,
+} from "./auto-update-release-notes.mjs";
 import { migrateCodexConfig } from "./migrate-codex-config.mjs";
 import { migrateOmoSotConfig } from "./migrate-omo-sot.mjs";
 import { resolveSpawnInvocation } from "./spawn-command.mjs";
@@ -38,9 +44,11 @@ export function resolveAutoUpdatePlan({ env = process.env, now = Date.now(), las
 		return { shouldRun: false, reason: "disabled" };
 	}
 
+	const flow = installFlow ?? detectAutoUpdateInstallFlow(env).flow;
+	const marketplaceRepair = flow === "marketplace" ? detectMarketplaceLocalRepair(env) : undefined;
 	const intervalMs = parsePositiveInteger(env.LAZYCODEX_AUTO_UPDATE_INTERVAL_MS, DEFAULT_INTERVAL_MS);
 	const successStatus = lastStatus === undefined || lastStatus === "success";
-	if (successStatus && typeof lastCheckedAt === "number" && intervalMs > 0 && now - lastCheckedAt < intervalMs) {
+	if (marketplaceRepair?.needsRepair !== true && successStatus && typeof lastCheckedAt === "number" && intervalMs > 0 && now - lastCheckedAt < intervalMs) {
 		return { shouldRun: false, reason: "throttled" };
 	}
 	const retryIntervalMs = parsePositiveInteger(env.LAZYCODEX_AUTO_UPDATE_RETRY_INTERVAL_MS, DEFAULT_RETRY_INTERVAL_MS);
@@ -48,8 +56,26 @@ export function resolveAutoUpdatePlan({ env = process.env, now = Date.now(), las
 		return { shouldRun: false, reason: "retry-throttled" };
 	}
 
-	const flow = installFlow ?? detectAutoUpdateInstallFlow(env).flow;
-	if (flow === "marketplace") return { shouldRun: false, reason: "marketplace-flow" };
+	if (flow === "marketplace") {
+		const repair = marketplaceRepair ?? detectMarketplaceLocalRepair(env);
+		if (!repair.needsRepair) return { shouldRun: false, reason: "marketplace-flow" };
+		const currentVersion = resolveCurrentVersion(env) ?? "unknown";
+		const latestVersion = resolveLatestVersion(env) ?? currentVersion ?? "latest";
+		return {
+			shouldRun: true,
+			kind: "marketplace-local-repair",
+			repairReasons: repair.reasons,
+			command: resolveCommand(env),
+			args: resolveArgs(env),
+			currentVersion,
+			latestVersion,
+			env: {
+				...env,
+				LAZYCODEX_AUTO_UPDATE_DISABLED: "1",
+				OMO_CODEX_AUTO_UPDATE_DISABLED: "1",
+			},
+		};
+	}
 
 	const currentVersion = resolveCurrentVersion(env);
 	const latestVersion = resolveLatestVersion(env);
@@ -142,7 +168,13 @@ export async function runAutoUpdateCheck({ env = process.env, now = Date.now() }
 		return { started: false, reason: "locked", notices };
 	}
 	try {
-		await appendUpdateLog(env, now, "started", { command: plan.command, args: plan.args });
+		await appendUpdateLog(env, now, "started", plan.kind === "marketplace-local-repair"
+			? { kind: plan.kind, repairReasons: plan.repairReasons ?? [] }
+			: {
+				command: plan.command,
+				args: plan.args,
+				...(plan.kind === undefined ? {} : { kind: plan.kind }),
+			});
 		const pendingNotice = { fromVersion: plan.currentVersion, toVersion: plan.latestVersion, startedAt: now };
 		const releaseNotes = await resolveReleaseNotes({ env, latestVersion: plan.latestVersion });
 		if (env.LAZYCODEX_AUTO_UPDATE_WAIT === "1") {
@@ -155,7 +187,7 @@ export async function runAutoUpdateCheck({ env = process.env, now = Date.now() }
 			await appendUpdateLog(env, now, "finished", { status });
 			if (status === 0) {
 				await writeState(statePath, { lastCheckedAt: now, lastAttemptedAt: now, lastStatus: "success", pendingNotice });
-				await recordUpdateStartedNotice({ env, now, notices, pendingNotice, releaseNotes });
+				await recordUpdateStartedNotice({ env, now, notices, pendingNotice, releaseNotes, plan });
 			} else {
 				await writeState(statePath, { lastAttemptedAt: now, lastStatus: "failed" });
 			}
@@ -169,7 +201,7 @@ export async function runAutoUpdateCheck({ env = process.env, now = Date.now() }
 			detached: true,
 		});
 		await writeState(statePath, { lastAttemptedAt: now, lastStatus: "started", pendingNotice });
-		await recordUpdateStartedNotice({ env, now, notices, pendingNotice, releaseNotes });
+		await recordUpdateStartedNotice({ env, now, notices, pendingNotice, releaseNotes, plan });
 		child.unref();
 		return { started: true, notices };
 	} finally {
@@ -197,10 +229,16 @@ async function settlePendingNotice({ env, now, statePath, state, notices }) {
 	return nextState;
 }
 
-async function recordUpdateStartedNotice({ env, now, notices, pendingNotice, releaseNotes }) {
-	notices.push(formatUpdateStartedNotice({ pendingNotice, releaseNotes }));
+async function recordUpdateStartedNotice({ env, now, notices, pendingNotice, releaseNotes, plan }) {
+	notices.push(plan.kind === "marketplace-local-repair"
+		? formatMarketplaceRepairStartedNotice({
+			pendingNotice,
+			releaseNotes,
+			repairReasons: plan.repairReasons ?? [],
+		})
+		: formatUpdateStartedNotice({ pendingNotice, releaseNotes }));
 	await appendUpdateLog(env, now, "notified", {
-		kind: "update-started",
+		kind: plan.kind === "marketplace-local-repair" ? "marketplace-local-repair-started" : "update-started",
 		fromVersion: pendingNotice.fromVersion,
 		toVersion: pendingNotice.toVersion,
 	});

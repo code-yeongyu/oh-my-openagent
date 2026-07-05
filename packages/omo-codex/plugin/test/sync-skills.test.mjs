@@ -9,6 +9,7 @@ import {
 	assertPackagedContentMatches,
 	componentSkillSources,
 	expectedSkills,
+	hiddenSharedSkills,
 	listSkillFiles,
 	removeCodexCompatibilityGuidance,
 	removeCodexSkillOverlays,
@@ -29,6 +30,13 @@ function excludeGeneratedSkillMetadata(files) {
 	return files.filter((file) => !generatedSkillMetadataFiles.has(file.replaceAll("\\", "/")));
 }
 
+async function assertNoLegacyResearchAliasInTree(rootDir, label) {
+	for (const file of await listSkillFiles(rootDir)) {
+		const content = await readFile(join(rootDir, file), "utf8");
+		assert.doesNotMatch(content, /ultraresearch/i, `${label}/${file} must not expose ultraresearch`);
+	}
+}
+
 test("#given synced aggregate Codex skills #when inspected #then component and shared skills are present", async () => {
 	// given
 	const skillsRoot = join(root, "skills");
@@ -45,6 +53,26 @@ test("#given synced aggregate Codex skills #when inspected #then component and s
 		const content = await readFile(join(skillsRoot, skillName, "SKILL.md"), "utf8");
 		assert.match(removeCodexCompatibilityGuidance(content), /^---\r?\n/);
 	}
+});
+
+test("#given reference-only designpowers frontend files #when synced for Codex #then nested SKILL.md files are not packaged", async () => {
+	// given
+	const frontendReferencesRoot = join(root, "skills", "frontend", "references");
+	const designpowersVendorSkillsRoot = join(frontendReferencesRoot, "designpowers", "vendor", "skills");
+
+	// when
+	const nestedSkillFiles = (await listSkillFiles(frontendReferencesRoot))
+		.map((file) => file.replaceAll("\\", "/"))
+		.filter((file) => file.endsWith("/SKILL.md") || file === "SKILL.md")
+		.sort();
+	const designpowersReferenceFiles = (await listSkillFiles(designpowersVendorSkillsRoot))
+		.map((file) => file.replaceAll("\\", "/"))
+		.filter((file) => file.endsWith("/reference.md"))
+		.sort();
+
+	// then
+	assert.deepEqual(nestedSkillFiles, []);
+	assert.equal(designpowersReferenceFiles.length, 27);
 });
 
 test("#given aggregate Codex skills #when source wiring is inspected #then shared skills are imported from the shared-skills package", async () => {
@@ -85,6 +113,7 @@ test("#given shared skill package source #when aggregate Codex shared skills are
 	// when / then
 	for (const skillName of sharedSkillNames) {
 		if (componentSkillNames.has(skillName)) continue;
+		if (hiddenSharedSkills.includes(skillName)) continue;
 		const sharedContent = await readFile(join(sharedSkillsRoot, skillName, "SKILL.md"), "utf8");
 		const aggregateContent = await readFile(join(aggregateSkillsRoot, skillName, "SKILL.md"), "utf8");
 		assert.equal(
@@ -112,10 +141,22 @@ test("#given shared skill source tests #when aggregate Codex skills are synced #
 	const aggregateSkillsRoot = join(root, "skills");
 
 	// when
-	const visualQaFiles = await listSkillFiles(join(aggregateSkillsRoot, "visual-qa"));
+	const forbiddenFiles = [];
+	for (const skillName of expectedSkills) {
+		for (const file of await listSkillFiles(join(aggregateSkillsRoot, skillName))) {
+			const normalized = file.replaceAll("\\", "/");
+			const segments = normalized.split("/");
+			const scriptsIndex = segments.lastIndexOf("scripts");
+			const hasPythonTestDir = scriptsIndex !== -1 && segments[scriptsIndex + 1] === "tests";
+			const isSourceMetadata = normalized === ".gitignore" || normalized === ".npmignore" || normalized === "pyrightconfig.json";
+			if (normalized.endsWith(".test.ts") || hasPythonTestDir || segments.includes("__pycache__") || normalized.endsWith(".pyc") || isSourceMetadata) {
+				forbiddenFiles.push(`${skillName}/${normalized}`);
+			}
+		}
+	}
 
 	// then
-	assert.equal(visualQaFiles.some((file) => file.endsWith(".test.ts")), false);
+	assert.deepEqual(forbiddenFiles, []);
 });
 
 test("#given component skill sources #when aggregate Codex component skills are inspected #then generated copies have no hand-authored drift", async () => {
@@ -133,7 +174,7 @@ test("#given component skill sources #when aggregate Codex component skills are 
 			const sourceContent = await readFile(join(sourceDir, relativePath), "utf8");
 			const aggregateContent = await readFile(join(aggregateDir, relativePath), "utf8");
 			assert.equal(
-				removeCodexCompatibilityGuidance(aggregateContent),
+				removeCodexSkillOverlays(skillName, removeCodexCompatibilityGuidance(aggregateContent)),
 				removeCodexCompatibilityGuidance(sourceContent),
 				`${skillName}/${relativePath} drifted from its component skill source`,
 			);
@@ -167,6 +208,20 @@ test("#given synced ulw-loop skill #when Codex hint metadata is inspected #then 
 	// then
 	assert.match(interfaceMetadata, /search_terms:/);
 	assert.match(interfaceMetadata, /- "ulw-loop"/);
+});
+
+test("#given shipped Codex skill payloads #when legacy ultraresearch alias is inspected #then it is not packaged", async () => {
+	// given
+	const skillsRoot = join(root, "skills");
+	const skillRoot = join(skillsRoot, "ultraresearch");
+
+	// then
+	await assert.rejects(readFile(join(skillRoot, "SKILL.md"), "utf8"), { code: "ENOENT" });
+	await assert.rejects(readFile(join(skillRoot, "agents", "openai.yaml"), "utf8"), { code: "ENOENT" });
+	await assertNoLegacyResearchAliasInTree(skillsRoot, "skills");
+	for (const [skillName, sourcePath] of componentSkillSources) {
+		await assertNoLegacyResearchAliasInTree(join(root, sourcePath), `components/${skillName}`);
+	}
 });
 
 test("#given synced git-master skill #when inspected #then commits and git history route through it", async () => {

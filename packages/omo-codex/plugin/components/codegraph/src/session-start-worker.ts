@@ -2,10 +2,10 @@ import { execFile } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { extname, join } from "node:path";
-import { cwd as processCwd, env as processEnv, stderr as processStderr } from "node:process";
+import { cwd as processCwd, env as processEnv, execPath as processExecPath, stderr as processStderr } from "node:process";
 
 import { getCodexOmoConfig } from "../../../shared/src/config-loader.ts";
-import { buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
+import { buildCodegraphChildEnv, buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
 import { evaluateCodegraphNodeSupport, type CodegraphNodeSupport } from "../../../../../utils/src/codegraph/node-support.ts";
 import { ensureCodegraphProvisioned } from "../../../../../utils/src/codegraph/provision.ts";
 import {
@@ -28,6 +28,7 @@ export const SESSION_START_CWD_ENV = "OMO_CODEGRAPH_SESSION_START_CWD";
 const CODEGRAPH_VERSION = "1.0.1";
 const COMMAND_TIMEOUT_MS = 60_000;
 const WINDOWS_CMD_EXTENSIONS = new Set([".bat", ".cmd"]);
+const WINDOWS_NODE_SCRIPT_EXTENSIONS = new Set([".cjs", ".js", ".mjs"]);
 type CodegraphBootstrapConfig = CodegraphConfig & {
 	readonly trustedCodegraphInstallDir?: string;
 };
@@ -160,7 +161,7 @@ function jsonSaysInitialized(value: unknown): boolean | undefined {
 async function runCodegraphCommand(projectRoot: string, command: string, args: readonly string[], options: { readonly env: Record<string, string>; readonly timeoutMs: number }): Promise<CodegraphCommandResult> {
 	const invocation = resolveCodegraphCommandInvocation(command, args);
 	return new Promise((resolvePromise) => {
-		execFile(invocation.command, [...invocation.args], { cwd: projectRoot, encoding: "utf8", env: { ...process.env, ...options.env }, maxBuffer: 1024 * 1024, timeout: options.timeoutMs, windowsHide: true }, (error, stdout, stderr) => {
+		execFile(invocation.command, [...invocation.args], { cwd: projectRoot, encoding: "utf8", env: buildCodegraphChildEnv({ ambientEnv: processEnv, codegraphEnv: options.env }), maxBuffer: 1024 * 1024, timeout: options.timeoutMs, windowsHide: true }, (error, stdout, stderr) => {
 			if (error === null) {
 				resolvePromise({ exitCode: 0, stderr: toOutputText(stderr), stdout: toOutputText(stdout), timedOut: false });
 				return;
@@ -176,7 +177,9 @@ export function resolveCodegraphCommandInvocation(
 	platform: NodeJS.Platform = process.platform,
 ): { readonly args: readonly string[]; readonly command: string } {
 	if (platform !== "win32") return { args: [...args], command };
-	if (!WINDOWS_CMD_EXTENSIONS.has(extname(command).toLowerCase())) return { args: [...args], command };
+	const extension = extname(command).toLowerCase();
+	if (WINDOWS_NODE_SCRIPT_EXTENSIONS.has(extension)) return { args: [command, ...args], command: processExecPath };
+	if (!WINDOWS_CMD_EXTENSIONS.has(extension)) return { args: [...args], command };
 	return { args: ["/d", "/s", "/c", command, ...args], command: "cmd.exe" };
 }
 

@@ -35,7 +35,6 @@ test("#given isolated components #when hooks are inspected #then commands stay i
 		"components/start-work-continuation/dist/cli.js",
 		"components/telemetry/dist/cli.js",
 		"components/teammode/dist/cli.js",
-		"components/workflow-selector/dist/cli.js",
 		"components/ulw-loop/dist/cli.js",
 		"components/ultrawork/dist/cli.js",
 		"scripts/auto-update.mjs",
@@ -107,8 +106,8 @@ test("#given aggregate hook commands #when inspected #then commands stay Node-ba
 
 	// then
 	assert(!commands.some((command) => /\bpython3?\b/i.test(command)));
-	assert(commands.includes('node "${PLUGIN_ROOT}/components/workflow-selector/dist/cli.js" hook user-prompt-submit'));
 	assert(commands.includes('node "${PLUGIN_ROOT}/components/ultrawork/dist/cli.js" hook user-prompt-submit'));
+	assert(!commands.some((command) => command.includes("components/workflow-selector/")));
 	assert(commands.every((command) => command.startsWith("node ")));
 	assert(commands.every((command) => !command.includes("\\")));
 });

@@ -124,7 +124,8 @@ This launches the TUI under tmux in an isolated sandbox, confirms it renders
 (`capture-pane`), confirms `send-keys` reaches the composer, tears the tmux
 session down, and verifies the real DB session count is unchanged.
 
-When TUI visual QA evidence is needed for a PR, attach a browser-rendered
+When TUI visual QA evidence is needed for a PR, follow
+`docs/reference/web-terminal-visual-qa.md` and attach a browser-rendered
 terminal artifact in addition to the tmux pane. From the repository root, replay
 the captured pane or run a short tmux-backed command through:
 

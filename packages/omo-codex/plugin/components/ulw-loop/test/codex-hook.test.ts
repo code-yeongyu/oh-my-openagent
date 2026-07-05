@@ -1,3 +1,5 @@
+// allow: SIZE_OK - ULW loop hook tests share one fake Codex stream/process harness; this release adds narrow hook cases and future additions should split by hook lifecycle.
+
 import { mkdir, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -190,6 +192,13 @@ describe("applyUserPromptUlwLoopSteering - error swallowing", () => {
 
 	it("returns empty when steering proposal is malformed JSON after marker", async () => {
 		const out = await applyUserPromptUlwLoopSteering(payload("OMO_ULW_LOOP_STEER: {bad", "/tmp"));
+		expect(out).toBe("");
+	});
+
+	it("#given malformed steering and standalone ultrawork enabled #when prompt contains OMO_ULW #then hook does not fall through to ultrawork", async () => {
+		const out = await applyUserPromptUlwLoopSteering(payload("OMO_ULW_LOOP_STEER: {bad", "/tmp"), {
+			includeUltraworkDirective: true,
+		});
 		expect(out).toBe("");
 	});
 });

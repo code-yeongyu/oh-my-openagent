@@ -2,7 +2,7 @@ import { isPlainRecord } from "./codex-cache-fs"
 import { createHash } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
-import type { TrustedHookState } from "./types"
+import type { CodexInstallPlatform, TrustedHookState } from "./types"
 
 const EVENT_LABELS = new Map<string, string>([
   ["PreToolUse", "pre_tool_use"],
@@ -19,6 +19,7 @@ const EVENT_LABELS = new Map<string, string>([
 
 export async function trustedHookStatesForPlugin(input: {
   readonly marketplaceName: string
+  readonly platform?: CodexInstallPlatform
   readonly pluginName: string
   readonly pluginRoot: string
 }): Promise<readonly TrustedHookState[]> {
@@ -37,6 +38,7 @@ export async function trustedHookStatesForPlugin(input: {
       ...trustedHookStatesForHooksFile({
         keySource: `${input.pluginName}@${input.marketplaceName}:${hookPath}`,
         hooks: parsed.hooks,
+        platform: input.platform ?? process.platform,
       }),
     )
   }
@@ -52,6 +54,7 @@ function hookManifestPaths(value: unknown): readonly string[] {
 function trustedHookStatesForHooksFile(input: {
   readonly keySource: string
   readonly hooks: Record<string, unknown>
+  readonly platform: CodexInstallPlatform
 }): readonly TrustedHookState[] {
   const states: TrustedHookState[] = []
   for (const [eventName, groups] of Object.entries(input.hooks)) {
@@ -63,20 +66,32 @@ function trustedHookStatesForHooksFile(input: {
       for (const [handlerIndex, handler] of group.hooks.entries()) {
         if (!isPlainRecord(handler) || handler.type !== "command") continue
         if (handler.async === true) continue
-        if (typeof handler.command !== "string" || handler.command.trim() === "") continue
+        const command = commandForPlatform(handler, input.platform)
+        if (command === undefined || command.trim() === "") continue
         const key = `${input.keySource}:${eventLabel}:${groupIndex}:${handlerIndex}`
-        states.push({ key, trustedHash: commandHookHash(eventLabel, group.matcher, handler) })
+        states.push({ key, trustedHash: commandHookHash(eventLabel, group.matcher, handler, command) })
       }
     }
   }
   return states
 }
 
-function commandHookHash(eventName: string, matcher: unknown, handler: Record<string, unknown>): string {
+function commandForPlatform(handler: Record<string, unknown>, platform: CodexInstallPlatform): string | undefined {
+  if (typeof handler.command !== "string") return undefined
+  if (platform === "win32" && typeof handler.commandWindows === "string") return handler.commandWindows
+  return handler.command
+}
+
+function commandHookHash(
+  eventName: string,
+  matcher: unknown,
+  handler: Record<string, unknown>,
+  command: string,
+): string {
   const timeout = Math.max(Number(handler.timeout ?? 600), 1)
   const normalizedHandler: Record<string, unknown> = {
     type: "command",
-    command: handler.command,
+    command,
     timeout,
     async: false,
   }

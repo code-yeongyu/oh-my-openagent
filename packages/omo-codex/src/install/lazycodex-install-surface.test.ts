@@ -70,7 +70,6 @@ describe("lazycodex install surface", () => {
         expect(wrapper).toContain("OMO_GENERATED_RUNTIME_WRAPPER")
         expect(wrapper).toContain(expectedTarget)
         expect(wrapper).toContain("CODEX_HOME")
-        expect(wrapper).toContain("OMO_SPARKSHELL_APP_SERVER_SOCKET")
         expect(wrapper).toContain("omo-ulw-loop")
         expect(wrapper).toContain("bun runtime not found")
         expect(wrapper).toContain("https://bun.sh")

@@ -16,9 +16,9 @@ Two things ship flat most often, and both read as "clean but generic": the **her
 The library lives flat in this directory (`references/design/`, max depth 1) and has two conceptual layers, and **most non-trivial tasks load one from each layer**:
 
 - **Layer A — taste skills (12 files):** how to execute. Discipline, motion physics, spacing rules, anti-slop guardrails, output completeness. Filenames end in `-skill.md` or start with `imagegen-`.
-- **Layer B — design systems (69 files):** what it should look like. Concrete color/type/component tokens for one specific brand aesthetic. Filenames are brand names (`claude.md`, `notion.md`, `stripe.md`, …).
+- **Layer B — design systems (70 files):** what it should look like. Concrete color/type/component tokens for one specific brand aesthetic. Filenames are brand names (`aside.md`, `claude.md`, `notion.md`, `stripe.md`, ...).
 
-A combined directory of all 81 reference files is at `_INDEX.md`. **Read that index before loading anything** unless the routing is obvious — it has the full mood-mapping and stacking rules in one place.
+A combined directory of all 83 reference files is at `_INDEX.md`. **Read that index before loading anything** unless the routing is obvious — it has the full mood-mapping and stacking rules in one place.
 
 ## Open Design Library
 
@@ -94,7 +94,7 @@ Run through this in order and stop at the first match. Do not skip — earlier r
 
 ### Step 1 — Did the user name a specific brand or site?
 
-Phrasings: "make it look like Linear", "Stripe-style buttons", "Notion-feel sidebar", "like {brand}'s landing page", or pasting a screenshot of a known brand site.
+Phrasings: "make it look like Linear", "Stripe-style buttons", "Notion-feel sidebar", "Aside-style browser agent", "like {brand}'s landing page", or pasting a screenshot of a known brand site.
 
 **Action:** Open `_INDEX.md`, find the brand under "Layer B — Design Systems", then load `<brand>.md`. Use it as the project's design system source of truth (color hex values, type scale, component specs, do/don'ts).
 
@@ -131,11 +131,13 @@ Do NOT use this for greenfield work — the audit phase is wasted effort there.
 
 ### Step 4 — Is this an image-first workflow?
 
-Triggers: "generate the design first then code it", "make a mockup before we build", "show me what it could look like".
+Triggers: "generate the design first then code it", "make a mockup before we build", "show me what it could look like" — AND, by default, any expressive greenfield brief (glossy / premium / wow / brand-grade) with no user-supplied reference.
 
 **Action:** Load both:
 - `image-to-code-skill.md` (the workflow: generate → analyze → implement)
 - `imagegen-frontend-web.md` for web, or `imagegen-frontend-mobile.md` for mobile screens
+
+For an expressive greenfield brief, default to generating **2-3 imagen concept drafts**, each prompt **seeded with the loaded Layer A + Layer B tokens** (palette, type, signature material) so the drafts inherit the reference's taste instead of generic priors. Pick the strongest, then treat the chosen draft as the reference-fidelity contract for `/visual-qa`.
 
 If the user wants only the imagery (no code), load only the imagegen file.
 
@@ -201,6 +203,7 @@ Once references are loaded, before writing any UI code:
 | User asks for... | Load these |
 |---|---|
 | "Build me a landing page" (no other info) | `_INDEX.md` shortlist → exactly one Layer B reference + `taste-skill.md` |
+| "Build me an Aside-style AI browser / agent page" | `aside.md` + `taste-skill.md` |
 | "Build me a Linear-style landing page" | `linear.app.md` + `taste-skill.md` |
 | "Make it Notion-like and minimal" | `notion.md` + `minimalist-skill.md` |
 | "Premium SaaS hero, like Stripe" | `stripe.md` + `soft-skill.md` |
@@ -214,39 +217,14 @@ Once references are loaded, before writing any UI code:
 
 ## Phase Final — Design QA (MANDATORY, runs after implementation)
 
-After implementation is complete, **before declaring the task done**, run a real browser-based Design QA.
+Before declaring the task done, verify the rendered UI. **The verification authority is `/visual-qa`, not a hand-rolled checklist here.** Run `/visual-qa`: it captures every page and breakpoint (375 / 768 / 1280px) on fresh evidence, drives and inspects interaction states (hover/focus/active) and motion (transitions, scroll-triggered, load), runs the dual-oracle pass, and loops until an independent reviewer passes. For a concrete reference or clone, run it in reference-fidelity mode.
 
-### Why
+This skill adds only the design-taste judgments `/visual-qa` cannot make for you:
 
-Code that "looks correct" in an editor is not verified. Colors render differently, spacing collapses, fonts fail to load, responsive breakpoints break, states are missing. The only way to know is to SEE it in a real browser.
+1. **Two kinds of failure count equally — fix both, then re-check.** Defects: clipping, wrong font, missing state, jank. Flatness: a surface that reads generic next to the loaded reference. When the render is bug-free but flat, you are NOT done — RAISE the design: deepen the material layering, give the color a real perceptual ramp (multiple stops / OKLCH, not one tint at varied opacity), render the hero focal object as real dimensional material (a generated bitmap, or real light/shadow/gradient/depth — never flat geometric primitives), and add the one signature moment. Patching only bugs while the surface stays at the floor is the single most common way this skill ships clean-but-generic work.
+2. **Motion serves meaning; slop animation is forbidden.** Every interactive element must communicate its affordance and state changes — but a hover that changes nothing, motion on a non-interactive element, or a decorative micro-animation with no informational purpose is slop. Do not add it, and treat any you find as a defect. The hero may carry one signature moment; the rest of the surface earns motion only where it signals interaction or state.
 
-### How
-
-1. **Launch the app** in a real browser (use `agent-browser` skill or the project's dev server + screenshot tool).
-2. **Take screenshots** at key breakpoints: mobile (375px), tablet (768px), desktop (1280px).
-3. **Walk the design system checklist** visually:
-   - [ ] Colors match `DESIGN.md` palette — no off-brand colors visible
-   - [ ] Typography hierarchy is clear — headings, body, captions are visually distinct
-   - [ ] Spacing rhythm feels consistent — no cramped or floating elements
-   - [ ] Interactive states work — hover every button, focus every input, toggle every switch
-   - [ ] Empty, loading, and error states exist and look intentional
-   - [ ] Dark mode (if declared in `DESIGN.md`) works completely
-   - [ ] No layout overflow, no horizontal scroll on mobile
-   - [ ] Motion/animation feels smooth — no jank, no missing transitions
-   - [ ] (Expressive brief) Surfaces AND the hero focal object read as real, dimensional material — not flat fills or flat geometric primitives. Use the brand's material: glass = tint+backdrop saturate+rim+sheen+glow; bright/playful = gradient fills+soft depth shadows+a lit focal object. The hero focal object is a generated bitmap, or carries real light/shadow/gradient/depth.
-   - [ ] (Expressive brief) Brand color is a perceptual ramp (multiple stops / OKLCH), not one tint reused at different opacities
-   - [ ] (Expressive brief) Every interactive element has a visible hover AND active/pressed micro-interaction, and the hero carries one signature moment
-4. **Two kinds of failure count equally — fix both, then re-check.** Defects: clipping, wrong font, missing state, jank. Flatness: a surface that reads generic next to the loaded reference. When the render is bug-free but flat, you are NOT done — RAISE the design: deepen the material layering, give the color real depth and a ramp, add the signature interaction. Patching only bugs while the surface stays at the floor is the single most common way this skill ships clean-but-generic work. Do not report "done" with visual bugs OR a floor-level surface.
-5. **If you cannot launch a browser** (e.g. no dev server, CI-only environment), state this explicitly and list what you would check. Never silently skip QA.
-
-### QA Report
-
-After passing QA, write a short summary:
-- Breakpoints tested
-- States verified (hover, focus, disabled, loading, error, empty)
-- Design system compliance: all tokens traced back to `DESIGN.md`
-- Issues found and fixed during QA
-- Screenshot evidence (attach or describe)
+Report "done" only when `/visual-qa` has passed on fresh evidence AND neither a visual bug nor a floor-level or slop-laden surface remains.
 
 
 ## Final notes

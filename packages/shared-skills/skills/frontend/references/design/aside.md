@@ -1,298 +1,209 @@
 # Design System Inspired by Aside
 
 > Category: Developer Tools & IDEs
-> AI browser agent. Dark-mode squircle UI, AsideDisplay variable font, sky-blue brand accent.
+> AI browser agent. Bright product-app marketing, custom display type, soft squircle controls, agent-browser product framing.
+
+## Provenance
+
+This reference is derived from a live capture of `https://aside.com/` on 2026-06-30, plus a reconnaissance pass following `JCodesMore/ai-website-cloner-template` at commit `8dd9cb47dde0d49fec06ee1d69bedd04840f3c95`.
+
+Reviewer-run evidence artifacts for the source capture were written under `.omo/evidence/20260630-aside-frontend-reference/`:
+
+- `aside-live-extraction.json`
+- `aside-home.png`
+- `cloner-output-summary.md`
+- `cloner-desktop-1440.png`
+- `cloner-tablet-768.png`
+- `cloner-mobile-390.png`
+
+Those `.omo/evidence` files are local review artifacts, not shipped package assets. Downstream agents should recapture the live site when fidelity to the current Aside page matters. This file carries the stable, reviewer-visible digest from that capture.
+
+### Reviewer-Visible Capture Digest
+
+- **Source page:** `https://aside.com/`
+- **Source metadata:** title indicated a browser built to do real work; description framed it as a browser that completes complex work across sites, accounts, and history.
+- **Template source:** `JCodesMore/ai-website-cloner-template` at commit `8dd9cb47dde0d49fec06ee1d69bedd04840f3c95`; the template was used as a local reconnaissance workflow, not copied into this repo.
+- **Screenshots captured:** live page at 1440px wide; reconstructed reconnaissance screenshots at 1440px, 768px, and 390px widths.
+- **Page topology:** compact nav, centered hero, sky/cloud hero wash, large browser-product frame, explanatory intro band, capability sections, benchmark tabs, password/security sections, blue closing CTA band, dense footer.
+- **Extracted type signals:** `displayFont` for hero and section display; Geist for body/UI; Geist Mono available for technical specimens.
+- **Extracted scale signals:** H1 around 48px / 52px with slight negative tracking; body 16px / 24px; UI labels around 14px / 20px.
+- **Extracted surface signals:** white page canvas, ink text around `#090b0c`, soft gray controls around `#f5f5f5`, black-opacity dividers, pill trust badge, rounded/squircle CTA buttons, product-frame shadows.
+- **Responsive observations:** desktop preserves full nav and large browser frame; tablet narrows the product frame; mobile crops/stacks the frame while keeping the hero and CTA visible.
+
+Do not treat this file as a license to copy Aside's logo, product screenshots, copy, or proprietary assets. Use it as a token and layout reference for original AI-browser, agent-workflow, and product-app surfaces.
 
 ## 1. Visual Theme & Atmosphere
 
-Aside's website presents a polished, app-like experience that mirrors the product itself — an AI-powered browser built to do real work. The design is dark-mode-first, opening on a near-black canvas (`#0a0a0a`) with carefully calibrated warm grays that avoid the cold, sterile feel of typical developer tools. The overall impression is of a premium native application rather than a marketing site, reinforced by the hero section's browser-frame mockup that blurs the line between product and page.
+Aside's current site reads as a bright, high-confidence product application rather than a dark developer landing page. The canvas is mostly white with hairline black dividers, dense product UI, large custom display headlines, and pale sky-blue atmospheric bands in the hero and final CTA. It feels closer to a native app launch page than a SaaS template: crisp, controlled, and built around the promise that the browser itself can do real work.
 
-The most distinctive visual element is the squircle border-radius system. Rather than standard CSS `border-radius`, Aside applies `corner-shape: superellipse()` to all rounded elements, producing the iOS-like continuous curvature that feels softer and more organic than circular arcs. This single detail — applied consistently from buttons to cards to the browser frame showcase — gives the entire interface a cohesive, platform-native quality that most web experiences lack.
+The signature move is the contrast between calm white space, a gentle cloud-like blue wash, and dense browser-product framing. The page opens with a centered hero, a small Y Combinator trust pill, and a large browser/app visual. Below that, sections use full-width bands, thin separators, and app-like capability cards instead of decorative feature-card grids. The tone is practical and confident: precise controls, product screenshots, benchmark pills, password/memory/security stories, and compact navigation.
 
-Typography is anchored by AsideDisplay, a custom variable font used exclusively for display headlines at tight tracking (`-0.0125em`). Body text and UI elements use Geist (Vercel's open-source sans-serif), while code surfaces use Geist Mono. The three-font stack creates a clear hierarchy: AsideDisplay commands attention, Geist handles utility, and Geist Mono signals technical content. All three are variable fonts supporting weight 100–900, giving the system fine-grained control without loading multiple font files.
-
-The color system uses a shadcn/ui-derived token architecture with full light and dark palettes, though the site presents exclusively in dark mode. A custom `mist` color scale (`#090b0c` at 950, `#22292b` at 800) replaces pure neutral black with a barely perceptible teal-green undertone — the foreground color in light mode is `#090b0c` (mist-950), not `#000000`. The brand accent is sky blue (`#00bcfe`), used sparingly for the `--brand` token but never as a primary CTA color. Instead, the primary button inverts the foreground/background relationship: dark text on light surface in dark mode, dark surface with light text in light mode.
-
-**Key Characteristics:**
-- Dark-mode-first presentation with warm mist-toned blacks (`#090b0c`, `#22292b`)
-- Squircle/superellipse border-radius on all rounded elements — iOS-like continuous curvature
-- AsideDisplay custom variable font for headlines, Geist for body, Geist Mono for code
-- Sky blue brand accent (`#00bcfe`) used as a signal color, not a CTA color
-- shadcn/ui token architecture with `--primary`, `--secondary`, `--muted`, `--accent` semantic tokens
-- Full light/dark dual palette, though the marketing site shows dark mode only
-- Browser-frame product showcase as the central hero element with glass morphism
-- Y Combinator-backed badge as a trust signal
-- Tailwind CSS v4 with `color-mix()` and `oklch` color space support
+Rounded elements should feel like soft squircles, not generic `rounded-2xl` blobs. Live capture shows very large pill radii for trust badges and hero CTAs, medium squircle radii around compact action buttons, and square rhythm for structural section boundaries. Depth is created by product frames, soft shadows, white/black opacity borders, and layered screenshot surfaces, not by colorful background decoration.
 
 ## 2. Color Palette & Roles
 
-### Primary (Dark Theme — site default)
-- **Near Black** (`#0a0a0a`): `--background`. Page canvas. A pure neutral-950 — warm but not tinted.
-- **Off White** (`#fafafa`): `--foreground`. Primary text in dark mode. Neutral-50.
-- **Light Gray** (`#e5e5e5`): `--primary`. Primary interactive surface in dark mode — buttons, links. Neutral-200.
-- **Dark Gray** (`#171717`): `--primary-foreground`. Text on primary surfaces. Neutral-900.
+### Core Canvas
 
-### Primary (Light Theme)
-- **White** (`#ffffff`): `--background`. Page canvas.
-- **Mist Black** (`#090b0c`): `--foreground` and `--primary`. A custom near-black with subtle teal undertone (not pure `#000`).
-- **Near White** (`#fafafa`): `--primary-foreground`. Text on primary surfaces.
+- **White** (`#ffffff`): primary page background. Use for the main canvas and broad content bands.
+- **Ink Black** (`lab(2.93655 -0.435196 -0.608262)`, approximate `#090b0c`): primary text. Use this instead of pure black when possible.
+- **Soft Gray Surface** (`lab(96.52 -0.0000298023 0.0000119209)`, approximate `#f5f5f5`): rounded control and panel surface.
+- **Hairline Divider** (`rgba(0,0,0,0.06)`): section borders and subtle containment.
+- **Muted Text** (`#737373` to `#a1a1a1` range): captions, footer links, secondary product explanations.
 
-### Brand & Accent
-- **Sky Blue** (`#00bcfe`): `--brand` (mapped from `--color-sky-400`). The signature accent — used for brand moments, hover highlights, and decorative elements. Not used for primary CTAs.
-- **Sky Light** (`#f0f9ff`): `--color-sky-50`. Tinted surface for sky-themed elements.
+### Action Surfaces
 
-### Surface & Background
-- **Card Dark** (`#171717`): `--card`. Card and container surfaces in dark mode. Neutral-900.
-- **Card Light** (`#ffffff`): `--card`. Light-mode card surface.
-- **Muted Dark** (`#262626`): `--muted`. Subdued surface for de-emphasized areas. Neutral-800.
-- **Muted Light** (`#f5f5f5`): `--muted`. Light-mode subdued surface. Neutral-100.
-- **Popover Dark** (`#171717`): `--popover`. Dropdown/overlay surface. Neutral-900.
-- **Glass Surface**: `color-mix(in oklab, var(--background) 80%, transparent)`. Browser-frame web content background — translucent with backdrop blur.
+- **Primary Button Surface**: light gray or ink-inverted depending on context. Use compact contrast instead of saturated brand color.
+- **Primary Button Text**: ink black on light controls; white on dark controls.
+- **Hover Surface**: slightly darker neutral fill with 150ms color/background/border transition.
+- **Focus Ring**: neutral gray ring. Keep it visible against white and soft gray.
 
-### Neutrals & Text
-- **Muted Foreground** (`#a1a1a1`): `--muted-foreground`. Secondary text, placeholders. Neutral-500.
-- **Ring** (`#737373` dark / `#a1a1a1` light): `--ring`. Focus ring color. Neutral-500/400.
-- **Border Dark** (`rgba(255,255,255,0.1)`): `--border`. Dark-mode borders — white at 10% opacity.
-- **Border Light** (`#e5e5e5`): `--border`. Light-mode borders. Neutral-200.
-- **Surface Border** (`rgba(250,250,250,0.15)`): `--border-surface`. Subtle surface separation.
-- **Surface Border Strong** (`rgba(250,250,250,0.2)`): `--border-surface-strong`. Emphasized surface borders.
+### Accent Use
 
-### Status Colors
-- **Destructive Dark** (`#ff6568`): `--destructive`. Error in dark mode — a soft coral-red. `--color-red-400`.
-- **Destructive Light** (`#e40014`): `--destructive`. Error in light mode — a deeper, more serious red.
-- **Success** (`#00bb7f`): `--color-emerald-500`. Success indicators.
-- **Warning** (`#f99c00`): `--color-amber-500`. Warning accents.
-- **Orange** (`#fe6e00`): `--color-orange-500`. Warm informational accent.
-- **Rose** (`#ff2357`): `--color-rose-500`. Decorative hot pink accent.
+Aside's live capture does not rely on one dominant neon accent. Accents come from product imagery, benchmark pills, subtle icon color, and carefully placed dark controls. If a project needs a brand color, keep it secondary to the black/white/gray product-app system and apply it only to small signals.
 
-### Custom Colors
-- **Mist 950** (`#090b0c`): The defining custom color — a near-black with a barely perceptible cool teal-green cast. Used as `--foreground` in light mode, distinguishing Aside from brands that use pure black.
-- **Mist 800** (`#22292b`): A dark teal-gray for elevated dark surfaces.
+The current page does use pale cyan/sky-blue atmosphere in large image-backed bands. Treat that as an optional Aside signature for AI-browser launches: soft, airy, and product-framing, not a generic blue gradient background.
 
 ## 3. Typography Rules
 
 ### Font Family
-- **Display**: `AsideDisplay Variable` (CSS: `displayFont`), fallback: `Arial`
-- **Body / UI**: `Geist` (variable, weight 100–900), fallback: `Arial`
-- **Monospace**: `Geist Mono` (variable, weight 100–900), fallback: `Arial`
-- **CSS custom properties**: `--font-display`, `--font-sans`, `--font-mono`
+
+- **Display**: Aside custom display font exposed in capture as `displayFont`, fallback display sans.
+- **Body / UI**: Geist, fallback sans.
+- **Mono**: Geist Mono for code, benchmark labels, and technical specimens.
 
 ### Hierarchy
 
-| Role | Font | Size | Weight | Line Height | Letter Spacing | Notes |
-|------|------|------|--------|-------------|----------------|-------|
-| Display Hero | AsideDisplay | 48px (3rem) | 400–500 | 1.08 (tight) | -0.0125em | `font-display tracking-display`, xl: text-5xl |
-| Display Medium | AsideDisplay | 36px (2.25rem) | 400–500 | 1.10 (tight) | -0.0125em | Section headlines |
-| Section Heading | AsideDisplay | 30px (1.875rem) | 400 | 1.15 (tight) | -0.0125em | Feature section titles |
-| Sub-heading | Geist | 20px (1.25rem) | 500–600 | 1.20 | normal | Card titles, sub-sections |
-| Body Large | Geist | 18px (1.125rem) | 400 | 1.50 | normal | Intro text, hero subtitle |
-| Body | Geist | 16px (1rem) | 400 | 1.50 | normal | Standard reading text |
-| Body Small | Geist | 14px (0.875rem) | 400–500 | 1.43 | normal | Compact body, nav links |
-| Button | Geist | 14px (0.875rem) | 500 | 1.00 | normal | Primary/secondary buttons, `text-sm font-medium` |
-| Button Large | Geist | 16px (1rem) | 500 | 1.00 | normal | `md:text-base` size-up |
-| Caption | Geist | 12px (0.75rem) | 400–550 | 1.33 | 0.01em | Badges, labels, YC pill |
-| Code | Geist Mono | 14px (0.875rem) | 400 | 1.50 | normal | Inline code, terminal text |
+| Role | Font | Size | Weight | Line Height | Letter Spacing | Use |
+|---|---|---:|---:|---:|---:|---|
+| Hero Display | displayFont | 48px | 400 | 52px | -0.48px | Primary H1 |
+| Section Display | displayFont | 36px-48px | 400-500 | 1.08-1.15 | tight | Major section claims |
+| Card Title | displayFont or Geist | 24px-30px | 500 | 1.2 | normal/tight | Product capability cards |
+| Body | Geist | 16px | 400 | 24px | normal | General explanation |
+| UI Label | Geist | 14px | 500 | 20px | normal | Nav, buttons, menu labels |
+| Pill/Caption | Geist | 12px-14px | 500-550 | 1.3 | slight | Badges, metadata, benchmarks |
 
 ### Principles
-- **AsideDisplay is display-only**: Never used for body text, buttons, or UI chrome. Reserved for headlines where its custom letterforms create brand presence.
-- **Geist carries all functional weight**: Navigation, buttons, labels, body text — all Geist. The variable font makes weight transitions seamless.
-- **Tight tracking on display**: `-0.0125em` letter-spacing on all AsideDisplay text creates dense, engineered headlines that feel confident without being aggressive.
-- **Font-weight as hierarchy signal**: Display uses 400–500 (medium), UI elements use 500 (medium), body uses 400 (regular). No bold (700) in the primary hierarchy.
-- **`font-semimedium` utility**: A custom weight designation (`font-[550]` or `font-[450]`) for badge/pill text — between regular and medium.
+
+- Use the display font for the claim, not for every word on the page.
+- Keep body copy plain, readable, and product-focused.
+- Favor medium weights over bold weights; the brand voice is confident but not shouty.
+- Avoid negative letter-spacing outside display text. The router's global rule against viewport-scaled font sizing still applies.
 
 ## 4. Component Stylings
 
-### Buttons
-
-**Primary (Dark Mode)**
-- Background: `#e5e5e5` (`--primary`)
-- Text: `#171717` (`--primary-foreground`)
-- Padding: 0 10px (h-8 px-2.5) or 0 12px (h-9 px-3, md)
-- Radius: squircle `rounded-xl` (0.75rem superellipse)
-- Hover: `bg-primary/80` (80% opacity)
-- Font: 14px Geist weight 500
-- Active: `scale(0.95)` transform
-- Use: Primary CTA ("Download", "Try it")
-
-**Primary Pill (Hero CTA)**
-- Same as Primary but `rounded-full` (pill shape with squircle)
-- Larger: h-11 on mobile, h-9/h-10 on desktop
-- Includes leading icon (download arrow)
-- Use: Hero section download button
-
-**Ghost / Icon**
-- Background: transparent
-- Text: `--muted-foreground`
-- Hover: `bg-muted text-foreground`
-- Size: 36px square (`size-9`) or 44px (`size-11`)
-- Radius: squircle `rounded-xl`
-- Use: Icon-only actions, search, compose
-
-**Badge / Pill**
-- Background: transparent
-- Text: `text-primary/70` (70% opacity primary)
-- Border: `border-primary/20` (20% opacity)
-- Padding: 0 10px (h-6 px-2.5)
-- Radius: `rounded-full`
-- Font: 12px weight 550, tracking 0.01em
-- Use: Trust badges ("Backed by Y Combinator")
-
-### Cards & Containers
-- Background: `--card` (`#171717` dark)
-- Border: `--border-surface` (`rgba(250,250,250,0.15)`) or `--border-surface-strong` for emphasis
-- Radius: squircle `rounded-xl` (0.75rem) standard, `rounded-2xl` (1rem) featured, `rounded-3xl` (1.5rem) hero
-- Shadow: `shadow-xl` on the browser frame showcase
-- Glass variant: `bg-web-content-background/80` with backdrop blur for the browser frame
-
-### Browser Frame (Distinctive Component)
-- Full browser mockup with macOS traffic light dots (red `bg-red-400`, amber `bg-amber-400`, green `bg-green-500`)
-- Sidebar with bookmark items (favicons + labels)
-- Glass morphism web content area
-- Border: `border-glass` token
-- Responsive scaling via CSS `transform: scale()` at breakpoints
-- Min width 1200px, max width 1320px, centered
-
-### Inputs & Forms
-- Border: `--input` (`rgba(255,255,255,0.15)` dark / `#e5e5e5` light)
-- Focus: `--ring` focus ring
-- Radius: squircle `rounded-xl`
-- Text: `--foreground`
-- Placeholder: `--muted-foreground`
-
 ### Navigation
-- Sticky top bar, transparent on hero background
-- Logo: Aside SVG wordmark, `h-9`, `#090b0c` fill in light / `currentColor` in dark
-- Links: Geist 14px weight 500, `font-sans text-sm font-medium`
-- Dropdowns via Base UI (`@base-ui/dropdown-menu`)
-- CTA: Primary button right-aligned ("Download")
-- Mobile: Hamburger toggle, `size-9` button
-- Height: `h-14` (56px)
+
+- Top navigation is compact and product-app-like.
+- Logo at left, grouped menu buttons/links in the center, download CTA at right.
+- Nav labels use Geist 14px/500 with short 150ms color/background transitions.
+- Dropdown triggers can be text buttons with no visible border until hover.
+- Mobile should collapse to icon/hamburger controls with the same neutral/squircle treatment.
+
+### Hero Trust Pill
+
+- Pill radius: full pill, visually continuous.
+- Border/fill: very subtle neutral contrast against white.
+- Text: 12px-14px Geist, medium weight.
+- Content: use as a trust or provenance signal, not a decorative chip pile.
+
+### Primary CTA
+
+- Shape: pill for hero CTA, medium squircle for standard nav/action buttons.
+- Height: 36px compact nav, 44px hero/mobile.
+- Padding: generous horizontal padding for hero; compact in nav.
+- Motion: 150ms background/color/border transition; pressed state can scale to 0.97.
+- Icon: use SVG icon from the app's icon library; do not use emoji.
+
+### Product Browser Frame
+
+This is the key Aside-inspired primitive.
+
+- Large product/browser mockup below or near the hero claim.
+- Use a real screenshot, generated bitmap, or carefully built UI surface. Do not substitute flat rectangles.
+- Contain with soft border, rounded/squircle corners, and restrained shadow.
+- Internal chrome should show real browser/app affordances: sidebar, tabs, compact controls, content panels.
+- The frame can overflow and crop at mobile widths, but the focal content must remain legible.
+
+### Capability Sections
+
+- Full-width horizontal bands separated by `border-b border-black/6` style dividers.
+- Section structure: one major claim, one explanatory block, one app-like visual or metric module.
+- Avoid three generic feature cards unless the product genuinely has three peer capabilities.
+- Link rows and "Learn more" controls stay quiet and text-forward.
+
+### Benchmark Pills / Tabs
+
+- Medium squircle radius around compact tabs.
+- Neutral backgrounds with dark text.
+- Hover/active states should be visible through fill, border, or text contrast.
+- Useful for agent benchmarks, model comparisons, task modes, and product states.
 
 ## 5. Layout Principles
 
-### Spacing System
-- Base unit: 4px (Tailwind `--spacing` default)
-- Scale: 0.5 (2px), 1 (4px), 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10, 12, 14, 16, 20, 24, 32, 40, 64
-- Page padding: `p-2 md:p-4` (8px mobile, 16px desktop) outer wrapper
-- Section padding: `py-16` (64px) for hero sections
-- Card spacing: `--card-spacing: calc(var(--spacing) * 4)` (16px)
+### Structure
 
-### Grid & Container
-- No explicit max-width container — content width controlled by component sizing
-- Browser frame: min 1200px, max 1320px, centered with 120px horizontal inset
-- Hero: centered text with generous padding, `max-sm:px-8 max-sm:text-left`
-- Feature sections: likely 2–3 column grids
-- Responsive scaling: browser frame scales from 1.0 (desktop) to 0.5 (mobile) via CSS transforms
+- Full page uses stacked bands rather than isolated floating cards.
+- Hero centers the brand claim and then gives the product visual real space.
+- Sections often span full width with internal max-width constraints.
+- Footer is link-dense and calm, with grouped columns.
 
-### Whitespace Philosophy
-- **App-like density**: Tighter than typical marketing sites — the interface mimics the product's native-app feel rather than luxurious editorial spacing.
-- **Hero breathes, UI compresses**: The hero section has generous `py-16` padding, but UI components within the browser showcase are densely packed (8px sidebar items, compact navigation).
-- **Responsive scaling over reflow**: The browser-frame hero uses CSS `transform: scale()` at breakpoints rather than reflowing content, maintaining visual fidelity across viewport sizes.
+### Spacing
 
-### Border Radius Scale
-- Standard: `rounded-md` (6px squircle) — small interactive elements
-- Comfortable: `rounded-lg` (8px squircle) — sidebar items, small buttons, traffic light dots area
-- Generous: `rounded-xl` (12px squircle) — buttons, inputs, cards, primary radius
-- Large: `rounded-2xl` (16px squircle) — browser frame, featured containers
-- Hero: `rounded-3xl` (24px squircle) — hero wrapper, largest containers
-- Pill: `rounded-full` — badges, hero CTA, circular elements
-- **All with `corner-shape: superellipse(var(--squircle-factor))`** — the defining detail
+- Outer page padding: 8px mobile, 16px desktop.
+- Hero vertical rhythm: generous, but not editorially sparse; the product visual arrives quickly.
+- Section padding: 56px-96px depending on density.
+- Dense UI inside product frames can use 8px-16px rhythm.
 
-## 6. Depth & Elevation
+### Responsive Behavior
 
-| Level | Treatment | Use |
-|-------|-----------|-----|
-| Flat (Level 0) | No shadow | Page background, inline text |
-| Subtle (Level 1) | `0 1px 2px rgba(0,0,0,0.15)` (`--drop-shadow-sm`) | Subtle element lift |
-| Glass (Level 2) | `color-mix(in oklab, var(--background) 80%, transparent)` + backdrop-blur | Browser frame content area, translucent overlays |
-| Elevated (Level 3) | `shadow-xl` (Tailwind default xl shadow) | Browser frame showcase, modals |
-| Border-as-depth | `--border-surface` (15–20% opacity white/black) | Cards, containers — border creates perceived elevation without shadow |
+- Desktop: full nav, large browser/product visual, multi-column footer.
+- Tablet: preserve product framing but reduce visual width and section padding.
+- Mobile: collapse nav, make hero text more compact, crop or stack the product frame deliberately.
+- Avoid horizontal overflow; if a browser mockup is wider than the viewport, scale or crop from a stable container.
 
-**Shadow Philosophy**: Aside communicates depth primarily through **opacity-based borders and glass morphism** rather than traditional drop shadows. The `--border-surface` (15% opacity) and `--border-surface-strong` (20% opacity) tokens create subtle containment lines that separate layers without the visual weight of shadows. The glass surface (`color-mix` with 80% background opacity) on the browser frame showcase is the most dramatic depth effect — a frosted-glass plane that suggests the product UI hovering above the marketing page.
+## 6. Depth, Motion & Interaction
+
+### Depth
+
+- Use hairline borders and product-frame shadows as the primary elevation language.
+- Prefer subtle neutral shadow over colored glows.
+- Layer product screenshots or UI panels to create depth.
+- Keep broad backgrounds flat white unless a product visual, hero, or closing CTA needs the current Aside-like pale sky-blue atmospheric wash.
+
+### Motion
+
+- Use short transitions for controls: color, background-color, border-color, opacity, transform.
+- Keep motion in the 150ms-200ms range with standard cubic-bezier easing.
+- Product demos may use scroll or time-based state changes, but document the interaction model in `DESIGN.md` before building.
+- Animate transform/opacity/filter only.
+
+### Interaction States
+
+Every primitive must define default, hover, active, focus-visible, disabled, loading, empty, and error states before implementation. Aside-like surfaces are quiet, so missing states are obvious.
 
 ## 7. Do's and Don'ts
 
 ### Do
-- Use squircle/superellipse `corner-shape` on all rounded elements — this IS the Aside identity
-- Use mist-950 (`#090b0c`) for foreground in light mode instead of pure black — the teal undertone matters
-- Keep AsideDisplay exclusive to display-size headlines — never use it for body or UI text
-- Apply sky-blue (`#00bcfe`) as a brand signal sparingly — it's not a CTA color
-- Use opacity-based borders (`rgba(255,255,255,0.1–0.2)`) for dark-mode containment
-- Invert the primary button in dark mode: light surface (`#e5e5e5`) with dark text (`#171717`)
-- Match the product's native-app density — tighter spacing than typical marketing sites
-- Use `color-mix(in oklab, ...)` for glass/translucent surfaces
+
+- Do use a bright canvas with crisp ink typography for the current Aside-inspired look.
+- Do use a custom display face or distinctive display substitute for hero and section claims.
+- Do preserve the product-browser frame as the memorable focal object.
+- Do use soft squircle or pill corners intentionally by component role.
+- Do build dense, useful product UI inside the hero visual.
+- Do use thin black-opacity dividers to make sections feel engineered.
+- Do keep CTA colors neutral and high contrast.
+- Do cite live screenshots or extracted design tokens when claiming Aside fidelity.
 
 ### Don't
-- Don't use circular `border-radius` — always apply the squircle superellipse factor
-- Don't use pure black (`#000000`) for text — use mist-950 (`#090b0c`) or neutral-950 (`#0a0a0a`)
-- Don't use sky-blue for primary buttons — it's a decorative/brand accent only
-- Don't use AsideDisplay below 24px — it's not designed for small sizes
-- Don't use warm-toned grays — Aside's neutrals are pure (neutral scale) with the only warmth in the custom mist colors
-- Don't apply heavy drop shadows — depth comes from opacity borders and glass morphism
-- Don't use weight 700+ on Geist for UI elements — keep to 400–550 range
-- Don't introduce pill-shaped buttons except for the hero CTA and badges — standard CTAs use `rounded-xl`
 
-## 8. Responsive Behavior
+- Don't resurrect the older dark-only Aside reference without checking the live site.
+- Don't copy Aside's logo, text, screenshots, or proprietary product assets.
+- Don't replace the product-browser focal object with flat geometric decoration.
+- Don't make the page a purple-blue gradient SaaS layout.
+- Don't use saturated sky blue as a giant primary CTA color; if using Aside's current atmosphere, keep it pale, cloud-like, and subordinate to the product frame.
+- Don't over-round every component equally; distinguish pills, squircles, and structural edges.
+- Don't hide visual QA behind tests. Aside-like work needs screenshots at mobile, tablet, and desktop widths.
 
-### Breakpoints
-| Name | Width | Key Changes |
-|------|-------|-------------|
-| Mobile | <640px | Single column, hamburger nav, hero text left-aligned, browser frame scales to 0.5x |
-| Tablet | 640–768px | Slightly wider content, nav still collapsed |
-| Small Desktop | 768–1024px | Full horizontal nav appears, browser frame at 0.7–0.8x scale |
-| Desktop | 1024–1280px | Full layout, browser frame at 0.9x |
-| Large Desktop | >1280px | Browser frame at 1.0x (1200–1320px), maximum hero height (832px) |
+## Agent Prompt
 
-### Touch Targets
-- Buttons: minimum h-8 (32px) compact, h-9 (36px) standard, h-11 (44px) hero CTA on mobile
-- Navigation links: adequate spacing in horizontal nav with dropdown triggers
-- Mobile hamburger: 36px (`size-9`) touch target
-- Sidebar items: 32px (`h-8`) minimum height
-
-### Collapsing Strategy
-- **Navigation**: Full horizontal with dropdowns → hamburger toggle on mobile
-- **Hero**: Centered text → left-aligned (`text-left`) on mobile, hero CTA gains full padding
-- **Browser frame**: CSS `transform: scale()` — 1.0x desktop → 0.9x → 0.8x → 0.7x → 0.5x mobile — no reflow, pure scaling
-- **Hero height**: 832px → 720px → 700px → 620px → 460px across breakpoints
-- **Page padding**: 16px desktop (`p-4`) → 8px mobile (`p-2`), with `pb-0` to allow content flush
-
-### Image Behavior
-- Browser frame showcase maintains squircle radius at all sizes via scaled container
-- Product screenshots within the browser frame scale proportionally
-- Background image on hero section via CSS `background-image`, covers full section
-- Favicon/bookmark icons maintain 16px (`size-4`) at all sizes
-
-## 9. Agent Prompt Guide
-
-### Quick Color Reference
-- Page background (dark): Near Black (`#0a0a0a`)
-- Page background (light): White (`#ffffff`)
-- Primary text (dark): Off White (`#fafafa`)
-- Primary text (light): Mist Black (`#090b0c`)
-- Primary button (dark): Light Gray (`#e5e5e5`) bg, Dark (`#171717`) text
-- Primary button (light): Mist Black (`#090b0c`) bg, Off White (`#fafafa`) text
-- Brand accent: Sky Blue (`#00bcfe`)
-- Muted surface (dark): Dark Gray (`#262626`)
-- Muted text: Medium Gray (`#a1a1a1`)
-- Border (dark): White 10% (`rgba(255,255,255,0.1)`)
-- Card (dark): Charcoal (`#171717`)
-- Error (dark): Coral (`#ff6568`)
-- Success: Emerald (`#00bb7f`)
-
-### Example Component Prompts
-- "Create a hero section on near-black (#0a0a0a) background. Headline in AsideDisplay at 48px weight 400, line-height 1.08, letter-spacing -0.0125em, color #fafafa. Subtitle in Geist 18px weight 400, #a1a1a1. Primary pill CTA: #e5e5e5 bg, #171717 text, rounded-full with superellipse, h-10 px-3. Include a download icon."
-- "Design a card on #171717 with rgba(250,250,250,0.15) border, squircle rounded-xl (12px superellipse). Title in Geist 20px weight 500, #fafafa. Body in 16px weight 400, #a1a1a1. No box-shadow — border is the depth signal."
-- "Build a navigation bar: transparent bg on hero, h-14. Geist 14px weight 500 for links, #fafafa text. Primary button right-aligned: #e5e5e5 bg, #171717 text, rounded-xl, h-8 px-2.5. Logo SVG left-aligned, h-9."
-- "Create a badge/pill: transparent bg, border at 20% primary opacity, rounded-full. Text in 12px Geist weight 550 at 70% primary opacity. Padding h-6 px-2.5. Include a trailing chevron icon at 50% opacity."
-- "Design a glass-morphism browser frame: #171717 base with border-glass, rounded-2xl squircle. Traffic light dots (red-400, amber-400, green-500) at 12px. Web content area uses color-mix(in oklab, #0a0a0a 80%, transparent) for frosted glass. Shadow-xl."
-
-### Iteration Guide
-1. Always apply `corner-shape: superellipse()` to any `border-radius` — this is the brand's most distinctive visual detail
-2. Use `#090b0c` (mist-950) for foreground in light mode, never `#000000`
-3. Primary buttons invert in dark mode: light surface, dark text — the opposite of most dark-mode systems
-4. Sky blue (`#00bcfe`) is decorative only — never use it for CTAs or primary buttons
-5. Borders use opacity (10–20%) rather than solid colors in dark mode — `rgba(255,255,255,0.1)`
-6. Glass surfaces use `color-mix(in oklab, background 80%, transparent)` — a modern CSS approach
-7. AsideDisplay only at display sizes (24px+) with tight tracking (-0.0125em)
-8. Geist at 500 weight for all UI elements (buttons, nav, labels) — 400 for body text
-9. Spacing follows the product's native-app density: tighter than typical marketing, generous in hero sections
+When building an Aside-inspired surface, first create or update `DESIGN.md` with: bright white product-app atmosphere, display/body/mono font roles, ink/neutral token ramp, squircle/pill component rules, a product-browser focal primitive, dense capability bands, and responsive crop/scale behavior for the product frame. Use original content and assets. Verify with screenshots at 375px, 768px, and 1280px or wider, and compare against the live-reference evidence before declaring visual fidelity.
