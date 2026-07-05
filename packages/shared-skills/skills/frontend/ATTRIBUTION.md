@@ -68,12 +68,15 @@ The taste-skill files and image-generation skills under `frontend/references/des
 `imagegen-brandkit.md`) are path-mapped copies of the per-skill `SKILL.md` files from the
 taste-skill project (each `skills/<name>/SKILL.md` is renamed to
 `references/design/<name>.md`; `imagegen-brandkit.md` maps from `skills/brandkit/SKILL.md`).
+`stitch-design-example.md` is a path-mapped verbatim copy of `skills/stitch-skill/DESIGN.md`,
+the worked example of the design-system document that the stitch skill exports.
 They are not committed here; the build materializes them from the pinned submodule under
 `packages/shared-skills/upstreams/taste-skill`. Only the allowed frontmatter description
 quoting normalization described above may alter these materialized `SKILL.md` files.
 
 - Source: https://github.com/Leonxlnx/taste-skill
-- Pinned upstream commit: 06d6028b5c623016c59ce8536f578e5a1127b499
+- Official site: https://www.tasteskill.dev/
+- Pinned upstream commit: b17742737e796305d829b3ad39eda3add0d79060
 
 ```
 MIT License
