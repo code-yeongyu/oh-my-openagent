@@ -291,7 +291,7 @@ describe("createTeamMemberErrorHandler", () => {
       },
     }
     await seedRuntimeState(runtimeStateWithLeader, config)
-    const handler = createTeamMemberErrorHandler(config)
+    const handler = createTeamMemberErrorHandler(config, { settleMs: 0 })
 
     // when
     await handler({

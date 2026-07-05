@@ -1,14 +1,12 @@
 #!/usr/bin/env node
 
 // src/serve.ts
-import { spawn } from "node:child_process";
 import { existsSync as existsSync5, realpathSync } from "node:fs";
 import { homedir as homedir6 } from "node:os";
-import { basename as basename3, extname, join as join6, resolve as resolve2 } from "node:path";
+import { basename as basename3, join as join6, resolve as resolve2 } from "node:path";
 import {
   cwd as processCwd,
   env as processEnv,
-  execPath as processExecPath,
   stdin as processStdin,
   stderr as processStderr,
   stdout as processStdout
@@ -22,6 +20,41 @@ var CODEGRAPH_INSTALL_DIR_ENV = "CODEGRAPH_INSTALL_DIR";
 var CODEGRAPH_NO_DOWNLOAD_ENV = "CODEGRAPH_NO_DOWNLOAD";
 var CODEGRAPH_TELEMETRY_ENV = "CODEGRAPH_TELEMETRY";
 var DO_NOT_TRACK_ENV = "DO_NOT_TRACK";
+var SAFE_AMBIENT_ENV_KEYS = new Set([
+  "APPDATA",
+  "CI",
+  "CODEX_HOME",
+  "ComSpec",
+  "HOME",
+  "HOMEDRIVE",
+  "HOMEPATH",
+  "LANG",
+  "LC_ALL",
+  "LC_CTYPE",
+  "LOCALAPPDATA",
+  "PATH",
+  "PATHEXT",
+  "Path",
+  "SystemRoot",
+  "TEMP",
+  "TMP",
+  "TMPDIR",
+  "USERPROFILE",
+  "WINDIR",
+  "XDG_CACHE_HOME",
+  "XDG_CONFIG_HOME",
+  "XDG_DATA_HOME",
+  "XDG_STATE_HOME"
+]);
+var SAFE_CODEGRAPH_RUNTIME_ENV_KEYS = new Set([
+  "CODEGRAPH_ALLOW_UNSAFE_NODE",
+  "CODEGRAPH_BIN",
+  "CODEGRAPH_FAKE_LOG",
+  "CODEGRAPH_NODE_BIN",
+  "OMO_CODEGRAPH_BIN",
+  "OMO_CODEGRAPH_PROJECT_CWD",
+  "OMO_CODEGRAPH_SESSION_START_CWD"
+]);
 function buildCodegraphEnv(options = {}) {
   const homeDir = options.homeDir ?? homedir();
   return {
@@ -30,6 +63,26 @@ function buildCodegraphEnv(options = {}) {
     [CODEGRAPH_TELEMETRY_ENV]: "0",
     [DO_NOT_TRACK_ENV]: "1"
   };
+}
+function copyDefinedEnvKeys(output, input, allowedKeys) {
+  for (const key of allowedKeys) {
+    const value = input[key];
+    if (value !== undefined)
+      output[key] = value;
+  }
+}
+function copyDefinedEnv(output, input) {
+  for (const [key, value] of Object.entries(input)) {
+    if (value !== undefined)
+      output[key] = value;
+  }
+}
+function buildCodegraphChildEnv(options = {}) {
+  const env = {};
+  copyDefinedEnvKeys(env, options.ambientEnv ?? {}, SAFE_AMBIENT_ENV_KEYS);
+  copyDefinedEnvKeys(env, options.runtimeEnv ?? {}, SAFE_CODEGRAPH_RUNTIME_ENV_KEYS);
+  copyDefinedEnv(env, options.codegraphEnv ?? {});
+  return env;
 }
 
 // ../../../../utils/src/codegraph/node-support.ts
@@ -1739,6 +1792,9 @@ function resolveHomeDir(options) {
   return options.homeDir ?? env["HOME"] ?? env["USERPROFILE"] ?? homedir5();
 }
 
+// src/mcp-bridge.ts
+import { spawn } from "node:child_process";
+
 // ../../../../mcp-stdio-core/src/record.ts
 function isPlainRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -1939,6 +1995,227 @@ function createIdleTimer(idleTimeoutMs, log, onIdleTimeout) {
     closed: () => isClosed
   };
 }
+// src/serve-invocation.ts
+import { extname } from "node:path";
+import { execPath as processExecPath } from "node:process";
+var WINDOWS_CMD_EXTENSIONS = new Set([".bat", ".cmd"]);
+var WINDOWS_NODE_SCRIPT_EXTENSIONS = new Set([".cjs", ".js", ".mjs"]);
+function resolveServeProcessInvocation(command, args, platform = process.platform) {
+  if (platform !== "win32")
+    return { args: [...args], command };
+  const extension = extname(command).toLowerCase();
+  if (WINDOWS_NODE_SCRIPT_EXTENSIONS.has(extension)) {
+    return { args: [command, ...args], command: processExecPath };
+  }
+  if (WINDOWS_CMD_EXTENSIONS.has(extension)) {
+    return { args: ["/d", "/s", "/c", command, ...args], command: "cmd.exe" };
+  }
+  return { args: [...args], command };
+}
+
+// src/mcp-bridge.ts
+class CodegraphBridgeStdioError extends Error {
+  streamName;
+  name = "CodegraphBridgeStdioError";
+  constructor(streamName) {
+    super(`CodeGraph MCP bridge missing child ${streamName}`);
+    this.streamName = streamName;
+  }
+}
+var CODEGRAPH_NODE_DESCRIPTION = "Inspect one named symbol or file. In symbol mode, includeCode=true includes leaf-symbol source when available. Container symbols such as classes, interfaces, structs, enums, modules, and namespaces return structural outlines with member lists by design. For container source, request a specific member symbol or use file mode with symbolsOnly=false plus offset/limit.";
+var CODEGRAPH_NODE_INCLUDE_CODE_DESCRIPTION = "Symbol mode: include leaf-symbol source when available. Container symbols such as classes, interfaces, structs, enums, modules, and namespaces intentionally return structural outlines with members; request a specific member symbol or use file mode with symbolsOnly=false plus offset/limit for source.";
+var CODEGRAPH_CONTAINER_OUTLINE_GUIDANCE = "Container symbols intentionally return structural outlines with members. For source, request a specific member symbol or call codegraph_node in file mode with symbolsOnly=false plus offset/limit around the symbol location.";
+async function runBridgedCodegraphProcess(command, args, options) {
+  const invocation = resolveServeProcessInvocation(command, args);
+  const child = spawn(invocation.command, invocation.args, {
+    cwd: options.cwd,
+    env: options.env,
+    stdio: ["pipe", "pipe", "inherit"]
+  });
+  const childInput = child.stdin;
+  const childOutput = child.stdout;
+  if (childInput === null)
+    throw new CodegraphBridgeStdioError("stdin");
+  if (childOutput === null)
+    throw new CodegraphBridgeStdioError("stdout");
+  const pendingResponses = new Map;
+  let defaultResponseMode = "framed";
+  const childExit = new Promise((resolveExit, reject) => {
+    child.once("error", reject);
+    child.once("exit", (code, signal) => {
+      if (code !== null) {
+        resolveExit(code);
+        return;
+      }
+      resolveExit(signal === null ? 0 : 1);
+    });
+  });
+  const bridgeDone = Promise.all([
+    forwardClientToCodegraph(options.input, childInput, pendingResponses, (mode) => {
+      defaultResponseMode = mode;
+    }),
+    forwardCodegraphToClient(childOutput, options.output, pendingResponses, () => defaultResponseMode)
+  ]);
+  const destroyChildPipes = () => {
+    childInput.destroy();
+    childOutput.destroy();
+  };
+  childExit.then(destroyChildPipes, destroyChildPipes);
+  return Promise.race([childExit, bridgeDone.then(() => childExit)]);
+}
+async function forwardClientToCodegraph(input, childInput, pendingResponses, setDefaultResponseMode) {
+  for await (const message of readStdioJsonRpcMessages(input)) {
+    if (message.kind === "parse_error") {
+      continue;
+    }
+    const responseMode = message.responseMode;
+    setDefaultResponseMode(responseMode);
+    const key = responseModeKey(message.payload);
+    if (key !== null) {
+      pendingResponses.set(key, {
+        method: jsonRpcMethod(message.payload),
+        responseMode,
+        toolName: jsonRpcToolName(message.payload)
+      });
+    }
+    await writeLine(childInput, JSON.stringify(message.payload));
+  }
+  childInput.end();
+}
+async function forwardCodegraphToClient(childOutput, output, pendingResponses, defaultResponseMode) {
+  for await (const message of readStdioJsonRpcMessages(childOutput)) {
+    if (message.kind === "parse_error") {
+      writeStdioJsonRpcResponse(output, errorResponse(null, -32700, "Parse error", message.message), defaultResponseMode());
+      continue;
+    }
+    const key = responseModeKey(message.payload);
+    const pendingResponse = key === null ? undefined : pendingResponses.get(key);
+    const responseMode = pendingResponse?.responseMode ?? defaultResponseMode();
+    if (key !== null)
+      pendingResponses.delete(key);
+    writeStdioJsonRpcResponse(output, clarifyCodegraphResponse(message.payload, pendingResponse), responseMode);
+  }
+}
+function responseModeKey(payload) {
+  if (!isPlainRecord(payload) || !("id" in payload))
+    return null;
+  const id = jsonRpcId(payload["id"]);
+  return `${typeof id}:${String(id)}`;
+}
+function jsonRpcMethod(payload) {
+  if (!isPlainRecord(payload))
+    return null;
+  const method = payload["method"];
+  return typeof method === "string" ? method : null;
+}
+function jsonRpcToolName(payload) {
+  if (jsonRpcMethod(payload) !== "tools/call" || !isPlainRecord(payload))
+    return null;
+  const params = payload["params"];
+  if (!isPlainRecord(params))
+    return null;
+  const name = params["name"];
+  return typeof name === "string" ? name : null;
+}
+function clarifyCodegraphResponse(payload, pendingResponse) {
+  if (pendingResponse?.method === "tools/list")
+    return clarifyCodegraphToolsList(payload);
+  if (pendingResponse?.method === "tools/call" && pendingResponse.toolName === "codegraph_node") {
+    return clarifyCodegraphNodeCallResult(payload);
+  }
+  return payload;
+}
+function clarifyCodegraphToolsList(payload) {
+  if (!isPlainRecord(payload))
+    return payload;
+  const result = payload["result"];
+  if (!isPlainRecord(result) || !Array.isArray(result["tools"]))
+    return payload;
+  let changed = false;
+  const tools = result["tools"].map((tool) => {
+    if (!isPlainRecord(tool) || tool["name"] !== "codegraph_node")
+      return tool;
+    if (!hasCodegraphNodeContractMetadata(tool))
+      return tool;
+    changed = true;
+    return clarifyCodegraphNodeTool(tool);
+  });
+  if (!changed)
+    return payload;
+  return { ...payload, result: { ...result, tools } };
+}
+function clarifyCodegraphNodeTool(tool) {
+  const clarified = {
+    ...tool,
+    description: CODEGRAPH_NODE_DESCRIPTION
+  };
+  const inputSchema = tool["inputSchema"];
+  if (isPlainRecord(inputSchema))
+    clarified["inputSchema"] = clarifyCodegraphNodeInputSchema(inputSchema);
+  return clarified;
+}
+function hasCodegraphNodeContractMetadata(tool) {
+  if (typeof tool["description"] === "string")
+    return true;
+  const inputSchema = tool["inputSchema"];
+  if (!isPlainRecord(inputSchema))
+    return false;
+  const properties = inputSchema["properties"];
+  return isPlainRecord(properties) && isPlainRecord(properties["includeCode"]);
+}
+function clarifyCodegraphNodeInputSchema(inputSchema) {
+  const properties = inputSchema["properties"];
+  if (!isPlainRecord(properties))
+    return inputSchema;
+  const includeCode = properties["includeCode"];
+  if (!isPlainRecord(includeCode))
+    return inputSchema;
+  return {
+    ...inputSchema,
+    properties: {
+      ...properties,
+      includeCode: {
+        ...includeCode,
+        description: CODEGRAPH_NODE_INCLUDE_CODE_DESCRIPTION
+      }
+    }
+  };
+}
+function clarifyCodegraphNodeCallResult(payload) {
+  if (!isPlainRecord(payload))
+    return payload;
+  const result = payload["result"];
+  if (!isPlainRecord(result) || !Array.isArray(result["content"]))
+    return payload;
+  let changed = false;
+  const content = result["content"].map((item) => {
+    if (!isPlainRecord(item) || item["type"] !== "text" || typeof item["text"] !== "string")
+      return item;
+    const text = clarifyContainerOutlineGuidance(item["text"]);
+    if (text === item["text"])
+      return item;
+    changed = true;
+    return { ...item, text };
+  });
+  if (!changed)
+    return payload;
+  return { ...payload, result: { ...result, content } };
+}
+function clarifyContainerOutlineGuidance(text) {
+  if (!text.includes("Structural outline only"))
+    return text;
+  return text.replace(/Structural outline only[^\n]*(?:\n[^\n]*(?:Read|read)[^\n]*)?/g, CODEGRAPH_CONTAINER_OUTLINE_GUIDANCE);
+}
+async function writeLine(output, line) {
+  if (output.write(`${line}
+`))
+    return;
+  await new Promise((resolveDrain, reject) => {
+    output.once("drain", resolveDrain);
+    output.once("error", reject);
+  });
+}
+
 // src/mcp-unavailable.ts
 async function runUnavailableCodegraphMcpServer(options) {
   await runJsonRpcStdioServer({
@@ -1985,18 +2262,24 @@ function requestedProtocolVersion(params) {
   return params["protocolVersion"];
 }
 
+// src/session-start-worker.ts
+var SESSION_START_CWD_ENV = "OMO_CODEGRAPH_SESSION_START_CWD";
+var WINDOWS_CMD_EXTENSIONS2 = new Set([".bat", ".cmd"]);
+var WINDOWS_NODE_SCRIPT_EXTENSIONS2 = new Set([".cjs", ".js", ".mjs"]);
+
 // src/serve.ts
 var CODEGRAPH_SKIP_HINT = `CodeGraph MCP skipped: codegraph binary not found. Install CodeGraph or set OMO_CODEGRAPH_BIN.
 `;
 var CODEGRAPH_DISABLED_HINT = `CodeGraph MCP skipped: disabled by OMO SOT config. Set [codex].codegraph.enabled=true to enable it.
 `;
 var CODEGRAPH_VERSION = "1.0.1";
-var WINDOWS_CMD_EXTENSIONS = new Set([".bat", ".cmd"]);
-var WINDOWS_NODE_SCRIPT_EXTENSIONS = new Set([".cjs", ".js", ".mjs"]);
+var PROJECT_CWD_ENV_KEYS = ["OMO_CODEGRAPH_PROJECT_CWD", SESSION_START_CWD_ENV, "PWD"];
 async function runCodegraphServe(options = {}) {
   const env = options.env ?? processEnv;
   const homeDir = options.homeDir ?? homedir6();
-  const config = options.config ?? getCodexOmoConfig({ cwd: options.cwd ?? processCwd(), env, homeDir });
+  const wrapperCwd = options.cwd ?? processCwd();
+  const projectCwd = resolveProjectCwd(env, wrapperCwd);
+  const config = options.config ?? getCodexOmoConfig({ cwd: projectCwd, env, homeDir });
   const codegraphConfig = config.codegraph ?? {};
   if (codegraphConfig.enabled === false) {
     return runUnavailableMcp(CODEGRAPH_DISABLED_HINT, options);
@@ -2028,15 +2311,16 @@ async function runCodegraphServe(options = {}) {
   if (codegraphCommandRequiresSupportedLocalNode(resolution) && !nodeSupport.supported) {
     return runUnavailableMcp(buildCodegraphNodeSkipHint(nodeSupport), options);
   }
-  const runProcess = options.runProcess ?? runChildProcess;
+  const runProcess = options.runProcess ?? runBridgedCodegraphProcess;
   const codegraphEnv = codegraphEnvForConfig(trustedInstallDir, homeDir, options.buildEnv);
-  const mergedEnv = {
-    ...env,
-    ...codegraphEnv
-  };
+  const mergedEnv = buildCodegraphChildEnv({ ambientEnv: env, codegraphEnv, runtimeEnv: env });
   return runProcess(resolution.command, [...resolution.argsPrefix, "serve", "--mcp"], {
+    cwd: projectCwd,
     env: mergedEnv,
-    stdio: "inherit"
+    input: options.stdin ?? processStdin,
+    output: options.stdout ?? processStdout,
+    stderr: options.stderr ?? processStderr,
+    stdio: "pipe"
   });
 }
 async function runUnavailableMcp(reason, options) {
@@ -2078,6 +2362,17 @@ function codegraphEnvForConfig(trustedInstallDir, homeDir, buildEnv) {
   const env = buildEnv?.({ homeDir }) ?? buildCodegraphEnv({ homeDir });
   return trustedInstallDir === undefined ? env : { ...env, CODEGRAPH_INSTALL_DIR: trustedInstallDir };
 }
+function resolveProjectCwd(env, fallback) {
+  for (const key of PROJECT_CWD_ENV_KEYS) {
+    const candidate = env[key]?.trim();
+    if (candidate === undefined || candidate.length === 0)
+      continue;
+    const resolved = resolve2(candidate);
+    if (existsSync5(resolved))
+      return resolved;
+  }
+  return resolve2(fallback);
+}
 function provisionedBinFromInstallDir(installDir) {
   if (installDir === undefined)
     return null;
@@ -2086,32 +2381,6 @@ function provisionedBinFromInstallDir(installDir) {
 }
 async function runCodegraphServeCli() {
   process.exitCode = await runCodegraphServe();
-}
-async function runChildProcess(command, args, options) {
-  const invocation = resolveServeProcessInvocation(command, args);
-  const child = spawn(invocation.command, invocation.args, { env: options.env, stdio: options.stdio });
-  return new Promise((resolve3, reject) => {
-    child.once("error", reject);
-    child.once("exit", (code, signal) => {
-      if (code !== null) {
-        resolve3(code);
-        return;
-      }
-      resolve3(signal === null ? 0 : 1);
-    });
-  });
-}
-function resolveServeProcessInvocation(command, args, platform = process.platform) {
-  if (platform !== "win32")
-    return { args: [...args], command };
-  const extension = extname(command).toLowerCase();
-  if (WINDOWS_NODE_SCRIPT_EXTENSIONS.has(extension)) {
-    return { args: [command, ...args], command: processExecPath };
-  }
-  if (WINDOWS_CMD_EXTENSIONS.has(extension)) {
-    return { args: ["/d", "/s", "/c", command, ...args], command: "cmd.exe" };
-  }
-  return { args: [...args], command };
 }
 if (isDirectInvocation(process.argv[1])) {
   runCodegraphServeCli().catch((error) => {

@@ -24,6 +24,7 @@ export interface SkillLoadOptions {
   opencodeOnly?: boolean
   /** Pre-merged skills to use instead of discovering */
   skills?: LoadedSkill[]
+  getLoadedSkills?: () => Promise<LoadedSkill[]>
   /** Pre-discovered commands to use instead of discovering */
   commands?: CommandInfo[]
   /** MCP manager for querying skill-embedded MCP servers */

@@ -10,18 +10,21 @@ import { resolveServeProcessInvocation, runCodegraphServe } from "../src/serve.t
 const componentRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("runCodegraphServe", () => {
-	it("#given CodeGraph resolves #when serving MCP #then execs codegraph serve --mcp with inherited stdio and telemetry disabled", async () => {
+	it("#given CodeGraph resolves #when serving MCP #then execs codegraph serve --mcp with bridged stdio and telemetry disabled", async () => {
 		// given
+		const runCwd = componentRoot;
 		const calls: Array<{
 			readonly args: readonly string[];
 			readonly command: string;
+			readonly cwd: string;
 			readonly env: Record<string, string | undefined>;
-			readonly stdio: "inherit";
+			readonly stdio: "pipe";
 		}> = [];
 
 		// when
 		const exitCode = await runCodegraphServe({
-			env: { CUSTOM: "keep", HOME: "/tmp/home" },
+			cwd: runCwd,
+			env: { CUSTOM: "drop", HOME: "/tmp/home", OPENAI_API_KEY: "sk-test-secret" },
 			nodeVersion: "22.14.0",
 			homeDir: "/tmp/home",
 			buildEnv: ({ homeDir }) => ({
@@ -34,9 +37,9 @@ describe("runCodegraphServe", () => {
 			runProcess: (
 				command: string,
 				args: readonly string[],
-				options: { readonly env: Record<string, string | undefined>; readonly stdio: "inherit" },
+				options: { readonly cwd: string; readonly env: Record<string, string | undefined>; readonly stdio: "pipe" },
 			) => {
-				calls.push({ args, command, env: options.env, stdio: options.stdio });
+				calls.push({ args, command, cwd: options.cwd, env: options.env, stdio: options.stdio });
 				return Promise.resolve(7);
 			},
 			stderr: { write: () => undefined },
@@ -48,17 +51,19 @@ describe("runCodegraphServe", () => {
 			{
 				args: ["shim.js", "serve", "--mcp"],
 				command: "node",
+				cwd: resolve(runCwd),
 				env: {
 					CODEGRAPH_INSTALL_DIR: "/tmp/home/.omo/codegraph",
 					CODEGRAPH_NO_DOWNLOAD: "1",
 					CODEGRAPH_TELEMETRY: "0",
-					CUSTOM: "keep",
 					DO_NOT_TRACK: "1",
 					HOME: "/tmp/home",
 				},
-				stdio: "inherit",
+				stdio: "pipe",
 			},
 		]);
+		expect(calls[0]?.env["CUSTOM"]).toBeUndefined();
+		expect(calls[0]?.env["OPENAI_API_KEY"]).toBeUndefined();
 	});
 
 	it("#given an unsupported local Node but the unsafe override is set #when serving MCP #then it still spawns codegraph", async () => {

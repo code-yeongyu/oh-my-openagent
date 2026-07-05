@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
 
+import { buildUltraworkAdditionalContext, type UltraworkAdditionalContextOptions } from "./ultrawork-skill-pointer.js";
+
 export interface UltraworkDirectiveInput {
 	readonly prompt: string;
 	readonly transcript_path?: string | null;
@@ -12,7 +14,6 @@ interface UserPromptSubmitHookOutput {
 	};
 }
 
-const ULTRAWORK_DIRECTIVE = readFileSync(new URL("../directive.md", import.meta.url), "utf8");
 const ULTRAWORK_CURRENT_PROMPT_PATTERN = /(?:ultrawork|ulw)/i;
 const ULTRAWORK_DIRECTIVE_MARKER = "<ultrawork-mode>";
 const TRANSCRIPT_SEARCH_BYTES = 512_000;
@@ -26,11 +27,16 @@ const CONTEXT_PRESSURE_MARKERS = [
 	"long threads and multiple compactions",
 ] as const;
 
-export function buildUltraworkDirectiveOutput(input: UltraworkDirectiveInput): string {
+export function buildUltraworkDirectiveOutput(
+	input: UltraworkDirectiveInput,
+	options: UltraworkAdditionalContextOptions = {},
+): string {
 	if (isContextPressureRecoveryPrompt(input.prompt)) return "";
 	if (hasUltraworkDirectiveAlreadyInTranscript(input.transcript_path)) return "";
 	if (isContextPressureTranscript(input.transcript_path)) return "";
-	return isUltraworkPrompt(input.prompt) ? formatAdditionalContextOutput(ULTRAWORK_DIRECTIVE) : "";
+	return isUltraworkPrompt(input.prompt)
+		? formatAdditionalContextOutput(buildUltraworkAdditionalContext(options))
+		: "";
 }
 
 function hasUltraworkDirectiveAlreadyInTranscript(transcriptPath: string | null | undefined): boolean {
@@ -74,7 +80,7 @@ function isContextPressureRecoveryPrompt(prompt: string): boolean {
 function isContextPressureTranscript(transcriptPath: string | null | undefined): boolean {
 	if (transcriptPath === undefined || transcriptPath === null) return false;
 	try {
-		return isContextPressureRecoveryPrompt(readFileSync(transcriptPath, "utf8"));
+		return isContextPressureRecoveryPrompt(readTranscriptTail(transcriptPath));
 	} catch (error) {
 		if (error instanceof Error) return false;
 		throw error;

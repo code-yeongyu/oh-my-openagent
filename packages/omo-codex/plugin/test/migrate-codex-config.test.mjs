@@ -1,3 +1,5 @@
+// allow: SIZE_OK - migration scenarios share one temp Codex-home harness across legacy TOML shapes; this release only adds config cases and future additions should split by migration family.
+
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
@@ -232,13 +234,16 @@ test("#given user-customized Codex model config #when migrating #then user value
 	});
 
 	const content = await readFile(join(codexHome, "config.toml"), "utf8");
-	assert.deepEqual(result.changed, []);
+	assert.deepEqual(result.changed, [join(codexHome, "config.toml")]);
 	assert.deepEqual(result.modeChanged, []);
 	assert.match(content, /model = "gpt-5\.4"/);
 	assert.match(content, /model_context_window = 123456/);
 	assert.match(content, /model_reasoning_effort = "medium"/);
 	assert.match(content, /plan_mode_reasoning_effort = "medium"/);
 	assert.doesNotMatch(content, /^\s*multi_agent_mode\s*=/m);
+	assert.match(content, /\[agents\][\s\S]*?max_threads = 1000/);
+	assert.match(content, /\[features\.multi_agent_v2\][\s\S]*?enabled = false/);
+	assert.match(content, /max_concurrent_threads_per_session = 1000/);
 });
 
 test("#given managed config state is malformed #when migrating #then migration ignores stale state safely", async () => {
@@ -399,6 +404,82 @@ test("#given config already matches current catalog #when catalog version advanc
 	assert.equal(state.files[configPath].catalogVersion, "test.role-only");
 	const content = await readFile(configPath, "utf8");
 	assert.doesNotMatch(content, /^\s*multi_agent_mode\s*=/m);
+	assert.match(content, /\[agents\][\s\S]*?max_threads = 1000/);
+	assert.match(content, /max_concurrent_threads_per_session = 1000/);
+});
+
+test("#given stale Context7 placeholder MCP config #when migrating #then removes it and keeps plugin policy", async () => {
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-context7-placeholder-cleanup-"));
+	const codexHome = join(root, "codex-home");
+	const configPath = join(codexHome, "config.toml");
+	await mkdir(codexHome, { recursive: true });
+	await writeFile(
+		configPath,
+		[
+			'model = "gpt-5.5"',
+			"model_context_window = 400000",
+			'model_reasoning_effort = "high"',
+			'plan_mode_reasoning_effort = "xhigh"',
+			"",
+			"[mcp_servers.context7] # stale npx package from old docs",
+			'command = "npx"',
+			'args = ["-y", "@upstash/context7-mcp", "--api-key", "YOUR_API_KEY"]',
+			"startup_timeout_sec = 20",
+			"",
+			'[plugins."omo@sisyphuslabs".mcp_servers.context7]',
+			"enabled = true",
+			"",
+		].join("\n"),
+	);
+
+	const result = await migrateCodexConfig({
+		env: { CODEX_HOME: codexHome, LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json") },
+		cwd: root,
+	});
+
+	const content = await readFile(configPath, "utf8");
+	assert.deepEqual(result.changed, [configPath]);
+	assert.doesNotMatch(content, /\[mcp_servers\.context7\]/);
+	assert.doesNotMatch(content, /@upstash\/context7-mcp/);
+	assert.doesNotMatch(content, /YOUR_API_KEY/);
+	assert.match(content, /\[plugins\."omo@sisyphuslabs"\.mcp_servers\.context7\][\s\S]*?enabled = true/);
+});
+
+test("#given real Context7 API key and placeholder comment #when migrating #then preserves user server settings", async () => {
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-context7-real-key-"));
+	const codexHome = join(root, "codex-home");
+	const configPath = join(codexHome, "config.toml");
+	await mkdir(codexHome, { recursive: true });
+	await writeFile(
+		configPath,
+		[
+			'model = "gpt-5.5"',
+			"model_context_window = 400000",
+			'model_reasoning_effort = "high"',
+			'plan_mode_reasoning_effort = "xhigh"',
+			"",
+			"[mcp_servers.context7]",
+			'command = "npx"',
+			'args = ["-y", "@upstash/context7-mcp", "--api-key", "ctx7sk_live_example"] # replace YOUR_API_KEY in docs only',
+			"startup_timeout_sec = 20",
+			"",
+			'[plugins."omo@sisyphuslabs".mcp_servers.context7]',
+			"enabled = true",
+			"",
+		].join("\n"),
+	);
+
+	const result = await migrateCodexConfig({
+		env: { CODEX_HOME: codexHome, LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json") },
+		cwd: root,
+	});
+
+	const content = await readFile(configPath, "utf8");
+	assert.deepEqual(result.changed, [configPath]);
+	assert.match(content, /\[mcp_servers\.context7\]/);
+	assert.match(content, /ctx7sk_live_example/);
+	assert.match(content, /replace YOUR_API_KEY in docs only/);
+	assert.match(content, /\[plugins\."omo@sisyphuslabs"\.mcp_servers\.context7\][\s\S]*?enabled = true/);
 });
 
 test("#given multi_agent_v2 enabled #when forcing disable #then flips the flag to false", () => {
@@ -503,18 +584,23 @@ test("#given an annotated managed section #when forcing disable runs again #then
 	assert.match(rerun, /enabled = false/);
 });
 
-test("#given [features] boolean shorthand multi_agent_v2 = false #when forcing disable #then returns config unchanged", () => {
+test("#given [features] boolean shorthand multi_agent_v2 = false #when forcing disable #then rewrites to the non-conflicting disabled table", () => {
 	const config = [
 		'model = "gpt-5.5"',
 		"",
 		"[features]",
 		"multi_agent_v2 = false",
+		"plugins = true",
 		"",
 	].join("\n");
 
 	const result = forceDisableMultiAgentV2(config);
+	const parsed = parseTomlWithPython(result);
 
-	assert.equal(result, config);
+	assert.doesNotMatch(result, /^\s*multi_agent_v2\s*=/m);
+	assert.equal((result.match(/\[features\.multi_agent_v2\]/g) ?? []).length, 1);
+	assert.equal(parsed.features.plugins, true);
+	assert.equal(parsed.features.multi_agent_v2.enabled, false);
 });
 
 test("#given multi_agent_v2 already disabled #when forcing disable #then returns config unchanged", () => {
@@ -555,7 +641,9 @@ test("#given global config without multi_agent_v2 section #when full migration r
 	assert.deepEqual(result.changed, [configPath]);
 	assert.deepEqual(result.modeChanged, []);
 	const content = await readFile(configPath, "utf8");
-	assert.match(content, /\[features\.multi_agent_v2\]\nenabled = false\n/);
+	assert.match(content, /\[features\.multi_agent_v2\][\s\S]*?enabled = false/);
+	assert.match(content, /max_concurrent_threads_per_session = 1000/);
+	assert.match(content, /\[agents\][\s\S]*?max_threads = 1000/);
 	assert.doesNotMatch(content, /^\s*multi_agent_mode\s*=/m);
 });
 
@@ -661,6 +749,8 @@ test("#given global config with forced multi_agent_v2 #when full migration runs 
 	const content = await readFile(configPath, "utf8");
 	assert.match(content, /enabled = false/);
 	assert.doesNotMatch(content, /enabled = true/);
+	assert.match(content, /max_concurrent_threads_per_session = 1000/);
+	assert.match(content, /\[agents\][\s\S]*?max_threads = 1000/);
 });
 
 test("#given enabled = true with an inline comment #when forcing disable #then flips to false and preserves the comment", () => {

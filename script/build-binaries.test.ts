@@ -213,18 +213,18 @@ describe("build-binaries", () => {
       expect(result.stdout).not.toContain("node-installer");
     });
 
-    it("launcher routes lazycodex sparkshell through the Bun CLI instead of the installer", async () => {
+    it("launcher routes lazycodex ulw-loop through the Bun CLI instead of the installer", async () => {
       // given
       const module = await import("./build-binaries.ts");
       const createPlatformLauncherSource = (module as { createPlatformLauncherSource: () => string }).createPlatformLauncherSource;
-      const tempDir = await mkdtemp(join(tmpdir(), "lazycodex-sparkshell-launcher-"));
+      const tempDir = await mkdtemp(join(tmpdir(), "lazycodex-ulw-loop-launcher-"));
       const launcherPath = join(tempDir, "oh-my-opencode.js");
       await writeFile(launcherPath, createPlatformLauncherSource());
       await chmod(launcherPath, 0o755);
       await writeFakeCli(tempDir);
 
       // when
-      const result = spawnSync(process.execPath, [launcherPath, "sparkshell", "printf", "ok"], {
+      const result = spawnSync(process.execPath, [launcherPath, "ulw-loop", "--help"], {
         encoding: "utf8",
         env: {
           ...process.env,
@@ -237,7 +237,7 @@ describe("build-binaries", () => {
       // then
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("bun-cli");
-      expect(normalizeOutputPath(result.stdout)).toContain("dist/cli/index.js sparkshell printf ok");
+      expect(normalizeOutputPath(result.stdout)).toContain("dist/cli/index.js ulw-loop --help");
       expect(result.stdout).not.toContain("Unsupported lazycodex-ai command");
     });
 

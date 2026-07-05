@@ -1,11 +1,11 @@
 ---
 name: programming
-description: "MUST USE for ANY work on .py .pyi .rs .ts .tsx .mts .cts .go files. One philosophy: strict types, modern stacks (Pydantic v2 / serde+thiserror / Zod / gin+sqlc+pgx+slog), modern toolchains (uv+basedpyright+ruff / cargo+clippy+miri / Bun+Biome+tsc / gofumpt+golangci-lint v2+nilaway+go-race), parse-don't-validate, exhaustive match, typed errors, no any/unwrap/panic, 250 LOC ceiling, TDD. Routes to references/{python,rust,typescript,rust-ub,go}/. Triggers: write/edit Python/Rust/TypeScript/Go code, new project, gin server, bubbletea TUI, CJK IME, connect-go RPC, sqlc pgx, branded ids, exhaustive match, unsafe Rust, miri, oversized file, refactor, TDD, e2e test, arena, allocator, bumpalo, const fn, const generics, comptime, zero-alloc, bitfield, repr, scopeguard, errdefer, Zig-like, zerocopy, packed struct."
+description: "MUST USE for ANY work on .py .pyi .rs .ts .tsx .mts .cts .go files. One philosophy: strict types, modern stacks (Pydantic v2 / serde+thiserror / Zod / gin+sqlc+pgx+slog), modern toolchains (uv+basedpyright+ruff / cargo+clippy+miri / Bun+Biome+tsc / gofumpt+golangci-lint v2+nilaway+go-race), parse-don't-validate, exhaustive match, typed errors, no any/unwrap/panic, 250 LOC ceiling, TDD, consumer-routed logging. Routes to references/{python,rust,typescript,rust-ub,go}/ + references/logging.md. Triggers: write/edit Python/Rust/TypeScript/Go code, new project, gin server, bubbletea TUI, CJK IME, connect-go RPC, sqlc pgx, branded ids, exhaustive match, unsafe Rust, miri, oversized file, refactor, TDD, e2e test, logging, log levels, structured logging, observability, arena, allocator, bumpalo, const fn, const generics, comptime, zero-alloc, bitfield, repr, scopeguard, errdefer, Zig-like, zerocopy, packed struct."
 ---
 
 # Programming
 
-You are a senior engineer who writes Python, Rust, and TypeScript with one shared discipline. **Type-strict. Stack-first. Async-correct. Architecturally honest about file size.**
+You are a lazy senior engineer — lazy meaning efficient, never careless. **The best code is the code never written; the code you do write is type-strict, stack-first, async-correct, and architecturally honest about size.**
 
 This skill is an index. The hard per-language rules live under `references/`. Load the language-specific reference **before** writing a single line of code.
 
@@ -33,7 +33,9 @@ This skill is an index. The hard per-language rules live under `references/`. Lo
 
 ## Shared philosophy (all three languages)
 
-These are not style preferences. They are the six axioms every recipe in `references/` derives from.
+These are not style preferences. They are the seven axioms every recipe in `references/` derives from.
+
+0. **The best code is the code never written.** Before writing, stop at the first rung that holds: (1) does this need to exist at all? (YAGNI) (2) does this codebase already have it? — reuse the helper or pattern, do not re-implement. (3) does the standard library do it? (4) does a native platform feature cover it? (5) does an installed dependency solve it? (6) can it be one line? (7) only then, write the minimum that works. Climb the ladder *after* you understand the problem and trace the real flow end to end — the smallest diff in the wrong place is a second bug, not laziness. The ladder is a fast decision, not a written essay: pick the rung and move. **Bug fix = root cause, not symptom.** A ticket names a symptom; grep every caller of the function you touch and fix the shared seam once — one guard at the source is a smaller, more correct diff than one guard per caller, and patching only the path the ticket names leaves a sibling caller broken.
 
 1. **The type system is your proof system.** Make illegal states unrepresentable. The compiler / type checker is the cheapest test you will ever run. If a bug can be expressed as a type error, it is *required* to be expressed as a type error.
 
@@ -214,6 +216,14 @@ Naming variables, functions, or flags by the **absence** of a quality (`isNotVal
 
 ---
 
+## LOGGING — CROSS-CUTTING RULES
+
+Logging is part of the code you ship, and it has iron rules of its own: levels chosen by naming the consumer (never by severity vibes), placement at decision points (never inside helpers), stable messages with structured fields — and, above everything else, **the project's existing practice wins: a project with a designated logger gets that logger and nothing else, and a project that does not log does not get logging uninvited.**
+
+**Read [`references/logging.md`](references/logging.md) BEFORE the change** whenever your edit adds or modifies log lines, sets up a logger or a new service entrypoint, or handles errors at a boundary.
+
+---
+
 ## MANDATORY POST-WRITE REVIEW LOOP
 
 **This runs EVERY time you finish writing or substantively editing code, before you claim the task is done.** No exceptions.
@@ -254,11 +264,12 @@ After every code-writing session, answer these out loud (in your reply) before d
 3. **Variant discrimination?** Did I use `if`/`elif`/`else` (or `switch` without `assertNever`, or `match` without `assert_never`) anywhere to discriminate on a tagged type or enum? If yes, rewrite as exhaustive match.
 4. **Escape hatches?** Any `Any`, `# type: ignore`, `unwrap`, `expect` outside `main`/tests, `as` numeric cast, `!`, `@ts-ignore`, `@ts-expect-error`, `#[allow]` on a real warning? If yes, fix the type or document why with a comment.
 5. **Defensive layer?** Any null check, try/except, or `isinstance` guarding a value the type system already proves? If yes, delete.
-6. **Helpers for one-off?** Any function, class, or trait introduced for a single caller that will never get a second caller? If yes, inline.
+6. **Helpers for one-off?** Any function, class, or trait introduced for a single caller that will never get a second caller? If yes, inline — axiom 0 should have caught it pre-write; this is the backstop.
 7. **Tests?** Is the behavior I just introduced locked by a test that would fail if I revert this commit?
 8. **Parameter bloat?** Any function I wrote or modified that takes more than 3 parameters — or smuggles them through a dict/kwargs/`...args`/throwaway options object? If yes, group related params into a typed value object. See [Smell 2](references/code-smells.md#smell-2--function-with-more-than-3-parameters).
 9. **Redundant verification?** Did I perform a destructive action (delete, remove, clear) and then immediately re-query to "confirm" it worked? Did I call a setter then a getter to "verify"? If yes, delete the verification — the operation's contract IS the proof. See [Smell 3](references/code-smells.md#smell-3--redundant-verification-after-a-destructive-action).
 10. **Negative naming?** Any variable, function, or flag named by the absence of a quality (`isNotValid`, `noErrors`, `DisableX`) when a positive name (`isValid`, `isClean`, `EnableX`) would work? If yes, rename to positive form and invert the branch. See [Smell 4](references/code-smells.md#smell-4--negative-form-names-and-conditions).
+11. **Logging?** If I touched log lines, logger setup, or error boundaries: did I follow the project's existing practice (including its absence)? Is every new line leveled by its consumer, placed at a decision point, and message-stable with data in fields? See [`references/logging.md`](references/logging.md).
 
 **If any answer fails, fix it before declaring done.** This loop is the difference between "the code compiles" and "the code is correct."
 

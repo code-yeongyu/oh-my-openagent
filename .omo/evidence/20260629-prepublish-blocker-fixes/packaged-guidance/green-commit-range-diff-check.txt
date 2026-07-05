@@ -1,0 +1,2 @@
+Invocation: git diff --check origin/dev..HEAD
+exit_code=0

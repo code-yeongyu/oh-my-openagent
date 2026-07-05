@@ -68,7 +68,7 @@ node "<skill-root>/scripts/team.mjs" set-status   --team <session_id> --id A --s
 node "<skill-root>/scripts/team.mjs" worktree-add    --team <session_id> --id A [--base-branch <branch>]
 node "<skill-root>/scripts/team.mjs" worktree-remove --team <session_id> --id A [--force]
 node "<skill-root>/scripts/team.mjs" integrate       --team <session_id> [--id A]
-node "<skill-root>/scripts/team.mjs" archive      --team <session_id> [--id A]
+node "<skill-root>/scripts/team.mjs" archive      --team <session_id> [--id A] [--note "<...>"]
 node "<skill-root>/scripts/team.mjs" delete       --team <session_id> [--force]
 node "<skill-root>/scripts/team.mjs" status       --team <session_id>
 ```
@@ -79,6 +79,13 @@ log), `guide.md` (the auto-generated member field manual), and `artifacts/` (a s
 space). `{session_id}` is the leader's Codex session id when you can pass it via `--session`;
 otherwise the script generates a stable handle. Re-running `init` is a safe no-op. Every mutating
 subcommand rewrites `guide.md`, so the manual always matches the current team.
+
+Mutating subcommands take a per-team state lock before reading and rewriting `team.json`. It is
+safe to run independent `add-member`, `bind-thread`, `set-status`, `archive`, `delete`, `guide`,
+and worktree mutation commands concurrently against the same team: they serialize and each command
+reads the latest committed state before writing. If a command reports that team state is locked,
+do not treat the intended mutation as complete; retry after the named command finishes, or inspect
+`.omo/teams/{session_id}/.team.lock/owner.json` if the previous command crashed.
 
 ## Create the team and its threads
 
@@ -121,8 +128,28 @@ members to the hard rules, so you mainly keep the channel open: expect frequent 
 from each member - findings, `WORKING:`/`BLOCKED:` markers, peer digests - rather than one final
 dump, and act on them as they arrive. All member-to-member and member-to-leader traffic is in English;
 when the END user addresses a member, that member replies in the user's own language. Members hand off
-files and memos through the team `artifacts/` directory and reference them by path. Wait for every
-required member's final report before you declare the team done.
+files and memos through the team `artifacts/` directory and reference them by path.
+
+## Let members work - do not rush them
+
+Members heartbeat every few tool calls and message you on every finding, blocker, and finished
+slice (their manual binds them to this). So a member that is quiet between heartbeats is **working,
+not stalled** - a stretch of silence is the normal sound of focused work, not a problem to chase.
+Re-reading `codex_app.read_thread` to check on a calm member, or sending "any update?" / "are you
+done?" / "hurry up" pings, interrupts that member and slows the whole team. Trust the heartbeat and
+let them cook.
+
+Message a member only when one of these is true:
+- you have new information, context, or a correction it needs to do its slice right;
+- you are reassigning, narrowing, or unblocking its scope;
+- a peer's result changes what it should do; or
+- it has gone fully silent well past its heartbeat cadence AND that stall is blocking the team -
+  then send one specific question, not a barrage.
+
+Otherwise stay calm and keep the channel open: read inbound updates as they arrive and act on them.
+A long-running member is alive; a heartbeat you have not received yet is not a failure. Wait for
+every required member's final report before you declare the team done - rushing toward "done" while
+members are still mid-slice just produces half-built work you will have to redo.
 
 ## Worktrees - isolate members who would touch the same files
 
@@ -163,12 +190,17 @@ result against that todo's acceptance criteria before you integrate.
 
 DISBAND the team the moment it is no longer needed. A team exists only to do its work; once that
 work is done, or the user no longer wants it, do not leave it lying around - archive every member,
-then delete the team state. A finished team that is never disbanded is a leak.
+then delete the team state only after archival evidence is clean or preserved. A finished team that
+is never disbanded is a leak.
 
 - `archive` closes the team: notify each active member, copy anything useful into `artifacts/`,
-  archive each member thread with `codex_app.set_thread_archived`, then `archive` flips the team
-  and all members to archived. If a thread-archive tool is unavailable, record that in the team log
-  and tell the user - never pretend a member was archived.
+  then try to archive each member thread with `codex_app.set_thread_archived`. Treat Codex App
+  failures such as "Ambiguous Codex thread id" or a thread id that is ambiguous across hosts as an
+  app-thread archival blocker, not as a team-state blocker: record the failure in the team log,
+  tell the user which member thread was not proven archived, and continue the team-state archive
+  with `archive --note "<blocker>"`. Never pretend a member thread was archived. Do not delete the
+  team state after an app-thread archival blocker unless the evidence has been copied elsewhere or
+  the user explicitly accepts that evidence loss.
 - `delete` removes `.omo/teams/{session_id}` and refuses while the team is unarchived or any member
   is still active unless `--force`.
 - When the work wraps up, land it the way the user asked: `integrate --team <id>` for a direct merge

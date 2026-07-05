@@ -30,6 +30,8 @@ export const RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERNS = [
   /quota.?exceeded/i,
   /exceeded.*quota/i,
   /usage\s*quota/i,
+  /free.?usage/i,
+  /usage.?exceeded/i,
   /exhausted\s+your\s+capacity/i,
   /limit\s+exhausted/i,
   /all\s+credentials\s+for\s+model/i,

@@ -12,7 +12,6 @@ import {
   createCodegraphBootstrapHook,
   type CodegraphBootstrapDeps,
 } from "./index"
-import { resolveCodegraphCommandInvocation } from "./command-runner"
 
 function createDeps(events: string[], overrides: Partial<CodegraphBootstrapDeps> = {}): CodegraphBootstrapDeps {
   return {
@@ -64,31 +63,6 @@ afterEach(() => {
 })
 
 describe("createCodegraphBootstrapHook", () => {
-  test("#given Windows codegraph.cmd #when command runner builds invocation #then it runs through cmd.exe", () => {
-    // given
-    const command = "C:\\Users\\test\\.omo\\codegraph\\bin\\codegraph.cmd"
-
-    // when
-    const invocation = resolveCodegraphCommandInvocation(command, ["status", "--json"], "win32")
-
-    // then
-    expect(invocation).toEqual({
-      args: ["/d", "/s", "/c", command, "status", "--json"],
-      command: "cmd.exe",
-    })
-  })
-
-  test("#given non-Windows codegraph command #when command runner builds invocation #then it executes directly", () => {
-    // given
-    const command = "/home/test/.omo/codegraph/bin/codegraph"
-
-    // when
-    const invocation = resolveCodegraphCommandInvocation(command, ["sync"], "linux")
-
-    // then
-    expect(invocation).toEqual({ args: ["sync"], command })
-  })
-
   test("#given a non-session-created event #when event fires #then it does nothing", () => {
     // given
     const events: string[] = []

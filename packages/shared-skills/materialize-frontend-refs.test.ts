@@ -1,8 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { materializeFrontendRefs } from "./scripts/materialize-frontend-refs.mjs";
+import { parseFrontmatter } from "@oh-my-opencode/utils";
+import { isSkillMarkdownSourcePath, materializeFrontendRefs } from "./scripts/materialize-frontend-refs.mjs";
 import { brandStems, designpowersThirdPartyRelativePaths, frontendSkillRoot, thirdPartyRelativePaths, uiUxDbScripts } from "./scripts/frontend-refs-manifest.mjs";
+
+type SkillFrontmatter = {
+	readonly name?: unknown
+	readonly description?: unknown
+}
 
 describe("materialize-frontend-refs", () => {
 	const result = materializeFrontendRefs({ strict: false });
@@ -32,6 +38,42 @@ describe("materialize-frontend-refs", () => {
 		for (const relPath of designpowersThirdPartyRelativePaths()) {
 			expect(existsSync(join(frontendSkillRoot, relPath))).toBe(true);
 		}
+	});
+
+	test("materialized designpowers skills have YAML-safe frontmatter", async () => {
+		if (result.skipped) return;
+		const failures: string[] = [];
+		for (const relPath of designpowersThirdPartyRelativePaths()) {
+			if (!relPath.endsWith("/reference.md")) continue;
+			const content = await Bun.file(join(frontendSkillRoot, relPath)).text();
+			const parsed = parseFrontmatter<SkillFrontmatter>(content);
+			if (!parsed.hadFrontmatter || parsed.parseError) {
+				failures.push(`${relPath}: invalid frontmatter`);
+				continue;
+			}
+			if (typeof parsed.data.name !== "string" || typeof parsed.data.description !== "string") {
+				failures.push(`${relPath}: missing skill metadata`);
+			}
+		}
+		expect(failures).toEqual([]);
+	});
+
+	test("materializes designpowers skills as references instead of nested skill entrypoints", () => {
+		if (result.skipped) return;
+		const referencePaths = designpowersThirdPartyRelativePaths().filter((relPath) => relPath.endsWith("/reference.md"));
+		const nestedSkillPaths = designpowersThirdPartyRelativePaths().filter((relPath) => relPath.endsWith("/SKILL.md"));
+
+		expect(referencePaths).toHaveLength(27);
+		expect(nestedSkillPaths).toEqual([]);
+		for (const relPath of referencePaths) {
+			expect(existsSync(join(frontendSkillRoot, relPath))).toBe(true);
+		}
+	});
+
+	test("recognizes upstream skill sources across platform path separators", () => {
+		expect(isSkillMarkdownSourcePath("skills/design-review/SKILL.md")).toBe(true);
+		expect(isSkillMarkdownSourcePath("skills\\design-review\\SKILL.md")).toBe(true);
+		expect(isSkillMarkdownSourcePath("skills/design-review/reference.md")).toBe(false);
 	});
 
 	test("materialized brand reference is verbatim upstream content", async () => {

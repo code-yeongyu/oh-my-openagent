@@ -1,6 +1,6 @@
 import { appendBlock, findTomlSection, removeSetting, replaceOrInsertRootSetting, replaceOrInsertSetting } from "./toml-section-editor"
 
-const AUTONOMOUS_FEATURES = ["multi_agent", "child_agents_md", "unified_exec", "goals"] as const
+const AUTONOMOUS_FEATURES = ["multi_agent", "unified_exec", "goals"] as const
 
 export function ensureAutonomousPermissions(config: string): string {
   let next = replaceOrInsertRootSetting(config, "approval_policy", JSON.stringify("never"))

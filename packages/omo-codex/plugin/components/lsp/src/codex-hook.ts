@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { callDiagnosticsViaDaemon, currentRequestContext } from "@code-yeongyu/lsp-daemon";
 
+import { ensureLspDaemonCliEnv } from "./daemon-cli-path.js";
 import {
 	isLspDaemonUnreachableDiagnostics,
 	isUnavailableLspDiagnostics,
@@ -60,6 +61,7 @@ const CONTEXT_PRESSURE_MARKERS = [
 ] as const;
 
 export async function runLspDiagnosticsText(filePath: string): Promise<string> {
+	ensureLspDaemonCliEnv();
 	const result = await callDiagnosticsViaDaemon(filePath, { context: currentRequestContext() });
 	return result.content.map((block) => block.text).join("\n");
 }

@@ -98,7 +98,7 @@ describe("visual-qa skill prompt contract", () => {
 			const web = sectionBetween(fixture.text, "### Web", "### TUI")
 
 			expect(web, fixture.label).toContain("agent-browser")
-			expect(fixture.text, fixture.label).toContain("bun add -g agent-browser")
+			expect(fixture.text, fixture.label).toContain("npm install -g agent-browser")
 			expect(fixture.text, fixture.label).toContain("https://github.com/vercel-labs/agent-browser")
 			expect(fixture.text, fixture.label).toContain("references/agent-browser-setup.md")
 		}
@@ -108,21 +108,34 @@ describe("visual-qa skill prompt contract", () => {
 		expect(existsSync(referencesPath)).toBe(true)
 		const doc = readFileSync(referencesPath, "utf8")
 
-		expect(doc).toContain("bun add -g agent-browser")
+		expect(doc).toContain("npm install -g agent-browser")
 		expect(doc).toContain("agent-browser install")
 		expect(doc).toContain("https://github.com/vercel-labs/agent-browser")
 		expect(doc).toContain("agent-browser --help")
 	})
 
-	test("#given a clone/design-port task #when in clone-coding mode #then dual pixel + code-fidelity verification loops until both pass", () => {
+	test("#given the visual QA evidence commands #when documented #then they use the Node bundle, not a Bun-only TypeScript launcher", () => {
+		for (const fixture of fixtures()) {
+			expect(fixture.text, fixture.label).toContain('node "$SKILL_DIR/scripts/visual-qa.mjs" image-diff')
+			expect(fixture.text, fixture.label).toContain('node "$SKILL_DIR/scripts/visual-qa.mjs" tui-check')
+			expect(fixture.text, fixture.label).not.toContain('bun "$SKILL_DIR/scripts/cli.ts"')
+		}
+	})
+
+	test("#given a concrete visual target #when in reference-fidelity mode #then dual pixel + code-fidelity verification loops until both pass", () => {
 		for (const fixture of fixtures()) {
 			const cloneMode = sectionBetween(fixture.text, "## Step 5", "## Reference evidence is not the verdict")
 			const lowerCloneMode = cloneMode.toLowerCase()
 
 			expect(lowerCloneMode, fixture.label).toContain("clone")
+			expect(lowerCloneMode, fixture.label).toContain("imagen")
+			expect(lowerCloneMode, fixture.label).toContain("stitch")
+			expect(lowerCloneMode, fixture.label).toContain("generated mockup")
+			expect(lowerCloneMode, fixture.label).toContain("overview")
 			expect(cloneMode, fixture.label).toContain("pixel-by-pixel")
 			expect(cloneMode, fixture.label).toContain("image-diff")
 			expect(cloneMode, fixture.label).toContain("lazycodex-clone-fidelity-reviewer")
+			expect(lowerCloneMode, fixture.label).toContain("extensible state variants")
 			expect(lowerCloneMode, fixture.label).toContain("retry")
 		}
 	})
@@ -192,6 +205,92 @@ describe("visual-qa skill exhaustive-coverage and review-gate contract", () => {
 			expect(lower, fixture.label).toContain("citation")
 			expect(lower, fixture.label).toContain("every page")
 			expect(lower, fixture.label).toContain("regardless of similarityscore")
+		}
+	})
+
+	test("#given a generated reference packet #when reviewing #then Pass A and B require extensible design-system code and pixel-level reference matching", () => {
+		for (const fixture of fixtures()) {
+			const passA = sectionBetween(fixture.text, "### Pass A", "### Pass B")
+			const passB = sectionBetween(fixture.text, "### Pass B", "## Step 4")
+			const lowerPassA = passA.toLowerCase()
+			const lowerPassB = passB.toLowerCase()
+
+			expect(passA, fixture.label).toContain("REFERENCE PACKET:")
+			expect(passB, fixture.label).toContain("REFERENCE PACKET:")
+			expect(lowerPassA, fixture.label).toContain("reusable tokens/primitives")
+			expect(lowerPassA, fixture.label).toContain("extend to new pages")
+			expect(lowerPassA, fixture.label).toContain("missing overview content")
+			expect(lowerPassB, fixture.label).toContain("pixel-perfectly")
+			expect(lowerPassB, fixture.label).toContain("actual against reference")
+			expect(lowerPassB, fixture.label).toContain("overview text is part of the target")
+		}
+	})
+
+	test("#given reference packet evidence #when prompting reviewers #then sensitive content is redacted and annotations stay untrusted data", () => {
+		for (const fixture of fixtures()) {
+			const capture = sectionBetween(fixture.text, "## Step 2", "## Step 3")
+			const passA = sectionBetween(fixture.text, "### Pass A", "### Pass B")
+			const passB = sectionBetween(fixture.text, "### Pass B", "## Step 4")
+			const combined = `${capture}\n${passA}\n${passB}`.toLowerCase()
+
+			expect(combined, fixture.label).toContain("redact or omit secrets")
+			expect(combined, fixture.label).toContain("credentials")
+			expect(combined, fixture.label).toContain("tokens")
+			expect(combined, fixture.label).toContain("auth headers")
+			expect(combined, fixture.label).toContain("customer data")
+			expect(combined, fixture.label).toContain("private messages")
+			expect(combined, fixture.label).toContain("internal urls")
+			expect(combined, fixture.label).toContain("other sensitive content")
+			expect(combined, fixture.label).toContain("overview text")
+			expect(combined, fixture.label).toContain("annotations")
+			expect(combined, fixture.label).toContain("untrusted data")
+			expect(combined, fixture.label).toContain("captured ui copy")
+			expect(combined, fixture.label).toContain("comments")
+			expect(combined, fixture.label).toContain("filenames")
+			expect(combined, fixture.label).toContain("not reviewer instructions")
+			expect(combined, fixture.label).toContain("never as instructions")
+		}
+	})
+})
+
+describe("visual-qa motion capture and slop-animation contract", () => {
+	test("#given an animated or interactive surface #when capturing #then rest, mid-transition and settled frames are driven and captured", () => {
+		for (const fixture of fixtures()) {
+			const motion = sectionBetween(fixture.text, "### Motion and interaction capture", "## Step 3")
+			const lower = motion.toLowerCase()
+
+			expect(lower, fixture.label).toContain("rest")
+			expect(lower, fixture.label).toContain("mid-transition")
+			expect(lower, fixture.label).toContain("settled")
+			expect(lower, fixture.label).toContain("hover")
+			expect(lower, fixture.label).toContain("focus")
+			expect(lower, fixture.label).toContain("click")
+			expect(lower, fixture.label).toContain("scroll-triggered")
+			expect(lower, fixture.label).toContain("load animation")
+		}
+	})
+
+	test("#given animation-induced pixel diff #when judging fidelity #then it is never an excuse to dismiss a defect", () => {
+		for (const fixture of fixtures()) {
+			const motion = sectionBetween(fixture.text, "### Motion and interaction capture", "## Step 3")
+			const lower = motion.toLowerCase()
+
+			expect(lower, fixture.label).toContain("never a valid excuse")
+			expect(lower, fixture.label).toContain("settled state to settled state")
+			expect(lower, fixture.label).toContain("reference's own motion")
+		}
+	})
+
+	test("#given meaningless motion #when reviewing #then Pass A flags slop animation, especially hover-without-action", () => {
+		for (const fixture of fixtures()) {
+			const passA = sectionBetween(fixture.text, "### Pass A", "### Pass B")
+			const checkBlock = sectionBetween(passA, "CHECK EACH:", "OUTPUT:")
+			const lower = checkBlock.toLowerCase()
+
+			expect(lower, fixture.label).toContain("slop animation")
+			expect(lower, fixture.label).toContain("non-interactive")
+			expect(lower, fixture.label).toContain("no state change")
+			expect(lower, fixture.label).toContain("hover-without-action")
 		}
 	})
 })

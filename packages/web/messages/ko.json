@@ -30,8 +30,26 @@
       "monthlyDownloads": "월 {count} 다운로드",
       "lifecycleHooks": "{count}개 라이프사이클 훅",
       "installCommand": "bunx oh-my-openagent install",
+      "codexInstallCommand": "npx lazycodex-ai install",
+      "codexLabel": "Codex CLI 에디션",
       "getStarted": "시작하기",
       "viewOnGitHub": "GitHub에서 보기"
+    },
+    "editions": {
+      "title": "두 가지 에디션, 하나의 두뇌",
+      "subtitle": "동일한 오케스트레이션 엔진. 하네스만 선택하세요.",
+      "ultimate": {
+        "name": "Ultimate",
+        "platform": "OpenCode",
+        "description": "11개 에이전트, Team Mode, 백그라운드 태스크, 3-tier MCP, 60+ 라이프사이클 훅을 갖춘 풀 플러그인.",
+        "install": "bunx oh-my-openagent install"
+      },
+      "light": {
+        "name": "Light",
+        "platform": "Codex CLI",
+        "description": "8개 컴포넌트 — comment-checker, git-bash, LSP, rules, start-work-continuation, telemetry, ultrawork, ulw-loop — Codex 이벤트에 연결.",
+        "install": "npx lazycodex-ai install"
+      }
     },
     "ulw": {
       "badge": "마법의 주문",
@@ -142,7 +160,7 @@
       "model": "GPT 5.5 Medium"
     },
     "teamMode": {
-      "badge": "NEW · v4.0",
+      "badge": "v4.0+",
       "title": "Team Mode",
       "headline": "여러 에이전트. 나란히. 병렬로.",
       "description": "리드 에이전트가 카테고리별 전문 멤버 팀을 지휘합니다. 모두 병렬로 동작하며 전용 도구로 실시간 통신합니다. tmux에서 모든 멤버가 동시에 작업하는 모습을 지켜보세요. 옵트인 — team_mode.enabled를 켜고 재시작하세요.",
@@ -180,7 +198,7 @@
     },
     "agents": {
       "title": "특화 에이전트",
-      "subtitle": "각 태스크에 최적화된 프롬프트와 툴셋으로 무장한 전문가들입니다.",
+      "subtitle": "각 태스크에 최적화된 프롬프트와 툴셋으로 무장한 8개 전문 에이전트. 필요에 따라 동적으로 에이전트를 조립하는 시스템까지.",
       "oracle": {
         "name": "Oracle",
         "role": "Architecture Consultant",
@@ -210,6 +228,24 @@
         "role": "Plan Reviewer",
         "model": "GPT 5.5 xHigh",
         "description": "무자비한 검증. 계획이 완벽하지 않으면 승인하지 않습니다."
+      },
+      "atlas": {
+        "name": "Atlas",
+        "role": "병렬 태스크 실행가",
+        "model": "Claude Opus 4.7",
+        "description": "의존성 추적과 함께 다단계 계획을 오케스트레이션. 전문가에게 위임하고 독립적으로 검증합니다."
+      },
+      "sisyphusJunior": {
+        "name": "Sisyphus-Junior",
+        "role": "집중 태스크 실행가",
+        "model": "카테고리별",
+        "description": "Sisyphus와 동일한 규율, 위임 없이. 증거 기반 QA로 단일 태스크를 끝까지 실행합니다."
+      },
+      "multimodalLooker": {
+        "name": "Multimodal-Looker",
+        "role": "미디어 분석",
+        "model": "Claude Sonnet 4.6",
+        "description": "PDF, 이미지, 다이어그램에서 정보를 추출. 전체 읽기 없이 빠르게 요약을 뽑아냅니다."
       },
       "dynamicSystem": {
         "name": "동적 오케스트레이터",
