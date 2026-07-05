@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
+import { randomUUID } from "node:crypto"
 import { join, win32 } from "node:path"
 import { tmpdir } from "node:os"
 import { findRecentSessionPlanPath } from "./session-plan-affinity"
@@ -10,7 +11,7 @@ type FindRecentSessionPlanPathInput = Parameters<typeof findRecentSessionPlanPat
 
 describe("findRecentSessionPlanPath", () => {
   test("#given session history references omo plan path #when finding recent plan #then returns matching plan", async () => {
-    const directory = join(tmpdir(), "session-plan-affinity-test")
+    const directory = join(tmpdir(), `session-plan-affinity-test-${randomUUID()}`)
     const planPath = join(directory, ".omo", "plans", "foo-bar.md")
     const client = unsafeTestValue<FindRecentSessionPlanPathInput["client"]>({
       session: {
