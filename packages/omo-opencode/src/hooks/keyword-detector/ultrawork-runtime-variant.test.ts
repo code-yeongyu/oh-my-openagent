@@ -6,6 +6,7 @@ import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 function createMockPluginInput(toastMessages: string[]) {
   return unsafeTestValue({
     client: {
+        session: { update: async () => ({}) },
       tui: {
         showToast: async (opts: { body: { message: string } }) => {
           toastMessages.push(opts.body.message)

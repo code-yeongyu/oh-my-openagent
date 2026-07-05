@@ -26,7 +26,10 @@ function expectTextPartText(parts: readonly OutputPart[]): string {
 
 function createPluginInputWithToast(showToast: (options: ToastOptions) => Promise<void>): PluginInput {
   const client = {} as PluginInput["client"]
-  Object.assign(client, { tui: { showToast } })
+  Object.assign(client, {
+    tui: { showToast },
+    session: { update: async () => ({}) },
+  })
 
   return {
     client,
@@ -1118,6 +1121,7 @@ describe("keyword-detector disabled_keywords config", () => {
             toastCalls.push(opts.body.title)
           },
         },
+        session: { update: async () => ({}) },
       },
     })
   }

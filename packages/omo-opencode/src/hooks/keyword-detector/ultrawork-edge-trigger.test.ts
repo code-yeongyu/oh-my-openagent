@@ -14,6 +14,7 @@ type StartLoopCall = {
 function createMockPluginInput(toastCalls: string[] = []) {
   return unsafeTestValue<PluginInput>({
     client: {
+        session: { update: async () => ({}) },
       tui: {
         showToast: async (opts: { body: { title: string } }) => {
           toastCalls.push(opts.body.title)

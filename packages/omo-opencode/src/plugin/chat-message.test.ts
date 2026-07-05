@@ -62,7 +62,10 @@ function createMockHandlerArgs(overrides?: {
   const appliedSessions: string[] = []
   return {
     ctx: unsafeTestValue<PluginContext>({
-      client: { tui: { showToast: async () => {} } },
+      client: {
+        tui: { showToast: async () => {} },
+        session: { update: async () => ({}) },
+      },
     }),
     pluginConfig: unsafeTestValue<OhMyOpenCodeConfig>((overrides?.pluginConfig ?? {})),
     firstMessageVariantGate: {
