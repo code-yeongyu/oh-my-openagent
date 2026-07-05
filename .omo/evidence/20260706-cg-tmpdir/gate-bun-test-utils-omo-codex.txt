@@ -14,10 +14,10 @@ packages/utils/src/port-utils.test.ts:
 (pass) port-utils > #given isPortAvailable > #when hostname is omitted #then 127.0.0.1 is the default target [2.82ms]
 (pass) port-utils > #given isPortAvailable > #when another interface owns the port #then default probing does not bind all interfaces [13.01ms]
 (pass) port-utils > #given findAvailablePort > #when the start port is available #then returns the start port [5.01ms]
-83 | 
+83 |
 84 |     server.once("error", handleError)
 85 |     server.once("listening", handleListening)
-86 | 
+86 |
 87 |     try {
 88 |       server.listen(port, hostname)
                   ^
@@ -735,7 +735,7 @@ packages/omo-codex/src/install/codex-cleanup-safety.test.ts:
 (pass) codex cleanup safety > #given filesystem root as Codex home #when managed removal runs #then refuses even shaped managed paths [0.31ms]
 
 packages/omo-codex/src/install/lazycodex-install-surface.test.ts:
-49 | 
+49 |
 50 | export async function assertHookCommandTargets(pluginRoot: string): Promise<void> {
 51 |   const missing = await findMissingHookCommandTargets(pluginRoot)
 52 |   if (missing.length === 0) return
