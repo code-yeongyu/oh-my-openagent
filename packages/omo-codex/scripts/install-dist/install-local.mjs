@@ -12934,6 +12934,10 @@ var SAFE_CODEGRAPH_RUNTIME_ENV_KEYS = new Set([
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 var execFileAsync = promisify(execFile);
+// packages/utils/src/codegraph/process-roots.ts
+var OMO_CODEX_PLUGIN_CACHE_PUBLISHERS = new Set(["sisyphuslabs"]);
+// packages/utils/src/codegraph/process-sweeper.ts
+var DEFAULT_THROTTLE_MS = 60 * 60 * 1000;
 // packages/utils/src/command-executor/execute-command.ts
 import { exec } from "node:child_process";
 import { promisify as promisify2 } from "node:util";

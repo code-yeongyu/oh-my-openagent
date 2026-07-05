@@ -17,6 +17,7 @@ import { resolveCodegraphCommand } from "../../../../../utils/src/codegraph/reso
 import { shouldExcludeCodegraphProject } from "../../../../../utils/src/codegraph/workspace.ts";
 import { getCodexOmoConfig } from "../../../shared/src/config-loader.ts";
 import { pruneCodegraphProjectStoresBestEffort } from "./cache-gc.js";
+import { sweepCodegraphZombiesBestEffort } from "./hook-sweep.js";
 import { resolveCodegraphCommandInvocation, SESSION_START_CWD_ENV } from "./session-start-worker.js";
 import type {
 	HookStdout,
@@ -66,6 +67,12 @@ export async function executeCodegraphSessionStartHook(options: SessionStartHook
 	const homeDir = resolveHomeDir(env);
 	const config = options.config ?? getCodexOmoConfig({ cwd: projectRoot, env, homeDir });
 	pruneCodegraphProjectStoresBestEffort(homeDir, { debugLog: writeDebugLog });
+	await sweepCodegraphZombiesBestEffort({
+		env,
+		homeDir,
+		...(config.trustedCodegraphInstallDir === undefined ? {} : { trustedCodegraphInstallDir: config.trustedCodegraphInstallDir }),
+		log: writeDebugLog,
+	}, options.sweepZombies);
 
 	if (config.codegraph?.enabled === false) {
 		return { action: "skipped-disabled", exitCode: 0 };

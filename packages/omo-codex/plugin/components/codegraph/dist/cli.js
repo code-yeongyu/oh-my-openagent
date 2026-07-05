@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 
 // components/codegraph/src/cli.ts
-import { realpathSync as realpathSync5 } from "node:fs";
-import { basename as basename5, resolve as resolve5 } from "node:path";
+import { realpathSync as realpathSync6 } from "node:fs";
+import { basename as basename5, resolve as resolve7 } from "node:path";
 import { stderr as processStderr4 } from "node:process";
-import { fileURLToPath as fileURLToPath3 } from "node:url";
+import { fileURLToPath as fileURLToPath4 } from "node:url";
 
 // components/codegraph/src/hook.ts
-import { execFile as execFile3, spawn } from "node:child_process";
-import { homedir as homedir11 } from "node:os";
-import { join as join11 } from "node:path";
+import { execFile as execFile4, spawn } from "node:child_process";
+import { homedir as homedir13 } from "node:os";
+import { join as join13 } from "node:path";
 import {
   cwd as processCwd2,
   env as processEnv2,
@@ -17,7 +17,7 @@ import {
   stdin as processStdin,
   stdout as processStdout
 } from "node:process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // ../../utils/src/codegraph/env.ts
 import { homedir } from "node:os";
@@ -1937,20 +1937,433 @@ function isNonFatalCodegraphGcError(error) {
   return typeof code === "string" && NON_FATAL_GC_ERROR_CODES.has(code);
 }
 
-// components/codegraph/src/session-start-worker.ts
-import { execFile as execFile2 } from "node:child_process";
-import { appendFileSync as appendFileSync2, existsSync as existsSync7, mkdirSync as mkdirSync2 } from "node:fs";
+// components/codegraph/src/hook-sweep.ts
+import { fileURLToPath } from "node:url";
+
+// ../../utils/src/codegraph/process-exec.ts
+import { execFile } from "node:child_process";
+
+// ../../utils/src/codegraph/process-match.ts
+import { resolve as resolve4 } from "node:path";
+var SERVE_WRAPPER_SUFFIX = "/components/codegraph/dist/serve.js";
+var UPSTREAM_PACKAGE_SEGMENT = "/@colbymchenry/codegraph/";
+function parsePosixProcessTable(output) {
+  const processes = [];
+  for (const line of output.split(/\r?\n/)) {
+    const match = /^\s*(\d+)\s+(\d+)\s+(.+?)\s*$/.exec(line);
+    if (match === null)
+      continue;
+    const pid = Number(match[1]);
+    const ppid = Number(match[2]);
+    const command = match[3];
+    if (!isValidProcessId(pid) || !Number.isInteger(ppid) || ppid < 0 || command === undefined)
+      continue;
+    processes.push({ command, pid, ppid });
+  }
+  return processes;
+}
+function parseWindowsProcessTable(output) {
+  const parsed = parseJson(output);
+  const entries = Array.isArray(parsed) ? parsed : parsed === undefined ? [] : [parsed];
+  const processes = [];
+  for (const entry of entries) {
+    if (!isRecord3(entry))
+      continue;
+    const pid = numberField(entry, "ProcessId");
+    const ppid = numberField(entry, "ParentProcessId");
+    const command = stringField(entry, "CommandLine");
+    if (pid === undefined || ppid === undefined || command === undefined || command.trim().length === 0)
+      continue;
+    processes.push({ command, pid, ppid });
+  }
+  return processes;
+}
+function selectZombieCodegraphProcesses(processes, options) {
+  const platform = options.platform ?? process.platform;
+  const livePids = new Set(processes.map((processInfo) => processInfo.pid));
+  const roots = normalizeRoots(options.ownedRoots, platform);
+  const zombies = [];
+  for (const processInfo of processes) {
+    const match = matchOwnedCodegraphCommand(processInfo.command, roots, platform);
+    if (match === null)
+      continue;
+    if (!isOrphaned(processInfo, livePids))
+      continue;
+    zombies.push({ ...processInfo, matchedRoot: match.root, matchKind: match.kind });
+  }
+  return zombies;
+}
+function matchOwnedCodegraphCommand(command, roots, platform) {
+  const normalizedCommand = normalizeForComparison2(command, platform);
+  for (const root of roots) {
+    if (root.length === 0)
+      continue;
+    const serveWrapper = `${root}${SERVE_WRAPPER_SUFFIX}`;
+    if (hasExecutableToken(normalizedCommand, serveWrapper))
+      return { kind: "serve-wrapper", root };
+    if (upstreamPackagePathIsUnderRoot(normalizedCommand, root)) {
+      return { kind: "upstream-codegraph", root };
+    }
+  }
+  return null;
+}
+function hasExecutableToken(command, expectedPath) {
+  let searchFrom = 0;
+  for (;; ) {
+    const pathIndex = command.indexOf(expectedPath, searchFrom);
+    if (pathIndex < 0)
+      return false;
+    const tokenStart = findTokenStart(command, pathIndex);
+    const tokenEnd = findTokenEnd(command, pathIndex + expectedPath.length);
+    if (command.slice(tokenStart, tokenEnd) === expectedPath && tokenLooksExecutable(command, tokenStart))
+      return true;
+    searchFrom = pathIndex + expectedPath.length;
+  }
+}
+function tokenLooksExecutable(command, tokenStart) {
+  const prefix = command.slice(0, tokenStart).trimEnd();
+  if (prefix.length === 0)
+    return true;
+  const previousTokenStart = findTokenStart(prefix, prefix.length - 1);
+  const previousToken = prefix.slice(previousTokenStart);
+  const executableName = previousToken.split("/").at(-1) ?? previousToken;
+  return /^node\d*(\.exe)?$/.test(executableName) || /^bun(\.exe)?$/.test(executableName);
+}
+function upstreamPackagePathIsUnderRoot(command, root) {
+  let searchFrom = 0;
+  for (;; ) {
+    const packageIndex = command.indexOf(UPSTREAM_PACKAGE_SEGMENT, searchFrom);
+    if (packageIndex < 0)
+      return false;
+    const tokenStart = findTokenStart(command, packageIndex);
+    if (command.slice(tokenStart).startsWith(`${root}/`) && tokenLooksExecutable(command, tokenStart))
+      return true;
+    searchFrom = packageIndex + UPSTREAM_PACKAGE_SEGMENT.length;
+  }
+}
+function findTokenStart(command, index) {
+  for (let cursor = index - 1;cursor >= 0; cursor -= 1) {
+    if (/\s|["']/.test(command[cursor] ?? ""))
+      return cursor + 1;
+  }
+  return 0;
+}
+function findTokenEnd(command, index) {
+  for (let cursor = index;cursor < command.length; cursor += 1) {
+    if (/\s|["']/.test(command[cursor] ?? ""))
+      return cursor;
+  }
+  return command.length;
+}
+function normalizeRoots(roots, platform) {
+  const normalized = new Set;
+  for (const root of roots) {
+    const trimmed = root.trim();
+    if (trimmed.length === 0)
+      continue;
+    normalized.add(normalizeForComparison2(resolve4(trimmed), platform));
+  }
+  return [...normalized].sort((left, right) => right.length - left.length || left.localeCompare(right));
+}
+function normalizeForComparison2(value, platform) {
+  const normalized = value.replaceAll("\\", "/").replace(/\/+$/, "");
+  return platform === "win32" ? normalized.toLowerCase() : normalized;
+}
+function isOrphaned(processInfo, livePids) {
+  return processInfo.ppid === 1 || !livePids.has(processInfo.ppid);
+}
+function isValidProcessId(value) {
+  return Number.isSafeInteger(value) && value > 0;
+}
+function parseJson(text) {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    if (error instanceof SyntaxError)
+      return;
+    throw error;
+  }
+}
+function numberField(record, key) {
+  const value = record[key];
+  return typeof value === "number" && isValidProcessId(value) ? value : undefined;
+}
+function stringField(record, key) {
+  const value = record[key];
+  return typeof value === "string" ? value : undefined;
+}
+function isRecord3(value) {
+  return typeof value === "object" && value !== null;
+}
+
+// ../../utils/src/codegraph/process-exec.ts
+function enumerateCodegraphProcesses(platform = process.platform) {
+  return platform === "win32" ? enumerateWindowsProcesses() : enumeratePosixProcesses();
+}
+function createDefaultCodegraphProcessKiller(platform = process.platform) {
+  return platform === "win32" ? createWindowsKiller() : createPosixKiller();
+}
+function enumeratePosixProcesses() {
+  return execFileText("ps", ["-eo", "pid=,ppid=,command="]).then(parsePosixProcessTable);
+}
+function enumerateWindowsProcesses() {
+  const command = [
+    "Get-CimInstance Win32_Process",
+    "Select-Object ProcessId,ParentProcessId,CommandLine",
+    "ConvertTo-Json -Compress -Depth 2"
+  ].join(" | ");
+  return execFileText("powershell.exe", ["-NoProfile", "-Command", command]).then(parseWindowsProcessTable);
+}
+function createPosixKiller() {
+  return {
+    isAlive: (pid) => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch (error) {
+        if (!(error instanceof Error))
+          throw error;
+        return processKillErrorMeansAlive(error);
+      }
+    },
+    kill: (pid) => {
+      process.kill(pid, "SIGKILL");
+      return Promise.resolve();
+    },
+    terminate: (pid) => {
+      process.kill(pid, "SIGTERM");
+      return Promise.resolve();
+    }
+  };
+}
+function createWindowsKiller() {
+  return {
+    isAlive: (pid) => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch (error) {
+        if (!(error instanceof Error))
+          throw error;
+        return processKillErrorMeansAlive(error);
+      }
+    },
+    kill: (pid) => execFileVoid("taskkill.exe", ["/PID", String(pid), "/T", "/F"]),
+    terminate: (pid) => execFileVoid("taskkill.exe", ["/PID", String(pid), "/T"])
+  };
+}
+function execFileText(command, args) {
+  return new Promise((resolvePromise, reject) => {
+    execFile(command, [...args], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024, windowsHide: true }, (error, stdout) => {
+      if (error !== null) {
+        reject(error);
+        return;
+      }
+      resolvePromise(stdout);
+    });
+  });
+}
+function execFileVoid(command, args) {
+  return execFileText(command, args).then(() => {
+    return;
+  });
+}
+function processKillErrorMeansAlive(error) {
+  const code = typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
+  if (code === "ESRCH")
+    return false;
+  if (code === "EPERM")
+    return true;
+  return false;
+}
+// ../../utils/src/codegraph/process-roots.ts
+import { existsSync as existsSync6, readdirSync as readdirSync2, realpathSync as realpathSync4 } from "node:fs";
+import { homedir as homedir9 } from "node:os";
+import { join as join9, resolve as resolve5 } from "node:path";
+function discoverCodegraphOwnedRoots(options = {}) {
+  const env = options.env ?? process.env;
+  const homeDir = options.homeDir ?? env["HOME"] ?? env["USERPROFILE"] ?? homedir9();
+  const roots = new Set;
+  addRoot(roots, options.trustedCodegraphInstallDir);
+  addRoot(roots, buildCodegraphEnv({ homeDir })[CODEGRAPH_INSTALL_DIR_ENV]);
+  addRoot(roots, options.pluginRoot);
+  for (const root of options.extraRoots ?? [])
+    addRoot(roots, root);
+  for (const root of readCodexPluginCacheRoots(options.codexHome ?? env["CODEX_HOME"] ?? join9(homeDir, ".codex"))) {
+    addRoot(roots, root);
+  }
+  return [...roots];
+}
+function readCodexPluginCacheRoots(codexHome) {
+  const cacheRoot = join9(codexHome, "plugins", "cache");
+  if (!existsSync6(cacheRoot))
+    return [];
+  const roots = [];
+  for (const publisher of safeReadDir(cacheRoot)) {
+    if (!OMO_CODEX_PLUGIN_CACHE_PUBLISHERS.has(publisher))
+      continue;
+    const omoRoot = join9(cacheRoot, publisher, "omo");
+    if (!existsSync6(omoRoot))
+      continue;
+    for (const version of safeReadDir(omoRoot))
+      roots.push(join9(omoRoot, version));
+  }
+  return roots;
+}
+function addRoot(roots, root) {
+  if (root === undefined || root.trim().length === 0)
+    return;
+  const resolved = resolve5(root);
+  roots.add(resolved);
+  roots.add(realpathIfPossible2(resolved));
+}
+function safeReadDir(path) {
+  try {
+    return readdirSync2(path, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  } catch (error) {
+    if (isNonFatalFsError(error))
+      return [];
+    throw error;
+  }
+}
+function realpathIfPossible2(path) {
+  try {
+    return realpathSync4(path);
+  } catch (error) {
+    if (error instanceof Error)
+      return resolve5(path);
+    throw error;
+  }
+}
+function isNonFatalFsError(error) {
+  if (!(error instanceof Error))
+    return false;
+  const code = typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
+  return typeof code === "string" && ["EACCES", "ENOENT", "ENOTDIR", "EPERM"].includes(code);
+}
+var OMO_CODEX_PLUGIN_CACHE_PUBLISHERS = new Set(["sisyphuslabs"]);
+// ../../utils/src/codegraph/process-sweeper.ts
+import { existsSync as existsSync7, mkdirSync as mkdirSync2, statSync as statSync2, utimesSync, writeFileSync as writeFileSync2 } from "node:fs";
 import { homedir as homedir10 } from "node:os";
-import { extname, join as join10 } from "node:path";
+import { dirname as dirname3, join as join10 } from "node:path";
+var DEFAULT_GRACE_MS = 2000;
+var DEFAULT_THROTTLE_MS = 60 * 60 * 1000;
+var SWEEP_STAMP_FILE = "zombie-sweep.stamp";
+async function sweepCodegraphZombies(options = {}) {
+  const homeDir = options.homeDir ?? options.env?.["HOME"] ?? options.env?.["USERPROFILE"] ?? homedir10();
+  const stampFile = join10(codegraphDataRoot(homeDir), SWEEP_STAMP_FILE);
+  const nowMs = options.nowMs ?? Date.now();
+  const dryRun = options.dryRun === true;
+  const ownedRoots = options.ownedRoots ?? discoverCodegraphOwnedRoots(options);
+  if (options.force !== true && isSweepThrottled(stampFile, nowMs, options.throttleMs ?? DEFAULT_THROTTLE_MS)) {
+    return emptyResult("throttled", dryRun, ownedRoots, stampFile);
+  }
+  try {
+    const provider = options.processProvider ?? (() => enumerateCodegraphProcesses(options.platform));
+    const candidates = selectZombieCodegraphProcesses(await provider(), {
+      ownedRoots,
+      ...options.platform === undefined ? {} : { platform: options.platform }
+    });
+    const result = dryRun ? { failed: [], killed: [] } : await killCandidates(candidates, options.killer ?? createDefaultCodegraphProcessKiller(options.platform), options);
+    if (!dryRun)
+      writeSweepStamp(stampFile, nowMs);
+    return { action: "swept", candidates, dryRun, failed: result.failed, killed: result.killed, ownedRoots, stampFile };
+  } catch (error) {
+    options.log?.(`CodeGraph zombie sweep skipped: ${error instanceof Error ? error.message : String(error)}`);
+    return emptyResult("failed", dryRun, ownedRoots, stampFile);
+  }
+}
+async function killCandidates(candidates, killer, options) {
+  const failed = [];
+  const killed = [];
+  for (const candidate of candidates) {
+    const terminated = await safelyTerminate(candidate.pid, killer, failed, options.log);
+    if (!terminated)
+      continue;
+    await delay(options.graceMs ?? DEFAULT_GRACE_MS);
+    if (!await killer.isAlive(candidate.pid)) {
+      killed.push(candidate);
+      continue;
+    }
+    if (await safelyKill(candidate.pid, killer, failed, options.log))
+      killed.push(candidate);
+  }
+  return { failed, killed };
+}
+async function safelyTerminate(pid, killer, failed, log) {
+  try {
+    await killer.terminate(pid);
+    return true;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    failed.push({ error: message, pid, stage: "terminate" });
+    log?.(`CodeGraph zombie sweep failed to terminate pid ${pid}: ${message}`);
+    return false;
+  }
+}
+async function safelyKill(pid, killer, failed, log) {
+  try {
+    await killer.kill(pid);
+    return true;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    failed.push({ error: message, pid, stage: "kill" });
+    log?.(`CodeGraph zombie sweep failed to kill pid ${pid}: ${message}`);
+    return false;
+  }
+}
+function isSweepThrottled(stampFile, nowMs, throttleMs) {
+  if (!existsSync7(stampFile))
+    return false;
+  return nowMs - statSync2(stampFile).mtimeMs < throttleMs;
+}
+function writeSweepStamp(stampFile, nowMs) {
+  mkdirSync2(dirname3(stampFile), { recursive: true });
+  writeFileSync2(stampFile, `${new Date(nowMs).toISOString()}
+`);
+  const stampDate = new Date(nowMs);
+  utimesSync(stampFile, stampDate, stampDate);
+}
+function emptyResult(action, dryRun, ownedRoots, stampFile) {
+  return { action, candidates: [], dryRun, failed: [], killed: [], ownedRoots, stampFile };
+}
+function delay(ms) {
+  if (ms <= 0)
+    return Promise.resolve();
+  return new Promise((resolvePromise) => {
+    setTimeout(resolvePromise, ms);
+  });
+}
+// components/codegraph/src/hook-sweep.ts
+async function sweepCodegraphZombiesBestEffort(options, sweep = sweepCodegraphZombies) {
+  try {
+    await sweep({
+      ...options,
+      pluginRoot: defaultPluginRoot(),
+      ...options.log === undefined ? {} : { log: options.log }
+    });
+  } catch (error) {
+    options.log?.(`CodeGraph zombie sweep skipped: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+function defaultPluginRoot() {
+  return fileURLToPath(new URL("../../..", import.meta.url));
+}
+
+// components/codegraph/src/session-start-worker.ts
+import { execFile as execFile3 } from "node:child_process";
+import { appendFileSync as appendFileSync2, existsSync as existsSync9, mkdirSync as mkdirSync3 } from "node:fs";
+import { homedir as homedir12 } from "node:os";
+import { extname, join as join12 } from "node:path";
 import { cwd as processCwd, env as processEnv, execPath as processExecPath, stderr as processStderr } from "node:process";
 
 // ../../utils/src/codegraph/provision.ts
 import { createHash as createHash2, randomUUID } from "node:crypto";
-import { execFile } from "node:child_process";
+import { execFile as execFile2 } from "node:child_process";
 import { chmod, mkdir, readdir, readFile, rename, rm, rmdir, stat, writeFile } from "node:fs/promises";
-import { existsSync as existsSync6 } from "node:fs";
-import { homedir as homedir9, hostname } from "node:os";
-import { basename as basename3, join as join9 } from "node:path";
+import { existsSync as existsSync8 } from "node:fs";
+import { homedir as homedir11, hostname } from "node:os";
+import { basename as basename3, join as join11 } from "node:path";
 import { promisify } from "node:util";
 
 // ../../utils/src/codegraph/manifest.ts
@@ -1994,15 +2407,15 @@ var CODEGRAPH_PROVISION_MANIFEST = {
 var DEFAULT_LOCK_WAIT_MS = 5000;
 var DEFAULT_LOCK_STALE_MS = 120000;
 var DEFAULT_DOWNLOAD_TIMEOUT_MS = 60000;
-var execFileAsync = promisify(execFile);
+var execFileAsync = promisify(execFile2);
 function platformKey() {
   return `${process.platform}-${process.arch}`;
 }
 function markerPath(installDir, version) {
-  return join9(installDir, ".provisioned", `codegraph-${version}.json`);
+  return join11(installDir, ".provisioned", `codegraph-${version}.json`);
 }
 function defaultInstallDir() {
-  return join9(homedir9(), ".omo", "codegraph");
+  return join11(homedir11(), ".omo", "codegraph");
 }
 function sha256(bytes) {
   return createHash2("sha256").update(bytes).digest("hex");
@@ -2022,7 +2435,7 @@ async function removeEmptyDirectory(path) {
   }
 }
 function sleep(ms) {
-  return new Promise((resolve4) => setTimeout(resolve4, ms));
+  return new Promise((resolve6) => setTimeout(resolve6, ms));
 }
 async function defaultDownloader(asset, timeoutMs = DEFAULT_DOWNLOAD_TIMEOUT_MS) {
   const response = await fetch(asset.url, { signal: AbortSignal.timeout(timeoutMs) });
@@ -2036,7 +2449,7 @@ function forcedBadChecksumOptions(options) {
   const key = options.platformKey ?? platformKey();
   return {
     downloader: async () => new TextEncoder().encode("checksum mismatch"),
-    installDir: options.installDir ?? join9(options.lockDir, "codegraph-force-bad-checksum"),
+    installDir: options.installDir ?? join11(options.lockDir, "codegraph-force-bad-checksum"),
     manifest: {
       assets: {
         [key]: { executableName: process.platform === "win32" ? "codegraph.cmd" : "codegraph", sha256: "0000", url: "memory://bad" }
@@ -2047,13 +2460,13 @@ function forcedBadChecksumOptions(options) {
   };
 }
 async function readMarker(path) {
-  if (!existsSync6(path))
+  if (!existsSync8(path))
     return null;
   try {
     const raw = JSON.parse(await readFile(path, "utf8"));
     if (typeof raw === "object" && raw !== null && "binPath" in raw) {
       const value = raw.binPath;
-      return typeof value === "string" && existsSync6(value) ? value : null;
+      return typeof value === "string" && existsSync8(value) ? value : null;
     }
     return null;
   } catch (error) {
@@ -2064,7 +2477,7 @@ async function readMarker(path) {
 }
 async function acquireLock(lockPath, waitMs, staleMs) {
   const startedAt = Date.now();
-  await mkdir(join9(lockPath, ".."), { recursive: true });
+  await mkdir(join11(lockPath, ".."), { recursive: true });
   while (Date.now() - startedAt <= waitMs) {
     try {
       await mkdir(lockPath);
@@ -2089,24 +2502,24 @@ async function installExtractedBundle(extractDir, installDir, executableName) {
   const roots = await readdir(extractDir);
   if (roots.length !== 1)
     throw new Error(`CodeGraph archive should contain one root directory, found ${roots.length}`);
-  const bundleDir = join9(extractDir, roots[0] ?? "");
+  const bundleDir = join11(extractDir, roots[0] ?? "");
   const bundleEntries = await readdir(bundleDir);
   await mkdir(installDir, { recursive: true });
   for (const entry of bundleEntries) {
-    await rm(join9(installDir, entry), { force: true, recursive: true });
-    await rename(join9(bundleDir, entry), join9(installDir, entry));
+    await rm(join11(installDir, entry), { force: true, recursive: true });
+    await rename(join11(bundleDir, entry), join11(installDir, entry));
   }
-  const destination = join9(installDir, "bin", executableName);
-  if (!existsSync6(destination))
+  const destination = join11(installDir, "bin", executableName);
+  if (!existsSync8(destination))
     throw new Error(`CodeGraph archive did not contain bin/${executableName}`);
   await chmod(destination, 493);
   return destination;
 }
 async function installAsset(layout) {
   const { asset, downloader, installDir, version } = layout;
-  const stagingDir = join9(installDir, ".staging", randomUUID());
-  const archivePath = join9(stagingDir, basename3(asset.url));
-  const extractDir = join9(stagingDir, "extract");
+  const stagingDir = join11(installDir, ".staging", randomUUID());
+  const archivePath = join11(stagingDir, basename3(asset.url));
+  const extractDir = join11(stagingDir, "extract");
   try {
     await mkdir(extractDir, { recursive: true });
     const bytes = await downloader(asset);
@@ -2120,13 +2533,13 @@ async function installAsset(layout) {
     await writeFile(archivePath, bytes);
     await extractTarGz(archivePath, extractDir);
     const destination = await installExtractedBundle(extractDir, installDir, asset.executableName);
-    await mkdir(join9(installDir, ".provisioned"), { recursive: true });
+    await mkdir(join11(installDir, ".provisioned"), { recursive: true });
     await writeFile(markerPath(installDir, version), `${JSON.stringify({ binPath: destination, version })}
 `);
     return destination;
   } finally {
     await rm(stagingDir, { force: true, recursive: true });
-    await removeEmptyDirectory(join9(installDir, ".staging"));
+    await removeEmptyDirectory(join11(installDir, ".staging"));
   }
 }
 async function ensureCodegraphProvisioned(options) {
@@ -2139,7 +2552,7 @@ async function ensureCodegraphProvisioned(options) {
   const existing = await readMarker(marker);
   if (existing !== null)
     return { binPath: existing, provisioned: true };
-  const lockPath = join9(options.lockDir, `codegraph-${hostname()}.lock`);
+  const lockPath = join11(options.lockDir, `codegraph-${hostname()}.lock`);
   const release = await acquireLock(lockPath, options.lockWaitMs ?? DEFAULT_LOCK_WAIT_MS, options.lockStaleMs ?? DEFAULT_LOCK_STALE_MS);
   if (release === null)
     return { error: "timed out waiting for codegraph provisioning lock", provisioned: false };
@@ -2229,8 +2642,8 @@ async function resolveOrProvisionCommand(deps, config, env, homeDir, nodeSupport
     return { kind: "unsupported-node" };
   if (config.auto_provision === false)
     return { error: "codegraph binary unavailable and auto_provision is disabled", kind: "unavailable", source: resolved.source };
-  const installDir = trustedInstallDir ?? join10(homeDir, ".omo", "codegraph");
-  const provisioned = await deps.ensureProvisioned({ installDir, lockDir: join10(installDir, ".locks"), version: CODEGRAPH_VERSION });
+  const installDir = trustedInstallDir ?? join12(homeDir, ".omo", "codegraph");
+  const provisioned = await deps.ensureProvisioned({ installDir, lockDir: join12(installDir, ".locks"), version: CODEGRAPH_VERSION });
   if (!provisioned.provisioned || provisioned.binPath === undefined) {
     return { error: provisioned.error ?? "provisioning did not produce a binary", kind: "unavailable", source: resolved.source };
   }
@@ -2250,7 +2663,7 @@ function decideStartupAction(status) {
 ${status.stderr ?? ""}`.toLowerCase();
   if (text.includes("not initialized") || text.includes("uninitialized"))
     return { kind: "init" };
-  const initialized = jsonSaysInitialized(parseJson(status.stdout));
+  const initialized = jsonSaysInitialized(parseJson2(status.stdout));
   if (initialized === false)
     return { kind: "init" };
   if (initialized === true)
@@ -2260,7 +2673,7 @@ ${status.stderr ?? ""}`.toLowerCase();
   return { kind: "sync" };
 }
 function jsonSaysInitialized(value) {
-  if (!isRecord3(value))
+  if (!isRecord4(value))
     return;
   const initialized = value["initialized"] ?? value["isInitialized"] ?? value["ready"];
   if (typeof initialized === "boolean")
@@ -2278,7 +2691,7 @@ function jsonSaysInitialized(value) {
 async function runCodegraphCommand(projectRoot, command, args, options) {
   const invocation = resolveCodegraphCommandInvocation(command, args);
   return new Promise((resolvePromise) => {
-    execFile2(invocation.command, [...invocation.args], { cwd: projectRoot, encoding: "utf8", env: buildCodegraphChildEnv({ ambientEnv: processEnv, codegraphEnv: options.env }), maxBuffer: 1024 * 1024, timeout: options.timeoutMs, windowsHide: true }, (error, stdout, stderr) => {
+    execFile3(invocation.command, [...invocation.args], { cwd: projectRoot, encoding: "utf8", env: buildCodegraphChildEnv({ ambientEnv: processEnv, codegraphEnv: options.env }), maxBuffer: 1024 * 1024, timeout: options.timeoutMs, windowsHide: true }, (error, stdout, stderr) => {
       if (error === null) {
         resolvePromise({ exitCode: 0, stderr: toOutputText(stderr), stdout: toOutputText(stdout), timedOut: false });
         return;
@@ -2298,9 +2711,9 @@ function resolveCodegraphCommandInvocation(command, args, platform = process.pla
   return { args: ["/d", "/s", "/c", command, ...args], command: "cmd.exe" };
 }
 function appendOutcome(homeDir, outcome) {
-  const logDir = join10(homeDir, ".omo", "codegraph");
-  mkdirSync2(logDir, { recursive: true });
-  appendFileSync2(join10(logDir, "session-start.jsonl"), `${JSON.stringify({ ...outcome, timestamp: new Date().toISOString() })}
+  const logDir = join12(homeDir, ".omo", "codegraph");
+  mkdirSync3(logDir, { recursive: true });
+  appendFileSync2(join12(logDir, "session-start.jsonl"), `${JSON.stringify({ ...outcome, timestamp: new Date().toISOString() })}
 `);
 }
 function safeLogOutcome(logOutcome, outcome) {
@@ -2317,8 +2730,8 @@ function safeLogOutcome(logOutcome, outcome) {
 function provisionedBinFromInstallDir(installDir) {
   if (installDir === undefined)
     return null;
-  const candidate = join10(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
-  return existsSync7(candidate) ? candidate : null;
+  const candidate = join12(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
+  return existsSync9(candidate) ? candidate : null;
 }
 function resolveExitCode(error) {
   if ("code" in error && typeof error.code === "number")
@@ -2329,9 +2742,9 @@ function toOutputText(value) {
   return Buffer.isBuffer(value) ? value.toString("utf8") : value;
 }
 function resolveHomeDir2(env) {
-  return env["HOME"] ?? env["USERPROFILE"] ?? homedir10();
+  return env["HOME"] ?? env["USERPROFILE"] ?? homedir12();
 }
-function parseJson(text) {
+function parseJson2(text) {
   try {
     return JSON.parse(text);
   } catch (error) {
@@ -2340,7 +2753,7 @@ function parseJson(text) {
     throw error;
   }
 }
-function isRecord3(value) {
+function isRecord4(value) {
   return typeof value === "object" && value !== null;
 }
 
@@ -2360,6 +2773,12 @@ async function executeCodegraphSessionStartHook(options = {}) {
   const homeDir = resolveHomeDir3(env);
   const config = options.config ?? getCodexOmoConfig({ cwd: projectRoot, env, homeDir });
   pruneCodegraphProjectStoresBestEffort(homeDir, { debugLog: writeDebugLog });
+  await sweepCodegraphZombiesBestEffort({
+    env,
+    homeDir,
+    ...config.trustedCodegraphInstallDir === undefined ? {} : { trustedCodegraphInstallDir: config.trustedCodegraphInstallDir },
+    log: writeDebugLog
+  }, options.sweepZombies);
   if (config.codegraph?.enabled === false) {
     return { action: "skipped-disabled", exitCode: 0 };
   }
@@ -2412,7 +2831,7 @@ async function isCodegraphProjectInitialized(options) {
 }
 function runStatusProbe(projectRoot, command, args, env) {
   return new Promise((resolveProbe) => {
-    execFile3(command, [...args], {
+    execFile4(command, [...args], {
       cwd: projectRoot,
       encoding: "utf8",
       env,
@@ -2429,8 +2848,8 @@ function runStatusProbe(projectRoot, command, args, env) {
   });
 }
 function codegraphStatusSaysInitialized(stdout) {
-  const parsed = parseJson2(stdout);
-  if (!isRecord4(parsed))
+  const parsed = parseJson3(stdout);
+  if (!isRecord5(parsed))
     return false;
   const initialized = parsed["initialized"] ?? parsed["isInitialized"] ?? parsed["ready"];
   if (typeof initialized === "boolean")
@@ -2444,7 +2863,7 @@ function codegraphStatusSaysInitialized(stdout) {
 function provisionedBinFromInstallDir2(installDir) {
   if (installDir === undefined)
     return null;
-  return join11(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
+  return join13(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
 }
 async function executeCodegraphPostToolUseHook(options = {}) {
   const env = options.env ?? processEnv2;
@@ -2456,9 +2875,9 @@ async function executeCodegraphPostToolUseHook(options = {}) {
   return { action: "emitted-guidance", exitCode: 0 };
 }
 function runCodegraphPostToolUseHook(input, options = {}) {
-  const toolName = isRecord4(input) ? input["tool_name"] : undefined;
-  const cwd = isRecord4(input) ? input["cwd"] : undefined;
-  const toolOutput = isRecord4(input) ? input["tool_response"] ?? input["tool_output"] ?? input["response"] : input;
+  const toolName = isRecord5(input) ? input["tool_name"] : undefined;
+  const cwd = isRecord5(input) ? input["cwd"] : undefined;
+  const toolOutput = isRecord5(input) ? input["tool_response"] ?? input["tool_output"] ?? input["response"] : input;
   const guidance = buildCodegraphInitGuidanceForToolResult({ cwd, toolName, toolOutput }, options);
   if (guidance === null)
     return "";
@@ -2491,7 +2910,7 @@ function spawnDetachedWorker(invocation) {
   child.unref();
 }
 function resolveHomeDir3(env) {
-  return env["HOME"] ?? env["USERPROFILE"] ?? homedir11();
+  return env["HOME"] ?? env["USERPROFILE"] ?? homedir13();
 }
 function resolveExitCode2(error) {
   if ("code" in error && typeof error.code === "number")
@@ -2502,7 +2921,7 @@ function toOutputText2(value) {
   return Buffer.isBuffer(value) ? value.toString("utf8") : value;
 }
 function resolveProjectRoot(input, fallback) {
-  if (!isRecord4(input))
+  if (!isRecord5(input))
     return fallback;
   const cwd = input["cwd"];
   return typeof cwd === "string" && cwd.trim().length > 0 ? cwd : fallback;
@@ -2515,9 +2934,9 @@ async function readHookInput(stdin) {
     text += typeof chunk === "string" ? chunk : String(chunk);
   if (text.trim().length === 0)
     return;
-  return parseJson2(text);
+  return parseJson3(text);
 }
-function parseJson2(text) {
+function parseJson3(text) {
   try {
     return JSON.parse(text);
   } catch (error) {
@@ -2526,17 +2945,17 @@ function parseJson2(text) {
     throw error;
   }
 }
-function isRecord4(value) {
+function isRecord5(value) {
   return typeof value === "object" && value !== null;
 }
 function defaultWorkerCliPath() {
-  return fileURLToPath(import.meta.url);
+  return fileURLToPath2(import.meta.url);
 }
 
 // components/codegraph/src/serve.ts
-import { existsSync as existsSync8, realpathSync as realpathSync4 } from "node:fs";
-import { homedir as homedir12 } from "node:os";
-import { basename as basename4, join as join12, resolve as resolve4 } from "node:path";
+import { existsSync as existsSync10, realpathSync as realpathSync5 } from "node:fs";
+import { homedir as homedir14 } from "node:os";
+import { basename as basename4, join as join14, resolve as resolve6 } from "node:path";
 import {
   cwd as processCwd3,
   env as processEnv3,
@@ -2544,7 +2963,7 @@ import {
   stderr as processStderr3,
   stdout as processStdout2
 } from "node:process";
-import { fileURLToPath as fileURLToPath2 } from "node:url";
+import { fileURLToPath as fileURLToPath3 } from "node:url";
 
 // components/codegraph/src/mcp-bridge.ts
 import { spawn as spawn2 } from "node:child_process";
@@ -3027,7 +3446,7 @@ var CODEGRAPH_VERSION2 = "1.0.1";
 var PROJECT_CWD_ENV_KEYS = ["OMO_CODEGRAPH_PROJECT_CWD", SESSION_START_CWD_ENV, "PWD"];
 async function runCodegraphServe(options = {}) {
   const env = options.env ?? processEnv3;
-  const homeDir = options.homeDir ?? homedir12();
+  const homeDir = options.homeDir ?? homedir14();
   const wrapperCwd = options.cwd ?? processCwd3();
   const projectCwd = resolveProjectCwd(env, wrapperCwd);
   const config = options.config ?? getCodexOmoConfig({ cwd: projectCwd, env, homeDir });
@@ -3051,7 +3470,7 @@ async function runCodegraphServe(options = {}) {
   };
   let resolution = options.resolve?.(resolutionOptions) ?? resolveCodegraphCommand(resolutionOptions);
   const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
-  if (!resolution.exists || shouldSkipResolvedCommand(resolution, options.commandExists ?? existsSync8)) {
+  if (!resolution.exists || shouldSkipResolvedCommand(resolution, options.commandExists ?? existsSync10)) {
     if (resolution.source === "path" && !nodeSupport.supported) {
       return runUnavailableMcp(buildCodegraphNodeSkipHint(nodeSupport), options);
     }
@@ -3097,10 +3516,10 @@ async function provisionMissingCodegraph(options) {
     return null;
   if (options.config.auto_provision === false)
     return null;
-  const installDir = options.trustedInstallDir ?? join12(options.homeDir, ".omo", "codegraph");
+  const installDir = options.trustedInstallDir ?? join14(options.homeDir, ".omo", "codegraph");
   const result = await options.ensureProvisioned({
     installDir,
-    lockDir: join12(installDir, ".locks"),
+    lockDir: join14(installDir, ".locks"),
     version: CODEGRAPH_VERSION2
   });
   if (!result.provisioned || result.binPath === undefined)
@@ -3126,17 +3545,17 @@ function resolveProjectCwd(env, fallback) {
     const candidate = env[key]?.trim();
     if (candidate === undefined || candidate.length === 0)
       continue;
-    const resolved = resolve4(candidate);
-    if (existsSync8(resolved))
+    const resolved = resolve6(candidate);
+    if (existsSync10(resolved))
       return resolved;
   }
-  return resolve4(fallback);
+  return resolve6(fallback);
 }
 function provisionedBinFromInstallDir3(installDir) {
   if (installDir === undefined)
     return null;
-  const candidate = join12(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
-  return existsSync8(candidate) ? candidate : null;
+  const candidate = join14(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
+  return existsSync10(candidate) ? candidate : null;
 }
 async function runCodegraphServeCli() {
   process.exitCode = await runCodegraphServe();
@@ -3151,11 +3570,68 @@ if (isDirectInvocation(process.argv[1])) {
 function isDirectInvocation(argvPath) {
   if (argvPath === undefined)
     return false;
-  const modulePath = fileURLToPath2(import.meta.url);
+  const modulePath = fileURLToPath3(import.meta.url);
   const moduleName = basename4(modulePath);
   if (moduleName !== "serve.js" && moduleName !== "serve.ts")
     return false;
-  return realpathSync4(resolve4(argvPath)) === realpathSync4(modulePath);
+  return realpathSync5(resolve6(argvPath)) === realpathSync5(modulePath);
+}
+
+// components/codegraph/src/sweep-cli.ts
+async function runCodegraphSweepCli(options = {}) {
+  const args = parseSweepCliArgs(options.argv ?? process.argv);
+  const result = await sweepCodegraphZombies({
+    ...options,
+    dryRun: args.dryRun,
+    extraRoots: args.roots,
+    force: args.force,
+    ...args.roots.length > 0 ? { ownedRoots: args.roots } : {}
+  });
+  writeSweepReport(options.stdout ?? process.stdout, result);
+  return result.action === "failed" ? 1 : 0;
+}
+function parseSweepCliArgs(argv) {
+  const roots = [];
+  let dryRun = false;
+  let force = false;
+  for (let index = 3;index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--dry-run") {
+      dryRun = true;
+      continue;
+    }
+    if (arg === "--force") {
+      force = true;
+      continue;
+    }
+    if (arg === "--root") {
+      const value = argv[index + 1];
+      if (value !== undefined && value.trim().length > 0)
+        roots.push(value);
+      index += 1;
+    }
+  }
+  return { dryRun, force, roots };
+}
+function writeSweepReport(stdout, result) {
+  stdout.write(`${JSON.stringify({
+    action: result.action,
+    candidates: result.candidates.map(formatProcess),
+    dryRun: result.dryRun,
+    failed: result.failed,
+    killed: result.killed.map(formatProcess),
+    ownedRoots: result.ownedRoots,
+    stampFile: result.stampFile
+  })}
+`);
+}
+function formatProcess(processInfo) {
+  return {
+    matchKind: processInfo.matchKind,
+    matchedRoot: processInfo.matchedRoot,
+    pid: processInfo.pid,
+    ppid: processInfo.ppid
+  };
 }
 
 // components/codegraph/src/cli.ts
@@ -3163,6 +3639,14 @@ async function runCodegraphCli(options = {}) {
   const argv = options.argv ?? process.argv;
   const command = argv[2];
   const subcommand = argv[3];
+  if (command === "sweep") {
+    return runCodegraphSweepCli({
+      ...options.sweepOptions,
+      argv,
+      ...options.env === undefined ? {} : { env: options.env },
+      ...options.stdout === undefined ? {} : { stdout: options.stdout }
+    });
+  }
   if (command === "hook" && subcommand === "session-start") {
     return runCodegraphSessionStartHook(options);
   }
@@ -3196,11 +3680,11 @@ if (isDirectInvocation2(process.argv[1])) {
 function isDirectInvocation2(argvPath) {
   if (argvPath === undefined)
     return false;
-  const modulePath = fileURLToPath3(import.meta.url);
+  const modulePath = fileURLToPath4(import.meta.url);
   const moduleName = basename5(modulePath);
   if (moduleName !== "cli.js" && moduleName !== "cli.ts")
     return false;
-  return realpathSync5(resolve5(argvPath)) === realpathSync5(modulePath);
+  return realpathSync6(resolve7(argvPath)) === realpathSync6(modulePath);
 }
 export {
   runCodegraphCli
