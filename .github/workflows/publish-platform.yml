@@ -202,7 +202,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: 2
+      # Each matrix leg is an independent OIDC-provenance npm publish with no shared
+      # state; the build matrix above already runs all 12 legs concurrently. 6 keeps
+      # a conservative margin against npm burst limits while roughly halving the
+      # publish wall time versus the previous value of 2.
+      max-parallel: 6
       matrix:
         platform: [darwin-arm64, darwin-x64, darwin-x64-baseline, linux-x64, linux-x64-baseline, linux-arm64, linux-x64-musl, linux-x64-musl-baseline, linux-arm64-musl, windows-x64, windows-x64-baseline, windows-arm64]
     steps:
