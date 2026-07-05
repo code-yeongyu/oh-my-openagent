@@ -11,6 +11,14 @@ const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 // the materialized packages/shared-skills/skills). materialize is hoisted to run exactly
 // once up front; OMO_SKIP_MATERIALIZE=1 makes the downstream copies inside codex-plugin and
 // shared-skills-assets no-ops, avoiding a git submodule index.lock and torn writes.
+//
+// Node deps encode the remaining read/write edges:
+// - shared-skills-assets `cp -R ... dist/skills` needs dist/ to exist, which the index
+//   bundle creates.
+// - node-require-shim patches dist/index.js, produced by the index bundle.
+// - codex-plugin's build-bundled-mcp-runtimes reads (and rebuilds when missing) the
+//   git-bash-mcp / lsp-tools-mcp / lsp-daemon dists, so those must finish first or the two
+//   builds race on the same vendored dist directory.
 type BuildNode = {
 	id: string;
 	command: string;
@@ -24,11 +32,11 @@ const nodes: BuildNode[] = [
 	{ id: "git-bash-mcp", command: "bun", args: ["run", "build:git-bash-mcp"], deps: [] },
 	{ id: "lsp-tools-mcp", command: "bun", args: ["run", "build:lsp-tools-mcp"], deps: [] },
 	{ id: "lsp-daemon", command: "bun", args: ["run", "build:lsp-daemon"], deps: [] },
-	{ id: "codex-plugin", command: "bun", args: ["run", "build:codex-plugin"], deps: [] },
+	{ id: "codex-plugin", command: "bun", args: ["run", "build:codex-plugin"], deps: ["git-bash-mcp", "lsp-tools-mcp", "lsp-daemon"] },
 	{ id: "senpi-plugin", command: "bun", args: ["run", "build:senpi-plugin"], deps: [] },
 	{ id: "index", command: "bun", args: ["build", "packages/omo-opencode/src/index.ts", "--outdir", "dist", "--target", "bun", "--format", "esm", "--external", "zod"], deps: [] },
 	{ id: "tui", command: "bun", args: ["build", "packages/omo-opencode/src/tui.ts", "--outdir", "dist", "--target", "bun", "--format", "esm", ...OPENTUI_EXTERNALS.flatMap((name) => ["--external", name])], deps: [] },
-	{ id: "shared-skills-assets", command: "bun", args: ["run", "build:shared-skills-assets"], deps: [] },
+	{ id: "shared-skills-assets", command: "bun", args: ["run", "build:shared-skills-assets"], deps: ["index"] },
 	{ id: "node-require-shim", command: "bun", args: ["run", "build:node-require-shim"], deps: ["index"] },
 	{ id: "declarations", command: "tsc", args: ["--emitDeclarationOnly"], deps: [] },
 	{ id: "cli", command: "bun", args: ["build", "packages/omo-opencode/src/cli/index.ts", "--outdir", "dist/cli", "--target", "bun", "--format", "esm"], deps: [] },
