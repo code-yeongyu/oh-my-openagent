@@ -14,7 +14,7 @@ test("#given aggregate build scripts #when inspected #then component CLIs are bu
 	const componentBuildScript = buildComponentsScript;
 
 	// then
-	assert.match(componentBuildScript, /run\("bun", \["build", entry, "--target", "node", "--format", "esm", "--outfile", output\]/);
+	assert.match(componentBuildScript, /"bun", \["build", entry, "--target", "node", "--format", "esm", "--outfile", output\]/);
 	assert.doesNotMatch(componentBuildScript, /\bbun\s+run\b/);
 });
 

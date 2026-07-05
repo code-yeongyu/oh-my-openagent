@@ -41,6 +41,12 @@ export const tasteSkillFiles = {
 	"imagegen-brandkit.md": "skills/brandkit/SKILL.md",
 };
 
+// Non-SKILL.md taste-skill artifact: upstream ships stitch-skill with a worked
+// example of the DESIGN.md document that skill exports.
+export const tasteSkillArtifactFiles = {
+	"stitch-design-example.md": "skills/stitch-skill/DESIGN.md",
+};
+
 export const uiUxDbFileRenames = {
 	"data/web-interface.csv": "data/app-interface.csv",
 };
@@ -94,6 +100,9 @@ export function designMaterializeMap() {
 		};
 	}
 	for (const [fileName, source] of Object.entries(tasteSkillFiles)) {
+		map[`references/design/${fileName}`] = { upstream: "taste-skill", source };
+	}
+	for (const [fileName, source] of Object.entries(tasteSkillArtifactFiles)) {
 		map[`references/design/${fileName}`] = { upstream: "taste-skill", source };
 	}
 	return map;

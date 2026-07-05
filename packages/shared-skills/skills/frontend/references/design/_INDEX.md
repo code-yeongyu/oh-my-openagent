@@ -33,7 +33,7 @@ From [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill).
 | `minimalist-skill.md` | Editorial product UI inspired by Notion/Linear. Restrained monochrome palette, crisp structure, generous whitespace. | The user says "minimal", "clean", "Notion-style", "Linear-style", "editorial", "boring is good", "remove decoration". |
 | `brutalist-skill.md` | BETA. Mechanical visual language. Swiss typography, sharp contrast, raw structure, experimental composition. | The user says "brutalist", "raw", "Swiss", "experimental", "industrial", "unstyled", "anti-design". |
 | `output-skill.md` | Pushes for complete output: no placeholder comments, no `// TODO`, no skipped implementation, no half-done components. | Stack on top of any other skill when the agent has been lazy or the user complains "you keep leaving things undone". Do not use alone. |
-| `stitch-skill.md` | Google Stitch-compatible semantic design rules. Includes the extra DESIGN.md export format. | The user is working with Google Stitch, or explicitly wants Stitch-format output, or wants a DESIGN.md alongside the code. |
+| `stitch-skill.md` | Google Stitch-compatible semantic design rules. Includes the extra DESIGN.md export format; a complete worked export ships alongside as `stitch-design-example.md`. | The user is working with Google Stitch, or explicitly wants Stitch-format output, or wants a DESIGN.md alongside the code. |
 
 ### Image-generation skills (do NOT write code, only produce reference imagery)
 
