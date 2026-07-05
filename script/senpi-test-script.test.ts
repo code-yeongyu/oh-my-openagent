@@ -43,7 +43,7 @@ describe("Senpi compatibility test script", () => {
     // #given
     const manifest = readRootManifest()
     const files = manifest.files ?? []
-    const buildScript = manifest.scripts?.build ?? ""
+    const buildOrchestrator = readFileSync(new URL("./build.ts", import.meta.url), "utf8")
     const prepublishOnlyScript = manifest.scripts?.prepublishOnly ?? ""
 
     // #when
@@ -57,8 +57,8 @@ describe("Senpi compatibility test script", () => {
     // #then
     expect(shipsPluginTree, "root npm files must include the hardcoded packages/omo-senpi/plugin tree").toBe(true)
     expect(hasBuildScript, "root scripts must expose a dedicated Senpi plugin artifact build").toBe(true)
-    expect(buildScript, "main build must generate Senpi plugin artifacts before publishing").toContain(
-      "bun run build:senpi-plugin",
+    expect(buildOrchestrator, "the build orchestrator must generate Senpi plugin artifacts before publishing").toContain(
+      "build:senpi-plugin",
     )
     expect(prepublishOnlyScript, "prepublishOnly must route through build, which includes the Senpi plugin build").toContain(
       "bun run build",
