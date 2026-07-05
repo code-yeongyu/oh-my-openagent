@@ -77,8 +77,14 @@ async function findFirstPartyEffectImports(): Promise<string[]> {
       ":(exclude)**/node_modules/**",
       ":(exclude)**/dist/**",
     ],
-    { cwd: REPO_ROOT, stdout: "pipe", stderr: "pipe" },
+    // Bound the spawn so a slow `git grep -P` on a loaded Windows runner fails
+    // deterministically instead of hanging past the test timeout (the observed flake).
+    { cwd: REPO_ROOT, stdout: "pipe", stderr: "pipe", timeout: 60_000 },
   )
+  expect(
+    result.signalCode ?? null,
+    `git grep did not finish within the spawn timeout (signal ${result.signalCode})`,
+  ).toBeNull()
   if (result.exitCode === 1) return []
   expect(result.exitCode, result.stderr.toString()).toBe(0)
   return result.stdout
