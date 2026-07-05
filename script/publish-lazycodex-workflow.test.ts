@@ -111,7 +111,7 @@ describe("LazyCodex publish workflow", () => {
       workflow.includes('https://registry.npmjs.org/lazycodex-ai/${VERSION}')
     const publishesLazycodexNpm = publishLazycodexStep.includes("name: Publish lazycodex-ai") &&
       publishLazycodexStep.includes("if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'") &&
-      publishLazycodexStep.includes("npm publish --access public --provenance --tag latest --loglevel verbose") &&
+      publishLazycodexStep.includes("npm publish --ignore-scripts --access public --provenance --tag latest --loglevel verbose") &&
       !publishLazycodexStep.includes("continue-on-error: true")
     const syncsLazycodexMarketplaceOnStableReleases = workflow.includes("name: Sync LazyCodex Codex marketplace") &&
       syncMarketplaceStep.includes("if: needs.release-metadata.outputs.dist_tag == ''") &&
