@@ -26,7 +26,7 @@ describe("CodeGraph zombie process selection", () => {
     ]
 
     // when
-    const zombies = selectZombieCodegraphProcesses(processes, { ownedRoots: [omoRoot] })
+    const zombies = selectZombieCodegraphProcesses(processes, { ownedRoots: [omoRoot], platform: "linux" })
 
     // then
     expect(zombies.map((processInfo) => processInfo.pid)).toEqual([301, 302])
@@ -57,7 +57,7 @@ describe("CodeGraph zombie process selection", () => {
     ]
 
     // when
-    const zombies = selectZombieCodegraphProcesses(processes, { ownedRoots: [omoRoot, versionRoot] })
+    const zombies = selectZombieCodegraphProcesses(processes, { ownedRoots: [omoRoot, versionRoot], platform: "linux" })
 
     // then
     expect(zombies.map((processInfo) => processInfo.pid)).toEqual([313])
@@ -87,7 +87,7 @@ describe("CodeGraph zombie process selection", () => {
     ]
 
     // when
-    const zombies = selectZombieCodegraphProcesses(processes, { ownedRoots: [omoRoot] })
+    const zombies = selectZombieCodegraphProcesses(processes, { ownedRoots: [omoRoot], platform: "linux" })
 
     // then
     expect(zombies.map((processInfo) => processInfo.pid)).toEqual([322])
@@ -111,7 +111,7 @@ describe("CodeGraph zombie process selection", () => {
     ]
 
     // when
-    const zombies = selectZombieCodegraphProcesses(processes, { ownedRoots: [omoRoot] })
+    const zombies = selectZombieCodegraphProcesses(processes, { ownedRoots: [omoRoot], platform: "linux" })
 
     // then
     expect(zombies.map((processInfo) => processInfo.pid)).toEqual([324])
@@ -140,7 +140,7 @@ describe("CodeGraph zombie process selection", () => {
     ]
 
     // when
-    const zombies = selectZombieCodegraphProcesses(processes, { ownedRoots: [omoRoot] })
+    const zombies = selectZombieCodegraphProcesses(processes, { ownedRoots: [omoRoot], platform: "linux" })
 
     // then
     expect(zombies.map((processInfo) => processInfo.pid)).toEqual([333])

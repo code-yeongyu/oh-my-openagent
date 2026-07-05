@@ -27,6 +27,7 @@ describe("CodeGraph zombie sweep", () => {
         },
       },
       ownedRoots: [omoRoot],
+      platform: "linux",
       processProvider: () => Promise.resolve([
         {
           command: `${process.execPath} ${omoRoot}/components/codegraph/dist/serve.js`,
@@ -128,6 +129,7 @@ describe("CodeGraph zombie sweep", () => {
         },
       },
       ownedRoots: [omoRoot],
+      platform: "linux",
       processProvider: () => Promise.resolve([
         {
           command: `${process.execPath} ${omoRoot}/components/codegraph/dist/serve.js`,
