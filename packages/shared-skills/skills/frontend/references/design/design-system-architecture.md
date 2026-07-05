@@ -16,10 +16,25 @@ Every frontend project MUST have a `DESIGN.md` at its root. This file is the sin
 
 ## DESIGN.md Structure
 
-The file has 7 sections. Every section is mandatory. Skip nothing.
+The file has 8 sections (0-7). Every section is mandatory. Skip nothing.
 
 ```markdown
 # [Project Name] Design System
+
+## 0. Design Read
+
+One line, declared before any token exists: "Reading this as: [page kind] for
+[audience], with a [vibe] language, leaning toward [design system or aesthetic
+family]."
+
+- Marketing surfaces (Layer A is taste-skill or gpt-tasteskill): also record the
+  three dial values — DESIGN_VARIANCE, MOTION_INTENSITY, VISUAL_DENSITY — inferred
+  from the brief via taste-skill.md's dial tables, each with a one-line justification.
+- Operational surfaces: name the official design system chosen via taste-skill.md's
+  Brief → Design System Map, and why the brief maps to it.
+
+Every later section must agree with this read. If implementation drifts from the
+read, update the read deliberately — never let them diverge silently.
 
 ## 1. Atmosphere & Identity
 
@@ -171,7 +186,7 @@ Surfaces use progressively lighter/darker shades. No borders, no shadows.
 
 ### For New Projects
 
-1. **Select references before taste** — no visual reference means `_INDEX.md` shortlist of 2-3 Layer B candidates, then exactly one Layer A style skill and one Layer B brand/design-system reference. Use `open-design` only when the curated set has no fit.
+1. **Declare the Design Read, then select references** — write the Section 0 one-liner first; it drives the shortlist. No visual reference means `_INDEX.md` shortlist of 2-3 Layer B candidates, then exactly one Layer A style skill and one Layer B brand/design-system reference. Use `open-design` only when the curated set has no fit.
 2. **Assemble from references** — extract tokens, layout grammar, component anatomy, states, motion, and taste decisions, then recombine them into project-specific primitives. Customize for the user's product; never copy logos, trademarked assets, or brand-specific copy.
 3. **Define the system** — atmosphere, palette, typography, spacing, and one depth strategy, grounded in the selected references and product semantics.
 4. **Document initial primitives** — only components you are about to build, including variants and states.
@@ -191,6 +206,7 @@ Surfaces use progressively lighter/darker shades. No borders, no shadows.
 
 After every component implementation, check:
 
+- [ ] Section 0 Design Read still matches what was built — the dials or official system named there are the ones actually in use.
 - [ ] All colors reference tokens from Section 2. No raw hex outside `DESIGN.md`.
 - [ ] All font sizes match Section 3 scale. No arbitrary sizes.
 - [ ] All spacing values are multiples of `--space-1` (4px). No magic numbers.

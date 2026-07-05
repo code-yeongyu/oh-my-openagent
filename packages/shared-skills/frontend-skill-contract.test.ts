@@ -53,6 +53,29 @@ describe("frontend skill taste-skill v2 routing contract", () => {
 	})
 })
 
+describe("frontend skill design-read planning contract", () => {
+	const architectureUrl = new URL("./skills/frontend/references/design/design-system-architecture.md", import.meta.url)
+	const designReadmeUrl2 = new URL("./skills/frontend/references/design/README.md", import.meta.url)
+
+	test("#given a new DESIGN.md #when the contract is created #then it opens with a Design Read and dial prelude", async () => {
+		const architecture = await Bun.file(architectureUrl).text()
+
+		expect(architecture).toContain("## 0. Design Read")
+		for (const dial of ["DESIGN_VARIANCE", "MOTION_INTENSITY", "VISUAL_DENSITY"]) {
+			expect(architecture).toContain(dial)
+		}
+		expect(architecture).toContain("Brief → Design System Map")
+	})
+
+	test("#given the design system gate #when committing a direction #then the Design Read is recorded into DESIGN.md", async () => {
+		const readme = await Bun.file(designReadmeUrl2).text()
+		const gate = sectionBetween(readme, "## Phase 0 — Design System Gate", "## Phase 0.5")
+
+		expect(gate).toContain("Design Read")
+		expect(gate).toContain("dial")
+	})
+})
+
 describe("frontend skill concrete-reference contract", () => {
 	test("#given a provided visual reference #when routing implementation #then it becomes a pixel-fidelity design-system contract", async () => {
 		const text = await Bun.file(frontendSkillPath).text()
