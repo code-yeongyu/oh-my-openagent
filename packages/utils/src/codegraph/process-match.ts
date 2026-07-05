@@ -1,4 +1,4 @@
-import { resolve } from "node:path"
+import { posix, win32 } from "node:path"
 
 export type CodegraphProcessMatchKind = "serve-wrapper" | "upstream-codegraph"
 
@@ -137,9 +137,13 @@ function normalizeRoots(roots: readonly string[], platform: NodeJS.Platform): st
   for (const root of roots) {
     const trimmed = root.trim()
     if (trimmed.length === 0) continue
-    normalized.add(normalizeForComparison(resolve(trimmed), platform))
+    normalized.add(normalizeForComparison(resolvePathForPlatform(trimmed, platform), platform))
   }
   return [...normalized].sort((left, right) => right.length - left.length || left.localeCompare(right))
+}
+
+function resolvePathForPlatform(value: string, platform: NodeJS.Platform): string {
+  return platform === "win32" ? win32.resolve(value) : posix.resolve(value)
 }
 
 function normalizeForComparison(value: string, platform: NodeJS.Platform): string {
