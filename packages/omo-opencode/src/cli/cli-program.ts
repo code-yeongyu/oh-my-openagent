@@ -79,7 +79,7 @@ program
   .description("The ultimate OpenCode plugin - multi-model orchestration, LSP tools, and more")
   .version(VERSION, "-v, --version", "Show version number")
   .helpOption("-h, --help", "Display help for command")
-  .addOption(new Option("--platform <platform>", "Install target platform: opencode, codex, both").choices(["opencode", "codex", "both"]).hideHelp())
+  .addOption(new Option("--platform <platform>", "Install target platform: opencode, codex, both, senpi").choices(["opencode", "codex", "both", "senpi"]).hideHelp())
   .enablePositionalOptions()
 
 program
@@ -91,7 +91,7 @@ program
   .option("--openai <value>", "OpenAI/ChatGPT subscription: no, yes (default: no)")
   .option("--gemini <value>", "Gemini integration: no, yes")
   .option("--copilot <value>", "GitHub Copilot subscription: no, yes")
-  .addOption(new Option("--platform <platform>", "Install target platform: opencode, codex, both").choices(["opencode", "codex", "both"]))
+  .addOption(new Option("--platform <platform>", "Install target platform: opencode, codex, both, senpi").choices(["opencode", "codex", "both", "senpi"]))
   .option("--opencode-zen <value>", "OpenCode Zen access: no, yes (default: no)")
   .option("--zai-coding-plan <value>", "Z.ai Coding Plan subscription: no, yes (default: no)")
   .option("--kimi-for-coding <value>", "Kimi For Coding subscription: no, yes (default: no)")

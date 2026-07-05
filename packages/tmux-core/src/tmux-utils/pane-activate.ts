@@ -1,6 +1,6 @@
 import { runTmuxCommand } from "../runner"
 import { isInsideTmux } from "./environment"
-import { buildTmuxAttachCommand } from "./pane-command"
+import { buildPaneAuthEnvironmentArgs, buildTmuxAttachCommand } from "./pane-command"
 
 export type ActivateTmuxPaneDeps = {
   readonly isInsideTmux: () => boolean
@@ -33,7 +33,14 @@ export async function activateTmuxPane(
   }
 
   const opencodeCmd = buildTmuxAttachCommand(serverUrl, sessionId, directory)
-  const result = await deps.runTmuxCommand(tmux, ["respawn-pane", "-k", "-t", paneId, opencodeCmd])
+  const result = await deps.runTmuxCommand(tmux, [
+    "respawn-pane",
+    "-k",
+    ...buildPaneAuthEnvironmentArgs(),
+    "-t",
+    paneId,
+    opencodeCmd,
+  ])
   if (result.exitCode !== 0) {
     deps.log("[activateTmuxPane] FAILED", { paneId, sessionId, exitCode: result.exitCode, stderr: result.stderr.trim() })
     return false
