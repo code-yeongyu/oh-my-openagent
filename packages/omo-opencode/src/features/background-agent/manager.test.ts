@@ -334,16 +334,41 @@ async function waitUntil(predicate: () => boolean, timeoutMs: number): Promise<v
   }
 }
 
-function waitForCoalescedFlush(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 400))
+// Awaits the debounced parent-wake flush to settle by racing the real
+// onScheduledFlushSettled signal against a bounded state poll, so scheduled
+// flushes resolve on the signal (~100ms debounce) and direct-flush flows
+// resolve when their observable settles — replacing blind 400ms sleeps.
+function waitForCoalescedFlush(manager: BackgroundManager, sessionID: string): Promise<void> {
+  return awaitFlushWithFallback(manager, sessionID)
 }
 
 function waitForParentWakeRequeue(manager: BackgroundManager, sessionID: string): Promise<void> {
   return waitUntil(() => getPendingParentWakes(manager).has(sessionID), 600)
 }
 
-function waitForParentWakeErrorSettle(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 260))
+// The late-error requeue tests assert the DISPATCHED wake was cleared (requeued
+// to pending or removed). Poll that observable directly — it becomes true once
+// the async late-error handling settles — instead of blindly sleeping 260ms.
+function waitForParentWakeErrorSettle(manager: BackgroundManager, sessionID: string): Promise<void> {
+  return waitUntil(() => !getDispatchedParentWakes(manager).has(sessionID), 600)
+}
+
+// Capture the settled-flush count at entry (the debounced flush is scheduled but
+// still pending here), then await count > captured — so a settle that lands
+// between this call and registration is not missed. A bounded state-drain covers
+// flows that never schedule a flush (never hangs).
+function awaitFlushWithFallback(manager: BackgroundManager, sessionID: string): Promise<void> {
+  const api = cast<{
+    getScheduledFlushSettledCount: (id: string) => number
+    awaitScheduledFlush: (id: string, sinceCount: number) => Promise<void>
+  }>(manager)
+  const sinceCount = api.getScheduledFlushSettledCount(sessionID)
+  const settled = api.awaitScheduledFlush(sessionID, sinceCount)
+  const drained = waitUntil(
+    () => !getPendingParentWakes(manager).has(sessionID) || getDispatchedParentWakes(manager).has(sessionID),
+    600,
+  )
+  return Promise.race([settled, drained])
 }
 
 function createToastRemoveTaskTracker(): { removeTaskCalls: string[]; resetToastManager: () => void } {
@@ -1879,7 +1904,7 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
     //#when
     await (cast<{ notifyParentSession: (value: BackgroundTask) => Promise<void> }>(manager))
       .notifyParentSession(task)
-    await waitForCoalescedFlush()
+    await waitForCoalescedFlush(manager, "session-parent")
 
     //#then
     expect(capturedBody?.agent).toBe("sisyphus")
@@ -2036,7 +2061,7 @@ describe("BackgroundManager.notifyParentSession - aborted parent", () => {
     //#when
     await (cast<{ notifyParentSession: (task: BackgroundTask) => Promise<void> }>(manager))
       .notifyParentSession(task)
-    await waitForCoalescedFlush()
+    await waitForCoalescedFlush(manager, "session-parent")
 
     //#then
     expect(promptCalled).toBe(true)
@@ -2079,7 +2104,7 @@ describe("BackgroundManager.notifyParentSession - aborted parent", () => {
     //#when
     await (cast<{ notifyParentSession: (task: BackgroundTask) => Promise<void> }>(manager))
       .notifyParentSession(task)
-    await waitForCoalescedFlush()
+    await waitForCoalescedFlush(manager, "session-parent")
 
     //#then
     expect(promptCalled).toBe(true)
@@ -2120,7 +2145,7 @@ describe("BackgroundManager.notifyParentSession - aborted parent", () => {
     //#when
     await (cast<{ notifyParentSession: (task: BackgroundTask) => Promise<void> }>(manager))
       .notifyParentSession(task)
-    await waitForCoalescedFlush()
+    await waitForCoalescedFlush(manager, "session-parent")
 
     //#then
     const pendingWake = getPendingParentWakes(manager).get("session-parent")
@@ -2232,7 +2257,7 @@ describe("BackgroundManager.notifyParentSession - variant propagation", () => {
     //#when
     await (cast<{ notifyParentSession: (task: BackgroundTask) => Promise<void> }>(manager))
       .notifyParentSession(task)
-    await waitForCoalescedFlush()
+    await waitForCoalescedFlush(manager, "session-parent")
 
     //#then
     expect(promptCalls).toHaveLength(1)
@@ -2274,7 +2299,7 @@ describe("BackgroundManager.notifyParentSession - variant propagation", () => {
     //#when
     await (cast<{ notifyParentSession: (task: BackgroundTask) => Promise<void> }>(manager))
       .notifyParentSession(task)
-    await waitForCoalescedFlush()
+    await waitForCoalescedFlush(manager, "session-parent")
 
     //#then
     expect(promptCalls).toHaveLength(1)
@@ -6216,7 +6241,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
         error: { name: "UnknownError", message: "late provider failure" },
       },
     })
-    await waitForParentWakeErrorSettle()
+    await waitForParentWakeErrorSettle(manager, "parent-session-part-wake")
 
     //#then
     expect(promptCalls).toHaveLength(1)
@@ -6292,7 +6317,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
         error: { name: "UnknownError", message: "late provider failure" },
       },
     })
-    await waitForParentWakeErrorSettle()
+    await waitForParentWakeErrorSettle(manager, "parent-session-delta-wake")
 
     //#then
     expect(promptCalls).toHaveLength(1)
@@ -6357,7 +6382,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
         error: { name: "UnknownError", message: "late provider failure" },
       },
     })
-    await waitForParentWakeErrorSettle()
+    await waitForParentWakeErrorSettle(manager, "parent-session-real-delta")
 
     //#then
     expect(promptCalls).toHaveLength(1)
@@ -6424,7 +6449,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
         error: { name: "UnknownError", message: "late provider failure" },
       },
     })
-    await waitForParentWakeErrorSettle()
+    await waitForParentWakeErrorSettle(manager, "parent-session-wake")
 
     //#then
     expect(promptCalls).toHaveLength(1)
@@ -6491,7 +6516,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
       },
     })
     await flushBackgroundNotifications()
-    await waitForParentWakeErrorSettle()
+    await waitForParentWakeErrorSettle(manager, "parent-session-wake")
 
     //#then
     expect(promptCalls).toHaveLength(1)
@@ -6983,7 +7008,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
     //#when
     pruneStaleTasksAndNotificationsForTest(manager)
     await flushBackgroundNotifications()
-    await waitForCoalescedFlush()
+    await waitForCoalescedFlush(manager, staleTask.parentSessionId)
 
     //#then
     const retainedTask = getTaskMap(manager).get(staleTask.id)

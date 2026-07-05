@@ -280,6 +280,8 @@ export class BackgroundManager {
   private loggedSessionStatusUnavailable = false
   readonly taskHistory = new TaskHistory()
   private cachedCircuitBreakerSettings?: CircuitBreakerSettings
+  private readonly scheduledFlushSettledCounts = new Map<string, number>()
+  private readonly scheduledFlushSettledWaiters = new Map<string, Array<() => void>>()
 
   constructor(config: BackgroundManagerConfig) {
     const { pluginContext, ...options } = config
@@ -307,7 +309,7 @@ export class BackgroundManager {
         directory: this.directory,
         enqueueNotificationForParent: this.enqueueNotificationForParent.bind(this),
         onPendingWakeRequeued: (sessionID) => this.updateBackgroundTaskMarker(sessionID),
-        onScheduledFlushSettled: (sessionID) => this.updateBackgroundTaskMarker(sessionID),
+        onScheduledFlushSettled: (sessionID) => this.recordScheduledFlushSettled(sessionID),
       },
       {
         pendingRetryMs: PENDING_PARENT_WAKE_RETRY_MS,
@@ -2792,6 +2794,48 @@ The task was re-queued on a fallback model after a retryable failure.
   private async isSessionActive(sessionID: string): Promise<boolean> {
     const resolved = await resolveDispatchClient(this.client, sessionID)
     return isOpenCodeSessionActive(resolved.client as Parameters<typeof isOpenCodeSessionActive>[0], sessionID)
+  }
+
+  private recordScheduledFlushSettled(sessionID: string): void {
+    this.updateBackgroundTaskMarker(sessionID)
+    this.scheduledFlushSettledCounts.set(sessionID, (this.scheduledFlushSettledCounts.get(sessionID) ?? 0) + 1)
+    const waiters = this.scheduledFlushSettledWaiters.get(sessionID)
+    if (waiters && waiters.length > 0) {
+      this.scheduledFlushSettledWaiters.set(sessionID, [])
+      for (const waiter of waiters) {
+        waiter()
+      }
+    }
+  }
+
+  /**
+   * Test-only: monotonic count of scheduled parent-wake flushes that have settled
+   * for this session (the real onScheduledFlushSettled signal). Capture this
+   * BEFORE triggering a flush, then awaitScheduledFlush(sessionID, captured) so a
+   * settle that races between trigger and await is not missed.
+   */
+  getScheduledFlushSettledCount(sessionID: string): number {
+    return this.scheduledFlushSettledCounts.get(sessionID) ?? 0
+  }
+
+  /**
+   * Test-only: resolves once the settled-flush count for this session exceeds
+   * `sinceCount` (captured before the flush was triggered). Deterministic — no
+   * blind sleep past the debounce, and no registration-after-settle race.
+   */
+  awaitScheduledFlush(sessionID: string, sinceCount: number): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const arm = (): void => {
+        if ((this.scheduledFlushSettledCounts.get(sessionID) ?? 0) > sinceCount) {
+          resolve()
+          return
+        }
+        const waiters = this.scheduledFlushSettledWaiters.get(sessionID) ?? []
+        waiters.push(arm)
+        this.scheduledFlushSettledWaiters.set(sessionID, waiters)
+      }
+      arm()
+    })
   }
 
   private queuePendingParentWake(
