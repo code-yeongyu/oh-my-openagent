@@ -14,6 +14,7 @@ type CancelLoopCall = { sessionID: string }
 function createMockPluginInput() {
   return unsafeTestValue({
     client: {
+        session: { update: async () => ({}) },
       tui: {
         showToast: async () => {},
       },

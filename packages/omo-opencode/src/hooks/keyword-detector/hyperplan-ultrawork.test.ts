@@ -25,6 +25,7 @@ describe("keyword-detector hyperplan-ultrawork combo", () => {
     const toastCalls = options.toastCalls ?? []
     return unsafeTestValue<PluginInput>({
       client: {
+        session: { update: async () => ({}) },
         tui: {
           showToast: async (opts: { body: { title: string } }) => {
             toastCalls.push(opts.body.title)
