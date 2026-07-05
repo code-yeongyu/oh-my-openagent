@@ -131,6 +131,8 @@ Triggers: "fix the design", "this looks bad", "redesign", "make this better", "i
 
 Do NOT use this for greenfield work — the audit phase is wasted effort there.
 
+For marketing-surface redesigns, also honor `taste-skill.md`'s Redesign Protocol preservation rules — never silently change URL slugs, nav labels, form field names, the brand wordmark, or legal/consent copy.
+
 ### Step 4 — Is this an image-first workflow?
 
 Triggers: "generate the design first then code it", "make a mockup before we build", "show me what it could look like" — AND, by default, any expressive greenfield brief (glossy / premium / wow / brand-grade) with no user-supplied reference.
@@ -220,6 +222,8 @@ Once references are loaded, before writing any UI code:
 ## Phase Final — Design QA (MANDATORY, runs after implementation)
 
 Before declaring the task done, verify the rendered UI. **The verification authority is `/visual-qa`, not a hand-rolled checklist here.** Run `/visual-qa`: it captures every page and breakpoint (375 / 768 / 1280px) on fresh evidence, drives and inspects interaction states (hover/focus/active) and motion (transitions, scroll-triggered, load), runs the dual-oracle pass, and loops until an independent reviewer passes. For a concrete reference or clone, run it in reference-fidelity mode.
+
+When the loaded Layer A is `taste-skill.md` or `gpt-tasteskill.md`, first run that file's own final pre-flight check (`taste-skill.md` → its FINAL PRE-FLIGHT CHECK section; `gpt-tasteskill.md` → its `<design_plan>` verification) and fix every failing box before invoking `/visual-qa`. Several boxes are mechanical — em-dash grep, eyebrow count, zigzag cap, duplicate CTA intent — so check them against the actual code, never from memory.
 
 This skill adds only the design-taste judgments `/visual-qa` cannot make for you:
 

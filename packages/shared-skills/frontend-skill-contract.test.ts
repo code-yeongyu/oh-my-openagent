@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test"
+import { existsSync } from "node:fs"
+import { fileURLToPath } from "node:url"
 
 const frontendSkillPath = new URL("./skills/frontend/SKILL.md", import.meta.url)
 
@@ -73,6 +75,38 @@ describe("frontend skill design-read planning contract", () => {
 
 		expect(gate).toContain("Design Read")
 		expect(gate).toContain("dial")
+	})
+})
+
+describe("frontend skill taste pre-flight QA contract", () => {
+	const designReadmeUrl3 = new URL("./skills/frontend/references/design/README.md", import.meta.url)
+
+	test("#given a taste Layer A is loaded #when running design QA #then the taste pre-flight gate runs before visual-qa", async () => {
+		const readme = await Bun.file(designReadmeUrl3).text()
+		const qa = sectionBetween(readme, "## Phase Final", "## Final notes")
+
+		expect(qa.toLowerCase()).toContain("pre-flight")
+		expect(qa).toContain("gpt-tasteskill")
+		expect(qa).toContain("/visual-qa")
+	})
+
+	test("#given a marketing redesign #when routing #then taste-skill preservation rules are honored", async () => {
+		const readme = await Bun.file(designReadmeUrl3).text()
+		const step3 = sectionBetween(readme, "### Step 3", "### Step 4")
+
+		expect(step3).toContain("never silently")
+		expect(step3).toContain("URL slugs")
+	})
+
+	test("#given the vendored taste-skill upstream #when synced #then the v2 markers the router relies on still exist", async () => {
+		const upstreamUrl = new URL("./upstreams/taste-skill/skills/taste-skill/SKILL.md", import.meta.url)
+		if (!existsSync(fileURLToPath(upstreamUrl))) return
+		const taste = await Bun.file(upstreamUrl).text()
+
+		expect(taste).toContain("BRIEF INFERENCE")
+		expect(taste).toContain("DESIGN SYSTEM MAP")
+		expect(taste).toContain("FINAL PRE-FLIGHT CHECK")
+		expect(taste).toContain("Not dashboards")
 	})
 })
 
