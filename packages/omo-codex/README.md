@@ -42,6 +42,24 @@ To remove managed Codex Light state, run `npx lazycodex-ai uninstall`. The backw
 The Codex plugin bundle includes Context7 as a default MCP in its `.mcp.json`, using the hosted `https://mcp.context7.com/mcp` endpoint. The installer enables the `omo@sisyphuslabs` plugin MCP policy for Context7 while leaving any existing user-level `[mcp_servers.context7]` block untouched.
 The same plugin-scoped MCP manifest also bundles `grep_app`, `git_bash`, `lsp`, and `codegraph`. The ast-grep capability ships as the `ast-grep` skill and provisions `sg` into the Codex runtime. `git_bash` is enabled only on Windows by default. `codegraph` is enabled only when the installer can resolve a supported local Node runtime for CodeGraph; unsupported runtimes disable that MCP policy while keeping `omo@sisyphuslabs` enabled.
 
+### CodeGraph exclusions
+
+CodeGraph is skipped for project roots under default ephemeral/state locations: POSIX `/tmp`, POSIX `/private/tmp`, the current OS temp directory on every platform, and any path containing a `.omo` segment. Skipped projects do not run the `SessionStart` bootstrap worker and the MCP exposes an unavailable stub instead of starting CodeGraph.
+
+Add extra exclude-only roots with `codegraph.excluded_roots`:
+
+```jsonc
+{
+  "codegraph": {
+    "excluded_roots": ["~/scratch/codegraph", "relative-cache-root"]
+  }
+}
+```
+
+Entries may be absolute, `~`-relative, or relative to the configured home directory. OMO expands `~`, realpath-canonicalizes each configured root when possible, and compares descendants after platform-aware normalization. There is no include override.
+
+CodeGraph runs with `CODEGRAPH_NO_DAEMON=1`, `CODEGRAPH_NO_DOWNLOAD=1`, `CODEGRAPH_TELEMETRY=0`, and `DO_NOT_TRACK=1` in the managed child environment. OMO stores per-project CodeGraph data under the managed CodeGraph home and prunes dead project stores when their recorded source directory no longer exists.
+
 Native Windows installs discover Git Bash before the installer mutates `~/.codex/`. The installer checks `OMO_CODEX_GIT_BASH_PATH`, standard Git for Windows locations such as `C:\Program Files\Git\bin\bash.exe`, and then PATH. If Git Bash is still missing, it prints the install guidance shown here and stops without running `winget` or changing system dependencies:
 
 ```powershell
