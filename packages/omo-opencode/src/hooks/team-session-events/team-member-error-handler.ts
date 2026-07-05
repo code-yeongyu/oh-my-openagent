@@ -162,43 +162,45 @@ export function createTeamMemberErrorHandler(
         return
       }
 
-      await requeuePendingLiveDeliveries(
-        runtimeState.teamRunId,
-        runtimeMember.memberName,
-        pendingInjectedMessageIds,
-        config,
-      )
+      let memberWasMarkedErrored = false
+      let messageIdsToRequeue: readonly string[] = []
+      const nextRuntimeState = await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
+        ...currentRuntimeState,
+        members: currentRuntimeState.members.map((member) => {
+          if (member.name !== runtimeMember.memberName) {
+            return member
+          }
+          if (member.sessionId !== undefined && member.sessionId !== erroredSessionID) {
+            return member
+          }
 
-      // Stale-event guard: between the initial state load and reaching this point
-      // we slept inside shouldKeepPendingLiveDeliveries. A background-agent fallback
-      // retry (manager.handleSessionErrorEvent → tryFallbackRetry → onSessionCreated)
-      // may have replaced the member's sessionId in the meantime. Re-read state and
-      // skip the errored transition when the active sessionId is no longer the one
-      // this event refers to — otherwise we overwrite a freshly running replacement.
-      const latestRuntimeState = await loadRuntimeState(runtimeMember.teamRunId, config)
-      const latestMember = latestRuntimeState.members.find((member) => member.name === runtimeMember.memberName)
-      if (latestMember?.sessionId !== undefined && latestMember.sessionId !== erroredSessionID) {
+          memberWasMarkedErrored = true
+          messageIdsToRequeue = member.pendingInjectedMessageIds ?? []
+          return { ...member, status: "errored", pendingInjectedMessageIds: [] }
+        }),
+      }), config)
+
+      if (!memberWasMarkedErrored) {
+        const currentMember = nextRuntimeState.members.find((member) => member.name === runtimeMember.memberName)
         log("team member session error skipped: session already replaced by fallback retry", {
           event: "team-mode-member-error-stale-after-replacement",
-          teamRunId: runtimeState.teamRunId,
-          teamName: runtimeState.teamName,
+          teamRunId: nextRuntimeState.teamRunId,
+          teamName: nextRuntimeState.teamName,
           memberName: runtimeMember.memberName,
           erroredSessionID,
-          currentSessionID: latestMember.sessionId,
+          currentSessionID: currentMember?.sessionId,
         })
         return
       }
 
-      await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
-        ...currentRuntimeState,
-        members: currentRuntimeState.members.map((member) => (
-          member.name === runtimeMember.memberName
-            ? { ...member, status: "errored", pendingInjectedMessageIds: [] }
-            : member
-        )),
-      }), config)
+      await requeuePendingLiveDeliveries(
+        nextRuntimeState.teamRunId,
+        runtimeMember.memberName,
+        messageIdsToRequeue,
+        config,
+      )
 
-      const leaderMember = runtimeState.members.find((member) => member.agentType === "leader")
+      const leaderMember = nextRuntimeState.members.find((member) => member.agentType === "leader")
       if (leaderMember !== undefined && leaderMember.name !== runtimeMember.memberName) {
         const errorText = extractErrorText(event.properties)
         const errorBody = `Team member "${runtimeMember.memberName}" has entered an error state and will not complete its task.\nError: ${errorText}`
@@ -213,14 +215,14 @@ export function createTeamMemberErrorHandler(
               body: errorBody,
               timestamp: Date.now(),
             },
-            runtimeState.teamRunId,
+            nextRuntimeState.teamRunId,
             config,
-            { isLead: true, activeMembers: runtimeState.members.map((m) => m.name) },
+            { isLead: true, activeMembers: nextRuntimeState.members.map((m) => m.name) },
           )
         } catch (sendError) {
           log("team member error handler: failed to notify lead of member error", {
             event: "team-mode-member-error-notify-failed",
-            teamRunId: runtimeState.teamRunId,
+            teamRunId: nextRuntimeState.teamRunId,
             memberName: runtimeMember.memberName,
             error: sendError instanceof Error ? sendError.message : String(sendError),
           })
@@ -229,11 +231,11 @@ export function createTeamMemberErrorHandler(
 
       log("team member session errored", {
         event: "team-mode-member-errored",
-        teamRunId: runtimeState.teamRunId,
-        teamName: runtimeState.teamName,
+        teamRunId: nextRuntimeState.teamRunId,
+        teamName: nextRuntimeState.teamName,
         memberName: runtimeMember.memberName,
         sessionID: erroredSessionID,
-        runtimeStatus: runtimeState.status,
+        runtimeStatus: nextRuntimeState.status,
       })
     } catch (error) {
       log("team member error handler failed", {
