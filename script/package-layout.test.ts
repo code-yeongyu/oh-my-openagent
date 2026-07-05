@@ -130,7 +130,16 @@ function parsePackedPaths(output: string): Set<string> {
   return packedPaths
 }
 
-async function packDryRunPaths(): Promise<Set<string>> {
+// Every test here packs the same unmutated tree, and `bun pm pack --dry-run` walks the whole
+// multi-thousand-file payload on each call, so pack once and reuse the result.
+let cachedPackDryRunPaths: Promise<Set<string>> | undefined
+
+function packDryRunPaths(): Promise<Set<string>> {
+  cachedPackDryRunPaths ??= runPackDryRun()
+  return cachedPackDryRunPaths
+}
+
+async function runPackDryRun(): Promise<Set<string>> {
   const packProcess = Bun.spawn({
     cmd: ["bun", "pm", "pack", "--dry-run", "--ignore-scripts"],
     cwd: repositoryRoot,
