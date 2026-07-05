@@ -584,6 +584,11 @@ jobs:
 
           jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
 
+      # PAYLOAD SOURCE OF TRUTH: this step and "Build Codex plugin components" below produce
+      # every artifact in the published `files` payload. The npm publish steps run with
+      # --ignore-scripts, so they do NOT re-run prepublishOnly/prepack/prepare at pack time.
+      # If these explicit builds are ever removed or reordered, the publishes would ship a
+      # stale or empty dist. Keep them before every publish.
       - name: Build main package
         if: >-
           steps.check.outputs.skip != 'true' ||
@@ -629,9 +634,9 @@ jobs:
           NPM_CONFIG_PROVENANCE: true
         run: |
           if [ -n "$DIST_TAG" ]; then
-            npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
+            npm publish --ignore-scripts --access public --provenance --tag "$DIST_TAG" --loglevel verbose
           else
-            npm publish --access public --provenance --tag latest --loglevel verbose
+            npm publish --ignore-scripts --access public --provenance --tag latest --loglevel verbose
           fi
 
       - name: Publish oh-my-openagent
@@ -653,9 +658,9 @@ jobs:
           ' package.json > tmp.json && mv tmp.json package.json
 
           if [ -n "$DIST_TAG" ]; then
-            npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
+            npm publish --ignore-scripts --access public --provenance --tag "$DIST_TAG" --loglevel verbose
           else
-            npm publish --access public --provenance --tag latest --loglevel verbose
+            npm publish --ignore-scripts --access public --provenance --tag latest --loglevel verbose
           fi
 
       - name: Restore package.json
@@ -683,9 +688,9 @@ jobs:
           ' package.json > tmp.json && mv tmp.json package.json
 
           if [ -n "$DIST_TAG" ]; then
-            npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
+            npm publish --ignore-scripts --access public --provenance --tag "$DIST_TAG" --loglevel verbose
           else
-            npm publish --access public --provenance --tag latest --loglevel verbose
+            npm publish --ignore-scripts --access public --provenance --tag latest --loglevel verbose
           fi
 
       - name: Smoke test published lazycodex-ai
