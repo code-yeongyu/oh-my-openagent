@@ -2,6 +2,14 @@ import { describe, expect, test } from "bun:test"
 
 const frontendSkillPath = new URL("./skills/frontend/SKILL.md", import.meta.url)
 
+function tableRowFor(text: string, rowStart: string): string {
+	const row = text.split("\n").find((line) => line.startsWith(rowStart))
+	if (!row) {
+		throw new Error(`missing table row: ${rowStart}`)
+	}
+	return row
+}
+
 function sectionBetween(text: string, startMarker: string, endMarker: string): string {
 	const start = text.indexOf(startMarker)
 	if (start < 0) {
@@ -13,6 +21,37 @@ function sectionBetween(text: string, startMarker: string, endMarker: string): s
 	}
 	return text.slice(start, end)
 }
+
+describe("frontend skill taste-skill v2 routing contract", () => {
+	const designReadmeUrl = new URL("./skills/frontend/references/design/README.md", import.meta.url)
+	const indexUrl = new URL("./skills/frontend/references/design/_INDEX.md", import.meta.url)
+
+	test("#given an operational brief #when routing Layer A #then it routes to the official design-system map, not taste-skill marketing defaults", async () => {
+		const readme = await Bun.file(designReadmeUrl).text()
+		const step2 = sectionBetween(readme, "### Step 2", "### Step 3")
+
+		expect(step2).toContain("Brief → Design System Map")
+		expect(step2).toContain("official design system")
+		for (const system of ["Fluent", "Carbon", "GOV.UK"]) {
+			expect(step2).toContain(system)
+		}
+		expect(step2).not.toContain("`taste-skill` is the right default")
+	})
+
+	test("#given router descriptions of taste-skill #when compared with its v2 scope #then they describe the brief-inference marketing workflow", async () => {
+		const skillText = await Bun.file(frontendSkillPath).text()
+		const indexText = await Bun.file(indexUrl).text()
+
+		const skillRow = tableRowFor(skillText, "| `taste-skill.md` |")
+		expect(skillRow).toContain("Design Read")
+		expect(skillRow).toContain("pre-flight")
+		expect(skillRow.toLowerCase()).not.toContain("safe default")
+
+		const indexRow = tableRowFor(indexText, "| `taste-skill.md` |")
+		expect(indexRow).toContain("Design Read")
+		expect(indexRow.toLowerCase()).not.toContain("safe default")
+	})
+})
 
 describe("frontend skill concrete-reference contract", () => {
 	test("#given a provided visual reference #when routing implementation #then it becomes a pixel-fidelity design-system contract", async () => {
