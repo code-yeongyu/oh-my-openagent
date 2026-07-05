@@ -3,6 +3,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { resolveCallerTeamLead, shouldReuseCallerLeadSession } from "./resolve-caller-team-lead"
+import { setOverrideDisplayNames, _resetOverrideDisplayNamesForTesting } from "../../shared/agent-display-names"
 import type { TeamSpec } from "./types"
 
 function makeSpec(overrides: Partial<TeamSpec> = {}): TeamSpec {
@@ -88,6 +89,28 @@ describe("resolveCallerTeamLead", () => {
       displayName: "Oracle",
       isEligibleForTeamLead: false,
     })
+  })
+
+  test("returns an eligible sisyphus lead for custom displayName", () => {
+    // given
+    setOverrideDisplayNames({
+      sisyphus: { displayName: "My Custom Sisyphus" },
+    })
+    const rawAgentName = "My Custom Sisyphus"
+
+    try {
+      // when
+      const result = resolveCallerTeamLead(rawAgentName)
+
+      // then
+      expect(result).toEqual({
+        agentTypeId: "sisyphus",
+        displayName: "My Custom Sisyphus",
+        isEligibleForTeamLead: true,
+      })
+    } finally {
+      _resetOverrideDisplayNamesForTesting()
+    }
   })
 })
 

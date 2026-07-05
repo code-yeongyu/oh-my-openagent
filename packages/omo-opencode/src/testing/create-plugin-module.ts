@@ -19,6 +19,7 @@ import {
   type CompactionAutocontinueHook,
 } from "../plugin/session-compacting"
 import { installAgentSortShim, setAgentSortOrder } from "../shared/agent-sort-shim"
+import { setOverrideDisplayNames } from "../shared/agent-display-names"
 import {
   detectDuplicateOmoPlugin,
   detectExternalSkillPlugin,
@@ -60,6 +61,7 @@ export type PluginModuleDeps = {
   setLiveParentWakeRoutingDisabled: typeof setLiveParentWakeRoutingDisabled
   warmLiveServerProbe: typeof warmLiveServerProbe
   loadPluginConfig: typeof loadPluginConfig
+  setOverrideDisplayNames: typeof setOverrideDisplayNames
   recordPluginTelemetry: typeof recordPluginTelemetry
   initI18n: typeof initI18n
   initializeOpenClaw: typeof initializeOpenClaw
@@ -91,6 +93,7 @@ const defaultPluginModuleDeps: PluginModuleDeps = {
   setLiveParentWakeRoutingDisabled,
   warmLiveServerProbe,
   loadPluginConfig,
+  setOverrideDisplayNames,
   recordPluginTelemetry,
   initI18n,
   initializeOpenClaw,
@@ -131,6 +134,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     deps.injectServerAuthIntoClient(input.client)
 
     const pluginConfig = deps.loadPluginConfig(input.directory, input)
+    deps.setOverrideDisplayNames(pluginConfig.agents)
     try {
       deps.recordPluginTelemetry({ configEnabled: pluginConfig.telemetry })
     } catch (error) {
