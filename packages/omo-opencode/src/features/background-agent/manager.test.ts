@@ -445,7 +445,7 @@ describe("BackgroundManager tmux callback ordering", () => {
         parentSessionId: "ses_parent",
         parentMessageId: "msg_parent",
       })
-      await new Promise((resolve) => setTimeout(resolve, 20))
+      await waitUntil(() => events.includes("session.create") && events.includes("promptAsync"), 600)
 
       //#then
       expect(events).toContain("session.create")
@@ -3611,7 +3611,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       // when
       await manager.launch(input)
-      await new Promise(resolve => setTimeout(resolve, 50))
+      await waitUntil(() => createCalls.length >= 1, 600)
 
       // then
       expect(createCalls).toHaveLength(1)
@@ -3634,7 +3634,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       // when
       const task = await manager.launch(input)
-      await new Promise(resolve => setTimeout(resolve, 50))
+      await waitUntil(() => manager.getTask(task.id)?.status === "running", 600)
 
       // then
       const updatedTask = manager.getTask(task.id)
@@ -3662,7 +3662,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       const task = await manager.launch(input)
       const queuedAt = task.queuedAt
 
-      await new Promise(resolve => setTimeout(resolve, 50))
+      await waitUntil(() => manager.getTask(task.id)?.startedAt != null, 600)
 
       // then
       const updatedTask = manager.getTask(task.id)
@@ -3837,7 +3837,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       await manager.launch(input)
       const queuedTask = await manager.launch(input)
-      await new Promise(resolve => setTimeout(resolve, 50))
+      await waitUntil(() => manager.getTask(queuedTask.id) != null, 600)
       expect(manager.getTask(queuedTask.id)?.status).toBe("pending")
 
       // when
@@ -3887,7 +3887,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       }
 
       await manager.launch(input)
-      await new Promise(resolve => setTimeout(resolve, 50))
+      await waitUntil(() => createAttempts >= 1, 600)
       expect(createAttempts).toBe(1)
 
       // when
@@ -4372,6 +4372,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         type: "session.error",
         properties: { sessionID: internalTask.sessionId, info: { id: internalTask.sessionId } },
       })
+      // monitored: waits for async session.error processing; no single status observable to poll.
       await new Promise((resolve) => setTimeout(resolve, 100))
 
       await expectResolvesDefined(manager.launch(input))
@@ -4424,7 +4425,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       await manager.launch(input)
       const task2 = await manager.launch(input)
-      await new Promise(resolve => setTimeout(resolve, 50))
+      await waitUntil(() => manager.getTask(task2.id) != null, 600)
 
       // when
       const cancelled = manager.cancelPendingTask(task2.id)
@@ -4451,7 +4452,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       }
 
       const task = await manager.launch(input)
-      await new Promise(resolve => setTimeout(resolve, 50))
+      await waitUntil(() => manager.getTask(task.id)?.status === "running", 600)
 
       // when
       const cancelled = manager.cancelPendingTask(task.id)
@@ -4479,7 +4480,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       await manager.launch(input)
       const task2 = await manager.launch(input)
       const task3 = await manager.launch(input)
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await waitUntil(() => manager.getTask(task3.id) != null, 600)
 
       // when - cancel middle task
       const cancelledTask2 = manager.getTask(task2.id)
@@ -4585,7 +4586,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // when
       const task1 = await manager.launch(input1)
       const task2 = await manager.launch(input2)
-      await new Promise(resolve => setTimeout(resolve, 50))
+      await waitUntil(() => manager.getTask(task1.id)?.status === "running" && manager.getTask(task2.id)?.status === "running", 600)
 
       // then - both should be running despite limit of 1 (different keys)
       const updatedTask1 = manager.getTask(task1.id)
@@ -4612,7 +4613,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // when
       const task1 = await manager.launch(input)
       const task2 = await manager.launch(input)
-      await new Promise(resolve => setTimeout(resolve, 50))
+      await waitUntil(() => manager.getTask(task1.id)?.status === "running", 600)
 
       // then - same key should respect limit
       const updatedTask1 = manager.getTask(task1.id)
@@ -4649,7 +4650,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // when
       const task1 = await manager.launch(input1)
       const task2 = await manager.launch(input2)
-      await new Promise(resolve => setTimeout(resolve, 50))
+      await waitUntil(() => manager.getTask(task1.id)?.status === "running" && manager.getTask(task2.id)?.status === "running", 600)
 
       // then - different models should run in parallel
       const updatedTask1 = manager.getTask(task1.id)
@@ -4686,7 +4687,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // when
       const task1 = await manager.launch(input1)
       const task2 = await manager.launch(input2)
-      await new Promise(resolve => setTimeout(resolve, 50))
+      await waitUntil(() => manager.getTask(task1.id)?.status === "running", 600)
 
       // then
       const updatedTask1 = manager.getTask(task1.id)
@@ -4728,7 +4729,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // when
       const task1 = await manager.launch(input1)
       const task2 = await manager.launch(input2)
-      await new Promise(resolve => setTimeout(resolve, 50))
+      await waitUntil(() => manager.getTask(task1.id)?.status === "running", 600)
 
       // then
       const updatedTask1 = manager.getTask(task1.id)
@@ -4779,7 +4780,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       await manager.launch(input1)
       await manager.launch(input2)
       const task3 = await manager.launch(input3)
-      await new Promise(resolve => setTimeout(resolve, 50))
+      await waitUntil(() => manager.getTask(task3.id) != null, 600)
 
       // when
       const cancelled = await manager.cancelTask(task3.id, { abortSession: false, skipNotification: true })
@@ -4809,9 +4810,9 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         parentMessageId: "parent-message",
       }
 
-      await manager.launch(input)
+      const task1 = await manager.launch(input)
       const task2 = await manager.launch(input)
-      await new Promise(resolve => setTimeout(resolve, 50))
+      await waitUntil(() => manager.getTask(task1.id)?.status === "running", 600)
 
       // when
       const pendingTask = manager.getTask(task2.id)
@@ -4842,7 +4843,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       // when
       const task = await manager.launch(input)
-      await new Promise(resolve => setTimeout(resolve, 50))
+      await waitUntil(() => manager.getTask(task.id)?.status === "running", 600)
 
       // then
       const runningTask = manager.getTask(task.id)
@@ -4873,6 +4874,9 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       const queuedAt = task2.queuedAt!
 
+      // monitored: this test asserts real elapsed time between queuedAt and startedAt
+      // (both from real Date.now()) and manually completes a sibling task mid-flow, so
+      // its blind waits let real time pass and are kept intentionally.
       await new Promise(resolve => setTimeout(resolve, 50))
 
       const tasks = Array.from(getTaskMap(manager).values())
@@ -4882,6 +4886,9 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         getConcurrencyManager(manager).release(runningTask.concurrencyKey)
       }
 
+      // monitored: this assertion needs REAL time to elapse between queuedAt and
+      // startedAt (both from real Date.now()); a poll that resolves instantly can
+      // land them in the same millisecond, so a short blind wait is required here.
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // then
@@ -4923,7 +4930,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         expect(task.id).toMatch(/^bg_/)
       })
 
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await waitUntil(() => tasks.filter(t => manager.getTask(t.id)?.status === "running").length >= 5, 600)
 
       const updatedTasks = tasks.map(t => manager.getTask(t.id))
       const runningCount = updatedTasks.filter(t => t?.status === "running").length
@@ -6612,7 +6619,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     })
     await flushBackgroundNotifications()
     manager.handleEvent({ type: "session.idle", properties: { sessionID } })
-    await new Promise((resolve) => setTimeout(resolve, 10))
+    await waitUntil(() => task.status === "completed", 600)
 
     //#then
     expect(task.status).toBe("completed")
@@ -6661,7 +6668,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
       type: "session.idle",
       properties: { info: { id: sessionID } },
     })
-    await new Promise((resolve) => setTimeout(resolve, 10))
+    await waitUntil(() => task.status === "completed", 600)
 
     //#then
     expect(task.status).toBe("completed")
@@ -7230,7 +7237,7 @@ describe("BackgroundManager.handleEvent - early session.idle deferral", () => {
 
       //#then - idle should be deferred (not dropped), and task should eventually complete
       expect(task.status).toBe("running")
-      await new Promise((resolve) => setTimeout(resolve, 220))
+      await waitUntil(() => task.status === "completed", 600)
       expect(task.status).toBe("completed")
       expect(messagesCalls).toEqual([sessionID])
     } finally {
@@ -7280,7 +7287,7 @@ describe("BackgroundManager.handleEvent - early session.idle deferral", () => {
     manager.handleEvent({ type: "session.idle", properties: { sessionID } })
 
     //#then - should be processed immediately
-    await new Promise((resolve) => setTimeout(resolve, 10))
+    await waitUntil(() => task.status === "completed", 600)
     expect(task.status).toBe("completed")
 
     manager.shutdown()
@@ -7650,7 +7657,7 @@ describe("BackgroundManager.handleEvent - non-tool event lastUpdate", () => {
     manager.handleEvent({ type: "session.idle", properties: { sessionID } })
 
     //#then - task completes without refetching session.messages
-    await new Promise((resolve) => setTimeout(resolve, 10))
+    await waitUntil(() => task.status === "completed", 600)
     expect(task.status).toBe("completed")
     expect(messagesCallCount).toBe(0)
     expect(todoCallCount).toBe(1)
@@ -7700,7 +7707,7 @@ describe("BackgroundManager regression fixes - resume and aborted notification",
       parentSessionId: "parent-session-2",
       parentMessageId: "msg-2",
     })
-    await new Promise((resolve) => setTimeout(resolve, 60))
+    await waitUntil(() => getTaskMap(manager).has(task.id) && !completionTimers.has(task.id), 600)
 
     //#then
     expect(getTaskMap(manager).has(task.id)).toBe(true)
@@ -8097,7 +8104,7 @@ describe("BackgroundManager - tool permission spread order", () => {
       //#when
       await (cast<{ startTask: (item: { task: BackgroundTask; input: import("./types").LaunchInput }) => Promise<void> }>(manager))
         .startTask({ task, input })
-      await new Promise((resolve) => setTimeout(resolve, 50))
+      await waitUntil(() => promptCalls.length >= 2, 600)
 
       //#then
       expect(promptCalls).toHaveLength(2)
