@@ -41,7 +41,7 @@ describe("runCodegraphServe provisioning", () => {
 			{
 				args: ["serve", "--mcp"],
 				command: binPath,
-				env: { PATH: "/bin" },
+				env: { CODEGRAPH_NO_DAEMON: "1", PATH: "/bin" },
 			},
 		]);
 	});

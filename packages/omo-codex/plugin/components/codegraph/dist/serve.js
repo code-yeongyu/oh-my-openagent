@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 // src/serve.ts
-import { existsSync as existsSync5, realpathSync } from "node:fs";
-import { homedir as homedir6 } from "node:os";
-import { basename as basename3, join as join6, resolve as resolve2 } from "node:path";
+import { existsSync as existsSync5, realpathSync as realpathSync2 } from "node:fs";
+import { homedir as homedir7 } from "node:os";
+import { basename as basename3, join as join7, resolve as resolve3 } from "node:path";
 import {
   cwd as processCwd,
   env as processEnv,
@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { join } from "node:path";
 var CODEGRAPH_INSTALL_DIR_ENV = "CODEGRAPH_INSTALL_DIR";
+var CODEGRAPH_NO_DAEMON_ENV = "CODEGRAPH_NO_DAEMON";
 var CODEGRAPH_NO_DOWNLOAD_ENV = "CODEGRAPH_NO_DOWNLOAD";
 var CODEGRAPH_TELEMETRY_ENV = "CODEGRAPH_TELEMETRY";
 var DO_NOT_TRACK_ENV = "DO_NOT_TRACK";
@@ -50,6 +51,7 @@ var SAFE_CODEGRAPH_RUNTIME_ENV_KEYS = new Set([
   "CODEGRAPH_ALLOW_UNSAFE_NODE",
   "CODEGRAPH_BIN",
   "CODEGRAPH_FAKE_LOG",
+  "CODEGRAPH_NO_DAEMON",
   "CODEGRAPH_NODE_BIN",
   "OMO_CODEGRAPH_BIN",
   "OMO_CODEGRAPH_PROJECT_CWD",
@@ -59,6 +61,7 @@ function buildCodegraphEnv(options = {}) {
   const homeDir = options.homeDir ?? homedir();
   return {
     [CODEGRAPH_INSTALL_DIR_ENV]: join(homeDir, ".omo", "codegraph"),
+    [CODEGRAPH_NO_DAEMON_ENV]: "1",
     [CODEGRAPH_NO_DOWNLOAD_ENV]: "1",
     [CODEGRAPH_TELEMETRY_ENV]: "0",
     [DO_NOT_TRACK_ENV]: "1"
@@ -537,12 +540,79 @@ function resolveCodegraphCommand(options = {}) {
   };
 }
 
+// ../../../../utils/src/codegraph/exclusion.ts
+import { realpathSync } from "node:fs";
+import { homedir as homedir4 } from "node:os";
+import { isAbsolute, join as join5, resolve } from "node:path";
+var POSIX_DEFAULT_EXCLUDED_ROOTS = ["/tmp", "/private/tmp"];
+function expandHome(path, homeDir) {
+  if (path === "~")
+    return homeDir;
+  if (path.startsWith("~/") || path.startsWith("~\\"))
+    return join5(homeDir, path.slice(2));
+  return path;
+}
+function realpathIfPossible(path) {
+  try {
+    return realpathSync(path);
+  } catch (error) {
+    if (error instanceof Error)
+      return resolve(path);
+    throw error;
+  }
+}
+function resolveConfiguredRoot(path, homeDir) {
+  const expanded = expandHome(path, homeDir);
+  return realpathIfPossible(isAbsolute(expanded) ? expanded : join5(homeDir, expanded));
+}
+function normalizeForComparison(path, platform) {
+  const normalized = path.replaceAll("\\", "/").replace(/\/+$/, "");
+  return platform === "win32" ? normalized.toLowerCase() : normalized;
+}
+function pathIsWithin(path, root, platform) {
+  const candidate = normalizeForComparison(path, platform);
+  const normalizedRoot = normalizeForComparison(root, platform);
+  return candidate === normalizedRoot || candidate.startsWith(`${normalizedRoot}/`);
+}
+function hasOmoPathSegment(path) {
+  return path.split(/[\\/]+/).includes(".omo");
+}
+function defaultExcludedRoots(platform) {
+  return platform === "win32" ? [] : POSIX_DEFAULT_EXCLUDED_ROOTS;
+}
+function shouldExcludeCodegraphProject(workspace, options = {}) {
+  const platform = options.platform ?? process.platform;
+  const homeDir = options.homeDir ?? homedir4();
+  const resolvedWorkspace = realpathIfPossible(resolve(workspace));
+  if (hasOmoPathSegment(resolvedWorkspace)) {
+    return { excluded: true, matchedRoot: ".omo", reason: "omo-state" };
+  }
+  for (const root of defaultExcludedRoots(platform)) {
+    const resolvedRoot = realpathIfPossible(resolve(root));
+    if (pathIsWithin(resolvedWorkspace, resolvedRoot, platform)) {
+      return { excluded: true, matchedRoot: root, reason: "tmp-root" };
+    }
+  }
+  for (const root of options.excludedRoots ?? []) {
+    const trimmedRoot = root.trim();
+    if (trimmedRoot.length === 0)
+      continue;
+    const resolvedRoot = resolveConfiguredRoot(trimmedRoot, homeDir);
+    if (pathIsWithin(resolvedWorkspace, resolvedRoot, platform)) {
+      return { excluded: true, matchedRoot: root, reason: "custom-root" };
+    }
+  }
+  return { excluded: false };
+}
 // ../../shared/src/config-loader.ts
-import { homedir as homedir5 } from "node:os";
+import { homedir as homedir6 } from "node:os";
 
 // ../../../../utils/src/omo-config/loader.ts
-import { existsSync as existsSync4, readFileSync } from "node:fs";
-import { homedir as homedir4 } from "node:os";
+import { existsSync as existsSync4 } from "node:fs";
+import { homedir as homedir5 } from "node:os";
+
+// ../../../../utils/src/omo-config/body.ts
+import { readFileSync } from "node:fs";
 
 // ../../../../utils/src/deep-merge.ts
 var DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
@@ -1420,127 +1490,13 @@ var HARNESS_IDS = ["codex", "opencode", "omo"];
 var SETTING_HARNESS_SUPPORT = {
   "codegraph.auto_provision": HARNESS_IDS,
   "codegraph.enabled": HARNESS_IDS,
+  "codegraph.excluded_roots": ["codex"],
   "codegraph.install_dir": HARNESS_IDS,
   "codegraph.telemetry": HARNESS_IDS,
   "codegraph.watch_debounce_ms": ["opencode", "omo"]
 };
 
-// ../../../../utils/src/omo-config/env-overrides.ts
-var CODEGRAPH_ENV_KEYS = [
-  ["auto_provision", "AUTO_PROVISION", "boolean"],
-  ["enabled", "ENABLED", "boolean"],
-  ["install_dir", "INSTALL_DIR", "string"],
-  ["telemetry", "TELEMETRY", "boolean"],
-  ["watch_debounce_ms", "WATCH_DEBOUNCE_MS", "number"]
-];
-function parseBooleanEnv(value) {
-  const normalized = value.trim().toLowerCase();
-  if (["1", "true", "yes", "on"].includes(normalized))
-    return true;
-  if (["0", "false", "no", "off"].includes(normalized))
-    return false;
-  return null;
-}
-function parseEnvValue(value, kind) {
-  if (kind === "boolean")
-    return parseBooleanEnv(value);
-  if (kind === "number") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-  }
-  return value;
-}
-function setCodegraphSetting(config, key, value) {
-  switch (key) {
-    case "auto_provision":
-      if (typeof value === "boolean")
-        config.auto_provision = value;
-      return;
-    case "enabled":
-      if (typeof value === "boolean")
-        config.enabled = value;
-      return;
-    case "install_dir":
-      if (typeof value === "string")
-        config.install_dir = value;
-      return;
-    case "telemetry":
-      if (typeof value === "boolean")
-        config.telemetry = value;
-      return;
-    case "watch_debounce_ms":
-      if (typeof value === "number")
-        config.watch_debounce_ms = value;
-      return;
-  }
-}
-function buildEnvOverrides(harness, env, warnings, merge) {
-  let config = {};
-  for (const prefix of ["OMO", harness.toUpperCase()]) {
-    const codegraph = {};
-    for (const [settingKey, envSuffix, kind] of CODEGRAPH_ENV_KEYS) {
-      const envKey = `${prefix}_CODEGRAPH_${envSuffix}`;
-      const rawValue = env[envKey];
-      if (rawValue === undefined)
-        continue;
-      const parsed = parseEnvValue(rawValue, kind);
-      if (parsed === null) {
-        warnings.push(`${envKey} has invalid ${kind} value "${rawValue}"`);
-        continue;
-      }
-      setCodegraphSetting(codegraph, settingKey, parsed);
-    }
-    if (Object.keys(codegraph).length > 0) {
-      config = merge(config, { codegraph });
-    }
-  }
-  return config;
-}
-
-// ../../../../utils/src/omo-config/resolve.ts
-import { existsSync as existsSync3 } from "node:fs";
-import { dirname as dirname2, isAbsolute, join as join5, relative, resolve } from "node:path";
-function containsPath(parent, child) {
-  const pathToChild = relative(parent, child);
-  return pathToChild === "" || !pathToChild.startsWith("..") && !isAbsolute(pathToChild);
-}
-function findProjectConfigPathsNearestFirst(cwd, homeDir) {
-  const startDir = resolve(cwd);
-  const stopBeforeDir = containsPath(resolve(homeDir), startDir) ? resolve(homeDir) : null;
-  const paths = [];
-  let currentDir = startDir;
-  while (true) {
-    if (stopBeforeDir !== null && currentDir === stopBeforeDir)
-      break;
-    const configPath = join5(currentDir, ".omo", "config.jsonc");
-    if (existsSync3(configPath)) {
-      paths.push(configPath);
-    }
-    const parentDir = dirname2(currentDir);
-    if (parentDir === currentDir)
-      break;
-    currentDir = parentDir;
-  }
-  return paths;
-}
-function resolveOmoConfigPaths(options) {
-  const globalPath = join5(resolve(options.homeDir), ".omo", "config.jsonc");
-  const projectPathsFarthestFirst = findProjectConfigPathsNearestFirst(options.cwd, options.homeDir).reverse();
-  return [
-    { path: globalPath, scope: "global" },
-    ...projectPathsFarthestFirst.map((path) => ({ path, scope: "project" }))
-  ];
-}
-function toMissingSource(candidate) {
-  return {
-    exists: false,
-    loaded: false,
-    path: candidate.path,
-    scope: candidate.scope
-  };
-}
-
-// ../../../../utils/src/omo-config/loader.ts
+// ../../../../utils/src/omo-config/body.ts
 var BUILT_IN_DEFAULTS = {
   codegraph: {
     auto_provision: true,
@@ -1552,6 +1508,7 @@ var HARNESS_BLOCK_KEYS = HARNESS_IDS.map((harness) => `[${harness}]`);
 var CODEGRAPH_SETTING_KEYS = [
   "auto_provision",
   "enabled",
+  "excluded_roots",
   "install_dir",
   "telemetry",
   "watch_debounce_ms"
@@ -1590,7 +1547,7 @@ function mergeCodegraphConfig(base, override) {
   for (const key of CODEGRAPH_SETTING_KEYS) {
     if (!hasOwn(merged, key))
       continue;
-    setCodegraphSetting2(codegraph, key, merged[key]);
+    setCodegraphSetting(codegraph, key, merged[key]);
   }
   return Object.keys(codegraph).length > 0 ? codegraph : undefined;
 }
@@ -1607,6 +1564,9 @@ function isKnownHarnessBlockKey(key) {
   return HARNESS_BLOCK_KEYS.includes(key);
 }
 function validateCodegraphValue(key, value) {
+  if (key === "excluded_roots") {
+    return Array.isArray(value) && value.every((entry) => typeof entry === "string") ? null : "must be an array of strings";
+  }
   if (key === "install_dir")
     return typeof value === "string" ? null : "must be a string";
   if (key === "watch_debounce_ms") {
@@ -1614,7 +1574,7 @@ function validateCodegraphValue(key, value) {
   }
   return typeof value === "boolean" ? null : "must be a boolean";
 }
-function setCodegraphSetting2(config, key, value) {
+function setCodegraphSetting(config, key, value) {
   switch (key) {
     case "auto_provision":
       if (typeof value === "boolean")
@@ -1623,6 +1583,11 @@ function setCodegraphSetting2(config, key, value) {
     case "enabled":
       if (typeof value === "boolean")
         config.enabled = value;
+      return;
+    case "excluded_roots":
+      if (Array.isArray(value) && value.every((entry) => typeof entry === "string")) {
+        config.excluded_roots = value;
+      }
       return;
     case "install_dir":
       if (typeof value === "string")
@@ -1654,7 +1619,7 @@ function normalizeCodegraphSection(section, pathPrefix, warnings) {
       warnings.push(`${pathPrefix}.${key} ${error}`);
       continue;
     }
-    setCodegraphSetting2(codegraph, key, value);
+    setCodegraphSetting(codegraph, key, value);
   }
   return codegraph;
 }
@@ -1733,9 +1698,131 @@ function validateHarnessApplicability(config, harness) {
   }
   return warnings;
 }
+
+// ../../../../utils/src/omo-config/env-overrides.ts
+var CODEGRAPH_ENV_KEYS = [
+  ["auto_provision", "AUTO_PROVISION", "boolean"],
+  ["enabled", "ENABLED", "boolean"],
+  ["install_dir", "INSTALL_DIR", "string"],
+  ["telemetry", "TELEMETRY", "boolean"],
+  ["watch_debounce_ms", "WATCH_DEBOUNCE_MS", "number"]
+];
+function parseBooleanEnv(value) {
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized))
+    return true;
+  if (["0", "false", "no", "off"].includes(normalized))
+    return false;
+  return null;
+}
+function parseEnvValue(value, kind) {
+  if (kind === "boolean")
+    return parseBooleanEnv(value);
+  if (kind === "number") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  }
+  return value;
+}
+function setCodegraphSetting2(config, key, value) {
+  switch (key) {
+    case "auto_provision":
+      if (typeof value === "boolean")
+        config.auto_provision = value;
+      return;
+    case "enabled":
+      if (typeof value === "boolean")
+        config.enabled = value;
+      return;
+    case "excluded_roots":
+      if (Array.isArray(value) && value.every((entry) => typeof entry === "string")) {
+        config.excluded_roots = value;
+      }
+      return;
+    case "install_dir":
+      if (typeof value === "string")
+        config.install_dir = value;
+      return;
+    case "telemetry":
+      if (typeof value === "boolean")
+        config.telemetry = value;
+      return;
+    case "watch_debounce_ms":
+      if (typeof value === "number")
+        config.watch_debounce_ms = value;
+      return;
+  }
+}
+function buildEnvOverrides(harness, env, warnings, merge) {
+  let config = {};
+  for (const prefix of ["OMO", harness.toUpperCase()]) {
+    const codegraph = {};
+    for (const [settingKey, envSuffix, kind] of CODEGRAPH_ENV_KEYS) {
+      const envKey = `${prefix}_CODEGRAPH_${envSuffix}`;
+      const rawValue = env[envKey];
+      if (rawValue === undefined)
+        continue;
+      const parsed = parseEnvValue(rawValue, kind);
+      if (parsed === null) {
+        warnings.push(`${envKey} has invalid ${kind} value "${rawValue}"`);
+        continue;
+      }
+      setCodegraphSetting2(codegraph, settingKey, parsed);
+    }
+    if (Object.keys(codegraph).length > 0) {
+      config = merge(config, { codegraph });
+    }
+  }
+  return config;
+}
+
+// ../../../../utils/src/omo-config/resolve.ts
+import { existsSync as existsSync3 } from "node:fs";
+import { dirname as dirname2, isAbsolute as isAbsolute2, join as join6, relative, resolve as resolve2 } from "node:path";
+function containsPath(parent, child) {
+  const pathToChild = relative(parent, child);
+  return pathToChild === "" || !pathToChild.startsWith("..") && !isAbsolute2(pathToChild);
+}
+function findProjectConfigPathsNearestFirst(cwd, homeDir) {
+  const startDir = resolve2(cwd);
+  const stopBeforeDir = containsPath(resolve2(homeDir), startDir) ? resolve2(homeDir) : null;
+  const paths = [];
+  let currentDir = startDir;
+  while (true) {
+    if (stopBeforeDir !== null && currentDir === stopBeforeDir)
+      break;
+    const configPath = join6(currentDir, ".omo", "config.jsonc");
+    if (existsSync3(configPath)) {
+      paths.push(configPath);
+    }
+    const parentDir = dirname2(currentDir);
+    if (parentDir === currentDir)
+      break;
+    currentDir = parentDir;
+  }
+  return paths;
+}
+function resolveOmoConfigPaths(options) {
+  const globalPath = join6(resolve2(options.homeDir), ".omo", "config.jsonc");
+  const projectPathsFarthestFirst = findProjectConfigPathsNearestFirst(options.cwd, options.homeDir).reverse();
+  return [
+    { path: globalPath, scope: "global" },
+    ...projectPathsFarthestFirst.map((path) => ({ path, scope: "project" }))
+  ];
+}
+function toMissingSource(candidate) {
+  return {
+    exists: false,
+    loaded: false,
+    path: candidate.path,
+    scope: candidate.scope
+  };
+}
+
+// ../../../../utils/src/omo-config/loader.ts
 function loadOmoConfig(options) {
   const cwd = options.cwd ?? process.cwd();
-  const homeDir = options.homeDir ?? process.env["HOME"] ?? process.env["USERPROFILE"] ?? homedir4();
+  const homeDir = options.homeDir ?? process.env["HOME"] ?? process.env["USERPROFILE"] ?? homedir5();
   const env = options.env ?? process.env;
   let config = BUILT_IN_DEFAULTS;
   const sources = [];
@@ -1789,7 +1876,7 @@ function getCodexOmoConfig(options = {}) {
 }
 function resolveHomeDir(options) {
   const env = options.env ?? process.env;
-  return options.homeDir ?? env["HOME"] ?? env["USERPROFILE"] ?? homedir5();
+  return options.homeDir ?? env["HOME"] ?? env["USERPROFILE"] ?? homedir6();
 }
 
 // src/mcp-bridge.ts
@@ -2272,17 +2359,27 @@ var CODEGRAPH_SKIP_HINT = `CodeGraph MCP skipped: codegraph binary not found. In
 `;
 var CODEGRAPH_DISABLED_HINT = `CodeGraph MCP skipped: disabled by OMO SOT config. Set [codex].codegraph.enabled=true to enable it.
 `;
+var CODEGRAPH_EXCLUDED_HINT = `CodeGraph MCP skipped: project excluded by OMO CodeGraph policy.
+`;
 var CODEGRAPH_VERSION = "1.0.1";
 var PROJECT_CWD_ENV_KEYS = ["OMO_CODEGRAPH_PROJECT_CWD", SESSION_START_CWD_ENV, "PWD"];
 async function runCodegraphServe(options = {}) {
   const env = options.env ?? processEnv;
-  const homeDir = options.homeDir ?? homedir6();
+  const homeDir = options.homeDir ?? homedir7();
   const wrapperCwd = options.cwd ?? processCwd();
   const projectCwd = resolveProjectCwd(env, wrapperCwd);
   const config = options.config ?? getCodexOmoConfig({ cwd: projectCwd, env, homeDir });
   const codegraphConfig = config.codegraph ?? {};
   if (codegraphConfig.enabled === false) {
     return runUnavailableMcp(CODEGRAPH_DISABLED_HINT, options);
+  }
+  const excludedRoots = codegraphConfig.excluded_roots;
+  const exclusion = shouldExcludeCodegraphProject(projectCwd, {
+    homeDir,
+    ...excludedRoots === undefined ? {} : { excludedRoots }
+  });
+  if (exclusion.excluded) {
+    return runUnavailableMcp(CODEGRAPH_EXCLUDED_HINT, options);
   }
   const trustedInstallDir = config.trustedCodegraphInstallDir;
   const resolutionOptions = {
@@ -2338,10 +2435,10 @@ async function provisionMissingCodegraph(options) {
     return null;
   if (options.config.auto_provision === false)
     return null;
-  const installDir = options.trustedInstallDir ?? join6(options.homeDir, ".omo", "codegraph");
+  const installDir = options.trustedInstallDir ?? join7(options.homeDir, ".omo", "codegraph");
   const result = await options.ensureProvisioned({
     installDir,
-    lockDir: join6(installDir, ".locks"),
+    lockDir: join7(installDir, ".locks"),
     version: CODEGRAPH_VERSION
   });
   if (!result.provisioned || result.binPath === undefined)
@@ -2359,7 +2456,7 @@ function looksLikePath2(command) {
   return command.includes("/") || command.includes("\\");
 }
 function codegraphEnvForConfig(trustedInstallDir, homeDir, buildEnv) {
-  const env = buildEnv?.({ homeDir }) ?? buildCodegraphEnv({ homeDir });
+  const env = { ...buildEnv?.({ homeDir }) ?? buildCodegraphEnv({ homeDir }), [CODEGRAPH_NO_DAEMON_ENV]: "1" };
   return trustedInstallDir === undefined ? env : { ...env, CODEGRAPH_INSTALL_DIR: trustedInstallDir };
 }
 function resolveProjectCwd(env, fallback) {
@@ -2367,16 +2464,16 @@ function resolveProjectCwd(env, fallback) {
     const candidate = env[key]?.trim();
     if (candidate === undefined || candidate.length === 0)
       continue;
-    const resolved = resolve2(candidate);
+    const resolved = resolve3(candidate);
     if (existsSync5(resolved))
       return resolved;
   }
-  return resolve2(fallback);
+  return resolve3(fallback);
 }
 function provisionedBinFromInstallDir(installDir) {
   if (installDir === undefined)
     return null;
-  const candidate = join6(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
+  const candidate = join7(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
   return existsSync5(candidate) ? candidate : null;
 }
 async function runCodegraphServeCli() {
@@ -2396,7 +2493,7 @@ function isDirectInvocation(argvPath) {
   const moduleName = basename3(modulePath);
   if (moduleName !== "serve.js" && moduleName !== "serve.ts")
     return false;
-  return realpathSync(resolve2(argvPath)) === realpathSync(modulePath);
+  return realpathSync2(resolve3(argvPath)) === realpathSync2(modulePath);
 }
 export {
   runCodegraphServeCli,

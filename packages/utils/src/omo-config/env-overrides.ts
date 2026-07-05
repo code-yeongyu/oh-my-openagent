@@ -37,6 +37,11 @@ function setCodegraphSetting(config: MutableCodegraphConfig, key: CodegraphSetti
     case "enabled":
       if (typeof value === "boolean") config.enabled = value
       return
+    case "excluded_roots":
+      if (Array.isArray(value) && value.every((entry) => typeof entry === "string")) {
+        config.excluded_roots = value
+      }
+      return
     case "install_dir":
       if (typeof value === "string") config.install_dir = value
       return

@@ -5,6 +5,7 @@ export type HarnessId = (typeof HARNESS_IDS)[number]
 export interface CodegraphConfig {
   readonly auto_provision?: boolean
   readonly enabled?: boolean
+  readonly excluded_roots?: readonly string[]
   readonly install_dir?: string
   readonly telemetry?: boolean
   readonly watch_debounce_ms?: number
@@ -26,6 +27,7 @@ type SettingPath = `codegraph.${CodegraphSettingKey}`
 export const SETTING_HARNESS_SUPPORT: Record<SettingPath, readonly HarnessId[]> = {
   "codegraph.auto_provision": HARNESS_IDS,
   "codegraph.enabled": HARNESS_IDS,
+  "codegraph.excluded_roots": ["codex"],
   "codegraph.install_dir": HARNESS_IDS,
   "codegraph.telemetry": HARNESS_IDS,
   "codegraph.watch_debounce_ms": ["opencode", "omo"],
@@ -42,9 +44,10 @@ const HARNESS_BLOCK_KEYS: Record<string, HarnessId> = {
   "[opencode]": "opencode",
 }
 
-const CODEGRAPH_VALUE_TYPES: Record<CodegraphSettingKey, "boolean" | "number" | "string"> = {
+const CODEGRAPH_VALUE_TYPES: Record<CodegraphSettingKey, "boolean" | "number" | "string" | "string_array"> = {
   auto_provision: "boolean",
   enabled: "boolean",
+  excluded_roots: "string_array",
   install_dir: "string",
   telemetry: "boolean",
   watch_debounce_ms: "number",
@@ -77,6 +80,13 @@ function validateCodegraphSection(
 
     const settingKey = key as CodegraphSettingKey
     const expectedType = CODEGRAPH_VALUE_TYPES[settingKey]
+    if (expectedType === "string_array") {
+      if (!Array.isArray(value) || !value.every((entry) => typeof entry === "string")) {
+        errors.push(`${pathPrefix}.${key} must be an array of strings`)
+      }
+      continue
+    }
+
     if (typeof value !== expectedType) {
       errors.push(`${pathPrefix}.${key} must be a ${expectedType}`)
       continue

@@ -9,7 +9,7 @@ import type {
 import type { CodegraphWorkspacePreparation as SharedCodegraphWorkspacePreparation } from "../../../../../utils/src/codegraph/workspace.ts";
 import type { CodegraphConfig as SharedCodegraphConfig } from "../../../../../utils/src/omo-config.ts";
 
-export type SessionStartAction = "skipped-disabled" | "skipped-initialized" | "spawned";
+export type SessionStartAction = "skipped-disabled" | "skipped-excluded" | "skipped-initialized" | "spawned";
 export type PostToolUseAction = "emitted-guidance" | "skipped";
 export type WorkerAction = "failed" | "initialized" | "skipped-disabled" | "skipped-status" | "skipped-unavailable" | "skipped-unsupported-node" | "synced";
 

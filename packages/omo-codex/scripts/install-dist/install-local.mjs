@@ -12775,7 +12775,7 @@ function log(message, data) {
 }
 // packages/utils/src/omo-config.ts
 var HARNESS_IDS = ["codex", "opencode", "omo"];
-// packages/utils/src/omo-config/loader.ts
+// packages/utils/src/omo-config/body.ts
 var HARNESS_BLOCK_KEYS = HARNESS_IDS.map((harness) => `[${harness}]`);
 // packages/utils/src/ast-grep/sg-manifest.ts
 function normalizeRuntimePlatform(platform = process.platform) {
@@ -12924,6 +12924,7 @@ var SAFE_CODEGRAPH_RUNTIME_ENV_KEYS = new Set([
   "CODEGRAPH_ALLOW_UNSAFE_NODE",
   "CODEGRAPH_BIN",
   "CODEGRAPH_FAKE_LOG",
+  "CODEGRAPH_NO_DAEMON",
   "CODEGRAPH_NODE_BIN",
   "OMO_CODEGRAPH_BIN",
   "OMO_CODEGRAPH_PROJECT_CWD",
