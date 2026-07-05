@@ -1,6 +1,7 @@
 import type { Readable } from "node:stream";
 
 import type { CodexOmoConfig as SharedCodexOmoConfig } from "../../../shared/src/config-loader.ts";
+import type { SweepCodegraphZombiesOptions } from "../../../../../utils/src/codegraph/process-sweep.ts";
 import type { CodegraphProvisionResult as SharedCodegraphProvisionResult } from "../../../../../utils/src/codegraph/provision.ts";
 import type {
 	CodegraphCommandResolution,
@@ -82,6 +83,7 @@ export interface SessionStartHookOptions {
 	}) => Promise<boolean>;
 	readonly stdin?: Readable & { readonly isTTY?: boolean };
 	readonly stdout?: HookStdout;
+	readonly sweepZombies?: (options: SweepCodegraphZombiesOptions) => Promise<unknown> | unknown;
 	readonly workerCliPath?: string;
 }
 
