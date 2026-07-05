@@ -99,10 +99,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build vendored lsp-daemon package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-daemon
-
+      # The full install runs the root `prepare` (`bun run build`), whose
+      # `build:lsp-daemon` step already runs `npm ci && npm run build` in
+      # packages/lsp-daemon, so its node_modules and dist exist before the tests.
       - name: Run vendored lsp-daemon tests
         run: npm test
         working-directory: packages/lsp-daemon
