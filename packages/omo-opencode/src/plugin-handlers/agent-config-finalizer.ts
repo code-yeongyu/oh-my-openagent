@@ -4,6 +4,7 @@ import {
 } from "../features/claude-code-session-state";
 import { log } from "../shared";
 import { setDefaultAgentForSort } from "../shared/agent-sort-shim";
+import { setOverrideDisplayNames } from "../shared/agent-display-names";
 import { remapAgentKeysToDisplayNames } from "./agent-key-remapper";
 import { reorderAgentsByPriority } from "./agent-priority-order";
 import type { ApplyAgentConfigParams } from "./agent-config-types";
@@ -13,6 +14,12 @@ export function finalizeAgentConfig(
     configuredDefaultAgent: string | undefined;
   },
 ): Record<string, unknown> {
+  // Register override display names BEFORE remapping so reverse lookups
+  // (display name → config key) work throughout the plugin lifecycle.
+  setOverrideDisplayNames(
+    params.pluginConfig.agents as Record<string, { displayName?: string } | undefined> | undefined,
+  );
+
   if (params.config.agent) {
     params.config.agent = remapAgentKeysToDisplayNames(
       params.config.agent as Record<string, unknown>,
