@@ -1,0 +1,3 @@
+No violations in 3 file(s).
+
+exit_code=0
