@@ -2,7 +2,7 @@
 
 // components/codegraph/src/cli.ts
 import { realpathSync as realpathSync6 } from "node:fs";
-import { basename as basename5, resolve as resolve7 } from "node:path";
+import { basename as basename5, resolve as resolve6 } from "node:path";
 import { stderr as processStderr4 } from "node:process";
 import { fileURLToPath as fileURLToPath4 } from "node:url";
 
@@ -1944,7 +1944,7 @@ import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 
 // ../../utils/src/codegraph/process-match.ts
-import { resolve as resolve4 } from "node:path";
+import { posix, win32 } from "node:path";
 var SERVE_WRAPPER_SUFFIX = "/components/codegraph/dist/serve.js";
 var UPSTREAM_PACKAGE_SEGMENT = "/@colbymchenry/codegraph/";
 function parsePosixProcessTable(output) {
@@ -2061,9 +2061,12 @@ function normalizeRoots(roots, platform) {
     const trimmed = root.trim();
     if (trimmed.length === 0)
       continue;
-    normalized.add(normalizeForComparison2(resolve4(trimmed), platform));
+    normalized.add(normalizeForComparison2(resolvePathForPlatform(trimmed, platform), platform));
   }
   return [...normalized].sort((left, right) => right.length - left.length || left.localeCompare(right));
+}
+function resolvePathForPlatform(value, platform) {
+  return platform === "win32" ? win32.resolve(value) : posix.resolve(value);
 }
 function normalizeForComparison2(value, platform) {
   const normalized = value.replaceAll("\\", "/").replace(/\/+$/, "");
@@ -2179,7 +2182,7 @@ function processKillErrorMeansAlive(error) {
 // ../../utils/src/codegraph/process-roots.ts
 import { existsSync as existsSync6, readdirSync as readdirSync2, realpathSync as realpathSync4 } from "node:fs";
 import { homedir as homedir9 } from "node:os";
-import { join as join9, resolve as resolve5 } from "node:path";
+import { join as join9, resolve as resolve4 } from "node:path";
 function discoverCodegraphOwnedRoots(options = {}) {
   const env = options.env ?? process.env;
   const homeDir = options.homeDir ?? env["HOME"] ?? env["USERPROFILE"] ?? homedir9();
@@ -2213,7 +2216,7 @@ function readCodexPluginCacheRoots(codexHome) {
 function addRoot(roots, root) {
   if (root === undefined || root.trim().length === 0)
     return;
-  const resolved = resolve5(root);
+  const resolved = resolve4(root);
   roots.add(resolved);
   roots.add(realpathIfPossible2(resolved));
 }
@@ -2231,7 +2234,7 @@ function realpathIfPossible2(path) {
     return realpathSync4(path);
   } catch (error) {
     if (error instanceof Error)
-      return resolve5(path);
+      return resolve4(path);
     throw error;
   }
 }
@@ -2435,7 +2438,7 @@ async function removeEmptyDirectory(path) {
   }
 }
 function sleep(ms) {
-  return new Promise((resolve6) => setTimeout(resolve6, ms));
+  return new Promise((resolve5) => setTimeout(resolve5, ms));
 }
 async function defaultDownloader(asset, timeoutMs = DEFAULT_DOWNLOAD_TIMEOUT_MS) {
   const response = await fetch(asset.url, { signal: AbortSignal.timeout(timeoutMs) });
@@ -2955,7 +2958,7 @@ function defaultWorkerCliPath() {
 // components/codegraph/src/serve.ts
 import { existsSync as existsSync10, realpathSync as realpathSync5 } from "node:fs";
 import { homedir as homedir14 } from "node:os";
-import { basename as basename4, join as join14, resolve as resolve6 } from "node:path";
+import { basename as basename4, join as join14, resolve as resolve5 } from "node:path";
 import {
   cwd as processCwd3,
   env as processEnv3,
@@ -3545,11 +3548,11 @@ function resolveProjectCwd(env, fallback) {
     const candidate = env[key]?.trim();
     if (candidate === undefined || candidate.length === 0)
       continue;
-    const resolved = resolve6(candidate);
+    const resolved = resolve5(candidate);
     if (existsSync10(resolved))
       return resolved;
   }
-  return resolve6(fallback);
+  return resolve5(fallback);
 }
 function provisionedBinFromInstallDir3(installDir) {
   if (installDir === undefined)
@@ -3574,7 +3577,7 @@ function isDirectInvocation(argvPath) {
   const moduleName = basename4(modulePath);
   if (moduleName !== "serve.js" && moduleName !== "serve.ts")
     return false;
-  return realpathSync5(resolve6(argvPath)) === realpathSync5(modulePath);
+  return realpathSync5(resolve5(argvPath)) === realpathSync5(modulePath);
 }
 
 // components/codegraph/src/sweep-cli.ts
@@ -3684,7 +3687,7 @@ function isDirectInvocation2(argvPath) {
   const moduleName = basename5(modulePath);
   if (moduleName !== "cli.js" && moduleName !== "cli.ts")
     return false;
-  return realpathSync6(resolve7(argvPath)) === realpathSync6(modulePath);
+  return realpathSync6(resolve6(argvPath)) === realpathSync6(modulePath);
 }
 export {
   runCodegraphCli

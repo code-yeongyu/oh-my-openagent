@@ -32,6 +32,24 @@ describe("CodeGraph zombie process selection", () => {
     expect(zombies.map((processInfo) => processInfo.pid)).toEqual([301, 302])
   })
 
+  it("#given a Windows-shaped owned root #when selecting Windows zombies #then platform-specific root resolution is used", () => {
+    // given
+    const omoRoot = "C:\\Users\\runner\\.codex\\plugins\\cache\\sisyphuslabs\\omo\\4.15.1"
+    const processes = [
+      {
+        command: `${process.execPath} ${omoRoot}\\components\\codegraph\\dist\\serve.js`,
+        pid: 305,
+        ppid: 1,
+      },
+    ]
+
+    // when
+    const zombies = selectZombieCodegraphProcesses(processes, { ownedRoots: [omoRoot], platform: "win32" })
+
+    // then
+    expect(zombies.map((processInfo) => processInfo.pid)).toEqual([305])
+  })
+
   it("#given a sibling path shares an OMO root prefix #when selecting zombies #then the sibling is ignored", () => {
     // given
     const omoRoot = "/tmp/omo"
