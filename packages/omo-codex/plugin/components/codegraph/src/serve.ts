@@ -12,7 +12,11 @@ import {
 import type { Readable, Writable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
-import { buildCodegraphChildEnv, buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
+import {
+	CODEGRAPH_NO_DAEMON_ENV,
+	buildCodegraphChildEnv,
+	buildCodegraphEnv,
+} from "../../../../../utils/src/codegraph/env.ts";
 import {
 	buildCodegraphNodeSkipHint,
 	evaluateCodegraphNodeSupport,
@@ -27,6 +31,7 @@ import {
 	type CodegraphCommandResolution,
 	type ResolveCodegraphCommandOptions,
 } from "../../../../../utils/src/codegraph/resolve.ts";
+import { shouldExcludeCodegraphProject } from "../../../../../utils/src/codegraph/workspace.ts";
 import { getCodexOmoConfig, type CodexOmoConfig } from "../../../shared/src/config-loader.ts";
 import type { CodegraphConfig } from "./hook.js";
 import { runBridgedCodegraphProcess } from "./mcp-bridge.js";
@@ -78,6 +83,7 @@ const CODEGRAPH_SKIP_HINT =
 	"CodeGraph MCP skipped: codegraph binary not found. Install CodeGraph or set OMO_CODEGRAPH_BIN.\n";
 const CODEGRAPH_DISABLED_HINT =
 	"CodeGraph MCP skipped: disabled by OMO SOT config. Set [codex].codegraph.enabled=true to enable it.\n";
+const CODEGRAPH_EXCLUDED_HINT = "CodeGraph MCP skipped: project excluded by OMO CodeGraph policy.\n";
 const CODEGRAPH_VERSION = "1.0.1";
 const PROJECT_CWD_ENV_KEYS = ["OMO_CODEGRAPH_PROJECT_CWD", SESSION_START_CWD_ENV, "PWD"] as const;
 
@@ -90,6 +96,14 @@ export async function runCodegraphServe(options: RunCodegraphServeOptions = {}):
 	const codegraphConfig = config.codegraph ?? {};
 	if (codegraphConfig.enabled === false) {
 		return runUnavailableMcp(CODEGRAPH_DISABLED_HINT, options);
+	}
+	const excludedRoots = codegraphConfig.excluded_roots;
+	const exclusion = shouldExcludeCodegraphProject(projectCwd, {
+		homeDir,
+		...(excludedRoots === undefined ? {} : { excludedRoots }),
+	});
+	if (exclusion.excluded) {
+		return runUnavailableMcp(CODEGRAPH_EXCLUDED_HINT, options);
 	}
 
 	const trustedInstallDir = config.trustedCodegraphInstallDir;
@@ -183,7 +197,7 @@ function codegraphEnvForConfig(
 	homeDir: string,
 	buildEnv: ((options: { readonly homeDir: string }) => Record<string, string>) | undefined,
 ): Record<string, string> {
-	const env = buildEnv?.({ homeDir }) ?? buildCodegraphEnv({ homeDir });
+	const env = { ...(buildEnv?.({ homeDir }) ?? buildCodegraphEnv({ homeDir })), [CODEGRAPH_NO_DAEMON_ENV]: "1" };
 	return trustedInstallDir === undefined ? env : { ...env, CODEGRAPH_INSTALL_DIR: trustedInstallDir };
 }
 

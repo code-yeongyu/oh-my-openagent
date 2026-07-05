@@ -2,6 +2,7 @@ import { homedir } from "node:os"
 import { join } from "node:path"
 
 export const CODEGRAPH_INSTALL_DIR_ENV = "CODEGRAPH_INSTALL_DIR"
+export const CODEGRAPH_NO_DAEMON_ENV = "CODEGRAPH_NO_DAEMON"
 export const CODEGRAPH_NO_DOWNLOAD_ENV = "CODEGRAPH_NO_DOWNLOAD"
 export const CODEGRAPH_TELEMETRY_ENV = "CODEGRAPH_TELEMETRY"
 export const DO_NOT_TRACK_ENV = "DO_NOT_TRACK"
@@ -37,6 +38,7 @@ const SAFE_CODEGRAPH_RUNTIME_ENV_KEYS = new Set([
   "CODEGRAPH_ALLOW_UNSAFE_NODE",
   "CODEGRAPH_BIN",
   "CODEGRAPH_FAKE_LOG",
+  "CODEGRAPH_NO_DAEMON",
   "CODEGRAPH_NODE_BIN",
   "OMO_CODEGRAPH_BIN",
   "OMO_CODEGRAPH_PROJECT_CWD",
@@ -55,6 +57,7 @@ export interface BuildCodegraphChildEnvOptions {
 
 export type CodegraphEnv = {
   readonly [CODEGRAPH_INSTALL_DIR_ENV]: string
+  readonly [CODEGRAPH_NO_DAEMON_ENV]: "1"
   readonly [CODEGRAPH_NO_DOWNLOAD_ENV]: "1"
   readonly [CODEGRAPH_TELEMETRY_ENV]: "0"
   readonly [DO_NOT_TRACK_ENV]: "1"
@@ -65,6 +68,7 @@ export function buildCodegraphEnv(options: BuildCodegraphEnvOptions = {}): Codeg
 
   return {
     [CODEGRAPH_INSTALL_DIR_ENV]: join(homeDir, ".omo", "codegraph"),
+    [CODEGRAPH_NO_DAEMON_ENV]: "1",
     [CODEGRAPH_NO_DOWNLOAD_ENV]: "1",
     [CODEGRAPH_TELEMETRY_ENV]: "0",
     [DO_NOT_TRACK_ENV]: "1",
