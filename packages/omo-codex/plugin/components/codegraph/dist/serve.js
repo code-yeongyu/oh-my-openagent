@@ -542,7 +542,7 @@ function resolveCodegraphCommand(options = {}) {
 
 // ../../../../utils/src/codegraph/exclusion.ts
 import { realpathSync } from "node:fs";
-import { homedir as homedir4 } from "node:os";
+import { homedir as homedir4, tmpdir as osTmpdir } from "node:os";
 import { isAbsolute, join as join5, resolve } from "node:path";
 var POSIX_DEFAULT_EXCLUDED_ROOTS = ["/tmp", "/private/tmp"];
 function expandHome(path, homeDir) {
@@ -577,17 +577,18 @@ function pathIsWithin(path, root, platform) {
 function hasOmoPathSegment(path) {
   return path.split(/[\\/]+/).includes(".omo");
 }
-function defaultExcludedRoots(platform) {
-  return platform === "win32" ? [] : POSIX_DEFAULT_EXCLUDED_ROOTS;
+function defaultExcludedRoots(platform, tmpdir) {
+  return platform === "win32" ? [tmpdir] : [...POSIX_DEFAULT_EXCLUDED_ROOTS, tmpdir];
 }
 function shouldExcludeCodegraphProject(workspace, options = {}) {
   const platform = options.platform ?? process.platform;
   const homeDir = options.homeDir ?? homedir4();
+  const tmpdir = options.tmpdir ?? osTmpdir();
   const resolvedWorkspace = realpathIfPossible(resolve(workspace));
   if (hasOmoPathSegment(resolvedWorkspace)) {
     return { excluded: true, matchedRoot: ".omo", reason: "omo-state" };
   }
-  for (const root of defaultExcludedRoots(platform)) {
+  for (const root of defaultExcludedRoots(platform, tmpdir)) {
     const resolvedRoot = realpathIfPossible(resolve(root));
     if (pathIsWithin(resolvedWorkspace, resolvedRoot, platform)) {
       return { excluded: true, matchedRoot: root, reason: "tmp-root" };
