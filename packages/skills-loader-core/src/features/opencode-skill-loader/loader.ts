@@ -1,5 +1,5 @@
 import { join } from "path"
-import { homedir } from "os"
+import { getHomeDirectory } from "@oh-my-opencode/utils"
 import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills"
 import {
   findProjectAgentsSkillDirs,
@@ -59,7 +59,7 @@ export async function loadProjectAgentsSkills(directory?: string): Promise<Recor
   return skillsToCommandDefinitionRecord(deduplicateSkillsByName(allSkills.flat()))
 }
 
-export async function loadGlobalAgentsSkills(homeDirectory: string = homedir()): Promise<Record<string, CommandDefinition>> {
+export async function loadGlobalAgentsSkills(homeDirectory: string = getHomeDirectory()): Promise<Record<string, CommandDefinition>> {
   const agentsGlobalDir = join(homeDirectory, ".agents", "skills")
   const skills = await loadSkillsFromDir({ skillsDir: agentsGlobalDir, scope: "user" })
   return skillsToCommandDefinitionRecord(skills)
@@ -195,7 +195,7 @@ export async function discoverProjectAgentsSkills(directory?: string): Promise<L
   return deduplicateSkillsByName(allSkills.flat())
 }
 
-export async function discoverGlobalAgentsSkills(homeDirectory: string = homedir()): Promise<LoadedSkill[]> {
+export async function discoverGlobalAgentsSkills(homeDirectory: string = getHomeDirectory()): Promise<LoadedSkill[]> {
   const agentsGlobalDir = join(homeDirectory, ".agents", "skills")
   return loadSkillsFromDir({ skillsDir: agentsGlobalDir, scope: "user" })
 }
