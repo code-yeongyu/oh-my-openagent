@@ -91,7 +91,11 @@ jobs:
         with:
           bun-version: "1.3.12"
 
-      - uses: actions/cache@v5
+      # TRIAL: skip the bun cache on Windows, where the ~92MB restore measured
+      # 43-82s (variable) — comparable to or worse than a cold install. The
+      # matrix run measures cold Windows install vs the restore+warm-install path.
+      - if: runner.os != 'Windows'
+        uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
@@ -139,7 +143,11 @@ jobs:
         with:
           bun-version: "1.3.12"
 
-      - uses: actions/cache@v5
+      # TRIAL: skip the bun cache on Windows, where the ~92MB restore measured
+      # 43-82s (variable) — comparable to or worse than a cold install. The
+      # matrix run measures cold Windows install vs the restore+warm-install path.
+      - if: runner.os != 'Windows'
+        uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
@@ -179,7 +187,11 @@ jobs:
         with:
           bun-version: "1.3.12"
 
-      - uses: actions/cache@v5
+      # TRIAL: skip the bun cache on Windows, where the ~92MB restore measured
+      # 43-82s (variable) — comparable to or worse than a cold install. The
+      # matrix run measures cold Windows install vs the restore+warm-install path.
+      - if: runner.os != 'Windows'
+        uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
@@ -220,7 +232,11 @@ jobs:
         with:
           bun-version: "1.3.12"
 
-      - uses: actions/cache@v5
+      # TRIAL: skip the bun cache on Windows, where the ~92MB restore measured
+      # 43-82s (variable) — comparable to or worse than a cold install. The
+      # matrix run measures cold Windows install vs the restore+warm-install path.
+      - if: runner.os != 'Windows'
+        uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
@@ -320,7 +336,11 @@ jobs:
         with:
           bun-version: "1.3.12"
 
-      - uses: actions/cache@v5
+      # TRIAL: skip the bun cache on Windows, where the ~92MB restore measured
+      # 43-82s (variable) — comparable to or worse than a cold install. The
+      # matrix run measures cold Windows install vs the restore+warm-install path.
+      - if: runner.os != 'Windows'
+        uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
@@ -367,7 +387,11 @@ jobs:
         with:
           bun-version: "1.3.12"
 
-      - uses: actions/cache@v5
+      # TRIAL: skip the bun cache on Windows, where the ~92MB restore measured
+      # 43-82s (variable) — comparable to or worse than a cold install. The
+      # matrix run measures cold Windows install vs the restore+warm-install path.
+      - if: runner.os != 'Windows'
+        uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
