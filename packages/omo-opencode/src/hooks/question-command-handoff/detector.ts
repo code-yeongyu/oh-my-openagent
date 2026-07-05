@@ -1,4 +1,6 @@
-import { NEGATION_MARKERS, SLASH_COMMAND_TOKEN_REGEX } from "./constants"
+import { NEGATION_PATTERNS, SLASH_COMMAND_TOKEN_REGEX } from "./constants"
+
+const CURLY_APOSTROPHE_REGEX = /[‘’ʼ]/g
 
 export interface AnsweredQuestionOption {
   label: string
@@ -18,7 +20,8 @@ export interface ResolveAnsweredCommandArgs {
 }
 
 function containsNegationMarker(text: string): boolean {
-  return NEGATION_MARKERS.some((marker) => text.includes(marker))
+  const normalized = text.replace(CURLY_APOSTROPHE_REGEX, "'")
+  return NEGATION_PATTERNS.some((pattern) => pattern.test(normalized))
 }
 
 // Resolves the registered command a single-question, single-choice answer

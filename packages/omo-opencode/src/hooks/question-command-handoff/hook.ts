@@ -121,8 +121,10 @@ export function createQuestionCommandHandoffHook(
       })
       if (!commandName) return
 
-      const dedupeKey = `${input.sessionID}:${input.callID || answers[0]?.[0] || ""}`
-      if (!markProcessed(dedupeKey)) return
+      // Answer labels are not a per-call identity, so dedupe only on real
+      // call IDs. Without one, the prompt-async-gate's semantic dedupe still
+      // collapses duplicate events that would dispatch the same command.
+      if (input.callID && !markProcessed(`${input.sessionID}:${input.callID}`)) return
 
       const result = await dispatch({
         mode: "async",

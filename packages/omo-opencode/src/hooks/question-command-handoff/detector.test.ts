@@ -160,6 +160,72 @@ describe("resolveAnsweredCommandReference", () => {
     expect(resolved).toBeNull()
   })
 
+  test("returns null when the declining option uses a curly apostrophe", () => {
+    //#given a negated option written with U+2019 instead of an ASCII apostrophe
+    const questions: AnsweredQuestion[] = [
+      {
+        question: "Continue?",
+        options: [
+          { label: "Hold off", description: "Don’t run /start-work yet" },
+        ],
+      },
+    ]
+
+    //#when
+    const resolved = resolveAnsweredCommandReference({
+      questions,
+      answers: [["Hold off"]],
+      knownCommandNames,
+    })
+
+    //#then
+    expect(resolved).toBeNull()
+  })
+
+  test("does not treat a negation marker inside a larger word as a decline", () => {
+    //#given "collateral" contains the marker "later" as a substring
+    const questions: AnsweredQuestion[] = [
+      {
+        question: "Continue?",
+        options: [
+          { label: "Go", description: "Review the collateral docs and run /start-work" },
+        ],
+      },
+    ]
+
+    //#when
+    const resolved = resolveAnsweredCommandReference({
+      questions,
+      answers: [["Go"]],
+      knownCommandNames,
+    })
+
+    //#then
+    expect(resolved).toBe("start-work")
+  })
+
+  test("ignores a registered command name inside a URL path", () => {
+    //#given a URL whose path segment matches a registered command
+    const questions: AnsweredQuestion[] = [
+      {
+        question: "Docs?",
+        options: [
+          { label: "Read", description: "See https://example.com/start-work for details" },
+        ],
+      },
+    ]
+
+    //#when
+    const resolved = resolveAnsweredCommandReference({
+      questions,
+      answers: [["Read"]],
+      knownCommandNames,
+    })
+
+    //#then
+    expect(resolved).toBeNull()
+  })
+
   test("returns the first registered command when several are referenced", () => {
     //#given
     const questions: AnsweredQuestion[] = [

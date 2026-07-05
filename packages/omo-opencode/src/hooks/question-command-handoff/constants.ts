@@ -19,4 +19,11 @@ export const NEGATION_MARKERS = [
   "later",
 ]
 
-export const SLASH_COMMAND_TOKEN_REGEX = /\/([a-z0-9:_-]+)/gi
+// Whole-word matches only, so "later" never fires inside "collateral".
+export const NEGATION_PATTERNS: ReadonlyArray<RegExp> = NEGATION_MARKERS.map(
+  (marker) => new RegExp(`(?<![a-z0-9'])${marker}(?![a-z0-9'])`),
+)
+
+// The lookbehind rejects slashes glued to URL/path text such as
+// "https://example.com/start-work" or "path.to/start-work".
+export const SLASH_COMMAND_TOKEN_REGEX = /(?<![a-z0-9./])\/([a-z0-9:_-]+)/gi

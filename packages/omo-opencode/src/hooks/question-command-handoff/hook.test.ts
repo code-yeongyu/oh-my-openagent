@@ -101,6 +101,26 @@ describe("createQuestionCommandHandoffHook", () => {
     expect(dispatched).toHaveLength(1)
   })
 
+  test("dispatches separate same-label answers when call IDs are missing", async () => {
+    //#given two distinct question tool calls that both lack a callID and
+    // happen to select the same visible label
+    const { hook, dispatched } = createHookHarness()
+    const input = {
+      tool: "question",
+      sessionID: "ses_no_call_id",
+      args: questionArgs,
+    }
+    const output = createAnsweredOutput("Start Work")
+
+    //#when
+    await hook["tool.execute.after"](input, output)
+    await hook["tool.execute.after"](input, createAnsweredOutput("Start Work"))
+
+    //#then both legitimate selections dispatch; duplicate-event collapse is
+    // the prompt-async-gate's semantic dedupe responsibility here
+    expect(dispatched).toHaveLength(2)
+  })
+
   test("does not dispatch for answers given to non-handoff agents", async () => {
     //#given a sisyphus session asking its own plan-selection question
     const { hook, dispatched } = createHookHarness({ agent: "sisyphus" })

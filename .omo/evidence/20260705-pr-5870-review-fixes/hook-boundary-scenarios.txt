@@ -1,0 +1,6 @@
+PASS  A: same callID observed twice collapses to one dispatch  dispatched=["/start-work"]
+PASS  B (P1 fix): two missing-callID answers with same label BOTH dispatch  dispatched=["/start-work","/start-work"]
+PASS  C (P2 fix): curly-apostrophe negation suppresses dispatch  dispatched=[]
+PASS  D (P2 fix): command name inside URL does not dispatch  dispatched=[]
+PASS  E (P2 fix): 'later' inside 'collateral' no longer suppresses  dispatched=["/start-work"]
+All 5 hook-boundary scenarios passed
