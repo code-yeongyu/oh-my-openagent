@@ -139,7 +139,11 @@ jobs:
         with:
           bun-version: "1.3.12"
 
-      - uses: actions/cache@v5
+      # Skip the bun cache on Windows: its restore (~60-80s) costs more than a
+      # cold `--ignore-scripts` install (~20s). Keep it on Linux/macOS where the
+      # restore is cheap. The test job (full install) keeps the cache everywhere.
+      - if: runner.os != 'Windows'
+        uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
@@ -179,7 +183,11 @@ jobs:
         with:
           bun-version: "1.3.12"
 
-      - uses: actions/cache@v5
+      # Skip the bun cache on Windows: its restore (~60-80s) costs more than a
+      # cold `--ignore-scripts` install (~20s). Keep it on Linux/macOS where the
+      # restore is cheap. The test job (full install) keeps the cache everywhere.
+      - if: runner.os != 'Windows'
+        uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
@@ -220,7 +228,11 @@ jobs:
         with:
           bun-version: "1.3.12"
 
-      - uses: actions/cache@v5
+      # Skip the bun cache on Windows: its restore (~60-80s) costs more than a
+      # cold `--ignore-scripts` install (~20s). Keep it on Linux/macOS where the
+      # restore is cheap. The test job (full install) keeps the cache everywhere.
+      - if: runner.os != 'Windows'
+        uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
@@ -320,7 +332,11 @@ jobs:
         with:
           bun-version: "1.3.12"
 
-      - uses: actions/cache@v5
+      # Skip the bun cache on Windows: its restore (~60-80s) costs more than a
+      # cold `--ignore-scripts` install (~20s). Keep it on Linux/macOS where the
+      # restore is cheap. The test job (full install) keeps the cache everywhere.
+      - if: runner.os != 'Windows'
+        uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
@@ -367,7 +383,11 @@ jobs:
         with:
           bun-version: "1.3.12"
 
-      - uses: actions/cache@v5
+      # Skip the bun cache on Windows: its restore (~60-80s) costs more than a
+      # cold `--ignore-scripts` install (~20s). Keep it on Linux/macOS where the
+      # restore is cheap. The test job (full install) keeps the cache everywhere.
+      - if: runner.os != 'Windows'
+        uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
