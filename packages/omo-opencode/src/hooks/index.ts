@@ -50,6 +50,7 @@ export { createAtlasHook } from "./atlas";
 export { createTeamToolGating } from "./team-tool-gating"
 export { createDelegateTaskRetryHook } from "./delegate-task-retry";
 export { createQuestionLabelTruncatorHook } from "./question-label-truncator";
+export { createQuestionCommandHandoffHook } from "./question-command-handoff";
 export { createStopContinuationGuardHook, type StopContinuationGuard } from "./stop-continuation-guard";
 export { createCompactionContextInjector } from "./compaction-context-injector";
 export { createCompactionTodoPreserverHook } from "./compaction-todo-preserver";
