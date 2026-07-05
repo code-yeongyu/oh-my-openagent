@@ -73,6 +73,28 @@ function createRuntimeStateWithPendingMessage(teamRunId: string, messageId: stri
   return runtimeState
 }
 
+function createRuntimeStateWithLeader(teamRunId: string, pendingInjectedMessageIds: string[] = []): RuntimeState {
+  return {
+    ...createRuntimeState(teamRunId),
+    members: [
+      {
+        name: "lead",
+        sessionId: "lead-session",
+        agentType: "leader",
+        status: "running",
+        pendingInjectedMessageIds: [],
+      },
+      {
+        name: "worker",
+        sessionId: "member-session",
+        agentType: "general-purpose",
+        status: "running",
+        pendingInjectedMessageIds,
+      },
+    ],
+  }
+}
+
 async function seedRuntimeState(runtimeState: RuntimeState, config: TeamModeConfig): Promise<void> {
   await mkdir(path.join(config.base_dir ?? "", "runtime", runtimeState.teamRunId), { recursive: true })
   await saveRuntimeState(runtimeState, config)
@@ -124,54 +146,53 @@ describe("createTeamMemberErrorHandler", () => {
     expect(runtimeState.members[0]?.status).toBe("errored")
   })
 
-  test("does NOT mark errored when a fallback-retry replaced the member sessionId during the settle window (#4420)", async () => {
-    // given — member runs as sessionId="member-session". While the handler is
-    // sleeping inside the active-session settle, a background-agent fallback
-    // retry spawns a replacement session and rewrites runtime state to
-    // sessionId="replacement-session", status="running". The handler must
-    // detect the replacement and skip the errored transition, otherwise the
-    // member is stuck "errored" while a fresh session is actively running.
+  test("#given fallback retry replaces a member sessionId #when stale session.error settles #then replacement stays running without a member_error announcement", async () => {
+    // given
     const baseDir = await createTemporaryBaseDir()
     const config = createConfig(baseDir)
     const teamRunId = randomUUID()
-    await seedRuntimeState(createRuntimeState(teamRunId), config)
+    const messageId = randomUUID()
+    await seedRuntimeState(createRuntimeStateWithLeader(teamRunId, [messageId]), config)
+    await seedReservedMessage(teamRunId, config, messageId)
     registerTeamSession("member-session", { teamRunId, memberName: "worker", role: "member" })
     const stubClient = {
       session: {
-        // Returning an empty status map keeps isSessionActive falsy so the
-        // handler treats the errored session as dead and proceeds past the
-        // active-session settle (mirroring the real "session torn down by
-        // tryFallbackRetry abortWithTimeout" flow).
-        status: async () => ({}) as Record<string, { type: string }>,
+        status: async () => {
+          await transitionRuntimeState(teamRunId, (state) => ({
+            ...state,
+            members: state.members.map((member) => (
+              member.name === "worker"
+                ? { ...member, sessionId: "replacement-session", status: "running" as const }
+                : member
+            )),
+          }), config)
+          return {}
+        },
       },
     }
-    const handler = createTeamMemberErrorHandler(config, { client: stubClient, settleMs: 300 })
+    const handler = createTeamMemberErrorHandler(config, { client: stubClient, settleMs: 0 })
 
-    // when — fire session.error AND, mid-flight, simulate the background-agent
-    // fallback retry's onSessionCreated swap.
-    const handlerPromise = handler({
+    // when
+    await handler({
       event: {
         type: "session.error",
         properties: { sessionID: "member-session", error: new Error("rate limit") },
       },
     })
 
-    await new Promise((resolve) => setTimeout(resolve, 100))
-    await transitionRuntimeState(teamRunId, (state) => ({
-      ...state,
-      members: state.members.map((member) => (
-        member.name === "worker"
-          ? { ...member, sessionId: "replacement-session", status: "running" as const }
-          : member
-      )),
-    }), config)
-
-    await handlerPromise
-
-    // then — replacement runs untouched.
+    // then
     const finalState = await loadRuntimeState(teamRunId, config)
-    expect(finalState.members[0]?.sessionId).toBe("replacement-session")
-    expect(finalState.members[0]?.status).toBe("running")
+    const finalWorker = finalState.members.find((member) => member.name === "worker")
+    expect(finalWorker?.sessionId).toBe("replacement-session")
+    expect(finalWorker?.status).toBe("running")
+    expect(finalWorker?.pendingInjectedMessageIds).toEqual([messageId])
+
+    const { listUnreadMessages } = await import("../../features/team-mode/team-mailbox/inbox")
+    expect(await listUnreadMessages(teamRunId, "lead", config)).toEqual([])
+
+    const workerInboxEntries = await readdir(getInboxDir(resolveBaseDir(config), teamRunId, "worker"))
+    expect(workerInboxEntries).toContain(`.delivering-${messageId}.json`)
+    expect(workerInboxEntries).not.toContain(`${messageId}.json`)
   })
 
   test("marks the member errored during the spawn race when the registry tracks the fresh session before disk state persists it", async () => {
