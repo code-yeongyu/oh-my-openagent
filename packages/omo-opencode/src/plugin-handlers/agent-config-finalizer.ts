@@ -18,12 +18,12 @@ export function finalizeAgentConfig(
   // Canonicalize legacy keys in override configs (e.g. "omo" -> "sisyphus")
   // so that override maps match downstream canonicalized keys.
   if (params.pluginConfig.agents) {
-    const migratedAgents: Record<string, any> = {}
+    const migratedAgents: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(params.pluginConfig.agents)) {
       const canonicalKey = AGENT_NAME_MAP[key.toLowerCase()] ?? AGENT_NAME_MAP[key] ?? key
       migratedAgents[canonicalKey] = value
     }
-    params.pluginConfig.agents = migratedAgents as any
+    params.pluginConfig.agents = migratedAgents as typeof params.pluginConfig.agents
   }
 
   // Register override display names BEFORE remapping so reverse lookups
