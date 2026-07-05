@@ -310,6 +310,19 @@ describe("reverse override lookup (setOverrideDisplayNames)", () => {
     // uppercase config key should still resolve to override name
     expect(normalizeAgentForPrompt("Atlas")).toBe("アトラス")
   })
+
+  it("resolves legacy config keys in overrides to canonical config keys", () => {
+    // given override with legacy key "omo"
+    setOverrideDisplayNames({ omo: { displayName: "总指挥" } })
+
+    // then getAgentConfigKey resolves "总指挥" to "sisyphus"
+    expect(getAgentConfigKey("总指挥")).toBe("sisyphus")
+
+    // and normalizeAgentForPrompt resolves legacy key "omo" to override display name "总指挥"
+    expect(normalizeAgentForPrompt("omo")).toBe("总指挥")
+    expect(normalizeAgentForPrompt("sisyphus")).toBe("总指挥")
+    expect(normalizeAgentForPromptKey("总指挥")).toBe("sisyphus")
+  })
 })
 
 describe("getAgentListDisplayName", () => {

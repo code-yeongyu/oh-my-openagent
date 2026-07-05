@@ -79,4 +79,28 @@ describe("finalizeAgentConfig", () => {
     // then returns lowercased unknown (not a config key)
     expect(getAgentConfigKey("总指挥")).toBe("总指挥");
   });
+
+  test("normalizes legacy agent keys in overrides when finalizing config", () => {
+    // given plugin config with a legacy agent override key
+    const pluginConfig = createPluginConfig();
+    pluginConfig.agents = {
+      omo: { displayName: "总指挥" },
+    } as unknown as OhMyOpenCodeConfig["agents"];
+
+    const config: Record<string, unknown> = {
+      agent: {
+        sisyphus: { name: "sisyphus" },
+      },
+    };
+
+    // when finalizeAgentConfig runs
+    finalizeAgentConfig({
+      config,
+      pluginConfig,
+      configuredDefaultAgent: undefined,
+    });
+
+    // then getAgentConfigKey resolves "总指挥" back to canonical "sisyphus"
+    expect(getAgentConfigKey("总指挥")).toBe("sisyphus");
+  });
 });

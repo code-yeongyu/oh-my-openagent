@@ -9,7 +9,7 @@ import type { OhMyOpenCodeConfig } from "../config"
 import * as agentLoader from "../features/claude-code-agent-loader"
 import * as skillLoader from "../features/opencode-skill-loader"
 import type { LoadedSkill } from "../features/opencode-skill-loader"
-import { getAgentDisplayName, getAgentListDisplayName, _resetOverrideDisplayNamesForTesting } from "../shared/agent-display-names"
+import { getAgentDisplayName, getAgentListDisplayName, _resetOverrideDisplayNamesForTesting, normalizeAgentForPrompt } from "../shared/agent-display-names"
 import {
   isAgentRegistered,
   registerAgentName,
@@ -964,5 +964,27 @@ describe("applyAgentConfig builtin override protection", () => {
     // then applyDefaultAgent resolved the override name to sisyphus config key
     // and set default_agent to the override display name (not the hardcoded English)
     expect(config.default_agent).toBe("\u603B\u6307\u6325")
+  })
+
+  test("normalizes legacy agent keys in overrides when applying config", async () => {
+    // given plugin config where the agent override is set on legacy key "omo"
+    const pluginConfig = createPluginConfig()
+    pluginConfig.agents = {
+      omo: { displayName: "总指挥" },
+    } as unknown as OhMyOpenCodeConfig["agents"]
+    const config = createBaseConfig()
+    config.default_agent = "总指挥"
+
+    // when applyAgentConfig runs
+    await applyAgentConfig({
+      config,
+      pluginConfig,
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then the override resolves the display name back to canonical "sisyphus"
+    expect(config.default_agent).toBe("总指挥")
+    expect(normalizeAgentForPrompt("sisyphus")).toBe("总指挥")
   })
 })

@@ -1,3 +1,5 @@
+import { AGENT_NAME_MAP } from "./migration"
+
 /**
  * Agent config keys to display names mapping.
  * Config keys are lowercase (e.g., "sisyphus", "atlas").
@@ -51,10 +53,15 @@ export function getAgentDisplayName(
   configKey: string,
   overrides?: Record<string, { displayName?: string } | undefined>,
 ): string {
+  const canonConfigKey = AGENT_NAME_MAP[configKey.toLowerCase()] ?? AGENT_NAME_MAP[configKey] ?? configKey
   // Check per-agent displayName override first (i18n support)
   if (overrides) {
-    const override = overrides[configKey]
-      ?? Object.entries(overrides).find(([k]) => k.toLowerCase() === configKey.toLowerCase())?.[1]
+    const override = overrides[canonConfigKey]
+      ?? overrides[configKey]
+      ?? Object.entries(overrides).find(([k]) => {
+           const canonK = AGENT_NAME_MAP[k.toLowerCase()] ?? AGENT_NAME_MAP[k] ?? k
+           return canonK.toLowerCase() === canonConfigKey.toLowerCase()
+         })?.[1]
     if (override?.displayName) return override.displayName
   }
 
@@ -90,9 +97,10 @@ export function getAgentListDisplayName(
 
 /**
  * Module-level registries for override display names.
- * Populated by `setOverrideDisplayNames()` during `finalizeAgentConfig()`
- * so that reverse lookups (display name → config key) can resolve user-configured
- * custom display names (e.g., CJK i18n names) back to their canonical config keys.
+ * Must be populated before assembly-time reverse lookups (e.g. inside `applyAgentConfig()`
+ * before `assembleAgentConfig()`), with `finalizeAgentConfig()` serving as an idempotent safety net.
+ * This allows reverse lookups (display name → config key) to resolve user-configured custom
+ * display names (e.g., CJK i18n names) back to their canonical config keys.
  *
  * `overrideDisplayNames`: lowercased override display name → lowercase config key (reverse lookup)
  * `overrideConfigKeyToDisplayName`: lowercase config key → override display name (forward lookup for normalizeAgentForPrompt)
@@ -102,8 +110,9 @@ const overrideConfigKeyToDisplayName = new Map<string, string>()
 
 /**
  * Populate the override display-name registry from the plugin config's agent overrides.
- * Must be called during config finalization (before agent key remapping) so that
- * reverse lookups throughout the plugin lifecycle can resolve custom display names.
+ * Must be called before assembly-time reverse lookups (e.g. inside `applyAgentConfig()`),
+ * with `finalizeAgentConfig()` serving as an idempotent safety net.
+ * Override keys are resolved to canonical lowercase config keys using `AGENT_NAME_MAP`.
  *
  * @param agents - The `agents` section of the plugin config, keyed by config key.
  *   Each value may contain a `displayName` override.
@@ -116,9 +125,9 @@ export function setOverrideDisplayNames(
   if (!agents) return
   for (const [configKey, override] of Object.entries(agents)) {
     if (override?.displayName) {
-      const lowerKey = configKey.toLowerCase()
-      overrideDisplayNames.set(override.displayName.toLowerCase(), lowerKey)
-      overrideConfigKeyToDisplayName.set(lowerKey, override.displayName)
+      const canonicalKey = (AGENT_NAME_MAP[configKey.toLowerCase()] ?? AGENT_NAME_MAP[configKey] ?? configKey).toLowerCase()
+      overrideDisplayNames.set(override.displayName.toLowerCase(), canonicalKey)
+      overrideConfigKeyToDisplayName.set(canonicalKey, override.displayName)
     }
   }
 }
@@ -157,6 +166,8 @@ function resolveKnownAgentConfigKey(agentName: string): string | undefined {
   if (reversed !== undefined) return reversed
   const legacy = LEGACY_DISPLAY_NAMES[lower]
   if (legacy !== undefined) return legacy
+  const canonical = AGENT_NAME_MAP[lower]
+  if (canonical !== undefined) return canonical
   if (AGENT_DISPLAY_NAMES[lower] !== undefined) return lower
   return undefined
 }

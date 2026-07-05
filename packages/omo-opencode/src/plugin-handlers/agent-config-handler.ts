@@ -12,6 +12,17 @@ import type { ApplyAgentConfigParams } from "./agent-config-types";
 export async function applyAgentConfig(
   params: ApplyAgentConfigParams,
 ): Promise<Record<string, unknown>> {
+  // Canonicalize legacy keys in override configs (e.g. "omo" -> "sisyphus")
+  // so that override maps match downstream canonicalized keys.
+  if (params.pluginConfig.agents) {
+    const migratedAgents: Record<string, any> = {}
+    for (const [key, value] of Object.entries(params.pluginConfig.agents)) {
+      const canonicalKey = AGENT_NAME_MAP[key.toLowerCase()] ?? AGENT_NAME_MAP[key] ?? key
+      migratedAgents[canonicalKey] = value
+    }
+    params.pluginConfig.agents = migratedAgents as any
+  }
+
   // Register override display names BEFORE assembly so reverse lookups
   // (display name -> config key) work in applyDefaultAgent() and throughout.
   setOverrideDisplayNames(
