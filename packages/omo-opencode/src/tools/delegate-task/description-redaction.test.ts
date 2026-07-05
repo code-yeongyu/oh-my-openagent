@@ -109,7 +109,7 @@ describe("background task description redaction", () => {
     )
 
     // then
-    expect(launchedDescription).toBe("atlas background task")
+    expect(launchedDescription).toBe("Atlas - Plan Executor background task")
     expect(launchedDescription).not.toContain("SECRET_TOKEN")
   })
 

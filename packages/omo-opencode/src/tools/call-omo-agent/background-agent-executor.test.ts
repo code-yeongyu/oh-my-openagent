@@ -5,7 +5,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { executeBackgroundAgent } from "./background-agent-executor"
 
 describe("executeBackgroundAgent", () => {
-  const launchMock = mock(async (): Promise<{
+  const launchMock = mock(async (input?: { agent?: string }): Promise<{
     id: string
     sessionId: string | null
     description: string
@@ -15,7 +15,7 @@ describe("executeBackgroundAgent", () => {
     id: "test-task-id",
     sessionId: null,
     description: "Test task",
-    agent: "explore",
+    agent: input?.agent ?? "explore",
     status: "pending",
   }))
   const getTaskMock = mock()
@@ -72,5 +72,38 @@ describe("executeBackgroundAgent", () => {
     expect(result).not.toContain("to check.")
     expect(result).toContain("Do NOT call background_output now")
     expect(result).toContain("<system-reminder>")
+  })
+
+  test("passes normalized agent display name to manager.launch", async () => {
+    //#given - a subagent_type with a known display name
+    const argsWithKnownAgent = {
+      description: "Test background task",
+      prompt: "Test prompt",
+      subagent_type: "explore",
+    } as Parameters<typeof executeBackgroundAgent>[0]
+
+    launchMock.mockResolvedValueOnce({
+      id: "test-task-id",
+      sessionId: "ses-known-agent",
+      description: "Test task",
+      agent: "explore",
+      status: "pending",
+    })
+    getTaskMock.mockReturnValueOnce({
+      id: "test-task-id",
+      sessionId: "ses-known-agent",
+      description: "Test task",
+      agent: "explore",
+      status: "pending",
+    })
+
+    //#when
+    await executeBackgroundAgent(argsWithKnownAgent, testContext, mockManager, mockClient)
+
+    //#then - launch was called with the display name from AGENT_DISPLAY_NAMES, not the raw subagent_type with sort prefix
+    const launchCall = launchMock.mock.calls[0]
+    expect(launchCall?.[0]).toMatchObject({
+      agent: "explore",
+    })
   })
 })

@@ -310,7 +310,7 @@ describe("executeSync", () => {
     //#then
     expect(toolContext.metadata).toHaveBeenCalledWith({
       title: "metadata title",
-      metadata: { sessionId: "ses-metadata" },
+      metadata: { sessionId: "ses-metadata", agent: "explore" },
     })
   })
 

@@ -109,17 +109,17 @@ export async function executeSync(
 
     applySessionPromptParams(sessionID, model)
 
-    await Promise.resolve(
-      toolContext.metadata?.({
-        title: args.description,
-        metadata: { sessionId: sessionID },
-      })
-    )
-
     log(`[call_omo_agent] Sending prompt to session ${sessionID}`)
     log(`[call_omo_agent] Prompt text:`, args.prompt.substring(0, 100))
     const normalizedSubagentType = stripAgentListSortPrefix(args.subagent_type)
     const promptAgent = normalizeAgentForPrompt(normalizedSubagentType) ?? normalizedSubagentType
+
+    await Promise.resolve(
+      toolContext.metadata?.({
+        title: args.description,
+        metadata: { sessionId: sessionID, agent: promptAgent },
+      })
+    )
     const promptTools = buildSyncPromptTools(normalizedSubagentType)
     setSessionAgent(sessionID, promptAgent)
     setSessionTools(sessionID, promptTools)
