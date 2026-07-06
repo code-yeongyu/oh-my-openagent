@@ -3,7 +3,7 @@ bun test v1.3.14 (0d9b296a)
 packages/omo-config-core/src/loader/loader.test.ts:
 142 |       platform: "linux",
 143 |     })
-144 | 
+144 |
 145 |     // then
 146 |     expect(result.diagnostics).toEqual([])
 147 |     expect(result.config.task?.default_concurrency).toBe(5)
