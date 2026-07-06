@@ -187,6 +187,50 @@ Momus only says "OKAY" when:
 
 If REJECTED, Prometheus fixes issues and resubmits. No maximum retry limit.
 
+### Where to Spend a Scarce Premium Model
+
+If you have exactly one quota-limited premium model and every other model is effectively unlimited, spend the premium model on low-frequency advisory roles, not high-churn execution.
+
+Recommended order:
+
+1. **Metis** - Best default placement. Metis usually runs once before implementation and catches hidden intent, ambiguity, missing acceptance criteria, and bad plan shape before any code is written.
+2. **Oracle** - Best on-demand placement. Use the premium model for hard architecture/debug consultations that Sisyphus or Atlas explicitly ask for.
+3. **Momus** - Good when you regularly use high-accuracy planning. Momus can loop, so it may spend more quota than Metis, but each pass gates plan quality before implementation.
+4. **Prometheus** - Use only when the planning interview itself needs the premium model. It is lower frequency than Sisyphus, but a long interview can still burn quota.
+
+Avoid these placements for a scarce premium model:
+
+- **Sisyphus**: high-frequency orchestrator; every normal turn spends quota.
+- **Atlas**: executes plan orchestration and verification loops; still too chatty for scarce quota.
+- **Sisyphus-Junior / categories**: execution layer; the system is designed so workers do not need the rarest model.
+- **Explore / Librarian**: search and lookup work; speed and parallelism matter more than peak reasoning.
+
+Example "surgical premium model" config:
+
+```jsonc
+{
+  "agents": {
+    "metis": {
+      "model": "anthropic/claude-fable-5",
+      "variant": "max",
+      "fallback_models": [
+        { "model": "anthropic/claude-sonnet-4-6" },
+        { "model": "openai/gpt-5.5", "variant": "high" },
+        { "model": "kimi-for-coding/k2p5" }
+      ]
+    },
+    "oracle": {
+      "fallback_models": [
+        { "model": "anthropic/claude-fable-5", "variant": "max" },
+        { "model": "openai/gpt-5.5", "variant": "high" }
+      ]
+    }
+  }
+}
+```
+
+This keeps Fable 5 out of the high-frequency path while still making it available at the moments where one better judgment call can prevent many downstream edits.
+
 ---
 
 ## Execution: Atlas
