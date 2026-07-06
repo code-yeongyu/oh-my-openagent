@@ -2,6 +2,7 @@ export {
   RESIDENCY_STATES,
   TASK_STATUSES,
   createTaskRecord,
+  markRecordLostForReconciliation,
   messageability,
   transitionTaskRecord,
 } from "./state"

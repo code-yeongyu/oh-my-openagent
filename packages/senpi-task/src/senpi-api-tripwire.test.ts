@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { describe, expect, test } from "bun:test"
@@ -7,6 +7,7 @@ import {
   SessionManager,
   createAgentSession,
   createExtensionRuntime,
+  DefaultResourceLoader,
   type AgentSessionEvent,
   type CreateAgentSessionOptions,
   type ResourceLoader,
@@ -16,10 +17,6 @@ import {
 } from "@code-yeongyu/senpi"
 
 import { createMinimalSenpiResourceLoader } from "./index"
-
-function acceptCreateAgentSessionOptions(options: CreateAgentSessionOptions): CreateAgentSessionOptions {
-  return options
-}
 
 function acceptRpcTypes(command: RpcCommand, response: RpcResponse, event: AgentSessionEvent): readonly string[] {
   return [typeof command, typeof response, event.type]
@@ -34,13 +31,13 @@ describe("pinned Senpi API surface", () => {
     const model: CreateAgentSessionOptions["model"] = undefined
 
     // when
-    const options = acceptCreateAgentSessionOptions({
+    const options = {
       customTools,
       sessionManager,
       tools: ["read", "bash"],
       model,
       resourceLoader,
-    })
+    } satisfies CreateAgentSessionOptions
 
     // then
     expect(typeof createAgentSession).toBe("function")
@@ -50,31 +47,46 @@ describe("pinned Senpi API surface", () => {
     expect(options.tools).toEqual(["read", "bash"])
   })
 
-  test("#given agent dir marker extension #when minimal loader is wired to session options #then no marker extension is discovered", () => {
+  test("#given agent dir marker extension #when session boots with minimal loader #then marker factory is not invoked", async () => {
     // given
-    const agentDir = mkdtempSync(join(tmpdir(), "senpi-task-marker-"))
+    const rootDir = mkdtempSync(join(tmpdir(), "senpi-task-marker-"))
+    const agentDir = join(rootDir, "agent")
+    const cwd = join(rootDir, "project")
     const markerPath = join(agentDir, "extensions", "marker.js")
+    const markerInvokedPath = join(rootDir, "marker-invoked")
+    mkdirSync(cwd, { recursive: true })
     mkdirSync(dirname(markerPath), { recursive: true })
-    writeFileSync(markerPath, "globalThis.__senpiTaskMarkerInvoked = true\n", "utf8")
+    writeFileSync(
+      markerPath,
+      `import { writeFileSync } from "node:fs"\nexport default function () { writeFileSync(${JSON.stringify(markerInvokedPath)}, "invoked", "utf8") }\n`,
+      "utf8",
+    )
+    const defaultLoader = new DefaultResourceLoader({ cwd, agentDir })
+    await defaultLoader.reload()
+    expect(existsSync(markerInvokedPath)).toBe(true)
+    rmSync(markerInvokedPath, { force: true })
     const loader: ResourceLoader = createMinimalSenpiResourceLoader({
       runtime: createExtensionRuntime(),
     })
 
     // when
-    const options = acceptCreateAgentSessionOptions({
+    const result = await createAgentSession({
+      agentDir,
+      cwd,
       customTools: [],
       sessionManager: SessionManager.inMemory(),
       tools: [],
       model: undefined,
       resourceLoader: loader,
+      scopedModels: [],
+      favoriteModels: [],
     })
-    expect(options.resourceLoader).toBe(loader)
-    const extensions = loader.getExtensions()
-    rmSync(agentDir, { recursive: true, force: true })
+    rmSync(rootDir, { recursive: true, force: true })
 
     // then
-    expect(extensions.extensions).toHaveLength(0)
-    expect(extensions.errors).toEqual([])
+    expect(result.extensionsResult.extensions).toHaveLength(0)
+    expect(result.extensionsResult.errors).toEqual([])
+    expect(existsSync(markerInvokedPath)).toBe(false)
   })
 
   test("#given minimal resource loader source #when audited #then fake marker factory option is absent", () => {

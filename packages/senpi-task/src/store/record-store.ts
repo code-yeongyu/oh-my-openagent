@@ -55,7 +55,8 @@ function listRecords(stateDir: string): ListTaskRecordsResult {
       const parsed: unknown = JSON.parse(readFileSync(path, "utf8"))
       records.push(parseTaskRecord(parsed, path))
     } catch (error) {
-      diagnostics.push({ type: "parse_error", path, message: errorMessage(error) })
+      if (!(error instanceof Error)) throw error
+      diagnostics.push({ type: "parse_error", path, message: error.message })
     }
   }
 
@@ -92,8 +93,4 @@ function appendTaskEvent(stateDir: string, taskId: TaskId, event: PersistedTaskE
 
 function taskPath(stateDir: string, taskId: TaskId): string {
   return join(stateDir, "tasks", `${taskId}.json`)
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
 }

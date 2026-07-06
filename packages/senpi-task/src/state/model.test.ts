@@ -25,14 +25,14 @@ const expectedMessageability: Record<TaskStatus, Record<ResidencyState, Messagea
     rpc_detached: "revive",
   },
   completed: {
-    resident: "not-continuable",
+    resident: "revive",
     evicted: "not-continuable",
     disposed: "not-continuable",
     persisted_only: "not-continuable",
     rpc_detached: "not-continuable",
   },
   error: {
-    resident: "not-continuable",
+    resident: "revive",
     evicted: "not-continuable",
     disposed: "not-continuable",
     persisted_only: "not-continuable",
@@ -46,11 +46,11 @@ const expectedMessageability: Record<TaskStatus, Record<ResidencyState, Messagea
     rpc_detached: "not-continuable",
   },
   interrupted: {
-    resident: "steer",
-    evicted: "revive",
+    resident: "revive",
+    evicted: "not-continuable",
     disposed: "not-continuable",
-    persisted_only: "revive",
-    rpc_detached: "revive",
+    persisted_only: "not-continuable",
+    rpc_detached: "not-continuable",
   },
   lost: {
     resident: "not-continuable",

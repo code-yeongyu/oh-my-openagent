@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { createTaskId } from "./id"
+import { createTaskId, createTaskIdFactory } from "./id"
 
 describe("createTaskId", () => {
   test("#given a deterministic clock #when ids are created #then ids are canonical and sortable", () => {
@@ -26,5 +26,34 @@ describe("createTaskId", () => {
     // then
     expect(new Set(ids).size).toBe(ids.length)
     expect(ids).toEqual(ids.toSorted())
+  })
+
+  test("#given an isolated deterministic clock #when ids are created #then the clock seam is repeatable", () => {
+    // given
+    const nowMs = 0x1234_5678
+    const firstFactory = createTaskIdFactory(() => nowMs)
+    const secondFactory = createTaskIdFactory(() => nowMs)
+
+    // when
+    const firstIds = [firstFactory(), firstFactory(), firstFactory()]
+    const secondIds = [secondFactory(), secondFactory(), secondFactory()]
+
+    // then
+    expect(firstIds).toEqual(secondIds)
+    expect(firstIds.every((id) => /^st_[0-9a-f]{8}$/.test(id))).toBe(true)
+    expect(firstIds).toEqual(firstIds.toSorted())
+  })
+
+  test("#given wrap pressure near the id ceiling #when ids are created #then ids never wrap or repeat", () => {
+    // given
+    const nextId = createTaskIdFactory(() => 0x00ff_ffff)
+
+    // when
+    const ids = Array.from({ length: 300 }, () => nextId())
+
+    // then
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(ids).toEqual(ids.toSorted())
+    expect(ids).not.toContain("st_00000000")
   })
 })

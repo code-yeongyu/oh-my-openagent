@@ -1,30 +1,25 @@
 export type TaskId = `st_${string}`
 
 const TASK_ID_PATTERN = /^st_[0-9a-f]{8}$/
-const TIME_MODULUS = 0x1000000
-const MAX_SEQUENCE = 0xff
+const UUIDV7_TIMESTAMP_HIGH_BITS_DIVISOR = 0x10000
+const TASK_ID_SPACE_SIZE = 0x1_0000_0000
+const MAX_TASK_ID_VALUE = 0xffff_ffff
 
-let lastTimePart = -1
-let lastSequence = -1
+let lastTaskIdValue: number | undefined
 
 export function createTaskId(nowMs = Date.now()): TaskId {
-  let timePart = normalizedTimePart(nowMs)
-  if (timePart < lastTimePart) timePart = lastTimePart
+  const nextValue = nextMonotonicValue(uuidV7TimestampHighBits(nowMs), lastTaskIdValue)
+  lastTaskIdValue = nextValue
+  return formatTaskId(nextValue)
+}
 
-  if (timePart === lastTimePart) {
-    if (lastSequence === MAX_SEQUENCE) {
-      timePart = (lastTimePart + 1) % TIME_MODULUS
-      lastSequence = 0
-    } else {
-      lastSequence += 1
-    }
-  } else {
-    lastSequence = 0
+export function createTaskIdFactory(clock: () => number = Date.now): () => TaskId {
+  let lastValue: number | undefined
+  return () => {
+    const nextValue = nextMonotonicValue(uuidV7TimestampHighBits(clock()), lastValue)
+    lastValue = nextValue
+    return formatTaskId(nextValue)
   }
-
-  lastTimePart = timePart
-  const id = `st_${timePart.toString(16).padStart(6, "0")}${lastSequence.toString(16).padStart(2, "0")}`
-  return parseTaskId(id)
 }
 
 export function parseTaskId(value: string): TaskId {
@@ -36,7 +31,25 @@ function isTaskId(value: string): value is TaskId {
   return TASK_ID_PATTERN.test(value)
 }
 
-function normalizedTimePart(nowMs: number): number {
-  const integerMs = Math.floor(nowMs)
-  return ((integerMs % TIME_MODULUS) + TIME_MODULUS) % TIME_MODULUS
+function uuidV7TimestampHighBits(nowMs: number): number {
+  const integerMs = Number.isFinite(nowMs) ? Math.max(0, Math.floor(nowMs)) : 0
+  // Eight hex chars cannot hold full uuidv7 time plus randomness; keep the sortable timestamp prefix.
+  return Math.floor(integerMs / UUIDV7_TIMESTAMP_HIGH_BITS_DIVISOR) % TASK_ID_SPACE_SIZE
+}
+
+function nextMonotonicValue(candidate: number, previous: number | undefined): number {
+  if (previous === undefined || candidate > previous) return candidate
+  if (previous >= MAX_TASK_ID_VALUE) throw new TaskIdSpaceExhaustedError()
+  return previous + 1
+}
+
+function formatTaskId(value: number): TaskId {
+  return parseTaskId(`st_${value.toString(16).padStart(8, "0")}`)
+}
+
+export class TaskIdSpaceExhaustedError extends Error {
+  constructor() {
+    super("Task id space exhausted for this process; restart before creating more task ids")
+    this.name = "TaskIdSpaceExhaustedError"
+  }
 }

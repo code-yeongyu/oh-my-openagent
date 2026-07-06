@@ -5,6 +5,7 @@ import { isDeepStrictEqual } from "node:util"
 import {
   createTaskRecord,
   createTaskRecordStore,
+  messageability,
   resolveStateDir,
   transitionTaskRecord,
 } from "../src/index"
@@ -87,6 +88,25 @@ const rejected = store.transition(completed.task_id, {
 })
 if (rejected.applied) throw new Error("Illegal completed to running transition applied")
 if (store.load(completed.task_id)?.status !== "completed") throw new Error("Completed status changed")
+if (messageability(completed.status, completed.residency_state) !== "revive") {
+  throw new Error("Completed resident task was not revivable")
+}
+const evictedCompleted = transitionTaskRecord(completed, {
+  type: "evict",
+  timestamp: "2026-07-06T02:00:03.000Z",
+})
+if (!evictedCompleted.applied) throw new Error("Completed resident eviction was rejected")
+if (evictedCompleted.record.status !== "completed") throw new Error("Completed eviction changed lifecycle status")
+if (messageability(evictedCompleted.record.status, evictedCompleted.record.residency_state) !== "not-continuable") {
+  throw new Error("Evicted completed task remained continuable")
+}
+const normalLost = transitionTaskRecord(running, {
+  type: "lose",
+  timestamp: "2026-07-06T02:00:04.000Z",
+  error_message: "manual lost should be reconciliation-only",
+})
+if (normalLost.applied) throw new Error("Normal lost transition applied")
+if (normalLost.record.status !== "running") throw new Error("Rejected normal lost transition changed status")
 
 const outsidePath = join(evidenceDir, "manual-outside.jsonl")
 let traversalRejected = false
@@ -120,6 +140,15 @@ const summary = {
   corruptDiagnostic,
   malformedOptionalDiagnostic,
   illegalTransitionApplied: rejected.applied,
+  completedResidentMessageability: messageability(completed.status, completed.residency_state),
+  evictedCompletedApplied: evictedCompleted.applied,
+  evictedCompletedStatus: evictedCompleted.record.status,
+  evictedCompletedMessageability: messageability(
+    evictedCompleted.record.status,
+    evictedCompleted.record.residency_state,
+  ),
+  normalLostApplied: normalLost.applied,
+  normalLostStatus: normalLost.record.status,
   traversalRejected,
   outsideWriteCreated: existsSync(outsidePath),
   finalStatus: store.load(completed.task_id)?.status ?? completed.status,

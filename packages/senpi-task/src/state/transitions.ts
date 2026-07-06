@@ -7,6 +7,13 @@ import type {
 } from "./types"
 
 const terminalStatuses = new Set<TaskStatus>(["completed", "error", "cancelled", "interrupted", "lost"])
+const residencyTransitionTypes = new Set<TaskTransition["type"]>([
+  "evict",
+  "dispose",
+  "persist_only",
+  "detach_rpc",
+  "mark_resident",
+])
 
 function transitionStatus(transition: TaskTransition, current: TaskStatus): TaskStatus {
   switch (transition.type) {
@@ -86,7 +93,8 @@ function applyTransitionFields(record: TaskRecord, transition: TaskTransition): 
 
 export function transitionTaskRecord(record: TaskRecord, transition: TaskTransition): TaskTransitionResult {
   const nextStatus = transitionStatus(transition, record.status)
-  if (terminalStatuses.has(record.status)) {
+  const changesOnlyResidency = residencyTransitionTypes.has(transition.type)
+  if (terminalStatuses.has(record.status) && !changesOnlyResidency) {
     return {
       applied: false,
       record,
@@ -130,6 +138,40 @@ export function transitionTaskRecord(record: TaskRecord, transition: TaskTransit
   }
 }
 
+export function markRecordLostForReconciliation(
+  record: TaskRecord,
+  input: { readonly timestamp: string; readonly error_message: string },
+): TaskTransitionResult {
+  if (terminalStatuses.has(record.status)) {
+    return {
+      applied: false,
+      record,
+      audit: {
+        type: "late_transition_ignored",
+        attempted_status: "lost",
+        current_status: record.status,
+      },
+    }
+  }
+
+  const nextRecord = {
+    ...record,
+    status: "lost" as const,
+    error_message: input.error_message,
+    updated_at: input.timestamp,
+  }
+
+  return {
+    applied: true,
+    record: nextRecord,
+    audit: {
+      type: "transition_applied",
+      status: nextRecord.status,
+      residency_state: nextRecord.residency_state,
+    },
+  }
+}
+
 function isStatusTransitionAllowed(current: TaskStatus, transition: TaskTransition): boolean {
   switch (transition.type) {
     case "start":
@@ -140,7 +182,7 @@ function isStatusTransitionAllowed(current: TaskStatus, transition: TaskTransiti
     case "interrupt":
       return current === "running"
     case "lose":
-      return current === "pending" || current === "running"
+      return false
     case "evict":
     case "dispose":
     case "persist_only":
