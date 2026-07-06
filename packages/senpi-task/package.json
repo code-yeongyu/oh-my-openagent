@@ -22,14 +22,19 @@
     "@oh-my-opencode/team-core": "workspace:*"
   },
   "peerDependencies": {
-    "@code-yeongyu/senpi": "2026.7.5-2"
+    "@code-yeongyu/senpi": "2026.7.5-2",
+    "typebox": "*"
   },
   "peerDependenciesMeta": {
     "@code-yeongyu/senpi": {
       "optional": true
+    },
+    "typebox": {
+      "optional": true
     }
   },
   "devDependencies": {
-    "@code-yeongyu/senpi": "2026.7.5-2"
+    "@code-yeongyu/senpi": "2026.7.5-2",
+    "typebox": "1.1.38"
   }
 }
