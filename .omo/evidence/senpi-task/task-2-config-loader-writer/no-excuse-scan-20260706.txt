@@ -1,0 +1,3 @@
+No violations in 4 file(s).
+
+EXIT_STATUS=0
