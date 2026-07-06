@@ -46,7 +46,7 @@ function continuationHint(record: TaskRecord): string {
   const mode = messageability(record.status, record.residency_state)
   const output = `task_output({ task_id: "${record.task_id}" }) to read the full result`
   if (mode === "not-continuable") return `Use ${output}.`
-  return `Use task_send({ task_id: "${record.task_id}", prompt: "..." }) to continue, or ${output}.`
+  return `Use task_send({ task_id: "${record.task_id}", message: "..." }) to continue, or ${output}.`
 }
 
 function renderContent(details: readonly CompletionDetails[]): string {
