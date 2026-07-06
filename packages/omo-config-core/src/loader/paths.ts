@@ -26,13 +26,32 @@ export function resolveUserOmoConfigPath(
   env: OmoConfigEnv = process.env,
   platform: NodeJS.Platform = process.platform,
 ): string {
+  return join(resolveUserOmoConfigDirectory(env, platform), "omo.jsonc")
+}
+
+function resolveUserOmoConfigDirectory(
+  env: OmoConfigEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+): string {
   if (platform === "win32" && env.APPDATA !== undefined && env.APPDATA.length > 0) {
-    return join(env.APPDATA, "omo", "omo.jsonc")
+    return join(env.APPDATA, "omo")
   }
   if (env.XDG_CONFIG_HOME !== undefined && env.XDG_CONFIG_HOME.length > 0) {
-    return join(env.XDG_CONFIG_HOME, "omo", "omo.jsonc")
+    return join(env.XDG_CONFIG_HOME, "omo")
   }
-  return join(resolveHomeDir(env), ".config", "omo", "omo.jsonc")
+  return join(resolveHomeDir(env), ".config", "omo")
+}
+
+function detectUserOmoJsonPath(
+  env: OmoConfigEnv,
+  platform: NodeJS.Platform,
+  fileSystem: OmoConfigReadFileSystem,
+): string {
+  const configDir = resolveUserOmoConfigDirectory(env, platform)
+  const jsoncPath = join(configDir, "omo.jsonc")
+  if (fileSystem.existsSync(jsoncPath)) return jsoncPath
+  const jsonPath = join(configDir, "omo.json")
+  return fileSystem.existsSync(jsonPath) ? jsonPath : jsoncPath
 }
 
 function detectOmoJsonPath(dir: string, fileSystem: OmoConfigReadFileSystem): string | null {
@@ -67,7 +86,8 @@ function findProjectConfigPathsFarthestFirst(
 export function resolveOmoConfigPaths(options: ResolveOmoConfigPathsOptions): readonly OmoConfigPathCandidate[] {
   const fileSystem = options.fileSystem ?? DEFAULT_READ_FILE_SYSTEM
   const env = options.env ?? process.env
-  const userPath = resolveUserOmoConfigPath(env, options.platform ?? process.platform)
+  const platform = options.platform ?? process.platform
+  const userPath = detectUserOmoJsonPath(env, platform, fileSystem)
   const projectPaths = findProjectConfigPathsFarthestFirst(options.cwd, resolveHomeDir(env), fileSystem)
   return [
     { path: userPath, scope: "user" },

@@ -117,4 +117,42 @@ describe("loadOmoConfig", () => {
     expect(result.diagnostics.map((diagnostic: { readonly kind: string }) => diagnostic.kind)).toContain("read")
     expect(result.diagnostics.some((diagnostic: { readonly path: string }) => diagnostic.path === unreadablePath)).toBe(true)
   })
+
+  test("#given only user omo json #when loading #then user json is read and jsonc takes precedence when both exist", () => {
+    // given
+    const jsonOnlyFixture = makeFixture()
+    const jsonOnlyPath = join(jsonOnlyFixture.xdgConfigHome, "omo", "omo.json")
+    writeJsonc(jsonOnlyPath, `{"task":{"default_concurrency":9}}`)
+
+    // when
+    const jsonOnly = loadOmoConfig({
+      cwd: jsonOnlyFixture.cwd,
+      env: { HOME: jsonOnlyFixture.homeDir, XDG_CONFIG_HOME: jsonOnlyFixture.xdgConfigHome },
+      platform: "linux",
+    })
+
+    // then
+    expect(jsonOnly.diagnostics).toEqual([])
+    expect(jsonOnly.config.task?.default_concurrency).toBe(9)
+    expect(jsonOnly.sources[0]).toEqual({ exists: true, loaded: true, path: jsonOnlyPath, scope: "user" })
+
+    // given
+    const bothFixture = makeFixture()
+    const jsoncPath = join(bothFixture.xdgConfigHome, "omo", "omo.jsonc")
+    const jsonPath = join(bothFixture.xdgConfigHome, "omo", "omo.json")
+    writeJsonc(jsonPath, `{"task":{"default_concurrency":8}}`)
+    writeJsonc(jsoncPath, `{"task":{"default_concurrency":4}}`)
+
+    // when
+    const both = loadOmoConfig({
+      cwd: bothFixture.cwd,
+      env: { HOME: bothFixture.homeDir, XDG_CONFIG_HOME: bothFixture.xdgConfigHome },
+      platform: "linux",
+    })
+
+    // then
+    expect(both.diagnostics).toEqual([])
+    expect(both.config.task?.default_concurrency).toBe(4)
+    expect(both.sources[0]).toEqual({ exists: true, loaded: true, path: jsoncPath, scope: "user" })
+  })
 })
