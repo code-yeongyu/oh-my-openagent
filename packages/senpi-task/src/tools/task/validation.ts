@@ -16,8 +16,7 @@ type TargetInput = {
   readonly subagent_type?: string
 }
 
-const BOTH_TARGETS_MESSAGE =
-  "Provide EITHER category OR subagent_type, not both. When category is provided, subagent_type is ignored - remove one."
+const BOTH_TARGETS_MESSAGE = "Provide EITHER category OR subagent_type, not both. Remove one and retry."
 
 const NO_TARGET_MESSAGE =
   'You MUST provide EITHER category OR subagent_type. Omitting BOTH will FAIL. Example: task(category="quick", prompt="...") or task(subagent_type="oracle", prompt="...").'

@@ -38,6 +38,9 @@ describe("validateTaskTarget", () => {
     expect(result.error.code).toBe("both_targets")
     expect(result.error.message).toContain("EITHER category OR subagent_type")
     expect(result.error.message).toContain("not both")
+    // the call hard-fails and spawns nothing, so the message must not claim subagent_type "is ignored"
+    expect(result.error.message).not.toContain("ignored")
+    expect(result.error.message).toContain("Remove one and retry")
   })
 
   test("#given neither category nor subagent_type #when validated #then returns a typed no_target error", () => {
