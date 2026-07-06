@@ -54,6 +54,8 @@ export function goalFooterIndicator(goal: Goal): GoalFooterIndicator {
 			return { color, text: usageText === null ? "Pursuing goal" : `Pursuing goal (${usageText})` };
 		case "paused":
 			return { color, text: "Goal paused (/goal resume)" };
+		case "blocked":
+			return { color, text: "Goal blocked (/goal resume)" };
 		case "budgetLimited":
 			return { color, text: usageText === null ? "Goal abandoned" : `Goal unmet (${usageText})` };
 		case "complete":
@@ -170,6 +172,8 @@ function goalStatusUsage(goal: Goal): string | null {
 				: `${formatTokensCompact(goal.tokensUsed)} / ${formatTokensCompact(goal.tokenBudget)}`;
 		case "paused":
 			return null;
+		case "blocked":
+			return null;
 		case "budgetLimited":
 			return goal.tokenBudget === undefined
 				? null
@@ -187,6 +191,8 @@ function goalStatusColor(status: GoalStatus): ThemeColor {
 			return "accent";
 		case "paused":
 			return "muted";
+		case "blocked":
+			return "warning";
 		case "budgetLimited":
 			return "warning";
 		case "complete":

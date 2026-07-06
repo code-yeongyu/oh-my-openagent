@@ -42,7 +42,7 @@ describe("goal display formatting", () => {
 			},
 			remainingTokens: 6_750,
 			completionBudgetReport:
-				"Goal achieved. Report final budget usage to the user: tokens used: 3250 of 10000; time used: 75 seconds.",
+				"Goal achieved. Report final usage from this tool result's structured goal fields. If `goal.tokenBudget` is present, include token usage from `goal.tokensUsed` and `goal.tokenBudget`. If `goal.timeUsedSeconds` is greater than 0, summarize elapsed time in a concise, human-friendly form appropriate to the response language.",
 		});
 	});
 });

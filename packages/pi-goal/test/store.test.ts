@@ -34,7 +34,7 @@ describe("goal store", () => {
 		const original = await createGoal(ref, "Original", 10_000);
 
 		await expect(createGoal(ref, "Replacement", 20_000)).rejects.toThrow(
-			"cannot create a new goal because this thread already has a goal",
+			"cannot create a new goal because this thread has an unfinished goal; complete the existing goal first",
 		);
 
 		expect(await readGoal(ref)).toMatchObject({
