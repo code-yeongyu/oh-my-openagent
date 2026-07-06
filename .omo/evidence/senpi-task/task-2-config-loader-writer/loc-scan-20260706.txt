@@ -1,0 +1,6 @@
+packages/omo-config-core/src/writer/writer.ts 105
+packages/omo-config-core/src/writer/types.ts 69
+packages/omo-config-core/src/writer/writer.test.ts 168
+packages/omo-config-core/src/writer/writer-security.test.ts 67
+
+EXIT_STATUS=0
