@@ -62,6 +62,18 @@ describe("buildCompletionDetails", () => {
     expect(details.continuation_hint).toContain("task_output")
   })
 
+  test("#given resident completed record #when details built #then task_send hint uses the message param not prompt", () => {
+    // given
+    const record = completedRecord()
+
+    // when
+    const details = buildCompletionDetails(record)
+
+    // then
+    expect(details.continuation_hint).toContain("message:")
+    expect(details.continuation_hint).not.toContain("prompt:")
+  })
+
   test("#given error record #when details built #then error message feeds the head", () => {
     // given
     const record = completedRecord({
