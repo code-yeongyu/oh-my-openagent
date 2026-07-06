@@ -20,3 +20,20 @@ export type {
   TeamRegistryError,
   TeamSpecSource,
 } from "./registry"
+export { createTeam, deleteTeam, SenpiTeamRuntimeError } from "./runtime"
+export type {
+  CreateTeamDeps,
+  CreateTeamResult,
+  DeleteTeamDeps,
+  DeleteTeamResult,
+  TeamRuntimeManagerPort,
+} from "./runtime-types"
+export type { SenpiTeamRuntimeErrorCode } from "./runtime-types"
+export { toTeamCoreConfig, toTeamCoreSpecSource } from "./runtime-config"
+export type { TeamCoreConfig, TeamCoreSpecSource } from "./runtime-config"
+export { memberTaskMapPath, readMemberTaskMap, writeMemberTaskMap } from "./member-map"
+export type { MemberTaskMap } from "./member-map"
+export { projectMemberStatus, refreshTeamMemberStatuses } from "./member-projection"
+export type { MemberStatusPort, RefreshTeamMemberStatusesDeps, RuntimeMemberStatus } from "./member-projection"
+export { memberTaskName, spawnTeamMembers } from "./spawn-members"
+export type { SpawnMembersInput, SpawnMembersResult, SpawnedMember } from "./spawn-members"
