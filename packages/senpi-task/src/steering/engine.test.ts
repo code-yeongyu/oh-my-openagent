@@ -116,6 +116,25 @@ describe.each(flavors)("steering engine over the %s runner fake", (flavor) => {
     expect(sent.kind).toBe("not_continuable")
   })
 
+  test("#given a running child whose abort rejects #when cancelled #then destruction still runs exactly once and the cancel resolves", async () => {
+    // given (rpc child already exited: protocol-client rejects the abort send)
+    const harness = makeHarness()
+    const record = harness.seedRecord()
+    toRunning(harness, record)
+    const fake = makeFakeHandle(record.task_id, flavor, { abortRejects: true })
+    harness.setLive(record.task_id, fake.handle)
+
+    // when
+    const cancelled = await harness.engine.cancelTask(record.task_id, "user aborted")
+
+    // then (abort rejection does NOT skip appendEvent + destruction; record is not a resident zombie)
+    if (cancelled.kind !== "cancelled") throw new Error("expected cancelled")
+    expect(cancelled.previous_status).toBe("running")
+    expect(fake.abortCalls).toHaveLength(1)
+    expect(harness.destruction.calls).toEqual([{ taskId: record.task_id, cause: "cancel" }])
+    expect(harness.store.load(record.task_id)?.status).toBe("cancelled")
+  })
+
   test("#given a cancelled child #when cancelled again #then it is an idempotent no-op and destruction is not re-run", async () => {
     // given
     const harness = makeHarness()
