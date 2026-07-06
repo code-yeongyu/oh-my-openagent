@@ -9,6 +9,13 @@ export { resolveExecutionMode } from "./execution-mode"
 export type { ExecutionMode, ExecutionModeSources } from "./execution-mode"
 export { adaptInProcessHandle, adaptRpcHandle } from "./child-handle"
 export type { ManagedChildEvent, ManagedChildHandle, ManagedChildListener } from "./child-handle"
+export {
+  TRANSCRIPT_ASSISTANT_EVENT,
+  TRANSCRIPT_TOOL_EVENT,
+  logTranscriptEvent,
+  subscribeTranscriptLog,
+} from "./transcript-log"
+export type { TranscriptLogStore } from "./transcript-log"
 export { createInProcessManagedRunner, createRpcManagedRunner } from "./runner"
 export type {
   InProcessRunnerLike,
@@ -17,6 +24,7 @@ export type {
   RpcRunnerLike,
 } from "./runner"
 export type {
+  AdmitResident,
   ChildPlanner,
   ContinueDelivery,
   ContinueResult,
@@ -28,6 +36,7 @@ export type {
   PlanResolution,
   PlanResolutionError,
   ResolvedChildPlan,
+  SpawnAdmission,
   StartResult,
   TaskManager,
   TaskManagerOptions,

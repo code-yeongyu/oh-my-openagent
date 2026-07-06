@@ -1,0 +1,136 @@
+import { describe, expect, test } from "bun:test"
+
+import type { ListScope, ListedTask } from "../../manager"
+import type { TaskRecord } from "../../state"
+import { makeRecord } from "./__fixtures__/records"
+import { runTaskOutput } from "./output"
+import type { OutputManager, TaskOutputDeps, TranscriptReadResult } from "./types"
+
+function managerFrom(records: readonly TaskRecord[]): OutputManager {
+  return {
+    get: (taskId) => records.find((record) => record.task_id === taskId),
+    list(scope: ListScope): readonly ListedTask[] {
+      const filtered =
+        scope.scope === "all" ? records : records.filter((record) => record.parent_session_id === scope.session_id)
+      return filtered.map((record) => ({ record }))
+    },
+  }
+}
+
+function depsFrom(records: readonly TaskRecord[], reader?: () => TranscriptReadResult): TaskOutputDeps {
+  return {
+    manager: managerFrom(records),
+    stateDir: "/tmp/state",
+    now: () => Date.parse("2024-12-03T15:00:00.000Z"),
+    transcriptReader: reader ?? (() => ({ entries: [], source: "none" })),
+  }
+}
+
+describe("runTaskOutput", () => {
+  test("#given a completed task in tail mode #when read #then the last assistant text is present", async () => {
+    // given
+    const record = makeRecord({ task_id: "st_done", status: "completed", final_response: "all done" })
+    const deps = depsFrom([record], () => ({
+      entries: [
+        { kind: "assistant", text: "starting the work" },
+        { kind: "tool", tool: "bash", is_error: false },
+        { kind: "assistant", text: "finished the work" },
+      ],
+      source: "event-log",
+    }))
+
+    // when
+    const result = await runTaskOutput(deps, { task_id: "st_done", mode: "tail" }, "session-parent")
+
+    // then
+    expect(result.details.kind).toBe("transcript")
+    if (result.details.kind === "transcript") {
+      expect(result.details.transcript).toContain("finished the work")
+      expect(result.details.source).toBe("event-log")
+    }
+  })
+
+  test("#given default mode #when read #then a status snapshot with final_response is returned", async () => {
+    // given
+    const record = makeRecord({ task_id: "st_done", status: "completed", final_response: "the answer" })
+    const deps = depsFrom([record])
+
+    // when
+    const result = await runTaskOutput(deps, { task_id: "st_done" }, "session-parent")
+
+    // then
+    expect(result.details.kind).toBe("status")
+    if (result.details.kind === "status") {
+      expect(result.details.snapshot.final_response).toBe("the answer")
+      expect(result.details.snapshot.status).toBe("completed")
+    }
+  })
+
+  test("#given a lost task #when read #then a status view with a lost explanation and pid/session-dir breadcrumbs is returned without throwing", async () => {
+    // given
+    const record = makeRecord({ task_id: "st_lost", status: "lost", pid: 4242 })
+    const deps = depsFrom([record])
+
+    // when
+    const result = await runTaskOutput(deps, { task_id: "st_lost", mode: "tail" }, "session-parent")
+
+    // then
+    expect(result.details.kind).toBe("status")
+    if (result.details.kind === "status") {
+      expect(result.details.snapshot.lost).toBeDefined()
+      expect(result.details.snapshot.lost?.pid).toBe(4242)
+      expect(result.details.snapshot.lost?.session_dir).toContain("st_lost")
+      expect(result.details.snapshot.lost?.explanation.length).toBeGreaterThan(0)
+    }
+  })
+
+  test("#given a task owned by another session #when read #then it is not found (fail-closed scope)", async () => {
+    // given
+    const record = makeRecord({ task_id: "st_other", parent_session_id: "session-other" })
+    const deps = depsFrom([record])
+
+    // when
+    const result = await runTaskOutput(deps, { task_id: "st_other", mode: "status" }, "session-parent")
+
+    // then
+    expect(result.details.kind).toBe("not_found")
+  })
+
+  test("#given no caller session #when read #then it fails closed as not found", async () => {
+    // given
+    const record = makeRecord({ task_id: "st_a", parent_session_id: "session-parent" })
+    const deps = depsFrom([record])
+
+    // when
+    const result = await runTaskOutput(deps, { task_id: "st_a", mode: "status" }, undefined)
+
+    // then
+    expect(result.details.kind).toBe("not_found")
+  })
+
+  test("#given neither task_id nor name #when read #then invalid arguments are reported", async () => {
+    // given
+    const deps = depsFrom([])
+
+    // when
+    const result = await runTaskOutput(deps, { mode: "status" }, "session-parent")
+
+    // then
+    expect(result.details.kind).toBe("invalid_arguments")
+  })
+
+  test("#given a name instead of an id #when read #then the task is resolved by name", async () => {
+    // given
+    const record = makeRecord({ task_id: "st_named", name: "explorer", status: "completed", final_response: "found" })
+    const deps = depsFrom([record])
+
+    // when
+    const result = await runTaskOutput(deps, { name: "explorer", mode: "status" }, "session-parent")
+
+    // then
+    expect(result.details.kind).toBe("status")
+    if (result.details.kind === "status") {
+      expect(result.details.snapshot.task_id).toBe("st_named")
+    }
+  })
+})
