@@ -24,7 +24,18 @@ export function loadOmoAgentOverlays(options: Required<LoadAgentsOptions>): OmoA
 
   for (const candidate of resolveOmoConfigPaths({ cwd: options.projectDir, env })) {
     if (!existsSync(candidate.path)) continue
-    const parsed = parseJsoncSafe(readFileSync(candidate.path, "utf8"))
+    let content: string
+    try {
+      content = readFileSync(candidate.path, "utf8")
+    } catch (error) {
+      if (error instanceof Error) {
+        diagnostics.push(readDiagnostic(candidate.path, error))
+        continue
+      }
+      throw error
+    }
+
+    const parsed = parseJsoncSafe(content)
     if (parsed.errors.length > 0) {
       diagnostics.push({
         kind: "config_parse",
@@ -52,4 +63,19 @@ export function loadOmoAgentOverlays(options: Required<LoadAgentsOptions>): OmoA
   }
 
   return { agents, diagnostics }
+}
+
+function readDiagnostic(path: string, error: Error): AgentLoaderDiagnostic {
+  const code = errorCode(error)
+  const codeText = code === undefined ? "" : ` (${code})`
+  return {
+    kind: "read",
+    path,
+    message: `Failed to read omo agents config ${path}${codeText}: ${error.message}`,
+  }
+}
+
+function errorCode(error: Error): string | undefined {
+  if ("code" in error && typeof error.code === "string") return error.code
+  return undefined
 }
