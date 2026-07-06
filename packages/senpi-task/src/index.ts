@@ -42,6 +42,37 @@ export type {
   SenpiModelPort,
   SenpiModelRegistryPort,
 } from "./category"
+export {
+  RpcCommandError,
+  RpcProcessRunner,
+  RpcProtocolClient,
+  buildAutoUiResponse,
+  buildRpcSpawn,
+  classifyChildExit,
+  createRpcChildHandle,
+  detectBunBinary,
+  mapExitOutcomeToError,
+  resolveChildSessionDir,
+  tailStderr,
+  terminateRpcChild,
+} from "./runners"
+export type {
+  ChildEventListener,
+  ChildExitFacts,
+  ChildExitInput,
+  ChildExitOutcome,
+  ChildHandle,
+  CreateRpcChildHandleOptions,
+  MalformedLineHandler,
+  RpcChildHandle,
+  RpcProcessRunnerOptions,
+  RpcProtocolClientOptions,
+  RpcRunnerSpec,
+  RpcSpawnDescriptor,
+  RpcSpawnRuntime,
+  RunnerErrorFacts,
+  TerminateOptions,
+} from "./runners"
 export { defineAgent, loadAgents, registerAgent, resolveToolRule } from "./agents"
 export type {
   AgentDefinition,
