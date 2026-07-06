@@ -1,42 +1,28 @@
 {
-  "fixtureRoot": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/senpi-task-w0-config-loader-writer/.omo/evidence/senpi-task/task-2-config-loader-writer/manual-public-api-fixture-IJlGaj",
-  "scenarios": {
-    "symlinkedProjectOmo": {
-      "diagnostics": [],
-      "loadedProjectSources": [],
-      "taskDefaultConcurrency": 5
-    },
-    "normalProjectOmo": {
-      "diagnostics": [],
-      "loadedProjectSources": [
-        {
-          "exists": true,
-          "loaded": true,
-          "path": "/Volumes/mengmotaStorage/local-workspaces/omo-wt/senpi-task-w0-config-loader-writer/.omo/evidence/senpi-task/task-2-config-loader-writer/manual-public-api-fixture-IJlGaj/normal/home/work/project/.omo/omo.jsonc",
-          "scope": "project"
-        }
-      ],
-      "taskDefaultConcurrency": 7
-    },
-    "sameKeyTeamPartialMerge": {
-      "diagnostics": [],
-      "alpha": {
-        "version": 1,
-        "description": "near layer description",
-        "members": [
-          {
-            "name": "one",
-            "backendType": "in-process",
-            "isActive": true,
-            "kind": "category",
-            "category": "quick",
-            "prompt": "go"
-          }
-        ]
-      }
-    }
+  "projectConfigFileSymlink": {
+    "diagnostics": [],
+    "loadedProjectSources": [],
+    "taskDefaultConcurrency": 5
   },
-  "cleanup": {
-    "fixtureRootExistsAfterCleanup": false
-  }
+  "projectOmoDirectorySymlink": {
+    "diagnostics": [],
+    "loadedProjectSources": [],
+    "taskDefaultConcurrency": 5
+  },
+  "normalProjectConfig": {
+    "diagnostics": [],
+    "loadedProjectSources": [
+      "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-config-public-api-normal-project-6fHRuB/home/work/project/.omo/omo.jsonc"
+    ],
+    "taskDefaultConcurrency": 8
+  },
+  "teamsPartialMerge": {
+    "diagnostics": [],
+    "description": "near layer",
+    "firstMemberName": "one"
+  },
+  "assertionsPassed": true,
+  "cleanupRootsExistAfter": []
 }
+
+EXIT_CODE=0

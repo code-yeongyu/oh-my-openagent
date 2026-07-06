@@ -1,0 +1,3 @@
+No violations in 2 file(s).
+
+EXIT_CODE=0
