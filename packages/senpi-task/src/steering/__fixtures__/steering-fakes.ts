@@ -32,9 +32,15 @@ export type FakeHandle = {
 
 export type RunnerFlavor = "in-process" | "rpc"
 
+export type FakeHandleOptions = {
+  // When set, abort() records the call THEN rejects, mirroring an rpc child that already exited
+  // (protocol-client rejects send after isExited). Proves teardown survives an abort rejection.
+  readonly abortRejects?: boolean
+}
+
 // Both runner adapters normalize onto ManagedChildHandle, so the two flavors differ only in the
 // pid/sessionId surface. Steering programs against the unified handle, so this covers both runners.
-export function makeFakeHandle(taskId: string, flavor: RunnerFlavor): FakeHandle {
+export function makeFakeHandle(taskId: string, flavor: RunnerFlavor, options: FakeHandleOptions = {}): FakeHandle {
   const steerCalls: string[] = []
   const followUpCalls: string[] = []
   const abortCalls: number[] = []
@@ -51,6 +57,7 @@ export function makeFakeHandle(taskId: string, flavor: RunnerFlavor): FakeHandle
     },
     abort: async () => {
       abortCalls.push(abortCalls.length + 1)
+      if (options.abortRejects === true) throw new Error("child already exited")
     },
     subscribe: () => () => {},
     waitForOutcome: () => new Promise(() => {}),

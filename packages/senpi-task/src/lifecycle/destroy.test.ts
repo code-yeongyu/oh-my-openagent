@@ -36,6 +36,26 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
     expect(readEvents(store, "st_0000000a")).toContain("destroyed")
   })
 
+  test("#given an in-process resident whose abort rejects #when cancel-destroyed #then dispose still runs and it ends disposed", async () => {
+    // given
+    const store = tempStore()
+    seedRecord(store, { task_id: "st_0000000e", status: "cancelled", residency_state: "resident" })
+    const registry = new FakeRegistry()
+    const order: CallLog = []
+    const handle = fakeHandle("st_0000000e", "in-process", order, { abortRejects: true })
+    registry.add(handle)
+    const lifecycle = createTaskLifecycle({ store, registry, config: settings() })
+
+    // when
+    await lifecycle.destroyResidentTask("st_0000000e", "cancel")
+
+    // then (abort rejection must not skip dispose or leave a resident zombie)
+    expect(order).toEqual(["abort:st_0000000e", "dispose:st_0000000e"])
+    expect(handle.disposed()).toBe(true)
+    expect(store.load("st_0000000e")?.residency_state).toBe("disposed")
+    expect(registry.forgotten).toContain("st_0000000e")
+  })
+
   test("#given an rpc resident #when destroyed #then it terminates (TERM->KILL) then detaches, never dispose-only", async () => {
     // given
     const store = tempStore()

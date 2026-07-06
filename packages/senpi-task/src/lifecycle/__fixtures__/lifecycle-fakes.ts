@@ -72,7 +72,7 @@ export function fakeHandle(
   taskId: string,
   kind: "in-process" | "rpc",
   order: CallLog,
-  options: { pid?: number } = {},
+  options: { pid?: number; abortRejects?: boolean } = {},
 ): FakeHandle {
   let didAbort = false
   let didDispose = false
@@ -84,6 +84,7 @@ export function fakeHandle(
     abort: async () => {
       didAbort = true
       order.push(`abort:${taskId}`)
+      if (options.abortRejects === true) throw new Error("child already exited")
     },
     dispose: async () => {
       didDispose = true

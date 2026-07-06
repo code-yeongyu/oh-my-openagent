@@ -152,7 +152,17 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
       return { kind: "noop", task_id: record.task_id, status: result.record.status, reason: `Task ${record.task_id} could not be cancelled from running.` }
     }
     const handle = port.liveHandle(record.task_id)
-    if (handle !== undefined) await handle.abort()
+    // The record is already terminal (cancelled) above. abort() is best-effort: an rpc child that
+    // already exited rejects the abort send (protocol-client isExited), and a rejection here must NOT
+    // skip the destruction that moves the record OUT of resident - otherwise it freezes at
+    // {cancelled, resident}, un-evictable, leaking a residency slot forever.
+    if (handle !== undefined) {
+      try {
+        await handle.abort()
+      } catch (error) {
+        log("senpi-task steering cancel abort rejected", { taskId: record.task_id, error: String(error) })
+      }
+    }
     port.store.appendEvent(record.task_id, { type: "cancelled", payload: { previous_status: "running", ...(reason !== undefined ? { reason } : {}) } })
     // Destruction is delegated EXCLUSIVELY to lifecycle's port; steering never disposes directly.
     await port.destruction.destroyResidentTask(record.task_id, "cancel")

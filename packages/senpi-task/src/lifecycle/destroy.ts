@@ -1,3 +1,5 @@
+import { log } from "@oh-my-opencode/utils"
+
 import { delay, nowIso, type LifecycleContext } from "./context"
 import type { DestroyCause, ResidentHandle } from "./port"
 
@@ -23,13 +25,21 @@ export async function destroyResidentTask(
 }
 
 async function teardownHandle(handle: ResidentHandle): Promise<void> {
-  if (handle.kind === "in-process") {
-    await handle.abort()
-    await handle.dispose()
-    return
-  }
-  await handle.terminate()
+  // The pre-dispose step (in-process abort / rpc terminate) is best-effort: an already-exited child
+  // rejects it. Swallow-and-log so dispose() ALWAYS runs and destroyResidentTask keeps going to
+  // forget + record disposed - a re-thrown abort would leave a resident zombie the LRU can never
+  // reclaim (the residency-slot leak this teardown exists to prevent).
+  if (handle.kind === "in-process") await bestEffort(handle.task_id, "abort", () => handle.abort())
+  else await bestEffort(handle.task_id, "terminate", () => handle.terminate())
   await handle.dispose()
+}
+
+async function bestEffort(taskId: string, step: "abort" | "terminate", run: () => Promise<void>): Promise<void> {
+  try {
+    await run()
+  } catch (error) {
+    log("senpi-task teardown pre-dispose step rejected", { taskId, step, error: String(error) })
+  }
 }
 
 // Kill a live orphan process left behind by a previous session: SIGTERM, then SIGKILL after the
