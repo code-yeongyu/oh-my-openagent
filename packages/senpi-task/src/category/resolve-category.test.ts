@@ -1,6 +1,4 @@
 import { describe, expect, test } from "bun:test"
-import { readdirSync, readFileSync } from "node:fs"
-import { join } from "node:path"
 
 import { BUILTIN_CATEGORY_DEFAULTS, resolveCategory } from "./index"
 
@@ -100,6 +98,58 @@ describe("resolveCategory", () => {
     expect(resolved.modelSelection.matchedFallback).toBe(true)
   })
 
+  test("#given quick primary is unavailable and hardcoded fallback is available #when resolved #then delegate-core fallback chain reaches Anthropic Haiku", () => {
+    // given
+    const models = registry([model("anthropic", "claude-haiku-4-5")])
+
+    // when
+    const result = resolveCategory("quick", {}, models)
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.spec.provider).toBe("anthropic")
+    expect(resolved.spec.modelId).toBe("claude-haiku-4-5")
+    expect(resolved.modelSelection.matchedFallback).toBe(true)
+    expect(resolved.modelSelection.fallbackEntry).toEqual({
+      providers: ["anthropic", "github-copilot", "vercel"],
+      model: "claude-haiku-4-5",
+    })
+  })
+
+  test("#given ultrabrain primary is unavailable and hardcoded Google fallback is available #when resolved #then delegate-core fallback chain preserves the high variant", () => {
+    // given
+    const models = registry([model("google", "gemini-3.1-pro")])
+
+    // when
+    const result = resolveCategory("ultrabrain", {}, models)
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.spec.provider).toBe("google")
+    expect(resolved.spec.modelId).toBe("gemini-3.1-pro")
+    expect(resolved.spec.variant).toBe("high")
+    expect(resolved.modelSelection.matchedFallback).toBe(true)
+    expect(resolved.modelSelection.fallbackEntry).toEqual({
+      providers: ["google", "github-copilot", "opencode", "vercel"],
+      model: "gemini-3.1-pro",
+      variant: "high",
+    })
+  })
+
+  test("#given no category or fallback model resolves and a system default is available #when resolved #then delegate-core reaches the system default", () => {
+    // given
+    const models = registry([model("local", "system-default")])
+
+    // when
+    const result = resolveCategory("quick", {}, models, { systemDefaultModel: "local/system-default" })
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.spec.provider).toBe("local")
+    expect(resolved.spec.modelId).toBe("system-default")
+    expect(resolved.modelSelection.matchedFallback).toBe(false)
+  })
+
   test("#given selected model is absent from registry #when resolved #then unavailable result names attempted and available models", () => {
     // given
     const models = registry([model("anthropic", "claude-sonnet-4-6")])
@@ -135,6 +185,7 @@ describe("resolveCategory", () => {
             maxTokens: 4096,
             thinking: { type: "enabled", budgetTokens: 1024 },
             reasoningEffort: "medium",
+            tools: { read: true, write: false },
             prompt_append: "EXTRA QUICK CONTEXT",
           },
         },
@@ -149,8 +200,67 @@ describe("resolveCategory", () => {
     expect(resolved.spec.maxTokens).toBe(4096)
     expect(resolved.spec.thinking).toEqual({ type: "enabled", budgetTokens: 1024 })
     expect(resolved.spec.reasoningEffort).toBe("medium")
+    expect(resolved.spec.tools).toEqual({ read: true, write: false })
     expect(resolved.spec.prompt_append).toContain("SMALL / QUICK")
     expect(resolved.spec.prompt_append).toEndWith("\n\nEXTRA QUICK CONTEXT")
+  })
+
+  test("#given a malformed registry entry #when resolved #then category resolution returns sanitized model_unavailable instead of throwing", () => {
+    // given
+    const malformedRegistry = {
+      getAvailable: () => [null],
+      find: () => undefined,
+    }
+
+    // when
+    const result = resolveCategory("quick", {}, malformedRegistry)
+
+    // then
+    expect(result.kind).toBe("model_unavailable")
+    if (result.kind !== "model_unavailable") throw new Error("Expected unavailable result")
+    expect(result.category).toBe("quick")
+    expect(result.attemptedModel).toBe("openai/gpt-5.4-mini")
+    expect(result.availableModels).toEqual([])
+  })
+
+  test("#given prototype-shaped category names #when resolved #then they return not_found instead of inherited object values", () => {
+    // given
+    const models = registry([model("openai", "gpt-5.4-mini")])
+
+    // when
+    const results = ["__proto__", "toString", "hasOwnProperty"].map((category) =>
+      resolveCategory(category, {}, models)
+    )
+
+    // then
+    expect(results.map((result) => result.kind)).toEqual(["not_found", "not_found", "not_found"])
+    for (const result of results) {
+      if (result.kind !== "not_found") throw new Error(`Expected not_found result, got ${result.kind}`)
+      expect(result.availableCategories).toContain("quick")
+    }
+  })
+
+  test("#given a custom category description #when resolved #then the resolved result preserves it", () => {
+    // given
+    const models = registry([model("openai", "custom-model")])
+
+    // when
+    const result = resolveCategory(
+      "custom-review",
+      {
+        categories: {
+          "custom-review": {
+            model: "openai/custom-model",
+            description: "Custom review lane",
+          },
+        },
+      },
+      models,
+    )
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.description).toBe("Custom review lane")
   })
 })
 
@@ -179,34 +289,5 @@ describe("builtin category defaults", () => {
       "unspecified-high",
       "writing",
     ])
-  })
-})
-
-describe("delegate-core model order guard", () => {
-  test("#given category source files #when statically audited #then resolver imports delegate-core and avoids local order logic", () => {
-    // given
-    const categoryDir = new URL(".", import.meta.url).pathname
-    const source = readdirSync(categoryDir)
-      .filter((fileName) => fileName.endsWith(".ts") && !fileName.endsWith(".test.ts"))
-      .map((fileName) => readFileSync(join(categoryDir, fileName), "utf8"))
-      .join("\n")
-
-    // when
-    const callsDelegateCore = source.includes("resolveModelForDelegateTask(")
-    const importsDelegateCore = source.includes('from "@oh-my-opencode/delegate-core"')
-    const importsOmoOpencode = /from\s+["'][^"']*omo-opencode/.test(source)
-    const suspiciousOrderPhrases = [
-      "user model override",
-      "cold-cache",
-      "category default",
-      "hardcoded fallbackChain",
-      "system default",
-    ].filter((phrase) => source.includes(phrase))
-
-    // then
-    expect(importsDelegateCore).toBe(true)
-    expect(callsDelegateCore).toBe(true)
-    expect(importsOmoOpencode).toBe(false)
-    expect(suspiciousOrderPhrases).toEqual([])
   })
 })

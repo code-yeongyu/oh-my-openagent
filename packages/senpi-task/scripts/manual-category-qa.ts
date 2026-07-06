@@ -57,4 +57,43 @@ requireCondition(
   "unavailable available models missing registry model",
 )
 
-console.log(JSON.stringify({ happy, disabled, unavailable }, null, 2))
+const hardcodedFallback = resolveCategory("quick", {}, registry([model("anthropic", "claude-haiku-4-5")]))
+requireCondition(hardcodedFallback.kind === "resolved", "hardcoded fallback scenario did not resolve")
+if (hardcodedFallback.kind !== "resolved") {
+  throw new Error("hardcoded fallback scenario did not resolve")
+}
+requireCondition(hardcodedFallback.spec.provider === "anthropic", "hardcoded fallback provider mismatch")
+requireCondition(hardcodedFallback.spec.modelId === "claude-haiku-4-5", "hardcoded fallback model mismatch")
+requireCondition(hardcodedFallback.modelSelection.matchedFallback, "hardcoded fallback was not marked as fallback")
+
+const systemDefault = resolveCategory(
+  "quick",
+  {},
+  registry([model("local", "system-default")]),
+  { systemDefaultModel: "local/system-default" },
+)
+requireCondition(systemDefault.kind === "resolved", "system default scenario did not resolve")
+if (systemDefault.kind !== "resolved") {
+  throw new Error("system default scenario did not resolve")
+}
+requireCondition(systemDefault.spec.provider === "local", "system default provider mismatch")
+requireCondition(systemDefault.spec.modelId === "system-default", "system default model mismatch")
+
+const malformed = resolveCategory(
+  "quick",
+  {},
+  {
+    getAvailable: () => [null],
+    find: () => undefined,
+  },
+)
+requireCondition(malformed.kind === "model_unavailable", "malformed registry did not return model_unavailable")
+if (malformed.kind !== "model_unavailable") {
+  throw new Error("malformed registry did not return model_unavailable")
+}
+requireCondition(malformed.availableModels.length === 0, "malformed registry leaked invalid available models")
+
+const prototypeName = resolveCategory("__proto__", {}, registry([model("openai", "gpt-5.4-mini")]))
+requireCondition(prototypeName.kind === "not_found", "prototype-shaped category did not return not_found")
+
+console.log(JSON.stringify({ happy, disabled, unavailable, hardcodedFallback, systemDefault, malformed, prototypeName }, null, 2))

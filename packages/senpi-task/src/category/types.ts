@@ -15,7 +15,7 @@ export type SenpiModelPort = {
 }
 
 export type SenpiModelRegistryPort<TModel extends SenpiModelPort> = {
-  readonly getAvailable: () => readonly TModel[]
+  readonly getAvailable: () => readonly unknown[]
   readonly find: (provider: string, modelId: string) => TModel | undefined
 }
 
@@ -29,7 +29,12 @@ export type ResolvedChildSpec<TModel extends SenpiModelPort> = {
   readonly maxTokens?: number
   readonly thinking?: OmoCategoryConfig["thinking"]
   readonly reasoningEffort?: OmoCategoryConfig["reasoningEffort"]
+  readonly tools?: OmoCategoryConfig["tools"]
   readonly prompt_append?: string
+}
+
+export type ResolveCategoryOptions = {
+  readonly systemDefaultModel?: string
 }
 
 export type CategoryModelSelection = {

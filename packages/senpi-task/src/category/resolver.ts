@@ -15,9 +15,11 @@ import {
   CATEGORY_PROMPT_APPENDS,
   DEFAULT_CATEGORIES,
 } from "./builtins"
+import { CATEGORY_FALLBACK_CHAINS } from "./fallback-chains"
 import type {
   CategoryModelSelection,
   CategoryResolutionResult,
+  ResolveCategoryOptions,
   ResolvedChildSpec,
   SenpiModelPort,
   SenpiModelRegistryPort,
@@ -45,6 +47,17 @@ type ModelSelectionInput = {
 
 function formatModel(model: SenpiModelPort): string {
   return `${model.provider}/${model.id}`
+}
+
+function isSenpiModelPort(model: unknown): model is SenpiModelPort {
+  return (
+    typeof model === "object" &&
+    model !== null &&
+    "provider" in model &&
+    "id" in model &&
+    typeof model.provider === "string" &&
+    typeof model.id === "string"
+  )
 }
 
 function parseModel(model: string): ParsedModel | undefined {
@@ -76,9 +89,21 @@ function availableCategoryNames(config: OmoConfig): readonly string[] {
   return Array.from(new Set([...Object.keys(DEFAULT_CATEGORIES), ...Object.keys(config.categories ?? {})])).sort()
 }
 
+function getOwnRecordValue<TValue>(
+  record: Readonly<Record<string, TValue>>,
+  key: string,
+): TValue | undefined {
+  return Object.hasOwn(record, key) ? record[key] : undefined
+}
+
+function safeAvailableModels(models: readonly unknown[]): readonly string[] {
+  return models.filter(isSenpiModelPort).map(formatModel).sort()
+}
+
 function promptAppendForCategory(categoryName: string, model: string | undefined, userPromptAppend: string | undefined): string | undefined {
-  const basePromptAppend = CATEGORY_PROMPT_APPEND_RESOLVERS[categoryName]?.(model)
-    ?? CATEGORY_PROMPT_APPENDS[categoryName]
+  const promptAppendResolver = getOwnRecordValue(CATEGORY_PROMPT_APPEND_RESOLVERS, categoryName)
+  const basePromptAppend = promptAppendResolver?.(model)
+    ?? getOwnRecordValue(CATEGORY_PROMPT_APPENDS, categoryName)
     ?? ""
   if (!userPromptAppend) {
     return basePromptAppend || undefined
@@ -99,6 +124,7 @@ function childSpec<TModel extends SenpiModelPort>(input: ChildSpecInput<TModel>)
     ...(config.maxTokens !== undefined ? { maxTokens: config.maxTokens } : {}),
     ...(config.thinking !== undefined ? { thinking: config.thinking } : {}),
     ...(config.reasoningEffort !== undefined ? { reasoningEffort: config.reasoningEffort } : {}),
+    ...(config.tools !== undefined ? { tools: config.tools } : {}),
     ...(prompt_append !== undefined ? { prompt_append } : {}),
   }
 }
@@ -123,9 +149,10 @@ export function resolveCategory<TModel extends SenpiModelPort>(
   categoryName: string,
   omoConfig: OmoConfig,
   senpiModelRegistry: SenpiModelRegistryPort<TModel>,
+  options: ResolveCategoryOptions = {},
 ): CategoryResolutionResult<TModel> {
   const availableCategories = availableCategoryNames(omoConfig)
-  const userConfig = omoConfig.categories?.[categoryName]
+  const userConfig = omoConfig.categories ? getOwnRecordValue(omoConfig.categories, categoryName) : undefined
   if (userConfig?.disable === true) {
     return {
       kind: "disabled",
@@ -135,20 +162,23 @@ export function resolveCategory<TModel extends SenpiModelPort>(
     }
   }
 
-  const builtinConfig = DEFAULT_CATEGORIES[categoryName]
+  const builtinConfig = getOwnRecordValue(DEFAULT_CATEGORIES, categoryName)
   if (!builtinConfig && !userConfig) {
     return { kind: "not_found", category: categoryName, availableCategories }
   }
 
   const config = { ...builtinConfig, ...userConfig }
-  const availableModels = senpiModelRegistry.getAvailable().map(formatModel).sort()
+  const availableModels = safeAvailableModels(senpiModelRegistry.getAvailable())
+  const fallbackChain = getOwnRecordValue(CATEGORY_FALLBACK_CHAINS, categoryName)
   const resolution = resolveModelForDelegateTask(
     {
       userModel: userConfig?.model,
       userFallbackModels: flattenFallbackModels(config.fallback_models),
       categoryDefaultModel: builtinConfig?.model,
       isUserConfiguredCategoryModel: false,
+      fallbackChain,
       availableModels: new Set(availableModels),
+      systemDefaultModel: options.systemDefaultModel,
     },
     {
       connectedProviders: null,
@@ -196,7 +226,7 @@ export function resolveCategory<TModel extends SenpiModelPort>(
     category: categoryName,
     spec: childSpec({ model, selection, config, userVariant: userConfig?.variant, prompt_append }),
     config,
-    description: CATEGORY_DESCRIPTIONS[categoryName],
+    description: userConfig?.description ?? getOwnRecordValue(CATEGORY_DESCRIPTIONS, categoryName),
     modelSelection: selection,
     availableCategories,
   }
