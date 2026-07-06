@@ -50,7 +50,7 @@ function getRunTmuxCommandCall(index: number): [string, string[]] {
 
 function getRespawnCommand(): string {
 	const respawnCall = getRunTmuxCommandCall(1)
-	const respawnCommand = respawnCall[1][4]
+	const respawnCommand = respawnCall[1].at(-1)
 	if (respawnCommand === undefined) {
 		throw new Error("Expected respawn-pane command")
 	}
@@ -110,7 +110,12 @@ describe("replaceTmuxPane runner integration", () => {
 		const selectPaneCall = getRunTmuxCommandCall(2)
 		expect(result).toEqual({ success: true, paneId: "%42" })
 		expect(sendKeysCall[1]).toEqual(["send-keys", "-t", "%42", "C-c"])
-		expect(respawnCall[1].slice(0, 4)).toEqual(["respawn-pane", "-k", "-t", "%42"])
+		const targetIndex = respawnCall[1].indexOf("-t")
+		if (targetIndex === -1) {
+			throw new Error("Expected respawn-pane target argument")
+		}
+		expect(respawnCall[1].slice(0, 2)).toEqual(["respawn-pane", "-k"])
+		expect(respawnCall[1].slice(targetIndex, targetIndex + 2)).toEqual(["-t", "%42"])
 		expect(selectPaneCall[1]).toEqual(["select-pane", "-t", "%42", "-T", "omo-subagent-worker"])
 		expect(getRespawnCommand()).toContain("Focus this pane to attach.")
 		expect(getRespawnCommand()).toContain("while :; do sleep 86400; done")

@@ -550,3 +550,16 @@ jobs:
                 --remove-label "sisyphus: working" || true
             fi
           fi
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Sisyphus agent run
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds local oh-my-opencode.
+            - Configures OpenCode and runs the Sisyphus agent against the issue or PR context.
+            - Pushes agent changes when the working branch is safe to push.
+          JOB_SUMMARY_NEXT: Check setup/auth first, then the `Run oh-my-opencode` step and pushed branch output.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

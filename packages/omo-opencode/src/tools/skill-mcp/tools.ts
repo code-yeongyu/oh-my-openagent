@@ -8,7 +8,7 @@ import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 
 interface SkillMcpToolOptions {
   manager: SkillMcpManager
-  getLoadedSkills: () => LoadedSkill[]
+  getLoadedSkills: () => LoadedSkill[] | Promise<LoadedSkill[]>
   getSessionID?: () => string | undefined
 }
 
@@ -78,7 +78,8 @@ function formatBuiltinMcpHint(mcpName: string): string | null {
   if (!nativeTools) return null
   return (
     `"${mcpName}" is a builtin MCP, not a skill MCP.\n` +
-    `Use the native tools directly:\n` +
+    `skill_mcp can only call MCP servers declared by loaded skills; do not retry this builtin through skill_mcp.\n` +
+    `Use the native builtin tool names when OpenCode exposes them:\n` +
     nativeTools.map((toolName) => `  - ${toolName}`).join("\n")
   )
 }
@@ -123,7 +124,7 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
     },
     async execute(args: SkillMcpArgs, toolContext: ToolContext) {
       const operation = validateOperationParams(args)
-      const skills = getLoadedSkills()
+      const skills = await getLoadedSkills()
       const found = findMcpServer(args.mcp_name, skills)
 
       if (!found) {

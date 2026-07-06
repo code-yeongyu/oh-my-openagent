@@ -90,6 +90,31 @@ describe("argsToConfig", () => {
     expect(config.hasCodex).toBe(true)
   })
 
+  test("enables only Senpi when platform is senpi", () => {
+    // #given
+    const args: InstallArgs = { tui: false, platform: "senpi" }
+
+    // #when
+    const config = argsToConfig(args)
+
+    // #then
+    expect(config.platform).toBe("senpi")
+    expect(config.hasOpenCode).toBe(false)
+    expect(config.hasCodex).toBe(false)
+    expect(config.hasSenpi).toBe(true)
+  })
+
+  test("keeps platform=both scoped to OpenCode and Codex", () => {
+    // #given
+    const args = createArgs({ platform: "both" })
+
+    // #when
+    const config = argsToConfig(args)
+
+    // #then
+    expect(config.hasSenpi).toBe(false)
+  })
+
   test("defaults to OpenCode when platform is omitted", () => {
     // #given
     const args = createArgs()
@@ -199,6 +224,18 @@ describe("validateNonTuiArgs", () => {
   test("allows codex-only non-TUI installs", () => {
     // #given
     const args: InstallArgs = { tui: false, platform: "codex" }
+
+    // #when
+    const result = validateNonTuiArgs(args)
+
+    // #then
+    expect(result.valid).toBe(true)
+    expect(result.errors).toEqual([])
+  })
+
+  test("allows senpi-only non-TUI installs without OpenCode provider flags", () => {
+    // #given
+    const args: InstallArgs = { tui: false, platform: "senpi" }
 
     // #when
     const result = validateNonTuiArgs(args)

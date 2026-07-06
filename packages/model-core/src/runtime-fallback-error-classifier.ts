@@ -30,6 +30,8 @@ export const RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERNS = [
   /quota.?exceeded/i,
   /exceeded.*quota/i,
   /usage\s*quota/i,
+  /free.?usage/i,
+  /usage.?exceeded/i,
   /exhausted\s+your\s+capacity/i,
   /limit\s+exhausted/i,
   /all\s+credentials\s+for\s+model/i,
@@ -105,7 +107,7 @@ export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErr
     /quota.?exceeded/i.test(message) ||
     /exceeded.*quota/i.test(message) ||
     /usage\s*quota/i.test(message) ||
-    /subscription.*quota/i.test(message) ||
+    /subscription.?(?:quota|limit)/i.test(message) ||
     /insufficient.?(?:quota|balance|funds?)/i.test(message) ||
     /billing.?(?:hard.?)?limit/i.test(message) ||
     /exhausted\s+your\s+capacity/i.test(message) ||

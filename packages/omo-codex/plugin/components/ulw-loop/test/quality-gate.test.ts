@@ -1,5 +1,6 @@
 import { existsSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
@@ -12,7 +13,7 @@ const VALID_GATE = {
 		by: "lazycodex-code-reviewer",
 		recommendation: "APPROVE",
 		codeQualityStatus: "CLEAR",
-		reportPath: "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/code-review.md",
+		reportPath: "test/fixtures/artifacts/code-review.md",
 		evidence: "Reviewed diff and focused tests; no blocking code-quality issues remain.",
 		blockers: [],
 	},
@@ -45,20 +46,20 @@ const VALID_GATE = {
 				id: "artifact-cli-pass",
 				kind: "cli-transcript",
 				description: "CLI transcript for valid quality gate acceptance.",
-				path: "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/cli-pass.txt",
+				path: "test/fixtures/artifacts/cli-pass.txt",
 			},
 			{
 				id: "artifact-cli-reject",
 				kind: "log",
 				description: "Log proving malformed quality gate rejection.",
-				path: "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/rejection.txt",
+				path: "test/fixtures/artifacts/rejection.txt",
 			},
 		],
 	},
 	gateReview: {
 		by: "lazycodex-gate-reviewer",
 		recommendation: "APPROVE",
-		reportPath: "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/gate-review.md",
+		reportPath: "test/fixtures/artifacts/gate-review.md",
 		evidence: "Rechecked reviewer reports and manual QA artifacts; gate is approved.",
 		blockers: [],
 	},
@@ -77,8 +78,8 @@ const VALID_GATE = {
 		adversarialClassesCovered: ["malformed_input", "stale_state"],
 	},
 } as const;
-const REPO_ROOT = fileURLToPath(new URL("../../../../../..", import.meta.url));
-const FS_OPTS = { repoRoot: REPO_ROOT, fs: { existsSync, statSync } } as const;
+const COMPONENT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const FS_OPTS = { repoRoot: COMPONENT_ROOT, fs: { existsSync, statSync } } as const;
 
 function makeGate(overrides: Record<string, unknown> = {}): Record<string, unknown> {
 	return { ...VALID_GATE, ...overrides };

@@ -1,11 +1,23 @@
 import { describe, expect, it } from "bun:test"
-import { existsSync, mkdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readlinkSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import {
   ensureCodegraphGitignored,
   prepareCodegraphWorkspace,
+  pruneDeadCodegraphProjectStores,
   pruneCodegraphStore,
   sanitizeBase,
 } from "./codegraph/workspace"
@@ -45,6 +57,10 @@ describe("prepareCodegraphWorkspace", () => {
     expect(result.mode).toBe("global-linked")
     expect(result.linked).toBe(true)
     expect(readlinkSync(join(workspace, ".codegraph"))).toContain(join(homeDir, ".omo", "codegraph", "projects"))
+    expect(JSON.parse(readFileSync(join(result.dataDir, "source.json"), "utf8"))).toEqual({
+      sourceDir: realpathSync(workspace),
+      version: 1,
+    })
 
     rmSync(workspace, { force: true, recursive: true })
     rmSync(homeDir, { force: true, recursive: true })
@@ -152,4 +168,89 @@ describe("CodeGraph workspace helpers", () => {
 
     rmSync(homeDir, { force: true, recursive: true })
   })
+
+  it("prunes project stores whose recorded source directory no longer exists", () => {
+    // given
+    const homeDir = tempDir("home")
+    const liveSource = tempDir("live-source")
+    const deadSource = tempDir("dead-source")
+    mkdirSync(liveSource, { recursive: true })
+    mkdirSync(deadSource, { recursive: true })
+    const liveProject = prepareCodegraphWorkspace(liveSource, { homeDir })
+    const deadProject = prepareCodegraphWorkspace(deadSource, { homeDir })
+    writeFileSync(join(liveProject.dataDir, "blob"), "live")
+    writeFileSync(join(deadProject.dataDir, "blob"), "dead")
+    rmSync(deadSource, { force: true, recursive: true })
+
+    // when
+    const options = { homeDir, maxAgeDays: 999, maxBytes: 100_000, pruneMissingSources: true }
+    const result = pruneCodegraphStore(options)
+
+    // then
+    expect(result.removed).toContain(deadProject.dataDir)
+    expect(result.removed).not.toContain(liveProject.dataDir)
+    expect(existsSync(deadProject.dataDir)).toBe(false)
+    expect(existsSync(liveProject.dataDir)).toBe(true)
+
+    rmSync(liveSource, { force: true, recursive: true })
+    rmSync(homeDir, { force: true, recursive: true })
+  })
+
+  it("prunes dead project stores without recursively sizing cache contents", () => {
+    if (process.platform === "win32") return
+
+    // given
+    const homeDir = tempDir("home")
+    const liveSource = tempDir("live-source")
+    const deadSource = tempDir("dead-source")
+    mkdirSync(liveSource, { recursive: true })
+    mkdirSync(deadSource, { recursive: true })
+    const liveProject = prepareCodegraphWorkspace(liveSource, { homeDir })
+    const deadProject = prepareCodegraphWorkspace(deadSource, { homeDir })
+    const unreadableCacheDir = join(liveProject.dataDir, "huge-cache")
+    mkdirSync(unreadableCacheDir, { recursive: true })
+    chmodSync(unreadableCacheDir, 0)
+    rmSync(deadSource, { force: true, recursive: true })
+
+    try {
+      // when
+      const result = pruneDeadCodegraphProjectStores({ homeDir })
+
+      // then
+      expect(result.removed).toContain(deadProject.dataDir)
+      expect(result.removed).not.toContain(liveProject.dataDir)
+      expect(existsSync(deadProject.dataDir)).toBe(false)
+      expect(existsSync(liveProject.dataDir)).toBe(true)
+    } finally {
+      if (existsSync(unreadableCacheDir)) chmodSync(unreadableCacheDir, 0o700)
+      rmSync(liveSource, { force: true, recursive: true })
+      rmSync(homeDir, { force: true, recursive: true })
+    }
+  })
+
+  it("ignores malformed source metadata while pruning valid dead project stores", () => {
+    // given
+    const homeDir = tempDir("home")
+    const liveSource = tempDir("live-source")
+    const deadSource = tempDir("dead-source")
+    mkdirSync(liveSource, { recursive: true })
+    mkdirSync(deadSource, { recursive: true })
+    const malformedProject = prepareCodegraphWorkspace(liveSource, { homeDir })
+    const deadProject = prepareCodegraphWorkspace(deadSource, { homeDir })
+    writeFileSync(join(malformedProject.dataDir, "source.json"), "{")
+    rmSync(deadSource, { force: true, recursive: true })
+
+    // when
+    const result = pruneDeadCodegraphProjectStores({ homeDir })
+
+    // then
+    expect(result.removed).toContain(deadProject.dataDir)
+    expect(result.removed).not.toContain(malformedProject.dataDir)
+    expect(existsSync(deadProject.dataDir)).toBe(false)
+    expect(existsSync(malformedProject.dataDir)).toBe(true)
+
+    rmSync(liveSource, { force: true, recursive: true })
+    rmSync(homeDir, { force: true, recursive: true })
+  })
+
 })

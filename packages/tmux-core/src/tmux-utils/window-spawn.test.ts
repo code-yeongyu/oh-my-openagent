@@ -64,7 +64,7 @@ function createHarness() {
 
 	function getNewWindowCommand(): string {
 		const firstCall = getRunTmuxCommandCall(0)
-		const newWindowCommand = firstCall[1][7]
+		const newWindowCommand = firstCall[1].at(-1)
 		if (newWindowCommand === undefined) {
 			throw new Error("Expected new-window command")
 		}

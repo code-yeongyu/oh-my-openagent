@@ -4,6 +4,8 @@ import { dirname, join } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
+import { CODEX_COMPONENT_NOTICE_REQUIREMENTS } from "./third-party-notice-requirements.mjs"
+
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..")
 const WINDOWS_CMD_SHIM_COMMANDS = new Set(["npm", "npx"])
 
@@ -63,37 +65,6 @@ const CODEX_AGGREGATE_COMPONENTS = [
   "posthog-node",
 ]
 
-const CODEX_COMPONENT_NOTICE_REQUIREMENTS = [
-  {
-    path: "packages/omo-codex/plugin/components/comment-checker",
-    requiredTerms: ["pi-comment-checker", "@code-yeongyu/comment-checker"],
-  },
-  {
-    path: "packages/omo-codex/plugin/components/lsp",
-    requiredTerms: ["pi-lsp-client"],
-  },
-  {
-    path: "packages/omo-codex/plugin/components/rules",
-    requiredTerms: ["pi-rules", "picomatch"],
-  },
-  {
-    path: "packages/omo-codex/plugin/components/start-work-continuation",
-    requiredTerms: [],
-  },
-  {
-    path: "packages/omo-codex/plugin/components/telemetry",
-    requiredTerms: ["posthog-node", "@oh-my-opencode/telemetry-core"],
-  },
-  {
-    path: "packages/omo-codex/plugin/components/ultrawork",
-    requiredTerms: [],
-  },
-  {
-    path: "packages/omo-codex/plugin/components/ulw-loop",
-    requiredTerms: [],
-  },
-]
-
 const ROOT_SHIP_REQUIRED_PATHS = [
   "THIRD-PARTY-NOTICES.md",
   "packages/omo-codex/THIRD-PARTY-NOTICES.md",
@@ -110,15 +81,7 @@ const scopes = {
   codex: {
     noticePath: "packages/omo-codex/THIRD-PARTY-NOTICES.md",
     requiredComponents() {
-      const componentsPath = join(repoRoot, "packages/omo-codex/plugin/components")
-      const componentPackageNames = readdirSync(componentsPath, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => {
-          const packagePath = join(componentsPath, entry.name, "package.json")
-          return JSON.parse(readFileSync(packagePath, "utf8")).name
-        })
-
-      return [...componentPackageNames, ...CODEX_AGGREGATE_COMPONENTS]
+      return [...readComponentPackageNames(), ...CODEX_AGGREGATE_COMPONENTS]
     },
     checkComponents: checkCodexComponentNotices,
   },
@@ -141,24 +104,39 @@ function readJson(path) {
   return JSON.parse(readFileSync(join(repoRoot, path), "utf8"))
 }
 
+function readComponentPackageNames() {
+  const componentsPath = join(repoRoot, "packages/omo-codex/plugin/components")
+  return readdirSync(componentsPath, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => join("packages/omo-codex/plugin/components", entry.name, "package.json"))
+    .filter((packagePath) => existsSync(join(repoRoot, packagePath)))
+    .map((packagePath) => JSON.parse(readFileSync(join(repoRoot, packagePath), "utf8")).name)
+}
+
 function checkCodexComponentNotices() {
   const failures = []
 
   for (const requirement of CODEX_COMPONENT_NOTICE_REQUIREMENTS) {
     const noticePath = join(repoRoot, requirement.path, "NOTICE")
-    const licensePath = join(repoRoot, requirement.path, "LICENSE")
     if (!existsSync(noticePath)) {
       failures.push(`${requirement.path}/NOTICE is missing`)
       continue
     }
-    if (!existsSync(licensePath)) {
-      failures.push(`${requirement.path}/LICENSE is missing`)
+    for (const filename of requirement.requiredFiles ?? ["LICENSE", "NOTICE"]) {
+      if (!existsSync(join(repoRoot, requirement.path, filename))) {
+        failures.push(`${requirement.path}/${filename} is missing`)
+      }
     }
 
     const noticeText = readFileSync(noticePath, "utf8")
     for (const term of requirement.requiredTerms) {
       if (!noticeText.includes(term)) {
         failures.push(`${requirement.path}/NOTICE is missing required term: ${term}`)
+      }
+    }
+    for (const term of requirement.forbiddenTerms ?? []) {
+      if (noticeText.includes(term)) {
+        failures.push(`${requirement.path}/NOTICE must be self-contained and not reference missing payload path: ${term}`)
       }
     }
   }
@@ -214,7 +192,7 @@ function runShipCheck() {
     const packagePath = `${requirement.path}/package.json`
     const packageJson = readJson(packagePath)
     const packageFiles = packageJson.files ?? []
-    for (const filename of ["LICENSE", "NOTICE"]) {
+    for (const filename of requirement.requiredFiles ?? ["LICENSE", "NOTICE"]) {
       if (existsSync(join(repoRoot, requirement.path, filename)) && !packageFiles.includes(filename)) {
         failures.push(`${packagePath} files[] is missing ${filename}`)
       }
@@ -225,7 +203,7 @@ function runShipCheck() {
   const requiredPackPaths = [
     ...ROOT_SHIP_REQUIRED_PATHS,
     ...CODEX_COMPONENT_NOTICE_REQUIREMENTS.flatMap((requirement) =>
-      ["LICENSE", "NOTICE"]
+      (requirement.requiredFiles ?? ["LICENSE", "NOTICE"])
         .map((filename) => `${requirement.path}/${filename}`)
         .filter((path) => existsSync(join(repoRoot, path))),
     ),

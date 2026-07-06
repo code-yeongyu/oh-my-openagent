@@ -1,6 +1,7 @@
 import type { Readable } from "node:stream";
 
 import type { CodexOmoConfig as SharedCodexOmoConfig } from "../../../shared/src/config-loader.ts";
+import type { SweepCodegraphZombiesOptions } from "../../../../../utils/src/codegraph/process-sweep.ts";
 import type { CodegraphProvisionResult as SharedCodegraphProvisionResult } from "../../../../../utils/src/codegraph/provision.ts";
 import type {
 	CodegraphCommandResolution,
@@ -9,7 +10,8 @@ import type {
 import type { CodegraphWorkspacePreparation as SharedCodegraphWorkspacePreparation } from "../../../../../utils/src/codegraph/workspace.ts";
 import type { CodegraphConfig as SharedCodegraphConfig } from "../../../../../utils/src/omo-config.ts";
 
-export type SessionStartAction = "skipped-disabled" | "spawned";
+export type SessionStartAction = "skipped-disabled" | "skipped-excluded" | "skipped-initialized" | "spawned";
+export type PostToolUseAction = "emitted-guidance" | "skipped";
 export type WorkerAction = "failed" | "initialized" | "skipped-disabled" | "skipped-status" | "skipped-unavailable" | "skipped-unsupported-node" | "synced";
 
 export interface WorkerSpawnInvocation {
@@ -24,6 +26,11 @@ export interface HookStdout {
 
 export interface SessionStartHookResult {
 	readonly action: SessionStartAction;
+	readonly exitCode: 0;
+}
+
+export interface PostToolUseHookResult {
+	readonly action: PostToolUseAction;
 	readonly exitCode: 0;
 }
 
@@ -68,9 +75,22 @@ export interface SessionStartHookOptions {
 	readonly cwd?: string;
 	readonly env?: Record<string, string | undefined>;
 	readonly spawnWorker?: (invocation: WorkerSpawnInvocation) => void;
+	readonly statusProbe?: (options: {
+		readonly env: Record<string, string | undefined>;
+		readonly homeDir: string;
+		readonly projectRoot: string;
+		readonly trustedCodegraphInstallDir?: string;
+	}) => Promise<boolean>;
 	readonly stdin?: Readable & { readonly isTTY?: boolean };
 	readonly stdout?: HookStdout;
+	readonly sweepZombies?: (options: SweepCodegraphZombiesOptions) => Promise<unknown> | unknown;
 	readonly workerCliPath?: string;
+}
+
+export interface PostToolUseHookOptions {
+	readonly env?: Record<string, string | undefined>;
+	readonly stdin?: Readable & { readonly isTTY?: boolean };
+	readonly stdout?: HookStdout;
 }
 
 export interface SessionStartWorkerOptions {

@@ -64,7 +64,7 @@ describe("ralph-loop non-abort error continuation", () => {
 					showToast: async () => ({}),
 				},
 			},
-		} as never)
+		} as never, { idleSettleMs: 0 })
 
 		hook.startLoop("session-123", "Keep working", {
 			messageCountAtStart: 0,
@@ -118,7 +118,7 @@ describe("ralph-loop non-abort error continuation", () => {
 					showToast: async () => ({}),
 				},
 			},
-		} as never)
+		} as never, { idleSettleMs: 0 })
 
 		hook.startLoop("session-123", "Keep ultraworking", {
 			messageCountAtStart: 0,
@@ -177,7 +177,7 @@ describe("ralph-loop non-abort error continuation", () => {
 					showToast: async () => ({}),
 				},
 			},
-		} as never)
+		} as never, { idleSettleMs: 0 })
 
 		try {
 			hook.startLoop("session-123", "Keep working", {
@@ -253,7 +253,7 @@ describe("ralph-loop non-abort error continuation", () => {
 					showToast: async () => ({}),
 				},
 			},
-		} as never)
+		} as never, { idleSettleMs: 0 })
 
 		try {
 			hook.startLoop("session-123", "Keep working", {
@@ -330,7 +330,7 @@ describe("ralph-loop non-abort error continuation", () => {
 					showToast: async () => ({}),
 				},
 			},
-		} as never)
+		} as never, { idleSettleMs: 0 })
 
 		try {
 			hook.startLoop("session-123", "Keep working", {
@@ -407,6 +407,7 @@ describe("ralph-loop non-abort error continuation", () => {
 				},
 			},
 		} as never, {
+			idleSettleMs: 0,
 			backgroundManager: {
 				getTasksByParentSession: (sessionID: string) => sessionID === "session-123"
 					? [{ status: "running" }]
@@ -465,7 +466,7 @@ describe("ralph-loop non-abort error continuation", () => {
 					showToast: async () => ({}),
 				},
 			},
-		} as never)
+		} as never, { idleSettleMs: 0 })
 
 		hook.startLoop("session-123", "Keep working", {
 			messageCountAtStart: 0,

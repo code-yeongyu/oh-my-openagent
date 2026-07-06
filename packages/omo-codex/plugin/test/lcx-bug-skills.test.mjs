@@ -4,11 +4,16 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-const root = dirname(dirname(fileURLToPath(import.meta.url)));
+const pluginRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+const sharedSkillsRoot = join(pluginRoot, "..", "..", "shared-skills");
+
+async function readSkill(name) {
+	return readFile(join(sharedSkillsRoot, "skills", name, "SKILL.md"), "utf8");
+}
 
 test("#given synced lcx-report-bug skill #when inspected #then it files LazyCodex bug issues with generated labels", async () => {
 	// given
-	const skillRoot = join(root, "skills", "lcx-report-bug");
+	const skillRoot = join(sharedSkillsRoot, "skills", "lcx-report-bug");
 
 	// when
 	const skill = await readFile(join(skillRoot, "SKILL.md"), "utf8");
@@ -27,7 +32,7 @@ test("#given synced lcx-report-bug skill #when inspected #then it files LazyCode
 
 test("#given synced lcx-contribute-bug-fix skill #when inspected #then it delivers LazyCodex fixes as issues and upstream fixes as fork PRs", async () => {
 	// given
-	const skillRoot = join(root, "skills", "lcx-contribute-bug-fix");
+	const skillRoot = join(sharedSkillsRoot, "skills", "lcx-contribute-bug-fix");
 
 	// when
 	const skill = await readFile(join(skillRoot, "SKILL.md"), "utf8");
@@ -45,9 +50,9 @@ test("#given synced lcx-contribute-bug-fix skill #when inspected #then it delive
 	assert.match(interfaceMetadata, /- "fix bug pr"/);
 });
 
-test("#given synced lcx-doctor skill #when inspected #then it diagnoses installs against latest /tmp sources without mutating them", async () => {
+test("#given synced lcx-doctor skill #when inspected #then it diagnoses installs against latest temp-root sources without mutating them", async () => {
 	// given
-	const skillRoot = join(root, "skills", "lcx-doctor");
+	const skillRoot = join(sharedSkillsRoot, "skills", "lcx-doctor");
 
 	// when
 	const skill = await readFile(join(skillRoot, "SKILL.md"), "utf8");
@@ -58,4 +63,53 @@ test("#given synced lcx-doctor skill #when inspected #then it diagnoses installs
 	assert.match(interfaceMetadata, /display_name: "lcx-doctor \(omo\)"/);
 	assert.match(interfaceMetadata, /- "lazycodex doctor"/);
 	assert.match(interfaceMetadata, /- "lazycodex health check"/);
+});
+
+test("#given lcx source-sync skills #when inspected #then source caches are validated before reuse", async () => {
+	// given
+	const skillNames = ["lcx-doctor", "lcx-report-bug", "lcx-contribute-bug-fix"];
+
+	for (const skillName of skillNames) {
+		// when
+		const skill = await readSkill(skillName);
+
+		// then
+		assert.match(skill, /LAZYCODEX_SOURCE_ROOT="\$\{LAZYCODEX_SOURCE_ROOT:-\$\{TMPDIR:-\/tmp\}\/lazycodex-sources\}"/);
+		assert.match(skill, /git -C "\$DEST" rev-parse --is-inside-work-tree/);
+		assert.match(skill, /git -C "\$DEST" config --get remote\.origin\.url/);
+		assert.match(skill, /DEST\.corrupt\.\$\(date \+%Y%m%d%H%M%S\)/);
+		assert.doesNotMatch(skill, /if \[ ! -d "\$DEST\/\.git" \]; then/);
+		assert.doesNotMatch(skill, /sync_latest_source code-yeongyu\/lazycodex \/tmp\/lazycodex-source/);
+		assert.doesNotMatch(skill, /sync_latest_source openai\/codex \/tmp\/openai-codex-source/);
+	}
+});
+
+test("#given lcx-doctor skill #when inspected #then aggregate hook validation follows the current manifest", async () => {
+	// given
+	const skill = await readSkill("lcx-doctor");
+
+	// then
+	assert.match(skill, /\.codex-plugin\/plugin\.json/);
+	assert.match(skill, /manifest declares a `hooks` array/);
+	assert.match(skill, /validate every direct hook path declared by the manifest/);
+	assert.match(skill, /`hooks\/hooks\.json` only when the manifest declares it/);
+	assert.match(skill, /do not require retired paths such as `components\/workflow-selector`/);
+	assert.match(skill, /`hooks\/user-prompt-submit-selecting-lazycodex-workflow\.json` unless the current manifest declares them/);
+	assert.doesNotMatch(skill, /Plugin payload present and non-empty: `hooks\/hooks\.json`/);
+});
+
+test("#given lcx-doctor skill #when inspected #then runtime probes and materialized payloads distinguish expected rewrites from missing files", async () => {
+	// given
+	const skill = await readSkill("lcx-doctor");
+
+	// then
+	assert.match(skill, /manifest-declared runtime payload/);
+	assert.match(skill, /`dist\/cli\/index\.js` and `dist\/cli-node\/index\.js`/);
+	assert.match(skill, /install-time materialization rewrites as expected/);
+	assert.match(skill, /absolute `\.mcp\.json` runtime paths/);
+	assert.match(skill, /Missing or zero-byte rewritten targets are FAIL/);
+	assert.match(skill, /Use the configured Codex default model/);
+	assert.match(skill, /unless the user explicitly passed a model override/);
+	assert.match(skill, /never force a guessed\/rejected model such as `gpt-5\.5-codex-mini`/);
+	assert.doesNotMatch(skill, /--model gpt-5\.5-codex-mini/);
 });

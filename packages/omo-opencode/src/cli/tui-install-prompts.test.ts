@@ -50,7 +50,7 @@ describe("promptInstallPlatform", () => {
     mock.restore()
   })
 
-  test("offers OpenCode, Codex, and Both choices", async () => {
+  test("offers OpenCode, Codex, Both, and Senpi choices", async () => {
     // given
     const selectSpy = spyOn(p, "select").mockResolvedValue("opencode")
 
@@ -66,6 +66,7 @@ describe("promptInstallPlatform", () => {
         { value: "opencode" },
         { value: "codex" },
         { value: "both" },
+        { value: "senpi" },
       ],
     })
   })
@@ -86,6 +87,7 @@ describe("promptInstallPlatform", () => {
         { value: "opencode" },
         { value: "codex" },
         { value: "both" },
+        { value: "senpi" },
       ],
     })
   })
@@ -116,6 +118,23 @@ describe("promptInstallConfig platform branching", () => {
       hasOpenCode: false,
       hasCodex: true,
       codexAutonomous: true,
+    } satisfies Partial<InstallConfig>)
+    expect(selectSpy).not.toHaveBeenCalled()
+  })
+
+  test("skips OpenCode questions when the user selects senpi", async () => {
+    // given
+    const selectSpy = spyOn(p, "select").mockResolvedValue("no")
+
+    // when
+    const config = await prompts.promptInstallConfig(createDetectedConfig(), "senpi")
+
+    // then
+    expect(config).toMatchObject({
+      platform: "senpi",
+      hasOpenCode: false,
+      hasCodex: false,
+      hasSenpi: true,
     } satisfies Partial<InstallConfig>)
     expect(selectSpy).not.toHaveBeenCalled()
   })

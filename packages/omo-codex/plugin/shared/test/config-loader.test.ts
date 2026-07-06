@@ -49,6 +49,40 @@ describe("getCodexOmoConfig", () => {
 			install_dir: "/base",
 			telemetry: false,
 		})
+		expect(result.trustedCodegraphInstallDir).toBe("/base")
+	})
+
+	it("#given project SOT sets install_dir #when loading config #then only the effective value changes while trusted install root stays global", () => {
+		// given
+		const homeDir = createTemporaryDirectory("omo-codex-shared-trusted-home-")
+		const cwd = createTemporaryDirectory("omo-codex-shared-trusted-project-")
+		writeOmoConfig(homeDir, JSON.stringify({ codegraph: { enabled: true, install_dir: "/global-codegraph" } }))
+		writeOmoConfig(cwd, JSON.stringify({ codegraph: { install_dir: "/project-codegraph" } }))
+
+		// when
+		const result = getCodexOmoConfig({ cwd, homeDir, env: {} })
+
+		// then
+		expect(result.codegraph?.install_dir).toBe("/project-codegraph")
+		expect(result.trustedCodegraphInstallDir).toBe("/global-codegraph")
+	})
+
+	it("#given codex SOT sets CodeGraph excluded roots #when loading config #then roots are returned to hooks", () => {
+		// given
+		const homeDir = createTemporaryDirectory("omo-codex-shared-excluded-home-")
+		const cwd = createTemporaryDirectory("omo-codex-shared-excluded-project-")
+		writeOmoConfig(
+			homeDir,
+			JSON.stringify({
+				"[codex]": { codegraph: { excluded_roots: ["/tmp/omo-research", "/private/tmp/omo-research"] } },
+			}),
+		)
+
+		// when
+		const result = getCodexOmoConfig({ cwd, homeDir, env: {} })
+
+		// then
+		expect(result.codegraph?.excluded_roots).toEqual(["/tmp/omo-research", "/private/tmp/omo-research"])
 	})
 
 	it("#given legacy env override and SOT value #when loading config #then env wins over the SOT", () => {

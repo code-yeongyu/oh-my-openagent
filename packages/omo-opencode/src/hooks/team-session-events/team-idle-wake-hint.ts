@@ -38,7 +38,10 @@ type TeamIdleWakeHintContext = {
 
 type HookInput = { event: { type: string; properties?: unknown } }
 export type HookImpl = (input: HookInput) => Promise<void>
-type TeamIdleWakeHintOptions = { idleSettleMs?: number }
+type TeamIdleWakeHintOptions = {
+  idleSettleMs?: number
+  postDispatchHoldMs?: number
+}
 const WAKE_HINT_DUPLICATE_SUPPRESSION_MS = 30_000
 
 function getIdleSessionID(properties: unknown): string | undefined {
@@ -229,6 +232,7 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
         sessionID,
         source: "team-idle-wake-hint",
         settleMs: options?.idleSettleMs,
+        postDispatchHoldMs: options?.postDispatchHoldMs,
         queueBehavior: "defer",
         input: {
           path: { id: sessionID },

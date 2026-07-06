@@ -85,7 +85,7 @@ Generator/checker note: update this file with the audited component list, then r
 - Where-bundled: root production dependency for OpenCode API access.
 
 ### CodeGraph bundled Node.js runtime
-- License: Node.js MIT license plus bundled third-party licenses for runtime components such as OpenSSL and V8. The inspected CodeGraph platform tarballs include the Node.js binary but no separate Node LICENSE or NOTICE files.
+- License: Node.js MIT license plus bundled third-party licenses for runtime components such as OpenSSL and V8. The inspected CodeGraph platform tarballs include the Node.js binary but no separate Node LICENSE or NOTICE files; the Codex CodeGraph component therefore ships Node.js v24.16.0 license text at `packages/omo-codex/plugin/components/codegraph/NODE-RUNTIME-LICENSES.md`.
 - Copyright: Node.js contributors, OpenSSL Software Foundation, V8 authors, and other Node.js third-party contributors.
 - Upstream URL: https://nodejs.org/
 - Where-bundled: each `@colbymchenry/codegraph-*` platform bundle includes `node` or `node.exe`.

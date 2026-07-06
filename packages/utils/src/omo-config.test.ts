@@ -10,6 +10,7 @@ describe("validateOmoConfig", () => {
         auto_provision: true,
         enabled: true,
         install_dir: "~/.omo/codegraph",
+        excluded_roots: ["/tmp/omo-scratch"],
         telemetry: false,
         watch_debounce_ms: 2_000,
       },

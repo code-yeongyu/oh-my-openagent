@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
-import { open, readFile, rename, rm, unlink } from "node:fs/promises"
+import { access, open, readFile, rename, rm, unlink } from "node:fs/promises"
+import { dirname } from "node:path"
 
 import { tolerantFsync } from "../tolerant-fsync"
 
@@ -14,8 +15,20 @@ type AtomicWriteDeps = {
   rm?: typeof rm
 }
 
+type LockOpenErrorDeps = {
+  readonly access?: typeof access
+  readonly platform?: NodeJS.Platform
+}
+
+type LockReleaseDeps = {
+  readonly delay?: typeof delay
+  readonly unlink?: typeof unlink
+}
+
 const LOCK_RETRY_MS = 50
 const LOCK_WAIT_TIMEOUT_MS = 15_000
+const LOCK_RELEASE_RETRY_ATTEMPTS = 3
+const LOCK_RELEASE_RETRY_MS = 25
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -37,6 +50,46 @@ function parseOwnerContent(content: string): { ownerPid: number; acquiredAtEpoch
   if (!Number.isInteger(acquiredAtEpochMs) || acquiredAtEpochMs <= 0) return null
 
   return { ownerPid, acquiredAtEpochMs }
+}
+
+function errorCode(error: unknown): string | null {
+  if (!(error instanceof Error) || !("code" in error)) return null
+  return typeof error.code === "string" ? error.code : null
+}
+
+function isPathAbsenceError(error: unknown): boolean {
+  const code = errorCode(error)
+  return code === "ENOENT" || code === "ENOTDIR"
+}
+
+function isRetryableLockReleaseError(error: unknown): boolean {
+  const code = errorCode(error)
+  return code === "EPERM" || code === "EBUSY"
+}
+
+async function pathMayExist(path: string, deps: LockOpenErrorDeps = {}): Promise<boolean> {
+  const accessPath = deps.access ?? access
+  try {
+    await accessPath(path)
+    return true
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
+    return !isPathAbsenceError(error)
+  }
+}
+
+export async function assertRetryableLockOpenError(
+  lockPath: string,
+  error: unknown,
+  deps?: LockOpenErrorDeps,
+): Promise<void> {
+  const code = errorCode(error)
+  if (code === "EEXIST") return
+  if (code === "EPERM") {
+    if (await pathMayExist(lockPath, deps)) return
+    if ((deps?.platform ?? process.platform) === "win32" && (await pathMayExist(dirname(lockPath), deps))) return
+  }
+  throw error
 }
 
 function isPidAlive(pid: number): boolean {
@@ -68,8 +121,7 @@ async function acquireLock(lockPath: string, ownerTag: string, staleAfterMs: num
       }
       return
     } catch (error) {
-      const err = error as NodeJS.ErrnoException
-      if (err.code !== "EEXIST") throw error
+      await assertRetryableLockOpenError(lockPath, error)
 
       if (await detectStaleLock(lockPath, staleAfterMs)) {
         await reapStaleLock(lockPath)
@@ -115,11 +167,21 @@ export async function detectStaleLock(lockPath: string, staleAfterMs: number): P
   }
 }
 
-export async function reapStaleLock(lockPath: string): Promise<void> {
-  await unlink(lockPath).catch((error: unknown) => {
-    if (error instanceof Error) return undefined
-    return undefined
-  })
+export async function reapStaleLock(lockPath: string, deps: LockReleaseDeps = {}): Promise<void> {
+  const wait = deps.delay ?? delay
+  const unlinkFile = deps.unlink ?? unlink
+
+  for (let attempt = 1; attempt <= LOCK_RELEASE_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      await unlinkFile(lockPath)
+      return
+    } catch (error) {
+      if (!(error instanceof Error)) return
+      if (isPathAbsenceError(error)) return
+      if (!isRetryableLockReleaseError(error) || attempt === LOCK_RELEASE_RETRY_ATTEMPTS) return
+      await wait(LOCK_RELEASE_RETRY_MS)
+    }
+  }
 }
 
 export async function atomicWrite(

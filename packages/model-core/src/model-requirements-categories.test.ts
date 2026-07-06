@@ -29,6 +29,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary?.model).toBe("gpt-5.5")
     expect(primary?.providers).toContain("openai")
     expect(primary?.providers).toContain("github-copilot")
+    expect(primary?.providers).not.toContain("venice")
   })
 
   test("visual-engineering keeps gemini, glm, opus, opencode-go, and k2p5 fallback order", () => {

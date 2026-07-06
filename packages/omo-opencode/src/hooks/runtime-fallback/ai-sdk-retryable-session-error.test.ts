@@ -19,6 +19,7 @@ describe("runtime-fallback AI SDK retryable session errors", () => {
       max_fallback_attempts: 3,
       cooldown_seconds: 60,
       notify_on_fallback: false,
+      restore_primary_after_cooldown: false,
     }
   }
 

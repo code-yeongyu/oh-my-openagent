@@ -1,6 +1,6 @@
 {
 	"name": "@code-yeongyu/codex-start-work-continuation",
-	"version": "4.10.0",
+	"version": "4.15.1",
 	"description": "Codex Stop hook continuation injector for omo-codex start-work plans.",
 	"type": "module",
 	"packageManager": "npm@11.12.1",
@@ -42,7 +42,6 @@
 		"NOTICE"
 	],
 	"devDependencies": {
-		"@oh-my-opencode/boulder-state": "file:../../../../boulder-state",
 		"@biomejs/biome": "2.4.16",
 		"@types/node": "^25.9.3",
 		"typescript": "^6.0.3",

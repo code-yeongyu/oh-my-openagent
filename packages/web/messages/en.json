@@ -30,8 +30,26 @@
       "monthlyDownloads": "{count} Monthly Downloads",
       "lifecycleHooks": "{count} Lifecycle Hooks",
       "installCommand": "bunx oh-my-openagent install",
+      "codexInstallCommand": "npx lazycodex-ai install",
+      "codexLabel": "Codex CLI Edition",
       "getStarted": "Get Started",
       "viewOnGitHub": "View on GitHub"
+    },
+    "editions": {
+      "title": "Two Editions, One Brain",
+      "subtitle": "Same orchestration engine. Pick your harness.",
+      "ultimate": {
+        "name": "Ultimate",
+        "platform": "OpenCode",
+        "description": "Full plugin with 11 agents, Team Mode, background tasks, 3-tier MCP, and 60+ lifecycle hooks.",
+        "install": "bunx oh-my-openagent install"
+      },
+      "light": {
+        "name": "Light",
+        "platform": "Codex CLI",
+        "description": "8 components — comment-checker, git-bash, LSP, rules, start-work-continuation, telemetry, ultrawork, ulw-loop — wired to Codex events.",
+        "install": "npx lazycodex-ai install"
+      }
     },
     "ulw": {
       "badge": "The Magic Word",
@@ -142,7 +160,7 @@
       "model": "GPT 5.5 Medium"
     },
     "teamMode": {
-      "badge": "NEW · v4.0",
+      "badge": "v4.0+",
       "title": "Team Mode",
       "headline": "Multiple Agents. Side-by-Side. In Parallel.",
       "description": "A lead agent orchestrates a team of category-specialized members, all running in parallel and communicating through dedicated tools. Watch every member work simultaneously in tmux. Opt-in — flip team_mode.enabled and restart.",
@@ -180,7 +198,7 @@
     },
     "agents": {
       "title": "Specialized Agents",
-      "subtitle": "Five built-in agents for common workflows. Plus a dynamic system that assembles custom agents on demand.",
+      "subtitle": "Eight built-in agents for common workflows. Plus a dynamic system that assembles custom agents on demand.",
       "oracle": {
         "name": "Oracle",
         "role": "Architecture Consultant",
@@ -210,6 +228,24 @@
         "role": "Plan Reviewer",
         "model": "GPT 5.5 xHigh",
         "description": "Ruthless validation. Only approves when the plan is bulletproof."
+      },
+      "atlas": {
+        "name": "Atlas",
+        "role": "Parallel Task Executor",
+        "model": "Claude Opus 4.7",
+        "description": "Orchestrates multi-step plans with dependency tracking. Delegates to specialists and verifies independently."
+      },
+      "sisyphusJunior": {
+        "name": "Sisyphus-Junior",
+        "role": "Focused Task Executor",
+        "model": "Per-category",
+        "description": "Same discipline as Sisyphus, no delegation. Executes single tasks end-to-end with evidence-bound QA."
+      },
+      "multimodalLooker": {
+        "name": "Multimodal-Looker",
+        "role": "Media Analysis",
+        "model": "Claude Sonnet 4.6",
+        "description": "Extracts information from PDFs, images, and diagrams. Quick summary extraction without full reads."
       },
       "dynamicSystem": {
         "name": "Dynamic Agent",

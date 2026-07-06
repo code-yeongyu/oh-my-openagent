@@ -1,6 +1,40 @@
 import { describe, expect, test } from "bun:test"
 import { stat } from "node:fs/promises"
 
+interface NpmPackFile {
+  readonly path: string
+}
+
+interface NpmPackEntry {
+  readonly files: readonly NpmPackFile[]
+}
+
+class NpmPackJsonShapeError extends Error {
+  constructor() {
+    super("npm pack --json output did not match expected file manifest shape")
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
+function isNpmPackFile(value: unknown): value is NpmPackFile {
+  return isRecord(value) && typeof value.path === "string"
+}
+
+function isNpmPackEntry(value: unknown): value is NpmPackEntry {
+  return isRecord(value) && Array.isArray(value.files) && value.files.every(isNpmPackFile)
+}
+
+function parseNpmPackEntries(stdout: string): readonly NpmPackEntry[] {
+  const parsed: unknown = JSON.parse(stdout)
+  if (!Array.isArray(parsed) || !parsed.every(isNpmPackEntry)) {
+    throw new NpmPackJsonShapeError()
+  }
+  return parsed
+}
+
 describe("shared skills package manifest", () => {
   test("#given root package metadata #when shared-skills package is required #then workspace and tarball entries include it", async () => {
     // given
@@ -35,7 +69,7 @@ describe("shared skills package manifest", () => {
 
   test("#given shared user skills #when copied into the package #then frontmatter and resource directories are preserved", async () => {
     // given
-    const copiedSkills = ["debugging", "programming", "refactor", "remove-ai-slops"] as const
+    const copiedSkills = ["coding-agent-sessions", "debugging", "programming", "refactor", "remove-ai-slops"] as const
 
     // when
     const skillFiles = await Promise.all(
@@ -51,7 +85,39 @@ describe("shared skills package manifest", () => {
       expect(skill.content).toContain(`name: ${skill.name}`)
     }
     expect((await stat("packages/shared-skills/skills/debugging/references")).isDirectory()).toBe(true)
+    expect((await stat("packages/shared-skills/skills/coding-agent-sessions/scripts")).isDirectory()).toBe(true)
+    expect((await stat("packages/shared-skills/skills/coding-agent-sessions/references")).isDirectory()).toBe(true)
     expect((await stat("packages/shared-skills/skills/programming/references")).isDirectory()).toBe(true)
     expect((await stat("packages/shared-skills/skills/programming/scripts")).isDirectory()).toBe(true)
+  })
+
+  test("#given coding-agent-sessions skill #when shared-skills is packed #then dev fixtures and caches are excluded", () => {
+    // when
+    const result = Bun.spawnSync(["npm", "pack", "--dry-run", "--json", "./packages/shared-skills"], {
+      cwd: process.cwd(),
+      stderr: "pipe",
+      stdout: "pipe",
+    })
+
+    // then
+    expect(result.exitCode).toBe(0)
+    const entries = parseNpmPackEntries(result.stdout.toString())
+    const files = entries[0]?.files.map((file) => file.path) ?? []
+    const codingAgentFiles = files.filter((file) => file.startsWith("skills/coding-agent-sessions/"))
+    const forbiddenFiles = codingAgentFiles.filter(
+      (file) =>
+        file.startsWith("skills/coding-agent-sessions/scripts/tests/") ||
+        file.includes("__pycache__") ||
+        file.endsWith(".pyc") ||
+        file.includes(".pytest_cache") ||
+        file.includes(".ruff_cache") ||
+        file.endsWith(".gitignore") ||
+        file.endsWith("pyrightconfig.json"),
+    )
+
+    expect(codingAgentFiles).toContain("skills/coding-agent-sessions/scripts/find-agent-sessions.py")
+    expect(codingAgentFiles).toContain("skills/coding-agent-sessions/scripts/agent_sessions/cli.py")
+    expect(codingAgentFiles).toContain("skills/coding-agent-sessions/references/all-platforms.md")
+    expect(forbiddenFiles).toEqual([])
   })
 })

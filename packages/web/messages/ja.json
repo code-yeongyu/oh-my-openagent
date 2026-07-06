@@ -30,8 +30,26 @@
       "monthlyDownloads": "月間{count}+ダウンロード",
       "lifecycleHooks": "{count}+ライフサイクルHooks",
       "installCommand": "bunx oh-my-openagent install",
+      "codexInstallCommand": "npx lazycodex-ai install",
+      "codexLabel": "Codex CLI エディション",
       "getStarted": "始める",
       "viewOnGitHub": "GitHubで見る"
+    },
+    "editions": {
+      "title": "2つのエディション、1つの頭脳",
+      "subtitle": "同じオーケストレーションエンジン。ハーネスを選ぶだけ。",
+      "ultimate": {
+        "name": "Ultimate",
+        "platform": "OpenCode",
+        "description": "11エージェント、Team Mode、バックグラウンドタスク、3-tier MCP、60+ライフサイクルフックを備えたフルプラグイン。",
+        "install": "bunx oh-my-openagent install"
+      },
+      "light": {
+        "name": "Light",
+        "platform": "Codex CLI",
+        "description": "8コンポーネント — comment-checker, git-bash, LSP, rules, start-work-continuation, telemetry, ultrawork, ulw-loop — Codexイベントに接続。",
+        "install": "npx lazycodex-ai install"
+      }
     },
     "ulw": {
       "badge": "魔法の言葉",
@@ -142,7 +160,7 @@
       "model": "GPT 5.5 Medium"
     },
     "teamMode": {
-      "badge": "NEW · v4.0",
+      "badge": "v4.0+",
       "title": "Team Mode",
       "headline": "複数のエージェント。横並び。並列で。",
       "description": "リードエージェントがカテゴリ特化のメンバーチームを統括します。全員が並列で動き、専用ツールでリアルタイムに通信。tmuxで全メンバーの作業を同時に観察できます。オプトイン — team_mode.enabledを切り替えて再起動。",
@@ -180,7 +198,7 @@
     },
     "agents": {
       "title": "Specialized Agents",
-      "subtitle": "5つの専用エージェントに加え、必要に応じて生成されるダイナミックエージェント。",
+      "subtitle": "8つの専用エージェントに加え、必要に応じて生成されるダイナミックエージェント。",
       "oracle": {
         "name": "Oracle",
         "role": "Architecture Consultant",
@@ -210,6 +228,24 @@
         "role": "Plan Reviewer",
         "model": "GPT 5.5 xHigh",
         "description": "容赦ない検証。プランが弾丸不可能な時だけ承認する。"
+      },
+      "atlas": {
+        "name": "Atlas",
+        "role": "並列タスク実行",
+        "model": "Claude Opus 4.7",
+        "description": "依存関係追跡付きで多段階プランをオーケストレーション。専門家に委任し、独立して検証する。"
+      },
+      "sisyphusJunior": {
+        "name": "Sisyphus-Junior",
+        "role": "集中タスク実行",
+        "model": "カテゴリ別",
+        "description": "Sisyphusと同じ規律、委任なし。証拠ベースのQAで単一タスクを最後まで実行。"
+      },
+      "multimodalLooker": {
+        "name": "Multimodal-Looker",
+        "role": "メディア分析",
+        "model": "Claude Sonnet 4.6",
+        "description": "PDF、画像、図から情報を抽出。全体読みなしで素早く要約を取り出す。"
       },
       "dynamicSystem": {
         "name": "Dynamic Agent",

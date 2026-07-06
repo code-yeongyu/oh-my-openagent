@@ -1,4 +1,6 @@
 import { extname } from "node:path"
+import { execPath as processExecPath } from "node:process"
+import { buildCodegraphChildEnv } from "@oh-my-opencode/utils"
 
 export interface CodegraphCommandResult {
   readonly exitCode: number
@@ -18,6 +20,7 @@ export interface CodegraphCommandInvocation {
 }
 
 const WINDOWS_CMD_EXTENSIONS = new Set([".bat", ".cmd"])
+const WINDOWS_NODE_SCRIPT_EXTENSIONS = new Set([".cjs", ".js", ".mjs"])
 
 function toOutputText(value: string | Buffer): string {
   return Buffer.isBuffer(value) ? value.toString("utf8") : value
@@ -47,7 +50,7 @@ export async function runCodegraphCommand(
       {
         cwd: projectRoot,
         encoding: "utf8",
-        env: { ...process.env, ...options.env },
+        env: buildCodegraphChildEnv({ ambientEnv: process.env, codegraphEnv: options.env }),
         maxBuffer: 1024 * 1024,
         timeout: options.timeoutMs,
         windowsHide: true,
@@ -75,6 +78,8 @@ export function resolveCodegraphCommandInvocation(
   platform: NodeJS.Platform = process.platform,
 ): CodegraphCommandInvocation {
   if (platform !== "win32") return { args: [...args], command }
-  if (!WINDOWS_CMD_EXTENSIONS.has(extname(command).toLowerCase())) return { args: [...args], command }
+  const extension = extname(command).toLowerCase()
+  if (WINDOWS_NODE_SCRIPT_EXTENSIONS.has(extension)) return { args: [command, ...args], command: processExecPath }
+  if (!WINDOWS_CMD_EXTENSIONS.has(extension)) return { args: [...args], command }
   return { args: ["/d", "/s", "/c", command, ...args], command: "cmd.exe" }
 }
