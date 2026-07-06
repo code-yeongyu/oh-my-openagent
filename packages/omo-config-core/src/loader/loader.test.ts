@@ -90,6 +90,43 @@ describe("loadOmoConfig", () => {
     expect("polluted" in Object.prototype).toBe(false)
   })
 
+  test("#given same-key partial team layers #when loading #then final team merges members and description", () => {
+    // given
+    const fixture = makeFixture()
+    writeJsonc(
+      join(fixture.xdgConfigHome, "omo", "omo.jsonc"),
+      `{
+        "teams": {
+          "alpha": {
+            "members": [{ "name": "one", "kind": "category", "category": "quick", "prompt": "go" }]
+          }
+        }
+      }`,
+    )
+    writeJsonc(
+      join(fixture.projectDir, ".omo", "omo.jsonc"),
+      `{
+        "teams": {
+          "alpha": {
+            "description": "near layer description"
+          }
+        }
+      }`,
+    )
+
+    // when
+    const result = loadOmoConfig({
+      cwd: fixture.cwd,
+      env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+      platform: "linux",
+    })
+
+    // then
+    expect(result.diagnostics).toEqual([])
+    expect(result.config.teams?.alpha?.description).toBe("near layer description")
+    expect(result.config.teams?.alpha?.members[0]?.name).toBe("one")
+  })
+
   test("#given malformed and unreadable configs #when loading #then defaults survive and typed diagnostics identify paths", () => {
     // given
     const fixture = makeFixture()
