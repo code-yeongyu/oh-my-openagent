@@ -26,8 +26,14 @@ export type PersistedTaskEvent = {
 export type TaskRecordStore = {
   readonly stateDir: string
   readonly save: (record: TaskRecord) => void
+  // Manager-owned overwrite for bookkeeping that lives OUTSIDE the status transition table (revive
+  // epoch bump, notification epoch persistence). Normal status changes must use transition().
+  readonly replace: (record: TaskRecord) => void
   readonly load: (taskId: string) => TaskRecord | null
   readonly list: () => ListTaskRecordsResult
   readonly appendEvent: (taskId: string, event: PersistedTaskEvent) => string
   readonly transition: (taskId: string, transition: TaskTransition) => TaskTransitionResult
+  // TTL cleanup only (lifecycle-owned): drop a record and its JSONL log. Idempotent on a missing
+  // record. Normal terminal transitions must NEVER delete a record - they use transition().
+  readonly remove: (taskId: string) => void
 }
