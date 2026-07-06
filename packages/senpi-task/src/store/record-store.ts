@@ -35,6 +35,9 @@ export function createTaskRecordStore(config: StateDirConfig): TaskRecordStore {
     save(record) {
       writeRecord(stateDir, record, "create")
     },
+    replace(record) {
+      writeRecord(stateDir, record, "replace")
+    },
     load(taskId) {
       const path = taskPath(stateDir, parseTaskId(taskId))
       return readRecord(path)
