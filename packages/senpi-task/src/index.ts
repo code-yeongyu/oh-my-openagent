@@ -28,6 +28,29 @@ export type {
 export { createMinimalSenpiResourceLoader } from "./senpi/minimal-resource-loader"
 export type { MinimalSenpiResourceLoaderOptions } from "./senpi/minimal-resource-loader"
 export {
+  SenpiTeamSpecError,
+  TEAM_LEAD_SENTINEL,
+  ensureTeamRuntimeDirs,
+  loadTeamRegistry,
+  normalizeSenpiTeamSpec,
+  resolveProjectTeamSpecPath,
+  resolveTeamMemberInboxDir,
+  resolveTeamRuntimeDirs,
+  teamStorageBaseDir,
+  validateSenpiTeamMembers,
+} from "./team"
+export type {
+  LoadTeamRegistryInput,
+  LoadTeamRegistryResult,
+  NormalizeSenpiTeamSpecOptions,
+  SenpiTeamMemberPorts,
+  SenpiTeamSpecErrorCode,
+  TeamRegistryEntry,
+  TeamRegistryError,
+  TeamRuntimeDirs,
+  TeamSpecSource,
+} from "./team"
+export {
   BUILTIN_CATEGORY_DEFAULTS,
   CATEGORY_DESCRIPTIONS,
   CATEGORY_PROMPT_APPENDS,
