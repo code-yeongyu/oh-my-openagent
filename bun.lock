@@ -44,6 +44,7 @@
         "@oh-my-opencode/pi-webfetch": "workspace:*",
         "@oh-my-opencode/prompts-core": "workspace:*",
         "@oh-my-opencode/rules-engine": "workspace:*",
+        "@oh-my-opencode/senpi-task": "workspace:*",
         "@oh-my-opencode/shared-skills": "workspace:*",
         "@oh-my-opencode/skills-loader-core": "workspace:*",
         "@oh-my-opencode/team-core": "workspace:*",
@@ -220,10 +221,10 @@
         "vscode-jsonrpc": "^8.2.1",
       },
       "devDependencies": {
-        "@code-yeongyu/senpi": "2026.7.3",
+        "@code-yeongyu/senpi": "2026.7.5-2",
       },
       "peerDependencies": {
-        "@code-yeongyu/senpi": "*",
+        "@code-yeongyu/senpi": "2026.7.5-2",
       },
       "optionalPeers": [
         "@code-yeongyu/senpi",
@@ -300,6 +301,25 @@
         "@oh-my-opencode/utils": "workspace:*",
         "picomatch": "^4.0.4",
       },
+    },
+    "packages/senpi-task": {
+      "name": "@oh-my-opencode/senpi-task",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/delegate-core": "workspace:*",
+        "@oh-my-opencode/omo-config-core": "workspace:*",
+        "@oh-my-opencode/team-core": "workspace:*",
+        "@oh-my-opencode/utils": "workspace:*",
+      },
+      "devDependencies": {
+        "@code-yeongyu/senpi": "2026.7.5-2",
+      },
+      "peerDependencies": {
+        "@code-yeongyu/senpi": "2026.7.5-2",
+      },
+      "optionalPeers": [
+        "@code-yeongyu/senpi",
+      ],
     },
     "packages/shared-skills": {
       "name": "@oh-my-opencode/shared-skills",
@@ -494,7 +514,7 @@
 
     "@code-yeongyu/comment-checker": ["@code-yeongyu/comment-checker@0.8.0", "", { "bin": { "comment-checker": "cli.js" } }, "sha512-Ret0qHtgDhEemQYNduqSyaihFWJSOKae4YW3sUHS680G8K57CsRUkK6Gs4kbzDuWqiNUYs254+qu5hZZZSEKUA=="],
 
-    "@code-yeongyu/senpi": ["@code-yeongyu/senpi@2026.7.3", "", { "dependencies": { "@anthropic-ai/sdk": "0.91.1", "@aws-sdk/client-bedrock-runtime": "3.1048.0", "@earendil-works/pi-agent-core": "^2026.7.3", "@earendil-works/pi-ai": "^2026.7.3", "@earendil-works/pi-tui": "^2026.7.3", "@mistralai/mistralai": "2.2.6", "@mozilla/readability": "0.6.0", "@opentelemetry/api": "1.9.0", "@silvia-odwyer/photon-node": "0.3.4", "@smithy/node-http-handler": "4.7.3", "@smithy/types": "4.8.0", "chalk": "5.6.2", "cross-spawn": "7.0.6", "diff": "8.0.4", "get-east-asian-width": "1.6.0", "glob": "13.0.6", "highlight.js": "10.7.3", "hosted-git-info": "9.0.3", "http-proxy-agent": "7.0.2", "https-proxy-agent": "7.0.6", "ignore": "7.0.5", "jiti": "2.7.0", "jsdom": "29.1.1", "marked": "18.0.5", "minimatch": "10.2.5", "openai": "6.26.0", "partial-json": "0.1.7", "picomatch": "4.0.4", "proper-lockfile": "4.1.2", "proxy-from-env": "1.1.0", "semver": "7.8.0", "turndown": "7.2.4", "typebox": "1.1.38", "undici": "8.5.0", "yaml": "2.9.0" }, "optionalDependencies": { "@mariozechner/clipboard": "0.3.9" }, "bin": { "senpi": "dist/cli.js" } }, "sha512-OCmH3yd333Mlm/d29wqaur2aNW9zMdjROmWTzLD+pimIW0MqRijzqe0RGMmXNnPZyka4DZMCWGXDKtM5jPg7sA=="],
+    "@code-yeongyu/senpi": ["@code-yeongyu/senpi@2026.7.5-2", "", { "dependencies": { "@anthropic-ai/sdk": "0.91.1", "@aws-sdk/client-bedrock-runtime": "3.1048.0", "@earendil-works/pi-agent-core": "^2026.7.5-2", "@earendil-works/pi-ai": "^2026.7.5-2", "@earendil-works/pi-tui": "^2026.7.5-2", "@mistralai/mistralai": "2.2.6", "@mozilla/readability": "0.6.0", "@opentelemetry/api": "1.9.0", "@silvia-odwyer/photon-node": "0.3.4", "@smithy/node-http-handler": "4.7.3", "@smithy/types": "4.8.0", "chalk": "5.6.2", "cross-spawn": "7.0.6", "diff": "8.0.4", "get-east-asian-width": "1.6.0", "glob": "13.0.6", "highlight.js": "10.7.3", "hosted-git-info": "9.0.3", "http-proxy-agent": "7.0.2", "https-proxy-agent": "7.0.6", "ignore": "7.0.5", "jiti": "2.7.0", "jsdom": "29.1.1", "marked": "18.0.5", "minimatch": "10.2.5", "openai": "6.26.0", "partial-json": "0.1.7", "picomatch": "4.0.4", "proper-lockfile": "4.1.2", "proxy-from-env": "1.1.0", "semver": "7.8.0", "turndown": "7.2.4", "typebox": "1.1.38", "undici": "8.5.0", "yaml": "2.9.0" }, "optionalDependencies": { "@mariozechner/clipboard": "0.3.9" }, "bin": { "senpi": "dist/cli.js" } }, "sha512-1RTLYWLm3XjchJq3GvCltlm/IJzIeAkJWk12iSU27QSo1rDTqP7KFMRoeoZ5IkZVsSOkANDpsrqIGV/7kim6ug=="],
 
     "@csstools/color-helpers": ["@csstools/color-helpers@6.1.0", "", {}, "sha512-064IFJdjTfUqnjpCVpMOdbr8FLQBhinbZj6yRv2An2E41O/pLEXqfFRWqGq/SxlE5PEUYTlvWsG2r8MswAVvkg=="],
 
@@ -619,6 +639,8 @@
     "@oh-my-opencode/prompts-core": ["@oh-my-opencode/prompts-core@workspace:packages/prompts-core"],
 
     "@oh-my-opencode/rules-engine": ["@oh-my-opencode/rules-engine@workspace:packages/rules-engine"],
+
+    "@oh-my-opencode/senpi-task": ["@oh-my-opencode/senpi-task@workspace:packages/senpi-task"],
 
     "@oh-my-opencode/shared-skills": ["@oh-my-opencode/shared-skills@workspace:packages/shared-skills"],
 
