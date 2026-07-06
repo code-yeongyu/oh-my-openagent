@@ -24,6 +24,21 @@ function registry(models: readonly FakeModel[]): FakeRegistry {
   }
 }
 
+function throwingProviderAccessorModel(message: string): object {
+  return Object.defineProperties({}, {
+    provider: {
+      enumerable: true,
+      get() {
+        throw new Error(message)
+      },
+    },
+    id: {
+      enumerable: true,
+      value: "gpt-5.4-mini",
+    },
+  })
+}
+
 function expectResolved(result: ReturnType<typeof resolveCategory<FakeModel>>): Extract<typeof result, { readonly kind: "resolved" }> {
   if (result.kind !== "resolved") {
     throw new Error(`Expected resolved category, got ${result.kind}`)
@@ -68,6 +83,26 @@ describe("resolveCategory boundary parsing", () => {
     expect(result.availableModels).toEqual([])
   })
 
+  test("#given getAvailable returns a throwing-accessor model #when resolved #then category resolution returns sanitized model_unavailable", () => {
+    // given
+    const throwingModel = throwingProviderAccessorModel("hidden available accessor marker")
+    const resolver = () => resolveCategory("quick", {}, {
+      getAvailable: () => [throwingModel],
+      find: () => undefined,
+    })
+
+    // when
+    expect(resolver).not.toThrow()
+    const result = resolver()
+
+    // then
+    expect(result.kind).toBe("model_unavailable")
+    if (result.kind !== "model_unavailable") throw new Error(`Expected unavailable result, got ${result.kind}`)
+    expect(result.attemptedModel).toBe("openai/gpt-5.4-mini")
+    expect(result.availableModels).toEqual([])
+    expect(JSON.stringify(result)).not.toContain("hidden available accessor marker")
+  })
+
   test("#given malformed truthy find results #when resolved #then category resolution returns sanitized model_unavailable", () => {
     // given
     const malformedFindResults = [
@@ -93,6 +128,27 @@ describe("resolveCategory boundary parsing", () => {
       expect(result.availableModels).toEqual(["openai/gpt-5.4-mini"])
       expect(JSON.stringify(result)).not.toContain("hidden")
     }
+  })
+
+  test("#given find returns a throwing-accessor model #when resolved #then category resolution returns sanitized model_unavailable", () => {
+    // given
+    const availableModel = model("openai", "gpt-5.4-mini")
+    const throwingModel = throwingProviderAccessorModel("hidden find accessor marker")
+    const resolver = () => resolveCategory("quick", {}, {
+      getAvailable: () => [availableModel],
+      find: () => throwingModel,
+    })
+
+    // when
+    expect(resolver).not.toThrow()
+    const result = resolver()
+
+    // then
+    expect(result.kind).toBe("model_unavailable")
+    if (result.kind !== "model_unavailable") throw new Error(`Expected unavailable result, got ${result.kind}`)
+    expect(result.attemptedModel).toBe("openai/gpt-5.4-mini")
+    expect(result.availableModels).toEqual(["openai/gpt-5.4-mini"])
+    expect(JSON.stringify(result)).not.toContain("hidden find accessor marker")
   })
 
   test("#given inherited model identity fields #when resolved #then category resolution rejects them without leaking prototype data", () => {

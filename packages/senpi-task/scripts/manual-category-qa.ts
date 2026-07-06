@@ -11,6 +11,21 @@ function model(provider: string, id: string): QaModel {
   return { provider, id, name: `${provider}/${id}` }
 }
 
+function throwingProviderAccessorModel(message: string): object {
+  return Object.defineProperties({}, {
+    provider: {
+      enumerable: true,
+      get() {
+        throw new Error(message)
+      },
+    },
+    id: {
+      enumerable: true,
+      value: "gpt-5.4-mini",
+    },
+  })
+}
+
 function registry(models: readonly QaModel[]): SenpiModelRegistryPort<QaModel> {
   return {
     getAvailable: () => models,
@@ -106,6 +121,22 @@ if (malformed.kind !== "model_unavailable") {
 }
 requireCondition(malformed.availableModels.length === 0, "malformed registry leaked invalid available models")
 
+const throwingAvailableMarker = "hidden available accessor marker"
+const throwingAvailable = resolveCategory(
+  "quick",
+  {},
+  {
+    getAvailable: () => [throwingProviderAccessorModel(throwingAvailableMarker)],
+    find: () => undefined,
+  },
+)
+requireCondition(throwingAvailable.kind === "model_unavailable", "throwing available accessor did not return model_unavailable")
+if (throwingAvailable.kind !== "model_unavailable") {
+  throw new Error("throwing available accessor did not return model_unavailable")
+}
+requireCondition(throwingAvailable.availableModels.length === 0, "throwing available accessor leaked available models")
+requireCondition(!JSON.stringify(throwingAvailable).includes(throwingAvailableMarker), "throwing available accessor marker leaked")
+
 const secretFindResults = [
   { provider: "openai", id: "gpt-5.4-mini", password: "hidden" },
   { provider: "openai", id: "gpt-5.4-mini", accessToken: "hidden" },
@@ -123,6 +154,25 @@ for (const result of secretFind) {
   requireCondition(result.kind === "model_unavailable", "secret find result did not return model_unavailable")
   requireCondition(!JSON.stringify(result).includes("hidden"), "secret find result leaked a private field")
 }
+
+const throwingFindMarker = "hidden find accessor marker"
+const throwingFind = resolveCategory(
+  "quick",
+  {},
+  {
+    getAvailable: () => [model("openai", "gpt-5.4-mini")],
+    find: () => throwingProviderAccessorModel(throwingFindMarker),
+  },
+)
+requireCondition(throwingFind.kind === "model_unavailable", "throwing find accessor did not return model_unavailable")
+if (throwingFind.kind !== "model_unavailable") {
+  throw new Error("throwing find accessor did not return model_unavailable")
+}
+requireCondition(
+  throwingFind.availableModels.includes("openai/gpt-5.4-mini"),
+  "throwing find accessor lost valid available model",
+)
+requireCondition(!JSON.stringify(throwingFind).includes(throwingFindMarker), "throwing find accessor marker leaked")
 
 const inheritedIdentityModel: object = Object.create({
   provider: "openai",
@@ -165,7 +215,9 @@ console.log(JSON.stringify({
   systemDefault,
   headerBearing,
   malformed,
+  throwingAvailable,
   secretFind,
+  throwingFind,
   inheritedIdentity,
   nonArrayAvailable,
   prototypeName,

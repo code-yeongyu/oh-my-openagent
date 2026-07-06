@@ -30,12 +30,8 @@ type ParsedModel = {
   readonly modelId: string
 }
 
-type ChildSpecInput<TModel extends SenpiModelPort> = {
+type ParsedRegistryModel<TModel extends SenpiModelPort> = ParsedModel & {
   readonly model: TModel
-  readonly selection: CategoryModelSelection
-  readonly config: OmoCategoryConfig
-  readonly userVariant?: string
-  readonly prompt_append?: string
 }
 
 type ModelSelectionInput = {
@@ -56,8 +52,8 @@ const SECRET_LIKE_MODEL_FIELD_NAMES: ReadonlySet<string> = new Set([
   "privatetoken", "secret", "secretkey", "token",
 ] as const)
 
-function formatModel(model: SenpiModelPort): string {
-  return `${model.provider}/${model.id}`
+function formatModel(model: ParsedModel): string {
+  return `${model.provider}/${model.modelId}`
 }
 
 function normalizeModelFieldName(key: string): string {
@@ -70,18 +66,33 @@ function hasSecretLikeModelField(model: object): boolean {
   )
 }
 
+function ownStringDataProperty(model: object, key: "provider" | "id"): string | undefined {
+  const descriptor = Object.getOwnPropertyDescriptor(model, key)
+  return descriptor && "value" in descriptor && typeof descriptor.value === "string"
+    ? descriptor.value
+    : undefined
+}
+
 function isSenpiModelPort<TModel extends SenpiModelPort>(model: unknown): model is TModel {
   return (
     typeof model === "object" &&
     model !== null &&
     !hasSecretLikeModelField(model) &&
-    Object.hasOwn(model, "provider") &&
-    Object.hasOwn(model, "id") &&
-    "provider" in model &&
-    "id" in model &&
-    typeof model.provider === "string" &&
-    typeof model.id === "string"
+    ownStringDataProperty(model, "provider") !== undefined &&
+    ownStringDataProperty(model, "id") !== undefined
   )
+}
+
+function parseRegistryModel<TModel extends SenpiModelPort>(model: unknown): ParsedRegistryModel<TModel> | undefined {
+  if (!isSenpiModelPort<TModel>(model)) {
+    return undefined
+  }
+  const provider = ownStringDataProperty(model, "provider")
+  const modelId = ownStringDataProperty(model, "id")
+  if (provider === undefined || modelId === undefined) {
+    return undefined
+  }
+  return { model, provider, modelId }
 }
 
 function parseModel(model: string): ParsedModel | undefined {
@@ -124,7 +135,7 @@ function parseAvailableModels(models: unknown): AvailableModelsParseResult {
   if (!Array.isArray(models)) {
     return { models: [], validContainer: false }
   }
-  return { models: models.filter(isSenpiModelPort).map(formatModel).sort(), validContainer: true }
+  return { models: models.map(parseRegistryModel).filter((model) => model !== undefined).map(formatModel).sort(), validContainer: true }
 }
 
 function promptAppendForCategory(categoryName: string, model: string | undefined, userPromptAppend: string | undefined): string | undefined {
@@ -136,24 +147,6 @@ function promptAppendForCategory(categoryName: string, model: string | undefined
     return basePromptAppend || undefined
   }
   return basePromptAppend ? `${basePromptAppend}\n\n${userPromptAppend}` : userPromptAppend
-}
-
-function childSpec<TModel extends SenpiModelPort>(input: ChildSpecInput<TModel>): ResolvedChildSpec<TModel> {
-  const { config, model, prompt_append, selection, userVariant } = input
-  const variant = userVariant ?? selection.variant ?? config.variant
-  return {
-    model,
-    provider: model.provider,
-    modelId: model.id,
-    ...(variant !== undefined ? { variant } : {}),
-    ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
-    ...(config.top_p !== undefined ? { top_p: config.top_p } : {}),
-    ...(config.maxTokens !== undefined ? { maxTokens: config.maxTokens } : {}),
-    ...(config.thinking !== undefined ? { thinking: config.thinking } : {}),
-    ...(config.reasoningEffort !== undefined ? { reasoningEffort: config.reasoningEffort } : {}),
-    ...(config.tools !== undefined ? { tools: config.tools } : {}),
-    ...(prompt_append !== undefined ? { prompt_append } : {}),
-  }
 }
 
 function nearestFallback(selection: CategoryModelSelection): string | undefined {
@@ -243,9 +236,8 @@ export function resolveCategory<TModel extends SenpiModelPort>(
     },
   )
   const parsedModel = parseModel(selection.selectedModel)
-  const foundModel = parsedModel ? senpiModelRegistry.find(parsedModel.provider, parsedModel.modelId) : undefined
-  const model = isSenpiModelPort<TModel>(foundModel) ? foundModel : undefined
-  if (!parsedModel || !model) {
+  const foundModel = parsedModel ? parseRegistryModel<TModel>(senpiModelRegistry.find(parsedModel.provider, parsedModel.modelId)) : undefined
+  if (!parsedModel || !foundModel) {
     const fallback = nearestFallback(selection)
     return {
       kind: "model_unavailable",
@@ -259,10 +251,24 @@ export function resolveCategory<TModel extends SenpiModelPort>(
   }
 
   const prompt_append = promptAppendForCategory(categoryName, selection.selectedModel, userConfig?.prompt_append)
+  const variant = userConfig?.variant ?? selection.variant ?? config.variant
+  const spec: ResolvedChildSpec<TModel> = {
+    model: foundModel.model,
+    provider: foundModel.provider,
+    modelId: foundModel.modelId,
+    ...(variant !== undefined ? { variant } : {}),
+    ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
+    ...(config.top_p !== undefined ? { top_p: config.top_p } : {}),
+    ...(config.maxTokens !== undefined ? { maxTokens: config.maxTokens } : {}),
+    ...(config.thinking !== undefined ? { thinking: config.thinking } : {}),
+    ...(config.reasoningEffort !== undefined ? { reasoningEffort: config.reasoningEffort } : {}),
+    ...(config.tools !== undefined ? { tools: config.tools } : {}),
+    ...(prompt_append !== undefined ? { prompt_append } : {}),
+  }
   return {
     kind: "resolved",
     category: categoryName,
-    spec: childSpec({ model, selection, config, userVariant: userConfig?.variant, prompt_append }),
+    spec,
     config,
     description: userConfig?.description ?? getOwnRecordValue(CATEGORY_DESCRIPTIONS, categoryName),
     modelSelection: selection,
