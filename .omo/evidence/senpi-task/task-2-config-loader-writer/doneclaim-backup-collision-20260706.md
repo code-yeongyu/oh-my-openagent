@@ -2,6 +2,9 @@
 
 ## What Changed
 
+- Product commit: `656432d6e` (`fix(omo-config-core): avoid backup filename collisions`)
+- Push status: pushed to `origin/code-yeongyu/senpi-task-w0-config-loader-writer`.
+  - Artifact: `.omo/evidence/senpi-task/task-2-config-loader-writer/push-backup-collision-20260706.txt`
 - `packages/omo-config-core/src/writer/writer.test.ts` adds a frozen-clock regression test for two immediate `updateOmoConfig` calls against one existing commented project `omo.jsonc`.
 - `packages/omo-config-core/src/writer/writer.ts` writes backups with exclusive file creation and appends a numeric suffix when the timestamped `.bak.<ISO>` candidate already exists.
 
