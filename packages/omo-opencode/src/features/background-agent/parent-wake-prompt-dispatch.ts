@@ -18,6 +18,14 @@ type ParentWakePromptDispatchInput = {
   readonly latestWake: PendingParentWake
   readonly forceNoReply?: boolean
   readonly retainPendingWake?: boolean
+  /**
+   * When true, bypass the prompt-gate status/tool-state checks and dispatch a
+   * reply-producing prompt even if the parent session is still busy. Used by
+   * the max-defer force-flush (#5864) to deliver a completion notification to
+   * a parent that never emits session.idle. Unlike forceNoReply, this keeps
+   * noReply=false so the orchestrator actually receives the result.
+   */
+  readonly forceReplyDispatch?: boolean
   readonly emptyAssistantTurnRetry: boolean
   readonly toolWaitDecision: ToolWaitDeferralDecision
   readonly getDispatchedWake: () => PendingParentWake | undefined
@@ -36,14 +44,16 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
       mode: "async",
       client: input.client,
       sessionID: input.sessionID,
+      checkStatus: input.forceReplyDispatch !== true && input.forceNoReply !== true,
+      checkToolState: input.forceReplyDispatch !== true
+        && input.forceNoReply !== true
+        && !input.toolWaitDecision.skipPromptGateToolStateCheck,
       source: "background-agent-parent-wake",
       ...(input.emptyAssistantTurnRetry
         ? { dedupeKey: createEmptyAssistantTurnRetryDedupeKey(input.latestWake) }
         : {}),
       settleMs: 0,
       queueBehavior: "defer",
-      checkStatus: input.forceNoReply !== true,
-      checkToolState: input.forceNoReply !== true && !input.toolWaitDecision.skipPromptGateToolStateCheck,
       input: {
         path: { id: input.sessionID },
         body: {

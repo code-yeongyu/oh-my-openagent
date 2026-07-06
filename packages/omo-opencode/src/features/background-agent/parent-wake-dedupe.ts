@@ -16,6 +16,13 @@ export type PendingParentWake = {
   toolCallDeferralStartedAt?: number
   allowEmptyAssistantTurnRetry?: boolean
   noAssistantOutputRetryCount?: number
+  /**
+   * Wall-clock time this wake first entered the pending queue. Used by the
+   * max-defer ceiling (#5864) to force-flush a wake whose parent never emits
+   * `session.idle`. Preserved across merges/requeues so a stream of overlapping
+   * completions cannot reset the clock.
+   */
+  queuedAt?: number
 }
 
 export function resolveParentWakePromptContext(promptContext: ParentWakePromptContext): ParentWakePromptContext {
@@ -45,6 +52,7 @@ export function cloneParentWake(wake: PendingParentWake): PendingParentWake {
     ...(wake.noAssistantOutputRetryCount !== undefined
       ? { noAssistantOutputRetryCount: wake.noAssistantOutputRetryCount }
       : {}),
+    ...(wake.queuedAt !== undefined ? { queuedAt: wake.queuedAt } : {}),
   }
 }
 

@@ -66,6 +66,7 @@ export class ParentWakeNotifier {
       pendingQueue: this.pendingQueue,
       dispatchedTracker: this.dispatchedTracker,
       sessionInspector: this.sessionInspector,
+      ...(options.maxDeferMs !== undefined ? { maxDeferMs: options.maxDeferMs } : {}),
     })
   }
 

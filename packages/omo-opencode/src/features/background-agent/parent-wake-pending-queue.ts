@@ -68,6 +68,7 @@ export class ParentWakePendingQueue {
       promptContext: resolvedPromptContext,
       notifications: [notification],
       shouldReply,
+      queuedAt: Date.now(),
     })
   }
 
@@ -82,6 +83,7 @@ export class ParentWakePendingQueue {
       pendingWake.promptContext = latestWake.promptContext
       pendingWake.noReplyAdmittedAt ??= latestWake.noReplyAdmittedAt
       pendingWake.toolCallDeferralStartedAt ??= latestWake.toolCallDeferralStartedAt
+      pendingWake.queuedAt ??= latestWake.queuedAt
       pendingWake.allowEmptyAssistantTurnRetry ||= latestWake.allowEmptyAssistantTurnRetry
       const noAssistantOutputRetryCount = Math.max(
         pendingWake.noAssistantOutputRetryCount ?? 0,

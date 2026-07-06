@@ -47,4 +47,11 @@ export type ParentWakeNotifierOptions = {
    */
   readonly userMessageInProgressWindowMs: number
   readonly parentSessionActivityInProgressWindowMs?: number
+  /**
+   * Absolute ceiling after which a pending wake is force-flushed as a reply
+   * dispatch even if the parent session is still active. Prevents indefinite
+   * defer when the parent never emits `session.idle` (#5864). When undefined
+   * (the default), behavior is unchanged — wakes defer indefinitely as before.
+   */
+  readonly maxDeferMs?: number
 }

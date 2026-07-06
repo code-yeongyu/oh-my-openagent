@@ -158,6 +158,13 @@ const PARENT_WAKE_TOOL_CALL_DEFER_MAX_MS = 5_000
  */
 const PARENT_WAKE_USER_MESSAGE_IN_PROGRESS_WINDOW_MS = 2_000
 const PARENT_WAKE_SESSION_ACTIVITY_IN_PROGRESS_WINDOW_MS = PARENT_WAKE_TOOL_CALL_DEFER_MAX_MS
+/**
+ * Absolute ceiling after which a pending parent wake is force-flushed as a
+ * reply dispatch even if the parent session stays continuously active (never
+ * emits session.idle). Prevents indefinite defer losing the completion
+ * notification. Well under the 30-min task-inactivity watchdog. See #5864.
+ */
+const PENDING_PARENT_WAKE_MAX_DEFER_MS = 120_000
 
 interface EventProperties {
   sessionID?: string
@@ -318,6 +325,7 @@ export class BackgroundManager {
         failureRequeueWindowMs: PARENT_WAKE_FAILURE_REQUEUE_WINDOW_MS,
         userMessageInProgressWindowMs: PARENT_WAKE_USER_MESSAGE_IN_PROGRESS_WINDOW_MS,
         parentSessionActivityInProgressWindowMs: PARENT_WAKE_SESSION_ACTIVITY_IN_PROGRESS_WINDOW_MS,
+        maxDeferMs: PENDING_PARENT_WAKE_MAX_DEFER_MS,
       },
     )
     this.registerProcessCleanup()

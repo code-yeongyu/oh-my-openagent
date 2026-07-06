@@ -13,6 +13,12 @@ type ParentWakeFlushRunnerDeps = {
   readonly pendingQueue: ParentWakePendingQueue
   readonly dispatchedTracker: ParentWakeDispatchedTracker
   readonly sessionInspector: ParentWakeSessionInspector
+  /**
+   * Absolute ceiling after which a pending wake is force-flushed as a reply
+   * dispatch even if the parent session is still active (#5864). Undefined
+   * preserves the legacy indefinite-defer behavior.
+   */
+  readonly maxDeferMs?: number
 }
 
 export class ParentWakeFlushRunner {
@@ -43,6 +49,35 @@ export class ParentWakeFlushRunner {
       return
     }
     if (await this.dropAdmittedWakeConsumedByParent(sessionID, latestWake)) {
+      return
+    }
+    const maxDeferMs = this.deps.maxDeferMs
+    if (
+      maxDeferMs !== undefined
+      && latestWake.queuedAt !== undefined
+      && Date.now() - latestWake.queuedAt >= maxDeferMs
+    ) {
+      log("[background-agent] Force-flushing parent wake after max-defer ceiling exceeded:", {
+        sessionID,
+        queuedAt: latestWake.queuedAt,
+        maxDeferMs,
+      })
+      // Bounded defer (#5864): the parent never emitted session.idle, so the
+      // normal sessionActive / hasRecentActivity / history-defer short-circuits
+      // would hold this wake indefinitely. Force a reply-producing dispatch that
+      // also bypasses the prompt-gate status/tool-state checks (forceReplyDispatch)
+      // — otherwise a permanently-busy parent returns {status:"active"} from the
+      // gate and the wake is never delivered. forceNoReply/retainPendingWake stay
+      // undefined → noReply=false (reply) + pending entry cleared on success.
+      // promptAsync's queueBehavior: "defer" serializes against any in-flight
+      // turn; if the gate still refuses (reserved/queued), sendParentWakePrompt
+      // requeues (keeping queuedAt) and reschedules, giving bounded retry.
+      const emptyAssistantTurnRetry = latestWake.allowEmptyAssistantTurnRetry === true
+      await this.sendParentWakePrompt(sessionID, latestWake, {
+        emptyAssistantTurnRetry,
+        toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: false },
+        forceReplyDispatch: true,
+      })
       return
     }
     if (sessionActive) {
@@ -200,6 +235,7 @@ export class ParentWakeFlushRunner {
       readonly toolWaitDecision: ToolWaitDeferralDecision
       readonly forceNoReply?: boolean
       readonly retainPendingWake?: boolean
+      readonly forceReplyDispatch?: boolean
     },
   ): Promise<void> {
     // Mark the dispatch in-flight BEFORE the pending entry is deleted so there is
@@ -221,6 +257,7 @@ export class ParentWakeFlushRunner {
         latestWake,
         ...(options.forceNoReply !== undefined ? { forceNoReply: options.forceNoReply } : {}),
         ...(options.retainPendingWake !== undefined ? { retainPendingWake: options.retainPendingWake } : {}),
+        ...(options.forceReplyDispatch !== undefined ? { forceReplyDispatch: options.forceReplyDispatch } : {}),
         emptyAssistantTurnRetry: options.emptyAssistantTurnRetry,
         toolWaitDecision: options.toolWaitDecision,
         getDispatchedWake: () => this.deps.dispatchedTracker.getWake(sessionID),
