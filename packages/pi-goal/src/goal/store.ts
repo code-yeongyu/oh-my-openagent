@@ -36,8 +36,11 @@ export async function writeGoal(ref: GoalStoreRef, goal: Goal | null): Promise<v
 }
 
 export async function createGoal(ref: GoalStoreRef, objective: string, tokenBudget?: number): Promise<Goal> {
-	if ((await readGoal(ref)) !== null) {
-		throw new GoalAlreadyExistsError("cannot create a new goal because this thread already has a goal");
+	const current = await readGoal(ref);
+	if (current !== null && current.status !== "complete") {
+		throw new GoalAlreadyExistsError(
+			"cannot create a new goal because this thread has an unfinished goal; complete the existing goal first",
+		);
 	}
 
 	const normalizedObjective = validateObjective(objective);
@@ -198,7 +201,9 @@ function statusAfterExplicitStatusUpdate(
 	tokensUsed: number,
 	tokenBudget: number | undefined,
 ): Goal["status"] {
-	if (currentStatus === "budgetLimited" && requestedStatus === "paused") return "budgetLimited";
+	if (currentStatus === "budgetLimited" && (requestedStatus === "paused" || requestedStatus === "blocked")) {
+		return "budgetLimited";
+	}
 	return statusAfterBudgetLimit(requestedStatus, tokensUsed, tokenBudget);
 }
 
@@ -258,7 +263,13 @@ function isGoal(value: unknown): value is Goal {
 }
 
 function isGoalStatus(value: unknown): value is Goal["status"] {
-	return value === "active" || value === "paused" || value === "budgetLimited" || value === "complete";
+	return (
+		value === "active" ||
+		value === "paused" ||
+		value === "blocked" ||
+		value === "budgetLimited" ||
+		value === "complete"
+	);
 }
 
 function isPositiveSafeInteger(value: unknown): value is number {

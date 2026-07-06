@@ -15,7 +15,7 @@ an active goal via hidden continuation prompts (`pi-goal-continuation` custom me
 |------|---------|
 | `src/index.ts` | Extension entry: tools + `/goal` command + session/agent lifecycle + usage accounting |
 | `src/goal/store.ts` | File persistence: read/write/create/update/clear/accountGoalUsage + status transitions |
-| `src/goal/types.ts` | `Goal`, `GoalStatus` (`active\|paused\|budgetLimited\|complete`), store/file/tool types |
+| `src/goal/types.ts` | `Goal`, `GoalStatus` (`active\|paused\|blocked\|budgetLimited\|complete`), store/file/tool types |
 | `src/goal/prompt.ts` | Continuation + budget-limited hidden prompt builders |
 | `src/goal/continuation.ts` | Continuation gating predicates |
 | `src/goal/format.ts` | Tool/UI formatting + tool JSON response snapshots |
@@ -26,6 +26,19 @@ an active goal via hidden continuation prompts (`pi-goal-continuation` custom me
 | `test/` | Vendored characterization suite (bun:test; assertions identical to upstream) |
 | `scripts/qa/drive.mjs` | Live QA driver: real pi CLI in RPC mode, isolated `PI_CODING_AGENT_DIR`, scripted mock provider, `--self-test` |
 | `scripts/qa/mock-provider/` | Self-contained scripted provider extension (no network, no keys) |
+
+## Codex alignment
+
+The goal tool contract is aligned with codex `codex-rs/ext/goal`:
+
+- `update_goal` accepts `complete` and `blocked` (codex `spec.rs` enum); `blocked` is a real,
+  model-settable, non-terminal status (resumable via `/goal resume`).
+- `create_goal` replaces only a `complete` goal and otherwise fails with the codex
+  "unfinished goal" message.
+- Tool/parameter descriptions, the `update_goal` error text, and the completion budget report
+  match codex verbatim; `budgetLimited` is preserved when `paused` or `blocked` is requested.
+- Deliberate deviation: pi omits `usage_limited` (codex sets it from a system
+  `UsageLimitExceeded` turn error, not the model; the Pi harness exposes no such signal).
 
 ## Conventions
 

@@ -1,5 +1,5 @@
-export const GOAL_STATUS_VALUES = ["active", "paused", "budgetLimited", "complete"] as const;
-export const COMPLETABLE_GOAL_STATUS_VALUES = ["complete"] as const;
+export const GOAL_STATUS_VALUES = ["active", "paused", "blocked", "budgetLimited", "complete"] as const;
+export const COMPLETABLE_GOAL_STATUS_VALUES = ["complete", "blocked"] as const;
 
 export type GoalStatus = (typeof GOAL_STATUS_VALUES)[number];
 export type CompletableGoalStatus = (typeof COMPLETABLE_GOAL_STATUS_VALUES)[number];
