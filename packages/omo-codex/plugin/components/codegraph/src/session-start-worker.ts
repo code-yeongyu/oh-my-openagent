@@ -2,13 +2,14 @@ import { execFile } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { extname, join } from "node:path";
-import { cwd as processCwd, env as processEnv, stderr as processStderr } from "node:process";
+import { cwd as processCwd, env as processEnv, execPath as processExecPath, stderr as processStderr } from "node:process";
 
 import { getCodexOmoConfig } from "../../../shared/src/config-loader.ts";
-import { buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
-import { evaluateCodegraphNodeSupport } from "../../../../../utils/src/codegraph/node-support.ts";
+import { buildCodegraphChildEnv, buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
+import { evaluateCodegraphNodeSupport, type CodegraphNodeSupport } from "../../../../../utils/src/codegraph/node-support.ts";
 import { ensureCodegraphProvisioned } from "../../../../../utils/src/codegraph/provision.ts";
 import {
+	codegraphCommandRequiresSupportedLocalNode,
 	resolveCodegraphCommand,
 	type CodegraphCommandResolution,
 } from "../../../../../utils/src/codegraph/resolve.ts";
@@ -27,6 +28,10 @@ export const SESSION_START_CWD_ENV = "OMO_CODEGRAPH_SESSION_START_CWD";
 const CODEGRAPH_VERSION = "1.0.1";
 const COMMAND_TIMEOUT_MS = 60_000;
 const WINDOWS_CMD_EXTENSIONS = new Set([".bat", ".cmd"]);
+const WINDOWS_NODE_SCRIPT_EXTENSIONS = new Set([".cjs", ".js", ".mjs"]);
+type CodegraphBootstrapConfig = CodegraphConfig & {
+	readonly trustedCodegraphInstallDir?: string;
+};
 
 const defaultDeps: CodegraphSessionStartDeps = {
 	ensureGitignored: ensureCodegraphGitignored,
@@ -47,30 +52,35 @@ export async function runCodegraphSessionStartWorker(options: SessionStartWorker
 		return finish("skipped-disabled", { projectRoot }, logOutcome);
 	}
 
-	if (!evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion }).supported) {
-		return finish("skipped-unsupported-node", { projectRoot }, logOutcome);
-	}
-
-	return runBootstrap(projectRoot, config.codegraph ?? {}, env, homeDir, { ...defaultDeps, ...options.deps }, logOutcome);
+	const nodeSupport = evaluateCodegraphNodeSupport({ env, nodeVersion: options.nodeVersion });
+	const bootstrapConfig: CodegraphBootstrapConfig = {
+		...(config.codegraph ?? {}),
+		...(config.trustedCodegraphInstallDir === undefined ? {} : { trustedCodegraphInstallDir: config.trustedCodegraphInstallDir }),
+	};
+	return runBootstrap(projectRoot, bootstrapConfig, env, homeDir, nodeSupport, { ...defaultDeps, ...options.deps }, logOutcome);
 }
 
 async function runBootstrap(
 	projectRoot: string,
-	config: CodegraphConfig,
+	config: CodegraphBootstrapConfig,
 	env: Record<string, string | undefined>,
 	homeDir: string,
+	nodeSupport: CodegraphNodeSupport,
 	deps: CodegraphSessionStartDeps,
 	logOutcome: (outcome: CodegraphSessionStartOutcome) => void,
 ): Promise<{ readonly action: WorkerAction }> {
 	try {
-		const command = await resolveOrProvisionCommand(deps, config, env, homeDir);
+		const command = await resolveOrProvisionCommand(deps, config, env, homeDir, nodeSupport);
 		if (command.kind === "unavailable") {
 			return finish("skipped-unavailable", { error: command.error, projectRoot, source: command.source }, logOutcome);
+		}
+		if (command.kind === "unsupported-node") {
+			return finish("skipped-unsupported-node", { projectRoot }, logOutcome);
 		}
 
 		deps.prepareWorkspace(projectRoot, { homeDir });
 		deps.ensureGitignored(projectRoot);
-		const codegraphEnv = config.install_dir === undefined ? buildCodegraphEnv({ homeDir }) : { ...buildCodegraphEnv({ homeDir }), CODEGRAPH_INSTALL_DIR: config.install_dir };
+		const codegraphEnv = codegraphEnvForConfig(config, homeDir);
 		const status = await deps.runCommand(projectRoot, command.resolution.command, [...command.resolution.argsPrefix, "status", "--json"], { env: codegraphEnv, timeoutMs: COMMAND_TIMEOUT_MS });
 		const decision = decideStartupAction(status);
 		if (decision.kind === "skip") return finish("skipped-status", { error: decision.reason, projectRoot }, logOutcome);
@@ -90,19 +100,39 @@ function finish(action: WorkerAction, detail: Omit<CodegraphSessionStartOutcome,
 
 type ResolutionResult =
 	| { readonly kind: "resolved"; readonly resolution: CodegraphCommandResolution }
+	| { readonly kind: "unsupported-node" }
 	| { readonly error: string; readonly kind: "unavailable"; readonly projectRoot?: string; readonly source: CodegraphCommandResolution["source"] };
 
-async function resolveOrProvisionCommand(deps: CodegraphSessionStartDeps, config: CodegraphConfig, env: Record<string, string | undefined>, homeDir: string): Promise<ResolutionResult> {
-	const resolved = deps.resolveCommand({ env, homeDir, provisioned: () => provisionedBinFromInstallDir(config.install_dir) });
-	if (resolved.exists) return { kind: "resolved", resolution: resolved };
+async function resolveOrProvisionCommand(
+	deps: CodegraphSessionStartDeps,
+	config: CodegraphBootstrapConfig,
+	env: Record<string, string | undefined>,
+	homeDir: string,
+	nodeSupport: CodegraphNodeSupport,
+): Promise<ResolutionResult> {
+	const trustedInstallDir = config.trustedCodegraphInstallDir;
+	const resolved = deps.resolveCommand({ env, homeDir, provisioned: () => provisionedBinFromInstallDir(trustedInstallDir) });
+	if (resolved.exists && canUseResolvedCommand(resolved, nodeSupport)) {
+		return { kind: "resolved", resolution: resolved };
+	}
+	if (resolved.exists && config.auto_provision === false) return { kind: "unsupported-node" };
 	if (config.auto_provision === false) return { error: "codegraph binary unavailable and auto_provision is disabled", kind: "unavailable", source: resolved.source };
 
-	const installDir = config.install_dir ?? join(homeDir, ".omo", "codegraph");
-	const provisioned = await deps.ensureProvisioned({ installDir, lockDir: join(installDir, "locks"), version: CODEGRAPH_VERSION });
+	const installDir = trustedInstallDir ?? join(homeDir, ".omo", "codegraph");
+	const provisioned = await deps.ensureProvisioned({ installDir, lockDir: join(installDir, ".locks"), version: CODEGRAPH_VERSION });
 	if (!provisioned.provisioned || provisioned.binPath === undefined) {
 		return { error: provisioned.error ?? "provisioning did not produce a binary", kind: "unavailable", source: resolved.source };
 	}
 	return { kind: "resolved", resolution: { argsPrefix: [], command: provisioned.binPath, exists: true, source: "provisioned" } };
+}
+
+function codegraphEnvForConfig(config: CodegraphBootstrapConfig, homeDir: string): Record<string, string> {
+	const env = buildCodegraphEnv({ homeDir });
+	return config.trustedCodegraphInstallDir === undefined ? env : { ...env, CODEGRAPH_INSTALL_DIR: config.trustedCodegraphInstallDir };
+}
+
+function canUseResolvedCommand(resolved: CodegraphCommandResolution, nodeSupport: CodegraphNodeSupport): boolean {
+	return !codegraphCommandRequiresSupportedLocalNode(resolved) || nodeSupport.supported;
 }
 
 function decideStartupAction(status: CodegraphCommandResult): { readonly kind: "init" } | { readonly kind: "skip"; readonly reason: string } | { readonly kind: "sync" } {
@@ -131,7 +161,7 @@ function jsonSaysInitialized(value: unknown): boolean | undefined {
 async function runCodegraphCommand(projectRoot: string, command: string, args: readonly string[], options: { readonly env: Record<string, string>; readonly timeoutMs: number }): Promise<CodegraphCommandResult> {
 	const invocation = resolveCodegraphCommandInvocation(command, args);
 	return new Promise((resolvePromise) => {
-		execFile(invocation.command, [...invocation.args], { cwd: projectRoot, encoding: "utf8", env: { ...process.env, ...options.env }, maxBuffer: 1024 * 1024, timeout: options.timeoutMs, windowsHide: true }, (error, stdout, stderr) => {
+		execFile(invocation.command, [...invocation.args], { cwd: projectRoot, encoding: "utf8", env: buildCodegraphChildEnv({ ambientEnv: processEnv, codegraphEnv: options.env }), maxBuffer: 1024 * 1024, timeout: options.timeoutMs, windowsHide: true }, (error, stdout, stderr) => {
 			if (error === null) {
 				resolvePromise({ exitCode: 0, stderr: toOutputText(stderr), stdout: toOutputText(stdout), timedOut: false });
 				return;
@@ -147,7 +177,9 @@ export function resolveCodegraphCommandInvocation(
 	platform: NodeJS.Platform = process.platform,
 ): { readonly args: readonly string[]; readonly command: string } {
 	if (platform !== "win32") return { args: [...args], command };
-	if (!WINDOWS_CMD_EXTENSIONS.has(extname(command).toLowerCase())) return { args: [...args], command };
+	const extension = extname(command).toLowerCase();
+	if (WINDOWS_NODE_SCRIPT_EXTENSIONS.has(extension)) return { args: [command, ...args], command: processExecPath };
+	if (!WINDOWS_CMD_EXTENSIONS.has(extension)) return { args: [...args], command };
 	return { args: ["/d", "/s", "/c", command, ...args], command: "cmd.exe" };
 }
 

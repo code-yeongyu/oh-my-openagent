@@ -1,7 +1,6 @@
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
-import { setContinuationMarkerSource } from "../../features/run-continuation-state"
 import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
 import {
   dispatchInternalPrompt,
@@ -50,6 +49,7 @@ import {
   type BackgroundTaskNotificationTask,
   buildBackgroundTaskNotificationText,
 } from "./background-task-notification-template"
+import { writeBackgroundTaskMarker } from "./background-task-marker"
 import {
   findNearestMessageExcludingCompaction,
   resolvePromptContextFromSessionMessages,
@@ -280,6 +280,8 @@ export class BackgroundManager {
   private loggedSessionStatusUnavailable = false
   readonly taskHistory = new TaskHistory()
   private cachedCircuitBreakerSettings?: CircuitBreakerSettings
+  private readonly scheduledFlushSettledCounts = new Map<string, number>()
+  private readonly scheduledFlushSettledWaiters = new Map<string, Array<() => void>>()
 
   constructor(config: BackgroundManagerConfig) {
     const { pluginContext, ...options } = config
@@ -306,6 +308,8 @@ export class BackgroundManager {
         client: this.client,
         directory: this.directory,
         enqueueNotificationForParent: this.enqueueNotificationForParent.bind(this),
+        onPendingWakeRequeued: (sessionID) => this.updateBackgroundTaskMarker(sessionID),
+        onScheduledFlushSettled: (sessionID) => this.recordScheduledFlushSettled(sessionID),
       },
       {
         pendingRetryMs: PENDING_PARENT_WAKE_RETRY_MS,
@@ -1107,28 +1111,27 @@ The fallback retry session is now created and can be inspected directly.
    * would report false between the status flip and the wake landing in the pending map.
    */
   hasPendingParentWake(sessionID: string): boolean {
+    return this.hasUndeliveredParentWake(sessionID) || this.parentWakeNotifier.getDispatchedParentWakes().has(sessionID)
+  }
+
+  private hasUndeliveredParentWake(sessionID: string): boolean {
     return (
       this.parentWakeNotifier.hasNotificationPreparation(sessionID) ||
       this.parentWakeNotifier.getPendingParentWakes().has(sessionID) ||
       this.parentWakeNotifier.getPendingParentWakeTimers().has(sessionID) ||
-      this.parentWakeNotifier.hasInFlightParentWakeDispatch(sessionID) ||
-      this.parentWakeNotifier.getDispatchedParentWakes().has(sessionID)
+      this.parentWakeNotifier.hasInFlightParentWakeDispatch(sessionID)
     )
   }
 
   private updateBackgroundTaskMarker(parentSessionID: string): void {
     const tasks = this.getTasksByParentSession(parentSessionID)
     const activeTasks = tasks.filter(t => t.status === "running" || t.status === "pending")
-    if (activeTasks.length > 0) {
-      setContinuationMarkerSource(
-        this.directory, parentSessionID, "background-task", "active",
-        `${activeTasks.length} background task(s) active`,
-      )
-    } else {
-      setContinuationMarkerSource(
-        this.directory, parentSessionID, "background-task", "idle",
-      )
-    }
+    writeBackgroundTaskMarker({
+      directory: this.directory,
+      parentSessionID,
+      activeTaskCount: activeTasks.length,
+      hasUndeliveredParentWake: this.hasUndeliveredParentWake(parentSessionID),
+    })
   }
 
   getAllDescendantTasks(sessionID: string): BackgroundTask[] {
@@ -1969,6 +1972,7 @@ The fallback retry session is now created and can be inspected directly.
     const releaseNotificationPreparation = (): void => {
       if (notificationParentSessionID) {
         this.parentWakeNotifier.releaseNotificationPreparation(notificationParentSessionID)
+        this.updateBackgroundTaskMarker(notificationParentSessionID)
       }
     }
 
@@ -2596,6 +2600,7 @@ The task was re-queued on a fallback model after a retryable failure.
     } finally {
       if (notificationParentSessionID) {
         this.parentWakeNotifier.releaseNotificationPreparation(notificationParentSessionID)
+        this.updateBackgroundTaskMarker(notificationParentSessionID)
       }
     }
   }
@@ -2791,6 +2796,48 @@ The task was re-queued on a fallback model after a retryable failure.
     return isOpenCodeSessionActive(resolved.client as Parameters<typeof isOpenCodeSessionActive>[0], sessionID)
   }
 
+  private recordScheduledFlushSettled(sessionID: string): void {
+    this.updateBackgroundTaskMarker(sessionID)
+    this.scheduledFlushSettledCounts.set(sessionID, (this.scheduledFlushSettledCounts.get(sessionID) ?? 0) + 1)
+    const waiters = this.scheduledFlushSettledWaiters.get(sessionID)
+    if (waiters && waiters.length > 0) {
+      this.scheduledFlushSettledWaiters.set(sessionID, [])
+      for (const waiter of waiters) {
+        waiter()
+      }
+    }
+  }
+
+  /**
+   * Test-only: monotonic count of scheduled parent-wake flushes that have settled
+   * for this session (the real onScheduledFlushSettled signal). Capture this
+   * BEFORE triggering a flush, then awaitScheduledFlush(sessionID, captured) so a
+   * settle that races between trigger and await is not missed.
+   */
+  getScheduledFlushSettledCount(sessionID: string): number {
+    return this.scheduledFlushSettledCounts.get(sessionID) ?? 0
+  }
+
+  /**
+   * Test-only: resolves once the settled-flush count for this session exceeds
+   * `sinceCount` (captured before the flush was triggered). Deterministic — no
+   * blind sleep past the debounce, and no registration-after-settle race.
+   */
+  awaitScheduledFlush(sessionID: string, sinceCount: number): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const arm = (): void => {
+        if ((this.scheduledFlushSettledCounts.get(sessionID) ?? 0) > sinceCount) {
+          resolve()
+          return
+        }
+        const waiters = this.scheduledFlushSettledWaiters.get(sessionID) ?? []
+        waiters.push(arm)
+        this.scheduledFlushSettledWaiters.set(sessionID, waiters)
+      }
+      arm()
+    })
+  }
+
   private queuePendingParentWake(
     sessionID: string,
     notification: string,
@@ -2799,10 +2846,15 @@ The task was re-queued on a fallback model after a retryable failure.
     delayMs?: number,
   ): void {
     this.parentWakeNotifier.queuePendingParentWake(sessionID, notification, promptContext, shouldReply, delayMs)
+    this.updateBackgroundTaskMarker(sessionID)
   }
 
   private async flushPendingParentWake(sessionID: string): Promise<void> {
-    await this.parentWakeNotifier.flushPendingParentWake(sessionID)
+    try {
+      await this.parentWakeNotifier.flushPendingParentWake(sessionID)
+    } finally {
+      this.updateBackgroundTaskMarker(sessionID)
+    }
   }
 
   private hasRunningTasks(): boolean {

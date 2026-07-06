@@ -5,24 +5,48 @@ import { stderr as processStderr } from "node:process";
 import { fileURLToPath } from "node:url";
 
 import {
+	runCodegraphPostToolUseHookCli,
 	runCodegraphSessionStartHook,
 	runCodegraphSessionStartWorker,
+	type PostToolUseHookOptions,
 	type SessionStartHookOptions,
 	type SessionStartWorkerOptions,
 } from "./hook.js";
 import { runCodegraphServeCli } from "./serve.js";
+import { runCodegraphSweepCli, type RunCodegraphSweepCliOptions } from "./sweep-cli.js";
 
 export interface RunCodegraphCliOptions extends SessionStartHookOptions {
+	readonly sweepOptions?: SweepCodegraphZombiesTestOptions;
 	readonly workerOptions?: SessionStartWorkerOptions;
 }
+
+type SweepCodegraphZombiesTestOptions = Omit<RunCodegraphSweepCliOptions, "argv" | "env" | "stdout">;
 
 export async function runCodegraphCli(options: RunCodegraphCliOptions = {}): Promise<number> {
 	const argv = options.argv ?? process.argv;
 	const command = argv[2];
 	const subcommand = argv[3];
 
+	if (command === "sweep") {
+		return runCodegraphSweepCli({
+			...options.sweepOptions,
+			argv,
+			...(options.env === undefined ? {} : { env: options.env }),
+			...(options.stdout === undefined ? {} : { stdout: options.stdout }),
+		});
+	}
+
 	if (command === "hook" && subcommand === "session-start") {
 		return runCodegraphSessionStartHook(options);
+	}
+
+	if (command === "hook" && subcommand === "post-tool-use") {
+		const hookOptions: PostToolUseHookOptions = {
+			...(options.env === undefined ? {} : { env: options.env }),
+			...(options.stdin === undefined ? {} : { stdin: options.stdin }),
+			...(options.stdout === undefined ? {} : { stdout: options.stdout }),
+		};
+		return runCodegraphPostToolUseHookCli(hookOptions);
 	}
 
 	if (command === "hook" && subcommand === "session-start-worker") {

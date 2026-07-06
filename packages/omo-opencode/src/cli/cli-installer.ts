@@ -25,6 +25,7 @@ import {
 } from "./install-validators"
 import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version"
 import { runCodexInstaller } from "./install-codex"
+import { runSenpiInstaller } from "./install-senpi"
 import { starGitHubRepositories } from "./star-request"
 import { getNoModelProvidersWarning, hasAnyConfiguredProvider } from "./provider-availability"
 import { ensureTuiPluginEntry } from "./config-manager/add-tui-plugin-to-tui-config"
@@ -158,6 +159,19 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
         return 1
       }
       printWarning(`Codex install failed (OpenCode install is still complete): ${message}`)
+    }
+    console.log()
+  }
+
+  if (config.hasSenpi) {
+    printInfo("Installing Senpi harness adapter...")
+    try {
+      const senpiResult = await runSenpiInstaller()
+      printSuccess(`Senpi adapter installed ${SYMBOLS.arrow} ${color.dim(senpiResult.settingsPath)}`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      printError(`Senpi install failed: ${message}`)
+      return 1
     }
     console.log()
   }

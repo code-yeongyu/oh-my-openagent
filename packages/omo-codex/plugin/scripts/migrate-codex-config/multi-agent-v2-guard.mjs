@@ -24,11 +24,10 @@ const MANAGED_DISABLE_COMMENT = [
 ].join("\n");
 
 export function forceDisableMultiAgentV2(config) {
-	let result = removeEnabledFeaturesShorthand(config);
+	let result = removeFeaturesShorthand(config);
 	const section = findSection(result, "[features.multi_agent_v2]");
 
 	if (!section) {
-		if (hasDisabledFeaturesShorthand(result)) return result;
 		return ensureManagedComment(appendDisabledSection(result));
 	}
 
@@ -53,21 +52,15 @@ function ensureManagedComment(config) {
 	return config.slice(0, section.start) + MANAGED_DISABLE_COMMENT + config.slice(section.start);
 }
 
-function removeEnabledFeaturesShorthand(config) {
+function removeFeaturesShorthand(config) {
 	const section = findSection(config, "[features]");
 	if (!section) return config;
 
-	const shorthandPattern = /^\s*multi_agent_v2\s*=\s*true[ \t]*(?:#[^\n]*)?[ \t]*\n?/m;
+	const shorthandPattern = /^\s*multi_agent_v2\s*=\s*(?:true|false)[ \t]*(?:#[^\n]*)?[ \t]*\n?/m;
 	if (!shorthandPattern.test(section.text)) return config;
 
 	const patched = section.text.replace(shorthandPattern, "");
 	return config.slice(0, section.start) + patched + config.slice(section.end);
-}
-
-function hasDisabledFeaturesShorthand(config) {
-	const section = findSection(config, "[features]");
-	if (!section) return false;
-	return /^\s*multi_agent_v2\s*=\s*false[ \t]*(?:#[^\n]*)?$/m.test(section.text);
 }
 
 function appendDisabledSection(config) {

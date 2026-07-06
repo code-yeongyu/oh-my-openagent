@@ -58,6 +58,20 @@ describe("star-request", () => {
     expect(results).toEqual(STAR_REPOSITORIES.map((repository) => ({ repository, ok: true })))
   })
 
+  test("stars the default repositories for senpi platform without adding a new repo", async () => {
+    // given
+    const starred: string[] = []
+
+    // when
+    const results = await starGitHubRepositories("senpi", async (repository) => {
+      starred.push(repository)
+    })
+
+    // then
+    expect(starred).toEqual([...STAR_REPOSITORIES])
+    expect(results).toEqual(STAR_REPOSITORIES.map((repository) => ({ repository, ok: true })))
+  })
+
   test("keeps going when one repository cannot be starred", async () => {
     // given
     // when

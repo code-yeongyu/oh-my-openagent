@@ -3,13 +3,21 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import test from "node:test";
 
-import { collectCommandHooks, readComponentHookManifests, readJson, root } from "./aggregate-plugin-fixture.mjs";
+import {
+	collectCommandHooks,
+	readAggregateHookManifests,
+	readComponentHookManifests,
+	readJson,
+	root,
+} from "./aggregate-plugin-fixture.mjs";
 
 const PLUGIN_ROOT_TARGET_PATTERN = /\$\{PLUGIN_ROOT\}([^"']+)/g;
 const SKIPPED_DIRECTORY_NAMES = new Set([".git", "node_modules"]);
 const EXPECTED_BOOTSTRAP_COMMAND = 'node "${PLUGIN_ROOT}/components/bootstrap/dist/cli.js" hook session-start';
 const EXPECTED_BOOTSTRAP_COMMAND_WINDOWS =
 	'powershell -NoProfile -ExecutionPolicy Bypass -File "${PLUGIN_ROOT}\\components\\bootstrap\\scripts\\bootstrap.ps1"';
+const EXPECTED_NODE_DISPATCH_PREFIX =
+	'powershell -NoProfile -ExecutionPolicy Bypass -File "${PLUGIN_ROOT}\\components\\bootstrap\\scripts\\node-dispatch.ps1"';
 
 async function pathExists(absolutePath) {
 	try {
@@ -58,13 +66,13 @@ function collectPluginRootTargets(handler) {
 }
 
 async function readHookManifestsWithRoots() {
-	const aggregate = { source: "hooks/hooks.json", hooks: await readJson("hooks/hooks.json"), roots: [root] };
+	const aggregate = (await readAggregateHookManifests()).map(({ source, hooks }) => ({ source, hooks, roots: [root] }));
 	const components = (await readComponentHookManifests()).map(({ source, hooks }) => ({
 		source,
 		hooks,
 		roots: [dirname(dirname(join(root, source))), root],
 	}));
-	return [aggregate, ...components];
+	return [...aggregate, ...components];
 }
 
 function findBootstrapSessionStartHandlers(hooks) {
@@ -121,13 +129,32 @@ test("#given aggregate and component hook manifests #when command targets are re
 	assert.deepEqual(missing, []);
 });
 
+test("#given aggregate hook manifests #when command handlers are inspected #then each has a Windows dispatcher", async () => {
+	// given
+	const aggregateHooks = await readAggregateHookManifests();
+
+	// when
+	const missing = [];
+	for (const manifest of aggregateHooks) {
+		for (const { handler } of collectCommandHooks(manifest.hooks, manifest.source)) {
+			if (typeof handler.commandWindows === "string" && handler.commandWindows.length > 0) continue;
+			missing.push(`${manifest.source}: ${handler.command}`);
+		}
+	}
+
+	// then
+	assert.deepEqual(missing, [], `Aggregate hook commands need commandWindows dispatchers:\n${missing.join("\n")}`);
+});
+
 test("#given the bootstrap component #when its SessionStart registration is inspected #then aggregate and component entries declare both platform commands", async () => {
 	// given
-	const aggregateHooks = await readJson("hooks/hooks.json");
+	const aggregateHooks = (await readAggregateHookManifests()).find(({ source }) =>
+		source.endsWith("session-start-checking-bootstrap-provisioning.json"),
+	)?.hooks;
 	const componentHooks = await readJson("components/bootstrap/hooks/hooks.json");
 
 	// when
-	const aggregateEntries = findBootstrapSessionStartHandlers(aggregateHooks);
+	const aggregateEntries = findBootstrapSessionStartHandlers(aggregateHooks ?? {});
 	const componentEntries = findBootstrapSessionStartHandlers(componentHooks);
 
 	// then
@@ -144,8 +171,27 @@ test("#given the bootstrap component #when its SessionStart registration is insp
 		assert.equal(typeof handler.timeout, "number");
 		assert(handler.timeout <= 60, `${label} bootstrap timeout must stay <= 60 seconds`);
 		assert.equal(typeof handler.statusMessage, "string");
-		assert.match(handler.statusMessage, /^LazyCodex\([^)]+\): .+$/);
+		assert.match(handler.statusMessage, /^\(OmO\) .+$/);
 	}
+});
+
+test("#given non-bootstrap aggregate hook manifests #when commandWindows entries are read #then they launch the managed Node dispatcher", async () => {
+	// given
+	const aggregateHooks = await readAggregateHookManifests();
+
+	// when
+	const offenders = [];
+	for (const manifest of aggregateHooks) {
+		for (const { handler } of collectCommandHooks(manifest.hooks, manifest.source)) {
+			if (handler.command === EXPECTED_BOOTSTRAP_COMMAND) continue;
+			if (typeof handler.commandWindows !== "string" || !handler.commandWindows.startsWith(EXPECTED_NODE_DISPATCH_PREFIX)) {
+				offenders.push(`${manifest.source}: ${handler.commandWindows ?? "<missing>"}`);
+			}
+		}
+	}
+
+	// then
+	assert.deepEqual(offenders, [], `Non-bootstrap aggregate hooks must use node-dispatch.ps1 on Windows:\n${offenders.join("\n")}`);
 });
 
 test("#given the built bootstrap bundle #when its module references are inspected #then it depends on Node built-ins only", async () => {

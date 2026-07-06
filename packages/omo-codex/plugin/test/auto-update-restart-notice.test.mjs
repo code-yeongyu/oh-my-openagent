@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -9,8 +9,6 @@ import { fileURLToPath } from "node:url";
 import { resolveAutoUpdatePlan, runAutoUpdateCheck } from "../scripts/auto-update.mjs";
 
 const SCRIPT_PATH = fileURLToPath(new URL("../scripts/auto-update.mjs", import.meta.url));
-const STARTED_NOTICE =
-	"[LazyCodex] Auto-update started in the background: v1.0.0 -> v1.0.1. Tell the user a new LazyCodex version is installing and that they should start a new Codex session after it completes to apply it.";
 const COMPLETED_NOTICE =
 	"[LazyCodex] Auto-update completed: v1.0.0 -> v1.0.1. This session is already running the new version. Tell the user the auto-update was applied.";
 
@@ -22,8 +20,20 @@ function autoUpdateEnv(root, extra = {}) {
 		LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json"),
 		LAZYCODEX_AUTO_UPDATE_STATE_PATH: join(root, "state.json"),
 		LAZYCODEX_AUTO_UPDATE_LOG_PATH: join(root, "auto-update.log"),
+		LAZYCODEX_CONFIG_MIGRATION_DISABLED: "1",
 		...extra,
 	};
+}
+
+function assertStartedNotice(notices) {
+	assert.equal(notices.length, 1);
+	const [notice] = notices;
+	assert.equal(typeof notice, "string");
+	assert.match(notice, /v1\.0\.0 -> v1\.0\.1/);
+	assert.match(notice, /Auto-update started in the background/i);
+	assert.match(notice, /new Codex session after it completes/i);
+	assert.match(notice, /user's preferred tone/i);
+	assert.match(notice, /Release notes for v1\.0\.1 were not available/);
 }
 
 test("#given a newer version #when resolving auto update plan #then plan carries current and latest versions", () => {
@@ -36,6 +46,28 @@ test("#given a newer version #when resolving auto update plan #then plan carries
 	assert.equal(plan.shouldRun, true);
 	assert.equal(plan.currentVersion, "1.0.0");
 	assert.equal(plan.latestVersion, "1.0.1");
+});
+
+test("#given SessionStart migration removes unsupported root multi-agent mode #when startup check runs #then emits cleanup notice", async () => {
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-root-mode-cleanup-notice-"));
+	const env = autoUpdateEnv(root, {
+		LAZYCODEX_CURRENT_VERSION: "1.0.1",
+		LAZYCODEX_LATEST_VERSION: "1.0.1",
+		LAZYCODEX_CONFIG_MIGRATION_DISABLED: "0",
+	});
+	await mkdir(env.CODEX_HOME, { recursive: true });
+	await writeFile(join(env.CODEX_HOME, "config.toml"), ['multi_agent_mode = "queue"', ""].join("\n"));
+
+	const result = await runAutoUpdateCheck({ env, now: 90_000_000 });
+
+	assert.equal(result.started, false);
+	assert.equal(result.reason, "up-to-date");
+	assert.equal(result.notices.length, 1);
+	assert.match(result.notices[0], /multi_agent_mode/);
+	assert.match(result.notices[0], /Removed unsupported Codex root/);
+	assert.match(result.notices[0], /per-turn multiAgentMode API/);
+	const config = await readFile(join(env.CODEX_HOME, "config.toml"), "utf8");
+	assert.doesNotMatch(config, /^\s*multi_agent_mode\s*=/m);
 });
 
 test("#given a newer version #when waited update succeeds #then returns update-started notice and persists pendingNotice", async () => {
@@ -54,7 +86,7 @@ test("#given a newer version #when waited update succeeds #then returns update-s
 
 	assert.equal(result.started, true);
 	assert.equal(result.status, 0);
-	assert.deepEqual(result.notices, [STARTED_NOTICE]);
+	assertStartedNotice(result.notices);
 	const state = JSON.parse(await readFile(env.LAZYCODEX_AUTO_UPDATE_STATE_PATH, "utf8"));
 	assert.deepEqual(state.pendingNotice, {
 		fromVersion: "1.0.0",

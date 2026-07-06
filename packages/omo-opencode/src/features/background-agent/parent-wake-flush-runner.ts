@@ -66,6 +66,9 @@ export class ParentWakeFlushRunner {
       log("[background-agent] Recorded admit-only parent wake because parent session activity is still fresh:", {
         sessionID,
       })
+      if (latestWake.shouldReply) {
+        this.schedulePendingParentWakeFlush(sessionID)
+      }
       return
     }
 
@@ -106,6 +109,27 @@ export class ParentWakeFlushRunner {
       return
     }
 
+    const finalToolWaitDecision = await this.confirmParentWakeStillSafeForReply(
+      sessionID,
+      latestWake,
+      toolWaitDecision,
+    )
+    if (finalToolWaitDecision.defer) {
+      if (this.deferReplyWakeWhileUnsafe(sessionID, latestWake)) {
+        return
+      }
+      await this.sendParentWakePrompt(sessionID, latestWake, {
+        emptyAssistantTurnRetry,
+        toolWaitDecision: { ...finalToolWaitDecision, skipPromptGateToolStateCheck: true },
+        forceNoReply: true,
+        retainPendingWake: latestWake.shouldReply,
+      })
+      log("[background-agent] Recorded admit-only parent wake because parent session history became unsafe:", {
+        sessionID,
+      })
+      return
+    }
+
     const dispatchedWake = this.deps.dispatchedTracker.getWake(sessionID)
     if (dispatchedWake && isRedundantParentWake(latestWake, dispatchedWake)) {
       this.deps.pendingQueue.deleteWake(sessionID)
@@ -115,12 +139,18 @@ export class ParentWakeFlushRunner {
 
     await this.sendParentWakePrompt(sessionID, latestWake, {
       emptyAssistantTurnRetry,
-      toolWaitDecision,
+      toolWaitDecision: finalToolWaitDecision,
     })
   }
 
   schedulePendingParentWakeFlush(sessionID: string, delayMs?: number): void {
-    this.deps.pendingQueue.scheduleFlush(sessionID, () => this.flushPendingParentWake(sessionID), delayMs)
+    this.deps.pendingQueue.scheduleFlush(sessionID, async () => {
+      try {
+        await this.flushPendingParentWake(sessionID)
+      } finally {
+        this.deps.notifierDeps.onScheduledFlushSettled?.(sessionID)
+      }
+    }, delayMs)
   }
 
   // Reply-required wakes must never be consumed by an admit-only noReply
@@ -221,6 +251,17 @@ export class ParentWakeFlushRunner {
     sessionID: string,
     wake: PendingParentWake,
   ): Promise<ToolWaitDeferralDecision> {
+    return this.deps.sessionInspector.shouldDeferForHistory(sessionID, wake)
+  }
+
+  private async confirmParentWakeStillSafeForReply(
+    sessionID: string,
+    wake: PendingParentWake,
+    decision: ToolWaitDeferralDecision,
+  ): Promise<ToolWaitDeferralDecision> {
+    if (!decision.skipPromptGateToolStateCheck) {
+      return decision
+    }
     return this.deps.sessionInspector.shouldDeferForHistory(sessionID, wake)
   }
 

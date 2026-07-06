@@ -875,4 +875,34 @@ describe("prometheus-md-only", () => {
        ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
      })
   })
+
+  describe("blocked-write guidance message", () => {
+    test("#given prometheus writes product code #when the hook blocks #then the error routes to plan todos, never to subagent implementation", async () => {
+      //#given
+      setupMessageStorage(TEST_SESSION_ID, "prometheus")
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-guidance",
+      }
+      const output = {
+        args: { filePath: "/path/to/file.ts" },
+      }
+
+      //#when
+      let blockedMessage = ""
+      try {
+        await hook["tool.execute.before"](input, output)
+      } catch (error) {
+        blockedMessage = error instanceof Error ? error.message : String(error)
+      }
+
+      //#then
+      expect(blockedMessage).toContain("delegated implementation is still implementation")
+      expect(blockedMessage).toContain("Record the intended change as a todo in the plan")
+      expect(blockedMessage).not.toContain("Use task() to delegate implementation")
+      expect(blockedMessage).not.toContain("APOLOGIZE")
+    })
+  })
 })

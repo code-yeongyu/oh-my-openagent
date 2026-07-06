@@ -75,6 +75,7 @@ describe("ulw-loop verification", () => {
 
 		test("#given ulw loop emits DONE #when idle fires #then verification phase starts instead of completing", async () => {
 		const hook = createRalphLoopHook(createMockPluginInput(), {
+			idleSettleMs: 0,
 			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
 		})
 		hook.startLoop("session-123", "Build API", { ultrawork: true })
@@ -95,6 +96,7 @@ describe("ulw-loop verification", () => {
 
 	test("#given ulw loop is awaiting verification #when VERIFIED appears in oracle session #then loop completes", async () => {
 		const hook = createRalphLoopHook(createMockPluginInput(), {
+			idleSettleMs: 0,
 			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
 		})
 		hook.startLoop("session-123", "Build API", { ultrawork: true })
@@ -121,6 +123,7 @@ describe("ulw-loop verification", () => {
 
 	test("#given ulw loop is awaiting verification #when oracle session idles with VERIFIED #then loop completes without parent idle", async () => {
 		const hook = createRalphLoopHook(createMockPluginInput(), {
+			idleSettleMs: 0,
 			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
 		})
 		hook.startLoop("session-123", "Build API", { ultrawork: true })
@@ -147,6 +150,7 @@ describe("ulw-loop verification", () => {
 
 	test("#given ulw loop is awaiting verification #when oracle transcript stores VERIFIED inside tool_result #then loop completes", async () => {
 		const hook = createRalphLoopHook(createMockPluginInput(), {
+			idleSettleMs: 0,
 			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
 		})
 		hook.startLoop("session-123", "Build API", { ultrawork: true })
@@ -177,6 +181,7 @@ describe("ulw-loop verification", () => {
 
 	test("#given ulw loop is awaiting verification without oracle session #when parent idles again #then loop continues until oracle verifies", async () => {
 		const hook = createRalphLoopHook(createMockPluginInput(), {
+			idleSettleMs: 0,
 			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
 		})
 		hook.startLoop("session-123", "Build API", { ultrawork: true })
@@ -202,6 +207,7 @@ describe("ulw-loop verification", () => {
 
 	test("#given ulw loop is awaiting oracle verification #when parent idles before VERIFIED arrives #then loop continues instead of waiting", async () => {
 		const hook = createRalphLoopHook(createMockPluginInput(), {
+			idleSettleMs: 0,
 			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
 		})
 		hook.startLoop("session-123", "Build API", { ultrawork: true })
@@ -250,6 +256,7 @@ describe("ulw-loop verification", () => {
 				},
 			},
 		} as Parameters<typeof createRalphLoopHook>[0], {
+			idleSettleMs: 0,
 			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
 		})
 		hook.startLoop("session-123", "Build API", { ultrawork: true })
@@ -284,6 +291,7 @@ describe("ulw-loop verification", () => {
 
 	test("#given ulw loop without max iterations #when it continues #then it stays unbounded", async () => {
 		const hook = createRalphLoopHook(createMockPluginInput(), {
+			idleSettleMs: 0,
 			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
 		})
 		hook.startLoop("session-123", "Build API", { ultrawork: true })
@@ -301,6 +309,7 @@ describe("ulw-loop verification", () => {
 			`${JSON.stringify({ type: "assistant", timestamp: "2000-01-01T00:00:00.000Z", content: "old <promise>DONE</promise>" })}\n`,
 		)
 		const hook = createRalphLoopHook(createMockPluginInput(), {
+			idleSettleMs: 0,
 			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
 		})
 		hook.startLoop("session-123", "Build API", { ultrawork: true })
@@ -314,6 +323,7 @@ describe("ulw-loop verification", () => {
 
 	test("#given ulw loop was awaiting verification #when same session starts again #then verification state is overwritten", async () => {
 		const hook = createRalphLoopHook(createMockPluginInput(), {
+			idleSettleMs: 0,
 			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
 		})
 		hook.startLoop("session-123", "Build API", { ultrawork: true })
@@ -332,6 +342,7 @@ describe("ulw-loop verification", () => {
 
 	test("#given ulw loop was awaiting verification #when different session starts a new ulw loop #then prior verification state is overwritten", async () => {
 		const hook = createRalphLoopHook(createMockPluginInput(), {
+			idleSettleMs: 0,
 			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
 		})
 		hook.startLoop("session-123", "Build API", { ultrawork: true })
@@ -351,6 +362,7 @@ describe("ulw-loop verification", () => {
 
 	test("#given verification state was overwritten by different ulw loop #when stale oracle session idles #then new loop remains active", async () => {
 		const hook = createRalphLoopHook(createMockPluginInput(), {
+			idleSettleMs: 0,
 			getTranscriptPath: (sessionID) => sessionID === "ses-oracle-old" ? oracleTranscriptPath : parentTranscriptPath,
 		})
 		hook.startLoop("session-123", "Build API", { ultrawork: true })
@@ -380,6 +392,7 @@ describe("ulw-loop verification", () => {
 
 	test("#given verification state was overwritten by restarted ulw loop #when stale oracle session idles #then restarted loop remains active", async () => {
 		const hook = createRalphLoopHook(createMockPluginInput(), {
+			idleSettleMs: 0,
 			getTranscriptPath: (sessionID) => sessionID === "ses-oracle-old" ? oracleTranscriptPath : parentTranscriptPath,
 		})
 		hook.startLoop("session-123", "Build API", { ultrawork: true })
@@ -410,6 +423,7 @@ describe("ulw-loop verification", () => {
 
 	test("#given parent session emits VERIFIED #when oracle session is not tracked #then ulw loop completes from parent session evidence", async () => {
 		const hook = createRalphLoopHook(createMockPluginInput(), {
+			idleSettleMs: 0,
 			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
 		})
 		hook.startLoop("session-123", "Build API", { ultrawork: true })
@@ -447,6 +461,7 @@ describe("ulw-loop verification", () => {
 				},
 			},
 		} as Parameters<typeof createRalphLoopHook>[0], {
+			idleSettleMs: 0,
 			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
 		})
 		hook.startLoop("session-123", "Build API", { ultrawork: true })
@@ -495,6 +510,7 @@ session_id: ses-oracle
 				},
 			},
 		} as Parameters<typeof createRalphLoopHook>[0], {
+			idleSettleMs: 0,
 			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
 		})
 		hook.startLoop("session-123", "Build API", { ultrawork: true })
@@ -541,6 +557,7 @@ session_id: ses-oracle
 				},
 			},
 		} as Parameters<typeof createRalphLoopHook>[0], {
+			idleSettleMs: 0,
 			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
 		})
 		hook.startLoop("session-123", "Build API", { ultrawork: true })
@@ -581,6 +598,7 @@ session_id: ses-oracle
 				},
 			},
 		} as Parameters<typeof createRalphLoopHook>[0], {
+			idleSettleMs: 0,
 			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
 		})
 		hook.startLoop("session-123", "Build API", { ultrawork: true })

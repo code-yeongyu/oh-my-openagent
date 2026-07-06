@@ -1,3 +1,5 @@
+// allow: SIZE_OK - legacy generated snapshot contract with shared provider-cache stubs; add new behavior in focused sibling tests instead.
+
 import type { ModelCapabilitiesSnapshot } from "./model-capabilities"
 import { afterEach, describe, expect, test, spyOn } from "bun:test"
 import { getModelCapabilities, getBundledModelCapabilitiesSnapshot } from "./model-capabilities"

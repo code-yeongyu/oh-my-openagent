@@ -7,8 +7,9 @@
 # or routes correctly through the live listener (FIXED).
 #
 # Two assertion modes:
-#   --expect reproduced   exit 0 if stops>1 OR children>1 OR mechanism arm true
-#   --expect fixed        exit 0 if children==1 AND stops==1
+#   --expect reproduced   exit 0 if terminal_stops>1 OR child_task_sessions>1 OR mechanism arm true
+#   --expect fixed        exit 0 if terminal_stops==1, child_task_sessions==1,
+#                         fixed branch counts hold, and route logs show live dispatch
 #
 # Usage:
 #   serve-wake-split-probe.sh [--expect reproduced|fixed] [--evidence-dir DIR]
@@ -45,10 +46,18 @@ FAKE_LLM_LOG=""     # set after evidence dir is known
 while [ $# -gt 0 ]; do
   case "$1" in
     --expect)
+      if [ $# -lt 2 ] || [ "${2#--}" != "$2" ]; then
+        printf 'error: --expect requires reproduced or fixed\n' >&2
+        exit 2
+      fi
       EXPECT_MODE="$2"
       shift 2
       ;;
     --evidence-dir)
+      if [ $# -lt 2 ] || [ "${2#--}" != "$2" ]; then
+        printf 'error: --evidence-dir requires a directory\n' >&2
+        exit 2
+      fi
       EVIDENCE_DIR="$2"
       shift 2
       ;;
@@ -80,6 +89,22 @@ fi
 
 swsp_log()  { printf '%s\n' "$*" >&2; }
 swsp_info() { printf '[swsp] %s\n' "$*" >&2; }
+
+swsp_tail_log_since_offset() {
+  local offset="$1"
+  local log_path="$2"
+  if [ ! -f "$log_path" ]; then
+    return 0
+  fi
+  local current_size
+  current_size="$(wc -c <"$log_path" 2>/dev/null | tr -d ' ')" || current_size=0
+  current_size="${current_size:-0}"
+  if [ "$offset" -gt "$current_size" ] 2>/dev/null; then
+    return 0
+  else
+    tail -c "+$((offset + 1))" "$log_path" 2>/dev/null || true
+  fi
+}
 
 # Start the fake-LLM server; sets FAKE_SERVER_PID + FAKE_SERVER_PORT.
 swsp_start_fake_llm() {
@@ -203,9 +228,9 @@ JSONC
   swsp_info "opencode.jsonc written to $cfg_dir/opencode/opencode.jsonc"
 }
 
-# Poll the sandbox DB for children/stops on a message matching a LIKE pattern.
+# Poll the sandbox DB for parent assistant step metrics on a message matching a LIKE pattern.
 # Args: db_path like_pattern timeout_s
-# Outputs: "<children> <stops>" on stdout
+# Outputs: "<parent_assistant_messages> <parent_tool_call_turns> <terminal_stops> <child_task_sessions>" on stdout
 swsp_poll_db_metrics() {
   local db="$1"
   local like_pat="$2"
@@ -222,17 +247,28 @@ swsp_poll_db_metrics() {
       ),
       counts AS (
         SELECT
-          count(a.id) AS children,
-          sum(CASE WHEN json_extract(a.data, '\$.finish') = 'stop' THEN 1 ELSE 0 END) AS stops
+          count(a.id) AS parent_assistant_messages,
+          sum(CASE WHEN json_extract(a.data, '\$.finish') = 'tool-calls' THEN 1 ELSE 0 END) AS parent_tool_call_turns,
+          sum(CASE WHEN json_extract(a.data, '\$.finish') = 'stop' THEN 1 ELSE 0 END) AS terminal_stops
         FROM target t
         LEFT JOIN message a
           ON a.session_id = t.session_id
           AND json_extract(a.data, '\$.parentID') = t.user_id
         GROUP BY t.user_id
+      ),
+      child_task_sessions AS (
+        SELECT count(DISTINCT m.session_id) AS child_task_sessions
+        FROM message m
+        JOIN part p ON p.message_id = m.id
+        WHERE json_extract(m.data, '\$.role') = 'user'
+          AND json_extract(p.data, '\$.type') = 'text'
+          AND json_extract(p.data, '\$.text') LIKE '%SPLIT_CHILD_TASK:%'
       )
-      SELECT printf('%d %d',
-        coalesce((SELECT max(children) FROM counts), 0),
-        coalesce((SELECT max(stops) FROM counts), 0)
+      SELECT printf('%d %d %d %d',
+        coalesce((SELECT max(parent_assistant_messages) FROM counts), 0),
+        coalesce((SELECT max(parent_tool_call_turns) FROM counts), 0),
+        coalesce((SELECT max(terminal_stops) FROM counts), 0),
+        coalesce((SELECT child_task_sessions FROM child_task_sessions), 0)
       );
   "
 
@@ -245,13 +281,15 @@ swsp_poll_db_metrics() {
     local result
     result="$(sqlite3 "$db" "$metrics_query" 2>/dev/null)" || true
 
-    local children stops
-    children="$(printf '%s' "$result" | awk '{print $1}')"
-    stops="$(printf '%s' "$result" | awk '{print $2}')"
+    local parent_assistant_messages parent_tool_call_turns terminal_stops child_task_sessions
+    parent_assistant_messages="$(printf '%s' "$result" | awk '{print $1}')"
+    parent_tool_call_turns="$(printf '%s' "$result" | awk '{print $2}')"
+    terminal_stops="$(printf '%s' "$result" | awk '{print $3}')"
+    child_task_sessions="$(printf '%s' "$result" | awk '{print $4}')"
 
     # Return once we have at least 1 stop (parent session finished)
-    if [ -n "$stops" ] && [ "${stops:-0}" -ge 1 ] 2>/dev/null; then
-      printf '%s %s' "$children" "$stops"
+    if [ -n "$terminal_stops" ] && [ "${terminal_stops:-0}" -ge 1 ] 2>/dev/null; then
+      printf '%s %s %s %s' "$parent_assistant_messages" "$parent_tool_call_turns" "$terminal_stops" "$child_task_sessions"
       return 0
     fi
     sleep 0.5
@@ -260,7 +298,7 @@ swsp_poll_db_metrics() {
   # Return whatever we have on timeout
   local result
   result="$(sqlite3 "$db" "$metrics_query" 2>/dev/null)" || true
-  printf '%s' "${result:-0 0}"
+  printf '%s' "${result:-0 0 0 0}"
 }
 
 # Wait until a session is no longer in the server's active status map.
@@ -291,11 +329,9 @@ swsp_count_plugin_inits() {
     printf '0'
     return 0
   fi
-  # tail from byte offset
-  tail -c "+$((offset + 1))" "$log_path" 2>/dev/null \
+  swsp_tail_log_since_offset "$offset" "$log_path" \
     | grep "ENTRY - plugin loading" \
-    | grep -c "$sandbox_dir" 2>/dev/null \
-    || printf '0'
+    | awk -v sandbox_dir="$sandbox_dir" 'index($0, sandbox_dir) { count += 1 } END { print count + 0 }'
 }
 
 # Detect WAKE_DISPATCHED_DURING_PARENT_TURN:
@@ -321,7 +357,7 @@ swsp_detect_wake_during_parent() {
 
   # Check for gate dispatch log line with parent-wake source since offset
   local dispatch_line
-  dispatch_line="$(tail -c "+$((offset + 1))" "$omo_log" 2>/dev/null \
+  dispatch_line="$(swsp_tail_log_since_offset "$offset" "$omo_log" \
     | grep "promptAsync dispatching" \
     | grep -i "parent-wake\|background-agent-parent-wake" \
     | head -1)" || true
@@ -350,10 +386,97 @@ swsp_detect_wake_during_parent() {
   fi
 }
 
+swsp_has_session_live_dispatch() {
+  local route_prov="$1"
+  local session_id="$2"
+  [ -n "$session_id" ] || return 1
+  printf '%s\n' "$route_prov" \
+    | grep -F "dispatch via live listener" \
+    | grep -F "\"sessionID\":\"${session_id}\"" >/dev/null 2>&1
+}
+
+swsp_is_nonnegative_int() {
+  case "${1:-}" in
+    ''|*[!0-9]*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+swsp_fixed_topology_observed() {
+  local parent_assistant_messages="$1"
+  local parent_tool_call_turns="$2"
+  local terminal_stops="$3"
+  local child_task_sessions="$4"
+  local parent_tool_call_branches="$5"
+  local parent_hold_branches="$6"
+  local child_branches="$7"
+  local wake_branches="$8"
+  local default_branches="$9"
+  local has_live_dispatch="${10}"
+
+  swsp_is_nonnegative_int "$parent_assistant_messages" || return 1
+  swsp_is_nonnegative_int "$parent_tool_call_turns" || return 1
+  swsp_is_nonnegative_int "$terminal_stops" || return 1
+  swsp_is_nonnegative_int "$child_task_sessions" || return 1
+  swsp_is_nonnegative_int "$parent_tool_call_branches" || return 1
+  swsp_is_nonnegative_int "$parent_hold_branches" || return 1
+  swsp_is_nonnegative_int "$child_branches" || return 1
+  swsp_is_nonnegative_int "$wake_branches" || return 1
+  swsp_is_nonnegative_int "$default_branches" || return 1
+
+  [ "$has_live_dispatch" = "true" ] || return 1
+
+  if [ "${terminal_stops:-0}" -ne 1 ] \
+    || [ "${child_task_sessions:-0}" -ne 1 ] \
+    || [ "${parent_tool_call_turns:-0}" -ne 2 ] \
+    || [ "${parent_assistant_messages:-0}" -ne 3 ] \
+    || [ "${parent_tool_call_branches:-0}" -ne 1 ] \
+    || [ "${parent_hold_branches:-0}" -ne 1 ] \
+    || [ "${child_branches:-0}" -ne 1 ] \
+    || [ "${default_branches:-0}" -lt 1 ] \
+    || [ "${wake_branches:-0}" -ne 0 ] 2>/dev/null; then
+    return 1
+  fi
+
+  return 0
+}
+
+swsp_collect_route_provenance() {
+  local offset="$1"
+  local log_path="$2"
+  local project_dir="$3"
+  local session_id="$4"
+  local output_file="$5"
+  local all_output_file="$6"
+  local timeout_s="${7:-0}"
+  local deadline
+  deadline=$(( $(date +%s) + timeout_s ))
+
+  while :; do
+    local route_prov_all="" route_prov=""
+    if [ -f "$log_path" ]; then
+      route_prov_all="$(swsp_tail_log_since_offset "$offset" "$log_path" \
+        | grep -E "live-server-route" || true)"
+      route_prov="$(printf '%s\n' "$route_prov_all" \
+        | awk -v dir="$project_dir" -v sid="\"sessionID\":\"${session_id}\"" 'index($0, dir) || index($0, sid)' || true)"
+    fi
+    printf '%s' "$route_prov" >"$all_output_file"
+    printf '%s' "$route_prov" >"$output_file"
+    if swsp_has_session_live_dispatch "$route_prov" "$session_id"; then
+      return 0
+    fi
+    if [ "$timeout_s" -le 0 ] || [ "$(date +%s)" -ge "$deadline" ]; then
+      return 1
+    fi
+    sleep 0.25
+  done
+}
+
 # Verify branch-count guard: all required branches fired.
 # Returns 0 if OK, 1 if any required branch missing (also sets RESULT=HARNESS_ERROR).
 swsp_check_branch_counts() {
   local fake_log="$1"
+  local mode="${2:-}"
   local ptc pc cc wc
   ptc="$(grep -c "branch=parent-tool-call" "$fake_log" 2>/dev/null | tr -d '[:space:]')"; ptc="${ptc:-0}"
   pc="$(grep -c "branch=parent-hold" "$fake_log" 2>/dev/null | tr -d '[:space:]')"; pc="${pc:-0}"
@@ -364,7 +487,7 @@ swsp_check_branch_counts() {
 
   swsp_info "branch counts: parent-tool-call=$ptc parent-hold=$pc child=$cc wake=$wc"
 
-  if [ "$ptc" -lt 1 ] || [ "$pc" -lt 1 ] || [ "$cc" -lt 1 ] || [ "$wc" -lt 1 ]; then
+  if [ "$ptc" -lt 1 ] || [ "$pc" -lt 1 ] || [ "$cc" -lt 1 ]; then
     printf 'RESULT=HARNESS_ERROR branch_counts parent-tool-call=%s parent-hold=%s child=%s wake=%s\n' \
       "$ptc" "$pc" "$cc" "$wc"
     return 1
@@ -400,6 +523,33 @@ swsp_self_test() {
     fi
   fi
 
+  local missing_expect_out missing_expect_err missing_evidence_out missing_evidence_err
+  missing_expect_out="$(mktemp -t swsp-missing-expect-out.XXXXXX)"
+  missing_expect_err="$(mktemp -t swsp-missing-expect-err.XXXXXX)"
+  missing_evidence_out="$(mktemp -t swsp-missing-evidence-out.XXXXXX)"
+  missing_evidence_err="$(mktemp -t swsp-missing-evidence-err.XXXXXX)"
+  OQA_TMPDIRS+=("$missing_expect_out" "$missing_expect_err" "$missing_evidence_out" "$missing_evidence_err")
+
+  if bash "${BASH_SOURCE[0]}" --expect >"$missing_expect_out" 2>"$missing_expect_err"; then
+    swsp_log "FAIL: missing --expect operand unexpectedly succeeded"
+    fails=$((fails+1))
+  elif grep -q "error: --expect requires reproduced or fixed" "$missing_expect_err"; then
+    swsp_info "PASS: missing --expect operand fails with usage error"
+  else
+    swsp_log "FAIL: missing --expect operand did not emit usage error"
+    fails=$((fails+1))
+  fi
+
+  if bash "${BASH_SOURCE[0]}" --evidence-dir --self-test >"$missing_evidence_out" 2>"$missing_evidence_err"; then
+    swsp_log "FAIL: missing --evidence-dir operand unexpectedly succeeded"
+    fails=$((fails+1))
+  elif grep -q "error: --evidence-dir requires a directory" "$missing_evidence_err"; then
+    swsp_info "PASS: missing --evidence-dir operand fails with usage error"
+  else
+    swsp_log "FAIL: missing --evidence-dir operand did not emit usage error"
+    fails=$((fails+1))
+  fi
+
   # Sandbox + opencode serve
   if ! oqa_start_server; then
     swsp_log "FAIL: opencode serve did not start"
@@ -433,16 +583,117 @@ swsp_self_test() {
     fi
   fi
 
+  local route_fixture
+  route_fixture='[2026-06-19T00:00:00.000Z] [live-server-route] dispatch via live listener {"sessionID":"ses_other","source":"background-agent-parent-wake"}
+[2026-06-19T00:00:01.000Z] [live-server-route] dispatch via live listener {"sessionID":"ses_probe","source":"background-agent-parent-wake"}'
+  if swsp_has_session_live_dispatch "$route_fixture" "ses_probe" \
+    && ! swsp_has_session_live_dispatch "$route_fixture" "ses_missing"; then
+    swsp_info "PASS: live dispatch detection is scoped to the probe session"
+  else
+    swsp_log "FAIL: live dispatch detection accepted an unrelated session"
+    fails=$((fails+1))
+  fi
+
+  local branch_log
+  branch_log="$(mktemp -t swsp-branch-log.XXXXXX)"
+  OQA_TMPDIRS+=("$branch_log")
+  {
+    printf '[2026-06-19T00:00:00.000Z] branch=parent-tool-call\n'
+    printf '[2026-06-19T00:00:01.000Z] branch=parent-hold\n'
+    printf '[2026-06-19T00:00:02.000Z] branch=child\n'
+  } >"$branch_log"
+  if swsp_check_branch_counts "$branch_log" reproduced >/dev/null 2>&1; then
+    swsp_info "PASS: reproduced branch guard accepts mechanism-only evidence"
+  else
+    swsp_log "FAIL: reproduced branch guard still requires wake branch"
+    fails=$((fails+1))
+  fi
+
+  if swsp_fixed_topology_observed 3 2 1 1 1 1 1 0 1 true; then
+    swsp_info "PASS: fixed topology accepts scoped live dispatch plus deterministic DB/provider evidence"
+  else
+    swsp_log "FAIL: fixed topology rejected scoped live dispatch plus deterministic DB/provider evidence"
+    fails=$((fails+1))
+  fi
+
+  if swsp_fixed_topology_observed 3 2 1 1 1 1 1 0 1 false; then
+    swsp_log "FAIL: fixed topology accepted missing scoped live dispatch"
+    fails=$((fails+1))
+  else
+    swsp_info "PASS: fixed topology rejects missing scoped live dispatch"
+  fi
+
+  if swsp_fixed_topology_observed bad 2 1 1 1 1 1 0 1 true; then
+    swsp_log "FAIL: fixed topology accepted malformed numeric evidence"
+    fails=$((fails+1))
+  else
+    swsp_info "PASS: fixed topology rejects malformed numeric evidence"
+  fi
+
+  if swsp_fixed_topology_observed 3 2 2 1 1 1 1 0 1 true; then
+    swsp_log "FAIL: fixed topology accepted duplicate terminal stop"
+    fails=$((fails+1))
+  else
+    swsp_info "PASS: fixed topology rejects duplicate terminal stop"
+  fi
+
+  local stale_log stale_scoped stale_all
+  stale_log="$(mktemp -t swsp-stale-log.XXXXXX)"
+  stale_scoped="$(mktemp -t swsp-stale-scoped.XXXXXX)"
+  stale_all="$(mktemp -t swsp-stale-all.XXXXXX)"
+  OQA_TMPDIRS+=("$stale_log" "$stale_scoped" "$stale_all")
+  printf '[2026-06-19T00:00:00.000Z] [live-server-route] dispatch via live listener {"sessionID":"ses_unrelated","source":"background-agent-parent-wake"}\n' >"$stale_log"
+  swsp_collect_route_provenance 999999 "$stale_log" "/probe" "ses_probe" "$stale_scoped" "$stale_all" 0 || true
+  if [ ! -s "$stale_scoped" ] && [ ! -s "$stale_all" ]; then
+    swsp_info "PASS: stale log offset does not persist unrelated route provenance"
+  else
+    swsp_log "FAIL: stale log offset persisted unrelated route provenance"
+    fails=$((fails+1))
+  fi
+
+  local scoped_log scoped_out scoped_all
+  scoped_log="$(mktemp -t swsp-scoped-log.XXXXXX)"
+  scoped_out="$(mktemp -t swsp-scoped-out.XXXXXX)"
+  scoped_all="$(mktemp -t swsp-scoped-all.XXXXXX)"
+  OQA_TMPDIRS+=("$scoped_log" "$scoped_out" "$scoped_all")
+  {
+    printf '[2026-06-19T00:00:00.000Z] [live-server-route] dispatch via live listener {"sessionID":"ses_other","source":"background-agent-parent-wake"}\n'
+    printf '[2026-06-19T00:00:01.000Z] [live-server-route] dispatch via live listener {"sessionID":"ses_probe","source":"background-agent-parent-wake"}\n'
+  } >"$scoped_log"
+  swsp_collect_route_provenance 0 "$scoped_log" "/probe" "ses_probe" "$scoped_out" "$scoped_all" 0 || true
+  if grep -q "ses_probe" "$scoped_all" && ! grep -q "ses_other" "$scoped_all"; then
+    swsp_info "PASS: route provenance artifact excludes unrelated sessions"
+  else
+    swsp_log "FAIL: route provenance artifact included unrelated sessions"
+    fails=$((fails+1))
+  fi
+
+  local route_wait_log route_wait_scoped route_wait_all
+  route_wait_log="$(mktemp -t swsp-route-wait-log.XXXXXX)"
+  route_wait_scoped="$(mktemp -t swsp-route-wait-scoped.XXXXXX)"
+  route_wait_all="$(mktemp -t swsp-route-wait-all.XXXXXX)"
+  OQA_TMPDIRS+=("$route_wait_log" "$route_wait_scoped" "$route_wait_all")
+  printf '[2026-06-19T00:00:00.000Z] [live-server-route] registered {"directory":"/probe","hasServerUrl":true}\n' >"$route_wait_log"
+  (
+    sleep 0.5
+    printf '[2026-06-19T00:00:01.000Z] [live-server-route] dispatch via live listener {"sessionID":"ses_wait","source":"background-agent-parent-wake"}\n' >>"$route_wait_log"
+  ) &
+  local route_wait_pid=$!
+  if swsp_collect_route_provenance 0 "$route_wait_log" "/probe" "ses_wait" "$route_wait_scoped" "$route_wait_all" 3; then
+    swsp_info "PASS: route provenance waits for delayed session dispatch"
+  else
+    swsp_log "FAIL: route provenance did not wait for delayed session dispatch"
+    fails=$((fails+1))
+  fi
+  wait "$route_wait_pid" 2>/dev/null || true
+
+  local st_fake_pid="$FAKE_SERVER_PID"
   swsp_stop_fake_llm
 
-  # Orphan check
-  local orphan_count
-  orphan_count="$(pgrep -f "fake-openai-server" 2>/dev/null | wc -l | tr -d ' ')" || orphan_count=0
-  if [ "${orphan_count:-0}" -eq 0 ]; then
-    swsp_info "PASS: no orphan fake-openai-server processes"
+  if [ -n "$st_fake_pid" ] && ! kill -0 "$st_fake_pid" 2>/dev/null; then
+    swsp_info "PASS: fake-openai server process stopped"
   else
-    swsp_log "FAIL: $orphan_count orphan fake-openai-server process(es) remain"
-    pkill -f "fake-openai-server" 2>/dev/null || true
+    swsp_log "FAIL: fake-openai server process still running"
     fails=$((fails+1))
   fi
 
@@ -573,29 +824,38 @@ swsp_run_probe() {
     2>/dev/null)" || prompt_response=""
   swsp_info "prompt_async response: $prompt_response"
 
-  # Step 7: Poll sandbox DB for children/stops; also wait for session idle
   swsp_info "polling DB for wake-split metrics (up to 120s)..."
   local metrics
-  metrics="$(swsp_poll_db_metrics "$sandbox_db" '%[BACKGROUND TASK%' 120)"
-  local children stops
-  children="$(printf '%s' "$metrics" | awk '{print $1}')"
-  stops="$(printf '%s' "$metrics" | awk '{print $2}')"
-  children="${children:-0}"
-  stops="${stops:-0}"
-  swsp_info "DB metrics: children=$children stops=$stops"
+  metrics="$(swsp_poll_db_metrics "$sandbox_db" '%Run the split probe:%' 120)"
+  local parent_assistant_messages parent_tool_call_turns terminal_stops child_task_sessions
+  parent_assistant_messages="$(printf '%s' "$metrics" | awk '{print $1}')"
+  parent_tool_call_turns="$(printf '%s' "$metrics" | awk '{print $2}')"
+  terminal_stops="$(printf '%s' "$metrics" | awk '{print $3}')"
+  child_task_sessions="$(printf '%s' "$metrics" | awk '{print $4}')"
+  parent_assistant_messages="${parent_assistant_messages:-0}"
+  parent_tool_call_turns="${parent_tool_call_turns:-0}"
+  terminal_stops="${terminal_stops:-0}"
+  child_task_sessions="${child_task_sessions:-0}"
+  swsp_info "DB metrics: parent_assistant_messages=$parent_assistant_messages parent_tool_call_turns=$parent_tool_call_turns terminal_stops=$terminal_stops child_task_sessions=$child_task_sessions"
 
   # Wait for parent session to go idle
   swsp_info "waiting for parent session to go idle..."
   swsp_wait_session_idle "$OQA_SERVER_URL" "$pass" "$ses_id" 60
 
   # Re-read metrics after idle
-  metrics="$(swsp_poll_db_metrics "$sandbox_db" '%[BACKGROUND TASK%' 10)"
-  children="$(printf '%s' "$metrics" | awk '{print $1}')"
-  stops="$(printf '%s' "$metrics" | awk '{print $2}')"
-  children="${children:-0}"
-  stops="${stops:-0}"
-  swsp_info "final DB metrics: children=$children stops=$stops"
-  printf 'children=%s stops=%s\n' "$children" "$stops" >"$evidence_dir/marker-metrics.txt"
+  metrics="$(swsp_poll_db_metrics "$sandbox_db" '%Run the split probe:%' 10)"
+  parent_assistant_messages="$(printf '%s' "$metrics" | awk '{print $1}')"
+  parent_tool_call_turns="$(printf '%s' "$metrics" | awk '{print $2}')"
+  terminal_stops="$(printf '%s' "$metrics" | awk '{print $3}')"
+  child_task_sessions="$(printf '%s' "$metrics" | awk '{print $4}')"
+  parent_assistant_messages="${parent_assistant_messages:-0}"
+  parent_tool_call_turns="${parent_tool_call_turns:-0}"
+  terminal_stops="${terminal_stops:-0}"
+  child_task_sessions="${child_task_sessions:-0}"
+  swsp_info "final DB metrics: parent_assistant_messages=$parent_assistant_messages parent_tool_call_turns=$parent_tool_call_turns terminal_stops=$terminal_stops child_task_sessions=$child_task_sessions"
+  printf 'parent_assistant_messages=%s parent_tool_call_turns=%s terminal_stops=%s child_task_sessions=%s\n' \
+    "$parent_assistant_messages" "$parent_tool_call_turns" "$terminal_stops" "$child_task_sessions" \
+    >"$evidence_dir/marker-metrics.txt"
 
   # Step 8: Plugin-init count
   local plugin_inits
@@ -606,11 +866,15 @@ swsp_run_probe() {
 
   # Step 9: Route provenance
   local route_prov=""
-  if [ -f "$omo_log" ]; then
-    route_prov="$(tail -c "+$((omo_log_offset + 1))" "$omo_log" 2>/dev/null \
-      | grep -E "live-server-route" || true)"
-  fi
-  printf '%s\n' "$route_prov" >"$evidence_dir/route-provenance.log"
+  swsp_collect_route_provenance \
+    "$omo_log_offset" \
+    "$omo_log" \
+    "$OQA_PROJ" \
+    "$ses_id" \
+    "$evidence_dir/route-provenance.log" \
+    "$evidence_dir/route-provenance-all.log" \
+    10 || true
+  route_prov="$(cat "$evidence_dir/route-provenance.log" 2>/dev/null || true)"
   swsp_info "route-provenance lines: $(printf '%s' "$route_prov" | wc -l | tr -d ' ')"
 
   # WAKE_DISPATCHED_DURING_PARENT_TURN mechanism signal
@@ -618,16 +882,30 @@ swsp_run_probe() {
   wake_during_parent="$(swsp_detect_wake_during_parent "$omo_log_offset" "$fake_llm_log" "$OQA_PROJ")"
   swsp_info "WAKE_DISPATCHED_DURING_PARENT_TURN=$wake_during_parent"
 
+  local real_db_count_after=""
+  if [ -n "$real_db_path" ] && [ "$real_db_path" != "(not found)" ] && [ -f "$real_db_path" ]; then
+    real_db_count_after="$(sqlite3 "$real_db_path" 'SELECT count(*) FROM session' 2>/dev/null || echo "0")"
+  else
+    real_db_count_after="$real_db_count_before"
+  fi
+  printf 'after=%s unchanged=%s\n' \
+    "$real_db_count_after" \
+    "$([ "$real_db_count_after" = "$real_db_count_before" ] && echo yes || echo NO)" \
+    >>"$evidence_dir/isolation-receipt.txt"
+  swsp_info "isolation: real DB before=$real_db_count_before after=$real_db_count_after"
+
+  sqlite3 "$sandbox_db" ".backup '$evidence_dir/sandbox-opencode.db'" 2>/dev/null || true
+
   # Step 10: Branch-count guard
-  if ! swsp_check_branch_counts "$fake_llm_log" >&2; then
+  if ! swsp_check_branch_counts "$fake_llm_log" "$EXPECT_MODE" >&2; then
     # Branch counts not met — HARNESS_ERROR
     local ptc pc cc wc
-    ptc="$(grep -c "branch=parent-tool-call" "$fake_llm_log" 2>/dev/null || printf '0')"
-    pc="$(grep -c "branch=parent-hold" "$fake_llm_log" 2>/dev/null || printf '0')"
-    cc="$(grep -c "branch=child" "$fake_llm_log" 2>/dev/null || printf '0')"
-    wc="$(grep -c "branch=wake" "$fake_llm_log" 2>/dev/null || printf '0')"
+    ptc="$(grep -c "branch=parent-tool-call" "$fake_llm_log" 2>/dev/null || true)"; ptc="${ptc:-0}"
+    pc="$(grep -c "branch=parent-hold" "$fake_llm_log" 2>/dev/null || true)"; pc="${pc:-0}"
+    cc="$(grep -c "branch=child" "$fake_llm_log" 2>/dev/null || true)"; cc="${cc:-0}"
+    wc="$(grep -c "branch=wake" "$fake_llm_log" 2>/dev/null || true)"; wc="${wc:-0}"
     local verdict_line
-    verdict_line="RESULT=HARNESS_ERROR children=${children} stops=${stops} plugin_inits=${plugin_inits} WAKE_DISPATCHED_DURING_PARENT_TURN=${wake_during_parent} branch_counts=parent-tool-call:${ptc},parent-hold:${pc},child:${cc},wake:${wc}"
+    verdict_line="RESULT=HARNESS_ERROR parent_assistant_messages=${parent_assistant_messages} parent_tool_call_turns=${parent_tool_call_turns} terminal_stops=${terminal_stops} child_task_sessions=${child_task_sessions} plugin_inits=${plugin_inits} WAKE_DISPATCHED_DURING_PARENT_TURN=${wake_during_parent} branch_counts=parent-tool-call:${ptc},parent-hold:${pc},child:${cc},wake:${wc}"
     printf '%s\n' "$verdict_line" | tee -a "$harness_log"
     swsp_stop_fake_llm
     return 1
@@ -636,29 +914,45 @@ swsp_run_probe() {
   # Step 11: Determine verdict
   local result="INCONCLUSIVE"
   local exit_code=1
+  local ptc pc cc wc
+  ptc="$(grep -c "branch=parent-tool-call" "$fake_llm_log" 2>/dev/null || true)"; ptc="${ptc:-0}"
+  pc="$(grep -c "branch=parent-hold" "$fake_llm_log" 2>/dev/null || true)"; pc="${pc:-0}"
+  cc="$(grep -c "branch=child" "$fake_llm_log" 2>/dev/null || true)"; cc="${cc:-0}"
+  wc="$(grep -c "branch=wake" "$fake_llm_log" 2>/dev/null || true)"; wc="${wc:-0}"
+  local dc
+  dc="$(grep -c "branch=default" "$fake_llm_log" 2>/dev/null || true)"; dc="${dc:-0}"
 
-  # Arm 1: SQLite evidence (stops>1 or children>1)
-  if [ "${stops:-0}" -gt 1 ] || [ "${children:-0}" -gt 1 ] 2>/dev/null; then
+  if [ "${terminal_stops:-0}" -gt 1 ] || [ "${child_task_sessions:-0}" -gt 1 ] 2>/dev/null; then
     result="REPRODUCED"
   fi
 
   # Arm 2: Mechanism signal (wake dispatched during parent turn + in-process path)
   # in-process path: no live-server-route dispatch line for this wake
   local has_live_dispatch=false
-  if printf '%s' "$route_prov" | grep -q "dispatch via live listener" 2>/dev/null; then
+  if swsp_has_session_live_dispatch "$route_prov" "$ses_id"; then
     has_live_dispatch=true
   fi
   if [ "$wake_during_parent" = "true" ] && [ "$has_live_dispatch" = "false" ]; then
     result="REPRODUCED"
   fi
 
-  # FIXED: exactly 1 child and 1 stop, and neither REPRODUCED arm held
-  if [ "$result" = "INCONCLUSIVE" ] && [ "${children:-0}" -eq 1 ] && [ "${stops:-0}" -eq 1 ] 2>/dev/null; then
+  if [ "$result" = "INCONCLUSIVE" ] \
+    && swsp_fixed_topology_observed \
+      "$parent_assistant_messages" \
+      "$parent_tool_call_turns" \
+      "$terminal_stops" \
+      "$child_task_sessions" \
+      "$ptc" \
+      "$pc" \
+      "$cc" \
+      "$wc" \
+      "$dc" \
+      "$has_live_dispatch"; then
     result="FIXED"
   fi
 
   local verdict_line
-  verdict_line="RESULT=${result} children=${children} stops=${stops} plugin_inits=${plugin_inits} WAKE_DISPATCHED_DURING_PARENT_TURN=${wake_during_parent}"
+  verdict_line="RESULT=${result} parent_assistant_messages=${parent_assistant_messages} parent_tool_call_turns=${parent_tool_call_turns} terminal_stops=${terminal_stops} child_task_sessions=${child_task_sessions} plugin_inits=${plugin_inits} WAKE_DISPATCHED_DURING_PARENT_TURN=${wake_during_parent} route_live_dispatch=${has_live_dispatch} branch_counts=parent-tool-call:${ptc},parent-hold:${pc},child:${cc},wake:${wc},default:${dc}"
   printf '%s\n' "$verdict_line" | tee -a "$harness_log"
 
   # Determine exit code based on expected mode
@@ -674,34 +968,17 @@ swsp_run_probe() {
     exit_code=0  # no expectation: just report
   fi
 
-  # Step 12: Isolation receipt — verify real DB count unchanged
-  local real_db_count_after=""
-  if [ -n "$real_db_path" ] && [ "$real_db_path" != "(not found)" ] && [ -f "$real_db_path" ]; then
-    real_db_count_after="$(sqlite3 "$real_db_path" 'SELECT count(*) FROM session' 2>/dev/null || echo "0")"
-  else
-    real_db_count_after="$real_db_count_before"
-  fi
-  printf 'after=%s unchanged=%s\n' \
-    "$real_db_count_after" \
-    "$([ "$real_db_count_after" = "$real_db_count_before" ] && echo yes || echo NO)" \
-    >>"$evidence_dir/isolation-receipt.txt"
-  swsp_info "isolation: real DB before=$real_db_count_before after=$real_db_count_after"
-
-  # Preserve the sandbox DB for post-hoc inspection before the trap removes it
-  sqlite3 "$sandbox_db" ".backup '$evidence_dir/sandbox-opencode.db'" 2>/dev/null || true
-
   # Cleanup receipt
+  local stopped_fake_pid="$FAKE_SERVER_PID"
   swsp_stop_fake_llm
   printf 'fake_llm=stopped opencode_serve=stopping\n' >"$evidence_dir/cleanup-receipt.txt"
 
-  # Orphan check
-  local orphan_count
-  orphan_count="$(pgrep -f "fake-openai-server" 2>/dev/null | wc -l | tr -d ' ')" || orphan_count=0
-  if [ "${orphan_count:-0}" -gt 0 ]; then
-    swsp_log "WARNING: $orphan_count orphan fake-openai-server process(es); killing"
-    pkill -f "fake-openai-server" 2>/dev/null || true
+  if [ -n "$stopped_fake_pid" ] && kill -0 "$stopped_fake_pid" 2>/dev/null; then
+    swsp_log "WARNING: fake-openai server process $stopped_fake_pid still running after cleanup"
+    printf 'fake_llm_pid_alive=yes pid=%s\n' "$stopped_fake_pid" >>"$evidence_dir/cleanup-receipt.txt"
+  else
+    printf 'fake_llm_pid_alive=no pid=%s\n' "$stopped_fake_pid" >>"$evidence_dir/cleanup-receipt.txt"
   fi
-  printf 'orphan_fake_llm=%s\n' "${orphan_count:-0}" >>"$evidence_dir/cleanup-receipt.txt"
 
   return "$exit_code"
 }

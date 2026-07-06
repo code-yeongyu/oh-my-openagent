@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execPath } from "node:process";
@@ -23,7 +23,11 @@ describe("start-work continuation CLI", () => {
 		// then
 		if (result.error !== undefined) throw result.error;
 		expect(result.status).toBe(0);
-		expect(result.stdout).toContain('"decision":"block"');
+		const output = parseStopHookOutput(result.stdout);
+		expect(output.decision).toBe("block");
+		expect(output.reason).toContain("Remaining top-level checkboxes: `2` of `3`");
+		expect(output.reason).toContain("Next incomplete task: `Task one`");
+		expect(output.reason).toContain("Your session id in boulder.json: `codex:s1`");
 	});
 
 	it("#given valid SubagentStop stdin #when CLI runs #then stdout contains block JSON", () => {
@@ -80,6 +84,18 @@ describe("start-work continuation CLI", () => {
 		expect(result.status).toBe(0);
 		expect(result.stdout).toBe("");
 	});
+
+	it("#given built CLI bundle #when inspected #then it does not depend on the monorepo boulder package", () => {
+		// given
+		const cliPath = join(process.cwd(), "dist", "cli.js");
+
+		// when
+		const source = readFileSync(cliPath, "utf8");
+
+		// then
+		expect(source).not.toContain("@oh-my-opencode/boulder-state");
+		expect(source).not.toContain("../../boulder-state");
+	});
 });
 
 function runCli(subcommand: "stop" | "subagent-stop", input: string) {
@@ -90,7 +106,7 @@ function createWorkspace(sessionIds: readonly string[]): string {
 	const root = mkdtempSync(join(tmpdir(), "codex-continuation-cli-"));
 	cleanupRoots.push(root);
 	mkdirSync(join(root, ".omo", "plans"), { recursive: true });
-	writeFileSync(join(root, ".omo", "plans", "plan.md"), "## TODOs\n\n- [ ] Task one\n");
+	writeFileSync(join(root, ".omo", "plans", "plan.md"), "## TODOs\n\n- [ ] Task one\n- [x] Done\n- [ ] Task two\n");
 	const work = {
 		work_id: "w1",
 		active_plan: ".omo/plans/plan.md",
@@ -121,4 +137,19 @@ function makePayload(
 		stop_hook_active: stopHookActive,
 		last_assistant_message: "done",
 	};
+}
+
+type ParsedStopHookOutput = {
+	readonly decision: unknown;
+	readonly reason: string;
+};
+
+function parseStopHookOutput(stdout: string): ParsedStopHookOutput {
+	const parsed: unknown = JSON.parse(stdout);
+	if (!isRecord(parsed) || typeof parsed["reason"] !== "string") throw new Error("CLI did not emit Stop hook JSON");
+	return { decision: parsed["decision"], reason: parsed["reason"] };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
 }

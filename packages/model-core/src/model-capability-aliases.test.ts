@@ -67,14 +67,13 @@ describe("model-capability-aliases", () => {
     })
   })
 
-  test("normalizes GitHub Copilot dotted Claude Opus aliases to the snapshot ID", () => {
+  test("treats GitHub Copilot dotted Claude Opus 4.7 as canonical since models.dev now serves it natively", () => {
     const result = resolveModelIDAlias("github-copilot/claude-opus-4.7")
 
     expect(result).toEqual({
       requestedModelID: "github-copilot/claude-opus-4.7",
-      canonicalModelID: "claude-opus-4-7",
-      source: "exact-alias",
-      ruleID: "claude-opus-dotted-version-alias",
+      canonicalModelID: "claude-opus-4.7",
+      source: "canonical",
     })
   })
 

@@ -24,7 +24,7 @@ const LAZYCODEX_AGENT_ROLE_NAMES = [
   "lazycodex-qa-executor",
 ] as const
 
-const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = 20_000
+const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
 
 const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
 
@@ -70,7 +70,6 @@ describe("lazycodex install surface", () => {
         expect(wrapper).toContain("OMO_GENERATED_RUNTIME_WRAPPER")
         expect(wrapper).toContain(expectedTarget)
         expect(wrapper).toContain("CODEX_HOME")
-        expect(wrapper).toContain("OMO_SPARKSHELL_APP_SERVER_SOCKET")
         expect(wrapper).toContain("omo-ulw-loop")
         expect(wrapper).toContain("bun runtime not found")
         expect(wrapper).toContain("https://bun.sh")

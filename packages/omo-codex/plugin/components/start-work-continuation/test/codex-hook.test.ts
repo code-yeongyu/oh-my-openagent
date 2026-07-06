@@ -138,6 +138,29 @@ describe("start-work Stop hook", () => {
 		expect(parsed.reason.split(/\s+/).filter(Boolean).length).toBeLessThanOrEqual(1100);
 	});
 
+	it("#given active codex work #when continuation directive is emitted #then PR lifecycle stays worktree-bound", () => {
+		// given
+		const workspace = createWorkspace({
+			boulderJson: createBoulderJson({
+				sessionIds: ["codex:sess_abc"],
+				status: "active",
+				worktreePath: "/tmp/worktree",
+			}),
+			planMarkdown: ["# Plan", "", "## TODOs", "- [ ] First"].join("\n"),
+		});
+		const fs = createMemoryFs();
+
+		// when
+		const output = runStopHook(createStopInput(workspace), fs);
+
+		// then
+		const parsed = parseBlockOutput(output);
+		expect(parsed.reason).toContain("PR or branch implementation/review/merge work requires a task-owned git worktree");
+		expect(parsed.reason).toContain("Treat the main worktree as read-only context");
+		expect(parsed.reason).toContain("create/update the PR, wait for CI/review/Cubic gates, merge by default");
+		expect(parsed.reason).toContain("Do not create a PR, PR handoff, branch handoff, merge");
+	});
+
 	it("#given stop hook source #when inspected #then it remains Boulder-only without planning bootstrap logic", () => {
 		// given
 		const hook = readFileSync(new URL("../src/codex-hook.ts", import.meta.url), "utf8");
