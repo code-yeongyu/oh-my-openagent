@@ -5,6 +5,7 @@ import { describe, expect, test } from "bun:test"
 const corePackages = [
   "packages/utils",
   "packages/model-core",
+  "packages/omo-config-core",
   "packages/delegate-core",
   "packages/prompts-core",
   "packages/rules-engine",
