@@ -218,6 +218,67 @@ Guarded
     expect(resolveToolRule(rules, "write")).toBeUndefined()
   })
 
+  test("#given the pi-task documented tools frontmatter shape #when loading #then the agent is kept and rules evaluate", () => {
+    // given
+    const fixture = makeFixture()
+    const agentPath = join(fixture.project, ".senpi", "agent", "finder.md")
+    writeText(
+      agentPath,
+      `---
+description: Find facts with read-only tools
+tools:
+  read: allow
+  write: deny
+  task:
+    "web-librarian": allow
+  bash:
+    "*": deny
+    "rg *": allow
+---
+You are a careful finder.
+`,
+    )
+
+    // when
+    const result = loadAgents({ homeDir: fixture.home, projectDir: fixture.project })
+    const rules = result.agents.finder?.tools ?? []
+
+    // then
+    expect(result.agents.finder).toBeDefined()
+    expect(result.diagnostics.filter((diagnostic) => diagnostic.path === agentPath)).toEqual([])
+    expect(resolveToolRule(rules, "read")).toBe(true)
+    expect(resolveToolRule(rules, "write")).toBe(false)
+    expect(resolveToolRule(rules, "task web-librarian")).toBe(true)
+    expect(resolveToolRule(rules, "bash rg foo")).toBe(true)
+    expect(resolveToolRule(rules, "bash ls")).toBe(false)
+  })
+
+  test("#given a string-action tools record #when loading #then the agent is not dropped with a validation diagnostic", () => {
+    // given
+    const fixture = makeFixture()
+    const agentPath = join(fixture.project, ".pi", "agent", "reader.md")
+    writeText(
+      agentPath,
+      `---
+tools:
+  read: allow
+  shell: deny
+---
+Reader
+`,
+    )
+
+    // when
+    const result = loadAgents({ homeDir: fixture.home, projectDir: fixture.project })
+
+    // then
+    expect(result.agents.reader).toBeDefined()
+    expect(result.diagnostics.some((diagnostic) => diagnostic.kind === "validation")).toBe(false)
+    const rules = result.agents.reader?.tools ?? []
+    expect(resolveToolRule(rules, "read")).toBe(true)
+    expect(resolveToolRule(rules, "shell")).toBe(false)
+  })
+
   test("#given snake case omo agent keys #when loading #then fields normalize to camelCase definitions", () => {
     // given
     const fixture = makeFixture()
