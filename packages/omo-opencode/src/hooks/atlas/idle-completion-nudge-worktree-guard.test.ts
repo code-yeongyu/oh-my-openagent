@@ -54,7 +54,9 @@ describe("atlas hook idle-completion-nudge worktree guard", () => {
     git(["config", "user.email", "test@example.com"], repoRoot)
     git(["config", "user.name", "Test"], repoRoot)
     writeFileSync(join(repoRoot, "baseline.txt"), "baseline\n", "utf-8")
-    git(["add", "baseline.txt"], repoRoot)
+    // Ignore .omo/* (except .omo/rules/) so ignored OMO state in worktrees is realistic.
+    writeFileSync(join(repoRoot, ".gitignore"), ".omo/*\n!.omo/rules/\n", "utf-8")
+    git(["add", "baseline.txt", ".gitignore"], repoRoot)
     git(["commit", "-m", "baseline"], repoRoot)
 
     worktreePath = join(tmpdir(), `atlas-worktree-wt-${randomUUID()}`)
@@ -185,6 +187,40 @@ describe("atlas hook idle-completion-nudge worktree guard", () => {
 
     // then: no WORKTREE LIFECYCLE line at all (blank line only from the placeholder)
     expect(capturedPrompt.text).not.toContain("WORKTREE LIFECYCLE")
+  })
+
+  it("HEAD==main with only ignored .omo state → nudge contains WORKTREE LIFECYCLE: DIRTY and ignored .omo paths", async () => {
+    // given: real git repo + worktree where HEAD == main, plain status empty, only ignored .omo files present
+    setupRealGitRepoWithWorktree()
+    // Write ignored OMO state inside the worktree (.omo/* is ignored in the baseline commit)
+    const omoDir = join(worktreePath, ".omo", "start-work")
+    mkdirSync(omoDir, { recursive: true })
+    const ledgerFile = "ledger.jsonl"
+    writeFileSync(join(omoDir, ledgerFile), '{"event":"task-completed"}\n', "utf-8")
+
+    const sessionID = "ses_omo"
+    const workId = "work-omo"
+    writePlanAndBoulderState(sessionID, "omo-plan", workId, worktreePath)
+
+    const { hook, capturedPrompt } = createHookWithCapturedPrompt(sessionID)
+
+    // when
+    await hook.handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID },
+      },
+    })
+
+    // then: nudge contains DIRTY lifecycle (not CLEAN), the ignored .omo section, and the .omo path
+    expect(capturedPrompt.text).toContain("WORKTREE LIFECYCLE: DIRTY")
+    expect(capturedPrompt.text).toContain("git status --short --ignored -- .omo")
+    expect(capturedPrompt.text).toContain("!! .omo/")
+    expect(capturedPrompt.text).not.toContain("WORKTREE LIFECYCLE: CLEAN")
+
+    // and: completeBoulder still ran — work status is "completed"
+    const work = readBoulderState(testDirectory)?.works?.[workId]
+    expect(work?.status).toBe("completed")
   })
 
   it("worktree_path points to removed/non-git path → nudge contains WORKTREE LIFECYCLE: UNKNOWN", async () => {

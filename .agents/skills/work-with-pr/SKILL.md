@@ -343,9 +343,10 @@ Before answering "is this merged/synced?" or reporting PR completion, inspect bo
 ```bash
 git -C "$WORKTREE_PATH" log --oneline "$BASE_BRANCH"..HEAD
 git -C "$WORKTREE_PATH" status --short
+git -C "$WORKTREE_PATH" status --short --ignored -- .omo
 ```
 
-If `git status --short` is non-empty, those files are local-only to the worktree. Do NOT say the work is already merged/synced, even if the PR is merged or the commit ancestry check is empty. Sync `.omo/` state as documented above, then either commit/merge the remaining files, hand them off explicitly, or get user direction before removing the worktree.
+If `git status --short` OR `git status --short --ignored -- .omo` is non-empty, those files are local-only to the worktree (tracked changes OR ignored `.omo/` state — Boulder state, evidence ledger, plans; `.gitignore` hides `.omo/*` except `.omo/rules/`). Do NOT say the work is already merged/synced, even if the PR is merged or the commit ancestry check is empty. Sync `.omo/` state as documented above, then either commit/merge the remaining files, hand them off explicitly, or get user direction before removing the worktree.
 
 ### Clean up the worktree
 

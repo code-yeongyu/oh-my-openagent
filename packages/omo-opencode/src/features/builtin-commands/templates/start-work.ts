@@ -123,12 +123,13 @@ When working in a worktree (\`worktree_path\` is set in boulder.json) and ALL pl
 \`\`\`bash
 git log --oneline <target-branch>..HEAD
 git status --short
+git status --short --ignored -- .omo
 \`\`\`
 
 - Use the actual target branch/ref from the user request, PR/base branch, or current lifecycle step. If no target ref is known, say "cannot confirm commit ancestry because target branch is unknown" and still report \`git status --short\`.
-- If \`git status --short\` is NON-EMPTY, local-only changes remain in the worktree filesystem. Refuse "already merged" / "already synced" even when \`git log <target>..HEAD\` is empty or HEAD equals the target branch.
+- If \`git status --short\` OR \`git status --short --ignored -- .omo\` is NON-EMPTY, local-only changes (tracked OR ignored \`.omo/\` state) remain in the worktree filesystem. Refuse "already merged" / "already synced" even when \`git log <target>..HEAD\` is empty or HEAD equals the target branch. Commit ancestry alone is not proof — dirty/untracked worktree files (including ignored \`.omo/\` state) can exist even when HEAD matches the target branch.
 - If \`git log <target>..HEAD\` is NON-EMPTY, commits remain ahead of the target; do not claim merged.
-- Only when BOTH the ancestry check is empty AND \`git status --short\` is empty may you say the worktree's committed and filesystem state is integrated.
+- Only when the ancestry check is empty AND BOTH \`git status --short\` AND \`git status --short --ignored -- .omo\` are empty may you say the worktree's committed and filesystem state is integrated. The \`.omo/\` directory holds Boulder state, evidence ledger, and plans; \`.gitignore\` hides \`.omo/*\` (except \`.omo/rules/\`), so plain \`git status --short\` cannot see ignored OMO state files.
 - Before final completion, state one exact lifecycle status: \`worktree-only dirty changes remain\`, \`branch merged into <target>\`, \`PR opened/updated and worktree left for handoff\`, or \`git worktree remove completed\`.
 
 1. Commit all remaining changes in the worktree

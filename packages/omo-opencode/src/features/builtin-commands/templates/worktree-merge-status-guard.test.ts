@@ -12,6 +12,7 @@ describe("worktree merge-status guard in loaded prompts", () => {
     expect(START_WORK_TEMPLATE).toContain("already merged")
     expect(START_WORK_TEMPLATE).toContain("local-only")
     expect(START_WORK_TEMPLATE).toContain("worktree-only dirty changes remain")
+    expect(START_WORK_TEMPLATE).toContain("git status --short --ignored -- .omo")
   })
 
   test("both work-with-pr SKILL copies contain worktree lifecycle guard and are byte-identical", () => {
@@ -24,6 +25,7 @@ describe("worktree merge-status guard in loaded prompts", () => {
     for (const content of [agentsContent, opencodeContent]) {
       expect(content).toContain('git -C "$WORKTREE_PATH" log --oneline "$BASE_BRANCH"..HEAD')
       expect(content).toContain('git -C "$WORKTREE_PATH" status --short')
+      expect(content).toContain('git -C "$WORKTREE_PATH" status --short --ignored -- .omo')
       expect(content).toContain("local-only")
       expect(content).toContain("Worktree lifecycle")
     }
@@ -39,6 +41,7 @@ describe("worktree merge-status guard in loaded prompts", () => {
     expect(content).toContain("git status --short")
     expect(content).toContain("git log --oneline <target-branch>..HEAD")
     expect(content).toContain("Commit ancestry alone")
+    expect(content).toContain("git status --short --ignored -- .omo")
   })
 
   test("start-work-continuation directive.md contains worktree lifecycle status and git status --short", () => {
@@ -47,6 +50,7 @@ describe("worktree merge-status guard in loaded prompts", () => {
 
     expect(content).toContain("worktree lifecycle status")
     expect(content).toContain("git status --short")
+    expect(content).toContain("git status --short --ignored -- .omo")
   })
 
   test("sync-skills.mjs contains git status --short in both start-work completion constants", () => {
@@ -62,8 +66,9 @@ describe("worktree merge-status guard in loaded prompts", () => {
 
     const originalSection = content.slice(originalStart, codexStart)
     const codexSection = content.slice(codexStart)
-
     expect(originalSection).toContain("git status --short")
+    expect(originalSection).toContain("git status --short --ignored -- .omo")
     expect(codexSection).toContain("git status --short")
+    expect(codexSection).toContain("git status --short --ignored -- .omo")
   })
 })

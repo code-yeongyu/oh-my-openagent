@@ -101,8 +101,10 @@ export async function handleCompletedBoulderIdle(input: {
     worktreeLifecycle?.lifecycle === "dirty"
       ? `WORKTREE LIFECYCLE: DIRTY — local-only changes remain in the worktree at ${work.worktree_path} and have NOT been merged, synced, or handed off.
 git status --short in the worktree:
-${worktreeLifecycle.statusShort}
-REQUIRED NEXT ACTION: integrate the worktree (merge into the target branch, open/update the PR, or hand off as the user instructed) BEFORE printing ORCHESTRATION COMPLETE. Do NOT print ORCHESTRATION COMPLETE while this DIRTY status is present. Do NOT claim the work is merged/synced; commit ancestry alone is not proof — filesystem changes can exist only in the worktree even when HEAD matches the target branch.`
+${worktreeLifecycle.statusShort}${worktreeLifecycle.ignoredOmoShort ? `
+git status --short --ignored -- .omo (ignored OMO state files — Boulder state, evidence ledger, plans; .gitignore hides .omo/*):
+${worktreeLifecycle.ignoredOmoShort}` : ""}
+REQUIRED NEXT ACTION: integrate the worktree (merge into the target branch, open/update the PR, or hand off as the user instructed) BEFORE printing ORCHESTRATION COMPLETE. Do NOT print ORCHESTRATION COMPLETE while this DIRTY status is present. Do NOT claim the work is merged/synced; commit ancestry alone is not proof — filesystem changes (including ignored .omo/ state) can exist only in the worktree even when HEAD matches the target branch.`
       : worktreeLifecycle?.lifecycle === "clean"
         ? `WORKTREE LIFECYCLE: CLEAN — no local-only changes in the worktree at ${work.worktree_path}.`
         : worktreeLifecycle?.lifecycle === "unknown"

@@ -15,10 +15,14 @@ describe("atlas prompt variants worktree-lifecycle guard", () => {
 
     const completionSection = content.slice(completionStart, completionEnd)
 
-    // The guard must mention the worktree lifecycle, git status --short, DIRTY, local-only,
-    // and the ancestry-is-not-proof clause.
+    // The guard must mention the worktree lifecycle, the dual git status check
+    // (plain + scoped ignored .omo), DIRTY, local-only, and the ancestry-is-not-proof clause.
     expect(completionSection).toContain("Worktree lifecycle guard")
     expect(completionSection).toContain("git status --short")
+    expect(completionSection).toContain("git status --short --ignored -- .omo")
+    expect(completionSection).toContain("EITHER output is NON-EMPTY")
+    expect(completionSection).toContain("BOTH outputs are EMPTY")
+    expect(completionSection).toContain("ignored `.omo/` state")
     expect(completionSection).toContain("DIRTY")
     expect(completionSection).toContain("local-only")
     // ancestry-is-not-proof clause
