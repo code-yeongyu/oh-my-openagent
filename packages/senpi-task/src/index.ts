@@ -17,7 +17,7 @@ export type {
   TaskTransitionAudit,
   TaskTransitionResult,
 } from "./state"
-export { createTaskRecordStore, resolveStateDir } from "./store"
+export { TaskRecordCollisionError, createTaskRecordStore, resolveStateDir } from "./store"
 export type {
   ListTaskRecordsResult,
   PersistedTaskEvent,

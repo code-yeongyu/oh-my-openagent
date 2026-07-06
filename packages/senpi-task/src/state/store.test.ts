@@ -4,11 +4,13 @@ import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
 
 import {
+  TaskRecordCollisionError,
   createTaskRecord,
   createTaskRecordStore,
   resolveStateDir,
   transitionTaskRecord,
 } from "../index"
+import { parseTaskId } from "./id"
 
 const cleanupRoots: string[] = []
 
@@ -137,6 +139,44 @@ describe("TaskRecordStore", () => {
         message: expect.stringContaining("JSON"),
       },
     ])
+  })
+
+  test("#given duplicate generated task id #when a different record is saved #then existing task file is not overwritten", () => {
+    // given
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+    const original = createTaskRecord({
+      parent_session_id: "parent-session",
+      root_session_id: "root-session",
+      depth: 0,
+      execution_mode: "direct",
+      model: "gpt-5.2",
+    })
+    const duplicate = {
+      ...createTaskRecord({
+        parent_session_id: "other-parent-session",
+        root_session_id: "root-session",
+        depth: 0,
+        execution_mode: "direct",
+        model: "gpt-5.2",
+      }),
+      task_id: original.task_id,
+    }
+    store.save(original)
+
+    // when
+    let collision: TaskRecordCollisionError | undefined
+    try {
+      store.save(duplicate)
+    } catch (error) {
+      if (!(error instanceof TaskRecordCollisionError)) throw error
+      collision = error
+    }
+
+    // then
+    expect(collision).toBeInstanceOf(TaskRecordCollisionError)
+    expect(collision?.taskId).toBe(parseTaskId(original.task_id))
+    expect(store.load(original.task_id)).toEqual(original)
   })
 
   test("#given completed record #when illegal running transition is persisted #then transition is rejected and completion remains", () => {

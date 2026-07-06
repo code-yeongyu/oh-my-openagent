@@ -70,23 +70,26 @@ describe("pinned Senpi API surface", () => {
     })
 
     // when
-    const result = await createAgentSession({
-      agentDir,
-      cwd,
-      customTools: [],
-      sessionManager: SessionManager.inMemory(),
-      tools: [],
-      model: undefined,
-      resourceLoader: loader,
-      scopedModels: [],
-      favoriteModels: [],
-    })
-    rmSync(rootDir, { recursive: true, force: true })
+    try {
+      const result = await createAgentSession({
+        agentDir,
+        cwd,
+        customTools: [],
+        sessionManager: SessionManager.inMemory(),
+        tools: [],
+        model: undefined,
+        resourceLoader: loader,
+        scopedModels: [],
+        favoriteModels: [],
+      })
 
-    // then
-    expect(result.extensionsResult.extensions).toHaveLength(0)
-    expect(result.extensionsResult.errors).toEqual([])
-    expect(existsSync(markerInvokedPath)).toBe(false)
+      // then
+      expect(existsSync(markerInvokedPath)).toBe(false)
+      expect(result.extensionsResult.extensions).toHaveLength(0)
+      expect(result.extensionsResult.errors).toEqual([])
+    } finally {
+      rmSync(rootDir, { recursive: true, force: true })
+    }
   })
 
   test("#given minimal resource loader source #when audited #then fake marker factory option is absent", () => {

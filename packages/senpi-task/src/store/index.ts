@@ -1,4 +1,4 @@
-export { createTaskRecordStore } from "./record-store"
+export { TaskRecordCollisionError, createTaskRecordStore } from "./record-store"
 export { resolveStateDir } from "./state-dir"
 export type {
   ListTaskRecordsResult,
