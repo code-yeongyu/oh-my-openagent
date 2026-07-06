@@ -81,7 +81,32 @@ export class ParentWakeFlushRunner {
       // sidecar on Electron/macOS (#4120). In that case, fall back to the same
       // retained noReply admission the normal path uses — the user's own turn
       // consumes the deposit without forking a concurrent assistant turn.
+      // Fresh-activity guard: even past the max-defer ceiling, if the parent
+      // has emitted a recent message.part.updated/message.updated event, the
+      // live turn may still be streaming even though session.messages looks
+      // safe/stopped. Forcing a reply-producing dispatch here would inject into
+      // an active turn. Fall back to retained noReply admission — the
+      // idle/consumption machinery resumes the wake when the turn settles.
+      // This mirrors the normal-path hasRecentParentSessionActivity guard below.
       const emptyAssistantTurnRetry = latestWake.allowEmptyAssistantTurnRetry === true
+      if (this.hasRecentParentSessionActivity(sessionID)) {
+        if (this.deferReplyWakeWhileUnsafe(sessionID, latestWake)) {
+          return
+        }
+        await this.sendParentWakePrompt(sessionID, latestWake, {
+          emptyAssistantTurnRetry,
+          toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
+          forceNoReply: true,
+          retainPendingWake: latestWake.shouldReply,
+        })
+        log("[background-agent] Recorded admit-only parent wake during max-defer force because parent session activity is still fresh:", {
+          sessionID,
+        })
+        if (latestWake.shouldReply) {
+          this.schedulePendingParentWakeFlush(sessionID)
+        }
+        return
+      }
       if (await this.isUserMessageInProgress(sessionID)) {
         if (this.deferReplyWakeWhileUnsafe(sessionID, latestWake)) {
           return

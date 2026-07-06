@@ -86,6 +86,7 @@ function createNotifier(args: {
   sessionStatuses?: Record<string, { type: string }>
   messagesProvider: () => SessionMessageStub[]
   maxDeferMs?: number
+  parentSessionActivityInProgressWindowMs?: number
 }): {
   notifier: ParentWakeNotifier
   promptAsyncCalls: PromptAsyncCall[]
@@ -118,6 +119,9 @@ function createNotifier(args: {
       failureRequeueWindowMs: 5_000,
       userMessageInProgressWindowMs: 2_000,
       ...(args.maxDeferMs !== undefined ? { maxDeferMs: args.maxDeferMs } : {}),
+      ...(args.parentSessionActivityInProgressWindowMs !== undefined
+        ? { parentSessionActivityInProgressWindowMs: args.parentSessionActivityInProgressWindowMs }
+        : {}),
     },
   )
 
@@ -280,6 +284,45 @@ describe("parent wake max-defer force-flush (#5864)", () => {
       // tool-state check saw an unsafe turn. The pending wake is retained
       // (requeued by sendParentWakePrompt's gate-refusal path).
       expect(promptAsyncCalls).toHaveLength(0)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(true)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given max-defer exceeded but parent has fresh session activity #then admits noReply retained and keeps the wake queued (fresh-activity guard)", async () => {
+    // given: 50ms max-defer ceiling; clock starts at 100_000. A reply-required
+    // wake is queued at 100_000. The parent has a fresh activity window
+    // (parentSessionActivityInProgressWindowMs: 10_000) and
+    // recordParentSessionActivity is called right before flushing — simulating
+    // a live turn streaming (message.part.updated/message.updated events) even
+    // though session.messages looks safe/stopped. The max-defer force path must
+    // NOT forceReplyDispatch into an active turn; it admits noReply retained
+    // instead, and the idle/consumption machinery resumes when the turn settles.
+    const originalDateNow = Date.now
+    Date.now = () => 100_000
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "busy" } },
+      messagesProvider: () => SAFE_MESSAGES,
+      maxDeferMs: 50,
+      parentSessionActivityInProgressWindowMs: 10_000,
+    })
+
+    try {
+      // when: queue a reply-required wake, then advance the clock past the
+      // ceiling (60ms > 50ms) and record fresh activity right before flushing.
+      // The fresh-activity guard fires inside the max-defer force path.
+      notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+      Date.now = () => 100_060
+      notifier.recordParentSessionActivity("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: a noReply dispatch happened (admit-only, not reply-producing)
+      // and the pending wake is retained for the turn to settle.
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
       expect(notifier.getPendingParentWakes().has("parent-1")).toBe(true)
     } finally {
       Date.now = originalDateNow
