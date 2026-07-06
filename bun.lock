@@ -40,6 +40,7 @@
         "@oh-my-opencode/omo-senpi": "workspace:*",
         "@oh-my-opencode/openclaw-core": "workspace:*",
         "@oh-my-opencode/pi-goal": "workspace:*",
+        "@oh-my-opencode/pi-webfetch": "workspace:*",
         "@oh-my-opencode/prompts-core": "workspace:*",
         "@oh-my-opencode/rules-engine": "workspace:*",
         "@oh-my-opencode/shared-skills": "workspace:*",
@@ -233,6 +234,32 @@
         "@mariozechner/pi-ai": "0.73.0",
         "@mariozechner/pi-coding-agent": "0.73.0",
         "@mariozechner/pi-tui": "0.73.0",
+        "typebox": "1.1.38",
+      },
+      "peerDependencies": {
+        "@mariozechner/pi-ai": "*",
+        "@mariozechner/pi-coding-agent": "*",
+        "@mariozechner/pi-tui": "*",
+        "typebox": "*",
+      },
+      "optionalPeers": [
+        "@mariozechner/pi-ai",
+        "@mariozechner/pi-coding-agent",
+        "@mariozechner/pi-tui",
+        "typebox",
+      ],
+    },
+    "packages/pi-webfetch": {
+      "name": "@oh-my-opencode/pi-webfetch",
+      "version": "4.15.1",
+      "dependencies": {
+        "turndown": "^7.2.4",
+      },
+      "devDependencies": {
+        "@mariozechner/pi-ai": "0.73.0",
+        "@mariozechner/pi-coding-agent": "0.73.0",
+        "@mariozechner/pi-tui": "0.73.0",
+        "@types/turndown": "^5.0.5",
         "typebox": "1.1.38",
       },
       "peerDependencies": {
@@ -575,6 +602,8 @@
 
     "@oh-my-opencode/pi-goal": ["@oh-my-opencode/pi-goal@workspace:packages/pi-goal"],
 
+    "@oh-my-opencode/pi-webfetch": ["@oh-my-opencode/pi-webfetch@workspace:packages/pi-webfetch"],
+
     "@oh-my-opencode/prompts-core": ["@oh-my-opencode/prompts-core@workspace:packages/prompts-core"],
 
     "@oh-my-opencode/rules-engine": ["@oh-my-opencode/rules-engine@workspace:packages/rules-engine"],
@@ -676,6 +705,8 @@
     "@types/picomatch": ["@types/picomatch@4.0.3", "", {}, "sha512-iG0T6+nYJ9FAPmx9SsUlnwcq1ZVRuCXcVEvWnntoPlrOpwtSTKNDC9uVAxTsC3PUvJ+99n4RpAcNgBbHX3JSnQ=="],
 
     "@types/retry": ["@types/retry@0.12.0", "", {}, "sha512-wWKOClTTiizcZhXnPY4wikVAwmdYHp8q6DmC+EJUzAMsycb7HB32Kh9RN4+0gExjmPmZSAQjgURXIGATPegAvA=="],
+
+    "@types/turndown": ["@types/turndown@5.0.6", "", {}, "sha512-ru00MoyeeouE5BX4gRL+6m/BsDfbRayOskWqUvh7CLGW+UXxHQItqALa38kKnOiZPqJrtzJUgAC2+F0rL1S4Pg=="],
 
     "@types/yauzl": ["@types/yauzl@2.10.3", "", { "dependencies": { "@types/node": "*" } }, "sha512-oJoftv0LSuaDZE3Le4DbKX+KS9G36NzOeSap90UIK0yMA/NhKJhqlSGtNDORNRaIbQfzjXDrQa0ytJ6mNRGz/Q=="],
 
