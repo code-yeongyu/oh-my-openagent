@@ -16,7 +16,7 @@ function writeText(path: string, content: string): void {
   writeFileSync(path, content, "utf8")
 }
 
-const finderPath = join(projectDir, ".senpi", "agents", "finder.md")
+const finderPath = join(projectDir, ".pi", "agents", "finder.md")
 writeText(
   finderPath,
   `---
@@ -41,7 +41,13 @@ const externalAgentPath = join(externalRoot, "agent", "linked.md")
 writeText(externalAgentPath, "---\nmodel: external-model\n---\nExternal prompt\n")
 mkdirSync(dirname(symlinkedScanRoot), { recursive: true })
 symlinkSync(externalRoot, symlinkedScanRoot, "dir")
-const brokenDirectorySymlink = join(projectDir, ".senpi", "agents", "nested", "missing")
+const configuredExternalRoot = join(fixtureRoot, "configured-external-agents")
+const symlinkedConfiguredRoot = join(projectDir, ".senpi", "agents")
+const configuredEscapedAgentPath = join(configuredExternalRoot, "agent", "escaped.md")
+writeText(configuredEscapedAgentPath, "---\nmodel: configured-external-model\n---\nConfigured external prompt\n")
+mkdirSync(dirname(symlinkedConfiguredRoot), { recursive: true })
+symlinkSync(configuredExternalRoot, symlinkedConfiguredRoot, "dir")
+const brokenDirectorySymlink = join(projectDir, ".pi", "agents", "nested", "missing")
 mkdirSync(dirname(brokenDirectorySymlink), { recursive: true })
 symlinkSync(join(projectDir, "missing-directory"), brokenDirectorySymlink, "dir")
 const projectConfigPath = join(projectDir, ".omo", "omo.json")
@@ -68,6 +74,9 @@ if (brokenDiagnostic?.kind !== "frontmatter") throw new Error("broken frontmatte
 if (loaded.agents.linked !== undefined) throw new Error("symlinked external agent loaded")
 const symlinkDiagnostic = loaded.diagnostics.find((diagnostic) => diagnostic.path === symlinkedScanRoot)
 if (symlinkDiagnostic?.kind !== "read") throw new Error("symlinked scan root diagnostic missing")
+if (loaded.agents.escaped !== undefined) throw new Error("symlinked configured-location external agent loaded")
+const configuredSymlinkDiagnostic = loaded.diagnostics.find((diagnostic) => diagnostic.path === symlinkedConfiguredRoot)
+if (configuredSymlinkDiagnostic?.kind !== "read") throw new Error("symlinked configured-location diagnostic missing")
 const brokenDirectoryDiagnostic = loaded.diagnostics.find((diagnostic) => diagnostic.path === brokenDirectorySymlink)
 if (brokenDirectoryDiagnostic?.kind !== "read") throw new Error("broken directory symlink diagnostic missing")
 const userConfigDiagnostic = loaded.diagnostics.find((diagnostic) => diagnostic.path === userConfigPath)
@@ -79,7 +88,9 @@ const summary = {
   projectConfigPath,
   userConfigPath,
   symlinkedScanRoot,
+  symlinkedConfiguredRoot,
   externalAgentPath,
+  configuredEscapedAgentPath,
   brokenDirectorySymlink,
   loadedAgentNames: Object.keys(loaded.agents).sort(),
   finderModel: finder.model,
@@ -87,9 +98,11 @@ const summary = {
   finderReadAllowed: resolveToolRule(finder.tools ?? [], "read"),
   brokenDiagnostic,
   symlinkDiagnostic,
+  configuredSymlinkDiagnostic,
   brokenDirectoryDiagnostic,
   userConfigDiagnostic,
   externalAgentLoaded: loaded.agents.linked !== undefined,
+  configuredExternalAgentLoaded: loaded.agents.escaped !== undefined,
   fixtureExistedBeforeCleanup: existsSync(fixtureRoot),
 }
 rmSync(fixtureRoot, { recursive: true, force: true })
