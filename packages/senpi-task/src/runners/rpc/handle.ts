@@ -73,6 +73,14 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): RpcC
     assertOk(response, label)
   }
 
+  // Reviving an idle resident child starts a fresh turn: clear the consumed idle flag so waitForIdle
+  // re-arms for the next agent_end instead of resolving immediately from the prior turn.
+  const rearmIdleAfterRevive = (): void => {
+    if (reachedIdle && outcome === undefined) {
+      reachedIdle = false
+    }
+  }
+
   return {
     task_id: taskId,
     get sessionId() {
@@ -82,7 +90,10 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): RpcC
       return child.pid ?? undefined
     },
     steer: (text) => runCommand({ type: "steer", message: text }, "steer"),
-    followUp: (text) => runCommand({ type: "prompt", message: text, streamingBehavior: "followUp" }, "prompt"),
+    followUp: async (text) => {
+      await runCommand({ type: "prompt", message: text, streamingBehavior: "followUp" }, "prompt")
+      rearmIdleAfterRevive()
+    },
     abort: () => runCommand({ type: "abort" }, "abort"),
     subscribe: (listener: ChildEventListener) => client.onEvent(listener),
     waitForIdle: () =>
