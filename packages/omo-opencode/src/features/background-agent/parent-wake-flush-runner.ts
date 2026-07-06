@@ -72,7 +72,31 @@ export class ParentWakeFlushRunner {
       // promptAsync's queueBehavior: "defer" serializes against any in-flight
       // turn; if the gate still refuses (reserved/queued), sendParentWakePrompt
       // requeues (keeping queuedAt) and reschedules, giving bounded retry.
+      //
+      // Exception: if the user just sent a fresh message into the parent session,
+      // a reply-producing dispatch would race their prompt and can crash the
+      // sidecar on Electron/macOS (#4120). In that case, fall back to the same
+      // retained noReply admission the normal path uses — the user's own turn
+      // consumes the deposit without forking a concurrent assistant turn.
       const emptyAssistantTurnRetry = latestWake.allowEmptyAssistantTurnRetry === true
+      if (await this.isUserMessageInProgress(sessionID)) {
+        if (this.deferReplyWakeWhileUnsafe(sessionID, latestWake)) {
+          return
+        }
+        await this.sendParentWakePrompt(sessionID, latestWake, {
+          emptyAssistantTurnRetry,
+          toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
+          forceNoReply: true,
+          retainPendingWake: latestWake.shouldReply,
+        })
+        log("[background-agent] Recorded admit-only parent wake during max-defer force because user message just arrived:", {
+          sessionID,
+        })
+        if (latestWake.shouldReply) {
+          this.schedulePendingParentWakeFlush(sessionID)
+        }
+        return
+      }
       await this.sendParentWakePrompt(sessionID, latestWake, {
         emptyAssistantTurnRetry,
         toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: false },

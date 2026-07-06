@@ -50,6 +50,20 @@ const SAFE_MESSAGES: SessionMessageStub[] = [
   },
 ]
 
+// Latest message is a fresh user prompt (created at "now") — triggers
+// isUserMessageInProgress so the max-defer force path must fall back to
+// retained noReply admission instead of a reply-producing dispatch (#4120).
+const USER_MESSAGE_IN_PROGRESS: SessionMessageStub[] = [
+  {
+    info: { role: "assistant", finish: "stop", time: { created: 90_000 } },
+    parts: [{ type: "text", text: "delegated to background" }],
+  },
+  {
+    info: { role: "user", time: { created: 100_060 } },
+    parts: [{ type: "text", text: "are you done yet?" }],
+  },
+]
+
 function createNotifier(args: {
   sessionStatuses?: Record<string, { type: string }>
   messagesProvider: () => SessionMessageStub[]
@@ -123,6 +137,45 @@ describe("parent wake max-defer force-flush (#5864)", () => {
       expect(promptAsyncCalls).toHaveLength(1)
       expect(promptAsyncCalls[0]?.body.noReply).toBe(false)
       expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given max-defer exceeded but user message just arrived #then admits noReply retained and keeps the wake queued (#4120 guard)", async () => {
+    // given: 50ms max-defer ceiling; clock starts at 100_000. A reply-required
+    // wake is queued at 100_000 and the parent stays busy/active. After the
+    // ceiling elapses the user sends a fresh prompt into the parent session
+    // (latest message created at "now"), so isUserMessageInProgress() is true.
+    // The max-defer force path must NOT force a reply-producing dispatch
+    // (that would race the user's prompt and can crash the sidecar on
+    // Electron/macOS, #4120). Instead it admits the wake as retained noReply
+    // and keeps the pending entry queued for the user's turn to consume.
+    const originalDateNow = Date.now
+    Date.now = () => 100_000
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "busy" } },
+      messagesProvider: () => USER_MESSAGE_IN_PROGRESS,
+      maxDeferMs: 50,
+    })
+
+    try {
+      // when: queue a reply-required wake, mark recent activity, advance the
+      // clock past the ceiling (60ms > 50ms), and flush. The messages provider
+      // returns a fresh user message created at 100_060 (== now), so the
+      // isUserMessageInProgress guard fires inside the max-defer force path.
+      notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+      notifier.recordParentSessionActivity("parent-1")
+      Date.now = () => 100_060
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: a noReply dispatch happened (admit-only, not reply-producing)
+      // and the pending wake is retained for the user's turn to consume.
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(true)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
