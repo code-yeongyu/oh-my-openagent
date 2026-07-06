@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -114,6 +114,80 @@ describe("loadAgents", () => {
       path: badPath,
       message: `Malformed YAML frontmatter in ${badPath}`,
     })
+  })
+
+  test("#given project scan root is a symlink #when loading #then external agents are blocked with a read diagnostic", () => {
+    // given
+    const fixture = makeFixture()
+    const externalRoot = join(fixture.home, "external-agents")
+    const linkedRoot = join(fixture.project, ".senpi", "agent")
+    const linkedPath = join(externalRoot, "agent", "linked.md")
+    writeText(linkedPath, agentMarkdown("external-model", "external prompt"))
+    mkdirSync(dirname(linkedRoot), { recursive: true })
+    symlinkSync(externalRoot, linkedRoot, "dir")
+
+    // when
+    const result = loadAgents({ homeDir: fixture.home, projectDir: fixture.project })
+
+    // then
+    expect(result.agents.linked).toBeUndefined()
+    expect(result.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "read",
+          path: linkedRoot,
+          message: expect.stringContaining(linkedRoot),
+        }),
+      ]),
+    )
+    expect(result.diagnostics.find((diagnostic) => diagnostic.path === linkedRoot)?.message).toContain("symlink")
+  })
+
+  test("#given broken directory symlink and valid sibling #when loading #then read diagnostic is returned and valid agent loads", () => {
+    // given
+    const fixture = makeFixture()
+    const brokenLinkPath = join(fixture.project, ".senpi", "agent", "nested", "missing")
+    writeText(join(fixture.project, ".senpi", "agent", "valid.md"), agentMarkdown("valid-model", "Valid"))
+    mkdirSync(dirname(brokenLinkPath), { recursive: true })
+    symlinkSync(join(fixture.project, "does-not-exist"), brokenLinkPath, "dir")
+
+    // when
+    const result = loadAgents({ homeDir: fixture.home, projectDir: fixture.project })
+
+    // then
+    expect(result.agents.valid?.model).toBe("valid-model")
+    expect(result.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "read",
+          path: brokenLinkPath,
+          message: expect.stringContaining(brokenLinkPath),
+        }),
+      ]),
+    )
+  })
+
+  test("#given omo json path is a directory #when loading #then read diagnostic is returned and valid agents still load", () => {
+    // given
+    const fixture = makeFixture()
+    const configPath = join(fixture.project, ".omo", "omo.json")
+    writeText(join(fixture.project, ".senpi", "agent", "valid.md"), agentMarkdown("valid-model", "Valid"))
+    mkdirSync(configPath, { recursive: true })
+
+    // when
+    const result = loadAgents({ homeDir: fixture.home, projectDir: fixture.project })
+
+    // then
+    expect(result.agents.valid?.model).toBe("valid-model")
+    expect(result.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "read",
+          path: configPath,
+          message: expect.stringContaining(configPath),
+        }),
+      ]),
+    )
   })
 
   test("#given repeated tool allow and deny rules #when resolving a tool #then the last matching rule wins", () => {

@@ -24,7 +24,9 @@ export function loadAgents(options: LoadAgentsOptions = {}): LoadAgentsResult {
   const diagnostics: AgentLoaderDiagnostic[] = []
 
   for (const location of resolveAgentDefinitionLocations(resolvedOptions)) {
-    for (const path of listMarkdownAgentFiles(location)) {
+    const listed = listMarkdownAgentFiles(location)
+    diagnostics.push(...listed.diagnostics)
+    for (const path of listed.files) {
       const loaded = loadMarkdownAgent(path)
       if (loaded.ok) overlayAgent(agents, loaded.agent)
       else diagnostics.push(loaded.diagnostic)
