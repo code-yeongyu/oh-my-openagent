@@ -97,6 +97,35 @@ export class ParentWakeFlushRunner {
         }
         return
       }
+      // History safety: even past the max-defer ceiling, if the parent's
+      // latest assistant turn has an outstanding tool call or unanswered
+      // question, forcing a reply-producing dispatch would fork a concurrent
+      // assistant turn into a turn the history code treats as unsafe. In that
+      // case, fall back to retained noReply admission — the idle/consumption
+      // machinery resumes the wake when the turn settles. This mirrors the
+      // normal-path history deferral at line ~135.
+      const maxDeferHistoryDecision = await this.shouldDeferParentWakeForSessionHistory(
+        sessionID,
+        latestWake,
+      )
+      if (maxDeferHistoryDecision.defer) {
+        if (this.deferReplyWakeWhileUnsafe(sessionID, latestWake)) {
+          return
+        }
+        await this.sendParentWakePrompt(sessionID, latestWake, {
+          emptyAssistantTurnRetry,
+          toolWaitDecision: { ...maxDeferHistoryDecision, skipPromptGateToolStateCheck: true },
+          forceNoReply: true,
+          retainPendingWake: latestWake.shouldReply,
+        })
+        log("[background-agent] Held max-defer force-flush because session history is unsafe:", {
+          sessionID,
+        })
+        if (latestWake.shouldReply) {
+          this.schedulePendingParentWakeFlush(sessionID)
+        }
+        return
+      }
       await this.sendParentWakePrompt(sessionID, latestWake, {
         emptyAssistantTurnRetry,
         toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: false },

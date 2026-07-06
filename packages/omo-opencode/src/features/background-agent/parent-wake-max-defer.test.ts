@@ -64,6 +64,24 @@ const USER_MESSAGE_IN_PROGRESS: SessionMessageStub[] = [
   },
 ]
 
+// Latest assistant turn has an outstanding (running) tool call — triggers
+// latestAssistantTurnBlocksInternalPrompt so shouldDeferParentWakeForSessionHistory
+// returns defer:true. The max-defer force path must NOT forceReplyDispatch into
+// this unsafe turn; it admits noReply retained instead.
+const TOOL_CALL_IN_PROGRESS: SessionMessageStub[] = [
+  {
+    info: {
+      role: "assistant",
+      finish: "tool-calls",
+      time: { created: 90_000 },
+    },
+    parts: [
+      { type: "text", text: "let me check" },
+      { type: "tool", state: { status: "running" } },
+    ],
+  },
+]
+
 function createNotifier(args: {
   sessionStatuses?: Record<string, { type: string }>
   messagesProvider: () => SessionMessageStub[]
@@ -173,6 +191,45 @@ describe("parent wake max-defer force-flush (#5864)", () => {
 
       // then: a noReply dispatch happened (admit-only, not reply-producing)
       // and the pending wake is retained for the user's turn to consume.
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(true)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given max-defer exceeded but assistant turn has outstanding tool call #then admits noReply retained and keeps the wake queued (history safety)", async () => {
+    // given: 50ms max-defer ceiling; clock starts at 100_000. A reply-required
+    // wake is queued at 100_000 and the parent stays busy/active. After the
+    // ceiling elapses, the parent's latest assistant turn has finish:"tool-calls"
+    // with a running tool part — shouldDeferParentWakeForSessionHistory returns
+    // defer:true. The max-defer force path must NOT forceReplyDispatch into
+    // this unsafe turn (would fork a concurrent assistant turn); it admits
+    // noReply retained instead, and the idle/consumption machinery resumes
+    // when the tool settles.
+    const originalDateNow = Date.now
+    Date.now = () => 100_000
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "busy" } },
+      messagesProvider: () => TOOL_CALL_IN_PROGRESS,
+      maxDeferMs: 50,
+    })
+
+    try {
+      // when: queue a reply-required wake, mark recent activity, advance the
+      // clock past the ceiling (60ms > 50ms), and flush. The messages provider
+      // returns an assistant turn with a running tool call, so the history
+      // deferral guard fires inside the max-defer force path.
+      notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+      notifier.recordParentSessionActivity("parent-1")
+      Date.now = () => 100_060
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: a noReply dispatch happened (admit-only, not reply-producing)
+      // and the pending wake is retained for the turn to settle.
       expect(promptAsyncCalls).toHaveLength(1)
       expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
       expect(notifier.getPendingParentWakes().has("parent-1")).toBe(true)
