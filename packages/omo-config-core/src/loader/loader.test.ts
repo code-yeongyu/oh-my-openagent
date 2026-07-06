@@ -148,6 +148,31 @@ describe("loadOmoConfig", () => {
     expect(result.sources.some((source) => source.scope === "project" && source.loaded)).toBe(false)
   })
 
+  for (const extension of ["jsonc", "json"] as const) {
+    test(`#given symlinked project omo ${extension} file #when loading #then target config is ignored`, () => {
+      // given
+      const fixture = makeFixture()
+      const projectOmoDir = join(fixture.projectDir, ".omo")
+      const outsideConfigPath = join(fixture.homeDir, `outside.${extension}`)
+      const projectConfigPath = join(projectOmoDir, `omo.${extension}`)
+      mkdirSync(projectOmoDir, { recursive: true })
+      writeJsonc(outsideConfigPath, `{"task":{"default_concurrency":9}}`)
+      symlinkSync(outsideConfigPath, projectConfigPath)
+
+      // when
+      const result = loadOmoConfig({
+        cwd: fixture.cwd,
+        env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+        platform: "linux",
+      })
+
+      // then
+      expect(result.diagnostics).toEqual([])
+      expect(result.config.task?.default_concurrency).toBe(5)
+      expect(result.sources.some((source) => source.scope === "project" && source.loaded)).toBe(false)
+    })
+  }
+
   test("#given malformed and unreadable configs #when loading #then defaults survive and typed diagnostics identify paths", () => {
     // given
     const fixture = makeFixture()

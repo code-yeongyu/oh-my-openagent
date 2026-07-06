@@ -54,7 +54,7 @@ function detectUserOmoJsonPath(
   return fileSystem.existsSync(jsonPath) ? jsonPath : jsoncPath
 }
 
-function isSymlinkedProjectOmoDirectory(path: string, fileSystem: OmoConfigReadFileSystem): boolean {
+function isSymlinkedProjectPath(path: string, fileSystem: OmoConfigReadFileSystem): boolean {
   if (fileSystem.lstatSync === undefined || !fileSystem.existsSync(path)) return false
   try {
     return fileSystem.lstatSync(path).isSymbolicLink()
@@ -64,13 +64,17 @@ function isSymlinkedProjectOmoDirectory(path: string, fileSystem: OmoConfigReadF
   }
 }
 
+function isLoadableProjectConfigFile(path: string, fileSystem: OmoConfigReadFileSystem): boolean {
+  return fileSystem.existsSync(path) && !isSymlinkedProjectPath(path, fileSystem)
+}
+
 function detectOmoJsonPath(dir: string, fileSystem: OmoConfigReadFileSystem): string | null {
   const omoDir = join(dir, ".omo")
-  if (isSymlinkedProjectOmoDirectory(omoDir, fileSystem)) return null
+  if (isSymlinkedProjectPath(omoDir, fileSystem)) return null
   const jsoncPath = join(omoDir, "omo.jsonc")
-  if (fileSystem.existsSync(jsoncPath)) return jsoncPath
+  if (isLoadableProjectConfigFile(jsoncPath, fileSystem)) return jsoncPath
   const jsonPath = join(omoDir, "omo.json")
-  return fileSystem.existsSync(jsonPath) ? jsonPath : null
+  return isLoadableProjectConfigFile(jsonPath, fileSystem) ? jsonPath : null
 }
 
 function findProjectConfigPathsFarthestFirst(
