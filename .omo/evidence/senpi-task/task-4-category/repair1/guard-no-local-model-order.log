@@ -1,0 +1,2 @@
+173:  const resolution = resolveModelForDelegateTask(
+PASS: senpi-task delegates model ordering and only owns category data/adapter mapping
