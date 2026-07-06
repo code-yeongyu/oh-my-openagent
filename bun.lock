@@ -215,7 +215,11 @@
       "version": "4.15.1",
       "dependencies": {
         "@oh-my-opencode/comment-checker-core": "workspace:*",
+        "@oh-my-opencode/delegate-core": "workspace:*",
+        "@oh-my-opencode/omo-config-core": "workspace:*",
         "@oh-my-opencode/prompts-core": "workspace:*",
+        "@oh-my-opencode/senpi-task": "workspace:*",
+        "@oh-my-opencode/team-core": "workspace:*",
         "@oh-my-opencode/telemetry-core": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
         "vscode-jsonrpc": "^8.2.1",

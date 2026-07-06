@@ -1,3 +1,5 @@
+import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
+import { installToolCaptureRegistry } from "./tool-capture-registry"
 import type { ComponentContext, ComponentLogger, OmoSenpiComponent, SenpiExtensionAPI } from "./types"
 
 export interface ComposeOmoSenpiExtensionOptions {
@@ -74,6 +76,13 @@ export function composeOmoSenpiExtension(
       return
     }
 
+    // Install the capture registry and idle coordinator BEFORE the component loop so every component
+    // (lsp registers earlier than task) has its tools captured and shares one injection arbiter.
+    const captureRegistry = installToolCaptureRegistry(pi)
+    const idleCoordinator = new IdleInjectionCoordinator((content, options) => {
+      pi.sendUserMessage(content, options)
+    })
+
     const ctx: ComponentContext = {
       logger,
       config: {
@@ -81,6 +90,8 @@ export function composeOmoSenpiExtension(
           return pi.getFlag(name)
         },
       },
+      getCapturedTools: () => captureRegistry.getCapturedTools(),
+      idleCoordinator,
     }
 
     for (const component of components) {

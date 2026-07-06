@@ -91,10 +91,28 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
 
         state.previousStatusRaw = status.raw
         state.consecutiveContinuations += 1
-        pi.sendUserMessage(CONTINUATION_PROMPT, { deliverAs: "followUp" })
+        deliverContinuation(pi, ctx)
       })
     },
   }
+}
+
+const ULW_CONTINUATION_INJECTION_KEY = "omo-senpi-ulw-loop-continuation"
+
+// Route the continuation through the idle-injection coordinator when the composition provides one, so
+// a task completion and this continuation on the same idle edge collapse to a single wake. Falls back
+// to a direct followUp when no coordinator is wired (isolated unit context).
+function deliverContinuation(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
+  if (ctx.idleCoordinator !== undefined) {
+    ctx.idleCoordinator.enqueue({
+      key: ULW_CONTINUATION_INJECTION_KEY,
+      source: "ulw-continuation",
+      content: CONTINUATION_PROMPT,
+    })
+    ctx.idleCoordinator.flushOnIdle()
+    return
+  }
+  pi.sendUserMessage(CONTINUATION_PROMPT, { deliverAs: "followUp" })
 }
 
 function resolveOmoBin(): string | null {
