@@ -118,11 +118,16 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     if (record.status !== "running") {
       return { kind: "noop", task_id: record.task_id, status: record.status, reason: `Task ${record.task_id} is ${record.status}, not running.` }
     }
+    // Transition BEFORE abort so steering is the single terminal writer: abort settles the launch
+    // outcome tracker, whose late complete/cancel transition is then rejected by terminal idempotence.
+    const result = port.store.transition(record.task_id, { type: "interrupt", timestamp: nowIso() })
+    if (!result.applied) {
+      return { kind: "noop", task_id: record.task_id, status: result.record.status, reason: `Task ${record.task_id} could not be interrupted from running.` }
+    }
     const handle = port.liveHandle(record.task_id)
     if (handle !== undefined) await handle.abort()
     const partial = handle?.lastAssistantText()
-    const result = port.store.transition(record.task_id, { type: "interrupt", timestamp: nowIso() })
-    if (result.applied && partial !== undefined && partial.length > 0) {
+    if (partial !== undefined && partial.length > 0) {
       port.store.replace({ ...result.record, final_response: partial })
     }
     port.store.appendEvent(record.task_id, { type: "interrupted", payload: { previous_status: "running" } })
@@ -136,8 +141,8 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
       const reasonText = record.status === "cancelled" ? `Task ${record.task_id} is already cancelled.` : `Task ${record.task_id} is ${record.status}, not running.`
       return { kind: "noop", task_id: record.task_id, status: record.status, reason: reasonText }
     }
-    const handle = port.liveHandle(record.task_id)
-    if (handle !== undefined) await handle.abort()
+    // Transition BEFORE abort so this cancel is the single terminal write; the tracker's later
+    // complete/cancel transition (settled by abort) is rejected by terminal idempotence.
     const result = port.store.transition(record.task_id, {
       type: "cancel",
       timestamp: nowIso(),
@@ -146,6 +151,8 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     if (!result.applied) {
       return { kind: "noop", task_id: record.task_id, status: result.record.status, reason: `Task ${record.task_id} could not be cancelled from running.` }
     }
+    const handle = port.liveHandle(record.task_id)
+    if (handle !== undefined) await handle.abort()
     port.store.appendEvent(record.task_id, { type: "cancelled", payload: { previous_status: "running", ...(reason !== undefined ? { reason } : {}) } })
     // Destruction is delegated EXCLUSIVELY to lifecycle's port; steering never disposes directly.
     await port.destruction.destroyResidentTask(record.task_id, "cancel")
