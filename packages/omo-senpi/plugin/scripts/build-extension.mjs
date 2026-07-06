@@ -54,7 +54,7 @@ export async function buildExtension(options = {}) {
     "esm",
     "--outfile",
     output,
-    "--no-minify",
+    "--minify",
     ...externalSpecifiers.flatMap((specifier) => ["--external", specifier]),
   ])
   await normalizeBuiltinImports(output)
@@ -106,8 +106,10 @@ function run(command, args) {
 
 async function normalizeBuiltinImports(output) {
   const bundled = await readFile(output, "utf8")
+  // Whitespace-tolerant so minified output (`from"path"`, `import"path"`) normalizes too, not just the
+  // spaced non-minified shape.
   const normalized = bundled.replace(
-    /(from\s+["']|import\s*\(\s*["']|import\s+["'])([^"']+)(["'])/g,
+    /(from\s*["']|import\s*\(\s*["']|import\s*["'])([^"']+)(["'])/g,
     (match, prefix, specifier, suffix) => {
       if (specifier.startsWith("node:")) return match
       if (!builtinModuleNames.includes(specifier)) return match
