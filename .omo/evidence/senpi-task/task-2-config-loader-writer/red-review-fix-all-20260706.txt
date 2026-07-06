@@ -8,7 +8,7 @@ packages/omo-config-core/src/writer/writer.test.ts:
 136 |         platform: "linux",
 137 |       })
 138 |     }
-139 | 
+139 |
 140 |     // then
 141 |     expect(run).toThrow(OmoConfigWriteError)
                       ^
@@ -25,7 +25,7 @@ Received value: undefined
 packages/omo-config-core/src/loader/merge.test.ts:
 22 |     const tools = (((merged.categories as Record<string, unknown>).quick as Record<string, unknown>).tools ??
 23 |       {}) as Record<string, unknown>
-24 | 
+24 |
 25 |     // then
 26 |     expect(tools.bash).toBe(true)
 27 |     expect(Object.hasOwn(tools, "__proto__")).toBe(false)
@@ -43,7 +43,7 @@ packages/omo-config-core/src/loader/loader.test.ts:
 (pass) loadOmoConfig > #given malformed and unreadable configs #when loading #then defaults survive and typed diagnostics identify paths [1.01ms]
 131 |       platform: "linux",
 132 |     })
-133 | 
+133 |
 134 |     // then
 135 |     expect(jsonOnly.diagnostics).toEqual([])
 136 |     expect(jsonOnly.config.task?.default_concurrency).toBe(9)
