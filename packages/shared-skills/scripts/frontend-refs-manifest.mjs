@@ -13,6 +13,7 @@ export const designOriginals = [
 	"aside.md",
 	"clone-from-url.md",
 	"design-system-architecture.md",
+	"lazyweb.md",
 	"react-dev-tooling-skill.md",
 ];
 

@@ -1,9 +1,33 @@
 #!/usr/bin/env bun
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { availableParallelism } from "node:os";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
+const isWindows = process.platform === "win32";
+
+// Detach each child on POSIX so it leads its own process group, letting us SIGKILL the whole
+// group (child + any grandchildren it spawned, e.g. `npm ci` / `bun build` sub-processes) on
+// abort. A plain child.kill() only signals the immediate child, so grandchildren survive and a
+// failed build would otherwise wait out a slow sibling. On Windows there is no process group;
+// killTree falls back to `taskkill /T /F`, which is best-effort tree termination.
+function killTree(child: ReturnType<typeof spawn>): void {
+	const pid = child.pid;
+	if (pid === undefined) return;
+	if (isWindows) {
+		spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
+		return;
+	}
+	try {
+		process.kill(-pid, "SIGKILL");
+	} catch (error) {
+		// ESRCH => the group is already gone (child exited between the race and this loop); any
+		// other failure (e.g. the child never became a group leader) falls back to a direct kill.
+		if ((error as NodeJS.ErrnoException).code !== "ESRCH") {
+			child.kill("SIGKILL");
+		}
+	}
+}
 
 // Every node writes to a disjoint output path, so ordering only matters where one node
 // reads another's output. The three real edges: index -> node-require-shim (patches
@@ -83,10 +107,11 @@ async function runGraph(graph: BuildNode[], env: NodeJS.ProcessEnv) {
 			await Promise.race(running.values());
 		}
 	} catch (error) {
-		// First failure aborts the build; stop the steps still running so they cannot keep
-		// writing artifacts after the build has already failed.
+		// First failure aborts the build; SIGKILL each still-running step's whole process group
+		// so it (and its grandchildren) stops immediately instead of holding the build open until
+		// a slow sibling finishes.
 		for (const child of liveChildren) {
-			child.kill();
+			killTree(child);
 		}
 		await Promise.allSettled(running.values());
 		throw error;
@@ -104,7 +129,10 @@ function runNode(node: BuildNode, env: NodeJS.ProcessEnv, liveChildren?: Set<Ret
 		const child = spawn(node.command, node.args, {
 			cwd: repoRoot,
 			env,
-			shell: process.platform === "win32",
+			shell: isWindows,
+			// POSIX: lead a new process group so killTree can SIGKILL the whole subtree on abort.
+			// Windows has no process groups; taskkill /T handles the tree there.
+			detached: !isWindows,
 			stdio: ["ignore", "pipe", "pipe"],
 		});
 		liveChildren?.add(child);

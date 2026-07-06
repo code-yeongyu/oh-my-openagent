@@ -204,6 +204,12 @@ capture evidence and a local reconnaissance run following the MIT-licensed
 template. Aside names, trademarks, product text, and visual assets remain the property of
 their respective owners and are referenced only for descriptive design-analysis purposes.
 
+`frontend/references/design/lazyweb.md` is a project-original, curl-only operating guide
+for the Lazyweb (lazyweb.com) design-research API, written from live endpoint verification;
+no Lazyweb source, documentation text, or screenshot content is vendored. Lazyweb names
+remain the property of their owner, and the guide grants no license to ship, trace, or
+commit reference screenshots harvested through it.
+
 `frontend/references/design/clone-from-url.md` is a project-original runtime-extraction
 workflow guide. Its browser + `getComputedStyle` clone approach follows the same
 MIT-licensed `JCodesMore/ai-website-cloner-template` clone-website workflow that `aside.md`
