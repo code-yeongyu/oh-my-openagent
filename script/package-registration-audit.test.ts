@@ -35,6 +35,7 @@ const adapterPackagePaths: readonly string[] = [
   "packages/omo-senpi",
   "packages/omo-opencode",
   "packages/pi-goal",
+  "packages/pi-webfetch",
 ] as const
 const skillPackagePaths: readonly string[] = ["packages/shared-skills"] as const
 const shimSourceRoots: readonly string[] = ["packages/omo-opencode/src", "packages/omo-codex/src"] as const
