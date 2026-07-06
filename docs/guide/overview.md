@@ -80,13 +80,13 @@ Named after the Greek myth. He rolls the boulder every day. Never stops. Never g
 
 Sisyphus is your main orchestrator. He plans, delegates to specialists, and drives tasks to completion with aggressive parallel execution. He doesn't stop halfway. He doesn't get distracted. He finishes.
 
-**Recommended models:**
+**Recommended Sisyphus models:**
 
-- **Claude Opus 4.7** — Best overall experience. Sisyphus was built with Claude-optimized prompts.
-- **Kimi K2.6** / **K2.5** — Great Claude-like alternatives. K2.6 is the current default fallback in the primary Sisyphus chain; many users run K2.6 or the K2.5/K2.6 combo exclusively.
-- **GLM 5** — Solid option, especially via Z.ai.
+- **Claude Fable 5 / Opus 4.8 / Opus 4.7** — Best overall experience. Sisyphus was built with Claude-optimized prompts.
+- **Kimi K2.7 / K2.6 / K2.5** — Great Claude-like alternatives. Kimi remains the preferred non-Claude choice for Sisyphus.
+- **GLM 5.2 / 5.1 / 5** — Acceptable Claude-like options. GLM 5.2 has dedicated Sisyphus prompt support from one community validation report, so treat it as supported but less broadly proven than Claude or Kimi.
 
-Sisyphus works best on Claude Opus 4.7, Kimi K2.6 (or K2.5), and GLM 5.1. GPT-5.4 and GPT-5.5 now have dedicated prompt paths, but older GPT models are still a poor fit and should route to Hephaestus instead.
+GPT-5.4 and GPT-5.5 have dedicated Sisyphus prompt paths, but they are supported exceptions, not the recommended default for the orchestrator. See the [Agent-Model Matching Guide](./agent-model-matching.md) for the current supported list, caveats, and safe override rules.
 
 ### Hephaestus: The Legitimate Craftsman
 
@@ -170,9 +170,9 @@ You can override specific agents or categories in your config:
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
 
   "agents": {
-    // Main orchestrator: Claude Opus or Kimi K2.6 work best
+    // Main orchestrator: prefer Claude or Kimi; see the matching guide before using GPT
     "sisyphus": {
-      "model": "kimi-for-coding/k2p5",
+      "model": "opencode-go/kimi-k2.7-code",
       "ultrawork": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
     },
 
@@ -217,11 +217,13 @@ You can override specific agents or categories in your config:
 
 ### Model Families
 
+This is a quick orientation, not the source of truth. Use the [Agent-Model Matching Guide](./agent-model-matching.md) for exact per-agent support, provider chains, and safe vs dangerous overrides.
+
 **Claude-like models** (instruction-following, structured output):
 
-- Claude Opus 4.7, Claude Haiku 4.5
-- Kimi K2.6 / K2.5 — behaves very similarly to Claude
-- GLM 5 — Claude-like behavior, good for broad tasks
+- Claude Fable 5, Claude Opus 4.8 / 4.7, Claude Haiku 4.5
+- Kimi K2.7 / K2.6 / K2.5 — behaves very similarly to Claude; preferred over GLM for Sisyphus when both are available
+- GLM 5.2 / 5.1 / 5 — Claude-like behavior for broad tasks; GLM 5.2 currently has one community validation report for Sisyphus
 
 **GPT models** (explicit reasoning, principle-driven):
 

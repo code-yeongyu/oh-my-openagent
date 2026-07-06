@@ -8,16 +8,16 @@
 
 > **STOP. BEFORE YOU POINT SISYPHUS AT SOME OTHER MODEL, READ EVERY WORD BELOW. THIS IS THE SINGLE MOST IGNORED THING IN THIS WHOLE GUIDE.**
 
-**SISYPHUS HAS ONLY EVER BEEN TESTED AND VERIFIED ON THE EXACT MODELS LISTED IN THIS DOCUMENT — AND NOTHING, *NOTHING*, ELSE.** The supported set is narrow on purpose:
+**SISYPHUS IS ONLY SUPPORTED ON THE EXACT MODELS LISTED IN THIS DOCUMENT — AND NOTHING, *NOTHING*, ELSE.** The supported set is narrow on purpose. GLM 5.2 is included because it has dedicated Sisyphus prompt support and one community validation report, not broad regression history:
 
 - **Claude family:** Fable 5 · Opus 4.8 · Opus 4.7 · Sonnet 4.6
 - **Kimi:** K2.7 · K2.6 · K2.5
-- **GLM:** 5 / 5.1 *(acceptable — slightly looser on the long nested workflows)*
+- **GLM:** 5.2 / 5.1 / 5 *(acceptable — 5.2 is single-report validated; GLM stays slightly looser on the long nested workflows)*
 - **GPT:** 5.4 / 5.5 *(dedicated GPT prompt path exists — supported, but still **NOT** the recommended default for the orchestrator)*
 
 **IF A MODEL IS NOT ON THAT LIST, IT IS 100% UNTESTED AND 100% UNVERIFIED WITH SISYPHUS.** It may not work at all. It may *look* like it works and then fall apart three tool-calls later. **AND IF IT SOMEHOW WORKS FOR YOU — THAT IS A LITERAL MIRACLE. IT IS NOT A SUPPORTED CONFIGURATION, IT IS NOT BLESSED, AND IT IS NOT A PROMISE THAT IT WILL STILL WORK TOMORROW.**
 
-**EVERY SINGLE PROMPT CHANGE TO SISYPHUS IS WRITTEN, TUNED, AND REGRESSION-CHECKED AGAINST THE MODELS ABOVE — AND ONLY THOSE MODELS.** Nobody is watching how an off-list model behaves. The consequences are not subtle:
+**EVERY SINGLE PROMPT CHANGE TO SISYPHUS IS WRITTEN, TUNED, AND REGRESSION-CHECKED AGAINST THE PRIMARY MODELS ABOVE — AND ONLY THOSE MODELS.** GLM 5.2 has a dedicated prompt path and one community validation report, but it does not yet have the same regression history as Claude/Kimi/GPT. Nobody is watching how an off-list model behaves. The consequences are not subtle:
 
 - **AN UNLISTED MODEL CAN BREAK AT THE *VERY NEXT PATCH*, WITH ZERO WARNING.** A prompt tweak that helps Claude/Kimi can silently shatter whatever fragile thing was holding your off-list model together — and we will *never notice*, because we are not testing it. Do not file it as a bug. It was never working on purpose.
 - **A PROMPT CANNOT FIX A MODEL.** Models have hard, intrinsic characteristics. No amount of prompt-carving makes a model do what it fundamentally *cannot* do. If a model is the wrong brain for orchestration, it stays the wrong brain — **forever**, no matter how perfectly the prompt is shaped. We have ground prompts down to the bone; the model that can't, still can't.
@@ -53,7 +53,7 @@ Sisyphus is the developer who knows everyone, goes everywhere, and gets things d
 
 Using Sisyphus with older GPT models would be like taking your best project manager — the one who coordinates everyone, runs standups, and keeps the whole team aligned — and sticking them in a room alone to debug a race condition. Wrong fit. GPT-5.4 and GPT-5.5 now have dedicated Sisyphus prompt paths, but GPT is still not the default recommendation for the orchestrator.
 
-> **⚠️ Sisyphus is ONLY tested on Claude (Fable 5 / Opus 4.8 / 4.7 / Sonnet 4.6), Kimi (K2.7 / K2.6 / K2.5), GLM (5 / 5.1), and GPT (5.4 / 5.5).** Anything else is untested, unsupported, and can break without warning. **MiniMax and Qwen as Sisyphus are strongly discouraged to the point we'd almost forbid it.** Read the **🚨 READ THIS FIRST** warning at the very top of this guide before you override the orchestrator's model.
+> **⚠️ Sisyphus support is limited to Claude (Fable 5 / Opus 4.8 / 4.7 / Sonnet 4.6), Kimi (K2.7 / K2.6 / K2.5), GLM (5.2 / 5.1 / 5; GLM 5.2 has one community validation report), and GPT (5.4 / 5.5).** Anything else is untested, unsupported, and can break without warning. **MiniMax and Qwen as Sisyphus are strongly discouraged to the point we'd almost forbid it.** Read the **🚨 READ THIS FIRST** warning at the very top of this guide before you override the orchestrator's model.
 
 ### Hephaestus: The Deep Specialist
 
@@ -198,7 +198,7 @@ Used by: Sisyphus, Atlas, Sisyphus-Junior, Metis (Claude path), Prometheus (prim
 | 2 | `claude-sonnet-4-6` | same | Faster, cheaper, still Claude. |
 | 3 | **`kimi-k2.7` - RECOMMENDED ALTERNATIVE (newest)** | `opencode-go`, `kimi-for-coding`, `moonshotai`, `opencode`, `vercel` | Restrained, outcome-first, and the top Kimi when Anthropic isn't connected. Agents with Kimi-specific prompt paths use their K2.7 tuning; Prometheus keeps its `ulw-plan`-backed prompt. |
 | 4 | **`kimi-k2.6` or `kimi-k2.5` — RECOMMENDED ALTERNATIVE** | same as K2.7 | Instruction-following mirrors Claude closely. Current default Kimi in the chains. |
-| 5 | **`glm-5` or `glm-5.1` — ACCEPTABLE ALTERNATIVE** | `opencode-go`, `zai-coding-plan`, `opencode`, `vercel` | Claude-like, slightly looser on long nested workflows. Solid fallback. |
+| 5 | **`glm-5.2`, `glm-5.1`, or `glm-5` — ACCEPTABLE ALTERNATIVE** | `opencode-go`, `zai-coding-plan`, `opencode`, `vercel` | Claude-like, slightly looser on long nested workflows. `glm-5.2` has dedicated Sisyphus prompt support from one community report; keep Kimi above GLM when both are available. |
 | 6 | `big-pickle` (GLM 4.6) | `opencode` | Free-tier safety net. |
 
 > **Kimi ≻ GLM.** Kimi (K2.7 newest, then K2.6/K2.5) holds up under Sisyphus's nested todo+delegation prompts better than GLM. Use Kimi whenever both are available.
@@ -234,7 +234,7 @@ Used by: `visual-engineering`, `artistry`, Oracle (visual fallback), Multimodal-
 
 | If you lose... | Swap to (in order) | Avoid |
 |---|---|---|
-| Claude Opus/Sonnet | Kimi K2.7 → K2.6/K2.5 → GLM 5 → Big Pickle | Older GPT models |
+| Claude Opus/Sonnet | Kimi K2.7 → K2.6/K2.5 → GLM 5.2 → GLM 5.1/5 → Big Pickle | Older GPT models |
 | GPT-5.4/5.5 | GPT-5.5 Codex → DeepSeek v3.2 | MiniMax (except for utility work) |
 | Gemini 3.1 Pro | Qwen 3.6-plus / 3.5-plus | Claude/Kimi (wrong reasoning style for visual) |
 | Grok Code Fast 1 (Explore) | GPT-5.4 Mini Fast → MiniMax M2.7 Highspeed → MiniMax M3 → Claude Haiku | Opus (massive cost waste) |
@@ -301,7 +301,7 @@ Communicative, instruction-following, structured output. Best for agents that ne
 | **Claude Haiku 4.5**  | Fast and cheap. Good for quick tasks and utility work.                       |
 | **Kimi K2.7**         | Newest Kimi: restrained and outcome-first, a GPT-5.5-leaning Opus 4.8 in a Claude-family body. Top Kimi for the orchestrators; agents with Kimi-specific prompt paths use K2.7 tuning while Prometheus keeps its `ulw-plan`-backed prompt. |
 | **Kimi K2.6 / K2.5**  | Behave very similarly to Claude. Great all-rounders at lower cost; K2.6 is the current default Kimi in the Sisyphus chain. |
-| **GLM 5**             | Claude-like behavior. Solid for orchestration tasks.                         |
+| **GLM 5.2 / 5.1 / 5** | Claude-like behavior. Acceptable for orchestration tasks, with GLM 5.2 currently based on one community validation report. |
 
 ### GPT Family
 
@@ -504,13 +504,13 @@ If you have OpenRouter and want DeepSeek in the chain when GPT is unavailable:
 
 **Safe** — same personality type:
 
-- Sisyphus: Opus → Sonnet, Kimi K2.5/2.6, GLM 5 (all communicative models)
+- Sisyphus: Opus → Sonnet, Kimi K2.7/2.6/2.5, GLM 5.2/5.1/5 (all communicative models; GLM 5.2 currently has one community validation report)
 - Prometheus: Opus → GPT-5.5 (same `ulw-plan`-backed prompt, different model)
 - Atlas: Claude Sonnet 4.6 → Kimi K2.6 → GPT-5.5 (auto-switches to the GPT prompt)
 
 **Dangerous** — personality mismatch:
 
-- **Sisyphus → ANY model not on the tested list**: The supported set is Claude (Fable 5 / Opus 4.8 / 4.7 / Sonnet 4.6), Kimi (K2.7 / K2.6 / K2.5), GLM (5 / 5.1), GPT (5.4 / 5.5). Everything else is untested and can break at the very next patch. **A prompt cannot fix a model** — if it doesn't fit, no tuning makes it fit. See the **🚨 READ THIS FIRST** warning at the very top of this guide.
+- **Sisyphus → ANY model not on the supported list**: The supported set is Claude (Fable 5 / Opus 4.8 / 4.7 / Sonnet 4.6), Kimi (K2.7 / K2.6 / K2.5), GLM (5.2 / 5.1 / 5; GLM 5.2 currently has one community validation report), GPT (5.4 / 5.5). Everything else is untested and can break at the very next patch. **A prompt cannot fix a model** — if it doesn't fit, no tuning makes it fit. See the **🚨 READ THIS FIRST** warning at the very top of this guide.
 - **Sisyphus → MiniMax / Qwen**: **Strongly discouraged to the point of "almost forbidden."** Neither holds up under the orchestration prompt. Never use them as the orchestrator.
 - **Sisyphus → MiMo / DeepSeek**: No working configuration found. Untested and unsupported as the orchestrator.
 - **Sisyphus → older GPT models**: Still a bad fit. GPT-5.4 and GPT-5.5 are the only dedicated GPT prompt paths.
