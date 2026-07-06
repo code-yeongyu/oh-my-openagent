@@ -1,0 +1,2 @@
+$ git diff -- bun.lock packages/omo-codex/plugin/components/codegraph/dist/serve.js
+exit=0

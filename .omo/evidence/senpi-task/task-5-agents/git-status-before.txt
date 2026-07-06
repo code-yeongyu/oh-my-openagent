@@ -1,0 +1,2 @@
+$ git status --short --untracked-files=all
+exit=0
