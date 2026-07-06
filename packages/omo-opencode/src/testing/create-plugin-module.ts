@@ -2,6 +2,7 @@ import type { Hooks, Plugin, PluginModule } from "@opencode-ai/plugin"
 import type { HookName } from "../config"
 import { initConfigContext } from "../cli/config-manager/config-context"
 import { ensureTuiPluginEntry } from "../cli/config-manager/add-tui-plugin-to-tui-config"
+import { wrapClientForV2Compat } from "../shared/sdk-v2-compat"
 
 import { createHooks } from "../create-hooks"
 import { createManagers } from "../create-managers"
@@ -130,6 +131,9 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
 
     deps.injectServerAuthIntoClient(input.client)
 
+    const originalClient = input.client
+    input.client = wrapClientForV2Compat(input.client) as typeof input.client
+
     const pluginConfig = deps.loadPluginConfig(input.directory, input)
     try {
       deps.recordPluginTelemetry({ configEnabled: pluginConfig.telemetry })
@@ -147,7 +151,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
         })
       }
     }
-    deps.initLiveServerRoute({ serverUrl: input.serverUrl, directory: input.directory, inProcessClient: input.client })
+    deps.initLiveServerRoute({ serverUrl: input.serverUrl, directory: input.directory, inProcessClient: originalClient })
     deps.setLiveParentWakeRoutingDisabled(pluginConfig.experimental?.disable_live_parent_wake_routing === true)
     deps.warmLiveServerProbe()
     const runtimeSecuritySkills = selectRuntimeSecuritySkills(pluginConfig)
