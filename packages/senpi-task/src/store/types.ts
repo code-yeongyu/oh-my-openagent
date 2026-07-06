@@ -33,4 +33,7 @@ export type TaskRecordStore = {
   readonly list: () => ListTaskRecordsResult
   readonly appendEvent: (taskId: string, event: PersistedTaskEvent) => string
   readonly transition: (taskId: string, transition: TaskTransition) => TaskTransitionResult
+  // TTL cleanup only (lifecycle-owned): drop a record and its JSONL log. Idempotent on a missing
+  // record. Normal terminal transitions must NEVER delete a record - they use transition().
+  readonly remove: (taskId: string) => void
 }
