@@ -45,14 +45,33 @@ type ModelSelectionInput = {
   readonly matchedFallback?: boolean
 }
 
+type AvailableModelsParseResult = {
+  readonly models: readonly string[]
+  readonly validContainer: boolean
+}
+
+const SENSITIVE_MODEL_FIELD_NAMES: ReadonlySet<string> = new Set([
+  "apiKey",
+  "authorization",
+  "headers",
+  "privateToken",
+  "secret",
+  "token",
+] as const)
+
 function formatModel(model: SenpiModelPort): string {
   return `${model.provider}/${model.id}`
 }
 
-function isSenpiModelPort(model: unknown): model is SenpiModelPort {
+function hasSensitiveModelField(model: object): boolean {
+  return Object.keys(model).some((key) => SENSITIVE_MODEL_FIELD_NAMES.has(key))
+}
+
+function isSenpiModelPort<TModel extends SenpiModelPort>(model: unknown): model is TModel {
   return (
     typeof model === "object" &&
     model !== null &&
+    !hasSensitiveModelField(model) &&
     "provider" in model &&
     "id" in model &&
     typeof model.provider === "string" &&
@@ -96,8 +115,11 @@ function getOwnRecordValue<TValue>(
   return Object.hasOwn(record, key) ? record[key] : undefined
 }
 
-function safeAvailableModels(models: readonly unknown[]): readonly string[] {
-  return models.filter(isSenpiModelPort).map(formatModel).sort()
+function parseAvailableModels(models: unknown): AvailableModelsParseResult {
+  if (!Array.isArray(models)) {
+    return { models: [], validContainer: false }
+  }
+  return { models: models.filter(isSenpiModelPort).map(formatModel).sort(), validContainer: true }
 }
 
 function promptAppendForCategory(categoryName: string, model: string | undefined, userPromptAppend: string | undefined): string | undefined {
@@ -168,7 +190,17 @@ export function resolveCategory<TModel extends SenpiModelPort>(
   }
 
   const config = { ...builtinConfig, ...userConfig }
-  const availableModels = safeAvailableModels(senpiModelRegistry.getAvailable())
+  const availableModelsResult = parseAvailableModels(senpiModelRegistry.getAvailable())
+  const availableModels = availableModelsResult.models
+  if (!availableModelsResult.validContainer) {
+    return {
+      kind: "model_unavailable",
+      category: categoryName,
+      attemptedModel: config.model,
+      availableModels,
+      availableCategories,
+    }
+  }
   const fallbackChain = getOwnRecordValue(CATEGORY_FALLBACK_CHAINS, categoryName)
   const resolution = resolveModelForDelegateTask(
     {
@@ -206,7 +238,8 @@ export function resolveCategory<TModel extends SenpiModelPort>(
     },
   )
   const parsedModel = parseModel(selection.selectedModel)
-  const model = parsedModel ? senpiModelRegistry.find(parsedModel.provider, parsedModel.modelId) : undefined
+  const foundModel = parsedModel ? senpiModelRegistry.find(parsedModel.provider, parsedModel.modelId) : undefined
+  const model = isSenpiModelPort<TModel>(foundModel) ? foundModel : undefined
   if (!parsedModel || !model) {
     const fallback = nearestFallback(selection)
     return {
