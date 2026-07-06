@@ -42,6 +42,30 @@ export type {
   SenpiModelPort,
   SenpiModelRegistryPort,
 } from "./category"
+export {
+  DEFAULT_MAX_CHILD_DEPTH,
+  InProcessRunner,
+  RunnerError,
+  buildSubagentPrompt,
+  createChildResourceLoader,
+  filterSharedParentTools,
+  isTaskOrTeamFamilyTool,
+  mergeChildCustomTools,
+} from "./runners"
+export type {
+  ChildHandle,
+  ChildSession,
+  ChildSessionEvent,
+  ChildSessionListener,
+  ChildSpec,
+  CreateChildSession,
+  DepthPolicy,
+  InProcessRunnerOptions,
+  RunnerFailure,
+  RunnerOutcome,
+  SharedToolFilterOptions,
+  SubagentPromptInput,
+} from "./runners"
 export { defineAgent, loadAgents, registerAgent, resolveToolRule } from "./agents"
 export type {
   AgentDefinition,
