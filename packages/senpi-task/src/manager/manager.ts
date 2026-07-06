@@ -17,6 +17,7 @@ import {
   nowIso,
 } from "./manager-helpers"
 import { NameRegistry } from "./names"
+import { subscribeTranscriptLog } from "./transcript-log"
 import type {
   ContinueResult,
   ListScope,
@@ -201,6 +202,7 @@ class TaskManagerImpl implements TaskManager {
     }
 
     this.#live.set(record.task_id, { handle, model })
+    subscribeTranscriptLog(handle, this.#options.store, record.task_id)
     this.#trackOutcome(record.task_id, handle, model, record.notification.run_epoch)
     void this.#steering.notifyStarted(record.task_id)
     return { ok: true }
