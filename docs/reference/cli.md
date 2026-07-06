@@ -95,7 +95,7 @@ For the full Codex Light event inventory, collected properties, local state path
 
 Removes managed Codex Light state. `cleanup` remains available as a backward-compatible alias.
 
-For the OpenCode plugin, temporary disable is just a config edit: remove `"oh-my-openagent"` or legacy `"oh-my-opencode"` from the `plugin` array in `~/.config/opencode/opencode.json[c]`, then restart OpenCode. Keep the plugin config files if you plan to re-enable later.
+For the OpenCode plugin, temporary disable is just a config edit: remove `"oh-my-openagent"` or legacy `"oh-my-opencode"` from the `plugin` arrays in `~/.config/opencode/opencode.json[c]` and, when present, `~/.config/opencode/tui.json`, then restart OpenCode. Keep the plugin config files if you plan to re-enable later.
 
 ### Usage
 
@@ -119,11 +119,12 @@ The command removes the managed `sisyphuslabs` plugin cache and marketplace snap
 
 ```bash
 bunx oh-my-openagent doctor --status
-grep -R "oh-my-openagent\|oh-my-opencode" ~/.config/opencode/opencode.json ~/.config/opencode/opencode.jsonc 2>/dev/null
+grep -R "oh-my-openagent\|oh-my-opencode" \
+  ~/.config/opencode/opencode.json ~/.config/opencode/opencode.jsonc ~/.config/opencode/tui.json 2>/dev/null
 grep -R "sisyphuslabs\|omo@sisyphuslabs" ~/.codex/config.toml 2>/dev/null
 ```
 
-The OpenCode grep should print no active plugin entry after disabling or uninstalling the OpenCode plugin. The Codex grep should print no managed `sisyphuslabs` plugin state after `uninstall` / `cleanup`. If project-local Codex config still fails with a legacy `multi_agent_v2` conflict, rerun cleanup from that project or pass `--project <path>`.
+The OpenCode grep should print no active server or TUI plugin entry after disabling or uninstalling the OpenCode plugin. The Codex grep should print no managed `sisyphuslabs` plugin state after `uninstall` / `cleanup`. If project-local Codex config still fails with a legacy `multi_agent_v2` conflict, rerun cleanup from that project or pass `--project <path>`.
 
 ---
 
