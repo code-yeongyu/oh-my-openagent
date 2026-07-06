@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { ParentWakeNotifier } from "./parent-wake-notifier"
+import { ParentWakePendingQueue } from "./parent-wake-pending-queue"
+import type { PendingParentWake } from "./parent-wake-dedupe"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../hooks/shared/prompt-async-gate"
 
 type PromptAsyncCall = {
@@ -180,5 +182,71 @@ describe("parent wake max-defer force-flush (#5864)", () => {
       notifier.shutdown()
       releaseAllPromptAsyncReservationsForTesting()
     }
+  })
+})
+
+describe("parent wake queuedAt preservation across requeue merges (#5864)", () => {
+  test("#given existing wake with newer queuedAt #when older wake requeues into it #then keeps the oldest queuedAt", () => {
+    // given: an existing pending wake queued at T=200 (newer)
+    const originalDateNow = Date.now
+    Date.now = () => 200_000
+    const queue = new ParentWakePendingQueue({
+      pendingRetryMs: 1_000,
+      enqueueNotificationForParent: async (_sessionID, operation) => {
+        await operation()
+      },
+    })
+    try {
+      queue.queueWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+      expect(queue.getWake("parent-1")?.queuedAt).toBe(200_000)
+
+      // when: an older wake (queuedAt=100) is requeued into the existing entry.
+      // Build the requeued wake as an independent literal — do NOT mutate the
+      // queue's existing wake, otherwise the old ??= bug would pass too.
+      const existing = queue.getWake("parent-1")!
+      const requeuedWake: PendingParentWake = {
+        ...existing,
+        queuedAt: 100_000,
+      }
+      Date.now = () => 210_000
+      queue.requeueWake("parent-1", requeuedWake)
+
+      // then: the merged wake keeps the oldest (minimum) queuedAt, not the
+      // newer one — so the max-defer clock still measures time-since-first-queue.
+      // With the old ??= bug, the existing 200_000 would be kept (not overwritten).
+      expect(queue.getWake("parent-1")?.queuedAt).toBe(100_000)
+    } finally {
+      Date.now = originalDateNow
+      queue.shutdown()
+    }
+  })
+
+  test("#given existing wake with older queuedAt #when newer wake requeues into it #then keeps the oldest queuedAt", () => {
+    // given: an existing pending wake queued at T=100 (older)
+    const originalDateNow = Date.now
+    Date.now = () => 100_000
+    const queue = new ParentWakePendingQueue({
+      pendingRetryMs: 1_000,
+      enqueueNotificationForParent: async (_sessionID, operation) => {
+        await operation()
+      },
+    })
+    queue.queueWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+    expect(queue.getWake("parent-1")?.queuedAt).toBe(100_000)
+
+    // when: a newer wake (queuedAt=200) is requeued into the existing entry
+    const existing = queue.getWake("parent-1")!
+    const requeuedWake = {
+      ...existing,
+      queuedAt: 200_000,
+    }
+    Date.now = () => 210_000
+    queue.requeueWake("parent-1", requeuedWake)
+
+    // then: the merged wake keeps the older (minimum) queuedAt
+    expect(queue.getWake("parent-1")?.queuedAt).toBe(100_000)
+
+    Date.now = originalDateNow
+    queue.shutdown()
   })
 })

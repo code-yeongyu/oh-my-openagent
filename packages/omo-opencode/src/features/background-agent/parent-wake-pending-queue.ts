@@ -8,6 +8,17 @@ import {
 } from "./parent-wake-dedupe"
 import { unrefTimerHandle } from "./parent-wake-timer-handle"
 
+/**
+ * Returns the oldest (minimum) defined `queuedAt` between two values. Used
+ * during requeue merges to keep the max-defer clock measuring time-since-first
+ * queue, not time-since-last-merge (#5864). If only one is defined, that one
+ * wins; if both are undefined, undefined is returned.
+ */
+function oldestQueuedAt(left: number | undefined, right: number | undefined): number | undefined {
+  if (left === undefined) return right
+  if (right === undefined) return left
+  return Math.min(left, right)
+}
 type ParentWakePendingQueueOptions = {
   readonly pendingRetryMs: number
   readonly enqueueNotificationForParent: (
@@ -83,7 +94,7 @@ export class ParentWakePendingQueue {
       pendingWake.promptContext = latestWake.promptContext
       pendingWake.noReplyAdmittedAt ??= latestWake.noReplyAdmittedAt
       pendingWake.toolCallDeferralStartedAt ??= latestWake.toolCallDeferralStartedAt
-      pendingWake.queuedAt ??= latestWake.queuedAt
+      pendingWake.queuedAt = oldestQueuedAt(pendingWake.queuedAt, latestWake.queuedAt)
       pendingWake.allowEmptyAssistantTurnRetry ||= latestWake.allowEmptyAssistantTurnRetry
       const noAssistantOutputRetryCount = Math.max(
         pendingWake.noAssistantOutputRetryCount ?? 0,
