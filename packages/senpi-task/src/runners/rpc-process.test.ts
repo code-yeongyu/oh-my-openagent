@@ -186,4 +186,28 @@ describe("RpcProcessRunner", () => {
     expect(sessionDir.startsWith(join(homedir(), ".senpi"))).toBe(false)
     expect(descriptor?.cwd).toBe(spec.cwd)
   })
+
+  test("#given an idle resident child #when revived with a follow-up #then waitForIdle re-arms for the new turn instead of the consumed first idle", async () => {
+    // given a first turn that completed while the child stays resident
+    const { runner } = makeRunner()
+    const handle = runner.start(makeSpec({ prompt: "first" }))
+    await handle.waitForIdle()
+    expect(handle.lastAssistantText()).toBe("first")
+
+    // when a follow-up revives the idle child
+    await handle.followUp("second")
+
+    // then the already-consumed first idle must NOT satisfy the re-armed waitForIdle
+    const nextIdle = handle.waitForIdle()
+    const raced = await Promise.race([
+      nextIdle.then(() => "resolved" as const),
+      new Promise<"pending">((resolve) => setTimeout(() => resolve("pending"), 50)),
+    ])
+    expect(raced).toBe("pending")
+
+    // and the re-armed waitForIdle resolves once the new turn actually completes
+    await handle.steer("complete")
+    await nextIdle
+    expect(handle.lastAssistantText()).toBe("steered-complete")
+  })
 })

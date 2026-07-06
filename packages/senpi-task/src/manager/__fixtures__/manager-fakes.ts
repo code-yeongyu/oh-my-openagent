@@ -35,7 +35,9 @@ export type FakeHandle = {
 
 export function makeHandle(taskId: string): FakeHandle {
   let resolveOutcome: (outcome: RunnerOutcome) => void = () => {}
-  const outcome = new Promise<RunnerOutcome>((resolve) => {
+  // Re-armable: each settle resolves the current cycle's promise and arms a fresh one for the next
+  // tracking cycle, so a revived task (re-tracked under a new epoch) awaits its OWN completion.
+  let outcome = new Promise<RunnerOutcome>((resolve) => {
     resolveOutcome = resolve
   })
   const steerCalls: string[] = []
@@ -53,9 +55,17 @@ export function makeHandle(taskId: string): FakeHandle {
     abort: async () => {},
     subscribe: () => () => {},
     waitForOutcome: () => outcome,
+    lastAssistantText: () => undefined,
     dispose: async () => {},
   }
-  return { handle, settle: (value) => resolveOutcome(value), steerCalls, followUpCalls }
+  const settle = (value: RunnerOutcome): void => {
+    const resolveCurrent = resolveOutcome
+    outcome = new Promise<RunnerOutcome>((resolve) => {
+      resolveOutcome = resolve
+    })
+    resolveCurrent(value)
+  }
+  return { handle, settle, steerCalls, followUpCalls }
 }
 
 export class FakeRunner implements ManagedRunner {

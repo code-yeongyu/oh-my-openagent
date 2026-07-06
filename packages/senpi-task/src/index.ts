@@ -187,3 +187,15 @@ export type {
   TaskLifecycle,
   TeardownSummary,
 } from "./lifecycle"
+export { DEFAULT_SEND_DELIVERY, createSteeringEngine } from "./steering"
+export type {
+  CancelOutcome,
+  DestructionCause,
+  DestructionPort,
+  InterruptOutcome,
+  SendDelivery,
+  SendInput,
+  SendOutcome,
+  SteeringEngine,
+  SteeringPort,
+} from "./steering"

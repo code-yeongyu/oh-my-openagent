@@ -56,21 +56,18 @@ export function buildManagedSpec(input: {
   }
 }
 
-export function notContinuableReason(record: TaskRecord): string {
-  if (record.residency_state === "disposed") return `Task ${record.task_id} was disposed and can no longer be continued.`
-  if (record.residency_state === "evicted") return `Task ${record.task_id} was evicted from residency and can no longer be continued.`
-  return `Task ${record.task_id} is ${record.status} and can no longer be continued.`
-}
-
 export const CONTINUE_SUGGESTION = "Use task_output to read the final result."
 
-export function revivedRecord(record: TaskRecord, timestamp: string): TaskRecord {
-  const { final_response: _final, error_message: _error, ...rest } = record
-  return {
-    ...rest,
-    status: "running",
-    residency_state: "resident",
-    updated_at: timestamp,
-    notification: { ...record.notification, run_epoch: record.notification.run_epoch + 1 },
-  }
+export function inSession(record: TaskRecord, sessionId: string): boolean {
+  return record.parent_session_id === sessionId || record.root_session_id === sessionId
+}
+
+export function isTerminalRecord(record: TaskRecord): boolean {
+  return (
+    record.status === "completed" ||
+    record.status === "error" ||
+    record.status === "cancelled" ||
+    record.status === "interrupted" ||
+    record.status === "lost"
+  )
 }

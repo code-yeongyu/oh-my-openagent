@@ -2,6 +2,13 @@ import type { ToolDefinition } from "@code-yeongyu/senpi"
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
 import type { TaskRecord, TaskStatus } from "../state"
+import type {
+  CancelOutcome,
+  DestructionPort,
+  InterruptOutcome,
+  SendInput,
+  SendOutcome,
+} from "../steering"
 import type { TaskRecordStore } from "../store"
 import type { ManagedChildHandle } from "./child-handle"
 import type { ExecutionMode } from "./execution-mode"
@@ -115,11 +122,17 @@ export type TaskManagerOptions = {
   readonly config: OmoTaskSettings
   readonly cwd: string
   readonly now?: () => number
+  // Injected by lifecycle (todo 12). Steering-driven cancel delegates destruction here; defaults to
+  // a no-op so the manager stays usable before lifecycle wiring lands.
+  readonly destruction?: DestructionPort
 }
 
 export type TaskManager = {
   start(spec: ManagerStartSpec): Promise<StartResult>
   continueTask(taskIdOrName: string, prompt: string, deliverAs?: "steer" | "followUp"): Promise<ContinueResult>
+  sendToTask(input: SendInput): Promise<SendOutcome>
+  interruptTask(idOrName: string): Promise<InterruptOutcome>
+  cancelTask(idOrName: string, reason?: string): Promise<CancelOutcome>
   get(taskId: string): TaskRecord | undefined
   list(scope: ListScope): readonly ListedTask[]
   waitFor(taskId: string): Promise<TaskRecord>
