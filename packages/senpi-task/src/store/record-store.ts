@@ -14,12 +14,26 @@ import type {
   TaskRecordStore,
 } from "./types"
 
+type WriteRecordMode = "create" | "replace"
+
+export class TaskRecordCollisionError extends Error {
+  readonly taskId: TaskId
+  readonly path: string
+
+  constructor(input: { readonly taskId: TaskId; readonly path: string }) {
+    super(`Task record already exists: ${input.taskId}`)
+    this.name = "TaskRecordCollisionError"
+    this.taskId = input.taskId
+    this.path = input.path
+  }
+}
+
 export function createTaskRecordStore(config: StateDirConfig): TaskRecordStore {
   const stateDir = resolveStateDir(config)
   return {
     stateDir,
     save(record) {
-      writeRecord(stateDir, record)
+      writeRecord(stateDir, record, "create")
     },
     load(taskId) {
       const path = taskPath(stateDir, parseTaskId(taskId))
@@ -37,7 +51,7 @@ export function createTaskRecordStore(config: StateDirConfig): TaskRecordStore {
       if (record === null) throw new Error(`Task record not found: ${taskId}`)
       const result = transitionTaskRecord(record, transition)
       appendTaskEvent(stateDir, parsedTaskId, { type: result.audit.type, payload: result.audit })
-      if (result.applied) writeRecord(stateDir, result.record)
+      if (result.applied) writeRecord(stateDir, result.record, "replace")
       return result
     },
   }
@@ -73,12 +87,26 @@ function readRecord(path: string): TaskRecord | null {
   }
 }
 
-function writeRecord(stateDir: string, record: TaskRecord): void {
+function writeRecord(stateDir: string, record: TaskRecord, mode: WriteRecordMode): void {
   const tasksDir = join(stateDir, "tasks")
   mkdirSync(tasksDir, { recursive: true })
-  const path = taskPath(stateDir, parseTaskId(record.task_id))
+  const taskId = parseTaskId(record.task_id)
+  const path = taskPath(stateDir, taskId)
+  const payload = JSON.stringify(record, null, 2)
+  if (mode === "create") {
+    try {
+      writeFileSync(path, payload, { encoding: "utf8", flag: "wx" })
+      return
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "EEXIST") {
+        throw new TaskRecordCollisionError({ taskId, path })
+      }
+      throw error
+    }
+  }
+
   const tmpPath = `${path}.${process.pid}.tmp`
-  writeFileSync(tmpPath, JSON.stringify(record, null, 2), "utf8")
+  writeFileSync(tmpPath, payload, "utf8")
   renameSync(tmpPath, path)
 }
 

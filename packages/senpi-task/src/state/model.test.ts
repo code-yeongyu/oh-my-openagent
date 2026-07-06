@@ -12,14 +12,14 @@ import type { Messageability, ResidencyState, TaskStatus } from "../index"
 const expectedMessageability: Record<TaskStatus, Record<ResidencyState, Messageability>> = {
   pending: {
     resident: "steer",
-    evicted: "revive",
+    evicted: "not-continuable",
     disposed: "not-continuable",
     persisted_only: "revive",
     rpc_detached: "revive",
   },
   running: {
     resident: "steer",
-    evicted: "revive",
+    evicted: "not-continuable",
     disposed: "not-continuable",
     persisted_only: "revive",
     rpc_detached: "revive",

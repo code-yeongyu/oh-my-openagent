@@ -5,6 +5,7 @@ export function messageability(status: TaskStatus, residencyState: ResidencyStat
   switch (status) {
     case "pending":
     case "running":
+      if (residencyState === "evicted") return "not-continuable"
       return residencyState === "resident" ? "steer" : "revive"
     case "completed":
     case "error":
