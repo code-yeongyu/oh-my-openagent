@@ -29,6 +29,26 @@ type RegisterSidebarContentSlotInput<Node> = {
   readonly renderSidebar: () => Node
 }
 
+type TuiSidebarApi = {
+  readonly state: {
+    readonly path: {
+      readonly directory: string
+    }
+  }
+  readonly theme: {
+    readonly current: Record<string, unknown>
+  }
+  readonly slots: {
+    readonly register: (registration: SidebarSlotRegistration<unknown>) => string
+  }
+  readonly renderer: {
+    readonly requestRender: () => void
+  }
+  readonly lifecycle: {
+    readonly onDispose: (dispose: () => void) => () => void
+  }
+}
+
 function registerSidebarContentSlot<Node>({
   registerSlot,
   requestRender,
@@ -67,6 +87,11 @@ function materializeNode<Node>(node: ViewNode, solid: SolidRuntime<Node>): Node 
 }
 
 type RosterResolver = (directory: string) => RosterRow[]
+type TuiPollErrorLogPayload = {
+  readonly name: string
+  readonly message: string
+}
+
 type PluginValidation = {
   readonly valid: boolean
   readonly messages: readonly string[]
@@ -103,9 +128,17 @@ async function readView(directory: string): Promise<SidebarView> {
   })
 }
 
+export function formatTuiPollErrorForLog(error: Error): TuiPollErrorLogPayload {
+  return {
+    name: error.name,
+    message: error.message,
+  }
+}
+
 export function handleTuiPollError(
   error: unknown,
-  reportPollError: (error: Error) => void = (pollError) => log("[tui-sidebar] polling failed", { error: pollError }),
+  reportPollError: (error: Error) => void = (pollError) =>
+    log("[tui-sidebar] polling failed", formatTuiPollErrorForLog(pollError)),
 ): void {
   if (error instanceof Error) {
     reportPollError(error)
@@ -114,67 +147,76 @@ export function handleTuiPollError(
   throw error
 }
 
-const module: TuiPluginModule = {
-  id: "oh-my-openagent:tui",
-  tui: async (api) => {
-    const solid = await import("@opentui/solid").catch(() => null)
-    if (!solid) {
+export async function startTuiSidebar(api: TuiSidebarApi): Promise<void> {
+  const solid = await import("@opentui/solid").catch((error) => {
+    if (error instanceof Error) return null
+    throw error
+  })
+  if (!solid) {
+    return
+  }
+
+  const directory = api.state.path.directory
+  if ((await loadPluginValidation(directory)).config.tui?.sidebar?.enabled === false) {
+    return
+  }
+
+  let currentView = await readView(directory)
+  let currentKey = viewKey(currentView)
+  let disposed = false
+  let inFlight = false
+  let timer: ReturnType<typeof setTimeout> | null = null
+
+  registerSidebarContentSlot({
+    registerSlot: (registration) => {
+      api.slots.register(registration)
+    },
+    requestRender: () => {
+      api.renderer.requestRender()
+    },
+    renderSidebar: () => materialize(buildViewNodes(currentView, api.theme.current), solid),
+  })
+
+  const schedule = (): void => {
+    timer = setTimeout(tick, POLL_INTERVAL_MS)
+  }
+
+  const tick = async (): Promise<void> => {
+    if (disposed || inFlight) {
+      if (!disposed) schedule()
       return
     }
-
-    const directory = api.state.path.directory
-    if ((await loadPluginValidation(directory)).config.tui?.sidebar?.enabled === false) {
-      return
-    }
-
-    let currentView = await readView(directory)
-    let currentKey = viewKey(currentView)
-    let disposed = false
-    let inFlight = false
-    let timer: ReturnType<typeof setTimeout> | null = null
-
-    registerSidebarContentSlot({
-      registerSlot: (registration) => {
-        api.slots.register(registration)
-      },
-      requestRender: () => {
+    inFlight = true
+    try {
+      const nextView = await readView(directory)
+      const nextKey = viewKey(nextView)
+      if (nextKey !== currentKey) {
+        currentView = nextView
+        currentKey = nextKey
         api.renderer.requestRender()
-      },
-      renderSidebar: () => materialize(buildViewNodes(currentView, api.theme.current), solid),
-    })
-
-    const schedule = (): void => {
-      timer = setTimeout(tick, POLL_INTERVAL_MS)
-    }
-
-    const tick = async (): Promise<void> => {
-      if (disposed || inFlight) {
-        if (!disposed) schedule()
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        handleTuiPollError(error)
         return
       }
-      inFlight = true
-      try {
-        const nextView = await readView(directory)
-        const nextKey = viewKey(nextView)
-        if (nextKey !== currentKey) {
-          currentView = nextView
-          currentKey = nextKey
-          api.renderer.requestRender()
-        }
-      } catch (error) {
-        handleTuiPollError(error)
-      } finally {
-        inFlight = false
-        if (!disposed) schedule()
-      }
+      throw error
+    } finally {
+      inFlight = false
+      if (!disposed) schedule()
     }
+  }
 
-    schedule()
-    api.lifecycle.onDispose(() => {
-      disposed = true
-      if (timer) clearTimeout(timer)
-    })
-  },
+  schedule()
+  api.lifecycle.onDispose(() => {
+    disposed = true
+    if (timer) clearTimeout(timer)
+  })
+}
+
+const module: TuiPluginModule = {
+  id: "oh-my-openagent:tui",
+  tui: async (api) => startTuiSidebar(api),
 }
 
 export default module

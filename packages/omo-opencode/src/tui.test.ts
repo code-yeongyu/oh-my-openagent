@@ -5,9 +5,9 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import type { TuiPluginApi, TuiPluginMeta, TuiSlotPlugin } from "@opencode-ai/plugin/tui"
+import type { TuiSlotPlugin } from "@opencode-ai/plugin/tui"
 
-import tuiModule, { handleTuiPollError } from "./tui"
+import { formatTuiPollErrorForLog, handleTuiPollError, startTuiSidebar } from "./tui"
 
 type SolidNode = {
   readonly tag: string
@@ -89,7 +89,7 @@ describe("TUI sidebar polling", () => {
     } satisfies SidebarApiForTest
 
     // when
-    await tuiModule.tui(api as unknown as TuiPluginApi, undefined, {} as TuiPluginMeta)
+    await startTuiSidebar(api)
 
     // then
     expect(calls).toEqual(["register", "render"])
@@ -115,6 +115,26 @@ describe("TUI sidebar polling", () => {
 
     // then
     expect(reportedErrors).toEqual([pollError])
+  })
+
+  it("#given a poll Error with a large cause #when the log payload is formatted #then only stable text fields are retained", () => {
+    // given
+    const pollError = new Error("Failed to fetch models.dev", {
+      cause: {
+        statusText: "socket closed",
+        rawOutput: "x".repeat(1024),
+      },
+    })
+
+    // when
+    const payload = formatTuiPollErrorForLog(pollError)
+
+    // then
+    expect(payload).toEqual({
+      name: "Error",
+      message: "Failed to fetch models.dev",
+    })
+    expect("cause" in payload).toBe(false)
   })
 
   it("#given a non-Error throw during polling #when the poll error handler runs #then the value is rethrown", () => {
