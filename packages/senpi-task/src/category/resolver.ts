@@ -50,28 +50,33 @@ type AvailableModelsParseResult = {
   readonly validContainer: boolean
 }
 
-const SENSITIVE_MODEL_FIELD_NAMES: ReadonlySet<string> = new Set([
-  "apiKey",
-  "authorization",
-  "headers",
-  "privateToken",
-  "secret",
-  "token",
+const SECRET_LIKE_MODEL_FIELD_NAMES: ReadonlySet<string> = new Set([
+  "accesstoken", "apikey", "auth", "authorization",
+  "bearertoken", "clientsecret", "password", "privatekey",
+  "privatetoken", "secret", "secretkey", "token",
 ] as const)
 
 function formatModel(model: SenpiModelPort): string {
   return `${model.provider}/${model.id}`
 }
 
-function hasSensitiveModelField(model: object): boolean {
-  return Object.keys(model).some((key) => SENSITIVE_MODEL_FIELD_NAMES.has(key))
+function normalizeModelFieldName(key: string): string {
+  return key.replaceAll(/[^a-zA-Z0-9]/g, "").toLowerCase()
+}
+
+function hasSecretLikeModelField(model: object): boolean {
+  return Object.getOwnPropertyNames(model).some((key) =>
+    SECRET_LIKE_MODEL_FIELD_NAMES.has(normalizeModelFieldName(key))
+  )
 }
 
 function isSenpiModelPort<TModel extends SenpiModelPort>(model: unknown): model is TModel {
   return (
     typeof model === "object" &&
     model !== null &&
-    !hasSensitiveModelField(model) &&
+    !hasSecretLikeModelField(model) &&
+    Object.hasOwn(model, "provider") &&
+    Object.hasOwn(model, "id") &&
     "provider" in model &&
     "id" in model &&
     typeof model.provider === "string" &&

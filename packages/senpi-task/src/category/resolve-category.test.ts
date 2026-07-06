@@ -204,6 +204,24 @@ describe("resolveCategory", () => {
     expect(resolved.spec.prompt_append).toEndWith("\n\nEXTRA QUICK CONTEXT")
   })
 
+  test("#given a registry model with legal headers #when resolved #then the header-bearing model is accepted", () => {
+    // given
+    const headerModel = {
+      provider: "openai",
+      id: "gpt-5.4-mini",
+      headers: { "User-Agent": "test" },
+    }
+
+    // when
+    const result = resolveCategory("quick", {}, registry([headerModel]))
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.spec.provider).toBe("openai")
+    expect(resolved.spec.modelId).toBe("gpt-5.4-mini")
+    expect(resolved.spec.model).toBe(headerModel)
+  })
+
   test("#given a malformed registry entry #when resolved #then category resolution returns sanitized model_unavailable instead of throwing", () => {
     // given
     const malformedRegistry = {
@@ -227,6 +245,8 @@ describe("resolveCategory", () => {
     const malformedFindResults = [
       {},
       { provider: { secret: "hidden" }, id: ["gpt-5.4-mini"] },
+      { provider: "openai", id: "gpt-5.4-mini", password: "hidden" },
+      { provider: "openai", id: "gpt-5.4-mini", accessToken: "hidden" },
       { provider: "openai", id: "gpt-5.4-mini", privateToken: "hidden" },
     ]
     const availableModel = model("openai", "gpt-5.4-mini")
@@ -245,6 +265,29 @@ describe("resolveCategory", () => {
       expect(result.availableModels).toEqual(["openai/gpt-5.4-mini"])
       expect(JSON.stringify(result)).not.toContain("hidden")
     }
+  })
+
+  test("#given inherited model identity fields #when resolved #then category resolution rejects them without leaking prototype data", () => {
+    // given
+    const availableModel = model("openai", "gpt-5.4-mini")
+    const inheritedIdentityModel: object = Object.create({
+      provider: "openai",
+      id: "gpt-5.4-mini",
+      privateToken: "hidden",
+    })
+
+    // when
+    const result = resolveCategory("quick", {}, {
+      getAvailable: () => [availableModel],
+      find: () => inheritedIdentityModel,
+    })
+
+    // then
+    expect(result.kind).toBe("model_unavailable")
+    if (result.kind !== "model_unavailable") throw new Error(`Expected unavailable result, got ${result.kind}`)
+    expect(result.attemptedModel).toBe("openai/gpt-5.4-mini")
+    expect(result.availableModels).toEqual(["openai/gpt-5.4-mini"])
+    expect(JSON.stringify(result)).not.toContain("hidden")
   })
 
   test("#given non-array registry availability #when resolved #then category resolution returns sanitized model_unavailable instead of throwing", () => {

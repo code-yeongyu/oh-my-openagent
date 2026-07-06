@@ -79,6 +79,19 @@ if (systemDefault.kind !== "resolved") {
 requireCondition(systemDefault.spec.provider === "local", "system default provider mismatch")
 requireCondition(systemDefault.spec.modelId === "system-default", "system default model mismatch")
 
+const headerModel = {
+  provider: "openai",
+  id: "gpt-5.4-mini",
+  name: "header model",
+  headers: { "User-Agent": "test" },
+}
+const headerBearing = resolveCategory("quick", {}, registry([headerModel]))
+requireCondition(headerBearing.kind === "resolved", "header-bearing model scenario did not resolve")
+if (headerBearing.kind !== "resolved") {
+  throw new Error("header-bearing model scenario did not resolve")
+}
+requireCondition(headerBearing.spec.model === headerModel, "header-bearing model was not preserved")
+
 const malformed = resolveCategory(
   "quick",
   {},
@@ -93,16 +106,39 @@ if (malformed.kind !== "model_unavailable") {
 }
 requireCondition(malformed.availableModels.length === 0, "malformed registry leaked invalid available models")
 
-const malformedFind = resolveCategory(
+const secretFindResults = [
+  { provider: "openai", id: "gpt-5.4-mini", password: "hidden" },
+  { provider: "openai", id: "gpt-5.4-mini", accessToken: "hidden" },
+  { provider: "openai", id: "gpt-5.4-mini", privateToken: "hidden" },
+]
+const secretFind = secretFindResults.map((findResult) => resolveCategory(
   "quick",
   {},
   {
     getAvailable: () => [model("openai", "gpt-5.4-mini")],
-    find: () => ({ provider: "openai", id: "gpt-5.4-mini", privateToken: "hidden" }),
+    find: () => findResult,
+  },
+))
+for (const result of secretFind) {
+  requireCondition(result.kind === "model_unavailable", "secret find result did not return model_unavailable")
+  requireCondition(!JSON.stringify(result).includes("hidden"), "secret find result leaked a private field")
+}
+
+const inheritedIdentityModel: object = Object.create({
+  provider: "openai",
+  id: "gpt-5.4-mini",
+  privateToken: "hidden",
+})
+const inheritedIdentity = resolveCategory(
+  "quick",
+  {},
+  {
+    getAvailable: () => [model("openai", "gpt-5.4-mini")],
+    find: () => inheritedIdentityModel,
   },
 )
-requireCondition(malformedFind.kind === "model_unavailable", "malformed find result did not return model_unavailable")
-requireCondition(!JSON.stringify(malformedFind).includes("hidden"), "malformed find result leaked a private field")
+requireCondition(inheritedIdentity.kind === "model_unavailable", "inherited identity model did not return model_unavailable")
+requireCondition(!JSON.stringify(inheritedIdentity).includes("hidden"), "inherited identity model leaked prototype data")
 
 const nonArrayAvailable = resolveCategory(
   "quick",
@@ -127,8 +163,10 @@ console.log(JSON.stringify({
   unavailable,
   hardcodedFallback,
   systemDefault,
+  headerBearing,
   malformed,
-  malformedFind,
+  secretFind,
+  inheritedIdentity,
   nonArrayAvailable,
   prototypeName,
 }, null, 2))
