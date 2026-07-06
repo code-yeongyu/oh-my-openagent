@@ -38,7 +38,7 @@ export function deriveRoster(rows: readonly RosterRow[]): RosterState {
 
   return {
     kind: "rows",
-    rows: [...rows].sort(compareRosterRows).slice(0, MAX_AGENTS),
+    rows: [...rows].sort(compareRosterRows),
   }
 }
 

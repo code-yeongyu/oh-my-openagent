@@ -8,6 +8,7 @@ import { START_WORK_TEMPLATE } from "./templates/start-work"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
 import { REMOVE_AI_SLOPS_TEMPLATE, REMOVE_AI_SLOPS_TEAM_MODE_ADDENDUM } from "./templates/remove-ai-slops"
 import { HYPERPLAN_TEMPLATE } from "./templates/hyperplan"
+import { SWITCH_PROFILE_TEMPLATE } from "./templates/switch-profile"
 
 interface LoadBuiltinCommandsOptions {
   useRegisteredAgents?: boolean
@@ -122,6 +123,13 @@ Timestamp: $TIMESTAMP
 $ARGUMENTS
 </user-request>`,
       argumentHint: "[goal]",
+    },
+    profile: {
+      description: "(builtin) Switch agent/model profile: local, hybrid, or cloud",
+      template: `<command-instruction>
+${SWITCH_PROFILE_TEMPLATE}
+</command-instruction>`,
+      argumentHint: "<local|hybrid|cloud> [-list]",
     },
     hyperplan: {
       description: "(builtin) Adversarial multi-agent planning via team-mode (5 hostile category members cross-critique, lead synthesizes)",

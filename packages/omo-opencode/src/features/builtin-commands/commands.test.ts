@@ -5,6 +5,7 @@ import { loadBuiltinCommands } from "./commands"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
 import { REFACTOR_TEMPLATE } from "./templates/refactor"
 import { REMOVE_AI_SLOPS_TEMPLATE } from "./templates/remove-ai-slops"
+import { SWITCH_PROFILE_TEMPLATE } from "./templates/switch-profile"
 import type { BuiltinCommandName } from "./types"
 import { _resetForTesting, registerAgentName } from "../claude-code-session-state"
 
@@ -60,6 +61,49 @@ describe("loadBuiltinCommands", () => {
     expect(commands.handoff.template).toContain("$SESSION_ID")
     expect(commands.handoff.template).toContain("$TIMESTAMP")
     expect(commands.handoff.template).toContain("$ARGUMENTS")
+  })
+
+  test("should include profile command in loaded commands", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = []
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands.profile).toBeDefined()
+    expect(commands.profile.name).toBe("profile")
+  })
+
+  test("should exclude profile when disabled", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = ["profile"]
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands.profile).toBeUndefined()
+  })
+
+  test("should include profile template content in command template", () => {
+    //#given - no disabled commands
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands.profile.template).toContain(SWITCH_PROFILE_TEMPLATE)
+  })
+
+  test("should include $ARGUMENTS variable in profile template", () => {
+    //#given - no disabled commands
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands.profile.template).toContain("$ARGUMENTS")
   })
 
   test("should default start-work to Atlas for static slash-command discovery", () => {
@@ -196,5 +240,29 @@ describe("loadBuiltinCommands - team mode gating for refactor", () => {
     //#when / #then
     expect(commands.refactor.template).toContain("refactor-squad")
     expect(commands.refactor.template).toContain("Team Mode Protocol")
+  })
+})
+
+describe("SWITCH_PROFILE_TEMPLATE", () => {
+  test("should be a non-empty string", () => {
+    //#given / #when / #then
+    expect(SWITCH_PROFILE_TEMPLATE).toBeTruthy()
+    expect(SWITCH_PROFILE_TEMPLATE.length).toBeGreaterThan(0)
+  })
+
+  test("should mention the profiles directory path", () => {
+    //#given / #when / #then
+    expect(SWITCH_PROFILE_TEMPLATE).toContain("profiles")
+    expect(SWITCH_PROFILE_TEMPLATE).toContain("oh-my-openagent.json")
+  })
+
+  test("should mention listing available profiles", () => {
+    //#given / #when / #then
+    expect(SWITCH_PROFILE_TEMPLATE).toContain("-list")
+  })
+
+  test("should mention the 1s polling update", () => {
+    //#given / #when / #then
+    expect(SWITCH_PROFILE_TEMPLATE).toContain("1 second")
   })
 })
