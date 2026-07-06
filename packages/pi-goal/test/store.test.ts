@@ -23,7 +23,8 @@ describe("goal store", () => {
 		expect(goal.status).toBe("active");
 		expect(goal.tokenBudget).toBe(10_000);
 		expect(await readGoal(ref)).toMatchObject({ id: goal.id, objective: "Ship the extension" });
-		expect(goalFilePath(ref)).toContain("extensions/pi-goal/thread-create.json");
+		// Normalize separators so the path assertion holds on Windows (backslashes) too.
+		expect(goalFilePath(ref).replaceAll("\\", "/")).toContain("extensions/pi-goal/thread-create.json");
 		expect(goalFilePath(ref)).not.toContain(".pi");
 		expect(await readFile(goalFilePath(ref), "utf8")).toContain('"version": 1');
 	});
