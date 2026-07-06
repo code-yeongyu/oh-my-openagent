@@ -44,7 +44,7 @@ Per-task breakdown:
 
 {WORKTREE_LIFECYCLE}
 
-Per your <boulder_completion_response> instructions, print the final ORCHESTRATION COMPLETE summary in your next turn. This nudge fires at most once.
+Per your <boulder_completion_response> instructions, print the final ORCHESTRATION COMPLETE summary in your next turn ONLY if the worktree lifecycle above is CLEAN or absent (no worktree_path set). If the lifecycle above is DIRTY or UNKNOWN, do NOT print ORCHESTRATION COMPLETE — follow the REQUIRED NEXT ACTION in the lifecycle block first (integrate the worktree, or inspect it manually), then print ORCHESTRATION COMPLETE only after the lifecycle becomes CLEAN. This nudge fires at most once.
 </system-reminder>`
 
 export const VERIFICATION_REMINDER = `**THE SUBAGENT JUST CLAIMED THIS TASK IS DONE. THEY ARE PROBABLY LYING.**

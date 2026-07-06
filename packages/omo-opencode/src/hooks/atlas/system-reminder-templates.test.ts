@@ -78,6 +78,21 @@ describe("BOULDER_COMPLETE_PROMPT", () => {
     expect(BOULDER_COMPLETE_PROMPT).toContain("{TASK_BREAKDOWN}")
     expect(BOULDER_COMPLETE_PROMPT).toContain("{WORKTREE_LIFECYCLE}")
   })
+
+  it("gates ORCHESTRATION COMPLETE on clean lifecycle (no contradiction with DIRTY/UNKNOWN block)", () => {
+    // The completion instruction must be conditional on CLEAN/absent lifecycle,
+    // not unconditional — otherwise a DIRTY/UNKNOWN {WORKTREE_LIFECYCLE} block
+    // contradicts the very next line and the model can follow the completion directive.
+    const lifecycleIdx = requireMatchIndex(BOULDER_COMPLETE_PROMPT.match(/\{WORKTREE_LIFECYCLE\}/), "{WORKTREE_LIFECYCLE}")
+    const completionIdx = requireMatchIndex(BOULDER_COMPLETE_PROMPT.match(/ORCHESTRATION COMPLETE/), "ORCHESTRATION COMPLETE")
+    expect(completionIdx).toBeGreaterThan(lifecycleIdx)
+
+    // The completion instruction must explicitly defer to the lifecycle block when DIRTY/UNKNOWN.
+    expect(BOULDER_COMPLETE_PROMPT).toContain("ONLY if the worktree lifecycle above is CLEAN or absent")
+    expect(BOULDER_COMPLETE_PROMPT).toContain("If the lifecycle above is DIRTY or UNKNOWN")
+    expect(BOULDER_COMPLETE_PROMPT).toContain("do NOT print ORCHESTRATION COMPLETE")
+    expect(BOULDER_COMPLETE_PROMPT).toContain("follow the REQUIRED NEXT ACTION in the lifecycle block first")
+  })
 })
 
 describe("VERIFICATION_REMINDER_GEMINI", () => {
