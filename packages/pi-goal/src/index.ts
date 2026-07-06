@@ -9,6 +9,7 @@ import { parseGoalCommand } from "./goal/command.js";
 import { shouldQueueGoalContinuationAfterAgentEnd, shouldQueueGoalContinuationWhenIdle } from "./goal/continuation.js";
 import { formatGoalForTool, formatGoalToolResponse, goalStatusLabel } from "./goal/format.js";
 import { buildBudgetLimitedPrompt, buildContinuationPrompt } from "./goal/prompt.js";
+import { GoalAlreadyExistsError } from "./goal/errors.js";
 import { accountGoalUsage, clearGoal, createGoal, readGoal, updateGoal } from "./goal/store.js";
 import type { Goal, GoalAccountingMode, GoalStoreRef, TokenUsageSnapshot } from "./goal/types.js";
 import { COMPLETABLE_GOAL_STATUS_VALUES, isRecord } from "./goal/types.js";
@@ -44,28 +45,28 @@ export default function (pi: ExtensionAPI): void {
 		name: "create_goal",
 		label: "Create Goal",
 		description:
-			"Create a goal only when explicitly requested by the user or system/developer instructions; do not infer goals from ordinary tasks.\nSet token_budget only when an explicit token budget is requested. Fails if a goal exists; use update_goal only for status.",
+			"Create a goal only when explicitly requested by the user or system/developer instructions; do not infer goals from ordinary tasks.\nSet token_budget only when an explicit token budget is requested. Fails if an unfinished goal exists; use update_goal only for status.",
 		parameters: Type.Object(
 			{
 				objective: Type.String({
 					description:
-						"Required. The concrete objective to start pursuing. This starts a new active goal only when no goal is currently defined; if a goal already exists, this tool fails.",
+						"Required. The concrete objective to start pursuing. This starts a new active goal when no goal exists or replaces the current goal when it is complete.",
 				}),
 				token_budget: Type.Optional(
-					Type.Integer({ description: "Optional positive token budget for the new active goal." }),
+					Type.Integer({ description: "Positive token budget for the new goal. Omit unless explicitly requested." }),
 				),
 			},
 			{ additionalProperties: false },
 		),
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 			const ref = goalStoreRef(ctx);
-			if ((await readGoal(ref)) !== null) {
-				return toolText(
-					"cannot create a new goal because this thread already has a goal; use update_goal only when the existing goal is complete",
-					true,
-				);
+			let goal: Goal;
+			try {
+				goal = await createGoal(ref, params.objective, params.token_budget);
+			} catch (error) {
+				if (error instanceof GoalAlreadyExistsError) return toolText(error.message, true);
+				throw error;
 			}
-			const goal = await createGoal(ref, params.objective, params.token_budget);
 			beginAgentGoalAccounting(goal);
 			updateGoalUi(ctx, goal);
 			return toolText(formatGoalToolResponse(goal, false));
@@ -76,31 +77,35 @@ export default function (pi: ExtensionAPI): void {
 		name: "update_goal",
 		label: "Update Goal",
 		description:
-			"Update the existing goal.\nUse this tool only to mark the goal achieved.\nSet status to `complete` only when the objective has actually been achieved and no required work remains.\nDo not mark a goal complete merely because its budget is nearly exhausted or because you are stopping work.\nYou cannot use this tool to pause, resume, or budget-limit a goal; those status changes are controlled by the user or system.\nWhen marking a budgeted goal achieved with status `complete`, report the final token usage from the tool result to the user.",
+			"Update the existing goal.\nUse this tool only to mark the goal achieved or genuinely blocked.\nSet status to `complete` only when the objective has actually been achieved and no required work remains.\nSet status to `blocked` only when the same blocking condition has repeated for at least three consecutive goal turns, counting the original/user-triggered turn and any automatic continuations, and the agent cannot make meaningful progress without user input or an external-state change.\nIf the user resumes a goal that was previously marked `blocked`, treat the resumed run as a fresh blocked audit. If the same blocking condition then repeats for at least three consecutive resumed goal turns, set status to `blocked` again.\nOnce the blocked threshold is satisfied, do not keep reporting that you are still blocked while leaving the goal active; set status to `blocked`.\nDo not use `blocked` merely because the work is hard, slow, uncertain, incomplete, or would benefit from clarification.\nDo not mark a goal complete merely because its budget is nearly exhausted or because you are stopping work.\nYou cannot use this tool to pause, resume, budget-limit, or usage-limit a goal; those status changes are controlled by the user or system.\nWhen marking a budgeted goal achieved with status `complete`, report the final token usage from the tool result to the user.",
 		parameters: Type.Object(
 			{
 				status: Type.Union(
 					COMPLETABLE_GOAL_STATUS_VALUES.map((status) => Type.Literal(status)),
 					{
 						description:
-							"Required. Set to complete only when the objective is achieved and no required work remains.",
+							"Required. Set to `complete` only when the objective is achieved and no required work remains. Set to `blocked` only after the same blocking condition has recurred for at least three consecutive goal turns and the agent is at an impasse. After a previously blocked goal is resumed, the resumed run starts a fresh blocked audit.",
 					},
 				),
 			},
 			{ additionalProperties: false },
 		),
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-			if (params.status !== "complete") {
+			if (params.status !== "complete" && params.status !== "blocked") {
 				return toolText(
-					"update_goal can only mark the existing goal complete; pause, resume, and budget-limited status changes are controlled by the user or system",
+					"update_goal can only mark the existing goal complete or blocked; pause, resume, budget-limited, and usage-limited status changes are controlled by the user or system",
 					true,
 				);
 			}
 			await accountCurrentAgentTurn(ctx, EMPTY_USAGE, "active");
-			const goal = await updateGoal(goalStoreRef(ctx), { status: "complete" });
-			markGoalCompletedThisTurn(goal);
+			const goal = await updateGoal(goalStoreRef(ctx), { status: params.status });
+			if (params.status === "complete") {
+				markGoalCompletedThisTurn(goal);
+			} else {
+				stopAgentGoalAccounting(goal.id);
+			}
 			updateGoalUi(ctx, goal);
-			return toolText(formatGoalToolResponse(goal, true));
+			return toolText(formatGoalToolResponse(goal, params.status === "complete"));
 		},
 	});
 

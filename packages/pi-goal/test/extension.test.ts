@@ -108,7 +108,7 @@ describe("pi-goal extension tool contract", () => {
 		expect(toolContract(harness.tool("create_goal"))).toEqual({
 			name: "create_goal",
 			description:
-				"Create a goal only when explicitly requested by the user or system/developer instructions; do not infer goals from ordinary tasks.\nSet token_budget only when an explicit token budget is requested. Fails if a goal exists; use update_goal only for status.",
+				"Create a goal only when explicitly requested by the user or system/developer instructions; do not infer goals from ordinary tasks.\nSet token_budget only when an explicit token budget is requested. Fails if an unfinished goal exists; use update_goal only for status.",
 			parameters: {
 				type: "object",
 				required: ["objective"],
@@ -116,11 +116,11 @@ describe("pi-goal extension tool contract", () => {
 					objective: {
 						type: "string",
 						description:
-							"Required. The concrete objective to start pursuing. This starts a new active goal only when no goal is currently defined; if a goal already exists, this tool fails.",
+							"Required. The concrete objective to start pursuing. This starts a new active goal when no goal exists or replaces the current goal when it is complete.",
 					},
 					token_budget: {
 						type: "integer",
-						description: "Optional positive token budget for the new active goal.",
+						description: "Positive token budget for the new goal. Omit unless explicitly requested.",
 					},
 				},
 				additionalProperties: false,
@@ -129,15 +129,18 @@ describe("pi-goal extension tool contract", () => {
 		expect(toolContract(harness.tool("update_goal"))).toEqual({
 			name: "update_goal",
 			description:
-				"Update the existing goal.\nUse this tool only to mark the goal achieved.\nSet status to `complete` only when the objective has actually been achieved and no required work remains.\nDo not mark a goal complete merely because its budget is nearly exhausted or because you are stopping work.\nYou cannot use this tool to pause, resume, or budget-limit a goal; those status changes are controlled by the user or system.\nWhen marking a budgeted goal achieved with status `complete`, report the final token usage from the tool result to the user.",
+				"Update the existing goal.\nUse this tool only to mark the goal achieved or genuinely blocked.\nSet status to `complete` only when the objective has actually been achieved and no required work remains.\nSet status to `blocked` only when the same blocking condition has repeated for at least three consecutive goal turns, counting the original/user-triggered turn and any automatic continuations, and the agent cannot make meaningful progress without user input or an external-state change.\nIf the user resumes a goal that was previously marked `blocked`, treat the resumed run as a fresh blocked audit. If the same blocking condition then repeats for at least three consecutive resumed goal turns, set status to `blocked` again.\nOnce the blocked threshold is satisfied, do not keep reporting that you are still blocked while leaving the goal active; set status to `blocked`.\nDo not use `blocked` merely because the work is hard, slow, uncertain, incomplete, or would benefit from clarification.\nDo not mark a goal complete merely because its budget is nearly exhausted or because you are stopping work.\nYou cannot use this tool to pause, resume, budget-limit, or usage-limit a goal; those status changes are controlled by the user or system.\nWhen marking a budgeted goal achieved with status `complete`, report the final token usage from the tool result to the user.",
 			parameters: {
 				type: "object",
 				required: ["status"],
 				properties: {
 					status: {
-						anyOf: [{ type: "string", const: "complete" }],
+						anyOf: [
+							{ type: "string", const: "complete" },
+							{ type: "string", const: "blocked" },
+						],
 						description:
-							"Required. Set to complete only when the objective is achieved and no required work remains.",
+							"Required. Set to `complete` only when the objective is achieved and no required work remains. Set to `blocked` only after the same blocking condition has recurred for at least three consecutive goal turns and the agent is at an impasse. After a previously blocked goal is resumed, the resumed run starts a fresh blocked audit.",
 					},
 				},
 				additionalProperties: false,

@@ -32,6 +32,8 @@ export function goalStatusLabel(status: GoalStatus): string {
 			return "active";
 		case "paused":
 			return "paused";
+		case "blocked":
+			return "blocked";
 		case "budgetLimited":
 			return "limited by budget";
 		case "complete":
@@ -93,11 +95,8 @@ function remainingTokens(goal: Goal | null): number | null {
 
 function completionBudgetReport(goal: Goal | null): string | null {
 	if (goal?.status !== "complete") return null;
-	const parts: string[] = [];
-	if (goal.tokenBudget !== undefined) parts.push(`tokens used: ${goal.tokensUsed} of ${goal.tokenBudget}`);
-	if (goal.timeUsedSeconds > 0) parts.push(`time used: ${goal.timeUsedSeconds} seconds`);
-	if (parts.length === 0) return null;
-	return `Goal achieved. Report final budget usage to the user: ${parts.join("; ")}.`;
+	if (goal.tokenBudget === undefined && goal.timeUsedSeconds <= 0) return null;
+	return "Goal achieved. Report final usage from this tool result's structured goal fields. If `goal.tokenBudget` is present, include token usage from `goal.tokensUsed` and `goal.tokenBudget`. If `goal.timeUsedSeconds` is greater than 0, summarize elapsed time in a concise, human-friendly form appropriate to the response language.";
 }
 
 function formatOneDecimal(value: number): string {
