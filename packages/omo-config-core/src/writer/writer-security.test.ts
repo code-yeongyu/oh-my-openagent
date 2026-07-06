@@ -84,4 +84,24 @@ describe("updateOmoConfig filesystem safety", () => {
     const backupFiles = readdirSync(join(configPath, "..")).filter((entry) => entry.includes(".bak."))
     expect(backupFiles).toEqual([])
   })
+
+  test("#given symlinked project omo directory #when editing project config #then global target is rejected without backup", () => {
+    // given
+    const fixture = makeFixture()
+    const targetConfigDir = join(fixture.xdgConfigHome, "omo")
+    const targetConfigPath = join(targetConfigDir, "omo.jsonc")
+    const original = `{"task":{"default_concurrency":8}}\n`
+    mkdirSync(targetConfigDir, { recursive: true })
+    writeFileSync(targetConfigPath, original)
+    symlinkSync(targetConfigDir, join(fixture.projectDir, ".omo"))
+
+    // when
+    const run = (): void => updateProjectConfig(fixture)
+
+    // then
+    expect(run).toThrow(OmoConfigWriteError)
+    expect(readFileSync(targetConfigPath, "utf-8")).toBe(original)
+    const backupFiles = readdirSync(targetConfigDir).filter((entry) => entry.includes(".bak."))
+    expect(backupFiles).toEqual([])
+  })
 })

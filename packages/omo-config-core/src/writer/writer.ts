@@ -67,6 +67,21 @@ function assertConfigPathIsSafe(path: string, fileSystem: typeof DEFAULT_WRITE_F
   }
 }
 
+function assertProjectConfigDirectoryIsSafe(directory: string, fileSystem: typeof DEFAULT_WRITE_FILE_SYSTEM): void {
+  try {
+    if (fileSystem.lstatSync(directory).isSymbolicLink()) {
+      throw new OmoConfigWriteError(
+        directory,
+        "read",
+        new Error("Refusing to edit config under symlinked project .omo directory"),
+      )
+    }
+  } catch (error) {
+    if (error instanceof OmoConfigWriteError) throw error
+    throw new OmoConfigWriteError(directory, "read", error)
+  }
+}
+
 function assertJsoncCanBeModified(path: string, content: string): void {
   const parsed = parseJsoncSafe<unknown>(content)
   if (parsed.errors.length === 0) return
@@ -84,6 +99,7 @@ export function updateOmoConfig(options: UpdateOmoConfigOptions): UpdateOmoConfi
 
   try {
     fileSystem.mkdirSync(directory, { recursive: true })
+    if (options.scope === "project") assertProjectConfigDirectoryIsSafe(directory, fileSystem)
     if (existed) {
       assertConfigPathIsSafe(path, fileSystem)
       content = fileSystem.readFileSync(path, "utf-8")
