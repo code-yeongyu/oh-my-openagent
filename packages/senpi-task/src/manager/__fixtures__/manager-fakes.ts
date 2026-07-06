@@ -1,0 +1,123 @@
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
+import { OmoTaskSettingsSchema, type OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
+
+import type { RunnerOutcome } from "../../runners/in-process/child-handle"
+import { createTaskRecordStore } from "../../store"
+import type { ManagedChildHandle } from "../child-handle"
+import { createTaskManager } from "../manager"
+import type { ChildPlanner, ManagedRunner, ManagedStartSpec, ManagerStartSpec } from "../types"
+
+const cleanupRoots: string[] = []
+
+export function cleanupProjects(): void {
+  for (const root of cleanupRoots.splice(0)) rmSync(root, { recursive: true, force: true })
+}
+
+export function tempProject(): string {
+  const directory = mkdtempSync(join(tmpdir(), "senpi-task-manager-"))
+  cleanupRoots.push(directory)
+  return directory
+}
+
+export function settings(overrides: Record<string, unknown> = {}): OmoTaskSettings {
+  return OmoTaskSettingsSchema.parse(overrides)
+}
+
+export type FakeHandle = {
+  readonly handle: ManagedChildHandle
+  settle: (outcome: RunnerOutcome) => void
+  readonly steerCalls: string[]
+  readonly followUpCalls: string[]
+}
+
+export function makeHandle(taskId: string): FakeHandle {
+  let resolveOutcome: (outcome: RunnerOutcome) => void = () => {}
+  const outcome = new Promise<RunnerOutcome>((resolve) => {
+    resolveOutcome = resolve
+  })
+  const steerCalls: string[] = []
+  const followUpCalls: string[] = []
+  const handle: ManagedChildHandle = {
+    task_id: taskId,
+    sessionId: `sess-${taskId}`,
+    pid: undefined,
+    steer: async (text) => {
+      steerCalls.push(text)
+    },
+    followUp: async (text) => {
+      followUpCalls.push(text)
+    },
+    abort: async () => {},
+    subscribe: () => () => {},
+    waitForOutcome: () => outcome,
+    dispose: async () => {},
+  }
+  return { handle, settle: (value) => resolveOutcome(value), steerCalls, followUpCalls }
+}
+
+export class FakeRunner implements ManagedRunner {
+  readonly handles = new Map<string, FakeHandle>()
+  throwOnStart = false
+  readonly startedSpecs: ManagedStartSpec[] = []
+
+  start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
+    this.startedSpecs.push(spec)
+    if (this.throwOnStart) throw new Error("runner boom")
+    const fake = makeHandle(spec.taskId)
+    this.handles.set(spec.taskId, fake)
+    return Promise.resolve(fake.handle)
+  }
+}
+
+export function categoryPlanner(models: Record<string, string> = {}): ChildPlanner {
+  return (spec: ManagerStartSpec) => {
+    const key = spec.category ?? spec.subagent_type ?? "default"
+    const model = spec.model ?? models[key] ?? "anthropic/claude"
+    return {
+      kind: "resolved",
+      plan: {
+        model,
+        ...(spec.category !== undefined ? { category: spec.category } : {}),
+        ...(spec.subagent_type !== undefined ? { agentType: spec.subagent_type } : {}),
+      },
+    }
+  }
+}
+
+export function flush(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0))
+}
+
+export function makeManager(options: {
+  project?: string
+  config?: OmoTaskSettings
+  planner?: ChildPlanner
+  inProcess?: FakeRunner
+  process?: FakeRunner
+} = {}) {
+  const project = options.project ?? tempProject()
+  const store = createTaskRecordStore({ project_dir: project })
+  const inProcess = options.inProcess ?? new FakeRunner()
+  const processRunner = options.process ?? new FakeRunner()
+  const manager = createTaskManager({
+    store,
+    runners: { "in-process": inProcess, process: processRunner },
+    planner: options.planner ?? categoryPlanner(),
+    config: options.config ?? settings({ default_concurrency: 5, max_depth: 1 }),
+    cwd: project,
+  })
+  return { manager, store, inProcess, process: processRunner, project }
+}
+
+export function baseSpec(overrides: Partial<ManagerStartSpec> = {}): ManagerStartSpec {
+  return {
+    prompt: "do the thing",
+    parent_session_id: "parent-1",
+    depth: 1,
+    category: "quick",
+    ...overrides,
+  }
+}

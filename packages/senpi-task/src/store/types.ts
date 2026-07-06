@@ -26,6 +26,9 @@ export type PersistedTaskEvent = {
 export type TaskRecordStore = {
   readonly stateDir: string
   readonly save: (record: TaskRecord) => void
+  // Manager-owned overwrite for bookkeeping that lives OUTSIDE the status transition table (revive
+  // epoch bump, notification epoch persistence). Normal status changes must use transition().
+  readonly replace: (record: TaskRecord) => void
   readonly load: (taskId: string) => TaskRecord | null
   readonly list: () => ListTaskRecordsResult
   readonly appendEvent: (taskId: string, event: PersistedTaskEvent) => string
