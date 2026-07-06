@@ -4,8 +4,15 @@ import type { RpcChildHandle } from "../runners/types"
 
 export type { RunnerOutcome } from "../runners/in-process/child-handle"
 
+// The child-event seam the manager subscribes to for transcript logging. `type` is the discriminator;
+// the transcript-bearing fields are OPTIONAL so both runners' concrete events (in-process
+// ChildSessionEvent and rpc AgentSessionEvent) remain assignable to this widened shape.
 export type ManagedChildEvent = {
   readonly type: string
+  readonly message?: unknown
+  readonly toolName?: string
+  readonly result?: unknown
+  readonly isError?: boolean
 }
 
 export type ManagedChildListener = (event: ManagedChildEvent) => void

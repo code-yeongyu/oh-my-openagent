@@ -94,6 +94,7 @@ export type StartResult =
     }
   | { readonly kind: "plan_unresolved"; readonly error: PlanResolutionError }
   | { readonly kind: "start_failed"; readonly task_id: string; readonly name: string; readonly error_message: string }
+  | { readonly kind: "residency_denied"; readonly reason: string }
 
 export type ContinueDelivery = "steer" | "followUp" | "revive"
 
@@ -115,6 +116,16 @@ export type ListedTask = {
   readonly queue_position?: number
 }
 
+// Residency admission decision consulted by manager.start() at spawn (W1-V F7). The wiring adapts
+// lifecycle.admitResident into this harness-neutral shape so the manager never imports lifecycle:
+// `evicted` means a terminal resident was reclaimed to make room and the spawn may proceed.
+export type SpawnAdmission =
+  | { readonly kind: "admitted" }
+  | { readonly kind: "evicted"; readonly evicted_task_id: string }
+  | { readonly kind: "rejected"; readonly message: string }
+
+export type AdmitResident = (parentSessionId: string) => Promise<SpawnAdmission>
+
 export type TaskManagerOptions = {
   readonly store: TaskRecordStore
   readonly runners: Readonly<Record<ExecutionMode, ManagedRunner>>
@@ -125,6 +136,9 @@ export type TaskManagerOptions = {
   // Injected by lifecycle (todo 12). Steering-driven cancel delegates destruction here; defaults to
   // a no-op so the manager stays usable before lifecycle wiring lands.
   readonly destruction?: DestructionPort
+  // Injected by the todo-17 wiring. Consulted at spawn so the residency cap (LRU eviction) gates a
+  // new child; absent -> admission is skipped (pre-wiring/unit behaviour, no cap enforcement).
+  readonly admit?: AdmitResident
 }
 
 export type TaskManager = {
@@ -136,4 +150,14 @@ export type TaskManager = {
   get(taskId: string): TaskRecord | undefined
   list(scope: ListScope): readonly ListedTask[]
   waitFor(taskId: string): Promise<TaskRecord>
+  // W1-V F3: prune a live handle (and its per-epoch release/background bookkeeping) so the lifecycle
+  // destruction port and eviction path never leave a stale handle behind or grow #live unbounded.
+  forget(taskId: string): void
+  // Live-handle read seam for the wiring's ResidencyRegistry (W1-V F7: registry and #live share one
+  // forget path). Returns the ManagedChildHandle for a task this process still owns, if any.
+  getResidentHandle(taskId: string): ManagedChildHandle | undefined
+  residentTaskIds(): readonly string[]
+  // Whether a task was spawned run_in_background, so the store-terminal completion bridge only
+  // notifies background terminals (sync spawns are awaited inline by the tool).
+  wasBackground(taskId: string): boolean
 }

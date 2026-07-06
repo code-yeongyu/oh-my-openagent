@@ -8,7 +8,7 @@ import type { RunnerOutcome } from "../../runners/in-process/child-handle"
 import { createTaskRecordStore } from "../../store"
 import type { ManagedChildHandle } from "../child-handle"
 import { createTaskManager } from "../manager"
-import type { ChildPlanner, ManagedRunner, ManagedStartSpec, ManagerStartSpec } from "../types"
+import type { AdmitResident, ChildPlanner, ManagedRunner, ManagedStartSpec, ManagerStartSpec } from "../types"
 
 const cleanupRoots: string[] = []
 
@@ -107,6 +107,7 @@ export function makeManager(options: {
   planner?: ChildPlanner
   inProcess?: FakeRunner
   process?: FakeRunner
+  admit?: AdmitResident
 } = {}) {
   const project = options.project ?? tempProject()
   const store = createTaskRecordStore({ project_dir: project })
@@ -118,6 +119,7 @@ export function makeManager(options: {
     planner: options.planner ?? categoryPlanner(),
     config: options.config ?? settings({ default_concurrency: 5, max_depth: 1 }),
     cwd: project,
+    ...(options.admit !== undefined && { admit: options.admit }),
   })
   return { manager, store, inProcess, process: processRunner, project }
 }

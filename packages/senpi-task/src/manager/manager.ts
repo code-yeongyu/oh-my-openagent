@@ -17,6 +17,7 @@ import {
   nowIso,
 } from "./manager-helpers"
 import { NameRegistry } from "./names"
+import { subscribeTranscriptLog } from "./transcript-log"
 import type {
   ContinueResult,
   ListScope,
@@ -53,6 +54,7 @@ class TaskManagerImpl implements TaskManager {
   // slot and still have its LATER release counted instead of swallowed by an already-released id.
   readonly #released = new Set<string>()
   readonly #waiters = new Map<string, Array<(record: TaskRecord) => void>>()
+  readonly #background = new Set<string>()
   readonly #steering: SteeringEngine
 
   constructor(options: TaskManagerOptions) {
@@ -78,6 +80,11 @@ class TaskManagerImpl implements TaskManager {
     if (resolution.kind === "error") return { kind: "plan_unresolved", error: resolution.error }
     const plan = resolution.plan
 
+    if (this.#options.admit !== undefined) {
+      const admission = await this.#options.admit(spec.parent_session_id)
+      if (admission.kind === "rejected") return { kind: "residency_denied", reason: admission.message }
+    }
+
     const maxDepth = plan.maxDepth ?? this.#options.config.max_depth
     const allowedSubagents = [...(spec.allowed_subagents ?? []), ...(plan.allowedSubagents ?? [])]
     const targetAgentType = spec.subagent_type ?? plan.agentType
@@ -100,6 +107,7 @@ class TaskManagerImpl implements TaskManager {
     const draft = createTaskRecord(buildRecordInput({ spec, plan, name: spec.name ?? "", executionMode }))
     const registration = this.#names.register(spec.parent_session_id, spec.name, draft.task_id)
     const record: TaskRecord = { ...draft, name: registration.name }
+    if (spec.run_in_background === true) this.#background.add(record.task_id)
     this.#options.store.save(record)
 
     const managedSpec = buildManagedSpec({
@@ -173,6 +181,18 @@ class TaskManagerImpl implements TaskManager {
     })
   }
 
+  forget(taskId: string): void {
+    this.#live.delete(taskId)
+    this.#background.delete(taskId)
+    for (const key of this.#released) if (key.startsWith(`${taskId}:`)) this.#released.delete(key)
+  }
+
+  getResidentHandle(taskId: string): ManagedChildHandle | undefined { return this.#live.get(taskId)?.handle }
+
+  residentTaskIds(): readonly string[] { return [...this.#live.keys()] }
+
+  wasBackground(taskId: string): boolean { return this.#background.has(taskId) }
+
   waitFor(taskId: string): Promise<TaskRecord> {
     const id = parseTaskId(taskId)
     const current = this.#tryLoad(id)
@@ -201,6 +221,7 @@ class TaskManagerImpl implements TaskManager {
     }
 
     this.#live.set(record.task_id, { handle, model })
+    subscribeTranscriptLog(handle, this.#options.store, record.task_id)
     this.#trackOutcome(record.task_id, handle, model, record.notification.run_epoch)
     void this.#steering.notifyStarted(record.task_id)
     return { ok: true }

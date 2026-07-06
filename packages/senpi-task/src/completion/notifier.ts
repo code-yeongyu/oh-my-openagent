@@ -119,8 +119,12 @@ function tryEnqueue(
   }
 }
 
+// W1-V F5: defense-in-depth dedupe. The notified_epoch guard only rejects ALREADY-PERSISTED
+// notifications; a buffered entry is not persisted until flush, so two notifyTerminal calls for the
+// same terminal (task_id, epoch) before a flush would otherwise buffer - and later deliver - twice.
 function pushBuffered(buffered: Map<string, BufferedEntry[]>, sessionId: string, entry: BufferedEntry): void {
   const existing = buffered.get(sessionId) ?? []
+  if (existing.some((buffered) => buffered.task_id === entry.task_id && buffered.epoch === entry.epoch)) return
   existing.push(entry)
   buffered.set(sessionId, existing)
 }
