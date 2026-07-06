@@ -142,6 +142,41 @@ describe("createSisyphusAgent", () => {
     });
   });
 
+  describe("#given a MiMo V2.5 Pro Sisyphus model", () => {
+    test("#when creating the agent #then uses the MiMo-native prompt with bare config", () => {
+      // given
+      const model = "xiaomi/mimo-v2.5-pro";
+
+      // when
+      const agent = createSisyphusAgent(model);
+
+      // then
+      expect(agent.prompt).toContain("running on MiMo V2.5 Pro");
+      expect(agent.prompt).toContain("<mimo_calibration>");
+      expect(agent.prompt).toContain("SEQUENTIAL TOOL CALLS");
+      expect(agent.prompt).toContain("THINKING-TOOL CONFLICT");
+      expect(agent.thinking).toBeUndefined();
+      expect(agent.reasoningEffort).toBeUndefined();
+    });
+
+    test("#when creating the agent with alternate provider naming #then still routes to MiMo variant", () => {
+      // given
+      const models = [
+        "XiaomiMiMo/MiMo-V2.5-Pro",
+        "mimo-v2.5-pro",
+        "opencode-go/mimo-v2-5-pro",
+      ];
+
+      for (const model of models) {
+        // when
+        const agent = createSisyphusAgent(model);
+
+        // then
+        expect(agent.prompt).toContain("running on MiMo V2.5 Pro");
+      }
+    });
+  });
+
   describe("#given a Gemini model", () => {
     test("#when creating the agent #then injects Gemini corrective anchors before constraints", () => {
       // given

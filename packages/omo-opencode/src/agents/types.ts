@@ -13,6 +13,7 @@ import {
   isKimiK2Model,
   isKimiK27Model,
   isMiniMaxModel,
+  isMimoModel,
 } from "@oh-my-opencode/model-core";
 
 export {
@@ -28,6 +29,7 @@ export {
   isKimiK2Model,
   isKimiK27Model,
   isMiniMaxModel,
+  isMimoModel,
 };
 
 const CLAUDE_THINKING_BUDGET_TOKENS = 32000;
