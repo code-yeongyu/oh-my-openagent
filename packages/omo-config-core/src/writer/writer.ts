@@ -1,4 +1,5 @@
 import { dirname, join } from "node:path"
+import { parseJsoncSafe } from "@oh-my-opencode/utils"
 import { applyEdits, modify } from "jsonc-parser/lib/esm/main.js"
 import { loadOmoConfig, resolveUserOmoConfigPath } from "../loader"
 import {
@@ -46,6 +47,14 @@ function writeAtomically(path: string, content: string, fileSystem: typeof DEFAU
   }
 }
 
+function assertJsoncCanBeModified(path: string, content: string): void {
+  const parsed = parseJsoncSafe<unknown>(content)
+  if (parsed.errors.length === 0) return
+
+  const message = parsed.errors.map((error) => `${error.message} at offset ${error.offset}`).join(", ")
+  throw new OmoConfigWriteError(path, "parse", new SyntaxError(message))
+}
+
 export function updateOmoConfig(options: UpdateOmoConfigOptions): UpdateOmoConfigResult {
   const fileSystem = options.fileSystem ?? DEFAULT_WRITE_FILE_SYSTEM
   const path = resolveWritePath(options)
@@ -59,6 +68,8 @@ export function updateOmoConfig(options: UpdateOmoConfigOptions): UpdateOmoConfi
   } catch (error) {
     throw new OmoConfigWriteError(path, "read", error)
   }
+
+  assertJsoncCanBeModified(path, content)
 
   const backupPath = existed ? `${path}.bak.${backupSuffix()}` : undefined
   if (backupPath !== undefined) {

@@ -62,7 +62,7 @@ export class OmoConfigWriteError extends Error {
 
   constructor(
     readonly path: string,
-    readonly operation: "backup" | "read" | "write",
+    readonly operation: "backup" | "parse" | "read" | "write",
     cause: unknown,
   ) {
     const detail = cause instanceof Error ? cause.message : String(cause)

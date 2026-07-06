@@ -117,4 +117,29 @@ describe("updateOmoConfig", () => {
     expect(existsSync(`${configPath}.tmp`)).toBe(false)
     expect(readFileSync(configPath, "utf-8")).toContain(`"default_concurrency":5`)
   })
+
+  test("#given malformed existing project config #when editing #then typed error surfaces and original bytes remain", () => {
+    // given
+    const fixture = makeFixture()
+    const configPath = join(fixture.projectDir, ".omo", "omo.jsonc")
+    const original = `{"task":`
+    mkdirSync(join(configPath, ".."), { recursive: true })
+    writeFileSync(configPath, original)
+
+    // when
+    const run = (): void => {
+      updateOmoConfig({
+        scope: "project",
+        projectDir: fixture.projectDir,
+        edits: [{ path: ["task", "default_concurrency"], value: 4 }],
+        env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+        platform: "linux",
+      })
+    }
+
+    // then
+    expect(run).toThrow(OmoConfigWriteError)
+    expect(readFileSync(configPath, "utf-8")).toBe(original)
+    expect(existsSync(`${configPath}.tmp`)).toBe(false)
+  })
 })
