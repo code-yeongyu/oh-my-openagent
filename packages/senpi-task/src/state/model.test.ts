@@ -96,16 +96,21 @@ describe("transitionTaskRecord", () => {
       execution_mode: "direct",
       model: "claude-sonnet-4",
     })
-    const cancelled = transitionTaskRecord(record, {
-      type: "cancel",
+    const running = transitionTaskRecord(record, {
+      type: "start",
       timestamp: "2026-07-06T00:00:00.000Z",
+      pid: 1234,
+    }).record
+    const cancelled = transitionTaskRecord(running, {
+      type: "cancel",
+      timestamp: "2026-07-06T00:00:01.000Z",
       error_message: "user cancelled",
     }).record
 
     // when
     const lateFailure = transitionTaskRecord(cancelled, {
       type: "fail",
-      timestamp: "2026-07-06T00:00:01.000Z",
+      timestamp: "2026-07-06T00:00:02.000Z",
       error_message: "process exited later",
     })
 

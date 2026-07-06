@@ -6,7 +6,7 @@ import type {
   TaskTransitionResult,
 } from "./types"
 
-const terminalStatuses = new Set<TaskStatus>(["completed", "error", "cancelled", "lost"])
+const terminalStatuses = new Set<TaskStatus>(["completed", "error", "cancelled", "interrupted", "lost"])
 
 function transitionStatus(transition: TaskTransition, current: TaskStatus): TaskStatus {
   switch (transition.type) {
@@ -62,8 +62,8 @@ function applyTransitionFields(record: TaskRecord, transition: TaskTransition): 
     case "start":
       return {
         ...record,
-        pid: transition.pid,
-        child_session_id: transition.child_session_id,
+        ...(transition.pid === undefined ? {} : { pid: transition.pid }),
+        ...(transition.child_session_id === undefined ? {} : { child_session_id: transition.child_session_id }),
       }
     case "complete":
       return { ...record, final_response: transition.final_response }
@@ -98,6 +98,18 @@ export function transitionTaskRecord(record: TaskRecord, transition: TaskTransit
     }
   }
 
+  if (!isStatusTransitionAllowed(record.status, transition)) {
+    return {
+      applied: false,
+      record,
+      audit: {
+        type: "invalid_transition_ignored",
+        attempted_status: nextStatus,
+        current_status: record.status,
+      },
+    }
+  }
+
   const nextResidency = transitionResidency(transition, record.residency_state)
   const withFields = applyTransitionFields(record, transition)
   const nextRecord = {
@@ -115,6 +127,28 @@ export function transitionTaskRecord(record: TaskRecord, transition: TaskTransit
       status: nextRecord.status,
       residency_state: nextRecord.residency_state,
     },
+  }
+}
+
+function isStatusTransitionAllowed(current: TaskStatus, transition: TaskTransition): boolean {
+  switch (transition.type) {
+    case "start":
+      return current === "pending"
+    case "complete":
+    case "fail":
+    case "cancel":
+    case "interrupt":
+      return current === "running"
+    case "lose":
+      return current === "pending" || current === "running"
+    case "evict":
+    case "dispose":
+    case "persist_only":
+    case "detach_rpc":
+    case "mark_resident":
+      return true
+    default:
+      return assertNever(transition)
   }
 }
 

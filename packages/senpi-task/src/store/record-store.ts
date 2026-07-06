@@ -1,8 +1,8 @@
 import { mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
-import { transitionTaskRecord } from "../state"
-import type { TaskRecord } from "../state"
+import { parseTaskId, transitionTaskRecord } from "../state"
+import type { TaskId, TaskRecord } from "../state"
 import { parseTaskRecord } from "./record-parse"
 import { redactEventPayload } from "./redaction"
 import { resolveStateDir } from "./state-dir"
@@ -22,20 +22,21 @@ export function createTaskRecordStore(config: StateDirConfig): TaskRecordStore {
       writeRecord(stateDir, record)
     },
     load(taskId) {
-      const path = taskPath(stateDir, taskId)
+      const path = taskPath(stateDir, parseTaskId(taskId))
       return readRecord(path)
     },
     list() {
       return listRecords(stateDir)
     },
     appendEvent(taskId, event) {
-      return appendTaskEvent(stateDir, taskId, event)
+      return appendTaskEvent(stateDir, parseTaskId(taskId), event)
     },
     transition(taskId, transition) {
-      const record = readRecord(taskPath(stateDir, taskId))
+      const parsedTaskId = parseTaskId(taskId)
+      const record = readRecord(taskPath(stateDir, parsedTaskId))
       if (record === null) throw new Error(`Task record not found: ${taskId}`)
       const result = transitionTaskRecord(record, transition)
-      appendTaskEvent(stateDir, taskId, { type: result.audit.type, payload: result.audit })
+      appendTaskEvent(stateDir, parsedTaskId, { type: result.audit.type, payload: result.audit })
       if (result.applied) writeRecord(stateDir, result.record)
       return result
     },
@@ -74,13 +75,13 @@ function readRecord(path: string): TaskRecord | null {
 function writeRecord(stateDir: string, record: TaskRecord): void {
   const tasksDir = join(stateDir, "tasks")
   mkdirSync(tasksDir, { recursive: true })
-  const path = taskPath(stateDir, record.task_id)
+  const path = taskPath(stateDir, parseTaskId(record.task_id))
   const tmpPath = `${path}.${process.pid}.tmp`
   writeFileSync(tmpPath, JSON.stringify(record, null, 2), "utf8")
   renameSync(tmpPath, path)
 }
 
-function appendTaskEvent(stateDir: string, taskId: string, event: PersistedTaskEvent): string {
+function appendTaskEvent(stateDir: string, taskId: TaskId, event: PersistedTaskEvent): string {
   const logsDir = join(stateDir, "logs")
   mkdirSync(logsDir, { recursive: true })
   const path = join(logsDir, `${taskId}.jsonl`)
@@ -89,7 +90,7 @@ function appendTaskEvent(stateDir: string, taskId: string, event: PersistedTaskE
   return path
 }
 
-function taskPath(stateDir: string, taskId: string): string {
+function taskPath(stateDir: string, taskId: TaskId): string {
   return join(stateDir, "tasks", `${taskId}.json`)
 }
 

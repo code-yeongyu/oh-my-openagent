@@ -64,7 +64,12 @@ describe("TaskRecordStore", () => {
       tool_allow: ["read", "bash"],
       tool_deny: ["write"],
     })
-    const completed = transitionTaskRecord(record, {
+    const running = transitionTaskRecord(record, {
+      type: "start",
+      timestamp: "2026-07-06T00:59:59.000Z",
+      pid: 9876,
+    }).record
+    const completed = transitionTaskRecord(running, {
       type: "complete",
       timestamp: "2026-07-06T01:00:00.000Z",
       final_response: "done",
@@ -78,7 +83,7 @@ describe("TaskRecordStore", () => {
     expect(reloaded).toEqual(completed)
   })
 
-  test("#given secret-like event payload #when event is appended #then jsonl payload is redacted", () => {
+  test("#given sensitive event payload #when event is appended #then jsonl payload is redacted", () => {
     // given
     const project = tempProject()
     const store = createTaskRecordStore({ project_dir: project })
@@ -94,14 +99,14 @@ describe("TaskRecordStore", () => {
     // when
     const eventPath = store.appendEvent(record.task_id, {
       type: "senpi_api",
-      payload: { apiKey: "secret", nested: { authorization: "Bearer secret" } },
+      payload: { apiKey: "redaction-sentinel", nested: { authorization: "Bearer redaction-sentinel" } },
     })
 
     // then
     const log = readFileSync(eventPath, "utf8")
     expect(log).toContain('"apiKey":"[REDACTED]"')
     expect(log).toContain('"authorization":"[REDACTED]"')
-    expect(log).not.toContain("secret")
+    expect(log).not.toContain("redaction-sentinel")
   })
 
   test("#given corrupt task json #when records are listed #then typed diagnostic is reported and corrupt record is skipped", () => {
@@ -138,7 +143,7 @@ describe("TaskRecordStore", () => {
     // given
     const project = tempProject()
     const store = createTaskRecordStore({ project_dir: project })
-    const completed = transitionTaskRecord(
+    const running = transitionTaskRecord(
       createTaskRecord({
         parent_session_id: "parent-session",
         root_session_id: "root-session",
@@ -147,11 +152,16 @@ describe("TaskRecordStore", () => {
         model: "gpt-5.2",
       }),
       {
-        type: "complete",
-        timestamp: "2026-07-06T01:00:00.000Z",
-        final_response: "done",
+        type: "start",
+        timestamp: "2026-07-06T00:59:59.000Z",
+        pid: 9876,
       },
     ).record
+    const completed = transitionTaskRecord(running, {
+      type: "complete",
+      timestamp: "2026-07-06T01:00:00.000Z",
+      final_response: "done",
+    }).record
     store.save(completed)
 
     // when

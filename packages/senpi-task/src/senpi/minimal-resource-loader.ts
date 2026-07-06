@@ -1,5 +1,4 @@
 import type {
-  ExtensionFactory,
   ExtensionRuntime,
   LoadExtensionsResult,
   ResourceLoader,
@@ -7,7 +6,6 @@ import type {
 
 export type MinimalSenpiResourceLoaderOptions = {
   readonly runtime: ExtensionRuntime
-  readonly markerFactory?: ExtensionFactory
 }
 
 export function createMinimalSenpiResourceLoader(options: MinimalSenpiResourceLoaderOptions): ResourceLoader {
