@@ -31,7 +31,7 @@
 		"vscode-jsonrpc": "^8.2.1"
 	},
 	"peerDependencies": {
-		"@code-yeongyu/senpi": "*"
+		"@code-yeongyu/senpi": "2026.7.5-2"
 	},
 	"peerDependenciesMeta": {
 		"@code-yeongyu/senpi": {
@@ -39,6 +39,6 @@
 		}
 	},
 	"devDependencies": {
-		"@code-yeongyu/senpi": "2026.7.3"
+		"@code-yeongyu/senpi": "2026.7.5-2"
 	}
 }
