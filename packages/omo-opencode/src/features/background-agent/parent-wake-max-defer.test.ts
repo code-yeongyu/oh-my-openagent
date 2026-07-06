@@ -240,6 +240,54 @@ describe("parent wake max-defer force-flush (#5864)", () => {
     }
   })
 
+  test("#given max-defer force-flush with history safe but gate tool-state sees running tool #then gate blocks and requeues (checkToolState preserved)", async () => {
+    // given: 50ms max-defer ceiling; clock starts at 100_000. The messages
+    // provider is stateful: the first read (isUserMessageInProgress guard)
+    // and second read (shouldDeferParentWakeForSessionHistory) return
+    // SAFE_MESSAGES, but the third read (the prompt gate's checkToolState via
+    // sessionLatestAssistantBlocksInternalPrompt) returns TOOL_CALL_IN_PROGRESS.
+    // This simulates the parent's turn becoming unsafe between the history
+    // check and the gate call. With checkToolState preserved for
+    // forceReplyDispatch, the gate returns {status:"active"} and the wake is
+    // requeued — promptAsync is never called.
+    const originalDateNow = Date.now
+    Date.now = () => 100_000
+    let messagesCallCount = 0
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "busy" } },
+      messagesProvider: () => {
+        messagesCallCount++
+        // Read 1: isUserMessageInProgress guard → safe (no user message)
+        // Read 2: shouldDeferParentWakeForSessionHistory → safe (no tool block)
+        // Read 3: prompt gate checkToolState → running tool (turn became unsafe)
+        return messagesCallCount <= 2 ? SAFE_MESSAGES : TOOL_CALL_IN_PROGRESS
+      },
+      maxDeferMs: 50,
+    })
+
+    try {
+      // when: queue a reply-required wake, mark recent activity, advance the
+      // clock past the ceiling, and flush. History reads safe messages first,
+      // so the history safety guard passes. But the gate's checkToolState reads
+      // messages again and sees a running tool call — it returns active and
+      // blocks the dispatch.
+      notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+      notifier.recordParentSessionActivity("parent-1")
+      Date.now = () => 100_060
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: no promptAsync call — the gate blocked the dispatch because the
+      // tool-state check saw an unsafe turn. The pending wake is retained
+      // (requeued by sendParentWakePrompt's gate-refusal path).
+      expect(promptAsyncCalls).toHaveLength(0)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(true)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
   test("#given max-defer ceiling not yet elapsed #then does not force-flush (regression guard)", async () => {
     // given: large max-defer ceiling so the ceiling has not elapsed
     const originalDateNow = Date.now

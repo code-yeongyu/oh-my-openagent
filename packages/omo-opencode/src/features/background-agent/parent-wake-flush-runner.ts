@@ -65,9 +65,12 @@ export class ParentWakeFlushRunner {
       // Bounded defer (#5864): the parent never emitted session.idle, so the
       // normal sessionActive / hasRecentActivity / history-defer short-circuits
       // would hold this wake indefinitely. Force a reply-producing dispatch that
-      // also bypasses the prompt-gate status/tool-state checks (forceReplyDispatch)
-      // — otherwise a permanently-busy parent returns {status:"active"} from the
-      // gate and the wake is never delivered. forceNoReply/retainPendingWake stay
+      // bypasses the prompt-gate busy-status check (forceReplyDispatch disables
+      // checkStatus only) — otherwise a permanently-busy parent returns
+      // {status:"active"} from the gate and the wake is never delivered. The
+      // tool-state check (checkToolState) stays enabled so the gate gets a last
+      // chance to reject if the parent's turn became unsafe between the history
+      // check above and the dispatch. forceNoReply/retainPendingWake stay
       // undefined → noReply=false (reply) + pending entry cleared on success.
       // promptAsync's queueBehavior: "defer" serializes against any in-flight
       // turn; if the gate still refuses (reserved/queued), sendParentWakePrompt
