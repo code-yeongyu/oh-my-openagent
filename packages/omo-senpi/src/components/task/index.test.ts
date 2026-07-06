@@ -3,9 +3,14 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
+
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext, ComponentLogger } from "../../extension/types"
-import { createTaskComponent } from "./index"
+import { composeTaskEngine } from "./engine"
+import { createTaskComponent, wireEventBridge } from "./index"
+import type { CapturedUi } from "./runtime-context"
+import { createSessionTransitionBridge } from "./session-transition-bridge"
 
 const TASK_TOOL_NAMES = ["task", "task_send", "task_wait", "task_interrupt", "task_cancel", "task_list", "task_output"]
 const TASK_EVENTS = [
@@ -52,6 +57,30 @@ function ctxFor(pi: FakeExtensionAPI, logger: ComponentLogger): ComponentContext
     config: { getFlag: (name) => pi.getFlag(name) },
     getCapturedTools: () => [],
   }
+}
+
+function fakeUi(): CapturedUi {
+  return {
+    notify: () => {},
+    setStatus: () => {},
+    setWidget: () => {},
+    select: async () => undefined,
+    confirm: async () => false,
+  }
+}
+
+const noopStatusUi = { scheduleSync: () => {}, syncNow: () => {} }
+
+// Build the real engine and wire its event bridge over a fake ExtensionAPI so tests can drive the
+// registered handlers and observe the captured-ui bridge (todo 18: cleared on switch/shutdown).
+function wiredBridge(): { pi: FakeExtensionAPI; engine: ReturnType<typeof composeTaskEngine> } {
+  const cwd = tempProject()
+  const pi = new FakeExtensionAPI()
+  const logger = createLogger()
+  const engine = composeTaskEngine({ pi, omoConfig: loadOmoConfig({ cwd }).config, cwd, sharedParentTools: () => [] })
+  const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })
+  wireEventBridge(pi, ctxFor(pi, logger), engine, noopStatusUi, transitions, { warnDualConfig: false })
+  return { pi, engine }
 }
 
 function toolNames(pi: FakeExtensionAPI): string[] {
@@ -114,6 +143,35 @@ describe("omo-senpi task component wiring", () => {
       (entry) => entry.level === "warn" && entry.message.includes("using default config after omo.json load issues"),
     )
     expect(configWarnings).toHaveLength(1)
+  })
+
+  it("#given a captured ui #when session_before_switch fires #then the ui bridge is cleared", async () => {
+    // given a wired event bridge over a real engine with a ui captured on session_start
+    const { pi, engine } = wiredBridge()
+    const liveCtx = { ui: fakeUi(), mode: "tui", sessionManager: { getSessionId: () => "session-a" } }
+    await pi.dispatch("session_start", {}, liveCtx)
+    expect(engine.runtime.ui()).toBeDefined()
+
+    // when a switch fires while a still-live ui context is present (the real ExtensionContext.ui is
+    // non-optional, so captureFrom would otherwise re-capture it)
+    await pi.dispatch("session_before_switch", {}, { ...liveCtx, ui: fakeUi() })
+
+    // then the bridge is cleared, so store-driven syncs no-op until the next re-capture
+    expect(engine.runtime.ui()).toBeUndefined()
+  })
+
+  it("#given a captured ui #when session_shutdown fires #then the ui bridge is cleared", async () => {
+    // given a wired event bridge with a ui captured on session_start
+    const { pi, engine } = wiredBridge()
+    const liveCtx = { ui: fakeUi(), mode: "tui", sessionManager: { getSessionId: () => "session-a" } }
+    await pi.dispatch("session_start", {}, liveCtx)
+    expect(engine.runtime.ui()).toBeDefined()
+
+    // when the session shuts down
+    await pi.dispatch("session_shutdown", {}, { ...liveCtx, ui: fakeUi() })
+
+    // then the bridge is cleared
+    expect(engine.runtime.ui()).toBeUndefined()
   })
 
   it("#given an ExtensionAPI missing registerMessageRenderer #when the component registers #then it skips with one warning and never crashes", () => {

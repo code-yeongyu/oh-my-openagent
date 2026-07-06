@@ -119,7 +119,7 @@ interface EventBridgeState {
 // and flushes its buffer; session_shutdown tears residents down; model_select refreshes the inherited
 // model registry; before_agent_start injects once-per-session usage guidance. Every handler refreshes
 // the captured UI so the footer/widget follow the live session.
-function wireEventBridge(
+export function wireEventBridge(
   pi: SenpiExtensionAPI,
   ctx: ComponentContext,
   engine: TaskEngine,
@@ -148,6 +148,9 @@ function wireEventBridge(
   pi.on("session_before_switch", (_payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     transitions.onBeforeSwitch(engine.runtime.sessionId())
+    // Fail-closed on switch: drop the captured ui so a background store mutation in the switch window
+    // cannot drive syncNow through the previous session's handle until the next session_start re-captures.
+    engine.runtime.clearUi()
   })
 
   pi.on("session_before_compact", (_payload, eventCtx) => {
