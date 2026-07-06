@@ -22,6 +22,8 @@ export type ManagedChildHandle = {
   abort(): Promise<void>
   subscribe(listener: ManagedChildListener): () => void
   waitForOutcome(): Promise<RunnerOutcome>
+  // Partial assistant text captured so far (used by interrupt to preserve work-in-progress).
+  lastAssistantText(): string | undefined
   dispose(): Promise<void>
 }
 
@@ -35,6 +37,7 @@ export function adaptInProcessHandle(handle: InProcessChildHandle): ManagedChild
     abort: () => handle.abort(),
     subscribe: (listener) => handle.subscribe(listener),
     waitForOutcome: () => handle.waitForIdle(),
+    lastAssistantText: () => handle.lastAssistantText(),
     dispose: () => {
       handle.dispose()
       return Promise.resolve()
@@ -56,6 +59,7 @@ export function adaptRpcHandle(handle: RpcChildHandle): ManagedChildHandle {
     abort: () => handle.abort(),
     subscribe: (listener) => handle.subscribe(listener),
     waitForOutcome: () => rpcOutcome(handle),
+    lastAssistantText: () => handle.lastAssistantText(),
     dispose: () => handle.dispose(),
   }
 }
