@@ -100,8 +100,10 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
 const ULW_CONTINUATION_INJECTION_KEY = "omo-senpi-ulw-loop-continuation"
 
 // Route the continuation through the idle-injection coordinator when the composition provides one, so
-// a task completion and this continuation on the same idle edge collapse to a single wake. Falls back
-// to a direct followUp when no coordinator is wired (isolated unit context).
+// a task completion and this continuation on the same idle edge collapse to a single wake. The
+// continuation only enqueues then requests a DEFERRED flush: a synchronous completion wake on the same
+// idle edge drains the shared queue first and carries the continuation with it, so the deferred pass
+// no-ops. Falls back to a direct followUp when no coordinator is wired (isolated unit context).
 function deliverContinuation(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
   if (ctx.idleCoordinator !== undefined) {
     ctx.idleCoordinator.enqueue({
@@ -109,7 +111,7 @@ function deliverContinuation(pi: SenpiExtensionAPI, ctx: ComponentContext): void
       source: "ulw-continuation",
       content: CONTINUATION_PROMPT,
     })
-    ctx.idleCoordinator.flushOnIdle()
+    ctx.idleCoordinator.scheduleFlush()
     return
   }
   pi.sendUserMessage(CONTINUATION_PROMPT, { deliverAs: "followUp" })

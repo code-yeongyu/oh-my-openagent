@@ -58,4 +58,77 @@ describe("IdleInjectionCoordinator", () => {
     expect(collapsed).toBe(0)
     expect(calls).toHaveLength(0)
   })
+
+  it("#given a deferred scheduleFlush #when the scheduler runs it #then delivery happens on the idle tick, not synchronously", () => {
+    // given a manual scheduler that captures the deferred flush
+    const calls: DeliveredCall[] = []
+    const scheduled: Array<() => void> = []
+    const coordinator = new IdleInjectionCoordinator((content, options) => calls.push({ content, options }), {
+      scheduleFlush: (flush) => scheduled.push(flush),
+    })
+    coordinator.enqueue({ key: "ulw", source: "ulw-continuation", content: "continue" })
+
+    // when scheduleFlush is requested
+    coordinator.scheduleFlush()
+
+    // then nothing is delivered yet
+    expect(calls).toHaveLength(0)
+
+    // when the idle tick runs the deferred flush
+    for (const flush of scheduled) flush()
+
+    // then it is delivered exactly once
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.content).toBe("continue")
+  })
+
+  it("#given a deferred continuation #when a synchronous wake flushOnIdle drains first #then the deferred pass no-ops", () => {
+    // given a continuation enqueued with a deferred flush pending
+    const calls: DeliveredCall[] = []
+    const scheduled: Array<() => void> = []
+    const coordinator = new IdleInjectionCoordinator((content, options) => calls.push({ content, options }), {
+      scheduleFlush: (flush) => scheduled.push(flush),
+    })
+    coordinator.enqueue({ key: "ulw", source: "ulw-continuation", content: "continue the run" })
+    coordinator.scheduleFlush()
+
+    // when a completion wake drains synchronously on the same idle edge
+    coordinator.enqueue({ key: "st_1", source: "task-completion", content: "task st_1 completed" })
+    coordinator.flushOnIdle()
+
+    // then exactly one injection carried both, completion first
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.content).toBe("task st_1 completed\n\ncontinue the run")
+
+    // and running the deferred flush adds nothing (queue already drained)
+    for (const flush of scheduled) flush()
+    expect(calls).toHaveLength(1)
+  })
+
+  it("#given repeated scheduleFlush requests before the deferred pass #when scheduled #then they coalesce to one flush", () => {
+    // given
+    let scheduledCount = 0
+    const runnables: Array<() => void> = []
+    const coordinator = new IdleInjectionCoordinator(() => undefined, {
+      scheduleFlush: (flush) => {
+        scheduledCount += 1
+        runnables.push(flush)
+      },
+    })
+
+    // when scheduleFlush is requested several times before the deferred pass runs
+    coordinator.enqueue({ key: "ulw", source: "ulw-continuation", content: "continue" })
+    coordinator.scheduleFlush()
+    coordinator.scheduleFlush()
+    coordinator.scheduleFlush()
+
+    // then only one deferred flush was scheduled
+    expect(scheduledCount).toBe(1)
+
+    // and after it runs, a fresh request schedules again
+    for (const flush of runnables) flush()
+    coordinator.enqueue({ key: "ulw", source: "ulw-continuation", content: "again" })
+    coordinator.scheduleFlush()
+    expect(scheduledCount).toBe(2)
+  })
 })
