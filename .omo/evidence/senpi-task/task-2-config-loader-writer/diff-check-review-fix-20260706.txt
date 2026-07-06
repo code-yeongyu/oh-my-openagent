@@ -1,0 +1,2 @@
+COMMAND: git diff --check code-yeongyu/senpi-task-w0-config-schema...HEAD
+EXIT_STATUS: 0

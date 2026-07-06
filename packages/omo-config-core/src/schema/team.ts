@@ -48,7 +48,10 @@ export const OmoTeamSpecSchema = OmoTeamSpecBaseSchema.superRefine((teamSpec, ct
   }
 })
 
+export const OmoTeamSpecLayerSchema = OmoTeamSpecBaseSchema.partial()
+
 export const OmoTeamsConfigSchema = z.record(z.string(), OmoTeamSpecSchema)
+export const OmoTeamsConfigLayerSchema = z.record(z.string(), OmoTeamSpecLayerSchema)
 
 export type OmoTeamMember = z.infer<typeof OmoTeamMemberSchema>
 export type OmoTeamSpec = z.infer<typeof OmoTeamSpecSchema>
