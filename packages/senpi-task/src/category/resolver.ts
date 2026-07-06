@@ -74,22 +74,20 @@ function ownStringDataProperty(model: object, key: "provider" | "id"): string | 
 }
 
 function isSenpiModelPort<TModel extends SenpiModelPort>(model: unknown): model is TModel {
-  return (
-    typeof model === "object" &&
-    model !== null &&
-    !hasSecretLikeModelField(model) &&
-    ownStringDataProperty(model, "provider") !== undefined &&
-    ownStringDataProperty(model, "id") !== undefined
-  )
+  if (typeof model !== "object" || model === null || hasSecretLikeModelField(model)) return false
+  return ownStringDataProperty(model, "provider") !== undefined && ownStringDataProperty(model, "id") !== undefined
 }
 
-function parseRegistryModel<TModel extends SenpiModelPort>(model: unknown): ParsedRegistryModel<TModel> | undefined {
+function parseRegistryModel<TModel extends SenpiModelPort>(
+  model: unknown,
+  expected?: ParsedModel,
+): ParsedRegistryModel<TModel> | undefined {
   if (!isSenpiModelPort<TModel>(model)) {
     return undefined
   }
   const provider = ownStringDataProperty(model, "provider")
   const modelId = ownStringDataProperty(model, "id")
-  if (provider === undefined || modelId === undefined) {
+  if (!provider || !modelId || (expected !== undefined && (provider !== expected.provider || modelId !== expected.modelId))) {
     return undefined
   }
   return { model, provider, modelId }
@@ -135,7 +133,7 @@ function parseAvailableModels(models: unknown): AvailableModelsParseResult {
   if (!Array.isArray(models)) {
     return { models: [], validContainer: false }
   }
-  return { models: models.map(parseRegistryModel).filter((model) => model !== undefined).map(formatModel).sort(), validContainer: true }
+  return { models: models.map((model) => parseRegistryModel(model)).filter((model) => model !== undefined).map(formatModel).sort(), validContainer: true }
 }
 
 function promptAppendForCategory(categoryName: string, model: string | undefined, userPromptAppend: string | undefined): string | undefined {
@@ -236,7 +234,7 @@ export function resolveCategory<TModel extends SenpiModelPort>(
     },
   )
   const parsedModel = parseModel(selection.selectedModel)
-  const foundModel = parsedModel ? parseRegistryModel<TModel>(senpiModelRegistry.find(parsedModel.provider, parsedModel.modelId)) : undefined
+  const foundModel = parsedModel ? parseRegistryModel<TModel>(senpiModelRegistry.find(parsedModel.provider, parsedModel.modelId), parsedModel) : undefined
   if (!parsedModel || !foundModel) {
     const fallback = nearestFallback(selection)
     return {

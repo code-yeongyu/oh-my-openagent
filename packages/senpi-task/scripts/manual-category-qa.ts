@@ -155,6 +155,28 @@ for (const result of secretFind) {
   requireCondition(!JSON.stringify(result).includes("hidden"), "secret find result leaked a private field")
 }
 
+const identityFindResults = [
+  { provider: "", id: "", name: "empty identity" },
+  { provider: "evil", id: "other", name: "mismatched identity" },
+  { provider: "openai", id: "", name: "empty model id" },
+]
+const identityFind = identityFindResults.map((findResult) => resolveCategory(
+  "quick",
+  {},
+  {
+    getAvailable: () => [model("openai", "gpt-5.4-mini")],
+    find: () => findResult,
+  },
+))
+for (const result of identityFind) {
+  requireCondition(result.kind === "model_unavailable", "identity find result did not return model_unavailable")
+  if (result.kind !== "model_unavailable") {
+    throw new Error("identity find result did not return model_unavailable")
+  }
+  requireCondition(result.attemptedModel === "openai/gpt-5.4-mini", "identity find attempted model changed")
+  requireCondition(!JSON.stringify(result).includes("evil"), "identity find result leaked mismatched provider")
+}
+
 const throwingFindMarker = "hidden find accessor marker"
 const throwingFind = resolveCategory(
   "quick",
@@ -217,6 +239,7 @@ console.log(JSON.stringify({
   malformed,
   throwingAvailable,
   secretFind,
+  identityFind,
   throwingFind,
   inheritedIdentity,
   nonArrayAvailable,
