@@ -93,7 +93,42 @@ if (malformed.kind !== "model_unavailable") {
 }
 requireCondition(malformed.availableModels.length === 0, "malformed registry leaked invalid available models")
 
+const malformedFind = resolveCategory(
+  "quick",
+  {},
+  {
+    getAvailable: () => [model("openai", "gpt-5.4-mini")],
+    find: () => ({ provider: "openai", id: "gpt-5.4-mini", privateToken: "hidden" }),
+  },
+)
+requireCondition(malformedFind.kind === "model_unavailable", "malformed find result did not return model_unavailable")
+requireCondition(!JSON.stringify(malformedFind).includes("hidden"), "malformed find result leaked a private field")
+
+const nonArrayAvailable = resolveCategory(
+  "quick",
+  {},
+  {
+    getAvailable: () => ({ 0: model("openai", "gpt-5.4-mini"), length: 1 }),
+    find: () => model("openai", "gpt-5.4-mini"),
+  },
+)
+requireCondition(nonArrayAvailable.kind === "model_unavailable", "non-array getAvailable did not return model_unavailable")
+if (nonArrayAvailable.kind !== "model_unavailable") {
+  throw new Error("non-array getAvailable did not return model_unavailable")
+}
+requireCondition(nonArrayAvailable.availableModels.length === 0, "non-array getAvailable leaked available models")
+
 const prototypeName = resolveCategory("__proto__", {}, registry([model("openai", "gpt-5.4-mini")]))
 requireCondition(prototypeName.kind === "not_found", "prototype-shaped category did not return not_found")
 
-console.log(JSON.stringify({ happy, disabled, unavailable, hardcodedFallback, systemDefault, malformed, prototypeName }, null, 2))
+console.log(JSON.stringify({
+  happy,
+  disabled,
+  unavailable,
+  hardcodedFallback,
+  systemDefault,
+  malformed,
+  malformedFind,
+  nonArrayAvailable,
+  prototypeName,
+}, null, 2))

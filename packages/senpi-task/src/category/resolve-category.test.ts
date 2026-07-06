@@ -5,7 +5,6 @@ import { BUILTIN_CATEGORY_DEFAULTS, resolveCategory } from "./index"
 type FakeModel = {
   readonly provider: string
   readonly id: string
-  readonly name: string
 }
 
 type FakeRegistry = {
@@ -14,7 +13,7 @@ type FakeRegistry = {
 }
 
 function model(provider: string, id: string): FakeModel {
-  return { provider, id, name: `${provider}/${id}` }
+  return { provider, id }
 }
 
 function registry(models: readonly FakeModel[]): FakeRegistry {
@@ -221,6 +220,54 @@ describe("resolveCategory", () => {
     expect(result.category).toBe("quick")
     expect(result.attemptedModel).toBe("openai/gpt-5.4-mini")
     expect(result.availableModels).toEqual([])
+  })
+
+  test("#given malformed truthy find results #when resolved #then category resolution returns sanitized model_unavailable", () => {
+    // given
+    const malformedFindResults = [
+      {},
+      { provider: { secret: "hidden" }, id: ["gpt-5.4-mini"] },
+      { provider: "openai", id: "gpt-5.4-mini", privateToken: "hidden" },
+    ]
+    const availableModel = model("openai", "gpt-5.4-mini")
+
+    // when
+    const results = malformedFindResults.map((findResult) => resolveCategory("quick", {}, {
+      getAvailable: () => [availableModel],
+      find: () => findResult,
+    }))
+
+    // then
+    for (const result of results) {
+      expect(result.kind).toBe("model_unavailable")
+      if (result.kind !== "model_unavailable") throw new Error(`Expected unavailable result, got ${result.kind}`)
+      expect(result.attemptedModel).toBe("openai/gpt-5.4-mini")
+      expect(result.availableModels).toEqual(["openai/gpt-5.4-mini"])
+      expect(JSON.stringify(result)).not.toContain("hidden")
+    }
+  })
+
+  test("#given non-array registry availability #when resolved #then category resolution returns sanitized model_unavailable instead of throwing", () => {
+    // given
+    const malformedAvailableResults = [
+      null,
+      { 0: model("openai", "gpt-5.4-mini"), length: 1 },
+      "openai/gpt-5.4-mini",
+    ]
+
+    // when
+    const results = malformedAvailableResults.map((availableResult) => resolveCategory("quick", {}, {
+      getAvailable: () => availableResult,
+      find: () => model("openai", "gpt-5.4-mini"),
+    }))
+
+    // then
+    for (const result of results) {
+      expect(result.kind).toBe("model_unavailable")
+      if (result.kind !== "model_unavailable") throw new Error(`Expected unavailable result, got ${result.kind}`)
+      expect(result.attemptedModel).toBe("openai/gpt-5.4-mini")
+      expect(result.availableModels).toEqual([])
+    }
   })
 
   test("#given prototype-shaped category names #when resolved #then they return not_found instead of inherited object values", () => {
