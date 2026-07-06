@@ -42,3 +42,13 @@ export type {
   SenpiModelPort,
   SenpiModelRegistryPort,
 } from "./category"
+export { defineAgent, loadAgents, registerAgent, resolveToolRule } from "./agents"
+export type {
+  AgentDefinition,
+  AgentDefinitionInput,
+  AgentLoaderDiagnostic,
+  AgentLoaderDiagnosticKind,
+  AgentToolRule,
+  LoadAgentsOptions,
+  LoadAgentsResult,
+} from "./agents"

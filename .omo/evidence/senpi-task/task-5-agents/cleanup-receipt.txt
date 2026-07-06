@@ -1,0 +1,3 @@
+$ ps cleanup check for task-local commands
+no matching task-local processes
+exit=0
