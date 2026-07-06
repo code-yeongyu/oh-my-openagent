@@ -65,6 +65,16 @@ for (const copy of skillCopies) {
 			expect(autoSection).toMatch(/metis still runs once/i)
 		})
 
+		test("#given the stop rules #when the plan is complete #then stopping is conditioned on recorded review receipts", async () => {
+			const fullWorkflow = await readRef(copy.root, "references/full-workflow.md")
+			const stopRules = fullWorkflow.slice(fullWorkflow.indexOf("## Stop rules"))
+
+			// The stale stop-rule fork let UNCLEAR stop without review receipts,
+			// contradicting SKILL.md's receipts-aware stop rule.
+			expect(stopRules).toMatch(/high-accuracy receipts/i)
+			expect(stopRules).not.toMatch(/lead with the best-practice brief \(UNCLEAR\), and stop/i)
+		})
+
 		test("#given the review trigger rule #when high accuracy is requested or intent is UNCLEAR #then momus review requirement stays gated", async () => {
 			const skillText = await readRef(copy.root, "SKILL.md")
 			const fullWorkflow = await readRef(copy.root, "references/full-workflow.md")
