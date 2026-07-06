@@ -27,6 +27,9 @@ export function resolveAgentDefinitionLocations(options: ResolveAgentPathsOption
 }
 
 export function listMarkdownAgentFiles(location: string): ListMarkdownAgentFilesResult {
+  const inspected = inspectDirectory(location, true)
+  if (!inspected.ok) return { files: [], diagnostics: inspected.diagnostics }
+
   const files: string[] = []
   const diagnostics: AgentLoaderDiagnostic[] = []
 

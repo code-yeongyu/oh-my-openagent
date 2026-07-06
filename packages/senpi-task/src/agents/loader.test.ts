@@ -143,6 +143,32 @@ describe("loadAgents", () => {
     expect(result.diagnostics.find((diagnostic) => diagnostic.path === linkedRoot)?.message).toContain("symlink")
   })
 
+  test("#given configured location is a symlink #when loading #then later scan children do not escape", () => {
+    // given
+    const fixture = makeFixture()
+    const externalRoot = join(fixture.home, "external-agents")
+    const linkedRoot = join(fixture.project, ".senpi", "agents")
+    const escapedPath = join(externalRoot, "agent", "escaped.md")
+    writeText(escapedPath, agentMarkdown("external-model", "external prompt"))
+    mkdirSync(dirname(linkedRoot), { recursive: true })
+    symlinkSync(externalRoot, linkedRoot, "dir")
+
+    // when
+    const result = loadAgents({ homeDir: fixture.home, projectDir: fixture.project })
+
+    // then
+    expect(result.agents.escaped).toBeUndefined()
+    expect(result.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "read",
+          path: linkedRoot,
+        }),
+      ]),
+    )
+    expect(result.diagnostics.find((diagnostic) => diagnostic.path === linkedRoot)?.message).toContain("symlink")
+  })
+
   test("#given broken directory symlink and valid sibling #when loading #then read diagnostic is returned and valid agent loads", () => {
     // given
     const fixture = makeFixture()
