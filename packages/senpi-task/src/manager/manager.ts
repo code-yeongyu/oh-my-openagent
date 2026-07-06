@@ -1,19 +1,20 @@
 import { log } from "@oh-my-opencode/utils"
 
-import { createTaskRecord, messageability, parseTaskId } from "../state"
+import { createTaskRecord, parseTaskId } from "../state"
 import type { TaskRecord } from "../state"
-import type { TaskRecordStore } from "../store"
+import { createSteeringEngine } from "../steering"
+import type { CancelOutcome, DestructionPort, InterruptOutcome, SendInput, SendOutcome, SteeringEngine, SteeringPort } from "../steering"
 import type { ManagedChildHandle } from "./child-handle"
 import { TaskConcurrency } from "./concurrency"
 import { decideDepthPolicy } from "./depth-policy"
 import { resolveExecutionMode, type ExecutionMode } from "./execution-mode"
+import { toContinueResult } from "./continue-result"
 import {
-  CONTINUE_SUGGESTION,
   buildManagedSpec,
   buildRecordInput,
-  notContinuableReason,
+  inSession,
+  isTerminalRecord,
   nowIso,
-  revivedRecord,
 } from "./manager-helpers"
 import { NameRegistry } from "./names"
 import type {
@@ -40,14 +41,19 @@ type LaunchContext = {
   readonly model: string
 }
 
+const NOOP_DESTRUCTION: DestructionPort = { destroyResidentTask: () => Promise.resolve() }
+
 class TaskManagerImpl implements TaskManager {
   readonly #options: TaskManagerOptions
   readonly #now: () => number
   readonly #concurrency: TaskConcurrency
   readonly #names = new NameRegistry()
   readonly #live = new Map<string, LiveTask>()
+  // Release guard keyed by `${taskId}:${runEpoch}` so a revived task (new epoch) can re-acquire a
+  // slot and still have its LATER release counted instead of swallowed by an already-released id.
   readonly #released = new Set<string>()
   readonly #waiters = new Map<string, Array<(record: TaskRecord) => void>>()
+  readonly #steering: SteeringEngine
 
   constructor(options: TaskManagerOptions) {
     this.#options = options
@@ -57,6 +63,14 @@ class TaskManagerImpl implements TaskManager {
       ...(options.config.provider_concurrency !== undefined && { provider_concurrency: options.config.provider_concurrency }),
       ...(options.config.model_concurrency !== undefined && { model_concurrency: options.config.model_concurrency }),
     })
+    const port: SteeringPort = {
+      store: options.store,
+      liveHandle: (taskId) => this.#live.get(taskId)?.handle,
+      reacquireForRevive: (taskId) => this.#reacquireForRevive(taskId),
+      destruction: options.destruction ?? NOOP_DESTRUCTION,
+      now: this.#now,
+    }
+    this.#steering = createSteeringEngine(port)
   }
 
   async start(spec: ManagerStartSpec): Promise<StartResult> {
@@ -126,35 +140,24 @@ class TaskManagerImpl implements TaskManager {
     prompt: string,
     deliverAs: "steer" | "followUp" = "followUp",
   ): Promise<ContinueResult> {
-    const record = this.#resolveRecord(taskIdOrName)
-    if (record === undefined) {
-      return { kind: "not_continuable", reason: `No task found for "${taskIdOrName}".`, suggestion: CONTINUE_SUGGESTION }
-    }
-    const mode = messageability(record.status, record.residency_state)
-    if (mode === "not-continuable") {
-      return { kind: "not_continuable", task_id: record.task_id, reason: notContinuableReason(record), suggestion: CONTINUE_SUGGESTION }
-    }
-    const live = this.#live.get(record.task_id)
-    if (live === undefined) {
-      return {
-        kind: "not_continuable",
-        task_id: record.task_id,
-        reason: `Task ${record.task_id} has no resident session in this process.`,
-        suggestion: CONTINUE_SUGGESTION,
-      }
-    }
+    const outcome = await this.#steering.sendToTask({ idOrName: taskIdOrName, message: prompt, deliverAs })
+    return toContinueResult(outcome)
+  }
 
-    if (mode === "steer") {
-      if (deliverAs === "steer") await live.handle.steer(prompt)
-      else await live.handle.followUp(prompt)
-      return { kind: "continued", task_id: record.task_id, status: record.status, delivered: deliverAs }
-    }
+  sendToTask(input: SendInput): Promise<SendOutcome> {
+    return this.#steering.sendToTask(input)
+  }
 
-    await live.handle.followUp(prompt)
-    const revived = revivedRecord(record, nowIso(this.#now))
-    this.#options.store.replace(revived)
-    this.#options.store.appendEvent(record.task_id, { type: "revived", payload: { run_epoch: revived.notification.run_epoch } })
-    return { kind: "continued", task_id: record.task_id, status: "running", delivered: "revive" }
+  async interruptTask(idOrName: string): Promise<InterruptOutcome> {
+    const outcome = await this.#steering.interruptTask(idOrName)
+    if (outcome.kind === "interrupted") this.#releaseSlotForTask(outcome.task_id)
+    return outcome
+  }
+
+  async cancelTask(idOrName: string, reason?: string): Promise<CancelOutcome> {
+    const outcome = await this.#steering.cancelTask(idOrName, reason)
+    if (outcome.kind === "cancelled") this.#releaseSlotForTask(outcome.task_id)
+    return outcome
   }
 
   get(taskId: string): TaskRecord | undefined {
@@ -173,7 +176,7 @@ class TaskManagerImpl implements TaskManager {
   waitFor(taskId: string): Promise<TaskRecord> {
     const id = parseTaskId(taskId)
     const current = this.#tryLoad(id)
-    if (current !== null && current !== undefined && isTerminal(current)) return Promise.resolve(current)
+    if (current !== null && current !== undefined && isTerminalRecord(current)) return Promise.resolve(current)
     return new Promise((resolve) => {
       const list = this.#waiters.get(id) ?? []
       list.push(resolve)
@@ -190,7 +193,7 @@ class TaskManagerImpl implements TaskManager {
       handle = await runner.start(managedSpec)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      this.#releaseSlot(record.task_id, model)
+      this.#releaseSlot(record.task_id, model, record.notification.run_epoch)
       this.#options.store.transition(record.task_id, { type: "fail", timestamp: nowIso(this.#now), error_message: message })
       this.#options.store.appendEvent(record.task_id, { type: "task_start_failed", payload: { error_message: message } })
       this.#settleWaiters(record.task_id)
@@ -198,15 +201,16 @@ class TaskManagerImpl implements TaskManager {
     }
 
     this.#live.set(record.task_id, { handle, model })
-    this.#trackOutcome(record.task_id, handle, model)
+    this.#trackOutcome(record.task_id, handle, model, record.notification.run_epoch)
+    void this.#steering.notifyStarted(record.task_id)
     return { ok: true }
   }
 
-  #trackOutcome(taskId: string, handle: ManagedChildHandle, model: string): void {
+  #trackOutcome(taskId: string, handle: ManagedChildHandle, model: string, epoch: number): void {
     handle
       .waitForOutcome()
       .then((outcome) => {
-        this.#releaseSlot(taskId, model)
+        this.#releaseSlot(taskId, model, epoch)
         const timestamp = nowIso(this.#now)
         if (outcome.status === "completed") {
           this.#options.store.transition(taskId, { type: "complete", timestamp, final_response: outcome.finalResponse })
@@ -220,22 +224,35 @@ class TaskManagerImpl implements TaskManager {
       .catch((error: unknown) => log("senpi-task manager outcome tracking failed", { taskId, error: String(error) }))
   }
 
-  #releaseSlot(taskId: string, model: string): void {
-    if (this.#released.has(taskId)) return
-    this.#released.add(taskId)
+  // A revived child is running again and SHOULD occupy a slot; re-acquire it and re-arm outcome
+  // tracking under the new run_epoch so the eventual second completion releases the slot cleanly.
+  #reacquireForRevive(taskId: string): void {
+    const live = this.#live.get(taskId)
+    if (live === undefined) return
+    const record = this.#tryLoad(taskId)
+    const epoch = record?.notification.run_epoch ?? 0
+    this.#concurrency.acquire(live.model, taskId)
+    this.#trackOutcome(taskId, live.handle, live.model, epoch)
+  }
+
+  #releaseSlot(taskId: string, model: string, epoch: number): void {
+    const key = `${taskId}:${epoch}`
+    if (this.#released.has(key)) return
+    this.#released.add(key)
     this.#concurrency.release(model)
+  }
+
+  #releaseSlotForTask(taskId: string): void {
+    const live = this.#live.get(taskId)
+    if (live === undefined) return
+    const epoch = this.#tryLoad(taskId)?.notification.run_epoch ?? 0
+    this.#releaseSlot(taskId, live.model, epoch)
   }
 
   #settleWaiters(taskId: string): void {
     const record = this.#tryLoad(taskId)
     if (record === null || record === undefined) return
     for (const resolve of this.#waiters.get(taskId)?.splice(0) ?? []) resolve(record)
-  }
-
-  #resolveRecord(taskIdOrName: string): TaskRecord | undefined {
-    const byId = this.#tryLoad(taskIdOrName)
-    if (byId !== null && byId !== undefined) return byId
-    return this.#options.store.list().records.find((record) => record.name === taskIdOrName)
   }
 
   #tryLoad(taskId: string): TaskRecord | null {
@@ -245,20 +262,6 @@ class TaskManagerImpl implements TaskManager {
       return null
     }
   }
-}
-
-function inSession(record: TaskRecord, sessionId: string): boolean {
-  return record.parent_session_id === sessionId || record.root_session_id === sessionId
-}
-
-function isTerminal(record: TaskRecord): boolean {
-  return (
-    record.status === "completed" ||
-    record.status === "error" ||
-    record.status === "cancelled" ||
-    record.status === "interrupted" ||
-    record.status === "lost"
-  )
 }
 
 export function createTaskManager(options: TaskManagerOptions): TaskManager {

@@ -50,9 +50,10 @@ function toFailureMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-// The initial prompt is a TRACKED async op: the promise is created and its rejection handled at
-// handle construction, so steering can happen WHILE it runs and no rejection ever escapes.
-async function runInitialPrompt(session: ChildSession, text: string, isAborted: () => boolean): Promise<RunnerOutcome> {
+// A prompt turn is a TRACKED async op: the promise is created and its rejection handled at the
+// call site, so steering can happen WHILE it runs and no rejection ever escapes. The same routine
+// drives the initial prompt and every revive follow-up (a fresh turn on an idle resident session).
+async function runTurn(session: ChildSession, text: string, isAborted: () => boolean): Promise<RunnerOutcome> {
   try {
     await session.prompt(text)
   } catch (error) {
@@ -70,13 +71,39 @@ export function createChildHandle(input: CreateChildHandleInput): ChildHandle {
   const { session } = input
   let aborted = false
   let disposed = false
-  const running = runInitialPrompt(session, input.promptText, () => aborted)
+  let turnActive = false
+  let running: Promise<RunnerOutcome>
+
+  // Start a fresh tracked turn and mark it active until it settles. waitForIdle() always returns the
+  // CURRENT turn, so a revive follow-up re-arms it to the new turn instead of a stale resolved one.
+  const beginTurn = (text: string): void => {
+    turnActive = true
+    running = runTurn(session, text, () => aborted)
+    void running.then(
+      () => {
+        turnActive = false
+      },
+      () => {
+        turnActive = false
+      },
+    )
+  }
+
+  beginTurn(input.promptText)
 
   return {
     task_id: input.taskId,
     sessionId: session.sessionId,
     steer: (text) => session.steer(text),
-    followUp: (text) => session.followUp(text),
+    followUp: async (text) => {
+      // While a turn is running, a follow-up is queued and delivered when the agent settles. Once
+      // the child is idle/resident, a follow-up REVIVES it: drive a fresh turn and re-arm tracking.
+      if (turnActive) {
+        await session.followUp(text)
+        return
+      }
+      beginTurn(text)
+    },
     abort: async () => {
       aborted = true
       await session.abort()
