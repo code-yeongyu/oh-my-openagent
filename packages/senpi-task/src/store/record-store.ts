@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
+import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { parseTaskId, transitionTaskRecord } from "../state"
@@ -57,7 +57,15 @@ export function createTaskRecordStore(config: StateDirConfig): TaskRecordStore {
       if (result.applied) writeRecord(stateDir, result.record, "replace")
       return result
     },
+    remove(taskId) {
+      removeRecord(stateDir, parseTaskId(taskId))
+    },
   }
+}
+
+function removeRecord(stateDir: string, taskId: TaskId): void {
+  rmSync(taskPath(stateDir, taskId), { force: true })
+  rmSync(join(stateDir, "logs", `${taskId}.jsonl`), { force: true })
 }
 
 function listRecords(stateDir: string): ListTaskRecordsResult {

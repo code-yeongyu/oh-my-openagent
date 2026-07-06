@@ -171,3 +171,19 @@ export type {
   SkipReason,
   TransitionReason,
 } from "./completion"
+export { AgentLimitReached, createTaskLifecycle } from "./lifecycle"
+export type {
+  AdmissionResult,
+  CleanupResult,
+  DestroyCause,
+  LifecycleDeps,
+  ProcessSignaller,
+  ReconcileOutcome,
+  ReconcileOutcomeKind,
+  ReconcileResult,
+  ResidentHandle,
+  ResidentSummary,
+  ResidencyRegistry,
+  TaskLifecycle,
+  TeardownSummary,
+} from "./lifecycle"
