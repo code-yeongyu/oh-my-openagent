@@ -108,6 +108,7 @@ export {
   resolveExecutionMode,
 } from "./manager"
 export type {
+  AdmitResident,
   ChildPlanner,
   ContinueDelivery,
   ContinueResult,
@@ -131,6 +132,7 @@ export type {
   PlanResolutionError,
   ResolvedChildPlan,
   RpcRunnerLike,
+  SpawnAdmission,
   StartResult,
   TaskConcurrencyConfig,
   TaskManager,

@@ -25,6 +25,10 @@ function fakeManager(overrides: Partial<TaskManager>): TaskManager {
     get: () => undefined,
     list: () => [],
     waitFor: () => notImplemented("waitFor"),
+    forget: () => {},
+    getResidentHandle: () => undefined,
+    residentTaskIds: () => [],
+    wasBackground: () => false,
     ...overrides,
   }
 }

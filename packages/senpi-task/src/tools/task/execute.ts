@@ -111,6 +111,9 @@ async function runSpawn(
   if (started.kind === "start_failed") {
     return result(started.error_message, { task_id: started.task_id, status: "error", mode: "spawn", name: started.name, reason: started.error_message })
   }
+  if (started.kind === "residency_denied") {
+    return result(started.reason, { task_id: "", status: "residency_denied", mode: "spawn", reason: started.reason })
+  }
   if (params.run_in_background === true) {
     return result(backgroundStartText(started), startedDetails(started, params))
   }

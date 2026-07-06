@@ -24,6 +24,7 @@ export type {
   RpcRunnerLike,
 } from "./runner"
 export type {
+  AdmitResident,
   ChildPlanner,
   ContinueDelivery,
   ContinueResult,
@@ -35,6 +36,7 @@ export type {
   PlanResolution,
   PlanResolutionError,
   ResolvedChildPlan,
+  SpawnAdmission,
   StartResult,
   TaskManager,
   TaskManagerOptions,
