@@ -27,3 +27,18 @@ export type {
 } from "./store"
 export { createMinimalSenpiResourceLoader } from "./senpi/minimal-resource-loader"
 export type { MinimalSenpiResourceLoaderOptions } from "./senpi/minimal-resource-loader"
+export {
+  BUILTIN_CATEGORY_DEFAULTS,
+  CATEGORY_DESCRIPTIONS,
+  CATEGORY_PROMPT_APPENDS,
+  DEFAULT_CATEGORIES,
+  resolveCategory,
+} from "./category"
+export type {
+  BuiltinCategoryDefinition,
+  CategoryModelSelection,
+  CategoryResolutionResult,
+  ResolvedChildSpec,
+  SenpiModelPort,
+  SenpiModelRegistryPort,
+} from "./category"
