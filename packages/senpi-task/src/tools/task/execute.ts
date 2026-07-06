@@ -1,7 +1,8 @@
 import type { AgentToolResult, AgentToolUpdateCallback } from "@code-yeongyu/senpi"
 
-import type { ContinueResult, ManagerStartSpec, StartResult } from "../../manager"
+import type { ManagerStartSpec, StartResult } from "../../manager"
 import type { TaskRecord } from "../../state"
+import type { SendOutcome } from "../../steering"
 import type { TaskToolParamsStatic } from "./params"
 import { createFsSkillLoader } from "./skills"
 import type { TaskToolContext, TaskToolDeps, TaskToolDetails, TaskToolMode } from "./types"
@@ -117,24 +118,58 @@ async function runSpawn(
   return syncResult(final, "spawn")
 }
 
+type DeliveredSend = { readonly task_id: string; readonly status: string; readonly delivered: string }
+
+async function finishContinuation(
+  deps: TaskToolDeps,
+  params: TaskToolParamsStatic,
+  delivered: DeliveredSend,
+): Promise<AgentToolResult<TaskToolDetails>> {
+  if (params.run_in_background === true) {
+    return result(
+      `Delivered to task ${delivered.task_id} via ${delivered.delivered} (${delivered.status}). The system will notify you on completion.`,
+      { task_id: delivered.task_id, status: delivered.status, mode: "continuation", run_in_background: true },
+    )
+  }
+  const final = await deps.manager.waitFor(delivered.task_id)
+  return syncResult(final, "continuation")
+}
+
+// Continuation drives the SCOPE-AWARE manager.sendToTask (never continueTask, which cannot carry a
+// caller id) and ALWAYS injects the caller session id, so the engine's scope guard fails closed:
+// a foreign session's send is scope_denied instead of leaking into the owning session's task.
 async function runContinuation(
   deps: TaskToolDeps,
   params: TaskToolParamsStatic,
   taskId: string,
+  ctx: TaskToolContext,
 ): Promise<AgentToolResult<TaskToolDetails>> {
-  const outcome: ContinueResult = await deps.manager.continueTask(taskId, params.prompt, "followUp")
-  if (outcome.kind === "not_continuable") {
-    const resolvedId = outcome.task_id ?? taskId
-    return result(`${outcome.reason}. ${outcome.suggestion}`, { task_id: resolvedId, status: "not_continuable", mode: "continuation", reason: outcome.reason })
+  const outcome: SendOutcome = await deps.manager.sendToTask({
+    idOrName: taskId,
+    message: params.prompt,
+    deliverAs: "followUp",
+    callerSessionId: ctx.sessionManager.getSessionId(),
+  })
+  switch (outcome.kind) {
+    case "scope_denied":
+      return result(outcome.reason, { task_id: outcome.task_id, status: "scope_denied", mode: "continuation", reason: outcome.reason })
+    case "not_continuable":
+      return result(`${outcome.reason}. ${outcome.suggestion}`, { task_id: outcome.task_id, status: "not_continuable", mode: "continuation", reason: outcome.reason })
+    case "not_found":
+      return result(`${outcome.reason}. ${outcome.suggestion}`, { task_id: taskId, status: "not_found", mode: "continuation", reason: outcome.reason })
+    case "steered":
+      return finishContinuation(deps, params, { task_id: outcome.task_id, status: outcome.status, delivered: outcome.delivered })
+    case "revived":
+      return finishContinuation(deps, params, { task_id: outcome.task_id, status: "running", delivered: "revive" })
+    case "queued":
+      return finishContinuation(deps, params, { task_id: outcome.task_id, status: "pending", delivered: "followUp" })
+    default:
+      return assertNever(outcome)
   }
-  if (params.run_in_background === true) {
-    return result(
-      `Delivered to task ${outcome.task_id} via ${outcome.delivered} (${outcome.status}). The system will notify you on completion.`,
-      { task_id: outcome.task_id, status: outcome.status, mode: "continuation", run_in_background: true },
-    )
-  }
-  const final = await deps.manager.waitFor(outcome.task_id)
-  return syncResult(final, "continuation")
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unexpected send outcome: ${JSON.stringify(value)}`)
 }
 
 // The task tool execute logic. Injects the caller (parent) session id into every manager call,
@@ -144,7 +179,7 @@ export function buildTaskExecute(deps: TaskToolDeps): TaskExecute {
   return async (_toolCallId, params, _signal, _onUpdate, ctx) => {
     const taskId = params.task_id?.trim()
     if (taskId !== undefined && taskId.length > 0) {
-      return runContinuation(deps, params, taskId)
+      return runContinuation(deps, params, taskId, ctx)
     }
     return runSpawn(deps, params, ctx)
   }
