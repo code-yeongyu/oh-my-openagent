@@ -37,6 +37,14 @@ The goal tool contract is aligned with codex `codex-rs/ext/goal`:
   "unfinished goal" message.
 - Tool/parameter descriptions, the `update_goal` error text, and the completion budget report
   match codex verbatim; `budgetLimited` is preserved when `paused` or `blocked` is requested.
+- The hidden continuation and budget-limit prompts use the codex `templates/goals/*.md`
+  content (`<objective>` tag; the continuation prompt carries the Continuation behavior /
+  Work from evidence / Progress visibility / Fidelity / Completion audit / Blocked audit
+  sections). The budget-limit prompt is queued at most once per goal id.
+- Continuation is not queued after a turn that did not end cleanly (last assistant
+  `stopReason` is `error`, or the last tool result was aborted), mirroring codex's
+  turn-error loop prevention (codex sets the goal `blocked`; pi's harness has no turn-error
+  signal, so it gates the auto-continuation instead).
 - Deliberate deviation: pi omits `usage_limited` (codex sets it from a system
   `UsageLimitExceeded` turn error, not the model; the Pi harness exposes no such signal).
 

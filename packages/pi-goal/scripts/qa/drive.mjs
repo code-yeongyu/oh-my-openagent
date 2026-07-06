@@ -22,6 +22,9 @@ const goalExtensionEntry = join(packageRoot, "src", "index.ts")
 const realPiAgentDir = join(homedir(), ".pi", "agent")
 const RUN_TIMEOUT_MILLISECONDS = 120_000
 const CONTINUATION_MARKER = "Continue working toward the active thread goal."
+// Present only in the codex-aligned continuation prompt, so its delivery proves
+// the new prompt content actually reached the real session (not the old prompt).
+const CODEX_CONTINUATION_MARKER = "Blocked audit:"
 
 const SCENARIOS = {
   complete: {
@@ -213,6 +216,7 @@ async function runScenario(piBin, name) {
     goalStoreFile: undefined,
     goalAfterRun: undefined,
     continuationObserved: false,
+    codexContinuationMarkerObserved: false,
     terminalStatusObserved: false,
     sandboxRoot: sandbox.root,
   }
@@ -221,11 +225,18 @@ async function runScenario(piBin, name) {
     const { file, goal } = readGoalFromSandbox(sandbox.root)
     scenarioReport.goalStoreFile = file
     scenarioReport.goalAfterRun = goal
-    scenarioReport.continuationObserved = readSandboxText(sandbox.root).includes(CONTINUATION_MARKER)
+    const sandboxText = readSandboxText(sandbox.root)
+    scenarioReport.continuationObserved = sandboxText.includes(CONTINUATION_MARKER)
+    scenarioReport.codexContinuationMarkerObserved = sandboxText.includes(CODEX_CONTINUATION_MARKER)
     scenarioReport.terminalStatusObserved = goal?.status === scenario.terminalStatus
 
     const shapeCorrect = goal?.objective === scenario.objective && goal?.tokenBudget === scenario.tokenBudget
-    if (shapeCorrect && scenarioReport.continuationObserved && scenarioReport.terminalStatusObserved) {
+    if (
+      shapeCorrect &&
+      scenarioReport.continuationObserved &&
+      scenarioReport.codexContinuationMarkerObserved &&
+      scenarioReport.terminalStatusObserved
+    ) {
       scenarioReport.result = "PASS"
     } else {
       scenarioReport.reason = "assertions-not-satisfied"

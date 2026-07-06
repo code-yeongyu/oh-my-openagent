@@ -40,6 +40,7 @@ export default function (pi: ExtensionAPI): void {
 	let agentTurnInProgress = false;
 	let agentGoalAccounting: AgentGoalAccounting | null = null;
 	let completedThisTurnGoalId: string | null = null;
+	let budgetLimitReportedGoalId: string | null = null;
 
 	pi.registerTool({
 		name: "create_goal",
@@ -213,12 +214,16 @@ export default function (pi: ExtensionAPI): void {
 		}
 		updateGoalUiBestEffort(ctx, goal);
 		if (goal?.status === "budgetLimited") {
-			if (!ctx.hasPendingMessages()) {
+			if (!ctx.hasPendingMessages() && budgetLimitReportedGoalId !== goal.id) {
+				budgetLimitReportedGoalId = goal.id;
 				queueHiddenGoalPrompt(pi, GOAL_BUDGET_LIMIT_MESSAGE_TYPE, buildBudgetLimitedPrompt(goal));
 			}
 			return;
 		}
-		if (goal?.status === "active" && shouldQueueGoalContinuationAfterAgentEnd(goal, ctx.hasPendingMessages())) {
+		if (
+			goal?.status === "active" &&
+			shouldQueueGoalContinuationAfterAgentEnd(goal, ctx.hasPendingMessages(), event.messages)
+		) {
 			queueHiddenGoalPrompt(pi, GOAL_CONTINUATION_MESSAGE_TYPE, buildContinuationPrompt(goal));
 		}
 	});
