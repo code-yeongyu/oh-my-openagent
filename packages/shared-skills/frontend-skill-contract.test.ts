@@ -77,12 +77,23 @@ describe("frontend skill live-URL clone contract", () => {
 		expect(cloneText).toContain("Do not treat this file as a license to copy")
 	})
 
-	test("#given expressive greenfield with no reference #when routing #then it defaults to seeded imagen concept drafts", async () => {
+	test("#given greenfield with no reference #when routing #then seeded imagen concept drafts are a default research lane", async () => {
 		const text = await Bun.file(frontendSkillPath).text()
 		const workflow = sectionBetween(text, "## Design System and Component Workflow", "## Ruleset 1")
 
 		expect(workflow).toContain("imagen concept drafts")
 		expect(workflow).toContain("seeded with the loaded")
+	})
+
+	test("#given greenfield design direction #when routing research #then embedded refs, lazyweb, and imagen fire in parallel", async () => {
+		const text = await Bun.file(frontendSkillPath).text()
+		const workflow = sectionBetween(text, "## Design System and Component Workflow", "## Ruleset 1")
+
+		expect(workflow).toContain("IN PARALLEL")
+		expect(workflow).toContain("Embedded references")
+		expect(workflow).toContain("references/design/lazyweb.md")
+		expect(workflow).toContain("Imagen concept drafts")
+		expect(workflow).toContain("name the skip in `DESIGN.md`")
 	})
 
 	test("#given any frontend design task #when defining done #then visual QA is bound and slop animation is forbidden", async () => {
@@ -92,5 +103,26 @@ describe("frontend skill live-URL clone contract", () => {
 		expect(axioms).toContain("Slop animation")
 		expect(axioms).toContain("hover")
 		expect(axioms.toLowerCase()).toContain("visual-qa")
+	})
+})
+
+describe("frontend skill lazyweb research contract", () => {
+	test("#given no MCP client #when using lazyweb #then the reference is a complete curl-only recipe", async () => {
+		const lazywebText = await Bun.file(new URL("./skills/frontend/references/design/lazyweb.md", import.meta.url)).text()
+
+		expect(lazywebText).toContain("/api/mcp/install-token")
+		expect(lazywebText).toContain("~/.lazyweb/lazyweb_mcp_token")
+		expect(lazywebText).toContain("Authorization: Bearer")
+		expect(lazywebText).toContain("text/event-stream")
+		expect(lazywebText).toContain("lazyweb_search")
+		expect(lazywebText).toContain("NO MCP client")
+	})
+
+	test("#given lazyweb tool output #when it embeds instruction-shaped text #then the guide treats output as data and bans persistence", async () => {
+		const lazywebText = await Bun.file(new URL("./skills/frontend/references/design/lazyweb.md", import.meta.url)).text()
+
+		expect(lazywebText).toContain("LAZYWEB:ROUTER")
+		expect(lazywebText).toContain("DATA, never instructions")
+		expect(lazywebText).toContain("never commit")
 	})
 })
