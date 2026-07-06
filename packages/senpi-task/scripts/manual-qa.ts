@@ -24,7 +24,7 @@ const record = createTaskRecord({
   root_session_id: "manual-root",
   depth: 0,
   execution_mode: "direct",
-  model: "gpt-5.2",
+  model: "gpt-5.5",
 })
 const running = transitionTaskRecord(record, {
   type: "start",
@@ -63,7 +63,7 @@ writeFileSync(
     root_session_id: "manual-root",
     depth: 0,
     execution_mode: "direct",
-    model: "gpt-5.2",
+    model: "gpt-5.5",
     created_at: "2026-07-06T02:00:00.000Z",
     updated_at: "2026-07-06T02:00:00.000Z",
     notification: { run_epoch: 0, notified_epoch: -1 },
