@@ -331,6 +331,55 @@ describe("parent wake max-defer force-flush (#5864)", () => {
     }
   })
 
+  test("#given max-defer exceeded with fresh activity but wake already admitted noReply #then force-flushes reply dispatch (bounded defer)", async () => {
+    // given: 50ms max-defer ceiling; clock starts at 100_000. A reply-required
+    // wake is queued and the parent has a fresh activity window. On the first
+    // flush past the ceiling, the fresh-activity guard admits it as noReply
+    // (recording the deposit). On the second flush, the wake already has
+    // noReplyAdmittedAt set — the fresh-activity guard must NOT keep deferring
+    // (that would reintroduce #5864's unbounded wait). Instead it proceeds to
+    // forceReplyDispatch to actually deliver the result.
+    const originalDateNow = Date.now
+    Date.now = () => 100_000
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "busy" } },
+      messagesProvider: () => SAFE_MESSAGES,
+      maxDeferMs: 50,
+      parentSessionActivityInProgressWindowMs: 10_000,
+    })
+
+    try {
+      // when: queue a reply-required wake, advance past the ceiling, record
+      // fresh activity, and flush twice. The first flush admits noReply. The
+      // second flush (still past the ceiling, still fresh activity) must
+      // proceed to forceReplyDispatch because noReplyAdmittedAt is set.
+      notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+      Date.now = () => 100_060
+      notifier.recordParentSessionActivity("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+      // First flush: noReply admission
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(true)
+      // Advance the clock past the first dispatch's 2s post-dispatch
+      // reservation hold and re-record activity so the fresh-activity guard
+      // is still active on the second flush.
+      Date.now = () => 102_061
+
+      // Second flush: still past the ceiling, still fresh activity, but
+      // noReplyAdmittedAt is set → fresh-activity guard bypassed → forceReplyDispatch
+      notifier.recordParentSessionActivity("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+      expect(promptAsyncCalls).toHaveLength(2)
+      expect(promptAsyncCalls[1]?.body.noReply).toBe(false)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
   test("#given max-defer ceiling not yet elapsed #then does not force-flush (regression guard)", async () => {
     // given: large max-defer ceiling so the ceiling has not elapsed
     const originalDateNow = Date.now

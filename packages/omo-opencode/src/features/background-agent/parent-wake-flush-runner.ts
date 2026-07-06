@@ -89,7 +89,25 @@ export class ParentWakeFlushRunner {
       // idle/consumption machinery resumes the wake when the turn settles.
       // This mirrors the normal-path hasRecentParentSessionActivity guard below.
       const emptyAssistantTurnRetry = latestWake.allowEmptyAssistantTurnRetry === true
-      if (this.hasRecentParentSessionActivity(sessionID)) {
+      // Fresh-activity guard: even past the max-defer ceiling, if the parent
+      // has emitted a recent message.part.updated/message.updated event, the
+      // live turn may still be streaming even though session.messages looks
+      // safe/stopped. Forcing a reply-producing dispatch here would inject into
+      // an active turn. Fall back to retained noReply admission — the
+      // idle/consumption machinery resumes the wake when the turn settles.
+      // This mirrors the normal-path hasRecentParentSessionActivity guard below.
+      //
+      // But only on the first admission: once noReplyAdmittedAt is set, the
+      // deposit is already recorded and the wake needs to be *delivered* as a
+      // reply. If we keep returning to this guard on every retry (parent emits
+      // activity every <5s), deferReplyWakeWhileUnsafe returns true and the
+      // wake waits indefinitely — reintroducing #5864's unbounded defer. So
+      // after the first noReply admission, skip this guard and let the
+      // subsequent guards (user-message, history, forceReplyDispatch) decide.
+      if (
+        this.hasRecentParentSessionActivity(sessionID)
+        && latestWake.noReplyAdmittedAt === undefined
+      ) {
         if (this.deferReplyWakeWhileUnsafe(sessionID, latestWake)) {
           return
         }
