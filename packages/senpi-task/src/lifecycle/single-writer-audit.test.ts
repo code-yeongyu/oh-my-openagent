@@ -40,7 +40,7 @@ function listSourceFiles(dir: string): string[] {
 }
 
 function relativePath(full: string): string {
-  return full.slice(packageRoot.length + 1)
+  return full.slice(packageRoot.length + 1).replaceAll("\\", "/")
 }
 
 function isAllowlisted(rel: string): boolean {
