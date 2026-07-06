@@ -76,6 +76,7 @@ describe("BOULDER_COMPLETE_PROMPT", () => {
     expect(BOULDER_COMPLETE_PROMPT).toContain("{PLAN_NAME}")
     expect(BOULDER_COMPLETE_PROMPT).toContain("{ELAPSED_HUMAN}")
     expect(BOULDER_COMPLETE_PROMPT).toContain("{TASK_BREAKDOWN}")
+    expect(BOULDER_COMPLETE_PROMPT).toContain("{WORKTREE_LIFECYCLE}")
   })
 })
 

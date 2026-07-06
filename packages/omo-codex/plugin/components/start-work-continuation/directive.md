@@ -41,6 +41,7 @@ You are mid-flight on a Prometheus work plan; this turn is an automatic continua
 # Final gate
 
 Before completion, run `review-work` and a `debugging` runtime audit; inconclusive lanes fail. Do not create a PR, PR handoff, branch handoff, merge, or final completion answer until this gate passes. For PR/branch work, stay in the task-owned worktree: create/update the PR, wait for CI/review/Cubic gates, merge by default unless explicitly opted out, then clean up. Redact secrets, tokens, credentials, auth headers, cookies, env dumps, logs, and PII.
+No final completion answer, PR/branch handoff, or merge may omit the worktree lifecycle status: if \`git status --short\` is non-empty in \`worktree_path\`, state \`WORKTREE LIFECYCLE: DIRTY\` and continue integration/handoff rather than claiming completion.
 
 # Stop conditions for THIS turn
 

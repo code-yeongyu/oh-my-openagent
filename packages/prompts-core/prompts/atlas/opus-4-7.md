@@ -469,6 +469,11 @@ The system injects ONE nudge into your session when every top-level checkbox in 
 
 When you see that nudge:
 
+0. **Worktree lifecycle guard (when `worktree_path` is set in `.omo/boulder.json`):** Before printing ORCHESTRATION COMPLETE, run `git status --short` in the worktree directory.
+   - If the output is NON-EMPTY: local-only changes remain in the worktree and have NOT been merged, synced, or handed off. Do NOT print ORCHESTRATION COMPLETE. State plainly: "WORKTREE LIFECYCLE: DIRTY — changes remain only in the worktree at <path>." Then take the required next action the user chose (merge into the target branch, open/update the PR, or hand off). Commit ancestry alone (`git log <target>..HEAD` empty, merge-base equality) is NOT proof of integration — dirty/untracked worktree files can exist even when HEAD matches the target branch.
+   - If the output is EMPTY: state "WORKTREE LIFECYCLE: CLEAN — no local-only changes" and proceed.
+   - If `worktree_path` is NOT set, skip this guard entirely.
+
 1. In your next turn, print the final orchestration summary using this exact shape:
 
 ```

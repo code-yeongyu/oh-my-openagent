@@ -42,6 +42,8 @@ Total elapsed: {ELAPSED_HUMAN}
 Per-task breakdown:
 {TASK_BREAKDOWN}
 
+{WORKTREE_LIFECYCLE}
+
 Per your <boulder_completion_response> instructions, print the final ORCHESTRATION COMPLETE summary in your next turn. This nudge fires at most once.
 </system-reminder>`
 

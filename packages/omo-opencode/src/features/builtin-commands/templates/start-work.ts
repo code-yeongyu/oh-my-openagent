@@ -118,6 +118,19 @@ Register these as task/todo items so progress is tracked and visible throughout 
 ## WORKTREE COMPLETION
 
 When working in a worktree (\`worktree_path\` is set in boulder.json) and ALL plan tasks are complete:
+**Merge-status guard:** When asked whether worktree changes are merged/synced, or before declaring a worktree task complete, inspect BOTH commit ancestry and filesystem state from the worktree:
+
+\`\`\`bash
+git log --oneline <target-branch>..HEAD
+git status --short
+\`\`\`
+
+- Use the actual target branch/ref from the user request, PR/base branch, or current lifecycle step. If no target ref is known, say "cannot confirm commit ancestry because target branch is unknown" and still report \`git status --short\`.
+- If \`git status --short\` is NON-EMPTY, local-only changes remain in the worktree filesystem. Refuse "already merged" / "already synced" even when \`git log <target>..HEAD\` is empty or HEAD equals the target branch.
+- If \`git log <target>..HEAD\` is NON-EMPTY, commits remain ahead of the target; do not claim merged.
+- Only when BOTH the ancestry check is empty AND \`git status --short\` is empty may you say the worktree's committed and filesystem state is integrated.
+- Before final completion, state one exact lifecycle status: \`worktree-only dirty changes remain\`, \`branch merged into <target>\`, \`PR opened/updated and worktree left for handoff\`, or \`git worktree remove completed\`.
+
 1. Commit all remaining changes in the worktree
 2. **Sync .omo state back**: Copy \`.omo/\` from the worktree to the main repo before removal.
    This is CRITICAL when \`.omo/\` is gitignored - state written during worktree execution would otherwise be lost.

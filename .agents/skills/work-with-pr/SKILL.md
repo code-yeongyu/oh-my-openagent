@@ -336,6 +336,17 @@ if [ -d "$WORKTREE_PATH/.omo" ]; then
 fi
 ```
 
+### Verify local worktree lifecycle before reporting done
+
+Before answering "is this merged/synced?" or reporting PR completion, inspect both the target relation and the worktree filesystem:
+
+```bash
+git -C "$WORKTREE_PATH" log --oneline "$BASE_BRANCH"..HEAD
+git -C "$WORKTREE_PATH" status --short
+```
+
+If `git status --short` is non-empty, those files are local-only to the worktree. Do NOT say the work is already merged/synced, even if the PR is merged or the commit ancestry check is empty. Sync `.omo/` state as documented above, then either commit/merge the remaining files, hand them off explicitly, or get user direction before removing the worktree.
+
 ### Clean up the worktree
 
 The worktree served its purpose — remove it to avoid disk bloat:
@@ -360,6 +371,7 @@ Summarize what happened:
 - **Gates**: CI pass | review-work pass | Cubic {pass | SKIPPED (quota exhausted)}
 - **Merged**: {yes | no — left for you to merge, as requested}
 - **Worktree**: cleaned up
+- **Worktree lifecycle**: {clean and removed | dirty local-only files remain at WORKTREE_PATH | handed off without removal}
 ```
 
 </merge_cleanup>

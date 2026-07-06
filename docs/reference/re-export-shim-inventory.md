@@ -300,6 +300,7 @@ Snapshot date: 2026-06-13. Total shim exports found: 317.
 | `packages/omo-opencode/src/shared/file-utils.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/frontmatter.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/git-worktree/collect-git-diff-stats.ts` | `@oh-my-opencode/utils` |
+| `packages/omo-opencode/src/shared/git-worktree/collect-worktree-dirty-status.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/git-worktree/format-file-changes.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/git-worktree/index.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/git-worktree/parse-diff-numstat.ts` | `@oh-my-opencode/utils` |

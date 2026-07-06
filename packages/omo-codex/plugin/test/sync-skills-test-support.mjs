@@ -70,6 +70,19 @@ export function removeCodexCompatibilityGuidance(content) {
 const startWorkOriginalCompletion = `When all top-level checkboxes in \`## TODOs\` and \`## Final Verification Wave\` are complete:
 
 1. Run the plan's final verification commands.
+**Merge-status guard:** When asked whether worktree changes are merged/synced, or before declaring a worktree task complete, inspect BOTH commit ancestry and filesystem state from the worktree:
+
+\`\`\`bash
+git log --oneline <target-branch>..HEAD
+git status --short
+\`\`\`
+
+- Use the actual target branch/ref from the user request, PR/base branch, or current lifecycle step. If no target ref is known, say "cannot confirm commit ancestry because target branch is unknown" and still report \`git status --short\`.
+- If \`git status --short\` is NON-EMPTY, work remains only in the worktree filesystem. Refuse "already merged" / "already synced" even when \`git log <target>..HEAD\` is empty or HEAD equals the target branch. Commit ancestry alone is not proof — dirty/untracked worktree files can exist even when HEAD matches the target branch.
+- If \`git log <target>..HEAD\` is NON-EMPTY, commits remain ahead of the target; do not claim merged.
+- Only when BOTH the ancestry check is empty AND \`git status --short\` is empty may you say the worktree's committed and filesystem state is integrated.
+- Before final completion, state one exact lifecycle status: \`worktree-only dirty changes remain\`, \`branch merged into <target>\`, \`PR opened/updated and worktree left for handoff\`, or \`git worktree remove completed\`.
+
 2. For PR/branch work, finish the lifecycle from the task-owned worktree: sync \`.omo/\` state back to the main repo, create or update the PR, wait for review/verification gates, merge by default unless explicitly opted out, and remove the worktree only after successful merge or explicit handoff.
 3. Remove or mark the Boulder work as completed.
 4. Print an \`ORCHESTRATION COMPLETE\` block with the plan path, verification commands, artifacts, and cleanup receipts.`;
@@ -77,6 +90,19 @@ const startWorkOriginalCompletion = `When all top-level checkboxes in \`## TODOs
 const startWorkCodexCompletion = `When all top-level checkboxes in \`## TODOs\` and \`## Final Verification Wave\` are complete:
 
 1. Run the plan's final verification commands.
+**Merge-status guard:** When asked whether worktree changes are merged/synced, or before declaring a worktree task complete, inspect BOTH commit ancestry and filesystem state from the worktree:
+
+\`\`\`bash
+git log --oneline <target-branch>..HEAD
+git status --short
+\`\`\`
+
+- Use the actual target branch/ref from the user request, PR/base branch, or current lifecycle step. If no target ref is known, say "cannot confirm commit ancestry because target branch is unknown" and still report \`git status --short\`.
+- If \`git status --short\` is NON-EMPTY, work remains only in the worktree filesystem. Refuse "already merged" / "already synced" even when \`git log <target>..HEAD\` is empty or HEAD equals the target branch. Commit ancestry alone is not proof — dirty/untracked worktree files can exist even when HEAD matches the target branch.
+- If \`git log <target>..HEAD\` is NON-EMPTY, commits remain ahead of the target; do not claim merged.
+- Only when BOTH the ancestry check is empty AND \`git status --short\` is empty may you say the worktree's committed and filesystem state is integrated.
+- Before final completion, state one exact lifecycle status: \`worktree-only dirty changes remain\`, \`branch merged into <target>\`, \`PR opened/updated and worktree left for handoff\`, or \`git worktree remove completed\`.
+
 2. Complete the **Global Review and Debugging Gate** before any completion claim, PR creation, PR handoff, branch handoff, or merge:
    - Invoke the \`review-work\` skill with the final diff, changed files, user goal, constraints, run command, and verification evidence. All five review lanes must return PASS. A timeout, missing deliverable, ack-only child, \`BLOCKED:\`, or inconclusive lane is a gate failure, not approval.
    - Run a debugging-oriented runtime audit even when the review passes: name at least three plausible failure hypotheses for the changed surface, run the distinguishing checks against the actual artifact, and append the ruled-out or confirmed result to \`.omo/start-work/ledger.jsonl\`.

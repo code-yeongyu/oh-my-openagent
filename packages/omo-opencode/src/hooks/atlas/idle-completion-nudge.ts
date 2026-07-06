@@ -10,7 +10,7 @@ import {
   isAgentRegistered,
   resolveRegisteredAgentName,
 } from "../../features/claude-code-session-state"
-import { createInternalAgentContinuationTextPart } from "../../shared"
+import { collectWorktreeDirtyStatus, createInternalAgentContinuationTextPart } from "../../shared"
 import { log } from "../../shared/logger"
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
@@ -93,10 +93,26 @@ export async function handleCompletedBoulderIdle(input: {
     })
     .join("\n")
 
+  const worktreeLifecycle = work.worktree_path
+    ? collectWorktreeDirtyStatus(work.worktree_path)
+    : null
+
+  const worktreeLifecycleBlock =
+    worktreeLifecycle?.lifecycle === "dirty"
+      ? `WORKTREE LIFECYCLE: DIRTY — local-only changes remain in the worktree at ${work.worktree_path} and have NOT been merged, synced, or handed off.
+git status --short in the worktree:
+${worktreeLifecycle.statusShort}
+REQUIRED NEXT ACTION: integrate the worktree (merge into the target branch, open/update the PR, or hand off as the user instructed) BEFORE printing ORCHESTRATION COMPLETE. Do NOT print ORCHESTRATION COMPLETE while this DIRTY status is present. Do NOT claim the work is merged/synced; commit ancestry alone is not proof — filesystem changes can exist only in the worktree even when HEAD matches the target branch.`
+      : worktreeLifecycle?.lifecycle === "clean"
+        ? `WORKTREE LIFECYCLE: CLEAN — no local-only changes in the worktree at ${work.worktree_path}.`
+        : worktreeLifecycle?.lifecycle === "unknown"
+          ? `WORKTREE LIFECYCLE: UNKNOWN — could not inspect git status --short in the worktree at ${work.worktree_path}. Error: ${worktreeLifecycle.errorMessage ?? "unknown error"}. REQUIRED NEXT ACTION: inspect the worktree manually before claiming it is clean, merged, synced, or safe to remove.`
+          : ""
   const prompt = BOULDER_COMPLETE_PROMPT
     .replace(/{PLAN_NAME}/g, work.plan_name)
     .replace(/{ELAPSED_HUMAN}/g, elapsedHuman)
     .replace(/{TASK_BREAKDOWN}/g, taskBreakdown.length > 0 ? taskBreakdown : "- (no task timings)")
+    .replace(/{WORKTREE_LIFECYCLE}/g, worktreeLifecycleBlock)
 
   const atlasAgent = resolveRegisteredAgentName(
     boulderState.agent ?? (isAgentRegistered("atlas") ? "atlas" : undefined),
