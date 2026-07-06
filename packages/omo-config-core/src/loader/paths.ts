@@ -54,10 +54,22 @@ function detectUserOmoJsonPath(
   return fileSystem.existsSync(jsonPath) ? jsonPath : jsoncPath
 }
 
+function isSymlinkedProjectOmoDirectory(path: string, fileSystem: OmoConfigReadFileSystem): boolean {
+  if (fileSystem.lstatSync === undefined || !fileSystem.existsSync(path)) return false
+  try {
+    return fileSystem.lstatSync(path).isSymbolicLink()
+  } catch (error) {
+    if (error instanceof Error) return true
+    throw error
+  }
+}
+
 function detectOmoJsonPath(dir: string, fileSystem: OmoConfigReadFileSystem): string | null {
-  const jsoncPath = join(dir, ".omo", "omo.jsonc")
+  const omoDir = join(dir, ".omo")
+  if (isSymlinkedProjectOmoDirectory(omoDir, fileSystem)) return null
+  const jsoncPath = join(omoDir, "omo.jsonc")
   if (fileSystem.existsSync(jsoncPath)) return jsoncPath
-  const jsonPath = join(dir, ".omo", "omo.json")
+  const jsonPath = join(omoDir, "omo.json")
   return fileSystem.existsSync(jsonPath) ? jsonPath : null
 }
 

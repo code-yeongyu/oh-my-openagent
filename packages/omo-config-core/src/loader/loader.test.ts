@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, test } from "bun:test"
@@ -125,6 +125,27 @@ describe("loadOmoConfig", () => {
     expect(result.diagnostics).toEqual([])
     expect(result.config.teams?.alpha?.description).toBe("near layer description")
     expect(result.config.teams?.alpha?.members[0]?.name).toBe("one")
+  })
+
+  test("#given symlinked project omo directory #when loading #then target config is ignored", () => {
+    // given
+    const fixture = makeFixture()
+    const outsideConfigDir = join(fixture.homeDir, "outside-omo")
+    mkdirSync(outsideConfigDir, { recursive: true })
+    writeJsonc(join(outsideConfigDir, "omo.jsonc"), `{"task":{"default_concurrency":9}}`)
+    symlinkSync(outsideConfigDir, join(fixture.projectDir, ".omo"))
+
+    // when
+    const result = loadOmoConfig({
+      cwd: fixture.cwd,
+      env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+      platform: "linux",
+    })
+
+    // then
+    expect(result.diagnostics).toEqual([])
+    expect(result.config.task?.default_concurrency).toBe(5)
+    expect(result.sources.some((source) => source.scope === "project" && source.loaded)).toBe(false)
   })
 
   test("#given malformed and unreadable configs #when loading #then defaults survive and typed diagnostics identify paths", () => {

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, lstatSync, readFileSync } from "node:fs"
 import type { OmoConfig } from "../schema"
 
 export type OmoConfigDiagnosticKind = "parse" | "read" | "validation"
@@ -29,6 +29,7 @@ export type OmoConfigEnv = {
 
 export type OmoConfigReadFileSystem = {
   readonly existsSync: (path: string) => boolean
+  readonly lstatSync?: (path: string) => { readonly isSymbolicLink: () => boolean }
   readonly readFileSync: (path: string, encoding: "utf-8") => string
 }
 
@@ -47,5 +48,6 @@ export type LoadOmoConfigResult = {
 
 export const DEFAULT_READ_FILE_SYSTEM: OmoConfigReadFileSystem = {
   existsSync,
+  lstatSync,
   readFileSync,
 }
