@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { describe, expect, test } from "bun:test"
 
@@ -8,7 +9,6 @@ import {
   createExtensionRuntime,
   type AgentSessionEvent,
   type CreateAgentSessionOptions,
-  type ExtensionFactory,
   type ResourceLoader,
   type RpcCommand,
   type RpcResponse,
@@ -50,24 +50,42 @@ describe("pinned Senpi API surface", () => {
     expect(options.tools).toEqual(["read", "bash"])
   })
 
-  test("#given minimal resource loader #when fake marker extension exists #then marker factory is not run and no extensions load", () => {
+  test("#given agent dir marker extension #when minimal loader is wired to session options #then no marker extension is discovered", () => {
     // given
-    let markerRan = false
-    const markerFactory: ExtensionFactory = () => {
-      markerRan = true
-    }
+    const agentDir = mkdtempSync(join(tmpdir(), "senpi-task-marker-"))
+    const markerPath = join(agentDir, "extensions", "marker.js")
+    mkdirSync(dirname(markerPath), { recursive: true })
+    writeFileSync(markerPath, "globalThis.__senpiTaskMarkerInvoked = true\n", "utf8")
     const loader: ResourceLoader = createMinimalSenpiResourceLoader({
       runtime: createExtensionRuntime(),
-      markerFactory,
     })
 
     // when
+    const options = acceptCreateAgentSessionOptions({
+      customTools: [],
+      sessionManager: SessionManager.inMemory(),
+      tools: [],
+      model: undefined,
+      resourceLoader: loader,
+    })
+    expect(options.resourceLoader).toBe(loader)
     const extensions = loader.getExtensions()
+    rmSync(agentDir, { recursive: true, force: true })
 
     // then
-    expect(markerRan).toBe(false)
     expect(extensions.extensions).toHaveLength(0)
     expect(extensions.errors).toEqual([])
+  })
+
+  test("#given minimal resource loader source #when audited #then fake marker factory option is absent", () => {
+    // given
+    const source = readFileSync(join(import.meta.dir, "senpi", "minimal-resource-loader.ts"), "utf8")
+
+    // when
+    const exposesMarkerFactory = source.includes("markerFactory")
+
+    // then
+    expect(exposesMarkerFactory).toBe(false)
   })
 
   test("#given pinned artifact #when package metadata and rpc entry are checked #then expected public contract exists", async () => {

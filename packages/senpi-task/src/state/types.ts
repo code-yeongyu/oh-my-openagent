@@ -101,6 +101,11 @@ export type TaskTransitionAudit =
       readonly attempted_status: TaskStatus
       readonly current_status: TaskStatus
     }
+  | {
+      readonly type: "invalid_transition_ignored"
+      readonly attempted_status: TaskStatus
+      readonly current_status: TaskStatus
+    }
 
 export type TaskTransitionResult = {
   readonly applied: boolean
