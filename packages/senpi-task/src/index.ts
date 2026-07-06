@@ -146,3 +146,28 @@ export type {
   LoadAgentsOptions,
   LoadAgentsResult,
 } from "./agents"
+export {
+  buildCompletionDetails,
+  buildCompletionMessage,
+  createCompletionNotifier,
+  routeCompletion,
+  shouldNotifyStatus,
+} from "./completion"
+export type {
+  CompletionDetails,
+  CompletionNotifier,
+  CompletionNotifierDeps,
+  CompletionNotifierStore,
+  CompletionRequest,
+  DeliveredDecision,
+  FlushInput,
+  FlushResult,
+  NotificationConfig,
+  NotifyResult,
+  ParentNotifier,
+  ParentNotifierMessage,
+  ParentState,
+  RoutingDecision,
+  SkipReason,
+  TransitionReason,
+} from "./completion"
