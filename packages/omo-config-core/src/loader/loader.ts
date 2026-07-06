@@ -1,5 +1,5 @@
 import { parseJsoncSafe } from "@oh-my-opencode/utils"
-import { OmoConfigSchema, OmoTaskSettingsSchema, type OmoConfig } from "../schema"
+import { OmoConfigLayerSchema, OmoConfigSchema, OmoTaskSettingsSchema, type OmoConfig } from "../schema"
 import { mergeOmoConfigRecords } from "./merge"
 import { resolveOmoConfigPaths } from "./paths"
 import {
@@ -73,7 +73,7 @@ function readConfigSource(
     }
   }
 
-  const validation = OmoConfigSchema.safeParse(parsed.data)
+  const validation = OmoConfigLayerSchema.safeParse(parsed.data)
   if (!validation.success) {
     return {
       diagnostic: validationDiagnostic(path, validation.error.issues),

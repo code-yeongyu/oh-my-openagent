@@ -10,12 +10,12 @@ index b4f82f5d2..e789161bb 100644
 -import { describe, expect, test } from "bun:test"
 +import { describe, expect, setSystemTime, test } from "bun:test"
  import { loadOmoConfig, OmoConfigWriteError, updateOmoConfig } from "../index"
- 
+
  function makeFixture(): {
 @@ -62,6 +62,57 @@ describe("updateOmoConfig", () => {
      expect(backupFiles[0]).toMatch(/omo\.jsonc\.bak\.\d{4}-\d{2}-\d{2}T/)
    })
- 
+
 +  test("#given fixed backup timestamp #when editing existing config twice immediately #then backup paths stay distinct", () => {
 +    // given
 +    const fixture = makeFixture()
@@ -77,7 +77,7 @@ index 7a0aaf197..af9ac769b 100644
 @@ -25,6 +25,30 @@ function backupSuffix(): string {
    return new Date().toISOString().replace(/[:.]/g, "-")
  }
- 
+
 +function isFileExistsError(error: unknown): boolean {
 +  return error instanceof Error && Reflect.get(error, "code") === "EEXIST"
 +}
@@ -106,9 +106,9 @@ index 7a0aaf197..af9ac769b 100644
    const fileSystem = options.fileSystem ?? DEFAULT_WRITE_FILE_SYSTEM
    if (options.scope === "user") {
 @@ -111,11 +135,11 @@ export function updateOmoConfig(options: UpdateOmoConfigOptions): UpdateOmoConfi
- 
+
    assertJsoncCanBeModified(path, content)
- 
+
 -  const backupPath = existed ? `${path}.bak.${backupSuffix()}` : undefined
 -  if (backupPath !== undefined) {
 +  let backupPath: string | undefined
