@@ -13,6 +13,7 @@ import {
   type SpawnAdmission,
   type TaskLifecycle,
   type TaskManager,
+  type TaskRecordStore,
 } from "@oh-my-opencode/senpi-task"
 
 import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
@@ -22,6 +23,7 @@ import { createParentNotifier } from "./parent-notifier"
 import { createTaskChildPlanner } from "./planner"
 import { createManagerResidencyRegistry } from "./residency-registry"
 import { TaskRuntimeContext } from "./runtime-context"
+import { createMutationNotifyingStore } from "./store-mutation-observer"
 
 export interface TaskEngine {
   readonly manager: TaskManager
@@ -32,6 +34,9 @@ export interface TaskEngine {
   readonly omoConfig: OmoConfig
   readonly settings: OmoTaskSettings
   readonly stateDir: string
+  // Subscribe to every store mutation (spawn/transition/replace/remove). The UI status sync attaches
+  // here so the footer/widget refresh on background task activity. Returns an unsubscribe.
+  onStoreMutation(listener: () => void): () => void
 }
 
 export interface ComposeTaskEngineDeps {
@@ -78,12 +83,17 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     wasBackground: (taskId) => managerRef?.wasBackground(taskId) ?? false,
   })
 
+  const mutationListeners = new Set<() => void>()
+  const notifyingStore: TaskRecordStore = createMutationNotifyingStore(observingStore, () => {
+    for (const listener of mutationListeners) listener()
+  })
+
   const registry = createManagerResidencyRegistry(getManager)
-  const lifecycle = createTaskLifecycle({ store: observingStore, registry, config: settings })
+  const lifecycle = createTaskLifecycle({ store: notifyingStore, registry, config: settings })
 
   const runner = buildRunner(runtime, deps.sharedParentTools, settings)
   const manager = createTaskManager({
-    store: observingStore,
+    store: notifyingStore,
     runners: { "in-process": runner, process: runner },
     planner: createTaskChildPlanner(deps.omoConfig, () => runtime.modelRegistry()),
     config: settings,
@@ -102,6 +112,10 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     omoConfig: deps.omoConfig,
     settings,
     stateDir: baseStore.stateDir,
+    onStoreMutation: (listener) => {
+      mutationListeners.add(listener)
+      return () => mutationListeners.delete(listener)
+    },
   }
 }
 

@@ -12,11 +12,14 @@ import {
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { shouldWarnDualConfig, DUAL_CONFIG_WARNING } from "./coexistence"
+import { registerTaskCommands } from "./commands"
 import { composeTaskEngine, type TaskEngine } from "./engine"
 import { detectOpencodeConfig } from "./opencode-config"
 import { TASK_COMPLETION_MESSAGE_TYPE } from "./parent-notifier"
 import { renderTaskCompletion } from "./renderers"
 import type { LiveTaskContext } from "./runtime-context"
+import { createSessionTransitionBridge, type SessionTransitionBridge } from "./session-transition-bridge"
+import { createTaskStatusUi, type TaskStatusUi } from "./status-ui"
 import { missingTaskCapabilities } from "./surface"
 import { createOncePerSessionGuard, TASK_USAGE_GUIDANCE } from "./usage-guidance"
 
@@ -64,7 +67,13 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
 
       pi.registerMessageRenderer?.(TASK_COMPLETION_MESSAGE_TYPE, renderTaskCompletion)
       registerTaskTools(pi, engine)
-      wireEventBridge(pi, ctx, engine, {
+      registerTaskCommands(pi, engine.manager)
+
+      const statusUi = createTaskStatusUi({ manager: engine.manager, runtime: engine.runtime })
+      engine.onStoreMutation(() => statusUi.scheduleSync())
+      const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })
+
+      wireEventBridge(pi, ctx, engine, statusUi, transitions, {
         warnDualConfig: shouldWarnDualConfig({ sources: loaded.sources, hasOpencodeConfig: detectOpencodeConfig(cwd) }),
       })
     },
@@ -103,16 +112,28 @@ interface EventBridgeState {
   readonly warnDualConfig: boolean
 }
 
-// The 4 task event handlers (pi-task event-bridge parity): session_start reconciles once per process
-// (F6) and restores runtime context; session_shutdown tears residents down; model_select refreshes
-// the inherited model registry; before_agent_start injects once-per-session usage guidance.
-function wireEventBridge(pi: SenpiExtensionAPI, ctx: ComponentContext, engine: TaskEngine, state: EventBridgeState): void {
+// The task event handlers (pi-task event-bridge parity): session_start reconciles once per process
+// (F6), restores runtime context, and flushes any completion buffered while the session was away;
+// session_before_switch/before_compact mark the parent transition so completions buffer instead of
+// injecting mid-transition (todo 18 inherited obligation); session_compact resumes the same session
+// and flushes its buffer; session_shutdown tears residents down; model_select refreshes the inherited
+// model registry; before_agent_start injects once-per-session usage guidance. Every handler refreshes
+// the captured UI so the footer/widget follow the live session.
+function wireEventBridge(
+  pi: SenpiExtensionAPI,
+  ctx: ComponentContext,
+  engine: TaskEngine,
+  statusUi: TaskStatusUi,
+  transitions: SessionTransitionBridge,
+  state: EventBridgeState,
+): void {
   let firstSessionStart = true
   let warnedDualConfig = false
   const guidanceGuard = createOncePerSessionGuard()
 
   pi.on("session_start", async (_payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
+    transitions.onSessionStart(engine.runtime.sessionId())
     if (firstSessionStart) {
       firstSessionStart = false
       await engine.lifecycle.reconcileOnSessionStart()
@@ -121,16 +142,35 @@ function wireEventBridge(pi: SenpiExtensionAPI, ctx: ComponentContext, engine: T
       warnedDualConfig = true
       notifyOrLog(engine, ctx, DUAL_CONFIG_WARNING)
     }
+    statusUi.scheduleSync()
+  })
+
+  pi.on("session_before_switch", (_payload, eventCtx) => {
+    engine.runtime.captureFrom(asLiveContext(eventCtx))
+    transitions.onBeforeSwitch(engine.runtime.sessionId())
+  })
+
+  pi.on("session_before_compact", (_payload, eventCtx) => {
+    engine.runtime.captureFrom(asLiveContext(eventCtx))
+    transitions.onBeforeCompact(engine.runtime.sessionId())
+  })
+
+  pi.on("session_compact", (_payload, eventCtx) => {
+    engine.runtime.captureFrom(asLiveContext(eventCtx))
+    transitions.onCompact(engine.runtime.sessionId())
+    statusUi.scheduleSync()
   })
 
   pi.on("session_shutdown", async (_payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
+    transitions.onShutdown(engine.runtime.sessionId())
     engine.runtime.clearUi()
     await engine.lifecycle.teardownOnSessionShutdown()
   })
 
   pi.on("model_select", (_payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
+    statusUi.scheduleSync()
   })
 
   pi.on("before_agent_start", (_payload, eventCtx) => {

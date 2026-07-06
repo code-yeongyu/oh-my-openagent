@@ -8,7 +8,16 @@ import type { ComponentContext, ComponentLogger } from "../../extension/types"
 import { createTaskComponent } from "./index"
 
 const TASK_TOOL_NAMES = ["task", "task_send", "task_wait", "task_interrupt", "task_cancel", "task_list", "task_output"]
-const TASK_EVENTS = ["session_start", "session_shutdown", "model_select", "before_agent_start"]
+const TASK_EVENTS = [
+  "session_start",
+  "session_before_switch",
+  "session_before_compact",
+  "session_compact",
+  "session_shutdown",
+  "model_select",
+  "before_agent_start",
+]
+const TASK_COMMANDS = ["task-kill", "tasks"]
 
 interface RecordedLog {
   level: "info" | "warn" | "error"
@@ -53,7 +62,7 @@ function toolNames(pi: FakeExtensionAPI): string[] {
 }
 
 describe("omo-senpi task component wiring", () => {
-  it("#given a fake ExtensionAPI boot #when the task component registers #then 7 tools, a renderer, and 4 event handlers are wired", () => {
+  it("#given a fake ExtensionAPI boot #when the task component registers #then tools, commands, a renderer, and the event handlers are wired", () => {
     // given
     const pi = new FakeExtensionAPI()
     const logger = createLogger()
@@ -63,9 +72,11 @@ describe("omo-senpi task component wiring", () => {
 
     // then the 7 task tools registered
     expect(toolNames(pi)).toEqual([...TASK_TOOL_NAMES].sort())
+    // the /tasks and /task-kill commands registered
+    expect(pi.commands.map((entry) => entry.name).sort()).toEqual([...TASK_COMMANDS].sort())
     // the completion renderer registered
     expect(pi.messageRenderers.map((entry) => entry.customType)).toEqual(["senpi-task.completion"])
-    // exactly the 4 task event handlers
+    // exactly the task event handlers (session lifecycle + transition-buffer edges)
     expect(pi.handlers.map((handler) => handler.event).sort()).toEqual([...TASK_EVENTS].sort())
   })
 

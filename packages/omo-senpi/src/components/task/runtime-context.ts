@@ -10,11 +10,21 @@ export interface LiveTaskContext {
   readonly modelRegistry?: TaskModelRegistry
   readonly model?: unknown
   readonly ui?: CapturedUi
+  readonly mode?: string
+  readonly hasUI?: boolean
+  readonly sessionManager?: { getSessionId(): string }
   isIdle?(): boolean
 }
 
+// The slice of senpi's ExtensionUIContext the task component drives (setStatus/setWidget power the
+// footer + below-editor widget, select/confirm power /task-kill, notify powers headless-safe warnings).
+// senpi's real ExtensionUIContext satisfies this structurally.
 export interface CapturedUi {
   notify(message: string, type?: "info" | "warning" | "error"): void
+  setStatus(key: string, text: string | undefined): void
+  setWidget(key: string, content: string[] | undefined, options?: { placement?: "belowEditor" | "aboveEditor" }): void
+  select(title: string, options: string[], opts?: { signal?: unknown; timeout?: number }): Promise<string | undefined>
+  confirm(title: string, message: string, opts?: { signal?: unknown; timeout?: number }): Promise<boolean>
 }
 
 export type ParentTransition = "compacting" | "session_switching" | "session_shutdown" | undefined
@@ -30,6 +40,8 @@ export class TaskRuntimeContext {
   #idle = true
   #transition: ParentTransition
   #ui: CapturedUi | undefined
+  #sessionId: string | undefined
+  #mode: string | undefined
 
   constructor(cwd: string) {
     this.#cwd = cwd
@@ -39,6 +51,8 @@ export class TaskRuntimeContext {
     if (typeof ctx.cwd === "string" && ctx.cwd.length > 0) this.#cwd = ctx.cwd
     if (ctx.modelRegistry !== undefined) this.#modelRegistry = ctx.modelRegistry
     if (ctx.ui !== undefined) this.#ui = ctx.ui
+    if (typeof ctx.mode === "string") this.#mode = ctx.mode
+    if (ctx.sessionManager !== undefined) this.#sessionId = ctx.sessionManager.getSessionId()
     if (typeof ctx.isIdle === "function") this.#idle = ctx.isIdle()
   }
 
@@ -60,6 +74,14 @@ export class TaskRuntimeContext {
 
   ui(): CapturedUi | undefined {
     return this.#ui
+  }
+
+  sessionId(): string | undefined {
+    return this.#sessionId
+  }
+
+  mode(): string | undefined {
+    return this.#mode
   }
 
   parentState(): ParentState {
