@@ -1,6 +1,7 @@
 import {
   copyFileSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
   readdirSync,
@@ -17,14 +18,20 @@ export type OmoConfigEdit = {
   readonly value: unknown
 }
 
+export type OmoConfigPathStats = {
+  readonly isSymbolicLink: () => boolean
+}
+
 export type OmoConfigWriteFileSystem = {
   readonly copyFileSync: (source: string, destination: string) => void
   readonly existsSync: (path: string) => boolean
+  readonly lstatSync: (path: string) => OmoConfigPathStats
   readonly mkdirSync: (path: string, options: { readonly recursive: true }) => string | undefined
   readonly readFileSync: (path: string, encoding: "utf-8") => string
   readonly readdirSync: (path: string) => string[]
   readonly renameSync: (oldPath: string, newPath: string) => void
   readonly unlinkSync: (path: string) => void
+  readonly writeFileExclusiveSync: (path: string, content: string) => void
   readonly writeFileSync: (path: string, content: string, encoding: "utf-8") => void
 }
 
@@ -42,18 +49,18 @@ export type UpdateOmoConfigResult = {
   readonly path: string
 }
 
-export type ReadModifyWriteOmoConfigOptions = UpdateOmoConfigOptions & {
-  readonly cwd?: string
-}
-
 export const DEFAULT_WRITE_FILE_SYSTEM: OmoConfigWriteFileSystem = {
   copyFileSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
   readdirSync,
   renameSync,
   unlinkSync,
+  writeFileExclusiveSync: (path: string, content: string): void => {
+    writeFileSync(path, content, { encoding: "utf-8", flag: "wx" })
+  },
   writeFileSync,
 }
 

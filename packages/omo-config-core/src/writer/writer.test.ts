@@ -1,8 +1,8 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, test } from "bun:test"
-import { OmoConfigWriteError, updateOmoConfig } from "../index"
+import { loadOmoConfig, OmoConfigWriteError, updateOmoConfig } from "../index"
 
 function makeFixture(): {
   readonly homeDir: string
@@ -82,6 +82,65 @@ describe("updateOmoConfig", () => {
     expect(content).toContain(`"default_concurrency": 6`)
   })
 
+  test("#given existing project omo json #when editing #then writer preserves json path and loaded settings", () => {
+    // given
+    const fixture = makeFixture()
+    const configPath = join(fixture.projectDir, ".omo", "omo.json")
+    const shadowPath = join(fixture.projectDir, ".omo", "omo.jsonc")
+    mkdirSync(join(configPath, ".."), { recursive: true })
+    writeFileSync(configPath, `{"task":{"default_concurrency":9,"wait":{"max_ms":70000}}}\n`)
+
+    // when
+    const result = updateOmoConfig({
+      scope: "project",
+      projectDir: fixture.projectDir,
+      edits: [{ path: ["task", "wait", "default_ms"], value: 12000 }],
+      env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+      platform: "linux",
+    })
+    const loaded = loadOmoConfig({
+      cwd: fixture.projectDir,
+      env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+      platform: "linux",
+    })
+
+    // then
+    expect(result.path).toBe(configPath)
+    expect(existsSync(shadowPath)).toBe(false)
+    expect(loaded.config.task?.default_concurrency).toBe(9)
+    expect(loaded.config.task?.wait.default_ms).toBe(12000)
+    expect(loaded.config.task?.wait.max_ms).toBe(70000)
+  })
+
+  test("#given existing user omo json #when editing #then writer preserves json path and loaded settings", () => {
+    // given
+    const fixture = makeFixture()
+    const configPath = join(fixture.xdgConfigHome, "omo", "omo.json")
+    const shadowPath = join(fixture.xdgConfigHome, "omo", "omo.jsonc")
+    mkdirSync(join(configPath, ".."), { recursive: true })
+    writeFileSync(configPath, `{"task":{"default_concurrency":9,"wait":{"max_ms":70000}}}\n`)
+
+    // when
+    const result = updateOmoConfig({
+      scope: "user",
+      edits: [{ path: ["task", "wait", "default_ms"], value: 12000 }],
+      env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+      platform: "linux",
+    })
+    const loaded = loadOmoConfig({
+      cwd: fixture.projectDir,
+      env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+      platform: "linux",
+    })
+
+    // then
+    expect(result.path).toBe(configPath)
+    expect(existsSync(shadowPath)).toBe(false)
+    expect(loaded.config.task?.default_concurrency).toBe(9)
+    expect(loaded.config.task?.wait.default_ms).toBe(12000)
+    expect(loaded.config.task?.wait.max_ms).toBe(70000)
+  })
+
   test("#given writer cannot create temp file #when editing #then typed error surfaces and no partial remains", () => {
     // given
     const fixture = makeFixture()
@@ -99,14 +158,16 @@ describe("updateOmoConfig", () => {
         fileSystem: {
           copyFileSync: () => undefined,
           existsSync,
+          lstatSync,
           mkdirSync,
           readFileSync,
           readdirSync,
           renameSync: () => undefined,
           unlinkSync: () => undefined,
-          writeFileSync: (path: string) => {
-            if (String(path).endsWith(".tmp")) throw new Error("EACCES synthetic")
+          writeFileExclusiveSync: () => {
+            throw new Error("EACCES synthetic")
           },
+          writeFileSync,
         },
         platform: "linux",
       })

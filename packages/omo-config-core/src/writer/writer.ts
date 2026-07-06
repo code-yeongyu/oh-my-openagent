@@ -1,11 +1,11 @@
+import { randomUUID } from "node:crypto"
 import { dirname, join } from "node:path"
 import { parseJsoncSafe } from "@oh-my-opencode/utils"
 import { applyEdits, modify } from "jsonc-parser/lib/esm/main.js"
-import { loadOmoConfig, resolveUserOmoConfigPath } from "../loader"
+import { resolveUserOmoConfigPath } from "../loader"
 import {
   DEFAULT_WRITE_FILE_SYSTEM,
   OmoConfigWriteError,
-  type ReadModifyWriteOmoConfigOptions,
   type UpdateOmoConfigOptions,
   type UpdateOmoConfigResult,
 } from "./types"
@@ -26,24 +26,44 @@ function backupSuffix(): string {
 }
 
 function resolveWritePath(options: UpdateOmoConfigOptions): string {
+  const fileSystem = options.fileSystem ?? DEFAULT_WRITE_FILE_SYSTEM
   if (options.scope === "user") {
-    return resolveUserOmoConfigPath(options.env, options.platform ?? process.platform)
+    const jsoncPath = resolveUserOmoConfigPath(options.env, options.platform ?? process.platform)
+    if (fileSystem.existsSync(jsoncPath)) return jsoncPath
+    const jsonPath = join(dirname(jsoncPath), "omo.json")
+    return fileSystem.existsSync(jsonPath) ? jsonPath : jsoncPath
   }
-  return join(options.projectDir ?? process.cwd(), ".omo", "omo.jsonc")
+  const jsoncPath = join(options.projectDir ?? process.cwd(), ".omo", "omo.jsonc")
+  if (fileSystem.existsSync(jsoncPath)) return jsoncPath
+  const jsonPath = join(dirname(jsoncPath), "omo.json")
+  return fileSystem.existsSync(jsonPath) ? jsonPath : jsoncPath
 }
 
 function writeAtomically(path: string, content: string, fileSystem: typeof DEFAULT_WRITE_FILE_SYSTEM): void {
-  const tempPath = `${path}.tmp`
+  const tempPath = `${path}.${randomUUID()}.tmp`
+  let tempCreated = false
   try {
-    fileSystem.writeFileSync(tempPath, content, "utf-8")
+    fileSystem.writeFileExclusiveSync(tempPath, content)
+    tempCreated = true
     fileSystem.renameSync(tempPath, path)
   } catch (error) {
     try {
-      if (fileSystem.existsSync(tempPath)) fileSystem.unlinkSync(tempPath)
+      if (tempCreated) fileSystem.unlinkSync(tempPath)
     } catch (cleanupError) {
       if (!(cleanupError instanceof Error)) throw cleanupError
     }
     throw new OmoConfigWriteError(path, "write", error)
+  }
+}
+
+function assertConfigPathIsSafe(path: string, fileSystem: typeof DEFAULT_WRITE_FILE_SYSTEM): void {
+  try {
+    if (fileSystem.lstatSync(path).isSymbolicLink()) {
+      throw new OmoConfigWriteError(path, "read", new Error("Refusing to edit symlinked omo config"))
+    }
+  } catch (error) {
+    if (error instanceof OmoConfigWriteError) throw error
+    throw new OmoConfigWriteError(path, "read", error)
   }
 }
 
@@ -64,8 +84,12 @@ export function updateOmoConfig(options: UpdateOmoConfigOptions): UpdateOmoConfi
 
   try {
     fileSystem.mkdirSync(directory, { recursive: true })
-    if (existed) content = fileSystem.readFileSync(path, "utf-8")
+    if (existed) {
+      assertConfigPathIsSafe(path, fileSystem)
+      content = fileSystem.readFileSync(path, "utf-8")
+    }
   } catch (error) {
+    if (error instanceof OmoConfigWriteError) throw error
     throw new OmoConfigWriteError(path, "read", error)
   }
 
@@ -74,8 +98,10 @@ export function updateOmoConfig(options: UpdateOmoConfigOptions): UpdateOmoConfi
   const backupPath = existed ? `${path}.bak.${backupSuffix()}` : undefined
   if (backupPath !== undefined) {
     try {
+      assertConfigPathIsSafe(path, fileSystem)
       fileSystem.copyFileSync(path, backupPath)
     } catch (error) {
+      if (error instanceof OmoConfigWriteError) throw error
       throw new OmoConfigWriteError(path, "backup", error)
     }
   }
@@ -90,14 +116,4 @@ export function updateOmoConfig(options: UpdateOmoConfigOptions): UpdateOmoConfi
 
   writeAtomically(path, nextContent, fileSystem)
   return backupPath === undefined ? { path } : { backupPath, path }
-}
-
-export function readModifyWriteOmoConfig(options: ReadModifyWriteOmoConfigOptions): UpdateOmoConfigResult {
-  loadOmoConfig({
-    cwd: options.cwd ?? options.projectDir ?? process.cwd(),
-    env: options.env,
-    fileSystem: options.fileSystem,
-    platform: options.platform,
-  })
-  return updateOmoConfig(options)
 }
