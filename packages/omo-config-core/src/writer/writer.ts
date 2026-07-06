@@ -25,6 +25,30 @@ function backupSuffix(): string {
   return new Date().toISOString().replace(/[:.]/g, "-")
 }
 
+function isFileExistsError(error: unknown): boolean {
+  return error instanceof Error && Reflect.get(error, "code") === "EEXIST"
+}
+
+function backupCandidate(basePath: string, attempt: number): string {
+  return attempt === 0 ? basePath : `${basePath}.${attempt}`
+}
+
+function writeBackup(path: string, content: string, fileSystem: typeof DEFAULT_WRITE_FILE_SYSTEM): string {
+  const basePath = `${path}.bak.${backupSuffix()}`
+  let attempt = 0
+
+  while (true) {
+    const candidate = backupCandidate(basePath, attempt)
+    try {
+      fileSystem.writeFileExclusiveSync(candidate, content)
+      return candidate
+    } catch (error) {
+      if (!isFileExistsError(error)) throw error
+      attempt += 1
+    }
+  }
+}
+
 function resolveWritePath(options: UpdateOmoConfigOptions): string {
   const fileSystem = options.fileSystem ?? DEFAULT_WRITE_FILE_SYSTEM
   if (options.scope === "user") {
@@ -111,11 +135,11 @@ export function updateOmoConfig(options: UpdateOmoConfigOptions): UpdateOmoConfi
 
   assertJsoncCanBeModified(path, content)
 
-  const backupPath = existed ? `${path}.bak.${backupSuffix()}` : undefined
-  if (backupPath !== undefined) {
+  let backupPath: string | undefined
+  if (existed) {
     try {
       assertConfigPathIsSafe(path, fileSystem)
-      fileSystem.copyFileSync(path, backupPath)
+      backupPath = writeBackup(path, content, fileSystem)
     } catch (error) {
       if (error instanceof OmoConfigWriteError) throw error
       throw new OmoConfigWriteError(path, "backup", error)

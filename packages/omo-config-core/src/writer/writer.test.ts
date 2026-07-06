@@ -1,7 +1,7 @@
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { describe, expect, test } from "bun:test"
+import { describe, expect, setSystemTime, test } from "bun:test"
 import { loadOmoConfig, OmoConfigWriteError, updateOmoConfig } from "../index"
 
 function makeFixture(): {
@@ -60,6 +60,57 @@ describe("updateOmoConfig", () => {
     expect(content).toContain(`"default_ms": 12000`)
     expect(backupFiles).toHaveLength(2)
     expect(backupFiles[0]).toMatch(/omo\.jsonc\.bak\.\d{4}-\d{2}-\d{2}T/)
+  })
+
+  test("#given fixed backup timestamp #when editing existing config twice immediately #then backup paths stay distinct", () => {
+    // given
+    const fixture = makeFixture()
+    const configPath = join(fixture.projectDir, ".omo", "omo.jsonc")
+    mkdirSync(join(configPath, ".."), { recursive: true })
+    writeFileSync(
+      configPath,
+      `{
+  // task settings stay documented
+  "task": {
+    "default_concurrency": 5
+  }
+}
+`,
+    )
+
+    // when
+    setSystemTime(new Date("2026-07-06T00:00:00.000Z"))
+    try {
+      const first = updateOmoConfig({
+        scope: "project",
+        projectDir: fixture.projectDir,
+        edits: [{ path: ["task", "default_concurrency"], value: 3 }],
+        env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+        platform: "linux",
+      })
+      const second = updateOmoConfig({
+        scope: "project",
+        projectDir: fixture.projectDir,
+        edits: [{ path: ["task", "wait", "default_ms"], value: 12000 }],
+        env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+        platform: "linux",
+      })
+
+      // then
+      const content = readFileSync(configPath, "utf-8")
+      const backupFiles = readdirSync(join(configPath, "..")).filter((entry: string) => entry.includes(".bak."))
+      expect(first.backupPath).toBe(`${configPath}.bak.2026-07-06T00-00-00-000Z`)
+      expect(second.backupPath).toStartWith(`${configPath}.bak.2026-07-06T00-00-00-000Z`)
+      expect(second.backupPath).not.toBe(first.backupPath)
+      expect(existsSync(first.backupPath ?? "")).toBe(true)
+      expect(existsSync(second.backupPath ?? "")).toBe(true)
+      expect(backupFiles).toHaveLength(2)
+      expect(content).toContain("// task settings stay documented")
+      expect(content).toContain(`"default_concurrency": 3`)
+      expect(content).toContain(`"default_ms": 12000`)
+    } finally {
+      setSystemTime()
+    }
   })
 
   test("#given missing user config #when editing #then file is created with header and parsed value", () => {
