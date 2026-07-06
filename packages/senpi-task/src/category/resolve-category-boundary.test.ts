@@ -151,6 +151,38 @@ describe("resolveCategory boundary parsing", () => {
     expect(JSON.stringify(result)).not.toContain("hidden find accessor marker")
   })
 
+  test("#given find returns an empty or mismatched identity #when resolved #then category resolution rejects the registry result", () => {
+    // given
+    const availableModel = model("openai", "gpt-5.4-mini")
+    const malformedFindResults = [
+      { provider: "", id: "" },
+      { provider: "evil", id: "other" },
+      { provider: "openai", id: "" },
+    ] satisfies readonly FakeModel[]
+
+    // when
+    const results = malformedFindResults.map((findResult) => resolveCategory("quick", {}, {
+      getAvailable: () => [availableModel],
+      find: () => findResult,
+    }))
+
+    // then
+    for (const result of results) {
+      if (result.kind === "resolved") {
+        expect(result.modelSelection.selectedModel).toBe("openai/gpt-5.4-mini")
+        expect(result.spec.provider).not.toBe("evil")
+        expect(result.spec.modelId).not.toBe("")
+        throw new Error(`Expected unavailable result, got resolved ${result.spec.provider}/${result.spec.modelId}`)
+      }
+      expect(result.kind).toBe("model_unavailable")
+      if (result.kind !== "model_unavailable") throw new Error(`Expected unavailable result, got ${result.kind}`)
+      expect(result.attemptedModel).toBe("openai/gpt-5.4-mini")
+      expect(result.availableModels).toEqual(["openai/gpt-5.4-mini"])
+      expect(JSON.stringify(result)).not.toContain("evil")
+      expect(JSON.stringify(result)).not.toContain("other")
+    }
+  })
+
   test("#given inherited model identity fields #when resolved #then category resolution rejects them without leaking prototype data", () => {
     // given
     const availableModel = model("openai", "gpt-5.4-mini")
