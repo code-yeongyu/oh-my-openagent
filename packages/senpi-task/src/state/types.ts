@@ -50,6 +50,9 @@ export type TaskRecord = TaskRecordInput & {
   readonly child_session_id?: string
   readonly final_response?: string
   readonly error_message?: string
+  // Set true when the terminal error was an external kill / exit-by-signal (todo-8 kill contract); a
+  // record FACT, not a status - the state vocabulary stays completed/error/cancelled/interrupted/lost.
+  readonly killed?: boolean
   readonly notification: TaskNotification
 }
 
@@ -69,6 +72,7 @@ export type TaskTransition =
       readonly type: "fail"
       readonly timestamp: string
       readonly error_message: string
+      readonly killed?: boolean
     }
   | {
       readonly type: "cancel"

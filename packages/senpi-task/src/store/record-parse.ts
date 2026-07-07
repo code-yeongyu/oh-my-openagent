@@ -13,6 +13,7 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
   const childSessionId = readOptionalString(value, "child_session_id")
   const finalResponse = readOptionalString(value, "final_response")
   const errorMessage = readOptionalString(value, "error_message")
+  const killed = readOptionalBoolean(value, "killed")
 
   return {
     task_id: parseTaskId(readString(value, "task_id")),
@@ -35,6 +36,7 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
     ...(childSessionId === undefined ? {} : { child_session_id: childSessionId }),
     ...(finalResponse === undefined ? {} : { final_response: finalResponse }),
     ...(errorMessage === undefined ? {} : { error_message: errorMessage }),
+    ...(killed === undefined ? {} : { killed }),
   }
 }
 
@@ -102,6 +104,13 @@ function readOptionalNumber(record: Record<string, unknown>, key: string): numbe
   const value = record[key]
   if (value === undefined) return undefined
   if (typeof value !== "number") throw new Error(`${key} is not a number`)
+  return value
+}
+
+function readOptionalBoolean(record: Record<string, unknown>, key: string): boolean | undefined {
+  const value = record[key]
+  if (value === undefined) return undefined
+  if (typeof value !== "boolean") throw new Error(`${key} is not a boolean`)
   return value
 }
 

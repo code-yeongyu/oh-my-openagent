@@ -77,7 +77,9 @@ async function rpcOutcome(handle: RpcChildHandle): Promise<RunnerOutcome> {
   if (exit !== undefined && exit.kind !== "clean") {
     const facts = mapExitOutcomeToError(exit, { alreadyTerminal: false })
     const message = facts?.error_message ?? "RPC child terminated abnormally"
-    return { status: "error", failure: { kind: "child-prompt-failed", message } }
+    // Thread the killed FACT (an external SIGKILL / exit-by-signal) onto the outcome so the manager can
+    // persist status=error with killed:true, per the todo-8 kill contract.
+    return { status: "error", failure: { kind: "child-prompt-failed", message }, killed: facts?.killed === true }
   }
   return { status: "completed", finalResponse: handle.lastAssistantText() ?? "" }
 }

@@ -115,6 +115,7 @@
     "build:all": "bun run build && bun run build:binaries",
     "build:binaries": "bun run script/build-binaries.ts",
     "build:schema": "bun run script/build-schema.ts",
+    "build:omo-schema": "bun run script/build-omo-schema.ts",
     "build:model-capabilities": "bun run script/build-model-capabilities.ts",
     "clean": "rm -rf dist",
     "prepack": "bun run build:materialize-frontend",

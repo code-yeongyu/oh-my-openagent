@@ -5,6 +5,13 @@ export type RpcRunnerSpec = {
   readonly cwd: string
   readonly state_dir: string
   readonly prompt: string
+  // The provider/modelId the child must resolve. A separate OS process cannot share the parent's
+  // in-memory registry, so the model is threaded onto the child command line (`--model`).
+  readonly model?: string
+  // Extension entry paths the child must load (`-e`). The child is spawned with `--no-extensions` and
+  // then ONLY these are loaded, so a keyless local provider (or a production `-e` extension) the parent
+  // registered is reproducible in the detached child without inheriting the parent's whole package set.
+  readonly extensions?: readonly string[]
 }
 
 export type ChildEventListener = (event: AgentSessionEvent) => void

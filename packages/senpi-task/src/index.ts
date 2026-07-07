@@ -94,12 +94,15 @@ export {
   RpcProcessRunner,
   RpcProtocolClient,
   buildAutoUiResponse,
+  buildChildArgs,
   buildRpcSpawn,
   classifyChildExit,
   createRpcChildHandle,
   detectBunBinary,
   mapExitOutcomeToError,
+  parseExtensionEntries,
   resolveChildSessionDir,
+  resolveSenpiExecutable,
   tailStderr,
   terminateRpcChild,
 } from "./runners"
@@ -125,13 +128,16 @@ export {
   adaptInProcessHandle,
   adaptRpcHandle,
   createInProcessManagedRunner,
+  createParentRegistrySessionContext,
   createRpcManagedRunner,
   createTaskManager,
   decideDepthPolicy,
+  findModelReference,
   resolveExecutionMode,
 } from "./manager"
 export type {
   AdmitResident,
+  ChildModelRegistry,
   ChildPlanner,
   ContinueDelivery,
   ContinueResult,
@@ -151,6 +157,7 @@ export type {
   ManagedStartSpec,
   ManagerStartSpec,
   NameRegistration,
+  ParentModelRegistryResolver,
   PlanResolution,
   PlanResolutionError,
   ResolvedChildPlan,
@@ -161,7 +168,7 @@ export type {
   TaskManager,
   TaskManagerOptions,
 } from "./manager"
-export { defineAgent, loadAgents, registerAgent, resolveToolRule } from "./agents"
+export { defineAgent, loadAgents, mapOmoConfigAgents, registerAgent, resolveToolRule } from "./agents"
 export type {
   AgentDefinition,
   AgentDefinitionInput,
