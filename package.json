@@ -88,6 +88,7 @@
     "packages/omo-codex/plugin/.codex-plugin",
     "!packages/omo-codex/plugin/node_modules",
     "!packages/omo-codex/plugin/**/node_modules",
+    "!packages/omo-codex/plugin/components/workflow-selector",
     "packages/omo-codex/scripts",
     "!packages/omo-codex/scripts/install"
   ],
