@@ -199,6 +199,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: For work that truly needs a plan, ask for the plan as a first explicit step and wait for it before implementation, or manually stop the parent when it starts executing before the spawned planner returns. Treat background planner output as advisory unless the parent explicitly reports that it read and applied it.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5481.
 
+## #5544 - Session titles can fall back to timestamp names
+
+- **Affects**: Windows OpenCode sessions after ULW/OMO install when title generation fails or receives the wrong prompt text.
+- **Symptom**: Session list entries become generic names such as `New session-2026-06-24T03:24:10.559Z` instead of a short task description.
+- **Workaround**: Check the configured OpenCode title model and fix any `doctor` failure first, especially Bun/UTF-8 errors on Windows. If the session is already created, rename it manually in the OpenCode UI or start a new session with a short first user message before entering `ulw`.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5544.
+
 ## #4722 - Codex hooks can report exit code 1 immediately after install
 
 - **Affects**: LazyCodex / OMO Codex installs where Codex keeps running across a plugin cache/config update.
