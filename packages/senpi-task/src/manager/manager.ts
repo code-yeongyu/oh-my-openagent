@@ -15,6 +15,7 @@ import {
   inSession,
   isTerminalRecord,
   nowIso,
+  recordSpawnedPid,
 } from "./manager-helpers"
 import { NameRegistry } from "./names"
 import { subscribeTranscriptLog } from "./transcript-log"
@@ -221,10 +222,21 @@ class TaskManagerImpl implements TaskManager {
     }
 
     this.#live.set(record.task_id, { handle, model })
+    this.#recordSpawnFacts(record.task_id, handle)
     subscribeTranscriptLog(handle, this.#options.store, record.task_id)
     this.#trackOutcome(record.task_id, handle, model, record.notification.run_epoch)
     void this.#steering.notifyStarted(record.task_id)
     return { ok: true }
+  }
+
+  // Persist the spawned child's OS pid onto the running record so task_output(status) and session_start
+  // reconciliation can see (and, for an orphan, signal) the live process. The pure decision lives in
+  // recordSpawnedPid; in-process children (no pid) and already-terminal records are left untouched.
+  #recordSpawnFacts(taskId: string, handle: ManagedChildHandle): void {
+    const current = this.#tryLoad(taskId)
+    if (current === null) return
+    const updated = recordSpawnedPid(current, handle.pid)
+    if (updated !== undefined) this.#options.store.replace(updated)
   }
 
   #trackOutcome(taskId: string, handle: ManagedChildHandle, model: string, epoch: number): void {
