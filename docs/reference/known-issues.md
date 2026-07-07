@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5874 - TUI can render transient wake-from-sleep errors in the input area
+
+- **Affects**: TUI sessions that resume after the host sleeps and a sidebar/model metadata fetch fails transiently.
+- **Symptom**: A `Failed to fetch models.dev` error can leak into the main content or input area instead of being routed to a toast or log-only path. The session may still work, but the TUI pane remains visually polluted.
+- **Workaround**: Start a fresh OpenCode session after the machine wakes if the error output appears in the input area. Treat this as a display leak unless the same model fetch error repeats in new sessions.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5874.
+
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
 - **Affects**: OpenAI-compatible custom providers whose models are written to `opencode.json` without a `limit` block.
