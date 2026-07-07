@@ -91,6 +91,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: For cost-sensitive sessions, pin cheaper category models, avoid `ulw`/team-mode/background delegation unless needed, and disable optional high-churn hooks or features before long interactive work. Use `opencode models`, `bunx oh-my-openagent doctor`, and provider dashboards to verify the effective model and usage path instead of relying on remembered v3 defaults.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4733.
 
+## #4734 - Version pins can report one version while another build loads
+
+- **Affects**: OpenCode plugin entries pinned as `oh-my-openagent@<version>` when package cache resolution still serves a newer installed build.
+- **Symptom**: The version checker says the plugin is pinned, for example to `3.16.0`, but the session header shows a newer running version such as `4.7.5`.
+- **Workaround**: Treat the session header and loaded package cache as the source of truth. Clear the OpenCode package cache for `oh-my-openagent@latest` / pinned entries, reinstall the exact package version, and re-open OpenCode before relying on a downgrade to reduce usage or behavior changes.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4734.
+
 ## #5050: OpenCode can hang during startup before the plugin runs
 
 - **Affects**: OpenCode 1.16.2 startup with external plugins and cold package caches.
