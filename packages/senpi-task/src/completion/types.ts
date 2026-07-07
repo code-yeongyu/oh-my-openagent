@@ -4,7 +4,6 @@ import type { PersistedTaskEvent } from "../store"
 // Resolved from omo.json task.notification (config-core OmoTaskNotificationSchema). Kept structural so
 // this module stays harness-neutral; the omo-senpi composition (todo 17) feeds the parsed config.
 export type NotificationConfig = {
-  readonly wake_idle_parent: boolean
   readonly deliver_as: "steer" | "followUp"
 }
 
@@ -20,7 +19,6 @@ export type ParentState =
 
 export type RoutingDecision =
   | { readonly kind: "wake" }
-  | { readonly kind: "queue_silently" }
   | { readonly kind: "deliver_streaming"; readonly deliverAs: "steer" | "followUp" }
   | { readonly kind: "buffer"; readonly reason: TransitionReason }
 
@@ -72,7 +70,7 @@ export type CompletionRequest = {
 
 export type SkipReason = "sync-task" | "non-notifying-terminal" | "not-terminal" | "already-notified"
 
-export type DeliveredDecision = "wake" | "queue_silently" | "deliver_streaming"
+export type DeliveredDecision = "wake" | "deliver_streaming"
 
 export type NotifyResult =
   | { readonly kind: "skipped"; readonly reason: SkipReason }

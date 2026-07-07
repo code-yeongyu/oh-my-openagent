@@ -78,7 +78,7 @@ export type MemberDeliveryResult =
   | { readonly kind: "delivery_failed"; readonly member: string; readonly messageId: string; readonly reason: string }
 
 export type LeadDeliveryResult =
-  | { readonly kind: "delivered"; readonly decision: "wake" | "queue_silently" | "deliver_streaming" }
+  | { readonly kind: "delivered"; readonly decision: "wake" | "deliver_streaming" }
   | { readonly kind: "buffered"; readonly reason: TransitionReason }
   | { readonly kind: "failed" }
 

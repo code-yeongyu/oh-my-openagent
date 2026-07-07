@@ -5,7 +5,7 @@ import type { NotificationConfig, ParentNotifier, ParentNotifierMessage, ParentS
 import type { TaskRecord } from "../state"
 import type { PersistedTaskEvent } from "../store"
 
-const wakeConfig: NotificationConfig = { wake_idle_parent: true, deliver_as: "followUp" }
+const wakeConfig: NotificationConfig = { deliver_as: "followUp" }
 
 function bufferedRecord(): TaskRecord {
   return {

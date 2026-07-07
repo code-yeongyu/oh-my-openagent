@@ -9,10 +9,14 @@ export function shouldNotifyStatus(status: TaskStatus): boolean {
   return notifyingStatuses.has(status)
 }
 
+// An idle parent ALWAYS wakes: a completed background child's notification must unconditionally reach
+// the parent's next turn, with no config able to suppress it. A streaming parent delivers with the
+// configured deliver_as (and the notifier also stamps triggerTurn so the queued message still fires a
+// turn). Transient transitions buffer and flush with triggerTurn on the next session_start/idle edge.
 export function routeCompletion(parentState: ParentState, config: NotificationConfig): RoutingDecision {
   switch (parentState.kind) {
     case "idle":
-      return config.wake_idle_parent ? { kind: "wake" } : { kind: "queue_silently" }
+      return { kind: "wake" }
     case "streaming":
       return { kind: "deliver_streaming", deliverAs: config.deliver_as }
     case "compacting":

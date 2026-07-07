@@ -3,7 +3,8 @@
 // BUILT omo plugin against an isolated SENPI_CODING_AGENT_DIR sandbox and a LOCAL mock provider (no real
 // API call, no network), then drives the 5-step in-process task cycle end to end:
 //   (1) task(category, run_in_background:true) -> a background st_ child id
-//   (2) parent idle -> the completion custom message arrives as a NEW turn (wake_idle_parent)
+//   (2) parent idle -> the completion custom message ALWAYS arrives as a NEW wake turn (unconditional;
+//       no config can suppress it - the wake_idle_parent suppression knob was removed)
 //   (3) task_send(deliver_as:"followUp") on the completed-resident child -> revive -> second completion
 //   (4) task_output(mode:"full") -> the child transcript
 //   (5) a sync task (run_in_background falsy) -> final text inline with NO extra notification
@@ -139,7 +140,7 @@ function runMainFlow(senpiBin, checks, capture, pids) {
   const wake = findWakeNotification(events, taskId)
   const signatures = jsonlSignatures(jsonl)
   checks.spawn_background = run.status === 0 && typeof taskId === "string" && existsSync(join(scenario.stateDir, "tasks", `${taskId}.json`)) ? "PASS" : "FAIL"
-  checks.wake_idle_parent = wake.ok ? "PASS" : "FAIL"
+  checks.unconditional_wake = wake.ok ? "PASS" : "FAIL"
   checks.followup_revive = findRevived(events) && JSON.stringify(events).includes(CHILD_SECOND) ? "PASS" : "FAIL"
   checks.task_output_full = findTranscript(events, CHILD_FIRST) ? "PASS" : "FAIL"
   checks.jsonl_sequence = matchesOrderedSubsequence(signatures, MAIN_FLOW_EXPECTED_SEQUENCE) ? "PASS" : "FAIL"
