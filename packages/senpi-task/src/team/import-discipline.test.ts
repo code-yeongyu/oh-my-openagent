@@ -21,7 +21,10 @@ const FORBIDDEN_SPECIFIERS: readonly string[] = [
 ]
 
 function listTeamSourceFiles(): readonly string[] {
-  return readdirSync(TEAM_DIR)
+  // Recursive so nested team-layer modules (messaging/, tasklist/, ...) are covered, not just the
+  // top-level directory. readdirSync recursive returns paths relative to TEAM_DIR.
+  return readdirSync(TEAM_DIR, { recursive: true })
+    .map((entry) => String(entry))
     .filter((name) => name.endsWith(".ts"))
     .map((name) => join(TEAM_DIR, name))
 }

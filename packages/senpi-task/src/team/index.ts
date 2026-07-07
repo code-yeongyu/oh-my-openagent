@@ -37,3 +37,30 @@ export { projectMemberStatus, refreshTeamMemberStatuses } from "./member-project
 export type { MemberStatusPort, RefreshTeamMemberStatusesDeps, RuntimeMemberStatus } from "./member-projection"
 export { memberTaskName, spawnTeamMembers } from "./spawn-members"
 export type { SpawnMembersInput, SpawnMembersResult, SpawnedMember } from "./spawn-members"
+export {
+  ackMemberInjection,
+  buildMemberUnreadInjection,
+  buildPeerMessageEnvelope,
+  buildTeamMessage,
+  deliverToLead,
+  deliverToMember,
+  reclaimStaleTeamReservations,
+  sendTeamMessage,
+} from "./messaging"
+export type {
+  AckMemberInjectionInput,
+  BuildMemberUnreadInjectionInput,
+  BuildTeamMessageOptions,
+  DeliverToLeadInput,
+  DeliverToMemberInput,
+  LeadDeliveryResult,
+  LeadMessageNotifier,
+  LeadTeamMessage,
+  MemberDeliveryResult,
+  MemberLiveHandle,
+  MessagingDeliveryPort,
+  MessagingEngineDeps,
+  ReclaimResult,
+  SendTeamMessageInput,
+  SendTeamMessageResult,
+} from "./messaging"

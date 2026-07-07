@@ -346,3 +346,30 @@ export type {
   TranscriptReader,
   TranscriptSource,
 } from "./tools/output"
+export {
+  ackMemberInjection,
+  buildMemberUnreadInjection,
+  buildPeerMessageEnvelope,
+  buildTeamMessage,
+  deliverToLead,
+  deliverToMember,
+  reclaimStaleTeamReservations,
+  sendTeamMessage,
+} from "./team"
+export type {
+  AckMemberInjectionInput,
+  BuildMemberUnreadInjectionInput,
+  BuildTeamMessageOptions,
+  DeliverToLeadInput,
+  DeliverToMemberInput,
+  LeadDeliveryResult,
+  LeadMessageNotifier,
+  LeadTeamMessage,
+  MemberDeliveryResult,
+  MemberLiveHandle,
+  MessagingDeliveryPort,
+  MessagingEngineDeps,
+  ReclaimResult,
+  SendTeamMessageInput,
+  SendTeamMessageResult,
+} from "./team"
