@@ -25,7 +25,7 @@ export type RunnerFailure = {
 
 export type RunnerOutcome =
   | { readonly status: "completed"; readonly finalResponse: string }
-  | { readonly status: "error"; readonly failure: RunnerFailure }
+  | { readonly status: "error"; readonly failure: RunnerFailure; readonly killed?: boolean }
   | { readonly status: "cancelled" }
 
 export type ChildHandle = {

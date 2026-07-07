@@ -66,6 +66,36 @@ describe("transitionTaskRecord lifecycle graph", () => {
     ])
   })
 
+  test("#given a running rpc child killed by signal #when the fail transition carries killed #then the record persists killed:true", () => {
+    // given
+    const running = transitionTaskRecord(pendingRecord(), { type: "start", timestamp: "2026-07-06T00:00:00.000Z", pid: 1234 }).record
+
+    // when
+    const killed = transitionTaskRecord(running, {
+      type: "fail",
+      timestamp: "2026-07-06T00:00:01.000Z",
+      error_message: "RPC child killed by signal SIGKILL (pid=1234)",
+      killed: true,
+    })
+
+    // then
+    expect(killed.applied).toBe(true)
+    expect(killed.record.status).toBe("error")
+    expect(killed.record.killed).toBe(true)
+  })
+
+  test("#given a plain (non-signal) failure #when the fail transition omits killed #then killed stays absent (a record fact)", () => {
+    // given
+    const running = transitionTaskRecord(pendingRecord(), { type: "start", timestamp: "2026-07-06T00:00:00.000Z", pid: 1234 }).record
+
+    // when
+    const failed = transitionTaskRecord(running, { type: "fail", timestamp: "2026-07-06T00:00:01.000Z", error_message: "boom" })
+
+    // then
+    expect(failed.record.status).toBe("error")
+    expect(failed.record.killed).toBeUndefined()
+  })
+
   test("#given pending or running task #when normal lose transition arrives #then lost is rejected", () => {
     // given
     const pending = pendingRecord()

@@ -75,6 +75,7 @@ function applyTransitionFields(record: TaskRecord, transition: TaskTransition): 
     case "complete":
       return { ...record, final_response: transition.final_response }
     case "fail":
+      return { ...record, error_message: transition.error_message, ...(transition.killed === true ? { killed: true } : {}) }
     case "lose":
       return { ...record, error_message: transition.error_message }
     case "cancel":
