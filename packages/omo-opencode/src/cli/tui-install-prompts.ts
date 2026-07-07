@@ -8,6 +8,7 @@ import type {
 } from "./types"
 import { detectedToInitialValues } from "./install-validators"
 import { ULTIMATE_FALLBACK } from "./model-fallback"
+import { isSenpiPlatformEnabled } from "./senpi-platform-flag"
 
 async function selectOrCancel<TValue extends Readonly<string | boolean | number>>(params: {
   message: string
@@ -35,8 +36,10 @@ export async function promptInstallPlatform(
     { value: "opencode", label: "OpenCode", hint: "Install OpenCode plugin only" },
     { value: "codex", label: "Codex", hint: "Install Codex harness adapter only" },
     { value: "both", label: "Both", hint: "Install OpenCode plugin and Codex adapter" },
-    { value: "senpi", label: "Senpi", hint: "Install Senpi harness adapter only" },
   ]
+  if (isSenpiPlatformEnabled()) {
+    options.push({ value: "senpi", label: "Senpi", hint: "Install Senpi harness adapter only" })
+  }
 
   return selectOrCancel<InstallPlatform>({
     message: "Which platform do you want to install?",
