@@ -168,6 +168,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: Before relying on multi-member activation, run a one-member smoke team and verify a reply reaches the lead. If replies do not appear, fall back to a parent-driven workflow with explicit `team_task_*` state checks or use the last known working version for team-mode-heavy runs.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5317.
 
+## #5288: Synchronous plan tasks can remain visible as running
+
+- **Affects**: `task(subagent_type="plan", run_in_background=false, ...)` routed through the delegate-task sync wrapper.
+- **Symptom**: The plan text is returned, but the visible `Plan Task` item remains running because child/background helper state can keep the wrapper alive.
+- **Workaround**: Prefer the normal `@plan` / Prometheus flow for planning, or invoke the planner directly through the agent surface instead of wrapping it as a synchronous `task(subagent_type="plan")`. If the UI already shows a stale running plan task after output is available, treat the returned plan text as authoritative and avoid waiting on the stale wrapper.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5288.
+
 ## #5120: Sisyphus can loop on simple tasks
 
 - **Affects**: OpenCode 1.17.0 with oh-my-openagent 4.8.1.
