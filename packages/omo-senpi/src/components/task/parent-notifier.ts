@@ -7,17 +7,19 @@ import type { SenpiExtensionAPI } from "../../extension/types"
 export const TASK_COMPLETION_MESSAGE_TYPE = "senpi-task.completion"
 
 /**
- * Adapt the engine's synchronous ParentNotifier.enqueue seam onto senpi delivery. A wake (triggerTurn
- * = an idle parent) routes through the idle-injection coordinator so a completion wake and a pending
- * ulw-loop continuation on the same idle edge collapse to ONE injection (the Oracle arbitration
- * blocker). Streaming (deliverAs) and silent-queue completions keep the rich custom-message channel so
- * the senpi-task.completion renderer applies. senpi swallows async delivery errors, so a synchronous
- * throw here surfaces as the engine's delivery failure.
+ * Adapt the engine's synchronous ParentNotifier.enqueue seam onto senpi delivery. Only an IDLE-edge
+ * wake (triggerTurn:true AND deliverAs === undefined) routes through the idle-injection coordinator, so
+ * a completion wake and a pending ulw-loop continuation on the same idle edge collapse to ONE injection
+ * (the Oracle arbitration blocker). A STREAMING completion carries triggerTurn:true AND a deliverAs; it
+ * is mid-turn, not on an idle edge, so it must NOT be arbitrated - it delivers directly through the rich
+ * custom-message channel so the senpi-task.completion renderer applies and the configured deliver_as
+ * (steer|followUp) is honored. Silent-queue completions (no triggerTurn) also stay on that channel.
+ * senpi swallows async delivery errors, so a synchronous throw here surfaces as the engine's failure.
  */
 export function createParentNotifier(pi: SenpiExtensionAPI, coordinator?: IdleInjectionCoordinator): ParentNotifier {
   return {
     enqueue(message: ParentNotifierMessage): void {
-      if (message.triggerTurn === true && coordinator !== undefined) {
+      if (message.triggerTurn === true && message.deliverAs === undefined && coordinator !== undefined) {
         coordinator.enqueue({ key: injectionKey(message), source: "task-completion", content: message.content })
         coordinator.flushOnIdle()
         return
