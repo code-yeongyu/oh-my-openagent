@@ -42,9 +42,12 @@ export {
   buildMemberUnreadInjection,
   buildPeerMessageEnvelope,
   buildTeamMessage,
+  DEFAULT_STALE_RESERVATION_TTL_MS,
   deliverToLead,
   deliverToMember,
   reclaimStaleTeamReservations,
+  reconcileTeamMailboxOnSessionStart,
+  releaseMemberInjection,
   sendTeamMessage,
 } from "./messaging"
 export type {
@@ -61,6 +64,8 @@ export type {
   MessagingDeliveryPort,
   MessagingEngineDeps,
   ReclaimResult,
+  ReconcileTeamMailboxDeps,
+  ReleaseMemberInjectionInput,
   SendTeamMessageInput,
   SendTeamMessageResult,
 } from "./messaging"

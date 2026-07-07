@@ -8,6 +8,7 @@ import {
   deleteTeam,
   getTeamTask,
   listTeamTasks,
+  reconcileTeamMailboxOnSessionStart,
   refreshTeamMemberStatuses,
   requestShutdown,
   approveShutdown,
@@ -160,4 +161,15 @@ export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
       }),
   }
   return service
+}
+
+/**
+ * The component `session_start` mailbox reconciler bound to the same state dir + team-core config as the
+ * live service: on process start it restores any delivery reservation left dangling by a crash back to
+ * unread (across every active team run) so the on-revive injection fallback can redeliver it (W3-V F1a).
+ */
+export function createTeamMailboxReconciler(deps: TeamServiceDeps): () => Promise<void> {
+  const stateDir = stateDirConfig(deps)
+  const config: TeamCoreConfig = toTeamCoreConfig(deps.settings, teamStorageBaseDir(stateDir))
+  return () => reconcileTeamMailboxOnSessionStart({ stateDir, config })
 }

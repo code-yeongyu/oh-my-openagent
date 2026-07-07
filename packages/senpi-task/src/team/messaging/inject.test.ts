@@ -8,7 +8,7 @@ import { sendMessage } from "@oh-my-opencode/team-core/team-mailbox"
 import { normalizeSenpiTeamSpec } from "../normalize"
 import { resolveTeamMemberInboxDir, teamStorageBaseDir } from "../storage"
 import { toTeamCoreConfig } from "../runtime-config"
-import { ackMemberInjection, buildMemberUnreadInjection } from "./inject"
+import { ackMemberInjection, buildMemberUnreadInjection, releaseMemberInjection } from "./inject"
 import { buildPeerMessageEnvelope, buildTeamMessage } from "./message"
 import { cleanupMessagingTmp, stateDirConfig, tempProjectDir } from "./__fixtures__/messaging-fakes"
 import { taskSettings } from "../__fixtures__/runtime-fakes"
@@ -96,5 +96,37 @@ describe("ackMemberInjection", () => {
     const inboxDir = resolveTeamMemberInboxDir(stateDir, teamRunId, "beta")
     expect(existsSync(join(inboxDir, `${message.messageId}.json`))).toBe(false)
     expect(existsSync(join(inboxDir, "processed", `${message.messageId}.json`))).toBe(true)
+  })
+})
+
+describe("releaseMemberInjection", () => {
+  test("#given an injected-but-unacked message #when released #then the pending mark clears and a fresh injection re-includes it", async () => {
+    // given
+    const { config, teamRunId } = await setup()
+    const message = buildTeamMessage(
+      { from: "alpha", to: "beta", body: "b" },
+      { newMessageId: () => "88888888-8888-4888-8888-888888888888" },
+    )
+    await sendMessage(message, teamRunId, config, { isLead: false, activeMembers: ["beta"] })
+    const first = await buildMemberUnreadInjection({ sessionId: "s", memberName: "beta", teamRunId, config, turnMarker: "t1" })
+    expect(first.messageIds).toEqual([message.messageId])
+    const blocked = await buildMemberUnreadInjection({ sessionId: "s", memberName: "beta", teamRunId, config, turnMarker: "t2" })
+    expect(blocked.injected).toBe(false)
+
+    // when
+    await releaseMemberInjection({ memberName: "beta", teamRunId, messageIds: first.messageIds, config })
+
+    // then
+    const reinjected = await buildMemberUnreadInjection({ sessionId: "s", memberName: "beta", teamRunId, config, turnMarker: "t3" })
+    expect(reinjected.injected).toBe(true)
+    expect(reinjected.messageIds).toEqual([message.messageId])
+  })
+
+  test("#given no message ids #when released #then it is a no-op", async () => {
+    // given
+    const { config, teamRunId } = await setup()
+
+    // when / then
+    await releaseMemberInjection({ memberName: "beta", teamRunId, messageIds: [], config })
   })
 })
