@@ -234,6 +234,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: Use canonical lower-case agent keys in `oh-my-openagent.jsonc` (`sisyphus-junior`, `sisyphus`, `atlas`, etc.) and use display-name settings only for UI labels. After migration, run `bunx oh-my-openagent doctor` and inspect the effective model for `sisyphus-junior`.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5574.
 
+## #5573 - Background tasks can hang behind incomplete todos
+
+- **Affects**: Background tasks whose subagent creates todos and produces a final answer while one or more todos remain `pending` or `in_progress`.
+- **Symptom**: The parent never receives the completed result because background completion waits for todos to resolve; disabling `todo-continuation-enforcer` can make this worse by removing the recovery prompt.
+- **Workaround**: Do not disable `todo-continuation-enforcer` for background-heavy workflows. In background prompts, add a final instruction to mark every todo completed immediately before emitting the final result, and avoid forcing extra todo usage through skills unless task tracking is essential.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5573.
+
 ## #5548 - ULW continuation can override intentional user-input pauses
 
 - **Affects**: ULW sessions where the agent has unfinished todos but intentionally stops to ask the user for a required decision.
