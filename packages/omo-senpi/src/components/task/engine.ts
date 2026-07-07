@@ -4,6 +4,7 @@ import {
   InProcessRunner,
   createCompletionNotifier,
   createInProcessManagedRunner,
+  createParentRegistrySessionContext,
   createTaskLifecycle,
   createTaskManager,
   createTaskRecordStore,
@@ -127,20 +128,23 @@ async function admitAdapter(lifecycle: TaskLifecycle, parentSessionId: string): 
 }
 
 function buildRunner(
-  _runtime: TaskRuntimeContext,
+  runtime: TaskRuntimeContext,
   sharedParentTools: () => readonly ToolDefinition[],
   settings: OmoTaskSettings,
 ): ManagedRunner {
   const inProcess = new InProcessRunner({
-    // The live capture-registry array; the runner filters the task/team family at spawn time. v1: the
-    // in-process child inherits the parent's default agent dir / auth resolution, so no per-child
-    // modelRegistry override is threaded here yet (deferred to the live-QA follow-up).
+    // The live capture-registry array; the runner filters the task/team family at spawn time.
     get sharedParentTools(): readonly ToolDefinition[] {
       return sharedParentTools()
     },
     depthPolicy: { maxDepth: Math.max(settings.max_depth + 1, 1) },
   })
-  return createInProcessManagedRunner(inProcess)
+  // Thread the PARENT session's captured model registry (and its bound auth storage) into every child,
+  // resolving the plan's provider/modelId against that same registry. Without this a child spawns
+  // against senpi's default agent-dir resolution and never sees a provider registered on the live
+  // parent session (the -e mock provider, extension providers) - the W2-V "No API key found" gap.
+  const context = createParentRegistrySessionContext(() => runtime.modelRegistry())
+  return createInProcessManagedRunner(inProcess, context)
 }
 
 // v1: the task tool's description enriches its category list from omoConfig directly. Custom agent

@@ -23,6 +23,8 @@ export type {
   InProcessSessionContextProvider,
   RpcRunnerLike,
 } from "./runner"
+export { createParentRegistrySessionContext, findModelReference } from "./parent-registry-context"
+export type { ChildModelRegistry, ParentModelRegistryResolver } from "./parent-registry-context"
 export type {
   AdmitResident,
   ChildPlanner,
