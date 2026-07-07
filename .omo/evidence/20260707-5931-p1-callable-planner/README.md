@@ -52,3 +52,21 @@ harness dependencies are absent on this host: `jq` and `tmux` are not on PATH,
 Docker is not on PATH, and the shared helper reports a Windows Python
 free-port-probe failure. No secrets, tokens, auth headers, or private env dumps
 were copied into this evidence directory.
+
+## P2 follow-up: stale planner label
+
+After the first P1 fix, Codex review found that `default.md` still said
+`PROMETHEUS PLANNER SPAWN` in the final checklist, and `gemini.md` had the same
+stale label. The follow-up adds a regression assertion rejecting
+`PROMETHEUS PLANNER` in all non-planner variants and changes both checklist
+labels to `CALLABLE PLANNING DELEGATION`.
+
+Additional captured commands:
+
+- RED: `bun test packages/prompts-core/src/ultrawork-prompts.test.ts`
+- GREEN: `bun test packages/prompts-core/src/ultrawork-prompts.test.ts`
+- GREEN routing: `bun test packages/prompts-core/src/ultrawork-prompts.test.ts packages/omo-opencode/src/hooks/keyword-detector/ultrawork/ultrawork-source-routing.test.ts`
+- Prompt-only stale scan: `rg -n 'PROMETHEUS PLANNER|subagent_type="prometheus"|subagent_type="plan"' packages/prompts-core/prompts/ultrawork/default.md packages/prompts-core/prompts/ultrawork/gemini.md packages/prompts-core/prompts/ultrawork/gpt.md packages/prompts-core/prompts/ultrawork/glm.md`
+- `bun run packages/shared-skills/skills/programming/scripts/typescript/check-no-excuse-rules.ts packages/prompts-core/src/ultrawork-prompts.test.ts`
+- `bun run typecheck`
+- `git diff --check`

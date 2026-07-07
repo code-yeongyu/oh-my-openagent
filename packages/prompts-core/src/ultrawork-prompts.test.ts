@@ -24,6 +24,7 @@ describe("ultrawork prompt variants", () => {
 
       expect(variant.content, variantName).not.toContain('subagent_type="plan"')
       expect(variant.content, variantName).not.toContain('subagent_type="prometheus"')
+      expect(variant.content, variantName).not.toContain("PROMETHEUS PLANNER")
     }
   })
 })
