@@ -83,6 +83,14 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: Switch to Prometheus first with the Tab agent selector or `/agent`, ask for the plan there, then run `/start-work` after approval.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4710.
 
+## #4733 - Credit usage can spike after v3 to v4 upgrades
+
+- **Affects**: Anthropic subscription-token users upgrading from the older v3 agent stack to the v4 orchestration stack.
+- **Symptom**: A workload that previously lasted all day can hit Claude session or usage limits within a few hours, even when the user believes the model list stayed the same.
+- **Likely contributors**: Larger v4 system prompts, more explicit orchestration instructions, background delegation, retry/fallback behavior, and feature hooks that did not exist in the same form in v3.
+- **Workaround**: For cost-sensitive sessions, pin cheaper category models, avoid `ulw`/team-mode/background delegation unless needed, and disable optional high-churn hooks or features before long interactive work. Use `opencode models`, `bunx oh-my-openagent doctor`, and provider dashboards to verify the effective model and usage path instead of relying on remembered v3 defaults.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4733.
+
 ## #5050: OpenCode can hang during startup before the plugin runs
 
 - **Affects**: OpenCode 1.16.2 startup with external plugins and cold package caches.
