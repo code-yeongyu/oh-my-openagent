@@ -43,3 +43,22 @@ The changed behavior is prompt/skill contract text for Codex orchestration. The 
 ## What was omitted
 
 Full live Codex app-server proof could not run on this host because the `codex-qa` scripts require `jq`; TUI smoke also requires `tmux`. No secret-bearing logs or environment dumps were copied.
+
+## CI follow-up: keep wait-agent liveness framing
+
+GitHub codex-compatibility failed after the wave-level fix because
+`sync-skills-orchestration.test.mjs` requires every skill that documents
+`multi_agent_v1.wait_agent` to also keep progress-oriented liveness guidance.
+The follow-up restores the `WORKING:` / `BLOCKED:` contract, frames wait-agent
+timeouts as mailbox silence, and keeps explicit fallback conditions while
+preserving the wave-level spawn barrier.
+
+Additional captured commands:
+
+- RED: `node --test packages/omo-codex/plugin/test/sync-skills-orchestration.test.mjs`
+- GREEN: `node --test packages/omo-codex/plugin/test/sync-skills-orchestration.test.mjs`
+- GREEN contract: `node --test packages/omo-codex/plugin/test/ulw-plan-skill-contract.test.mjs`
+- GREEN generated/orchestration set: `node --test packages/omo-codex/plugin/test/aggregate-skills.test.mjs packages/omo-codex/plugin/test/ultrawork-skill-pointer.test.mjs packages/omo-codex/plugin/test/ulw-plan-skill-contract.test.mjs packages/omo-codex/plugin/test/sync-skills-orchestration.test.mjs`
+- No-excuse audit: `rg -n "as any|@ts-ignore|@ts-expect-error" packages/omo-codex/plugin/test/ulw-plan-skill-contract.test.mjs`
+- `bun run typecheck`
+- `git diff --check`

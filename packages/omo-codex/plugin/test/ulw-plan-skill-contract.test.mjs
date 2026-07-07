@@ -35,6 +35,14 @@ test("#given ulw-plan skill #when Codex delegation is inspected #then spawned pl
 			`${copy.label}: must not serialize independent spawns`,
 		);
 		assert.match(copy.content, /terminal status/i, `${copy.label}: must wait until terminal status`);
+		assert.match(copy.content, /WORKING:/, `${copy.label}: must keep progress liveness guidance`);
+		assert.match(copy.content, /BLOCKED:/, `${copy.label}: must keep blocked liveness guidance`);
+		assert.match(
+			copy.content,
+			/timeout only means no new mailbox update arrived/i,
+			`${copy.label}: must frame wait timeouts as mailbox silence`,
+		);
+		assert.match(copy.content, /Fallback only when/, `${copy.label}: must keep explicit fallback conditions`);
 		assert.match(
 			copy.content,
 			/do not start dependent planning, drafting, approval-gate work, or final handoff/i,
