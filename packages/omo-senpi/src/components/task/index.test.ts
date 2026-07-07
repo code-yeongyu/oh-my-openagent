@@ -88,14 +88,25 @@ const noopStatusUi = { scheduleSync: () => {}, syncNow: () => {} }
 
 // Build the real engine and wire its event bridge over a fake ExtensionAPI so tests can drive the
 // registered handlers and observe the captured-ui bridge (todo 18: cleared on switch/shutdown).
-function wiredBridge(): { pi: FakeExtensionAPI; engine: ReturnType<typeof composeTaskEngine> } {
+function wiredBridge(): {
+  pi: FakeExtensionAPI
+  engine: ReturnType<typeof composeTaskEngine>
+  reconcileCalls: { count: number }
+} {
   const cwd = tempProject()
   const pi = new FakeExtensionAPI()
   const logger = createLogger()
   const engine = composeTaskEngine({ pi, omoConfig: loadOmoConfig({ cwd }).config, cwd, sharedParentTools: () => [] })
   const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })
-  wireEventBridge(pi, ctxFor(pi, logger), engine, noopStatusUi, transitions, { warnDualConfig: false })
-  return { pi, engine }
+  const reconcileCalls = { count: 0 }
+  wireEventBridge(pi, ctxFor(pi, logger), engine, noopStatusUi, transitions, {
+    warnDualConfig: false,
+    reconcileTeamMailbox: () => {
+      reconcileCalls.count += 1
+      return Promise.resolve()
+    },
+  })
+  return { pi, engine, reconcileCalls }
 }
 
 function toolNames(pi: FakeExtensionAPI): string[] {
@@ -172,6 +183,19 @@ describe("omo-senpi task component wiring", () => {
       (entry) => entry.level === "warn" && entry.message.includes("using default config after omo.json load issues"),
     )
     expect(configWarnings).toHaveLength(1)
+  })
+
+  it("#given a wired bridge #when session_start fires #then the team mailbox is reconciled exactly once across repeated starts", async () => {
+    // given
+    const { pi, reconcileCalls } = wiredBridge()
+    const liveCtx = { ui: fakeUi(), mode: "tui", sessionManager: { getSessionId: () => "session-a" } }
+
+    // when the session starts twice (only the first start reconciles, matching lifecycle.reconcileOnSessionStart)
+    await pi.dispatch("session_start", {}, liveCtx)
+    await pi.dispatch("session_start", {}, liveCtx)
+
+    // then
+    expect(reconcileCalls.count).toBe(1)
   })
 
   it("#given a captured ui #when session_before_switch fires #then the ui bridge is cleared", async () => {
