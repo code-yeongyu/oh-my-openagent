@@ -1,4 +1,4 @@
-export type IdleInjectionSource = "task-completion" | "ulw-continuation"
+export type IdleInjectionSource = "task-completion" | "team-message" | "ulw-continuation"
 
 export interface IdleInjection {
   // Dedupe/order key. Task completions key on their task id; the ulw continuation keys on its source
@@ -23,7 +23,8 @@ export interface IdleInjectionCoordinatorOptions {
 // parent sees "what finished" before "keep going".
 const SOURCE_RANK: Readonly<Record<IdleInjectionSource, number>> = {
   "task-completion": 0,
-  "ulw-continuation": 1,
+  "team-message": 1,
+  "ulw-continuation": 2,
 }
 
 /**

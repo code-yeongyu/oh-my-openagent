@@ -28,6 +28,29 @@ export type {
 export { createMinimalSenpiResourceLoader } from "./senpi/minimal-resource-loader"
 export type { MinimalSenpiResourceLoaderOptions } from "./senpi/minimal-resource-loader"
 export {
+  SenpiTeamSpecError,
+  TEAM_LEAD_SENTINEL,
+  ensureTeamRuntimeDirs,
+  loadTeamRegistry,
+  normalizeSenpiTeamSpec,
+  resolveProjectTeamSpecPath,
+  resolveTeamMemberInboxDir,
+  resolveTeamRuntimeDirs,
+  teamStorageBaseDir,
+  validateSenpiTeamMembers,
+} from "./team"
+export type {
+  LoadTeamRegistryInput,
+  LoadTeamRegistryResult,
+  NormalizeSenpiTeamSpecOptions,
+  SenpiTeamMemberPorts,
+  SenpiTeamSpecErrorCode,
+  TeamRegistryEntry,
+  TeamRegistryError,
+  TeamRuntimeDirs,
+  TeamSpecSource,
+} from "./team"
+export {
   BUILTIN_CATEGORY_DEFAULTS,
   CATEGORY_DESCRIPTIONS,
   CATEGORY_PROMPT_APPENDS,
@@ -323,3 +346,87 @@ export type {
   TranscriptReader,
   TranscriptSource,
 } from "./tools/output"
+export {
+  ackMemberInjection,
+  buildMemberUnreadInjection,
+  buildPeerMessageEnvelope,
+  buildTeamMessage,
+  DEFAULT_STALE_RESERVATION_TTL_MS,
+  deliverToLead,
+  deliverToMember,
+  reclaimStaleTeamReservations,
+  reconcileTeamMailboxOnSessionStart,
+  releaseMemberInjection,
+  sendTeamMessage,
+} from "./team"
+export type {
+  AckMemberInjectionInput,
+  BuildMemberUnreadInjectionInput,
+  BuildTeamMessageOptions,
+  DeliverToLeadInput,
+  DeliverToMemberInput,
+  LeadDeliveryResult,
+  LeadMessageNotifier,
+  LeadTeamMessage,
+  MemberDeliveryResult,
+  MemberLiveHandle,
+  MessagingDeliveryPort,
+  MessagingEngineDeps,
+  ReclaimResult,
+  ReconcileTeamMailboxDeps,
+  ReleaseMemberInjectionInput,
+  SendTeamMessageInput,
+  SendTeamMessageResult,
+} from "./team"
+export {
+  approveShutdown,
+  canClaimTeamTask,
+  claimTeamTask,
+  createTeamTask,
+  DELETABLE_MEMBER_STATUSES,
+  getTeamTask,
+  isMemberDeletable,
+  listTeamTasks,
+  rejectShutdown,
+  requestShutdown,
+  SenpiShutdownError,
+  TeamTaskAlreadyClaimedError,
+  TeamTaskBlockedByError,
+  TeamTaskCrossOwnerUpdateError,
+  TeamTaskInvalidTransitionError,
+  updateTeamTaskStatus,
+} from "./team"
+export type {
+  ApproveShutdownDeps,
+  CreateTeamTaskInput,
+  RejectShutdownDeps,
+  RequestShutdownDeps,
+  SenpiShutdownErrorCode,
+  ShutdownMessageKind,
+  ShutdownMessenger,
+  ShutdownOutboundMessage,
+  TeamTaskFilter,
+  TeamTasklistContext,
+} from "./team"
+export {
+  createTeam,
+  deleteTeam,
+  readMemberTaskMap,
+  refreshTeamMemberStatuses,
+  SenpiTeamRuntimeError,
+  toTeamCoreConfig,
+} from "./team"
+export type {
+  CreateTeamDeps,
+  CreateTeamResult,
+  DeleteTeamDeps,
+  DeleteTeamResult,
+  MemberStatusPort,
+  MemberTaskMap,
+  RefreshTeamMemberStatusesDeps,
+  SenpiTeamRuntimeErrorCode,
+  TeamCoreConfig,
+  TeamRuntimeManagerPort,
+} from "./team"
+
+export * from "./tools/team"

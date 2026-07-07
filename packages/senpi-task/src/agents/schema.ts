@@ -1,4 +1,4 @@
-import { z } from "zod"
+import * as z from "zod"
 
 import { ToolsInputSchema, normalizeToolRules } from "./tools"
 import type { AgentDefinition, AgentDefinitionInput } from "./types"
