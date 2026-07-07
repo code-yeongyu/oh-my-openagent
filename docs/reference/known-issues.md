@@ -119,6 +119,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: For one-off trivial prompts, run `opencode --pure` or temporarily disable the plugin for that session.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5120.
 
+## #5187: ChatGPT Plus installs can select API-tier Codex models
+
+- **Affects**: TUI installer runs where the user selects ChatGPT Plus / `--openai=yes`.
+- **Symptom**: Generated category config can map `unspecified-low` and `unspecified-high` to `openai/gpt-5.3-codex`, which then fails for accounts that do not have that API-tier model available even though `doctor` reports the installation as healthy.
+- **Workaround**: Edit `.opencode/oh-my-openagent.jsonc` and move those categories back to a model available through your actual provider set, such as an OpenCode Go Kimi/GLM entry or a supported GPT model visible in `opencode models`. Re-run `bunx oh-my-openagent doctor` after the edit to confirm effective model resolution.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5187.
+
 ## #5105: Ralph Loop can flood logs while child subagents are active
 
 - **Affects**: Sessions with an active Ralph Loop and background child subagents.
