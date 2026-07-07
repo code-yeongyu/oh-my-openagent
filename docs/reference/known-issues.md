@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5752 - `ulw-loop --session-id` without a value falls back silently
+
+- **Affects**: Codex Light `ulw-loop` CLI usage that passes `--session-id` as a bare flag.
+- **Symptom**: A present-but-valueless `--session-id` can be treated like an omitted flag, so the command falls back to ambient session environment or writes unscoped `.omo/ulw-loop` state instead of failing.
+- **Workaround**: Use `--session-id=<id>` or `--session-id <id>` with a non-empty value whenever explicit scoping matters. Omit the flag entirely only when you intentionally want ambient session detection.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5752.
+
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
 - **Affects**: OpenAI-compatible custom providers whose models are written to `opencode.json` without a `limit` block.
