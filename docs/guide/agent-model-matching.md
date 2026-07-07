@@ -211,10 +211,12 @@ Used by: Hephaestus, Oracle, Momus, `deep`, `ultrabrain`, `quick`, Prometheus (G
 |---|---|---|---|
 | 1 | `gpt-5.5` / `gpt-5.4` (pro / xhigh / high / medium) | `openai`, `github-copilot`, `opencode`, `vercel` | Native OpenAI is the gold standard for principle-driven prompts. Hephaestus requires this family. |
 | 2 | `gpt-5.5-codex` | same | Still the deep-coding powerhouse. Kept as an explicit override option. |
-| 3 | **DeepSeek — LIMITED ALTERNATIVE** (`deepseek-v3.2`, `deepseek-chat-v3.1`) | `openrouter/deepseek` | Closest OSS equivalent for autonomous coding behavior. Not wired into default chains — add via `fallback_models`. |
+| 3 | **DeepSeek — LIMITED ALTERNATIVE** (`deepseek-v3.2`, `deepseek-chat-v3.1`) | `openrouter/deepseek` | Closest OSS equivalent for autonomous coding behavior. Not wired into default chains or Hephaestus registration — add via `fallback_models` only on model-flexible GPT-family routes you intentionally own. |
 | 4 | **MiniMax — STRONGLY DISCOURAGED** (`minimax-m3`, `minimax-m2.7`, `minimax-m2.5`) | `opencode-go`, `opencode`, `openrouter/minimax` | Used only in **utility** fallback chains (Explore, Librarian, `quick`). Consistency and long-context management issues make it a poor substitute for Hephaestus/Oracle. Do NOT override deep agents to MiniMax. |
 
 > **DeepSeek ≻≻ MiniMax.** DeepSeek retains GPT's autonomous exploration character. MiniMax loses coherence on multi-step deep work. MiniMax is fine for grep-style utility agents, nothing more.
+
+> **Why Hephaestus still hard-requires GPT:** the DeepSeek entry above is for fallback chains on model-flexible GPT-family routes such as Oracle, `deep`, `ultrabrain`, or custom categories. Hephaestus is a dedicated GPT-native agent with prompt scaffolding and QA expectations tuned against GPT behavior, so its registration stays single-entry. If you want to experiment with DeepSeek, route that work through `fallback_models` on a category or custom agent instead of making Hephaestus pretend DeepSeek is the same runtime contract.
 
 ### Gemini Family (visual, different reasoning style)
 
@@ -272,6 +274,8 @@ These agents are built for GPT's principle-driven style. Their prompts assume au
 | **Hephaestus** | Autonomous deep worker | `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (medium) — single-entry chain, requires one of those providers. The craftsman. |
 | **Oracle** | Architecture consultant | `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (high) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `opencode-go\|vercel/glm-5.1` |
 | **Momus** | Ruthless reviewer | `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (xhigh) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `opencode-go\|vercel/glm-5.1` |
+
+Hephaestus is intentionally stricter than the general GPT-family table. The table names DeepSeek as a limited alternative for routes that already expose `fallback_models`; it does not mean Hephaestus itself accepts non-GPT models.
 
 ### Utility Runners → Speed over Intelligence
 
@@ -476,9 +480,9 @@ Cheapest full-stack path. Hephaestus won't activate — accept that trade-off.
 }
 ```
 
-### Example D — Adding DeepSeek as GPT Alternative
+### Example D — Adding DeepSeek as GPT Alternative for Flexible Routes
 
-If you have OpenRouter and want DeepSeek in the chain when GPT is unavailable:
+If you have OpenRouter and want DeepSeek in a model-flexible chain when GPT is unavailable:
 
 ```jsonc
 {
@@ -515,6 +519,7 @@ If you have OpenRouter and want DeepSeek in the chain when GPT is unavailable:
 - **Sisyphus → MiMo / DeepSeek**: No working configuration found. Untested and unsupported as the orchestrator.
 - **Sisyphus → older GPT models**: Still a bad fit. GPT-5.4 and GPT-5.5 are the only dedicated GPT prompt paths.
 - **Hephaestus → Claude**: Built for Codex's autonomous style. Claude can't replicate this.
+- **Hephaestus → DeepSeek**: DeepSeek is a limited GPT-family alternative for configurable fallback routes, not a tested Hephaestus runtime contract.
 - **Hephaestus → MiniMax**: MiniMax loses coherence on multi-step deep work. **Never do this.**
 - **Oracle → MiniMax**: Same reason. Oracle needs sustained reasoning; MiniMax drifts.
 - **Explore → Opus**: Massive cost waste. Explore needs speed, not intelligence.
