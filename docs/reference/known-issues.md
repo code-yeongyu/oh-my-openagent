@@ -133,6 +133,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: Keep the parent session active with a short manual follow-up after expected background completion, then ask it to check background task status/output. For critical work, prefer synchronous delegation or explicitly poll task output rather than relying on a single automatic wake.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5804.
 
+## #5742: ULW loop can create multiple run-continuation files per session
+
+- **Affects**: `/ulw-loop` sessions that write continuation state under `.omo/run-continuation/`.
+- **Symptom**: One visible OpenCode session can generate many continuation files, making it unclear which file represents the active run.
+- **Workaround**: Before deleting anything, identify the current session id and sort `.omo/run-continuation/` by modified time. Archive or move older duplicates out of the active workspace only after the session has ended, then restart the loop from a clean session if state appears inconsistent.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5742.
+
 ## #5790: Completed background results can require a manual follow-up
 
 - **Affects**: Background or parallel investigations where the parent agent promises to wait for the result and then ends the turn.
