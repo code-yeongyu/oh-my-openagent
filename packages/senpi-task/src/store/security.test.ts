@@ -97,6 +97,34 @@ describe("TaskRecordStore task id boundary", () => {
 })
 
 describe("parseTaskRecord persisted boundary", () => {
+  test("#given a persisted killed:true error record #when listed #then the killed FACT survives the parse round-trip", () => {
+    // given: a subsequent residency transition (dispose) reloads through the parser, so killed must be preserved
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+    writePersistedRecord(project, "st_deadbee1", { status: "error", killed: true, error_message: "RPC child killed by signal SIGKILL" })
+
+    // when
+    const result = store.list()
+
+    // then
+    expect(result.diagnostics).toEqual([])
+    expect(result.records[0]?.killed).toBe(true)
+  })
+
+  test("#given a persisted non-boolean killed #when listed #then a typed diagnostic is reported", () => {
+    // given
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+    const path = writePersistedRecord(project, "st_deadbee2", { killed: "yes" })
+
+    // when
+    const result = store.list()
+
+    // then
+    expect(result.records).toEqual([])
+    expect(result.diagnostics).toEqual([{ type: "parse_error", path, message: "killed is not a boolean" }])
+  })
+
   test("#given malformed optional pid #when records are listed #then diagnostic is typed and record is skipped", () => {
     // given
     const project = tempProject()

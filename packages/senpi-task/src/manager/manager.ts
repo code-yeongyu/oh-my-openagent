@@ -250,7 +250,12 @@ class TaskManagerImpl implements TaskManager {
         } else if (outcome.status === "cancelled") {
           this.#options.store.transition(taskId, { type: "cancel", timestamp })
         } else {
-          this.#options.store.transition(taskId, { type: "fail", timestamp, error_message: outcome.failure.message })
+          this.#options.store.transition(taskId, {
+            type: "fail",
+            timestamp,
+            error_message: outcome.failure.message,
+            ...(outcome.killed === true ? { killed: true } : {}),
+          })
         }
         this.#settleWaiters(taskId)
       })
