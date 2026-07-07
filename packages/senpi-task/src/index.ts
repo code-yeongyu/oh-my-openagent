@@ -403,3 +403,25 @@ export type {
   TeamTaskFilter,
   TeamTasklistContext,
 } from "./team"
+export {
+  createTeam,
+  deleteTeam,
+  readMemberTaskMap,
+  refreshTeamMemberStatuses,
+  SenpiTeamRuntimeError,
+  toTeamCoreConfig,
+} from "./team"
+export type {
+  CreateTeamDeps,
+  CreateTeamResult,
+  DeleteTeamDeps,
+  DeleteTeamResult,
+  MemberStatusPort,
+  MemberTaskMap,
+  RefreshTeamMemberStatusesDeps,
+  SenpiTeamRuntimeErrorCode,
+  TeamCoreConfig,
+  TeamRuntimeManagerPort,
+} from "./team"
+
+export * from "./tools/team"

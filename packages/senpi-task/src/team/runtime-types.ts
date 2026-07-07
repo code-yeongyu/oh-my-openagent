@@ -48,8 +48,10 @@ export type CreateTeamDeps = {
   readonly spawnDepth: number
   readonly now?: () => number
   // Optional per-member tool injection (todo 24 binds the pre-scoped `team_send_message`). Absent in
-  // the runtime layer's own tests; the spawner forwards whatever it returns via memberScopedTools.
-  readonly memberScopedTools?: (memberName: string) => readonly ToolDefinition[]
+  // the runtime layer's own tests; the spawner forwards whatever it returns via memberScopedTools. The
+  // team run id is threaded so the binder can run-scope the member's send tool (it is not known until
+  // createRuntimeState mints it, so the caller cannot bind it up front).
+  readonly memberScopedTools?: (memberName: string, teamRunId: string) => readonly ToolDefinition[]
 }
 
 export type CreateTeamResult = {

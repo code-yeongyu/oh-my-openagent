@@ -24,7 +24,7 @@ export type SpawnMembersInput = {
   readonly maxParallel: number
   readonly deadlineAt: number
   readonly now: () => number
-  readonly memberScopedTools?: (memberName: string) => readonly ToolDefinition[]
+  readonly memberScopedTools?: (memberName: string, teamRunId: string) => readonly ToolDefinition[]
 }
 
 export type SpawnMembersResult = {
@@ -107,7 +107,7 @@ async function spawnOneMember(input: SpawnMembersInput, member: TeamMember): Pro
 }
 
 function buildMemberStartSpec(input: SpawnMembersInput, member: TeamMember): ManagerStartSpec {
-  const scopedTools = input.memberScopedTools?.(member.name)
+  const scopedTools = input.memberScopedTools?.(member.name, input.teamRunId)
   return {
     prompt: member.prompt ?? `You are team member '${member.name}' in team '${input.spec.name}'.`,
     parent_session_id: input.leadSessionId,
