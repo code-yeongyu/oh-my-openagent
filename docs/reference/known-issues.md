@@ -133,6 +133,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: Keep the parent session active with a short manual follow-up after expected background completion, then ask it to check background task status/output. For critical work, prefer synchronous delegation or explicitly poll task output rather than relying on a single automatic wake.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5804.
 
+## #5790: Completed background results can require a manual follow-up
+
+- **Affects**: Background or parallel investigations where the parent agent promises to wait for the result and then ends the turn.
+- **Symptom**: The background work may finish successfully, but no final answer is delivered into the original conversation until the user asks whether the result came back.
+- **Workaround**: Ask the parent to record the task ids before waiting, then send one follow-up after the expected completion window asking it to read those task outputs and summarize. For long-running work, prefer explicit task status checks over assuming the parent will proactively resume.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5790.
+
 ## #5802: `multimodal-looker` can hang on `opencode/mimo-v2.5-free`
 
 - **Affects**: `look_at` / `multimodal-looker` when `agents.multimodal-looker.model` is explicitly set to `opencode/mimo-v2.5-free`.
