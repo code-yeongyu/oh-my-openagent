@@ -67,6 +67,7 @@ const nodes: BuildNode[] = [
 	{ id: "cli-node", command: "bun", args: ["run", "build:cli-node"], deps: [] },
 	{ id: "codex-install", command: "bun", args: ["run", "build:codex-install"], deps: [] },
 	{ id: "schema", command: "bun", args: ["run", "build:schema"], deps: [] },
+	{ id: "omo-schema", command: "bun", args: ["run", "build:omo-schema"], deps: [] },
 ];
 
 async function run() {

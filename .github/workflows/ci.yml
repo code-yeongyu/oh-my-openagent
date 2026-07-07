@@ -380,12 +380,12 @@ jobs:
 
       - name: Auto-commit schema changes
         run: |
-          if git diff --quiet assets/oh-my-opencode.schema.json; then
+          if git diff --quiet assets/oh-my-opencode.schema.json assets/omo.schema.json; then
             echo "No schema changes to commit"
           else
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add assets/oh-my-opencode.schema.json
+            git add assets/oh-my-opencode.schema.json assets/omo.schema.json
             git commit -m "chore: auto-update schema.json"
             git push
           fi
@@ -397,8 +397,8 @@ jobs:
           JOB_SUMMARY_TITLE: Schema auto-commit
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
-            - Rebuilds the schema artifact on `master` pushes.
-            - Commits `assets/oh-my-opencode.schema.json` only when generation changes it.
+            - Rebuilds the schema artifacts on `master` pushes.
+            - Commits `assets/oh-my-opencode.schema.json` and `assets/omo.schema.json` only when generation changes them.
           JOB_SUMMARY_NEXT: If this fails, inspect schema generation first, then check bot write permissions.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
