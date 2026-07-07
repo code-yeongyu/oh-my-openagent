@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5904 - TUI status bar does not show the active provider prefix
+
+- **Affects**: Multi-provider setups where the same model name is available through more than one provider.
+- **Symptom**: The TUI status bar can show only the model name, such as `claude-opus-4-7`, without the provider prefix. After runtime fallback or manual model changes, users must open the model picker to tell whether the active route is `opencode/`, `anthropic/`, an OpenAI-compatible provider, or a local provider.
+- **Workaround**: When provider identity matters, use the model picker or logs to confirm the full `provider/model` route before starting a long run. Keep provider-specific display names or notes in your project config until a persistent status-bar provider indicator exists.
+- **Status**: Open enhancement. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5904.
+
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
 - **Affects**: OpenAI-compatible custom providers whose models are written to `opencode.json` without a `limit` block.
