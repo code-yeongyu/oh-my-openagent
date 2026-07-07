@@ -1,4 +1,4 @@
-import { z } from "zod"
+import * as z from "zod"
 import { OmoAgentsConfigSchema } from "./agent"
 import { OmoCategoriesConfigSchema } from "./category"
 import { OmoTaskSettingsSchema } from "./task"

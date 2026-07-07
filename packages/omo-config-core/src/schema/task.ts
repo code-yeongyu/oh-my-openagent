@@ -1,4 +1,4 @@
-import { z } from "zod"
+import * as z from "zod"
 
 export const OmoTaskNotificationSchema = z.object({
   deliver_as: z.enum(["followUp", "steer"]).default("followUp"),
