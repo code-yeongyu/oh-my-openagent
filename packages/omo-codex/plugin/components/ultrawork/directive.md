@@ -287,6 +287,12 @@ evidence for that step. Do not start dependent implementation until the
 audit, research, or review result is integrated or explicitly recorded
 as inconclusive. Do not generate a plan before spawned research lanes
 that feed the plan have returned or been closed as inconclusive.
+Immediately after any `multi_agent_v1.spawn_agent`, run
+`multi_agent_v1.wait_agent` until the child reaches terminal status
+(`completed`, `failed`, `blocked`, or explicitly recorded inconclusive)
+before any dependent `update_plan` transition, `create_goal`
+continuation, implementation tool call, plan drafting, approval-gate
+work, PR handoff, or final response. A timeout is not terminal status.
 Do not write the final answer, PR handoff, or completion summary while
 active child agents remain open. Use short `multi_agent_v1.wait_agent` cycles.
 After two silent waits send `TASK STILL ACTIVE: return <deliverable> or

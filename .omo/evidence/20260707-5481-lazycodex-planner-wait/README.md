@@ -1,0 +1,41 @@
+# QA Evidence: LazyCodex planner result wait barrier
+
+## What was tested
+
+- RED/GREEN hook contract: `npm --prefix packages/omo-codex/plugin/components/ultrawork test -- test/codex-hook.test.ts`.
+- RED/GREEN planner skill contract: `node --test packages/omo-codex/plugin/test/ulw-plan-skill-contract.test.mjs`.
+- Component regression: `npm --prefix packages/omo-codex/plugin/components/ultrawork test`.
+- Generated skill sync and pointer checks:
+  - `node --test packages/omo-codex/plugin/test/aggregate-skills.test.mjs packages/omo-codex/plugin/test/ultrawork-skill-pointer.test.mjs packages/omo-codex/plugin/test/ulw-plan-skill-contract.test.mjs`
+  - `node --test --test-name-pattern "component skill sources|shared skill name collides|packaged ulw-plan|context-pressure-prone" packages/omo-codex/plugin/test/sync-skills.test.mjs`
+- Type/lint guardrails:
+  - `npm --prefix packages/omo-codex/plugin/components/ultrawork run typecheck`
+  - `bun run packages/shared-skills/skills/programming/scripts/typescript/check-no-excuse-rules.ts packages/omo-codex/plugin/components/ultrawork/test/codex-hook.test.ts`
+  - `bun run typecheck`
+  - `git diff --check`
+- Codex QA skill attempts:
+  - `bash scripts/lib/common.sh --self-check`
+  - `bash scripts/hook-unit-probe.sh --self-test`
+  - `bash scripts/app-server-drive.sh --plugin`
+- Codex compatibility gate: `bun run test:codex` before and after `bun install --frozen-lockfile`, plus a sanitized-PATH retry excluding the user-global npm shim.
+
+## What was observed
+
+- The hook contract failed before the prompt edit because the injected directive did not require waiting after `multi_agent_v1.spawn_agent`; it passed after the edit with 14/14 tests green.
+- The planner skill contract failed before the skill edit because `ulw-plan` did not document `multi_agent_v1.wait_agent`; it passed after the edit for both component and packaged skill copies.
+- The ultrawork component suite passed: 5 files, 31 tests.
+- Focused generated-skill and pointer checks passed after rebuilding `ultrawork` and `ulw-loop`: 8/8 tests and 4/4 focused sync tests.
+- Typecheck passed at both component and repository level. No-excuse audit and `git diff --check` passed.
+- Codex QA isolation self-check confirmed isolated `CODEX_HOME`, mock model response, and unchanged real `~/.codex/config.toml`, but failed host dependency checks because `jq` and `tmux` are not installed.
+- `hook-unit-probe.sh --self-test` and `app-server-drive.sh --plugin` are blocked on the same missing `jq` dependency.
+- `bun run test:codex` is partially blocked by this Windows host environment:
+  - Default PATH fails in `packages/lsp-tools-mcp/test/process.test.ts` because `%APPDATA%/npm` contains a global `typescript-language-server.CMD` shim.
+  - Sanitized PATH fixes that LSP MCP failure, then the gate reaches unrelated installer cleanup and LSP component package-smoke failures captured in `bun-test-codex-sanitized-path-standalone-bun.txt`.
+
+## Why it is enough
+
+The changed behavior is prompt/skill contract text for Codex orchestration. The RED/GREEN tests prove the injected ultrawork directive and both `ulw-plan` copies now require `wait_agent` to terminal status before dependent work can proceed. The component, sync, pointer, typecheck, and diff checks prove the generated runtime copies stay aligned and the changed TypeScript test is clean.
+
+## What was omitted
+
+Full live Codex app-server proof could not run on this host because the `codex-qa` scripts require `jq`; TUI smoke also requires `tmux`. No secret-bearing logs or environment dumps were copied.
