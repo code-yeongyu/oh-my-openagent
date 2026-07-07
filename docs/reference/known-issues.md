@@ -192,6 +192,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: Use short wait cycles, send one targeted follow-up that asks the child to return a result or `BLOCKED`, then record the child as inconclusive before closing or respawning it. Do not treat repeated wait timeouts as proof that the child finished.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5021.
 
+## #5481 - LazyCodex can continue without consuming a spawned planner result
+
+- **Affects**: LazyCodex `ulw` flows that spawn a planner/research subagent while the parent keeps executing.
+- **Symptom**: The planner continues spending high-effort tokens, but the main agent proceeds with its own plan and never incorporates the planner output.
+- **Workaround**: For work that truly needs a plan, ask for the plan as a first explicit step and wait for it before implementation, or manually stop the parent when it starts executing before the spawned planner returns. Treat background planner output as advisory unless the parent explicitly reports that it read and applied it.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5481.
+
 ## #4722 - Codex hooks can report exit code 1 immediately after install
 
 - **Affects**: LazyCodex / OMO Codex installs where Codex keeps running across a plugin cache/config update.
