@@ -119,6 +119,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: Use `session_info` first when you know the session id, then relaunch OpenCode from the project directory that owns the historical sessions before using read/search/list. For forensic work, inspect/export the OpenCode DB directly rather than relying on scope-filtered list output.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5810.
 
+## #5802: `multimodal-looker` can hang on `opencode/mimo-v2.5-free`
+
+- **Affects**: `look_at` / `multimodal-looker` when `agents.multimodal-looker.model` is explicitly set to `opencode/mimo-v2.5-free`.
+- **Symptom**: The delegated image-reading task receives image data but never returns a response or clear timeout. `doctor` can also report the configured model as `unknown`.
+- **Workaround**: Do not use `opencode/mimo-v2.5-free` as the primary multimodal-looker model. Use a known working OpenCode free-tier model such as `opencode/deepseek-v4-flash-free` or `opencode/big-pickle`, then keep `mimo-v2.5-free` out of the primary slot until the model registry/dispatch path is fixed.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5802.
+
 ## #5341: `oh-my-opencode` Linux/Windows wrapper can miss platform binaries
 
 - **Affects**: `npm install -g oh-my-opencode@4.10.0` on Linux x64 and Windows x64.
