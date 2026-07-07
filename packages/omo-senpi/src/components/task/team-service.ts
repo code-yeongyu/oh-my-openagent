@@ -59,8 +59,10 @@ function stateDirConfig(deps: TeamServiceDeps): StateDirConfig {
   }
 }
 
-function requireLeadSession(deps: TeamServiceDeps, override: string | undefined): string {
-  const leadSessionId = override ?? deps.runtime.sessionId()
+// The lead is ALWAYS the current session; there is no model-supplied override (dropped per W3-V F2 so
+// the "current session IS lead" sentinel cannot be spoofed by a tool argument).
+function requireLeadSession(deps: TeamServiceDeps): string {
+  const leadSessionId = deps.runtime.sessionId()
   if (leadSessionId === undefined || leadSessionId.length === 0) {
     throw new Error("team tools require an active lead session; none was captured yet")
   }
@@ -94,7 +96,7 @@ export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
 
   const service: TeamToolsService = {
     async createTeam(input) {
-      const leadSessionId = requireLeadSession(deps, input.leadSessionId)
+      const leadSessionId = requireLeadSession(deps)
       const { spec, source } = await resolveTeamSpec(input, ports, deps.cwd, omoTeams)
       return createTeam(spec, source, {
         manager: deps.manager,
