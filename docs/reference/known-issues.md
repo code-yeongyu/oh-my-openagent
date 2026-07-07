@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5748 - Hidden `plan` alias can bypass the Prometheus coordinator guard
+
+- **Affects**: Worker-agent delegation paths that call `task(subagent_type="plan")` while OMO plan replacement/demotion is enabled.
+- **Symptom**: Direct `task(subagent_type="prometheus")` is blocked as a coordinator target, but the hidden `plan` lane can still be reached from a worker and can receive ULW planning injection. That creates a path into planner/coordinator behavior that the guard was meant to prevent.
+- **Workaround**: Do not call `task(subagent_type="plan")` from worker agents. Route planning through the top-level Prometheus/`@plan` flow, or use normal category delegation for executable worker tasks.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5748.
+
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
 - **Affects**: OpenAI-compatible custom providers whose models are written to `opencode.json` without a `limit` block.
