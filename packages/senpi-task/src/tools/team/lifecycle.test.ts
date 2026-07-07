@@ -2,9 +2,14 @@ import { describe, expect, test } from "bun:test"
 
 import { SenpiTeamRuntimeError, SenpiTeamSpecError } from "../../team"
 import { createFakeTeamService, fakeCreateResult, fakeDeleteResult } from "./__fixtures__/team-tool-fakes"
-import { createTeamCreateTool, createTeamDeleteTool, runTeamCreate, runTeamDelete } from "./lifecycle"
+import { TeamCreateParams, createTeamCreateTool, createTeamDeleteTool, runTeamCreate, runTeamDelete } from "./lifecycle"
 
 describe("team_create tool", () => {
+  test("#given the team_create schema #when inspected #then it exposes no model-supplied lead_session_id override", () => {
+    // then: the lead is always the current session; the spoofable override must not exist
+    expect(Object.keys(TeamCreateParams.properties)).not.toContain("lead_session_id")
+  })
+
   test("#given an inline spec #when team_create runs #then it reports the created run and members", async () => {
     // given
     const service = createFakeTeamService({ createTeam: async () => fakeCreateResult() })

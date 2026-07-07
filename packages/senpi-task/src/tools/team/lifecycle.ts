@@ -13,9 +13,6 @@ export const TeamCreateParams = Type.Object({
   inline_spec: Type.Optional(
     Type.Unknown({ description: "Inline team spec object, e.g. { name, members: [{ name, category|subagent_type, prompt? }] }. Provide exactly one of team_name or inline_spec." }),
   ),
-  lead_session_id: Type.Optional(
-    Type.String({ description: "Optional lead session id override. Usually omit; team_create leads with the current session." }),
-  ),
 })
 
 export const TeamDeleteParams = Type.Object({
@@ -53,10 +50,9 @@ export async function runTeamCreate(service: TeamToolsService, params: TeamCreat
   }
 
   try {
-    const result = await service.createTeam({
-      ...(hasName ? { teamName: params.team_name } : { inlineSpec: params.inline_spec }),
-      ...(params.lead_session_id !== undefined ? { leadSessionId: params.lead_session_id } : {}),
-    })
+    const result = await service.createTeam(
+      hasName ? { teamName: params.team_name } : { inlineSpec: params.inline_spec },
+    )
     const state = result.runtimeState
     const members = state.members.map((member) => ({ name: member.name, status: member.status }))
     return toolResult(

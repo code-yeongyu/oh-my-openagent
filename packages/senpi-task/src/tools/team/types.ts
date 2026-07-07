@@ -16,7 +16,6 @@ export type TeamTaskStatus = Task["status"]
 export type CreateTeamToolInput = {
   readonly teamName?: string
   readonly inlineSpec?: unknown
-  readonly leadSessionId?: string
 }
 
 export type CreateTeamTaskServiceInput = {
