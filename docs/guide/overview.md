@@ -41,7 +41,7 @@ We used to call this "Claude Code on steroids." That was wrong.
 
 This isn't about making Claude Code better. It's about breaking free from the idea that one model, one provider, one way of working is enough. Anthropic wants you locked in. OpenAI wants you locked in. Everyone wants you locked in.
 
-Oh My OpenAgent doesn't play that game. It orchestrates across models, picking the right brain for the right job. Claude for orchestration. GPT for deep reasoning. Gemini for frontend. GPT-5.4 Mini for quick tasks. All working together, automatically.
+Oh My OpenAgent doesn't play that game. It orchestrates across models, picking the right brain for the right job. Claude-like models for orchestration and communicative fallback. GPT for deep specialist work. Gemini for frontend. GPT-5.4 Mini for quick tasks. All working together, automatically.
 
 ---
 
@@ -82,11 +82,11 @@ Sisyphus is your main orchestrator. He plans, delegates to specialists, and driv
 
 **Recommended models:**
 
-- **Claude Opus 4.7** — Best overall experience. Sisyphus was built with Claude-optimized prompts.
-- **Kimi K2.6** / **K2.5** — Great Claude-like alternatives. K2.6 is the current default fallback in the primary Sisyphus chain; many users run K2.6 or the K2.5/K2.6 combo exclusively.
-- **GLM 5** — Solid option, especially via Z.ai.
+- **Claude Fable 5 / Opus 4.8 / Opus 4.7** — Best overall experience. Sisyphus was built with Claude-optimized prompts; Opus 4.7 remains the snapshot-backed auto-resolution floor.
+- **Kimi K2.7 / K2.6 / K2.5** — Great Claude-like alternatives. K2.6 is the current default fallback in the primary Sisyphus chain; many users run Kimi exclusively.
+- **GLM 5 / 5.1** — Solid option, especially via Z.ai, though looser than Kimi on long nested workflows.
 
-Sisyphus works best on Claude Opus 4.7, Kimi K2.6 (or K2.5), and GLM 5.1. GPT-5.4 and GPT-5.5 now have dedicated prompt paths, but older GPT models are still a poor fit and should route to Hephaestus instead.
+GPT-5.4 and GPT-5.5 have dedicated Sisyphus prompt paths, but treat them as compatibility allowances, not the recommended default for the orchestrator. Use Hephaestus, `deep`, or `ultrabrain` when the work specifically needs GPT-native deep specialist behavior.
 
 ### Hephaestus: The Legitimate Craftsman
 
@@ -100,7 +100,7 @@ Use Hephaestus when you need deep architectural reasoning, complex debugging acr
 
 - **Multi-model orchestration.** Pure Codex is single-model. OmO routes different tasks to different models automatically. GPT for deep reasoning. Gemini for frontend. GPT-5.4 Mini for speed. The right brain for the right job.
 - **Background agents.** Fire 5+ agents in parallel. Something Codex simply cannot do. While one agent writes code, another researches patterns, another checks documentation. Like a real dev team.
-- **Category system.** Tasks are routed by intent, not model name. `visual-engineering` gets Gemini. `ultrabrain` gets GPT-5.5 xhigh. `deep` gets GPT-5.5. `artistry` gets Gemini. `quick` gets GPT-5.4 Mini. `unspecified-low` gets fast cheap models. `unspecified-high` gets Claude Opus. `writing` gets prose-optimized models. No manual juggling.
+- **Category system.** Tasks are routed by intent, not model name. `visual-engineering` gets Gemini. `ultrabrain` gets GPT-5.5 xhigh. `deep` gets GPT-5.5. `artistry` gets Gemini. `quick` gets GPT-5.4 Mini. `unspecified-low` gets fast cheap models. `unspecified-high` gets Claude-like communicative fallback. `writing` gets prose-optimized models. No manual juggling.
 - **Accumulated wisdom.** Subagents learn from previous results. Conventions discovered in task 1 are passed to task 5. Mistakes made early aren't repeated. The system gets smarter as it works.
 
 ### Prometheus: The Strategic Planner
@@ -153,7 +153,9 @@ Use Prometheus for multi-day projects, critical production changes, complex refa
 
 ## Agent Model Matching
 
-Different agents work best with different models. Oh My OpenAgent automatically assigns optimal models, but you can customize everything.
+Different agents work best with different models. Oh My OpenAgent automatically assigns optimal models, but you can customize everything. The short version: keep orchestration and general high-effort fallback on Claude-like models, and send deep autonomous specialist work to GPT-native routes.
+
+Read the [Agent-Model Matching Guide](./agent-model-matching.md) before overriding Sisyphus, `unspecified-high`, `deep`, or Hephaestus. It explains which overrides are safe, which are only compatibility fallbacks, and which combinations are expected to degrade.
 
 ### Default Configuration
 
@@ -170,7 +172,8 @@ You can override specific agents or categories in your config:
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
 
   "agents": {
-    // Main orchestrator: Claude Opus or Kimi K2.6 work best
+    // Main orchestrator: Claude/Kimi/GLM work best.
+    // GPT-5.4/5.5 are compatibility paths, not the default recommendation.
     "sisyphus": {
       "model": "kimi-for-coding/k2p5",
       "ultrawork": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
@@ -194,7 +197,8 @@ You can override specific agents or categories in your config:
     // Hard logic and architecture: GPT-5.5 xhigh
     "ultrabrain": { "model": "openai/gpt-5.5", "variant": "xhigh" },
 
-    // Autonomous research and execution
+    // GPT-native autonomous category. Use Hephaestus when you need
+    // its dedicated deep-worker prompt scaffolding, not just a category route.
     "deep": { "model": "openai/gpt-5.5", "variant": "medium" },
 
     // Creative and design work
@@ -206,7 +210,8 @@ You can override specific agents or categories in your config:
     // Low-effort fallback: cheapest available
     "unspecified-low": { "model": "openai/gpt-5.4-mini" },
 
-    // High-effort fallback: best available
+    // General high-effort fallback: communicative Claude-like behavior.
+    // Route purely deep GPT specialist work to deep/ultrabrain/Hephaestus.
     "unspecified-high": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
 
     // Prose and documentation
@@ -225,7 +230,7 @@ You can override specific agents or categories in your config:
 
 **GPT models** (explicit reasoning, principle-driven):
 
-- GPT-5.5 — deep coding powerhouse, required for Hephaestus and default for Oracle
+- GPT-5.5 — deep coding powerhouse, required for Hephaestus and default for Oracle/deep routes. Sisyphus GPT support is a compatibility path, not the recommended orchestrator default.
 - GPT-5.4 Mini — fast and cheap utility tasks
 
 **Different-behavior models**:

@@ -50,6 +50,8 @@
   "categories": {
     "quick": { "model": "opencode/gpt-5-nano" },
     "unspecified-low": { "model": "anthropic/claude-sonnet-4-6" },
+    // General high-effort fallback stays Claude-like for communicative orchestration.
+    // Use deep/ultrabrain or Hephaestus for GPT-native specialist work.
     "unspecified-high": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
     "writing": { "model": "kimi-for-coding/k2p5" },
     "visual-engineering": { "model": "google/gemini-3.1-pro", "variant": "high" },
