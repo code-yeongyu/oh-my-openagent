@@ -126,6 +126,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: Use `session_info` first when you know the session id, then relaunch OpenCode from the project directory that owns the historical sessions before using read/search/list. For forensic work, inspect/export the OpenCode DB directly rather than relying on scope-filtered list output.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5810.
 
+## #5804: Parent session can miss background completion notifications
+
+- **Affects**: Sisyphus sessions that dispatch background work with `task(run_in_background=true)` or `call_omo_agent` and then end the turn saying they are waiting.
+- **Symptom**: The child/background agent completes, but the parent never receives or acts on the wake notification, so the visible session stays stuck until the user manually sends a follow-up such as `continue`.
+- **Workaround**: Keep the parent session active with a short manual follow-up after expected background completion, then ask it to check background task status/output. For critical work, prefer synchronous delegation or explicitly poll task output rather than relying on a single automatic wake.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5804.
+
 ## #5802: `multimodal-looker` can hang on `opencode/mimo-v2.5-free`
 
 - **Affects**: `look_at` / `multimodal-looker` when `agents.multimodal-looker.model` is explicitly set to `opencode/mimo-v2.5-free`.
