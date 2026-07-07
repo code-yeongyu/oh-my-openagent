@@ -93,6 +93,20 @@ Mode distinction:
 - `mode: "primary"`: top-level session agents selected directly in UI/CLI
 - `mode: "subagent"`: worker/consultant agents invoked via `task(..., subagent_type="...")` or `call_omo_agent(...)`
 
+### Display Names vs Providers
+
+`Sisyphus - Ultraworker` is the display name for the primary Sisyphus agent. It is not a separate provider, proxy, or replacement for your original model account.
+
+Three names can appear together in logs or the TUI:
+
+- **Agent display name**: `Sisyphus - Ultraworker`, `Atlas - Plan Executor`, `Hephaestus - Deep Agent`
+- **Provider namespace**: `anthropic`, `openai`, `github-copilot`, `opencode`, `opencode-go`, `vercel`
+- **Model id**: `claude-opus-4-7`, `kimi-k2.6`, `gpt-5.5`, `glm-5`
+
+The agent decides the prompt and behavior. The provider namespace decides which connected account or gateway serves the request. The model id decides the model family. If you see Sisyphus running through `opencode-go/kimi-k2.6`, that means the Sisyphus prompt is using Kimi through the OpenCode Go provider path; it does not mean OMO replaced your provider silently.
+
+When `ulw` or `ultrawork` is present, Sisyphus receives the ultrawork instruction set for a harder autonomous task. It still resolves its model through the same configured model or fallback chain.
+
 ### Delegation Semantics (Important)
 
 - `task(category="...")` routes to **Sisyphus-Junior** with category-optimized model routing
