@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5604 - Invalid delegation routing can look like a silent subagent skip
+
+- **Affects**: Multi-agent runs where an invalid subagent/category route is attempted.
+- **Symptom**: The harness can create child-session-like artifacts without a usable model or stream, while the parent continues directly. From the outside this can look like subagents were called but hidden, stuck, or skipped.
+- **Workaround**: When delegation appears missing, inspect whether the child session has a resolved provider/model and stream events before treating it as running. If routing is invalid, stop the parent workflow and reroute through a valid category or subagent instead of letting the parent implement directly.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5604.
+
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
 - **Affects**: OpenAI-compatible custom providers whose models are written to `opencode.json` without a `limit` block.
