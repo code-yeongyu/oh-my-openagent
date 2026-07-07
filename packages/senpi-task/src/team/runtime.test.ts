@@ -174,6 +174,31 @@ describe("createTeam", () => {
     expect(reloaded.status).toBe("failed")
   })
 
+  test("#given the member sidecar write throws #when created #then members are cancelled, the team is failed, and it never activates", async () => {
+    // given
+    const stateDir = stateDirConfig(tempProjectDir())
+    const settings = taskSettings()
+    const manager = new FakeTeamManager()
+
+    // when
+    const attempt = createTeam(threeMemberSpec(), "project", {
+      manager,
+      stateDir,
+      taskSettings: settings,
+      leadSessionId: "lead-session",
+      spawnDepth: 1,
+      writeMemberMap: () => Promise.reject(new Error("disk full")),
+    })
+
+    // then
+    await expect(attempt).rejects.toMatchObject({ code: "sidecar_write_failed" })
+    expect(manager.cancelled.map((entry) => entry.taskId).sort()).toEqual(["st_000001", "st_000002", "st_000003"])
+    const config = toTeamCoreConfig(settings, teamStorageBaseDir(stateDir))
+    const teamRunId = manager.started[0]?.name?.split(":")[1] ?? ""
+    const reloaded = await loadRuntimeState(teamRunId, config)
+    expect(reloaded.status).toBe("failed")
+  })
+
   test("#given a create deadline already passed #when created #then it fails with a deadline error and no spawns", async () => {
     // given
     const stateDir = stateDirConfig(tempProjectDir())
