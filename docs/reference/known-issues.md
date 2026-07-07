@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5578 - Sisyphus prompt reconciliation can shift behavior between turns
+
+- **Affects**: Sisyphus sessions where the configured model family differs from the runtime-selected model family.
+- **Symptom**: Runtime prompt reconciliation can rebuild a large Sisyphus prompt body per request, so adjacent turns may receive materially different instructions. The agent can appear to reverse a prior commitment, such as waiting for a user decision and then proceeding autonomously on the next turn.
+- **Workaround**: For interactive work that depends on stable agent behavior, align the configured Sisyphus model family with the model selected in the TUI, or start a fresh session after changing runtime model family. Avoid switching between GPT and non-GPT Sisyphus routes mid-decision.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5578.
+
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
 - **Affects**: OpenAI-compatible custom providers whose models are written to `opencode.json` without a `limit` block.
