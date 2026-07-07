@@ -46,12 +46,35 @@ export function readRecords(stateDir) {
     .map((f) => JSON.parse(readFileSync(join(dir, f), "utf8")))
 }
 
+// The child's rpc session JSONL lands at the product's canonical child session dir, which nests under
+// children/<id>/ (senpi-task tools/output/transcript/session-dir.ts childSessionDir), NOT directly at
+// sessions/<id>/. The rpc runner's resolveChildSessionDir appends sessions/<id> to the per-child state
+// dir (join(stateDir,"children",<id>)), so the full path is children/<id>/sessions/<id>/.
 export function childSessionJsonlExists(stateDir, taskId) {
-  const dir = join(stateDir, "sessions", taskId)
+  const dir = join(stateDir, "children", taskId, "sessions", taskId)
   if (!existsSync(dir)) return false
   const walk = (root) =>
     readdirSync(root, { withFileTypes: true }).some((e) => (e.isDirectory() ? walk(join(root, e.name)) : e.name.endsWith(".jsonl")))
   return walk(dir)
+}
+
+// Proof of the STEP-1 wiring fix (engine.ts runners.process): a process-mode task must reach the rpc
+// runner instead of silently falling back to the in-process runner. The two runners leave different
+// store fingerprints - the in-process fallback COMPLETES the task through the mock child (status
+// completed), while the rpc runner reaches a real child spawn: either a recorded pid, or (in an
+// environment where the rpc child entry cannot be located) a spawn-path failure whose error names the
+// rpc child entry. Either fingerprint proves the process slot no longer aliases the in-process runner.
+export function analyzeRpcRouting(records) {
+  const record = records.find((r) => r.execution_mode === "process") ?? records[0]
+  if (record === undefined) return { routed: false, reason: "no task record persisted", facts: {} }
+  const hasPid = typeof record.pid === "number"
+  const message = typeof record.error_message === "string" ? record.error_message : ""
+  const spawnPathFailure = /rpc-entry|--mode rpc|@code-yeongyu\/senpi/i.test(message)
+  const routed = record.execution_mode === "process" && (hasPid || spawnPathFailure)
+  const reason = routed
+    ? undefined
+    : `execution_mode=${record.execution_mode} pid=${hasPid} spawnPathFailure=${spawnPathFailure} status=${record.status}`
+  return { routed, reason, facts: { task_id: record.task_id, pid: record.pid, status: record.status, error_excerpt: message.slice(0, 160) } }
 }
 
 // The forward-correct spawn assertion: a real rpc-process child is proven ONLY when the record carries
