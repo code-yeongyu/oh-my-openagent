@@ -112,6 +112,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: Record a `declined` install decision for the missing server with `lsp_install_decision`; future LSP calls collapse to a one-line warning. To share that decision across sessions, set `LSP_TOOLS_MCP_INSTALL_DECISIONS` to a stable decisions-file path.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5260.
 
+## #5341: `oh-my-opencode` Linux/Windows wrapper can miss platform binaries
+
+- **Affects**: `npm install -g oh-my-opencode@4.10.0` on Linux x64 and Windows x64.
+- **Symptom**: Running `oh-my-opencode --version` exits with `Platform binary not installed` because the wrapper looks for `oh-my-opencode-linux-x64` / `oh-my-opencode-windows-x64`, while the published platform packages for those targets use the `oh-my-openagent-*` family.
+- **Workaround**: Install through the `oh-my-openagent` package family or use `bunx oh-my-openagent ...` until the wrapper/platform package aliasing is made symmetric. If you already installed the broken wrapper globally, remove it before reinstalling to avoid bin shadowing.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5341.
+
 ## #5120: Sisyphus can loop on simple tasks
 
 - **Affects**: OpenCode 1.17.0 with oh-my-openagent 4.8.1.
