@@ -258,8 +258,9 @@ describe("codex ultrawork hook", () => {
 		// then
 		const directive = parsed.hookSpecificOutput.additionalContext;
 		expect(directive).toMatch(/Subagent-dependent transition barrier/);
-		expect(directive).toMatch(/after any `multi_agent_v1\.spawn_agent`/);
-		expect(directive).toMatch(/wait_agent[\s\S]{0,240}terminal status/);
+		expect(directive).toMatch(/Spawn every independent child for the current wave first/);
+		expect(directive).toMatch(/After the wave\s+is launched[\s\S]{0,240}wait_agent[\s\S]{0,240}terminal status/);
+		expect(directive).not.toMatch(/Immediately after any `multi_agent_v1\.spawn_agent`/);
 		expect(directive).toMatch(/Do not start dependent implementation/);
 		expect(directive).toMatch(/Do not mark an `update_plan` step `completed`/);
 	});

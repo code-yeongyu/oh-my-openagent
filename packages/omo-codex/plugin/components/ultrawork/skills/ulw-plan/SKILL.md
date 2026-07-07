@@ -67,9 +67,9 @@ Fan out read-only research before deciding. Every spawn names DELIVERABLE / SCOP
 multi_agent_v1.spawn_agent({"message":"TASK: act as an explorer. DELIVERABLE: ... SCOPE: ... VERIFY: ...","agent_type":"explorer","fork_context":false})
 ```
 
-Immediately after any `multi_agent_v1.spawn_agent`, use
-`multi_agent_v1.wait_agent` until the child reaches terminal status.
-A timeout is not terminal status. Do not start dependent planning, drafting, approval-gate work, or final handoff until each child result is integrated or recorded as inconclusive.
+Spawn every independent child for the current wave first. After the wave
+is launched, use `multi_agent_v1.wait_agent` for each child until each
+reaches terminal status. A timeout is not terminal status. Do not start dependent planning, drafting, approval-gate work, or final handoff until each child result is integrated or recorded as inconclusive.
 
 Roles: `explorer` (internal patterns/conventions/tests), `librarian` (external docs/contracts), `metis` (gap analysis), `momus` (high-accuracy plan review). Full spawn/wait/fallback discipline is in `references/full-workflow.md`.
 

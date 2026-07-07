@@ -21,8 +21,18 @@ test("#given ulw-plan skill #when Codex delegation is inspected #then spawned pl
 		assert.match(copy.content, /multi_agent_v1\.wait_agent/, `${copy.label}: must document Codex waiting`);
 		assert.match(
 			copy.content,
-			/after any `multi_agent_v1\.spawn_agent`/i,
-			`${copy.label}: must require waiting after every spawn`,
+			/Spawn every independent child for the current wave first/i,
+			`${copy.label}: must preserve independent spawn waves`,
+		);
+		assert.match(
+			copy.content,
+			/After the wave\s+is launched[\s\S]{0,240}multi_agent_v1\.wait_agent[\s\S]{0,240}terminal status/i,
+			`${copy.label}: must wait after the wave is launched`,
+		);
+		assert.doesNotMatch(
+			copy.content,
+			/Immediately after any `multi_agent_v1\.spawn_agent`/i,
+			`${copy.label}: must not serialize independent spawns`,
 		);
 		assert.match(copy.content, /terminal status/i, `${copy.label}: must wait until terminal status`);
 		assert.match(

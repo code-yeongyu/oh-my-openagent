@@ -4,6 +4,9 @@
 
 - RED/GREEN hook contract: `npm --prefix packages/omo-codex/plugin/components/ultrawork test -- test/codex-hook.test.ts`.
 - RED/GREEN planner skill contract: `node --test packages/omo-codex/plugin/test/ulw-plan-skill-contract.test.mjs`.
+- Review follow-up RED/GREEN contracts for wave-level spawning:
+  - `npm --prefix packages/omo-codex/plugin/components/ultrawork test -- test/codex-hook.test.ts`
+  - `node --test packages/omo-codex/plugin/test/ulw-plan-skill-contract.test.mjs`
 - Component regression: `npm --prefix packages/omo-codex/plugin/components/ultrawork test`.
 - Generated skill sync and pointer checks:
   - `node --test packages/omo-codex/plugin/test/aggregate-skills.test.mjs packages/omo-codex/plugin/test/ultrawork-skill-pointer.test.mjs packages/omo-codex/plugin/test/ulw-plan-skill-contract.test.mjs`
@@ -23,6 +26,7 @@
 
 - The hook contract failed before the prompt edit because the injected directive did not require waiting after `multi_agent_v1.spawn_agent`; it passed after the edit with 14/14 tests green.
 - The planner skill contract failed before the skill edit because `ulw-plan` did not document `multi_agent_v1.wait_agent`; it passed after the edit for both component and packaged skill copies.
+- The review follow-up contracts failed before changing the wording because the prompt still serialized child launches with "Immediately after any `multi_agent_v1.spawn_agent`". They pass after the wording now requires spawning every independent child in the current wave first, then waiting each child to terminal status before dependent planning or handoff.
 - The ultrawork component suite passed: 5 files, 31 tests.
 - Focused generated-skill and pointer checks passed after rebuilding `ultrawork` and `ulw-loop`: 8/8 tests and 4/4 focused sync tests.
 - Typecheck passed at both component and repository level. No-excuse audit and `git diff --check` passed.
@@ -34,7 +38,7 @@
 
 ## Why it is enough
 
-The changed behavior is prompt/skill contract text for Codex orchestration. The RED/GREEN tests prove the injected ultrawork directive and both `ulw-plan` copies now require `wait_agent` to terminal status before dependent work can proceed. The component, sync, pointer, typecheck, and diff checks prove the generated runtime copies stay aligned and the changed TypeScript test is clean.
+The changed behavior is prompt/skill contract text for Codex orchestration. The RED/GREEN tests prove the injected ultrawork directive and both `ulw-plan` copies now require `wait_agent` to terminal status before dependent work can proceed, while preserving parallel launch of independent children in the same wave. The component, sync, pointer, typecheck, and diff checks prove the generated runtime copies stay aligned and the changed TypeScript test is clean.
 
 ## What was omitted
 
