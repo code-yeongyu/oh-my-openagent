@@ -8,6 +8,7 @@ declare const process: {
   argv: string[]
   cwd(): string
   getBuiltinModule<T>(id: string): T
+  env: Record<string, string | undefined>
 }
 
 interface FsModule {
@@ -34,6 +35,7 @@ const CHILD_IDENTITY = "running as an omo senpi-task child"
 type MockStep =
   | { type: "text"; text: string }
   | { type: "tool_call"; name: string; arguments: Record<string, unknown>; id?: string }
+  | { type: "hang" }
 
 interface MockScript {
   parentSteps: MockStep[]
@@ -154,14 +156,16 @@ function messagesContainChild(context: Context): boolean {
   return false
 }
 
+function stepContent(step: MockStep, callCount: number): AssistantContent[] {
+  if (step.type === "text") return [{ type: "text", text: step.text }]
+  if (step.type === "hang") return [{ type: "text", text: "" }]
+  return [{ type: "toolCall", id: step.id ?? `omo-mock-tool-${callCount}`, name: step.name, arguments: step.arguments }]
+}
+
 function stepToAssistantMessage(step: MockStep, callCount: number): AssistantMessage {
-  const content: AssistantContent[] =
-    step.type === "text"
-      ? [{ type: "text", text: step.text }]
-      : [{ type: "toolCall", id: step.id ?? `omo-mock-tool-${callCount}`, name: step.name, arguments: step.arguments }]
   return {
     role: "assistant",
-    content,
+    content: stepContent(step, callCount),
     api: "openai-completions",
     provider: "omo-mock",
     model: "mock-1",
@@ -174,10 +178,36 @@ function stepToAssistantMessage(step: MockStep, callCount: number): AssistantMes
 let parentCallCount = 0
 let childCallCount = 0
 
+// A detached rpc child runs in a SEPARATE process whose SENPI_CODING_AGENT_SESSION_DIR the runner nests
+// under children/<id>/; the parent's session dir never contains that segment. This env marker is a
+// leak-proof child selector that also works when the harness cannot prepend the CHILD_IDENTITY line.
+function isChildTurn(context: Context): boolean {
+  if (messagesContainChild(context)) return true
+  const sessionDir = process.env.SENPI_CODING_AGENT_SESSION_DIR ?? ""
+  return sessionDir.includes("/children/") || sessionDir.includes("\\children\\")
+}
+
+function emitStep(stream: LocalAssistantMessageEventStream, step: MockStep, message: AssistantMessage): void {
+  stream.push({ type: "start", partial: { ...message, content: [] } })
+  if (step.type === "text") {
+    const partial = { ...message, content: [{ type: "text" as const, text: "" }] }
+    stream.push({ type: "text_start", contentIndex: 0, partial })
+    stream.push({ type: "text_delta", contentIndex: 0, delta: step.text, partial: message })
+    stream.push({ type: "text_end", contentIndex: 0, content: step.text, partial: message })
+  } else if (step.type === "tool_call") {
+    const toolCall = message.content[0]
+    stream.push({ type: "toolcall_start", contentIndex: 0, partial: { ...message, content: [] } })
+    stream.push({ type: "toolcall_delta", contentIndex: 0, delta: JSON.stringify(step.arguments), partial: message })
+    stream.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial: message })
+  }
+  stream.push({ type: "done", reason: message.stopReason, message })
+  stream.end(message)
+}
+
 function streamMockResponse(_model: Model<Api>, context: Context, options?: SimpleStreamOptions) {
   const stream = createLocalAssistantMessageEventStream()
   const script = loadMockScript(context.cwd ?? process.cwd())
-  const isChild = messagesContainChild(context)
+  const isChild = isChildTurn(context)
   const steps = isChild ? script.childSteps : script.parentSteps
   const index = isChild ? childCallCount : parentCallCount
   const step = steps[Math.min(index, steps.length - 1)]
@@ -192,20 +222,18 @@ function streamMockResponse(_model: Model<Api>, context: Context, options?: Simp
       stream.end(aborted)
       return
     }
-    stream.push({ type: "start", partial: { ...message, content: [] } })
-    if (step.type === "text") {
-      const partial = { ...message, content: [{ type: "text" as const, text: "" }] }
-      stream.push({ type: "text_start", contentIndex: 0, partial })
-      stream.push({ type: "text_delta", contentIndex: 0, delta: step.text, partial: message })
-      stream.push({ type: "text_end", contentIndex: 0, content: step.text, partial: message })
-    } else {
-      const toolCall = message.content[0]
-      stream.push({ type: "toolcall_start", contentIndex: 0, partial: { ...message, content: [] } })
-      stream.push({ type: "toolcall_delta", contentIndex: 0, delta: JSON.stringify(step.arguments), partial: message })
-      stream.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial: message })
+    // A hang step keeps the child's turn in-flight forever (the record stays "running") so the kill and
+    // reconcile failure-path scenarios have a live, non-terminal child to act on. An abort still settles.
+    if (step.type === "hang") {
+      stream.push({ type: "start", partial: { ...message, content: [] } })
+      options?.signal?.addEventListener("abort", () => {
+        const aborted = { ...message, stopReason: "aborted" as const }
+        stream.push({ type: "error", reason: "aborted", error: aborted })
+        stream.end(aborted)
+      })
+      return
     }
-    stream.push({ type: "done", reason: message.stopReason, message })
-    stream.end(message)
+    emitStep(stream, step, message)
   })
 
   return stream
