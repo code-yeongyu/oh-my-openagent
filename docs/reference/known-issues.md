@@ -192,6 +192,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: Use short wait cycles, send one targeted follow-up that asks the child to return a result or `BLOCKED`, then record the child as inconclusive before closing or respawning it. Do not treat repeated wait timeouts as proof that the child finished.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5021.
 
+## #4722 - Codex hooks can report exit code 1 immediately after install
+
+- **Affects**: LazyCodex / OMO Codex installs where Codex keeps running across a plugin cache/config update.
+- **Symptom**: Codex shows `SessionStart hook (failed)` or `UserPromptSubmit hook (failed)` with `hook exited with code 1`, but the visible saved hook output may not identify which OMO component failed.
+- **Workaround**: Re-run `npx --yes lazycodex-ai@latest install --no-tui --skip-auth`, start a fresh Codex session, and confirm no hook failure banner appears. If failures persist, manually replay the registered OMO hook commands with minimal Codex-shaped JSON payloads so the failing component can be separated from unrelated global hooks.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4722.
+
 ## #3303 - Windows OpenCode proxy install can fail before OMO loads
 
 - **Affects**: Windows OpenCode installs behind an HTTP(S) proxy, especially first startup paths that ask OpenCode to fetch `oh-my-openagent@latest`.
