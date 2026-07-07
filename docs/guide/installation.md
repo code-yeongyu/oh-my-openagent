@@ -233,6 +233,18 @@ Map their answer to:
 
 **MUST STRONGLY WARN, WHEN USER SAID THEY DON'T HAVE CLAUDE SUBSCRIPTION, SISYPHUS AGENT MIGHT NOT WORK IDEALLY.**
 
+#### Optional: community model-management tools
+
+Community tools such as the experimental [oh-my-openagent VS Code extension](https://github.com/andersou/oh-my-openagent-vscode-extension) can make agent model selection easier to inspect and edit. Treat them as configuration frontends: they should write the same `oh-my-openagent.jsonc` / `oh-my-opencode.jsonc` fields documented here, not a separate runtime integration.
+
+After using any external UI to change models:
+
+1. Review the generated JSONC before restarting OpenCode.
+2. Run `bunx oh-my-openagent doctor` to confirm the effective model for each agent/category.
+3. Keep provider credentials and API keys in the provider auth flow or environment, not in shared project config.
+
+If an external tool shows a model that OMO later skips, the source of truth is still the model-matching and registration logic in this repository. Use the [Agent Model Matching](./agent-model-matching.md) guide to check whether the selected model family is supported for that agent.
+
 ### Step 1: Prerequisites
 
 #### For platform `opencode` or `both`
