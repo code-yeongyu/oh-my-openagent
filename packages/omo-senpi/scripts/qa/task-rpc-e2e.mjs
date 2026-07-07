@@ -13,22 +13,21 @@
 // reconciliation marks the orphan lost (cause reconcile_lost) with breadcrumbs in task_list(all) and the
 // old child pid is DEAD. Each check asserts the REAL fact, so the driver goes green ONLY on a build that
 // actually spawns the rpc child and records its pid.
-import { spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
-const { createSandbox, seedSandbox, digestDirectory } = await import(pathToFileURL(join(scriptDir, "drive.mjs")).href)
-// Lane-private pure helpers (analysis + read-only isolation probes), kept out of this file so the driver
-// stays under the repo pure-LOC ceiling; the driver's --self-test unit-covers them.
-const { CREDENTIAL_FILES, digestCredentialFiles, parseEvents, readRecords, analyzeSpawn, analyzeRpcRouting, eventsMentionSteerAck, statusSnapshots, scanRpcChildPids, pidAlive } =
+const { digestDirectory } = await import(pathToFileURL(join(scriptDir, "drive.mjs")).href)
+// Lane-private pure helpers (analysis + read-only isolation probes) and the live scenario drivers, kept
+// out of this file so the driver stays under the repo pure-LOC ceiling; the --self-test unit-covers the
+// pure helpers.
+const { CREDENTIAL_FILES, digestCredentialFiles, parseEvents, readRecords, analyzeSpawn, analyzeRpcRouting, eventsMentionSteerAck, statusSnapshots, scanRpcChildPids } =
   await import(pathToFileURL(join(scriptDir, "task-rpc-e2e-helpers.mjs")).href)
-const mockProviderEntry = join(scriptDir, "task-rpc-e2e-mock-provider.ts")
+const { SCENARIO_A_STEPS, prepareScenarioSandbox, driveSenpi, runKillCheck, runReconcileCheck } =
+  await import(pathToFileURL(join(scriptDir, "task-rpc-e2e-scenarios.mjs")).href)
 const realSenpiAgentDir = join(homedir(), ".senpi", "agent")
-const CHILD_FINAL_TEXT = "omo rpc child mock work complete"
-const PROJECT_OMO_CONFIG = { categories: { proc: { description: "Process-mode mock category.", model: "omo-mock/mock-1" } } }
 
 function resolveSenpi() {
   const bin = process.env.SENPI_BIN?.trim() || "senpi"
@@ -40,46 +39,16 @@ function resolveSenpi() {
   return null
 }
 
-function driveSenpi(senpiBin, sandbox, sessionDir, parentSteps) {
-  const script = { parentSteps, childSteps: [{ type: "text", text: CHILD_FINAL_TEXT }] }
-  writeFileSync(join(sandbox.cwd, "mock-script.json"), `${JSON.stringify(script, null, 2)}\n`)
-  const run = spawnSync(
-    senpiBin,
-    ["-e", mockProviderEntry, "-p", "--mode", "json", "--provider", "omo-mock", "--model", "mock-1", "--session-dir", sessionDir, "run the rpc-process task e2e"],
-    {
-      cwd: sandbox.cwd,
-      env: { ...process.env, SENPI_CODING_AGENT_DIR: sandbox.agentDir, SENPI_CODING_AGENT_SESSION_DIR: sessionDir, OMO_SENPI_QA: "1" },
-      encoding: "utf8",
-      timeout: 120_000,
-      maxBuffer: 64 * 1024 * 1024,
-    },
-  )
-  return { status: run.status, signal: run.signal ?? null, stdout: run.stdout ?? "", stderr: run.stderr ?? "" }
-}
-
-const SCENARIO_A_STEPS = [
-  { type: "tool_call", name: "task", arguments: { category: "proc", execution_mode: "process", run_in_background: true, name: "p1", prompt: "Do the rpc child work and stop." } },
-  { type: "tool_call", name: "task_send", arguments: { name: "p1", message: "steer: keep going", deliver_as: "steer" } },
-  { type: "tool_call", name: "task_wait", arguments: { targets: ["p1"], timeout_ms: 20_000 } },
-  { type: "tool_call", name: "task_output", arguments: { name: "p1", mode: "status" } },
-  { type: "text", text: "rpc-process scenario A complete" },
-]
-
-const RECONCILE_RELAUNCH_STEPS = [
-  { type: "tool_call", name: "task_list", arguments: { all_scope: true } },
-  { type: "text", text: "reconcile relaunch complete" },
-]
-
-// Run the live scenarios and return an ordered check list. When scenario A proves no real child process
-// (the current wiring falls back to the in-process runner and never records a pid), the process-dependent
-// checks 2-5 are blocked and reported FAIL with the localized product-gap reason rather than faked green.
-function runChecks(senpiBin, sandbox, sessionDir, stateDir, spawnedPidsBefore) {
+// Run the live scenarios and return an ordered check list. Scenario A proves spawn (real pid + child
+// session JSONL), steer, and completion against a real detached rpc child; the KILL and RECONCILE
+// scenarios then drive a HANGING child so the failure-path proofs (kill -> error+killed:true; parent
+// crash -> orphan reconciled lost + terminated) run against a genuinely live, non-terminal process.
+async function runChecks(senpiBin, sandbox, sessionDir, stateDir, spawnedPidsBefore) {
   const checks = []
   const a = driveSenpi(senpiBin, sandbox, sessionDir, SCENARIO_A_STEPS)
   const aEvents = parseEvents(a.stdout)
-  // Headline STEP-1 proof: process mode now reaches the rpc runner instead of the in-process fallback.
-  // This PASSES on the fixed wiring even when the deeper rpc child-spawn strategy (below) cannot run
-  // headlessly, so the driver still positively records the now-working behavior the fix delivered.
+  // Headline STEP-1 proof: process mode reaches the rpc runner (a recorded pid or a named rpc spawn-path
+  // failure), never the silent in-process fallback.
   const routing = analyzeRpcRouting(readRecords(stateDir))
   checks.push({ check: "process_mode_routes_to_rpc_runner", verdict: routing.routed ? "PASS" : "FAIL", ...(routing.reason && { reason: routing.reason }), facts: routing.facts })
   const spawn = analyzeSpawn(readRecords(stateDir), stateDir)
@@ -101,43 +70,15 @@ function runChecks(senpiBin, sandbox, sessionDir, stateDir, spawnedPidsBefore) {
     facts: { statusSnapshotCount: snaps.length },
   })
 
-  // Scenario 4 (kill): a real build exposes the child pid in task_output(status); we kill -9 it and the
-  // parent's outcome tracking records status=error killed:true. With no pid there is nothing to kill.
-  const killPid = snaps.map((s) => s.pid).find((p) => typeof p === "number")
-  if (spawn.pass && typeof killPid === "number") {
-    try {
-      process.kill(killPid, "SIGKILL")
-    } catch {
-      // already gone: still a valid kill outcome
-    }
-  }
-  const killed = readRecords(stateDir).some((r) => r.status === "error" && r.killed === true)
-  checks.push({
-    check: "kill_marks_error_killed_true",
-    verdict: spawn.pass && typeof killPid === "number" && killed ? "PASS" : "FAIL",
-    reason: spawn.pass ? (typeof killPid === "number" ? (killed ? undefined : "kill did not yield error+killed:true") : "no child pid in task_output(status) to kill") : "blocked: no rpc child spawned (see spawn_process)",
-  })
-
-  // Scenario 5 (reconcile): relaunch senpi in the same sandbox cwd. session_start reconciliation must mark
-  // a live orphan lost (cause reconcile_lost) with pid breadcrumbs in task_list(all) and terminate it.
-  const relaunch = driveSenpi(senpiBin, sandbox, sessionDir, RECONCILE_RELAUNCH_STEPS)
-  const relaunchOk = relaunch.status === 0
-  const reconcileRecords = readRecords(stateDir)
-  const orphanPid = spawn.facts.pid
-  const orphanDead = typeof orphanPid === "number" ? pidAlive(orphanPid) === false : false
-  const lostWithPid = reconcileRecords.some((r) => r.status === "lost" && typeof r.pid === "number")
-  checks.push({
-    check: "reconcile_lost_terminates_orphan",
-    verdict: spawn.pass && relaunchOk && lostWithPid && orphanDead ? "PASS" : "FAIL",
-    reason: spawn.pass ? (lostWithPid ? undefined : "no lost record with pid breadcrumb after relaunch") : "blocked: no rpc child spawned with a pid to reconcile (see spawn_process)",
-  })
+  checks.push(await runKillCheck(senpiBin))
+  checks.push(await runReconcileCheck(senpiBin))
 
   const leakedPids = scanRpcChildPids().filter((p) => spawnedPidsBefore.includes(p) === false)
   checks.push({ check: "no_leaked_rpc_child_pids", verdict: leakedPids.length === 0 ? "PASS" : "FAIL", ...(leakedPids.length > 0 && { reason: `leaked pids ${leakedPids.join(",")}` }), facts: { leakedPids } })
   return { checks, leakedPids, spawnPass: spawn.pass, routed: routing.routed }
 }
 
-function main() {
+async function main() {
   const providedAgentDir = process.env.SENPI_CODING_AGENT_DIR ? "IGNORED" : "unset"
   const senpiBin = resolveSenpi()
   const beforeCreds = digestCredentialFiles(realSenpiAgentDir)
@@ -146,19 +87,11 @@ function main() {
     console.log(JSON.stringify({ result: "SKIP", reason: "senpi-binary-unavailable", providedAgentDir }))
     return
   }
-  const sandbox = createSandbox()
+  const { sandbox, sessionDir, stateDir } = prepareScenarioSandbox()
   const pidsBefore = scanRpcChildPids()
   let payload
   try {
-    seedSandbox(sandbox)
-    const sessionDir = join(sandbox.root, "sessions")
-    mkdirSync(sessionDir, { recursive: true })
-    const omoDir = join(sandbox.cwd, ".omo")
-    mkdirSync(omoDir, { recursive: true })
-    writeFileSync(join(omoDir, "omo.json"), `${JSON.stringify(PROJECT_OMO_CONFIG, null, 2)}\n`)
-    const stateDir = join(sandbox.cwd, ".omo", "senpi-task")
-
-    const { checks, leakedPids, spawnPass, routed } = runChecks(senpiBin, sandbox, sessionDir, stateDir, pidsBefore)
+    const { checks, leakedPids, spawnPass, routed } = await runChecks(senpiBin, sandbox, sessionDir, stateDir, pidsBefore)
     const afterCreds = digestCredentialFiles(realSenpiAgentDir)
     const wholeDirDigestStable = beforeWholeDir === digestDirectory(realSenpiAgentDir)
     const realCredentialsUntouched = beforeCreds === afterCreds
@@ -185,7 +118,7 @@ function main() {
         ? {}
         : {
             productGap: routed
-              ? "STEP-1 wiring FIXED: execution_mode:'process' now routes to the rpc runner (engine.ts runners.process -> createRpcManagedRunner(new RpcProcessRunner()); manager.ts #launch now persists the handle pid). PROVEN by process_mode_routes_to_rpc_runner=PASS. The FULL live child scenarios (steer/completion/kill/reconcile + child JSONL) remain blocked by a DEEPER todo-8 rpc-child-spawn defect that is out of todo-27's wiring scope: (1) buildRpcSpawn resolves '@code-yeongyu/senpi/rpc-entry', but that specifier is hijacked by senpi's own loader alias when omo runs as a senpi extension, so the child entry never resolves (node senpi) - it needs to spawn via the senpi executable itself; (2) the rpc child is spawned as a bare 'senpi --mode rpc' WITHOUT the -e mock provider and WITHOUT a model threaded through RpcRunnerSpec, so a keyless/networkless mock child cannot run a turn under the QA no-keys/no-network law. Both are spawn-strategy/model-threading changes owned by todo 8, not the runner wiring."
+              ? "execution_mode:'process' routes to the rpc runner, but no real detached child spawned with a pid + child session JSONL. Expected after the spawn-strategy fix: buildRpcSpawn must spawn the senpi EXECUTABLE ('<exe> --mode rpc'), not require.resolve('@code-yeongyu/senpi/rpc-entry') which senpi's loader alias hijacks; and RpcRunnerSpec must thread the model + the parent's -e extensions so a keyless mock child can run."
               : "execution_mode:'process' did not reach the rpc runner - the process slot still aliases the in-process runner. Fix engine.ts runners.process to createRpcManagedRunner(new RpcProcessRunner()).",
           }),
     }
@@ -211,13 +144,24 @@ function killProcessTree(pidsBefore) {
 }
 
 function runSelfTest() {
-  // #given a fixed-product spawn shape #then analyzeSpawn passes
+  // #given a process record with a pid but no real child session JSONL #then analyzeSpawn fails
   const stateDir = join(process.cwd(), "__self_test_missing__")
-  const fixed = analyzeSpawn([{ task_id: "st_fix", execution_mode: "process", pid: 4242, residency_state: "rpc_detached" }], stateDir)
-  if (fixed.pass !== false) throw new Error("self-test: sessions-jsonl absence must fail the fixed shape without a real dir")
-  // analyzeSpawn's pid+residency branch: verify the non-jsonl fields are read correctly
-  if (fixed.facts.pid !== 4242 || fixed.facts.residency_state !== "rpc_detached") throw new Error("self-test: analyzeSpawn must surface pid + residency facts")
-  // #given the current broken shape (in-process fallback) #then the gap is detected
+  const noJsonl = analyzeSpawn([{ task_id: "st_fix", execution_mode: "process", pid: 4242, residency_state: "rpc_detached" }], stateDir)
+  if (noJsonl.pass !== false) throw new Error("self-test: sessions-jsonl absence must fail the spawn proof")
+  if (noJsonl.facts.pid !== 4242) throw new Error("self-test: analyzeSpawn must surface the pid fact")
+  // #given a real child session JSONL under children/<id>/sessions/<id>/ #then a pid + transcript PASSES
+  // even when residency is the honest terminal "disposed" (residency is informational, not gating).
+  const jsonlRoot = join(process.cwd(), `__self_test_jsonl_${process.pid}__`)
+  const childDir = join(jsonlRoot, "children", "st_ok", "sessions", "st_ok")
+  mkdirSync(childDir, { recursive: true })
+  try {
+    writeFileSync(join(childDir, "t.jsonl"), "{}\n")
+    const ok = analyzeSpawn([{ task_id: "st_ok", execution_mode: "process", pid: 7, residency_state: "disposed" }], jsonlRoot)
+    if (ok.pass !== true) throw new Error("self-test: pid + real child JSONL must pass regardless of disposed residency")
+  } finally {
+    rmSync(jsonlRoot, { recursive: true, force: true })
+  }
+  // #given the broken shape (in-process fallback, no pid) #then the gap is detected
   const broken = analyzeSpawn([{ task_id: "st_brk", execution_mode: "process", residency_state: "disposed" }], stateDir)
   if (broken.pass !== false) throw new Error("self-test: in-process fallback must not read as a spawned rpc child")
   if (broken.reason === undefined || broken.reason.includes("pid=absent") === false) throw new Error("self-test: broken shape must localize the missing pid")
@@ -252,5 +196,6 @@ function runSelfTest() {
 if (process.argv.includes("--self-test")) {
   runSelfTest()
 } else {
-  main()
+  await main()
 }
+

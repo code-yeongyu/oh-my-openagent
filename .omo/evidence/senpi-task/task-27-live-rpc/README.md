@@ -1,82 +1,75 @@
-# Task 27 - Live QA: rpc-process task e2e (`task-rpc-e2e.mjs`)
+# Task 27 - Live rpc-process e2e (spawn / steer / completion / kill / reconcile)
 
-Refreshed after the STEP-1 product fixes landed. This directory records the live QA of process
-execution mode for the omo senpi-task component.
+Base: branch `code-yeongyu/senpi-task-w4-rpc-e2e`, HEAD `10b0865c9` + the rpc-child-spawn fix.
 
 ## WHAT WAS TESTED
 
-Driver: `packages/omo-senpi/scripts/qa/task-rpc-e2e.mjs` (+ `-helpers.mjs`, `-mock-provider.ts`),
-run in an isolated `mktemp` sandbox with its own `SENPI_CODING_AGENT_DIR` (caller env ignored) and a
-LOCAL mock provider (no keys, no network). It drives the REAL `senpi` binary (`/opt/homebrew/bin/senpi`,
-v2026.7.5-2) with the built omo plugin (`packages/omo-senpi/plugin`) loaded via the sandbox
-`settings.json` `packages`.
+The committed todo-27 driver `packages/omo-senpi/scripts/qa/task-rpc-e2e.mjs` drives the REAL `senpi`
+binary in a per-scenario isolated sandbox (own `SENPI_CODING_AGENT_DIR` + session dir under `mktemp`,
+project `omo.json`) with a LOCAL mock provider loaded via `-e` (no API keys, no network). Eight checks,
+each asserting a REAL fact:
 
-Two product bugs were fixed (RED-first) and are exercised here:
+1. `real_credentials_untouched_and_caller_env_ignored` - the real `~/.senpi/agent` credential/config
+   files (`auth.json`/`models.json`/`settings.json`/`trust.json`) are byte-identical before/after and the
+   caller's `SENPI_CODING_AGENT_DIR` is ignored in favour of the sandbox agent dir.
+2. `process_mode_routes_to_rpc_runner` - `execution_mode:"process"` reaches the rpc runner (recorded pid).
+3. `spawn_process_pid_and_session_jsonl` - a real detached rpc child spawned: `execution_mode=process`,
+   a numeric pid, and a child session JSONL transcript under `children/<id>/sessions/<id>/`.
+4. `steer_ack_mid_run` - a `task_send deliver_as:"steer"` is acked and reaches the child.
+5. `completion_push_arrives` - the background process task reaches a completed terminal.
+6. `kill_marks_error_killed_true` - a HANGING background child (record stays `running`) is `kill -9`'d and
+   the parent records `status=error` with the `killed:true` FACT (todo-8 kill contract).
+7. `reconcile_lost_terminates_orphan` - a HANGING child's PARENT is crashed (SIGKILL) while the child is
+   live; on the next `session_start` the reconcile pass marks the orphan `lost` with a pid breadcrumb AND
+   terminates it (orphan pid dead afterwards).
+8. `no_leaked_rpc_child_pids` - no `senpi --mode rpc` child that appeared during the run survives it.
 
-1. `packages/omo-senpi/src/components/task/engine.ts` wired BOTH runner slots to the in-process runner
-   (`runners:{"in-process":runner, process:runner}`), so `execution_mode:"process"` silently fell back
-   to in-process and `RpcProcessRunner` was never instantiated. Now the process slot is
-   `createRpcManagedRunner(new RpcProcessRunner())` via injectable `runnerFactories`.
-2. `packages/senpi-task/src/manager/manager.ts` `#launch` recorded the `start` transition WITHOUT the
-   spawned handle's pid, so `task_output(status)` and `session_start` reconciliation never saw a pid.
-   Now `#recordSpawnFacts` persists the pid (pure decision in `manager-helpers.ts` `recordSpawnedPid`).
+## THE DEFECT AND THE FIX
 
-Unit RED-first proofs (`red-proof-engine.txt`, `red-proof-manager.txt`): reverting either fix flips the
-corresponding unit test to FAIL; the fix flips it GREEN (`unit-tests.txt`, 7 pass).
+The engine wiring at `10b0865c9` routed `process` mode to `RpcProcessRunner`, but the rpc CHILD spawn was
+broken, so no real detached child booted (`spawn_process` observed `pid=absent sessionJsonl=false`):
+
+- SPAWN STRATEGY: `buildRpcSpawn` resolved `require.resolve("@code-yeongyu/senpi/rpc-entry")`. When omo
+  runs AS an extension inside senpi, senpi's loader alias hijacks that specifier to the running dist
+  entry, so the child never boots. FIX (`packages/senpi-task/src/runners/rpc/spawn.ts`): resolve and
+  spawn the senpi EXECUTABLE (`<exe> --mode rpc`) - `SENPI_BIN` override, then the Bun sibling binary,
+  then a PATH scan - for BOTH node and bun; the `execPath + rpc-entry` path remains a documented fallback.
+- MODEL + PROVIDER THREADING: a separate OS process cannot share the parent's in-memory registry. The
+  child is now spawned with `--no-extensions`, the parent's `-e` extensions forwarded explicitly
+  (`RpcProcessRunner.inheritedExtensions` <- `parseExtensionEntries(process.argv)` in
+  `omo-senpi/src/components/task/engine.ts`), and the resolved `--model` threaded through `RpcRunnerSpec`
+  (`createRpcManagedRunner`). A keyless local mock child now boots and runs a turn.
+- KILL FACT: `mapExitOutcomeToError` already computed `killed:true`, but it was dropped. It is now threaded
+  outcome -> `fail` transition -> record, and `parseTaskRecord` preserves `killed` so a later residency
+  (`dispose`) reload does not strip it.
 
 ## WHAT WAS OBSERVED
 
-`full-run-verdict.json` (== `full-run.json`), captured live:
+- RED (pre-fix source, clean rebuild): `spawn_process_pid_and_session_jsonl` FAIL, reason
+  `execution_mode=process pid=absent sessionJsonl=false residency=resident` - no real child.
+- POST-FIX full run: `result=PASS`, all 8 checks PASS, `leakedPids=0`, `realCredentialsUntouched=true`.
+  Reproduced PASS on three consecutive full runs. Verdict: `full-run-verdict.json`. Self-test:
+  `self-test.txt`. Gates: `gates.txt` (tsgo x2 exit 0, `test:senpi` 144/0, `bun test packages/senpi-task`
+  539/0, bundle 510919 <= 700000, 0 leaked procs). Unit tests for the fixed seams: `unit-tests.txt`
+  (44/0, incl. executable-vs-fallback spawn, model/extension threading, `killed` transition + parse
+  round-trip). Isolation: `credential-isolation-shasum.txt`.
 
-- `real_credentials_untouched_and_caller_env_ignored`: PASS - the 4 real `~/.senpi/agent`
-  credential/config files are byte-identical before/after (`realCredentialsUntouched:true`,
-  `credential-isolation-shasum.txt`). Caller `SENPI_CODING_AGENT_DIR` was ignored in favor of the
-  sandbox agent dir.
-- `process_mode_routes_to_rpc_runner`: PASS - the STEP-1 wiring fix, proven live. The `process` task
-  record reaches the rpc child-spawn path (its `error_message` names the rpc child entry
-  `@code-yeongyu/senpi/.../rpc-entry`), a fingerprint the OLD in-process fallback could NEVER produce
-  (the fallback completes the mock child in-process with no rpc trace).
-- `no_leaked_rpc_child_pids`: PASS - `leakedPids:0`; the process tree is killed in `finally` and no
-  `senpi --mode rpc` pid survives.
-- `spawn_process_pid_and_session_jsonl`, `steer_ack_mid_run`, `completion_push_arrives`,
-  `kill_marks_error_killed_true`, `reconcile_lost_terminates_orphan`: FAIL (documented, NOT silent) -
-  the full live child scenarios cannot complete headlessly. See `productGap` in the verdict.
+Note on `spawn_process` residency fact: a background child that finished its turn is honestly reclaimed to
+`disposed` by the time the driver reads the record, so the spawn proof gates on `pid + real child JSONL`
+(the substantive evidence a detached rpc process spawned and ran), per plan todo-27 scenario 1; residency
+is surfaced as an informational fact. The kill/reconcile scenarios use a HANGING child so their records
+stay `running`, giving a genuinely live, non-terminal process to signal / reconcile.
 
-## WHY IT IS ENOUGH (and what is NOT yet possible headlessly)
+## WHY IT IS ENOUGH
 
-The two bugs the driver and this todo named are fixed and proven: unit-proven (RED-first, both
-directions) AND live-proven for the wiring (the rpc-spawn path is reached only when the process slot is
-the rpc runner). Isolation is proven (credential shasums unchanged) and there are zero leaked pids.
-
-The remaining 5 checks require a live rpc CHILD to run to completion, which is blocked by a DEEPER
-`todo 8` rpc-child-spawn defect that is OUT OF todo-27's "wire the runner slot" scope:
-
-1. `packages/senpi-task/src/runners/rpc/spawn.ts` resolves the `@code-yeongyu/senpi/rpc-entry`
-   specifier at spawn time, but when omo runs as a senpi extension that specifier is hijacked by
-   senpi's OWN loader alias (`@code-yeongyu/senpi` -> the running senpi's `dist/index.js`), so the
-   child entry never resolves under the node-based senpi. A correct fix must spawn the child via the
-   senpi executable itself, not via module resolution.
-2. Even past (1), the rpc child is spawned as a bare `senpi --mode rpc` WITHOUT the `-e` mock provider
-   and WITHOUT a model threaded through `RpcRunnerSpec`, so a keyless/networkless mock child cannot run
-   a turn under the QA no-keys/no-network law. Threading a model/provider into the rpc child is a
-   `RpcRunnerSpec` + `buildRpcSpawn` product change owned by todo 8.
-
-Both are spawn-strategy / model-threading changes, not runner wiring. They are recorded here as a live
-QA finding rather than fixed in this pass to keep the change surgical to the two named bugs.
+Every check asserts a REAL on-disk/OS fact against the live `senpi` binary: a recorded child pid, a real
+JSONL transcript, a real `kill -9` producing `error+killed:true`, and a real parent crash producing a
+reconciled+terminated orphan. RED-first unit tests pin each fixed seam. Isolation is gated (real
+credential files byte-unchanged; caller env ignored), and 0 pids leak.
 
 ## WHAT WAS OMITTED
 
-No secrets/tokens/auth headers are copied here. `credential-isolation-shasum.txt` records only SHA-256
-digests of the real credential files, never their contents. `full-run.stderr` is empty. The
-informational whole-dir digest (`wholeDirDigestStable`) is expected to move on a live dev machine
-(senpi writes `senpi-debug.log` + concurrent session JSONL that ignore `SENPI_CODING_AGENT_DIR`); the
-gated isolation check is the per-file credential digest, which held.
-
-## Files
-
-- `full-run-verdict.json` / `full-run.json` - live driver JSON verdict (result FAIL; wiring PASS)
-- `full-run.stderr` - driver stderr (empty)
-- `self-test.txt` - `--self-test` output (SELF-TEST OK)
-- `unit-tests.txt` - the two RED-first unit suites, green (7 pass)
-- `red-proof-engine.txt` / `red-proof-manager.txt` - reverting each fix flips its unit test to FAIL
-- `credential-isolation-shasum.txt` - real `~/.senpi/agent` credential digests
+The whole-dir digest of `~/.senpi/agent` is informational only (a live dev machine churns ambient files
+like `senpi-debug.log` that ignore `SENPI_CODING_AGENT_DIR`); the GATED isolation proof is the
+credential/config file digest, which is byte-stable. Raw child transcripts and env dumps are not copied to
+avoid leaking machine-local paths / tokens; the verdict JSON carries only sandbox paths and pids.
