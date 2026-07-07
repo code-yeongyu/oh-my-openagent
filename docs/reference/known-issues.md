@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5850 - `ulw` planner can fall into native OpenCode plan mode
+
+- **Affects**: Complex `ulw` runs where planning is delegated through a subagent named `plan`.
+- **Symptom**: The delegated planner can use OpenCode's native plan mode, write under `.opencode/plans/`, and show the native `plan_exit` prompt instead of returning an OMO plan under `.omo/plans/` to the parent. Accepting the prompt can make the subagent implement the plan itself; rejecting it can leave the parent waiting.
+- **Workaround**: If a native `plan_exit` prompt appears inside a delegated `ulw` planner, avoid accepting implementation from that nested prompt. Interrupt back to the parent, then ask the parent to recover the plan output or rerun planning through Prometheus/OMO planning explicitly.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5850.
+
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
 - **Affects**: OpenAI-compatible custom providers whose models are written to `opencode.json` without a `limit` block.
