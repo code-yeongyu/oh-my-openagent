@@ -13,6 +13,21 @@ import type { CapturedUi } from "./runtime-context"
 import { createSessionTransitionBridge } from "./session-transition-bridge"
 
 const TASK_TOOL_NAMES = ["task", "task_send", "task_wait", "task_interrupt", "task_cancel", "task_list", "task_output"]
+const TEAM_TOOL_NAMES = [
+  "team_create",
+  "team_delete",
+  "team_send_message",
+  "team_status",
+  "team_list",
+  "team_task_create",
+  "team_task_list",
+  "team_task_update",
+  "team_task_get",
+  "team_shutdown_request",
+  "team_approve_shutdown",
+  "team_reject_shutdown",
+]
+const ALL_TOOL_NAMES = [...TASK_TOOL_NAMES, ...TEAM_TOOL_NAMES]
 const TASK_EVENTS = [
   "session_start",
   "session_before_switch",
@@ -99,14 +114,28 @@ describe("omo-senpi task component wiring", () => {
     // when
     createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
 
-    // then the 7 task tools registered
-    expect(toolNames(pi)).toEqual([...TASK_TOOL_NAMES].sort())
+    // then the 7 task tools + 12 lead team tools registered
+    expect(toolNames(pi)).toEqual([...ALL_TOOL_NAMES].sort())
     // the /tasks and /task-kill commands registered
     expect(pi.commands.map((entry) => entry.name).sort()).toEqual([...TASK_COMMANDS].sort())
-    // the completion renderer registered
-    expect(pi.messageRenderers.map((entry) => entry.customType)).toEqual(["senpi-task.completion"])
+    // the completion + team-message renderers registered
+    expect(pi.messageRenderers.map((entry) => entry.customType).sort()).toEqual(["senpi-task.completion", "senpi-task.team-message"])
     // exactly the task event handlers (session lifecycle + transition-buffer edges)
     expect(pi.handlers.map((handler) => handler.event).sort()).toEqual([...TASK_EVENTS].sort())
+  })
+
+  it("#given a fake ExtensionAPI boot #when the task component registers #then the 12 lead team tools are wired", () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    const logger = createLogger()
+
+    // when
+    createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
+
+    // then every lead team tool is present (child/member sessions never see these; the manager's
+    // shared-tool filter strips the team_* family and only the pre-scoped member send is re-added)
+    const registered = toolNames(pi)
+    for (const teamTool of TEAM_TOOL_NAMES) expect(registered).toContain(teamTool)
   })
 
   it("#given the omo-task flag is false #when the component registers #then nothing is wired", () => {
@@ -137,7 +166,7 @@ describe("omo-senpi task component wiring", () => {
     createTaskComponent({ resolveCwd: () => project }).register(pi, ctxFor(pi, logger))
 
     // then it never crashed: all tools still registered
-    expect(toolNames(pi)).toEqual([...TASK_TOOL_NAMES].sort())
+    expect(toolNames(pi)).toEqual([...ALL_TOOL_NAMES].sort())
     // and exactly one config-load warning was emitted
     const configWarnings = logger.entries.filter(
       (entry) => entry.level === "warn" && entry.message.includes("using default config after omo.json load issues"),

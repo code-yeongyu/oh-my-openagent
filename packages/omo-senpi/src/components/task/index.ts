@@ -1,5 +1,6 @@
 import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
 import {
+  buildLeadTeamTools,
   createTaskCancelTool,
   createTaskInterruptTool,
   createTaskListTool,
@@ -17,6 +18,9 @@ import { composeTaskEngine, type TaskEngine } from "./engine"
 import { detectOpencodeConfig } from "./opencode-config"
 import { TASK_COMPLETION_MESSAGE_TYPE } from "./parent-notifier"
 import { renderTaskCompletion } from "./renderers"
+import { TEAM_MESSAGE_MESSAGE_TYPE, createTeamMessageNotifier } from "./team-message-notifier"
+import { renderTeamMessage } from "./team-renderers"
+import { createTeamService } from "./team-service"
 import type { LiveTaskContext } from "./runtime-context"
 import { createSessionTransitionBridge, type SessionTransitionBridge } from "./session-transition-bridge"
 import { createTaskStatusUi, type TaskStatusUi } from "./status-ui"
@@ -66,7 +70,9 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
       })
 
       pi.registerMessageRenderer?.(TASK_COMPLETION_MESSAGE_TYPE, renderTaskCompletion)
+      pi.registerMessageRenderer?.(TEAM_MESSAGE_MESSAGE_TYPE, renderTeamMessage)
       registerTaskTools(pi, engine)
+      registerTeamTools(pi, ctx, engine)
       registerTaskCommands(pi, engine.manager)
 
       const statusUi = createTaskStatusUi({ manager: engine.manager, runtime: engine.runtime })
@@ -106,6 +112,24 @@ function registerTaskTools(pi: SenpiExtensionAPI, engine: TaskEngine): void {
   pi.registerTool({ ...createTaskCancelTool({ manager }) })
   pi.registerTool({ ...createTaskListTool({ manager, resolveCallerSessionId }) })
   pi.registerTool({ ...createTaskOutputTool({ manager, stateDir: engine.stateDir, resolveCallerSessionId }) })
+}
+
+// The 12 lead-only team tools, bound to the live task engine + the idle-coordinator-backed lead
+// notifier so a team lead-message wake shares the completion push's one-wake-per-idle-edge. Registered
+// only on the lead (current) session; the manager's shared-tool filter strips the whole team_* family
+// from member children, and only the pre-scoped member team_send_message is re-added (see team-service).
+function registerTeamTools(pi: SenpiExtensionAPI, ctx: ComponentContext, engine: TaskEngine): void {
+  const leadNotifier = createTeamMessageNotifier(pi, ctx.idleCoordinator)
+  const service = createTeamService({
+    manager: engine.manager,
+    runtime: engine.runtime,
+    settings: engine.settings,
+    omoConfig: engine.omoConfig,
+    cwd: engine.runtime.cwd(),
+    agentNames: new Set(Object.keys(engine.agents)),
+    leadNotifier,
+  })
+  for (const tool of buildLeadTeamTools({ service })) pi.registerTool({ ...tool })
 }
 
 interface EventBridgeState {
