@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5816 - Manual model selection can be reset by runtime fallback state
+
+- **Affects**: OpenCode sessions where an OMO agent has an explicit configured model and the user manually selects another model from that agent's fallback list.
+- **Symptom**: The manually selected model can be used for the current message and then be interpreted as an active fallback, causing the next message to be forced back to the agent-configured model.
+- **Workaround**: For sessions where manual model choice must persist, temporarily adjust the agent's configured model/fallback list or use an agent path without an explicit model override. After changing model routing, start a fresh session so runtime fallback state is rebuilt from the intended baseline.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5816.
+
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
 - **Affects**: OpenAI-compatible custom providers whose models are written to `opencode.json` without a `limit` block.
