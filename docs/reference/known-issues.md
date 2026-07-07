@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5657 - Team members can stop waking after their first idle response
+
+- **Affects**: Team Mode runs with several members receiving messages concurrently.
+- **Symptom**: Members can show unread messages in `team_status`, but never wake to process them after initial idle/completed transitions. `team_send_message` delivery only proves the inbox file was written; it does not prove the member consumed the message.
+- **Workaround**: Monitor `team_status` for unread counts that keep increasing while member output stays unchanged. If a member is stuck, restart the affected team/member or redistribute the task rather than repeatedly sending more messages to the same unread mailbox.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5657.
+
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
 - **Affects**: OpenAI-compatible custom providers whose models are written to `opencode.json` without a `limit` block.
