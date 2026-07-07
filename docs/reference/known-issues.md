@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5838 - LazyCodex frontend runs can skip the visual QA gate
+
+- **Affects**: Codex Light / LazyCodex sessions where the frontend skill is used for UI work.
+- **Symptom**: The frontend skill prompt requires a visual QA evidence pass, but Codex currently enforces that requirement through prose instructions rather than a hard completion gate. Under long context or inconvenient browser setup, the model can report completion without screenshots or a dual-oracle visual verdict.
+- **Workaround**: Add an explicit instruction such as "verify with visual-qa before claiming done" to frontend prompts, and require screenshot/evidence output before accepting UI work as complete. If no rendered surface is available, ask the agent to state that limitation directly.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5838.
+
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
 - **Affects**: OpenAI-compatible custom providers whose models are written to `opencode.json` without a `limit` block.
