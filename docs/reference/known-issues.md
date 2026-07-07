@@ -227,6 +227,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: Start complex work with a short descriptive first sentence before `ulw`, or rename affected sessions manually after creation. If you rely heavily on history search, avoid starting multiple unrelated tasks with identical `ulw` prefixes until title injection ordering is fixed.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5586.
 
+## #5574 - Agent config rewrites can confuse Sisyphus-Junior overrides
+
+- **Affects**: Configs that use display-style keys such as `Sisyphus-Junior` instead of canonical config keys such as `sisyphus-junior`.
+- **Symptom**: OMO rewrites the config and creates a backup, but the effective model/category override can appear to apply to the wrong name, causing Sisyphus-Junior to fall back to a cheaper/default model.
+- **Workaround**: Use canonical lower-case agent keys in `oh-my-openagent.jsonc` (`sisyphus-junior`, `sisyphus`, `atlas`, etc.) and use display-name settings only for UI labels. After migration, run `bunx oh-my-openagent doctor` and inspect the effective model for `sisyphus-junior`.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5574.
+
 ## #4722 - Codex hooks can report exit code 1 immediately after install
 
 - **Affects**: LazyCodex / OMO Codex installs where Codex keeps running across a plugin cache/config update.
