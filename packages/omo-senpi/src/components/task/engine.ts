@@ -8,6 +8,7 @@ import {
   createParentRegistrySessionContext,
   createRpcManagedRunner,
   createTaskLifecycle,
+  parseExtensionEntries,
   createTaskManager,
   createTaskRecordStore,
   mapOmoConfigAgents,
@@ -172,7 +173,11 @@ function buildInProcessRunner(build: RunnerBuildContext): ManagedRunner {
 // agent dir's auth/models. Wiring this slot is what makes `execution_mode:"process"` spawn an rpc child
 // instead of silently falling back to the in-process runner.
 function buildProcessRunner(_build: RunnerBuildContext): ManagedRunner {
-  return createRpcManagedRunner(new RpcProcessRunner())
+  // Forward the parent's own `-e` extensions to every detached child. A separate OS process cannot
+  // inherit the parent's in-memory extension registry, so the child is spawned with `--no-extensions`
+  // plus these entries reproduced explicitly (a local provider in QA, or a production `-e` extension).
+  const inheritedExtensions = parseExtensionEntries(process.argv)
+  return createRpcManagedRunner(new RpcProcessRunner({ inheritedExtensions }))
 }
 
 // Fold the user's omo.json `agents` into the child-agent registry so the task tool advertises them and
