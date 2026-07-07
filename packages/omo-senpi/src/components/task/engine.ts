@@ -2,9 +2,11 @@ import type { ToolDefinition } from "@code-yeongyu/senpi"
 import { OmoTaskSettingsSchema, type OmoConfig, type OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 import {
   InProcessRunner,
+  RpcProcessRunner,
   createCompletionNotifier,
   createInProcessManagedRunner,
   createParentRegistrySessionContext,
+  createRpcManagedRunner,
   createTaskLifecycle,
   createTaskManager,
   createTaskRecordStore,
@@ -47,6 +49,25 @@ export interface ComposeTaskEngineDeps {
   readonly cwd: string
   readonly sharedParentTools: () => readonly ToolDefinition[]
   readonly coordinator?: IdleInjectionCoordinator
+  // Per-execution-mode runner construction, injectable so tests can prove `execution_mode:"process"`
+  // routes to the process (rpc) runner and not the in-process one. Defaults wire the real runners.
+  readonly runnerFactories?: TaskRunnerFactories
+}
+
+export interface RunnerBuildContext {
+  readonly runtime: TaskRuntimeContext
+  readonly sharedParentTools: () => readonly ToolDefinition[]
+  readonly settings: OmoTaskSettings
+}
+
+export interface TaskRunnerFactories {
+  readonly inProcess: (context: RunnerBuildContext) => ManagedRunner
+  readonly process: (context: RunnerBuildContext) => ManagedRunner
+}
+
+const DEFAULT_RUNNER_FACTORIES: TaskRunnerFactories = {
+  inProcess: buildInProcessRunner,
+  process: buildProcessRunner,
 }
 
 /**
@@ -93,10 +114,11 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   const registry = createManagerResidencyRegistry(getManager)
   const lifecycle = createTaskLifecycle({ store: notifyingStore, registry, config: settings })
 
-  const runner = buildRunner(runtime, deps.sharedParentTools, settings)
+  const factories = deps.runnerFactories ?? DEFAULT_RUNNER_FACTORIES
+  const runnerContext: RunnerBuildContext = { runtime, sharedParentTools: deps.sharedParentTools, settings }
   const manager = createTaskManager({
     store: notifyingStore,
-    runners: { "in-process": runner, process: runner },
+    runners: { "in-process": factories.inProcess(runnerContext), process: factories.process(runnerContext) },
     planner: createTaskChildPlanner(deps.omoConfig, () => runtime.modelRegistry()),
     config: settings,
     cwd: deps.cwd,
@@ -128,24 +150,29 @@ async function admitAdapter(lifecycle: TaskLifecycle, parentSessionId: string): 
   return { kind: "rejected", message: admission.error.message }
 }
 
-function buildRunner(
-  runtime: TaskRuntimeContext,
-  sharedParentTools: () => readonly ToolDefinition[],
-  settings: OmoTaskSettings,
-): ManagedRunner {
+function buildInProcessRunner(build: RunnerBuildContext): ManagedRunner {
   const inProcess = new InProcessRunner({
     // The live capture-registry array; the runner filters the task/team family at spawn time.
     get sharedParentTools(): readonly ToolDefinition[] {
-      return sharedParentTools()
+      return build.sharedParentTools()
     },
-    depthPolicy: { maxDepth: Math.max(settings.max_depth + 1, 1) },
+    depthPolicy: { maxDepth: Math.max(build.settings.max_depth + 1, 1) },
   })
   // Thread the PARENT session's captured model registry (and its bound auth storage) into every child,
   // resolving the plan's provider/modelId against that same registry. Without this a child spawns
   // against senpi's default agent-dir resolution and never sees a provider registered on the live
   // parent session (the -e mock provider, extension providers) - the W2-V "No API key found" gap.
-  const context = createParentRegistrySessionContext(() => runtime.modelRegistry())
+  const context = createParentRegistrySessionContext(() => build.runtime.modelRegistry())
   return createInProcessManagedRunner(inProcess, context)
+}
+
+// The process (multi-process) slot: a real senpi rpc child. It runs in a SEPARATE OS process, so the
+// parent's in-memory model registry object cannot be handed across the boundary; instead the child
+// inherits the parent env (SENPI_CODING_AGENT_DIR and friends via buildRpcSpawn) and resolves the same
+// agent dir's auth/models. Wiring this slot is what makes `execution_mode:"process"` spawn an rpc child
+// instead of silently falling back to the in-process runner.
+function buildProcessRunner(_build: RunnerBuildContext): ManagedRunner {
+  return createRpcManagedRunner(new RpcProcessRunner())
 }
 
 // Fold the user's omo.json `agents` into the child-agent registry so the task tool advertises them and
