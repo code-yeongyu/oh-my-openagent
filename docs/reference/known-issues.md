@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5569 - Reply-required parent wake may persist without starting a new turn
+
+- **Affects**: Background-task completion flows where the final all-complete wake is written into the parent session.
+- **Symptom**: The parent session can receive a `[BACKGROUND TASK COMPLETED] [ALL BACKGROUND TASKS COMPLETE]` internal wake without `OMO_INTERNAL_NOREPLY`, but no assistant/model turn starts until the user sends another message.
+- **Workaround**: If background tasks appear complete and the parent stays silent, send a short manual follow-up such as `continue`, then ask the parent to call `background_output` for each completed task. Confirm the wake exists before re-dispatching the same work.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5569.
+
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
 - **Affects**: OpenAI-compatible custom providers whose models are written to `opencode.json` without a `limit` block.
