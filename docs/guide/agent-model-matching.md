@@ -68,6 +68,8 @@ Hephaestus is the developer who stays in their room coding all day. Doesn't talk
 
 Using Hephaestus with GLM or Kimi would be like assigning your most communicative, sociable developer to sit alone and do nothing but deep technical work. They'd get it done eventually, but they wouldn't shine — you'd be wasting exactly the skills that make them valuable.
 
+Configuration note: `agents.hephaestus.allow_non_gpt_model: true` does **not** make a non-GPT Hephaestus appear in the agent list. Registration still requires a GPT-family model. That flag only tells the runtime `no-hephaestus-non-gpt` guard not to switch away from an already-registered Hephaestus session if the active model later resolves outside the expected GPT path. If your configured Hephaestus model is `opencode-go/glm-5.1`, `volcengine/glm-5.2`, Kimi, Claude, DeepSeek, or MiniMax, Hephaestus is still skipped during registration.
+
 ### The Takeaway
 
 Every agent's prompt is tuned to match its model's personality. **When you change the model, you change the brain — and the same instructions get understood completely differently.** Model matching isn't about "better" or "worse." It's about fit.
