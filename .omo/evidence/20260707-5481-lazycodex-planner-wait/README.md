@@ -62,3 +62,24 @@ Additional captured commands:
 - No-excuse audit: `rg -n "as any|@ts-ignore|@ts-expect-error" packages/omo-codex/plugin/test/ulw-plan-skill-contract.test.mjs`
 - `bun run typecheck`
 - `git diff --check`
+
+## P2 follow-up: mirror the barrier into ulw-loop
+
+Codex review found that `packages/omo-codex/plugin/components/ulw-loop/directive.md`
+still carried the old standalone ultrawork directive, so `ulw-loop --with-ultrawork`
+could emit a prompt without the wave-level wait barrier. The follow-up copies the
+updated ultrawork directive into the ulw-loop mirror and relies on the existing
+byte-identical directive test to keep them synchronized.
+
+Additional captured commands:
+
+- RED: `npm --prefix packages/omo-codex/plugin/components/ulw-loop test -- test/ultrawork-directive.test.ts`
+- GREEN: `npm --prefix packages/omo-codex/plugin/components/ulw-loop test -- test/ultrawork-directive.test.ts`
+- Typecheck: `npm --prefix packages/omo-codex/plugin/components/ulw-loop run typecheck`
+- Root typecheck: `bun run typecheck`
+- `git diff --check`
+
+The full local ulw-loop component suite was also attempted and captured in
+`ulw-loop-component-suite-windows-host-failures.txt`; it still hits host-specific
+Windows failures unrelated to this mirror change (`/bin/sh` / `npm` spawn and
+POSIX path expectations), while the directive mirror test itself passes.
