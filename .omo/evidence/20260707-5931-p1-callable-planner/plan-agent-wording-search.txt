@@ -1,0 +1,2 @@
+Forbidden planner wording scan
+PASS: no forbidden planner wording in non-planner prompt variants

@@ -198,7 +198,7 @@ task(category="ultrabrain", load_skills=[], run_in_background=false, prompt="<ga
 ## WORKFLOW
 1. **CLASSIFY INTENT** (MANDATORY - see GEMINI_INTENT_GATE above)
 2. Spawn exploration/librarian agents via task(run_in_background=true) in PARALLEL
-3. Use Plan agent with gathered context to create detailed work breakdown
+3. Use callable planner delegate with gathered context to create detailed work breakdown
 4. Execute with continuous verification against original requirements
 
 ## VERIFICATION GUARANTEE (NON-NEGOTIABLE)

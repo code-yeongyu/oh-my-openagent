@@ -97,7 +97,7 @@ deep_context = background_output(task_id=...)
 // Merge ALL findings for comprehensive understanding
 ```
 
-**Plan agent (size the scope first):**
+**Callable planner delegate (size the scope first):**
 - Count distinct surfaces, files, steps. Invoke for 5+ interdependent steps / multi-file / unclear scope; skip only for genuinely trivial single-step work.
 - Invoke AFTER gathering context from both tracks.
 - Then execute in the plan's exact wave order + parallel grouping and run the verification it specifies.

@@ -70,3 +70,21 @@ Additional captured commands:
 - `bun run packages/shared-skills/skills/programming/scripts/typescript/check-no-excuse-rules.ts packages/prompts-core/src/ultrawork-prompts.test.ts`
 - `bun run typecheck`
 - `git diff --check`
+
+## P2 follow-up: remaining Plan-agent wording
+
+After the stale-label follow-up, Codex review found that `default.md`,
+`gemini.md`, and `gpt.md` still used exact `Plan agent` wording in workflow
+copy. The follow-up expands the prompt regression test to reject `Plan agent`
+labels in all non-planner variants and changes those references to callable
+planner delegate wording.
+
+Additional captured commands:
+
+- RED: `bun test packages/prompts-core/src/ultrawork-prompts.test.ts`
+- GREEN: `bun test packages/prompts-core/src/ultrawork-prompts.test.ts`
+- Clean scan: `rg -n '\bPlan agent\b|PROMETHEUS PLANNER|subagent_type="plan"|subagent_type="prometheus"' packages/prompts-core/prompts/ultrawork/default.md packages/prompts-core/prompts/ultrawork/gpt.md packages/prompts-core/prompts/ultrawork/gemini.md packages/prompts-core/prompts/ultrawork/glm.md`
+- GREEN routing: `bun test packages/prompts-core/src/ultrawork-prompts.test.ts packages/omo-opencode/src/hooks/keyword-detector/ultrawork/ultrawork-source-routing.test.ts`
+- No-excuse audit: `rg -n "as any|@ts-ignore|@ts-expect-error" packages/prompts-core/src/ultrawork-prompts.test.ts`
+- `bun run typecheck`
+- `git diff --check`

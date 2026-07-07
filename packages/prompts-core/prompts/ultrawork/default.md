@@ -186,7 +186,7 @@ task(category="quick", load_skills=["git-master"], run_in_background=true)
 ## WORKFLOW
 1. Analyze the request and identify required capabilities
 2. Spawn exploration/librarian agents via task(run_in_background=true) in PARALLEL (10+ if needed)
-3. Use Plan agent with gathered context to create detailed work breakdown
+3. Use callable planner delegate with gathered context to create detailed work breakdown
 4. Execute with continuous verification against original requirements
 
 ## VERIFICATION GUARANTEE (NON-NEGOTIABLE)
