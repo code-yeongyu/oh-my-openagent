@@ -98,6 +98,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: If the hang happens before `/tmp/oh-my-opencode.log` gets a plugin entry, avoid the npm resolver path by using an absolute `file://` plugin path or by pre-populating the OpenCode package cache. If logs point to a malformed or locked `opencode.db`, back up and remove `~/.local/share/opencode/opencode.db*`; OpenCode recreates it on next start, but local session history is lost.
 - **Status**: Open. The npm resolver timeout belongs upstream in OpenCode; tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5050.
 
+## #5072: Blank TUI when the external plugin is enabled globally
+
+- **Affects**: OpenCode 1.16.2 on macOS when `oh-my-openagent@latest` is loaded from global `opencode.jsonc`.
+- **Symptom**: The TUI opens to a blank screen and logs stop around `service=plugin path=oh-my-openagent@latest loading plugin`; disabling plugins restores normal startup.
+- **Workaround**: Temporarily remove the plugin from global config, then retry with a pinned plugin version or a project-local plugin entry so the failing config can be isolated. Start with `opencode --log-level DEBUG .` and compare logs with `plugin: []` before assuming provider or terminal rendering is at fault.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5072.
+
 ## #5260: Background tasks can wait on an LSP install decision
 
 - **Affects**: Background tasks that call LSP tools when the language server is not installed.
