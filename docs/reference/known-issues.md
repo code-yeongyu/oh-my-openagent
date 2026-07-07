@@ -206,6 +206,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: Check the configured OpenCode title model and fix any `doctor` failure first, especially Bun/UTF-8 errors on Windows. If the session is already created, rename it manually in the OpenCode UI or start a new session with a short first user message before entering `ulw`.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5544.
 
+## #5560 - LSP daemon MCP proxy processes can survive ended sessions
+
+- **Affects**: LSP-backed MCP proxy processes (`cli.js mcp`) after OpenCode sessions end normally or are killed.
+- **Symptom**: Multiple stale `lsp-daemon` proxy processes and language-server children accumulate over days, consuming significant memory even though the original OpenCode sessions are gone.
+- **Workaround**: Periodically inspect process lists for stale `lsp-daemon` / language-server children and terminate orphaned processes after closing OpenCode. If memory pressure appears, restart the editor/terminal session that launched OpenCode so inherited daemon handles are released.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5560.
+
 ## #4722 - Codex hooks can report exit code 1 immediately after install
 
 - **Affects**: LazyCodex / OMO Codex installs where Codex keeps running across a plugin cache/config update.
