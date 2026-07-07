@@ -77,8 +77,22 @@ export async function createTeam(
   }
 
   const memberTaskIds = toMemberTaskMap(result.spawned)
+  const writeMemberMap = deps.writeMemberMap ?? writeMemberTaskMap
+  // Persist the member sidecar AFTER spawn success but BEFORE the ->active transition (W3-V F4): an
+  // active team with no discoverable/cancellable members is a leak, so a write failure rolls the whole
+  // create back (cancel spawned members + ->failed) instead of activating an orphaned run.
+  try {
+    await writeMemberMap(resolveTeamRuntimeDirs(deps.stateDir, teamRunId).runtimeDir, memberTaskIds)
+  } catch (error) {
+    await rollbackFailedCreate(teamRunId, result, deps, config)
+    throw new SenpiTeamRuntimeError(
+      `team '${spec.name}' member sidecar write failed: ${error instanceof Error ? error.message : String(error)}`,
+      "sidecar_write_failed",
+      spec.name,
+    )
+  }
+
   const activated = await activateTeam(teamRunId, result.spawned, config)
-  await writeMemberTaskMap(resolveTeamRuntimeDirs(deps.stateDir, teamRunId).runtimeDir, memberTaskIds)
   return { runtimeState: activated, memberTaskIds }
 }
 

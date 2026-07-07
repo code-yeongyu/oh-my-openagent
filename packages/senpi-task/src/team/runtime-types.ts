@@ -13,6 +13,7 @@ export type SenpiTeamRuntimeErrorCode =
   | "member_start_rejected"
   | "create_deadline_exceeded"
   | "invalid_delete_state"
+  | "sidecar_write_failed"
 
 /**
  * Raised by the team runtime for lifecycle failures distinct from spec normalization
@@ -52,6 +53,9 @@ export type CreateTeamDeps = {
   // team run id is threaded so the binder can run-scope the member's send tool (it is not known until
   // createRuntimeState mints it, so the caller cannot bind it up front).
   readonly memberScopedTools?: (memberName: string, teamRunId: string) => readonly ToolDefinition[]
+  // Injectable member-sidecar writer (defaults to the atomic writeMemberTaskMap). Present so tests can
+  // force the pre-activation write to fail and exercise the create rollback.
+  readonly writeMemberMap?: (runtimeDir: string, map: MemberTaskMap) => Promise<void>
 }
 
 export type CreateTeamResult = {
