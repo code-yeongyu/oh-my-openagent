@@ -220,6 +220,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: If this exact regression appears, downgrade OpenCode to `1.17.9` or use an OMO build that explicitly includes the SDK v2 compatibility wrapper. Do not debug it as a model/provider problem until hook delivery has been confirmed.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5575.
 
+## #5586 - ULW sessions can be titled `ULTRAWORK MODE ENABLED!`
+
+- **Affects**: ULW prompts when title generation sees the injected ultrawork instruction block before the user's task text.
+- **Symptom**: The session title describes the mode banner instead of the actual task, making session history hard to scan.
+- **Workaround**: Start complex work with a short descriptive first sentence before `ulw`, or rename affected sessions manually after creation. If you rely heavily on history search, avoid starting multiple unrelated tasks with identical `ulw` prefixes until title injection ordering is fixed.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5586.
+
 ## #4722 - Codex hooks can report exit code 1 immediately after install
 
 - **Affects**: LazyCodex / OMO Codex installs where Codex keeps running across a plugin cache/config update.
