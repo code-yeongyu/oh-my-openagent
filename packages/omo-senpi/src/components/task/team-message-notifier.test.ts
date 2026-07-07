@@ -97,4 +97,23 @@ describe("team-message notifier + shared idle coordinator", () => {
     expect(pi.sent[0]?.message.customType).toBe("senpi-task.team-message")
     expect(pi.sent[0]?.options).toMatchObject({ deliverAs: "followUp" })
   })
+
+  test("#given a streaming lead message carrying BOTH triggerTurn and deliverAs:steer #when enqueued #then it delivers directly via the renderer with steer preserved, not the coordinator", () => {
+    // given: the engine now stamps a streaming lead message with triggerTurn:true AND the configured deliverAs
+    const delivered: string[] = []
+    const { coordinator } = deferredCoordinator(delivered)
+    const pi = fakePi()
+    const teamNotifier = createTeamMessageNotifier(pi, coordinator)
+
+    // when
+    teamNotifier.enqueue({ customType: "senpi-task.team-message", content: "beta: steering", display: false, from: "beta", messageId: "m3", triggerTurn: true, deliverAs: "steer" })
+
+    // then: it bypasses the idle-edge arbiter and reaches the rich channel with steer + triggerTurn intact
+    expect(coordinator.pendingCount()).toBe(0)
+    expect(delivered).toHaveLength(0)
+    expect(pi.sent).toHaveLength(1)
+    expect(pi.sent[0]?.message.customType).toBe("senpi-task.team-message")
+    expect(pi.sent[0]?.message.details).toEqual({ from: "beta", messageId: "m3" })
+    expect(pi.sent[0]?.options).toMatchObject({ deliverAs: "steer", triggerTurn: true })
+  })
 })

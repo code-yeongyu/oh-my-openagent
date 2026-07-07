@@ -366,8 +366,7 @@
         },
         "notification": {
           "default": {
-            "deliver_as": "followUp",
-            "wake_idle_parent": true
+            "deliver_as": "followUp"
           },
           "type": "object",
           "properties": {
@@ -378,15 +377,10 @@
                 "followUp",
                 "steer"
               ]
-            },
-            "wake_idle_parent": {
-              "default": true,
-              "type": "boolean"
             }
           },
           "required": [
-            "deliver_as",
-            "wake_idle_parent"
+            "deliver_as"
           ],
           "additionalProperties": false
         },

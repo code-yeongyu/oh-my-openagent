@@ -5,7 +5,7 @@ import { deliverToLead } from "./deliver-lead"
 import { buildTeamMessage } from "./message"
 import { FakeLeadNotifier } from "./__fixtures__/messaging-fakes"
 
-const CONFIG: NotificationConfig = { wake_idle_parent: true, deliver_as: "followUp" }
+const CONFIG: NotificationConfig = { deliver_as: "followUp" }
 
 function leadMessage() {
   return buildTeamMessage(
@@ -43,24 +43,7 @@ member alpha needs a decision
     })
   })
 
-  test("#given an idle parent with wake disabled #when delivered #then it is queued silently", () => {
-    // given
-    const notifier = new FakeLeadNotifier()
-
-    // when
-    const result = deliverToLead({
-      message: leadMessage(),
-      parentState: { kind: "idle" },
-      notificationConfig: { wake_idle_parent: false, deliver_as: "followUp" },
-      notifier,
-    })
-
-    // then
-    expect(result).toEqual({ kind: "delivered", decision: "queue_silently" })
-    expect(notifier.enqueued[0]?.triggerTurn).toBeUndefined()
-  })
-
-  test("#given a streaming parent #when delivered #then it is delivered with the configured deliverAs", () => {
+  test("#given a streaming parent #when delivered #then it carries the configured deliverAs and triggerTurn", () => {
     // given
     const notifier = new FakeLeadNotifier()
 
@@ -68,13 +51,14 @@ member alpha needs a decision
     const result = deliverToLead({
       message: leadMessage(),
       parentState: { kind: "streaming" },
-      notificationConfig: { wake_idle_parent: true, deliver_as: "steer" },
+      notificationConfig: { deliver_as: "steer" },
       notifier,
     })
 
-    // then
+    // then a streaming lead delivery both steers AND guarantees a turn
     expect(result).toEqual({ kind: "delivered", decision: "deliver_streaming" })
     expect(notifier.enqueued[0]?.deliverAs).toBe("steer")
+    expect(notifier.enqueued[0]?.triggerTurn).toBe(true)
   })
 
   test.each<[ParentState["kind"], "compacting" | "session_switching" | "session_shutdown"]>([

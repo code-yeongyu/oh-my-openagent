@@ -56,7 +56,7 @@ export function findTaskIds(events) {
 }
 
 // The idle-wake completion is injected as a NEW turn carrying a <task-notification> block. Proof for the
-// wake_idle_parent contract: the block names the finished task_id AND carries the task_send continuation
+// unconditional-wake contract: the block names the finished task_id AND carries the task_send continuation
 // hint (messageability = continuable). Returns both facts so the driver can attribute a precise failure.
 export function findWakeNotification(events, taskId) {
   const hay = JSON.stringify(events)

@@ -3,31 +3,21 @@ import { describe, expect, test } from "bun:test"
 import { routeCompletion, shouldNotifyStatus } from "./routing"
 import type { NotificationConfig, ParentState } from "./types"
 
-const wakeConfig: NotificationConfig = { wake_idle_parent: true, deliver_as: "followUp" }
-const silentConfig: NotificationConfig = { wake_idle_parent: false, deliver_as: "followUp" }
-const steerConfig: NotificationConfig = { wake_idle_parent: true, deliver_as: "steer" }
+const wakeConfig: NotificationConfig = { deliver_as: "followUp" }
+const steerConfig: NotificationConfig = { deliver_as: "steer" }
 
 describe("routeCompletion", () => {
-  test("#given idle parent and wake enabled #when routed #then wake decision", () => {
+  test("#given idle parent #when routed #then always wakes regardless of config", () => {
     // given
     const state: ParentState = { kind: "idle" }
 
     // when
-    const decision = routeCompletion(state, wakeConfig)
+    const followUp = routeCompletion(state, wakeConfig)
+    const steer = routeCompletion(state, steerConfig)
 
-    // then
-    expect(decision).toEqual({ kind: "wake" })
-  })
-
-  test("#given idle parent and wake disabled #when routed #then queued silently", () => {
-    // given
-    const state: ParentState = { kind: "idle" }
-
-    // when
-    const decision = routeCompletion(state, silentConfig)
-
-    // then
-    expect(decision).toEqual({ kind: "queue_silently" })
+    // then an idle parent unconditionally wakes; there is no silent-queue path
+    expect(followUp).toEqual({ kind: "wake" })
+    expect(steer).toEqual({ kind: "wake" })
   })
 
   test("#given streaming parent #when routed #then delivered with configured deliver_as", () => {

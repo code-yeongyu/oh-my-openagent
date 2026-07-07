@@ -23,7 +23,7 @@ export const MemberSendMessageParams = Type.Object(MESSAGE_FIELDS)
 export type TeamSendMessageInput = Static<typeof TeamSendMessageParams>
 export type MemberSendMessageInput = Static<typeof MemberSendMessageParams>
 
-export type LeadDeliveryView = "wake" | "queue_silently" | "deliver_streaming" | "buffered" | "failed"
+export type LeadDeliveryView = "wake" | "deliver_streaming" | "buffered" | "failed"
 export type MemberDeliveryOutcome = "steered" | "revived" | "left_unread" | "delivery_failed"
 
 export type TeamSendMemberView = { readonly member: string; readonly outcome: MemberDeliveryOutcome; readonly reason?: string }

@@ -85,17 +85,20 @@ export function createCompletionNotifier(deps: CompletionNotifierDeps): Completi
   return { notifyTerminal, flushBuffered, bufferedCount }
 }
 
-function buildDeliveryMessage(details: readonly CompletionDetails[], decision: RoutingDecision): ParentNotifierMessage {
+// A streaming completion queues as the configured deliverAs AND stamps triggerTurn:true so the parent
+// is guaranteed to take a turn to process it once the current turn ends (senpi sendMessage accepts
+// triggerTurn + deliverAs together). A wake completion (idle parent) fires the turn directly.
+function buildDeliveryMessage(
+  details: readonly CompletionDetails[],
+  decision: Exclude<RoutingDecision, { kind: "buffer" }>,
+): ParentNotifierMessage {
   const base = buildCompletionMessage(details)
   if (decision.kind === "wake") return { ...base, triggerTurn: true }
-  if (decision.kind === "deliver_streaming") return { ...base, deliverAs: decision.deliverAs }
-  return base
+  return { ...base, deliverAs: decision.deliverAs, triggerTurn: true }
 }
 
-function deliveredDecision(decision: RoutingDecision): DeliveredDecision {
-  if (decision.kind === "wake") return "wake"
-  if (decision.kind === "deliver_streaming") return "deliver_streaming"
-  return "queue_silently"
+function deliveredDecision(decision: Exclude<RoutingDecision, { kind: "buffer" }>): DeliveredDecision {
+  return decision.kind === "wake" ? "wake" : "deliver_streaming"
 }
 
 function deliverWithRetry(
