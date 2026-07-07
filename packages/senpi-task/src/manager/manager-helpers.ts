@@ -62,6 +62,14 @@ export function inSession(record: TaskRecord, sessionId: string): boolean {
   return record.parent_session_id === sessionId || record.root_session_id === sessionId
 }
 
+// Fold a spawned child's OS pid onto its record, or return undefined when nothing should change: an
+// in-process child (no pid) and an already-terminal record are both left untouched so a settled task
+// is never resurrected and an in-process record stays byte-identical.
+export function recordSpawnedPid(record: TaskRecord, pid: number | undefined): TaskRecord | undefined {
+  if (pid === undefined || isTerminalRecord(record)) return undefined
+  return { ...record, pid }
+}
+
 export function isTerminalRecord(record: TaskRecord): boolean {
   return (
     record.status === "completed" ||
