@@ -1,0 +1,7 @@
+2026년 07월  7일 화 오전 10:13:41
+
+Dependency paths:
+opencode=/c/Users/pss/AppData/Roaming/npm/opencode
+sqlite3=/c/Users/pss/anaconda3/Library/bin/sqlite3
+curl=/mingw64/bin/curl
+jq=tmux=docker=

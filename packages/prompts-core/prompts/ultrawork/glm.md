@@ -92,7 +92,7 @@ Use the fastest path that increases certainty.
 | Broad codebase search | Delegate explore in background, then keep working on non-overlapping tasks. |
 | External docs or API uncertainty | Delegate librarian or query docs. |
 | Hard architecture/debugging after 2 attempts | Ask oracle with evidence and options. |
-| 5+ dependent steps or unclear sequencing | Use Prometheus planning before implementation. |
+| 5+ dependent steps or unclear sequencing | Use callable planning delegation before implementation. |
 
 Delegation is not a substitute for ownership. You remain responsible for synthesis, edits, and verification.
 
@@ -105,7 +105,7 @@ Survey applicable skills before working raw. Use only resources that fit the tas
 | explore agent | Repo patterns, ownership, hidden call sites | File paths, conventions, risks |
 | librarian agent | Official docs, external examples, APIs | Current guidance with source names |
 | oracle agent | Conflicting evidence or hard design choice | Recommendation with tradeoffs |
-| Prometheus planner | Large dependent work | Ordered waves and verification plan |
+| Callable planner | Large dependent work | Ordered waves and verification plan |
 | category + skill | Domain work exists | Specialized execution with criteria |
 
 <tool_usage_rules>

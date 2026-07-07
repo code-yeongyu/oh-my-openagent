@@ -18,11 +18,12 @@ describe("ultrawork prompt variants", () => {
     expect(codexVariant.content).toBe(readFileSync(codexPromptPath, "utf8"))
   })
 
-  test("#given OpenCode ultrawork prompts #then planner delegation avoids native plan mode", () => {
+  test("#given OpenCode ultrawork prompts #then planner delegation avoids non-callable agents", () => {
     for (const [variantName, variant] of Object.entries(ultraworkPromptVariants)) {
       if (variantName === "planner") continue
 
       expect(variant.content, variantName).not.toContain('subagent_type="plan"')
+      expect(variant.content, variantName).not.toContain('subagent_type="prometheus"')
     }
   })
 })

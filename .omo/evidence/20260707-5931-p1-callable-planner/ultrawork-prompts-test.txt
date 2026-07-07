@@ -1,0 +1,10 @@
+bun test v1.3.11 (af24e281)
+
+packages\prompts-core\src\ultrawork-prompts.test.ts:
+(pass) ultrawork prompt variants > #given package surface #when inspected #then OpenCode and Codex ultrawork variants are exported
+(pass) ultrawork prompt variants > #given OpenCode ultrawork prompts #then planner delegation avoids non-callable agents
+
+ 2 pass
+ 0 fail
+ 12 expect() calls
+Ran 2 tests across 1 file. [270.00ms]

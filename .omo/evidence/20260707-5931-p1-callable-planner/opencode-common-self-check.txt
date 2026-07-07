@@ -1,0 +1,10 @@
+missing dependency: jq
+missing dependency: tmux
+FAIL: missing dependencies
+PASS: oqa_db_path -> C:\Users\pss\.local\share\opencode\opencode.db
+PASS: oqa_sql_escape quotes single quotes
+Python FAIL: oqa_free_port -> ''
+PASS: isolated XDG sandbox auto-removed on exit (/tmp/oqa-xdg.7sbi5C)
+PASS: isolated HOME points inside sandbox
+PASS: isolated HOME preserves HOME-based opencode shim
+common.sh self-check had 2 failure(s)

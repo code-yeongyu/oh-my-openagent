@@ -1,0 +1,2 @@
+packages/prompts-core/prompts/ultrawork\gemini.md:312:3. GATHER -> PROMETHEUS PLANNER SPAWN
+packages/prompts-core/prompts/ultrawork\default.md:327:2. GATHER -> PROMETHEUS PLANNER SPAWN

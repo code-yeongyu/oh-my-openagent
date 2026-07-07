@@ -1,0 +1,13 @@
+bun test v1.3.11 (af24e281)
+
+packages\prompts-core\src\ultrawork-prompts.test.ts:
+(pass) ultrawork prompt variants > #given package surface #when inspected #then OpenCode and Codex ultrawork variants are exported
+(pass) ultrawork prompt variants > #given OpenCode ultrawork prompts #then planner delegation avoids non-callable agents
+
+packages\omo-opencode\src\hooks\keyword-detector\ultrawork\ultrawork-source-routing.test.ts:
+(pass) Ultrawork source routing > #given agent and model #then getUltraworkSource routes to the expected variant
+
+ 3 pass
+ 0 fail
+ 18 expect() calls
+Ran 3 tests across 2 files. [245.00ms]

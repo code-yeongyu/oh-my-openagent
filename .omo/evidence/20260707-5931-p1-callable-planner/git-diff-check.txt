@@ -1,0 +1,6 @@
+ packages/prompts-core/prompts/ultrawork/default.md | 39 +++++++++++-----------
+ packages/prompts-core/prompts/ultrawork/gemini.md  | 24 ++++++-------
+ packages/prompts-core/prompts/ultrawork/glm.md     |  4 +--
+ packages/prompts-core/prompts/ultrawork/gpt.md     |  2 +-
+ .../prompts-core/src/ultrawork-prompts.test.ts     |  3 +-
+ 5 files changed, 37 insertions(+), 35 deletions(-)
