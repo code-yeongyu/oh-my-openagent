@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5572 - Sisyphus can receive redundant analyze/search keyword prompts
+
+- **Affects**: Sisyphus sessions where user messages repeatedly include analyze/search trigger words.
+- **Symptom**: The keyword detector can inject analyze/search mode prompts that duplicate behavior already present in the Sisyphus system prompt. Repeated trigger words can add avoidable prompt tokens without changing behavior.
+- **Workaround**: In Sisyphus, rely on the default exploration/delegation behavior unless you specifically need a mode keyword. If token budget is tight, avoid repeating generic `analyze`, `search`, `debug`, or equivalent trigger words in every follow-up.
+- **Status**: Open optimization. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5572.
+
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
 - **Affects**: OpenAI-compatible custom providers whose models are written to `opencode.json` without a `limit` block.
