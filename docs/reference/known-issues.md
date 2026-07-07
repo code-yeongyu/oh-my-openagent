@@ -112,6 +112,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: Record a `declined` install decision for the missing server with `lsp_install_decision`; future LSP calls collapse to a one-line warning. To share that decision across sessions, set `LSP_TOOLS_MCP_INSTALL_DECISIONS` to a stable decisions-file path.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5260.
 
+## #5810: Session tools can miss history outside the current instance scope
+
+- **Affects**: `session_read`, `session_search`, and `session_list` when OpenCode is launched from a directory whose instance scope excludes older sessions, especially non-git directories on Windows.
+- **Symptom**: `session_info(<id>)` can return metadata for a session while `session_read(<id>)` reports `Session not found`, and `session_list()` shows only a small subset of sessions that exist in the SQLite database.
+- **Workaround**: Use `session_info` first when you know the session id, then relaunch OpenCode from the project directory that owns the historical sessions before using read/search/list. For forensic work, inspect/export the OpenCode DB directly rather than relying on scope-filtered list output.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5810.
+
 ## #5341: `oh-my-opencode` Linux/Windows wrapper can miss platform binaries
 
 - **Affects**: `npm install -g oh-my-opencode@4.10.0` on Linux x64 and Windows x64.
