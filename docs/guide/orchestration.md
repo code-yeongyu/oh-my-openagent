@@ -529,6 +529,31 @@ Use the `ulw` keyword in Sisyphus when:
 - **For most users**: Use `ulw` keyword in Sisyphus. It's the default path and works excellently for 90% of complex tasks.
 - **For power users**: Switch to Hephaestus when you specifically need GPT-5.5's reasoning style or want the "AmpCode deep mode" experience of fully autonomous exploration and execution.
 
+### Brownfield / KISS Mode
+
+For mature projects, the safest default is not "make the best architecture." It is "make the smallest correct change that fits the architecture already here."
+
+Use Prometheus first when a brownfield task could invite broad cleanup, rewrites, or speculative abstractions. Ask it to produce a constrained plan with explicit boundaries:
+
+```text
+@plan "Fix <problem> in this existing codebase.
+Preserve the current architecture and public behavior.
+Use the smallest viable change.
+Follow local patterns in <files or areas>.
+Do not refactor, rename, reorganize, or clean up unrelated code.
+List exact files in scope and exact verification commands."
+```
+
+Then run `/start-work` from that plan. Atlas will execute against the written scope instead of treating the task as an open-ended modernization pass.
+
+Use `ulw` directly only when the target is already narrow:
+
+```text
+ulw fix the null handling in packages/foo/src/bar.ts using the existing helper style. No unrelated cleanup.
+```
+
+Avoid Hephaestus for routine brownfield work unless you deliberately want deeper architectural exploration. It is powerful, but that is also why it is easier to over-scope. If the job is "touch the old system without disturbing it," Prometheus plus a KISS plan is the safer path.
+
 ---
 
 ## Configuration
