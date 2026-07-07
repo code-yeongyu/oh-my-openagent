@@ -1,0 +1,68 @@
+{
+  "result": "FAIL",
+  "checks": [
+    {
+      "check": "real_credentials_untouched_and_caller_env_ignored",
+      "verdict": "PASS",
+      "facts": {
+        "realCredentialsUntouched": true,
+        "providedAgentDir": "unset",
+        "sandboxAgentDir": "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-iSOqvi/agent",
+        "credentialFiles": [
+          "auth.json",
+          "models.json",
+          "settings.json",
+          "trust.json"
+        ]
+      }
+    },
+    {
+      "check": "spawn_process_pid_and_session_jsonl",
+      "verdict": "FAIL",
+      "reason": "execution_mode=process pid=absent sessionJsonl=false residency=disposed",
+      "facts": {
+        "task_id": "st_019f3b37",
+        "execution_mode": "process",
+        "sessionJsonl": false,
+        "residency_state": "disposed"
+      }
+    },
+    {
+      "check": "steer_ack_mid_run",
+      "verdict": "FAIL",
+      "reason": "blocked: no rpc child spawned (see spawn_process)"
+    },
+    {
+      "check": "completion_push_arrives",
+      "verdict": "FAIL",
+      "reason": "blocked: no rpc child spawned (see spawn_process)",
+      "facts": {
+        "statusSnapshotCount": 5
+      }
+    },
+    {
+      "check": "kill_marks_error_killed_true",
+      "verdict": "FAIL",
+      "reason": "blocked: no rpc child spawned (see spawn_process)"
+    },
+    {
+      "check": "reconcile_lost_terminates_orphan",
+      "verdict": "FAIL",
+      "reason": "blocked: no rpc child spawned with a pid to reconcile (see spawn_process)"
+    },
+    {
+      "check": "no_leaked_rpc_child_pids",
+      "verdict": "PASS",
+      "facts": {
+        "leakedPids": []
+      }
+    }
+  ],
+  "realCredentialsUntouched": true,
+  "wholeDirDigestStable": true,
+  "leakedPids": 0,
+  "providedAgentDir": "unset",
+  "sandboxAgentDir": "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-iSOqvi/agent",
+  "sandboxCwd": "/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/omo-senpi-qa-iSOqvi/project",
+  "productGap": "execution_mode:'process' does not spawn an rpc child. packages/omo-senpi/src/components/task/engine.ts wires runners.process to the in-process runner (RpcProcessRunner/createRpcManagedRunner are exported but never instantiated), and packages/senpi-task/src/manager/manager.ts #launch records the start transition without the handle pid, so task_output(status) and reconcile never see a pid. Live proof: record.execution_mode='process' yet no pid, no sessions/<id>/ JSONL, residency_state='disposed'."
+}
