@@ -213,6 +213,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: Periodically inspect process lists for stale `lsp-daemon` / language-server children and terminate orphaned processes after closing OpenCode. If memory pressure appears, restart the editor/terminal session that launched OpenCode so inherited daemon handles are released.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5560.
 
+## #5575 - OpenCode 1.17.10+ can stop dispatching OMO hooks
+
+- **Affects**: OMO versions still wired to OpenCode's older plugin hook shape when run on OpenCode 1.17.10 or newer.
+- **Symptom**: The plugin loads without an obvious crash, but session lifecycle hooks stop firing, subagent completion reminders do not reach the parent, and delegated work can look permanently stuck.
+- **Workaround**: If this exact regression appears, downgrade OpenCode to `1.17.9` or use an OMO build that explicitly includes the SDK v2 compatibility wrapper. Do not debug it as a model/provider problem until hook delivery has been confirmed.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5575.
+
 ## #4722 - Codex hooks can report exit code 1 immediately after install
 
 - **Affects**: LazyCodex / OMO Codex installs where Codex keeps running across a plugin cache/config update.
