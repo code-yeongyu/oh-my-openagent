@@ -1,0 +1,24 @@
+bun test v1.3.11 (af24e281)
+
+packages\prompts-core\src\ultrawork-prompts.test.ts:
+(pass) ultrawork prompt variants > #given package surface #when inspected #then OpenCode and Codex ultrawork variants are exported [15.00ms]
+(pass) ultrawork prompt variants > #given OpenCode ultrawork prompts #then planner delegation avoids native plan mode
+
+packages\prompts-core\src\variant-resolver.test.ts:
+(pass) resolveVariant > #given Claude Opus 4.7 model #then resolves default variant
+(pass) resolveVariant > #given GPT model #then resolves gpt variant
+(pass) resolveVariant > #given Gemini model #then resolves gemini variant
+(pass) resolveVariant > #given Kimi K2 model #then resolves kimi variant
+(pass) resolveVariant > #given a kimi-k2-7 variant ordered before kimi #then K2.7 wins and K2.6 stays on kimi
+(pass) resolveVariant > #given GLM model #then resolves glm variant
+(pass) resolveVariant > #given Prometheus agent #then planner overrides model variant
+(pass) resolveVariant > #given unknown model #then falls back to default variant [16.00ms]
+(pass) resolveVariant > #given empty variants table #then throws TypeError
+
+ 11 pass
+ 0 fail
+ 18 expect() calls
+Ran 11 tests across 2 files. [262.00ms]
+
+exit_code=0
+[H[2J[3J

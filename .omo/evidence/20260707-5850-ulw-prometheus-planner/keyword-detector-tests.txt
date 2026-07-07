@@ -1,0 +1,112 @@
+bun test v1.3.11 (af24e281)
+
+packages\omo-opencode\src\hooks\keyword-detector\hook-ralph-loop.test.ts:
+(pass) keyword-detector ultrawork routing > #given ulw keyword in main session #when chat.message fires #then ultrawork prompt is injected without starting ralph loop
+(pass) keyword-detector ultrawork routing > #given ultrawork keyword in main session #when chat.message fires #then ultrawork prompt is injected without starting ralph loop
+(pass) keyword-detector ultrawork routing > #given ulw mentioned mid-sentence #when chat.message fires #then ultrawork prompt is injected without starting ralph loop [15.00ms]
+(pass) keyword-detector ultrawork routing > #given question about ultrawork #when chat.message fires #then ultrawork prompt is injected without starting ralph loop
+(pass) keyword-detector ultrawork routing > #given non-ulw message #when chat.message fires #then ralph-loop startLoop is not invoked
+(pass) keyword-detector ultrawork routing > #given ulw keyword with planner agent #when chat.message fires #then ralph-loop startLoop is not invoked
+(pass) keyword-detector ultrawork routing > #given ulw keyword with non-OMO agent #when chat.message fires #then ralph-loop startLoop is not invoked
+(pass) keyword-detector ultrawork routing > #given ulw keyword without ralphLoop dependency #when chat.message fires #then no error is thrown and prompt is still injected
+(pass) keyword-detector ultrawork routing > #given partial 'ulw' substring in StatefulWidget #when chat.message fires #then ralph-loop startLoop is not invoked
+(pass) keyword-detector ultrawork routing > #given ulw keyword inside system-reminder block #when chat.message fires #then ralph-loop startLoop is not invoked
+(pass) keyword-detector ultrawork routing > #given ulw keyword #when chat.message fires #then prompt is injected as before without starting ralph loop
+
+packages\omo-opencode\src\hooks\keyword-detector\hyperplan-ultrawork.test.ts:
+(pass) keyword-detector hyperplan-ultrawork combo > should inject combo message when user types 'hpp ulw' (forward order)
+(pass) keyword-detector hyperplan-ultrawork combo > should inject combo message when user types 'ulw hpp' (reverse order)
+(pass) keyword-detector hyperplan-ultrawork combo > should NOT trigger combo on non-adjacent 'hpp do ulw' but fire both standalones instead
+(pass) keyword-detector hyperplan-ultrawork combo > should suppress standalone messages when combo fires (only ONE banner injected)
+(pass) keyword-detector hyperplan-ultrawork combo > should fire combo toast and suppress standalone toasts
+(pass) keyword-detector hyperplan-ultrawork combo > should disable combo only when disabled_keywords includes 'hyperplan-ultrawork' (standalones still fire)
+(pass) keyword-detector hyperplan-ultrawork combo > should block combo via intersection rule when disabled_keywords includes 'ultrawork'
+(pass) keyword-detector hyperplan-ultrawork combo > should allow combo in non-main session (passes through like standalone ultrawork)
+(pass) keyword-detector hyperplan-ultrawork combo > should filter combo when agent is prometheus (planner) [16.00ms]
+(pass) keyword-detector hyperplan-ultrawork combo > should reuse ultrawork variant: combo with GPT model embeds GPT ultrawork content
+
+packages\omo-opencode\src\hooks\keyword-detector\hyperplan.test.ts:
+(pass) keyword-detector hyperplan keyword > should inject hyperplan message when user types 'hyperplan'
+(pass) keyword-detector hyperplan keyword > should inject hyperplan message when user types 'hpp' shorthand
+(pass) keyword-detector hyperplan keyword > should inject hyperplan message case-insensitively
+(pass) keyword-detector hyperplan keyword > should NOT trigger hyperplan when 'hpp' is a substring of another word
+(pass) keyword-detector hyperplan keyword > should NOT trigger hyperplan when 'hpp' is the extension of a C++ header path
+(pass) keyword-detector hyperplan keyword > should NOT trigger hyperplan when path-like '.hpp' appears in a deeper file path
+(pass) keyword-detector hyperplan keyword > should fire 'Hyperplan Mode Activated' toast when keyword detected
+(pass) keyword-detector hyperplan keyword > should NOT inject hyperplan when disabled_keywords includes 'hyperplan'
+(pass) keyword-detector hyperplan keyword > should filter hyperplan keyword in non-main session (only ultrawork allowed there) [15.00ms]
+(pass) keyword-detector hyperplan keyword > should skip hyperplan injection when agent is prometheus (planner)
+(pass) keyword-detector hyperplan keyword > should NOT inject hyperplan when user invokes /hyperplan slash command
+(pass) keyword-detector hyperplan keyword > should NOT inject hyperplan when user invokes /hpp shorthand slash command
+(pass) keyword-detector hyperplan keyword > should still inject hyperplan when slash appears mid-message (not a slash command)
+(pass) keyword-detector hyperplan keyword > should skip hyperplan injection when agent name contains 'planner' token
+
+packages\omo-opencode\src\hooks\keyword-detector\index.test.ts:
+(pass) keyword-detector message transform > should prepend ultrawork message to text part [16.00ms]
+(pass) keyword-detector message transform > should leave search wording as plain user text
+(pass) keyword-detector message transform > should not prepend mode messages twice when an injected message is processed again
+(pass) keyword-detector message transform > should NOT transform when no keywords detected
+(pass) keyword-detector message transform > should not prepend mode instructions to synthetic team peer messages
+(pass) keyword-detector message transform > should not prepend mode instructions to internally marked peer messages
+(pass) keyword-detector message transform > should only fire ultrawork when enabled_expansions is set to [ultrawork]
+(pass) keyword-detector message transform > should ignore removed expansions in allowlist
+(pass) keyword-detector message transform > should block all expansions when enabled_expansions is empty array
+(pass) keyword-detector message transform > should allow both allowlist and denylist to coexist
+(pass) keyword-detector session filtering > should leave removed keyword wording plain in non-main session
+(pass) keyword-detector session filtering > should allow ultrawork keywords in non-main session
+(pass) keyword-detector session filtering > should allow active keywords in main session
+(pass) keyword-detector session filtering > should allow all keywords when mainSessionID is not set [15.00ms]
+(pass) keyword-detector session filtering > should preserve existing runtime variant when ultrawork keyword is used
+(pass) keyword-detector word boundary > should NOT trigger ultrawork on partial matches like 'StatefulWidget' containing 'ulw'
+(pass) keyword-detector word boundary > should trigger ultrawork on standalone 'ulw' keyword
+(pass) keyword-detector word boundary > should NOT trigger ultrawork on file references containing 'ulw' substring
+(pass) keyword-detector system-reminder filtering > should keep system-reminder search wording plain
+(pass) keyword-detector system-reminder filtering > should keep system-reminder analyze wording plain
+(pass) keyword-detector system-reminder filtering > should detect active keywords in user text even when system-reminder is present
+(pass) keyword-detector system-reminder filtering > should handle multiple system-reminder tags in message
+(pass) keyword-detector system-reminder filtering > should handle case-insensitive system-reminder tags
+(pass) keyword-detector system-reminder filtering > should handle multiline system-reminder content with search wording
+(pass) keyword-detector agent-specific ultrawork messages > should skip ultrawork injection when agent is prometheus [16.00ms]
+(pass) keyword-detector agent-specific ultrawork messages > should skip ultrawork injection when agent name contains 'planner'
+(pass) keyword-detector agent-specific ultrawork messages > should skip ultrawork injection when agent name contains 'plan' token
+(pass) keyword-detector agent-specific ultrawork messages > should use normal ultrawork message when agent is Sisyphus
+(pass) keyword-detector agent-specific ultrawork messages > should use normal ultrawork message when agent is undefined
+(pass) keyword-detector agent-specific ultrawork messages > should skip ultrawork for prometheus but inject for sisyphus
+(pass) keyword-detector agent-specific ultrawork messages > should use session state agent over stale input.agent (bug fix)
+(pass) keyword-detector agent-specific ultrawork messages > should fall back to input.agent when session state is empty and skip ultrawork for prometheus
+(pass) keyword-detector non-OMO agent skipping > should skip all keyword injection for OpenCode-Builder agent
+(pass) keyword-detector non-OMO agent skipping > should skip all keyword injection for Plan agent
+(pass) keyword-detector non-OMO agent skipping > should still inject keywords for OMO agents like Sisyphus
+(pass) keyword-detector non-OMO agent skipping > should skip keyword injection for agent names containing 'builder'
+(pass) keyword-detector team mode > should inject team-mode message when user types 'team mode'
+(pass) keyword-detector team mode > should NOT trigger team-mode on bare 'team' without 'mode' [16.00ms]
+(pass) keyword-detector team mode > should filter team-mode keyword in non-main session (only ultrawork allowed there)
+(pass) keyword-detector disabled_keywords config > should leave search wording plain without a disable flag
+(pass) keyword-detector disabled_keywords config > should leave analyze wording plain without a disable flag
+(pass) keyword-detector disabled_keywords config > should NOT inject team-mode when disabled_keywords includes 'team'
+(pass) keyword-detector disabled_keywords config > should NOT inject ultrawork message AND not show toast when disabled_keywords includes 'ultrawork'
+(pass) keyword-detector disabled_keywords config > should leave combined search and analyze wording plain
+(pass) keyword-detector disabled_keywords config > should let active keywords through when search and analyze wording is present
+(pass) keyword-detector disabled_keywords config > should leave search wording plain when config is undefined
+(pass) keyword-detector disabled_keywords config > should leave analyze wording plain when disabled_keywords is an empty array
+
+packages\omo-opencode\src\hooks\keyword-detector\ultrawork-edge-trigger.test.ts:
+(pass) keyword-detector ultrawork edge trigger > #given greeting text before ulw and surrounding whitespace #when chat.message fires #then ultrawork still activates without starting ralph loop [15.00ms]
+(pass) keyword-detector ultrawork edge trigger > #given greeting before ulw with a trailing task #when chat.message fires #then ultrawork activates and preserves the task without starting ralph loop
+(pass) keyword-detector ultrawork edge trigger > #given ulw mentioned in the middle of a sentence #when chat.message fires #then ultrawork still activates without starting ralph loop
+(pass) keyword-detector ultrawork edge trigger > #given trailing ultrawork reference without punctuation #when chat.message fires #then ultrawork still activates without starting ralph loop
+
+packages\omo-opencode\src\hooks\keyword-detector\ultrawork-runtime-variant.test.ts:
+(pass) keyword-detector ultrawork runtime variant gating > #given runtime max variant #when ultrawork activates #then maximum precision toast is preserved
+(pass) keyword-detector ultrawork runtime variant gating > #given runtime non-max variant #when ultrawork activates #then variant stays unchanged and toast does not claim max
+
+packages\omo-opencode\src\hooks\keyword-detector\ultrawork\ultrawork-source-routing.test.ts:
+(pass) Ultrawork source routing > #given agent and model #then getUltraworkSource routes to the expected variant
+
+ 89 pass
+ 0 fail
+ 268 expect() calls
+Ran 89 tests across 7 files. [380.00ms]
+
+exit_code=0
+[H[2J[3J

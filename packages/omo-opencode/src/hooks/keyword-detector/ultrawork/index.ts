@@ -2,7 +2,7 @@
  * Ultrawork message module - routes to appropriate message based on agent/model.
  *
  * Routing:
- * 1. Planner agents (prometheus, plan) → planner.ts
+ * 1. Planner agents (prometheus, planner-named agents) → planner.ts
  * 2. GPT models → gpt.ts
  * 3. Gemini models → gemini.ts
  * 4. GLM models → glm.ts

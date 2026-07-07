@@ -42,6 +42,12 @@ const ULTRAWORK_ROUTING_BASELINES: readonly UltraworkRoutingBaseline[] = [
     modelID: "gpt-5.5",
     expectedSource: "planner",
   },
+  {
+    name: "native-plan",
+    agentName: "plan",
+    modelID: "claude-sonnet-4-6",
+    expectedSource: "default",
+  },
 ]
 
 describe("Ultrawork source routing", () => {

@@ -1,0 +1,18 @@
+$ opencode --version
+1.17.13
+
+$ sqlite3 --version
+3.45.3 2024-04-15 13:34:05 8653b758870e6ef0c98d46b3ace27849054af85da891eb121e9aaa537f1e8355 (64-bit)
+
+$ jq --version
+/usr/bin/bash: line 1: jq: command not found
+
+$ tmux -V
+/usr/bin/bash: line 1: tmux: command not found
+
+$ python3 --version
+Python 
+$ python --version
+Python 3.13.1
+
+exit_code=0

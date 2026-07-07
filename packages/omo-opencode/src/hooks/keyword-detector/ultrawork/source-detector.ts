@@ -2,7 +2,7 @@
  * Agent/model detection utilities for ultrawork message routing.
  *
  * Routing logic:
- * 1. Planner agents (prometheus, plan) → planner.ts
+ * 1. Planner agents (prometheus, planner-named agents) → planner.ts
  * 2. GPT 5.4 models → gpt5.4.ts
  * 3. Gemini models → gemini.ts
  * 4. GLM models → glm.ts
@@ -18,10 +18,12 @@ import { isGeminiModel, isGlmModel, isGptModel } from "../../../agents/types"
 export function isPlannerAgent(agentName?: string): boolean {
   if (!agentName) return false
   const lowerName = agentName.toLowerCase()
-  if (lowerName.includes("prometheus") || lowerName.includes("planner")) return true
-
-  const normalized = lowerName.replace(/[_-]+/g, " ")
-  return /\bplan\b/.test(normalized)
+  const normalizedName = lowerName.replace(/[_-]+/g, " ").trim()
+  return (
+    lowerName.includes("prometheus") ||
+    lowerName.includes("planner") ||
+    normalizedName === "plan agent"
+  )
 }
 
 /**
