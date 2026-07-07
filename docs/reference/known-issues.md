@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5864 - Background completion wake can defer forever while the parent stays active
+
+- **Affects**: Long-running orchestrator sessions that keep calling tools while background tasks finish.
+- **Symptom**: A background subagent can finish and persist its output, but the parent notification remains queued until the parent emits `session.idle`. If the parent never naturally idles, the task can later appear as a 30-minute inactivity timeout even though the work already landed on disk.
+- **Workaround**: For long orchestrator loops, create explicit turn boundaries after dispatching background work and check `background_output` before re-dispatching the same task. If a task reports an inactivity timeout, inspect its artifact path before assuming the child failed.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5864.
+
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
 - **Affects**: OpenAI-compatible custom providers whose models are written to `opencode.json` without a `limit` block.
