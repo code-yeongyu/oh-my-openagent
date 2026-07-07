@@ -373,3 +373,33 @@ export type {
   SendTeamMessageInput,
   SendTeamMessageResult,
 } from "./team"
+export {
+  approveShutdown,
+  canClaimTeamTask,
+  claimTeamTask,
+  createTeamTask,
+  DELETABLE_MEMBER_STATUSES,
+  getTeamTask,
+  isMemberDeletable,
+  listTeamTasks,
+  rejectShutdown,
+  requestShutdown,
+  SenpiShutdownError,
+  TeamTaskAlreadyClaimedError,
+  TeamTaskBlockedByError,
+  TeamTaskCrossOwnerUpdateError,
+  TeamTaskInvalidTransitionError,
+  updateTeamTaskStatus,
+} from "./team"
+export type {
+  ApproveShutdownDeps,
+  CreateTeamTaskInput,
+  RejectShutdownDeps,
+  RequestShutdownDeps,
+  SenpiShutdownErrorCode,
+  ShutdownMessageKind,
+  ShutdownMessenger,
+  ShutdownOutboundMessage,
+  TeamTaskFilter,
+  TeamTasklistContext,
+} from "./team"

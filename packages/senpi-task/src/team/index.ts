@@ -64,3 +64,27 @@ export type {
   SendTeamMessageInput,
   SendTeamMessageResult,
 } from "./messaging"
+export {
+  canClaimTeamTask,
+  claimTeamTask,
+  createTeamTask,
+  getTeamTask,
+  listTeamTasks,
+  TeamTaskAlreadyClaimedError,
+  TeamTaskBlockedByError,
+  TeamTaskCrossOwnerUpdateError,
+  TeamTaskInvalidTransitionError,
+  updateTeamTaskStatus,
+} from "./tasks"
+export type { CreateTeamTaskInput, TeamTaskFilter, TeamTasklistContext } from "./tasks"
+export { DELETABLE_MEMBER_STATUSES, isMemberDeletable } from "./shutdown-helpers"
+export { approveShutdown, rejectShutdown, requestShutdown, SenpiShutdownError } from "./shutdown"
+export type {
+  ApproveShutdownDeps,
+  RejectShutdownDeps,
+  RequestShutdownDeps,
+  SenpiShutdownErrorCode,
+  ShutdownMessageKind,
+  ShutdownMessenger,
+  ShutdownOutboundMessage,
+} from "./shutdown"
