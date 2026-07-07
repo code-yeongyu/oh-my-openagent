@@ -154,6 +154,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: Install through the `oh-my-openagent` package family or use `bunx oh-my-openagent ...` until the wrapper/platform package aliasing is made symmetric. If you already installed the broken wrapper globally, remove it before reinstalling to avoid bin shadowing.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5341.
 
+## #5331: `team_mode.base_dir` does not expand a literal `~`
+
+- **Affects**: Team mode configs that set `"base_dir": "~/.omo"` instead of leaving the field unset/null.
+- **Symptom**: OMO creates a real directory named `~` in the current working directory, with team state under `./~/.omo/...`, rather than writing to the user's home directory.
+- **Workaround**: Use an absolute path for `team_mode.base_dir`, or set it to `null`/remove it so OMO uses its built-in home-directory default. Delete any accidental literal `./~` directories only after confirming they contain no state you still need.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5331.
+
 ## #5120: Sisyphus can loop on simple tasks
 
 - **Affects**: OpenCode 1.17.0 with oh-my-openagent 4.8.1.
