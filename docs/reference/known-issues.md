@@ -234,6 +234,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: Use canonical lower-case agent keys in `oh-my-openagent.jsonc` (`sisyphus-junior`, `sisyphus`, `atlas`, etc.) and use display-name settings only for UI labels. After migration, run `bunx oh-my-openagent doctor` and inspect the effective model for `sisyphus-junior`.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5574.
 
+## #5548 - ULW continuation can override intentional user-input pauses
+
+- **Affects**: ULW sessions where the agent has unfinished todos but intentionally stops to ask the user for a required decision.
+- **Symptom**: A continuation prompt can push the model to proceed without the user's answer, causing it to invent defaults or make decisions that should have stayed with the user.
+- **Workaround**: When asking ULW to do work that needs human confirmation, explicitly require `BLOCKED awaiting user input` and no further action until the answer arrives. For sensitive approval workflows, use a normal interactive prompt or disable the continuation hook for that session rather than relying on ULW autonomy.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5548.
+
 ## #4722 - Codex hooks can report exit code 1 immediately after install
 
 - **Affects**: LazyCodex / OMO Codex installs where Codex keeps running across a plugin cache/config update.
