@@ -126,6 +126,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: If you are not using Ralph Loop in that workspace, add `"disabled_hooks": ["ralph-loop"]` to `oh-my-openagent.jsonc`. If a loop is already active, run `/cancel-ralph` before disabling the hook.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5105.
 
+## #5107: Team tmux visualization can silently skip pane creation
+
+- **Affects**: Team mode with `team_mode.tmux_visualization: true` on OpenCode 1.16.2 / OMO 4.8.1 when the TUI uses a dynamic server port.
+- **Symptom**: `team_create` reports an active team, but no tmux panes are spawned, `team_status` has no `tmuxPaneId`, and the only clue is an internal log line saying the OpenCode server is not reachable.
+- **Workaround**: Launch OpenCode with an explicit matching port in both places, for example `OPENCODE_PORT=24096 opencode --port 24096`, then create the team from that session. Treat `removedLayout: true` on delete as a requested-layout flag, not proof that panes existed.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5107.
+
 ## #5025 — OpenCode Desktop loads the plugin but only shows native modes
 
 - **Affects**: OpenCode Desktop on Windows with `oh-my-openagent@4.7.5`.
