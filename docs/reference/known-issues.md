@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5784 - Reserved retry window can be too short for shared-quota providers
+
+- **Affects**: Runtime fallback from providers that keep retrying internally after shared quota exhaustion.
+- **Symptom**: OMO can queue a fallback toast, but the dispatch sees the session as `reserved` through the entire short retry window and gives up before OpenCode's own provider retry cycle releases the reservation. The session can remain stuck on the exhausted provider.
+- **Workaround**: When a shared-quota provider is exhausted, wait for the provider retry cycle to settle or start a fresh session directly on the fallback provider. If this repeats for a provider, avoid putting that exhausted provider first in the fallback chain until the quota window resets.
+- **Status**: Open tuning request. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5784.
+
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
 - **Affects**: OpenAI-compatible custom providers whose models are written to `opencode.json` without a `limit` block.
