@@ -66,7 +66,6 @@
     "packages/shared-skills/package.json",
     "packages/shared-skills/index.mjs",
     "packages/shared-skills/skills",
-    "packages/omo-senpi/plugin",
     "packages/omo-codex/THIRD-PARTY-NOTICES.md",
     "packages/omo-codex/marketplace.json",
     "packages/omo-codex/lazycodex-repository",
@@ -89,6 +88,7 @@
     "packages/omo-codex/plugin/.codex-plugin",
     "!packages/omo-codex/plugin/node_modules",
     "!packages/omo-codex/plugin/**/node_modules",
+    "!packages/omo-codex/plugin/components/workflow-selector",
     "packages/omo-codex/scripts",
     "!packages/omo-codex/scripts/install"
   ],

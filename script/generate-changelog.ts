@@ -4,6 +4,13 @@ import { $ } from "bun"
 
 const TEAM = ["actions-user", "github-actions[bot]", "code-yeongyu"]
 
+const EXCLUDED_PREFIX_PATTERN = /^(ignore:|test:|chore:|ci:|release:)/i
+const CONTAINED_SURFACE_PATTERN = /\bsenpi\b|\bpi-goal\b|\bpi-webfetch\b/i
+
+export function isExcludedReleaseNoteSubject(subject: string): boolean {
+  return EXCLUDED_PREFIX_PATTERN.test(subject) || CONTAINED_SURFACE_PATTERN.test(subject)
+}
+
 async function getLatestReleasedTag(): Promise<string | null> {
   try {
     const tag = await $`gh release list --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // empty'`.text()
@@ -20,7 +27,7 @@ async function generateChangelog(previousTag: string): Promise<string[]> {
     const log = await $`git log ${previousTag}..HEAD --oneline --format="%h %s"`.text()
     const commits = log
       .split("\n")
-      .filter((line) => line && !line.match(/^\w+ (ignore:|test:|chore:|ci:|release:)/i))
+      .filter((line) => line && !isExcludedReleaseNoteSubject(line.replace(/^\w+ /, "")))
 
     if (commits.length > 0) {
       for (const commit of commits) {
@@ -111,7 +118,7 @@ async function getContributors(previousTag: string): Promise<string[]> {
     for (const line of compare.split("\n").filter(Boolean)) {
       const { login, message } = JSON.parse(line) as { login: string | null; message: string }
       const title = message.split("\n")[0] ?? ""
-      if (title.match(/^(ignore:|test:|chore:|ci:|release:)/i)) continue
+      if (isExcludedReleaseNoteSubject(title)) continue
 
       if (login && !TEAM.includes(login)) {
         if (!contributors.has(login)) contributors.set(login, [])
@@ -157,4 +164,6 @@ async function main() {
   }
 }
 
-main()
+if (import.meta.main) {
+  main()
+}
