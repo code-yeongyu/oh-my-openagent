@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5809 - cmux tmux panes can stay on the focus-to-attach placeholder
+
+- **Affects**: Users running OMO inside cmux's tmux-compat native split layer.
+- **Symptom**: Subagent panes can be created with the "Focus this pane to attach" placeholder but never transition into `opencode attach`, because the activation path relies on `tmux respawn-pane -k`, which cmux may treat as a no-op.
+- **Workaround**: Use a real tmux server for subagent pane visualization when interactive attach matters, or avoid relying on focus-to-attach behavior inside cmux until an eager attach path is available. The underlying subagent work can still be inspected through non-pane outputs/logs.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5809.
+
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
 - **Affects**: OpenAI-compatible custom providers whose models are written to `opencode.json` without a `limit` block.
