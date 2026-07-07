@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5854 - `session_search` can report `Error: [object Object]` for CJK queries
+
+- **Affects**: Session-manager search paths when the underlying SDK throws a non-`Error` object, most visibly with CJK or other non-ASCII search terms.
+- **Symptom**: Instead of a useful diagnostic, the tool returns the literal string `Error: [object Object]`, hiding the real SDK or storage-layer failure.
+- **Workaround**: Retry with narrower ASCII search terms when possible, or list candidate sessions first and inspect them with `session_read`. Treat `[object Object]` as an error serialization bug, not as proof that no matching session exists.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5854.
+
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
 - **Affects**: OpenAI-compatible custom providers whose models are written to `opencode.json` without a `limit` block.
