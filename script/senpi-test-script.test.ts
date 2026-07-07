@@ -39,7 +39,7 @@ function sliceWorkflowSection(workflow: string, startMarker: string, endMarker: 
 }
 
 describe("Senpi compatibility test script", () => {
-  test("#given published root package #when payload contract is inspected #then senpi install artifacts are shipped and built", () => {
+  test("#given published root package #when payload contract is inspected #then senpi payload is contained while local build stays available", () => {
     // #given
     const manifest = readRootManifest()
     const files = manifest.files ?? []
@@ -55,7 +55,10 @@ describe("Senpi compatibility test script", () => {
     ].join(" && ")
 
     // #then
-    expect(shipsPluginTree, "root npm files must include the hardcoded packages/omo-senpi/plugin tree").toBe(true)
+    expect(
+      shipsPluginTree,
+      "root npm files must NOT ship packages/omo-senpi/plugin while the senpi platform flag is disabled for release",
+    ).toBe(false)
     expect(hasBuildScript, "root scripts must expose a dedicated Senpi plugin artifact build").toBe(true)
     expect(buildOrchestrator, "the build orchestrator must generate Senpi plugin artifacts before publishing").toContain(
       "build:senpi-plugin",

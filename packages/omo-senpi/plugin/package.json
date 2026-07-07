@@ -1,6 +1,7 @@
 {
   "name": "@code-yeongyu/omo-senpi",
   "version": "4.15.1",
+  "private": true,
   "description": "OMO Senpi adapter packaged as one local-path Pi package.",
   "type": "module",
   "keywords": [
