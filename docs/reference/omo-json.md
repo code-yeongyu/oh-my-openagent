@@ -36,6 +36,40 @@ A generated JSON schema artifact ships at `assets/omo.schema.json`, produced fro
 https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json
 ```
 
+### Example
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
+  "categories": {
+    "deep": {
+      "description": "Deep analysis",
+      "model": "anthropic/claude",
+      "reasoningEffort": "high"
+    }
+  },
+  "agents": {
+    "reviewer": {
+      "description": "Reviews code",
+      "model": "openai/gpt-5",
+      "execution_mode": "in-process"
+    }
+  },
+  "task": {
+    "default_execution_mode": "in-process",
+    "default_concurrency": 5
+  },
+  "teams": {
+    "builders": {
+      "description": "Build team",
+      "members": [
+        { "name": "quick-one", "kind": "category", "category": "quick", "prompt": "Help" }
+      ]
+    }
+  }
+}
+```
+
 ## Top-level schema
 
 ```jsonc
