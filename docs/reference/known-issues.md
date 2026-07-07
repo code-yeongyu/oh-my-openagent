@@ -161,6 +161,13 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 - **Workaround**: Use an absolute path for `team_mode.base_dir`, or set it to `null`/remove it so OMO uses its built-in home-directory default. Delete any accidental literal `./~` directories only after confirming they contain no state you still need.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5331.
 
+## #5317: `team_send_message` replies can disappear after team activation
+
+- **Affects**: Team-mode workflows on the reported 4.10.0 path where leads send activation checks to members immediately after `team_create`.
+- **Symptom**: `team_send_message` reports successful delivery, but member acknowledgements never appear in the lead transcript or status flow, leaving the lead unable to confirm that members are alive.
+- **Workaround**: Before relying on multi-member activation, run a one-member smoke team and verify a reply reaches the lead. If replies do not appear, fall back to a parent-driven workflow with explicit `team_task_*` state checks or use the last known working version for team-mode-heavy runs.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5317.
+
 ## #5120: Sisyphus can loop on simple tasks
 
 - **Affects**: OpenCode 1.17.0 with oh-my-openagent 4.8.1.
