@@ -19,7 +19,7 @@ import {
 import { taskSettings } from "../__fixtures__/runtime-fakes"
 
 const TEAM_RUN_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
-const NOTIFICATION: NotificationConfig = { wake_idle_parent: true, deliver_as: "followUp" }
+const NOTIFICATION: NotificationConfig = { deliver_as: "followUp" }
 
 afterEach(() => {
   cleanupMessagingTmp()

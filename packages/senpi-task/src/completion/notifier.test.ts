@@ -5,7 +5,7 @@ import type { NotificationConfig, ParentNotifier, ParentNotifierMessage, ParentS
 import type { TaskRecord } from "../state"
 import type { PersistedTaskEvent } from "../store"
 
-const wakeConfig: NotificationConfig = { wake_idle_parent: true, deliver_as: "followUp" }
+const wakeConfig: NotificationConfig = { deliver_as: "followUp" }
 
 function baseRecord(overrides: Partial<TaskRecord> = {}): TaskRecord {
   return {
@@ -174,31 +174,23 @@ describe("createCompletionNotifier - routing table", () => {
     return { result, calls, completion }
   }
 
-  test("#given idle parent with wake #when delivered #then triggerTurn payload recorded", () => {
+  test("#given idle parent #when delivered #then triggerTurn payload recorded unconditionally", () => {
     // when
-    const { result, calls } = route({ kind: "idle" }, { wake_idle_parent: true, deliver_as: "followUp" })
+    const { result, calls } = route({ kind: "idle" }, { deliver_as: "followUp" })
 
-    // then
+    // then an idle parent always wakes with a triggerTurn payload
     expect(result).toEqual({ kind: "delivered", decision: "wake" })
     expect(calls[0]?.triggerTurn).toBe(true)
   })
 
-  test("#given idle parent without wake #when delivered #then queued silently without triggerTurn", () => {
+  test("#given streaming parent #when delivered #then followUp deliverAs and triggerTurn are set", () => {
     // when
-    const { result, calls } = route({ kind: "idle" }, { wake_idle_parent: false, deliver_as: "followUp" })
+    const { result, calls } = route({ kind: "streaming" }, { deliver_as: "followUp" })
 
-    // then
-    expect(result).toEqual({ kind: "delivered", decision: "queue_silently" })
-    expect(calls[0]?.triggerTurn).toBeUndefined()
-  })
-
-  test("#given streaming parent #when delivered #then followUp deliverAs is set", () => {
-    // when
-    const { result, calls } = route({ kind: "streaming" }, { wake_idle_parent: true, deliver_as: "followUp" })
-
-    // then
+    // then a streaming completion queues as followUp AND guarantees a turn
     expect(result).toEqual({ kind: "delivered", decision: "deliver_streaming" })
     expect(calls[0]?.deliverAs).toBe("followUp")
+    expect(calls[0]?.triggerTurn).toBe(true)
   })
 
   test("#given compacting parent #when notified #then buffered without delivery", () => {

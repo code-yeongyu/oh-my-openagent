@@ -2,7 +2,6 @@ import * as z from "zod"
 
 export const OmoTaskNotificationSchema = z.object({
   deliver_as: z.enum(["followUp", "steer"]).default("followUp"),
-  wake_idle_parent: z.boolean().default(true),
 }).strict()
 
 export const OmoTaskWaitSchema = z.object({
@@ -24,7 +23,7 @@ export const OmoTaskSettingsSchema = z.object({
   model_concurrency: z.record(z.string(), z.number().int().positive()).optional(),
   max_depth: z.number().int().nonnegative().default(1),
   residency_max_children: z.number().int().positive().default(8),
-  notification: OmoTaskNotificationSchema.default({ deliver_as: "followUp", wake_idle_parent: true }),
+  notification: OmoTaskNotificationSchema.default({ deliver_as: "followUp" }),
   ttl_ms: z.number().int().positive().default(86400000),
   state_dir: z.string().optional(),
   wait: OmoTaskWaitSchema.default({ min_ms: 5000, default_ms: 60000, max_ms: 600000 }),

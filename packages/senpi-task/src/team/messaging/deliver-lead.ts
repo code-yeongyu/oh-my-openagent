@@ -12,7 +12,8 @@ export type DeliverToLeadInput = {
 
 /**
  * Routes a member->lead message through the SAME parent-state machine the completion push uses (todo
- * 11): idle wakes (or queues silently), streaming delivers with the configured `deliverAs`, and a
+ * 11): an idle lead ALWAYS wakes (no config may suppress it), a streaming lead delivers with the
+ * configured `deliverAs` AND stamps triggerTurn so the queued message still fires a turn, and a
  * mid-transition parent (compacting / switching / shutdown) buffers WITHOUT enqueue for the omo-senpi
  * coordinator to flush later. Enqueue is a synchronous fire-and-forget seam; only a sync throw is
  * observable, so a single retry is attempted before reporting failure (mirrors the completion notifier).
@@ -25,8 +26,7 @@ export function deliverToLead(input: DeliverToLeadInput): LeadDeliveryResult {
   if (!enqueueWithRetry(input.notifier, message)) return { kind: "failed" }
 
   if (decision.kind === "wake") return { kind: "delivered", decision: "wake" }
-  if (decision.kind === "deliver_streaming") return { kind: "delivered", decision: "deliver_streaming" }
-  return { kind: "delivered", decision: "queue_silently" }
+  return { kind: "delivered", decision: "deliver_streaming" }
 }
 
 function buildLeadMessage(
@@ -41,8 +41,7 @@ function buildLeadMessage(
     messageId: message.messageId,
   }
   if (decision.kind === "wake") return { ...base, triggerTurn: true }
-  if (decision.kind === "deliver_streaming") return { ...base, deliverAs: decision.deliverAs }
-  return base
+  return { ...base, deliverAs: decision.deliverAs, triggerTurn: true }
 }
 
 function enqueueWithRetry(notifier: LeadMessageNotifier, message: LeadTeamMessage): boolean {

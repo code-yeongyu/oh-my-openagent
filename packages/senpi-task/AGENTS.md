@@ -47,7 +47,7 @@ The Senpi-coupled engine behind the `omo-senpi` task component: a durable task s
 
 ### Completion routing table (`completion/routing.ts`)
 
-`shouldNotifyStatus` fires only for externally-caused terminals `completed`/`error`/`lost` (`routing.ts:4`); parent-initiated cancel/interrupt return synchronously in the tool result and never push. `routeCompletion` maps parent state to an action: `idle` -> `wake` (or `queue_silently` when `wake_idle_parent` is false), `streaming` -> `deliver_streaming` using `deliver_as` (`followUp` | `steer`), and `compacting`/`session_switching`/`session_shutdown` -> `buffer` until the parent settles (`routing.ts:12`).
+`shouldNotifyStatus` fires only for externally-caused terminals `completed`/`error`/`lost` (`routing.ts:4`); parent-initiated cancel/interrupt return synchronously in the tool result and never push. `routeCompletion` maps parent state to an action: `idle` -> `wake` unconditionally (no setting may suppress it), `streaming` -> `deliver_streaming` using `deliver_as` (`followUp` | `steer`) with `triggerTurn` also stamped so the queued message still fires a turn, and `compacting`/`session_switching`/`session_shutdown` -> `buffer` until the parent settles (`routing.ts:12`).
 
 ## EXECUTION MODES
 
