@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5928 - Bash `PreToolUse` hooks can inspect the session repo instead of the active worktree
+
+- **Affects**: Workflows that run project-level Claude-style `PreToolUse` Bash hooks from a secondary git worktree.
+- **Symptom**: The hook input can expose the session or main repository cwd instead of the command's active worktree cwd. Repo-local checks such as `git rev-parse --show-toplevel` then validate the wrong checkout, so a dirty main checkout can block a clean worktree push.
+- **Workaround**: Keep the main session checkout clean before running guarded Bash commands from a worktree. If the hook is user-controlled, prefer deriving the target repository from an explicit command argument or a hook-specific environment variable instead of falling back to `$PWD`.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5928.
+
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
 - **Affects**: OpenAI-compatible custom providers whose models are written to `opencode.json` without a `limit` block.
