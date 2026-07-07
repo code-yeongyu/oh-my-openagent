@@ -96,4 +96,22 @@ describe("createRpcManagedRunner", () => {
     expect(captured?.prompt).toBe("do it")
     expect(handle.pid).toBe(99)
   })
+
+  test("#given a managed spec with a model #when started #then the model is threaded onto the rpc spec for the detached child", async () => {
+    // given
+    let captured: RpcRunnerSpec | undefined
+    const runner: RpcRunnerLike = {
+      start: (spec) => {
+        captured = spec
+        return fakeRpcHandle()
+      },
+    }
+    const managed = createRpcManagedRunner(runner)
+
+    // when
+    await managed.start(managedSpec())
+
+    // then: a separate OS process cannot share the parent's registry, so the model rides the spec
+    expect(captured?.model).toBe("anthropic/claude")
+  })
 })

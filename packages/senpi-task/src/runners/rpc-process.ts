@@ -14,6 +14,9 @@ export type RpcProcessRunnerOptions = {
   readonly heartbeatIntervalMs?: number
   readonly onMalformedLine?: MalformedLineHandler
   readonly now?: () => number
+  // The parent's `-e` extension entries, forwarded to every child so a detached process reproduces the
+  // parent's extensions. Applied only when a spec does not already carry its own extensions.
+  readonly inheritedExtensions?: readonly string[]
 }
 
 /**
@@ -28,6 +31,7 @@ export class RpcProcessRunner {
   private readonly heartbeatIntervalMs: number
   private readonly onMalformedLine: MalformedLineHandler | undefined
   private readonly now: () => number
+  private readonly inheritedExtensions: readonly string[]
 
   constructor(options: RpcProcessRunnerOptions = {}) {
     this.spawnChild = options.spawnChild ?? defaultSpawnChild
@@ -35,9 +39,14 @@ export class RpcProcessRunner {
     this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS
     this.onMalformedLine = options.onMalformedLine
     this.now = options.now ?? Date.now
+    this.inheritedExtensions = options.inheritedExtensions ?? []
   }
 
-  start(spec: RpcRunnerSpec): RpcChildHandle {
+  start(specInput: RpcRunnerSpec): RpcChildHandle {
+    const spec =
+      specInput.extensions === undefined && this.inheritedExtensions.length > 0
+        ? { ...specInput, extensions: this.inheritedExtensions }
+        : specInput
     const descriptor = this.buildSpawn(spec)
     const child = this.spawnChild(descriptor)
     const client = new RpcProtocolClient({ child, onMalformedLine: this.onMalformedLine })
