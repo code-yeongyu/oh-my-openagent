@@ -165,7 +165,7 @@ export type {
   TaskManager,
   TaskManagerOptions,
 } from "./manager"
-export { defineAgent, loadAgents, registerAgent, resolveToolRule } from "./agents"
+export { defineAgent, loadAgents, mapOmoConfigAgents, registerAgent, resolveToolRule } from "./agents"
 export type {
   AgentDefinition,
   AgentDefinitionInput,

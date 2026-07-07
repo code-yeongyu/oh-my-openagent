@@ -8,6 +8,7 @@ import {
   createTaskLifecycle,
   createTaskManager,
   createTaskRecordStore,
+  mapOmoConfigAgents,
   type AgentDefinition,
   type CompletionNotifier,
   type ManagedRunner,
@@ -147,9 +148,9 @@ function buildRunner(
   return createInProcessManagedRunner(inProcess, context)
 }
 
-// v1: the task tool's description enriches its category list from omoConfig directly. Custom agent
-// definitions from omo.json are not yet folded into the child-agent registry (deferred follow-up), so
-// this stays an empty record rather than casting the structurally-different omo.json agent shape.
-function resolveAgents(_config: OmoConfig): Readonly<Record<string, AgentDefinition>> {
-  return {}
+// Fold the user's omo.json `agents` into the child-agent registry so the task tool advertises them and
+// `subagent_type` / team-member spawns can address them. mapOmoConfigAgents bridges the structural gap
+// between the omo-config-core `OmoAgentDef` shape and senpi-task's `AgentDefinition`.
+function resolveAgents(config: OmoConfig): Readonly<Record<string, AgentDefinition>> {
+  return mapOmoConfigAgents(config)
 }
