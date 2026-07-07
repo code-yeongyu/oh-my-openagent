@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5896 - npm pack payload is larger after embedding frontend skill references
+
+- **Affects**: Publish and install paths that package or download the full npm payload.
+- **Symptom**: The packed artifact includes embedded frontend/taste-skill reference material, increasing the unpacked payload size and making `bun pm pack --dry-run --ignore-scripts` noticeably slower than earlier releases.
+- **Workaround**: Treat the larger payload as expected for current releases unless release maintainers decide some embedded reference paths are accidental. When investigating publish slowness, measure pack time separately from test/build time so this payload walk is not mistaken for a runtime regression.
+- **Status**: Informational. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5896.
+
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
 - **Affects**: OpenAI-compatible custom providers whose models are written to `opencode.json` without a `limit` block.
