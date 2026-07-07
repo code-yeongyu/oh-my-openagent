@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5516 - Custom Qwen models can report capabilities as unknown
+
+- **Affects**: Custom OpenAI-compatible providers serving Qwen-family models that are not present in the bundled model-capabilities snapshot.
+- **Symptom**: `omo doctor` can warn that configured models rely on compatibility fallback and show `[capabilities: unknown]`, even when the provider supplies enough runtime metadata for the model to work.
+- **Workaround**: Configure practical runtime fields such as `tool_call`, `reasoning`, and `limit` in the provider definition where supported, then treat the `unknown` doctor label as diagnostic noise unless runtime tool use actually fails.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5516.
+
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
 - **Affects**: OpenAI-compatible custom providers whose models are written to `opencode.json` without a `limit` block.
