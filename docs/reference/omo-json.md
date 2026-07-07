@@ -137,7 +137,6 @@ Task engine settings; every field has a default, so the whole object is optional
 | `max_depth` | int >= 0 | `1` |
 | `residency_max_children` | positive int | `8` |
 | `notification.deliver_as` | `followUp \| steer` | `followUp` |
-| `notification.wake_idle_parent` | boolean | `true` |
 | `ttl_ms` | positive int | `86400000` (24h) |
 | `state_dir` | string | unset (defaults to `<project>/.omo/senpi-task`) |
 | `wait.min_ms` | positive int | `5000` |
@@ -181,7 +180,7 @@ Each member shares a base (`name` matching `^[a-z0-9-]+$`, optional `cwd`, `work
   "task": {
     "default_execution_mode": "in-process",
     "default_concurrency": 4,
-    "notification": { "deliver_as": "followUp", "wake_idle_parent": true },
+    "notification": { "deliver_as": "followUp" },
     "wait": { "default_ms": 90000 }
   },
   "categories": {
