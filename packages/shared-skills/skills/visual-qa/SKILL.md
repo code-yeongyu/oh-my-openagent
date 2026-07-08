@@ -57,32 +57,28 @@ For reference-fidelity work, repeat the capture and diff for every referenced vi
 
 ### TUI
 
-1. Capture plain text and an ANSI-preserving copy:
-
-```
-tmux capture-pane -p > capture.txt
-tmux capture-pane -e -p > capture-ansi.txt
-```
-
-2. When the TUI evidence will be attached to a PR or reviewed visually, render
-   the capture through the browser helper from the repository root:
+1. Render the TUI through the REAL xterm.js web terminal and screenshot it -
+   NEVER `tmux capture-pane`, which degrades truecolor and misaligns wide (CJK)
+   glyphs. Run the command in a real pty and capture the browser render from the
+   repository root:
 
 ```
 node script/qa/web-terminal-visual-qa.mjs --title "TUI Visual QA" \
-  --from-file capture.txt \
+  --command "<tui-command>" \
+  --input "{ArrowDown}" --input "{Enter}" \
   --evidence-dir .omo/evidence/<slug>/tui-web-terminal
 ```
 
-This produces `terminal.png`, `terminal.html`, `terminal.txt`,
-`terminal-ansi.txt`, and `metadata.json`. Treat this as the standard TUI visual
-artifact pattern for terminal screenshots. If the project is outside this repo,
-copy the same pattern: terminal capture -> browser-rendered page -> PNG +
-metadata with cleanup receipt.
+   Replay a saved raw stream with `--from-file <capture.ansi>` instead of
+   `--command`. This produces `terminal.png` (the true-color artifact),
+   `terminal.txt`, `terminal-ansi.txt`, and `metadata.json`. Treat this as the
+   standard TUI visual artifact pattern. Outside this repo, copy the pattern:
+   real pty -> xterm.js in a browser -> PNG + metadata with cleanup receipt.
 
-3. Run the check with the REAL terminal width and keep the JSON:
+2. Run the width check on the produced text and keep the JSON:
 
 ```
-node "$SKILL_DIR/scripts/visual-qa.mjs" tui-check capture.txt --cols <N>
+node "$SKILL_DIR/scripts/visual-qa.mjs" tui-check .omo/evidence/<slug>/tui-web-terminal/terminal.txt --cols <N>
 ```
 
 Key fields: `maxWidth`, `overflowLines[]`, `borderMisaligned`, `wideCharColumns[]`, `hasAnsi`.
