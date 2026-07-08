@@ -43,7 +43,7 @@ Before touching any UI code, before routing to any reference, before even thinki
    - **The reference's distinctive material MUST survive extraction (expressive briefs).** The common failure is loading a rich reference and then distilling it into a generic dark-SaaS token set. Your `DESIGN.md` must carry the *non-default* decisions forward and name which reference each came from: the actual elevation recipe (the specific layers that make a surface read as glass/glossy, not a single blur), a multi-stop perceptual color ramp (not one brand hex reused at varied opacity), the explicit display/body/mono type choices, and one signature interaction. Self-check before writing code: if your `DESIGN.md` could describe any generic dark SaaS, you flattened the reference — go back and put the specific material in.
 4. **Existing UI with implicit patterns/components:** extract the colors, typography, spacing, primitives, states, and motion already in use. Write `DESIGN.md` to codify what exists before changing UI code.
 5. **Existing UI with no reusable component layer:** STOP and ask whether to preserve the current style with copy-nearby edits or extract a `DESIGN.md` plus reusable components first. Do not silently choose the cheaper path or the larger refactor.
-6. **Do not proceed to product screens until `DESIGN.md` exists, Section 5 names the reusable primitives and their states, and each primitive plus required state passes mobile/tablet/desktop visual QA in a component showcase or equivalent state harness.**
+6. Finish the triage at the Primitive Showcase Gate below.
 
 #### If YES design system exists → READ IT, FOLLOW IT
 
@@ -51,6 +51,10 @@ Before touching any UI code, before routing to any reference, before even thinki
 2. Every color, font size, spacing value, and component pattern you produce MUST reference tokens from this file.
 3. If you need a token that doesn't exist, **add it to `DESIGN.md` first**, then use it.
 4. Never introduce raw hex codes, arbitrary px values, or ad-hoc component patterns that bypass the system.
+
+### Primitive Showcase Gate (MANDATORY)
+
+**Do not proceed to product screens until `DESIGN.md` exists, Section 5 names the reusable primitives and their states, and each primitive plus required state passes mobile/tablet/desktop visual QA in a component showcase or equivalent state harness.** Skipping this gate ships ad-hoc-styled product screens and re-enters the redesign loop.
 
 **This gate is non-negotiable. No design system = no UI work. Period.**
 

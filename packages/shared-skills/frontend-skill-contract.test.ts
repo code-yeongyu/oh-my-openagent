@@ -202,3 +202,23 @@ describe("frontend skill designpowers default integration", () => {
 		expect(archText).toContain("## 8. Accessibility Constraints & Accepted Debt")
 	})
 })
+
+describe("frontend skill primitive showcase gate", () => {
+	test("#given DESIGN.md exists #when primitives are defined #then the showcase gate is a standalone mandatory gate", async () => {
+		const readmeText = await Bun.file(new URL("./skills/frontend/references/design/README.md", import.meta.url)).text()
+		const skillText = await Bun.file(frontendSkillPath).text()
+
+		expect(readmeText).toContain("### Primitive Showcase Gate")
+		expect(skillText).toContain("Primitive Showcase Gate")
+	})
+})
+
+describe("frontend skill ui-ux-db wiring", () => {
+	test("#given DESIGN.md color/type authoring #when the system is defined #then one ui-ux-db sanity search is instructed", async () => {
+		const archText = await Bun.file(
+			new URL("./skills/frontend/references/design/design-system-architecture.md", import.meta.url),
+		).text()
+
+		expect(archText).toContain("ui-ux-db")
+	})
+})
