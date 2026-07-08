@@ -5,6 +5,8 @@ import path from "node:path"
 
 const RAW_BUN_RUNTIME_API_RE =
   /(?<![.$\w])Bun\.(spawn|spawnSync|file|write|which|hash|serve|readableStreamToText)\b/g
+const RAW_BUN_MODULE_RE =
+  /\b(?:from\s*["']bun:[^"']+["']|import\s*\(\s*["']bun:[^"']+["']\s*\)|require\s*\(\s*["']bun:[^"']+["']\s*\))/g
 const APPROVED_BUN_SHIM_RE = /^bun-[a-z0-9-]+-shim\.ts$/
 
 function repoRootFrom(start: string): string {
@@ -56,6 +58,8 @@ function isAuditedProductionSource(filePath: string): boolean {
     && !basename.endsWith(".d.ts")
     && !basename.endsWith(".test.ts")
     && !basename.endsWith(".smoke.ts")
+    && !basename.endsWith("test-support.ts")
+    && !basename.endsWith("-test-fixture.ts")
     && !basename.endsWith(".fixture.ts")
     && !basename.endsWith(".fixtures.ts")
     && !APPROVED_BUN_SHIM_RE.test(basename)
@@ -108,12 +112,17 @@ function isTypeOnlyBunReference(line: string, position: number): boolean {
   return /\btypeof\s+$/.test(line.slice(0, position))
 }
 
+function isTypeOnlyBunModuleReference(line: string, position: number): boolean {
+  const prefix = line.slice(0, position)
+  return /\b(?:type\s+\w+\s*=\s*|typeof\s+)$/.test(prefix)
+}
+
 function formatOffender(filePath: string, lineNumber: number, apiName: string): string {
   return `${relativeAdapterPath(filePath)}:${lineNumber} uses ${apiName}`
 }
 
 describe("OpenCode adapter Bun runtime audit", () => {
-  test("#given production adapter source #when audited #then raw Bun runtime APIs are shimmed", async () => {
+  test("#given production adapter source #when audited #then raw Bun runtime APIs and modules are shimmed", async () => {
     // Given
     const files = await listAdapterSourceFiles(OPENCODE_SRC_DIR)
     const offenders: string[] = []
@@ -138,6 +147,20 @@ describe("OpenCode adapter Bun runtime audit", () => {
             || isInsideStringLiteral(line, match.index)
             || isLineComment(line, match.index)
             || isTypeOnlyBunReference(line, match.index)
+          ) {
+            continue
+          }
+
+          offenders.push(formatOffender(filePath, lineIndex + 1, match[0]))
+        }
+
+        RAW_BUN_MODULE_RE.lastIndex = 0
+        for (const match of line.matchAll(RAW_BUN_MODULE_RE)) {
+          if (
+            match.index === undefined
+            || isLineComment(line, match.index)
+            || isInsideStringLiteral(line, match.index)
+            || isTypeOnlyBunModuleReference(line, match.index)
           ) {
             continue
           }
