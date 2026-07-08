@@ -191,7 +191,7 @@ describe("frontend skill designpowers default integration", () => {
 		const dpText = await Bun.file(new URL("./skills/frontend/references/designpowers/README.md", import.meta.url)).text()
 
 		expect(dpText).toContain("EVERY implementation or redesign")
-		expect(dpText).toContain("lane-c-review.md")
+		expect(dpText).toContain("`lane-c-review.md` loads with this README for every implementation or redesign")
 	})
 
 	test("#given the DESIGN.md schema #when designpowers joins the default flow #then accessibility constraints and accepted debt are schema sections", async () => {
@@ -229,6 +229,6 @@ describe("frontend skill ui-ux-db wiring", () => {
 			new URL("./skills/frontend/references/design/design-system-architecture.md", import.meta.url),
 		).text()
 
-		expect(archText).toContain("ui-ux-db")
+		expect(archText).toContain("Sanity-check the palette and type pairing with one `ui-ux-db` domain search")
 	})
 })

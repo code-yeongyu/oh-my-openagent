@@ -52,11 +52,11 @@ Before touching any UI code, before routing to any reference, before even thinki
 3. If you need a token that doesn't exist, **add it to `DESIGN.md` first**, then use it.
 4. Never introduce raw hex codes, arbitrary px values, or ad-hoc component patterns that bypass the system.
 
+**The Design System Gate is non-negotiable. No design system = no UI work. Period.**
+
 ### Primitive Showcase Gate (MANDATORY)
 
 **Do not proceed to product screens until `DESIGN.md` exists, Section 5 names the reusable primitives and their states, and each primitive plus required state passes mobile/tablet/desktop visual QA in a component showcase or equivalent state harness.** Skipping this gate ships ad-hoc-styled product screens and re-enters the redesign loop.
-
-**This gate is non-negotiable. No design system = no UI work. Period.**
 
 
 ## Phase 0.5 — React Dev Tooling Gate (MANDATORY for React projects)
