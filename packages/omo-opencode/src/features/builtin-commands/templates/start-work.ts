@@ -1,4 +1,4 @@
-export const START_WORK_TEMPLATE = `You are starting a Sisyphus work session.
+export const START_WORK_TEMPLATE = `You are starting an Atlas work session.
 
 ## ARGUMENTS
 

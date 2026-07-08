@@ -325,7 +325,7 @@ Commands are slash-triggered workflows that execute predefined templates.
 | `/ulw-loop`          | Start ultrawork loop - continues with ultrawork mode                                       |
 | `/cancel-ralph`      | Cancel active Ralph Loop                                                                   |
 | `/refactor`          | Intelligent refactoring with LSP, AST-grep, architecture analysis, and TDD verification    |
-| `/start-work`        | Start Sisyphus work session from Prometheus plan                                           |
+| `/start-work`        | Start Atlas work session from Prometheus plan                                              |
 | `/stop-continuation` | Stop all continuation mechanisms (ralph loop, todo continuation, boulder) for this session |
 | `/handoff`           | Create a detailed context summary for continuing work in a new session                     |
 
