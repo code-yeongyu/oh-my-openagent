@@ -5,6 +5,7 @@ import { DEFAULT_MAX_DIAGNOSTICS } from "../constants.js";
 import { aggregateDiagnosticsForDirectory } from "../directory-diagnostics.js";
 import { filterDiagnosticsBySeverity, formatDiagnostic } from "../formatters.js";
 import { inferExtensionFromDirectory } from "../infer-extension.js";
+import { renderDiagnosticsCall, renderDiagnosticsResult } from "../renderers-diagnostics.js";
 import { defineTool, Type } from "../schema.js";
 import type { Diagnostic, SeverityFilter } from "../types.js";
 import { handleMissingDependencyError } from "../utils.js";
@@ -101,6 +102,8 @@ export const lsp_diagnostics = defineTool({
 		"Get errors, warnings, and hints from the language server BEFORE running build. " +
 		"Works for both single files and directories - file extension is auto-detected for directories.",
 	parameters: Params,
+	renderCall: renderDiagnosticsCall,
+	renderResult: renderDiagnosticsResult,
 	async execute(
 		_toolCallId: string,
 		rawParams: unknown,

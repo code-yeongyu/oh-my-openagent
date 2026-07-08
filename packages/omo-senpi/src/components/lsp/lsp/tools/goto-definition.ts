@@ -1,5 +1,6 @@
 import { withLspClient } from "../client-wrapper.js";
 import { formatLocation } from "../formatters.js";
+import { renderGotoDefinitionCall, renderGotoDefinitionResult } from "../renderers-navigation.js";
 import { defineTool, Type } from "../schema.js";
 import type { Location, LocationLink } from "../types.js";
 import { handleMissingDependencyError } from "../utils.js";
@@ -30,6 +31,8 @@ export const lsp_goto_definition = defineTool({
 	label: "LSP Goto Definition",
 	description: "Jump to symbol definition. Find WHERE something is defined.",
 	parameters: Params,
+	renderCall: renderGotoDefinitionCall,
+	renderResult: renderGotoDefinitionResult,
 	async execute(
 		_toolCallId: string,
 		params: LspGotoDefinitionParams,

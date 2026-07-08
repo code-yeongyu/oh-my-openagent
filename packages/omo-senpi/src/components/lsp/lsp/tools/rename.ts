@@ -1,5 +1,11 @@
 import { withLspClient } from "../client-wrapper.js";
 import { formatApplyResult, formatPrepareRenameResult } from "../formatters.js";
+import {
+	renderPrepareRenameCall,
+	renderPrepareRenameResult,
+	renderRenameCall,
+	renderRenameResult,
+} from "../renderers-rename.js";
 import { defineTool, Type } from "../schema.js";
 import type { PrepareRenameDefaultBehavior, PrepareRenameResult, Range, WorkspaceEdit } from "../types.js";
 import { handleMissingDependencyError } from "../utils.js";
@@ -53,6 +59,8 @@ export const lsp_prepare_rename = defineTool({
 	label: "LSP Prepare Rename",
 	description: "Check if rename is valid at a given position. Use BEFORE lsp_rename.",
 	parameters: PrepareParams,
+	renderCall: renderPrepareRenameCall,
+	renderResult: renderPrepareRenameResult,
 	async execute(
 		_toolCallId: string,
 		params: LspPositionParams,
@@ -104,6 +112,8 @@ export const lsp_rename = defineTool({
 	description: "Rename symbol across the entire workspace. APPLIES changes to all files.",
 	parameters: RenameParams,
 	executionMode: "sequential",
+	renderCall: renderRenameCall,
+	renderResult: renderRenameResult,
 	async execute(_toolCallId: string, params: LspRenameParams, signal?: AbortSignal, _onUpdate?: unknown, _ctx?: unknown) {
 		try {
 			const edit = await withLspClient<WorkspaceEdit | null>(
