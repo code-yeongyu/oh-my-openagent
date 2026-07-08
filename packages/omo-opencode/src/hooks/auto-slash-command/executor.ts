@@ -130,6 +130,7 @@ async function formatCommandTemplate(cmd: CommandInfo, args: string): Promise<st
 export interface ExecuteResult {
   success: boolean
   replacementText?: string
+  scope?: CommandInfo["scope"]
   error?: string
 }
 
@@ -157,6 +158,7 @@ export async function executeSlashCommand(parsed: ParsedSlashCommand, options?: 
     return {
       success: true,
       replacementText: template,
+      scope: command.scope,
     }
   } catch (err) {
     return {

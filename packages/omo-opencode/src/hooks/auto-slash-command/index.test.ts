@@ -228,6 +228,73 @@ describe("createAutoSlashCommandHook", () => {
     })
   })
 
+  describe("custom /btw command shadowing the builtin", () => {
+    function createCustomBtwProject(): string {
+      const projectDir = join(tempDir, `project-custom-btw-${Date.now()}-${Math.random()}`)
+      const commandDir = join(projectDir, ".claude", "commands")
+      mkdirSync(commandDir, { recursive: true })
+      writeFileSync(
+        join(commandDir, "btw.md"),
+        `---\ndescription: Custom btw command\n---\nCustom btw template body.\n`,
+      )
+      return projectDir
+    }
+
+    it("should expand a custom /btw without marking it as a builtin side question", async () => {
+      // given a project command named btw shadowing the builtin
+      const hook = createAutoSlashCommandHook({ directory: createCustomBtwProject() })
+      const sessionID = `test-session-custom-btw-${Date.now()}`
+      const output = createMockOutput("/btw custom question")
+
+      // when the message routes through chat.message
+      await hook["chat.message"](createMockInput(sessionID), output)
+
+      // then the custom command expands but carries no btw marker or turn state
+      expect(output.parts[0].text).toContain("Custom btw template body.")
+      expect(output.parts[0].text).toContain("**Scope**: project")
+      expect(output.message?.[BTW_AUTO_SLASH_COMMAND_MARKER]).toBeUndefined()
+      expect(output.parts[0]?.[BTW_AUTO_SLASH_COMMAND_MARKER]).toBeUndefined()
+      expect(isBtwTurnActive(sessionID)).toBe(false)
+    })
+
+    it("should expand a custom /btw even in a subagent session", async () => {
+      // given a subagent session in a project with a custom btw command
+      const hook = createAutoSlashCommandHook({ directory: createCustomBtwProject() })
+      const sessionID = `test-session-custom-btw-sub-${Date.now()}`
+      subagentSessions.add(sessionID)
+      const output = createMockOutput("/btw custom question")
+
+      // when the message routes through chat.message
+      await hook["chat.message"](createMockInput(sessionID), output)
+
+      // then the custom command is not blocked by the builtin-only primary gate
+      expect(output.parts[0].text).toContain("Custom btw template body.")
+      expect(output.message?.[BTW_AUTO_SLASH_COMMAND_MARKER]).toBeUndefined()
+      expect(isBtwTurnActive(sessionID)).toBe(false)
+    })
+
+    it("should expand a custom /btw via command.execute.before without marking", async () => {
+      // given a native btw execution in a project with a custom btw command
+      const hook = createAutoSlashCommandHook({ directory: createCustomBtwProject() })
+      const sessionID = `test-session-custom-btw-cmd-${Date.now()}`
+      const input: CommandExecuteBeforeInput = {
+        sessionID,
+        command: "btw",
+        arguments: "custom question",
+        agent: "test-agent",
+      }
+      const output: CommandExecuteBeforeOutput = { parts: [{ type: "text", text: "/btw custom question" }] }
+
+      // when the command routes through command.execute.before
+      await hook["command.execute.before"](input, output)
+
+      // then the custom template is injected without btw marking or turn state
+      expect(output.parts[0].text).toContain("Custom btw template body.")
+      expect(output.parts[0]?.[BTW_AUTO_SLASH_COMMAND_MARKER]).toBeUndefined()
+      expect(isBtwTurnActive(sessionID)).toBe(false)
+    })
+  })
+
   describe("btw primary-session gating", () => {
     it("should not expand /btw in a subagent session", async () => {
       // given a subagent session receives a /btw message
