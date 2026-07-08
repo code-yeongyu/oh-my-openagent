@@ -16,10 +16,18 @@ Every frontend project MUST have a `DESIGN.md` at its root. This file is the sin
 
 ## DESIGN.md Structure
 
-The file has 7 sections. Every section is mandatory. Skip nothing.
+The file has 7 sections plus a greenfield-only `## 0. Research Log`. Every section is mandatory. Skip nothing.
 
 ```markdown
 # [Project Name] Design System
+
+## 0. Research Log (greenfield only)
+
+One line per research lane, written before the sections below — a lane with no line did not run:
+- Embedded refs: shortlisted [2-3 Layer B candidates] → picked [Layer A] + [Layer B] because [reason]
+- Lazyweb: [N] queries, [M] screens viewed → [layout grammar taken]
+- Imagen drafts: [paths] → picked [draft] as the reference-fidelity contract
+- Skipped lanes: [lane] — [tool/network reason]
 
 ## 1. Atmosphere & Identity
 
