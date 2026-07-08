@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills";
 
@@ -22,6 +22,7 @@ const skillSources = [
 const componentSkillNames = new Set(skillSources.map(([name]) => name));
 const codexHiddenSharedSkillNames = new Set(["ultraresearch"]);
 const skillDisplayPrefix = "(OmO) ";
+const ignoredSkillMetadataDirNames = new Set(["agents"]);
 
 function shouldCopySkillSource(source) {
 	const normalized = source.replaceAll("\\", "/");
@@ -210,12 +211,11 @@ function upsertDisplayName(metadata, displayName) {
 	return `interface:\n  display_name: "${displayName}"\n${content}`;
 }
 
-async function writeCodexSkillDisplayMetadata(skillName) {
-	const skillRoot = join(skillsRoot, skillName);
-	const skillPath = join(skillRoot, "SKILL.md");
+async function writeCodexSkillDisplayMetadata(skillDir) {
+	const skillPath = join(skillDir, "SKILL.md");
 	const content = await readFile(skillPath, "utf8");
-	const frontmatterName = readSkillFrontmatterName(content, skillName);
-	const metadataDir = join(skillRoot, "agents");
+	const frontmatterName = readSkillFrontmatterName(content, basename(skillDir));
+	const metadataDir = join(skillDir, "agents");
 	const metadataPath = join(metadataDir, "openai.yaml");
 	await mkdir(metadataDir, { recursive: true });
 	let metadata = "interface:\n";
@@ -227,6 +227,20 @@ async function writeCodexSkillDisplayMetadata(skillName) {
 	await writeFile(metadataPath, upsertDisplayName(metadata, `${skillDisplayPrefix}${frontmatterName}`), "utf8");
 }
 
+async function writeNestedSkillDisplayMetadata(skillDir) {
+	const entries = await readdir(skillDir, { withFileTypes: true });
+	for (const entry of entries) {
+		if (!entry.isDirectory() || ignoredSkillMetadataDirNames.has(entry.name)) continue;
+		const childDir = join(skillDir, entry.name);
+		try {
+			await writeCodexSkillDisplayMetadata(childDir);
+		} catch (error) {
+			if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+		}
+		await writeNestedSkillDisplayMetadata(childDir);
+	}
+}
+
 async function adaptSkillForCodex(skillName) {
 	const skillPath = join(skillsRoot, skillName, "SKILL.md");
 	const content = await readFile(skillPath, "utf8");
@@ -234,7 +248,8 @@ async function adaptSkillForCodex(skillName) {
 	if (adapted !== content) {
 		await writeFile(skillPath, adapted, "utf8");
 	}
-	await writeCodexSkillDisplayMetadata(skillName);
+	await writeCodexSkillDisplayMetadata(join(skillsRoot, skillName));
+	await writeNestedSkillDisplayMetadata(join(skillsRoot, skillName));
 }
 
 async function syncSkills() {

@@ -7,6 +7,7 @@ import { readJson, root } from "./aggregate-plugin-fixture.mjs";
 
 const hookSlugPattern = /^\.\/hooks\/[a-z0-9]+(?:-[a-z0-9]+)*\.json$/;
 const displayNamePrefix = "(OmO) ";
+const ignoredSkillMetadataDirNames = new Set(["agents"]);
 
 async function exists(path) {
 	try {
@@ -35,6 +36,19 @@ async function readOpenAiDisplayName(skillDir) {
 	assert(displayName, `${metadataPath} must define interface.display_name`);
 	return displayName;
 }
+async function collectSkillDirs(dir) {
+	const skillDirs = [];
+	if (await exists(join(dir, "SKILL.md"))) {
+		skillDirs.push(dir);
+	}
+	const entries = await readdir(dir, { withFileTypes: true });
+	for (const entry of entries) {
+		if (!entry.isDirectory() || ignoredSkillMetadataDirNames.has(entry.name)) continue;
+		skillDirs.push(...(await collectSkillDirs(join(dir, entry.name))));
+	}
+	return skillDirs;
+}
+
 
 test("#given Codex plugin hooks #when plugin metadata is inspected #then hook keys contain human-readable hook slugs", async () => {
 	// given
@@ -59,11 +73,10 @@ test("#given Codex plugin hooks #when plugin metadata is inspected #then hook ke
 	}
 });
 
-test("#given Codex plugin skills #when skill metadata is inspected #then every skill has an OmO display name", async () => {
+test("#given Codex plugin skills #when skill metadata is inspected #then every discoverable skill has an OmO display name", async () => {
 	// given
-	const skillsDir = join(root, "skills");
-	const skillEntries = await readdir(skillsDir, { withFileTypes: true });
-	const skillDirs = skillEntries.filter((entry) => entry.isDirectory()).map((entry) => join(skillsDir, entry.name));
+	const skillDirs = await collectSkillDirs(join(root, "skills"));
+	assert(skillDirs.length > 0, "plugin must expose at least one skill");
 
 	// when
 	const invalidDisplayNames = [];
