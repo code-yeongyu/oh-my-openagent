@@ -11,7 +11,7 @@ Two things ship flat most often, and both read as "clean but generic": the **her
 
 ## Why route at all
 
-`taste-skill.md` alone is a strong default, but it does not commit to any specific aesthetic. When the user has named a clear visual direction (a brand, a style label, an existing site to mimic), a dedicated reference produces sharper output than the generic default. Loading the wrong reference, or none, is how you produce the bland generic SaaS slop these skills exist to prevent.
+`taste-skill.md` is the standard marketing-surface workflow, but it does not commit to any specific aesthetic. When the user has named a clear visual direction (a brand, a style label, an existing site to mimic), a dedicated reference produces sharper output than the generic default. Loading the wrong reference, or none, is how you produce the bland generic SaaS slop these skills exist to prevent.
 
 The library lives flat in this directory (`references/design/`, max depth 1) and has two conceptual layers, and **most non-trivial tasks load one from each layer**:
 
@@ -39,7 +39,7 @@ Before touching any UI code, before routing to any reference, before even thinki
 1. Read `design-system-architecture.md` — it defines the exact structure.
 2. Identify the branch: greenfield setup, existing UI with implicit patterns/components, or existing UI with no reusable component layer.
 3. **Greenfield setup:** if the user gave no concrete visual reference, use `_INDEX.md` to shortlist 2-3 plausible Layer B references, then deeply load exactly one Layer A style skill and one Layer B brand/design-system reference; use `open-design` only when the curated set has no fit. Treat those references as source material, not mood labels: extract tokens, layout grammar, component anatomy, interaction states, motion, and taste decisions into `DESIGN.md`, then recombine them into project-specific primitives. Customize for the user's product and content, but do not freestyle past the selected references; never copy logos, trademarked assets, or brand-specific copy.
-   - **Commit a distinctive direction BEFORE extracting tokens.** In 1-2 sentences, name the atmosphere, the signature material, the color story, and the one moment a visitor will remember. For an expressive brief, sketch 2-3 genuinely different directions and pick the boldest one you can defend with the loaded reference; do not average them, because the average IS the generic default this skill exists to beat. A locked, never-revisited one-shot decision is how a page ends up flat.
+   - **Commit a distinctive direction BEFORE extracting tokens.** In 1-2 sentences, name the atmosphere, the signature material, the color story, and the one moment a visitor will remember. Record it as the `DESIGN.md` Design Read (Section 0): the one-line read plus — when the loaded Layer A is `taste-skill.md` or `gpt-tasteskill.md` — the three dial values inferred from the brief, each with a one-line justification. Operational surfaces record the chosen official design system instead of dials. For an expressive brief, sketch 2-3 genuinely different directions and pick the boldest one you can defend with the loaded reference; do not average them, because the average IS the generic default this skill exists to beat. A locked, never-revisited one-shot decision is how a page ends up flat.
    - **The reference's distinctive material MUST survive extraction (expressive briefs).** The common failure is loading a rich reference and then distilling it into a generic dark-SaaS token set. Your `DESIGN.md` must carry the *non-default* decisions forward and name which reference each came from: the actual elevation recipe (the specific layers that make a surface read as glass/glossy, not a single blur), a multi-stop perceptual color ramp (not one brand hex reused at varied opacity), the explicit display/body/mono type choices, and one signature interaction. Self-check before writing code: if your `DESIGN.md` could describe any generic dark SaaS, you flattened the reference — go back and put the specific material in.
 4. **Existing UI with implicit patterns/components:** extract the colors, typography, spacing, primitives, states, and motion already in use. Write `DESIGN.md` to codify what exists before changing UI code.
 5. **Existing UI with no reusable component layer:** STOP and ask whether to preserve the current style with copy-nearby edits or extract a `DESIGN.md` plus reusable components first. Do not silently choose the cheaper path or the larger refactor.
@@ -107,7 +107,8 @@ If the user names a brand not in the index, fall back to Step 2 + a mood-based s
 Decide the lane by **ambition first** — this is what your output gets judged on, and the wrong read is how a high-craft request ships clean-but-flat:
 
 - **Expressive brief** — any surface-ambition signal: "glossy", "glassy", "liquid glass", "premium", "luxe", "startup-grade", "brand-grade", "make it beautiful / pretty / wow", or a named product company to feel like. The page is a showcase and rich material IS the deliverable. Commit to a high-craft Layer A (`soft-skill` or `gpt-tasteskill`) and ALWAYS pair a high-craft Layer B exemplar (`supabase`, `linear.app`, `vercel`, `stripe`) as the token source. This lane OVERRIDES any default "keep it quiet / utilitarian" instinct.
-- **Operational brief** — internal tool, dashboard, admin, "just make it usable". Restraint is correct here and `taste-skill` is the right default.
+- **Operational brief** — internal tool, dashboard, admin, "just make it usable". Restraint is correct here, but taste-skill's marketing defaults are NOT: its v2 scope excludes dashboards, data tables, and dense product UI. Open `taste-skill.md` and read ONLY its **Brief → Design System Map** section: pick the official design system the brief maps to (Fluent, Carbon, Material, Polaris, Atlassian, Primer, GOV.UK, USWDS, Radix Themes, shadcn/Tailwind) and use that system's official tokens and components as the Layer B token source for `DESIGN.md`. Do not apply the dials, hero rules, or layout bans to product UI.
+- **Standard marketing brief** — landing page, portfolio, or marketing redesign with no named brand and no wow demand. Run the full `taste-skill.md` v2 workflow: declare its one-line Design Read, set the three dials from the brief, map to a design system or honest aesthetic, and pass its final pre-flight.
 
 Do NOT let an expressive brief fall through to `taste-skill`. Then map the phrasing:
 
@@ -116,8 +117,9 @@ Do NOT let an expressive brief fall through to `taste-skill`. Then map the phras
 | "minimal", "clean", "Notion-like", "Linear-like", "editorial", "boring is good" | `minimalist-skill.md` |
 | "brutalist", "raw", "Swiss", "experimental", "industrial", "anti-design", "unstyled" | `brutalist-skill.md` |
 | "premium", "luxury", "calm", "expensive", "elegant", "spa", "boutique", "glossy", "glassy", "liquid glass", "startup-grade", "make it beautiful/pretty" | `soft-skill.md` + a high-craft Layer B (`supabase` / `linear.app` / `vercel` / `stripe`) |
-| "Awwwards-level", "wow factor", "magnetic", "scroll-triggered", "high-variance", "cinematic", "make it crazy" | `gpt-tasteskill.md` |
-| Neutral or operational — internal tool, dashboard, admin, "just make it usable" with no surface ambition | `taste-skill.md` as Layer A, plus the greenfield `_INDEX.md` shortlist → exactly one Layer B reference |
+| "Awwwards-level", "wow factor", "magnetic", "scroll-triggered", "high-variance", "cinematic", "make it crazy" | `gpt-tasteskill.md` — also the preferred taste lane for GPT/Codex sessions: its mandatory `<design_plan>` pre-flight forces layout variance on models with weak taste priors |
+| Landing page / portfolio / marketing surface, no named brand, no wow demand | `taste-skill.md` (v2 workflow: Design Read → dials → design-system map → pre-flight), plus the greenfield `_INDEX.md` shortlist → exactly one Layer B reference |
+| Neutral or operational — internal tool, dashboard, admin, "just make it usable" with no surface ambition | `taste-skill.md` → its **Brief → Design System Map** section ONLY; the chosen official design system replaces the Layer B brand reference as the token source |
 
 You may also load a brand DESIGN.md from Layer B as a *concrete reference* if the user's mood maps cleanly (see the "Mood-based shortcuts" section in `_INDEX.md`).
 
@@ -128,6 +130,8 @@ Triggers: "fix the design", "this looks bad", "redesign", "make this better", "i
 **Action:** Load `redesign-skill.md`. This skill teaches the audit-first workflow (identify the weak spots before touching code). Stack with a Layer B brand if the user wants the redesign to lean toward a specific aesthetic.
 
 Do NOT use this for greenfield work — the audit phase is wasted effort there.
+
+For marketing-surface redesigns, also honor `taste-skill.md`'s Redesign Protocol preservation rules — never silently change URL slugs, nav labels, form field names, the brand wordmark, or legal/consent copy.
 
 ### Step 4 — Is this an image-first workflow?
 
@@ -218,6 +222,8 @@ Once references are loaded, before writing any UI code:
 ## Phase Final — Design QA (MANDATORY, runs after implementation)
 
 Before declaring the task done, verify the rendered UI. **The verification authority is `/visual-qa`, not a hand-rolled checklist here.** Run `/visual-qa`: it captures every page and breakpoint (375 / 768 / 1280px) on fresh evidence, drives and inspects interaction states (hover/focus/active) and motion (transitions, scroll-triggered, load), runs the dual-oracle pass, and loops until an independent reviewer passes. For a concrete reference or clone, run it in reference-fidelity mode.
+
+When the loaded Layer A is `taste-skill.md` or `gpt-tasteskill.md`, first run that file's own final pre-flight check (`taste-skill.md` → its FINAL PRE-FLIGHT CHECK section; `gpt-tasteskill.md` → its `<design_plan>` verification) and fix every failing box before invoking `/visual-qa`. Several boxes are mechanical — em-dash grep, eyebrow count, zigzag cap, duplicate CTA intent — so check them against the actual code, never from memory.
 
 This skill adds only the design-taste judgments `/visual-qa` cannot make for you:
 

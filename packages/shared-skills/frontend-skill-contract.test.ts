@@ -1,6 +1,16 @@
 import { describe, expect, test } from "bun:test"
+import { existsSync } from "node:fs"
+import { fileURLToPath } from "node:url"
 
 const frontendSkillPath = new URL("./skills/frontend/SKILL.md", import.meta.url)
+
+function tableRowFor(text: string, rowStart: string): string {
+	const row = text.split("\n").find((line) => line.startsWith(rowStart))
+	if (!row) {
+		throw new Error(`missing table row: ${rowStart}`)
+	}
+	return row
+}
 
 function sectionBetween(text: string, startMarker: string, endMarker: string): string {
 	const start = text.indexOf(startMarker)
@@ -13,6 +23,92 @@ function sectionBetween(text: string, startMarker: string, endMarker: string): s
 	}
 	return text.slice(start, end)
 }
+
+describe("frontend skill taste-skill v2 routing contract", () => {
+	const designReadmeUrl = new URL("./skills/frontend/references/design/README.md", import.meta.url)
+	const indexUrl = new URL("./skills/frontend/references/design/_INDEX.md", import.meta.url)
+
+	test("#given an operational brief #when routing Layer A #then it routes to the official design-system map, not taste-skill marketing defaults", async () => {
+		const readme = await Bun.file(designReadmeUrl).text()
+		const step2 = sectionBetween(readme, "### Step 2", "### Step 3")
+
+		expect(step2).toContain("Brief → Design System Map")
+		expect(step2).toContain("official design system")
+		for (const system of ["Fluent", "Carbon", "GOV.UK"]) {
+			expect(step2).toContain(system)
+		}
+		expect(step2).not.toContain("`taste-skill` is the right default")
+	})
+
+	test("#given router descriptions of taste-skill #when compared with its v2 scope #then they describe the brief-inference marketing workflow", async () => {
+		const skillText = await Bun.file(frontendSkillPath).text()
+		const indexText = await Bun.file(indexUrl).text()
+
+		const skillRow = tableRowFor(skillText, "| `taste-skill.md` |")
+		expect(skillRow).toContain("Design Read")
+		expect(skillRow).toContain("pre-flight")
+		expect(skillRow.toLowerCase()).not.toContain("safe default")
+
+		const indexRow = tableRowFor(indexText, "| `taste-skill.md` |")
+		expect(indexRow).toContain("Design Read")
+		expect(indexRow.toLowerCase()).not.toContain("safe default")
+	})
+})
+
+describe("frontend skill design-read planning contract", () => {
+	const architectureUrl = new URL("./skills/frontend/references/design/design-system-architecture.md", import.meta.url)
+	const designReadmeUrl2 = new URL("./skills/frontend/references/design/README.md", import.meta.url)
+
+	test("#given a new DESIGN.md #when the contract is created #then it opens with a Design Read and dial prelude", async () => {
+		const architecture = await Bun.file(architectureUrl).text()
+
+		expect(architecture).toContain("## 0. Design Read")
+		for (const dial of ["DESIGN_VARIANCE", "MOTION_INTENSITY", "VISUAL_DENSITY"]) {
+			expect(architecture).toContain(dial)
+		}
+		expect(architecture).toContain("Brief → Design System Map")
+	})
+
+	test("#given the design system gate #when committing a direction #then the Design Read is recorded into DESIGN.md", async () => {
+		const readme = await Bun.file(designReadmeUrl2).text()
+		const gate = sectionBetween(readme, "## Phase 0 — Design System Gate", "## Phase 0.5")
+
+		expect(gate).toContain("Design Read")
+		expect(gate).toContain("dial")
+	})
+})
+
+describe("frontend skill taste pre-flight QA contract", () => {
+	const designReadmeUrl3 = new URL("./skills/frontend/references/design/README.md", import.meta.url)
+
+	test("#given a taste Layer A is loaded #when running design QA #then the taste pre-flight gate runs before visual-qa", async () => {
+		const readme = await Bun.file(designReadmeUrl3).text()
+		const qa = sectionBetween(readme, "## Phase Final", "## Final notes")
+
+		expect(qa.toLowerCase()).toContain("pre-flight")
+		expect(qa).toContain("gpt-tasteskill")
+		expect(qa).toContain("/visual-qa")
+	})
+
+	test("#given a marketing redesign #when routing #then taste-skill preservation rules are honored", async () => {
+		const readme = await Bun.file(designReadmeUrl3).text()
+		const step3 = sectionBetween(readme, "### Step 3", "### Step 4")
+
+		expect(step3).toContain("never silently")
+		expect(step3).toContain("URL slugs")
+	})
+
+	test("#given the vendored taste-skill upstream #when synced #then the v2 markers the router relies on still exist", async () => {
+		const upstreamUrl = new URL("./upstreams/taste-skill/skills/taste-skill/SKILL.md", import.meta.url)
+		if (!existsSync(fileURLToPath(upstreamUrl))) return
+		const taste = await Bun.file(upstreamUrl).text()
+
+		expect(taste).toContain("BRIEF INFERENCE")
+		expect(taste).toContain("DESIGN SYSTEM MAP")
+		expect(taste).toContain("FINAL PRE-FLIGHT CHECK")
+		expect(taste).toContain("Not dashboards")
+	})
+})
 
 describe("frontend skill concrete-reference contract", () => {
 	test("#given a provided visual reference #when routing implementation #then it becomes a pixel-fidelity design-system contract", async () => {

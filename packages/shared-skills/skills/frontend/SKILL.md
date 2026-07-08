@@ -52,7 +52,7 @@ The reference library has one architecture file, 12 taste skills (Layer A — *h
 
 | File | Read when the user says… |
 |---|---|
-| `taste-skill.md` | Neutral or operational UI with no surface ambition — internal tools, dashboards, "just make it usable". The safe default; do NOT settle here when the brief signals glossy / premium / startup-grade craft. |
+| `taste-skill.md` | Standard marketing surfaces — landing pages, portfolios, marketing redesigns with no named brand and no wow demand. Runs its v2 workflow: one-line Design Read → three dials → brief-to-design-system map → final pre-flight. NOT a dashboard default: for operational briefs (internal tools, admin, dense product UI) read ONLY its Brief → Design System Map to pick an official system (Fluent, Carbon, Material, Polaris, GOV.UK, USWDS, Radix, shadcn) as the token source. |
 | `gpt-tasteskill.md` | "Awwwards-tier", "wow factor", "cinematic", "scroll-triggered" marketing/landing experiences. |
 | `minimalist-skill.md` | "minimal", "clean", "Notion-like", "Linear-like", "editorial". |
 | `brutalist-skill.md` | "brutalist", "raw", "Swiss", "experimental", "anti-design". |
@@ -113,6 +113,7 @@ Domains: `product` `style` `typography` `color` `landing` `chart` `ux` `react` `
 | "Linear-style landing page" | `design/README.md` + `design/linear.app.md` + `design/taste-skill.md` + `perfection/README.md` |
 | "Premium SaaS hero like Stripe" | `design/README.md` + `design/stripe.md` + `design/soft-skill.md` + `perfection/README.md` |
 | "Improve this existing dashboard" | `design/README.md` + `design/redesign-skill.md` + `perfection/README.md` |
+| "Build an internal dashboard / admin tool" | `design/README.md` → `design/taste-skill.md` **Brief → Design System Map** section (official system as token source) + `perfection/README.md` |
 | "Build this screenshot / Imagen mock / Stitch output exactly" | `design/README.md` + `design/image-to-code-skill.md` + `perfection/README.md` + `/visual-qa` reference-fidelity mode |
 | "Audit my site" / "make this page faster" | `perfection/README.md` (+ `perfection/react-perf-tooling.md` if React) |
 | "Mockup image of a fintech app" — no code | `design/imagegen-frontend-mobile.md` (+ a Layer B brand if named) |
