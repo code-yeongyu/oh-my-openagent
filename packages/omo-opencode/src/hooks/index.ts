@@ -33,7 +33,7 @@ export { createInteractiveBashSessionHook } from "./interactive-bash-session";
 
 export { createTeamMailboxInjector } from "./team-mailbox-injector";
 export { createTeamModeStatusInjector } from "./team-mode-status-injector";
-export { createBtwContextStripHook, isBtwMarked } from "./btw-context-strip";
+export { createBtwContextStripHook, hasDetectableBtwMarker, isBtwMarked } from "./btw-context-strip";
 export { createToolPairValidatorHook } from "./tool-pair-validator";
 export { createCategorySkillReminderHook } from "./category-skill-reminder";
 export { createRalphLoopHook, type RalphLoopHook } from "./ralph-loop";

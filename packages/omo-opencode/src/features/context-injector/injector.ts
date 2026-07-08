@@ -87,8 +87,13 @@ function hasText(part: Part): boolean {
   return "text" in part && typeof part.text === "string" && part.text.length > 0
 }
 
+type MessagesTransformOptions = {
+  skipInjection?: (message: MessageWithParts) => boolean
+}
+
 export function createContextInjectorMessagesTransformHook(
-  collector: ContextCollector
+  collector: ContextCollector,
+  options?: MessagesTransformOptions
 ): MessagesTransformHook {
   return {
     "experimental.chat.messages.transform": async (_input, output) => {
@@ -116,6 +121,12 @@ export function createContextInjectorMessagesTransformHook(
       }
       if (!isRealUserMessage(lastUserMessage)) {
         log("[context-injector] Latest user message is synthetic/internal, skipping injection", {
+          sessionID: getSessionIDFromMessageInfo(lastUserMessage.info) ?? getMainSessionID(),
+        })
+        return
+      }
+      if (options?.skipInjection?.(lastUserMessage) === true) {
+        log("[context-injector] Latest user message excluded by skipInjection, keeping context pending", {
           sessionID: getSessionIDFromMessageInfo(lastUserMessage.info) ?? getMainSessionID(),
         })
         return

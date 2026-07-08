@@ -41,6 +41,35 @@ describe("createContextInjectorMessagesTransformHook", () => {
     ],
   })
 
+  it("keeps pending context queued when the last user message matches skipInjection", async () => {
+    // given a pending context and a /btw-like last user message the caller wants skipped
+    const hook = createContextInjectorMessagesTransformHook(collector, {
+      skipInjection: (message) =>
+        JSON.stringify(message).includes("__omoBtwAutoSlashCommand"),
+    })
+    const sessionID = "ses_transform_btw_skip"
+    collector.register(sessionID, {
+      id: "ulw",
+      source: "keyword-detector",
+      content: "Ultrawork context",
+    })
+    const btwMessage = createMockMessage("user", "side question", sessionID)
+    Object.assign(btwMessage.parts[0], { __omoBtwAutoSlashCommand: true })
+    const messages = [
+      createMockMessage("user", "First message", sessionID),
+      createMockMessage("assistant", "Response", sessionID),
+      btwMessage,
+    ]
+    const output = unsafeTestValue({ messages })
+
+    // when
+    await hook["experimental.chat.messages.transform"]!({}, output)
+
+    // then - nothing is injected and the pending context survives for the next real turn
+    expect(output.messages[2].parts.length).toBe(1)
+    expect(collector.hasPending(sessionID)).toBe(true)
+  })
+
   it("inserts synthetic part before text part in last user message", async () => {
     // given
     const hook = createContextInjectorMessagesTransformHook(collector)

@@ -11,6 +11,7 @@ import {
   createTeamMailboxInjector,
   createTeamModeStatusInjector,
   createToolPairValidatorHook,
+  hasDetectableBtwMarker,
   isBtwMarked,
 } from "../../hooks"
 import {
@@ -76,8 +77,12 @@ export function createTransformHooks(args: {
       )
     : null
 
+  // A /btw turn is stripped from future payloads, so injecting pending context
+  // into it would consume that context without it ever reaching the model again.
   const contextInjectorMessagesTransform =
-    createContextInjectorMessagesTransformHook(contextCollector)
+    createContextInjectorMessagesTransformHook(contextCollector, {
+      skipInjection: hasDetectableBtwMarker,
+    })
 
   const teamModeConfig = pluginConfig.team_mode
 
