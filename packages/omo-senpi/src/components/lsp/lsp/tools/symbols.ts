@@ -1,6 +1,7 @@
 import { withLspClient } from "../client-wrapper.js";
 import { DEFAULT_MAX_SYMBOLS } from "../constants.js";
 import { formatDocumentSymbol, formatSymbolInfo } from "../formatters.js";
+import { renderSymbolsCall, renderSymbolsResult } from "../renderers-symbols.js";
 import { defineTool, Type } from "../schema.js";
 import type { DocumentSymbol, SymbolInfo } from "../types.js";
 import { handleMissingDependencyError } from "../utils.js";
@@ -43,6 +44,8 @@ export const lsp_symbols = defineTool({
 		"Get symbols from a file (document) or search across the workspace. " +
 		"Use scope='document' for a file outline, scope='workspace' for project-wide symbol search.",
 	parameters: Params,
+	renderCall: renderSymbolsCall,
+	renderResult: renderSymbolsResult,
 	async execute(
 		_toolCallId: string,
 		params: LspSymbolsParams,
