@@ -170,6 +170,57 @@ describe("createAutoSlashCommandHook", () => {
     })
   })
 
+  describe("disabled builtin commands", () => {
+    it("should not expand /btw via chat.message when disabled_commands includes btw", async () => {
+      // given btw is disabled in config
+      const hook = createAutoSlashCommandHook({ disabledCommands: ["btw"] })
+      const sessionID = `test-session-btw-disabled-chat-${Date.now()}`
+      const output = createMockOutput("/btw secret aside")
+      const originalText = output.parts[0].text
+
+      // when the message routes through chat.message
+      await hook["chat.message"](createMockInput(sessionID), output)
+
+      // then the message is left untouched and unmarked
+      expect(output.parts[0].text).toBe(originalText)
+      expect(output.message?.[BTW_AUTO_SLASH_COMMAND_MARKER]).toBeUndefined()
+      expect(isBtwTurnActive(sessionID)).toBe(false)
+    })
+
+    it("should not expand /btw via command.execute.before when disabled_commands includes btw", async () => {
+      // given btw is disabled in config
+      const hook = createAutoSlashCommandHook({ disabledCommands: ["btw"] })
+      const sessionID = `test-session-btw-disabled-cmd-${Date.now()}`
+      const input: CommandExecuteBeforeInput = {
+        sessionID,
+        command: "btw",
+        arguments: "secret aside",
+        agent: "test-agent",
+      }
+      const output: CommandExecuteBeforeOutput = { parts: [{ type: "text", text: "/btw secret aside" }] }
+
+      // when the native command routes through command.execute.before
+      await hook["command.execute.before"](input, output)
+
+      // then no template is injected and the session is not marked
+      expect(output.parts[0].text).toBe("/btw secret aside")
+      expect(isBtwTurnActive(sessionID)).toBe(false)
+    })
+
+    it("should still expand other builtin commands when only btw is disabled", async () => {
+      // given btw is disabled but init-deep is not
+      const hook = createAutoSlashCommandHook({ disabledCommands: ["btw"] })
+      const sessionID = `test-session-other-enabled-${Date.now()}`
+      const output = createMockOutput("/init-deep")
+
+      // when the message routes through chat.message
+      await hook["chat.message"](createMockInput(sessionID), output)
+
+      // then the non-disabled builtin still expands
+      expect(output.parts[0].text).toContain("<auto-slash-command>")
+    })
+  })
+
   describe("btw turn state for the tool guard", () => {
     it("should record an active /btw turn when chat.message expands /btw", async () => {
       // given a /btw question arriving on the chat.message route

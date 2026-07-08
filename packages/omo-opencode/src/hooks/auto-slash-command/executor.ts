@@ -41,14 +41,18 @@ export interface ExecutorOptions {
   enabledPluginsOverride?: Record<string, boolean>
   agent?: string
   directory?: string
+  disabledCommands?: string[]
 }
 
 
 async function discoverAllCommands(options?: ExecutorOptions): Promise<CommandInfo[]> {
+  const disabledBuiltins = new Set(
+    (options?.disabledCommands ?? []).map((name) => name.toLowerCase()),
+  )
   const discoveredCommands = commandDiscovery.discoverCommandsSync(options?.directory ?? process.cwd(), {
     pluginsEnabled: options?.pluginsEnabled,
     enabledPluginsOverride: options?.enabledPluginsOverride,
-  })
+  }).filter((cmd) => cmd.scope !== "builtin" || !disabledBuiltins.has(cmd.name.toLowerCase()))
 
   const skills = options?.skills ?? await discoverAllSkills()
   const skillCommands = skills.map(skillToCommandInfo)

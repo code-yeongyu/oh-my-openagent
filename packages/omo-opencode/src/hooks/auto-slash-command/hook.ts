@@ -100,6 +100,7 @@ export interface AutoSlashCommandHookOptions {
   pluginsEnabled?: boolean
   enabledPluginsOverride?: Record<string, boolean>
   directory?: string
+  disabledCommands?: string[]
 }
 
 export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions) {
@@ -108,6 +109,7 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
     pluginsEnabled: options?.pluginsEnabled,
     enabledPluginsOverride: options?.enabledPluginsOverride,
     directory: options?.directory,
+    disabledCommands: options?.disabledCommands,
   }
   const sessionProcessedCommands = createProcessedCommandStore()
   const sessionProcessedCommandExecutions = createProcessedCommandStore()
