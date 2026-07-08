@@ -8,7 +8,39 @@ import {
 import { appendTranscriptEntry } from "../transcript"
 import { cacheToolInput } from "../tool-input-cache"
 import type { PluginConfig } from "../types"
+import { getWorkForSession } from "../../../features/boulder-state"
 import { isHookDisabled, log, replaceToolArgs } from "../../../shared"
+
+function nonBlankString(value: unknown): string | null {
+	if (typeof value !== "string") {
+		return null
+	}
+
+	const trimmed = value.trim()
+	return trimmed.length > 0 ? value : null
+}
+
+function resolvePreToolUseCwd(
+	input: { tool: string; sessionID: string },
+	toolInput: Record<string, unknown>,
+	ctx: Pick<PluginInput, "directory" | "worktree">,
+): string {
+	if (input.tool.trim().toLowerCase() !== "bash") {
+		return ctx.directory
+	}
+
+	const explicitCwd = nonBlankString(toolInput.cwd)
+	if (explicitCwd) {
+		return explicitCwd
+	}
+
+	const trackedWorktree = nonBlankString(getWorkForSession(ctx.directory, input.sessionID)?.worktree_path)
+	if (trackedWorktree) {
+		return trackedWorktree
+	}
+
+	return nonBlankString(ctx.worktree) ?? ctx.directory
+}
 
 export function createToolExecuteBeforeHandler(ctx: PluginInput, config: PluginConfig) {
 	return async (
@@ -69,7 +101,7 @@ export function createToolExecuteBeforeHandler(ctx: PluginInput, config: PluginC
 			sessionId: input.sessionID,
 			toolName: input.tool,
 			toolInput: output.args,
-			cwd: ctx.directory,
+			cwd: resolvePreToolUseCwd(input, output.args, ctx),
 			toolUseId: input.callID,
 		}
 
