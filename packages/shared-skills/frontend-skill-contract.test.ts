@@ -126,3 +126,109 @@ describe("frontend skill lazyweb research contract", () => {
 		expect(lazywebText).toContain("never commit")
 	})
 })
+
+describe("frontend skill research-log deliverable contract", () => {
+	test("#given a greenfield brief #when routing research #then the lanes are logged deliverables exempt from exploration budgets", async () => {
+		const text = await Bun.file(frontendSkillPath).text()
+		const workflow = sectionBetween(text, "## Design System and Component Workflow", "## Ruleset 1")
+
+		expect(workflow).toContain("## 0. Research Log")
+		expect(workflow).toContain("not exploration to be budgeted")
+		expect(workflow).toContain("did not run")
+		expect(workflow).toContain("IN PARALLEL")
+		expect(workflow).toContain("name the skip in `DESIGN.md`")
+	})
+
+	test("#given the design README triage #when no DESIGN.md exists #then the Research Log requirement is stated there too", async () => {
+		const readmeText = await Bun.file(new URL("./skills/frontend/references/design/README.md", import.meta.url)).text()
+
+		expect(readmeText).toContain("## 0. Research Log")
+		expect(readmeText).toContain("did not run")
+	})
+
+	test("#given the DESIGN.md schema #when a greenfield project starts #then the Research Log section is defined", async () => {
+		const archText = await Bun.file(
+			new URL("./skills/frontend/references/design/design-system-architecture.md", import.meta.url),
+		).text()
+
+		expect(archText).toContain("## 0. Research Log")
+	})
+})
+
+describe("frontend skill lazyweb pointer discipline", () => {
+	test("#given the lazyweb research lane #when it fires #then the recipe file is read first and run verbatim", async () => {
+		const text = await Bun.file(frontendSkillPath).text()
+		const workflow = sectionBetween(text, "## Design System and Component Workflow", "## Ruleset 1")
+
+		expect(workflow).toContain("READ `references/design/lazyweb.md` FIRST")
+		expect(workflow).toContain("verbatim")
+		expect(workflow).toContain("do not improvise")
+	})
+})
+
+describe("frontend skill full-read reference contract", () => {
+	test("#given Layer A/B routing #when references load #then partial reads are forbidden and 'deeply load' is gone", async () => {
+		const skillText = await Bun.file(frontendSkillPath).text()
+		const readmeText = await Bun.file(new URL("./skills/frontend/references/design/README.md", import.meta.url)).text()
+
+		for (const text of [skillText, readmeText]) {
+			expect(text).toContain("in full")
+			expect(text).toContain("no partial reads")
+			expect(text).not.toContain("deeply load")
+		}
+	})
+})
+
+describe("frontend skill designpowers default integration", () => {
+	test("#given any implementation or redesign #when Phase 0 routes #then designpowers lane-c loads by default", async () => {
+		const text = await Bun.file(frontendSkillPath).text()
+
+		expect(text).toContain("designpowers/lane-c-review.md")
+		expect(text).toContain("implementation or redesign that creates or updates")
+	})
+
+	test("#given the designpowers wrapper #when implementation heads to review #then lane-c is the required default lane", async () => {
+		const dpText = await Bun.file(new URL("./skills/frontend/references/designpowers/README.md", import.meta.url)).text()
+
+		expect(dpText).toContain("EVERY implementation or redesign")
+		expect(dpText).toContain("`lane-c-review.md` loads with this README for every implementation or redesign")
+	})
+
+	test("#given the DESIGN.md schema #when designpowers joins the default flow #then accessibility constraints and accepted debt are schema sections", async () => {
+		const archText = await Bun.file(
+			new URL("./skills/frontend/references/design/design-system-architecture.md", import.meta.url),
+		).text()
+
+		expect(archText).toContain("## 8. Accessibility Constraints & Accepted Debt")
+	})
+
+	test("#given the routing pointers #when the schema grows #then no stale 7-section count survives anywhere", async () => {
+		const skillText = await Bun.file(frontendSkillPath).text()
+		const indexText = await Bun.file(new URL("./skills/frontend/references/design/_INDEX.md", import.meta.url)).text()
+
+		for (const text of [skillText, indexText]) {
+			expect(text).not.toContain("7-section")
+			expect(text).toContain("8 sections")
+		}
+	})
+})
+
+describe("frontend skill primitive showcase gate", () => {
+	test("#given DESIGN.md exists #when primitives are defined #then the showcase gate is a standalone mandatory gate", async () => {
+		const readmeText = await Bun.file(new URL("./skills/frontend/references/design/README.md", import.meta.url)).text()
+		const skillText = await Bun.file(frontendSkillPath).text()
+
+		expect(readmeText).toContain("### Primitive Showcase Gate")
+		expect(skillText).toContain("Primitive Showcase Gate")
+	})
+})
+
+describe("frontend skill ui-ux-db wiring", () => {
+	test("#given DESIGN.md color/type authoring #when the system is defined #then one ui-ux-db sanity search is instructed", async () => {
+		const archText = await Bun.file(
+			new URL("./skills/frontend/references/design/design-system-architecture.md", import.meta.url),
+		).text()
+
+		expect(archText).toContain("Sanity-check the palette and type pairing with one `ui-ux-db` domain search")
+	})
+})
