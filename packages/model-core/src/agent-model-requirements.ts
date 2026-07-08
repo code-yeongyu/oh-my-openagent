@@ -9,6 +9,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       { providers: ["opencode-go", "vercel"], model: "kimi-k2.6" },
+      { providers: ["openrouter", "vercel"], model: "mimo-v2.5-pro" },
       { providers: ["kimi-for-coding"], model: "k2p5" },
       {
         providers: [
