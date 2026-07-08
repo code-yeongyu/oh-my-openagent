@@ -1,6 +1,7 @@
 import { withLspClient } from "../client-wrapper.js";
 import { DEFAULT_MAX_REFERENCES } from "../constants.js";
 import { formatLocation } from "../formatters.js";
+import { renderFindReferencesCall, renderFindReferencesResult } from "../renderers-navigation.js";
 import { defineTool, Type } from "../schema.js";
 import type { Location } from "../types.js";
 import { handleMissingDependencyError } from "../utils.js";
@@ -35,6 +36,8 @@ export const lsp_find_references = defineTool({
 	label: "LSP Find References",
 	description: "Find ALL usages/references of a symbol across the entire workspace.",
 	parameters: Params,
+	renderCall: renderFindReferencesCall,
+	renderResult: renderFindReferencesResult,
 	async execute(
 		_toolCallId: string,
 		params: LspFindReferencesParams,
