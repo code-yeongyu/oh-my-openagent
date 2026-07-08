@@ -18,45 +18,68 @@ function looksLikeFilePath(path: string): boolean {
 	return /\.[a-zA-Z0-9]+$/.test(lastSegment)
 }
 
+function splitTrailingSentencePunctuation(path: string): {
+	pathWithoutPunctuation: string
+	trailingPunctuation: string
+} {
+	const match = path.match(/[.,;:!?]+$/)
+	if (!match) {
+		return { pathWithoutPunctuation: path, trailingPunctuation: "" }
+	}
+
+	return {
+		pathWithoutPunctuation: path.slice(0, -match[0].length),
+		trailingPunctuation: match[0],
+	}
+}
+
 export function resolveSkillPathReferences(content: string, basePath: string): string {
 	const normalizedBase = basePath.replace(/[\\/]$/, "")
 	return content.replace(
 		/(?<![a-zA-Z0-9="\(])@([a-zA-Z0-9_-]+\/[a-zA-Z0-9_.\-\/]*)/g,
 		(match, relativePath: string) => {
-			if (!looksLikeFilePath(relativePath)) return match
+			const { pathWithoutPunctuation, trailingPunctuation } =
+				splitTrailingSentencePunctuation(relativePath)
+			if (!looksLikeFilePath(pathWithoutPunctuation)) return match
 			if (isWindowsAbsolutePath(normalizedBase)) {
-				const resolvedPath = win32.resolve(normalizedBase, relativePath)
+				const resolvedPath = win32.resolve(normalizedBase, pathWithoutPunctuation)
 				const relativePathFromBase = win32.relative(normalizedBase, resolvedPath)
 				if (relativePathFromBase.startsWith("..") || win32.isAbsolute(relativePathFromBase)) {
 					return match
 				}
 				const displayPath = toDisplayPath(resolvedPath)
-				return relativePath.endsWith("/") && !displayPath.endsWith("/")
-					? `${displayPath}/`
-					: displayPath
+				const resolvedDisplayPath =
+					pathWithoutPunctuation.endsWith("/") && !displayPath.endsWith("/")
+						? `${displayPath}/`
+						: displayPath
+				return `${resolvedDisplayPath}${trailingPunctuation}`
 			}
 
 			if (isPosixAbsolutePath(normalizedBase)) {
 				const displayBase = toDisplayPath(normalizedBase)
-				const resolvedPath = posix.resolve(displayBase, relativePath)
+				const resolvedPath = posix.resolve(displayBase, pathWithoutPunctuation)
 				const relativePathFromBase = posix.relative(displayBase, resolvedPath)
 				if (relativePathFromBase.startsWith("..") || posix.isAbsolute(relativePathFromBase)) {
 					return match
 				}
-				return relativePath.endsWith("/") && !resolvedPath.endsWith("/")
-					? `${resolvedPath}/`
-					: resolvedPath
+				const resolvedDisplayPath =
+					pathWithoutPunctuation.endsWith("/") && !resolvedPath.endsWith("/")
+						? `${resolvedPath}/`
+						: resolvedPath
+				return `${resolvedDisplayPath}${trailingPunctuation}`
 			}
 
-			const resolvedPath = resolve(normalizedBase, relativePath)
+			const resolvedPath = resolve(normalizedBase, pathWithoutPunctuation)
 			const relativePathFromBase = relative(normalizedBase, resolvedPath)
 			if (relativePathFromBase.startsWith("..") || isAbsolute(relativePathFromBase)) {
 				return match
 			}
 			const displayPath = toDisplayPath(resolvedPath)
-			return relativePath.endsWith("/") && !displayPath.endsWith("/")
-				? `${displayPath}/`
-				: displayPath
+			const resolvedDisplayPath =
+				pathWithoutPunctuation.endsWith("/") && !displayPath.endsWith("/")
+					? `${displayPath}/`
+					: displayPath
+			return `${resolvedDisplayPath}${trailingPunctuation}`
 		}
 	)
 }
