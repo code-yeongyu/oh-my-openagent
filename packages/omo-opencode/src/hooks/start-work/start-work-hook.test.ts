@@ -8,13 +8,14 @@ import { randomUUID } from "node:crypto"
 import { readBoulderState, clearBoulderState } from "../../features/boulder-state"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { createStartWorkHook } from "./start-work-hook"
+import { START_WORK_TEMPLATE } from "../../features/builtin-commands/templates/start-work"
 
 describe("start-work hook platform session ids", () => {
   let testDir: string
 
   function createStartWorkPrompt(): string {
     return `<command-instruction>
-You are starting a Sisyphus work session.
+You are starting an Atlas work session.
 </command-instruction>
 
 <session-context></session-context>`
@@ -81,5 +82,14 @@ You are starting a Sisyphus work session.
     // then
     expect(sessionMessageIds).toContain("raw-sess")
     expect(sessionMessageIds).not.toContain("opencode:raw-sess")
+  })
+})
+
+describe("start-work template label matches the activated agent (#5499)", () => {
+  test("#given /start-work activates Atlas #when reading the shipped template header #then it announces an Atlas work session, not Sisyphus", () => {
+    // /start-work activates the atlas agent (see createStartWorkHook), so the
+    // shipped template header must not announce a stale 'Sisyphus work session' (#5499).
+    expect(START_WORK_TEMPLATE).toContain("You are starting an Atlas work session.")
+    expect(START_WORK_TEMPLATE).not.toContain("Sisyphus work session")
   })
 })
