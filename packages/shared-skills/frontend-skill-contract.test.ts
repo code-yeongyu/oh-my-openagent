@@ -201,6 +201,16 @@ describe("frontend skill designpowers default integration", () => {
 
 		expect(archText).toContain("## 8. Accessibility Constraints & Accepted Debt")
 	})
+
+	test("#given the routing pointers #when the schema grows #then no stale 7-section count survives anywhere", async () => {
+		const skillText = await Bun.file(frontendSkillPath).text()
+		const indexText = await Bun.file(new URL("./skills/frontend/references/design/_INDEX.md", import.meta.url)).text()
+
+		for (const text of [skillText, indexText]) {
+			expect(text).not.toContain("7-section")
+			expect(text).toContain("8 sections")
+		}
+	})
 })
 
 describe("frontend skill primitive showcase gate", () => {

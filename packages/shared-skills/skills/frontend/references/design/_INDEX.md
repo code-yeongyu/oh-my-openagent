@@ -13,7 +13,7 @@ All reference files live flat in this directory. Three layers:
 
 | File | Purpose | Load when |
 |---|---|---|
-| `design-system-architecture.md` | Defines the 7-section `DESIGN.md` structure (atmosphere, color tokens, typography scale, spacing system, components, motion, depth). Creation workflow for new and existing projects. Validation rules and memory management. | Phase 0 fires and no `DESIGN.md` exists in the project. Also load when extracting a design system from existing code. |
+| `design-system-architecture.md` | Defines the `DESIGN.md` structure — 8 sections plus a greenfield-only `## 0. Research Log` (atmosphere, color tokens, typography scale, spacing system, components, motion, depth, accessibility constraints & accepted debt). Creation workflow for new and existing projects. Validation rules and memory management. | Phase 0 fires and no `DESIGN.md` exists in the project. Also load when extracting a design system from existing code. |
 
 ---
 
