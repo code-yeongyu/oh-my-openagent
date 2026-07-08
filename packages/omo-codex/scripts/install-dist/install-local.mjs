@@ -7718,6 +7718,23 @@ async function pruneMarketplacePluginCaches(input) {
     await rm5(cacheRoot, { recursive: true, force: true });
   }
 }
+async function pruneMarketplacePluginVersions(input) {
+  const cacheRoot = join13(input.codexHome, "plugins", "cache", input.marketplaceName);
+  if (!await fileExistsStrict(cacheRoot))
+    return;
+  for (const plugin of input.plugins) {
+    const pluginRoot = join13(cacheRoot, plugin.name);
+    if (!await fileExistsStrict(pluginRoot))
+      continue;
+    const keepVersions = new Set([plugin.version]);
+    const entries = await readCacheEntries(pluginRoot);
+    for (const entry of entries) {
+      if (keepVersions.has(entry.name))
+        continue;
+      await rm5(join13(pluginRoot, entry.name), { recursive: true, force: true });
+    }
+  }
+}
 async function readCacheEntries(path) {
   const emptyEntries = [];
   return readCacheRoot(path, () => readdir5(path, { withFileTypes: true }), emptyEntries);
@@ -13791,6 +13808,7 @@ async function runCodexInstaller(options = {}) {
     marketplaceName: marketplace.name,
     keepPluginNames: marketplace.plugins.map((plugin) => plugin.name)
   });
+  await pruneMarketplacePluginVersions({ codexHome, marketplaceName: marketplace.name, plugins: installed });
   for (const legacyMarketplaceName of legacyCacheMarketplaces(marketplace.name)) {
     await pruneMarketplacePluginCaches({
       codexHome,

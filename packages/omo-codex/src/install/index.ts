@@ -12,7 +12,14 @@ export { runCodexInstaller } from "./install-codex"
 export { detectCodexInstallation, formatCodexInstallationWarning } from "./codex-installation-detection"
 export { cleanupCodexLight, cleanupCodexLightConfigText } from "./codex-cleanup"
 export { readMarketplace, readPluginManifest, resolvePluginSource, validatePathSegment } from "./codex-marketplace"
-export { installCachedPlugin, linkCachedPluginBins, linkRootRuntimeBin, pruneMarketplaceCache, rewriteCachedMcpManifest } from "./codex-cache"
+export {
+  installCachedPlugin,
+  linkCachedPluginBins,
+  linkRootRuntimeBin,
+  pruneMarketplaceCache,
+  pruneMarketplacePluginVersions,
+  rewriteCachedMcpManifest,
+} from "./codex-cache"
 export {
   findNewestCachedCodexComponentCli,
   resolveCachedCodexComponentCliPath,

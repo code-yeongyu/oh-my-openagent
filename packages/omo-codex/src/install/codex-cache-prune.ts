@@ -34,6 +34,25 @@ export async function pruneMarketplacePluginCaches(input: {
   }
 }
 
+export async function pruneMarketplacePluginVersions(input: {
+  readonly codexHome: string
+  readonly marketplaceName: string
+  readonly plugins: readonly { readonly name: string; readonly version: string }[]
+}): Promise<void> {
+  const cacheRoot = join(input.codexHome, "plugins", "cache", input.marketplaceName)
+  if (!(await fileExistsStrict(cacheRoot))) return
+  for (const plugin of input.plugins) {
+    const pluginRoot = join(cacheRoot, plugin.name)
+    if (!(await fileExistsStrict(pluginRoot))) continue
+    const keepVersions = new Set([plugin.version])
+    const entries = await readCacheEntries(pluginRoot)
+    for (const entry of entries) {
+      if (keepVersions.has(entry.name)) continue
+      await rm(join(pluginRoot, entry.name), { recursive: true, force: true })
+    }
+  }
+}
+
 async function readCacheEntries(path: string): Promise<readonly Dirent<string>[]> {
   const emptyEntries: readonly Dirent<string>[] = []
   return readCacheRoot(path, () => readdir(path, { withFileTypes: true }), emptyEntries)
