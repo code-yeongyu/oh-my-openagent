@@ -1,0 +1,1 @@
+PASS: git status was clean except ignored recovery evidence before force-adding evidence.

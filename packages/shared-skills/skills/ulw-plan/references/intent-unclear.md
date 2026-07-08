@@ -26,13 +26,13 @@ Fold a contrarian self-grill into the Metis spawn: challenge the single highest-
 </default_selection>
 
 <high_accuracy_auto>
-Because the human did not steer, adversarial review SUBSTITUTES for the interview you skipped - this is what catches a bad default. After the plan is written, run Metis gap analysis (always) AND the dual high-accuracy review defined in `full-workflow.md` AUTOMATICALLY - no "do you want a review?" question. Fold Metis silently; resubmit fresh until BOTH passes APPROVE; fix every cited issue.
+Because the human did not steer, adversarial review SUBSTITUTES for the interview you skipped - this is what catches a bad default. Metis runs during plan generation as always; after Metis findings are folded and the plan file is complete, run the dual high-accuracy review defined in `full-workflow.md` AUTOMATICALLY - no "do you want a review?" question - and resubmit fresh until BOTH passes APPROVE, fixing every cited issue.
 
 TRIVIAL-TIER GUARD: if Classify sized the work Trivial, the auto-Momus loop is SUPPRESSED (Metis still runs once) - a vague-but-tiny request ("clean this up") must not trigger the full adversarial loop. UNCLEAR raises the research-plus-default posture; it does not override the Trivial cost guard for Momus.
 </high_accuracy_auto>
 
 <approval_gate>
-Still present a brief and wait for the user's explicit okay - approval is not execution - but the brief LEADS with "here is the best-practice approach I derived and the assumptions I adopted (with reversibility)", not "here are questions for you". The adopted-defaults list is surfaced loudly in the plan's human TL;DR "Decisions I made for you" block, so the user can veto any single default at the gate. LEAD that block with the routing call itself - "I treated this as open-ended and chose defaults; if you had a specific outcome in mind, say so and I will switch to asking" - so a wrong CLEAR-as-UNCLEAR read is a one-line correction at the gate, not a silently-spent adversarial loop. Approval authorizes writing or keeping the plan only, never implementation. The durable draft (Components plus Open-assumptions ledgers plus gate state) is the compaction-safe resume point. ($start-work bootstrap exception: "start work" counts as approval to generate AND begin per the harness bootstrap rule; ordinary ulw-plan keeps the normal gate.)
+Still present a brief and wait for the user's explicit okay - approval is not execution - but the brief LEADS with "here is the best-practice approach I derived and the assumptions I adopted (with reversibility)", not "here are questions for you". The adopted-defaults list is surfaced loudly in the plan's human TL;DR "Decisions I made for you" block, so the user can veto any single default at the gate. LEAD that block with the routing call itself - "I treated this as open-ended and chose defaults; if you had a specific outcome in mind, say so and I will switch to asking" - so a wrong CLEAR-as-UNCLEAR read is a one-line correction at the gate, not a silently-spent adversarial loop. Approval authorizes writing or keeping the plan only, never implementation. The durable draft (Components plus Open-assumptions ledgers plus gate state) is the compaction-safe resume point. ($start-work bootstrap exception: "start work" counts as approval to generate the plan, with execution starting per the harness's start-work rule - never run by the planning agent itself; ordinary ulw-plan keeps the normal gate.)
 </approval_gate>
 
 <worked_example>
@@ -40,5 +40,5 @@ Request: "make auth better".
 1. Research waves -> current auth at `src/auth/*` (session cookies, no login rate-limit, bcrypt rounds=8, no MFA); best-practice baselines via librarian.
 2. Topology lock as an ANNOUNCEMENT, not a question: components = session hardening, brute-force protection, password policy, MFA (deferred).
 3. Adopted-defaults table (assumption | default | rationale | reversible?): bcrypt rounds 8 -> 12 (reversible), add 5/min-per-IP login limit (reversible), rotate session id on privilege change (reversible).
-4. Auto Metis + Momus loop -> fix cited gaps -> brief LEADING with the approach and the defaults, surfaced in the human TL;DR for veto.
+4. Metis folded -> auto dual review (fix cited gaps until both approve) -> brief LEADING with the approach and the defaults, surfaced in the human TL;DR for veto.
 </worked_example>

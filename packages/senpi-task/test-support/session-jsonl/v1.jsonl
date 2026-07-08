@@ -1,0 +1,5 @@
+{"type":"session","version":1,"id":"11111111-1111-1111-1111-111111111111","timestamp":"2024-12-03T14:00:00.000Z","cwd":"/proj"}
+{"type":"message","message":{"role":"user","content":"Investigate the failing build."}}
+{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"The build fails because of a missing import."}],"provider":"anthropic","model":"claude-sonnet-4-5","stopReason":"stop"}}
+{"type":"message","message":{"role":"toolResult","toolCallId":"call_1","toolName":"bash","content":[{"type":"text","text":"tsc output"}],"isError":false}}
+{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"Fixed it. The import path was wrong."}],"provider":"anthropic","model":"claude-sonnet-4-5","stopReason":"stop"}}

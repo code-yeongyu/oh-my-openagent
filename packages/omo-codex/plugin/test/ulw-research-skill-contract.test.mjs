@@ -77,7 +77,11 @@ test("#given ulw-research description #when activation policy is inspected #then
 	for (const copy of await readUlwResearchCopies()) {
 		const description = frontmatterDescription(copy.content);
 		assert.match(description, /ulw-research/i, `${copy.label}: description must name the ulw-research trigger`);
-		assert.match(description, /ultraresearch/i, `${copy.label}: description must preserve ultraresearch discoverability`);
+		if (copy.label === "shared") {
+			assert.match(description, /ultraresearch/i, `${copy.label}: description must preserve ultraresearch discoverability`);
+		} else {
+			assert.doesNotMatch(description, /ultraresearch/i, `${copy.label}: description must not expose ultraresearch`);
+		}
 		assert.match(description, /\bulw\b/i, `${copy.label}: description must preserve ulw discoverability`);
 		assert.match(description, /explicit/i, `${copy.label}: description must gate activation on explicit demand`);
 		assert.match(
@@ -87,6 +91,20 @@ test("#given ulw-research description #when activation policy is inspected #then
 		);
 		assert.match(description, /\bresearch\b/i, `${copy.label}: description must name the research trigger`);
 	}
+});
+
+test("#given packaged ulw-research skill #when scanned for legacy aliases #then ultraresearch is not exposed", async () => {
+	const packaged = (await readUlwResearchCopies()).find((copy) => copy.label === "packaged");
+	assert.notEqual(packaged, undefined, "packaged copy not found");
+	assert.doesNotMatch(packaged.content, /ultraresearch/i, "packaged ulw-research must not expose ultraresearch");
+});
+
+test("#given packaged ulw-research skill #when Codex guidance is inspected #then compatibility guidance is preserved", async () => {
+	const packaged = (await readUlwResearchCopies()).find((copy) => copy.label === "packaged");
+	assert.notEqual(packaged, undefined, "packaged copy not found");
+	assert.match(packaged.content, /## Codex Harness Tool Compatibility/);
+	assert.match(packaged.content, /multi_agent_v1\.spawn_agent/);
+	assert.match(packaged.content, /multi_agent_v1\.wait_agent/);
 });
 
 test("#given ulw-research body #when authority is inspected #then it takes precedence over exploration-bounding instructions", async () => {
@@ -227,22 +245,22 @@ test("#given ulw-research default swarm #when team guidance is inspected #then t
 	}
 });
 
-test("#given ulw-research non-code verification #when the gate is inspected #then a claim ledger / verified-claims data-flow-lock exists", async () => {
+test("#given ulw-research non-code verification #when the gate is inspected #then a claim graph / verified-claims data-flow-lock exists", async () => {
 	for (const copy of await readUlwResearchCopies()) {
 		assert.match(
 			copy.content,
-			/claim ledger|verified-claims/i,
-			`${copy.label}: body must define the non-code claim-ledger verification gate`,
+			/claim graph|verified-claims/i,
+			`${copy.label}: body must define the non-code claim-graph verification gate`,
 		);
 	}
 });
 
-test("#given ulw-research claim ledger #when ownership is inspected #then workers never write the ledger / verified-claims artifact", async () => {
+test("#given ulw-research claim graph #when ownership is inspected #then workers never write the graph / verified-claims artifact", async () => {
 	for (const copy of await readUlwResearchCopies()) {
 		assert.doesNotMatch(
 			copy.content,
-			/worker[^.]*\b(?:write|append|create)s?\b[^.]*(?:ledger|verified-claims)/i,
-			`${copy.label}: workers must not be instructed to write/append/create the ledger or verified-claims`,
+			/worker[^.]*\b(?:write|append|create)s?\b[^.]*(?:claim[- ]graph|verified-claims)/i,
+			`${copy.label}: workers must not be instructed to write/append/create the claim graph or verified-claims`,
 		);
 	}
 });

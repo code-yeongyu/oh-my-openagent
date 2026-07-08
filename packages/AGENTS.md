@@ -1,10 +1,10 @@
-# packages/ — Monorepo Packages
+# packages/ - Monorepo Packages
 
 **Generated:** 2026-06-17
 
 ## OVERVIEW
 
-37 sibling packages across 6 roles. `omo-opencode` is the **build entry** for the main npm dist (`packages/omo-opencode/src/index.ts` → bundled into root `dist/`). The root `package.json` `files` array ships `dist/` + `bin/` + `postinstall.mjs` plus selected sibling artifacts (`lsp-tools-mcp`, `lsp-daemon`, `git-bash-mcp` `dist/`; `shared-skills`; the `omo-codex` plugin bundle; and `.opencode`/`.agents` command+skill dirs). Everything else is a sibling with its own publication / deployment target.
+40 sibling packages across 6 roles. `omo-opencode` is the **build entry** for the main npm dist (`packages/omo-opencode/src/index.ts` → bundled into root `dist/`). The root `package.json` `files` array ships `dist/` + `bin/` + `postinstall.mjs` plus selected sibling artifacts (`lsp-tools-mcp`, `lsp-daemon`, `git-bash-mcp` `dist/`; `shared-skills`; the `omo-codex` plugin bundle; and `.opencode`/`.agents` command+skill dirs). Everything else is a sibling with its own package boundary; check the package docs before assuming a publication, deployment, or local-install surface.
 
 ## ROLE MAP
 
@@ -12,8 +12,8 @@
 |------|-------|----------|
 | **Platform binaries** | 12 | One per (OS × arch × variant). Uniform layout: `bin/` + `package.json` only. Selected at install time by `bin/` shim + `postinstall.mjs`. |
 | **MCP packages** | 3 | `lsp-tools-mcp`, `git-bash-mcp`, `lsp-daemon` |
-| **Core packages** | 18 | `utils`, `model-core`, `prompts-core`, `rules-engine` (was `rules-core`), `agents-md-core`, `comment-checker-core`, `hashline-core`, `boulder-state`, `telemetry-core`, `lsp-core`, `mcp-stdio-core`, `tmux-core`, `claude-code-compat-core`, `skills-loader-core`, `mcp-client-core`, `openclaw-core`, `team-core`, `delegate-core` |
-| **Adapters** | 2 | `omo-opencode` (OpenCode Ultimate edition; the former root `src/`, build entry for the main npm dist) + `omo-codex` (Codex CLI Light edition; npm/bin alias `lazycodex`; Codex marketplace `sisyphuslabs` / plugin `omo`). See [`packages/omo-opencode/src/AGENTS.md`](omo-opencode/src/AGENTS.md), [`packages/omo-codex/AGENTS.md`](omo-codex/AGENTS.md) |
+| **Core packages** | 19 | `utils`, `model-core`, `prompts-core`, `rules-engine` (was `rules-core`), `agents-md-core`, `comment-checker-core`, `hashline-core`, `boulder-state`, `telemetry-core`, `lsp-core`, `mcp-stdio-core`, `tmux-core`, `claude-code-compat-core`, `skills-loader-core`, `mcp-client-core`, `openclaw-core`, `team-core`, `delegate-core`, `omo-config-core` |
+| **Adapters** | 3 (+1 adapter-support) | `omo-opencode` (OpenCode Ultimate edition; the former root `src/`, build entry for the main npm dist) + `omo-codex` (Codex CLI Light edition; npm/bin alias `lazycodex`; Codex marketplace `sisyphuslabs` / plugin `omo`) + `omo-senpi` (Senpi native TypeScript extension adapter; local-path Pi package under `packages/omo-senpi/plugin`). Adapter-support: `senpi-task` (Senpi-coupled task engine consumed only by `omo-senpi`; not harness-neutral, so not a `*-core` package). See [`packages/omo-opencode/src/AGENTS.md`](omo-opencode/src/AGENTS.md), [`packages/omo-codex/AGENTS.md`](omo-codex/AGENTS.md), [`packages/omo-senpi/AGENTS.md`](omo-senpi/AGENTS.md), [`packages/senpi-task/AGENTS.md`](senpi-task/AGENTS.md) |
 | **Skills** | 1 | [`shared-skills`](shared-skills/AGENTS.md) (cross-harness SKILL.md bundle shared between OMO and Codex; shipped via root `files` array) |
 | **Web** | 1 | `web` |
 
@@ -57,6 +57,7 @@ Every Core package now ships its own AGENTS.md (linked below).
 | [`openclaw-core/`](openclaw-core/AGENTS.md) | `src/`, `tsconfig.json` | OpenClaw gateway, reply-listener daemon, session registry, and tmux injection primitives. |
 | [`team-core/`](team-core/AGENTS.md) | `src/`, `tsconfig.json` | Team-mode registry, mailbox, tasklist, state, worktree, and tmux layout domain primitives. |
 | [`delegate-core/`](delegate-core/AGENTS.md) | `src/`, `tsconfig.json` | Delegate task selection and retry primitives. |
+| [`omo-config-core/`](omo-config-core/AGENTS.md) | `src/`, `tsconfig.json` | Harness-neutral `omo.json` schema, walked loader, and comment-preserving atomic writer. |
 
 ## WEB
 
@@ -66,8 +67,10 @@ Every Core package now ships its own AGENTS.md (linked below).
 
 ## ADAPTERS
 
-- **`omo-opencode`** is the OpenCode Ultimate edition — the former root `src/`, moved here by the package layering refactor (100% git rename). It is the build entry for the main npm dist (`packages/omo-opencode/src/index.ts` → root `dist/`) and holds all 11 agents, ~55 hooks, native tools, features, and built-in MCPs. Full breakdown in [`packages/omo-opencode/src/AGENTS.md`](omo-opencode/src/AGENTS.md).
+- **`omo-opencode`** is the OpenCode Ultimate edition - the former root `src/`, moved here by the package layering refactor (100% git rename). It is the build entry for the main npm dist (`packages/omo-opencode/src/index.ts` → root `dist/`) and holds all 11 agents, ~55 hooks, native tools, features, and built-in MCPs. Full breakdown in [`packages/omo-opencode/src/AGENTS.md`](omo-opencode/src/AGENTS.md).
 - **`omo-codex`** is the Codex CLI Light edition (vendored Codex plugin namespace `omo` + TS installer + telemetry); its public distribution is the `lazycodex` bin/npm alias and the `code-yeongyu/lazycodex` marketplace repo; full layout in [`packages/omo-codex/AGENTS.md`](omo-codex/AGENTS.md) and the publish/deploy pipeline in the root [`AGENTS.md`](../AGENTS.md).
+- **`omo-senpi`** is the native Senpi TypeScript extension adapter. It builds one local-path Pi package at `packages/omo-senpi/plugin` with six components: `ultrawork`, `ulw-loop`, `comment-checker`, `telemetry`, `lsp`, and `task` (the `task` component drives the `@oh-my-opencode/senpi-task` engine and reads `omo.json` via `@oh-my-opencode/omo-config-core`). Rules are intentionally excluded because Senpi has builtin rules. V1 is local-path install only; do not describe npm, git, or marketplace distribution unless the implementation changes. Full breakdown in [`packages/omo-senpi/AGENTS.md`](omo-senpi/AGENTS.md).
+- **`senpi-task`** is the Senpi-coupled task engine consumed only by `omo-senpi`: the task state machine, record store, in-process + RPC runners, residency/TTL/reconcile lifecycle, completion notifier, steering engine, named-team runtime, and the 7 task + 12 team `ToolDefinition`s. Full breakdown in [`packages/senpi-task/AGENTS.md`](senpi-task/AGENTS.md).
 
 ## CONVENTIONS
 
@@ -81,4 +84,4 @@ Every Core package now ships its own AGENTS.md (linked below).
 
 - Never publish a sibling package manually. Use the GitHub Actions workflows.
 - Never copy code between packages by hand. Either share via a core package or accept the duplication and document it.
-- Never modify `bin/<binary>` inside a platform package — those are compiled artifacts.
+- Never modify `bin/<binary>` inside a platform package - those are compiled artifacts.

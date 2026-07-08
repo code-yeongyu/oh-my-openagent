@@ -183,7 +183,7 @@ describe("codex ultrawork hook", () => {
 		};
 
 		// when
-		const output = runUserPromptSubmitHook(payload);
+		const output = runUserPromptSubmitHook(payload, { skillFilePath: null });
 		const parsed = parseHookOutput(output);
 
 		// then
@@ -209,7 +209,7 @@ describe("codex ultrawork hook", () => {
 		};
 
 		// when
-		const output = runUserPromptSubmitHook(payload);
+		const output = runUserPromptSubmitHook(payload, { skillFilePath: null });
 		const parsed = parseHookOutput(output);
 
 		// then
@@ -230,7 +230,7 @@ describe("codex ultrawork hook", () => {
 		};
 
 		// when
-		const output = runUserPromptSubmitHook(payload);
+		const output = runUserPromptSubmitHook(payload, { skillFilePath: null });
 		const parsed = parseHookOutput(output);
 
 		// then
@@ -252,7 +252,7 @@ describe("codex ultrawork hook", () => {
 		};
 
 		// when
-		const output = runUserPromptSubmitHook(payload);
+		const output = runUserPromptSubmitHook(payload, { skillFilePath: null });
 		const parsed = parseHookOutput(output);
 
 		// then

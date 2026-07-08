@@ -93,7 +93,7 @@ jobs:
         working-directory: packages/lsp-tools-mcp
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Type check
         run: bun run typecheck
@@ -132,7 +132,7 @@ jobs:
         working-directory: packages/lsp-tools-mcp
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Build vendored lsp-daemon package
         run: npm ci && npm run build
@@ -359,7 +359,7 @@ jobs:
           bun-version: "1.3.12"
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Prepare and merge release state before publishing
         id: prepare
@@ -497,7 +497,7 @@ jobs:
         run: npm install -g npm@latest
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Verify platform packages are published
         env:
@@ -584,6 +584,11 @@ jobs:
 
           jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
 
+      # PAYLOAD SOURCE OF TRUTH: this step and "Build Codex plugin components" below produce
+      # every artifact in the published `files` payload. The npm publish steps run with
+      # --ignore-scripts, so they do NOT re-run prepublishOnly/prepack/prepare at pack time.
+      # If these explicit builds are ever removed or reordered, the publishes would ship a
+      # stale or empty dist. Keep them before every publish.
       - name: Build main package
         if: >-
           steps.check.outputs.skip != 'true' ||
@@ -608,6 +613,16 @@ jobs:
           npm --prefix packages/omo-codex/plugin ci
           bun run --cwd packages/omo-codex/plugin build
 
+      # Payload containment gate: publishes below run with --ignore-scripts, so this is the
+      # last check that no senpi payload, nested node_modules, or retired component residue
+      # ships in the tarball (lazycodex-ai@4.15.1 shipped ~699MB of nested node_modules).
+      - name: Verify npm payload containment
+        if: >-
+          steps.check.outputs.skip != 'true' ||
+          steps.check-openagent.outputs.skip != 'true' ||
+          (inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true')
+        run: node script/verify-npm-payload.mjs
+
       - name: Strip token auth from .npmrc to force OIDC
         if: >-
           steps.check.outputs.skip != 'true' ||
@@ -629,9 +644,9 @@ jobs:
           NPM_CONFIG_PROVENANCE: true
         run: |
           if [ -n "$DIST_TAG" ]; then
-            npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
+            npm publish --ignore-scripts --access public --provenance --tag "$DIST_TAG" --loglevel verbose
           else
-            npm publish --access public --provenance --tag latest --loglevel verbose
+            npm publish --ignore-scripts --access public --provenance --tag latest --loglevel verbose
           fi
 
       - name: Publish oh-my-openagent
@@ -653,9 +668,9 @@ jobs:
           ' package.json > tmp.json && mv tmp.json package.json
 
           if [ -n "$DIST_TAG" ]; then
-            npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
+            npm publish --ignore-scripts --access public --provenance --tag "$DIST_TAG" --loglevel verbose
           else
-            npm publish --access public --provenance --tag latest --loglevel verbose
+            npm publish --ignore-scripts --access public --provenance --tag latest --loglevel verbose
           fi
 
       - name: Restore package.json
@@ -674,7 +689,7 @@ jobs:
             .name = "lazycodex-ai" |
             .version = $omo_version |
             .bin = { "lazycodex-ai": "packages/omo-codex/scripts/install-local.mjs", "lazycodex": "packages/omo-codex/scripts/install-local.mjs" } |
-            .files = ["dist/cli", "dist/cli-node", "script/qa/web-terminal-redaction.d.mts", "script/qa/web-terminal-redaction.mjs", "script/qa/web-terminal-renderer.mjs", "script/qa/web-terminal-visual-qa.mjs", "docs/reference/github-attachment-upload.md", "docs/reference/web-terminal-visual-qa.md", "packages/omo-codex/scripts/install-local.mjs", "packages/omo-codex/scripts/install-dist", "packages/omo-codex/plugin", "packages/omo-codex/plugin/components/bootstrap/dist/cli.js", "packages/omo-codex/plugin/components/bootstrap/scripts/bootstrap.ps1", "packages/omo-codex/plugin/components/bootstrap/scripts/node-dispatch.ps1", "packages/omo-codex/plugin/components/codegraph/dist/cli.js", "packages/omo-codex/plugin/components/codegraph/dist/serve.js", "packages/omo-codex/plugin/components/comment-checker/dist/cli.js", "packages/omo-codex/plugin/components/git-bash/dist/cli.js", "packages/omo-codex/plugin/components/lazycodex-executor-verify/dist/cli.js", "packages/omo-codex/plugin/components/lsp/dist/cli.js", "packages/omo-codex/plugin/components/rules/dist/cli.js", "packages/omo-codex/plugin/components/start-work-continuation/dist/cli.js", "packages/omo-codex/plugin/components/teammode/dist/cli.js", "packages/omo-codex/plugin/components/telemetry/dist/cli.js", "packages/omo-codex/plugin/components/ultrawork/dist/cli.js", "packages/omo-codex/plugin/components/ulw-loop/dist/cli.js", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/lsp-daemon/package.json", "packages/lsp-daemon/dist", "packages/git-bash-mcp/dist", "packages/shared-skills/package.json", "packages/shared-skills/index.mjs", "packages/shared-skills/skills"] |
+            .files = ["dist/cli", "dist/cli-node", "script/qa/web-terminal-redaction.d.mts", "script/qa/web-terminal-redaction.mjs", "script/qa/web-terminal-renderer.mjs", "script/qa/web-terminal-visual-qa.mjs", "docs/reference/github-attachment-upload.md", "docs/reference/web-terminal-visual-qa.md", "packages/omo-codex/scripts/install-local.mjs", "packages/omo-codex/scripts/install-dist", "packages/omo-codex/plugin", "packages/omo-codex/plugin/components/bootstrap/dist/cli.js", "packages/omo-codex/plugin/components/bootstrap/scripts/bootstrap.ps1", "packages/omo-codex/plugin/components/bootstrap/scripts/node-dispatch.ps1", "packages/omo-codex/plugin/components/codegraph/dist/cli.js", "packages/omo-codex/plugin/components/codegraph/dist/serve.js", "packages/omo-codex/plugin/components/comment-checker/dist/cli.js", "packages/omo-codex/plugin/components/git-bash/dist/cli.js", "packages/omo-codex/plugin/components/lazycodex-executor-verify/dist/cli.js", "packages/omo-codex/plugin/components/lsp/dist/cli.js", "packages/omo-codex/plugin/components/rules/dist/cli.js", "packages/omo-codex/plugin/components/start-work-continuation/dist/cli.js", "packages/omo-codex/plugin/components/teammode/dist/cli.js", "packages/omo-codex/plugin/components/telemetry/dist/cli.js", "packages/omo-codex/plugin/components/ultrawork/dist/cli.js", "packages/omo-codex/plugin/components/ulw-loop/dist/cli.js", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/lsp-daemon/package.json", "packages/lsp-daemon/dist", "packages/git-bash-mcp/dist", "packages/shared-skills/package.json", "packages/shared-skills/index.mjs", "packages/shared-skills/skills", "!packages/omo-codex/plugin/node_modules", "!packages/omo-codex/plugin/**/node_modules", "!packages/omo-codex/plugin/components/workflow-selector"] |
             .scripts = {} |
             .dependencies = {} |
             .devDependencies = {} |
@@ -682,10 +697,12 @@ jobs:
             .peerDependencies = {}
           ' package.json > tmp.json && mv tmp.json package.json
 
+          node script/verify-npm-payload.mjs
+
           if [ -n "$DIST_TAG" ]; then
-            npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
+            npm publish --ignore-scripts --access public --provenance --tag "$DIST_TAG" --loglevel verbose
           else
-            npm publish --access public --provenance --tag latest --loglevel verbose
+            npm publish --ignore-scripts --access public --provenance --tag latest --loglevel verbose
           fi
 
       - name: Smoke test published lazycodex-ai
@@ -800,7 +817,7 @@ jobs:
           bun-version: "1.3.12"
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Generate changelog
         run: |

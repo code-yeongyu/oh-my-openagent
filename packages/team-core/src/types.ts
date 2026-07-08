@@ -1,4 +1,4 @@
-import { z } from "zod"
+import * as z from "zod"
 import { createParseMember } from "./member-parser"
 
 export const MESSAGE_KINDS = [

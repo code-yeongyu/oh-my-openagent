@@ -65,7 +65,7 @@ describe("DMCA provenance gate", () => {
 		for (const skillName of includedDesignpowersSkills) {
 			const upstream = readFileSync(join(upstreamsRoot, "designpowers", "skills", skillName, "SKILL.md"), "utf8");
 			const materialized = readFileSync(
-				join(frontendSkillRoot, "references", "designpowers", "vendor", "skills", skillName, "SKILL.md"),
+				join(frontendSkillRoot, "references", "designpowers", "vendor", "skills", skillName, "reference.md"),
 				"utf8",
 			);
 			if (normalizeSkillFrontmatter(upstream) !== materialized) mismatches.push(skillName);

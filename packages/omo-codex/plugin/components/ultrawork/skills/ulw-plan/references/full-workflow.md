@@ -36,7 +36,7 @@ Make ONE judgment and follow ONE reference. Review modifiers are not routing sig
 - CLEAR -> `intent-clear.md`: run the **two filters** on every candidate question; ask only surviving forks (owner-decisions), with WHY.
 - UNCLEAR -> `intent-unclear.md`: research maximally, adopt announced best-practice defaults, do not ask the user extra questions.
 
-If a draft/plan already exists and the user asks for high-accuracy review, high-accuracy planning, or to make the plan more accurate, do not reroute from scratch unless the scope changed. Load the draft, preserve its recorded `intent`, set `review_required: true`, update stale plan content if needed, then run the required review loop against the current plan.
+If a draft/plan already exists and the user says a review modifier - even appended to an otherwise unrelated follow-up question - or asks to make the plan more accurate, do not reroute from scratch unless the scope changed. Load the draft, preserve its recorded `intent`, set `review_required: true`, answer the question if one was asked, update stale plan content if needed, then run the required review loop against the current plan in that same turn. A more rigorous answer is not a substitute for the review.
 
 Both paths record `intent`, `review_required`, and decisions to `.omo/drafts/<slug>.md` as they go - long sessions outlive your context, and plan generation reads the draft, not your memory.
 
@@ -82,10 +82,10 @@ Runs in parallel; ALL must APPROVE; surface results and wait for the user's expl
 ## Phase 4 - Deliver
 - CLEAR with `review_required: false`: present the plan summary, then ask ONE question and stop - start work now, or run a high-accuracy review first? Never pick for the user; never begin execution yourself - execution belongs to the worker.
 - CLEAR with `review_required: true`: run the high-accuracy review before delivery, record receipts, then present the plan summary and review result. Do not ask whether to run the review; the user already asked.
-- UNCLEAR: run Metis plus the high-accuracy review AUTOMATICALLY before presenting (unless Classify=Trivial), then present a brief that LEADS with the derived approach and the adopted defaults; still wait for the user's explicit okay.
+- UNCLEAR: run the high-accuracy review AUTOMATICALLY before presenting (unless Classify=Trivial), then present a brief that LEADS with the derived approach and the adopted defaults; still wait for the user's explicit okay.
 
 ### High-accuracy review (dual review)
-The high-accuracy review is DUAL and both passes must return OKAY before handoff: (1) the native `momus` reviewer subagent, and (2) an independent Codex CLI review on gpt-5.5 at xhigh reasoning, run in a disposable isolated workspace and `CODEX_HOME` with the harness's normal approval and sandbox policy. Do not add flags that disable approvals or sandboxing. Fix every cited issue and resubmit BOTH fresh until each approves. CLEAR: runs when the user opts in or `review_required: true`. UNCLEAR: runs automatically unless Classify=Trivial.
+The high-accuracy review is DUAL and both passes must return OKAY before handoff: (1) the native `momus` reviewer subagent, and (2) an independent Codex CLI review on gpt-5.5 at xhigh reasoning, run in a disposable isolated workspace and `CODEX_HOME` with the harness's normal approval and sandbox policy. Do not add flags that disable approvals or sandboxing. One round = exactly ONE `momus` + ONE independent review, dispatched together against the COMPLETE plan file (todos + TL;DR filled) - never a second `momus` while a round is in flight. After both verdicts return, fix every cited issue and resubmit both fresh until each approves. CLEAR: runs when the user opts in or `review_required: true`. UNCLEAR: runs automatically unless Classify=Trivial.
 
 The draft must record the native Momus session/result, the independent Codex CLI review command/result, and the fix/retry summary. Do not say "high-accuracy review completed" unless both receipts exist and both final verdicts are unconditional approval.
 
@@ -99,6 +99,6 @@ multi_agent_v1.spawn_agent({"message":"TASK: act as an explorer. DELIVERABLE: ..
 Roles: `explorer`, `librarian`, `metis`, `momus`. Spawn long plan/reviewer agents in the background and poll with short waits; require the child to send `WORKING: <task> - <phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A wait timeout only means no new mailbox update arrived; treat a running child as alive. Fall back only when the child completed without the deliverable, is ack-only after followup, explicitly `BLOCKED:`, or no longer running; then respawn a smaller `fork_context: false` job. Close each agent after integrating its result.
 
 ## Stop rules
-- Plan file exists, template filled, every todo has references + acceptance + QA + commit, dependency matrix consistent: present the summary, ask the start-or-high-accuracy question (CLEAR) or lead with the best-practice brief (UNCLEAR), and stop. Execution belongs to the worker, never to you.
+- Plan file exists, template filled, every todo has references + acceptance + QA + commit, dependency matrix consistent, and any required high-accuracy receipts recorded: present the summary, then (CLEAR without `review_required`) ask the start-or-high-accuracy question, or (CLEAR with `review_required` / UNCLEAR) report the review result - and stop. Execution belongs to the worker, never to you.
 - Brief presented and `status: awaiting-approval` recorded: wait. Do not re-explore unless the user changes scope.
 - Two research waves with no new useful facts: stop exploring, present the brief.

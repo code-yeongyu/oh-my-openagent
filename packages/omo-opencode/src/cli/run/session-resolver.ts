@@ -10,8 +10,10 @@ export async function resolveSession(options: {
   client: OpencodeClient
   sessionId?: string
   directory: string
+  retryDelayMs?: number
 }): Promise<string> {
   const { client, sessionId, directory } = options
+  const retryDelayMs = options.retryDelayMs ?? SESSION_CREATE_RETRY_DELAY_MS
 
   if (sessionId) {
     const res = await client.session.get({
@@ -42,7 +44,7 @@ export async function resolveSession(options: {
       console.error(pc.dim(`  Error: ${serializeError(res.error)}`))
 
       if (attempt < SESSION_CREATE_MAX_RETRIES) {
-        const delay = SESSION_CREATE_RETRY_DELAY_MS * attempt
+        const delay = retryDelayMs * attempt
         console.log(pc.dim(`  Retrying in ${delay}ms...`))
         await new Promise((resolve) => setTimeout(resolve, delay))
       }
@@ -60,7 +62,7 @@ export async function resolveSession(options: {
     )
 
     if (attempt < SESSION_CREATE_MAX_RETRIES) {
-      const delay = SESSION_CREATE_RETRY_DELAY_MS * attempt
+      const delay = retryDelayMs * attempt
       console.log(pc.dim(`  Retrying in ${delay}ms...`))
       await new Promise((resolve) => setTimeout(resolve, delay))
     }

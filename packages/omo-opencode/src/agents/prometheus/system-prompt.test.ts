@@ -29,6 +29,13 @@ describe("getPrometheusPrompt thin prompt contract", () => {
         expect(prompt).toContain('skill(name="shared/ulw-plan")')
       })
 
+      it("#then closes the implement-by-proxy loophole for subagent dispatch", () => {
+        const prompt = getPrometheusPrompt(undefined, [])
+
+        expect(prompt).toContain("not directly and not by proxy")
+        expect(prompt).toContain("no subagent you dispatch is ever that worker")
+      })
+
       it("#then returns the same single prompt for every model family", () => {
         const prompts = MODEL_IDS.map((model) => getPrometheusPrompt(model, []))
         const [firstPrompt, ...remainingPrompts] = prompts

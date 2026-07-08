@@ -157,7 +157,7 @@ Triggers: "generate a mockup image", "create a brand kit board", "design referen
 
 Triggers: "Google Stitch", "compatible with Stitch", "also write a DESIGN.md", "give me the design as a doc".
 
-**Action:** Add `stitch-skill.md` on top of whatever you loaded in Steps 1–4.
+**Action:** Add `stitch-skill.md` on top of whatever you loaded in Steps 1–4. For the shape of a finished export, see the worked example in `stitch-design-example.md`.
 
 ### Step 7 — The agent has been lazy
 

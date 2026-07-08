@@ -50,8 +50,9 @@ describe("promptInstallPlatform", () => {
     mock.restore()
   })
 
-  test("offers OpenCode, Codex, and Both choices", async () => {
+  test("offers OpenCode, Codex, and Both choices while the senpi platform flag is disabled", async () => {
     // given
+    delete process.env.OMO_ENABLE_SENPI_PLATFORM
     const selectSpy = spyOn(p, "select").mockResolvedValue("opencode")
 
     // when
@@ -70,8 +71,35 @@ describe("promptInstallPlatform", () => {
     })
   })
 
+  test("offers the Senpi choice when the senpi platform flag is enabled", async () => {
+    // given
+    process.env.OMO_ENABLE_SENPI_PLATFORM = "1"
+    const selectSpy = spyOn(p, "select").mockResolvedValue("senpi")
+
+    try {
+      // when
+      const value = await prompts.promptInstallPlatform("opencode")
+
+      // then
+      expect(value).toBe("senpi")
+      expect(selectSpy).toHaveBeenCalledTimes(1)
+      expect(selectSpy.mock.calls[0]?.[0]).toMatchObject({
+        initialValue: "opencode",
+        options: [
+          { value: "opencode" },
+          { value: "codex" },
+          { value: "both" },
+          { value: "senpi" },
+        ],
+      })
+    } finally {
+      delete process.env.OMO_ENABLE_SENPI_PLATFORM
+    }
+  })
+
   test("preserves Codex as the initial platform", async () => {
     // given
+    delete process.env.OMO_ENABLE_SENPI_PLATFORM
     const selectSpy = spyOn(p, "select").mockResolvedValue("codex")
 
     // when
@@ -116,6 +144,23 @@ describe("promptInstallConfig platform branching", () => {
       hasOpenCode: false,
       hasCodex: true,
       codexAutonomous: true,
+    } satisfies Partial<InstallConfig>)
+    expect(selectSpy).not.toHaveBeenCalled()
+  })
+
+  test("skips OpenCode questions when the user selects senpi", async () => {
+    // given
+    const selectSpy = spyOn(p, "select").mockResolvedValue("no")
+
+    // when
+    const config = await prompts.promptInstallConfig(createDetectedConfig(), "senpi")
+
+    // then
+    expect(config).toMatchObject({
+      platform: "senpi",
+      hasOpenCode: false,
+      hasCodex: false,
+      hasSenpi: true,
     } satisfies Partial<InstallConfig>)
     expect(selectSpy).not.toHaveBeenCalled()
   })

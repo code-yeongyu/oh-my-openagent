@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs"
-import { homedir } from "node:os"
 import { join } from "node:path"
+import { getHomeDirectory } from "@oh-my-opencode/utils"
 import { matchSkillByName } from "../../tools/skill/skill-matcher"
 import {
 	findProjectAgentsSkillDirs,
@@ -97,7 +97,7 @@ async function loadConfiguredGitMasterSkill(options?: SkillResolutionOptions): P
 		{ roots: findProjectClaudeSkillDirs(directory), scope: "project" },
 		{ roots: findProjectAgentsSkillDirs(directory), scope: "project" },
 		{ roots: [join(getClaudeConfigDir(), "skills")], scope: "user" },
-		{ roots: [join(homedir(), ".agents", "skills")], scope: "user" },
+		{ roots: [join(getHomeDirectory(), ".agents", "skills")], scope: "user" },
 	]
 
 	for (const group of rootGroups) {

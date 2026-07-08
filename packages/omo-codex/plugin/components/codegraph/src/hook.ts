@@ -1,14 +1,23 @@
 import { execFile, spawn } from "node:child_process";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { cwd as processCwd, env as processEnv, stdin as processStdin, stdout as processStdout } from "node:process";
+import {
+	cwd as processCwd,
+	env as processEnv,
+	stderr as processStderr,
+	stdin as processStdin,
+	stdout as processStdout,
+} from "node:process";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
 import { buildCodegraphChildEnv, buildCodegraphEnv } from "../../../../../utils/src/codegraph/env.ts";
 import { buildCodegraphInitGuidanceForToolResult } from "../../../../../utils/src/codegraph/guidance.ts";
 import { resolveCodegraphCommand } from "../../../../../utils/src/codegraph/resolve.ts";
+import { shouldExcludeCodegraphProject } from "../../../../../utils/src/codegraph/workspace.ts";
 import { getCodexOmoConfig } from "../../../shared/src/config-loader.ts";
+import { pruneCodegraphProjectStoresBestEffort } from "./cache-gc.js";
+import { sweepCodegraphZombiesBestEffort } from "./hook-sweep.js";
 import { resolveCodegraphCommandInvocation, SESSION_START_CWD_ENV } from "./session-start-worker.js";
 import type {
 	HookStdout,
@@ -57,9 +66,24 @@ export async function executeCodegraphSessionStartHook(options: SessionStartHook
 	const projectRoot = resolveProjectRoot(input, options.cwd ?? processCwd());
 	const homeDir = resolveHomeDir(env);
 	const config = options.config ?? getCodexOmoConfig({ cwd: projectRoot, env, homeDir });
+	pruneCodegraphProjectStoresBestEffort(homeDir, { debugLog: writeDebugLog });
+	await sweepCodegraphZombiesBestEffort({
+		env,
+		homeDir,
+		...(config.trustedCodegraphInstallDir === undefined ? {} : { trustedCodegraphInstallDir: config.trustedCodegraphInstallDir }),
+		log: writeDebugLog,
+	}, options.sweepZombies);
 
 	if (config.codegraph?.enabled === false) {
 		return { action: "skipped-disabled", exitCode: 0 };
+	}
+	const excludedRoots = config.codegraph?.excluded_roots;
+	const exclusion = shouldExcludeCodegraphProject(projectRoot, {
+		homeDir,
+		...(excludedRoots === undefined ? {} : { excludedRoots }),
+	});
+	if (exclusion.excluded) {
+		return { action: "skipped-excluded", exitCode: 0 };
 	}
 
 	const isInitialized = await (options.statusProbe ?? isCodegraphProjectInitialized)({
@@ -191,6 +215,11 @@ function writeHookJson(stdout: HookStdout): void {
 		},
 	};
 	stdout.write(`${JSON.stringify(output)}\n`);
+}
+
+function writeDebugLog(message: string): void {
+	if (processEnv["OMO_CODEGRAPH_DEBUG"] !== "1") return;
+	processStderr.write(`${message}\n`);
 }
 
 function spawnDetachedWorker(invocation: WorkerSpawnInvocation): void {

@@ -3,6 +3,7 @@ import { join } from "node:path"
 
 import {
   CODEGRAPH_INSTALL_DIR_ENV,
+  CODEGRAPH_NO_DAEMON_ENV,
   CODEGRAPH_NO_DOWNLOAD_ENV,
   CODEGRAPH_TELEMETRY_ENV,
   DO_NOT_TRACK_ENV,
@@ -21,6 +22,7 @@ describe("buildCodegraphEnv", () => {
     // then
     expect(result).toEqual({
       [CODEGRAPH_INSTALL_DIR_ENV]: join(homeDir, ".omo", "codegraph"),
+      [CODEGRAPH_NO_DAEMON_ENV]: "1",
       [CODEGRAPH_NO_DOWNLOAD_ENV]: "1",
       [CODEGRAPH_TELEMETRY_ENV]: "0",
       [DO_NOT_TRACK_ENV]: "1",
