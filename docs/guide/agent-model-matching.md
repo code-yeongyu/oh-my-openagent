@@ -28,7 +28,7 @@
 
 **We have NOT found any way to make MiniMax, Qwen, MiMo, or DeepSeek work acceptably as Sisyphus.** We tried. They do not hold up under Sisyphus's nested todo + delegation + orchestration prompt. This is not a "tune it more" situation — see the rule above: *a prompt cannot fix a model.*
 
-**MiniMax and Qwen in particular are so bad in the Sisyphus role that we would almost forbid it outright.** Treat **"Sisyphus on MiniMax"** and **"Sisyphus on Qwen"** as configurations you should simply *never* reach for. (These models still have legitimate jobs elsewhere — MiniMax for fast utility fallback, Qwen for visual work, both documented below — just **NEVER** as the orchestrator.)
+**MiniMax and Qwen in particular are so bad in the Sisyphus role that we would almost forbid it outright.** Treat **"Sisyphus on MiniMax"** and **"Sisyphus on Qwen"** as configurations you should simply *never* reach for. (These models still have legitimate jobs elsewhere — MiniMax for fast utility fallback, Qwen for explicit visual overrides, both documented below — just **NEVER** as the orchestrator.)
 
 ---
 
@@ -157,7 +157,7 @@ You don't need every provider. You need the right two.
 ### Why this specific combination
 
 1. **Hephaestus requires GPT-5.5.** It has no Claude-family fallback. ChatGPT Plus/Pro or OpenAI API access is the cheapest real path.
-2. **OpenCode Go covers the orchestration and creative surface.** Kimi K2.5/2.6 behaves like Claude for Sisyphus/Atlas. GLM-5 fills the long tail. Qwen handles visual tasks when Gemini isn't available.
+2. **OpenCode Go covers the orchestration and creative surface.** Kimi K2.5/2.6 behaves like Claude for Sisyphus/Atlas. GLM-5 fills the long tail. Qwen can be configured explicitly for visual tasks, but the built-in visual fallback chains are implementation-specific and documented below.
 3. **No single provider can cover everything.** Anthropic-only setups break Hephaestus. OpenAI-only setups degrade Sisyphus. You need at least one from each family.
 
 ### What if you already have a Claude subscription?
@@ -222,11 +222,15 @@ Used by: `visual-engineering`, `artistry`, Oracle (visual fallback), Multimodal-
 
 | Priority | Model | Provider | Why |
 |---|---|---|---|
-| 1 | `gemini-3.1-pro` (high) | `google`, `github-copilot`, `opencode`, `vercel` | Best for UI/UX, CSS, design tokens, layout decisions. `artistry` category **requires** this family. |
+| 1 | `gemini-3.1-pro` (high) | `google`, `github-copilot`, `opencode`, `vercel` | Best for UI/UX, CSS, design tokens, layout decisions. Default for `visual-engineering` and `artistry`. |
 | 2 | `gemini-3-flash` | same | Fast variant, writing/doc tasks. |
-| 3 | **Qwen — ALTERNATIVE** (`qwen3.6-plus`, `qwen3.5-plus`) | `opencode-go`, `openrouter/qwen` | Closest vision-capable substitute when Google isn't connected. Uses different reasoning style but handles visual tasks competently. |
+| 3 | **Qwen — explicit override only** (`qwen3.6-plus`, `qwen3.5-plus`) | `opencode-go`, `openrouter/qwen` | User-configured substitute when your provider exposes a vision-capable Qwen. Qwen is not currently in the hardcoded visual fallback chains. |
 
-> **No GLM/Kimi here.** They're not Gemini substitutes for visual work. Use Qwen.
+The hardcoded chains are not uniform:
+
+- `visual-engineering`: Gemini → `zai-coding-plan/opencode/vercel/glm-5` → `claude-opus-4-7` (max) → `opencode-go/vercel/glm-5.1` → `kimi-for-coding/k2p5`.
+- `artistry`: Gemini → `claude-opus-4-7` (max) → `gpt-5.5` → `opencode-go/vercel/kimi-k2.6` → `opencode-go/vercel/glm-5.1`.
+- Multimodal-Looker: registered vision-capable model first when present; otherwise GPT-5.5 medium → `opencode-go/vercel/kimi-k2.6` → `zai-coding-plan/vercel/glm-4.6v` → GPT-5-nano. The `look_at` tool can prepend dynamically discovered vision-capable models before this hardcoded tail.
 
 ---
 
@@ -236,7 +240,7 @@ Used by: `visual-engineering`, `artistry`, Oracle (visual fallback), Multimodal-
 |---|---|---|
 | Claude Opus/Sonnet | Kimi K2.7 → K2.6/K2.5 → GLM 5 → Big Pickle | Older GPT models |
 | GPT-5.4/5.5 | GPT-5.5 Codex → DeepSeek v3.2 | MiniMax (except for utility work) |
-| Gemini 3.1 Pro | Qwen 3.6-plus / 3.5-plus | Claude/Kimi (wrong reasoning style for visual) |
+| Gemini 3.1 Pro | Built-in chains differ by surface: `visual-engineering` uses GLM/Opus/GLM/Kimi; `artistry` uses Opus/GPT/Kimi/GLM; Multimodal-Looker uses GPT/Kimi/GLM/nano. Qwen only when explicitly configured as a vision-capable override. | Assuming one universal Qwen fallback |
 | Grok Code Fast 1 (Explore) | GPT-5.4 Mini Fast → MiniMax M2.7 Highspeed → MiniMax M3 → Claude Haiku | Opus (massive cost waste) |
 
 ---
@@ -362,7 +366,7 @@ When agents delegate work, they don't pick a model name — they pick a **catego
 | Category | Used For | Default Model | Fallback Chain |
 |---|---|---|---|
 | `visual-engineering` | Frontend, UI, CSS, design | `google/gemini-3.1-pro` (high) | Gemini → `zai-coding-plan/glm-5` → `claude-opus-4-7` (max) → `opencode-go/glm-5.1` → `kimi-for-coding/k2p5` |
-| `artistry` | Creative, novel approaches | `google/gemini-3.1-pro` (high) | Gemini → `claude-opus-4-7` (max) → `gpt-5.5` |
+| `artistry` | Creative, novel approaches | `google/gemini-3.1-pro` (high) | Gemini → `claude-opus-4-7` (max) → `gpt-5.5` → `opencode-go/kimi-k2.6` → `opencode-go/glm-5.1` |
 | `ultrabrain` | Maximum reasoning needed | `openai/gpt-5.5` (xhigh) | GPT-5.5 xhigh → `gemini-3.1-pro` (high) → `claude-opus-4-7` (max) → `opencode-go/glm-5.1` |
 | `deep` | Deep coding, complex logic | `openai/gpt-5.5` (medium) | GPT-5.5 → `claude-opus-4-7` (max) → `gemini-3.1-pro` (high) |
 | `quick` | Simple, fast tasks | `openai/gpt-5.4-mini` | GPT-5.4-mini → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `gemini-3-flash` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` → `opencode/gpt-5-nano` |
@@ -411,7 +415,7 @@ See the [Orchestration System Guide](./orchestration.md) for how agents dispatch
   },
 
   "categories": {
-    "visual-engineering": { "model": "opencode-go/qwen3.6-plus" },  // Qwen as Gemini alt
+    "visual-engineering": { "model": "opencode-go/qwen3.6-plus" },  // Explicit Qwen override; not the built-in fallback chain
     "deep": { "model": "openai/gpt-5.5", "variant": "medium" },
     "ultrabrain": { "model": "openai/gpt-5.5", "variant": "xhigh" },
     "quick": { "model": "openai/gpt-5.4-mini" },
@@ -466,7 +470,7 @@ Cheapest full-stack path. Hephaestus won't activate — accept that trade-off.
     "librarian": { "model": "opencode-go/qwen3.5-plus" },
   },
   "categories": {
-    "visual-engineering": { "model": "opencode-go/qwen3.6-plus" },
+    "visual-engineering": { "model": "opencode-go/glm-5.1" },
     "deep": { "model": "opencode-go/kimi-k2.7-code" },  // Not ideal — Kimi isn't GPT, but best available
     "unspecified-high": { "model": "opencode-go/kimi-k2.7-code" },
     "unspecified-low": { "model": "opencode-go/kimi-k2.7-code" },
@@ -519,7 +523,7 @@ If you have OpenRouter and want DeepSeek in the chain when GPT is unavailable:
 - **Oracle → MiniMax**: Same reason. Oracle needs sustained reasoning; MiniMax drifts.
 - **Explore → Opus**: Massive cost waste. Explore needs speed, not intelligence.
 - **Librarian → Opus**: Same. Doc search doesn't need Opus-level reasoning.
-- **`visual-engineering` → Kimi/GLM**: Wrong reasoning style. Use Qwen if Gemini is unavailable, not Claude-likes.
+- **`visual-engineering` → assuming one universal visual fallback**: The built-in chain is Gemini → GLM-5 → Opus → OpenCode Go GLM-5.1 → K2P5. Use Qwen only as an explicit override when you know that provider/model is vision-capable.
 
 ---
 
