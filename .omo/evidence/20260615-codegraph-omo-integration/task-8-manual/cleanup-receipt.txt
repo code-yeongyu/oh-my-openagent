@@ -1,5 +1,0 @@
-Task 8 cleanup receipt
-tmux sessions remaining for task 8:
-none
-missing-home temp exists: no
-Real DB after: 5675

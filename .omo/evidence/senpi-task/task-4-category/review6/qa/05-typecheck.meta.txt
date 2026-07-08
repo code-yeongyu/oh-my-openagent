@@ -1,6 +1,0 @@
-scenario: 05-typecheck
-surface: Bun workspace typecheck
-invocation: bun run typecheck
-started_at: 2026-07-06T11:02:03Z
-finished_at: 2026-07-06T11:02:07Z
-exit: 0

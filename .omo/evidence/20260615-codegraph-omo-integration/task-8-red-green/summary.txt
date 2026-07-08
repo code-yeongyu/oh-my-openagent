@@ -1,6 +1,0 @@
-Task 8 red/green summary
-RED: bun test packages/omo-opencode/src/mcp/codegraph.test.ts packages/omo-opencode/src/mcp/zauc-mocks-mcp-index/index.test.ts failed before implementation because ./codegraph was missing and createBuiltinMcps did not return codegraph. See red-focused-mcp-tests.txt.
-GREEN focused final: 11 pass, 0 fail. See green-focused-mcp-tests-final.txt.
-Typecheck final: bun run --cwd packages/omo-opencode typecheck exited 0. See typecheck-omo-opencode-final.txt.
-Full opencode final: 7746 pass, 1 skip, 0 fail. See bun-test-packages-omo-opencode-final.txt.
-Manual tmux QA: positive/disabled/missing-binary scenarios exited 0. See task-8-manual/*.txt and *.tmux.txt.

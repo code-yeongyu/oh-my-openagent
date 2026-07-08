@@ -1,6 +1,0 @@
- Test Files  1 passed (1)
-      Tests  4 passed (4)
----ultraresearch ref + word budget---
-123:Research-shape goals change the cycle: BEFORE each investigation, read this goal's prior ledger findings and open hypotheses, then extend them — never re-investigate an answered question (the ledger is your research notebook). Record findings via `annotate_ledger` with their source (`file:line`, command output, doc URL) as `--evidence`. Track hypotheses as `HYPOTHESIS[id]: <claim> | status: open`, flipped to `confirmed`/`refuted` only on an observed source. A research criterion passes on a cited answer — skip QA-channel, cleanup, and commit, but keep source-observability (never "looks correct"). Keep hypotheses inside the user's stated question; a scope-widening one is an `add_subgoal` proposal you surface, never silent creep. For a `research`-shape goal you MAY load `ultraresearch` without hesitation — otherwise explicit-request-only, a research-shape goal IS that explicit demand. Research-only: never for a `delivery` goal. It composes with the librarian routing above — `ultraresearch` for saturation (many parallel sources, recursive expansion), a single `librarian` for one lookup.
-workflow words: 3696 ceiling 3697
-malformed input count: 1

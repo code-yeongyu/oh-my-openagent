@@ -1,7 +1,0 @@
-PR-D pre-push gates (all green):
-- bun run typecheck -> exit 0
-- bun test -> 10091 pass, 0 fail, 2 skip
-- bun run build -> dist + schema built; ulw-loop synced into plugin
-- bun run test:codex -> 363 pass, 0 fail (incl. ulw-loop skill-contract vitest: word budget 3696<=3697, malformed-input once, sync-skills full parity)
-Cross-harness landing: codex install-verify lands full-workflow.md with the research-only ultraresearch carve-out; real ~/.codex/config.toml SHA unchanged.
-Word budget: workflow 3696 (ratchet ceiling advanced 3668->3697); skill 601<=611 (unchanged).

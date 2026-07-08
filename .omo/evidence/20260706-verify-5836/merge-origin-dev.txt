@@ -1,9 +1,0 @@
-$ git merge origin/dev
-commit ea4c7ec21948bf6d9d5831dc619a8d0fd44db4aa
-Merge: 8bfd6f950 141e90f1d
-Author:     YeonGyu-Kim <code.yeon.gyu@gmail.com>
-AuthorDate: Mon Jul 6 00:39:22 2026 +0900
-Commit:     YeonGyu-Kim <code.yeon.gyu@gmail.com>
-CommitDate: Mon Jul 6 00:39:22 2026 +0900
-
-    Merge remote-tracking branch 'origin/dev' into verify/pr-5836

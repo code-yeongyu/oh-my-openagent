@@ -1,3 +1,0 @@
-$ bun run packages/shared-skills/skills/programming/scripts/typescript/check-no-excuse-rules.ts <touched TS files>
-No violations in 12 file(s).
-exit=0

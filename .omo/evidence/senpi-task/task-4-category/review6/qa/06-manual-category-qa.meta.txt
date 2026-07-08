@@ -1,6 +1,0 @@
-scenario: 06-manual-category-qa
-surface: Manual category QA script
-invocation: bun run packages/senpi-task/scripts/manual-category-qa.ts
-started_at: 2026-07-06T11:02:07Z
-finished_at: 2026-07-06T11:02:07Z
-exit: 0

@@ -1,1 +1,0 @@
-.omo/evidence/20260625-codex-config-generated-bundle/generated-bundle-false-shorthand-probe.txt:23: new blank line at EOF.

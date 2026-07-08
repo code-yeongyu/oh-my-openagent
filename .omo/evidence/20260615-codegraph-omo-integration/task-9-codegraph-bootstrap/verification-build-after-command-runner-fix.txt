@@ -1,5 +1,0 @@
-COMMAND: bun build packages/omo-opencode/src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi --external zod
-Bundled 1739 modules in 73ms
-
-  index.js  5.20 MB  (entry point)
-

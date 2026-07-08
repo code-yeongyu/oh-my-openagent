@@ -1,6 +1,0 @@
-scenario: 02-boundary-test
-surface: Bun test: resolver boundary test
-invocation: bun test packages/senpi-task/src/category/resolve-category-boundary.test.ts
-started_at: 2026-07-06T11:02:01Z
-finished_at: 2026-07-06T11:02:01Z
-exit: 0

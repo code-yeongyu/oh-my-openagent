@@ -1,1 +1,0 @@
-scripts/typescript/check-no-excuse-rules.ts not present

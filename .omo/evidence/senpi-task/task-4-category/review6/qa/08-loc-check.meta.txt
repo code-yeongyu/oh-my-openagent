@@ -1,6 +1,0 @@
-scenario: 08-loc-check
-surface: Static LOC check for scoped TypeScript files and resolver
-invocation: files=$(find packages/senpi-task/src/category -type f \( -name "*.ts" -o -name "*.tsx" \) -print | sort; printf "%s\n" packages/senpi-task/scripts/manual-category-qa.ts packages/senpi-task/src/index.ts); fail=0; for file in $files; do lines=$(wc -l < "$file" | tr -d " "); printf "%4s %s\n" "$lines" "$file"; if [ "$lines" -gt 250 ]; then fail=1; fi; done; resolver_lines=$(wc -l < packages/senpi-task/src/category/resolve-category.ts | tr -d " "); printf "resolver_lines=%s packages/senpi-task/src/category/resolve-category.ts\n" "$resolver_lines"; if [ "$resolver_lines" -gt 250 ]; then fail=1; fi; exit "$fail"
-started_at: 2026-07-06T11:02:24Z
-finished_at: 2026-07-06T11:02:24Z
-exit: 1

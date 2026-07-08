@@ -1,9 +1,0 @@
-bun test v1.3.14 (0d9b296a)
-
-test/serve-mcp-bridge.test.ts:
-(pass) runCodegraphServe MCP protocol bridge > #given Codex framed stdio and a newline-json CodeGraph child #when listing tools #then it bridges frames and serves from the project cwd [233.37ms]
-
- 1 pass
- 0 fail
- 3 expect() calls
-Ran 1 test across 1 file. [252.00ms]

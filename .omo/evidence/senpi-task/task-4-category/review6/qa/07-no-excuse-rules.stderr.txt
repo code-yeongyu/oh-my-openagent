@@ -1,1 +1,0 @@
-/Users/yeongyu/.bash_profile: line 3: /usr/local/bin/gog.bash: No such file or directory

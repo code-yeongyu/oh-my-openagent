@@ -1,6 +1,0 @@
-Todo 6 — scaffold ultimate-browsing + register
-RED: sync-skills.test deepEqual FAILED (ultimate-browsing synced but not in expectedSkills whitelist) at sync-skills.test.mjs:43
-GREEN: added "ultimate-browsing" to expectedSkills AFTER "teammode" BEFORE "ultraresearch"; re-ran node --test test/sync-skills.test.mjs -> tests 14, pass 14, fail 0
-Acceptance: grep -c -iE 'aside|jobdori|quotio|/Users/yeongyu' SKILL.md -> 0
-Loader: discoverSharedSkills().some(name==="ultimate-browsing") -> true
-Whitelist sorted + contains -> true

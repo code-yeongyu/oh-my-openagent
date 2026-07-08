@@ -1,6 +1,0 @@
-scenario: 11-adversarial-boundary-proof
-surface: Repair6 adversarial proof: boundary tests/manual QA contain empty and mismatched find identity model_unavailable cases
-invocation: rg -n -C 3 "empty.*find|mismatch|mismatched|model_unavailable|find\\(\\)" packages/senpi-task/src/category/resolve-category-boundary.test.ts packages/senpi-task/scripts/manual-category-qa.ts
-started_at: 2026-07-06T11:02:24Z
-finished_at: 2026-07-06T11:02:24Z
-exit: 0

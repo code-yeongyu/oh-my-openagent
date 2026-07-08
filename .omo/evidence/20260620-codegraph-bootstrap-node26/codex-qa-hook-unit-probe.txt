@@ -1,4 +1,0 @@
-$ bash .agents/skills/codex-qa/scripts/hook-unit-probe.sh --self-test
-installing local omo into /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/cqa-home.XXXXXX.LCUkWDaW87/codex ...
-PASS: real ~/.codex/config.toml unchanged (dede921f3da9eca7f7546bafe890927a59a16e61)
-PASS: ultrawork UserPromptSubmit injected <ultrawork-mode> on an ulw prompt

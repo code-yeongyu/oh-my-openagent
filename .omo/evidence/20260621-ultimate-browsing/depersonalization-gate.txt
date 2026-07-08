@@ -1,2 +1,0 @@
-OK: no personal-identity or credential leakage found.
-exit=

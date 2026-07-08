@@ -1,4 +1,0 @@
-$ find pi-extensions/pi-task/src/agents pi-extensions/pi-task -maxdepth 1 -type f -name README.md -print
-exit=1
-find: pi-extensions/pi-task/src/agents: No such file or directory
-find: pi-extensions/pi-task: No such file or directory

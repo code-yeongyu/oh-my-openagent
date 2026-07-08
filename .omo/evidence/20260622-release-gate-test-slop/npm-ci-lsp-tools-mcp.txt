@@ -1,8 +1,0 @@
-$ npm --prefix packages/lsp-tools-mcp ci
-
-added 52 packages, and audited 55 packages in 500ms
-
-18 packages are looking for funding
-  run `npm fund` for details
-
-found 0 vulnerabilities

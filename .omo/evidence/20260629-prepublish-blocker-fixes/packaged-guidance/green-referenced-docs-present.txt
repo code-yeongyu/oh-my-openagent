@@ -1,6 +1,0 @@
-Scenario: after fix, root bun pm pack dry-run should include both referenced guidance docs.
-Invocation: rg -n "docs/reference/(web-terminal-visual-qa|github-attachment-upload)\.md|web-terminal-visual-qa\.md|github-attachment-upload\.md" green-pack-dry-run.txt
-Observable: packed paths for both docs are present.
-
-2265:packed 2.87KB docs/reference/github-attachment-upload.md
-2266:packed 4.42KB docs/reference/web-terminal-visual-qa.md

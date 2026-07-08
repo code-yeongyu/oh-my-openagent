@@ -1,9 +1,0 @@
-$ node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check
-Bundled 532 modules in 36ms
-
-  omo.js  0.50 MB  (entry point)
-
-Built omo-senpi extension: /Users/yeongyu/local-workspaces/omo-worktrees/prepublish-gate-cleanup/packages/omo-senpi/plugin/extensions/omo.js
-synced 2 omo-senpi skills to /Users/yeongyu/local-workspaces/omo-worktrees/prepublish-gate-cleanup/packages/omo-senpi/plugin/skills
-generated directive is current: /Users/yeongyu/local-workspaces/omo-worktrees/prepublish-gate-cleanup/packages/omo-senpi/src/components/ultrawork/generated-directive.ts
-exit=0

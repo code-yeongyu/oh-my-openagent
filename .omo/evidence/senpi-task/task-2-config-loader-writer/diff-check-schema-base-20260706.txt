@@ -1,2 +1,0 @@
-$ git diff --check origin/code-yeongyu/senpi-task-w0-config-schema...HEAD
-exit_code=0

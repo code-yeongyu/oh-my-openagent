@@ -1,5 +1,0 @@
-command: pure LOC checks for changed source/test files
-script/qa/web-terminal-visual-qa.mjs: 228
-script/web-terminal-visual-qa.test.ts: 224
-script/web-terminal-visual-qa-command.test.ts: 75
-verdict: all touched files are under 250 pure LOC

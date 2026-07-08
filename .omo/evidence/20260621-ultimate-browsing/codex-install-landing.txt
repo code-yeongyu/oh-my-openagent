@@ -1,9 +1,0 @@
-PASS: plugin cache present (4.12.1)
-PASS: config.toml enables omo@sisyphuslabs
-PASS: component bins linked in sandbox (9 bins)
-PASS: agent TOMLs linked in sandbox
-PASS: real ~/.codex/config.toml unchanged (c6bbf449ccf554f4db591f35a5a9a799779f6582)
-kept isolated home: /var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/cqa-home.XXXXXX.T3MGF47mRP/codex
-PASS: install-verify
-ultimate-browsing landed in installed plugin: found=0 (skills/ultimate-browsing/SKILL.md + engine/ + references/ + scripts/ + ATTRIBUTION.md)
-SHA_BEFORE=c6bbf449ccf554f4db591f35a5a9a799779f6582 SHA_AFTER=c6bbf449ccf554f4db591f35a5a9a799779f6582 -> real ~/.codex/config.toml UNCHANGED (isolation proven)

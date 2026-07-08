@@ -1,5 +1,0 @@
-Scenario: before fix, root bun pm pack dry-run should omit the referenced guidance docs.
-Invocation: rg -n "docs/reference/(web-terminal-visual-qa|github-attachment-upload)\.md|web-terminal-visual-qa\.md|github-attachment-upload\.md" red-pack-dry-run.txt
-Observable: rg exit 1 means no packed path for either referenced doc.
-
-No referenced guidance docs were present in red-pack-dry-run.txt.

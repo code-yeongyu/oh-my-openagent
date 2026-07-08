@@ -1,2 +1,0 @@
-{"auto_provision":true,"enabled":false,"telemetry":false}
-ASSERT_EXACT_JSON_PASS

@@ -1,9 +1,0 @@
-COMMAND: structural anti-slop check for inline retired-agent purge and <=250 pure LOC
-
-link-cached-plugin-agents.ts pure LOC: 262
-FAIL: file exceeds 250 pure LOC before split
-5:const RETIRED_MANAGED_AGENT_FILES = [
-67:  await purgeRetiredManagedAgentFiles({ codexHome: input.codexHome })
-100:async function purgeRetiredManagedAgentFiles(input: { readonly codexHome: string }): Promise<void> {
-104:  for (const retiredAgent of RETIRED_MANAGED_AGENT_FILES) {
-FAIL: retired managed agent purge responsibility is still inline

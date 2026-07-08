@@ -1,9 +1,0 @@
-Pure LOC for changed TypeScript files
-packages/senpi-task/src/agents/paths.ts 102
-
-packages/senpi-task/src/agents/loader.test.ts 201
-
-packages/senpi-task/scripts/manual-agents-qa.ts 101
-
-
-[exit-code] 0

@@ -1,5 +1,0 @@
-=== task-4 edge: mode regression detected both directions ===
-after chmod 644:
- mode change 100755 => 100644 packages/omo-codex/plugin/components/codegraph/dist/serve.js
-after chmod 755 restore:
-(empty = clean)

@@ -1,7 +1,0 @@
-2026년 07월  7일 화 오전  2:15:36
-$ opencode --version; sqlite3 --version; jq --version; tmux -V; python3 --version || python --version
-1.17.13
-3.45.3 2024-04-15 13:34:05 8653b758870e6ef0c98d46b3ace27849054af85da891eb121e9aaa537f1e8355 (64-bit)
-/usr/bin/bash: line 14: jq: command not found
-/usr/bin/bash: line 15: tmux: command not found
-Python Python 3.13.1
