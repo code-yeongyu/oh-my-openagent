@@ -88,6 +88,32 @@ export function isBtwUserMessage(
   return msg.info.role === "user" && isMarked(msg)
 }
 
+const TOOL_RESULT_PART_TYPES = new Set(["tool_result", "tool-result"])
+
+function isToolResultPart(part: unknown): boolean {
+  return isRecord(part) && typeof part["type"] === "string" && TOOL_RESULT_PART_TYPES.has(part["type"])
+}
+
+// Tool results ride back in user-role messages mid-turn. Such carrier messages
+// belong to the /btw answer span; only a real user prompt ends the span.
+export function isToolResultCarrierUserMessage(message: unknown): boolean {
+  if (!isRecord(message)) {
+    return false
+  }
+
+  const info = message["info"]
+  if (!isRecord(info) || info["role"] !== "user") {
+    return false
+  }
+
+  const parts = message["parts"]
+  if (!Array.isArray(parts)) {
+    return false
+  }
+
+  return parts.some(isToolResultPart) && !parts.some(isTextPart)
+}
+
 export function computeBtwStripIndices(
   messages: MessageWithParts[],
   isMarked: BtwMarkerPredicate,
@@ -100,7 +126,7 @@ export function computeBtwStripIndices(
       continue
     }
 
-    const assistantIndices: number[] = []
+    const answerIndices: number[] = []
     let hasLaterUserMessage = false
 
     for (let cursor = index + 1; cursor < messages.length; cursor += 1) {
@@ -109,23 +135,21 @@ export function computeBtwStripIndices(
         continue
       }
 
-      if (candidate.info.role === "user") {
+      if (candidate.info.role === "user" && !isToolResultCarrierUserMessage(candidate)) {
         hasLaterUserMessage = true
         break
       }
 
-      if (candidate.info.role === "assistant") {
-        assistantIndices.push(cursor)
-      }
+      answerIndices.push(cursor)
     }
 
-    if (!hasLaterUserMessage && assistantIndices.length === 0) {
+    if (!hasLaterUserMessage && answerIndices.length === 0) {
       continue
     }
 
     stripIndices.add(index)
-    for (const assistantIndex of assistantIndices) {
-      stripIndices.add(assistantIndex)
+    for (const answerIndex of answerIndices) {
+      stripIndices.add(answerIndex)
     }
   }
 

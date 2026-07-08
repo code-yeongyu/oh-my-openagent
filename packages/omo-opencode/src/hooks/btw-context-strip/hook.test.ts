@@ -220,9 +220,9 @@ describe("createBtwContextStripHook", () => {
     })
   })
 
-  describe("#given a /btw answer adjacent to a tool pair", () => {
+  describe("#given a /btw answer that used a tool despite the read-only guard", () => {
     describe("#when the strip transform runs", () => {
-      it("#then keeps the tool pair intact instead of orphaning it", () => {
+      it("#then strips the whole exchange including the tool pair so nothing leaks", () => {
         const opening = buildUserMessage("public opening")
         const btwUser = buildBtwPair(TEST_MARKER, SECRET).btwUser
         const pair = buildToolUsePair("fixture_tool", "toolu_fixture_1")
@@ -230,10 +230,24 @@ describe("createBtwContextStripHook", () => {
 
         const result = runHook(messages)
 
-        expect(result).toEqual([opening, pair.toolUse, pair.toolResult])
-        expect(result[1]).toBe(pair.toolUse)
-        expect(result[2]).toBe(pair.toolResult)
+        expect(result).toEqual([opening])
         expect(payload(result)).not.toContain(TEST_MARKER)
+        expect(payload(result)).not.toContain("toolu_fixture_1")
+      })
+
+      it("#then strips the tool pair together with the turn when a later real user turn exists", () => {
+        const opening = buildUserMessage("public opening")
+        const btwUser = buildBtwPair(TEST_MARKER, SECRET).btwUser
+        const pair = buildToolUsePair("fixture_tool", "toolu_fixture_2")
+        const followUp = buildUserMessage("continue publicly")
+        const messages = [opening, btwUser, pair.toolUse, pair.toolResult, followUp]
+
+        const result = runHook(messages)
+
+        expect(result).toEqual([opening, followUp])
+        expect(payload(result)).not.toContain(TEST_MARKER)
+        expect(payload(result)).not.toContain(SECRET)
+        expect(payload(result)).not.toContain("toolu_fixture_2")
       })
     })
   })

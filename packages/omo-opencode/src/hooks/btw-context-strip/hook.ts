@@ -1,6 +1,10 @@
 import { log } from "../../shared/logger"
 
-import { computeBtwStripIndices, hasDetectableBtwMarker } from "./predicates"
+import {
+  computeBtwStripIndices,
+  hasDetectableBtwMarker,
+  isToolResultCarrierUserMessage,
+} from "./predicates"
 import type { BtwMarkerPredicate, MessageRole, MessageWithParts } from "./predicates"
 
 // NOTE: This hook strips /btw pairs from normal model-request payloads only.
@@ -28,15 +32,6 @@ function getMessageRole(message: unknown): MessageRole | undefined {
   return role === "user" || role === "assistant" || role === "tool" ? role : undefined
 }
 
-function getMessageParts(message: unknown): unknown[] {
-  if (!isRecord(message)) {
-    return []
-  }
-
-  const parts = message["parts"]
-  return Array.isArray(parts) ? parts : []
-}
-
 function safeIsMarked(message: unknown, isMarked: BtwMarkerPredicate): boolean {
   try {
     return isMarked(message as MessageWithParts) === true
@@ -49,18 +44,6 @@ function safeIsMarked(message: unknown, isMarked: BtwMarkerPredicate): boolean {
 function isMarkedFailClosed(message: unknown, isMarked: BtwMarkerPredicate): boolean {
   return safeIsMarked(message, isMarked) || hasDetectableBtwMarker(message)
 }
-
-function hasToolPairPart(message: unknown): boolean {
-  return getMessageParts(message).some((part) => {
-    if (!isRecord(part)) {
-      return false
-    }
-
-    const type = part["type"]
-    return type === "tool_use" || type === "tool_result"
-  })
-}
-
 
 function computeFailClosedStripIndices(
   messages: MessageWithParts[],
@@ -81,7 +64,7 @@ function computeFailClosedStripIndices(
       const candidate = messages[cursor]
       const role = getMessageRole(candidate)
 
-      if (role === "user") {
+      if (role === "user" && !isToolResultCarrierUserMessage(candidate)) {
         hasLaterUserMessage = true
         break
       }
@@ -115,30 +98,6 @@ function addPredicateStripIndices(
   } catch (error) {
     log("[btw-context-strip] predicate strip computation failed", { error: String(error) })
   }
-}
-
-function removeUnsafeToolAnswerIndices(
-  stripIndices: Set<number>,
-  messages: MessageWithParts[],
-  isMarked: BtwMarkerPredicate,
-): Set<number> {
-  const safeStripIndices = new Set(stripIndices)
-
-  for (const index of stripIndices) {
-    const message = messages[index]
-    if (isMarkedFailClosed(message, isMarked)) {
-      continue
-    }
-
-    if (!hasToolPairPart(message)) {
-      continue
-    }
-
-    safeStripIndices.delete(index)
-    log("[btw-context-strip] skipped stripping tool-bearing answer message", { index })
-  }
-
-  return safeStripIndices
 }
 
 function removeMessagesInPlace(messages: MessageWithParts[], stripIndices: Set<number>): void {
@@ -184,8 +143,7 @@ export function createBtwContextStripHook(isMarked: BtwMarkerPredicate) {
         return
       }
 
-      const safeStripIndices = removeUnsafeToolAnswerIndices(stripIndices, output.messages, isMarked)
-      removeMessagesInPlace(output.messages, safeStripIndices)
+      removeMessagesInPlace(output.messages, stripIndices)
     } catch (error) {
       log("[btw-context-strip] unexpected strip failure", { error: String(error) })
       applyFailClosedStrip(output, isMarked)
