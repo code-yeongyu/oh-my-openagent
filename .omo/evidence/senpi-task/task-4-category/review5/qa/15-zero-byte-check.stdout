@@ -1,5 +1,0 @@
-Zero-byte check for Todo 4 evidence subtree and review5 QA artifacts
-Invocation: find .omo/evidence/senpi-task/task-4-category -type f -size 0 -print
-
-
-FAIL: zero-byte artifacts listed above.

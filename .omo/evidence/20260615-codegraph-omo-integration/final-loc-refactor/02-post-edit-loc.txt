@@ -1,6 +1,0 @@
-$ for f in packages/omo-codex/plugin/components/codegraph/src/*.ts; do awk pure LOC; done
-packages/omo-codex/plugin/components/codegraph/src/cli.ts 46
-packages/omo-codex/plugin/components/codegraph/src/hook-types.ts 71
-packages/omo-codex/plugin/components/codegraph/src/hook.ts 93
-packages/omo-codex/plugin/components/codegraph/src/serve.ts 129
-packages/omo-codex/plugin/components/codegraph/src/session-start-worker.ts 157

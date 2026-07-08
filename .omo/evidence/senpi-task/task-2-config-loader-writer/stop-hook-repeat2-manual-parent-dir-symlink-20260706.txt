@@ -1,9 +1,0 @@
-{
-  "cleanedUp": true,
-  "normalProjectWrite": "succeeded",
-  "normalProjectWritePath": "/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/omo-config-manual-parent-symlink-bdWqN6/home/normal-project/.omo/omo.jsonc",
-  "rejectedSymlinkedProjectOmo": true,
-  "rejectionName": "OmoConfigWriteError",
-  "targetBackups": [],
-  "targetGlobalConfigUnchanged": true
-}

@@ -1,3 +1,0 @@
-packages/model-core/src/context-limit-resolver.ts       40
-packages/model-core/src/context-limit-resolver.test.ts      131
-.omo/evidence/20260704-fix-5788/resolve-sonnet-limit.mts        7

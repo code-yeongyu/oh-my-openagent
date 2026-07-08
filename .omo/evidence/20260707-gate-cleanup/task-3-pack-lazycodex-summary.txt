@@ -1,6 +1,0 @@
-=== QA: simulated lazycodex-ai pack, OLD (dev) override vs NEW override ===
---- RED: dev override (no negations) ---
-total: 3948 | node_modules: 2213 | workflow-selector: 0 | senpi: 0
---- GREEN: fixed override (with negations) ---
-total: 1735 | node_modules: 0 | workflow-selector: 0 | senpi: 0
-package.json restored byte-identical

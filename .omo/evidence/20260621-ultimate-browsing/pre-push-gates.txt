@@ -1,5 +1,0 @@
-PR-A pre-push gates (all green):
-- bun run typecheck -> exit 0 (tsgo all packages clean; .test.ts excluded by tsconfig)
-- bun test -> 10091 pass, 0 fail, 2 skip (1224 files)
-- bun run build -> dist/index.js + cli-node + schema built; ultimate-browsing materialized into dist/skills via build:shared-skills-assets
-- bun run test:codex -> 360 pass, 0 fail (hermetic codex installer + config + plugin suite)

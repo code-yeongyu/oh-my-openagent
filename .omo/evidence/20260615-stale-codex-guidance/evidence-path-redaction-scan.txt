@@ -1,5 +1,0 @@
-$ tracked evidence broad local absolute-path scan
-
-Result: PASS
-Exit status: 0
-Output: no matches.

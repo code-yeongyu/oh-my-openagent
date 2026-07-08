@@ -1,3 +1,0 @@
- M packages/senpi-task/src/index.ts
-?? packages/senpi-task/scripts/manual-category-qa.ts
-?? packages/senpi-task/src/category/

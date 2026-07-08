@@ -1,4 +1,0 @@
-Final zero-byte check after qa.md and final clean status write
-Invocation: find .omo/evidence/senpi-task/task-4-category -type f -size 0 -print
-
-PASS: no zero-byte files found under .omo/evidence/senpi-task/task-4-category.

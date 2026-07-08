@@ -1,4 +1,0 @@
-Todo 4 setup 2026-07-06T08:31:53Z
-branch code-yeongyu/senpi-task-w0-category
-base 27fc9ca95abfa266e0b2e0e3efa44b56ec8b9ab4
-controller .omo copied; main draft copied; main plan not copied because only difference was stale [ ] state for todos 1-3.

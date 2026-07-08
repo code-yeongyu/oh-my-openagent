@@ -1,5 +1,0 @@
- M packages/senpi-task/scripts/manual-category-qa.ts
- M packages/senpi-task/src/category/resolve-category.test.ts
- M packages/senpi-task/src/category/resolver.ts
- M packages/senpi-task/src/category/types.ts
-PASS: cleanup/status captured; all QA commands were one-shot bun/shell invocations and no server/tmux/browser resources were spawned

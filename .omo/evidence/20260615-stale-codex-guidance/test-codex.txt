@@ -1,8 +1,0 @@
-$ bun run test:codex
-
-Result: PASS
-
-Important receipts:
-- lsp-tools-mcp vitest suite passed: 25 files, 95 tests.
-- Codex compatibility suite passed: 339 tests, 0 failed.
-- build:codex-install, ast-grep MCP, git-bash MCP, lsp-tools MCP, lsp-daemon, plugin ci/build, Bun installer/config tests, and Node installer/plugin tests all completed.

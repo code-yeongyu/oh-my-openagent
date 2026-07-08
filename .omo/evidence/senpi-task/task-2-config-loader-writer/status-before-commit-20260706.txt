@@ -1,9 +1,0 @@
-Command: git status --short
- M .omo/evidence/senpi-task/task-2-config-loader-writer/loc-scan-20260706.txt
- M packages/omo-config-core/src/writer/writer.test.ts
- M packages/omo-config-core/src/writer/writer.ts
-
-Scoped status check:
- M .omo/evidence/senpi-task/task-2-config-loader-writer/loc-scan-20260706.txt
- M packages/omo-config-core/src/writer/writer.test.ts
- M packages/omo-config-core/src/writer/writer.ts

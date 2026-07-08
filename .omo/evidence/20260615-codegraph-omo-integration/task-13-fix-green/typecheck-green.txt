@@ -1,6 +1,0 @@
-$ npm --prefix packages/omo-codex/plugin/components/codegraph run typecheck
-
-> @sisyphuslabs/codex-codegraph@4.10.0 typecheck
-> tsc --noEmit
-
-exit=0

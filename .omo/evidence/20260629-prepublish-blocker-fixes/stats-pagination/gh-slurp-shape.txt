@@ -1,5 +1,0 @@
-{
-  "pages": 3,
-  "releases": 207,
-  "asset_downloads": 12615
-}

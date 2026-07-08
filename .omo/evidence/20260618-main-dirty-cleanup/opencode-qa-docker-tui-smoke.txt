@@ -1,158 +1,0 @@
-[qa-docker] building omo-dev from .devcontainer/Dockerfile (one-time)
-#0 building with "orbstack" instance using docker driver
-
-#1 [internal] load build definition from Dockerfile
-#1 transferring dockerfile: 657B done
-#1 DONE 0.0s
-
-#2 [internal] load metadata for mcr.microsoft.com/devcontainers/javascript-node:24-bookworm
-#2 DONE 0.2s
-
-#3 [internal] load .dockerignore
-#3 transferring context: 2B done
-#3 DONE 0.1s
-
-#4 [1/3] FROM mcr.microsoft.com/devcontainers/javascript-node:24-bookworm@sha256:569f039a2825f7921a1e8e563173a020e58cc351f2b7f503fc70f9283316ca92
-#4 CACHED
-
-#5 [2/3] RUN apt-get update  && apt-get install -y --no-install-recommends tmux  && rm -rf /var/lib/apt/lists/*
-#5 0.151 Get:1 http://deb.debian.org/debian bookworm InRelease [151 kB]
-#5 0.156 Get:2 http://deb.debian.org/debian bookworm-updates InRelease [55.4 kB]
-#5 0.158 Get:3 http://deb.debian.org/debian-security bookworm-security InRelease [48.0 kB]
-#5 0.184 Get:4 http://deb.debian.org/debian bookworm/main arm64 Packages [8690 kB]
-#5 0.268 Get:5 http://deb.debian.org/debian bookworm-updates/main arm64 Packages [6936 B]
-#5 0.268 Get:6 http://deb.debian.org/debian-security bookworm-security/main arm64 Packages [308 kB]
-#5 0.754 Fetched 9259 kB in 1s (14.9 MB/s)
-#5 0.754 Reading package lists...
-#5 0.962 Reading package lists...
-#5 1.173 Building dependency tree...
-#5 1.228 Reading state information...
-#5 1.287 The following additional packages will be installed:
-#5 1.287   libutempter0
-#5 1.304 The following NEW packages will be installed:
-#5 1.304   libutempter0 tmux
-#5 1.315 0 upgraded, 2 newly installed, 0 to remove and 0 not upgraded.
-#5 1.315 Need to get 428 kB of archives.
-#5 1.315 After this operation, 1277 kB of additional disk space will be used.
-#5 1.315 Get:1 http://deb.debian.org/debian bookworm/main arm64 libutempter0 arm64 1.2.1-3 [8964 B]
-#5 1.319 Get:2 http://deb.debian.org/debian bookworm/main arm64 tmux arm64 3.3a-3 [419 kB]
-#5 1.378 debconf: unable to initialize frontend: Dialog
-#5 1.378 debconf: (TERM is not set, so the dialog frontend is not usable.)
-#5 1.378 debconf: falling back to frontend: Readline
-#5 1.380 debconf: unable to initialize frontend: Readline
-#5 1.381 debconf: (This frontend requires a controlling tty.)
-#5 1.381 debconf: falling back to frontend: Teletype
-#5 1.382 dpkg-preconfigure: unable to re-open stdin: 
-#5 1.391 Fetched 428 kB in 0s (20.5 MB/s)
-#5 1.424 Selecting previously unselected package libutempter0:arm64.
-#5 1.424 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 29662 files and directories currently installed.)
-#5 1.435 Preparing to unpack .../libutempter0_1.2.1-3_arm64.deb ...
-#5 1.511 Unpacking libutempter0:arm64 (1.2.1-3) ...
-#5 1.536 Selecting previously unselected package tmux.
-#5 1.537 Preparing to unpack .../archives/tmux_3.3a-3_arm64.deb ...
-#5 1.540 Unpacking tmux (3.3a-3) ...
-#5 1.581 Setting up libutempter0:arm64 (1.2.1-3) ...
-#5 1.589 Setting up tmux (3.3a-3) ...
-#5 1.600 Processing triggers for man-db (2.11.2-2) ...
-#5 1.830 Processing triggers for libc-bin (2.36-9+deb12u14) ...
-#5 DONE 1.9s
-
-#6 [3/3] RUN curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.12"  && bun --version
-#6 0.492 #=#=#                                                                         ##O#-#                                                                        ##O=#  #                                                                      ################                                                          22.7%###################                                                       27.6%#######################################                                   55.4%########################################################                  78.9%###########################################################               82.7%######################################################################## 100.0%
-#6 2.543 bun was installed successfully to /usr/local/bin/bun 
-#6 2.544 Run 'bun --help' to get started
-#6 2.544 1.3.12
-#6 DONE 2.6s
-
-#7 exporting to image
-#7 exporting layers
-#7 exporting layers 0.1s done
-#7 writing image sha256:4b1423a8b4de18c08c157a93454c37924c688aec35ff2daf42e2b3d2fbdb329f done
-#7 naming to docker.io/library/omo-dev done
-#7 DONE 0.1s
-[qa-docker] building omo-qa with latest opencode + codex (one-time)
-#0 building with "orbstack" instance using docker driver
-
-#1 [internal] load build definition from qa.Dockerfile
-#1 transferring dockerfile: 1.16kB done
-#1 DONE 0.0s
-
-#2 [internal] load metadata for docker.io/library/omo-dev:latest
-#2 DONE 0.0s
-
-#3 [internal] load .dockerignore
-#3 transferring context: 2B done
-#3 DONE 0.0s
-
-#4 [internal] load build context
-#4 transferring context: 932B done
-#4 DONE 0.1s
-
-#5 [1/5] FROM docker.io/library/omo-dev:latest
-#5 DONE 0.2s
-
-#6 [2/5] RUN apt-get update  && apt-get install -y --no-install-recommends sqlite3 jq curl rsync ca-certificates  && rm -rf /var/lib/apt/lists/*
-#6 0.165 Get:1 http://deb.debian.org/debian bookworm InRelease [151 kB]
-#6 0.171 Get:2 http://deb.debian.org/debian bookworm-updates InRelease [55.4 kB]
-#6 0.172 Get:3 http://deb.debian.org/debian-security bookworm-security InRelease [48.0 kB]
-#6 0.196 Get:4 http://deb.debian.org/debian bookworm/main arm64 Packages [8690 kB]
-#6 0.280 Get:5 http://deb.debian.org/debian bookworm-updates/main arm64 Packages [6936 B]
-#6 0.280 Get:6 http://deb.debian.org/debian-security bookworm-security/main arm64 Packages [308 kB]
-#6 0.770 Fetched 9259 kB in 1s (15.0 MB/s)
-#6 0.770 Reading package lists...
-#6 0.973 Reading package lists...
-#6 1.166 Building dependency tree...
-#6 1.221 Reading state information...
-#6 1.281 jq is already the newest version (1.6-2.1+deb12u1).
-#6 1.281 curl is already the newest version (7.88.1-10+deb12u14).
-#6 1.281 rsync is already the newest version (3.2.7-1+deb12u5).
-#6 1.281 ca-certificates is already the newest version (20230311+deb12u1).
-#6 1.281 Suggested packages:
-#6 1.281   sqlite3-doc
-#6 1.298 The following NEW packages will be installed:
-#6 1.298   sqlite3
-#6 1.310 0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
-#6 1.310 Need to get 342 kB of archives.
-#6 1.310 After this operation, 570 kB of additional disk space will be used.
-#6 1.310 Get:1 http://deb.debian.org/debian bookworm/main arm64 sqlite3 arm64 3.40.1-2+deb12u2 [342 kB]
-#6 1.376 debconf: unable to initialize frontend: Dialog
-#6 1.376 debconf: (TERM is not set, so the dialog frontend is not usable.)
-#6 1.376 debconf: falling back to frontend: Readline
-#6 1.377 debconf: unable to initialize frontend: Readline
-#6 1.377 debconf: (This frontend requires a controlling tty.)
-#6 1.377 debconf: falling back to frontend: Teletype
-#6 1.378 dpkg-preconfigure: unable to re-open stdin: 
-#6 1.386 Fetched 342 kB in 0s (21.7 MB/s)
-#6 1.410 Selecting previously unselected package sqlite3.
-#6 1.410 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 29679 files and directories currently installed.)
-#6 1.417 Preparing to unpack .../sqlite3_3.40.1-2+deb12u2_arm64.deb ...
-#6 1.436 Unpacking sqlite3 (3.40.1-2+deb12u2) ...
-#6 1.498 Setting up sqlite3 (3.40.1-2+deb12u2) ...
-#6 1.512 Processing triggers for man-db (2.11.2-2) ...
-#6 DONE 1.8s
-
-#7 [3/5] RUN npm install -g "opencode-ai@latest" "@openai/codex@latest"  && opencode --version  && codex --version
-#7 5.214 
-#7 5.214 added 4 packages in 5s
-#7 5.424 1.17.8
-#7 5.442 codex-cli 0.141.0
-#7 DONE 5.9s
-
-#8 [4/5] COPY .devcontainer/qa-entrypoint.sh /usr/local/bin/qa-entrypoint.sh
-#8 DONE 0.1s
-
-#9 [5/5] RUN chmod +x /usr/local/bin/qa-entrypoint.sh
-#9 DONE 0.1s
-
-#10 exporting to image
-#10 exporting layers
-#10 exporting layers 0.8s done
-#10 writing image sha256:298db938c609400f439f6957463410b2d2ce1cf737b053f506f81f2a236a3cf6
-#10 writing image sha256:298db938c609400f439f6957463410b2d2ce1cf737b053f506f81f2a236a3cf6 done
-#10 naming to docker.io/library/omo-qa done
-#10 DONE 0.8s
-PASS: TUI rendered under tmux (marker found; version 1.17.8)
-PASS: send-keys reached the TUI composer (sentinel echoed)
-PASS: tmux session torn down (has-session false)
-PASS: real DB untouched (session count 0 unchanged)
-PASS: tui-smoke

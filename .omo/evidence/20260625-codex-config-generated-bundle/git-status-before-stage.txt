@@ -1,6 +1,0 @@
- M .omo/evidence/20260625-codex-config-generated-bundle/QA-SUMMARY.md
- M .omo/evidence/20260625-codex-config-generated-bundle/generated-bundle-false-shorthand-probe.txt
- M .omo/evidence/20260625-codex-config-generated-bundle/generated-config-and-bundle-tests.txt
- M .omo/evidence/20260625-codex-config-generated-bundle/git-status-before-stage.txt
- M .omo/evidence/20260625-codex-config-generated-bundle/install-verify.txt
- M .omo/evidence/20260625-codex-config-generated-bundle/source-config-tests.txt

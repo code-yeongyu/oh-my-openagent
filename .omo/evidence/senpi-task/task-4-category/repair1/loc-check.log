@@ -1,7 +1,0 @@
-packages/senpi-task/src/category/fallback-chains.ts 77
-packages/senpi-task/src/category/resolver.ts 211
-packages/senpi-task/src/category/types.ts 69
-packages/senpi-task/src/category/index.ts 16
-packages/senpi-task/src/category/resolve-category.test.ts 215
-packages/senpi-task/scripts/manual-category-qa.ts 87
-PASS: changed source files are <=250 pure LOC

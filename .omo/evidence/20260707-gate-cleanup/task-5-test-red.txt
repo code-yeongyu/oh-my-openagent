@@ -1,8 +1,0 @@
-SyntaxError: Export named 'isExcludedReleaseNoteSubject' not found in module '/Users/yeongyu/local-workspaces/omo-worktrees/prepublish-gate-cleanup/script/generate-changelog.ts'.
--------------------------------
-
-
- 0 pass
- 1 fail
- 1 error
-Ran 1 test across 1 file. [111.00ms]

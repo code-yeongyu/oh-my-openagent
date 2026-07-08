@@ -1,8 +1,0 @@
-COMMAND: npm --prefix packages/omo-codex/plugin/components/ulw-loop run typecheck
-
-
-> @code-yeongyu/codex-ulw-loop@4.10.0 typecheck
-> tsc --noEmit
-
-
-EXIT_CODE=0

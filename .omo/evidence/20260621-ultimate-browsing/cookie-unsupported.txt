@@ -1,3 +1,0 @@
-  File "/Users/yeongyu/local-workspaces/omo-wt/ultimate-browsing-skill/packages/shared-skills/skills/ultimate-browsing/scripts/cookie_paths.py", line 59, in resolve_cookie_db
-    raise UnsupportedPlatform(f"unsupported browser: {browser!r}")
-scripts.cookie_paths.UnsupportedPlatform: unsupported browser: 'nonexistent'

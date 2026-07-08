@@ -1,1 +1,0 @@
-{"CODEGRAPH_INSTALL_DIR":"/Users/yeongyu/.omo/codegraph","CODEGRAPH_NO_DOWNLOAD":"1","CODEGRAPH_TELEMETRY":"0","DO_NOT_TRACK":"1"}

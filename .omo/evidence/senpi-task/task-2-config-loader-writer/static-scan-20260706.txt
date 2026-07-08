@@ -1,2 +1,0 @@
-Command: rg -n "as any|@ts-ignore|@ts-expect-error|catch\s*(\([^)]*\))?\s*\{\s*\}" packages/omo-config-core --glob "*.ts"
-No forbidden as-any, TypeScript suppression, or empty catch patterns found.

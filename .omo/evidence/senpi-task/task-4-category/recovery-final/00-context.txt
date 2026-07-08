@@ -1,2 +1,0 @@
-Recovery verification started: 2026-07-06T08:56:45Z
-HEAD: 856366e3799079a66c9d82b99957a057309f7122

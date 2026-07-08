@@ -1,5 +1,0 @@
-Positive delegate-core handoff:
-2:  resolveModelForDelegateTask,
-205:  const resolution = resolveModelForDelegateTask(
-Local model-order anti-pattern scan:
-PASS: no local 7-step/model-order implementation patterns in scoped files

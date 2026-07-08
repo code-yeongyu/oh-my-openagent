@@ -1,7 +1,0 @@
-$ bun run packages/shared-skills/skills/programming/scripts/typescript/check-no-excuse-rules.ts packages/omo-codex/src/install/codex-multi-agent-v2-config.ts packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts
-No violations in 2 file(s).
-
-$ pure LOC
-packages/omo-codex/src/install/codex-multi-agent-v2-config.ts       62
-packages/omo-codex/src/install/codex-multi-agent-v2-config.test.ts      105
-packages/omo-codex/plugin/scripts/migrate-codex-config/multi-agent-v2-guard.mjs       84

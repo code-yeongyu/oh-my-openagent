@@ -1,8 +1,0 @@
-$ node .omo/evidence/20260706-verify-5836/live-codegraph-qa.mjs
-Error: real ~/.omo changed
-    at assert (file:///Users/yeongyu/local-workspaces/omo/.local-ignore/pr-worktrees/verify-5836/.omo/evidence/20260706-verify-5836/live-codegraph-support.mjs:113:24)
-    at file:///Users/yeongyu/local-workspaces/omo/.local-ignore/pr-worktrees/verify-5836/.omo/evidence/20260706-verify-5836/live-codegraph-qa.mjs:170:2
-    at ModuleJob.run (node:internal/modules/esm/module_job:447:25)
-    at async node:internal/modules/esm/loader:646:26
-    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
-EXIT_CODE=1

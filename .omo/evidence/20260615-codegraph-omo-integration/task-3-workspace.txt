@@ -1,6 +1,0 @@
-{"dataDir":"/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.gy3g6gu2wR/.omo/codegraph/projects/tmp.mmjJFsr2cn-af624636ebc00010","dataRoot":"/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.gy3g6gu2wR/.omo/codegraph","linked":true,"mode":"global-linked","projectLink":"/private/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.mmjJFsr2cn/.codegraph"}
-/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.gy3g6gu2wR/.omo/codegraph/projects/tmp.mmjJFsr2cn-af624636ebc00010
-SYMLINK
-TEMP_DIR:/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.mmjJFsr2cn
-HOME_DIR:/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.gy3g6gu2wR
-DONE

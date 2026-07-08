@@ -1,3 +1,0 @@
-HookNameSchema.safeParse("codegraph-bootstrap").success=true
-
-EXIT_STATUS=0

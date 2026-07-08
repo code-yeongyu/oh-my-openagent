@@ -1,6 +1,0 @@
-scenario: 12-cleanup-receipt
-surface: Cleanup receipt: no review6 tmux/server/temp processes left by this QA run
-invocation: printf "No servers or tmux sessions were started by review6 QA. Checking for lingering review6/manual-category processes.\\n"; { tmux ls 2>/dev/null || true; } | rg -n "review6|senpi-task-review6|manual-category-qa" && exit 1 || true; { pgrep -fl "manual-category-qa|senpi-task-review6|review6-qa" || true; } | rg -n "manual-category-qa|senpi-task-review6|review6-qa" && exit 1 || true; printf "cleanup_receipt=clean\\n"
-started_at: 2026-07-06T11:03:17Z
-finished_at: 2026-07-06T11:03:17Z
-exit: 1

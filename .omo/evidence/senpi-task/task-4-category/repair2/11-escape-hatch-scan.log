@@ -1,1 +1,0 @@
-PASS: scoped scan found no as any, ts-ignore, ts-expect-error, non-null assertion member access, or empty catch patterns.

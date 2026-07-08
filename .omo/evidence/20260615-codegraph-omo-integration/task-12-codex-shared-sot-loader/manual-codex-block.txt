@@ -1,1 +1,0 @@
-{"auto_provision":true,"enabled":false,"install_dir":"/base","telemetry":false}

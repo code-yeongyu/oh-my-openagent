@@ -1,7 +1,0 @@
-packages/omo-config-core/src/loader/loader.test.ts      132
-packages/omo-config-core/src/loader/merge.test.ts       39
-packages/omo-config-core/src/loader/merge.ts       26
-packages/omo-config-core/src/loader/paths.ts       84
-packages/omo-config-core/src/writer/types.ts       62
-packages/omo-config-core/src/writer/writer.test.ts      119
-packages/omo-config-core/src/writer/writer.ts       89

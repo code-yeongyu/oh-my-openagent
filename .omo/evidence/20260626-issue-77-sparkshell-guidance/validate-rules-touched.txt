@@ -1,9 +1,0 @@
-
-> @code-yeongyu/codex-rules@4.13.0 typecheck
-> tsc --noEmit
-
-Bundled 52 modules in 7ms
-
-  cli.js  159.59 KB  (entry point)
-
-Checked 2 files in 4ms. No fixes applied.
