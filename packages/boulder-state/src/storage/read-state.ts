@@ -14,7 +14,7 @@ export function readBoulderState(directory: string): BoulderState | null {
   try {
     const content = readFileSync(filePath, "utf-8")
     const parsed = JSON.parse(content)
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || Object.keys(parsed).length === 0) {
       return null
     }
 
