@@ -28,11 +28,11 @@ Build, publish, QA, and repo-invariant automation. Run via `bun run <script>` fr
 ## SUBDIRS
 
 - `agent/` -- dev-env contract: `setup.sh`, `cleanup.sh`, `cleanup-hook.sh`, `docker-dev.sh`, `qa-sandbox.sh`, `qa-docker.sh` (see root AGENTS.md DEVELOPMENT ENVIRONMENT).
-- `qa/` -- QA drivers: `codex-marketplace-e2e.sh`, `web-terminal-visual-qa.mjs` (tmux capture-pane evidence; rejects empty captures), `web-terminal-renderer.mjs`, `web-terminal-redaction.mjs`.
+- `qa/` -- QA drivers: `codex-marketplace-e2e.sh`, `web-terminal-visual-qa.mjs` (renders TUI evidence through real xterm.js + node-pty in a browser, true color; NEVER tmux capture-pane), `xterm-live-terminal.mjs` (live capture core), `strip-ansi.mjs`, `web-terminal-redaction.mjs`.
 
 ## TESTS (~40 `*.test.ts`)
 
-Co-located per script (`build-binaries.test.ts`, `stats.test.ts`, `sync-lazycodex-marketplace.test.ts`, `publish-lazycodex-workflow.test.ts`, `package-layout.test.ts`, `lazycodex-marketplace-validation.pin.test.ts`, `web-terminal-visual-qa-command.test.ts`, ...). Repo-wide meta-audits also live here and run in root `bun test`:
+Co-located per script (`build-binaries.test.ts`, `stats.test.ts`, `sync-lazycodex-marketplace.test.ts`, `publish-lazycodex-workflow.test.ts`, `package-layout.test.ts`, `lazycodex-marketplace-validation.pin.test.ts`, `web-terminal-visual-qa.test.ts`, ...). Repo-wide meta-audits also live here and run in root `bun test`:
 
 | File | Invariant |
 |------|-----------|

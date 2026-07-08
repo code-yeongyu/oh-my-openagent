@@ -190,7 +190,7 @@ describe("codex ultrawork hook", () => {
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/# Manual-QA channels/);
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/TESTS ALONE NEVER PROVE DONE/);
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/1\. HTTP call/);
-		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/2\. tmux/);
+		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/2\. Terminal \/ TUI/);
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/3\. Browser use/);
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/4\. Computer use/);
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/CLEANUP \(PAIRED/);

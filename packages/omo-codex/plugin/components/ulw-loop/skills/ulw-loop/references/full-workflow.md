@@ -19,16 +19,16 @@ Audit each pass, fail, block, steering change, and checkpoint in `.omo/ulw-loop/
 Run each criterion's real-surface proof yourself through the channel that faithfully exercises it; capture the artifact before recording PASS.
 
 1. **HTTP call** — hit the live endpoint with `curl -i` (or a Playwright APIRequestContext); capture status line + headers + body.
-2. **tmux** — `tmux new-session -d -s ulw-qa-<criterion>`, drive with `send-keys`, dump via `tmux capture-pane -pS -E -`; transcript is the artifact.
+2. **Terminal / TUI** - prove it through the xterm.js web terminal; tmux `send-keys` is fine for a boot smoke, but NEVER `tmux capture-pane` for color/layout/CJK evidence (it degrades truecolor).
 3. **Browser use** — in Codex, use `browser:control-in-app-browser` first when available and the scenario does not need an authenticated or persistent user browser profile. Otherwise use Chrome to drive the REAL page; if unavailable, use agent-browser. Capture action log + screenshot path. Never downgrade a browser-facing criterion.
 4. **Computer use** — for desktop/GUI apps, drive the running app via OS automation (computer-use, AppleScript, xdotool, etc.); capture action log + screenshot.
 
-For TUI visual QA, pair the tmux transcript with a browser-rendered terminal
-screenshot. In this repo run `node script/qa/web-terminal-visual-qa.mjs
---from-file <capture.txt> --evidence-dir <dir>` and record `terminal.png`,
-`terminal.html`, `terminal.txt`, and `metadata.json` as the visual evidence
-bundle. This is mandatory when a PR or review needs to inspect the terminal
-screen, not just the text.
+For TUI visual QA, render the terminal through the real xterm.js web terminal and
+screenshot it - NEVER a `tmux capture-pane` dump (it degrades color and wide-glyph
+width). In this repo run `node script/qa/web-terminal-visual-qa.mjs --command
+"<cmd>" --input "{Enter}" --evidence-dir <dir>` (live pty + xterm.js in Chrome;
+`--from-file` replays a raw stream) and record `terminal.png`, `terminal.txt`, and
+`metadata.json`. Mandatory when a PR or review must inspect the terminal screen.
 
 Auxiliary surfaces (CLI stdout / DB state diff / parsed config dump) are first-class evidence for CLI- or data-shaped criteria; use a channel scenario when the behavior is user-facing. `--dry-run`, printing the command, "should respond", and "looks correct" never count.
 

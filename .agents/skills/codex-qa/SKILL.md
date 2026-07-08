@@ -70,19 +70,21 @@ Windows.
 | `scripts/tui-smoke.sh` | the real codex TUI boots in the isolated home, renders, and survives (no early exit); captures the pane |
 
 When TUI visual QA evidence is needed, follow
-`docs/reference/web-terminal-visual-qa.md` and do not stop at the raw pane. Replay the
-captured pane through the repository web-terminal helper so the PR can attach a
-stable browser screenshot:
+`docs/reference/web-terminal-visual-qa.md`: render the TUI through the real
+xterm.js web terminal - NEVER the `tmux capture-pane` frame, which degrades
+color and CJK width:
 
 ```bash
 node script/qa/web-terminal-visual-qa.mjs --title "Codex TUI QA" \
-  --from-file .omo/evidence/<slug>/codex-tui-pane.txt \
+  --command "codex" --input "{Enter}" \
   --evidence-dir .omo/evidence/<slug>/codex-web-terminal
 ```
 
-The helper writes `terminal.txt`, `terminal-ansi.txt`, `terminal.html`,
-`terminal.png`, and `metadata.json`. Use that artifact set for TUI visual QA;
-use `app-server-drive.sh --plugin` for assertion-grade hook behavior.
+The helper runs a real pty, renders it in xterm.js under Chrome, and writes
+`terminal.txt`, `terminal-ansi.txt`, `terminal.png` (true color), and
+`metadata.json` (`--from-file <capture.ansi>` replays a saved raw stream). Use
+that artifact set for TUI visual QA; use `app-server-drive.sh --plugin` for
+assertion-grade hook behavior.
 
 ## Match QA to your change scope
 

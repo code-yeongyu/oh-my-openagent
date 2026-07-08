@@ -181,7 +181,7 @@ Tests are necessary and insufficient. Exercise the real surface.
 | CLI | Run the command and show stdout/stderr. |
 | API | Call the endpoint and show status/body. |
 | UI | Drive the page in a browser and capture a screenshot or trace. |
-| TUI | Capture the terminal pane and verify layout. |
+| TUI | Render through the xterm.js web terminal and screenshot it (NEVER `tmux capture-pane`); verify color, layout, and CJK width. |
 | Config | Load the config and verify the parsed shape. |
 | Prompt or mode | Verify the prompt loads or the registry resolves it. |
 | Build output | Run build and verify exit code 0. |
