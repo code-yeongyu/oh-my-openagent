@@ -1,12 +1,6 @@
 import type { TaskRecord, TaskStatus } from "../state"
 import type { PersistedTaskEvent } from "../store"
 
-// Resolved from omo.json task.notification (config-core OmoTaskNotificationSchema). Kept structural so
-// this module stays harness-neutral; the omo-senpi composition (todo 17) feeds the parsed config.
-export type NotificationConfig = {
-  readonly deliver_as: "steer" | "followUp"
-}
-
 export type TransitionReason = "compacting" | "session_switching" | "session_shutdown"
 
 // The live parent-session state the completion push routes against (Metis #3 five-state machine).
@@ -19,7 +13,7 @@ export type ParentState =
 
 export type RoutingDecision =
   | { readonly kind: "wake" }
-  | { readonly kind: "deliver_streaming"; readonly deliverAs: "steer" | "followUp" }
+  | { readonly kind: "deliver_streaming" }
   | { readonly kind: "buffer"; readonly reason: TransitionReason }
 
 export type CompletionDetails = {
@@ -34,13 +28,14 @@ export type CompletionDetails = {
 
 // Structurally compatible with senpi sendMessage(Pick<CustomMessage,"customType"|"content"|"display"|
 // "details">, {triggerTurn, deliverAs}). One message carries one or many completions (batching).
+// Delivery is UNCONDITIONAL STEER: every delivered notification triggers a turn and steers into the
+// running turn at the next tool-call boundary; the adapter batches all ready messages into ONE steer.
 export type ParentNotifierMessage = {
   readonly customType: "senpi-task.completion"
   readonly content: string
   readonly display: boolean
   readonly details: readonly CompletionDetails[]
   readonly triggerTurn?: boolean
-  readonly deliverAs?: "steer" | "followUp"
 }
 
 // SYNCHRONOUS enqueue seam. senpi pi.sendMessage returns void and swallows async delivery errors, so
@@ -58,7 +53,6 @@ export type CompletionNotifierStore = {
 export type CompletionNotifierDeps = {
   readonly notifier: ParentNotifier
   readonly store: CompletionNotifierStore
-  readonly config: NotificationConfig
 }
 
 export type CompletionRequest = {

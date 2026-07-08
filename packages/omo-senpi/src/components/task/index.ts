@@ -120,7 +120,7 @@ function registerTaskTools(pi: SenpiExtensionAPI, engine: TaskEngine): void {
 // only on the lead (current) session; the manager's shared-tool filter strips the whole team_* family
 // from member children, and only the pre-scoped member team_send_message is re-added (see team-service).
 function registerTeamTools(pi: SenpiExtensionAPI, ctx: ComponentContext, engine: TaskEngine): () => Promise<void> {
-  const leadNotifier = createTeamMessageNotifier(pi, ctx.idleCoordinator)
+  const leadNotifier = createTeamMessageNotifier(pi, ctx.idleCoordinator, () => engine.runtime.parentState().kind === "streaming")
   const serviceDeps = {
     manager: engine.manager,
     runtime: engine.runtime,
@@ -204,6 +204,21 @@ export function wireEventBridge(
   pi.on("model_select", (_payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     statusUi.scheduleSync()
+  })
+
+  // Idle-edge drain: when the parent's turn ends, everything collected in the batch window is
+  // delivered NOW as one combined steer, before senpi's print mode can decide the session is over
+  // (the 200ms collect timer alone would race a -p exit and lose the wake - live-driver proven).
+  // Deferred one microtask so a ulw-loop continuation enqueued by its own agent_end handler on the
+  // same edge joins the same injection instead of racing it.
+  pi.on("agent_end", (_payload, eventCtx) => {
+    engine.runtime.captureFrom(asLiveContext(eventCtx))
+    const coordinator = ctx.idleCoordinator
+    if (coordinator === undefined) return undefined
+    queueMicrotask(() => {
+      coordinator.flushOnIdle()
+    })
+    return undefined
   })
 
   pi.on("before_agent_start", (_payload, eventCtx) => {

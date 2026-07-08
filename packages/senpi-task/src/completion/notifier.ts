@@ -39,7 +39,7 @@ export function createCompletionNotifier(deps: CompletionNotifierDeps): Completi
     if (record.notification.notified_epoch >= epoch) return { kind: "skipped", reason: "already-notified" }
 
     const details = buildCompletionDetails(record, request.tokens === undefined ? {} : { tokens: request.tokens })
-    const decision = routeCompletion(request.parentState, deps.config)
+    const decision = routeCompletion(request.parentState)
     if (decision.kind === "buffer") {
       pushBuffered(buffered, record.parent_session_id, { task_id: record.task_id, epoch, details })
       return { kind: "buffered", reason: decision.reason }
@@ -85,16 +85,16 @@ export function createCompletionNotifier(deps: CompletionNotifierDeps): Completi
   return { notifyTerminal, flushBuffered, bufferedCount }
 }
 
-// A streaming completion queues as the configured deliverAs AND stamps triggerTurn:true so the parent
-// is guaranteed to take a turn to process it once the current turn ends (senpi sendMessage accepts
-// triggerTurn + deliverAs together). A wake completion (idle parent) fires the turn directly.
+// Every delivered notification stamps triggerTurn:true; the omo-senpi adapter routes it through the
+// idle-injection coordinator, which batches ALL ready notifications into ONE injection steered into
+// the running turn at the next tool-call boundary (unconditional-steer contract).
 function buildDeliveryMessage(
   details: readonly CompletionDetails[],
   decision: Exclude<RoutingDecision, { kind: "buffer" }>,
 ): ParentNotifierMessage {
+  void decision
   const base = buildCompletionMessage(details)
-  if (decision.kind === "wake") return { ...base, triggerTurn: true }
-  return { ...base, deliverAs: decision.deliverAs, triggerTurn: true }
+  return { ...base, triggerTurn: true }
 }
 
 function deliveredDecision(decision: Exclude<RoutingDecision, { kind: "buffer" }>): DeliveredDecision {

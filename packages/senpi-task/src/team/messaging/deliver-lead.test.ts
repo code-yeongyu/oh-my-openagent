@@ -1,11 +1,9 @@
 import { describe, expect, test } from "bun:test"
 
-import type { NotificationConfig, ParentState } from "../../completion"
+import type { ParentState } from "../../completion"
 import { deliverToLead } from "./deliver-lead"
 import { buildTeamMessage } from "./message"
 import { FakeLeadNotifier } from "./__fixtures__/messaging-fakes"
-
-const CONFIG: NotificationConfig = { deliver_as: "followUp" }
 
 function leadMessage() {
   return buildTeamMessage(
@@ -23,7 +21,6 @@ describe("deliverToLead", () => {
     const result = deliverToLead({
       message: leadMessage(),
       parentState: { kind: "idle" },
-      notificationConfig: CONFIG,
       notifier,
     })
 
@@ -51,13 +48,11 @@ member alpha needs a decision
     const result = deliverToLead({
       message: leadMessage(),
       parentState: { kind: "streaming" },
-      notificationConfig: { deliver_as: "steer" },
       notifier,
     })
 
-    // then a streaming lead delivery both steers AND guarantees a turn
+    // then a streaming lead delivery also guarantees a turn; the adapter steers the batched injection
     expect(result).toEqual({ kind: "delivered", decision: "deliver_streaming" })
-    expect(notifier.enqueued[0]?.deliverAs).toBe("steer")
     expect(notifier.enqueued[0]?.triggerTurn).toBe(true)
   })
 
@@ -73,7 +68,6 @@ member alpha needs a decision
     const result = deliverToLead({
       message: leadMessage(),
       parentState: { kind } as ParentState,
-      notificationConfig: CONFIG,
       notifier,
     })
 
@@ -90,7 +84,6 @@ member alpha needs a decision
     const result = deliverToLead({
       message: leadMessage(),
       parentState: { kind: "idle" },
-      notificationConfig: CONFIG,
       notifier,
     })
 
@@ -107,7 +100,6 @@ member alpha needs a decision
     const result = deliverToLead({
       message: leadMessage(),
       parentState: { kind: "idle" },
-      notificationConfig: CONFIG,
       notifier,
     })
 

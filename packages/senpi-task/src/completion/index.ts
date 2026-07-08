@@ -11,7 +11,6 @@ export type {
   DeliveredDecision,
   FlushInput,
   FlushResult,
-  NotificationConfig,
   NotifyResult,
   ParentNotifier,
   ParentNotifierMessage,

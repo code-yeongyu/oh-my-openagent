@@ -24,26 +24,37 @@ function fakePi(): SenpiExtensionAPI & { readonly sent: SentMessage[] } {
   }
 }
 
-function deferredCoordinator(delivered: string[]): { coordinator: IdleInjectionCoordinator; runDeferred: () => void } {
+type Delivered = { content: string; deliverAs: "steer" | "followUp" }
+
+function deferredCoordinator(delivered: Delivered[]): { coordinator: IdleInjectionCoordinator; runDeferred: () => void } {
   let pending: (() => void) | undefined
-  const coordinator = new IdleInjectionCoordinator((content) => delivered.push(content), {
-    scheduleFlush: (flush) => {
-      pending = flush
+  const coordinator = new IdleInjectionCoordinator(
+    (content, options) => delivered.push({ content, deliverAs: options.deliverAs }),
+    {
+      scheduleFlush: (flush) => {
+        pending = flush
+      },
     },
-  })
-  return { coordinator, runDeferred: () => pending?.() }
+  )
+  return {
+    coordinator,
+    runDeferred: () => {
+      pending?.()
+      pending = undefined
+    },
+  }
 }
 
 describe("team-message notifier + shared idle coordinator", () => {
-  test("#given a lead message and a completion on one idle edge #when both wake #then exactly one injection", () => {
+  test("#given a lead message and a completion in one batch window #when flushed #then exactly one steer injection", () => {
     // given
-    const delivered: string[] = []
+    const delivered: Delivered[] = []
     const { coordinator, runDeferred } = deferredCoordinator(delivered)
     const pi = fakePi()
-    const teamNotifier = createTeamMessageNotifier(pi, coordinator)
-    const completionNotifier = createParentNotifier(pi, coordinator)
+    const teamNotifier = createTeamMessageNotifier(pi, coordinator, () => true)
+    const completionNotifier = createParentNotifier(pi, coordinator, () => true)
 
-    // when: the team lead-message wake enqueues + defers, then the completion wake flushes synchronously
+    // when: both become ready inside the same batch window
     teamNotifier.enqueue({ customType: "senpi-task.team-message", content: "beta: shipped", display: false, from: "beta", messageId: "m1", triggerTurn: true })
     completionNotifier.enqueue({
       customType: "senpi-task.completion",
@@ -53,22 +64,26 @@ describe("team-message notifier + shared idle coordinator", () => {
       triggerTurn: true,
     })
 
-    // then: the synchronous completion flush drains BOTH into one injection
-    expect(delivered).toHaveLength(1)
-    expect(delivered[0]).toContain("st_1 completed")
-    expect(delivered[0]).toContain("beta: shipped")
+    // then: nothing delivers until the window closes
+    expect(delivered).toHaveLength(0)
 
-    // and: the deferred team flush finds an empty queue and no-ops
+    // when the batch window closes
     runDeferred()
+
+    // then: ONE steer injection carries both, in deterministic completion-first order
     expect(delivered).toHaveLength(1)
+    expect(delivered[0]?.deliverAs).toBe("steer")
+    expect(delivered[0]?.content).toContain("st_1 completed")
+    expect(delivered[0]?.content).toContain("beta: shipped")
+    expect(delivered[0]?.content.indexOf("st_1 completed")).toBeLessThan(delivered[0]?.content.indexOf("beta: shipped") ?? -1)
     expect(pi.sent).toHaveLength(0)
   })
 
   test("#given the same lead message enqueued twice (retry) #when flushed #then it injects once", () => {
     // given
-    const delivered: string[] = []
+    const delivered: Delivered[] = []
     const { coordinator, runDeferred } = deferredCoordinator(delivered)
-    const teamNotifier = createTeamMessageNotifier(fakePi(), coordinator)
+    const teamNotifier = createTeamMessageNotifier(fakePi(), coordinator, () => true)
     const wake = { customType: "senpi-task.team-message", content: "beta: done", display: false, from: "beta", messageId: "m1", triggerTurn: true } as const
 
     // when: the engine's enqueue-with-retry double-fires the SAME message id
@@ -81,39 +96,36 @@ describe("team-message notifier + shared idle coordinator", () => {
     expect(delivered).toHaveLength(1)
   })
 
-  test("#given a streaming (non-wake) lead message #when enqueued #then it routes to the rich renderer channel, not the coordinator", () => {
-    // given
-    const delivered: string[] = []
-    const { coordinator } = deferredCoordinator(delivered)
+  test("#given a streaming lead message #when enqueued #then it also batches through the coordinator as steer", () => {
+    // given: a streaming lead delivery carries triggerTurn like every delivered notification
+    const delivered: Delivered[] = []
+    const { coordinator, runDeferred } = deferredCoordinator(delivered)
     const pi = fakePi()
-    const teamNotifier = createTeamMessageNotifier(pi, coordinator)
+    const teamNotifier = createTeamMessageNotifier(pi, coordinator, () => true)
 
     // when
-    teamNotifier.enqueue({ customType: "senpi-task.team-message", content: "beta: fyi", display: false, from: "beta", messageId: "m2", deliverAs: "followUp" })
+    teamNotifier.enqueue({ customType: "senpi-task.team-message", content: "beta: steering", display: false, from: "beta", messageId: "m3", triggerTurn: true })
+    runDeferred()
 
-    // then
-    expect(coordinator.pendingCount()).toBe(0)
-    expect(pi.sent).toHaveLength(1)
-    expect(pi.sent[0]?.message.customType).toBe("senpi-task.team-message")
-    expect(pi.sent[0]?.options).toMatchObject({ deliverAs: "followUp" })
+    // then: the coordinator steers the injection; nothing bypasses the batch
+    expect(pi.sent).toHaveLength(0)
+    expect(delivered).toHaveLength(1)
+    expect(delivered[0]?.deliverAs).toBe("steer")
+    expect(delivered[0]?.content).toContain("beta: steering")
   })
 
-  test("#given a streaming lead message carrying BOTH triggerTurn and deliverAs:steer #when enqueued #then it delivers directly via the renderer with steer preserved, not the coordinator", () => {
-    // given: the engine now stamps a streaming lead message with triggerTurn:true AND the configured deliverAs
-    const delivered: string[] = []
-    const { coordinator } = deferredCoordinator(delivered)
+  test("#given no coordinator is wired #when a lead message enqueues #then it falls back to a direct steer on the renderer channel", () => {
+    // given
     const pi = fakePi()
-    const teamNotifier = createTeamMessageNotifier(pi, coordinator)
+    const teamNotifier = createTeamMessageNotifier(pi)
 
     // when
-    teamNotifier.enqueue({ customType: "senpi-task.team-message", content: "beta: steering", display: false, from: "beta", messageId: "m3", triggerTurn: true, deliverAs: "steer" })
+    teamNotifier.enqueue({ customType: "senpi-task.team-message", content: "beta: fyi", display: false, from: "beta", messageId: "m2", triggerTurn: true })
 
-    // then: it bypasses the idle-edge arbiter and reaches the rich channel with steer + triggerTurn intact
-    expect(coordinator.pendingCount()).toBe(0)
-    expect(delivered).toHaveLength(0)
+    // then
     expect(pi.sent).toHaveLength(1)
     expect(pi.sent[0]?.message.customType).toBe("senpi-task.team-message")
-    expect(pi.sent[0]?.message.details).toEqual({ from: "beta", messageId: "m3" })
-    expect(pi.sent[0]?.options).toMatchObject({ deliverAs: "steer", triggerTurn: true })
+    expect(pi.sent[0]?.message.details).toEqual({ from: "beta", messageId: "m2" })
+    expect(pi.sent[0]?.options).toMatchObject({ triggerTurn: true, deliverAs: "steer" })
   })
 })

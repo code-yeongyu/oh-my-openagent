@@ -1,6 +1,6 @@
 import type { Message } from "@oh-my-opencode/team-core/types"
 
-import type { NotificationConfig, ParentState, TransitionReason } from "../../completion"
+import type { ParentState, TransitionReason } from "../../completion"
 import type { TaskRecord } from "../../state"
 import type { SendOutcome } from "../../steering"
 import type { StateDirConfig } from "../../store"
@@ -40,7 +40,6 @@ export type LeadTeamMessage = {
   readonly from: string
   readonly messageId: string
   readonly triggerTurn?: boolean
-  readonly deliverAs?: "steer" | "followUp"
 }
 
 // SYNCHRONOUS enqueue seam (same failure contract as the completion notifier): the only observable
@@ -63,7 +62,6 @@ export type MessagingEngineDeps = {
   readonly config: TeamCoreConfig
   readonly delivery: MessagingDeliveryPort
   readonly leadNotifier: LeadMessageNotifier
-  readonly notificationConfig: NotificationConfig
   // The lead's live session state at send time, resolved lazily so the member-direction path never
   // pays for it. Feeds the SAME parent-state routing machine the completion push uses (todo 11).
   readonly parentState: () => ParentState

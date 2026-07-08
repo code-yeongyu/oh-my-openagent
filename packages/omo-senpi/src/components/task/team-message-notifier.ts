@@ -8,32 +8,30 @@ export const TEAM_MESSAGE_MESSAGE_TYPE = "senpi-task.team-message"
 
 /**
  * Adapt the team messaging engine's synchronous LeadMessageNotifier.enqueue seam onto senpi delivery.
- * Only an IDLE-edge wake (triggerTurn:true AND deliverAs === undefined) routes through the SHARED
- * idle-injection coordinator so a team lead-message wake and a task-completion wake landing on the same
- * idle edge collapse to ONE injection (the completion path enqueues + flushOnIdle synchronously; this
- * path enqueues + schedules a deferred flush, which the synchronous flush drains first). The coordinator
- * dedupes on the message id, so the enqueue is all-or-nothing under the engine's retry: a re-enqueue of
- * the same message never double-injects. A STREAMING lead message carries triggerTurn:true AND a
- * deliverAs; it is mid-turn, not on an idle edge, so it delivers DIRECTLY through the rich custom-message
- * channel so the senpi-task.team-message renderer applies and the configured deliver_as survives.
- * Silent-queue deliveries (no triggerTurn) also stay on that channel. senpi swallows async delivery
- * errors, so a synchronous throw here surfaces to the engine as a failed lead delivery.
+ * EVERY delivered lead-message routes through the SHARED idle-injection coordinator with a DEFERRED
+ * flush, so lead messages, task completions, and a pending ulw-loop continuation that become ready in
+ * the same batch window collapse into exactly ONE injection steered into the running turn at the next
+ * tool-call boundary. The coordinator dedupes on the message id, so the enqueue stays all-or-nothing
+ * under the engine's retry: re-enqueueing the same message never double-injects. Without a coordinator
+ * it falls back to a direct steer through the rich custom-message channel. senpi swallows async
+ * delivery errors, so a synchronous throw here surfaces to the engine as a failed lead delivery.
  */
-export function createTeamMessageNotifier(pi: SenpiExtensionAPI, coordinator?: IdleInjectionCoordinator): LeadMessageNotifier {
+export function createTeamMessageNotifier(
+  pi: SenpiExtensionAPI,
+  coordinator?: IdleInjectionCoordinator,
+  isStreaming?: () => boolean,
+): LeadMessageNotifier {
   return {
     enqueue(message: LeadTeamMessage): void {
-      if (message.triggerTurn === true && message.deliverAs === undefined && coordinator !== undefined) {
+      if (coordinator !== undefined) {
         coordinator.enqueue({ key: `team-message:${message.messageId}`, source: "team-message", content: message.content })
-        coordinator.scheduleFlush()
+        if (isStreaming?.() === true) coordinator.scheduleFlush()
+        else coordinator.flushSoon()
         return
-      }
-      const options: { triggerTurn?: boolean; deliverAs?: "steer" | "followUp" } = {
-        ...(message.triggerTurn !== undefined && { triggerTurn: message.triggerTurn }),
-        ...(message.deliverAs !== undefined && { deliverAs: message.deliverAs }),
       }
       pi.sendMessage(
         { customType: message.customType, content: message.content, display: message.display, details: { from: message.from, messageId: message.messageId } },
-        options,
+        { triggerTurn: true, deliverAs: "steer" },
       )
     },
   }
