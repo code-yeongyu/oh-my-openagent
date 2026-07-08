@@ -2,7 +2,6 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
 
-import type { NotificationConfig } from "../../completion"
 import { writeMemberTaskMap } from "../member-map"
 import { ensureTeamRuntimeDirs, resolveTeamMemberInboxDir, resolveTeamRuntimeDirs, teamStorageBaseDir } from "../storage"
 import { toTeamCoreConfig } from "../runtime-config"
@@ -19,7 +18,6 @@ import {
 import { taskSettings } from "../__fixtures__/runtime-fakes"
 
 const TEAM_RUN_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
-const NOTIFICATION: NotificationConfig = { deliver_as: "followUp" }
 
 afterEach(() => {
   cleanupMessagingTmp()
@@ -46,7 +44,6 @@ function deps(
     config,
     delivery,
     leadNotifier,
-    notificationConfig: NOTIFICATION,
     parentState: () => ({ kind: "idle" as const }),
   }
 }

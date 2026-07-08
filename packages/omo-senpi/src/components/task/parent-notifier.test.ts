@@ -28,108 +28,131 @@ function fakePi(): SenpiExtensionAPI & { readonly sent: SentMessage[]; readonly 
   }
 }
 
-function coordinatorCapturing(delivered: { content: string; deliverAs: "steer" | "followUp" }[]): IdleInjectionCoordinator {
-  return new IdleInjectionCoordinator((content, options) => delivered.push({ content, deliverAs: options.deliverAs }))
+type Delivered = { content: string; deliverAs: "steer" | "followUp" }
+
+// A manually-driven flush scheduler stands in for the production batch-window timer so the tests
+// control exactly when the deferred flush runs (everything enqueued before it batches together).
+function coordinatorWithManualFlush(delivered: Delivered[]): { coordinator: IdleInjectionCoordinator; runFlush: () => void } {
+  let pending: (() => void) | undefined
+  const coordinator = new IdleInjectionCoordinator(
+    (content, options) => delivered.push({ content, deliverAs: options.deliverAs }),
+    { scheduleFlush: (flush) => { pending = flush } },
+  )
+  return {
+    coordinator,
+    runFlush: () => {
+      pending?.()
+      pending = undefined
+    },
+  }
 }
 
 const completionDetails = [
   { task_id: "st_1", name: "worker", status: "completed" as const, duration_ms: 10, final_response_head: "ok", continuation_hint: "continue" },
 ]
 
-describe("createParentNotifier idle vs streaming routing", () => {
-  test("#given an idle wake (triggerTurn, no deliverAs) #when enqueued #then it routes through the coordinator and collapses", () => {
+function completionMessage(taskId: string) {
+  return {
+    customType: "senpi-task.completion" as const,
+    content: `${taskId} completed`,
+    display: false,
+    details: [{ ...completionDetails[0]!, task_id: taskId }],
+    triggerTurn: true,
+  }
+}
+
+describe("createParentNotifier batched steer delivery", () => {
+  test("#given one completion #when enqueued #then it defers through the coordinator and flushes as ONE steer", () => {
     // given
-    const delivered: { content: string; deliverAs: "steer" | "followUp" }[] = []
-    const coordinator = coordinatorCapturing(delivered)
+    const delivered: Delivered[] = []
+    const { coordinator, runFlush } = coordinatorWithManualFlush(delivered)
     const pi = fakePi()
-    const notifier = createParentNotifier(pi, coordinator)
+    const notifier = createParentNotifier(pi, coordinator, () => true)
 
-    // when: a wake completion carries triggerTurn:true and NO deliverAs (the idle-edge arbitration path)
-    notifier.enqueue({
-      customType: "senpi-task.completion",
-      content: "st_1 completed",
-      display: false,
-      details: completionDetails,
-      triggerTurn: true,
-    })
+    // when: the parent is STREAMING, so the completion collects in the batch window
+    notifier.enqueue(completionMessage("st_1"))
 
-    // then: it is arbitrated by the coordinator (one followUp injection), NOT delivered directly
+    // then nothing delivers synchronously (the batch window is open)
+    expect(delivered).toHaveLength(0)
+    expect(pi.sent).toHaveLength(0)
+
+    // when the batch window closes
+    runFlush()
+
+    // then exactly one steer injection carries the completion
     expect(delivered).toHaveLength(1)
     expect(delivered[0]?.content).toContain("st_1 completed")
-    expect(delivered[0]?.deliverAs).toBe("followUp")
-    expect(pi.sent).toHaveLength(0)
+    expect(delivered[0]?.deliverAs).toBe("steer")
     expect(pi.userSent).toHaveLength(0)
   })
 
-  test("#given a streaming completion (triggerTurn AND deliverAs:steer) #when enqueued #then it delivers DIRECTLY via the renderer channel with steer preserved", () => {
+  test("#given two near-simultaneous completions #when the batch window closes #then BOTH arrive in ONE steer injection", () => {
     // given
-    const delivered: { content: string; deliverAs: "steer" | "followUp" }[] = []
-    const coordinator = coordinatorCapturing(delivered)
+    const delivered: Delivered[] = []
+    const { coordinator, runFlush } = coordinatorWithManualFlush(delivered)
     const pi = fakePi()
-    const notifier = createParentNotifier(pi, coordinator)
+    const notifier = createParentNotifier(pi, coordinator, () => true)
 
-    // when: a STREAMING completion now carries BOTH triggerTurn:true AND the configured deliverAs
-    notifier.enqueue({
-      customType: "senpi-task.completion",
-      content: "st_1 completed",
-      display: false,
-      details: completionDetails,
-      triggerTurn: true,
-      deliverAs: "steer",
-    })
+    // when two children complete inside the same batch window (streaming parent)
+    notifier.enqueue(completionMessage("st_1"))
+    notifier.enqueue(completionMessage("st_2"))
+    runFlush()
 
-    // then: it bypasses the coordinator and goes straight to the rich custom-message channel
-    expect(delivered).toHaveLength(0)
-    expect(pi.userSent).toHaveLength(0)
-    expect(pi.sent).toHaveLength(1)
-    // and: the configured deliver_as (steer) survives, and triggerTurn rides along
-    expect(pi.sent[0]?.options).toMatchObject({ deliverAs: "steer", triggerTurn: true })
-    // and: the senpi-task.completion renderer applies (custom message shape, not a plain user message)
-    expect(pi.sent[0]?.message.customType).toBe("senpi-task.completion")
-    expect(pi.sent[0]?.message.details).toEqual(completionDetails)
+    // then the parent receives exactly ONE steer carrying both notifications
+    expect(delivered).toHaveLength(1)
+    expect(delivered[0]?.deliverAs).toBe("steer")
+    expect(delivered[0]?.content).toContain("st_1 completed")
+    expect(delivered[0]?.content).toContain("st_2 completed")
   })
 
-  test("#given a streaming completion with deliverAs:followUp #when enqueued #then it delivers directly with followUp preserved", () => {
+  test("#given a re-enqueue of the same completion #when the batch window closes #then the key dedupes to one entry", () => {
     // given
-    const delivered: { content: string; deliverAs: "steer" | "followUp" }[] = []
-    const coordinator = coordinatorCapturing(delivered)
-    const pi = fakePi()
-    const notifier = createParentNotifier(pi, coordinator)
+    const delivered: Delivered[] = []
+    const { coordinator, runFlush } = coordinatorWithManualFlush(delivered)
+    const notifier = createParentNotifier(fakePi(), coordinator, () => true)
 
-    // when
-    notifier.enqueue({
-      customType: "senpi-task.completion",
-      content: "st_1 completed",
-      display: false,
-      details: completionDetails,
-      triggerTurn: true,
-      deliverAs: "followUp",
-    })
+    // when the engine's sync-throw retry re-enqueues the same message (streaming parent)
+    notifier.enqueue(completionMessage("st_1"))
+    notifier.enqueue(completionMessage("st_1"))
+    runFlush()
 
-    // then
-    expect(delivered).toHaveLength(0)
-    expect(pi.sent).toHaveLength(1)
-    expect(pi.sent[0]?.options).toMatchObject({ deliverAs: "followUp", triggerTurn: true })
-    expect(pi.sent[0]?.message.customType).toBe("senpi-task.completion")
+    // then it never double-injects
+    expect(delivered).toHaveLength(1)
+    expect(delivered[0]?.content.match(/st_1 completed/g)).toHaveLength(1)
   })
 
-  test("#given no coordinator is wired #when an idle wake enqueues #then it falls back to the direct renderer channel", () => {
+  test("#given an IDLE parent #when two completions land in the same tick #then one microtask steer carries both", async () => {
+    // given: no manual scheduler - the idle path flushes itself on the next microtask
+    const delivered: Delivered[] = []
+    const coordinator = new IdleInjectionCoordinator(
+      (content, options) => delivered.push({ content, deliverAs: options.deliverAs }),
+    )
+    const notifier = createParentNotifier(fakePi(), coordinator, () => false)
+
+    // when both completions land in the same tick
+    notifier.enqueue(completionMessage("st_1"))
+    notifier.enqueue(completionMessage("st_2"))
+    expect(delivered).toHaveLength(0)
+    await Promise.resolve()
+
+    // then delivery is immediate (no exit race in print mode) and still batched into ONE steer
+    expect(delivered).toHaveLength(1)
+    expect(delivered[0]?.deliverAs).toBe("steer")
+    expect(delivered[0]?.content).toContain("st_1 completed")
+    expect(delivered[0]?.content).toContain("st_2 completed")
+  })
+
+  test("#given no coordinator is wired #when a completion enqueues #then it falls back to a direct steer on the renderer channel", () => {
     // given
     const pi = fakePi()
     const notifier = createParentNotifier(pi)
 
     // when
-    notifier.enqueue({
-      customType: "senpi-task.completion",
-      content: "st_1 completed",
-      display: false,
-      details: completionDetails,
-      triggerTurn: true,
-    })
+    notifier.enqueue(completionMessage("st_1"))
 
-    // then: with no arbiter, the wake still reaches the parent through the rich channel
+    // then the completion still steers into the running turn through the rich channel
     expect(pi.sent).toHaveLength(1)
-    expect(pi.sent[0]?.options).toMatchObject({ triggerTurn: true })
+    expect(pi.sent[0]?.options).toMatchObject({ triggerTurn: true, deliverAs: "steer" })
     expect(pi.sent[0]?.message.customType).toBe("senpi-task.completion")
   })
 })

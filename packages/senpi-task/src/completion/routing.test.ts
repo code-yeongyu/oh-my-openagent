@@ -1,36 +1,29 @@
 import { describe, expect, test } from "bun:test"
 
 import { routeCompletion, shouldNotifyStatus } from "./routing"
-import type { NotificationConfig, ParentState } from "./types"
-
-const wakeConfig: NotificationConfig = { deliver_as: "followUp" }
-const steerConfig: NotificationConfig = { deliver_as: "steer" }
+import type { ParentState } from "./types"
 
 describe("routeCompletion", () => {
-  test("#given idle parent #when routed #then always wakes regardless of config", () => {
+  test("#given idle parent #when routed #then always wakes with no config to consult", () => {
     // given
     const state: ParentState = { kind: "idle" }
 
     // when
-    const followUp = routeCompletion(state, wakeConfig)
-    const steer = routeCompletion(state, steerConfig)
+    const decision = routeCompletion(state)
 
-    // then an idle parent unconditionally wakes; there is no silent-queue path
-    expect(followUp).toEqual({ kind: "wake" })
-    expect(steer).toEqual({ kind: "wake" })
+    // then an idle parent unconditionally wakes; there is no silent-queue path and no knob
+    expect(decision).toEqual({ kind: "wake" })
   })
 
-  test("#given streaming parent #when routed #then delivered with configured deliver_as", () => {
+  test("#given streaming parent #when routed #then delivered into the running turn", () => {
     // given
     const state: ParentState = { kind: "streaming" }
 
     // when
-    const followUp = routeCompletion(state, wakeConfig)
-    const steer = routeCompletion(state, steerConfig)
+    const decision = routeCompletion(state)
 
-    // then
-    expect(followUp).toEqual({ kind: "deliver_streaming", deliverAs: "followUp" })
-    expect(steer).toEqual({ kind: "deliver_streaming", deliverAs: "steer" })
+    // then delivery timing is not configurable: the adapter steers the batched injection
+    expect(decision).toEqual({ kind: "deliver_streaming" })
   })
 
   test("#given compacting parent #when routed #then buffered with compacting reason", () => {
@@ -38,7 +31,7 @@ describe("routeCompletion", () => {
     const state: ParentState = { kind: "compacting" }
 
     // when
-    const decision = routeCompletion(state, wakeConfig)
+    const decision = routeCompletion(state)
 
     // then
     expect(decision).toEqual({ kind: "buffer", reason: "compacting" })
@@ -49,7 +42,7 @@ describe("routeCompletion", () => {
     const state: ParentState = { kind: "session_switching" }
 
     // when
-    const decision = routeCompletion(state, wakeConfig)
+    const decision = routeCompletion(state)
 
     // then
     expect(decision).toEqual({ kind: "buffer", reason: "session_switching" })
@@ -60,7 +53,7 @@ describe("routeCompletion", () => {
     const state: ParentState = { kind: "session_shutdown" }
 
     // when
-    const decision = routeCompletion(state, wakeConfig)
+    const decision = routeCompletion(state)
 
     // then
     expect(decision).toEqual({ kind: "buffer", reason: "session_shutdown" })

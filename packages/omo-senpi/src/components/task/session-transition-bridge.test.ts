@@ -123,7 +123,7 @@ describe("createSessionTransitionBridge buffered-completion round trip", () => {
     const runtime = new TaskRuntimeContext("/project")
     const store = fakeStore(completedRecord("session-a"))
     const notifier = capturingNotifier()
-    const completion = createCompletionNotifier({ notifier, store, config: { deliver_as: "followUp" } })
+    const completion = createCompletionNotifier({ notifier, store })
     const bridge = createSessionTransitionBridge({ runtime, notifier: completion })
 
     // when the session enters compaction and a background terminal arrives
@@ -149,7 +149,7 @@ describe("createSessionTransitionBridge buffered-completion round trip", () => {
     const runtime = new TaskRuntimeContext("/project")
     const store = fakeStore(completedRecord("session-a"))
     const notifier = capturingNotifier()
-    const completion = createCompletionNotifier({ notifier, store, config: { deliver_as: "followUp" } })
+    const completion = createCompletionNotifier({ notifier, store })
     const bridge = createSessionTransitionBridge({ runtime, notifier: completion })
 
     // when a switch begins and a completion buffers
@@ -172,7 +172,7 @@ describe("createSessionTransitionBridge buffered-completion round trip", () => {
     const runtime = new TaskRuntimeContext("/project")
     const store = fakeStore(completedRecord("session-a"))
     const notifier = capturingNotifier()
-    const completion = createCompletionNotifier({ notifier, store, config: { deliver_as: "followUp" } })
+    const completion = createCompletionNotifier({ notifier, store })
     const bridge = createSessionTransitionBridge({ runtime, notifier: completion })
 
     // when

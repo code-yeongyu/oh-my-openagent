@@ -29,7 +29,6 @@ export async function sendTeamMessage(
     const lead = deliverToLead({
       message,
       parentState: deps.parentState(),
-      notificationConfig: deps.notificationConfig,
       notifier: deps.leadNotifier,
     })
     return { kind: "to_lead", messageId: message.messageId, lead }

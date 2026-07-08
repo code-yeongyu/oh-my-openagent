@@ -88,11 +88,10 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     ...(settings.state_dir !== undefined && { task: { state_dir: settings.state_dir } }),
   })
 
-  const parentNotifier = createParentNotifier(deps.pi, deps.coordinator)
+  const parentNotifier = createParentNotifier(deps.pi, deps.coordinator, () => runtime.parentState().kind === "streaming")
   const notifier = createCompletionNotifier({
     notifier: parentNotifier,
     store: baseStore,
-    config: settings.notification,
   })
 
   let managerRef: TaskManager | undefined

@@ -36,6 +36,7 @@ const TASK_EVENTS = [
   "session_shutdown",
   "model_select",
   "before_agent_start",
+  "agent_end",
 ]
 const TASK_COMMANDS = ["task-kill", "tasks"]
 

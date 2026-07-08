@@ -1,11 +1,10 @@
 import { describe, expect, test } from "bun:test"
 
 import { createCompletionNotifier } from "./notifier"
-import type { NotificationConfig, ParentNotifier, ParentNotifierMessage, ParentState } from "./types"
+import type { ParentNotifier, ParentNotifierMessage, ParentState } from "./types"
 import type { TaskRecord } from "../state"
 import type { PersistedTaskEvent } from "../store"
 
-const wakeConfig: NotificationConfig = { deliver_as: "followUp" }
 
 function bufferedRecord(): TaskRecord {
   return {
@@ -46,7 +45,7 @@ describe("completion notifier buffered dedupe (W1-V F5)", () => {
     // given a compacting parent so both notifyTerminal calls route to the buffer
     const record = bufferedRecord()
     const { notifier: parent, calls } = fakeNotifier()
-    const notifier = createCompletionNotifier({ notifier: parent, store: fakeStore(record), config: wakeConfig })
+    const notifier = createCompletionNotifier({ notifier: parent, store: fakeStore(record) })
     const compacting: ParentState = { kind: "compacting" }
 
     // when notifyTerminal fires twice for the same terminal (task,epoch) before a flush

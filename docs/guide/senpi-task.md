@@ -45,7 +45,7 @@ Cancel and interrupt are parent-initiated: they return their result synchronousl
 When a background child finishes on its own - `completed`, `error`, or `lost` - the engine routes a completion to the parent exactly once (`packages/senpi-task/src/completion/routing.ts`):
 
 - Parent **idle**: it is always woken so the completion injects on the parent's next turn. No setting can suppress this.
-- Parent **streaming**: the completion is delivered using `task.notification.deliver_as` (`followUp` or `steer`) and still triggers a turn so the queued message is processed.
+- Parent **streaming**: the completion is steered into the running turn at the next tool-call boundary. Multiple notifications that become ready in the same batch window (about 200ms) are combined into one injection.
 - Parent **compacting / switching / shutting down**: the completion is buffered and flushed once the parent settles.
 
 Because cancel and interrupt return synchronously, they are never delivered as notifications - only externally-caused terminals notify.
@@ -74,7 +74,6 @@ All defaults live in `omo.json` under `task` and `teams`. A minimal project conf
 {
   "task": {
     "default_execution_mode": "in-process",
-    "notification": { "deliver_as": "followUp" },
     "wait": { "default_ms": 90000 }
   }
 }

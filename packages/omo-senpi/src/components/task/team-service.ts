@@ -118,7 +118,6 @@ export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
         config,
         delivery,
         leadNotifier: deps.leadNotifier,
-        notificationConfig: deps.settings.notification,
         parentState: () => deps.runtime.parentState(),
         ...(deps.now !== undefined ? { now: deps.now } : {}),
         ...(deps.newMessageId !== undefined ? { newMessageId: deps.newMessageId } : {}),

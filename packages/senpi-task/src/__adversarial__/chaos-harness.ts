@@ -134,7 +134,7 @@ export function buildHarness(options: ChaosHarnessOptions): ChaosHarness {
     destruction,
   })
   const parentNotifier = makeNotifier(store, observations)
-  const notifier = createCompletionNotifier({ notifier: parentNotifier, store, config: config.notification })
+  const notifier = createCompletionNotifier({ notifier: parentNotifier, store })
 
   return {
     manager,
