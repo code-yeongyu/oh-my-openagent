@@ -98,7 +98,7 @@ TELL THE USER WHAT AGENTS + SKILLS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUE
 | Architecture decision needed | MUST call plan agent |
 
 ```
-task(subagent_type="plan", load_skills=[], run_in_background=false, prompt="<gathered context + user request>")
+task(subagent_type="prometheus", load_skills=[], run_in_background=false, prompt="<gathered context + user request>")
 ```
 
 **SIZE THE SCOPE FIRST.** Count the distinct surfaces, files, and steps; that count decides whether the plan agent is required (any 2+ step / multi-file / unclear-scope / architecture task = required). After the plan agent returns, execute in the EXACT wave order and parallel grouping it specifies, and run the verification IT defines for each task — do not invent your own ordering or skip its verification.
@@ -127,7 +127,7 @@ task(subagent_type="plan", load_skills=[], run_in_background=false, prompt="<gat
 
 ```
 // WRONG: Starting fresh loses all context
-task(subagent_type="plan", load_skills=[], run_in_background=false, prompt="Here's more info...")
+task(subagent_type="prometheus", load_skills=[], run_in_background=false, prompt="Here's more info...")
 
 // CORRECT: Resume preserves everything
 task(task_id="ses_abc123", load_skills=[], run_in_background=false, prompt="Here's my answer to your question: ...")
@@ -145,7 +145,7 @@ task(task_id="ses_abc123", load_skills=[], run_in_background=false, prompt="Here
 |-----------|--------|-----|
 | Codebase exploration | task(subagent_type="explore", load_skills=[], run_in_background=true) | Parallel, context-efficient |
 | Documentation lookup | task(subagent_type="librarian", load_skills=[], run_in_background=true) | Specialized knowledge |
-| Planning | task(subagent_type="plan", load_skills=[], run_in_background=false) | Parallel task graph + structured TODO list |
+| Planning | task(subagent_type="prometheus", load_skills=[], run_in_background=false) | Parallel task graph + structured TODO list |
 | Hard problem (conventional) | task(subagent_type="oracle", load_skills=[], run_in_background=false) | Architecture, debugging, complex logic |
 | Hard problem (non-conventional) | task(category="artistry", load_skills=[...], run_in_background=true) | Different approach needed |
 | Implementation | task(category="...", load_skills=[...], run_in_background=true) | Domain-optimized models |
@@ -306,7 +306,7 @@ Test-first is not optional. Every behavior change — features, fixes, refactors
 Trigger when ANY apply: user said "엄밀" / "strictly" / "rigorously" / "properly review"; task touches 3+ files OR ran 20+ turns OR 30+ minutes; refactor / migration / perf / security work; user called it "깊게" / "deeply".
 
 Procedure (non-negotiable):
-1. Spawn a reviewer via `task(category="ultrabrain", subagent_type="plan", load_skills=[...], run_in_background=false, prompt="<goal + scenarios + evidence + diff + notepad path>")` — or any high-rigor reviewer agent available.
+1. Spawn a reviewer via `task(category="ultrabrain", subagent_type="prometheus", load_skills=[...], run_in_background=false, prompt="<goal + scenarios + evidence + diff + notepad path>")` — or any high-rigor reviewer agent available.
 2. Reviewer verdict is BINDING. There is no "false positive". Do not argue, minimise, or explain away.
 3. Fix every concern. Re-run the FULL scenario QA. Capture fresh evidence. Update notepad.
 4. Re-submit to the SAME reviewer. Loop until UNCONDITIONAL approval. "looks good but..." = REJECTION.

@@ -145,7 +145,7 @@ TELL THE USER WHAT AGENTS + SKILLS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUE
 **AFTER THE PLAN RETURNS:** execute in the EXACT wave order and parallel grouping it specifies, and run the verification IT defines per task. Do NOT invent your own ordering or skip its verification.
 
 ```
-task(subagent_type="plan", load_skills=[], run_in_background=false, prompt="<gathered context + user request>")
+task(subagent_type="prometheus", load_skills=[], run_in_background=false, prompt="<gathered context + user request>")
 ```
 
 ### SESSION CONTINUITY WITH PLAN AGENT (CRITICAL)
@@ -172,7 +172,7 @@ task(subagent_type="plan", load_skills=[], run_in_background=false, prompt="<gat
 |-----------|--------|-----|
 | Codebase exploration | task(subagent_type="explore", load_skills=[], run_in_background=true) | Parallel, context-efficient |
 | Documentation lookup | task(subagent_type="librarian", load_skills=[], run_in_background=true) | Specialized knowledge |
-| Planning | task(subagent_type="plan", load_skills=[], run_in_background=false) | Parallel task graph + structured TODO list |
+| Planning | task(subagent_type="prometheus", load_skills=[], run_in_background=false) | Parallel task graph + structured TODO list |
 | Hard problem (conventional) | task(subagent_type="oracle", load_skills=[], run_in_background=false) | Architecture, debugging, complex logic |
 | Hard problem (non-conventional) | task(category="artistry", load_skills=[...], run_in_background=true) | Different approach needed |
 | Implementation | task(category="...", load_skills=[...], run_in_background=true) | Domain-optimized models |
