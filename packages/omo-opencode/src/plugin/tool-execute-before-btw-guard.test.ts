@@ -32,6 +32,20 @@ function createHooks(ctx: PluginContext): CreatedHooks {
   })
 }
 
+function createOrderRecordingHooks(ctx: PluginContext, invocations: string[]): CreatedHooks {
+  const recorder = (name: string) => ({
+    "tool.execute.before": async (): Promise<void> => {
+      invocations.push(name)
+    },
+  })
+
+  return unsafeTestValue<CreatedHooks>({
+    writeExistingFileGuard: recorder("writeExistingFileGuard"),
+    claudeCodeHooks: recorder("claudeCodeHooks"),
+    btwToolGuard: createBtwToolGuardHook({ client: ctx.client }),
+  })
+}
+
 async function runReadTool(ctx: PluginContext): Promise<void> {
   const handler = createToolExecuteBeforeHandler({
     ctx,
@@ -71,5 +85,34 @@ describe("tool.execute.before btw-tool-guard dispatch", () => {
 
     // when a tool is attempted then the btw guard does not throw
     await runReadTool(ctx)
+  })
+
+  test("#given a marked /btw answer turn #when a tool is attempted #then the guard denies before side-effectful pre-tool hooks run", async () => {
+    // given a primary-session /btw answer turn with hooks that record invocation order
+    const ctx = createContext(true)
+    const invocations: string[] = []
+    const handler = createToolExecuteBeforeHandler({
+      ctx,
+      hooks: createOrderRecordingHooks(ctx, invocations),
+    })
+
+    // when a tool is attempted
+    let caughtMessage = ""
+    try {
+      await handler(
+        { tool: "Read", sessionID: "ses_btw_guard_order", callID: "call_btw_guard_order" },
+        { args: { filePath: "/tmp/whatever.ts" } },
+      )
+    } catch (error) {
+      if (error instanceof Error) {
+        caughtMessage = error.message
+      } else {
+        throw error
+      }
+    }
+
+    // then the guard denies the tool and no side-effectful hook observed the call
+    expect(caughtMessage).toBe(BTW_TOOL_GUARD_DENIAL_MESSAGE)
+    expect(invocations).toEqual([])
   })
 })

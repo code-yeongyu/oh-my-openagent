@@ -83,6 +83,10 @@ export function createToolExecuteBeforeHandler(args: {
       input.tool = stripped
     }
 
+    // /btw answer turns are read-only: deny tools before any side-effectful
+    // pre-tool hook (e.g. claudeCodeHooks PreToolUse) can observe the call.
+    await hooks.btwToolGuard?.["tool.execute.before"]?.(input, output)
+
     if (input.tool.toLowerCase() === "bash" && typeof output.args.command === "string") {
       if (output.args.command.includes("\x00")) {
         replaceToolArgs(output, { command: output.args.command.replace(/\x00/g, "") })
@@ -121,7 +125,6 @@ export function createToolExecuteBeforeHandler(args: {
     await hooks.atlasHook?.["tool.execute.before"]?.(input, output)
     await hooks.compactionTodoPreserver?.["tool.execute.before"]?.(input, output)
     await hooks.teamToolGating?.["tool.execute.before"]?.(input, output)
-    await hooks.btwToolGuard?.["tool.execute.before"]?.(input, output)
 
     const normalizedToolName = input.tool.toLowerCase()
     if (
