@@ -20,6 +20,7 @@ import {
   createBtwToolGuardHook,
   type BtwToolGuardClient,
 } from "./hook"
+import { _resetBtwTurnStateForTesting, markBtwTurnActive } from "./turn-state"
 
 type SessionInfo = {
   parentID?: string
@@ -113,6 +114,7 @@ describe("btw tool guard", () => {
   afterEach(() => {
     _resetForTesting()
     clearTeamSessionRegistry()
+    _resetBtwTurnStateForTesting()
   })
 
   describe("#given the latest user message is btw-marked in the primary session", () => {
@@ -181,6 +183,43 @@ describe("btw tool guard", () => {
         })
 
         await expectHookToAllow(client, "child-session")
+      })
+    })
+  })
+
+  describe("#given session.messages() rejects while the local /btw turn state is active", () => {
+    describe("#when the model attempts to call a tool", () => {
+      test("#then fails closed and denies the tool call", async () => {
+        setMainSession("main-session")
+        markBtwTurnActive("main-session")
+        const client: BtwToolGuardClient = {
+          session: {
+            get: mock(async () => ({ data: {} })),
+            messages: mock(async () => {
+              throw new Error("transient SDK failure")
+            }),
+          },
+        }
+
+        await expectHookToThrow(client, BTW_TOOL_GUARD_DENIAL_MESSAGE)
+      })
+    })
+  })
+
+  describe("#given session.messages() rejects with no local /btw turn state", () => {
+    describe("#when the model attempts to call a tool on a normal turn", () => {
+      test("#then allows the tool call so transient SDK failures cannot brick normal turns", async () => {
+        setMainSession("main-session")
+        const client: BtwToolGuardClient = {
+          session: {
+            get: mock(async () => ({ data: {} })),
+            messages: mock(async () => {
+              throw new Error("transient SDK failure")
+            }),
+          },
+        }
+
+        await expectHookToAllow(client)
       })
     })
   })

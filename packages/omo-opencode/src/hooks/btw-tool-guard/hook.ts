@@ -12,6 +12,7 @@ import {
   type MessageRole,
   type MessageWithParts,
 } from "../btw-context-strip/predicates"
+import { isBtwTurnActive } from "./turn-state"
 
 export const BTW_TOOL_GUARD_DENIAL_MESSAGE = "/btw side questions are read-only and cannot use tools."
 
@@ -120,11 +121,12 @@ async function isBtwAnswerTurn(deps: BtwToolGuardDeps, sessionID: string): Promi
     const latestUserMessage = findLatestUserMessage(normalizeSessionMessages(response))
     return latestUserMessage ? isBtwMarked(latestUserMessage) : false
   } catch (error) {
-    log("[btw-tool-guard] Failed to resolve session messages", {
+    log("[btw-tool-guard] Failed to resolve session messages, falling back to local turn state", {
       sessionID,
       error: String(error),
+      localBtwTurnActive: isBtwTurnActive(sessionID),
     })
-    return false
+    return isBtwTurnActive(sessionID)
   }
 }
 

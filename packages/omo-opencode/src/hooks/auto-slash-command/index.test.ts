@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { clearCommandLoaderCache } from "../../features/claude-code-command-loader"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import { BTW_AUTO_SLASH_COMMAND_MARKER } from "../btw-context-strip/predicates"
+import { _resetBtwTurnStateForTesting, isBtwTurnActive } from "../btw-tool-guard/turn-state"
 // Import real shared module to avoid mock leaking to other test files
 import * as shared from "../../shared"
 import type {
@@ -63,6 +64,7 @@ describe("createAutoSlashCommandHook", () => {
     process.chdir(originalWorkingDirectory)
     rmSync(tempDir, { recursive: true, force: true })
     mock.restore()
+    _resetBtwTurnStateForTesting()
   })
 
   describe("slash command replacement", () => {
@@ -165,6 +167,79 @@ describe("createAutoSlashCommandHook", () => {
       expect(output.message?.[BTW_AUTO_SLASH_COMMAND_MARKER]).toBe(true)
       expect(output.parts[0]?.[BTW_AUTO_SLASH_COMMAND_MARKER]).toBe(true)
       expect(output.parts[0].text).toContain("<auto-slash-command>")
+    })
+  })
+
+  describe("btw turn state for the tool guard", () => {
+    it("should record an active /btw turn when chat.message expands /btw", async () => {
+      // given a /btw question arriving on the chat.message route
+      const hook = createAutoSlashCommandHook()
+      const sessionID = `test-session-btw-state-on-${Date.now()}`
+
+      // when the /btw message is expanded
+      await hook["chat.message"](createMockInput(sessionID), createMockOutput("/btw quick aside"))
+
+      // then the local turn state marks the session as an active /btw turn
+      expect(isBtwTurnActive(sessionID)).toBe(true)
+    })
+
+    it("should clear the active /btw turn when the next normal message arrives", async () => {
+      // given a session with a completed /btw expansion
+      const hook = createAutoSlashCommandHook()
+      const sessionID = `test-session-btw-state-off-${Date.now()}`
+      await hook["chat.message"](createMockInput(sessionID), createMockOutput("/btw quick aside"))
+
+      // when a normal follow-up message arrives
+      await hook["chat.message"](createMockInput(sessionID), createMockOutput("back to real work"))
+
+      // then the local turn state no longer marks the session
+      expect(isBtwTurnActive(sessionID)).toBe(false)
+    })
+
+    it("should keep the active /btw turn when the marked message refires with tags", async () => {
+      // given a /btw expansion whose tagged message refires through chat.message
+      const hook = createAutoSlashCommandHook()
+      const sessionID = `test-session-btw-state-refire-${Date.now()}`
+      const output = createMockOutput("/btw quick aside")
+      await hook["chat.message"](createMockInput(sessionID), output)
+
+      // when the already-expanded btw message is observed again
+      await hook["chat.message"](createMockInput(sessionID), output)
+
+      // then the turn state stays active
+      expect(isBtwTurnActive(sessionID)).toBe(true)
+    })
+
+    it("should record an active /btw turn on the command.execute.before route", async () => {
+      // given a native /btw command execution
+      const hook = createAutoSlashCommandHook()
+      const sessionID = `test-session-btw-state-cmd-${Date.now()}`
+      const input: CommandExecuteBeforeInput = {
+        sessionID,
+        command: "btw",
+        arguments: "quick aside",
+        agent: "test-agent",
+      }
+      const output: CommandExecuteBeforeOutput = { parts: [{ type: "text", text: "/btw quick aside" }] }
+
+      // when the command route expands /btw
+      await hook["command.execute.before"](input, output)
+
+      // then the local turn state marks the session
+      expect(isBtwTurnActive(sessionID)).toBe(true)
+    })
+
+    it("should clear the turn state when the session is deleted", async () => {
+      // given a session with an active /btw turn
+      const hook = createAutoSlashCommandHook()
+      const sessionID = `test-session-btw-state-del-${Date.now()}`
+      await hook["chat.message"](createMockInput(sessionID), createMockOutput("/btw quick aside"))
+
+      // when the session is deleted
+      await hook["event"]({ event: { type: "session.deleted", properties: { info: { id: sessionID } } } })
+
+      // then the local turn state is cleared
+      expect(isBtwTurnActive(sessionID)).toBe(false)
     })
   })
 

@@ -13,6 +13,7 @@ import {
 } from "./constants"
 import { createProcessedCommandStore } from "./processed-command-store"
 import { BTW_AUTO_SLASH_COMMAND_MARKER } from "../btw-context-strip/predicates"
+import { clearBtwTurnActive, markBtwTurnActive } from "../btw-tool-guard/turn-state"
 import type {
   AutoSlashCommandHookInput,
   AutoSlashCommandHookOutput,
@@ -86,6 +87,14 @@ function partsContainAutoSlashCommandTags(parts: Array<{ text?: string }>): bool
   )
 }
 
+function isBtwChatTraffic(promptText: string, parts: Array<Record<string, unknown>>): boolean {
+  if (parts.some((part) => part[BTW_AUTO_SLASH_COMMAND_MARKER] === true)) {
+    return true
+  }
+
+  return detectSlashCommand(promptText)?.command.toLowerCase() === "btw"
+}
+
 export interface AutoSlashCommandHookOptions {
   skills?: LoadedSkill[]
   pluginsEnabled?: boolean
@@ -114,6 +123,12 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       output: AutoSlashCommandHookOutput
     ): Promise<void> => {
       const promptText = extractPromptText(output.parts)
+
+      // Non-/btw traffic ends any active /btw turn; /btw traffic (fresh or a
+      // tagged refire of the same marked message) must keep the guard state.
+      if (!isBtwChatTraffic(promptText, output.parts)) {
+        clearBtwTurnActive(input.sessionID)
+      }
 
       // Debug logging to diagnose slash command issues
       if (promptText.startsWith("/")) {
@@ -175,6 +190,9 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       output.parts[idx].text = taggedContent
       markBtwCommandPart(parsed.command, output.parts[idx])
       markBtwCommandMessage(parsed.command, output)
+      if (parsed.command.toLowerCase() === "btw") {
+        markBtwTurnActive(input.sessionID)
+      }
 
       log(`[auto-slash-command] Replaced message with command template`, {
         sessionID: input.sessionID,
@@ -186,6 +204,10 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       input: CommandExecuteBeforeInput,
       output: CommandExecuteBeforeOutput
     ): Promise<void> => {
+      if (input.command.toLowerCase() !== "btw") {
+        clearBtwTurnActive(input.sessionID)
+      }
+
       if (partsContainAutoSlashCommandTags(output.parts)) {
         return
       }
@@ -243,6 +265,9 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         output.parts.unshift(injectedPart)
       }
       markBtwCommandMessage(parsed.command, output)
+      if (parsed.command.toLowerCase() === "btw") {
+        markBtwTurnActive(input.sessionID)
+      }
 
       log(`[auto-slash-command] command.execute.before - injected template`, {
         sessionID: input.sessionID,
@@ -265,6 +290,7 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
 
       sessionProcessedCommands.cleanupSession(sessionID)
       sessionProcessedCommandExecutions.cleanupSession(sessionID)
+      clearBtwTurnActive(sessionID)
     },
     dispose,
   }
