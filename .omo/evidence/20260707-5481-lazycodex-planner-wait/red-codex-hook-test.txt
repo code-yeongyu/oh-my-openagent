@@ -1,11 +1,36 @@
----
-name: ultrawork
-description: Binding ultrawork mode directive for omo on Codex. When a prompt contains ultrawork or ulw, the omo UserPromptSubmit hook injects a short bootstrap that points at this file. Read the whole file and follow every rule in it for the rest of the task.
-metadata:
-  short-description: Binding ultrawork mode directive
----
 
-<ultrawork-mode>
+> @code-yeongyu/codex-ultrawork@4.15.1 test
+> vitest --run test/codex-hook.test.ts
+
+
+ RUN  v4.1.8 C:/Users/pss/OneDrive/Documents/github/oh-my-openagent-5481/packages/omo-codex/plugin/components/ultrawork
+
+ ❯ test/codex-hook.test.ts (14 tests | 1 failed) 25ms
+     ✓ #given ultrawork prompt #when hook runs #then emits directive as Codex hook JSON 2ms
+     ✓ #given Windows cwd #when hook sees ultrawork prompt #then emits directive as Codex hook JSON 1ms
+     ✓ #given transcript already contains ultrawork directive #when hook sees ultrawork prompt #then it does not repeat directive 3ms
+     ✓ #given transcript only mentions ultrawork marker in user content #when hook sees first ulw command #then it emits directive 3ms
+     ✓ #given context-pressure recovery prompt with ulw #when hook runs #then does not add more context 0ms
+     ✓ #given context-pressure transcript with ulw prompt #when hook runs #then does not add more context 3ms
+     ✓ #given Codex canonical context-window transcript with ulw prompt #when hook runs #then does not add more context 3ms
+     ✓ #given context-pressure recovery prompt without ulw #when hook runs #then stays quiet 0ms
+     ✓ #given malformed or empty input #when hook runs #then exits with empty output 1ms
+     ✓ #given directive #when inspected #then keeps manual QA and cleanup invariants 0ms
+     ✓ #given directive #when inspected #then avoids context-expensive agent polling 1ms
+     ✓ #given directive #when inspected #then hardens Codex subagent assignment ambiguity 1ms
+     × #given directive #when inspected #then blocks dependent work until spawned planners finish 4ms
+     ✓ #given directive #when inspected #then keeps impact-proportional sizing invariants 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/codex-hook.test.ts > codex ultrawork hook > #given directive #when inspected #then blocks dependent work until spawned planners finish
+AssertionError: expected '<ultrawork-mode>\n\n**MANDATORY**: Fi…' to match /after any `multi_agent_v1\.spawn_agen…/
+
+- Expected:
+/after any `multi_agent_v1\.spawn_agent`/
+
++ Received:
+"<ultrawork-mode>
 
 **MANDATORY**: First user-visible line this turn MUST be exactly:
 `ULTRAWORK MODE ENABLED!`
@@ -30,8 +55,8 @@ can point to: a new module / layer / domain model / abstraction;
 auth, security, session, or permissions; an external integration
 (API, queue, payment, webhook); a DB schema or migration; concurrency,
 transaction boundaries, or cache invalidation; a refactor crossing
-domain boundaries; or the user signaled care ("carefully",
-"thoroughly", "design first") or demanded review.
+domain boundaries; or the user signaled care (\"carefully\",
+\"thoroughly\", \"design first\") or demanded review.
 When unsure, take HEAVY. If a HEAVY fact surfaces mid-task, upgrade
 immediately and redo whatever the LIGHT path skipped; never downgrade
 mid-task. The tier sizes process, never honesty: both tiers capture
@@ -75,20 +100,20 @@ exercises the surface; capture the artifact.
 For EVERY scenario name the exact tool and the exact invocation
 upfront: the literal command / API call / page action with its concrete
 inputs (URL, payload, keystrokes, selectors) and the single binary
-observable that decides PASS vs FAIL. "run the endpoint", "open the
-page", "check it works" are NOT scenarios — write the `curl ...`, the
+observable that decides PASS vs FAIL. \"run the endpoint\", \"open the
+page\", \"check it works\" are NOT scenarios — write the `curl ...`, the
 `send-keys ...`, the Browser plugin action, the `page.click(...)`, the
 expected status/text.
 
 Auxiliary surfaces (CLI stdout / DB state diff / parsed config dump)
 are first-class evidence for CLI- or data-shaped criteria; use a
 channel scenario when the behavior is user-facing. `--dry-run`,
-printing the command, "should respond", and "looks correct" never
+printing the command, \"should respond\", and \"looks correct\" never
 count.
 
 For TUI visual QA, terminal transcripts alone are not enough when a
 visual surface is being evaluated. In this repo, prefer
-`node script/qa/web-terminal-visual-qa.mjs --title "<surface>" --from-file <capture.txt> --evidence-dir <dir>`
+`node script/qa/web-terminal-visual-qa.mjs --title \"<surface>\" --from-file <capture.txt> --evidence-dir <dir>`
 or the helper's `--command` tmux-backed PTY connector when available.
 Outside this repo, capture equivalent browser/computer-use rendered
 terminal evidence: screenshot, plain transcript, rendered HTML or action
@@ -184,7 +209,7 @@ instead of waiting for the next pass. Step text encodes WHERE / WHY
 GOOD pair (test-first, ordered):
   `foo.test.ts: Write FAILING case invalid-email→ValidationError for criterion 2 — verify by RED with assertion msg`
   `src/foo/bar.ts: Implement validateEmail() RFC-5322-lite for criterion 2 — verify by foo.test.ts GREEN + curl 400 body`
-BAD: "Implement feature" / "Fix bug" / "Add tests later" / writing
+BAD: \"Implement feature\" / \"Fix bug\" / \"Add tests later\" / writing
 production code before its failing test → rewrite.
 
 # Finding things (lead with these, parallel-flood the first wave)
@@ -294,13 +319,6 @@ evidence for that step. Do not start dependent implementation until the
 audit, research, or review result is integrated or explicitly recorded
 as inconclusive. Do not generate a plan before spawned research lanes
 that feed the plan have returned or been closed as inconclusive.
-Spawn every independent child for the current wave first. After the wave
-is launched, run `multi_agent_v1.wait_agent` for each spawned child until
-each reaches terminal status (`completed`, `failed`, `blocked`, or
-explicitly recorded inconclusive) before any dependent `update_plan`
-transition, `create_goal` continuation, implementation tool call, plan
-drafting, approval-gate work, PR handoff, or final response. A timeout is
-not terminal status.
 Do not write the final answer, PR handoff, or completion summary while
 active child agents remain open. Use short `multi_agent_v1.wait_agent` cycles.
 After two silent waits send `TASK STILL ACTIVE: return <deliverable> or
@@ -324,13 +342,13 @@ Procedure (NON-NEGOTIABLE):
    the message.
    Pass: goal, success-criteria, scenario evidence, full diff, notepad
    path.
-2. Treat the reviewer's verdict as binding. There is NO "false
-   positive". Every concern is real. Do not argue. Do not minimise. Do
+2. Treat the reviewer's verdict as binding. There is NO \"false
+   positive\". Every concern is real. Do not argue. Do not minimise. Do
    not explain it away.
 3. Fix every issue. Re-run the FULL scenario QA. Capture fresh
    evidence. Update notepad.
 4. Re-submit to the SAME reviewer. Loop until you receive an
-   UNCONDITIONAL approval ("looks good but..." = REJECTION).
+   UNCONDITIONAL approval (\"looks good but...\" = REJECTION).
 5. Only on unconditional approval may you declare done. Stopping early
    IS failure.
 
@@ -384,4 +402,20 @@ message + present for approval.
 - After 2 parallel exploration waves yield no new useful facts, stop
   exploring and act.
 
-</ultrawork-mode>
+</ultrawork-mode>"
+
+ ❯ test/codex-hook.test.ts:261:21
+    259|   const directive = parsed.hookSpecificOutput.additionalContext;
+    260|   expect(directive).toMatch(/Subagent-dependent transition barrier/);
+    261|   expect(directive).toMatch(/after any `multi_agent_v1\.spawn_agent`/);
+       |                     ^
+    262|   expect(directive).toMatch(/wait_agent[\s\S]{0,240}terminal status/);
+    263|   expect(directive).toMatch(/Do not start dependent implementation/);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 passed (14)
+   Start at  19:36:13
+   Duration  364ms (transform 56ms, setup 0ms, import 82ms, tests 25ms, environment 0ms)

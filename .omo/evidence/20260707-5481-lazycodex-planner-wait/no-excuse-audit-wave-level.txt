@@ -1,0 +1,2 @@
+No-excuse audit for changed TS/JS test files
+PASS: no forbidden any/suppression patterns found

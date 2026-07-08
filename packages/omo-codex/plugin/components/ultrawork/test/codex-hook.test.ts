@@ -244,6 +244,27 @@ describe("codex ultrawork hook", () => {
 		expect(directive).toMatch(/WORKING:/);
 	});
 
+	it("#given directive #when inspected #then blocks dependent work until spawned planners finish", () => {
+		// given
+		const payload = {
+			hook_event_name: "UserPromptSubmit",
+			prompt: "ulw",
+		};
+
+		// when
+		const output = runUserPromptSubmitHook(payload, { skillFilePath: null });
+		const parsed = parseHookOutput(output);
+
+		// then
+		const directive = parsed.hookSpecificOutput.additionalContext;
+		expect(directive).toMatch(/Subagent-dependent transition barrier/);
+		expect(directive).toMatch(/Spawn every independent child for the current wave first/);
+		expect(directive).toMatch(/After the wave\s+is launched[\s\S]{0,240}wait_agent[\s\S]{0,240}terminal status/);
+		expect(directive).not.toMatch(/Immediately after any `multi_agent_v1\.spawn_agent`/);
+		expect(directive).toMatch(/Do not start dependent implementation/);
+		expect(directive).toMatch(/Do not mark an `update_plan` step `completed`/);
+	});
+
 	it("#given directive #when inspected #then keeps impact-proportional sizing invariants", () => {
 		// given
 		const payload = {
