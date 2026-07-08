@@ -196,6 +196,32 @@ describe("auto-slash command executor plugin dispatch", () => {
     expect(result.replacementText).not.toContain("${user_message}")
   })
 
+  it("replaces $SESSION_ID and $TIMESTAMP in builtin command templates", async () => {
+    // given
+    const sessionID = "ses_test-12345"
+
+    // when
+    const result = await executeSlashCommand(
+      {
+        command: "handoff",
+        args: "",
+        raw: "/handoff",
+      },
+      {
+        skills: [],
+        sessionID,
+      },
+    )
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.replacementText).toContain(sessionID)
+    expect(result.replacementText).not.toContain("$SESSION_ID")
+    expect(result.replacementText).not.toContain("$TIMESTAMP")
+    // Verify the session_read call in the template has the real session ID
+    expect(result.replacementText).toContain(`session_id: "${sessionID}"`)
+  })
+
   it("renders Atlas as the builtin start-work agent during slash-command execution", async () => {
     // given
 

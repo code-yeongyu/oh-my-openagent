@@ -41,6 +41,7 @@ export interface ExecutorOptions {
   enabledPluginsOverride?: Record<string, boolean>
   agent?: string
   directory?: string
+  sessionID?: string
 }
 
 
@@ -75,7 +76,7 @@ async function findCommand(commandName: string, options?: ExecutorOptions): Prom
   ) ?? null
 }
 
-async function formatCommandTemplate(cmd: CommandInfo, args: string): Promise<string> {
+async function formatCommandTemplate(cmd: CommandInfo, args: string, sessionID?: string): Promise<string> {
   const sections: string[] = []
 
   sections.push(`# /${cmd.name} Command\n`)
@@ -109,9 +110,13 @@ async function formatCommandTemplate(cmd: CommandInfo, args: string): Promise<st
   const withFileRefs = await resolveFileReferencesInText(content, commandDir)
   const resolvedContent = await resolveCommandsInText(withFileRefs)
   const resolvedArguments = args
+  const resolvedSessionID = sessionID ?? ""
+  const resolvedTimestamp = new Date().toISOString()
   const substitutedContent = resolvedContent
     .replace(/\$\{user_message\}/g, resolvedArguments)
     .replace(/\$ARGUMENTS/g, resolvedArguments)
+    .replace(/\$SESSION_ID/g, resolvedSessionID)
+    .replace(/\$TIMESTAMP/g, resolvedTimestamp)
   sections.push(substitutedContent.trim())
 
   if (args) {
@@ -149,7 +154,7 @@ export async function executeSlashCommand(parsed: ParsedSlashCommand, options?: 
   }
 
   try {
-    const template = await formatCommandTemplate(command, parsed.args)
+    const template = await formatCommandTemplate(command, parsed.args, options?.sessionID)
     return {
       success: true,
       replacementText: template,
