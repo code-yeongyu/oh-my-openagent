@@ -16,7 +16,7 @@ Every frontend project MUST have a `DESIGN.md` at its root. This file is the sin
 
 ## DESIGN.md Structure
 
-The file has 7 sections plus a greenfield-only `## 0. Research Log`. Every section is mandatory. Skip nothing.
+The file has 8 sections plus a greenfield-only `## 0. Research Log`. Every section is mandatory. Skip nothing.
 
 ```markdown
 # [Project Name] Design System
@@ -173,6 +173,19 @@ If borders:
 
 If tonal-shift:
 Surfaces use progressively lighter/darker shades. No borders, no shadows.
+
+## 8. Accessibility Constraints & Accepted Debt
+
+### Constraints
+- WCAG target: [e.g. 2.2 AA] — contrast floor [4.5:1 body / 3:1 large text], visible focus on every
+  interactive element, full keyboard reachability, `prefers-reduced-motion` respected (Section 6).
+
+### Accepted Debt
+| Item | Location | Why accepted | Owner / Exit |
+|------|----------|--------------|--------------|
+| [debt] | [file/screen] | [reason + user sign-off] | [when it gets fixed] |
+
+New debt is recorded here at the moment it is accepted — never silently.
 ```
 
 ## Creation Workflow
@@ -207,6 +220,7 @@ After every component implementation, check:
 - [ ] Component reused 2+ times? Documented in Section 5.
 - [ ] Motion follows the timing table. No arbitrary durations.
 - [ ] Component visual QA passed for each primitive and required state before product screens were composed.
+- [ ] Section 8 accessibility constraints hold for the new component; any new debt is recorded in Section 8, not silently accepted.
 
 ## Memory Management
 

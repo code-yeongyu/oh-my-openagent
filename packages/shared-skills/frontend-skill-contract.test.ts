@@ -178,3 +178,27 @@ describe("frontend skill full-read reference contract", () => {
 		}
 	})
 })
+
+describe("frontend skill designpowers default integration", () => {
+	test("#given any implementation or redesign #when Phase 0 routes #then designpowers lane-c loads by default", async () => {
+		const text = await Bun.file(frontendSkillPath).text()
+
+		expect(text).toContain("designpowers/lane-c-review.md")
+		expect(text).toContain("implementation or redesign that creates or updates")
+	})
+
+	test("#given the designpowers wrapper #when implementation heads to review #then lane-c is the required default lane", async () => {
+		const dpText = await Bun.file(new URL("./skills/frontend/references/designpowers/README.md", import.meta.url)).text()
+
+		expect(dpText).toContain("EVERY implementation or redesign")
+		expect(dpText).toContain("lane-c-review.md")
+	})
+
+	test("#given the DESIGN.md schema #when designpowers joins the default flow #then accessibility constraints and accepted debt are schema sections", async () => {
+		const archText = await Bun.file(
+			new URL("./skills/frontend/references/design/design-system-architecture.md", import.meta.url),
+		).text()
+
+		expect(archText).toContain("## 8. Accessibility Constraints & Accepted Debt")
+	})
+})
