@@ -4,6 +4,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { clearCommandLoaderCache } from "../../features/claude-code-command-loader"
+import { _resetForTesting, subagentSessions } from "../../features/claude-code-session-state"
+import {
+  clearTeamSessionRegistry,
+  registerTeamSession,
+} from "../../features/team-mode/team-session-registry"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import { BTW_AUTO_SLASH_COMMAND_MARKER } from "../btw-context-strip/predicates"
 import { _resetBtwTurnStateForTesting, isBtwTurnActive } from "../btw-tool-guard/turn-state"
@@ -65,6 +70,8 @@ describe("createAutoSlashCommandHook", () => {
     rmSync(tempDir, { recursive: true, force: true })
     mock.restore()
     _resetBtwTurnStateForTesting()
+    _resetForTesting()
+    clearTeamSessionRegistry()
   })
 
   describe("slash command replacement", () => {
@@ -217,6 +224,64 @@ describe("createAutoSlashCommandHook", () => {
       await hook["chat.message"](createMockInput(sessionID), output)
 
       // then the non-disabled builtin still expands
+      expect(output.parts[0].text).toContain("<auto-slash-command>")
+    })
+  })
+
+  describe("btw primary-session gating", () => {
+    it("should not expand /btw in a subagent session", async () => {
+      // given a subagent session receives a /btw message
+      const hook = createAutoSlashCommandHook()
+      const sessionID = `test-session-btw-subagent-${Date.now()}`
+      subagentSessions.add(sessionID)
+      const output = createMockOutput("/btw private aside")
+      const originalText = output.parts[0].text
+
+      // when the message routes through chat.message
+      await hook["chat.message"](createMockInput(sessionID), output)
+
+      // then the message is left untouched, unmarked, and unrecorded
+      expect(output.parts[0].text).toBe(originalText)
+      expect(output.message?.[BTW_AUTO_SLASH_COMMAND_MARKER]).toBeUndefined()
+      expect(isBtwTurnActive(sessionID)).toBe(false)
+    })
+
+    it("should not expand /btw in a team member session", async () => {
+      // given a team member session receives a native /btw command
+      const hook = createAutoSlashCommandHook()
+      const sessionID = `test-session-btw-team-${Date.now()}`
+      registerTeamSession(sessionID, {
+        teamRunId: "11111111-1111-4111-8111-111111111111",
+        memberName: "member-one",
+        role: "member",
+      })
+      const input: CommandExecuteBeforeInput = {
+        sessionID,
+        command: "btw",
+        arguments: "private aside",
+        agent: "test-agent",
+      }
+      const output: CommandExecuteBeforeOutput = { parts: [{ type: "text", text: "/btw private aside" }] }
+
+      // when the command routes through command.execute.before
+      await hook["command.execute.before"](input, output)
+
+      // then no template is injected and the session is not marked
+      expect(output.parts[0].text).toBe("/btw private aside")
+      expect(isBtwTurnActive(sessionID)).toBe(false)
+    })
+
+    it("should still expand non-btw commands in subagent sessions", async () => {
+      // given a subagent session uses a normal builtin command
+      const hook = createAutoSlashCommandHook()
+      const sessionID = `test-session-subagent-other-${Date.now()}`
+      subagentSessions.add(sessionID)
+      const output = createMockOutput("/init-deep")
+
+      // when the message routes through chat.message
+      await hook["chat.message"](createMockInput(sessionID), output)
+
+      // then the command expands as usual
       expect(output.parts[0].text).toContain("<auto-slash-command>")
     })
   })

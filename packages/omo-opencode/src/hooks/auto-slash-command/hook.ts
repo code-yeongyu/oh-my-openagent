@@ -14,6 +14,12 @@ import {
 import { createProcessedCommandStore } from "./processed-command-store"
 import { BTW_AUTO_SLASH_COMMAND_MARKER } from "../btw-context-strip/predicates"
 import { clearBtwTurnActive, markBtwTurnActive } from "../btw-tool-guard/turn-state"
+import {
+  getMainSessionID,
+  subagentSessions,
+  syncSubagentSessions,
+} from "../../features/claude-code-session-state"
+import { lookupTeamSession } from "../../features/team-mode/team-session-registry"
 import type {
   AutoSlashCommandHookInput,
   AutoSlashCommandHookOutput,
@@ -95,6 +101,26 @@ function isBtwChatTraffic(promptText: string, parts: Array<Record<string, unknow
   return detectSlashCommand(promptText)?.command.toLowerCase() === "btw"
 }
 
+// /btw is documented as primary-session-only; expanding it in subagent, team,
+// or non-main sessions would inject the template where the tool guard does not
+// protect it, so those sessions keep the raw text instead.
+function isBtwExpansionAllowed(command: string, sessionID: string): boolean {
+  if (command.toLowerCase() !== "btw") {
+    return true
+  }
+
+  if (subagentSessions.has(sessionID) || syncSubagentSessions.has(sessionID)) {
+    return false
+  }
+
+  if (lookupTeamSession(sessionID)) {
+    return false
+  }
+
+  const mainSessionID = getMainSessionID()
+  return !mainSessionID || mainSessionID === sessionID
+}
+
 export interface AutoSlashCommandHookOptions {
   skills?: LoadedSkill[]
   pluginsEnabled?: boolean
@@ -154,6 +180,13 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         return
       }
 
+      if (!isBtwExpansionAllowed(parsed.command, input.sessionID)) {
+        log(`[auto-slash-command] Skipping /btw expansion outside the primary session`, {
+          sessionID: input.sessionID,
+        })
+        return
+      }
+
       const commandKey = input.messageID
         ? `${input.sessionID}:${input.messageID}:${parsed.command}`
         : `${input.sessionID}:${parsed.command}`
@@ -208,6 +241,13 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
     ): Promise<void> => {
       if (input.command.toLowerCase() !== "btw") {
         clearBtwTurnActive(input.sessionID)
+      }
+
+      if (!isBtwExpansionAllowed(input.command, input.sessionID)) {
+        log(`[auto-slash-command] Skipping /btw expansion outside the primary session`, {
+          sessionID: input.sessionID,
+        })
+        return
       }
 
       if (partsContainAutoSlashCommandTags(output.parts)) {
