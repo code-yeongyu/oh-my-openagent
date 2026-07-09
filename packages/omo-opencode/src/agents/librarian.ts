@@ -22,6 +22,7 @@ export const LIBRARIAN_PROMPT_METADATA: AgentPromptMetadata = {
 }
 
 export function createLibrarianAgent(model: string): AgentConfig {
+  // ponytail: stays a blocklist (not deny-all allowlist) because librarian's job needs bash for gh/git; allowing bash would reopen the FS-write leak anyway.
   const restrictions = createAgentToolRestrictions([
     "write",
     "edit",

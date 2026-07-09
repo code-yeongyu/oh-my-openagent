@@ -1,7 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
 import { buildClaudeThinkingConfig, isGpt5_5Model, isGptModel } from "./types";
-import { createAgentToolRestrictions } from "../shared/permission-compat";
+import { createAgentToolAllowlist } from "../shared/permission-compat";
 
 const MODE: AgentMode = "subagent";
 
@@ -409,11 +409,17 @@ If the follow-up contradicts what you recommended and you still believe the orig
 
 
 export function createOracleAgent(model: string): AgentConfig {
-  const restrictions = createAgentToolRestrictions([
-    "write",
-    "edit",
-    "apply_patch",
-    "task",
+  // ponytail: deny-all allowlist, not a write-tool blocklist; a blocklist leaves bash + MCP write tools open.
+  const restrictions = createAgentToolAllowlist([
+    "read",
+    "grep",
+    "glob",
+    "list",
+    "webfetch",
+    "lsp_symbols",
+    "lsp_goto_definition",
+    "lsp_find_references",
+    "lsp_diagnostics",
   ]);
 
   const base = {
