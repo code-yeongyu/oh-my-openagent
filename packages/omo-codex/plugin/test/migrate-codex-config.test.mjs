@@ -900,6 +900,82 @@ test("#given gpt-5.6-terra managed disable #when full migration sees models_cach
 	assert.match(content, /max_concurrent_threads_per_session = 1000/);
 });
 
+test("#given config default gpt-5.5 #when SessionStart model is gpt-5.6-terra #then prefers session model and clears disable", () => {
+	const config = [
+		'model = "gpt-5.5"',
+		"",
+		"[features.multi_agent_v2]",
+		"enabled = false",
+		"max_concurrent_threads_per_session = 1000",
+		"",
+	].join("\n");
+
+	const result = forceDisableMultiAgentV2(config, {
+		sessionModel: "gpt-5.6-terra",
+		multiAgentVersion: "v2",
+	});
+
+	assert.doesNotMatch(result, /^\s*enabled\s*=\s*false/m);
+	assert.match(result, /max_concurrent_threads_per_session = 1000/);
+});
+
+test("#given SessionStart without model #when requireSessionModel is set #then skips legacy force-disable", () => {
+	const config = ['model = "gpt-5.5"', "", "[features]", "plugins = true", ""].join("\n");
+
+	const result = forceDisableMultiAgentV2(config, {
+		multiAgentVersion: null,
+		requireSessionModel: true,
+		sessionModel: null,
+	});
+
+	assert.equal(result, config);
+	assert.doesNotMatch(result, /\[features\.multi_agent_v2\]/);
+});
+
+test("#given config default gpt-5.5 #when full migration gets SessionStart gpt-5.6-terra #then clears disable using session model", async () => {
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-multi-agent-v2-session-model-"));
+	const codexHome = join(root, "codex-home");
+	await mkdir(codexHome, { recursive: true });
+	const configPath = join(codexHome, "config.toml");
+	await writeFile(
+		configPath,
+		[
+			'model = "gpt-5.5"',
+			'model_reasoning_effort = "high"',
+			"",
+			"[agents]",
+			"max_threads = 1000",
+			"",
+			"[features.multi_agent_v2]",
+			"enabled = false",
+			"max_concurrent_threads_per_session = 1000",
+			"",
+		].join("\n"),
+	);
+	await writeFile(
+		join(codexHome, "models_cache.json"),
+		JSON.stringify({
+			models: [
+				{ slug: "gpt-5.5", multi_agent_version: "v1" },
+				{ slug: "gpt-5.6-terra", multi_agent_version: "v2" },
+			],
+		}),
+	);
+
+	const result = await migrateCodexConfig({
+		env: { CODEX_HOME: codexHome, LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json") },
+		cwd: root,
+		sessionModel: "gpt-5.6-terra",
+		requireSessionModel: true,
+	});
+
+	assert.deepEqual(result.changed, [configPath]);
+	const content = await readFile(configPath, "utf8");
+	assert.doesNotMatch(content, /^\s*enabled\s*=\s*false/m);
+	assert.doesNotMatch(content, /^\s*max_threads\s*=/m);
+	assert.match(content, /max_concurrent_threads_per_session = 1000/);
+});
+
 async function canCreateSymlink(type) {
 	const root = await mkdtemp(join(tmpdir(), "lazycodex-symlink-capability-"));
 	const target = join(root, "target");

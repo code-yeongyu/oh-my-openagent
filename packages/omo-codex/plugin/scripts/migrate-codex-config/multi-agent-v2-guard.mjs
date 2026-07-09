@@ -33,31 +33,61 @@ const MANAGED_DISABLE_COMMENT = [
 
 /**
  * @param {string} config
- * @param {{ multiAgentVersion?: string | null, env?: NodeJS.ProcessEnv, modelsCachePath?: string }} [options]
+ * @param {{
+ *   multiAgentVersion?: string | null,
+ *   sessionModel?: string | null,
+ *   requireSessionModel?: boolean,
+ *   env?: NodeJS.ProcessEnv,
+ *   modelsCachePath?: string,
+ * }} [options]
  */
 export function forceDisableMultiAgentV2(config, options = {}) {
+	const sessionModel = normalizeModel(options.sessionModel);
 	const multiAgentVersion =
 		options.multiAgentVersion !== undefined
 			? options.multiAgentVersion
 			: resolveMultiAgentVersionFromConfig(config, options);
 
-	if (multiAgentVersion === "v2") {
+	if (multiAgentVersion === "v2" || (multiAgentVersion == null && isGpt56Family(sessionModel))) {
 		return clearMultiAgentV2DisableForReservedSchema(config);
+	}
+
+	// SessionStart can run with an override model (`codex -m gpt-5.6-terra`) while
+	// config.toml still lists a different default. If we cannot see the effective
+	// session model, do not force-disable — writing enabled=false would break a
+	// GPT-5.6 reserved collaboration.spawn_agent session.
+	if (options.requireSessionModel === true && !sessionModel) {
+		return config;
+	}
+
+	// Unknown catalog entry for an explicit session model: skip force-disable
+	// rather than assume the legacy encrypted-V2 failure mode.
+	if (sessionModel && multiAgentVersion == null) {
+		return config;
 	}
 
 	return forceDisableLegacyEncryptedV2(config);
 }
 
 /**
- * Resolve the selected root `model` against Codex `models_cache.json`.
+ * Resolve the effective model against Codex `models_cache.json`.
+ * Prefers SessionStart `model` over the root `model` in config.toml.
  * @param {string} config
- * @param {{ env?: NodeJS.ProcessEnv, modelsCachePath?: string }} [options]
+ * @param {{ sessionModel?: string | null, env?: NodeJS.ProcessEnv, modelsCachePath?: string }} [options]
  * @returns {"v1" | "v2" | null}
  */
 export function resolveMultiAgentVersionFromConfig(config, options = {}) {
-	const model = readRootModel(config);
+	const model = normalizeModel(options.sessionModel) || readRootModel(config);
 	if (!model) return null;
+	return resolveMultiAgentVersionForModel(model, options);
+}
 
+/**
+ * @param {string} model
+ * @param {{ env?: NodeJS.ProcessEnv, modelsCachePath?: string }} [options]
+ * @returns {"v1" | "v2" | null}
+ */
+export function resolveMultiAgentVersionForModel(model, options = {}) {
 	const cachePath =
 		options.modelsCachePath?.trim() ||
 		join(options.env?.CODEX_HOME?.trim() || join(homedir(), ".codex"), "models_cache.json");
@@ -79,6 +109,16 @@ export function readRootModel(config) {
 	if (double) return double[1];
 	const single = config.match(/^\s*model\s*=\s*'([^']+)'/m);
 	return single?.[1] ?? null;
+}
+
+function normalizeModel(value) {
+	if (typeof value !== "string") return null;
+	const trimmed = value.trim();
+	return trimmed.length > 0 ? trimmed : null;
+}
+
+function isGpt56Family(model) {
+	return typeof model === "string" && /^gpt-5\.6\b/i.test(model);
 }
 
 function clearMultiAgentV2DisableForReservedSchema(config) {

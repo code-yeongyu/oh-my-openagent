@@ -22,7 +22,12 @@ export function ensureCodexReasoningConfig(config, profile = FALLBACK_CATALOG.cu
 	return applyReasoningProfile(config, profile);
 }
 
-export async function migrateCodexConfig({ env = process.env, cwd = process.cwd() } = {}) {
+export async function migrateCodexConfig({
+	env = process.env,
+	cwd = process.cwd(),
+	sessionModel = null,
+	requireSessionModel = false,
+} = {}) {
 	const catalog = await readModelCatalog(env);
 	const statePath = resolveStatePath(env);
 	const state = await readState(statePath);
@@ -35,6 +40,8 @@ export async function migrateCodexConfig({ env = process.env, cwd = process.cwd(
 			catalog,
 			previousState: state.files?.[configPath],
 			env,
+			sessionModel,
+			requireSessionModel,
 		});
 		if (result.changed) changed.push(configPath);
 		if (result.multiAgentModeChanged) modeChanged.push(configPath);
@@ -48,7 +55,16 @@ export async function migrateCodexConfig({ env = process.env, cwd = process.cwd(
 	return { changed, modeChanged };
 }
 
-export async function migrateConfigFile(configPath, { catalog = FALLBACK_CATALOG, previousState, env = process.env } = {}) {
+export async function migrateConfigFile(
+	configPath,
+	{
+		catalog = FALLBACK_CATALOG,
+		previousState,
+		env = process.env,
+		sessionModel = null,
+		requireSessionModel = false,
+	} = {},
+) {
 	const before = await readConfig(configPath);
 	const decision = shouldApplyCatalog(before, catalog, previousState);
 
@@ -60,7 +76,7 @@ export async function migrateConfigFile(configPath, { catalog = FALLBACK_CATALOG
 		reasoningApplied = config !== before;
 	}
 
-	const multiAgentOptions = { env };
+	const multiAgentOptions = { env, sessionModel, requireSessionModel };
 	const multiAgentVersion = resolveMultiAgentVersionFromConfig(config, multiAgentOptions);
 	const afterMultiAgentGuard = forceDisableMultiAgentV2(config, {
 		...multiAgentOptions,
