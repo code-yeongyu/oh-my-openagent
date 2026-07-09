@@ -3,8 +3,8 @@
 export const TASK_USAGE_GUIDANCE = [
   "<omo-senpi-task>",
   "You can delegate work to background subagents with the task tool family:",
-  "- task({ prompt, category|subagent_type, run_in_background }) spawns a child; task_send continues it, task_wait blocks for it.",
-  "- task_list shows this session's tasks; task_output reads a child's transcript; task_interrupt / task_cancel stop one.",
+  "- task({ prompt, category|subagent_type, run_in_background }) spawns a child; task_send continues it; task_output({ block:true }) waits for it.",
+  "- /tasks shows this session's child tasks; task_output reads a child's transcript; task_send({ deliver_as:\"interrupt\" }) parks one, while task_cancel ends it.",
   "Background tasks notify you on completion; prefer them for parallelizable or long-running work.",
   "</omo-senpi-task>",
 ].join("\n")
