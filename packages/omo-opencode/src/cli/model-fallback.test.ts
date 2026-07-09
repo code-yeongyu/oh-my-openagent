@@ -98,10 +98,13 @@ describe("generateModelConfig", () => {
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then Bailian is limited to compatible utility routes
+      // #then Bailian is limited to compatible utility routes plus GLM Hephaestus
       expect(result.agents?.librarian?.model).toBe("bailian-coding-plan/qwen3.5-plus")
       expect(result.agents?.explore?.model).toBe("bailian-coding-plan/qwen3.5-plus")
-      expect(result.agents?.hephaestus).toBeUndefined()
+      expect(result.agents?.hephaestus).toEqual({
+        model: "bailian-coding-plan/glm-5",
+        variant: "medium",
+      })
     })
   })
 
@@ -325,7 +328,7 @@ describe("generateModelConfig", () => {
       expect(result.agents?.hephaestus).toBeUndefined()
     })
 
-    test("Hephaestus is omitted when only ZAI is available (no required provider connected)", () => {
+    test("Hephaestus is created when only ZAI coding-plan is available", () => {
       // #given
       const config = createConfig({ hasZaiCodingPlan: true })
 
@@ -333,7 +336,10 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.hephaestus).toBeUndefined()
+      expect(result.agents?.hephaestus).toEqual({
+        model: "zai-coding-plan/glm-5",
+        variant: "medium",
+      })
     })
   })
 

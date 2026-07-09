@@ -5,6 +5,7 @@ import {
   getHephaestusPromptSource,
   getHephaestusPrompt,
   createHephaestusAgent,
+  isHephaestusSupportedModel,
   UnsupportedHephaestusModelError,
 } from "./index";
 
@@ -74,6 +75,23 @@ describe("getHephaestusPromptSource", () => {
     expect(source3).toBe("gpt");
   });
 
+  test("returns 'gpt' for GLM coding-plan models", () => {
+    // given
+    const model1 = "zai-coding-plan/glm-5.2";
+    const model2 = "bailian-coding-plan/glm-5";
+    const model3 = "opencode/glm-5.1";
+
+    // when
+    const source1 = getHephaestusPromptSource(model1);
+    const source2 = getHephaestusPromptSource(model2);
+    const source3 = getHephaestusPromptSource(model3);
+
+    // then
+    expect(source1).toBe("gpt");
+    expect(source2).toBe("gpt");
+    expect(source3).toBe("gpt");
+  });
+
   test("throws for generic GPT, unsupported GPT 5.x, non-GPT, and undefined models", () => {
     // given
     const model1 = "openai/gpt-4o";
@@ -95,6 +113,13 @@ describe("getHephaestusPromptSource", () => {
     expect(getSource3).toThrow(UnsupportedHephaestusModelError);
     expect(getSource4).toThrow(UnsupportedHephaestusModelError);
     expect(getSource5).toThrow(UnsupportedHephaestusModelError);
+  });
+
+  test("supports GLM but not unrelated non-GPT models", () => {
+    // given / when / then
+    expect(isHephaestusSupportedModel("zai-coding-plan/glm-5.2")).toBe(true);
+    expect(isHephaestusSupportedModel("anthropic/claude-opus-4-7")).toBe(false);
+    expect(isHephaestusSupportedModel("kimi-for-coding/k2p5")).toBe(false);
   });
 });
 
@@ -151,6 +176,19 @@ describe("getHephaestusPrompt", () => {
     expect(prompt).toContain("Senior Staff Engineer");
     expect(prompt).toContain("KEEP GOING");
     expect(prompt).not.toContain("intent_extraction");
+  });
+
+  test("GLM coding-plan model returns generic deep-worker prompt", () => {
+    // given
+    const model = "zai-coding-plan/glm-5.2";
+
+    // when
+    const prompt = getHephaestusPrompt(model);
+
+    // then
+    expect(prompt).toContain("Senior Staff Engineer");
+    expect(prompt).toContain("KEEP GOING");
+    expect(prompt).toContain("Hephaestus");
   });
 
   test("Claude model is rejected", () => {
@@ -278,6 +316,19 @@ describe("createHephaestusAgent", () => {
     expect(gpt53CodexConfig.permission ?? {}).not.toHaveProperty("apply_patch");
   });
 
+  test("GLM coding-plan model creates Hephaestus config with generic prompt", () => {
+    // given
+    const model = "zai-coding-plan/glm-5.2";
+
+    // when
+    const config = createHephaestusAgent(model);
+
+    // then
+    expect(config.model).toBe(model);
+    expect(config.prompt).toContain("Senior Staff Engineer");
+    expect(config.permission ?? {}).not.toHaveProperty("apply_patch");
+  });
+
   test("useTaskSystem=true produces Task Discipline prompt", () => {
     // given
     const model = "openai/gpt-5.4";
@@ -372,6 +423,37 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
 
       // then
       expect(config).toBeUndefined();
+    });
+  });
+
+  describe("#given GLM coding-plan model with user override", () => {
+    test("#when config is created #then Hephaestus is registered", () => {
+      // given
+      const agentOverrides: AgentOverrides = {
+        hephaestus: {
+          model: "zai-coding-plan/glm-5.2",
+        },
+      };
+      const mergedCategories: Record<string, CategoryConfig> = {};
+
+      // when
+      const config = maybeCreateHephaestusConfig({
+        disabledAgents: [],
+        agentOverrides,
+        availableModels: new Set(["zai-coding-plan/glm-5.2"]),
+        systemDefaultModel: "zai-coding-plan/glm-5.2",
+        isFirstRunNoCache: false,
+        availableAgents: [],
+        availableSkills: [],
+        availableCategories: [],
+        mergedCategories,
+        useTaskSystem: false,
+      });
+
+      // then
+      expect(config).toBeDefined();
+      expect(config?.model).toBe("zai-coding-plan/glm-5.2");
+      expect(config?.variant).toBe("medium");
     });
   });
 

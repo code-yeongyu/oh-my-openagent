@@ -244,7 +244,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(bigPickleIndex).toBeGreaterThan(minimaxIndex)
   })
 
-  test("hephaestus supports openai, github-copilot, opencode, and vercel providers", () => {
+  test("hephaestus supports GPT providers plus GLM coding-plan fallback providers", () => {
     // given
     const hephaestus = AGENT_MODEL_REQUIREMENTS["hephaestus"]
 
@@ -254,7 +254,14 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       "github-copilot",
       "opencode",
       "vercel",
+      "zai-coding-plan",
+      "bailian-coding-plan",
     ])
+    expect(hephaestus.fallbackChain).toContainEqual({
+      providers: ["zai-coding-plan", "opencode", "bailian-coding-plan", "vercel"],
+      model: "glm-5",
+      variant: "medium",
+    })
     expect(hephaestus.requiresProvider).not.toContain("venice")
     expect(hephaestus.fallbackChain[0]?.providers).not.toContain("venice")
     expect(hephaestus.requiresModel).toBeUndefined()

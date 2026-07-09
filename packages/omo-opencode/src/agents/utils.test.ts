@@ -802,6 +802,25 @@ describe("createBuiltinAgents with requiresProvider gating (hephaestus)", () => 
     }
   })
 
+  test("hephaestus is created when zai-coding-plan provider is connected with a GLM model", async () => {
+    // #given - zai-coding-plan provider has a GLM coding model available
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
+      new Set(["zai-coding-plan/glm-5.2"])
+    )
+
+    try {
+      // #when
+      const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], {})
+
+      // #then
+      expect(agents.hephaestus).toBeDefined()
+      expect(agents.hephaestus.model).toBe("zai-coding-plan/glm-5.2")
+      expect(agents.hephaestus.variant).toBe("medium")
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   test("hephaestus is created on first run when no availableModels or cache exist", async () => {
     // #given
     const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)

@@ -45,8 +45,8 @@ describe("no-hephaestus-non-gpt hook", () => {
     expect(output2.message.agent).toBe("sisyphus")
     expect(showToast.mock.calls[0]?.[0]).toMatchObject({
       body: {
-        title: "NEVER Use Hephaestus with Non-GPT",
-        message: expect.stringContaining("Hephaestus is trash without GPT."),
+        title: "Unsupported Hephaestus Model",
+        message: expect.stringContaining("This model is unsupported for Hephaestus."),
         variant: "error",
       },
     })
@@ -75,10 +75,31 @@ describe("no-hephaestus-non-gpt hook", () => {
     expect(output.message.agent).toBeUndefined()
     expect(showToast.mock.calls[0]?.[0]).toMatchObject({
       body: {
-        title: "NEVER Use Hephaestus with Non-GPT",
+        title: "Unsupported Hephaestus Model",
         variant: "warning",
       },
     })
+  })
+
+  test("does not switch agent when hephaestus uses supported GLM model", async () => {
+    // given - hephaestus with GLM coding-plan model
+    const showToast = spyOn({ fn: async (_input: unknown) => ({}) }, "fn")
+    const hook = createNoHephaestusNonGptHook(unsafeTestValue({
+      client: { tui: { showToast } },
+    }))
+
+    const output = createOutput()
+
+    // when - chat.message runs
+    await hook["chat.message"]?.({
+      sessionID: "ses_glm",
+      agent: HEPHAESTUS_DISPLAY,
+      model: { providerID: "zai-coding-plan", modelID: "glm-5.2" },
+    }, output)
+
+    // then - GLM is a supported Hephaestus model and should remain selected
+    expect(showToast).toHaveBeenCalledTimes(0)
+    expect(output.message.agent).toBeUndefined()
   })
 
   test("does not show toast when hephaestus uses gpt model", async () => {
