@@ -15,6 +15,8 @@ type ParentWakeFlushRunnerDeps = {
   readonly sessionInspector: ParentWakeSessionInspector
 }
 
+const PENDING_PARENT_WAKE_MAX_ACTIVE_DEFER_MS = 60_000
+
 export class ParentWakeFlushRunner {
   constructor(private readonly deps: ParentWakeFlushRunnerDeps) {}
 
@@ -45,7 +47,9 @@ export class ParentWakeFlushRunner {
     if (await this.dropAdmittedWakeConsumedByParent(sessionID, latestWake)) {
       return
     }
-    if (sessionActive) {
+    const emptyAssistantTurnRetry = latestWake.allowEmptyAssistantTurnRetry === true
+    const forceDispatchAfterActiveDefer = sessionActive && this.shouldForceDispatchAfterActiveDefer(latestWake)
+    if (sessionActive && !forceDispatchAfterActiveDefer) {
       this.schedulePendingParentWakeFlush(sessionID)
       log("[background-agent] Deferred parent wake because parent session is active:", {
         sessionID,
@@ -53,7 +57,7 @@ export class ParentWakeFlushRunner {
       return
     }
 
-    if (this.hasRecentParentSessionActivity(sessionID)) {
+    if (!forceDispatchAfterActiveDefer && this.hasRecentParentSessionActivity(sessionID)) {
       if (this.deferReplyWakeWhileUnsafe(sessionID, latestWake)) {
         return
       }
@@ -72,7 +76,6 @@ export class ParentWakeFlushRunner {
       return
     }
 
-    const emptyAssistantTurnRetry = latestWake.allowEmptyAssistantTurnRetry === true
     const toolWaitDecision = await this.shouldDeferParentWakeForSessionHistory(sessionID, latestWake)
     if (toolWaitDecision.defer) {
       if (this.deferReplyWakeWhileUnsafe(sessionID, latestWake)) {
@@ -140,7 +143,14 @@ export class ParentWakeFlushRunner {
     await this.sendParentWakePrompt(sessionID, latestWake, {
       emptyAssistantTurnRetry,
       toolWaitDecision: finalToolWaitDecision,
+      ...(forceDispatchAfterActiveDefer ? { skipPromptGateStatusCheck: true } : {}),
     })
+    if (forceDispatchAfterActiveDefer) {
+      log("[background-agent] Sent parent wake after active-session defer ceiling:", {
+        sessionID,
+        queuedAgeMs: this.getQueuedAgeMs(latestWake),
+      })
+    }
   }
 
   schedulePendingParentWakeFlush(sessionID: string, delayMs?: number): void {
@@ -200,6 +210,7 @@ export class ParentWakeFlushRunner {
       readonly toolWaitDecision: ToolWaitDeferralDecision
       readonly forceNoReply?: boolean
       readonly retainPendingWake?: boolean
+      readonly skipPromptGateStatusCheck?: boolean
     },
   ): Promise<void> {
     // Mark the dispatch in-flight BEFORE the pending entry is deleted so there is
@@ -221,6 +232,9 @@ export class ParentWakeFlushRunner {
         latestWake,
         ...(options.forceNoReply !== undefined ? { forceNoReply: options.forceNoReply } : {}),
         ...(options.retainPendingWake !== undefined ? { retainPendingWake: options.retainPendingWake } : {}),
+        ...(options.skipPromptGateStatusCheck !== undefined
+          ? { skipPromptGateStatusCheck: options.skipPromptGateStatusCheck }
+          : {}),
         emptyAssistantTurnRetry: options.emptyAssistantTurnRetry,
         toolWaitDecision: options.toolWaitDecision,
         getDispatchedWake: () => this.deps.dispatchedTracker.getWake(sessionID),
@@ -237,6 +251,14 @@ export class ParentWakeFlushRunner {
 
   private async isSessionActive(sessionID: string): Promise<boolean> {
     return isOpenCodeSessionActive(this.deps.notifierDeps.client, sessionID)
+  }
+
+  private shouldForceDispatchAfterActiveDefer(wake: PendingParentWake): boolean {
+    return wake.shouldReply && this.getQueuedAgeMs(wake) >= PENDING_PARENT_WAKE_MAX_ACTIVE_DEFER_MS
+  }
+
+  private getQueuedAgeMs(wake: PendingParentWake): number {
+    return Date.now() - (wake.queuedAt ?? Date.now())
   }
 
   private hasRecentParentSessionActivity(sessionID: string): boolean {
