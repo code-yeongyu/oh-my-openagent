@@ -32,29 +32,13 @@ type PluginContextWithTui = {
   }
 }
 
-function isRuntimeFallbackEnabled(
-  hooks: ChatMessageHooks,
-  pluginConfig: OhMyOpenCodeConfig,
-): boolean {
-  return (
-    hooks.runtimeFallback !== null &&
-    hooks.runtimeFallback !== undefined &&
-    (typeof pluginConfig.runtime_fallback === "boolean"
-      ? pluginConfig.runtime_fallback
-      : (pluginConfig.runtime_fallback?.enabled ?? false))
-  )
-}
-
 async function runChatMessageHooks(args: {
   readonly input: ChatMessageInput
   readonly output: ChatMessageHandlerOutput
   readonly hooks: ChatMessageHooks
-  readonly runtimeFallbackEnabled: boolean
 }): Promise<void> {
-  const { input, output, hooks, runtimeFallbackEnabled } = args
-  if (!runtimeFallbackEnabled) {
-    await hooks.modelFallback?.["chat.message"]?.(input, output)
-  }
+  const { input, output, hooks } = args
+  await hooks.modelFallback?.["chat.message"]?.(input, output)
   recordSessionModel(input, output)
   await hooks.stopContinuationGuard?.["chat.message"]?.(input)
   await hooks.backgroundNotificationHook?.["chat.message"]?.(input, output)
@@ -79,7 +63,6 @@ export function createChatMessageHandler(args: {
 ) => Promise<void> {
   const { ctx, pluginConfig, firstMessageVariantGate, hooks } = args
   const pluginContext = ctx as PluginContextWithTui
-  const runtimeFallbackEnabled = isRuntimeFallbackEnabled(hooks, pluginConfig)
 
   return async (
     input: ChatMessageInput,
@@ -114,7 +97,6 @@ export function createChatMessageHandler(args: {
       input,
       output,
       hooks,
-      runtimeFallbackEnabled,
     })
     await runStartWorkHookIfApplicable(hooks, input, output)
     notifyWhenModelCacheIsMissing(pluginContext.client.tui)

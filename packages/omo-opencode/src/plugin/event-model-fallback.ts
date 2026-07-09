@@ -88,13 +88,17 @@ export function createModelFallbackEventHandler(args: {
       ? setPendingModelFallback(args.modelFallback, sessionID, agentName, currentProvider, currentModel)
       : false;
 
-    if (setFallback && shouldAutoContinue) {
+    // When runtime-fallback is enabled, it handles the actual retry dispatch.
+    // Model-fallback only records the pending state (for proactive chat.message switching)
+    // without also dispatching a retry, to avoid double-dispatch.
+    const canAutoContinue = shouldAutoContinue && !args.isRuntimeFallbackEnabled;
+    if (setFallback && canAutoContinue) {
       await continuation.autoContinueAfterFallback(sessionID, source, fallbackContext);
     }
   };
 
   const shouldHandleModelFallback = (): boolean => {
-    return args.isModelFallbackEnabled && !args.isRuntimeFallbackEnabled;
+    return args.isModelFallbackEnabled;
   };
 
   const handleAssistantMessageUpdated = async (params: {
