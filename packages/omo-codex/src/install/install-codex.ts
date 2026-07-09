@@ -15,6 +15,7 @@ import { defaultRunCommand } from "./codex-process"
 import { repairProjectLocalCodexArtifactsBestEffort } from "./codex-project-local-cleanup-best-effort"
 import { reapLspDaemons } from "./lsp-daemon-reaper"
 import { resolveCodexInstallerBinDir } from "./codex-installer-bin-dir"
+import { removeGitBashHooksOffWindows } from "./codex-git-bash-hooks"
 import { seedAndMigrateOmoSot } from "./omo-sot-migration"
 import { installAstGrepForCodex } from "./install-ast-grep-sg"
 import { trackCodexInstallTelemetry } from "./codex-install-telemetry"
@@ -84,6 +85,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     if (marketplace.name === "sisyphuslabs" && plugin.name === "omo") {
       await stampLazyCodexPluginVersion({ pluginRoot: plugin.path, version })
       await writeLazyCodexInstallSnapshot({ pluginRoot: plugin.path, distributionManifest })
+      await removeGitBashHooksOffWindows({ platform, pluginRoot: plugin.path })
     }
 
     const links = await linkCachedPluginBins({ binDir, pluginRoot: plugin.path, platform })

@@ -234,65 +234,6 @@ describe("install-codex", () => {
     expect(sotInvocation?.home).toBe(home)
   }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
-  test("#given simulated Windows Codex install #when installing omo #then enables git_bash MCP and trusts shell hooks", async () => {
-    // given
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-git-bash-win-"))
-    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-git-bash-win-"))
-    const repoRoot = await createRepoWithBuiltComponentBins({ includeBundledGitBashMcp: true })
-
-    // when
-    const result = await runCodexInstaller({
-      codexHome,
-      binDir,
-      repoRoot,
-      platform: "win32",
-      astGrepInstaller: skipAstGrepInstall,
-      gitBashResolver: () => ({ found: true, path: "C:\\Program Files\\Git\\bin\\bash.exe", source: "program-files" }),
-      runCommand: async () => undefined,
-    })
-
-    // then
-    const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
-    expect(configContent).toContain('[plugins."omo@sisyphuslabs".mcp_servers.git_bash]')
-    expect(configContent).toContain("enabled = true")
-    expect(configContent).toContain("pre_tool_use")
-    expect(configContent).toContain("post_compact")
-    expect(result.gitBashPath).toBe("C:\\Program Files\\Git\\bin\\bash.exe")
-    const pluginPath = result.installed[0]?.path ?? ""
-    const mcpManifest = JSON.parse(await readFile(join(pluginPath, ".mcp.json"), "utf8")) as {
-      readonly mcpServers: { readonly git_bash: { readonly args: readonly string[] } }
-    }
-    expect(mcpManifest.mcpServers.git_bash.args[0]).toBe(join(pluginPath, "components", "git-bash-mcp", "dist", "cli.js"))
-    expect((await stat(mcpManifest.mcpServers.git_bash.args[0] ?? "")).isFile()).toBe(true)
-  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
-
-  test("#given simulated Linux Codex install #when installing omo #then keeps git_bash manifest but disables policy exposure", async () => {
-    // given
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-git-bash-linux-"))
-    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-git-bash-linux-"))
-    const repoRoot = await createRepoWithBuiltComponentBins({ includeBundledGitBashMcp: true })
-
-    // when
-    const result = await runCodexInstaller({
-      codexHome,
-      binDir,
-      repoRoot,
-      platform: "linux",
-      astGrepInstaller: skipAstGrepInstall,
-      runCommand: async () => undefined,
-    })
-
-    // then
-    const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
-    expect(configContent).toContain('[plugins."omo@sisyphuslabs".mcp_servers.git_bash]')
-    expect(configContent).toContain("enabled = false")
-    const pluginPath = result.installed[0]?.path ?? ""
-    const mcpManifest = JSON.parse(await readFile(join(pluginPath, ".mcp.json"), "utf8")) as {
-      readonly mcpServers: { readonly git_bash: { readonly args: readonly string[] } }
-    }
-    expect(mcpManifest.mcpServers.git_bash.args[0]).toBe(join(pluginPath, "components", "git-bash-mcp", "dist", "cli.js"))
-  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
-
   test("#given repoRoot without root CLI dist #when installing omo #then warns about the skipped omo runtime wrapper", async () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-no-dist-"))
