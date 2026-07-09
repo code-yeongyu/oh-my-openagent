@@ -57,7 +57,7 @@ export class ParentWakeFlushRunner {
       return
     }
 
-    if (this.hasRecentParentSessionActivity(sessionID)) {
+    if (!forceDispatchAfterActiveDefer && this.hasRecentParentSessionActivity(sessionID)) {
       if (this.deferReplyWakeWhileUnsafe(sessionID, latestWake)) {
         return
       }

@@ -63,6 +63,7 @@ const SAFE_MESSAGES: SessionMessageStub[] = [
 function createNotifier(args: {
   sessionStatuses: Record<string, { type: string }>
   messagesProvider: () => SessionMessageStub[]
+  parentActivityWindowMs?: number
 }): {
   notifier: ParentWakeNotifier
   promptAsyncCalls: PromptAsyncCall[]
@@ -93,6 +94,7 @@ function createNotifier(args: {
       toolCallDeferMaxMs: 5_000,
       failureRequeueWindowMs: 5_000,
       userMessageInProgressWindowMs: 2_000,
+      parentSessionActivityInProgressWindowMs: args.parentActivityWindowMs,
     },
   )
 
@@ -178,6 +180,41 @@ describe("parent wake active defer ceiling", () => {
     }
   })
 
+  test("#given retained noReply wake and fresh activity exceed active ceiling #then it dispatches once safe", async () => {
+    // given
+    const originalDateNow = Date.now
+    let now = 100_000
+    Date.now = () => now
+    const sessionStatuses: Record<string, { type: string }> = { "parent-1": { type: "idle" } }
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses,
+      messagesProvider: () => SAFE_MESSAGES,
+      parentActivityWindowMs: 180_000,
+    })
+    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+    notifier.recordParentSessionActivity("parent-1")
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-1")
+      now = 220_000
+      sessionStatuses["parent-1"] = { type: "busy" }
+      releaseParentWakeHold("parent-1")
+      notifier.clearPendingParentWakeTimer("parent-1")
+      notifier.recordParentSessionActivity("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(2)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(promptAsyncCalls[1]?.body.noReply).not.toBe(true)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+    }
+  })
+
   test("#given fresh user message and aged wake while parent is busy #then it admits noReply", async () => {
     // given
     const originalDateNow = Date.now
@@ -227,6 +264,30 @@ describe("parent wake active defer ceiling", () => {
       expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
       expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
       expect(notifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
+    } finally {
+      notifier.shutdown()
+    }
+  })
+
+  test("#given prompt gate sees blocked tool state after active ceiling #then reply stays queued", async () => {
+    // given
+    let messageLoads = 0
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "busy" } },
+      messagesProvider: () => {
+        messageLoads += 1
+        return messageLoads >= 3 ? BLOCKED_MESSAGES : SAFE_MESSAGES
+      },
+    })
+    queueAgedWake(notifier)
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(0)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(true)
     } finally {
       notifier.shutdown()
     }
