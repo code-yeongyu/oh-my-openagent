@@ -1,4 +1,4 @@
-import { resolveMultiAgentVersionFromConfig } from "./multi-agent-v2-guard.mjs";
+import { prefersMultiAgentV2, resolveMultiAgentVersionFromConfig } from "./multi-agent-v2-guard.mjs";
 
 const CODEX_AGENTS_HEADER = "[agents]";
 const CODEX_MULTI_AGENT_V2_HEADER = "[features.multi_agent_v2]";
@@ -6,19 +6,20 @@ const CODEX_SUBAGENT_THREAD_LIMIT = "1000";
 
 /**
  * Ensure subagent concurrency limits without writing settings that conflict
- * with MultiAgentV2. When the selected model prefers V2 (or V2 is already
- * enabled), skip `agents.max_threads` because Codex rejects that key while
- * features.multi_agent_v2 is enabled.
+ * with MultiAgentV2. When the selected model prefers V2 (catalog `v2`, or a
+ * GPT-5.6 family session model with the catalog unavailable) or V2 is already
+ * enabled in config, skip `agents.max_threads` because Codex rejects that key
+ * while features.multi_agent_v2 is enabled.
  *
  * @param {string} config
- * @param {{ multiAgentVersion?: string | null, env?: NodeJS.ProcessEnv, modelsCachePath?: string }} [options]
+ * @param {{ multiAgentVersion?: string | null, sessionModel?: string | null, env?: NodeJS.ProcessEnv, modelsCachePath?: string }} [options]
  */
 export function ensureSubagentConcurrencyLimit(config, options = {}) {
 	const multiAgentVersion =
 		options.multiAgentVersion !== undefined
 			? options.multiAgentVersion
 			: resolveMultiAgentVersionFromConfig(config, options);
-	const v2Preferred = multiAgentVersion === "v2" || isMultiAgentV2Enabled(config);
+	const v2Preferred = prefersMultiAgentV2(multiAgentVersion, options.sessionModel) || isMultiAgentV2Enabled(config);
 
 	let result = config;
 	if (!v2Preferred) {

@@ -42,14 +42,19 @@ const MANAGED_DISABLE_COMMENT = [
  * }} [options]
  */
 export function forceDisableMultiAgentV2(config, options = {}) {
+	// Always normalize the legacy `[features]` boolean shorthand first: leaving
+	// `multi_agent_v2 = true|false` in place while a later guard appends the
+	// `[features.multi_agent_v2]` table would define the same name as both a
+	// scalar and a table, which Codex rejects as invalid TOML.
+	const normalized = removeFeaturesShorthand(config);
 	const sessionModel = normalizeModel(options.sessionModel);
 	const multiAgentVersion =
 		options.multiAgentVersion !== undefined
 			? options.multiAgentVersion
-			: resolveMultiAgentVersionFromConfig(config, options);
+			: resolveMultiAgentVersionFromConfig(normalized, options);
 
-	if (multiAgentVersion === "v2" || (multiAgentVersion == null && isGpt56Family(sessionModel))) {
-		return clearMultiAgentV2DisableForReservedSchema(config);
+	if (prefersMultiAgentV2(multiAgentVersion, sessionModel)) {
+		return clearMultiAgentV2DisableForReservedSchema(normalized);
 	}
 
 	// SessionStart can run with an override model (`codex -m gpt-5.6-terra`) while
@@ -57,16 +62,27 @@ export function forceDisableMultiAgentV2(config, options = {}) {
 	// session model, do not force-disable — writing enabled=false would break a
 	// GPT-5.6 reserved collaboration.spawn_agent session.
 	if (options.requireSessionModel === true && !sessionModel) {
-		return config;
+		return normalized;
 	}
 
 	// Unknown catalog entry for an explicit session model: skip force-disable
 	// rather than assume the legacy encrypted-V2 failure mode.
 	if (sessionModel && multiAgentVersion == null) {
-		return config;
+		return normalized;
 	}
 
-	return forceDisableLegacyEncryptedV2(config);
+	return forceDisableLegacyEncryptedV2(normalized);
+}
+
+/**
+ * True when the effective model should run MultiAgentV2: the catalog says
+ * "v2", or the catalog is unavailable but the model is a GPT-5.6 family
+ * model (which reserves the collaboration.spawn_agent schema).
+ * @param {"v1" | "v2" | null | undefined} multiAgentVersion
+ * @param {string | null | undefined} sessionModel
+ */
+export function prefersMultiAgentV2(multiAgentVersion, sessionModel) {
+	return multiAgentVersion === "v2" || (multiAgentVersion == null && isGpt56Family(normalizeModel(sessionModel)));
 }
 
 /**
@@ -122,8 +138,8 @@ function isGpt56Family(model) {
 }
 
 function clearMultiAgentV2DisableForReservedSchema(config) {
-	let result = removeFeaturesShorthand(config);
-	result = removeManagedDisableComments(result);
+	// `config` arrives shorthand-normalized from forceDisableMultiAgentV2.
+	const result = removeManagedDisableComments(config);
 
 	const section = findSection(result, "[features.multi_agent_v2]");
 	if (!section) return result;
@@ -133,12 +149,12 @@ function clearMultiAgentV2DisableForReservedSchema(config) {
 	return result.slice(0, section.start) + withoutEnabledFalse + result.slice(section.end);
 }
 
+// `config` arrives shorthand-normalized from forceDisableMultiAgentV2.
 function forceDisableLegacyEncryptedV2(config) {
-	let result = removeFeaturesShorthand(config);
-	const section = findSection(result, "[features.multi_agent_v2]");
+	const section = findSection(config, "[features.multi_agent_v2]");
 
 	if (!section) {
-		return ensureManagedComment(appendDisabledSection(result));
+		return ensureManagedComment(appendDisabledSection(config));
 	}
 
 	const enabledTruePattern = /^(\s*)enabled\s*=\s*true[ \t]*(#[^\n]*)?$/m;
@@ -146,15 +162,15 @@ function forceDisableLegacyEncryptedV2(config) {
 		const patched = section.text.replace(enabledTruePattern, (_match, indent, comment) =>
 			comment ? `${indent}enabled = false ${comment}` : `${indent}enabled = false`,
 		);
-		return ensureManagedComment(result.slice(0, section.start) + patched + result.slice(section.end));
+		return ensureManagedComment(config.slice(0, section.start) + patched + config.slice(section.end));
 	}
 
-	if (/^\s*enabled\s*=\s*false[ \t]*(?:#[^\n]*)?$/m.test(section.text)) return result;
+	if (/^\s*enabled\s*=\s*false[ \t]*(?:#[^\n]*)?$/m.test(section.text)) return config;
 
 	const headerEnd = section.text.indexOf("\n");
 	const insertAt = headerEnd === -1 ? section.text.length : headerEnd + 1;
 	const patched = `${section.text.slice(0, insertAt)}${headerEnd === -1 ? "\n" : ""}enabled = false\n${section.text.slice(insertAt)}`;
-	return ensureManagedComment(result.slice(0, section.start) + patched + result.slice(section.end));
+	return ensureManagedComment(config.slice(0, section.start) + patched + config.slice(section.end));
 }
 
 function ensureManagedComment(config) {

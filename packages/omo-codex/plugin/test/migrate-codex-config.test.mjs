@@ -932,6 +932,57 @@ test("#given SessionStart without model #when requireSessionModel is set #then s
 	assert.doesNotMatch(result, /\[features\.multi_agent_v2\]/);
 });
 
+test("#given legacy [features] shorthand #when requireSessionModel skips force-disable #then still removes the shorthand", () => {
+	const config = ['model = "gpt-5.5"', "", "[features]", "plugins = true", "multi_agent_v2 = true", ""].join("\n");
+
+	const result = forceDisableMultiAgentV2(config, {
+		multiAgentVersion: null,
+		requireSessionModel: true,
+		sessionModel: null,
+	});
+
+	assert.doesNotMatch(result, /^\s*multi_agent_v2\s*=/m);
+	assert.match(result, /plugins = true/);
+	assert.doesNotMatch(result, /\[features\.multi_agent_v2\]/);
+});
+
+test("#given legacy [features] shorthand #when session model has no catalog entry #then still removes the shorthand", () => {
+	const config = ['model = "gpt-5.5"', "", "[features]", "multi_agent_v2 = false", ""].join("\n");
+
+	const result = forceDisableMultiAgentV2(config, {
+		multiAgentVersion: null,
+		sessionModel: "gpt-5.7-nova",
+	});
+
+	assert.doesNotMatch(result, /^\s*multi_agent_v2\s*=/m);
+	assert.doesNotMatch(result, /\[features\.multi_agent_v2\]/);
+});
+
+test("#given legacy shorthand and no session model on hook path #when full migration runs #then output stays valid TOML", async () => {
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-multi-agent-v2-shorthand-hook-"));
+	const codexHome = join(root, "codex-home");
+	await mkdir(codexHome, { recursive: true });
+	const configPath = join(codexHome, "config.toml");
+	await writeFile(
+		configPath,
+		['model = "gpt-5.5"', 'model_reasoning_effort = "high"', "", "[features]", "plugins = true", "multi_agent_v2 = true", ""].join("\n"),
+	);
+
+	await migrateCodexConfig({
+		env: { CODEX_HOME: codexHome, LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json") },
+		cwd: root,
+		sessionModel: null,
+		requireSessionModel: true,
+	});
+
+	const content = await readFile(configPath, "utf8");
+	const parsed = parseTomlWithPython(content);
+	assert.doesNotMatch(content, /^\s*multi_agent_v2\s*=\s*(?:true|false)/m);
+	assert.equal(parsed.features.plugins, true);
+	assert.equal(parsed.features.multi_agent_v2.max_concurrent_threads_per_session, 1000);
+	assert.equal("enabled" in parsed.features.multi_agent_v2, false);
+});
+
 test("#given config default gpt-5.5 #when full migration gets SessionStart gpt-5.6-terra #then clears disable using session model", async () => {
 	const root = await mkdtemp(join(tmpdir(), "lazycodex-multi-agent-v2-session-model-"));
 	const codexHome = join(root, "codex-home");
