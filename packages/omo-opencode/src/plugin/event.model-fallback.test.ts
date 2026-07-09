@@ -812,7 +812,7 @@ describe("createEventHandler - model fallback", () => {
     expect(staleOutput.message["model"]).toBeUndefined()
   })
 
-  test("does not trigger model-fallback from session.status when runtime_fallback is enabled", async () => {
+  test("triggers model-fallback from session.status even when runtime_fallback is enabled", async () => {
     //#given
     const sessionID = "ses_status_retry_runtime_enabled"
     setMainSession(sessionID)
@@ -860,9 +860,10 @@ describe("createEventHandler - model fallback", () => {
       },
     })
 
-    //#then
-    expect(abortCalls).toEqual([])
-    expect(promptCalls).toEqual([])
+    //#then — model-fallback still dispatches because it owns the retry dispatch;
+    //          runtime-fallback's attempt is blocked by the session reservation gate.
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
   })
 
   test("prefers user-configured fallback_models over hardcoded chain on session.status retry", async () => {

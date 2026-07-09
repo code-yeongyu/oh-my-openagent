@@ -128,6 +128,31 @@ export function createEventHandler(args: {
       }
     }
 
+    // For session.error events, model-fallback MUST handle before dispatchToHooks
+    // (which fires runtime-fallback and other hooks). This ensures model-fallback
+    // sets pending state and dispatches a retry first; runtime-fallback's subsequent
+    // dispatch attempt is silently blocked by the session reservation gate.
+    if (input.event.type === "session.error") {
+      const props = input.event.properties as Record<string, unknown> | undefined;
+      const sessionID = resolveSessionEventID(props);
+      if (sessionID) {
+        const error = props?.error;
+        try {
+          await modelFallbackHandler.handleSessionError({
+            sessionID,
+            errorName: extractErrorName(error),
+            errorMessage: extractErrorMessage(error),
+            props,
+          });
+        } catch (err) {
+          log("[event] model-fallback error in session.error:", {
+            sessionID,
+            error: err instanceof Error ? err : String(err),
+          });
+        }
+      }
+    }
+
     await dispatchToHooks(input);
     if (syntheticIdle) await dispatchSyntheticIdle(syntheticIdle);
 
@@ -220,22 +245,6 @@ export function createEventHandler(args: {
     }
 
     if (event.type === "session.error") {
-      try {
-        const sessionID = resolveSessionEventID(props);
-        const error = props?.error;
-        const errorName = extractErrorName(error);
-        const errorMessage = extractErrorMessage(error);
-        if (sessionID) {
-          await modelFallbackHandler.handleSessionError({ sessionID, errorName, errorMessage, props });
-        }
-      } catch (err) {
-        const sessionID = resolveSessionEventID(props);
-        log("[event] model-fallback error in session.error:", {
-          sessionID,
-          error: err instanceof Error ? err : String(err),
-        });
-      }
-
       await runEventHookSafely("teamMemberErrorHandler", teamHandlers.teamMemberErrorHandler, input);
     }
   };
