@@ -76,6 +76,7 @@ export async function resolveMember(
         withoutSisyphusJuniorOverride(ctx),
         undefined,
         undefined,
+        parentAgent,
       )
 
       if (execution.error) {

@@ -15,6 +15,7 @@ import { getAvailableModelsForDelegateTask } from "./available-models"
 import { resolveModelForDelegateTask } from "./model-selection"
 import type { DelegatedModelConfig } from "./types"
 import { applyCategoryParams } from "./delegated-model-config"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 
 function resolveCategoryPromptAppendForModel(
   categoryName: string,
@@ -58,13 +59,39 @@ function categoryResolutionError(error: string): CategoryResolutionResult {
   }
 }
 
+export function resolveCategoryTargetAgent(
+  parentAgent: string | undefined,
+  agentOverrides: ExecutorContext["agentOverrides"],
+): string {
+  if (!parentAgent || !agentOverrides) return SISYPHUS_JUNIOR_AGENT
+
+  const parentKey = getAgentConfigKey(parentAgent)
+  const directOverride = agentOverrides[parentKey]
+  if (directOverride?.category_target_agent) {
+    return directOverride.category_target_agent
+  }
+
+  for (const [overrideKey, override] of Object.entries(agentOverrides)) {
+    if (!override?.category_target_agent) continue
+
+    const overrideConfigKey = getAgentConfigKey(overrideKey)
+    const overrideDisplayKey = override.displayName ? getAgentConfigKey(override.displayName) : undefined
+    if (overrideConfigKey === parentKey || overrideDisplayKey === parentKey) {
+      return override.category_target_agent
+    }
+  }
+
+  return SISYPHUS_JUNIOR_AGENT
+}
+
 export async function resolveCategoryExecution(
   args: DelegateTaskArgs,
   executorCtx: ExecutorContext,
   inheritedModel: string | undefined,
-  systemDefaultModel: string | undefined
+  systemDefaultModel: string | undefined,
+  parentAgent?: string,
 ): Promise<CategoryResolutionResult> {
-  const { client, userCategories, sisyphusJuniorModel } = executorCtx
+  const { client, userCategories, sisyphusJuniorModel, agentOverrides } = executorCtx
 
   const categoryName = args.category!
   const enabledCategories = mergeCategories(userCategories)
@@ -248,7 +275,7 @@ Available categories: ${categoryNames.join(", ")}`)
   }
 
   return {
-    agentToUse: SISYPHUS_JUNIOR_AGENT,
+    agentToUse: resolveCategoryTargetAgent(parentAgent, agentOverrides),
     categoryModel,
     categoryPromptAppend,
     maxPromptTokens: resolved.config.max_prompt_tokens,
