@@ -1,14 +1,13 @@
 import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
 import {
+  TEAM_LEAD_SENTINEL,
   buildLeadTeamTools,
   createTaskCancelTool,
-  createTaskInterruptTool,
-  createTaskListTool,
   createTaskOutputTool,
   createTaskSendTool,
   createTaskTool,
-  createTaskWaitTool,
   defaultResolveCallerSessionId,
+  type TeamToolsService,
 } from "@oh-my-opencode/senpi-task"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
@@ -71,8 +70,10 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
 
       pi.registerMessageRenderer?.(TASK_COMPLETION_MESSAGE_TYPE, renderTaskCompletion)
       pi.registerMessageRenderer?.(TEAM_MESSAGE_MESSAGE_TYPE, renderTeamMessage)
-      registerTaskTools(pi, engine)
-      const reconcileTeamMailbox = registerTeamTools(pi, ctx, engine)
+      const teamTools = createTeamToolContext(pi, ctx, engine)
+      registerTaskTools(pi, engine, teamTools.service)
+      registerTeamTools(pi, teamTools.service)
+      const reconcileTeamMailbox = teamTools.reconcileTeamMailbox
       registerTaskCommands(pi, engine.manager)
 
       const statusUi = createTaskStatusUi({ manager: engine.manager, runtime: engine.runtime })
@@ -103,23 +104,22 @@ function registerTaskFlags(pi: SenpiExtensionAPI): void {
 // senpi-task tool factories return fully-typed ToolDefinitions whose typed renderCall breaks a plain
 // structural assignment to the registerTool(Record) seam; spreading each into a fresh object literal
 // lands it through the record-shaped registration boundary without a cast (no behavioural change).
-function registerTaskTools(pi: SenpiExtensionAPI, engine: TaskEngine): void {
+function registerTaskTools(pi: SenpiExtensionAPI, engine: TaskEngine, teamService: TeamToolsService): void {
   const resolveCallerSessionId = defaultResolveCallerSessionId
   const manager = engine.manager
   pi.registerTool({ ...createTaskTool({ manager, omoConfig: engine.omoConfig, agents: engine.agents }) })
-  pi.registerTool({ ...createTaskSendTool({ manager, resolveCallerSessionId }) })
-  pi.registerTool({ ...createTaskWaitTool({ manager, waitConfig: engine.settings.wait, resolveCallerSessionId }) })
-  pi.registerTool({ ...createTaskInterruptTool({ manager }) })
+  pi.registerTool({
+    ...createTaskSendTool({ manager, resolveCallerSessionId, teamRouting: { service: teamService, from: TEAM_LEAD_SENTINEL } }),
+  })
   pi.registerTool({ ...createTaskCancelTool({ manager }) })
-  pi.registerTool({ ...createTaskListTool({ manager, resolveCallerSessionId }) })
-  pi.registerTool({ ...createTaskOutputTool({ manager, stateDir: engine.stateDir, resolveCallerSessionId }) })
+  pi.registerTool({ ...createTaskOutputTool({ manager, stateDir: engine.stateDir, waitConfig: engine.settings.wait, resolveCallerSessionId }) })
 }
 
-// The 12 lead-only team tools, bound to the live task engine + the idle-coordinator-backed lead
-// notifier so a team lead-message wake shares the completion push's one-wake-per-idle-edge. Registered
-// only on the lead (current) session; the manager's shared-tool filter strips the whole team_* family
-// from member children, and only the pre-scoped member team_send_message is re-added (see team-service).
-function registerTeamTools(pi: SenpiExtensionAPI, ctx: ComponentContext, engine: TaskEngine): () => Promise<void> {
+function createTeamToolContext(
+  pi: SenpiExtensionAPI,
+  ctx: ComponentContext,
+  engine: TaskEngine,
+): { readonly service: TeamToolsService; readonly reconcileTeamMailbox: () => Promise<void> } {
   const leadNotifier = createTeamMessageNotifier(pi, ctx.idleCoordinator, () => engine.runtime.parentState().kind === "streaming")
   const serviceDeps = {
     manager: engine.manager,
@@ -131,8 +131,11 @@ function registerTeamTools(pi: SenpiExtensionAPI, ctx: ComponentContext, engine:
     leadNotifier,
   }
   const service = createTeamService(serviceDeps)
+  return { service, reconcileTeamMailbox: createTeamMailboxReconciler(serviceDeps) }
+}
+
+function registerTeamTools(pi: SenpiExtensionAPI, service: TeamToolsService): void {
   for (const tool of buildLeadTeamTools({ service })) pi.registerTool({ ...tool })
-  return createTeamMailboxReconciler(serviceDeps)
 }
 
 interface EventBridgeState {

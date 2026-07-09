@@ -6,6 +6,8 @@ import { makeRecord } from "./__fixtures__/records"
 import { runTaskOutput } from "./output"
 import type { OutputManager, TaskOutputDeps, TranscriptReadResult } from "./types"
 
+const WAIT_CONFIG = { min_ms: 5000, default_ms: 60000, max_ms: 600000 } as const
+
 function managerFrom(records: readonly TaskRecord[]): OutputManager {
   return {
     get: (taskId) => records.find((record) => record.task_id === taskId),
@@ -14,6 +16,7 @@ function managerFrom(records: readonly TaskRecord[]): OutputManager {
         scope.scope === "all" ? records : records.filter((record) => record.parent_session_id === scope.session_id)
       return filtered.map((record) => ({ record }))
     },
+    waitFor: () => Promise.reject(new Error("waitFor should not be called")),
   }
 }
 
@@ -21,6 +24,7 @@ function depsFrom(records: readonly TaskRecord[], reader?: () => TranscriptReadR
   return {
     manager: managerFrom(records),
     stateDir: "/tmp/state",
+    waitConfig: WAIT_CONFIG,
     now: () => Date.parse("2024-12-03T15:00:00.000Z"),
     transcriptReader: reader ?? (() => ({ entries: [], source: "none" })),
   }

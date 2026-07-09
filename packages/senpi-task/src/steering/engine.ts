@@ -15,7 +15,7 @@ import {
 } from "./types"
 
 const TASK_OUTPUT_SUGGESTION = "Use task_output to read the final result."
-const NOT_FOUND_SUGGESTION = "Use task_list to see available tasks."
+const NOT_FOUND_SUGGESTION = "Use /tasks to see available tasks, or task_output to read a known task."
 
 type QueuedMessage = { readonly message: string; readonly deliverAs: SendDelivery }
 

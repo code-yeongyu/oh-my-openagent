@@ -1,7 +1,3 @@
-// Scenario driving + the two live failure-path checks for task-rpc-e2e.mjs (todo 27), split out so the
-// driver stays under the repo's pure-LOC ceiling. Every parent is spawned into an isolated sandbox
-// (agent dir + session dir), never the real ~/.senpi; the mock provider (loaded via -e and forwarded to
-// the child) needs no API keys or network.
 import { spawn, spawnSync } from "node:child_process"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
@@ -13,28 +9,28 @@ const { readRecords, pidAlive, pollRecord, sleep } = await import(pathToFileURL(
 
 const mockProviderEntry = join(scriptDir, "task-rpc-e2e-mock-provider.ts")
 const CHILD_FINAL_TEXT = "omo rpc child mock work complete"
-const PROJECT_OMO_CONFIG = { categories: { proc: { description: "Process-mode mock category.", model: "omo-mock/mock-1" } } }
-// A child turn that completes with a final text (scenario A), vs one that hangs forever so the record
-// stays "running" and the kill / reconcile failure paths have a live, non-terminal child to act on.
+const PROJECT_OMO_CONFIG = {
+  task: { default_execution_mode: "process" },
+  categories: { proc: { description: "Process-mode mock category.", model: "omo-mock/mock-1" } },
+}
 const CHILD_STEPS_COMPLETE = [{ type: "text", text: CHILD_FINAL_TEXT }]
 const CHILD_STEPS_HANG = [{ type: "hang" }]
 
 export const SCENARIO_A_STEPS = [
-  { type: "tool_call", name: "task", arguments: { category: "proc", execution_mode: "process", run_in_background: true, name: "p1", prompt: "Do the rpc child work and stop." } },
-  { type: "tool_call", name: "task_send", arguments: { name: "p1", message: "steer: keep going", deliver_as: "steer" } },
-  { type: "tool_call", name: "task_wait", arguments: { targets: ["p1"], timeout_ms: 20_000 } },
+  { type: "tool_call", name: "task", arguments: { category: "proc", run_in_background: true, name: "p1", prompt: "Do the rpc child work and stop." } },
+  { type: "tool_call", name: "task_send", arguments: { to: "p1", message: "steer: keep going", deliver_as: "steer" } },
+  { type: "tool_call", name: "task_output", arguments: { name: "p1", mode: "status", block: true, timeout_ms: 20_000 } },
   { type: "tool_call", name: "task_output", arguments: { name: "p1", mode: "status" } },
   { type: "text", text: "rpc-process scenario A complete" },
 ]
 
 const RECONCILE_RELAUNCH_STEPS = [
-  { type: "tool_call", name: "task_list", arguments: { all_scope: true } },
   { type: "text", text: "reconcile relaunch complete" },
 ]
 
 const hangingChildSteps = (name) => [
-  { type: "tool_call", name: "task", arguments: { category: "proc", execution_mode: "process", run_in_background: true, name, prompt: "hang until signalled" } },
-  { type: "tool_call", name: "task_wait", arguments: { targets: [name], timeout_ms: 60_000 } },
+  { type: "tool_call", name: "task", arguments: { category: "proc", run_in_background: true, name, prompt: "hang until signalled" } },
+  { type: "tool_call", name: "task_output", arguments: { name, mode: "status", block: true, timeout_ms: 60_000 } },
   { type: "text", text: `${name} parent done` },
 ]
 
@@ -44,8 +40,6 @@ function childArgv(sessionDir, prompt) {
   return ["-e", mockProviderEntry, "-p", "--mode", "json", "--provider", "omo-mock", "--model", "mock-1", "--session-dir", sessionDir, prompt]
 }
 
-// SENPI_BIN pins the child's rpc executable to the SAME resolved binary the driver drives, so the child
-// spawn strategy (executable, not the loader-hijacked rpc-entry) is deterministic in the sandbox.
 function childEnv(sandbox, sessionDir, senpiBin) {
   return { ...process.env, SENPI_BIN: senpiBin, SENPI_CODING_AGENT_DIR: sandbox.agentDir, SENPI_CODING_AGENT_SESSION_DIR: sessionDir, OMO_SENPI_QA: "1" }
 }
@@ -54,8 +48,6 @@ function writeScript(sandbox, parentSteps, childSteps) {
   writeFileSync(join(sandbox.cwd, "mock-script.json"), `${JSON.stringify({ parentSteps, childSteps }, null, 2)}\n`)
 }
 
-// Each scenario gets its OWN isolated sandbox (agent dir + session dir + project omo.json), so task-ids
-// (derived from the per-session id) never collide across scenarios that would otherwise share a session.
 export function prepareScenarioSandbox() {
   const sandbox = createSandbox()
   seedSandbox(sandbox)
@@ -78,8 +70,6 @@ export function driveSenpi(senpiBin, sandbox, sessionDir, parentSteps, childStep
   return { status: run.status, signal: run.signal ?? null, stdout: run.stdout ?? "", stderr: run.stderr ?? "" }
 }
 
-// Async parent for the failure-path scenarios: the parent keeps running (a long task_wait on a hanging
-// child) while the driver observes the live child pid from the on-disk record and signals it.
 function driveSenpiAsync(senpiBin, sandbox, sessionDir, parentSteps, childSteps, prompt) {
   writeScript(sandbox, parentSteps, childSteps)
   return spawn(senpiBin, childArgv(sessionDir, prompt), {
@@ -89,10 +79,6 @@ function driveSenpiAsync(senpiBin, sandbox, sessionDir, parentSteps, childSteps,
   })
 }
 
-// Scenario KILL: an async parent spawns a HANGING background rpc child (record stays "running" with a
-// real pid), the driver kill -9's that child, and the parent's outcome tracking must record status=error
-// with the killed:true FACT (todo-8 kill contract). The child is a real detached OS process, so this is
-// a genuine external kill, not a simulated failure.
 export async function runKillCheck(senpiBin) {
   const { sandbox, sessionDir, stateDir } = prepareScenarioSandbox()
   const parent = driveSenpiAsync(senpiBin, sandbox, sessionDir, hangingChildSteps("pk"), CHILD_STEPS_HANG, "drive the kill scenario")
@@ -117,16 +103,12 @@ export async function runKillCheck(senpiBin) {
     try {
       parent.kill("SIGKILL")
     } catch {
-      // parent already exited when its task_wait observed the child failure
+      // parent already exited when its blocking output read observed the child failure
     }
     rmSync(sandbox.root, { recursive: true, force: true })
   }
 }
 
-// Scenario RECONCILE: an async parent spawns a HANGING background rpc child, then the PARENT is crashed
-// (SIGKILL) while the child is live and the record is "running". On the next session_start the reconcile
-// pass must mark the orphan lost (cause reconcile_lost) with a pid breadcrumb AND terminate it, so the
-// orphan pid is dead afterwards.
 export async function runReconcileCheck(senpiBin) {
   const { sandbox, sessionDir, stateDir } = prepareScenarioSandbox()
   const parent = driveSenpiAsync(senpiBin, sandbox, sessionDir, hangingChildSteps("pr"), CHILD_STEPS_HANG, "drive the reconcile scenario")

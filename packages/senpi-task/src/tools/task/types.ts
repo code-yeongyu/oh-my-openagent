@@ -49,7 +49,7 @@ export type TaskToolDeps = {
   readonly loadSkills?: SkillLoader
 }
 
-export type TaskToolMode = "spawn" | "continuation"
+export type TaskToolMode = "spawn"
 
 export type TaskToolDetails = {
   readonly task_id: string

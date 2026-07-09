@@ -1,16 +1,4 @@
 #!/usr/bin/env node
-// In-process task e2e live QA driver (senpi-task plan todo 26). Boots the REAL senpi binary with the
-// BUILT omo plugin against an isolated SENPI_CODING_AGENT_DIR sandbox and a LOCAL mock provider (no real
-// API call, no network), then drives the 5-step in-process task cycle end to end:
-//   (1) task(category, run_in_background:true) -> a background st_ child id
-//   (2) parent idle -> the completion custom message ALWAYS arrives as a NEW wake turn (unconditional;
-//       no config can suppress it - the wake_idle_parent suppression knob was removed)
-//   (3) task_send(deliver_as:"followUp") on the completed-resident child -> revive -> second completion
-//   (4) task_output(mode:"full") -> the child transcript
-//   (5) a sync task (run_in_background falsy) -> final text inline with NO extra notification
-// plus a NEGATIVE step: task(category:"nonexistent") -> the category-listing error (PASS on error shape).
-// Asserts real ~/.senpi/agent shasum-unchanged, sandbox .omo/senpi-task JSON+JSONL, the store transition
-// sequence, ZERO child extensions (marker-suppression), and no leaked pids. Emits a per-check JSON verdict.
 import { spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
@@ -45,9 +33,10 @@ const MAIN_SCRIPT = {
   parentSteps: [
     { type: "tool_call", name: "task", arguments: { category: "mockcat", prompt: "do the first unit", run_in_background: true, name: "e2echild" } },
     { type: "text", text: "parent turn one done, going idle" },
-    { type: "tool_call", name: "task_send", arguments: { name: "e2echild", deliver_as: "followUp", message: "do the second unit" } },
+    { type: "tool_call", name: "task_send", arguments: { to: "e2echild", deliver_as: "interrupt" } },
+    { type: "tool_call", name: "task_send", arguments: { to: "e2echild", message: "do the second unit" } },
     { type: "text", text: "parent turn two done, going idle" },
-    { type: "tool_call", name: "task_output", arguments: { name: "e2echild", mode: "full" } },
+    { type: "tool_call", name: "task_output", arguments: { name: "e2echild", mode: "full", block: true } },
     { type: "text", text: "parent read the transcript, all done" },
   ],
 }
@@ -143,6 +132,7 @@ function runMainFlow(senpiBin, checks, capture, pids) {
   checks.unconditional_wake = wake.ok ? "PASS" : "FAIL"
   checks.followup_revive = findRevived(events) && JSON.stringify(events).includes(CHILD_SECOND) ? "PASS" : "FAIL"
   checks.task_output_full = findTranscript(events, CHILD_FIRST) ? "PASS" : "FAIL"
+  checks.task_output_block = findBlockingTaskOutput(events) && checks.task_output_full === "PASS" ? "PASS" : "FAIL"
   checks.jsonl_sequence = matchesOrderedSubsequence(signatures, MAIN_FLOW_EXPECTED_SEQUENCE) ? "PASS" : "FAIL"
   checks.extension_suppression = markerCount(scenario.markerLog) === 1 ? "PASS" : "FAIL"
   capture.markerCount = markerCount(scenario.markerLog)
@@ -244,12 +234,17 @@ function writeEvidenceMaybe(capture, payload) {
   writeFileSync(join(outDir, "negative.stdout.json.log"), capture.negativeStdout ?? "")
 }
 
+function findBlockingTaskOutput(events) {
+  return JSON.stringify(events).includes('"name":"task_output"') && JSON.stringify(events).includes('"block":true')
+}
+
 function runSelfTest() {
-  const wakeEvents = parseJsonEvents(`banner\n${JSON.stringify({ type: "custom", content: "<task-notification>\n- task \"e2echild\" (st_abc) completed in 3ms\n  Use task_send({ task_id: \"st_abc\" }) to continue, or task_output({ task_id: \"st_abc\" }) to read the full result." })}`)
+  const wakeEvents = parseJsonEvents(`banner\n${JSON.stringify({ type: "custom", content: "<task-notification>\n- task \"e2echild\" (st_abc) completed in 3ms\n  Use task_send({ to: \"st_abc\" }) to continue, or task_output({ task_id: \"st_abc\" }) to read the full result." })}`)
   if (!findWakeNotification(wakeEvents, "st_abc").ok) throw new Error("self-test: wake notification must be detected")
   if (findWakeNotification(wakeEvents, "st_missing").ok) throw new Error("self-test: wake must not match a foreign task id")
   if (!findRevived(parseJsonEvents(JSON.stringify({ type: "toolResult", details: { kind: "revived", task_id: "st_abc", run_epoch: 1 } })))) throw new Error("self-test: revived must be detected")
   if (!findTranscript(parseJsonEvents(JSON.stringify({ type: "toolResult", content: `st_abc [completed] transcript via jsonl:\n${CHILD_FIRST}` })), CHILD_FIRST)) throw new Error("self-test: transcript must be detected")
+  if (!findBlockingTaskOutput(parseJsonEvents(JSON.stringify({ name: "task_output", arguments: { block: true } })))) throw new Error("self-test: blocking output call must be detected")
   if (!findInlineFinal(parseJsonEvents(JSON.stringify({ type: "text", text: SYNC_FINAL })), SYNC_FINAL)) throw new Error("self-test: inline final must be detected")
   if (!findCategoryListingError(parseJsonEvents(JSON.stringify({ type: "toolResult", content: "Unknown category. Available categories: quick, deep." })))) throw new Error("self-test: category listing error must be detected")
   const signatures = jsonlSignatures([
