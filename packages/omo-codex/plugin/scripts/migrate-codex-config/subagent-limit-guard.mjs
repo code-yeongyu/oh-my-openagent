@@ -1,15 +1,60 @@
+import { resolveMultiAgentVersionFromConfig } from "./multi-agent-v2-guard.mjs";
+
 const CODEX_AGENTS_HEADER = "[agents]";
 const CODEX_MULTI_AGENT_V2_HEADER = "[features.multi_agent_v2]";
 const CODEX_SUBAGENT_THREAD_LIMIT = "1000";
 
-export function ensureSubagentConcurrencyLimit(config) {
-	return ensureMultiAgentV2ThreadLimit(ensureAgentsMaxThreads(config));
+/**
+ * Ensure subagent concurrency limits without writing settings that conflict
+ * with MultiAgentV2. When the selected model prefers V2 (or V2 is already
+ * enabled), skip `agents.max_threads` because Codex rejects that key while
+ * features.multi_agent_v2 is enabled.
+ *
+ * @param {string} config
+ * @param {{ multiAgentVersion?: string | null, env?: NodeJS.ProcessEnv, modelsCachePath?: string }} [options]
+ */
+export function ensureSubagentConcurrencyLimit(config, options = {}) {
+	const multiAgentVersion =
+		options.multiAgentVersion !== undefined
+			? options.multiAgentVersion
+			: resolveMultiAgentVersionFromConfig(config, options);
+	const v2Preferred = multiAgentVersion === "v2" || isMultiAgentV2Enabled(config);
+
+	let result = config;
+	if (!v2Preferred) {
+		result = ensureAgentsMaxThreads(result);
+	} else {
+		result = removeAgentsMaxThreads(result);
+	}
+	return ensureMultiAgentV2ThreadLimit(result);
+}
+
+function isMultiAgentV2Enabled(config) {
+	const section = findSection(config, CODEX_MULTI_AGENT_V2_HEADER);
+	if (!section) return false;
+	return /^\s*enabled\s*=\s*true[ \t]*(?:#[^\n]*)?$/m.test(section.text);
 }
 
 function ensureAgentsMaxThreads(config) {
 	const section = findSection(config, CODEX_AGENTS_HEADER);
 	if (!section) return appendBlock(config, `${CODEX_AGENTS_HEADER}\nmax_threads = ${CODEX_SUBAGENT_THREAD_LIMIT}\n`);
 	return replaceOrInsertSetting(config, section, "max_threads", CODEX_SUBAGENT_THREAD_LIMIT);
+}
+
+function removeAgentsMaxThreads(config) {
+	const section = findSection(config, CODEX_AGENTS_HEADER);
+	if (!section) return config;
+	if (!/^\s*max_threads\s*=/m.test(section.text)) return config;
+
+	const patched = section.text.replace(/^\s*max_threads\s*=\s*[^\n]*\n?/m, "");
+	const bodyLines = patched
+		.split("\n")
+		.slice(1)
+		.filter((line) => line.trim() !== "");
+	if (bodyLines.length === 0) {
+		return config.slice(0, section.start) + config.slice(section.end).replace(/^\n+/, "");
+	}
+	return config.slice(0, section.start) + patched + config.slice(section.end);
 }
 
 function ensureMultiAgentV2ThreadLimit(config) {
@@ -26,7 +71,9 @@ function ensureMultiAgentV2ThreadLimit(config) {
 function replaceOrInsertSetting(config, section, key, value) {
 	const pattern = new RegExp(`^(\\s*)${escapeRegExp(key)}\\s*=\\s*[^\\n#]*(#[^\\n]*)?$`, "m");
 	if (pattern.test(section.text)) {
-		const patched = section.text.replace(pattern, (_match, indent, comment) => comment ? `${indent}${key} = ${value} ${comment}` : `${indent}${key} = ${value}`);
+		const patched = section.text.replace(pattern, (_match, indent, comment) =>
+			comment ? `${indent}${key} = ${value} ${comment}` : `${indent}${key} = ${value}`,
+		);
 		return config.slice(0, section.start) + patched + config.slice(section.end);
 	}
 
