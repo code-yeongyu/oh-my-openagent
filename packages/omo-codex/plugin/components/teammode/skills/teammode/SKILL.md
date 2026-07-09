@@ -1,6 +1,6 @@
 ---
 name: teammode
-description: "Codex-only team orchestration: run a named team of cooperating Codex threads with durable, script-managed state. MUST USE when the user asks Codex to create, run, coordinate, inspect, archive, or delete a team of threads/sessions, or to work on something as a team in parallel. The main session is always the leader; members are defined by a concrete part, ownership area, or perspective - never a vague job role; a bundled cross-platform script writes the .omo/teams state plus an auto-generated member field manual. Use a team when the work is not perfectly isolated but parallelizing helps, or when a task still needs exploration under a clear goal; use plain subagents when scope is perfectly isolated or the goal is ambiguous. Triggers: team mode, teammode, make a team, run as a team, team of agents, coordinate threads, parallel Codex threads, archive the team, delete the team."
+description: "Codex-only team orchestration: run a named team of cooperating Codex threads with durable, script-managed state. Use when the user asks Codex to create, run, coordinate, inspect, archive, or delete a team of threads/sessions, or to work on something as a team in parallel, but only when the current Codex runtime exposes the required thread tools. If create/read/send thread tools are unavailable, do not stop ordinary implementation work just because the user mentioned teammode; explain that durable Codex-thread teammode is unavailable in this surface and continue with the best available non-team workflow. The main session is always the leader; members are defined by a concrete part, ownership area, or perspective - never a vague job role; a bundled cross-platform script writes the .omo/teams state plus an auto-generated member field manual. Use a team when the work is not perfectly isolated but parallelizing helps, or when a task still needs exploration under a clear goal; use plain subagents when scope is perfectly isolated or the goal is ambiguous. Triggers: team mode, teammode, make a team, run as a team, team of agents, coordinate threads, parallel Codex threads, archive the team, delete the team."
 ---
 
 # Teammode
@@ -10,6 +10,26 @@ This is a Codex-only workflow. It is inspired by the lifecycle concerns in the
 Yeachan-Heo/oh-my-codex team skill, but it does not copy that runtime model and never depends
 on an external terminal runner - it coordinates through Codex's own thread tools plus a bundled
 state script.
+
+## Runtime tool preflight
+
+A real team needs durable Codex thread tools. Before `init`, `add-member`, or any team-state mutation,
+confirm the current tool surface has these capabilities:
+
+- create a thread: `codex_app.create_thread` or `create_thread`
+- send to a thread: `codex_app.send_message_to_thread` or equivalent thread-send tool
+- read a thread: `codex_app.read_thread` or equivalent thread-read tool
+
+If the required create/read/send tools are unavailable, durable teammode is unavailable in this
+runtime. Do not create `.omo/teams` state, do not pretend a team exists, and do not stop an
+ordinary implementation request with no code changed. Instead:
+
+1. State briefly that Codex-thread teammode needs unavailable thread tools in this surface.
+2. Continue the user's implementation with the best available non-team workflow:
+   - use `multi_agent_v1.spawn_agent` only when that tool is available and the work is safely
+     isolated; otherwise
+   - keep execution in the main session with a small explicit plan and verification.
+3. Do not call the result a team. It is a degraded non-team execution path.
 
 ## When to use a team (and when to use plain subagents instead)
 
@@ -109,14 +129,14 @@ do not treat the intended mutation as complete; retry after the named command fi
    `codex://threads/019ef350-ee78-72a3-bd5e-e40cebc3d814`. Worktree-backed threads are easy to
    lose in the sidebar without this link.
 
-Every team member is a real Codex thread created with `codex_app.create_thread` - this is strict,
-not a preference. NEVER substitute `multi_agent_v1.spawn_agent`, or any other in-process subagent,
-for a team member: a spawned agent is an ephemeral helper that does not show up as a team thread,
-cannot carry the `[team name] <member name>` title, and cannot be inspected, titled, archived, or
-re-opened with the `codex_app.*` thread tools - which defeats the entire point of a durable team.
-A member only counts once you have `bind-thread`-ed it to a real `codex_app.create_thread` thread
-id. If the thread-creation tool is unavailable, STOP and say so (see Stop rules); do not quietly
-fall back to a spawned agent.
+Every team member is a real Codex thread created with `codex_app.create_thread` (or the runtime's
+bare `create_thread` alias) - this is strict, not a preference. NEVER substitute
+`multi_agent_v1.spawn_agent`, or any other in-process subagent, for a team member: a spawned agent is
+an ephemeral helper that does not show up as a team thread, cannot carry the `[team name] <member name>`
+title, and cannot be inspected, titled, archived, or re-opened with the `codex_app.*` thread tools -
+which defeats the entire point of a durable team. A member only counts once you have
+`bind-thread`-ed it to a real Codex thread id. If the thread-creation tool is unavailable, follow the
+Runtime tool preflight degraded path instead of faking a team.
 
 ## Communication
 
@@ -212,5 +232,5 @@ is never disbanded is a leak.
 - Stop and ask before deleting an unarchived team while any member is still active.
 - Member communication stays English unless the user explicitly requests otherwise; user-facing
   replies follow the user's language.
-- Stop if the requested operation needs Codex thread tools (create/read/send/title/archive) and
-  they are unavailable; say so instead of faking it.
+- Stop if a management operation on an existing team needs Codex thread tools (create/read/send/title/archive) and they are unavailable; say so instead of faking it.
+- For a new implementation request where the user merely asked to use teammode, follow the Runtime tool preflight degraded path rather than stopping before work begins.
