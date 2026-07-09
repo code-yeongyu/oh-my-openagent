@@ -52,7 +52,9 @@ async function runChatMessageHooks(args: {
   readonly runtimeFallbackEnabled: boolean
 }): Promise<void> {
   const { input, output, hooks, runtimeFallbackEnabled } = args
-  await hooks.modelFallback?.["chat.message"]?.(input, output)
+  if (!runtimeFallbackEnabled) {
+    await hooks.modelFallback?.["chat.message"]?.(input, output)
+  }
   recordSessionModel(input, output)
   await hooks.stopContinuationGuard?.["chat.message"]?.(input)
   await hooks.backgroundNotificationHook?.["chat.message"]?.(input, output)

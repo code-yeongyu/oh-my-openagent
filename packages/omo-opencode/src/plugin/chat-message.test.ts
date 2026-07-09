@@ -192,7 +192,7 @@ describe("createChatMessageHandler - first message hook ordering", () => {
     ])
   })
 
-  test("runs both model and runtime fallback when runtime fallback is enabled", async () => {
+  test("skips model fallback when runtime fallback is enabled", async () => {
     // given
     const hookCalls: string[] = []
     const args = createMockHandlerArgs({
@@ -217,7 +217,7 @@ describe("createChatMessageHandler - first message hook ordering", () => {
     })
 
     // then
-    expect(hookCalls).toEqual(["modelFallback", "runtimeFallback"])
+    expect(hookCalls).toEqual(["runtimeFallback"])
   })
 })
 
