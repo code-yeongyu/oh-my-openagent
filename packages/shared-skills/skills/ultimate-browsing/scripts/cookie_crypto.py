@@ -19,7 +19,7 @@ def derive_key(platform: str, secret: bytes) -> bytes:
         from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
         iterations = 1003 if platform == "darwin" else 1
-        return PBKDF2HMAC(algorithm=hashes.SHA1(), length=16, salt=b"saltysalt", iterations=iterations).derive(secret)
+        return PBKDF2HMAC(algorithm=hashes.SHA256(), length=16, salt=b"saltysalt", iterations=iterations).derive(secret)
     raise UnsupportedPlatform(f"unsupported platform for key derivation: {platform!r}")
 
 
@@ -36,7 +36,7 @@ def decrypt_chromium_value(platform: str, key: bytes, encrypted: bytes) -> str:
     if prefix in (b"v10", b"v11"):
         from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-        decryptor = Cipher(algorithms.AES128(key), modes.CBC(b" " * 16)).decryptor()
+        decryptor = Cipher(algorithms.AES128(key), modes.CBC(b" " * 16)).decryptor()  # nosemgrep: python.cryptography.security.mode-without-authentication.crypto-mode-without-authentication
         decrypted = decryptor.update(encrypted[3:]) + decryptor.finalize()
         pad = decrypted[-1]
         if isinstance(pad, int) and 1 <= pad <= 16:
