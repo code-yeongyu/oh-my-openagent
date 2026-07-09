@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-The Senpi-coupled engine behind the `omo-senpi` task component: a durable task state machine, a persistent record store, two child runners (in-process and RPC process), a residency/TTL/reconcile lifecycle, an exactly-once completion notifier, a steering engine, a named-team runtime, and the 7 task + 12 team `ToolDefinition`s. Package: `@oh-my-opencode/senpi-task` (private, `sideEffects: false`). `@code-yeongyu/senpi` and `typebox` are optional peers (`package.json:25`) so pure state/store/schema code stays runnable without a live Senpi import; runner and tool code that needs the Senpi surface is isolated. Do not import `packages/omo-opencode` from here.
+The Senpi-coupled engine behind the `omo-senpi` task component: a durable task state machine, a persistent record store, two child runners (in-process and RPC process), a residency/TTL/reconcile lifecycle, an exactly-once completion notifier, a steering engine, a named-team runtime, and the 4 task + 6 lead-team `ToolDefinition`s. Package: `@oh-my-opencode/senpi-task` (private, `sideEffects: false`). `@code-yeongyu/senpi` and `typebox` are optional peers (`package.json:25`) so pure state/store/schema code stays runnable without a live Senpi import; runner and tool code that needs the Senpi surface is isolated. Do not import `packages/omo-opencode` from here.
 
 ## ANATOMY
 
@@ -18,28 +18,29 @@ The Senpi-coupled engine behind the `omo-senpi` task component: a durable task s
 | Completion | `src/completion/` | `createCompletionNotifier` + `routeCompletion` - the exactly-once wake/deliver/buffer/queue routing table (`completion/routing.ts`). |
 | Steering | `src/steering/` | `createSteeringEngine` - send / interrupt / cancel against a live or resident child. |
 | Team | `src/team/` | Named-team registry, normalize/validate, mailbox messaging, tasklist, shutdown handshake, and runtime (`team/runtime.ts`). |
-| Tools | `src/tools/` | `task/` (spawn), `control/` (`task_send`/`task_wait`/`task_interrupt`/`task_cancel`), `output/` (`task_list`/`task_output`), `team/` (the 12 lead-only tools). |
+| Tools | `src/tools/` | `task/` (spawn), `control/` (`task_send`/`task_cancel`), `output/` (`task_output`), `team/` (the 6 lead-only tools). |
 | Agents | `src/agents/` | `loadAgents` + `mapOmoConfigAgents` - omo.json agent definitions to task-tool targets. |
 | Category | `src/category/` | `resolveCategory` + per-provider builtin category tables (anthropic/openai/google/kimi). |
 | Adversarial | `src/__adversarial__/` | Seeded 200-iteration chaos bench asserting the four W1 invariants (`chaos-bench.test.ts`). |
 
 ## PUBLIC API (`src/index.ts` barrel)
 
-### Task tools (7, names as registered)
+### Task tools (4, names as registered)
 
 | Tool | Factory | File |
 |------|---------|------|
 | `task` | `createTaskTool` | `tools/task/tool.ts:9` (`TASK_TOOL_NAME`) |
-| `task_send` | `createTaskSendTool` | `tools/control/send.ts:118` |
-| `task_wait` | `createTaskWaitTool` | `tools/control/wait.ts:173` |
-| `task_interrupt` | `createTaskInterruptTool` | `tools/control/interrupt.ts:57` |
+| `task_send` | `createTaskSendTool` | `tools/control/send.ts` |
 | `task_cancel` | `createTaskCancelTool` | `tools/control/cancel.ts:61` |
-| `task_list` | `createTaskListTool` | `tools/output/list.ts:61` |
-| `task_output` | `createTaskOutputTool` | `tools/output/output.ts:117` |
+| `task_output` | `createTaskOutputTool` | `tools/output/output.ts` |
 
-### Team tools (12, lead-only)
+`task` is spawn-only. Continue, steer, park, team messaging, and shutdown approval traffic goes through `task_send`; child output and single-child blocking reads go through `task_output`.
 
-`buildLeadTeamTools(deps)` returns them in canonical order (`tools/team/index.ts:92`): `team_create`, `team_delete`, `team_send_message`, `team_status`, `team_list`, `team_task_create`, `team_task_list`, `team_task_update`, `team_task_get`, `team_shutdown_request`, `team_approve_shutdown`, `team_reject_shutdown`. Child/member sessions never receive the `team_*` family; only a pre-scoped member `team_send_message` is re-added.
+### Team tools (6, lead-only)
+
+`buildLeadTeamTools(deps)` returns them in canonical order (`tools/team/index.ts`): `team_create`, `team_delete`, `task_create`, `task_get`, `task_list`, `task_update`. Child/member sessions never receive the lead family; member sessions receive only a pre-scoped `task_send`.
+
+`packages/omo-opencode` is a separate build that still uses its prior task/team names; cross-edition parity is a deliberate follow-up outside this package.
 
 ### Engine primitives
 
