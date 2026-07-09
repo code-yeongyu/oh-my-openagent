@@ -136,7 +136,14 @@ function stampHookGroups(hooks: unknown, version: string): void {
 }
 
 function stampHookStatusMessage(hook: unknown, version: string): void {
-  void version
   if (!isPlainRecord(hook) || typeof hook.statusMessage !== "string") return
-  hook.statusMessage = hook.statusMessage.replace(/^LazyCodex\([^)]+\):\s*/, "(OmO) ")
+  hook.statusMessage = hook.statusMessage.replace(
+    /^(?:LazyCodex\([^)]+\):|\(OmO(?:\s+[^)]+)?\))\s*/,
+    `(OmO ${normalizeHookStatusVersion(version)}) `,
+  )
+}
+
+function normalizeHookStatusVersion(version: string): string {
+  const normalized = version.trim()
+  return normalized.length === 0 ? "local" : normalized
 }

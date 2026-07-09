@@ -171,7 +171,7 @@ test("#given the bootstrap component #when its SessionStart registration is insp
 		assert.equal(typeof handler.timeout, "number");
 		assert(handler.timeout <= 60, `${label} bootstrap timeout must stay <= 60 seconds`);
 		assert.equal(typeof handler.statusMessage, "string");
-		assert.match(handler.statusMessage, /^\(OmO\) .+$/);
+		assert.match(handler.statusMessage, /^\(OmO [^)]+\) .+$/);
 	}
 });
 
