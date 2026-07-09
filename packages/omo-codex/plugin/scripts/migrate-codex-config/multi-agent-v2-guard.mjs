@@ -9,9 +9,12 @@
  * GPT-5.6 models that declare `multi_agent_version: "v2"` in the Codex model
  * catalog invert that failure mode: forcing `enabled = false` makes every
  * turn 400 with a reserved `collaboration.spawn_agent` schema mismatch
- * (lazycodex#118 / oh-my-openagent#6002 / openai/codex#31097). For those
- * models this guard clears the managed disable and leaves V2 unset so Codex
- * can follow model metadata.
+ * (lazycodex#118 / oh-my-openagent#6002 / openai/codex#31097), and
+ * `hide_spawn_agent_metadata = false` (written by OMO installers <= 4.15.x)
+ * mismatches the same reserved schema by re-adding agent_type/model
+ * properties to spawn_agent. For those models this guard clears the managed
+ * disable and the stale metadata override, leaving V2 unset so Codex can
+ * follow model metadata.
  *
  * When the selected model is unknown or declares V1, keep the #26753
  * force-disable path.
@@ -144,9 +147,20 @@ function clearMultiAgentV2DisableForReservedSchema(config) {
 	const section = findSection(result, "[features.multi_agent_v2]");
 	if (!section) return result;
 
-	const withoutEnabledFalse = section.text.replace(/^\s*enabled\s*=\s*false[ \t]*(?:#[^\n]*)?\n?/gm, "");
-	if (withoutEnabledFalse === section.text) return result;
-	return result.slice(0, section.start) + withoutEnabledFalse + result.slice(section.end);
+	// Two settings poison the reserved collaboration.spawn_agent schema on V2
+	// models (verified against codex-cli 0.144.1 + gpt-5.6-sol):
+	// - `enabled = false` forces the legacy V1 tool surface on some Codex
+	//   versions (#6002's failure shape);
+	// - `hide_spawn_agent_metadata = false` (written by OMO installers
+	//   <= 4.15.x to expose agent_type) re-adds agent_type/model/... to
+	//   spawn_agent, mismatching the reserved schema -> HTTP 400 every turn.
+	// Remove both; `hide_spawn_agent_metadata = true` matches the Codex
+	// default and is left alone.
+	const cleared = section.text
+		.replace(/^\s*enabled\s*=\s*false[ \t]*(?:#[^\n]*)?\n?/gm, "")
+		.replace(/^\s*hide_spawn_agent_metadata\s*=\s*false[ \t]*(?:#[^\n]*)?\n?/gm, "");
+	if (cleared === section.text) return result;
+	return result.slice(0, section.start) + cleared + result.slice(section.end);
 }
 
 // `config` arrives shorthand-normalized from forceDisableMultiAgentV2.
