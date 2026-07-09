@@ -1,4 +1,6 @@
+import { createReadStream } from "node:fs";
 import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { createInterface } from "node:readline";
 
 import { aggregateCodexObjectiveForScope } from "./goal-status.js";
 import {
@@ -14,7 +16,7 @@ import { iso, ULW_LOOP_DIR, ULW_LOOP_GOALS, ULW_LOOP_LEDGER, UlwLoopError } from
 
 const LEGACY_OBJECTIVE_PREFIX = `Complete all ulw-loop stories in ${ULW_LOOP_DIR}/${ULW_LOOP_GOALS}: `;
 const LEGACY_OBJECTIVE = `Complete all ulw-loop stories listed in ${ULW_LOOP_DIR}/${ULW_LOOP_GOALS}. Use ${ULW_LOOP_DIR}/${ULW_LOOP_LEDGER} as the durable audit trail.`;
-const locks = new Map<string, Promise<unknown>>();
+const locks = new Map<string, Promise<undefined>>();
 
 function hasCode(error: unknown, code: string): boolean {
 	return error instanceof Error && "code" in error && error.code === code;
@@ -43,12 +45,19 @@ export async function withUlwLoopMutationLock<T>(
 	const fn = typeof scopeOrFn === "function" ? scopeOrFn : maybeFn;
 	if (fn === undefined) throw new UlwLoopError("Missing ulw-loop mutation body.", "ULW_LOOP_LOCK_BODY_MISSING");
 	const lockKey = `${repoRoot}\0${ulwLoopRelativeDir(scope)}`;
-	const prior = locks.get(lockKey) ?? Promise.resolve();
+	const prior = locks.get(lockKey) ?? Promise.resolve(undefined);
 	const run = prior.then(fn, fn);
-	locks.set(
-		lockKey,
-		run.catch(() => undefined),
+	// The stored gate resolves to undefined so the map never retains fn's result
+	// (plans/audits), and it removes itself once no newer waiter replaced it —
+	// otherwise a long-lived host leaks one entry per (repo, scope) forever.
+	const gate: Promise<undefined> = run.then(
+		() => undefined,
+		() => undefined,
 	);
+	locks.set(lockKey, gate);
+	void gate.then(() => {
+		if (locks.get(lockKey) === gate) locks.delete(lockKey);
+	});
 	return run;
 }
 
@@ -107,18 +116,57 @@ export async function appendLedger(repoRoot: string, entry: UlwLoopLedgerEntry, 
 	await appendFile(ulwLoopLedgerPath(repoRoot, scope), `${JSON.stringify(entry)}\n`, "utf8");
 }
 
-export async function readSteeringLedgerEntries(repoRoot: string, scope?: UlwLoopScope): Promise<UlwLoopLedgerEntry[]> {
-	let raw: string;
+/**
+ * Streams raw ledger lines without materializing the file. Real ledgers reach
+ * many MB (legacy entries embedded full-plan snapshots), so `readFile` here
+ * ballooned every steer/dedup path; line-at-a-time keeps memory O(longest line).
+ */
+async function* ledgerLines(repoRoot: string, scope?: UlwLoopScope): AsyncGenerator<string> {
+	const stream = createReadStream(ulwLoopLedgerPath(repoRoot, scope), { encoding: "utf8" });
+	const lines = createInterface({ input: stream, crlfDelay: Number.POSITIVE_INFINITY });
 	try {
-		raw = await readFile(ulwLoopLedgerPath(repoRoot, scope), "utf8");
+		for await (const line of lines) {
+			if (line.trim().length > 0) yield line;
+		}
 	} catch (error) {
-		if (hasCode(error, "ENOENT")) return [];
-		throw error;
+		if (!hasCode(error, "ENOENT")) throw error;
+	} finally {
+		lines.close();
+		stream.destroy();
 	}
+}
+
+export async function readSteeringLedgerEntries(repoRoot: string, scope?: UlwLoopScope): Promise<UlwLoopLedgerEntry[]> {
 	const entries: UlwLoopLedgerEntry[] = [];
-	for (const line of raw.split(/\r?\n/).filter(Boolean)) {
+	for await (const line of ledgerLines(repoRoot, scope)) {
 		const entry: UlwLoopLedgerEntry = JSON.parse(line);
 		if (isSteeringKind(entry.kind)) entries.push(entry);
 	}
 	return entries;
+}
+
+/**
+ * First accepted steering entry matching an idempotency key/prompt signature.
+ * A cheap substring probe on the raw line skips JSON.parse for the vast
+ * majority of entries, so dedup stays flat even on legacy multi-MB ledgers.
+ */
+export async function findAcceptedSteeringLedgerEntry(
+	repoRoot: string,
+	key: string,
+	scope?: UlwLoopScope,
+): Promise<UlwLoopLedgerEntry | undefined> {
+	const probe = JSON.stringify(key);
+	for await (const line of ledgerLines(repoRoot, scope)) {
+		if (!line.includes(probe)) continue;
+		const entry: UlwLoopLedgerEntry = JSON.parse(line);
+		if (!isSteeringKind(entry.kind)) continue;
+		if (entry.steering?.invariant.accepted !== true) continue;
+		if (
+			entry.idempotencyKey === key ||
+			entry.steering.idempotencyKey === key ||
+			entry.steering.promptSignature === key
+		)
+			return entry;
+	}
+	return undefined;
 }
