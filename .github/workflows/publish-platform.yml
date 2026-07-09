@@ -294,7 +294,7 @@ jobs:
 
       - name: Upgrade npm for trusted publishing (>=11.5.1)
         if: steps.check.outputs.skip_all != 'true' && steps.download.outcome == 'success'
-        run: npm install -g npm@latest
+        run: npm install -g npm@11.18.0
 
       - name: Strip token auth from .npmrc to force OIDC
         if: steps.check.outputs.skip_all != 'true' && steps.download.outcome == 'success'
