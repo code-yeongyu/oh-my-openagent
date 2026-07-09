@@ -1,5 +1,10 @@
 import type { FallbackEntry } from "../../shared/model-requirements"
 import type { ChatMessageInput, ChatMessageHandlerOutput } from "../../plugin/chat-message"
+import { isRealUserTextPart } from "../../shared"
+import {
+  applyPendingFallbackPromptParams,
+  restorePendingFallbackPromptParams,
+} from "../../shared/session-prompt-params-state"
 import { applyFallbackToChatMessage } from "./chat-message-fallback-handler"
 import {
   createModelFallbackStateController,
@@ -21,12 +26,18 @@ type FallbackCallback = (input: {
   variant?: string
 }) => void | Promise<void>
 
+type FallbackClearCallback = (input: {
+  sessionID: string
+}) => void | Promise<void>
+
 export type ModelFallbackState = {
   providerID: string
   modelID: string
   fallbackChain: FallbackEntry[]
   attemptCount: number
   pending: boolean
+  lastFailedProviderID?: string
+  lastFailedModelID?: string
 }
 
 type ModelFallbackControllerWithState = Pick<
@@ -38,12 +49,14 @@ type ModelFallbackControllerWithState = Pick<
   | "setPendingModelFallback"
   | "getNextFallback"
   | "clearPendingModelFallback"
+  | "clearLastFailedModelFallback"
   | "hasPendingModelFallback"
   | "getFallbackState"
   | "reset"
 >
 
 export type ModelFallbackHook = ModelFallbackControllerWithState & {
+  markPendingFallbackAutoContinuation: (sessionID: string) => void
   "chat.message": (
     input: ChatMessageInput,
     output: ChatMessageHandlerOutput,
@@ -53,6 +66,7 @@ export type ModelFallbackHook = ModelFallbackControllerWithState & {
 type ModelFallbackHookArgs = {
   toast?: FallbackToast
   onApplied?: FallbackCallback
+  onCleared?: FallbackClearCallback
   controllerAccessor?: ModelFallbackControllerAccessor
 }
 
@@ -146,6 +160,7 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
   const pendingModelFallbacks = new Map<string, ModelFallbackState>()
   const lastToastKey = new Map<string, string>()
   const sessionFallbackChains = new Map<string, FallbackEntry[]>()
+  const autoContinuationPendingSessions = new Set<string>()
   const controller = createModelFallbackStateController({
     pendingModelFallbacks,
     lastToastKey,
@@ -156,18 +171,46 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
 
   const toast = args?.toast
   const onApplied = args?.onApplied
+  const onCleared = args?.onCleared
+
+  const clearPending = (sessionID: string): void => {
+    controller.clearPendingModelFallback(sessionID)
+    restorePendingFallbackPromptParams(sessionID)
+    void Promise.resolve(onCleared?.({ sessionID })).catch(() => {})
+  }
+
+  const setPending = (
+    sessionID: string,
+    agentName: string,
+    currentProviderID: string,
+    currentModelID: string,
+  ): boolean => {
+    const hadAutoContinuationMarker = autoContinuationPendingSessions.has(sessionID)
+    const armed = controller.setPendingModelFallback(
+      sessionID,
+      agentName,
+      currentProviderID,
+      currentModelID,
+    )
+    if (armed && hadAutoContinuationMarker) autoContinuationPendingSessions.delete(sessionID)
+    return armed
+  }
 
   return {
     lastToastKey: controller.lastToastKey,
     setSessionFallbackChain: controller.setSessionFallbackChain,
     getSessionFallbackChain: controller.getSessionFallbackChain,
     clearSessionFallbackChain: controller.clearSessionFallbackChain,
-    setPendingModelFallback: controller.setPendingModelFallback,
+    setPendingModelFallback: setPending,
     getNextFallback: controller.getNextFallback,
-    clearPendingModelFallback: controller.clearPendingModelFallback,
+    clearPendingModelFallback: clearPending,
+    clearLastFailedModelFallback: controller.clearLastFailedModelFallback,
     hasPendingModelFallback: controller.hasPendingModelFallback,
     getFallbackState: controller.getFallbackState,
     reset: controller.reset,
+    markPendingFallbackAutoContinuation: (sessionID: string) => {
+      if (sessionID) autoContinuationPendingSessions.add(sessionID)
+    },
     "chat.message": async (
       input: ChatMessageInput,
       output: ChatMessageHandlerOutput,
@@ -175,8 +218,23 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
       const { sessionID } = input
       if (!sessionID) return
 
+      if (
+        autoContinuationPendingSessions.has(sessionID)
+        && output.parts.some(isRealUserTextPart)
+      ) {
+        autoContinuationPendingSessions.delete(sessionID)
+        if (controller.hasPendingModelFallback(sessionID)) clearPending(sessionID)
+        return
+      }
+
       const fallback = getNextFallback(controller, sessionID)
-      if (!fallback) return
+      if (!fallback) {
+        autoContinuationPendingSessions.delete(sessionID)
+        return
+      }
+      autoContinuationPendingSessions.delete(sessionID)
+
+      applyPendingFallbackPromptParams(sessionID)
 
       await applyFallbackToChatMessage({
         input,
@@ -186,6 +244,7 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
         onApplied,
         lastToastKey: controller.lastToastKey,
       })
+      void Promise.resolve(onCleared?.({ sessionID })).catch(() => {})
     },
   }
 }

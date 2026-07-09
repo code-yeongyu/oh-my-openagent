@@ -8,6 +8,7 @@ import { handleRalphLoopMessage } from "./chat-message/loop-commands"
 import { notifyWhenModelCacheIsMissing } from "./chat-message/model-cache-warning"
 import { recordSessionModel, getStoredMainSessionModel } from "./chat-message/session-model"
 import { runStartWorkHookIfApplicable } from "./chat-message/start-work-message"
+import { recoverStaleFallbackSessionModel } from "./chat-message/stale-fallback-model"
 import type {
   ChatMessageHandlerOutput,
   ChatMessageHooks,
@@ -52,10 +53,13 @@ async function runChatMessageHooks(args: {
   readonly runtimeFallbackEnabled: boolean
 }): Promise<void> {
   const { input, output, hooks, runtimeFallbackEnabled } = args
+  recordSessionModel(input, output)
   if (!runtimeFallbackEnabled) {
+    if (hooks.modelFallback && hooks.stopContinuationGuard?.isStopped(input.sessionID)) {
+      hooks.modelFallback.clearPendingModelFallback?.(input.sessionID)
+    }
     await hooks.modelFallback?.["chat.message"]?.(input, output)
   }
-  recordSessionModel(input, output)
   await hooks.stopContinuationGuard?.["chat.message"]?.(input)
   await hooks.backgroundNotificationHook?.["chat.message"]?.(input, output)
   await hooks.runtimeFallback?.["chat.message"]?.(input, output)
@@ -109,6 +113,12 @@ export function createChatMessageHandler(args: {
     if (storedMainSessionModel) {
       output.message.model = storedMainSessionModel
     }
+    await recoverStaleFallbackSessionModel({
+      ctx,
+      input,
+      output,
+      modelFallback: hooks.modelFallback as { hasPendingModelFallback?: (sessionID: string) => boolean } | null | undefined,
+    })
 
     await runChatMessageHooks({
       input,

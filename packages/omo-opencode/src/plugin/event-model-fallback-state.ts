@@ -13,7 +13,20 @@ import { getAgentConfigKey } from "../shared/agent-display-names";
 import { readConnectedProvidersCache } from "../shared/connected-providers-cache";
 import { buildFallbackChainFromModels } from "../shared/fallback-chain-from-models";
 import { isAmbiguousPostDispatchPromptFailure } from "../shared/prompt-failure-classifier";
-import { getSessionModel } from "../shared/session-model-state";
+import {
+  getSessionModel,
+  markSessionModelFallback,
+  restoreSessionModelFallback,
+} from "../shared/session-model-state";
+import {
+  armPendingFallbackPromptParamsRestore,
+  clearSessionPromptParams,
+  getSessionPromptParams,
+  hasPendingFallbackPromptParamsRestore,
+  markAppliedFallbackPromptParams,
+  type SessionPromptParams,
+  setSessionPromptParams,
+} from "../shared/session-prompt-params-state";
 import { log } from "../shared/logger";
 import type { PluginEventContext } from "./event-types";
 
@@ -22,6 +35,12 @@ export type FallbackContinuationContext = {
   providerID?: string;
   dedupeProviderID?: string;
   modelID?: string;
+  variant?: string;
+  reasoningEffort?: string;
+  temperature?: number;
+  top_p?: number;
+  maxTokens?: number;
+  thinking?: { type: "enabled" | "disabled"; budgetTokens?: number };
 };
 
 type FallbackContinuationDedupeKeys = {
@@ -35,6 +54,45 @@ type FallbackContinuationDedupeState = {
   providerlessModelKeys: Set<string>;
 };
 
+function hasFallbackPromptParamOverrides(fallbackContext: FallbackContinuationContext | undefined): boolean {
+  return fallbackContext?.reasoningEffort !== undefined
+    || fallbackContext?.temperature !== undefined
+    || fallbackContext?.top_p !== undefined
+    || fallbackContext?.maxTokens !== undefined
+    || fallbackContext?.thinking !== undefined;
+}
+
+function restoreSessionPromptParams(sessionID: string, promptParams: SessionPromptParams | undefined): void {
+  if (promptParams) {
+    setSessionPromptParams(sessionID, promptParams);
+  } else {
+    clearSessionPromptParams(sessionID);
+  }
+}
+
+function applyFallbackPromptParamOverrides(
+  sessionID: string,
+  fallbackContext: FallbackContinuationContext | undefined,
+  basePromptParams: SessionPromptParams | undefined,
+): boolean {
+  if (!hasFallbackPromptParamOverrides(fallbackContext)) return false;
+
+  const previousOptions = basePromptParams?.options ?? {};
+  const options = {
+    ...previousOptions,
+    ...(fallbackContext?.reasoningEffort !== undefined ? { reasoningEffort: fallbackContext.reasoningEffort } : {}),
+    ...(fallbackContext?.thinking !== undefined ? { thinking: fallbackContext.thinking } : {}),
+  };
+  setSessionPromptParams(sessionID, {
+    ...(basePromptParams ?? {}),
+    ...(fallbackContext?.temperature !== undefined ? { temperature: fallbackContext.temperature } : {}),
+    ...(fallbackContext?.top_p !== undefined ? { topP: fallbackContext.top_p } : {}),
+    ...(fallbackContext?.maxTokens !== undefined ? { maxOutputTokens: fallbackContext.maxTokens } : {}),
+    ...(Object.keys(options).length > 0 ? { options } : {}),
+  });
+  return true;
+}
+
 export function applyUserConfiguredFallbackChain(
   modelFallback: Pick<ModelFallbackHook, "setSessionFallbackChain"> | null | undefined,
   sessionID: string,
@@ -44,12 +102,12 @@ export function applyUserConfiguredFallbackChain(
 ): void {
   const agentKey = getAgentConfigKey(agentName);
   const rawFallbackModels = getRawFallbackModels(sessionID, agentKey, pluginConfig);
-  if (!rawFallbackModels || rawFallbackModels.length === 0) return;
+  if (!rawFallbackModels) return;
 
   const fallbackChain = buildFallbackChainFromModels(rawFallbackModels, currentProviderID);
 
-  if (fallbackChain && fallbackChain.length > 0 && modelFallback) {
-    setSessionFallbackChain(modelFallback, sessionID, fallbackChain);
+  if (modelFallback) {
+    setSessionFallbackChain(modelFallback, sessionID, fallbackChain ?? []);
   }
 }
 
@@ -62,16 +120,17 @@ export function createModelFallbackContinuationController(args: {
 }) {
   const { pluginConfig, pluginContext, lastKnownModelBySession, continuationsInFlight } = args;
   const lastDispatchedContinuationKeys = args.lastDispatchedContinuationKeys;
+  const fallbackPromptParamRestoreBySession = new Map<string, SessionPromptParams | undefined>();
 
   const resolveFallbackProviderID = (sessionID: string, providerHint?: string): string => {
     const normalizedProviderHint = providerHint?.trim();
     if (normalizedProviderHint) return normalizedProviderHint;
 
-    const sessionModel = getSessionModel(sessionID);
-    if (sessionModel?.providerID) return sessionModel.providerID;
-
     const lastKnownModel = lastKnownModelBySession.get(sessionID);
     if (lastKnownModel?.providerID) return lastKnownModel.providerID;
+
+    const sessionModel = getSessionModel(sessionID);
+    if (sessionModel?.providerID) return sessionModel.providerID;
 
     const connectedProvider = readConnectedProvidersCache()?.[0];
     if (connectedProvider) return connectedProvider;
@@ -159,11 +218,25 @@ export function createModelFallbackContinuationController(args: {
     sessionID: string,
     source: string,
     fallbackContext?: FallbackContinuationContext,
-  ): Promise<void> => {
-    if (shouldSkipFallbackContinuation(sessionID, source, fallbackContext)) return;
+    dedupeContext: FallbackContinuationContext | undefined = fallbackContext,
+  ): Promise<boolean> => {
+    if (shouldSkipFallbackContinuation(sessionID, source, dedupeContext)) return false;
 
     continuationsInFlight.add(sessionID);
     let dispatched = false;
+    let promptParamsApplied = false;
+    let appliedFallbackPromptParams: SessionPromptParams | undefined;
+    let temporarySessionModelFallback: { providerID: string; modelID: string } | undefined;
+    if (
+      fallbackPromptParamRestoreBySession.has(sessionID)
+      && !hasPendingFallbackPromptParamsRestore(sessionID)
+    ) {
+      fallbackPromptParamRestoreBySession.delete(sessionID);
+    }
+    const previousPromptParams = getSessionPromptParams(sessionID);
+    const fallbackPromptParamsBase = fallbackPromptParamRestoreBySession.has(sessionID)
+      ? fallbackPromptParamRestoreBySession.get(sessionID)
+      : previousPromptParams;
     try {
       try {
         await pluginContext.client.session.abort({ path: { id: sessionID } });
@@ -173,7 +246,7 @@ export function createModelFallbackContinuationController(args: {
           source,
           error: error instanceof Error ? error : String(error),
         });
-        return;
+        return false;
       }
       releasePromptAsyncReservation(sessionID, `model-fallback-abort:${source}`, {
         reservedBy: [`model-fallback:${source}`, `model-fallback:${source}:sync`],
@@ -186,11 +259,25 @@ export function createModelFallbackContinuationController(args: {
       const launchModel = fallbackContext?.providerID && fallbackContext?.modelID
         ? { providerID: fallbackContext.providerID, modelID: fallbackContext.modelID }
         : undefined;
+      if (launchModel) {
+        markSessionModelFallback(sessionID, launchModel);
+        temporarySessionModelFallback = launchModel;
+      }
       const agentConfigKey = fallbackContext?.agentName ? getAgentConfigKey(fallbackContext.agentName) : undefined;
       const agentSettings = agentConfigKey
         ? pluginConfig.agents?.[agentConfigKey as keyof NonNullable<typeof pluginConfig.agents>]
         : undefined;
-      const launchVariant = (agentSettings as { variant?: string } | undefined)?.variant;
+      const launchVariant = fallbackContext?.variant ?? (agentSettings as { variant?: string } | undefined)?.variant;
+      if (hasFallbackPromptParamOverrides(fallbackContext)) {
+        if (!fallbackPromptParamRestoreBySession.has(sessionID)) {
+          fallbackPromptParamRestoreBySession.set(sessionID, previousPromptParams);
+        }
+        promptParamsApplied = applyFallbackPromptParamOverrides(sessionID, fallbackContext, fallbackPromptParamsBase);
+        appliedFallbackPromptParams = promptParamsApplied ? getSessionPromptParams(sessionID) : undefined;
+      } else if (fallbackPromptParamRestoreBySession.has(sessionID)) {
+        restoreSessionPromptParams(sessionID, fallbackPromptParamsBase);
+        fallbackPromptParamRestoreBySession.delete(sessionID);
+      }
       const promptBody = {
         path: { id: sessionID },
         body: {
@@ -228,9 +315,23 @@ export function createModelFallbackContinuationController(args: {
         });
       }
     } finally {
-      if (dispatched) markDispatched(sessionID, fallbackContext);
+      if (dispatched) {
+        markDispatched(sessionID, dedupeContext);
+        if (promptParamsApplied) {
+          armPendingFallbackPromptParamsRestore(sessionID, fallbackPromptParamsBase, appliedFallbackPromptParams);
+          markAppliedFallbackPromptParams(sessionID);
+        }
+      } else {
+        if (temporarySessionModelFallback) restoreSessionModelFallback(sessionID, temporarySessionModelFallback);
+        if (promptParamsApplied) {
+          armPendingFallbackPromptParamsRestore(sessionID, fallbackPromptParamsBase, appliedFallbackPromptParams);
+          restoreSessionPromptParams(sessionID, fallbackPromptParamsBase);
+        }
+      }
       continuationsInFlight.delete(sessionID);
     }
+
+    return dispatched;
   };
 
   return {

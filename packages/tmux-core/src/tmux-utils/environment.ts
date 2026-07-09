@@ -4,8 +4,8 @@ export function isInsideTmuxEnvironment(environment: Record<string, string | und
   return Boolean(environment.TMUX)
 }
 
-export function isInsideTmux(): boolean {
-	return isInsideTmuxEnvironment(process.env)
+export function isInsideTmux(env: typeof process.env = process.env): boolean {
+	return isInsideTmuxEnvironment(env)
 }
 
 export function getCurrentPaneId(): string | undefined {

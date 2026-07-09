@@ -5,9 +5,13 @@ import {
   clearSessionFallbackChain,
   setPendingModelFallback,
   type ModelFallbackHook,
+  type ModelFallbackState,
 } from "../hooks/model-fallback/hook";
+import { getNextReachableFallback } from "../hooks/model-fallback/next-fallback";
+import { isAbortError } from "../shared/is-abort-error";
 import { shouldRetryError } from "../shared/model-error-classifier";
 import { extractRetryAttempt, normalizeRetryStatusMessage } from "../shared/retry-status-utils";
+import { getSessionModel } from "../shared/session-model-state";
 import {
   extractErrorMessage,
   extractErrorName,
@@ -21,6 +25,56 @@ import {
   type FallbackContinuationContext,
 } from "./event-model-fallback-state";
 import type { PluginEventContext } from "./event-types";
+
+function resolveAutoContinuationFallbackContext(
+  modelFallback: Pick<ModelFallbackHook, "getFallbackState"> | null | undefined,
+  sessionID: string,
+  fallbackContext: FallbackContinuationContext,
+): FallbackContinuationContext | null {
+  if (typeof modelFallback?.getFallbackState !== "function") return fallbackContext;
+
+  const state = modelFallback?.getFallbackState(sessionID);
+  if (!state?.pending) return null;
+
+  const fallback = getNextReachableFallback(sessionID, {
+    ...state,
+    fallbackChain: [...state.fallbackChain],
+  } satisfies ModelFallbackState);
+  if (!fallback) return null;
+
+  return {
+    ...fallbackContext,
+    providerID: fallback.providerID,
+    dedupeProviderID: fallback.providerID,
+    modelID: fallback.modelID,
+    variant: fallback.variant,
+    reasoningEffort: fallback.reasoningEffort,
+    temperature: fallback.temperature,
+    top_p: fallback.top_p,
+    maxTokens: fallback.maxTokens,
+    thinking: fallback.thinking,
+  };
+}
+
+function resolveDedupeProviderID(
+  providerHint: string | undefined,
+  modelID: string | undefined,
+  lastKnown: { providerID: string; modelID: string } | undefined,
+  sessionModel: { providerID: string; modelID: string } | undefined,
+): string | undefined {
+  if (providerHint) return providerHint;
+
+  if (!modelID) return lastKnown?.providerID ?? sessionModel?.providerID;
+
+  const normalizedModelID = normalizeFallbackModelID(modelID);
+  if (lastKnown && normalizeFallbackModelID(lastKnown.modelID) === normalizedModelID) {
+    return lastKnown.providerID;
+  }
+  if (sessionModel && normalizeFallbackModelID(sessionModel.modelID) === normalizedModelID) {
+    return sessionModel.providerID;
+  }
+  return undefined;
+}
 
 export function createModelFallbackEventHandler(args: {
   pluginConfig: OhMyOpenCodeConfig;
@@ -66,6 +120,13 @@ export function createModelFallbackEventHandler(args: {
   const clearRetryDedupeAfterIdle = (sessionID: string): void => {
     lastHandledRetryStatusKey.delete(sessionID);
     lastDispatchedContinuationKeys.delete(sessionID);
+    args.modelFallback?.clearLastFailedModelFallback?.(sessionID);
+  };
+
+  const clearPendingFallbackAfterAbort = (sessionID: string): void => {
+    lastHandledRetryStatusKey.delete(sessionID);
+    lastDispatchedContinuationKeys.delete(sessionID);
+    if (args.modelFallback) clearPendingModelFallback(args.modelFallback, sessionID);
   };
 
   const setLastKnownModel = (sessionID: string, model: { providerID: string; modelID: string }): void => {
@@ -89,7 +150,32 @@ export function createModelFallbackEventHandler(args: {
       : false;
 
     if (setFallback && shouldAutoContinue) {
-      await continuation.autoContinueAfterFallback(sessionID, source, fallbackContext);
+      const continuationContext = resolveAutoContinuationFallbackContext(args.modelFallback, sessionID, fallbackContext);
+      if (!continuationContext) {
+        args.modelFallback?.getNextFallback?.(sessionID);
+        return;
+      }
+      if (continuation.shouldSkipFallbackContinuation(sessionID, source, continuationContext)) return;
+
+      const dispatchDedupeContext = fallbackContext.dedupeProviderID
+        ? fallbackContext
+        : { ...fallbackContext, dedupeProviderID: currentProvider };
+      const dispatched = await continuation.autoContinueAfterFallback(
+        sessionID,
+        source,
+        continuationContext,
+        dispatchDedupeContext,
+      );
+      if (dispatched) {
+        const advancedFallback = args.modelFallback?.getNextFallback?.(sessionID);
+        const advancedState = advancedFallback ? args.modelFallback?.getFallbackState?.(sessionID) : undefined;
+        if (advancedFallback && advancedState) {
+          advancedState.providerID = advancedFallback.providerID;
+          advancedState.modelID = advancedFallback.modelID;
+          setLastKnownModel(sessionID, { providerID: advancedFallback.providerID, modelID: advancedFallback.modelID });
+        }
+        args.modelFallback?.markPendingFallbackAutoContinuation?.(sessionID);
+      }
     }
   };
 
@@ -108,11 +194,16 @@ export function createModelFallbackEventHandler(args: {
     const assistantError = params.info.error;
     if (!assistantMessageID || !assistantError) return false;
 
+    const errorName = extractErrorName(assistantError);
+    const errorMessage = extractErrorMessage(assistantError);
+    if (isAbortError(assistantError) || isAbortError({ name: errorName, message: errorMessage })) {
+      clearPendingFallbackAfterAbort(params.sessionID);
+      return false;
+    }
+
     const lastHandled = lastHandledModelErrorMessageID.get(params.sessionID);
     if (lastHandled === assistantMessageID) return true;
 
-    const errorName = extractErrorName(assistantError);
-    const errorMessage = extractErrorMessage(assistantError);
     if (!shouldRetryError({ name: errorName, message: errorMessage })) return false;
 
     const agentName = resolveFallbackAgentName({
@@ -125,9 +216,17 @@ export function createModelFallbackEventHandler(args: {
 
     const providerHint = params.info.providerID as string | undefined;
     const currentProvider = continuation.resolveFallbackProviderID(params.sessionID, providerHint);
-    const rawModel = (params.info.modelID as string | undefined) ?? "claude-opus-4-7";
+    const lastKnown = lastKnownModelBySession.get(params.sessionID);
+    const sessionModel = getSessionModel(params.sessionID);
+    const explicitModelID = params.info.modelID as string | undefined;
+    const dedupeProviderID = resolveDedupeProviderID(providerHint, explicitModelID, lastKnown, sessionModel);
+    const rawModel =
+      explicitModelID
+      ?? lastKnown?.modelID
+      ?? sessionModel?.modelID
+      ?? "claude-opus-4-7";
     const currentModel = normalizeFallbackModelID(rawModel);
-    const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID: providerHint, modelID: currentModel };
+    const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID, modelID: currentModel };
     const shouldAutoContinue = args.shouldAutoRetrySession(params.sessionID) && !args.isSessionStopped(params.sessionID);
 
     await applyFallback(
@@ -169,9 +268,11 @@ export function createModelFallbackEventHandler(args: {
 
     const parsed = extractProviderModelFromErrorMessage(retryMessage);
     const lastKnown = lastKnownModelBySession.get(params.sessionID);
+    const sessionModel = getSessionModel(params.sessionID);
+    const dedupeProviderID = resolveDedupeProviderID(parsed.providerID, parsed.modelID, lastKnown, sessionModel);
     const currentProvider = continuation.resolveFallbackProviderID(params.sessionID, parsed.providerID);
-    const currentModel = normalizeFallbackModelID(parsed.modelID ?? lastKnown?.modelID ?? "claude-opus-4-7");
-    const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID: parsed.providerID, modelID: currentModel };
+    const currentModel = normalizeFallbackModelID(parsed.modelID ?? lastKnown?.modelID ?? sessionModel?.modelID ?? "claude-opus-4-7");
+    const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID, modelID: currentModel };
     const shouldAutoContinue = args.shouldAutoRetrySession(params.sessionID) && !args.isSessionStopped(params.sessionID);
 
     await applyFallback(
@@ -192,7 +293,12 @@ export function createModelFallbackEventHandler(args: {
     errorName?: string;
     props?: Record<string, unknown>;
   }): Promise<void> => {
-    if (!shouldHandleModelFallback() || !shouldRetryError({ name: params.errorName, message: params.errorMessage })) return;
+    if (!shouldHandleModelFallback()) return;
+    if (isAbortError({ name: params.errorName, message: params.errorMessage })) {
+      clearPendingFallbackAfterAbort(params.sessionID);
+      return;
+    }
+    if (!shouldRetryError({ name: params.errorName, message: params.errorMessage })) return;
 
     const agentName = resolveFallbackAgentName({
       currentAgent: getSessionAgent(params.sessionID),
@@ -203,12 +309,19 @@ export function createModelFallbackEventHandler(args: {
     if (!agentName) return;
 
     const parsed = extractProviderModelFromErrorMessage(params.errorMessage);
+    const lastKnown = lastKnownModelBySession.get(params.sessionID);
+    const sessionModel = getSessionModel(params.sessionID);
     const providerHint = (params.props?.providerID as string | undefined) || parsed.providerID;
+    const explicitModelID = (params.props?.modelID as string | undefined) || parsed.modelID;
+    const dedupeProviderID = resolveDedupeProviderID(providerHint, explicitModelID, lastKnown, sessionModel);
     const currentProvider = continuation.resolveFallbackProviderID(params.sessionID, providerHint);
     const currentModel = normalizeFallbackModelID(
-      (params.props?.modelID as string | undefined) || parsed.modelID || "claude-opus-4-7",
+      explicitModelID
+        || lastKnown?.modelID
+        || sessionModel?.modelID
+        || "claude-opus-4-7",
     );
-    const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID: providerHint, modelID: currentModel };
+    const fallbackContext = { agentName, providerID: currentProvider, dedupeProviderID, modelID: currentModel };
     const shouldAutoContinue = args.shouldAutoRetrySession(params.sessionID) && !args.isSessionStopped(params.sessionID);
 
     await applyFallback(

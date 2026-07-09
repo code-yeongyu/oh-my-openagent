@@ -24,7 +24,6 @@ function createFetchRecorder(responseFactory: () => Promise<Response>): typeof f
   }) as typeof fetch & { calls: Array<[RequestInfo | URL, RequestInit | undefined]> }
 }
 
-
 describe("isInsideTmux", () => {
   test("returns true when TMUX env is set", () => {
     // given
@@ -172,7 +171,6 @@ describe("resetServerCheck", () => {
 
     // then - should call fetch twice after reset
     expect(fetchMock.calls.length).toBe(2)
-
   })
 })
 

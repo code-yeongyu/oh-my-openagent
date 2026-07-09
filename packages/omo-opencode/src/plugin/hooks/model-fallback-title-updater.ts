@@ -8,11 +8,16 @@ export type ModelFallbackTitleInput = {
   readonly variant?: string
 }
 
+export type ModelFallbackTitleUpdater = {
+  (input: ModelFallbackTitleInput): Promise<void>
+  clear: (input: { readonly sessionID: string }) => Promise<void>
+}
+
 export function createModelFallbackTitleUpdater(ctx: PluginContext) {
   const fallbackTitleMaxEntries = 200
   const fallbackTitleState = new Map<string, { baseTitle?: string; lastKey?: string }>()
 
-  return async (input: ModelFallbackTitleInput): Promise<void> => {
+  const update: ModelFallbackTitleUpdater = async (input: ModelFallbackTitleInput): Promise<void> => {
     const key = `${input.providerID}/${input.modelID}${input.variant ? `:${input.variant}` : ""}`
     const existing = fallbackTitleState.get(input.sessionID) ?? {}
     if (existing.lastKey === key) return
@@ -46,4 +51,36 @@ export function createModelFallbackTitleUpdater(ctx: PluginContext) {
       if (oldestKey) fallbackTitleState.delete(oldestKey)
     }
   }
+
+  update.clear = async (input: { readonly sessionID: string }): Promise<void> => {
+    const existing = fallbackTitleState.get(input.sessionID)
+    const sessionResp = await ctx.client.session.get({ path: { id: input.sessionID } }).catch(() => null)
+    const sessionInfo = sessionResp
+      ? normalizeSDKResponse<{ readonly title?: string } | null>(sessionResp, null, { preferResponseOnMissingData: true })
+      : null
+    const rawTitle = sessionInfo?.title
+    const hasFallbackMarker = typeof rawTitle === "string" && /\s*\[fallback:[^\]]+\]$/i.test(rawTitle)
+    if (!existing?.baseTitle && !hasFallbackMarker) {
+      fallbackTitleState.delete(input.sessionID)
+      return
+    }
+
+    const restoredTitle = (existing?.baseTitle
+      ?? (typeof rawTitle === "string" && rawTitle.length > 0
+        ? rawTitle.replace(/\s*\[fallback:[^\]]+\]$/i, "").trim()
+        : "Session"))
+      || "Session"
+
+    await ctx.client.session
+      .update({
+        path: { id: input.sessionID },
+        body: { title: restoredTitle },
+        query: { directory: ctx.directory },
+      })
+      .catch(() => {})
+
+    fallbackTitleState.delete(input.sessionID)
+  }
+
+  return update
 }

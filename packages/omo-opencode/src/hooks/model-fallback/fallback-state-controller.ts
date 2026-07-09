@@ -10,19 +10,35 @@ type ModelFallbackStateLike = {
   fallbackChain: FallbackEntry[]
   attemptCount: number
   pending: boolean
+  lastFailedProviderID?: string
+  lastFailedModelID?: string
 }
 
 function canonicalizeModelIDForDuplicateCheck(modelID: string): string {
   return modelID.toLowerCase().replace(/\./g, "-")
 }
 
-function isSameFailedModel(
+function isSameLastFailedModel(
   state: ModelFallbackStateLike,
   providerID: string,
   modelID: string,
 ): boolean {
-  return state.providerID.toLowerCase() === providerID.toLowerCase()
-    && canonicalizeModelIDForDuplicateCheck(state.modelID) === canonicalizeModelIDForDuplicateCheck(modelID)
+  const failedProviderID = state.lastFailedProviderID
+  const failedModelID = state.lastFailedModelID
+
+  if (!failedProviderID || !failedModelID) return false
+
+  return failedProviderID.toLowerCase() === providerID.toLowerCase()
+    && canonicalizeModelIDForDuplicateCheck(failedModelID) === canonicalizeModelIDForDuplicateCheck(modelID)
+}
+
+function markLastFailedModel(
+  state: ModelFallbackStateLike,
+  providerID: string,
+  modelID: string,
+): void {
+  state.lastFailedProviderID = providerID
+  state.lastFailedModelID = modelID
 }
 
 export type ModelFallbackStateController = {
@@ -38,6 +54,7 @@ export type ModelFallbackStateController = {
   ) => boolean
   getNextFallback: (sessionID: string) => ReturnType<typeof getNextReachableFallback>
   clearPendingModelFallback: (sessionID: string) => void
+  clearLastFailedModelFallback: (sessionID: string) => void
   hasPendingModelFallback: (sessionID: string) => boolean
   getFallbackState: (sessionID: string) => ModelFallbackStateLike | undefined
   reset: () => void
@@ -87,6 +104,8 @@ export function createModelFallbackStateController(input: {
         fallbackChain,
         attemptCount: 0,
         pending: true,
+        lastFailedProviderID: currentProviderID,
+        lastFailedModelID: currentModelID,
       })
       log(`[model-fallback] Set pending fallback for session: ${sessionID}, agent: ${agentName}`)
       return true
@@ -97,13 +116,14 @@ export function createModelFallbackStateController(input: {
       return false
     }
 
-    if (existing.attemptCount > 0 && isSameFailedModel(existing, currentProviderID, currentModelID)) {
-      log(`[model-fallback] Ignoring duplicate fallback arm for already handled model in session: ${sessionID}`)
+    if (existing.attemptCount > 0 && isSameLastFailedModel(existing, currentProviderID, currentModelID)) {
+      log(`[model-fallback] Duplicate fallback trigger ignored for session: ${sessionID}`)
       return false
     }
 
     existing.providerID = currentProviderID
     existing.modelID = currentModelID
+    markLastFailedModel(existing, currentProviderID, currentModelID)
     existing.pending = true
     if (existing.attemptCount >= existing.fallbackChain.length) {
       log(`[model-fallback] Fallback chain exhausted for session: ${sessionID}`)
@@ -130,6 +150,14 @@ export function createModelFallbackStateController(input: {
     lastToastKey.delete(sessionID)
   }
 
+  function clearLastFailedModelFallback(sessionID: string): void {
+    const state = pendingModelFallbacks.get(sessionID)
+    if (!state || state.pending) return
+
+    delete state.lastFailedProviderID
+    delete state.lastFailedModelID
+  }
+
   function hasPendingModelFallback(sessionID: string): boolean {
     return pendingModelFallbacks.get(sessionID)?.pending === true
   }
@@ -152,6 +180,7 @@ export function createModelFallbackStateController(input: {
     setPendingModelFallback,
     getNextFallback,
     clearPendingModelFallback,
+    clearLastFailedModelFallback,
     hasPendingModelFallback,
     getFallbackState,
     reset,

@@ -3,13 +3,27 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test"
 
 import { createEventHandler } from "./event"
 import { createChatMessageHandler } from "./chat-message"
-import { _resetForTesting, setMainSession } from "../features/claude-code-session-state"
+import { createChatParamsHandler } from "./chat-params"
+import { handleMessageUpdatedSessionState } from "./event-session-lifecycle"
+import { _resetForTesting, setMainSession, subagentSessions } from "../features/claude-code-session-state"
 import { createModelFallbackHook, clearPendingModelFallback } from "../hooks/model-fallback/hook"
 import * as connectedProvidersCache from "../shared/connected-providers-cache"
 import {
+  dispatchInternalPrompt,
   releaseAllPromptAsyncReservationsForTesting,
   releasePromptAsyncReservation,
 } from "../hooks/shared/prompt-async-gate"
+import {
+  clearSessionModel,
+  getSessionModel,
+  markSessionModelFallback,
+  setSessionModel,
+} from "../shared/session-model-state"
+import {
+  clearAllSessionPromptParams,
+  getSessionPromptParams,
+  setSessionPromptParams,
+} from "../shared/session-prompt-params-state"
 import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 
 type EventInput = { event: { type: string; properties?: unknown } }
@@ -25,6 +39,7 @@ function asEventHandlerInput(input: EventInput): EventHandlerInput {
 
 let readConnectedProvidersCacheSpy: { mockRestore: () => void } | undefined
 let readProviderModelsCacheSpy: { mockRestore: () => void } | undefined
+const sessionModelTestSessions = new Set<string>()
 
 function setupConnectedProviderCacheMocks(): void {
   readConnectedProvidersCacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
@@ -42,6 +57,7 @@ describe("createEventHandler - model fallback", () => {
     const abortCalls: string[] = []
     const promptCalls: string[] = []
     const promptAsyncCalls: string[] = []
+    const promptInputs: Array<{ path: { id: string }; body?: Record<string, unknown>; query?: Record<string, unknown> }> = []
 
     const sessionClient = {
       abort: async ({ path }: { path: { id: string } }) => {
@@ -51,14 +67,16 @@ describe("createEventHandler - model fallback", () => {
         }
         return {}
       },
-      prompt: async ({ path }: { path: { id: string } }) => {
-        promptCalls.push(path.id)
+      prompt: async (input: { path: { id: string }; body?: Record<string, unknown>; query?: Record<string, unknown> }) => {
+        promptCalls.push(input.path.id)
+        promptInputs.push(input)
         return {}
       },
       ...(args?.promptAsync
         ? {
-            promptAsync: async (input: { path: { id: string } }) => {
+            promptAsync: async (input: { path: { id: string }; body?: Record<string, unknown>; query?: Record<string, unknown> }) => {
               promptAsyncCalls.push(input.path.id)
+              promptInputs.push(input)
               return args.promptAsync?.(input)
             },
           }
@@ -90,7 +108,7 @@ describe("createEventHandler - model fallback", () => {
     })
     const handler = (input: EventInput): Promise<void> => eventHandler(asEventHandlerInput(input))
 
-    return { handler, abortCalls, promptCalls, promptAsyncCalls }
+    return { handler, abortCalls, promptCalls, promptAsyncCalls, promptInputs }
   }
 
   afterEach(() => {
@@ -100,13 +118,45 @@ describe("createEventHandler - model fallback", () => {
     readProviderModelsCacheSpy = undefined
     _resetForTesting()
     releaseAllPromptAsyncReservationsForTesting()
+    clearAllSessionPromptParams()
+    for (const sessionID of sessionModelTestSessions) clearSessionModel(sessionID)
+    sessionModelTestSessions.clear()
+  })
+
+  test("restores the original session model when a fallback user message is stored", () => {
+    //#given
+    const sessionID = "ses_fallback_user_message_restore"
+    sessionModelTestSessions.add(sessionID)
+    setSessionModel(sessionID, { providerID: "anthropic", modelID: "claude-opus-4-7" })
+    markSessionModelFallback(sessionID, { providerID: "openai", modelID: "gpt-5.5" })
+    const notedModels: Array<{ providerID: string; modelID: string }> = []
+
+    //#when
+    handleMessageUpdatedSessionState({
+      props: {
+        info: {
+          sessionID,
+          role: "user",
+          agent: "Sisyphus - Ultraworker",
+          providerID: "openai",
+          modelID: "gpt-5.5",
+        },
+      },
+      noteSessionModel: (_sessionID, model) => {
+        notedModels.push(model)
+      },
+    })
+
+    //#then
+    expect(getSessionModel(sessionID)).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+    expect(notedModels).toEqual([{ providerID: "openai", modelID: "gpt-5.5" }])
   })
 
   test("triggers retry prompt for assistant message.updated APIError payloads (headless resume)", async () => {
     //#given
     const sessionID = "ses_message_updated_fallback"
     const modelFallback = createModelFallbackHook()
-    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
 
     //#when
     await handler({
@@ -142,6 +192,1642 @@ describe("createEventHandler - model fallback", () => {
     //#then
     expect(abortCalls).toEqual([sessionID])
     expect(promptCalls).toEqual([sessionID])
+  })
+
+  test("preserves pending fallback for non-auto retry sessions until the next user message", async () => {
+    //#given
+    const sessionID = "ses_non_auto_subagent_fallback"
+    subagentSessions.add(sessionID)
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: unsafeTestValue({
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue({
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      }),
+    })
+
+    //#when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_non_auto_subagent_error",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "APIError",
+              data: {
+                message:
+                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+                isRetryable: true,
+              },
+            },
+            parentID: "msg_non_auto_subagent_user",
+            modelID: "claude-opus-4-7-thinking",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then - non-auto sessions do not dispatch continuation, so pending fallback must remain.
+    expect(abortCalls).toEqual([])
+    expect(promptCalls).toEqual([])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(true)
+
+    //#when - the next real user message is the fallback application opportunity.
+    const output: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+      },
+      output,
+    )
+
+    //#then
+    expect(output.message["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "kimi-k2.6",
+    })
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+  })
+
+  test("ignores duplicate non-auto failed-model updates after the fallback is consumed", async () => {
+    //#given
+    const sessionID = "ses_non_auto_duplicate_failed_model"
+    subagentSessions.add(sessionID)
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["opencode-go"], model: "gpt-5.5" },
+      { providers: ["opencode-go"], model: "kimi-k2.6" },
+    ]))
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: unsafeTestValue({
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue({
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      }),
+    })
+    const retryInfo = (id: string, modelID: string, providerID = "anthropic") => ({
+      id,
+      sessionID,
+      role: "assistant",
+      time: { created: 1, completed: 2 },
+      error: {
+        name: "ModelNotSupportedError",
+        message: `model_not_supported: ${modelID} is not supported`,
+      },
+      parentID: `${id}_user`,
+      modelID,
+      providerID,
+      agent: "Sisyphus - Ultraworker",
+      path: { cwd: "/tmp", root: "/tmp" },
+    })
+
+    //#when - the first non-auto error arms fallback and the next user message consumes it.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: { info: retryInfo("msg_non_auto_duplicate_failed_model", "claude-opus-4-7-thinking") },
+      },
+    })
+    const firstOutput: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+      },
+      firstOutput,
+    )
+
+    //#then - the duplicate original error must not arm the next fallback entry.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: { info: retryInfo("msg_non_auto_duplicate_failed_model", "claude-opus-4-7-thinking") },
+      },
+    })
+    const duplicateOutput: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+      },
+      duplicateOutput,
+    )
+
+    //#when - the selected fallback model itself fails, the chain still advances.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: { info: retryInfo("msg_non_auto_selected_fallback_failed", "gpt-5.5", "opencode-go") },
+      },
+    })
+    const fallbackFailureOutput: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "opencode-go", modelID: "gpt-5.5" },
+      },
+      fallbackFailureOutput,
+    )
+
+    //#then
+    expect(abortCalls).toEqual([])
+    expect(promptCalls).toEqual([])
+    expect(firstOutput.message["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "gpt-5.5",
+    })
+    expect(duplicateOutput.message["model"]).toBeUndefined()
+    expect(fallbackFailureOutput.message["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "kimi-k2.6",
+    })
+  })
+
+  test("advances non-auto fallback chain when the consumed fallback later fails without model metadata", async () => {
+    //#given
+    const sessionID = "ses_non_auto_name_only_consumed_fallback_failure"
+    subagentSessions.add(sessionID)
+    setSessionModel(sessionID, { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" })
+    sessionModelTestSessions.add(sessionID)
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["opencode-go"], model: "gpt-5.5" },
+      { providers: ["opencode-go"], model: "kimi-k2.6" },
+    ]))
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: unsafeTestValue({
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue({
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      }),
+    })
+
+    //#when - original failure arms the first fallback, then the user resume consumes it.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_non_auto_name_only_original_failure",
+            sessionID,
+            role: "assistant",
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7-thinking is not supported",
+            },
+            modelID: "claude-opus-4-7-thinking",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+    const firstOutput: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+      },
+      firstOutput,
+    )
+
+    //#when - OpenCode stores that user turn with fallback provider/model.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_non_auto_name_only_fallback_user",
+            sessionID,
+            role: "user",
+            agent: "Sisyphus - Ultraworker",
+            providerID: "opencode-go",
+            modelID: "gpt-5.5",
+          },
+        },
+      },
+    })
+    expect(getSessionModel(sessionID)).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7-thinking" })
+
+    //#when - the consumed fallback later fails with name-only metadata.
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: {
+            name: "ModelNotSupportedError",
+          },
+        },
+      },
+    })
+    const fallbackFailureOutput: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "opencode-go", modelID: "gpt-5.5" },
+      },
+      fallbackFailureOutput,
+    )
+
+    //#then
+    expect(abortCalls).toEqual([])
+    expect(promptCalls).toEqual([])
+    expect(firstOutput.message["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "gpt-5.5",
+    })
+    expect(fallbackFailureOutput.message["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "kimi-k2.6",
+    })
+  })
+
+  test("auto-continuation prompt uses the selected fallback model instead of the failed model", async () => {
+    //#given
+    const sessionID = "ses_auto_continuation_selected_fallback_model"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      { providers: ["opencode-go"], model: "gpt-5.5", variant: "medium" },
+    ]))
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
+
+    //#when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_auto_continuation_selected_fallback_model",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7 is not supported",
+            },
+            parentID: "msg_user_auto_continuation_selected_fallback_model",
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(promptInputs[0]?.body?.["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "gpt-5.5",
+    })
+    expect(promptInputs[0]?.body?.["variant"]).toBe("medium")
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+  })
+
+  test("auto-continuation prompt carries selected fallback object settings", async () => {
+    //#given
+    const sessionID = "ses_auto_continuation_selected_fallback_settings"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      {
+        providers: ["openai"],
+        model: "gpt-5.5",
+        variant: "high",
+        reasoningEffort: "high",
+        temperature: 0,
+        top_p: 0.4,
+        maxTokens: 12345,
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+    ]))
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
+
+    //#when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_auto_continuation_selected_fallback_settings",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7 is not supported",
+            },
+            parentID: "msg_user_auto_continuation_selected_fallback_settings",
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(promptInputs[0]?.body).toMatchObject({
+      model: {
+        providerID: "openai",
+        modelID: "gpt-5.5",
+      },
+      variant: "high",
+    })
+    expect(promptInputs[0]?.body).not.toHaveProperty("reasoningEffort")
+    expect(promptInputs[0]?.body).not.toHaveProperty("temperature")
+    expect(promptInputs[0]?.body).not.toHaveProperty("top_p")
+    expect(promptInputs[0]?.body).not.toHaveProperty("maxTokens")
+    expect(promptInputs[0]?.body).not.toHaveProperty("thinking")
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0,
+      topP: 0.4,
+      maxOutputTokens: 12345,
+      options: {
+        reasoningEffort: "high",
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+    })
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+  })
+
+  test("restores fallback prompt params after dispatched retry turn consumes chat params", async () => {
+    //#given
+    const sessionID = "ses_auto_continuation_restores_prompt_params_after_chat_params"
+    setMainSession(sessionID)
+    setSessionPromptParams(sessionID, {
+      temperature: 0.2,
+      topP: 0.8,
+      maxOutputTokens: 2048,
+      options: { reasoningEffort: "low" },
+    })
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      {
+        providers: ["openai"],
+        model: "gpt-5.5",
+        reasoningEffort: "high",
+        temperature: 0,
+        top_p: 0.4,
+        maxTokens: 12345,
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+    ]))
+    const { handler, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const chatParamsHandler = createChatParamsHandler()
+
+    //#when - fallback retry is dispatched with generation overrides.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_auto_continuation_restores_prompt_params_after_chat_params",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7 is not supported",
+            },
+            parentID: "msg_user_auto_continuation_restores_prompt_params_after_chat_params",
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then - fallback params are active only until chat.params consumes the retry turn.
+    expect(promptCalls).toEqual([sessionID])
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0,
+      topP: 0.4,
+      maxOutputTokens: 12345,
+      options: {
+        reasoningEffort: "high",
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+    })
+
+    const output = { options: {} as Record<string, unknown> }
+    await chatParamsHandler(unsafeTestValue({
+      sessionID,
+      agent: { name: "sisyphus" },
+      model: { providerID: "openai", modelID: "gpt-5.5" },
+      provider: { id: "openai" },
+      message: {},
+    }), output)
+
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0.2,
+      topP: 0.8,
+      maxOutputTokens: 2048,
+      options: { reasoningEffort: "low" },
+    })
+  })
+
+  test("preserves existing prompt params when accepted fallback has no generation overrides", async () => {
+    //#given
+    const sessionID = "ses_auto_continuation_provider_only_preserves_prompt_params"
+    setMainSession(sessionID)
+    setSessionPromptParams(sessionID, {
+      temperature: 0.3,
+      topP: 0.7,
+      maxOutputTokens: 2048,
+      options: {
+        reasoningEffort: "medium",
+        thinking: { type: "enabled", budgetTokens: 1024 },
+      },
+    })
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      { providers: ["openai"], model: "gpt-5.5" },
+    ]))
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
+
+    //#when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_auto_continuation_provider_only_preserves_prompt_params",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7 is not supported",
+            },
+            parentID: "msg_user_auto_continuation_provider_only_preserves_prompt_params",
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(promptInputs[0]?.body?.["model"]).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.5",
+    })
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0.3,
+      topP: 0.7,
+      maxOutputTokens: 2048,
+      options: {
+        reasoningEffort: "medium",
+        thinking: { type: "enabled", budgetTokens: 1024 },
+      },
+    })
+  })
+
+  test("clears prior fallback prompt params before provider-only fallback retry", async () => {
+    //#given
+    const sessionID = "ses_auto_continuation_provider_only_clears_prior_fallback_params"
+    setMainSession(sessionID)
+    setSessionPromptParams(sessionID, {
+      temperature: 0.3,
+      topP: 0.7,
+      maxOutputTokens: 2048,
+      options: {
+        reasoningEffort: "medium",
+        thinking: { type: "enabled", budgetTokens: 1024 },
+      },
+    })
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      {
+        providers: ["openai"],
+        model: "gpt-5.5",
+        reasoningEffort: "high",
+        temperature: 0,
+        top_p: 0.4,
+        maxTokens: 12345,
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+      { providers: ["opencode-go"], model: "gpt-5.5" },
+    ]))
+    const { handler, promptInputs } = createHandler({ hooks: { modelFallback } })
+
+    //#when - first fallback with overrides is selected.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_provider_only_clears_prior_params_first",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7 is not supported",
+            },
+            parentID: "msg_user_provider_only_clears_prior_params_first",
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(promptInputs[0]?.body?.["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0,
+      topP: 0.4,
+      maxOutputTokens: 12345,
+      options: {
+        reasoningEffort: "high",
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+    })
+
+    //#when - the override fallback fails and the next fallback has no generation overrides.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_provider_only_clears_prior_params_second",
+            sessionID,
+            role: "assistant",
+            time: { created: 3, completed: 4 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: gpt-5.5 is not supported",
+            },
+            parentID: "msg_user_provider_only_clears_prior_params_second",
+            modelID: "gpt-5.5",
+            providerID: "openai",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then - fallback A's override params do not leak into fallback B.
+    expect(promptInputs[1]?.body?.["model"]).toEqual({ providerID: "opencode-go", modelID: "gpt-5.5" })
+    expect(promptInputs[1]?.body).not.toHaveProperty("reasoningEffort")
+    expect(promptInputs[1]?.body).not.toHaveProperty("temperature")
+    expect(promptInputs[1]?.body).not.toHaveProperty("top_p")
+    expect(promptInputs[1]?.body).not.toHaveProperty("maxTokens")
+    expect(promptInputs[1]?.body).not.toHaveProperty("thinking")
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0.3,
+      topP: 0.7,
+      maxOutputTokens: 2048,
+      options: {
+        reasoningEffort: "medium",
+        thinking: { type: "enabled", budgetTokens: 1024 },
+      },
+    })
+  })
+
+  test("restores base prompt params after chained override fallback consumes chat params", async () => {
+    //#given
+    const sessionID = "ses_auto_continuation_chained_override_restores_base_params"
+    setMainSession(sessionID)
+    setSessionPromptParams(sessionID, {
+      temperature: 0.3,
+      topP: 0.7,
+      maxOutputTokens: 2048,
+      options: {
+        reasoningEffort: "medium",
+        thinking: { type: "enabled", budgetTokens: 1024 },
+      },
+    })
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      {
+        providers: ["openai"],
+        model: "gpt-5.5",
+        reasoningEffort: "high",
+        temperature: 0,
+        top_p: 0.4,
+        maxTokens: 12345,
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+      {
+        providers: ["opencode-go"],
+        model: "gpt-5.5",
+        reasoningEffort: "low",
+        temperature: 0.1,
+        top_p: 0.5,
+        maxTokens: 6789,
+        thinking: { type: "enabled", budgetTokens: 2048 },
+      },
+    ]))
+    const { handler, promptInputs } = createHandler({ hooks: { modelFallback } })
+    const chatParamsHandler = createChatParamsHandler()
+
+    //#when - fallback A with overrides is selected.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_chained_override_restores_base_first",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7 is not supported",
+            },
+            parentID: "msg_user_chained_override_restores_base_first",
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    expect(promptInputs[0]?.body?.["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0,
+      topP: 0.4,
+      maxOutputTokens: 12345,
+      options: {
+        reasoningEffort: "high",
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+    })
+
+    //#when - fallback A fails before its chat.params restore runs, then fallback B is selected.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_chained_override_restores_base_second",
+            sessionID,
+            role: "assistant",
+            time: { created: 3, completed: 4 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: gpt-5.5 is not supported",
+            },
+            parentID: "msg_user_chained_override_restores_base_second",
+            modelID: "gpt-5.5",
+            providerID: "openai",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then - fallback B is based on the original prompt params, not fallback A's overrides.
+    expect(promptInputs[1]?.body?.["model"]).toEqual({ providerID: "opencode-go", modelID: "gpt-5.5" })
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0.1,
+      topP: 0.5,
+      maxOutputTokens: 6789,
+      options: {
+        reasoningEffort: "low",
+        thinking: { type: "enabled", budgetTokens: 2048 },
+      },
+    })
+
+    const output = { options: {} as Record<string, unknown> }
+    await chatParamsHandler(unsafeTestValue({
+      sessionID,
+      agent: { name: "sisyphus" },
+      model: { providerID: "opencode-go", modelID: "gpt-5.5" },
+      provider: { id: "opencode-go" },
+      message: {},
+    }), output)
+
+    //#then - fallback B restore returns to the chain's base snapshot, not fallback A's stale overrides.
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0.3,
+      topP: 0.7,
+      maxOutputTokens: 2048,
+      options: {
+        reasoningEffort: "medium",
+        thinking: { type: "enabled", budgetTokens: 1024 },
+      },
+    })
+  })
+
+  test("uses current prompt params as base after a previous fallback restore was consumed", async () => {
+    //#given
+    const sessionID = "ses_auto_continuation_resets_consumed_fallback_base"
+    setMainSession(sessionID)
+    setSessionPromptParams(sessionID, {
+      temperature: 0.3,
+      topP: 0.7,
+      maxOutputTokens: 2048,
+      options: {
+        reasoningEffort: "medium",
+        thinking: { type: "enabled", budgetTokens: 1024 },
+      },
+    })
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      {
+        providers: ["openai"],
+        model: "gpt-5.5",
+        reasoningEffort: "high",
+        temperature: 0,
+        top_p: 0.4,
+        maxTokens: 12345,
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+      {
+        providers: ["opencode-go"],
+        model: "gpt-5.5",
+        reasoningEffort: "low",
+        temperature: 0.1,
+        top_p: 0.5,
+        maxTokens: 6789,
+        thinking: { type: "enabled", budgetTokens: 2048 },
+      },
+    ]))
+    const { handler, promptInputs } = createHandler({ hooks: { modelFallback } })
+    const chatParamsHandler = createChatParamsHandler()
+
+    //#when - fallback A runs and its chat.params restore is consumed.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_consumed_fallback_base_first",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7 is not supported",
+            },
+            parentID: "msg_user_consumed_fallback_base_first",
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+    expect(promptInputs[0]?.body?.["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
+
+    await chatParamsHandler(unsafeTestValue({
+      sessionID,
+      agent: { name: "sisyphus" },
+      model: { providerID: "openai", modelID: "gpt-5.5" },
+      provider: { id: "openai" },
+      message: {},
+    }), { options: {} as Record<string, unknown> })
+
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0.3,
+      topP: 0.7,
+      maxOutputTokens: 2048,
+      options: {
+        reasoningEffort: "medium",
+        thinking: { type: "enabled", budgetTokens: 1024 },
+      },
+    })
+
+    //#when - later session prompt params change, then fallback B is selected.
+    setSessionPromptParams(sessionID, {
+      temperature: 0.6,
+      topP: 0.9,
+      maxOutputTokens: 4096,
+      options: {
+        reasoningEffort: "xhigh",
+        thinking: { type: "enabled", budgetTokens: 8192 },
+      },
+    })
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_consumed_fallback_base_second",
+            sessionID,
+            role: "assistant",
+            time: { created: 3, completed: 4 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: gpt-5.5 is not supported",
+            },
+            parentID: "msg_user_consumed_fallback_base_second",
+            modelID: "gpt-5.5",
+            providerID: "openai",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    expect(promptInputs[1]?.body?.["model"]).toEqual({ providerID: "opencode-go", modelID: "gpt-5.5" })
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0.1,
+      topP: 0.5,
+      maxOutputTokens: 6789,
+      options: {
+        reasoningEffort: "low",
+        thinking: { type: "enabled", budgetTokens: 2048 },
+      },
+    })
+
+    await chatParamsHandler(unsafeTestValue({
+      sessionID,
+      agent: { name: "sisyphus" },
+      model: { providerID: "opencode-go", modelID: "gpt-5.5" },
+      provider: { id: "opencode-go" },
+      message: {},
+    }), { options: {} as Record<string, unknown> })
+
+    //#then - fallback B restores to the current base, not the prior retry chain's base.
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0.6,
+      topP: 0.9,
+      maxOutputTokens: 4096,
+      options: {
+        reasoningEffort: "xhigh",
+        thinking: { type: "enabled", budgetTokens: 8192 },
+      },
+    })
+  })
+
+  test("keeps selected fallback prompt params when prompt gate skip leaves fallback pending for manual resume", async () => {
+    //#given
+    const sessionID = "ses_auto_continuation_skipped_keeps_prompt_params_for_resume"
+    setMainSession(sessionID)
+    setSessionPromptParams(sessionID, {
+      temperature: 0.2,
+      topP: 0.8,
+      options: { reasoningEffort: "low" },
+    })
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      {
+        providers: ["openai"],
+        model: "gpt-5.5",
+        reasoningEffort: "high",
+        temperature: 0,
+        top_p: 0.4,
+        maxTokens: 12345,
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+    ]))
+    await dispatchInternalPrompt({
+      mode: "async",
+      client: unsafeTestValue({
+        session: {
+          promptAsync: async () => ({}),
+          prompt: async () => ({}),
+        },
+      }),
+      sessionID,
+      input: { path: { id: sessionID }, body: { parts: [] } },
+      source: "test:fallback-param-resume:hold",
+      settleMs: 0,
+    })
+    const { handler, abortCalls, promptCalls, promptAsyncCalls } = createHandler({
+      hooks: { modelFallback },
+      promptAsync: async () => ({}),
+    })
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: unsafeTestValue({
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue({
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      }),
+    })
+
+    //#when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_auto_continuation_skipped_keeps_prompt_params_for_resume",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7 is not supported",
+            },
+            parentID: "msg_user_auto_continuation_skipped_keeps_prompt_params_for_resume",
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then - the gate skipped the internal retry, so fallback params are not left on unrelated prompts.
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([])
+    expect(promptAsyncCalls).toEqual([])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(true)
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0.2,
+      topP: 0.8,
+      options: { reasoningEffort: "low" },
+    })
+
+    //#when - another prompt reaches chat.params before the fallback prompt is consumed.
+    const unrelatedChatParamsHandler = createChatParamsHandler()
+    const unrelatedChatParamsOutput = { options: {} as Record<string, unknown> }
+    await unrelatedChatParamsHandler(unsafeTestValue({
+      sessionID,
+      agent: { name: "sisyphus" },
+      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      provider: { id: "anthropic" },
+      message: {},
+    }), unrelatedChatParamsOutput)
+
+    //#then - unrelated chat.params does not delete the held fallback-only params.
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0.2,
+      topP: 0.8,
+      options: { reasoningEffort: "low" },
+    })
+
+    //#when - a real user resume consumes the same fallback model.
+    const output: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      },
+      output,
+    )
+
+    //#then - the manually consumed fallback keeps its selected generation params.
+    expect(output.message["model"]).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.5",
+    })
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0,
+      topP: 0.4,
+      maxOutputTokens: 12345,
+      options: {
+        reasoningEffort: "high",
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+    })
+
+    const chatParamsHandler = createChatParamsHandler()
+    const chatParamsOutput = { options: {} as Record<string, unknown> }
+    await chatParamsHandler(unsafeTestValue({
+      sessionID,
+      agent: { name: "sisyphus" },
+      model: { providerID: "openai", modelID: "gpt-5.5" },
+      provider: { id: "openai" },
+      message: {},
+    }), chatParamsOutput)
+
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0.2,
+      topP: 0.8,
+      options: { reasoningEffort: "low" },
+    })
+  })
+
+  test("restores previous prompt params when skipped pending fallback is cleared before manual resume", async () => {
+    //#given
+    const sessionID = "ses_auto_continuation_skipped_restore_on_clear"
+    setMainSession(sessionID)
+    setSessionPromptParams(sessionID, {
+      temperature: 0.2,
+      topP: 0.8,
+      options: { reasoningEffort: "low" },
+    })
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      {
+        providers: ["openai"],
+        model: "gpt-5.5",
+        reasoningEffort: "high",
+        temperature: 0,
+        top_p: 0.4,
+        maxTokens: 12345,
+        thinking: { type: "enabled", budgetTokens: 4096 },
+      },
+    ]))
+    await dispatchInternalPrompt({
+      mode: "async",
+      client: unsafeTestValue({
+        session: {
+          promptAsync: async () => ({}),
+          prompt: async () => ({}),
+        },
+      }),
+      sessionID,
+      input: { path: { id: sessionID }, body: { parts: [] } },
+      source: "test:fallback-param-clear:hold",
+      settleMs: 0,
+    })
+    const { handler } = createHandler({
+      hooks: { modelFallback },
+      promptAsync: async () => ({}),
+    })
+
+    //#when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_auto_continuation_skipped_restore_on_clear",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7 is not supported",
+            },
+            parentID: "msg_user_auto_continuation_skipped_restore_on_clear",
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then - skipped retry params are held for fallback consumption but not left globally active.
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(true)
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0.2,
+      topP: 0.8,
+      options: { reasoningEffort: "low" },
+    })
+
+    //#when - an abort/stopped-message path clears the pending fallback before it is applied.
+    clearPendingModelFallback(modelFallback, sessionID)
+
+    //#then - fallback-only params do not leak into the next normal turn.
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+    expect(getSessionPromptParams(sessionID)).toEqual({
+      temperature: 0.2,
+      topP: 0.8,
+      options: { reasoningEffort: "low" },
+    })
+  })
+
+  test("skips auto-continuation when configured fallbacks contain no usable model", async () => {
+    //#given
+    const sessionID = "ses_auto_continuation_no_usable_fallback"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    const pluginConfig = {
+      agents: {
+        sisyphus: {
+          fallback_models: ["anthropic/claude-opus-4-7"],
+        },
+      },
+    }
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback }, pluginConfig })
+
+    //#when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_auto_continuation_no_usable_fallback",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7 is not supported",
+            },
+            parentID: "msg_user_auto_continuation_no_usable_fallback",
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([])
+    expect(promptCalls).toEqual([])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+  })
+
+  test("honors explicit empty fallback_models by suppressing hardcoded main-session fallback on session.status retry", async () => {
+    //#given
+    const sessionID = "ses_status_retry_explicit_empty_fallback_models"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    const pluginConfig = {
+      agents: {
+        sisyphus: {
+          fallback_models: [],
+        },
+      },
+    }
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback }, pluginConfig })
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: unsafeTestValue({
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue({
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      }),
+    })
+
+    //#when
+    await handler({
+      event: {
+        type: "session.status",
+        properties: {
+          sessionID,
+          status: {
+            type: "retry",
+            attempt: 1,
+            message:
+              "All credentials for model claude-opus-4-8 are cooling down [retrying in 7m 56s attempt #1]",
+            next: 476,
+          },
+        },
+      },
+    })
+
+    const output: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-8" },
+      },
+      output,
+    )
+
+    //#then
+    expect(abortCalls).toEqual([])
+    expect(promptCalls).toEqual([])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+    expect(output.message["model"]).toBeUndefined()
+  })
+
+  test("keeps dispatched auto-continuation fallback model temporary after synthetic user update", async () => {
+    //#given
+    const sessionID = "ses_auto_continuation_temporary_model"
+    setMainSession(sessionID)
+    setSessionModel(sessionID, { providerID: "anthropic", modelID: "claude-opus-4-7" })
+    sessionModelTestSessions.add(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      { providers: ["openai"], model: "gpt-5.5" },
+    ]))
+    const { handler, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
+
+    //#when - an assistant model error dispatches an internal retry on the fallback model.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_auto_continuation_temporary_model_error",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7 is not supported",
+            },
+            parentID: "msg_user_auto_continuation_temporary_model_error",
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_auto_continuation_temporary_model_user",
+            sessionID,
+            role: "user",
+            time: { created: 3 },
+            modelID: "gpt-5.5",
+            providerID: "openai",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then - the synthetic retry model does not become the durable main-session model.
+    expect(promptCalls).toEqual([sessionID])
+    expect(promptInputs[0]?.body?.["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
+    expect(getSessionModel(sessionID)).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+  })
+
+  test("auto-continuation advances fallback state before the selected fallback model can retry", async () => {
+    //#given
+    const sessionID = "ses_auto_continuation_advances_fallback_state"
+    setMainSession(sessionID)
+    setSessionModel(sessionID, { providerID: "anthropic", modelID: "claude-opus-4-7" })
+    sessionModelTestSessions.add(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["opencode-go"], model: "gpt-5.5" },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
+    ]))
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
+
+    //#when - first failure auto-continues on the first fallback.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_auto_continuation_first_fallback",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+              message: "model_not_supported: claude-opus-4-7 is not supported",
+            },
+            parentID: "msg_user_auto_continuation_first_fallback",
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#when - that selected fallback fails before any manual resume.
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          providerID: "opencode-go",
+          modelID: "gpt-5.5",
+          error: {
+            name: "ModelNotSupportedError",
+            message: "model_not_supported: gpt-5.5 is not supported",
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID, sessionID])
+    expect(promptCalls).toEqual([sessionID, sessionID])
+    expect(promptInputs[0]?.body?.["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "gpt-5.5",
+    })
+    expect(promptInputs[1]?.body?.["model"]).toEqual({
+      providerID: "kimi-for-coding",
+      modelID: "k2p5",
+    })
+    expect(getSessionModel(sessionID)).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+  })
+
+  test("uses session model for name-only session.error before skipping no-op fallback", async () => {
+    //#given
+    const sessionID = "ses_name_only_session_error_uses_session_model"
+    setMainSession(sessionID)
+    setSessionModel(sessionID, { providerID: "openai", modelID: "gpt-5.5" })
+    sessionModelTestSessions.add(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["openai"], model: "gpt-5.5" },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
+    ]))
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
+
+    //#when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: {
+            name: "ModelNotSupportedError",
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(promptInputs[0]?.body?.["model"]).toEqual({
+      providerID: "kimi-for-coding",
+      modelID: "k2p5",
+    })
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+  })
+
+  test("uses session model for name-only message.updated before skipping no-op fallback", async () => {
+    //#given
+    const sessionID = "ses_name_only_message_updated_uses_session_model"
+    setMainSession(sessionID)
+    setSessionModel(sessionID, { providerID: "openai", modelID: "gpt-5.5" })
+    sessionModelTestSessions.add(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["openai"], model: "gpt-5.5" },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
+    ]))
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
+
+    //#when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_name_only_message_updated",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "ModelNotSupportedError",
+            },
+            parentID: "msg_user_name_only_message_updated",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(promptInputs[0]?.body?.["model"]).toEqual({
+      providerID: "kimi-for-coding",
+      modelID: "k2p5",
+    })
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+  })
+
+  test("advances after name-only auto-fallback switches provider while keeping model id", async () => {
+    //#given
+    const sessionID = "ses_name_only_cross_provider_same_model_advances"
+    setMainSession(sessionID)
+    setSessionModel(sessionID, { providerID: "openai", modelID: "gpt-5.5" })
+    sessionModelTestSessions.add(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["opencode-go"], model: "gpt-5.5" },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
+    ]))
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
+
+    //#when - name-only error records the resolved failed provider (`openai`) for dedupe.
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: {
+            name: "ModelNotSupportedError",
+          },
+        },
+      },
+    })
+
+    //#when - the selected fallback keeps the same model id but changes provider, then fails.
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          providerID: "opencode-go",
+          modelID: "gpt-5.5",
+          error: {
+            name: "ModelNotSupportedError",
+            message: "model_not_supported: gpt-5.5 is not supported",
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID, sessionID])
+    expect(promptCalls).toEqual([sessionID, sessionID])
+    expect(promptInputs[0]?.body?.["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "gpt-5.5",
+    })
+    expect(promptInputs[1]?.body?.["model"]).toEqual({
+      providerID: "kimi-for-coding",
+      modelID: "k2p5",
+    })
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+  })
+
+  test("records auto-selected fallback before handling its name-only failure", async () => {
+    //#given
+    const sessionID = "ses_name_only_selected_fallback_recorded"
+    setMainSession(sessionID)
+    setSessionModel(sessionID, { providerID: "openai", modelID: "gpt-5.5" })
+    sessionModelTestSessions.add(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["opencode-go"], model: "gpt-5.5" },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
+    ]))
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
+
+    //#when - first name-only error dispatches auto-continuation to opencode-go/gpt-5.5.
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: {
+            name: "ModelNotSupportedError",
+          },
+        },
+      },
+    })
+
+    //#when - the selected fallback then fails with only an error name.
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: {
+            name: "ModelNotSupportedError",
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID, sessionID])
+    expect(promptCalls).toEqual([sessionID, sessionID])
+    expect(promptInputs[0]?.body?.["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "gpt-5.5",
+    })
+    expect(promptInputs[1]?.body?.["model"]).toEqual({
+      providerID: "kimi-for-coding",
+      modelID: "k2p5",
+    })
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
   })
 
   test("#given model-fallback promptAsync may have been accepted before EOF #when the same assistant error repeats after the gate hold #then fallback continue is not duplicated", async () => {
@@ -369,19 +2055,41 @@ describe("createEventHandler - model fallback", () => {
     const sessionID = "ses_model_fallback_abort_failure"
     setMainSession(sessionID)
     let pendingFallbackArms = 0
-    const modelFallback = unsafeTestValue({
-      setSessionFallbackChain: () => {},
-      setPendingModelFallback: () => {
-        pendingFallbackArms += 1
-        return true
-      },
-    })
+    const modelFallback = createModelFallbackHook()
+    const setPendingModelFallback = modelFallback.setPendingModelFallback.bind(modelFallback)
+    modelFallback.setPendingModelFallback = (...args) => {
+      pendingFallbackArms += 1
+      return setPendingModelFallback(...args)
+    }
     const { handler, abortCalls, promptAsyncCalls } = createHandler({
       hooks: { modelFallback },
       abort: async () => {
         throw new Error("abort transport failed")
       },
       promptAsync: async () => ({}),
+    })
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: unsafeTestValue({
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue({
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      }),
     })
     const assistantError = {
       name: "APIError",
@@ -414,6 +2122,74 @@ describe("createEventHandler - model fallback", () => {
     expect(pendingFallbackArms).toBe(1)
     expect(abortCalls).toEqual([sessionID])
     expect(promptAsyncCalls).toEqual([])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(true)
+
+    //#when - a real user resume after failed dispatch must still consume the pending fallback.
+    const output: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+      },
+      output,
+    )
+
+    //#then
+    expect(output.message["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "kimi-k2.6",
+    })
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+  })
+
+  test("uses resolved provider dedupe for model-only fallback failures", async () => {
+    //#given
+    const sessionID = "ses_model_only_failure_uses_resolved_provider_dedupe"
+    setMainSession(sessionID)
+    setSessionModel(sessionID, { providerID: "openai", modelID: "gpt-5.5" })
+    sessionModelTestSessions.add(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["openai"], model: "gpt-5.5" },
+      { providers: ["opencode-go"], model: "gpt-5.5" },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
+    ]))
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
+
+    //#when - the first model-only failure resolves to the stored OpenAI provider.
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: {
+            name: "ModelNotSupportedError",
+            message: "model_not_supported: gpt-5.5 is not supported",
+          },
+        },
+      },
+    })
+
+    //#when - the same model id then fails after the selected fallback provider became last-known.
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: {
+            name: "ModelNotSupportedError",
+            message: "model_not_supported: gpt-5.5 is not supported",
+          },
+        },
+      },
+    })
+
+    //#then - provider-qualified dedupe allows the chain to advance across providers sharing a model id.
+    expect(abortCalls).toEqual([sessionID, sessionID])
+    expect(promptCalls).toEqual([sessionID, sessionID])
+    expect(promptInputs[0]?.body?.["model"]).toEqual({ providerID: "opencode-go", modelID: "gpt-5.5" })
+    expect(promptInputs[1]?.body?.["model"]).toEqual({ providerID: "kimi-for-coding", modelID: "k2p5" })
   })
 
   test("does not collapse fallback continuations for different providers with the same model id", async () => {
@@ -485,7 +2261,7 @@ describe("createEventHandler - model fallback", () => {
     const modelFallback = createModelFallbackHook()
     clearPendingModelFallback(modelFallback, sessionID)
 
-    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback } })
 
     const chatMessageHandler = createChatMessageHandler({
       ctx: unsafeTestValue({
@@ -560,11 +2336,11 @@ describe("createEventHandler - model fallback", () => {
     //#then
     expect(abortCalls).toEqual([sessionID])
     expect(promptCalls).toEqual([sessionID])
-    expect(output.message["model"]).toMatchObject({
+    expect(promptInputs[0]?.body?.["model"]).toMatchObject({
       providerID: "opencode-go",
       modelID: "kimi-k2.6",
     })
-    expect(output.message["variant"]).toBeUndefined()
+    expect(promptInputs[0]?.body?.["variant"]).toBeUndefined()
   })
 
   test("does not spam abort/prompt when session.status retry countdown updates", async () => {
@@ -812,6 +2588,446 @@ describe("createEventHandler - model fallback", () => {
     expect(staleOutput.message["model"]).toBeUndefined()
   })
 
+  test("clears pending fallback on aborted assistant turns before a manual resume message", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_abort_clear_message"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["opencode-go"], model: "gpt-5.5" },
+    ]))
+    expect(
+      modelFallback.setPendingModelFallback(
+        sessionID,
+        "sisyphus",
+        "anthropic",
+        "claude-opus-4-7",
+      ),
+    ).toBe(true)
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: unsafeTestValue({
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue({
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      }),
+    })
+
+    //#when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_abort_clear_message",
+            sessionID,
+            role: "assistant",
+            error: {
+              name: "MessageAbortedError",
+              message: "The user aborted the message.",
+            },
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    const output: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      },
+      output,
+    )
+
+    //#then
+    expect(abortCalls).toEqual([])
+    expect(promptCalls).toEqual([])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+    expect(output.message["model"]).toBeUndefined()
+  })
+
+  test("clears pending fallback on session.error aborts", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_abort_clear_session_error"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["opencode-go"], model: "gpt-5.5" },
+    ]))
+    expect(
+      modelFallback.setPendingModelFallback(
+        sessionID,
+        "sisyphus",
+        "anthropic",
+        "claude-opus-4-7",
+      ),
+    ).toBe(true)
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+
+    //#when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: {
+            name: "AbortError",
+            message: "The user aborted the message.",
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([])
+    expect(promptCalls).toEqual([])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+  })
+
+  test("clears pending fallback on lowercase abort error names before manual resume", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_lowercase_abort_clear"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["opencode-go"], model: "gpt-5.5" },
+    ]))
+    expect(
+      modelFallback.setPendingModelFallback(
+        sessionID,
+        "sisyphus",
+        "anthropic",
+        "claude-opus-4-7",
+      ),
+    ).toBe(true)
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: unsafeTestValue({
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue({
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      }),
+    })
+
+    //#when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_lowercase_abort_clear_message",
+            sessionID,
+            role: "assistant",
+            error: {
+              name: "messageabortederror",
+              message: "The user aborted the message.",
+            },
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    const output: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      },
+      output,
+    )
+
+    //#then
+    expect(abortCalls).toEqual([])
+    expect(promptCalls).toEqual([])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+    expect(output.message["model"]).toBeUndefined()
+  })
+
+  test("clears pending fallback on abort message even when error name is generic", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_generic_abort_message_clear"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["opencode-go"], model: "gpt-5.5" },
+    ]))
+    expect(
+      modelFallback.setPendingModelFallback(
+        sessionID,
+        "sisyphus",
+        "anthropic",
+        "claude-opus-4-7",
+      ),
+    ).toBe(true)
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: unsafeTestValue({
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue({
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      }),
+    })
+
+    //#when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: {
+            name: "APIError",
+            message: "Request was cancelled by the user.",
+          },
+        },
+      },
+    })
+
+    const output: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      },
+      output,
+    )
+
+    //#then
+    expect(abortCalls).toEqual([])
+    expect(promptCalls).toEqual([])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+    expect(output.message["model"]).toBeUndefined()
+  })
+
+  test("clears pending fallback when the same assistant message updates from retryable error to abort", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_same_message_abort_clear"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["opencode-go"], model: "gpt-5.5" },
+    ]))
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: unsafeTestValue({
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue({
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      }),
+    })
+
+    //#when - first update arms fallback and marks this assistant message id as handled.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_retry_then_abort_clear",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "APIError",
+              data: {
+                message:
+                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+                isRetryable: true,
+              },
+            },
+            parentID: "msg_user_retry_then_abort_clear",
+            modelID: "claude-opus-4-7-thinking",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+
+    //#when - OpenCode later rewrites the same assistant message to the user-abort error.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_retry_then_abort_clear",
+            sessionID,
+            role: "assistant",
+            error: {
+              name: "APIError",
+              message: "Request was canceled by the user.",
+            },
+            modelID: "claude-opus-4-7-thinking",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    const output: ChatMessageOutput = { message: {}, parts: [{ type: "text", text: "작업재개" }] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+      },
+      output,
+    )
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+    expect(output.message["model"]).toBeUndefined()
+  })
+
+  test("clears auto-continuation dedupe on abort so same-model retry can re-arm fallback before idle", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_abort_clears_auto_dedupe"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain(sessionID, unsafeTestValue([
+      { providers: ["opencode-go"], model: "gpt-5.5" },
+    ]))
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const retryInfo = (id: string) => ({
+      id,
+      sessionID,
+      role: "assistant",
+      time: { created: 1, completed: 2 },
+      error: {
+        name: "ModelNotSupportedError",
+        message: "model_not_supported: claude-opus-4-7 is not supported",
+      },
+      parentID: `${id}_user`,
+      modelID: "claude-opus-4-7",
+      providerID: "anthropic",
+      agent: "Sisyphus - Ultraworker",
+      path: { cwd: "/tmp", root: "/tmp" },
+    })
+
+    //#when - first retryable error dispatches auto-continuation and records dedupe.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: retryInfo("msg_retry_before_abort_dedupe_clear"),
+        },
+      },
+    })
+
+    //#when - abort update arrives before session.idle.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_retry_before_abort_dedupe_clear",
+            sessionID,
+            role: "assistant",
+            error: {
+              name: "APIError",
+              message: "Request was canceled by the user.",
+            },
+            modelID: "claude-opus-4-7",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    //#when - user retries and OpenCode reports the same failed model before idle clears dedupe.
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: retryInfo("msg_retry_after_abort_dedupe_clear"),
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID, sessionID])
+    expect(promptCalls).toEqual([sessionID, sessionID])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+  })
+
   test("does not trigger model-fallback from session.status when runtime_fallback is enabled", async () => {
     //#given
     const sessionID = "ses_status_retry_runtime_enabled"
@@ -879,7 +3095,7 @@ describe("createEventHandler - model fallback", () => {
       },
     }
 
-    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback }, pluginConfig })
+    const { handler, abortCalls, promptCalls, promptInputs } = createHandler({ hooks: { modelFallback }, pluginConfig })
 
     const chatMessageHandler = createChatMessageHandler({
       ctx: unsafeTestValue({
@@ -954,17 +3170,18 @@ describe("createEventHandler - model fallback", () => {
     //#then
     expect(abortCalls).toEqual([sessionID])
     expect(promptCalls).toEqual([sessionID])
-    expect(output.message["model"]).toEqual({
+    expect(promptInputs[0]?.body?.["model"]).toEqual({
       providerID: "quotio",
       modelID: "gpt-5.5",
     })
-    expect(output.message["variant"]).toBeUndefined()
+    expect(promptInputs[0]?.body?.["variant"]).toBeUndefined()
   })
 
   test("advances main-session fallback chain across repeated session.error retries end-to-end", async () => {
     //#given
     const abortCalls: string[] = []
     const promptCalls: string[] = []
+    const promptInputs: Array<{ path: { id: string }; body?: Record<string, unknown>; query?: Record<string, unknown> }> = []
     const toastCalls: string[] = []
     const sessionID = "ses_main_fallback_chain"
     setMainSession(sessionID)
@@ -981,8 +3198,9 @@ describe("createEventHandler - model fallback", () => {
               abortCalls.push(path.id)
               return {}
             },
-            prompt: async ({ path }: { path: { id: string } }) => {
-              promptCalls.push(path.id)
+            prompt: async (input: { path: { id: string }; body?: Record<string, unknown>; query?: Record<string, unknown> }) => {
+              promptCalls.push(input.path.id)
+              promptInputs.push(input)
               return {}
             },
           },
@@ -1064,28 +3282,26 @@ describe("createEventHandler - model fallback", () => {
         },
         output,
       )
-      return output
+      return promptInputs[promptInputs.length - 1]?.body?.["model"]
     }
 
     //#when - first retry cycle
     const first = await triggerRetryCycle("anthropic", "claude-opus-4-7-thinking")
 
     //#then - first fallback entry applied (no-op skip: claude-opus-4-7 matches current model after normalization)
-    expect(first.message["model"]).toMatchObject({
+    expect(first).toMatchObject({
       providerID: "opencode-go",
       modelID: "kimi-k2.6",
     })
-    expect(first.message["variant"]).toBeUndefined()
 
     //#when - second retry cycle
     const second = await triggerRetryCycle("opencode-go", "kimi-k2.6")
 
     //#then - second fallback entry applied (chain advanced past opencode-go/kimi-k2.6)
-    expect(second.message["model"]).toMatchObject({
+    expect(second).toMatchObject({
       providerID: "kimi-for-coding",
       modelID: "k2p5",
     })
-    expect(second.message["variant"]).toBeUndefined()
     expect(abortCalls).toEqual([sessionID, sessionID])
     expect(promptCalls).toEqual([sessionID, sessionID])
     expect(toastCalls.length).toBeGreaterThanOrEqual(0)

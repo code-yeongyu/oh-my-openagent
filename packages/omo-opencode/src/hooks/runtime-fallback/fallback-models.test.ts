@@ -45,6 +45,27 @@ describe("runtime-fallback fallback-models", () => {
     expect(result).toEqual(["openai/gpt-5.5", "anthropic/claude-opus-4-7"])
   })
 
+  test("honors explicit empty fallback_models for display-name agents", () => {
+    //#given
+    const pluginConfig = unsafeTestValue({
+      agents: {
+        atlas: {
+          fallback_models: [],
+        },
+      },
+    })
+
+    //#when
+    const result = getFallbackModelsForSession(
+      "ses_runtime_fallback_atlas_display_name_empty",
+      "Atlas - Plan Executor",
+      pluginConfig,
+    )
+
+    //#then
+    expect(result).toEqual([])
+  })
+
   test("does not fall back to another agent chain when agent cannot be resolved", () => {
     //#given
     const pluginConfig = unsafeTestValue({

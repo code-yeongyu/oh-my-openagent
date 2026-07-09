@@ -178,6 +178,70 @@ describe("createToolExecuteBeforeHandler", () => {
       expect(output.args.subagent_type).toBe("sisyphus-junior")
     })
 
+    test("defaults task delegation to quick category instead of direct native general", async () => {
+      //#given
+      const ctx = createCtxWithSessionMessages()
+      const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
+      const input = { tool: "task", sessionID: "ses_123", callID: "call_1" }
+      const output = { args: { description: "Do implementation work", prompt: "fix it" } as Record<string, unknown> }
+
+      //#when
+      await handler(input, output)
+
+      //#then
+      expect(output.args.category).toBe("quick")
+      expect(output.args.subagent_type).toBeUndefined()
+    })
+
+    test("rewrites explicit general subagent delegation to quick category", async () => {
+      //#given
+      const ctx = createCtxWithSessionMessages()
+      const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
+      const input = { tool: "task", sessionID: "ses_123", callID: "call_1" }
+      const output = { args: { subagent_type: "general", description: "Do implementation work", prompt: "fix it" } as Record<string, unknown> }
+
+      //#when
+      await handler(input, output)
+
+      //#then
+      expect(output.args.category).toBe("quick")
+      expect(output.args.subagent_type).toBeUndefined()
+    })
+
+    test("rewrites whitespace and case variants of native general aliases to quick category", async () => {
+      //#given
+      const ctx = createCtxWithSessionMessages()
+      const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
+      const input = { tool: "task", sessionID: "ses_123", callID: "call_1" }
+      const outputs = [
+        { args: { subagent_type: "general-purpose ", description: "Do implementation work", prompt: "fix it" } as Record<string, unknown> },
+        { args: { subagent_type: " General", description: "Do implementation work", prompt: "fix it" } as Record<string, unknown> },
+      ]
+
+      //#when
+      for (const output of outputs) await handler(input, output)
+
+      //#then
+      for (const output of outputs) {
+        expect(output.args.category).toBe("quick")
+        expect(output.args.subagent_type).toBeUndefined()
+      }
+    })
+
+    test("does not rewrite call_omo_agent general-purpose outside its allowed-agent validator", async () => {
+      //#given
+      const ctx = createCtxWithSessionMessages()
+      const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
+      const input = { tool: "call_omo_agent", sessionID: "ses_123", callID: "call_1" }
+      const output = { args: { subagent_type: "general-purpose", description: "Do implementation work", prompt: "fix it" } as Record<string, unknown> }
+
+      //#when
+      await handler(input, output)
+
+      //#then
+      expect(output.args.subagent_type).toBe("general-purpose")
+    })
+
     test("resolves subagent_type from session first message when task_id is provided without subagent_type", async () => {
       //#given
       const ctx = createCtxWithSessionMessages([

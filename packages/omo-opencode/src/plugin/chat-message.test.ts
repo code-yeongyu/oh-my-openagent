@@ -9,6 +9,7 @@ import { readBoulderState } from "../features/boulder-state"
 import { _resetForTesting, getSessionAgent, registerAgentName, setMainSession, subagentSessions, updateSessionAgent } from "../features/claude-code-session-state"
 import { createAutoSlashCommandHook } from "../hooks/auto-slash-command"
 import { createKeywordDetectorHook } from "../hooks/keyword-detector"
+import { createModelFallbackHook } from "../hooks/model-fallback/hook"
 import { createStartWorkHook } from "../hooks/start-work"
 import { getAgentListDisplayName } from "../shared/agent-display-names"
 import { getOmoOpenCodeCacheDir, getOpenCodeCacheDir } from "../shared/data-path"
@@ -218,6 +219,42 @@ describe("createChatMessageHandler - first message hook ordering", () => {
 
     // then
     expect(hookCalls).toEqual(["runtimeFallback"])
+  })
+
+  test("clears pending model fallback before ordinary stopped user messages", async () => {
+    // given
+    const stopContinuationGuard = createStopContinuationGuardMock(true)
+    const fallbackClearCalls: string[] = []
+    let pendingFallback = true
+    const args = createMockHandlerArgs()
+    args.hooks.stopContinuationGuard = stopContinuationGuard.guard
+    args.hooks.modelFallback = {
+      clearPendingModelFallback: (sessionID: string) => {
+        fallbackClearCalls.push(sessionID)
+        pendingFallback = false
+      },
+      "chat.message": async (_input, output) => {
+        if (pendingFallback) {
+          output.message["model"] = {
+            providerID: "opencode-go",
+            modelID: "gpt-5.5",
+          }
+        }
+      },
+    }
+    const handler = createChatMessageHandler(args)
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [{ type: "text", text: "작업재개" }],
+    }
+
+    // when
+    await handler(createMockInput("sisyphus"), output)
+
+    // then
+    expect(stopContinuationGuard.isStoppedCalls).toEqual(["test-session"])
+    expect(fallbackClearCalls).toEqual(["test-session"])
+    expect(output.message["model"]).toBeUndefined()
   })
 })
 
@@ -837,6 +874,152 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     //#then
     expect(output.message["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
     expect(getSessionModel("test-session")).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+  })
+
+  test("does not persist a consumed fallback model as the main session model", async () => {
+    //#given
+    setMainSession("test-session")
+    setSessionModel("test-session", { providerID: "anthropic", modelID: "claude-opus-4-7" })
+    const modelFallback = createModelFallbackHook()
+    modelFallback.setSessionFallbackChain("test-session", unsafeTestValue([
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      { providers: ["openai"], model: "gpt-5.5" },
+    ]))
+    expect(modelFallback.setPendingModelFallback(
+      "test-session",
+      "Sisyphus - Ultraworker",
+      "anthropic",
+      "claude-opus-4-7",
+    )).toBe(true)
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    args.hooks.modelFallback = modelFallback
+    const handler = createChatMessageHandler(args)
+    const fallbackOutput = createMockOutput()
+
+    //#when - the pending fallback is consumed for this turn only.
+    await handler(
+      createMockInput("sisyphus", { providerID: "anthropic", modelID: "claude-opus-4-7" }),
+      fallbackOutput,
+    )
+
+    //#then
+    expect(fallbackOutput.message["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
+    expect(getSessionModel("test-session")).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+
+    //#when - a later normal UI turn sends no model.
+    const normalOutput = createMockOutput()
+    await handler(createMockInput("sisyphus"), normalOutput)
+
+    //#then - the stale fallback is not reused as the main-session model.
+    expect(normalOutput.message["model"]).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+  })
+
+  test("recovers an already-stale fallback title before reusing the fallback model", async () => {
+    //#given
+    setMainSession("test-session")
+    let title = "Atlas work [fallback: openai/gpt-5.5 high]"
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    args.ctx = unsafeTestValue<PluginContext>({
+      directory: "/tmp/project",
+      client: {
+        tui: { showToast: async () => {} },
+        session: {
+          get: async () => ({ data: { title } }),
+          update: async ({ body }: { body: { title: string } }) => {
+            title = body.title
+            return {}
+          },
+          messages: async () => ({
+            data: [
+              {
+                info: {
+                  role: "user",
+                  agent: "Sisyphus - Ultraworker",
+                  providerID: "anthropic",
+                  modelID: "claude-opus-4-7",
+                },
+                parts: [{ type: "text", text: "original" }],
+              },
+              {
+                info: {
+                  role: "user",
+                  agent: "Sisyphus - Ultraworker",
+                  providerID: "openai",
+                  modelID: "gpt-5.5",
+                },
+                parts: [{ type: "text", text: "작업재개" }],
+              },
+            ],
+          }),
+        },
+      },
+    })
+    const handler = createChatMessageHandler(args)
+    const output = createMockOutput()
+
+    //#when
+    await handler(
+      createMockInput("sisyphus", { providerID: "openai", modelID: "gpt-5.5" }),
+      output,
+    )
+
+    //#then
+    expect(output.message["model"]).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+    expect(getSessionModel("test-session")).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+    expect(title).toBe("Atlas work")
+  })
+
+  test("recovers a stale stored fallback model when the UI sends no model", async () => {
+    //#given
+    setMainSession("test-session")
+    setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.5" })
+    let title = "Atlas work [fallback: openai/gpt-5.5 high]"
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    args.ctx = unsafeTestValue<PluginContext>({
+      directory: "/tmp/project",
+      client: {
+        tui: { showToast: async () => {} },
+        session: {
+          get: async () => ({ data: { title } }),
+          update: async ({ body }: { body: { title: string } }) => {
+            title = body.title
+            return {}
+          },
+          messages: async () => ({
+            data: [
+              {
+                info: {
+                  role: "user",
+                  agent: "Sisyphus - Ultraworker",
+                  providerID: "anthropic",
+                  modelID: "claude-opus-4-7",
+                },
+                parts: [{ type: "text", text: "original" }],
+              },
+              {
+                info: {
+                  role: "user",
+                  agent: "Sisyphus - Ultraworker",
+                  providerID: "openai",
+                  modelID: "gpt-5.5",
+                },
+                parts: [{ type: "text", text: "작업재개" }],
+              },
+            ],
+          }),
+        },
+      },
+    })
+    const handler = createChatMessageHandler(args)
+    const output = createMockOutput()
+
+    //#when
+    await handler(createMockInput("sisyphus"), output)
+
+    //#then
+    expect(output.message["model"]).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+    expect(getSessionModel("test-session")).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+    expect(title).toBe("Atlas work")
   })
 
   test("does not reuse a stored model for the first message of a session", async () => {

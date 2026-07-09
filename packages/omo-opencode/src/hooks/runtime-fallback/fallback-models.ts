@@ -3,6 +3,7 @@ import type { FallbackModelObject } from "../../config/schema/fallback-models"
 import { agentPattern } from "./agent-resolver"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
 
@@ -69,7 +70,7 @@ function getRawFallbackModelsForSession(
   }
 
   if (agent) {
-    const result = tryGetFallbackFromAgent(agent)
+    const result = tryGetFallbackFromAgent(getAgentConfigKey(agent))
     if (result) return result
   }
 

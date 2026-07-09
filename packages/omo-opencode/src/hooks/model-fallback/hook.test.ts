@@ -24,6 +24,10 @@ const {
 
 type ModelFallbackHook = ReturnType<typeof createModelFallbackHook>
 
+function fallbackContinuationParts() {
+  return [{ type: "text", text: "continue", synthetic: true }]
+}
+
 describe("model fallback hook", () => {
   let modelFallback: ModelFallbackHook
 
@@ -54,7 +58,7 @@ describe("model fallback hook", () => {
         model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
         variant: "max",
       },
-      parts: [{ type: "text", text: "continue" }],
+      parts: fallbackContinuationParts(),
     }
 
     await hook["chat.message"]?.(
@@ -66,6 +70,210 @@ describe("model fallback hook", () => {
       providerID: "anthropic",
       modelID: "claude-opus-4-7",
     })
+  })
+
+  test("preserves pending fallback for real user messages when no auto-continuation consumed it", async () => {
+    const hook = unsafeTestValue<{
+      "chat.message"?: (
+        input: { sessionID: string },
+        output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
+      ) => Promise<void>
+    }>(modelFallback)
+    const sessionID = "ses_model_fallback_real_user_retry"
+
+    const set = setPendingModelFallback(
+      modelFallback,
+      sessionID,
+      "Sisyphus - Ultraworker",
+      "anthropic",
+      "claude-opus-4-7-thinking",
+    )
+    expect(set).toBe(true)
+
+    const output = {
+      message: {
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+        variant: "max",
+      },
+      parts: [{ type: "text", text: "작업재개" }],
+    }
+
+    await hook["chat.message"]?.({ sessionID }, output)
+
+    expect(output.message["model"]).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-opus-4-7",
+    })
+    expect(output.message["variant"]).toBe("max")
+  })
+
+  test("clears fallback title state after a fallback is applied", async () => {
+    const clearedSessions: string[] = []
+    const hook = unsafeTestValue<{
+      "chat.message"?: (
+        input: { sessionID: string },
+        output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
+      ) => Promise<void>
+    }>(createModelFallbackHook({
+      onCleared: ({ sessionID }) => {
+        clearedSessions.push(sessionID)
+      },
+    }))
+    const sessionID = "ses_model_fallback_title_applied_clear"
+
+    const set = setPendingModelFallback(
+      hook,
+      sessionID,
+      "Sisyphus - Ultraworker",
+      "anthropic",
+      "claude-opus-4-7-thinking",
+    )
+    expect(set).toBe(true)
+
+    const output = {
+      message: {
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+        variant: "max",
+      },
+      parts: [{ type: "text", text: "작업재개" }],
+    }
+
+    await hook["chat.message"]?.({ sessionID }, output)
+
+    expect(output.message["model"]).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-opus-4-7",
+    })
+    expect(clearedSessions).toEqual([sessionID])
+  })
+
+  test("clears stale auto-continuation pending fallback on real user resume", async () => {
+    const clearedSessions: string[] = []
+    const hook = unsafeTestValue<{
+      markPendingFallbackAutoContinuation?: (sessionID: string) => void
+      hasPendingModelFallback?: (sessionID: string) => boolean
+      "chat.message"?: (
+        input: { sessionID: string },
+        output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
+      ) => Promise<void>
+    }>(createModelFallbackHook({
+      onCleared: ({ sessionID }) => {
+        clearedSessions.push(sessionID)
+      },
+    }))
+    const sessionID = "ses_model_fallback_auto_resume"
+
+    const set = setPendingModelFallback(
+      hook,
+      sessionID,
+      "Sisyphus - Ultraworker",
+      "anthropic",
+      "claude-opus-4-7-thinking",
+    )
+    expect(set).toBe(true)
+    hook.markPendingFallbackAutoContinuation?.(sessionID)
+
+    const output = {
+      message: {
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+        variant: "max",
+      },
+      parts: [{ type: "text", text: "작업재개" }],
+    }
+
+    await hook["chat.message"]?.({ sessionID }, output)
+
+    expect(output.message["model"]).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-opus-4-7-thinking",
+    })
+    expect(output.message["variant"]).toBe("max")
+    expect(hook.hasPendingModelFallback?.(sessionID)).toBe(false)
+    expect(clearedSessions).toEqual([sessionID])
+  })
+
+  test("applies re-armed fallback when an old auto-continuation marker remains", async () => {
+    const hook = unsafeTestValue<{
+      markPendingFallbackAutoContinuation?: (sessionID: string) => void
+      hasPendingModelFallback?: (sessionID: string) => boolean
+      "chat.message"?: (
+        input: { sessionID: string },
+        output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
+      ) => Promise<void>
+    }>(modelFallback)
+    const sessionID = "ses_model_fallback_rearmed_after_auto_marker"
+
+    hook.markPendingFallbackAutoContinuation?.(sessionID)
+    const set = setPendingModelFallback(
+      modelFallback,
+      sessionID,
+      "Sisyphus - Ultraworker",
+      "anthropic",
+      "claude-opus-4-7-thinking",
+    )
+    expect(set).toBe(true)
+
+    const output = {
+      message: {
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+        variant: "max",
+      },
+      parts: [{ type: "text", text: "작업재개" }],
+    }
+
+    await hook["chat.message"]?.({ sessionID }, output)
+
+    expect(output.message["model"]).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-opus-4-7",
+    })
+    expect(output.message["variant"]).toBe("max")
+    expect(hook.hasPendingModelFallback?.(sessionID)).toBe(false)
+  })
+
+  test("clears auto-continuation marker without changing model after fallback was already consumed", async () => {
+    const hook = unsafeTestValue<{
+      markPendingFallbackAutoContinuation?: (sessionID: string) => void
+      "chat.message"?: (
+        input: { sessionID: string },
+        output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
+      ) => Promise<void>
+    }>(modelFallback)
+    const sessionID = "ses_model_fallback_auto_resume_consumed"
+
+    const set = setPendingModelFallback(
+      modelFallback,
+      sessionID,
+      "Sisyphus - Ultraworker",
+      "anthropic",
+      "claude-opus-4-7-thinking",
+    )
+    expect(set).toBe(true)
+    hook.markPendingFallbackAutoContinuation?.(sessionID)
+
+    await hook["chat.message"]?.(
+      { sessionID },
+      {
+        message: { model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" } },
+        parts: fallbackContinuationParts(),
+      },
+    )
+
+    const output = {
+      message: {
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+        variant: "max",
+      },
+      parts: [{ type: "text", text: "작업재개" }],
+    }
+
+    await hook["chat.message"]?.({ sessionID }, output)
+
+    expect(output.message["model"]).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-opus-4-7",
+    })
+    expect(output.message["variant"]).toBe("max")
   })
 
   test("preserves fallback progression across repeated session.error retries", async () => {
@@ -86,7 +294,7 @@ describe("model fallback hook", () => {
         model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
         variant: "max",
       },
-      parts: [{ type: "text", text: "continue" }],
+      parts: fallbackContinuationParts(),
     }
 
     await hook["chat.message"]?.({ sessionID }, firstOutput)
@@ -104,7 +312,7 @@ describe("model fallback hook", () => {
       message: {
         model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
       },
-      parts: [{ type: "text", text: "continue" }],
+      parts: fallbackContinuationParts(),
     }
     await hook["chat.message"]?.({ sessionID }, secondOutput)
 
@@ -113,6 +321,85 @@ describe("model fallback hook", () => {
       modelID: "kimi-k2.6",
     })
     expect(secondOutput.message["variant"]).toBeUndefined()
+  })
+
+  test("rejects duplicate original failed-model re-arm after a fallback was consumed", async () => {
+    const hook = unsafeTestValue<{
+      "chat.message"?: (
+        input: { sessionID: string },
+        output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
+      ) => Promise<void>
+    }>(modelFallback)
+    const sessionID = "ses_model_fallback_duplicate_original"
+    clearPendingModelFallback(modelFallback, sessionID)
+    setSessionFallbackChain(modelFallback, sessionID, [
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      { providers: ["opencode-go"], model: "kimi-k2.6" },
+    ])
+
+    expect(
+      setPendingModelFallback(
+        modelFallback,
+        sessionID,
+        "Sisyphus - Ultraworker",
+        "anthropic",
+        "claude-opus-4-7-thinking",
+      ),
+    ).toBe(true)
+
+    const firstOutput = {
+      message: {
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+      },
+      parts: fallbackContinuationParts(),
+    }
+    await hook["chat.message"]?.({ sessionID }, firstOutput)
+
+    expect(firstOutput.message["model"]).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-opus-4-7",
+    })
+
+    expect(
+      setPendingModelFallback(
+        modelFallback,
+        sessionID,
+        "Sisyphus - Ultraworker",
+        "anthropic",
+        "claude-opus-4-7-thinking",
+      ),
+    ).toBe(false)
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+
+    const duplicateOutput: ChatMessageOutput = {
+      message: {},
+      parts: fallbackContinuationParts(),
+    }
+    await hook["chat.message"]?.({ sessionID }, duplicateOutput)
+    expect(duplicateOutput.message["model"]).toBeUndefined()
+
+    expect(
+      setPendingModelFallback(
+        modelFallback,
+        sessionID,
+        "Sisyphus - Ultraworker",
+        "anthropic",
+        "claude-opus-4-7",
+      ),
+    ).toBe(true)
+
+    const fallbackFailureOutput: ChatMessageOutput = {
+      message: {
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      },
+      parts: fallbackContinuationParts(),
+    }
+    await hook["chat.message"]?.({ sessionID }, fallbackFailureOutput)
+
+    expect(fallbackFailureOutput.message["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "kimi-k2.6",
+    })
   })
 
   test("does not re-arm fallback when one is already pending", () => {
@@ -185,7 +472,7 @@ describe("model fallback hook", () => {
       message: {
         model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
       },
-      parts: [{ type: "text", text: "continue" }],
+      parts: fallbackContinuationParts(),
     }
 
     await hook["chat.message"]?.({ sessionID }, output)
@@ -228,7 +515,7 @@ describe("model fallback hook", () => {
         model: { providerID: "quotio", modelID: "claude-opus-4-7" },
         variant: "max",
       },
-      parts: [{ type: "text", text: "continue" }],
+      parts: fallbackContinuationParts(),
     }
 
     await hook["chat.message"]?.({ sessionID }, output)
@@ -280,7 +567,7 @@ describe("model fallback hook", () => {
       message: {
         model: { providerID: "provider-x", modelID: "current-model" },
       },
-      parts: [{ type: "text", text: "continue" }],
+      parts: fallbackContinuationParts(),
     }
 
     await hook["chat.message"]?.({ sessionID }, output)
@@ -336,7 +623,7 @@ describe("model fallback hook", () => {
         model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
         variant: "max",
       },
-      parts: [{ type: "text", text: "continue" }],
+      parts: fallbackContinuationParts(),
     }
 
     await hook["chat.message"]?.({ sessionID: "ses_model_fallback_toast" }, output)
@@ -373,7 +660,7 @@ describe("model fallback hook", () => {
       message: {
         model: { providerID: "github-copilot", modelID: "claude-sonnet-4-6" },
       },
-      parts: [{ type: "text", text: "continue" }],
+      parts: fallbackContinuationParts(),
     }
 
     await hook["chat.message"]?.({ sessionID }, output)
@@ -414,7 +701,7 @@ describe("model fallback hook", () => {
       message: {
         model: { providerID: "google", modelID: "gemini-3.1-pro-preview" },
       },
-      parts: [{ type: "text", text: "continue" }],
+      parts: fallbackContinuationParts(),
     }
 
     await hook["chat.message"]?.({ sessionID }, output)

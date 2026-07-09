@@ -1,4 +1,5 @@
 import { getSessionAgent } from "../../features/claude-code-session-state"
+import { isSyntheticOrInternalUserMessage } from "../../shared/internal-initiator-marker"
 import type { CompactionAgentConfigCheckpoint } from "../../shared/compaction-agent-config-checkpoint"
 import { log } from "../../shared/logger"
 import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
@@ -10,6 +11,7 @@ import { resolveValidatedModel } from "./validated-model"
 
 type SessionMessage = {
   info?: {
+    role?: string
     agent?: string
     model?: {
       providerID?: string
@@ -19,6 +21,25 @@ type SessionMessage = {
     modelID?: string
     tools?: Record<string, boolean | "allow" | "deny" | "ask">
   }
+  parts?: ReadonlyArray<{
+    type?: string
+    text?: string
+    synthetic?: boolean
+  }>
+}
+
+const BOULDER_CONTINUATION_MARKER = "BOULDER CONTINUATION"
+
+function isBoulderContinuationMessage(message: SessionMessage): boolean {
+  return (message.parts ?? []).some((part) =>
+    part.type === "text" &&
+    typeof part.text === "string" &&
+    part.text.includes(BOULDER_CONTINUATION_MARKER)
+  )
+}
+
+function isInternalContinuationMessage(message: SessionMessage): boolean {
+  return isSyntheticOrInternalUserMessage(message) || isBoulderContinuationMessage(message)
 }
 
 type ResolverContext = {
@@ -47,7 +68,12 @@ export async function resolveSessionPromptConfig(
     })
 
     for (let index = messages.length - 1; index >= 0; index--) {
-      const info = messages[index].info
+      const message = messages[index]
+      if (isInternalContinuationMessage(message)) {
+        continue
+      }
+
+      const info = message.info
 
       if (!promptConfig.agent && info?.agent && !isCompactionAgent(info.agent)) {
         promptConfig.agent = info.agent
@@ -95,7 +121,8 @@ export async function resolveLatestSessionPromptConfig(
     const messages = normalizeSDKResponse(response, [] as SessionMessage[], {
       preferResponseOnMissingData: true,
     })
-    const latestInfo = messages.at(-1)?.info
+    const latestMessage = [...messages].reverse().find((message) => !isInternalContinuationMessage(message))
+    const latestInfo = latestMessage?.info
 
     if (!latestInfo) {
       return {}
