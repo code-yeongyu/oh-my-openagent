@@ -33,6 +33,8 @@ afterAll(() => {
 })
 
 const { createPreemptiveCompactionHook } = await import("./preemptive-compaction")
+const { createModelCacheState } = await import("../plugin-state")
+const { applyProviderConfig } = await import("../plugin-handlers/provider-config-handler")
 
 function createMockCtx() {
   return {
@@ -834,5 +836,101 @@ describe("preemptive-compaction", () => {
     )
 
     expect(ctx.client.session.summarize).toHaveBeenCalled()
+  })
+
+  // #given DeepSeek V4 model at 36% context usage
+  // #when tool.execute.after runs
+  // #then should trigger summarize (V4 uses lower threshold to prevent tool call drift)
+  it("should trigger compaction earlier for DeepSeek V4 models (35% threshold)", async () => {
+    // given — V4 models drift after ~40 tool calls; compaction at 35% keeps context under drift threshold
+    const modelCacheState = createModelCacheState()
+    applyProviderConfig({
+      config: {
+        provider: {
+          deepseek: {
+            models: {
+              "deepseek-v4-pro": {
+                limit: { context: 1_000_000 },
+              },
+            },
+          },
+        },
+      },
+      modelCacheState,
+    })
+
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never, modelCacheState)
+    const sessionID = "ses_v4_early"
+
+    // 350K input + 10K cache = 360K → 36% of 1M (above V4's 35% threshold, below default 78%)
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "deepseek",
+            modelID: "deepseek-v4-pro",
+            finish: true,
+            tokens: {
+              input: 350000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    // when
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    // then
+    expect(ctx.client.session.summarize).toHaveBeenCalled()
+  })
+
+  // #given non-V4 model at 36% context usage
+  // #when tool.execute.after runs
+  // #then should NOT trigger summarize (default 78% threshold preserved for non-V4)
+  it("should NOT trigger compaction at 36% for non-V4 models (78% threshold preserved)", async () => {
+    // given — 36% is below the default 78% threshold; only V4 models get the lower threshold
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const sessionID = "ses_non_v4_36pct"
+
+    // 350K input + 10K cache = 360K → 36% of 1M (Claude with GA 1M)
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-6",
+            finish: true,
+            tokens: {
+              input: 350000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    // when
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    // then
+    expect(ctx.client.session.summarize).not.toHaveBeenCalled()
   })
 })

@@ -17,6 +17,7 @@ import { buildClaudeOpus48SisyphusPrompt } from "./sisyphus/claude-opus-4-8";
 import { buildGlm52SisyphusPrompt } from "./sisyphus/glm-5-2";
 import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
 import { buildGpt55SisyphusPrompt } from "./sisyphus/gpt-5-5";
+import { buildDeepSeekV4SisyphusPrompt } from "./sisyphus/deepseek-v4";
 import { buildKimiK26SisyphusPrompt } from "./sisyphus/kimi-k2-6";
 import { buildKimiK27SisyphusPrompt } from "./sisyphus/kimi-k2-7";
 import type { AgentMode } from "./types";
@@ -24,6 +25,7 @@ import {
   isClaudeFable5Model,
   isClaudeOpus47Model,
   isClaudeOpus48Model,
+  isDeepSeekV4Model,
   isGlmModel,
   isGpt5_5Model,
   isGptModel,
@@ -50,6 +52,7 @@ export type SisyphusPromptFamily =
   | "claude-opus-4-8"
   | "claude-opus-4-7"
   | "glm-5-2"
+  | "deepseek-v4"
   | "fallback";
 
 export function resolveSisyphusPromptFamily(model: string): SisyphusPromptFamily {
@@ -61,6 +64,7 @@ export function resolveSisyphusPromptFamily(model: string): SisyphusPromptFamily
   if (isClaudeOpus48Model(model)) return "claude-opus-4-8";
   if (isClaudeOpus47Model(model)) return "claude-opus-4-7";
   if (isGlmModel(model)) return "glm-5-2";
+  if (isDeepSeekV4Model(model)) return "deepseek-v4";
   return "fallback";
 }
 
@@ -125,6 +129,12 @@ export function createSisyphusAgent(
         MODE,
         model,
         buildGlm52SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
+      );
+    case "deepseek-v4":
+      return buildGptSisyphusAgentConfig(
+        MODE,
+        model,
+        buildDeepSeekV4SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
       );
     case "fallback": {
       const prompt = buildFallbackSisyphusPrompt(
