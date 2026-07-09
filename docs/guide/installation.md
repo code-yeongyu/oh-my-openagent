@@ -599,7 +599,7 @@ Priority: **Claude > GPT > Claude-like models**
 | --------------------- | ------------------ | ---------------------------------------------------------------------- |
 | **Explore**           | Fast codebase grep | openai/gpt-5.4-mini-fast → opencode-go/qwen3.5-plus → vercel/minimax-m2.7-highspeed → opencode-go\|vercel/minimax-m3 → opencode-go\|vercel/minimax-m2.7 → anthropic\|vercel/claude-haiku-4-5 → openai\|vercel/gpt-5.4-nano |
 | **Librarian**         | Docs/code search   | (same chain as Explore)                                                |
-| **Multimodal Looker** | Vision/screenshots | openai\|opencode/gpt-5.5 (medium) → opencode-go/kimi-k2.6 → zai-coding-plan/glm-4.6v → openai\|github-copilot\|opencode/gpt-5-nano |
+| **Multimodal Looker** | Vision/screenshots | openai\|opencode/gpt-5.5 (medium) → opencode-go/kimi-k2.6 → zai-coding-plan/glm-4.6v → openai\|opencode/gpt-5-nano |
 
 #### Why different models need different prompts
 

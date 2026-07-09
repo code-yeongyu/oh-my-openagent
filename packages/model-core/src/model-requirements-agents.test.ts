@@ -120,7 +120,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(secondary).toEqual({ providers: ["opencode-go", "vercel"], model: "kimi-k2.6" })
     expect(tertiary?.model).toBe("glm-4.6v")
     expect(last).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
+      providers: ["openai", "opencode", "vercel"],
       model: "gpt-5-nano",
     })
   })
