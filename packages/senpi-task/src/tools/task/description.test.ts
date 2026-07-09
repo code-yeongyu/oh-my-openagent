@@ -37,7 +37,7 @@ describe("buildTaskToolDescription", () => {
     expect(description).toContain("DO NOT provide both")
   })
 
-  test("#given the description #when built #then it explains the single st_ task_id continuation contract", () => {
+  test("#given the description #when built #then it describes spawn-only task and task_send continuation", () => {
     // given
     const config: OmoConfig = { categories: {}, agents: {} }
 
@@ -45,8 +45,8 @@ describe("buildTaskToolDescription", () => {
     const description = buildTaskToolDescription({ omoConfig: config, agents })
 
     // then
-    expect(description).toContain("task_id")
-    expect(description).toContain("st_")
+    expect(description).toContain("task_send")
+    expect(description).not.toContain("task(task_id")
     expect(description).toContain("run_in_background")
   })
 
