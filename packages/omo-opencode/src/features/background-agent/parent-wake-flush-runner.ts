@@ -48,19 +48,8 @@ export class ParentWakeFlushRunner {
       return
     }
     const emptyAssistantTurnRetry = latestWake.allowEmptyAssistantTurnRetry === true
-    if (sessionActive) {
-      if (this.shouldForceDispatchAfterActiveDefer(latestWake)) {
-        await this.sendParentWakePrompt(sessionID, latestWake, {
-          emptyAssistantTurnRetry,
-          toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
-          skipPromptGateStatusCheck: true,
-        })
-        log("[background-agent] Sent parent wake after active-session defer ceiling:", {
-          sessionID,
-          queuedAgeMs: this.getQueuedAgeMs(latestWake),
-        })
-        return
-      }
+    const forceDispatchAfterActiveDefer = sessionActive && this.shouldForceDispatchAfterActiveDefer(latestWake)
+    if (sessionActive && !forceDispatchAfterActiveDefer) {
       this.schedulePendingParentWakeFlush(sessionID)
       log("[background-agent] Deferred parent wake because parent session is active:", {
         sessionID,
@@ -154,7 +143,14 @@ export class ParentWakeFlushRunner {
     await this.sendParentWakePrompt(sessionID, latestWake, {
       emptyAssistantTurnRetry,
       toolWaitDecision: finalToolWaitDecision,
+      ...(forceDispatchAfterActiveDefer ? { skipPromptGateStatusCheck: true } : {}),
     })
+    if (forceDispatchAfterActiveDefer) {
+      log("[background-agent] Sent parent wake after active-session defer ceiling:", {
+        sessionID,
+        queuedAgeMs: this.getQueuedAgeMs(latestWake),
+      })
+    }
   }
 
   schedulePendingParentWakeFlush(sessionID: string, delayMs?: number): void {

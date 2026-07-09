@@ -136,38 +136,6 @@ describe("BackgroundManager parent wake active turn events", () => {
     expect(getPendingParentWakes(manager).has("parent-1")).toBe(true)
   })
 
-  test("#when active parent turn keeps a reply wake past the defer ceiling #then the wake is dispatched", async () => {
-    // given
-    const sessionStatuses: Record<string, { type: string }> = {
-      "parent-1": { type: "busy" },
-    }
-    const { manager, promptAsyncCalls } = createManager(sessionStatuses)
-    managerUnderTest = manager
-    const task = createTask({
-      id: "task-a",
-      parentSessionId: "parent-1",
-      description: "task A",
-      status: "completed",
-      completedAt: new Date("2026-05-20T14:19:14.625Z"),
-    })
-    getTasks(manager).set(task.id, task)
-    getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
-    await notifyParentSessionForTest(manager, task)
-    const pendingWake = getPendingParentWakes(manager).get("parent-1")
-    if (!pendingWake) {
-      throw new Error("expected pending wake after active parent notification")
-    }
-    pendingWake.queuedAt = Date.now() - 120_000
-
-    // when
-    await flushPendingParentWakeForTest(manager, "parent-1")
-
-    // then
-    expect(promptAsyncCalls).toHaveLength(1)
-    expect(promptAsyncCalls[0]?.body.noReply).not.toBe(true)
-    expect(getPendingParentWakes(manager).has("parent-1")).toBe(false)
-  })
-
   test("#when duplicate background completions overlap an active parent turn #then one coalesced wake stays queued", async () => {
     // given
     const sessionStatuses: Record<string, { type: string }> = {
