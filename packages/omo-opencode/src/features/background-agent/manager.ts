@@ -69,6 +69,7 @@ import {
   getSessionErrorMessage,
   isAbortedSessionError,
   isRecord,
+  isTerminalSessionError,
 } from "./error-classifier"
 import { isEmptyNoProgressAssistantTurnInfo } from "./empty-assistant-turn"
 import { tryFallbackRetry } from "./fallback-retry-handler"
@@ -2081,13 +2082,21 @@ The fallback retry session is now created and can be inspected directly.
     const sessionId = task.sessionId
     if (sessionId) {
       const sessionStillAlive = await this.verifySessionExists(sessionId)
-      if (sessionStillAlive) {
+      if (sessionStillAlive && !isTerminalSessionError(errorInfo)) {
         this.logger("[background-agent] session.error received but session still alive, treating as transient:", {
           taskId: task.id,
           sessionId,
           errorMessage: errorMsg?.slice(0, 200),
         })
         return
+      }
+      if (sessionStillAlive && isTerminalSessionError(errorInfo)) {
+        this.logger("[background-agent] Finalizing task after terminal session.error (session shell alive but will never produce output):", {
+          taskId: task.id,
+          sessionId,
+          errorName,
+          errorMessage: errorMsg?.slice(0, 200),
+        })
       }
     }
 
