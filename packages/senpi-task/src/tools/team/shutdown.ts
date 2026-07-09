@@ -1,10 +1,10 @@
-import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
+import type { AgentToolResult } from "@code-yeongyu/senpi"
 import { Type } from "typebox"
 import type { Static } from "typebox"
 
 import { SenpiShutdownError } from "../../team"
 import { toolResult } from "../control"
-import type { TeamToolDeps, TeamToolsService } from "./types"
+import type { TeamToolsService } from "./types"
 
 export const TeamShutdownRequestParams = Type.Object({
   team_run_id: Type.String({ description: "Team run id." }),
@@ -70,16 +70,4 @@ export async function runTeamRejectShutdown(service: TeamToolsService, params: T
     const view = shutdownErrorView(error)
     return toolResult(view.reason, view)
   }
-}
-
-export function createTeamShutdownRequestTool(deps: TeamToolDeps): ToolDefinition {
-  return { name: "team_shutdown_request", label: "Team Shutdown Request", description: "Request a team member's shutdown. Lead-only.", parameters: TeamShutdownRequestParams, execute: (_toolCallId: string, params: TeamShutdownRequestInput) => runTeamShutdownRequest(deps.service, params) }
-}
-
-export function createTeamApproveShutdownTool(deps: TeamToolDeps): ToolDefinition {
-  return { name: "team_approve_shutdown", label: "Team Approve Shutdown", description: "Approve a member's pending shutdown and cancel its task. Lead-only.", parameters: TeamApproveShutdownParams, execute: (_toolCallId: string, params: TeamApproveShutdownInput) => runTeamApproveShutdown(deps.service, params) }
-}
-
-export function createTeamRejectShutdownTool(deps: TeamToolDeps): ToolDefinition {
-  return { name: "team_reject_shutdown", label: "Team Reject Shutdown", description: "Reject a member's pending shutdown with a reason to keep working. Lead-only.", parameters: TeamRejectShutdownParams, execute: (_toolCallId: string, params: TeamRejectShutdownInput) => runTeamRejectShutdown(deps.service, params) }
 }
