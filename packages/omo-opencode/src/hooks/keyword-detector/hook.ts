@@ -36,6 +36,14 @@ function filterAlreadyInjectedKeywords(
   return detected.filter((keyword) => !text.includes(keyword.message))
 }
 
+function extractTaskTitle(text: string): string | null {
+  const cleaned = text.replace(/\b(ultrawork|ulw)\b/gi, "").trim()
+  if (cleaned.length === 0) return null
+  const firstLine = cleaned.split("\n")[0].trim()
+  if (firstLine.length === 0) return null
+  return firstLine.length > 80 ? `${firstLine.slice(0, 77)}...` : firstLine
+}
+
 export function createKeywordDetectorHook(
   ctx: PluginInput,
   _collector?: ContextCollector,
@@ -239,6 +247,24 @@ export function createKeywordDetectorHook(
       const originalText = output.parts[textPartIndex].text ?? ""
 
       output.parts[textPartIndex].text = `${allMessages}\n\n---\n\n${originalText}`
+
+      if (hasUltrawork && originalText.trim().length > 0) {
+        const taskTitle = extractTaskTitle(originalText)
+        if (taskTitle) {
+          ctx.client.session
+            .update({
+              path: { id: input.sessionID },
+              body: { title: taskTitle },
+              query: { directory: ctx.directory },
+            })
+            .catch((err: unknown) =>
+              log(`[keyword-detector] Failed to update session title`, {
+                error: err,
+                sessionID: input.sessionID,
+              })
+            )
+        }
+      }
 
       log(`[keyword-detector] Detected ${detectedKeywords.length} keywords`, {
         sessionID: input.sessionID,
