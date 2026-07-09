@@ -1,8 +1,8 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { appendFile, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ulwLoopGoalsPath } from "../src/paths.js";
+import { ulwLoopGoalsPath, ulwLoopLedgerPath } from "../src/paths.js";
 import { readSteeringLedgerEntries, readUlwLoopPlan, writePlan } from "../src/plan-io.js";
 import {
 	applySteeringMutation,
@@ -12,6 +12,7 @@ import {
 } from "../src/steering.js";
 import type {
 	UlwLoopItem,
+	UlwLoopLedgerEntry,
 	UlwLoopPlan,
 	UlwLoopSteeringProposal,
 	UlwLoopSuccessCriterion,
@@ -319,6 +320,104 @@ describe("steerUlwLoop", () => {
 		const second = await steerUlwLoop(repoRoot, steering({ idempotencyKey: "same-key" }));
 		expect(second.deduped).toBe(true);
 		expect((await readUlwLoopPlan(repoRoot)).goals).toHaveLength(4);
+	});
+
+	describe("compact steering ledger entries", () => {
+		const DETAIL = "evidence detail ".repeat(200);
+
+		function fatGoal(id: string): UlwLoopItem {
+			return goal({
+				id,
+				title: `Fat goal ${id}`,
+				objective: `Objective ${id}: ${DETAIL}`,
+				evidence: DETAIL,
+				successCriteria: [
+					criterion({ id: "C001", scenario: DETAIL, expectedEvidence: DETAIL }),
+					criterion({ id: "C002", scenario: DETAIL, expectedEvidence: DETAIL }),
+				],
+			});
+		}
+
+		function fatPlan(): UlwLoopPlan {
+			return plan({
+				goals: Array.from({ length: 20 }, (_, index) => fatGoal(`G${String(index + 1).padStart(3, "0")}`)),
+			});
+		}
+
+		it("writes an O(changed goals) ledger entry instead of embedding the full plan", async () => {
+			// given
+			const seed = fatPlan();
+			const planBytes = JSON.stringify(seed).length;
+			const repoRoot = await repoWithPlan(seed);
+
+			// when
+			await steerUlwLoop(
+				repoRoot,
+				steering({ kind: "revise_pending_wording", targetGoalId: "G010", revisedTitle: "Sharper goal ten" }),
+			);
+
+			// then
+			const lines = (await readFile(ulwLoopLedgerPath(repoRoot), "utf8")).split("\n").filter(Boolean);
+			expect(lines).toHaveLength(1);
+			const line = lines[0] ?? "";
+			expect(line.length).toBeLessThan(planBytes / 4);
+			const entry: UlwLoopLedgerEntry = JSON.parse(line);
+			expect("before" in entry).toBe(false);
+			expect("after" in entry).toBe(false);
+			expect(entry.steering?.before?.goals.map((item) => item.id)).toEqual(["G010"]);
+			expect(entry.steering?.after?.goals.map((item) => item.id)).toEqual(["G010"]);
+			expect(entry.steering?.after?.goals[0]?.title).toBe("Sharper goal ten");
+			expect(entry.steering?.before?.goalCount).toBe(20);
+			expect(entry.steering?.before?.goalIds).toEqual(seed.goals.map((item) => item.id));
+		});
+	});
+
+	it("dedup against a legacy full-plan entry strips before/after from the returned audit", async () => {
+		// given
+		const seed = plan();
+		const repoRoot = await repoWithPlan(seed);
+		const legacyLine = JSON.stringify({
+			at: NOW,
+			kind: "steering_accepted",
+			goalId: "G001",
+			idempotencyKey: "legacy-key",
+			evidence: "observable blocker evidence",
+			message: "the plan must change to stay safe",
+			mutationKind: "revise_pending_wording",
+			steering: {
+				kind: "revise_pending_wording",
+				source: "cli",
+				targetGoalIds: ["G001"],
+				evidence: "observable blocker evidence",
+				rationale: "the plan must change to stay safe",
+				idempotencyKey: "legacy-key",
+				invariant: {
+					accepted: true,
+					structuralInvariantAccepted: true,
+					evidenceBackedNecessity: true,
+					noEasierCompletion: true,
+					rejectedReasons: [],
+				},
+				before: seed,
+				after: seed,
+			},
+		});
+		await appendFile(ulwLoopLedgerPath(repoRoot), `${legacyLine}\n`, "utf8");
+
+		// when
+		const result = await steerUlwLoop(repoRoot, steering({ idempotencyKey: "legacy-key" }));
+
+		// then
+		expect(result.deduped).toBe(true);
+		expect(result.accepted).toBe(true);
+		expect("before" in result.audit).toBe(false);
+		expect("after" in result.audit).toBe(false);
+		expect(result.audit).toMatchObject({
+			kind: "revise_pending_wording",
+			idempotencyKey: "legacy-key",
+			deduped: true,
+		});
+		expect((await readUlwLoopPlan(repoRoot)).goals).toEqual(seed.goals);
 	});
 });
 

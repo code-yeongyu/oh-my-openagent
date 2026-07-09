@@ -73,7 +73,8 @@ function model(value: string | undefined): UlwLoopSuccessCriterionUserModel | un
 function neverKind(kind: never): never { return fail(`Unsupported steering kind: ${String(kind)}.`, "ULW_LOOP_STEERING_KIND_UNSUPPORTED", { kind }); }
 
 export async function parseSteeringProposal(argv: readonly string[]): Promise<CliSteeringProposal> {
-	const kind = parseSteeringKind(argv); const source = parseSteeringSource(argv); const base = { kind, source, evidence: required(argv, "--evidence"), rationale: required(argv, "--rationale") };
+	const kind = parseSteeringKind(argv); const source = parseSteeringSource(argv); const idempotencyKey = text(readValue(argv, "--idempotency-key"), "--idempotency-key");
+	const base = { kind, source, evidence: required(argv, "--evidence"), rationale: required(argv, "--rationale"), ...(idempotencyKey === undefined ? {} : { idempotencyKey }) };
 	switch (kind) {
 		case "add_subgoal": return normalizeSteeringProposal({ ...base, title: required(argv, "--title"), objective: required(argv, "--objective") });
 		case "split_subgoal": { const goalId = requiredGoal(argv); return normalizeSteeringProposal({ ...base, goalId, targetGoalId: goalId, childGoals: await children(argv, "--children", true) }); }
