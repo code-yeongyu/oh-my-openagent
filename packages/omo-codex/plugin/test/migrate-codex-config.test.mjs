@@ -845,6 +845,57 @@ test("#given gpt-5.6-terra with managed disable #when model catalog prefers v2 #
 	assert.match(result, /max_concurrent_threads_per_session = 1000/);
 });
 
+test("#given gpt-5.6 v2 model with hide_spawn_agent_metadata=false #when clearing #then removes the stale metadata override", () => {
+	const config = [
+		'model = "gpt-5.6-sol"',
+		"",
+		"[features.multi_agent_v2]",
+		"enabled = false",
+		"hide_spawn_agent_metadata = false",
+		"max_concurrent_threads_per_session = 1000",
+		"",
+	].join("\n");
+
+	const result = forceDisableMultiAgentV2(config, { multiAgentVersion: "v2" });
+
+	assert.doesNotMatch(result, /^\s*enabled\s*=\s*false/m);
+	assert.doesNotMatch(result, /^\s*hide_spawn_agent_metadata\s*=/m);
+	assert.match(result, /max_concurrent_threads_per_session = 1000/);
+});
+
+test("#given gpt-5.6 v2 model with hide_spawn_agent_metadata=true #when clearing #then leaves the default-matching value alone", () => {
+	const config = [
+		'model = "gpt-5.6-sol"',
+		"",
+		"[features.multi_agent_v2]",
+		"enabled = false",
+		"hide_spawn_agent_metadata = true",
+		"max_concurrent_threads_per_session = 1000",
+		"",
+	].join("\n");
+
+	const result = forceDisableMultiAgentV2(config, { multiAgentVersion: "v2" });
+
+	assert.doesNotMatch(result, /^\s*enabled\s*=\s*false/m);
+	assert.match(result, /hide_spawn_agent_metadata = true/);
+});
+
+test("#given v1 model with hide_spawn_agent_metadata=false #when forcing disable #then keeps the metadata override", () => {
+	const config = [
+		'model = "gpt-5.5"',
+		"",
+		"[features.multi_agent_v2]",
+		"hide_spawn_agent_metadata = false",
+		"max_concurrent_threads_per_session = 1000",
+		"",
+	].join("\n");
+
+	const result = forceDisableMultiAgentV2(config, { multiAgentVersion: "v1" });
+
+	assert.match(result, /hide_spawn_agent_metadata = false/);
+	assert.match(result, /enabled = false/);
+});
+
 test("#given gpt-5.6-sol with no multi_agent_v2 section #when model catalog prefers v2 #then does not append a disable", () => {
 	const config = ['model = "gpt-5.6-sol"', "", "[features]", "plugins = true", ""].join("\n");
 
