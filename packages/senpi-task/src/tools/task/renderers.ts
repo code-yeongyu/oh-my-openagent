@@ -6,7 +6,6 @@ type CallArgs = {
   readonly prompt?: string
   readonly category?: string
   readonly subagent_type?: string
-  readonly task_id?: string
   readonly run_in_background?: boolean
 }
 
@@ -30,9 +29,6 @@ export function statusThemeColor(status: string): ThemeColor {
 }
 
 export function taskCallLines(args: CallArgs): readonly string[] {
-  if (args.task_id !== undefined) {
-    return [`continue ${args.task_id}`]
-  }
   const target = args.category !== undefined
     ? `category:${args.category}`
     : args.subagent_type !== undefined

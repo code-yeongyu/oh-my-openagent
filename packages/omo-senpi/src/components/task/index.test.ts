@@ -12,20 +12,14 @@ import { createTaskComponent, wireEventBridge } from "./index"
 import type { CapturedUi } from "./runtime-context"
 import { createSessionTransitionBridge } from "./session-transition-bridge"
 
-const TASK_TOOL_NAMES = ["task", "task_send", "task_wait", "task_interrupt", "task_cancel", "task_list", "task_output"]
+const TASK_TOOL_NAMES = ["task", "task_send", "task_cancel", "task_output"]
 const TEAM_TOOL_NAMES = [
   "team_create",
   "team_delete",
-  "team_send_message",
-  "team_status",
-  "team_list",
-  "team_task_create",
-  "team_task_list",
-  "team_task_update",
-  "team_task_get",
-  "team_shutdown_request",
-  "team_approve_shutdown",
-  "team_reject_shutdown",
+  "task_create",
+  "task_get",
+  "task_list",
+  "task_update",
 ]
 const ALL_TOOL_NAMES = [...TASK_TOOL_NAMES, ...TEAM_TOOL_NAMES]
 const TASK_EVENTS = [
@@ -126,7 +120,6 @@ describe("omo-senpi task component wiring", () => {
     // when
     createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
 
-    // then the 7 task tools + 12 lead team tools registered
     expect(toolNames(pi)).toEqual([...ALL_TOOL_NAMES].sort())
     // the /tasks and /task-kill commands registered
     expect(pi.commands.map((entry) => entry.name).sort()).toEqual([...TASK_COMMANDS].sort())
@@ -136,7 +129,7 @@ describe("omo-senpi task component wiring", () => {
     expect(pi.handlers.map((handler) => handler.event).sort()).toEqual([...TASK_EVENTS].sort())
   })
 
-  it("#given a fake ExtensionAPI boot #when the task component registers #then the 12 lead team tools are wired", () => {
+  it("#given a fake ExtensionAPI boot #when the task component registers #then the 6 lead team tools are wired", () => {
     // given
     const pi = new FakeExtensionAPI()
     const logger = createLogger()
@@ -144,8 +137,6 @@ describe("omo-senpi task component wiring", () => {
     // when
     createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
 
-    // then every lead team tool is present (child/member sessions never see these; the manager's
-    // shared-tool filter strips the team_* family and only the pre-scoped member send is re-added)
     const registered = toolNames(pi)
     for (const teamTool of TEAM_TOOL_NAMES) expect(registered).toContain(teamTool)
   })

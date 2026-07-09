@@ -214,6 +214,10 @@ describe("steering engine scope + resolution guards", () => {
 
     // then
     expect(outcome.kind).toBe("not_found")
+    if (outcome.kind !== "not_found") throw new Error("expected not_found")
+    expect(outcome.suggestion).toContain("/tasks")
+    expect(outcome.suggestion).toContain("task_output")
+    expect(outcome.suggestion).not.toContain("task_list")
   })
 
   test("#given a task resolved by name #when sent a steer #then the name resolves to the record", async () => {

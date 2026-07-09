@@ -40,6 +40,7 @@ const { randomUUID } = process.getBuiltinModule<CryptoModule>("crypto")
 type MockStep =
   | { type: "text"; text: string }
   | { type: "tool_call"; name: string; arguments: Record<string, unknown>; id?: string }
+  | { type: "hang" }
 
 type MockScript = Record<string, MockStep[]>
 
@@ -156,8 +157,8 @@ function resolvePlaceholders(step: MockStep, text: string): MockStep {
   const taskId = firstMatch(text, /Created task (\d+)/) ?? firstMatch(text, /"id"\s*:\s*"(\d+)"/)
   const raw = JSON.stringify(step.arguments)
   const substituted = raw
-    .replaceAll("__TEAM_RUN_ID__", teamRunId ?? "__TEAM_RUN_ID__")
-    .replaceAll("__TASK_ID__", taskId ?? "__TASK_ID__")
+    .split("__TEAM_RUN_ID__").join(teamRunId ?? "__TEAM_RUN_ID__")
+    .split("__TASK_ID__").join(taskId ?? "__TASK_ID__")
   return { ...step, arguments: JSON.parse(substituted) as Record<string, unknown> }
 }
 
@@ -204,11 +205,10 @@ function seedDuraBacklog(cwd: string): void {
 
 const roleCallCounts = new Map<string, number>()
 
-function stepToAssistantMessage(step: MockStep, callCount: number): AssistantMessage {
-  const content: AssistantContent[] =
-    step.type === "text"
-      ? [{ type: "text", text: step.text }]
-      : [{ type: "toolCall", id: step.id ?? `omo-mock-tool-${callCount}`, name: step.name, arguments: step.arguments }]
+function stepToAssistantMessage(step: Exclude<MockStep, { type: "hang" }>, callCount: number): AssistantMessage {
+  const content: AssistantContent[] = step.type === "text"
+    ? [{ type: "text", text: step.text }]
+    : [{ type: "toolCall", id: step.id ?? `omo-mock-tool-${callCount}`, name: step.name, arguments: step.arguments }]
   return {
     role: "assistant",
     content,
@@ -233,6 +233,7 @@ function streamMockResponse(_model: Model<Api>, context: Context, options?: Simp
   roleCallCounts.set(role, index + 1)
   if (role === "dura" && index === 0) seedDuraBacklog(cwd)
   const step = resolvePlaceholders(steps[Math.min(index, steps.length - 1)], text)
+  if (step.type === "hang") return streamHangingResponse(index + 1, options)
   const message = stepToAssistantMessage(step, index + 1)
 
   queueMicrotask(() => {
@@ -259,6 +260,37 @@ function streamMockResponse(_model: Model<Api>, context: Context, options?: Simp
   })
 
   return stream
+}
+
+function streamHangingResponse(callCount: number, options?: SimpleStreamOptions) {
+  const stream = createLocalAssistantMessageEventStream()
+  const aborted = assistantMessage("aborted", [{ type: "text", text: `hang aborted ${callCount}` }])
+  const abort = () => {
+    stream.push({ type: "error", reason: "aborted", error: aborted })
+    stream.end(aborted)
+  }
+  queueMicrotask(() => {
+    if (options?.signal?.aborted === true) {
+      abort()
+      return
+    }
+    stream.push({ type: "start", partial: { ...aborted, content: [] } })
+    options?.signal?.addEventListener("abort", abort, { once: true })
+  })
+  return stream
+}
+
+function assistantMessage(stopReason: StopReason, content: AssistantContent[]): AssistantMessage {
+  return {
+    role: "assistant",
+    content,
+    api: "openai-completions",
+    provider: "omo-mock",
+    model: "mock-1",
+    usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: 0 },
+    stopReason,
+    timestamp: Date.now(),
+  }
 }
 
 function createLocalAssistantMessageEventStream(): LocalAssistantMessageEventStream {
@@ -329,12 +361,12 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     if (detectRole("prompt with MOCKROLE=quick here") !== "quick") throw new Error("quick role detection failed")
     if (detectRole("plain lead prompt") !== "lead") throw new Error("lead role detection failed")
     const resolved = resolvePlaceholders(
-      { type: "tool_call", name: "team_status", arguments: { team_run_id: "__TEAM_RUN_ID__" } },
+      { type: "tool_call", name: "task_send", arguments: { team_run_id: "__TEAM_RUN_ID__", to: "quick", message: "hello" } },
       'foo "team_run_id":"run-xyz" bar',
     )
     if (resolved.type !== "tool_call" || resolved.arguments.team_run_id !== "run-xyz") throw new Error("placeholder resolution failed")
     const withTask = resolvePlaceholders(
-      { type: "tool_call", name: "team_task_update", arguments: { task_id: "__TASK_ID__" } },
+      { type: "tool_call", name: "task_update", arguments: { task_id: "__TASK_ID__" } },
       "Created task 7.",
     )
     if (withTask.type !== "tool_call" || withTask.arguments.task_id !== "7") throw new Error("task id resolution failed")

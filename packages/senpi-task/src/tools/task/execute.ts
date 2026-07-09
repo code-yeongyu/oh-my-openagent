@@ -1,8 +1,7 @@
 import type { AgentToolResult, AgentToolUpdateCallback } from "@code-yeongyu/senpi"
 
-import type { ManagerStartSpec, StartResult } from "../../manager"
+import { resolveExecutionMode, type ExecutionMode, type ManagerStartSpec, type StartResult } from "../../manager"
 import type { TaskRecord } from "../../state"
-import type { SendOutcome } from "../../steering"
 import type { TaskToolParamsStatic } from "./params"
 import { createFsSkillLoader } from "./skills"
 import type { TaskToolContext, TaskToolDeps, TaskToolDetails, TaskToolMode } from "./types"
@@ -16,12 +15,14 @@ type TaskExecute = (
   ctx: TaskToolContext,
 ) => Promise<AgentToolResult<TaskToolDetails>>
 
+type ResolvedManagerStartSpec = ManagerStartSpec & { readonly execution_mode: ExecutionMode }
+
 function result(text: string, details: TaskToolDetails): AgentToolResult<TaskToolDetails> {
   return { content: [{ type: "text", text }], details }
 }
 
 function continuationFooter(taskId: string): string {
-  return `\n\n[task_id: ${taskId} - continue with task(task_id="${taskId}", prompt="...")]`
+  return `\n\n[task_id: ${taskId} - continue with task_send(to="${taskId}", message="...")]`
 }
 
 function recordDetails(record: TaskRecord, mode: TaskToolMode): TaskToolDetails {
@@ -48,26 +49,57 @@ function buildStartSpec(
   parentSessionId: string,
   deps: TaskToolDeps,
   cwd: string,
-): ManagerStartSpec {
+): ResolvedManagerStartSpec {
   const ancestry = deps.resolveAncestry?.(parentSessionId)
   const loadSkills = deps.loadSkills ?? createFsSkillLoader()
   const skills = loadSkills(params.load_skills ?? [], cwd)
+  const executionMode = resolvedTaskExecutionMode(target, deps)
   return {
     prompt: skills.prepend + params.prompt,
     parent_session_id: parentSessionId,
     root_session_id: ancestry?.rootSessionId ?? parentSessionId,
     depth: (ancestry?.depth ?? 0) + 1,
     ...("category" in target ? { category: target.category } : { subagent_type: target.subagentType }),
-    ...(params.execution_mode !== undefined && { execution_mode: params.execution_mode }),
+    execution_mode: executionMode,
     ...(params.model !== undefined && { model: params.model }),
     ...(params.name !== undefined && { name: params.name }),
     ...(params.run_in_background !== undefined && { run_in_background: params.run_in_background }),
   }
 }
 
+function toExecutionMode(value: string | undefined): ExecutionMode | undefined {
+  switch (value) {
+    case "in-process":
+    case "process":
+      return value
+    default:
+      return undefined
+  }
+}
+
+function resolvedAgentMode(
+  target: { readonly category: string } | { readonly subagentType: string },
+  deps: TaskToolDeps,
+): ExecutionMode | undefined {
+  if (!("subagentType" in target)) return undefined
+  return toExecutionMode(deps.agents[target.subagentType]?.executionMode) ?? deps.omoConfig.agents?.[target.subagentType]?.execution_mode
+}
+
+function resolvedTaskExecutionMode(
+  target: { readonly category: string } | { readonly subagentType: string },
+  deps: TaskToolDeps,
+): ExecutionMode {
+  const agentMode = resolvedAgentMode(target, deps)
+  return resolveExecutionMode({
+    ...(agentMode !== undefined && { agentMode }),
+    configMode: deps.omoConfig.task?.default_execution_mode,
+  })
+}
+
 function startedDetails(
   started: Extract<StartResult, { kind: "started" }>,
   params: TaskToolParamsStatic,
+  executionMode: ExecutionMode,
 ): TaskToolDetails {
   return {
     task_id: started.task_id,
@@ -76,7 +108,7 @@ function startedDetails(
     name: started.name,
     ...(params.category !== undefined && { category: params.category }),
     ...(params.subagent_type !== undefined && { subagent_type: params.subagent_type }),
-    ...(params.execution_mode !== undefined && { execution_mode: params.execution_mode }),
+    execution_mode: executionMode,
     ...(params.model !== undefined && { model: params.model }),
     run_in_background: params.run_in_background === true,
     ...(started.queue_position !== undefined && { queue_position: started.queue_position }),
@@ -115,75 +147,14 @@ async function runSpawn(
     return result(started.reason, { task_id: "", status: "residency_denied", mode: "spawn", reason: started.reason })
   }
   if (params.run_in_background === true) {
-    return result(backgroundStartText(started), startedDetails(started, params))
+    return result(backgroundStartText(started), startedDetails(started, params, spec.execution_mode))
   }
   const final = await deps.manager.waitFor(started.task_id)
   return syncResult(final, "spawn")
 }
 
-type DeliveredSend = { readonly task_id: string; readonly status: string; readonly delivered: string }
-
-async function finishContinuation(
-  deps: TaskToolDeps,
-  params: TaskToolParamsStatic,
-  delivered: DeliveredSend,
-): Promise<AgentToolResult<TaskToolDetails>> {
-  if (params.run_in_background === true) {
-    return result(
-      `Delivered to task ${delivered.task_id} via ${delivered.delivered} (${delivered.status}). The system will notify you on completion.`,
-      { task_id: delivered.task_id, status: delivered.status, mode: "continuation", run_in_background: true },
-    )
-  }
-  const final = await deps.manager.waitFor(delivered.task_id)
-  return syncResult(final, "continuation")
-}
-
-// Continuation drives the SCOPE-AWARE manager.sendToTask (never continueTask, which cannot carry a
-// caller id) and ALWAYS injects the caller session id, so the engine's scope guard fails closed:
-// a foreign session's send is scope_denied instead of leaking into the owning session's task.
-async function runContinuation(
-  deps: TaskToolDeps,
-  params: TaskToolParamsStatic,
-  taskId: string,
-  ctx: TaskToolContext,
-): Promise<AgentToolResult<TaskToolDetails>> {
-  const outcome: SendOutcome = await deps.manager.sendToTask({
-    idOrName: taskId,
-    message: params.prompt,
-    deliverAs: "followUp",
-    callerSessionId: ctx.sessionManager.getSessionId(),
-  })
-  switch (outcome.kind) {
-    case "scope_denied":
-      return result(outcome.reason, { task_id: outcome.task_id, status: "scope_denied", mode: "continuation", reason: outcome.reason })
-    case "not_continuable":
-      return result(`${outcome.reason}. ${outcome.suggestion}`, { task_id: outcome.task_id, status: "not_continuable", mode: "continuation", reason: outcome.reason })
-    case "not_found":
-      return result(`${outcome.reason}. ${outcome.suggestion}`, { task_id: taskId, status: "not_found", mode: "continuation", reason: outcome.reason })
-    case "steered":
-      return finishContinuation(deps, params, { task_id: outcome.task_id, status: outcome.status, delivered: outcome.delivered })
-    case "revived":
-      return finishContinuation(deps, params, { task_id: outcome.task_id, status: "running", delivered: "revive" })
-    case "queued":
-      return finishContinuation(deps, params, { task_id: outcome.task_id, status: "pending", delivered: "followUp" })
-    default:
-      return assertNever(outcome)
-  }
-}
-
-function assertNever(value: never): never {
-  throw new Error(`Unexpected send outcome: ${JSON.stringify(value)}`)
-}
-
-// The task tool execute logic. Injects the caller (parent) session id into every manager call,
-// routes to continuation when task_id is present, and composes start + waitFor for sync spawns while
-// background spawns return immediately without awaiting child completion.
 export function buildTaskExecute(deps: TaskToolDeps): TaskExecute {
   return async (_toolCallId, params, _signal, _onUpdate, ctx) => {
-    const taskId = params.task_id?.trim()
-    if (taskId !== undefined && taskId.length > 0) {
-      return runContinuation(deps, params, taskId, ctx)
-    }
     return runSpawn(deps, params, ctx)
   }
 }

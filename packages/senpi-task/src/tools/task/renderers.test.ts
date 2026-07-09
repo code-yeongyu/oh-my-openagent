@@ -23,12 +23,12 @@ describe("taskCallLines", () => {
     expect(lines.join(" ")).toContain("background")
   })
 
-  test("#given a continuation call #when rendered #then the task_id is shown", () => {
+  test("#given a spawn call without a target #when rendered #then it falls back to a generic task label", () => {
     // when
-    const lines = taskCallLines({ prompt: "more", task_id: "st_0000000a" })
+    const lines = taskCallLines({ prompt: "more" })
 
     // then
-    expect(lines.join(" ")).toContain("st_0000000a")
+    expect(lines.join(" ")).toContain("task")
   })
 })
 

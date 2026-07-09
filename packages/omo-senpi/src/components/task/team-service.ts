@@ -2,7 +2,7 @@ import type { OmoConfig, OmoTaskSettings } from "@oh-my-opencode/omo-config-core
 import {
   TEAM_LEAD_SENTINEL,
   claimTeamTask,
-  createMemberScopedSendMessageTool,
+  createMemberScopedTaskSendTool,
   createTeam,
   createTeamTask,
   deleteTeam,
@@ -79,13 +79,6 @@ function toTeams(rows: Awaited<ReturnType<typeof listActiveTeams>>): readonly Ac
   }))
 }
 
-/**
- * The live TeamToolsService the omo-senpi component binds to the task engine: it threads the task
- * manager, the omo.json-derived team-core config + state dir, the current lead session, and the
- * idle-coordinator-backed lead notifier into the senpi-task team layer. Member children receive
- * exactly one pre-scoped `team_send_message` (from-bound to the member, run-bound to this run) via the
- * createTeam memberScopedTools seam; the manager's shared-tool filter strips every other team tool.
- */
 export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
   const stateDir = stateDirConfig(deps)
   const config: TeamCoreConfig = toTeamCoreConfig(deps.settings, teamStorageBaseDir(stateDir))
@@ -106,7 +99,7 @@ export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
         spawnDepth: TEAM_MEMBER_SPAWN_DEPTH,
         ...(deps.now !== undefined ? { now: deps.now } : {}),
         memberScopedTools: (memberName, teamRunId) => [
-          createMemberScopedSendMessageTool({ service, teamRunId, from: memberName }),
+          createMemberScopedTaskSendTool({ manager: deps.manager, service, teamRunId, from: memberName }),
         ],
       })
     },
