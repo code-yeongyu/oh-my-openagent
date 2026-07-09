@@ -1,7 +1,6 @@
 // Lane-private pure helpers for task-rpc-e2e.mjs (todo 27). Extracted so the driver stays under the
 // repo's pure-LOC ceiling; every function here is side-effect-free analysis or a read-only probe of the
 // sandbox state / real agent dir, unit-covered by the driver's --self-test.
-import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
@@ -112,10 +111,14 @@ export function statusSnapshots(events) {
   return snaps
 }
 
-export function scanRpcChildPids() {
-  const out = spawnSync("pgrep", ["-f", "senpi --mode rpc"], { encoding: "utf8" })
-  if (typeof out.stdout !== "string") return []
-  return out.stdout.split(/\s+/).filter((s) => s.length > 0).map((s) => Number.parseInt(s, 10)).filter((n) => Number.isInteger(n))
+export function recordRpcChildPids(records) {
+  return records
+    .filter((record) => record.execution_mode === "process" && typeof record.pid === "number")
+    .map((record) => record.pid)
+}
+
+export function liveRecordRpcChildPids(records) {
+  return recordRpcChildPids(records).filter(pidAlive)
 }
 
 export function pidAlive(pid) {
