@@ -811,6 +811,11 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          # GH_PAT (sisyphus-dev-ai, workflow scope) — the default GITHUB_TOKEN
+          # cannot push refs whose diff touches .github/workflows/* (hard GitHub
+          # security boundary). Required for the tag push and the master mirror,
+          # both of which carry workflow-file changes at release time.
+          token: ${{ secrets.GH_PAT }}
 
       - run: git fetch --force --tags
 
@@ -1024,18 +1029,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Merge to master
+      - name: Mirror release to master
+        # Non-blocking: npm is already published by this point, so a mirror
+        # failure must never fail the release. With no error swallow, a genuine
+        # failure still surfaces as a red step for visibility.
+        # Auth: uses the GH_PAT persisted by checkout (workflow scope) so the
+        # push can carry the release's .github/workflows/* diff — the default
+        # GITHUB_TOKEN cannot, which is why this silently failed the whole v4.x line.
+        # Fast-forward only: master always trails the new tag (releases move
+        # forward on dev), so the direct refspec push is a clean FF and satisfies
+        # the branch ruleset's non_fast_forward rule without needing a bypass.
         continue-on-error: true
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git stash --include-untracked || true
-          git checkout master
-          git reset --hard "v${VERSION}"
-          git push -f origin master || echo "::warning::Failed to push to master"
+          git push origin "v${VERSION}^{commit}:refs/heads/master"
 
       - name: Write job summary
         if: always()
