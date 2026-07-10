@@ -22,17 +22,6 @@ type LinesComponent = {
 
 type RendererTheme = Pick<Theme, "fg" | "italic">
 
-export type StructuredSendMessageSummary =
-  | {
-      readonly type: "shutdown_request"
-      readonly reason?: string
-    }
-  | {
-      readonly type: "shutdown_response"
-      readonly approve: boolean
-      readonly reason?: string
-    }
-
 const STATUS_COLORS: Readonly<Record<string, ThemeColor>> = {
   completed: "success",
   error: "error",
@@ -84,20 +73,6 @@ export function formatTaskStatus(status: string): string {
 export function formatResolvedModel(model: string | undefined): string | undefined {
   const normalized = optionalRendererText(model)
   return normalized === undefined ? undefined : `model:${normalized}`
-}
-
-export function formatSendMessageSummary(message: string | StructuredSendMessageSummary, width = DEFAULT_EXCERPT_WIDTH): string {
-  if (typeof message === "string") return excerptRendererText(message, width)
-
-  switch (message.type) {
-    case "shutdown_request":
-      return joinRendererTokens(["shutdown request", message.reason === undefined ? undefined : excerptRendererText(message.reason, width)])
-    case "shutdown_response":
-      return joinRendererTokens([
-        message.approve ? "shutdown approved" : "shutdown rejected",
-        message.reason === undefined ? undefined : excerptRendererText(message.reason, width),
-      ])
-  }
 }
 
 export function taskCallLines(args: CallArgs): readonly string[] {

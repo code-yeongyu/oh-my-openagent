@@ -2,14 +2,12 @@ import { describe, expect, test } from "bun:test"
 
 import {
   excerptRendererText,
-  formatSendMessageSummary,
   linesComponent,
   rendererVisibleWidth,
   statusThemeColor,
   taskCallLines,
   taskResultLines,
 } from "./renderers"
-import type { StructuredSendMessageSummary } from "./renderers"
 
 describe("statusThemeColor", () => {
   test("#given terminal statuses #when mapped #then success/error/warning colors are chosen", () => {
@@ -181,26 +179,6 @@ describe("renderer grammar", () => {
     expect(rendererVisibleWidth(excerpt)).toBeLessThanOrEqual(72)
   })
 
-  test("#given structured shutdown messages #when summarized #then objects are described without object coercion", () => {
-    // given
-    const request: StructuredSendMessageSummary = { type: "shutdown_request", reason: "작업 완료\nReady to stop." }
-    const rejection: StructuredSendMessageSummary = {
-      type: "shutdown_response",
-      approve: false,
-      reason: "Need final Korean/English pass",
-    }
-
-    // when
-    const requestSummary = formatSendMessageSummary(request)
-    const rejectionSummary = formatSendMessageSummary(rejection)
-
-    // then
-    expect(requestSummary).toContain("shutdown request")
-    expect(requestSummary).toContain("작업 완료 Ready to stop.")
-    expect(rejectionSummary).toContain("shutdown rejected")
-    expect(rejectionSummary).toContain("Need final Korean/English pass")
-    expect(`${requestSummary} ${rejectionSummary}`).not.toContain("[object Object]")
-  })
 })
 
 describe("linesComponent", () => {
