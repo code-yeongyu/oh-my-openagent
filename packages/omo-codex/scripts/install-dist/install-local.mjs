@@ -8663,7 +8663,8 @@ var CODEX_SUBAGENT_THREAD_LIMIT = 1000;
 function ensureCodexMultiAgentV2Config(config, options = {}) {
   const featureFlag = removeFeatureFlagSetting(config, "multi_agent_v2");
   const v2Preferred = options.multiAgentVersion === "v2";
-  const agentsConfig = v2Preferred ? removeAgentsMaxThreads(featureFlag.config) : ensureAgentsMaxThreads(featureFlag.config);
+  const modelKnown = options.multiAgentVersion != null || readRootModel(featureFlag.config) !== null;
+  const agentsConfig = v2Preferred ? removeAgentsMaxThreads(featureFlag.config) : modelKnown ? ensureAgentsMaxThreads(featureFlag.config) : raiseExistingAgentsMaxThreads(featureFlag.config);
   const section = findTomlSection(agentsConfig, CODEX_MULTI_AGENT_V2_HEADER);
   const maxThreadsValue = CODEX_SUBAGENT_THREAD_LIMIT.toString();
   const preserveDisable = featureFlag.value === false && !v2Preferred;
@@ -8688,7 +8689,8 @@ function resolveCodexMultiAgentVersion(config, configPath) {
   const model = readRootModel(config);
   if (model === null)
     return null;
-  const catalogVersion = readCatalogMultiAgentVersion(model, join18(dirname7(configPath), "models_cache.json"));
+  const catalogPath = readRootModelCatalogPath(config) ?? join18(dirname7(configPath), "models_cache.json");
+  const catalogVersion = readCatalogMultiAgentVersion(model, catalogPath);
   if (catalogVersion !== null)
     return catalogVersion;
   return /^gpt-5\.6\b/i.test(model) ? "v2" : null;
@@ -8727,6 +8729,13 @@ function readRootModel(config) {
   const single = config.match(/^\s*model\s*=\s*'([^']+)'/m);
   return single?.[1] ?? null;
 }
+function readRootModelCatalogPath(config) {
+  const double = config.match(/^\s*model_catalog_json\s*=\s*"([^"]+)"/m);
+  if (double !== null)
+    return double[1] ?? null;
+  const single = config.match(/^\s*model_catalog_json\s*=\s*'([^']+)'/m);
+  return single?.[1] ?? null;
+}
 function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -8756,6 +8765,14 @@ function removeAgentsMaxThreads(config) {
   if (!/^\s*max_threads\s*=/m.test(section.text))
     return config;
   return removeSetting(config, section, "max_threads");
+}
+function raiseExistingAgentsMaxThreads(config) {
+  const section = findTomlSection(config, CODEX_AGENTS_HEADER);
+  if (!section)
+    return config;
+  if (!/^\s*max_threads\s*=/m.test(section.text))
+    return config;
+  return replaceOrInsertSetting(config, section, "max_threads", CODEX_SUBAGENT_THREAD_LIMIT.toString());
 }
 function readBooleanSetting(sectionText, key) {
   const match = new RegExp(`^\\s*${escapeRegExp(key)}\\s*=\\s*(true|false)\\s*(?:#.*)?$`, "m").exec(sectionText);
