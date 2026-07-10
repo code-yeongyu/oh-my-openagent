@@ -209,8 +209,8 @@ describe("formatTaskRow", () => {
     expect(row).toBe("st_empty category:ultrabrain model:google/gemini-3.1-pro mode:in-process status:running")
   })
 
-  it("#given wide CJK progress text #when formatting #then the progress excerpt is terminal-width safe and concise", () => {
-    // given
+  it("#given a stale malformed running record with final_response #when formatting defensively #then the progress excerpt is terminal-width safe and concise", () => {
+    // given a stale persisted record; normal lifecycle progress does not set final_response while running
     const task = record({
       task_id: "st_cjk",
       status: "running",
@@ -251,8 +251,8 @@ describe("createTaskStatusUi.syncNow", () => {
     expect(widget?.placement).toBe("belowEditor")
   })
 
-  it("#given controls across an active task #when syncing #then the row widget and footer are sanitized without damaging CJK text", () => {
-    // given
+  it("#given controls across a stale malformed running record with final_response #when syncing defensively #then the row widget and footer are sanitized without damaging CJK text", () => {
+    // given a stale persisted record; normal lifecycle progress does not set final_response while running
     const task = record({
       task_id: "st_\u001b[31mred\u001b[0m", name: "한국어\u0007 작업",
       status: "running", category: "ultra\u001b[2Jbrain",

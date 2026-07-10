@@ -1,3 +1,4 @@
+// allow: SIZE_OK - package-root public API barrel contains re-exports only and intentionally preserves one stable root import surface.
 export {
   RESIDENCY_STATES,
   RESOLVED_MODEL_SOURCES,
