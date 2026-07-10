@@ -19,16 +19,16 @@ const lazycodexAgentInvariants = new Map([
 	[
 		"explorer.toml",
 		{
-			model: "gpt-5.6-terra",
-			effort: "medium",
+			model: "gpt-5.6-luna",
+			effort: "low",
 			includes: [/Read-only/, /working tree/, /rg/],
 		},
 	],
 	[
 		"librarian.toml",
 		{
-			model: "gpt-5.6-terra",
-			effort: "medium",
+			model: "gpt-5.6-luna",
+			effort: "low",
 			includes: [/Read-only/, /SHA-pinned GitHub permalink/, /external/],
 		},
 	],
@@ -62,6 +62,30 @@ const lazycodexAgentInvariants = new Map([
 			model: "gpt-5.6-sol",
 			effort: "high",
 			includes: [/EVIDENCE_RECORDED: <path>/, /scenario/i, /artifact/i],
+		},
+	],
+	[
+		"lazycodex-worker-low.toml",
+		{
+			model: "gpt-5.6-luna",
+			effort: "high",
+			includes: [/EVIDENCE_RECORDED: <path>/, /low-difficulty/i, /smallest correct change/i],
+		},
+	],
+	[
+		"lazycodex-worker-medium.toml",
+		{
+			model: "gpt-5.6-sol",
+			effort: "high",
+			includes: [/EVIDENCE_RECORDED: <path>/, /medium-difficulty/i, /smallest correct change/i],
+		},
+	],
+	[
+		"lazycodex-worker-high.toml",
+		{
+			model: "gpt-5.6-sol",
+			effort: "max",
+			includes: [/EVIDENCE_RECORDED: <path>/, /high-difficulty/i, /smallest correct change/i],
 		},
 	],
 	[
@@ -117,6 +141,9 @@ test("#given bundled Codex agents #when components/ultrawork/agents directory is
 		"lazycodex-executor.toml",
 		"lazycodex-gate-reviewer.toml",
 		"lazycodex-qa-executor.toml",
+		"lazycodex-worker-high.toml",
+		"lazycodex-worker-low.toml",
+		"lazycodex-worker-medium.toml",
 		"librarian.toml",
 		"metis.toml",
 		"momus.toml",

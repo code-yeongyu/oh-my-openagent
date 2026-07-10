@@ -22,6 +22,9 @@ const LAZYCODEX_AGENT_ROLE_NAMES = [
   "lazycodex-executor",
   "lazycodex-gate-reviewer",
   "lazycodex-qa-executor",
+  "lazycodex-worker-high",
+  "lazycodex-worker-low",
+  "lazycodex-worker-medium",
 ] as const
 
 const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000

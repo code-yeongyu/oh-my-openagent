@@ -8,6 +8,9 @@ const LEGACY_MANAGED_CODEX_AGENT_NAMES_TO_PURGE = ["codex-ultrawork-reviewer"] a
 
 const CURRENT_MANAGED_CODEX_AGENT_NAMES = [
   "explorer",
+  "lazycodex-worker-high",
+  "lazycodex-worker-low",
+  "lazycodex-worker-medium",
   "librarian",
   "metis",
   "momus",
