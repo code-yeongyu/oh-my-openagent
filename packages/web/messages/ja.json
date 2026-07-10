@@ -157,7 +157,7 @@
         "verify": "VERIFY — 動作を証明する"
       },
       "tagline": "良いだけではない時に。",
-      "model": "GPT 5.5 Medium"
+      "model": "GPT 5.6 Sol Medium"
     },
     "teamMode": {
       "badge": "v4.0+",
@@ -226,13 +226,13 @@
       "momus": {
         "name": "Momus",
         "role": "Plan Reviewer",
-        "model": "GPT 5.5 xHigh",
+        "model": "GPT 5.6 Sol xHigh",
         "description": "容赦ない検証。プランが弾丸不可能な時だけ承認する。"
       },
       "atlas": {
         "name": "Atlas",
         "role": "並列タスク実行",
-        "model": "Claude Opus 4.7",
+        "model": "Claude Sonnet 4.6",
         "description": "依存関係追跡付きで多段階プランをオーケストレーション。専門家に委任し、独立して検証する。"
       },
       "sisyphusJunior": {
@@ -244,7 +244,7 @@
       "multimodalLooker": {
         "name": "Multimodal-Looker",
         "role": "メディア分析",
-        "model": "Claude Sonnet 4.6",
+        "model": "GPT 5.5 Medium",
         "description": "PDF、画像、図から情報を抽出。全体読みなしで素早く要約を取り出す。"
       },
       "dynamicSystem": {
