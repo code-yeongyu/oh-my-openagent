@@ -114,10 +114,10 @@ export type ReviewKey = (typeof REVIEW_KEYS)[number]
 
 export const CATEGORY_ROUTING = [
   { cat: "visual-engineering", model: "Gemini 3.1 Pro" },
-  { cat: "ultrabrain", model: "GPT 5.5 xHigh" },
+  { cat: "ultrabrain", model: "GPT 5.6 Sol xHigh" },
   { cat: "artistry", model: "Gemini 3.1 Pro" },
   { cat: "quick", model: "GPT 5.4 Mini" },
-  { cat: "deep", model: "GPT 5.5 Medium" },
+  { cat: "deep", model: "GPT 5.6 Terra xHigh" },
   { cat: "writing", model: "Kimi K2.6" },
   { cat: "git", model: "Claude Haiku 4.5" },
 ] as const

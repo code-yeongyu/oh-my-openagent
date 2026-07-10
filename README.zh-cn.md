@@ -246,7 +246,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 | `quick`              | 单文件修改、修错字     |
 | `ultrabrain`         | 复杂硬核逻辑、架构决策 |
 
-智能体只需要说明要做什么类型的工作，框架就会挑选出最合适的模型去干。`ultrabrain` 现在默认路由到 GPT-5.5 xhigh。你完全不需要操心。
+智能体只需要说明要做什么类型的工作，框架就会挑选出最合适的模型去干。`ultrabrain` 在 OpenAI 或 Vercel 可用时优先路由到 GPT-5.6 Sol xhigh，其次是 GPT-5.5 xhigh。你完全不需要操心。
 
 ### 完全兼容 Claude Code
 
