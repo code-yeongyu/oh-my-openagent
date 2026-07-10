@@ -1,4 +1,11 @@
-import { excerptRendererText, type ListScope, type ListedTask, type TaskRecord, type TaskStatus } from "@oh-my-opencode/senpi-task"
+import {
+  excerptRendererText,
+  normalizeRendererText,
+  type ListScope,
+  type ListedTask,
+  type TaskRecord,
+  type TaskStatus,
+} from "@oh-my-opencode/senpi-task"
 
 import type { CapturedUi } from "./runtime-context"
 
@@ -48,36 +55,42 @@ function isTerminal(status: TaskStatus): boolean {
   return TERMINAL_STATUSES.has(status)
 }
 
-function trimmedNonEmpty(value: string | undefined): string | undefined {
-  const trimmed = value?.trim()
-  return trimmed === undefined || trimmed.length === 0 ? undefined : trimmed
+function optionalRendererText(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined
+  const normalized = statusRendererText(value)
+  return normalized.length === 0 ? undefined : normalized
+}
+
+function statusRendererText(value: string): string {
+  return normalizeRendererText(value)
 }
 
 function targetLabel(record: TaskRecord): string {
-  const category = trimmedNonEmpty(record.category)
+  const category = optionalRendererText(record.category)
   if (category !== undefined) return `category:${category}`
-  return `agent:${trimmedNonEmpty(record.agent_type) ?? "?"}`
+  return `agent:${optionalRendererText(record.agent_type) ?? "?"}`
 }
 
 function modelDisplay(record: TaskRecord): string {
-  return trimmedNonEmpty(record.resolved_model?.display) ?? record.model
+  return optionalRendererText(record.resolved_model?.display) ?? statusRendererText(record.model)
 }
 
 function progressHead(record: TaskRecord): string | undefined {
-  const trimmed = trimmedNonEmpty(record.final_response)
-  if (trimmed === undefined) return undefined
-  return excerptRendererText(trimmed, PROGRESS_HEAD_MAX)
+  const normalized = optionalRendererText(record.final_response)
+  if (normalized === undefined) return undefined
+  return excerptRendererText(normalized, PROGRESS_HEAD_MAX)
 }
 
 export function formatTaskRow(record: TaskRecord): string {
-  const parts = [record.task_id]
-  if (record.name !== undefined) parts.push(record.name)
+  const parts = [statusRendererText(record.task_id)]
+  const name = optionalRendererText(record.name)
+  if (name !== undefined) parts.push(name)
   parts.push(targetLabel(record), `model:${modelDisplay(record)}`)
-  const reasoning = trimmedNonEmpty(record.resolved_model?.reasoning_effort)
+  const reasoning = optionalRendererText(record.resolved_model?.reasoning_effort)
   if (reasoning !== undefined) parts.push(`reasoning:${reasoning}`)
-  const variant = trimmedNonEmpty(record.resolved_model?.variant)
+  const variant = optionalRendererText(record.resolved_model?.variant)
   if (variant !== undefined) parts.push(`variant:${variant}`)
-  parts.push(`mode:${record.execution_mode}`, `status:${record.status}`)
+  parts.push(`mode:${statusRendererText(record.execution_mode)}`, `status:${statusRendererText(record.status)}`)
   if (record.pid !== undefined) parts.push(`pid:${record.pid}`)
   const progress = progressHead(record)
   if (progress !== undefined) parts.push(`progress:${progress}`)
