@@ -103,6 +103,53 @@ describe("control tool renderers", () => {
     expect([request, approve, reject].join("\n")).not.toContain("[object Object]")
   })
 
+  test("#given a structured shutdown request with a meaningful reason #when rendering at normal width #then the real reason remains visible", () => {
+    const line = firstLine(
+      renderTaskSendCall(
+        {
+          to: "member-with-long-readable-name",
+          team_run_id: "team-run-with-readable-context",
+          message: {
+            type: "shutdown_request",
+            reason: "Renderer QA request after the mixed Korean and English edge pass",
+          },
+        },
+        TEST_THEME,
+      ),
+      160,
+    )
+
+    expect(line).toContain("task_send shutdown:request")
+    expect(line).toContain("to:member-with-long-readable-name")
+    expect(line).toContain("team:team-run-with-readable-context")
+    expect(line).toContain("reason:")
+    expect(line).toContain("Renderer QA request")
+  })
+
+  test("#given a structured shutdown request with no room for a meaningful reason #when rendering at 72 columns #then the optional reason field is omitted", () => {
+    const line = firstLine(
+      renderTaskSendCall(
+        {
+          to: "edge-member",
+          team_run_id: "edge-team-long",
+          message: {
+            type: "shutdown_request",
+            reason: "Renderer QA request after the mixed Korean and English edge pass",
+          },
+        },
+        ANSI_THEME,
+      ),
+      72,
+    )
+
+    expect(line).toContain("task_send shutdown:request")
+    expect(line).toContain("to:edge-member")
+    expect(line).toContain("team:edge-team-long")
+    expect(line).not.toContain("reason:")
+    expect(line).not.toContain('reason:"."')
+    expect(visibleWidth(line)).toBeLessThanOrEqual(72)
+  })
+
   test("#given pure interrupt task_send #when rendering the call #then it is meaningful without an empty message label", () => {
     const line = firstLine(renderTaskSendCall({ to: "atlas", deliver_as: "interrupt" }, TEST_THEME), 80)
 
