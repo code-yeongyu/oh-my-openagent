@@ -18,35 +18,6 @@ export const MODEL_VERSION_MAP: Record<string, string> = {
   "anthropic/claude-opus-4-4": "anthropic/claude-opus-4-7",
 }
 
-type ScopedModelMigration = { model: string; variant?: string }
-
-/**
- * Entry-scoped migrations: applied only when a specific agent/category entry
- * is pinned to the old model. Unlike MODEL_VERSION_MAP this may move entries
- * off a still-selectable model, because it narrowly retargets entries whose
- * pinned value matches the PREVIOUS built-in default (typically written by the
- * installer, not chosen by hand). Other entries pinned to the same model are
- * untouched, and the sidecar prevents re-applying after a user revert.
- *
- * GPT-5.6 default rollout: hephaestus keeps the user's variant; deep and
- * ultrabrain adopt the new default variants (high / xhigh); momus adopts
- * the new default xhigh variant.
- */
-export const ENTRY_SCOPED_MODEL_VERSION_MAP: Record<string, Record<string, ScopedModelMigration>> = {
-  hephaestus: {
-    "openai/gpt-5.5": { model: "openai/gpt-5.6-sol" },
-  },
-  momus: {
-    "openai/gpt-5.5": { model: "openai/gpt-5.6-sol", variant: "xhigh" },
-  },
-  deep: {
-    "openai/gpt-5.5": { model: "openai/gpt-5.6-sol", variant: "high" },
-  },
-  ultrabrain: {
-    "openai/gpt-5.5": { model: "openai/gpt-5.6-sol", variant: "xhigh" },
-  },
-}
-
 const CURRENT_USER_SELECTABLE_MODELS = new Set([
   "anthropic/claude-opus-4-5",
   "anthropic/claude-opus-4-6",
@@ -55,10 +26,6 @@ const CURRENT_USER_SELECTABLE_MODELS = new Set([
 
 function migrationKey(oldModel: string, newModel: string): string {
   return `model-version:${oldModel}->${newModel}`
-}
-
-function scopedMigrationKey(entry: string, oldModel: string, newModel: string): string {
-  return `model-version:${entry}:${oldModel}->${newModel}`
 }
 
 export function migrateModelVersions(
@@ -72,28 +39,6 @@ export function migrateModelVersions(
   for (const [key, value] of Object.entries(configs)) {
     if (value && typeof value === "object" && !Array.isArray(value)) {
       const config = value as Record<string, unknown>
-      const scopedMigration =
-        typeof config.model === "string"
-          ? ENTRY_SCOPED_MODEL_VERSION_MAP[key]?.[config.model]
-          : undefined
-      if (scopedMigration && typeof config.model === "string") {
-        const oldModel = config.model
-        const mKey = scopedMigrationKey(key, oldModel, scopedMigration.model)
-
-        if (appliedMigrations?.has(mKey)) {
-          migrated[key] = value
-          continue
-        }
-
-        migrated[key] = {
-          ...config,
-          model: scopedMigration.model,
-          ...(scopedMigration.variant ? { variant: scopedMigration.variant } : {}),
-        }
-        changed = true
-        newMigrations.push(mKey)
-        continue
-      }
       if (
         typeof config.model === "string" &&
         !CURRENT_USER_SELECTABLE_MODELS.has(config.model) &&
