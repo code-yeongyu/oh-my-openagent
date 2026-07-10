@@ -165,7 +165,7 @@ Name the exact tool + exact invocation per scenario (literal `curl` / `send-keys
 
 ## REVIEWER GATE (triggered)
 
-Trigger if user said "엄밀"/"strictly"/"rigorously"/"properly review", or task touches 3+ files OR ran 20+ turns OR 30+ min, or it's a refactor/migration/perf/security change. Spawn a high-rigor reviewer via `task` with goal + scenarios + evidence + diff. Reviewer verdict is BINDING; "looks good but..." = rejection. Re-submit until UNCONDITIONAL approval before declaring done.
+Trigger if user said "엄밀"/"strictly"/"rigorously"/"properly review", or task touches 3+ files OR ran 20+ turns OR 30+ min, or it's a refactor/migration/perf/security change. Spawn a high-rigor reviewer via `task` with goal + scenarios + evidence + diff. A concern blocks only when it cites a success criterion the evidence fails — others are notes. Fix cited blockers, re-run only the affected QA, and re-submit the delta at most twice; an approval with only notes left counts as approval. If cited blockers remain after two re-reviews, surface them to the user before declaring done.
 
 ## COMPLETION CRITERIA
 

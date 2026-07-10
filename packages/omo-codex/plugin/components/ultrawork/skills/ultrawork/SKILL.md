@@ -326,15 +326,20 @@ Procedure (NON-NEGOTIABLE):
    the message.
    Pass: goal, success-criteria, scenario evidence, full diff, notepad
    path.
-2. Treat the reviewer's verdict as binding. There is NO "false
-   positive". Every concern is real. Do not argue. Do not minimise. Do
-   not explain it away.
-3. Fix every issue. Re-run the FULL scenario QA. Capture fresh
-   evidence. Update notepad.
-4. Re-submit to the SAME reviewer. Loop until you receive an
-   UNCONDITIONAL approval ("looks good but..." = REJECTION).
-5. Only on unconditional approval may you declare done. Stopping early
-   IS failure.
+2. Verify each reviewer concern yourself. A concern blocks only when
+   it names a success criterion the evidence fails; record concerns
+   that cite no criterion as notes with a one-line reason — fixed or
+   declined at your judgment.
+3. Fix every criterion-cited blocker. Re-run ONLY the scenario QA
+   affected by the fix; capture fresh evidence for the delta. Update
+   notepad.
+4. Re-submit to the SAME reviewer at most twice, passing only the
+   delta diff, the blockers it cited, and the already-approved criteria
+   marked out-of-scope. An approval whose only remaining items are
+   notes counts as approval.
+5. On approval, declare done. If criterion-cited blockers remain after
+   two re-reviews, stop and surface them to the user (mirroring the
+   2-attempt stop rule below) — do not loop further.
 
 # Commits
 Atomic, Conventional Commits (`<type>(<scope>): <imperative>` — feat /
