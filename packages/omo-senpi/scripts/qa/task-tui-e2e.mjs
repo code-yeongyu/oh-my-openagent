@@ -10,13 +10,17 @@ import { changedRealPaths, snapshotDir } from "./task-e2e-analysis.mjs"
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "task-e2e-mock-provider.ts")
 const realSenpiAgentDir = join(homedir(), ".senpi", "agent")
-const OMO_CONFIG = { categories: { mockcat: { description: "Local mock category for TUI QA.", model: "omo-mock/mock-1" } } }
+const OMO_CONFIG = {
+  categories: {
+    ultrabrain: { description: "Local mock ultrabrain category for TUI QA.", model: "omo-mock/mock-1", reasoningEffort: "xhigh" },
+  },
+}
 
 const SCENARIOS = {
   full: {
     prompt: "Use the omo task tools to spawn a background child, interrupt it, continue it, read its output, and cancel it.",
     parentSteps: [
-      { type: "tool_call", name: "task", arguments: { category: "mockcat", prompt: "Inspect the isolated Senpi task lifecycle, report the initial result clearly, and remain ready for a continuation that verifies resident-session revival.", run_in_background: true, name: "tui-child" } },
+      { type: "tool_call", name: "task", arguments: { category: "ultrabrain", prompt: "Inspect the isolated Senpi task lifecycle, report the initial result clearly, and remain ready for a continuation that verifies resident-session revival.", run_in_background: true, name: "tui-child" } },
       { type: "text", text: "tui parent observed the initial child completion" },
       { type: "tool_call", name: "task_send", arguments: { to: "tui-child", deliver_as: "interrupt" } },
       { type: "tool_call", name: "task_send", arguments: { to: "tui-child", deliver_as: "followUp", message: "Continue in the same resident child session, verify that revival preserved the initial task context, and produce a concise second-stage report describing what changed after the follow-up instruction." } },
@@ -33,7 +37,7 @@ const SCENARIOS = {
   edge: {
     prompt: "Exercise the task-family renderer edge path at 72 columns, then remain interactive.",
     parentSteps: [
-      { type: "tool_call", name: "task", arguments: { category: "missing-cat", prompt: "한국어로 긴 작업 지시를 작성하고 여러 줄의 혼합 폭 텍스트가 72열 터미널에서 안전하게 줄임표 처리되는지 확인하세요.\nThen inspect the missing-category routing error and summarize the English continuation without overflowing the interactive xterm row.", run_in_background: true, name: "edge-missing-child" } },
+      { type: "tool_call", name: "task", arguments: { category: "missing-cat", prompt: "한국어로 긴 작업 지시를 작성하고 여러 줄의 혼합 폭 텍스트가 72열 터미널에서 안전하게 줄임표 처리되는지 확인하세요.\nThen inspect the missing-category routing error and summarize the English continuation without overflowing the interactive xterm row.", name: "edge-missing-child" } },
       { type: "tool_call", name: "task_send", arguments: { to: "edge-missing-child", message: " \n\t " } },
       { type: "tool_call", name: "task_send", arguments: { to: "edge-missing-child", deliver_as: "interrupt" } },
       { type: "tool_call", name: "task_send", arguments: { team_run_id: "edge-team-72", to: "edge-member", message: { type: "shutdown_request", reason: "Renderer QA request after the mixed Korean and English edge pass" } } },
@@ -147,7 +151,9 @@ function assertScenarioCoverage() {
   if (toolNames(full) !== "task,task_send,task_send,task_output,task_cancel") failures.push("full tool sequence")
   if (toolNames(edge) !== "task,task_send,task_send,task_send,task_send,task_output,task_cancel") failures.push("edge tool sequence")
   const fullTask = full[0]?.arguments
-  if (fullTask?.category !== "mockcat" || fullTask.run_in_background !== true || String(fullTask.prompt ?? "").trim().length < 60) failures.push("meaningful background task")
+  const configuredCategory = OMO_CONFIG.categories.ultrabrain
+  if (configuredCategory?.model !== "omo-mock/mock-1" || configuredCategory.reasoningEffort !== "xhigh") failures.push("ultrabrain mock model config")
+  if (fullTask?.category !== "ultrabrain" || fullTask.run_in_background !== true || String(fullTask.prompt ?? "").trim().length < 60) failures.push("meaningful ultrabrain background task")
   const fullInterrupt = full[1]?.arguments
   if (fullInterrupt?.deliver_as !== "interrupt" || Object.hasOwn(fullInterrupt, "message")) failures.push("full pure interrupt")
   const fullFollowUp = full[2]?.arguments
@@ -155,7 +161,7 @@ function assertScenarioCoverage() {
   if (full[3]?.arguments?.block !== true) failures.push("blocking task_output")
   if (SCENARIOS.full.childSteps.filter((step) => step.type === "text").length < 2) failures.push("completion and revival child steps")
   const edgePrompt = String(edge[0]?.arguments?.prompt ?? "")
-  if (edge[0]?.arguments?.category !== "missing-cat" || !edgePrompt.includes("\n") || !/[가-힣]/u.test(edgePrompt) || !/[A-Za-z]/u.test(edgePrompt) || edgePrompt.length < 120) failures.push("long multiline Korean/English task")
+  if (edge[0]?.arguments?.category !== "missing-cat" || Object.hasOwn(edge[0]?.arguments ?? {}, "run_in_background") || !edgePrompt.includes("\n") || !/[가-힣]/u.test(edgePrompt) || !/[A-Za-z]/u.test(edgePrompt) || edgePrompt.length < 120) failures.push("foreground long multiline Korean/English task")
   const edgeWhitespaceSend = edge[1]?.arguments?.message
   const edgeInterrupt = edge[2]?.arguments
   if (typeof edgeWhitespaceSend !== "string" || edgeWhitespaceSend.length === 0 || edgeWhitespaceSend.trim().length !== 0) failures.push("whitespace-only task_send message")
