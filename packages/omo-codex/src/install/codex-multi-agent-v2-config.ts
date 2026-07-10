@@ -80,7 +80,8 @@ export function ensureCodexMultiAgentV2Config(
 export function resolveCodexMultiAgentVersion(config: string, configPath: string): CodexMultiAgentVersion {
   const model = readRootModel(config)
   if (model === null) return null
-  const catalogVersion = readCatalogMultiAgentVersion(model, join(dirname(configPath), "models_cache.json"))
+  const catalogPath = readRootModelCatalogPath(config) ?? join(dirname(configPath), "models_cache.json")
+  const catalogVersion = readCatalogMultiAgentVersion(model, catalogPath)
   if (catalogVersion !== null) return catalogVersion
   return /^gpt-5\.6\b/i.test(model) ? "v2" : null
 }
@@ -113,6 +114,13 @@ function readRootModel(config: string): string | null {
   const double = config.match(/^\s*model\s*=\s*"([^"]+)"/m)
   if (double !== null) return double[1] ?? null
   const single = config.match(/^\s*model\s*=\s*'([^']+)'/m)
+  return single?.[1] ?? null
+}
+
+function readRootModelCatalogPath(config: string): string | null {
+  const double = config.match(/^\s*model_catalog_json\s*=\s*"([^"]+)"/m)
+  if (double !== null) return double[1] ?? null
+  const single = config.match(/^\s*model_catalog_json\s*=\s*'([^']+)'/m)
   return single?.[1] ?? null
 }
 

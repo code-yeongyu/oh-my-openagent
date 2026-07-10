@@ -107,7 +107,10 @@ export function prefersMultiAgentV2(multiAgentVersion, sessionModel) {
 export function resolveMultiAgentVersionFromConfig(config, options = {}) {
 	const model = normalizeModel(options.sessionModel) || readRootModel(config);
 	if (!model) return null;
-	return resolveMultiAgentVersionForModel(model, options);
+	return resolveMultiAgentVersionForModel(model, {
+		...options,
+		modelsCachePath: options.modelsCachePath?.trim() || readRootModelCatalogPath(config) || undefined,
+	});
 }
 
 /**
@@ -136,6 +139,18 @@ export function readRootModel(config) {
 	const double = config.match(/^\s*model\s*=\s*"([^"]+)"/m);
 	if (double) return double[1];
 	const single = config.match(/^\s*model\s*=\s*'([^']+)'/m);
+	return single?.[1] ?? null;
+}
+
+// Codex documents `model_catalog_json` as a COMPLETE replacement for the
+// fetched models_cache.json (codex-rs/core/src/config/mod.rs load_model_catalog
+// -> load_catalog_json -> ModelsResponse). When set, Codex resolves the model
+// only from that file, so the guard must too — otherwise Codex and the guard
+// disagree on the multi-agent version (lazycodex#120).
+export function readRootModelCatalogPath(config) {
+	const double = config.match(/^\s*model_catalog_json\s*=\s*"([^"]+)"/m);
+	if (double) return double[1];
+	const single = config.match(/^\s*model_catalog_json\s*=\s*'([^']+)'/m);
 	return single?.[1] ?? null;
 }
 
