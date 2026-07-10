@@ -247,6 +247,7 @@ export {
   linesComponent,
   listTaskAgents,
   listTaskCategories,
+  normalizeRendererText,
   rendererVisibleWidth,
   statusThemeColor,
   taskCallLines,

@@ -6,6 +6,7 @@ export type { TaskToolParamsStatic } from "./params"
 export {
   excerptRendererText,
   linesComponent,
+  normalizeRendererText,
   rendererVisibleWidth,
   statusThemeColor,
   taskCallLines,

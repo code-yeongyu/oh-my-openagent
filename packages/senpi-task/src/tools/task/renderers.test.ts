@@ -1,13 +1,29 @@
 import { describe, expect, test } from "bun:test"
 
+import type { ThemeColor } from "@code-yeongyu/senpi"
+
 import {
   excerptRendererText,
   linesComponent,
+  normalizeRendererText,
+  renderTaskCallLines,
+  renderTaskResultLines,
   rendererVisibleWidth,
   statusThemeColor,
   taskCallLines,
   taskResultLines,
 } from "./renderers"
+
+const ANSI_THEME = {
+  fg: (_color: ThemeColor, text: string) => `\u001b[33m${text}\u001b[0m`,
+  italic: (text: string) => `\u001b[3m${text}\u001b[0m`,
+}
+
+const TERMINAL_CONTROL_PATTERN = /[\u0000-\u001f\u007f-\u009f]/u
+
+function expectNoTerminalControls(value: string): void {
+  expect(value).not.toMatch(TERMINAL_CONTROL_PATTERN)
+}
 
 describe("statusThemeColor", () => {
   test("#given terminal statuses #when mapped #then success/error/warning colors are chosen", () => {
@@ -176,9 +192,60 @@ describe("renderer grammar", () => {
     expect(excerpt).not.toContain("\n")
     expect(excerpt).toContain(" ")
     expect(excerpt).toContain("...")
+    expectNoTerminalControls(excerpt)
     expect(rendererVisibleWidth(excerpt)).toBeLessThanOrEqual(72)
   })
 
+  test("#given adversarial terminal sequences and Korean whitespace #when normalized #then controls are removed without damaging ordinary text", () => {
+    // given
+    const cases = [
+      { value: "앞 \u001b[31m빨강\u001b[0m 뒤", expected: "앞 빨강 뒤" },
+      { value: "앞 \u001b]8;;https://example.com\u0007링크\u001b]8;;\u0007 뒤", expected: "앞 링크 뒤" },
+      { value: "한\u001b]0;창 제목\u001b\\글", expected: "한글" },
+      { value: "한\u0007글", expected: "한글" },
+      { value: "한\u001b[2J글", expected: "한글" },
+      { value: "한\u001bc글", expected: "한글" },
+      { value: "한\u007f\u0085글", expected: "한글" },
+      { value: "안전\u001b]8;;https://example.com/숨김", expected: "안전" },
+      { value: "  첫째\t둘째\n界  ", expected: "첫째 둘째 界" },
+    ] as const
+
+    // when
+    const normalized = cases.map(({ value }) => normalizeRendererText(value))
+
+    // then
+    expect(normalized).toEqual(cases.map(({ expected }) => expected))
+    for (const value of normalized) expectNoTerminalControls(value)
+  })
+
+  test("#given injected ANSI in task call and result fields #when themed #then injected controls are removed while trusted theme ANSI remains", () => {
+    // given
+    const callArgs = {
+      prompt: "검토 \u001b[31m빨강\u001b[0m 완료",
+      category: "quick\u001b[2J",
+      run_in_background: false,
+    }
+    const resultDetails = {
+      task_id: "st_\u001b]8;;https://example.com\u0007링크\u001b]8;;\u0007",
+      status: "completed\u0007",
+      mode: "spawn" as const,
+      reason: "정상\u007f 종료",
+      run_in_background: true,
+    }
+
+    // when
+    const call = renderTaskCallLines(callArgs, ANSI_THEME).join(" ")
+    const result = renderTaskResultLines(resultDetails, ANSI_THEME).join(" ")
+    const plain = [...taskCallLines(callArgs), ...taskResultLines(resultDetails)].join(" ")
+
+    // then
+    expect(call).toContain("\u001b[3mforeground\u001b[0m")
+    expect(result).toContain("\u001b[3mbackground\u001b[0m")
+    expect(call).not.toContain("\u001b[31m")
+    expect(call).not.toContain("\u001b[2J")
+    expect(result).not.toContain("https://example.com")
+    expectNoTerminalControls(plain)
+  })
 })
 
 describe("linesComponent", () => {
