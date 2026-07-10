@@ -23,6 +23,8 @@ export const ExperimentalConfigSchema = z.object({
   max_tools: z.number().int().min(1).optional(),
   /** Disable routing parent-targeted internal prompts through the live opencode listener (rollback to pre-migration in-process dispatch) */
   disable_live_parent_wake_routing: z.boolean().optional(),
+  /** Enable the blocking `wait-for-background-tasks` tool + a turn-end reminder while tasks run. For turn-end-kill harnesses (e.g. an ACP proxy) that kill the process on turn end before parent-wake resumes the session. Off for normal OpenCode, where parent-wake already covers it. */
+  block_on_background_tasks: z.boolean().optional(),
 })
 
 export type ExperimentalConfig = z.infer<typeof ExperimentalConfigSchema>
