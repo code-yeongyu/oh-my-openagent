@@ -29,11 +29,15 @@ type ScopedModelMigration = { model: string; variant?: string }
  * untouched, and the sidecar prevents re-applying after a user revert.
  *
  * GPT-5.6 default rollout: hephaestus keeps the user's variant; deep and
- * ultrabrain adopt the new default variants (high / xhigh).
+ * ultrabrain adopt the new default variants (high / xhigh); momus adopts
+ * the new default xhigh variant.
  */
 export const ENTRY_SCOPED_MODEL_VERSION_MAP: Record<string, Record<string, ScopedModelMigration>> = {
   hephaestus: {
     "openai/gpt-5.5": { model: "openai/gpt-5.6-sol" },
+  },
+  momus: {
+    "openai/gpt-5.5": { model: "openai/gpt-5.6-sol", variant: "xhigh" },
   },
   deep: {
     "openai/gpt-5.5": { model: "openai/gpt-5.6-sol", variant: "high" },
