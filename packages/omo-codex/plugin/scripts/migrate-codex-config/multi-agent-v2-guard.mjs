@@ -24,7 +24,7 @@
  */
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 
 const MANAGED_COMMENT_MARKER = "openai/codex#26753";
 const MANAGED_DISABLE_COMMENT = [
@@ -42,6 +42,7 @@ const MANAGED_DISABLE_COMMENT = [
  *   requireSessionModel?: boolean,
  *   env?: NodeJS.ProcessEnv,
  *   modelsCachePath?: string,
+ *   configPath?: string,
  * }} [options]
  */
 export function forceDisableMultiAgentV2(config, options = {}) {
@@ -55,8 +56,9 @@ export function forceDisableMultiAgentV2(config, options = {}) {
 		options.multiAgentVersion !== undefined
 			? options.multiAgentVersion
 			: resolveMultiAgentVersionFromConfig(normalized, options);
+	const effectiveModel = sessionModel || readRootModel(normalized);
 
-	if (prefersMultiAgentV2(multiAgentVersion, sessionModel)) {
+	if (prefersMultiAgentV2(multiAgentVersion, effectiveModel)) {
 		return clearMultiAgentV2DisableForReservedSchema(normalized);
 	}
 
@@ -101,16 +103,17 @@ export function prefersMultiAgentV2(multiAgentVersion, sessionModel) {
  * Resolve the effective model against Codex `models_cache.json`.
  * Prefers SessionStart `model` over the root `model` in config.toml.
  * @param {string} config
- * @param {{ sessionModel?: string | null, env?: NodeJS.ProcessEnv, modelsCachePath?: string }} [options]
+ * @param {{ sessionModel?: string | null, env?: NodeJS.ProcessEnv, modelsCachePath?: string, configPath?: string }} [options]
  * @returns {"v1" | "v2" | null}
  */
 export function resolveMultiAgentVersionFromConfig(config, options = {}) {
 	const model = normalizeModel(options.sessionModel) || readRootModel(config);
 	if (!model) return null;
-	return resolveMultiAgentVersionForModel(model, {
+	const version = resolveMultiAgentVersionForModel(model, {
 		...options,
-		modelsCachePath: options.modelsCachePath?.trim() || readRootModelCatalogPath(config) || undefined,
+		modelsCachePath: options.modelsCachePath?.trim() || resolveModelCatalogPath(readRootModelCatalogPath(config), options) || undefined,
 	});
+	return version ?? (isGpt56Family(model) ? "v2" : null);
 }
 
 /**
@@ -152,6 +155,14 @@ export function readRootModelCatalogPath(config) {
 	if (double) return double[1];
 	const single = config.match(/^\s*model_catalog_json\s*=\s*'([^']+)'/m);
 	return single?.[1] ?? null;
+}
+
+function resolveModelCatalogPath(configuredPath, options) {
+	const trimmed = normalizeModel(configuredPath);
+	if (!trimmed) return null;
+	if (isAbsolute(trimmed)) return trimmed;
+	const baseDir = options.configPath ? dirname(options.configPath) : options.env?.CODEX_HOME?.trim() || join(homedir(), ".codex");
+	return join(baseDir, trimmed);
 }
 
 function normalizeModel(value) {
