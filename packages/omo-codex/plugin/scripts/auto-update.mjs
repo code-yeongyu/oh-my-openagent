@@ -39,6 +39,44 @@ const DEFAULT_RETRY_INTERVAL_MS = 30 * 60 * 1_000;
 
 export { resolveLazyCodexUpdatePlan };
 
+/**
+ * Read Codex SessionStart stdin JSON and extract the effective session model.
+ * @param {NodeJS.ReadableStream | null | undefined} stdin
+ * @returns {Promise<string | null>}
+ */
+export async function readSessionModelFromStdin(stdin = process.stdin) {
+	if (!stdin || typeof stdin.on !== "function") return null;
+	if (stdin.isTTY) return null;
+
+	const raw = await new Promise((resolve) => {
+		let data = "";
+		let settled = false;
+		const finish = () => {
+			if (settled) return;
+			settled = true;
+			resolve(data);
+		};
+		stdin.setEncoding("utf8");
+		stdin.on("data", (chunk) => {
+			data += chunk;
+		});
+		stdin.once("end", finish);
+		stdin.once("error", finish);
+		// Hooks normally close stdin quickly; avoid hanging migration forever.
+		setTimeout(finish, 250).unref?.();
+	});
+
+	const trimmed = raw.trim();
+	if (!trimmed) return null;
+	try {
+		const payload = JSON.parse(trimmed);
+		if (typeof payload?.model === "string" && payload.model.trim()) return payload.model.trim();
+		return null;
+	} catch {
+		return null;
+	}
+}
+
 export function resolveAutoUpdatePlan({ env = process.env, now = Date.now(), lastCheckedAt, lastAttemptedAt, lastStatus, installFlow } = {}) {
 	if (env.LAZYCODEX_AUTO_UPDATE_DISABLED === "1" || env.OMO_CODEX_AUTO_UPDATE_DISABLED === "1") {
 		return { shouldRun: false, reason: "disabled" };
@@ -126,8 +164,13 @@ export async function runLazyCodexManualUpdate({ env = process.env, dryRun = fal
 	return 0;
 }
 
-export async function runAutoUpdateCheck({ env = process.env, now = Date.now() } = {}) {
-	const migrationNotices = await runConfigMigration({ env });
+export async function runAutoUpdateCheck({
+	env = process.env,
+	now = Date.now(),
+	sessionModel = null,
+	requireSessionModel = false,
+} = {}) {
+	const migrationNotices = await runConfigMigration({ env, sessionModel, requireSessionModel });
 	const statePath = resolveStatePath(env);
 	const notices = [...migrationNotices];
 	const state = await settlePendingNotice({ env, now, statePath, state: await readState(statePath), notices });
@@ -251,11 +294,11 @@ function resolveUpdateContext({ env }) {
 	return { currentVersion, latestVersion, shouldUpdate: plan.shouldUpdate };
 }
 
-async function runConfigMigration({ env }) {
+async function runConfigMigration({ env, sessionModel = null, requireSessionModel = false }) {
 	if (env.LAZYCODEX_CONFIG_MIGRATION_DISABLED === "1" || env.OMO_CODEX_CONFIG_MIGRATION_DISABLED === "1") return [];
 	try {
 		await migrateOmoSotConfig({ env, seed: true });
-		const result = await migrateCodexConfig({ env });
+		const result = await migrateCodexConfig({ env, sessionModel, requireSessionModel });
 		if (result.modeChanged.length === 0) return [];
 		return [
 			"[LazyCodex] Removed unsupported Codex root multi_agent_mode from config.toml. Tell the user LazyCodex cleaned up a stale OMO-managed setting so Codex uses its supported per-turn multiAgentMode API.",
@@ -267,18 +310,22 @@ async function runConfigMigration({ env }) {
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
-	runAutoUpdateCheck()
-		.then(({ notices }) => {
-			if (notices.length === 0) return;
-			console.log(JSON.stringify({
-				hookSpecificOutput: {
-					hookEventName: "SessionStart",
-					additionalContext: notices.join("\n\n"),
-				},
-			}));
-		})
-		.catch((error) => {
-			console.error(error instanceof Error ? error.message : String(error));
-			process.exit(0);
+	(async () => {
+		const sessionModel = await readSessionModelFromStdin(process.stdin);
+		const { notices } = await runAutoUpdateCheck({
+			sessionModel,
+			// Hook CLI path: only force-disable when SessionStart provided the active model.
+			requireSessionModel: true,
 		});
+		if (notices.length === 0) return;
+		console.log(JSON.stringify({
+			hookSpecificOutput: {
+				hookEventName: "SessionStart",
+				additionalContext: notices.join("\n\n"),
+			},
+		}));
+	})().catch((error) => {
+		console.error(error instanceof Error ? error.message : String(error));
+		process.exit(0);
+	});
 }

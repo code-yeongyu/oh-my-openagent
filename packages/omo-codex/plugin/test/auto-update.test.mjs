@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, symlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { PassThrough } from "node:stream";
 import test from "node:test";
 
-import { resolveAutoUpdatePlan, resolveLazyCodexUpdatePlan, runAutoUpdateCheck } from "../scripts/auto-update.mjs";
+import { readSessionModelFromStdin, resolveAutoUpdatePlan, resolveLazyCodexUpdatePlan, runAutoUpdateCheck } from "../scripts/auto-update.mjs";
 import { detectInstallFlow } from "../scripts/install-flow.mjs";
 import { resolveSpawnInvocation } from "../scripts/spawn-command.mjs";
 
@@ -20,6 +21,12 @@ function autoUpdateEnv(root, extra = {}) {
 	};
 }
 
+function stdinFrom(payload) {
+	const stream = new PassThrough();
+	stream.end(payload);
+	return stream;
+}
+
 test("#given auto update is disabled #when resolving plan #then no command is scheduled", () => {
 	const plan = resolveAutoUpdatePlan({
 		env: { LAZYCODEX_AUTO_UPDATE_DISABLED: "1" },
@@ -29,6 +36,33 @@ test("#given auto update is disabled #when resolving plan #then no command is sc
 
 	assert.equal(plan.shouldRun, false);
 	assert.equal(plan.reason, "disabled");
+});
+
+test("#given SessionStart payload with model #when reading stdin #then returns the model", async () => {
+	const payload = JSON.stringify({
+		hook_event_name: "SessionStart",
+		session_id: "s-1",
+		cwd: "/tmp",
+		model: "gpt-5.6-terra",
+		permission_mode: "default",
+		source: "startup",
+	});
+
+	assert.equal(await readSessionModelFromStdin(stdinFrom(payload)), "gpt-5.6-terra");
+});
+
+test("#given empty or malformed stdin #when reading session model #then returns null", async () => {
+	assert.equal(await readSessionModelFromStdin(stdinFrom("")), null);
+	assert.equal(await readSessionModelFromStdin(stdinFrom("not json")), null);
+	assert.equal(await readSessionModelFromStdin(stdinFrom(JSON.stringify({ model: "  " }))), null);
+	assert.equal(await readSessionModelFromStdin(stdinFrom(JSON.stringify({ session_id: "s-1" }))), null);
+	assert.equal(await readSessionModelFromStdin(null), null);
+});
+
+test("#given a TTY stdin #when reading session model #then returns null without waiting", async () => {
+	const stream = stdinFrom("{}");
+	stream.isTTY = true;
+	assert.equal(await readSessionModelFromStdin(stream), null);
 });
 
 test("#given stale state #when resolving plan #then installer update command is scheduled", () => {
