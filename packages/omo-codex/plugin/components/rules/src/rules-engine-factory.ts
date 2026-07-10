@@ -14,12 +14,17 @@ interface RulesEngineFactoryOptions {
 
 const componentRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
-export function createRulesEngine(options: RulesEngineFactoryOptions, config = configFromEnvironment(options.env)) {
+export function createRulesEngine(
+	options: RulesEngineFactoryOptions,
+	config = configFromEnvironment(options.env),
+	model?: string,
+) {
 	const platform = options.platform ?? process.platform;
 	const pluginRoot = options.env?.["PLUGIN_ROOT"] ?? process.env["PLUGIN_ROOT"] ?? componentRoot;
 
 	return createEngine(config, {
-		findCandidates: (finderOptions) => findRuleCandidates({ ...finderOptions, platform, pluginRoot }),
+		findCandidates: (finderOptions) =>
+			findRuleCandidates({ ...finderOptions, platform, pluginRoot, ...(model === undefined ? {} : { model }) }),
 		findProjectRoot,
 		readFile: (path) => {
 			try {

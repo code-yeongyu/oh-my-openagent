@@ -182,6 +182,7 @@ export async function runPostToolUseHook(
 		completedPostCompactKind !== undefined
 			? withPostCompactBudget(dynamicConfig, { model: input.model, transcriptPath: input.transcript_path })
 			: dynamicConfig,
+		input.model,
 	);
 	hydrateEngineState(engine, cachePath);
 	debugTimer.lap("hydrate", {

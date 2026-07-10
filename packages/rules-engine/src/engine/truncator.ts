@@ -18,7 +18,10 @@ export function isNeverTruncatedRule(relativePath: string): boolean {
 	const normalized = relativePath.replace(/\\/g, "/");
 	const segments = normalized.split("/").filter((segment) => segment.length > 0);
 	const filename = segments.at(-1) ?? normalized;
-	return filename.toLowerCase() === "hephaestus.md";
+	if (filename.toLowerCase() === "hephaestus.md") {
+		return true;
+	}
+	return segments.at(-2)?.toLowerCase() === "hephaestus";
 }
 
 function safeSliceEnd(body: string, end: number): number {

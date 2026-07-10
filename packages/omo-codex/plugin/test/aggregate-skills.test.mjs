@@ -34,7 +34,8 @@ test('#given synced skills and bundled rules #when role-specific agents are spaw
 	const promptFiles = skillEntries
 		.filter((entry) => entry.isDirectory())
 		.map((entry) => join(skillsDir, entry.name, "SKILL.md"));
-	promptFiles.push(join(root, "components", "rules", "bundled-rules", "hephaestus.md"));
+	promptFiles.push(join(root, "components", "rules", "bundled-rules", "hephaestus", "gpt-5.5.md"));
+	promptFiles.push(join(root, "components", "rules", "bundled-rules", "hephaestus", "gpt-5.6.md"));
 
 	const missingForkContext = [];
 	for (const promptPath of promptFiles) {
@@ -53,7 +54,8 @@ test("#given long-running orchestration prompts #when waiting on child agents #t
 		join(root, "skills", "ulw-loop", "references", "full-workflow.md"),
 		join(root, "skills", "review-work", "SKILL.md"),
 		join(root, "skills", "start-work", "SKILL.md"),
-		join(root, "components", "rules", "bundled-rules", "hephaestus.md"),
+		join(root, "components", "rules", "bundled-rules", "hephaestus", "gpt-5.5.md"),
+		join(root, "components", "rules", "bundled-rules", "hephaestus", "gpt-5.6.md"),
 	];
 
 	const missingLivenessGuidance = [];

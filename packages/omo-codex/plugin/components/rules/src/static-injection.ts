@@ -47,7 +47,7 @@ export function runStaticInjection(
 	}
 
 	const effectiveConfig = eventName === "UserPromptSubmit" ? withPromptBudget(config) : config;
-	const engine = createRulesEngine(options, effectiveConfig);
+	const engine = createRulesEngine(options, effectiveConfig, model);
 	hydrateEngineState(engine, cachePath);
 	engine.state.cwd = cwd;
 
@@ -89,7 +89,7 @@ function runPostCompactRecovery(input: PostCompactRecoveryInput): string {
 		model: input.model,
 		transcriptPath: input.transcriptPath,
 	});
-	const engine = createRulesEngine(input.options, effectiveConfig);
+	const engine = createRulesEngine(input.options, effectiveConfig, input.model);
 	hydrateEngineState(engine, input.cachePath);
 	engine.state.cwd = input.cwd;
 
