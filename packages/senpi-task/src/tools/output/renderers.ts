@@ -27,7 +27,7 @@ const TARGET_EXCERPT_MAX = 56
 
 export function renderTaskOutputCall(args: TaskOutputInput, theme: OutputRenderTheme): RenderComponent {
   return {
-    render: (width: number): string[] => [theme.fg("toolTitle", taskOutputCallLine(args, width))],
+    render: (width: number): string[] => linesComponent([theme.fg("toolTitle", taskOutputCallLine(args, width))]).render(width),
     invalidate: (): void => {},
   }
 }

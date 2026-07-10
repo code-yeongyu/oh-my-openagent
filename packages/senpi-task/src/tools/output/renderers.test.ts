@@ -83,6 +83,18 @@ describe("task_output renderers", () => {
     expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(72)
   })
 
+  test("#given a width smaller than the fixed call tokens #when rendering task_output #then the complete ANSI row is clamped", () => {
+    // given / when
+    const line = firstLine(
+      renderTaskOutputCall({ name: "abcdef", mode: "status", block: true }, ANSI_THEME),
+      20,
+    )
+
+    // then
+    expect(line).toContain("...")
+    expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(20)
+  })
+
   test("#given every result detail kind #when rendering compact rows #then rows are exhaustive and transcripts are not echoed", () => {
     // given
     const details: readonly TaskOutputDetails[] = [
