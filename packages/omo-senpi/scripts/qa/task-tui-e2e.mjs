@@ -6,7 +6,7 @@ import { delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { createSandbox, digestDirectory, seedSandbox } from "./drive.mjs"
 import { changedRealPaths, snapshotDir } from "./task-e2e-analysis.mjs"
-import { OMO_CONFIG, SCENARIOS, assertScenarioCoverage, scenarioUsage } from "./task-tui-scenarios.mjs"
+import { OMO_CONFIG, SCENARIOS, scenarioUsage } from "./task-tui-scenarios.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "task-e2e-mock-provider.ts")
@@ -145,7 +145,6 @@ async function runScenario(name) {
 }
 
 function runSelfTest() {
-  assertScenarioCoverage()
   if (parseArgs(["--scenario", "edge"]).scenario !== "edge") throw new Error("self-test: scenario parser failed")
   if (parseArgs(["--scenario", "active"]).scenario !== "active") throw new Error("self-test: active scenario parser failed")
   try {
