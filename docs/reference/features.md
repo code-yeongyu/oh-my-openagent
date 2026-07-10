@@ -579,7 +579,7 @@ You can create powerful specialized agents by combining Categories and Skills.
 
 - **Category**: `ultrabrain`
 - **load_skills**: `[]` (pure reasoning)
-- **Effect**: Leverages GPT-5.5 xhigh reasoning for in-depth system architecture analysis.
+- **Effect**: Uses GPT-5.6 Sol xhigh reasoning through OpenAI or Vercel when available, then GPT-5.5 xhigh, for in-depth system architecture analysis.
 
 #### The Maintainer (Quick Fixes)
 
