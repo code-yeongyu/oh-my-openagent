@@ -2,8 +2,8 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { pathToFileURL } from "node:url";
 
+import { isCliEntry } from "./entry-guard.mjs";
 import { FALLBACK_CATALOG, readModelCatalog } from "./migrate-codex-config/catalog.mjs";
 import { configPaths } from "./migrate-codex-config/config-paths.mjs";
 import { removeStaleContext7PlaceholderMcpServer } from "./migrate-codex-config/context7-placeholder-guard.mjs";
@@ -145,7 +145,7 @@ async function readConfig(configPath) {
 	}
 }
 
-if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isCliEntry(import.meta.url)) {
 	migrateCodexConfig().catch((error) => {
 		if (!(error instanceof Error)) throw error;
 		process.exit(0);

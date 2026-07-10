@@ -1,8 +1,13 @@
+import { readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+
 import { appendBlock, escapeRegExp, findTomlSection, removeSetting, replaceOrInsertSetting } from "./toml-section-editor"
 
 const CODEX_AGENTS_HEADER = "agents"
 const CODEX_MULTI_AGENT_V2_HEADER = "features.multi_agent_v2"
 const CODEX_SUBAGENT_THREAD_LIMIT = 1000
+
+export type CodexMultiAgentVersion = "v1" | "v2" | null
 
 /**
  * Configure Codex subagent thread limits without forcing multi_agent_v2 on.
@@ -13,24 +18,41 @@ const CODEX_SUBAGENT_THREAD_LIMIT = 1000
  * parameters (e.g. gpt-5.5-medium, API-key-only models, third-party
  * providers).  The installer therefore sets only the v1 and v2 tuning knobs
  * so sessions keep the high subagent cap regardless of the active runtime.
+ *
+ * When the selected model prefers V2 (catalog `multi_agent_version: "v2"`,
+ * or a GPT-5.6 family model with the catalog unavailable), the installer
+ * additionally skips/removes `agents.max_threads` (Codex rejects it while
+ * MultiAgentV2 is enabled) and does not materialize `enabled = false` from
+ * the legacy `[features]` boolean shorthand (a config-level disable
+ * mismatches the reserved `collaboration.spawn_agent` schema on some Codex
+ * versions - oh-my-openagent#6002 / #6008).
  */
-export function ensureCodexMultiAgentV2Config(config: string): string {
+export function ensureCodexMultiAgentV2Config(
+  config: string,
+  options: { readonly multiAgentVersion?: CodexMultiAgentVersion } = {},
+): string {
   const featureFlag = removeFeatureFlagSetting(config, "multi_agent_v2")
-  const agentsConfig = ensureAgentsMaxThreads(featureFlag.config)
+  const v2Preferred = options.multiAgentVersion === "v2"
+  const agentsConfig = v2Preferred
+    ? removeAgentsMaxThreads(featureFlag.config)
+    : ensureAgentsMaxThreads(featureFlag.config)
   const section = findTomlSection(agentsConfig, CODEX_MULTI_AGENT_V2_HEADER)
   const maxThreadsValue = CODEX_SUBAGENT_THREAD_LIMIT.toString()
+  const preserveDisable = featureFlag.value === false && !v2Preferred
   if (!section) {
-    const enabledSetting = featureFlag.value === false ? "enabled = false\n" : ""
+    const enabledSetting = preserveDisable ? "enabled = false\n" : ""
     return appendBlock(
       agentsConfig,
       `[${CODEX_MULTI_AGENT_V2_HEADER}]\n${enabledSetting}max_concurrent_threads_per_session = ${maxThreadsValue}\n`,
     )
   }
 
-  const withPreservedDisable =
-    featureFlag.value === false ? replaceOrInsertSetting(agentsConfig, section, "enabled", "false") : agentsConfig
-  const updatedSection =
-    featureFlag.value === false ? findTomlSection(withPreservedDisable, CODEX_MULTI_AGENT_V2_HEADER) : section
+  const withPreservedDisable = preserveDisable
+    ? replaceOrInsertSetting(agentsConfig, section, "enabled", "false")
+    : agentsConfig
+  const updatedSection = preserveDisable
+    ? findTomlSection(withPreservedDisable, CODEX_MULTI_AGENT_V2_HEADER)
+    : section
   if (!updatedSection) {
     return appendBlock(
       withPreservedDisable,
@@ -38,6 +60,55 @@ export function ensureCodexMultiAgentV2Config(config: string): string {
     )
   }
   return replaceOrInsertSetting(withPreservedDisable, updatedSection, "max_concurrent_threads_per_session", maxThreadsValue)
+}
+
+/**
+ * Resolve the configured root model's multi-agent version from the Codex
+ * model catalog cache (`models_cache.json` next to `config.toml`).
+ * Mirrors `plugin/scripts/migrate-codex-config/multi-agent-v2-guard.mjs`:
+ * catalog wins; a GPT-5.6 family model with no catalog entry counts as V2.
+ */
+export function resolveCodexMultiAgentVersion(config: string, configPath: string): CodexMultiAgentVersion {
+  const model = readRootModel(config)
+  if (model === null) return null
+  const catalogVersion = readCatalogMultiAgentVersion(model, join(dirname(configPath), "models_cache.json"))
+  if (catalogVersion !== null) return catalogVersion
+  return /^gpt-5\.6\b/i.test(model) ? "v2" : null
+}
+
+function readCatalogMultiAgentVersion(model: string, cachePath: string): CodexMultiAgentVersion {
+  let raw: string
+  try {
+    raw = readFileSync(cachePath, "utf8")
+  } catch {
+    return null
+  }
+  let cache: unknown
+  try {
+    cache = JSON.parse(raw)
+  } catch {
+    return null
+  }
+  if (!isRecord(cache) || !Array.isArray(cache.models)) return null
+  for (const entry of cache.models) {
+    if (!isRecord(entry)) continue
+    if (entry.slug !== model && entry.id !== model) continue
+    const version = entry.multi_agent_version
+    if (version === "v1" || version === "v2") return version
+    return null
+  }
+  return null
+}
+
+function readRootModel(config: string): string | null {
+  const double = config.match(/^\s*model\s*=\s*"([^"]+)"/m)
+  if (double !== null) return double[1] ?? null
+  const single = config.match(/^\s*model\s*=\s*'([^']+)'/m)
+  return single?.[1] ?? null
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
 function removeFeatureFlagSetting(
@@ -62,6 +133,13 @@ function ensureAgentsMaxThreads(config: string): string {
     return appendBlock(config, `[${CODEX_AGENTS_HEADER}]\nmax_threads = ${maxThreadsValue}\n`)
   }
   return replaceOrInsertSetting(config, section, "max_threads", maxThreadsValue)
+}
+
+function removeAgentsMaxThreads(config: string): string {
+  const section = findTomlSection(config, CODEX_AGENTS_HEADER)
+  if (!section) return config
+  if (!/^\s*max_threads\s*=/m.test(section.text)) return config
+  return removeSetting(config, section, "max_threads")
 }
 
 function readBooleanSetting(sectionText: string, key: string): boolean | null {

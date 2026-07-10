@@ -152,11 +152,11 @@ You don't need every provider. You need the right two.
 | Subscription | Cost | What You Get | Covers |
 |---|---|---|---|
 | **OpenCode Go** | $10/mo | `kimi-k2.5`, `kimi-k2.6`, `glm-5`, `glm-5.1`, `minimax-m2.5`, `minimax-m2.7`, `minimax-m3`, `mimo-v2-pro`, `qwen3.5-plus`, `qwen3.6-plus` | Claude-family alternatives (Kimi, GLM), Gemini-family alternatives (Qwen), utility/retrieval (MiniMax) |
-| **OpenAI Plus/Pro** | $20+/mo | `gpt-5.4`, `gpt-5.4-pro`, `gpt-5.5`, `gpt-5.5-codex` | GPT-native agents (Hephaestus, Oracle, Momus), GPT fallbacks for model-flexible agents |
+| **OpenAI Plus/Pro** | $20+/mo | `gpt-5.4`, `gpt-5.4-pro`, `gpt-5.5`, `gpt-5.5-codex`, `gpt-5.6-sol` | GPT-native agents (Hephaestus, Oracle, Momus), GPT fallbacks for model-flexible agents |
 
 ### Why this specific combination
 
-1. **Hephaestus requires GPT-5.5.** It has no Claude-family fallback. ChatGPT Plus/Pro or OpenAI API access is the cheapest real path.
+1. **Hephaestus requires the GPT-5.x family (default: GPT-5.6 sol).** It has no Claude-family fallback. ChatGPT Plus/Pro or OpenAI API access is the cheapest real path.
 2. **OpenCode Go covers the orchestration and creative surface.** Kimi K2.5/2.6 behaves like Claude for Sisyphus/Atlas. GLM-5 fills the long tail. Qwen handles visual tasks when Gemini isn't available.
 3. **No single provider can cover everything.** Anthropic-only setups break Hephaestus. OpenAI-only setups degrade Sisyphus. You need at least one from each family.
 
@@ -209,8 +209,9 @@ Used by: Hephaestus, Oracle, Momus, `deep`, `ultrabrain`, `quick`, Prometheus (G
 
 | Priority | Model | Provider | Why |
 |---|---|---|---|
-| 1 | `gpt-5.5` / `gpt-5.4` (pro / xhigh / high / medium) | `openai`, `github-copilot`, `opencode`, `vercel` | Native OpenAI is the gold standard for principle-driven prompts. Hephaestus requires this family. |
-| 2 | `gpt-5.5-codex` | same | Still the deep-coding powerhouse. Kept as an explicit override option. |
+| 1 | `gpt-5.6-sol` (xhigh / high / medium) | `openai`, `vercel` | The GPT-5.6 flagship. New default for Hephaestus (medium), `deep` (high), and `ultrabrain` (xhigh). |
+| 2 | `gpt-5.5` / `gpt-5.4` (pro / xhigh / high / medium) | `openai`, `github-copilot`, `opencode`, `vercel` | Previous flagship generation; first fallback on providers without GPT-5.6. Hephaestus requires this family. |
+| 3 | `gpt-5.5-codex` | same | Still the deep-coding powerhouse. Kept as an explicit override option. |
 | 3 | **DeepSeek — LIMITED ALTERNATIVE** (`deepseek-v3.2`, `deepseek-chat-v3.1`) | `openrouter/deepseek` | Closest OSS equivalent for autonomous coding behavior. Not wired into default chains — add via `fallback_models`. |
 | 4 | **MiniMax — STRONGLY DISCOURAGED** (`minimax-m3`, `minimax-m2.7`, `minimax-m2.5`) | `opencode-go`, `opencode`, `openrouter/minimax` | Used only in **utility** fallback chains (Explore, Librarian, `quick`). Consistency and long-context management issues make it a poor substitute for Hephaestus/Oracle. Do NOT override deep agents to MiniMax. |
 
@@ -269,7 +270,7 @@ These agents are built for GPT's principle-driven style. Their prompts assume au
 
 | Agent | Role | Fallback Chain |
 |---|---|---|
-| **Hephaestus** | Autonomous deep worker | `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (medium) — single-entry chain, requires one of those providers. The craftsman. |
+| **Hephaestus** | Autonomous deep worker | `openai\|vercel/gpt-5.6-sol` (medium) → `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (medium) — GPT-only chain, requires one of those providers. The craftsman. |
 | **Oracle** | Architecture consultant | `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (high) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `opencode-go\|vercel/glm-5.1` |
 | **Momus** | Ruthless reviewer | `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (xhigh) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `opencode-go\|vercel/glm-5.1` |
 
@@ -363,8 +364,8 @@ When agents delegate work, they don't pick a model name — they pick a **catego
 |---|---|---|---|
 | `visual-engineering` | Frontend, UI, CSS, design | `google/gemini-3.1-pro` (high) | Gemini → `zai-coding-plan/glm-5` → `claude-opus-4-7` (max) → `opencode-go/glm-5.1` → `kimi-for-coding/k2p5` |
 | `artistry` | Creative, novel approaches | `google/gemini-3.1-pro` (high) | Gemini → `claude-opus-4-7` (max) → `gpt-5.5` |
-| `ultrabrain` | Maximum reasoning needed | `openai/gpt-5.5` (xhigh) | GPT-5.5 xhigh → `gemini-3.1-pro` (high) → `claude-opus-4-7` (max) → `opencode-go/glm-5.1` |
-| `deep` | Deep coding, complex logic | `openai/gpt-5.5` (medium) | GPT-5.5 → `claude-opus-4-7` (max) → `gemini-3.1-pro` (high) |
+| `ultrabrain` | Maximum reasoning needed | `openai/gpt-5.6-sol` (xhigh) | GPT-5.6-sol xhigh → `gpt-5.5` (xhigh) → `gemini-3.1-pro` (high) → `claude-opus-4-7` (max) → `opencode-go/glm-5.1` |
+| `deep` | Deep coding, complex logic | `openai/gpt-5.6-sol` (high) | GPT-5.6-sol high → `gpt-5.5` (medium) → `claude-opus-4-7` (max) → `gemini-3.1-pro` (high) |
 | `quick` | Simple, fast tasks | `openai/gpt-5.4-mini` | GPT-5.4-mini → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `gemini-3-flash` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` → `opencode/gpt-5-nano` |
 | `unspecified-high` | General complex work | `anthropic/claude-opus-4-7` (max) | Opus → `gpt-5.5` (high) → `zai-coding-plan/glm-5` → `kimi-for-coding/k2p5` → `opencode-go/glm-5.1` → `opencode/kimi-k2.5` → `moonshotai/kimi-k2.5` |
 | `unspecified-low` | General standard work | `anthropic/claude-sonnet-4-6` | Sonnet → `gpt-5.5-codex` (medium) → `opencode-go/kimi-k2.6` → `google/gemini-3-flash` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` |
@@ -394,7 +395,7 @@ See the [Orchestration System Guide](./orchestration.md) for how agents dispatch
     },
 
     // Hephaestus: needs GPT. ChatGPT Plus gets you here.
-    "hephaestus": { "model": "openai/gpt-5.5", "variant": "medium" },
+    "hephaestus": { "model": "openai/gpt-5.6-sol", "variant": "medium" },
 
     // Architecture consultation: GPT or Claude Opus
     "oracle": { "model": "openai/gpt-5.5", "variant": "high" },
@@ -412,8 +413,8 @@ See the [Orchestration System Guide](./orchestration.md) for how agents dispatch
 
   "categories": {
     "visual-engineering": { "model": "opencode-go/qwen3.6-plus" },  // Qwen as Gemini alt
-    "deep": { "model": "openai/gpt-5.5", "variant": "medium" },
-    "ultrabrain": { "model": "openai/gpt-5.5", "variant": "xhigh" },
+    "deep": { "model": "openai/gpt-5.6-sol", "variant": "high" },
+    "ultrabrain": { "model": "openai/gpt-5.6-sol", "variant": "xhigh" },
     "quick": { "model": "openai/gpt-5.4-mini" },
     "unspecified-low": { "model": "opencode-go/kimi-k2.7-code" },
     "unspecified-high": { "model": "opencode-go/kimi-k2.7-code" },

@@ -224,3 +224,36 @@ test("#given completed pending update #when hook session-start runs as CLI #then
 	assert.equal(repeat.status, 0);
 	assert.equal(repeat.stdout, "");
 });
+
+test("#given the script reached through a symlinked directory #when hook session-start runs as CLI #then the entry guard still fires", async () => {
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-restart-notice-symlink-"));
+	const env = autoUpdateEnv(root, {
+		LAZYCODEX_CURRENT_VERSION: "1.0.1",
+		LAZYCODEX_LATEST_VERSION: "1.0.1",
+		LAZYCODEX_CONFIG_MIGRATION_DISABLED: "1",
+	});
+	await writeFile(env.LAZYCODEX_AUTO_UPDATE_STATE_PATH, JSON.stringify({
+		lastCheckedAt: Date.now() - 1_000,
+		lastStatus: "success",
+		pendingNotice: { fromVersion: "1.0.0", toVersion: "1.0.1", startedAt: 1 },
+	}));
+	// Simulate a symlinked plugin cache dir: argv[1] spells the symlink, while
+	// import.meta.url resolves to the real path. Seen in the wild; the old
+	// `pathToFileURL(process.argv[1])` guard never matched and the hook was a
+	// silent no-op.
+	const { symlink } = await import("node:fs/promises");
+	const { dirname } = await import("node:path");
+	const linkDir = join(root, "linked-scripts");
+	await symlink(dirname(SCRIPT_PATH), linkDir, "dir");
+	const linkedScript = join(linkDir, "auto-update.mjs");
+
+	const result = spawnSync(process.execPath, [linkedScript, "hook", "session-start"], {
+		encoding: "utf8",
+		env: { ...process.env, ...env },
+	});
+
+	assert.equal(result.status, 0);
+	const lines = result.stdout.split("\n").filter((line) => line.length > 0);
+	assert.equal(lines.length, 1, `expected one SessionStart JSON line, got stdout=${JSON.stringify(result.stdout)} stderr=${JSON.stringify(result.stderr)}`);
+	assert.equal(JSON.parse(lines[0]).hookSpecificOutput.hookEventName, "SessionStart");
+});

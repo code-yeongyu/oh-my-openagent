@@ -21,6 +21,11 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   ultrabrain: {
     fallbackChain: [
       {
+        providers: ["openai", "vercel"],
+        model: "gpt-5.6-sol",
+        variant: "xhigh",
+      },
+      {
         providers: ["openai", "opencode", "vercel"],
         model: "gpt-5.5",
         variant: "xhigh",
@@ -40,6 +45,11 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   deep: {
     fallbackChain: [
+      {
+        providers: ["openai", "vercel"],
+        model: "gpt-5.6-sol",
+        variant: "high",
+      },
       {
         providers: ["openai", "github-copilot", "opencode", "vercel"],
         model: "gpt-5.5",
