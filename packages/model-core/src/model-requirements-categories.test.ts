@@ -53,7 +53,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(third?.model).toBe("claude-opus-4-7")
     expect(third?.variant).toBe("max")
     expect(fourth?.providers[0]).toBe("opencode-go")
-    expect(fourth?.model).toBe("glm-5.1")
+    expect(fourth?.model).toBe("glm-5.2")
     expect(fifth?.providers[0]).toBe("kimi-for-coding")
     expect(fifth?.model).toBe("k2p5")
   })
