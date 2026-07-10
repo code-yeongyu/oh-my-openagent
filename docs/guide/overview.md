@@ -192,10 +192,10 @@ You can override specific agents or categories in your config:
     },
 
     // Hard logic and architecture: GPT-5.5 xhigh
-    "ultrabrain": { "model": "openai/gpt-5.5", "variant": "xhigh" },
+    "ultrabrain": { "model": "openai/gpt-5.6-sol", "variant": "xhigh" },
 
     // Autonomous research and execution
-    "deep": { "model": "openai/gpt-5.5", "variant": "medium" },
+    "deep": { "model": "openai/gpt-5.6-sol", "variant": "high" },
 
     // Creative and design work
     "artistry": { "model": "google/gemini-3.1-pro", "variant": "high" },
