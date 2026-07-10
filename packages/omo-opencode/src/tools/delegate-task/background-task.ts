@@ -213,6 +213,10 @@ export async function executeBackgroundTask(
       })}`
       : ""
 
+    const completionGuidance = executorCtx.blockOnBackgroundTasks
+      ? "Before ending your turn, you MUST call `wait-for-background-tasks` so the session is not terminated while tasks are still running. It blocks until all tasks finish and returns their results."
+      : "Do NOT call background_output now. Wait for <system-reminder> notification first. The system will deliver the result when the task completes; you do not need to poll for it."
+
     return `Background task launched.
 
 Background Task ID: ${task.id}
@@ -220,7 +224,7 @@ Description: ${task.description}
 Agent: ${task.agent}${args.category ? ` (category: ${args.category})` : ""}
 Status: ${task.status}
 
-Do NOT call background_output now. Wait for <system-reminder> notification first. The system will deliver the result when the task completes; you do not need to poll for it.${taskMetadataBlock}`
+${completionGuidance}${taskMetadataBlock}`
   } catch (error) {
     return formatDetailedError(error, {
       operation: "Launch background task",

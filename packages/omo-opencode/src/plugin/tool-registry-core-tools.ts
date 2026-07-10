@@ -23,7 +23,9 @@ export function createCoreTools(args: {
   readonly factories: ToolRegistryFactories
 }): Record<string, ToolDefinition> {
   const { ctx, pluginConfig, managers, skillContext, availableCategories, factories } = args
-  const backgroundTools = factories.createBackgroundTools(managers.backgroundManager, ctx.client)
+  const backgroundTools = factories.createBackgroundTools(managers.backgroundManager, ctx.client, {
+    blockOnBackgroundTasks: pluginConfig.experimental?.block_on_background_tasks,
+  })
   const callOmoAgent = factories.createCallOmoAgent(
     ctx,
     managers.backgroundManager,
@@ -63,6 +65,7 @@ export function createCoreTools(args: {
     getLoadedSkills,
     sisyphusAgentConfig: pluginConfig.sisyphus_agent,
     syncPollTimeoutMs: pluginConfig.background_task?.syncPollTimeoutMs,
+    blockOnBackgroundTasks: pluginConfig.experimental?.block_on_background_tasks,
     modelFallbackControllerAccessor: managers.modelFallbackControllerAccessor,
     onSyncSessionCreated: async (event) => {
       log("[index] onSyncSessionCreated callback", {
