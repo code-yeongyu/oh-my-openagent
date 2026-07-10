@@ -29,7 +29,7 @@ function patternFromParts(parts, flags) {
 }
 
 const multiAgentV2RoleGuidance =
-	"On `multi_agent_v2` sessions the same `agent_type` applies (the OMO installer exposes it) with `fork_turns` instead of `fork_context`.";
+	"If instead a flat `spawn_agent` with a required `task_name` exists (`multi_agent_v2`), rewrite every `multi_agent_v1.*` example:";
 const loadSkillsGuidance =
 	"When translating `load_skills=[...]`, include the requested skill names in the spawned agent's `message`.";
 
@@ -148,7 +148,9 @@ call_omo_agent(subagent_type="explore", prompt="inspect")
 	assert.match(adapted, /fork_context":false/);
 	assert.match(adapted, /"agent_type":"explorer"/);
 	assert.match(adapted, /multi_agent_v1\.wait_agent/);
-	assert.doesNotMatch(adapted, /task_name/);
+	assert.match(adapted, /"task_name":"<lowercase_digits_underscores>"/);
+	assert.match(adapted, /fork_turns/);
+	assert.doesNotMatch(adapted, /\| `spawn_agent\({"task_name"/);
 	assert.doesNotMatch(adapted, /Obsolete generated compatibility prose/);
 });
 

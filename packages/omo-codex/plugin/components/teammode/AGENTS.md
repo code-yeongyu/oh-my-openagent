@@ -41,6 +41,6 @@ Codex team-mode component. Two deliverables in one dir:
 - Archive ambiguity: "Ambiguous Codex thread id" from `codex_app.set_thread_archived` is an app-thread archival blocker, not a team-state blocker. Record it via `archive --note`, never claim the thread was archived, never delete team state before evidence is copied or the user accepts the loss.
 - `integrate` lands member branches with merge commits only (`--no-ff`); never squash or rebase.
 - `bind-thread` refuses while the team has fewer than 2 members; a single-member team is a subagent, not a team. Member focus, name, and threadTitle must each be unique (case/whitespace-insensitive).
-- Every member is a real `codex_app.create_thread` thread bound via `bind-thread`; `multi_agent_v1.spawn_agent` is never a substitute.
+- Every member is a real `codex_app.create_thread` thread bound via `bind-thread`; a spawned in-process subagent (`multi_agent_v1.spawn_agent` or flat `spawn_agent`) is never a substitute.
 - The hook must stay silent (empty stdout) on unrelated tools and malformed payloads; it never blocks a Codex turn.
 - `init` with an explicit `--session <leader thread id>` makes `leader.sessionId` messageable; without it members cannot report and the leader is stuck polling. Re-running `init` is a safe no-op.

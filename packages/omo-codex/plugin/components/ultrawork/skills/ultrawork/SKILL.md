@@ -266,6 +266,7 @@ Every `multi_agent_v1.spawn_agent` message is self-contained and starts with
 handoff. Use `fork_context: false` unless full history is truly
 required; paste only the context the child needs. Full-history forks can
 make the child continue old parent context instead of the delegated task.
+If your tool list has a flat `spawn_agent` with a required `task_name` instead of `multi_agent_v1.*` (`multi_agent_v2`), rewrite: `fork_context: false` becomes `fork_turns: "none"`, `send_input` becomes `send_message`, finished agents end on their own (no `close_agent`; `followup_task` re-tasks, `interrupt_agent` stops), and `wait_agent` takes only `timeout_ms`, returning on any child mailbox activity.
 
 # TOML-backed subagent routing compatibility
 Treat TOML-backed role routing as **routing-unverified**. The
