@@ -156,10 +156,10 @@ By combining these two concepts, you can generate optimal agents through `task`.
 | -------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `visual-engineering` | `google/gemini-3.1-pro` (high)  | Frontend, UI/UX, design, styling, animation                                                                                 |
 | `ultrabrain`         | `openai/gpt-5.6-sol` (xhigh)    | Deep logical reasoning, complex architecture decisions requiring extensive analysis                                         |
-| `deep`               | `openai/gpt-5.6-sol` (high)     | Goal-oriented autonomous problem-solving on hairy problems requiring deep research. ONE goal + ONE deliverable per call — multiple goals must fan out as parallel `deep` calls, never bundled into one. |
+| `deep`               | `openai/gpt-5.6-terra` (xhigh)  | Goal-oriented autonomous problem-solving on hairy problems requiring deep research. ONE goal + ONE deliverable per call — multiple goals must fan out as parallel `deep` calls, never bundled into one. |
 | `artistry`           | `google/gemini-3.1-pro` (high)  | Highly creative/artistic tasks, novel ideas                                                                                 |
 | `quick`              | `openai/gpt-5.4-mini`           | Trivial tasks - single file changes, typo fixes, simple modifications                                                       |
-| `unspecified-low`    | `anthropic/claude-sonnet-4-6`   | Tasks that don't fit other categories, low effort required                                                                  |
+| `unspecified-low`    | `openai/gpt-5.6-luna` (xhigh)   | Tasks that don't fit other categories, low effort required                                                                  |
 | `unspecified-high`   | `anthropic/claude-opus-4-7` (max) | Tasks that don't fit other categories, high effort required                                                               |
 | `writing`            | `kimi-for-coding/k2p5`          | Documentation, prose, technical writing                                                                                     |
 

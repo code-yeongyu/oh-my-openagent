@@ -542,9 +542,11 @@ Not all models behave the same way. Understanding "similar" families helps you m
 
 | Model             | Provider(s)                      | Notes                                                                                                       |
 | ----------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| **GPT-5.6 Sol**   | openai, vercel                   | Preferred when available for Hephaestus, Momus, `deep`, and `ultrabrain`, with role-specific effort levels. |
+| **GPT-5.6 Sol**   | openai, vercel                   | Preferred when available for Hephaestus, Momus, and `ultrabrain`, with role-specific effort levels; first fallback for `deep`. |
+| **GPT-5.6 Terra** | openai, vercel                   | GPT-5.6 mid-tier. Default for the `deep` category (xhigh).                                                 |
+| **GPT-5.6 Luna**  | openai, vercel                   | GPT-5.6 light tier. Default for the `unspecified-low` category (xhigh).                                    |
 | **GPT-5.5-codex** | openai, github-copilot, opencode | Deep coding powerhouse available as an explicit override.                                                  |
-| **GPT-5.5**       | openai, github-copilot, opencode, vercel | Default for Oracle and the first GPT fallback for Hephaestus, Momus, `deep`, and `ultrabrain`.       |
+| **GPT-5.5**       | openai, github-copilot, opencode, vercel | Default for Oracle and the first GPT-5.5-family fallback for Hephaestus, Momus, `deep`, and `ultrabrain`. |
 | **GPT-5.4 Mini**  | openai, github-copilot, opencode, vercel | Fast + strong reasoning. Default for quick category.                                                |
 | **GPT-5-Nano**    | opencode, vercel                 | Ultra-cheap, fast. Good for simple utility tasks.                                                           |
 

@@ -100,7 +100,7 @@ Use Hephaestus when you need deep architectural reasoning, complex debugging acr
 
 - **Multi-model orchestration.** Pure Codex is single-model. OmO routes different tasks to different models automatically. GPT for deep reasoning. Gemini for frontend. GPT-5.4 Mini for speed. The right brain for the right job.
 - **Background agents.** Fire 5+ agents in parallel. Something Codex simply cannot do. While one agent writes code, another researches patterns, another checks documentation. Like a real dev team.
-- **Category system.** Tasks are routed by intent, not model name. `visual-engineering` gets Gemini. `ultrabrain` prefers GPT-5.6 Sol xhigh through OpenAI or Vercel. `deep` prefers GPT-5.6 Sol high through OpenAI or Vercel. `artistry` gets Gemini. `quick` gets GPT-5.4 Mini. `unspecified-low` gets fast general-purpose models. `unspecified-high` gets Claude Opus. `writing` gets prose-optimized models. No manual juggling.
+- **Category system.** Tasks are routed by intent, not model name. `visual-engineering` gets Gemini. `ultrabrain` prefers GPT-5.6 Sol xhigh through OpenAI or Vercel. `deep` prefers GPT-5.6 Terra xhigh through OpenAI or Vercel. `artistry` gets Gemini. `quick` gets GPT-5.4 Mini. `unspecified-low` prefers GPT-5.6 Luna xhigh. `unspecified-high` gets Claude Opus. `writing` gets prose-optimized models. No manual juggling.
 - **Accumulated wisdom.** Subagents learn from previous results. Conventions discovered in task 1 are passed to task 5. Mistakes made early aren't repeated. The system gets smarter as it works.
 
 ### Prometheus: The Strategic Planner
@@ -195,7 +195,7 @@ You can override specific agents or categories in your config:
     "ultrabrain": { "model": "openai/gpt-5.6-sol", "variant": "xhigh" },
 
     // Autonomous research and execution
-    "deep": { "model": "openai/gpt-5.6-sol", "variant": "high" },
+    "deep": { "model": "openai/gpt-5.6-terra", "variant": "xhigh" },
 
     // Creative and design work
     "artistry": { "model": "google/gemini-3.1-pro", "variant": "high" },
