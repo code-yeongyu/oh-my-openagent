@@ -101,7 +101,7 @@ const lazycodexAgentInvariants = new Map([
 		{
 			model: "gpt-5.6-sol",
 			effort: "xhigh",
-			includes: [/codeQualityStatus/, /recommendation/, /\.omo\/evidence\/<goal>-code-review\.md/],
+			includes: [/codeQualityStatus/, /recommendation/, /<attemptDir>\/<goalId>-code-review\.md/, /currentAttemptDir/],
 		},
 	],
 	[
@@ -109,7 +109,7 @@ const lazycodexAgentInvariants = new Map([
 		{
 			model: "gpt-5.6-terra",
 			effort: "medium",
-			includes: [/not_applicable/, /surfaceEvidence/, /adversarialCases/],
+			includes: [/not_applicable/, /surfaceEvidence/, /adversarialCases/, /<attemptDir>\/<goalId>-manual-qa\.md/],
 		},
 	],
 	[
@@ -117,7 +117,7 @@ const lazycodexAgentInvariants = new Map([
 		{
 			model: "gpt-5.6-sol",
 			effort: "xhigh",
-			includes: [/APPROVE\/REJECT/, /blockers/, /\.omo\/evidence\/<goal>-gate-review\.md/],
+			includes: [/APPROVE\/REJECT/, /blockers/, /<attemptDir>\/<goalId>-gate-review\.md/, /currentAttemptDir/],
 		},
 	],
 ]);
@@ -170,7 +170,8 @@ test("#given planner agent prompt #when inspected #then generated artifacts stay
 	const prompt = await readFile(join(root, "components", "ultrawork", "agents", "plan.toml"), "utf8");
 
 	assert.match(prompt, /\.omo\/plans\/<slug>\.md/);
-	assert.match(prompt, /\.omo\/evidence\/task-<N>-<slug>\.<ext>/);
+	assert.match(prompt, /<attemptDir>\/task-<N>-<slug>\.<ext>/);
+	assert.match(prompt, /\.omo\/evidence\/ulw\/<session>\/<goalId>\/a<attempt>/);
 	assert.doesNotMatch(prompt, /(?<!\.omo\/)plans\/<slug>\.md/);
 	assert.doesNotMatch(prompt, /(?<!\.omo\/)evidence\/task-/);
 });
