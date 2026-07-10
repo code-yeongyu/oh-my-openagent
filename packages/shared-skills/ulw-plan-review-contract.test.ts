@@ -1,4 +1,12 @@
+/// <reference path="../../bun-test.d.ts" />
+
 import { describe, expect, test } from "bun:test"
+
+declare const Bun: {
+	file(path: URL): {
+		text(): Promise<string>
+	}
+}
 
 const skillCopies = [
 	{
@@ -38,7 +46,10 @@ for (const copy of skillCopies) {
 			// Regression pin: real sessions dispatched 2x momus + oracle in one batch
 			// (opencode ses_0ccf84a1c..., ses_0cd1e299a... on 2026-07-05).
 			expect(review).toMatch(/exactly one `momus`/i)
-			expect(review).toMatch(/never .{0,80}second `?momus`?/i)
+			expect(review).toMatch(/momus runs at ultra/i)
+			expect(review).toMatch(/terminal result/i)
+			expect(review).toMatch(/elapsed time alone/i)
+			expect(review).toMatch(/cancell?ing, duplicating, replacing, or treating it as failed/i)
 			expect(review).toMatch(/both verdicts/i)
 			expect(review).toMatch(/in flight/i)
 			expect(review).toMatch(/complete plan file/i)
