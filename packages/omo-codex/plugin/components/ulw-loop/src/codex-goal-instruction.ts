@@ -52,6 +52,7 @@ function buildText(
 		"- Use the create_goal payload exactly as rendered: objective only.",
 		"- Goals are unlimited. Do not add numeric limits.",
 		...modeConstraintLines(mode, isFinal),
+		...evidenceLayoutLines(plan),
 		finalSection(plan, goal, isFinal, mode === "aggregate"),
 		...checkpointLines(plan, mode),
 		"",
@@ -101,6 +102,13 @@ function formatCriterionLine(criterion: UlwLoopSuccessCriterion): string {
 	const remainingWork = criterion.status === "pending" ? " remaining work:" : "";
 	const marker = isEssentialCriterion(criterion) ? "essential" : "non-essential";
 	return `-${remainingWork} [${criterion.id}] [${marker}] (${criterion.userModel}) ${criterion.scenario} — expect: ${criterion.expectedEvidence} — status: ${criterion.status}`;
+}
+
+function evidenceLayoutLines(plan: UlwLoopPlan): string[] {
+	if (plan.evidenceLayoutVersion !== 2) return [];
+	return [
+		"- Evidence layout v2: write every artifact for the active goal (QA matrix, review reports, receipts) under the current attempt directory — read currentAttemptDir from `omo ulw-loop status --json` (.omo/evidence/ulw/<session>/<goalId>/a<attempt>). The final checkpoint rejects quality-gate artifacts outside that directory.",
+	];
 }
 
 function finalSection(plan: UlwLoopPlan, goal: UlwLoopItem, isFinal: boolean, aggregate: boolean): string {
