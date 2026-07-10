@@ -1,5 +1,6 @@
 import { log } from "@oh-my-opencode/utils"
 
+import { isRunnerError } from "../runners/in-process/runner-error"
 import { createTaskRecord, parseTaskId } from "../state"
 import type { TaskRecord } from "../state"
 import { createSteeringEngine } from "../steering"
@@ -44,6 +45,25 @@ type LaunchContext = {
 }
 
 const NOOP_DESTRUCTION: DestructionPort = { destroyResidentTask: () => Promise.resolve() }
+const GENERIC_START_FAILURE_MESSAGE = "Task runner failed to start."
+
+function publicStartFailureMessage(error: unknown): string {
+  try {
+    if (!isRunnerError(error)) return GENERIC_START_FAILURE_MESSAGE
+    switch (error.failure.kind) {
+      case "depth-exceeded":
+        return "In-process child depth limit exceeded."
+      case "session-create-failed":
+        return "In-process child session creation failed."
+      case "child-prompt-failed":
+        return "In-process child prompt failed to start."
+      default:
+        return GENERIC_START_FAILURE_MESSAGE
+    }
+  } catch {
+    return GENERIC_START_FAILURE_MESSAGE
+  }
+}
 
 // allow: SIZE_OK - one stateful manager keeps concurrency, queue, live-handle, and waiter invariants in one closure-backed implementation.
 class TaskManagerImpl implements TaskManager {
@@ -227,8 +247,8 @@ class TaskManagerImpl implements TaskManager {
     let handle: ManagedChildHandle
     try {
       handle = await runner.start(managedSpec)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
+    } catch (error) { // no-excuse-ok: catch - runner boundary converts every thrown value into a public classification.
+      const message = publicStartFailureMessage(error)
       this.#releaseSlot(record.task_id, model, record.notification.run_epoch)
       this.#options.store.transition(record.task_id, { type: "fail", timestamp: nowIso(this.#now), error_message: message })
       this.#options.store.appendEvent(record.task_id, { type: "task_start_failed", payload: { error_message: message } })

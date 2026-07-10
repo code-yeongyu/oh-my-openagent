@@ -220,10 +220,10 @@ describe("TaskManager.start", () => {
       model: "openai/gpt-5.6-sol",
       resolved_model: resolvedModel,
       run_in_background: true,
-      reason: "runner boom",
+      reason: "Task runner failed to start.",
     })
     expect(row).toBe(
-      `task category:ultrabrain (GPT-5.6 Sol reasoning:xhigh) <i>background</i> error id:${result.details.task_id} reason:runner boom`,
+      `task category:ultrabrain (GPT-5.6 Sol reasoning:xhigh) <i>background</i> error id:${result.details.task_id} reason:Task runner failed to start.`,
     )
     expect(JSON.stringify({ result, row })).not.toContain(privatePrompt)
   })

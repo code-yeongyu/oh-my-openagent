@@ -2,6 +2,7 @@ import { createAgentSession, SessionManager, type CreateAgentSessionOptions, typ
 
 import { createChildResourceLoader } from "./in-process/child-loader"
 import { createChildHandle, type ChildHandle, type ChildSession } from "./in-process/child-handle"
+import { RunnerError } from "./in-process/runner-error"
 import { mergeChildCustomTools } from "./in-process/shared-tool-filter"
 import { buildSubagentPrompt } from "./in-process/subagent-prompt"
 
@@ -19,8 +20,7 @@ export {
   mergeChildCustomTools,
   type SharedToolFilterOptions,
 } from "./in-process/shared-tool-filter"
-
-import type { RunnerFailure } from "./in-process/child-handle"
+export { RunnerError } from "./in-process/runner-error"
 
 export const DEFAULT_MAX_CHILD_DEPTH = 4
 
@@ -58,16 +58,6 @@ export type InProcessRunnerOptions = {
   readonly uiOnlyToolNames?: Iterable<string>
   readonly depthPolicy?: DepthPolicy
   readonly createSession?: CreateChildSession
-}
-
-export class RunnerError extends Error {
-  readonly failure: RunnerFailure
-
-  constructor(failure: RunnerFailure) {
-    super(failure.message, failure.cause === undefined ? undefined : { cause: failure.cause })
-    this.name = "RunnerError"
-    this.failure = failure
-  }
 }
 
 const defaultCreateChildSession: CreateChildSession = async (options) => (await createAgentSession(options)).session
