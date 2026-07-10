@@ -3779,6 +3779,7 @@ describe("sisyphus-task", () => {
       // then - default model from DEFAULT_CATEGORIES is used
       const category = expectResolvedCategoryConfig(resolved)
       expect(category.config.model).toBe("openai/gpt-5.6-luna")
+      expect(category.config.variant).toBe("xhigh")
     })
 
     test("category built-in model takes precedence over inheritedModel for builtin category", () => {
