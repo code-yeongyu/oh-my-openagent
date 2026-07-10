@@ -57,6 +57,7 @@ export interface UlwLoopAggregateCompletion {
 
 export interface UlwLoopPlan {
 	version: 1;
+	evidenceLayoutVersion?: 2;
 	createdAt: string;
 	updatedAt: string;
 	briefPath: string;

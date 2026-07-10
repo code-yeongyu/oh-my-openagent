@@ -37,6 +37,7 @@ export interface QualityGateFs {
 export interface ValidateQualityGateOptions {
 	readonly repoRoot: string;
 	readonly fs: QualityGateFs;
+	readonly currentAttemptDir?: string;
 }
 
 function reviewerRoleField<T extends string>(value: unknown, expected: T, field: string): T {
@@ -94,6 +95,14 @@ function checkFile(path: string, field: string, opts?: ValidateQualityGateOption
 	if (!opts.fs.existsSync(absolute)) invalid(`${field} must point to an existing artifact.`, field);
 	const stat = opts.fs.statSync(absolute);
 	if (stat.size <= 0) invalid(`${field} must point to a non-empty artifact.`, field);
+	if (opts.currentAttemptDir !== undefined) {
+		const attemptRoot = resolve(opts.repoRoot, opts.currentAttemptDir);
+		if (absolute !== attemptRoot && !absolute.startsWith(`${attemptRoot}/`))
+			invalid(
+				`${field} (${path}) must point to an artifact from the current attempt (${opts.currentAttemptDir}).`,
+				field,
+			);
+	}
 }
 
 function artifactMap(refs: readonly UlwLoopManualQaArtifactRef[]): Map<string, UlwLoopManualQaArtifactRef> {

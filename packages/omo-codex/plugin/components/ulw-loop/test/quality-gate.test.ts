@@ -284,3 +284,22 @@ describe("quality gate middle states (WATCH / reasoned not_applicable)", () => {
 	});
 });
 
+describe("validateQualityGate attempt containment", () => {
+	const ATTEMPT_OPTS = { ...FS_OPTS, currentAttemptDir: "test/fixtures/artifacts" } as const;
+
+	it("#given artifacts inside the current attempt dir #when validating #then the gate accepts", () => {
+		expect(() => validateQualityGate(makeGate(), ATTEMPT_OPTS)).not.toThrow();
+	});
+
+	it("#given an artifact outside the current attempt dir #when validating #then the gate rejects naming the path", () => {
+		const opts = { ...FS_OPTS, currentAttemptDir: "test/fixtures/elsewhere" } as const;
+		expect(() => validateQualityGate(makeGate(), opts)).toThrow(
+			/\(test\/fixtures\/artifacts\/cli-pass\.txt\) must point to an artifact from the current attempt \(test\/fixtures\/elsewhere\)/,
+		);
+	});
+
+	it("#given a sibling dir sharing the attempt dir prefix #when validating #then the gate still rejects", () => {
+		const opts = { ...FS_OPTS, currentAttemptDir: "test/fixtures/artifact" } as const;
+		expect(() => validateQualityGate(makeGate(), opts)).toThrow(/current attempt/);
+	});
+});
