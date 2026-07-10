@@ -25,7 +25,7 @@ import type {
 
 export const SESSION_START_CWD_ENV = "OMO_CODEGRAPH_SESSION_START_CWD";
 
-const CODEGRAPH_VERSION = "1.0.1";
+const CODEGRAPH_VERSION = "1.3.1";
 const COMMAND_TIMEOUT_MS = 60_000;
 const WINDOWS_CMD_EXTENSIONS = new Set([".bat", ".cmd"]);
 const WINDOWS_NODE_SCRIPT_EXTENSIONS = new Set([".cjs", ".js", ".mjs"]);

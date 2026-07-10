@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-`@sisyphuslabs/codex-codegraph` (private, Node >=20, bin `omo-codegraph`). Wraps the external CodeGraph CLI (`@colbymchenry/codegraph`, pinned `1.0.1` as optionalDependency + `CODEGRAPH_VERSION` constant) behind a stdio MCP server plus Codex lifecycle hooks. Two committed dists ship in the published payload; rebuild `dist/` in the same change as `src/` edits.
+`@sisyphuslabs/codex-codegraph` (private, Node >=20, bin `omo-codegraph`). Wraps the external CodeGraph CLI (`@colbymchenry/codegraph`, pinned `1.3.1` as optionalDependency + `CODEGRAPH_VERSION` constant) behind a stdio MCP server plus Codex lifecycle hooks. Two committed dists ship in the published payload; rebuild `dist/` in the same change as `src/` edits.
 
 Codex wiring (all repo-relative to `packages/omo-codex/plugin/`):
 - **MCP:** `.mcp.json` server `codegraph` → `node components/codegraph/dist/serve.js` (`required: false`).

@@ -24,43 +24,43 @@ Generator/checker note: update this file with the audited component list, then r
 - Upstream URL: https://github.com/code-yeongyu/go-claude-code-comment-checker
 - Where-bundled: root production dependency and vendored checker binary payload under `vendor/<platform>/`.
 
-### @colbymchenry/codegraph@1.0.1
+### @colbymchenry/codegraph@1.3.1
 - License: MIT, from npm package metadata. The inspected tarball did not include a separate LICENSE file.
 - Copyright: CodeGraph contributors.
 - Upstream URL: https://www.npmjs.com/package/@colbymchenry/codegraph
 - Where-bundled: pinned CodeGraph provisioning payload for the CodeGraph OMO integration.
 
-### @colbymchenry/codegraph-darwin-arm64@1.0.1
+### @colbymchenry/codegraph-darwin-arm64@1.3.1
 - License: MIT, from npm package metadata. The inspected tarball did not include a separate LICENSE file.
 - Copyright: CodeGraph contributors.
 - Upstream URL: https://www.npmjs.com/package/@colbymchenry/codegraph-darwin-arm64
 - Where-bundled: optional CodeGraph platform bundle for darwin arm64, including CodeGraph runtime files, Node.js runtime binary, and tree-sitter WASM assets.
 
-### @colbymchenry/codegraph-darwin-x64@1.0.1
+### @colbymchenry/codegraph-darwin-x64@1.3.1
 - License: MIT, from npm package metadata. The inspected tarball did not include a separate LICENSE file.
 - Copyright: CodeGraph contributors.
 - Upstream URL: https://www.npmjs.com/package/@colbymchenry/codegraph-darwin-x64
 - Where-bundled: optional CodeGraph platform bundle for darwin x64, including CodeGraph runtime files, Node.js runtime binary, and tree-sitter WASM assets.
 
-### @colbymchenry/codegraph-linux-arm64@1.0.1
+### @colbymchenry/codegraph-linux-arm64@1.3.1
 - License: MIT, from npm package metadata. The inspected tarball did not include a separate LICENSE file.
 - Copyright: CodeGraph contributors.
 - Upstream URL: https://www.npmjs.com/package/@colbymchenry/codegraph-linux-arm64
 - Where-bundled: optional CodeGraph platform bundle for linux arm64, including CodeGraph runtime files, Node.js runtime binary, and tree-sitter WASM assets.
 
-### @colbymchenry/codegraph-linux-x64@1.0.1
+### @colbymchenry/codegraph-linux-x64@1.3.1
 - License: MIT, from npm package metadata. The inspected tarball did not include a separate LICENSE file.
 - Copyright: CodeGraph contributors.
 - Upstream URL: https://www.npmjs.com/package/@colbymchenry/codegraph-linux-x64
 - Where-bundled: optional CodeGraph platform bundle for linux x64, including CodeGraph runtime files, Node.js runtime binary, and tree-sitter WASM assets.
 
-### @colbymchenry/codegraph-win32-arm64@1.0.1
+### @colbymchenry/codegraph-win32-arm64@1.3.1
 - License: MIT, from npm package metadata. The inspected tarball did not include a separate LICENSE file.
 - Copyright: CodeGraph contributors.
 - Upstream URL: https://www.npmjs.com/package/@colbymchenry/codegraph-win32-arm64
 - Where-bundled: optional CodeGraph platform bundle for win32 arm64, including CodeGraph runtime files, Node.js runtime binary, and tree-sitter WASM assets.
 
-### @colbymchenry/codegraph-win32-x64@1.0.1
+### @colbymchenry/codegraph-win32-x64@1.3.1
 - License: MIT, from npm package metadata. The inspected tarball did not include a separate LICENSE file.
 - Copyright: CodeGraph contributors.
 - Upstream URL: https://www.npmjs.com/package/@colbymchenry/codegraph-win32-x64

@@ -58,7 +58,7 @@ export interface CodegraphSessionStartOutcome {
 
 export interface CodegraphSessionStartDeps {
 	readonly ensureGitignored: (projectRoot: string) => boolean;
-	readonly ensureProvisioned: (options: { readonly installDir?: string; readonly lockDir: string; readonly version: "1.0.1" }) => Promise<CodegraphProvisionResult>;
+	readonly ensureProvisioned: (options: { readonly installDir?: string; readonly lockDir: string; readonly version: "1.3.1" }) => Promise<CodegraphProvisionResult>;
 	readonly prepareWorkspace: (projectRoot: string, options: { readonly homeDir: string }) => CodegraphWorkspacePreparation;
 	readonly resolveCommand: (options?: ResolveCodegraphCommandOptions) => CodegraphCommandResolution;
 	readonly runCommand: (

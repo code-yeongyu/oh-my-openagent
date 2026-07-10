@@ -29,7 +29,7 @@ export interface EnsureCodegraphProvisionedOptions {
   readonly lockWaitMs?: number
   readonly manifest?: CodegraphProvisionManifest
   readonly platformKey?: string
-  readonly version: "1.0.1"
+  readonly version: "1.3.1"
 }
 
 export interface CodegraphProvisionResult {

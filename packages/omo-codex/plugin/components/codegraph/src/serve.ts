@@ -84,7 +84,7 @@ const CODEGRAPH_SKIP_HINT =
 const CODEGRAPH_DISABLED_HINT =
 	"CodeGraph MCP skipped: disabled by OMO SOT config. Set [codex].codegraph.enabled=true to enable it.\n";
 const CODEGRAPH_EXCLUDED_HINT = "CodeGraph MCP skipped: project excluded by OMO CodeGraph policy.\n";
-const CODEGRAPH_VERSION = "1.0.1";
+const CODEGRAPH_VERSION = "1.3.1";
 const PROJECT_CWD_ENV_KEYS = ["OMO_CODEGRAPH_PROJECT_CWD", SESSION_START_CWD_ENV, "PWD"] as const;
 
 export async function runCodegraphServe(options: RunCodegraphServeOptions = {}): Promise<number> {

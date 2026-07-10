@@ -85,7 +85,7 @@ describe("runCodegraphServe MCP protocol bridge", () => {
 					result: {
 						capabilities: { tools: { listChanged: false } },
 						protocolVersion: "2025-06-18",
-						serverInfo: { name: "codegraph", version: "1.0.1" },
+						serverInfo: { name: "codegraph", version: "1.3.1" },
 					},
 				},
 				{
