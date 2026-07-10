@@ -40,7 +40,8 @@ const lazycodexAgentInvariants = new Map([
 	[
 		"lazycodex-qa-executor.toml",
 		{
-			effort: "xhigh",
+			model: "gpt-5.6-terra",
+			effort: "medium",
 			includes: [/not_applicable/, /surfaceEvidence/, /adversarialCases/],
 		},
 	],
@@ -109,7 +110,9 @@ test("#given lazycodex agent prompts #when inspected #then each role pins model 
 	for (const [fileName, invariant] of lazycodexAgentInvariants) {
 		const prompt = await readFile(join(agentsDir, fileName), "utf8");
 
-		assert.match(prompt, /^model\s*=\s*"gpt-5\.6-sol"$/m);
+		const expectedModel = invariant.model ?? "gpt-5.6-sol";
+		const escapedModel = expectedModel.replace(/\./g, "\\.");
+		assert.match(prompt, new RegExp(`^model\\s*=\\s*"${escapedModel}"$`, "m"));
 		assert.match(prompt, new RegExp(`^model_reasoning_effort\\s*=\\s*"${invariant.effort}"$`, "m"));
 		assert.doesNotMatch(prompt, /^tools\s*=/m);
 		assert.doesNotMatch(prompt, /^blocking\s*=/m);
