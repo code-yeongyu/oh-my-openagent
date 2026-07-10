@@ -35,6 +35,8 @@ function recordDetails(record: TaskRecord, mode: TaskToolMode): TaskToolDetails 
     ...(record.agent_type !== undefined && { subagent_type: record.agent_type }),
     execution_mode: record.execution_mode,
     model: record.model,
+    ...(record.resolved_model !== undefined && { resolved_model: record.resolved_model }),
+    run_in_background: false,
   }
 }
 
@@ -110,6 +112,7 @@ function startedDetails(
     ...(params.subagent_type !== undefined && { subagent_type: params.subagent_type }),
     execution_mode: executionMode,
     ...(params.model !== undefined && { model: params.model }),
+    ...(started.resolved_model !== undefined && { resolved_model: started.resolved_model }),
     run_in_background: params.run_in_background === true,
     ...(started.queue_position !== undefined && { queue_position: started.queue_position }),
   }
