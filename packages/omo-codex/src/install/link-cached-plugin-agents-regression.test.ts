@@ -16,8 +16,9 @@ describe("managed bundled agent effort migration", () => {
     await linkCachedPluginAgents({ codexHome, pluginRoot, preservedReasoning })
 
     expect(await readAgentEffort(codexHome, "momus")).toBe("ultra")
-    expect(await readAgentEffort(codexHome, "explorer")).toBe("medium")
-    expect(await readAgentEffort(codexHome, "librarian")).toBe("medium")
+    // explorer/librarian chain lands on the newest bundled default (luna/low), 2026-07-11
+    expect(await readAgentEffort(codexHome, "explorer")).toBe("low")
+    expect(await readAgentEffort(codexHome, "librarian")).toBe("low")
   })
 
   test("#given custom installed support-agent efforts #when agents are re-linked #then preserves customization", async () => {

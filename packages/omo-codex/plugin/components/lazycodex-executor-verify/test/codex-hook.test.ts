@@ -344,3 +344,67 @@ function isBlockOutput(value: unknown): value is BlockOutput {
 		typeof value.reason === "string"
 	);
 }
+
+describe("tier worker receipt enforcement", () => {
+	// given the matcher set now covers the difficulty-tier workers
+	const workerTypes = ["lazycodex-worker-low", "lazycodex-worker-medium", "lazycodex-worker-high"] as const;
+
+	for (const agentType of workerTypes) {
+		it(`#given no evidence receipt #when a ${agentType} child stops #then blocks`, () => {
+			// given
+			const cwd = createWorkspace();
+
+			// when
+			const output = runSubagentStopHook(createInput(cwd, { agent_type: agentType }), nodeFileSystem);
+
+			// then
+			expect(parseBlockOutput(output).decision).toBe("block");
+		});
+	}
+
+	it("#given no evidence receipt #when an explorer child stops #then no-ops", () => {
+		// given
+		const cwd = createWorkspace();
+
+		// when
+		const output = runSubagentStopHook(createInput(cwd, { agent_type: "explorer" }), nodeFileSystem);
+
+		// then
+		expect(output).toBe("");
+	});
+
+	it("#given both hook manifests #when their matchers are applied #then enforced agents match and read-only roles do not", () => {
+		// given
+		const componentManifest = JSON.parse(
+			readFileSync(new URL("../hooks/hooks.json", import.meta.url), "utf8"),
+		);
+		const rootManifest = JSON.parse(
+			readFileSync(
+				new URL("../../../hooks/subagent-stop-verifying-lazycodex-executor-evidence.json", import.meta.url),
+				"utf8",
+			),
+		);
+		for (const manifest of [componentManifest, rootManifest]) {
+			const matcher = new RegExp(manifest.hooks.SubagentStop[0].matcher);
+
+			// then
+			for (const name of ["lazycodex-executor", ...workerTypes]) expect(matcher.test(name)).toBe(true);
+			expect(matcher.test("explorer")).toBe(false);
+			expect(matcher.test("lazycodex-gate-reviewer")).toBe(false);
+		}
+	});
+
+	it("#given the tier worker TOMLs #when inspected #then each instructs the EVIDENCE_RECORDED receipt line", () => {
+		for (const tier of ["low", "medium", "high"]) {
+			// when
+			const toml = readFileSync(
+				new URL(`../../ultrawork/agents/lazycodex-worker-${tier}.toml`, import.meta.url),
+				"utf8",
+			);
+
+			// then
+			expect(toml).toContain("EVIDENCE_RECORDED: <path>");
+		}
+	});
+});
+

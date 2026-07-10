@@ -2,7 +2,7 @@
 	"hooks": {
 		"SubagentStop": [
 			{
-				"matcher": "^lazycodex-executor$",
+				"matcher": "^lazycodex-(executor|worker-(low|medium|high))$",
 				"hooks": [
 					{
 						"type": "command",

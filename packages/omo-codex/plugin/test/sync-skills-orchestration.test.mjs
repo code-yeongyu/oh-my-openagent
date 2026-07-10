@@ -235,6 +235,15 @@ test("#given synced aggregate Codex skills #when they describe background orches
 	}
 });
 
+test("#given start-work skill #when synced for Codex #then the difficulty-tier delegation guidance survives the overlay", async () => {
+	const content = await readSkill("start-work");
+
+	assert.match(content, /lazycodex-worker-medium/);
+	assert.match(content, /Delegation by difficulty/);
+	assert.match(content, /Global Review and Debugging Gate/);
+	assert.doesNotMatch(content, /works the same on both surfaces/);
+});
+
 test("#given review-work skill #when some lanes do not finish #then aggregate result remains bounded", async () => {
 	const content = await readSkill("review-work");
 

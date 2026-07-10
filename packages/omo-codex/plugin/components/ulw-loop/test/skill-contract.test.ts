@@ -64,7 +64,8 @@ describe("ulw-loop skill contract", () => {
 
 		// then
 		expect(workflow.match(/malformed input, prompt injection/g)?.length ?? 0).toBe(1);
-		expect(wordCount(workflow)).toBeLessThanOrEqual(3697);
+			// budget raised 3697 -> 3775 for the difficulty-tier delegation rows (2026-07-11)
+	expect(wordCount(workflow)).toBeLessThanOrEqual(3775);
 		expect(wordCount(skill)).toBeLessThanOrEqual(625);
 	});
 });

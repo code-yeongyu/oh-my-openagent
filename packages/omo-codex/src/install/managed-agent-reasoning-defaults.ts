@@ -3,32 +3,46 @@ export interface PreservedAgentReasoning {
   readonly effort: string
 }
 
-interface ManagedReasoningUpgrade {
+interface ManagedReasoningUpgradeStep {
   readonly previous: PreservedAgentReasoning
   readonly current: PreservedAgentReasoning
 }
 
-const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, ManagedReasoningUpgrade>([
+const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReasoningUpgradeStep[]>([
   [
     "explorer",
-    {
-      previous: { model: "gpt-5.4-mini", effort: "low" },
-      current: { model: "gpt-5.6-terra", effort: "medium" },
-    },
+    [
+      {
+        previous: { model: "gpt-5.4-mini", effort: "low" },
+        current: { model: "gpt-5.6-terra", effort: "medium" },
+      },
+      {
+        previous: { model: "gpt-5.6-terra", effort: "medium" },
+        current: { model: "gpt-5.6-luna", effort: "low" },
+      },
+    ],
   ],
   [
     "librarian",
-    {
-      previous: { model: "gpt-5.4-mini", effort: "low" },
-      current: { model: "gpt-5.6-terra", effort: "medium" },
-    },
+    [
+      {
+        previous: { model: "gpt-5.4-mini", effort: "low" },
+        current: { model: "gpt-5.6-terra", effort: "medium" },
+      },
+      {
+        previous: { model: "gpt-5.6-terra", effort: "medium" },
+        current: { model: "gpt-5.6-luna", effort: "low" },
+      },
+    ],
   ],
   [
     "momus",
-    {
-      previous: { model: "gpt-5.5", effort: "xhigh" },
-      current: { model: "gpt-5.6-sol", effort: "ultra" },
-    },
+    [
+      {
+        previous: { model: "gpt-5.5", effort: "xhigh" },
+        current: { model: "gpt-5.6-sol", effort: "ultra" },
+      },
+    ],
   ],
 ])
 
@@ -38,15 +52,16 @@ export function resolveManagedAgentReasoning(input: {
   readonly bundledEffort: string | null
   readonly preserved: PreservedAgentReasoning
 }): string {
-  const upgrade = MANAGED_REASONING_DEFAULT_UPGRADES.get(input.agentName)
-  if (
-    upgrade !== undefined &&
-    input.preserved.model === upgrade.previous.model &&
-    input.preserved.effort === upgrade.previous.effort &&
-    input.bundledModel === upgrade.current.model &&
-    input.bundledEffort === upgrade.current.effort
-  ) {
-    return upgrade.current.effort
+  const steps = MANAGED_REASONING_DEFAULT_UPGRADES.get(input.agentName)
+  if (steps === undefined) return input.preserved.effort
+  const latest = steps[steps.length - 1]
+  if (latest === undefined) return input.preserved.effort
+  if (input.bundledModel !== latest.current.model || input.bundledEffort !== latest.current.effort) {
+    return input.preserved.effort
   }
-  return input.preserved.effort
+  const preservedMatchesAnyStep = steps.some(
+    (step) =>
+      input.preserved.model === step.previous.model && input.preserved.effort === step.previous.effort,
+  )
+  return preservedMatchesAnyStep ? latest.current.effort : input.preserved.effort
 }
