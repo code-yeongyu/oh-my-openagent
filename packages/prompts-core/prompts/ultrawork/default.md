@@ -307,10 +307,10 @@ Trigger when ANY apply: user said "엄밀" / "strictly" / "rigorously" / "proper
 
 Procedure (non-negotiable):
 1. Spawn a reviewer via `task(category="ultrabrain", subagent_type="plan", load_skills=[...], run_in_background=false, prompt="<goal + scenarios + evidence + diff + notepad path>")` — or any high-rigor reviewer agent available.
-2. Reviewer verdict is BINDING. There is no "false positive". Do not argue, minimise, or explain away.
-3. Fix every concern. Re-run the FULL scenario QA. Capture fresh evidence. Update notepad.
-4. Re-submit to the SAME reviewer. Loop until UNCONDITIONAL approval. "looks good but..." = REJECTION.
-5. Only on unconditional approval may you declare done.
+2. Verify each reviewer concern yourself. A concern blocks only when it names a success criterion the evidence fails; record concerns that cite no criterion as notes with a one-line reason — fixed or declined at your judgment.
+3. Fix every criterion-cited blocker. Re-run ONLY the scenario QA affected by the fix; capture fresh evidence for the delta. Update notepad.
+4. Re-submit to the SAME reviewer at most twice, passing only the delta diff, the blockers it cited, and the already-approved criteria marked out-of-scope. An approval whose only remaining items are notes counts as approval.
+5. On approval, declare done. If criterion-cited blockers remain after two re-reviews, stop and surface them to the user — do not loop further.
 
 ## ZERO TOLERANCE FAILURES
 - **NO Scope Reduction**: Never make "demo", "skeleton", "simplified", "basic" versions - deliver FULL implementation

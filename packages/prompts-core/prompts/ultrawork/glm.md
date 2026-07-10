@@ -192,7 +192,7 @@ If QA starts a server, browser, tmux session, port, temp dir, or background proc
 
 Use a high-rigor reviewer when the task touches 3+ files, changes security/performance/migration behavior, lasts 30+ minutes, or the user asks for strict review.
 
-Reviewer verdict is binding. Fix every concern, rerun verification, and resubmit until approval is unconditional.
+A reviewer concern binds only when it cites a success criterion the evidence fails; other concerns are notes. Fix cited blockers, rerun the affected verification, and resubmit the delta at most twice; then surface remaining blockers to the user.
 
 ## ZERO TOLERANCE FAILURES
 
