@@ -76,7 +76,7 @@ export async function migrateConfigFile(
 		reasoningApplied = config !== before;
 	}
 
-	const multiAgentOptions = { env, sessionModel, requireSessionModel };
+	const multiAgentOptions = { env, sessionModel, requireSessionModel, configPath };
 	const multiAgentVersion = resolveMultiAgentVersionFromConfig(config, multiAgentOptions);
 	const afterMultiAgentGuard = forceDisableMultiAgentV2(config, {
 		...multiAgentOptions,
