@@ -533,6 +533,30 @@ describe("codex-config-toml", () => {
     expect(content).toContain("max_concurrent_threads_per_session = 1000")
   })
 
+  test("#given user-modified config without root model #when updating config #then does not introduce agents.max_threads", async () => {
+    // given: Codex Desktop selects the model in the UI; a user-modified config
+    // (reasoning profile not applied) keeps no root model, so the installer
+    // cannot prove the session is not a GPT-5.6 V2 model that rejects
+    // agents.max_threads at thread/start (#6002).
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-no-model-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(configPath, ['model_reasoning_effort = "high"', "", "[features]", "plugins = false", ""].join("\n"))
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).not.toMatch(/^\s*max_threads\s*=/m)
+    expect(content).toContain("max_concurrent_threads_per_session = 1000")
+  })
+
   test("#given managed agent role sections #when updating config #then preserves role config while raising only root agents max_threads", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-role-section-"))

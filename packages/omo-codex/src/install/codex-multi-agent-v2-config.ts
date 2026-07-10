@@ -26,6 +26,12 @@ export type CodexMultiAgentVersion = "v1" | "v2" | null
  * the legacy `[features]` boolean shorthand (a config-level disable
  * mismatches the reserved `collaboration.spawn_agent` schema on some Codex
  * versions - oh-my-openagent#6002 / #6008).
+ *
+ * When config.toml names no root model at all (Codex Desktop selects the
+ * model in the UI), the installer never introduces `agents.max_threads`:
+ * Codex rejects that key at thread/start while MultiAgentV2 is active. An
+ * existing cap is still raised in place so the legacy low-cap repair keeps
+ * working and a hand-removed key stays removed.
  */
 export function ensureCodexMultiAgentV2Config(
   config: string,
@@ -33,9 +39,12 @@ export function ensureCodexMultiAgentV2Config(
 ): string {
   const featureFlag = removeFeatureFlagSetting(config, "multi_agent_v2")
   const v2Preferred = options.multiAgentVersion === "v2"
+  const modelKnown = options.multiAgentVersion != null || readRootModel(featureFlag.config) !== null
   const agentsConfig = v2Preferred
     ? removeAgentsMaxThreads(featureFlag.config)
-    : ensureAgentsMaxThreads(featureFlag.config)
+    : modelKnown
+      ? ensureAgentsMaxThreads(featureFlag.config)
+      : raiseExistingAgentsMaxThreads(featureFlag.config)
   const section = findTomlSection(agentsConfig, CODEX_MULTI_AGENT_V2_HEADER)
   const maxThreadsValue = CODEX_SUBAGENT_THREAD_LIMIT.toString()
   const preserveDisable = featureFlag.value === false && !v2Preferred
@@ -140,6 +149,13 @@ function removeAgentsMaxThreads(config: string): string {
   if (!section) return config
   if (!/^\s*max_threads\s*=/m.test(section.text)) return config
   return removeSetting(config, section, "max_threads")
+}
+
+function raiseExistingAgentsMaxThreads(config: string): string {
+  const section = findTomlSection(config, CODEX_AGENTS_HEADER)
+  if (!section) return config
+  if (!/^\s*max_threads\s*=/m.test(section.text)) return config
+  return replaceOrInsertSetting(config, section, "max_threads", CODEX_SUBAGENT_THREAD_LIMIT.toString())
 }
 
 function readBooleanSetting(sectionText: string, key: string): boolean | null {
