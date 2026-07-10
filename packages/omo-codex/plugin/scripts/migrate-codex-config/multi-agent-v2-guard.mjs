@@ -68,6 +68,15 @@ export function forceDisableMultiAgentV2(config, options = {}) {
 		return normalized;
 	}
 
+	// No model evidence at all (no session model AND no root `model` in
+	// config.toml — Codex Desktop selects the model in the UI): config alone
+	// cannot prove the session is not a GPT-5.6 reserved-schema model, and
+	// writing `enabled = false` would 400 every turn on those sessions
+	// (#6002). Leave the enable state untouched.
+	if (multiAgentVersion == null && !sessionModel && !readRootModel(normalized)) {
+		return normalized;
+	}
+
 	// Unknown catalog entry for an explicit session model: skip force-disable
 	// rather than assume the legacy encrypted-V2 failure mode.
 	if (sessionModel && multiAgentVersion == null) {
