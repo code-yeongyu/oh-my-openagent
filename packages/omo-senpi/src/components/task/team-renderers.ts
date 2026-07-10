@@ -1,5 +1,5 @@
 import type { MessageRenderer } from "@code-yeongyu/senpi"
-import { linesComponent } from "@oh-my-opencode/senpi-task"
+import { linesComponent, normalizeRendererText } from "@oh-my-opencode/senpi-task"
 
 // The details a team lead-message custom message carries; the renderer shows the sender + envelope.
 export type TeamMessageDetails = { readonly from?: string; readonly messageId?: string }
@@ -9,5 +9,5 @@ export type TeamMessageDetails = { readonly from?: string; readonly messageId?: 
 // the engine already delivered.
 export const renderTeamMessage: MessageRenderer<TeamMessageDetails> = (message) => {
   const content = typeof message.content === "string" ? message.content : ""
-  return linesComponent(content.length > 0 ? content.split("\n") : ["(team message)"])
+  return linesComponent(content.length > 0 ? content.split("\n").map(normalizeRendererText) : ["(team message)"])
 }
