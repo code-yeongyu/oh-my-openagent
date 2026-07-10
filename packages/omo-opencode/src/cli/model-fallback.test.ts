@@ -273,7 +273,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.hephaestus?.model).toBe("openai/gpt-5.5")
+      expect(result.agents?.hephaestus?.model).toBe("openai/gpt-5.6-sol")
       expect(result.agents?.hephaestus?.variant).toBe("medium")
     })
 
@@ -482,8 +482,8 @@ describe("generateModelConfig", () => {
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then hephaestus should be created with gateway-routed gpt-5.5
-      expect(result.agents?.hephaestus?.model).toBe("vercel/openai/gpt-5.5")
+      // #then hephaestus should be created with gateway-routed gpt-5.6-sol
+      expect(result.agents?.hephaestus?.model).toBe("vercel/openai/gpt-5.6-sol")
     })
 
     test("native providers take priority over gateway", () => {

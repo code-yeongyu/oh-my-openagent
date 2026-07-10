@@ -841,7 +841,7 @@ describe("Prometheus category config resolution", () => {
 
     // then
     expect(config).toBeDefined()
-    expect(config?.model).toBe("openai/gpt-5.5")
+    expect(config?.model).toBe("openai/gpt-5.6-sol")
     expect(config?.variant).toBe("xhigh")
   })
 
@@ -901,7 +901,7 @@ describe("Prometheus category config resolution", () => {
 
     // then - falls back to DEFAULT_CATEGORIES
     expect(config).toBeDefined()
-    expect(config?.model).toBe("openai/gpt-5.5")
+    expect(config?.model).toBe("openai/gpt-5.6-sol")
     expect(config?.variant).toBe("xhigh")
   })
 

@@ -813,7 +813,7 @@ describe("createBuiltinAgents with requiresProvider gating (hephaestus)", () => 
 
       // #then
       expect(agents.hephaestus).toBeDefined()
-      expect(agents.hephaestus.model).toBe("openai/gpt-5.5")
+      expect(agents.hephaestus.model).toBe("openai/gpt-5.6-sol")
     } finally {
       cacheSpy.mockRestore()
       fetchSpy.mockRestore()
@@ -1309,7 +1309,7 @@ describe("buildAgent with category and skills", () => {
     const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL))
 
     // #then - category's built-in model and skills are applied
-    expect(agent.model).toBe("openai/gpt-5.5")
+    expect(agent.model).toBe("openai/gpt-5.6-sol")
     expect(agent.variant).toBe("xhigh")
     expect(agent.prompt).toContain("router, not a rulebook")
     expect(agent.prompt).toContain("Task description")
@@ -1455,9 +1455,9 @@ describe("override.category expansion in createBuiltinAgents", () => {
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - ultrabrain category: model=openai/gpt-5.5, variant=xhigh
+    // #then - ultrabrain category: model=openai/gpt-5.6-sol, variant=xhigh
     expect(agents.oracle).toBeDefined()
-    expect(agents.oracle.model).toBe("openai/gpt-5.5")
+    expect(agents.oracle.model).toBe("openai/gpt-5.6-sol")
     expect(agents.oracle.variant).toBe("xhigh")
   })
 
@@ -1524,9 +1524,9 @@ describe("override.category expansion in createBuiltinAgents", () => {
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - ultrabrain category: model=openai/gpt-5.5, variant=xhigh
+    // #then - ultrabrain category: model=openai/gpt-5.6-sol, variant=xhigh
     expect(agents.sisyphus).toBeDefined()
-    expect(agents.sisyphus.model).toBe("openai/gpt-5.5")
+    expect(agents.sisyphus.model).toBe("openai/gpt-5.6-sol")
     expect(agents.sisyphus.variant).toBe("xhigh")
   })
 
@@ -1539,9 +1539,9 @@ describe("override.category expansion in createBuiltinAgents", () => {
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - ultrabrain category: model=openai/gpt-5.5, variant=xhigh
+    // #then - ultrabrain category: model=openai/gpt-5.6-sol, variant=xhigh
     expect(agents.atlas).toBeDefined()
-    expect(agents.atlas.model).toBe("openai/gpt-5.5")
+    expect(agents.atlas.model).toBe("openai/gpt-5.6-sol")
     expect(agents.atlas.variant).toBe("xhigh")
   })
 

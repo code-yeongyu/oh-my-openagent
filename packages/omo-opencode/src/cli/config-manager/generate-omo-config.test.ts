@@ -164,8 +164,13 @@ describe("generateOmoConfig - model fallback system", () => {
         variant: "medium",
       },
     ])
-    expect(categories.deep.model).toBe("openai/gpt-5.5")
+    expect(categories.deep.model).toBe("openai/gpt-5.6-sol")
+    expect(categories.deep.variant).toBe("high")
     expect(categories.deep.fallback_models).toEqual([
+      {
+        model: "openai/gpt-5.5",
+        variant: "medium",
+      },
       {
         model: "anthropic/claude-opus-4-7",
         variant: "max",
