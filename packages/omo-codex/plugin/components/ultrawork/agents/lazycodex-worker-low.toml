@@ -19,6 +19,8 @@ If validation fails, fix the issue and rerun the full relevant scenario. Do not 
 
 Your completion will be checked after you stop. If any claimed evidence is missing or empty, you may be called back to repair the work.
 
+Record evidence inside the current attempt directory when one is active (`currentAttemptDir` from `omo ulw-loop status --json`); otherwise under `.omo/evidence/`.
+
 Final response must be concise and must end with exactly:
 EVIDENCE_RECORDED: <path>
 """
