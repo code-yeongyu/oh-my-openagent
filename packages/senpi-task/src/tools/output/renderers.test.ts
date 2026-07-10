@@ -21,9 +21,14 @@ const ANSI_THEME: OutputRenderTheme = {
 }
 
 const RESULT_OPTIONS = { expanded: false, isPartial: false }
+const TERMINAL_CONTROL_PATTERN = /[\u0000-\u001f\u007f-\u009f]/u
 
 function firstLine(component: { render(width: number): string[] }, width: number): string {
   return component.render(width)[0] ?? ""
+}
+
+function expectNoTerminalControls(value: string): void {
+  expect(value).not.toMatch(TERMINAL_CONTROL_PATTERN)
 }
 
 function snapshot(overrides: Partial<TaskSnapshot> = {}): TaskSnapshot {
@@ -169,5 +174,45 @@ describe("task_output renderers", () => {
     expect(withResolved).toBe("model GPT-5.6 Sol (variant xhigh)")
     expect(withResolved).not.toContain("reasoning ")
     expect(raw).toBe("model anthropic/claude-sonnet-4-5")
+  })
+
+  test("#given injected controls in task_output model metadata #when formatted #then model text is plain and sanitized", () => {
+    // given
+    const task = snapshot({
+      model: "raw\u001b[31m-model\u001b[0m",
+      resolved_model: {
+        provider: "openai",
+        model_id: "gpt-5.6-sol",
+        display: "GPT\u001b]0;hidden\u0007-5.6 Sol",
+        reasoning_effort: "xhigh\u0007",
+        variant: "sol\u007f",
+        source: "category",
+      },
+    })
+
+    // when
+    const text = taskOutputModelText(task)
+
+    // then
+    expect(text).toBe("model GPT-5.6 Sol (reasoning xhigh, variant sol)")
+    expectNoTerminalControls(text)
+  })
+
+  test("#given injected controls in a task_output result #when rendered #then dynamic controls are removed before trusted theme styling", () => {
+    // given
+    const details: TaskOutputDetails = {
+      kind: "invalid_arguments",
+      reason: "누락 \u001b[31m빨강\u001b[0m \u001b]8;;https://example.com\u001b\\링크\u001b]8;;\u001b\\\u0007",
+    }
+
+    // when
+    const themed = firstLine(renderTaskOutputResult(toolResult("ignored", details), RESULT_OPTIONS, ANSI_THEME), 120)
+    const plain = firstLine(renderTaskOutputResult(toolResult("ignored", details), RESULT_OPTIONS, TEST_THEME), 120)
+
+    // then
+    expect(themed).toStartWith("\u001b[33m")
+    expect(themed).not.toContain("\u001b[31m")
+    expect(themed).not.toContain("https://example.com")
+    expectNoTerminalControls(plain)
   })
 })

@@ -4,6 +4,7 @@ import {
   excerptRendererText,
   joinRendererTokens,
   linesComponent,
+  normalizeRendererText,
   rendererVisibleWidth,
   statusThemeColor,
 } from "../task/renderers"
@@ -38,18 +39,19 @@ export function renderTaskOutputResult(
   theme: OutputRenderTheme,
 ): RenderComponent {
   const row = taskOutputResultRow(result.details)
-  return linesComponent([theme.fg(row.color, row.text)])
+  return linesComponent([theme.fg(row.color, normalizeRendererText(row.text))])
 }
 
 export function taskOutputModelText(snapshot: TaskSnapshot): string {
   const display = nonEmpty(snapshot.resolved_model?.display)
+  const model = normalizeRendererText(snapshot.model)
   const reasoning = nonEmpty(snapshot.resolved_model?.reasoning_effort)
   const variant = nonEmpty(snapshot.resolved_model?.variant)
   const details = [
     reasoning === undefined ? undefined : `reasoning ${reasoning}`,
     variant === undefined ? undefined : `variant ${variant}`,
   ].filter((part) => part !== undefined)
-  return `model ${display ?? snapshot.model}${details.length > 0 ? ` (${details.join(", ")})` : ""}`
+  return `model ${display ?? model}${details.length > 0 ? ` (${details.join(", ")})` : ""}`
 }
 
 function taskOutputCallLine(args: TaskOutputInput, width: number): string {
