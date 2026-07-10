@@ -2,34 +2,38 @@ import { describe, expect, test } from "bun:test"
 import { CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
 describe("CATEGORY_MODEL_REQUIREMENTS", () => {
-  test("ultrabrain has gpt-5.5 xhigh as primary", () => {
+  test("ultrabrain has gpt-5.6-sol xhigh as primary before gpt-5.5 xhigh", () => {
     // given
     const ultrabrain = CATEGORY_MODEL_REQUIREMENTS["ultrabrain"]
 
     // when
-    const primary = ultrabrain.fallbackChain[0]
+    const [primary, secondary] = ultrabrain.fallbackChain
 
     // then
-    expect(ultrabrain.fallbackChain.length).toBeGreaterThan(0)
+    expect(ultrabrain.fallbackChain.length).toBeGreaterThan(1)
     expect(primary?.variant).toBe("xhigh")
-    expect(primary?.model).toBe("gpt-5.5")
+    expect(primary?.model).toBe("gpt-5.6-sol")
     expect(primary?.providers[0]).toBe("openai")
+    expect(secondary?.model).toBe("gpt-5.5")
+    expect(secondary?.variant).toBe("xhigh")
   })
 
-  test("deep has gpt-5.5 medium as primary", () => {
+  test("deep has gpt-5.6-sol high as primary before gpt-5.5 medium", () => {
     // given
     const deep = CATEGORY_MODEL_REQUIREMENTS["deep"]
 
     // when
-    const primary = deep.fallbackChain[0]
+    const [primary, secondary] = deep.fallbackChain
 
     // then
-    expect(deep.fallbackChain.length).toBeGreaterThan(0)
-    expect(primary?.variant).toBe("medium")
-    expect(primary?.model).toBe("gpt-5.5")
+    expect(deep.fallbackChain.length).toBeGreaterThan(1)
+    expect(primary?.variant).toBe("high")
+    expect(primary?.model).toBe("gpt-5.6-sol")
     expect(primary?.providers).toContain("openai")
-    expect(primary?.providers).toContain("github-copilot")
     expect(primary?.providers).not.toContain("venice")
+    expect(secondary?.model).toBe("gpt-5.5")
+    expect(secondary?.variant).toBe("medium")
+    expect(secondary?.providers).toContain("github-copilot")
   })
 
   test("visual-engineering keeps gemini, glm, opus, opencode-go, and k2p5 fallback order", () => {

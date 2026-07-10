@@ -1,4 +1,4 @@
-import { isGpt5_5Model } from "../../agents/types"
+import { isGpt5_5Model, isGpt5_6Model } from "../../agents/types"
 import type { BuiltinCategoryDefinition } from "./builtin-category-definition"
 
 const ULTRABRAIN_CATEGORY_PROMPT_APPEND = `<Category_Context>
@@ -67,7 +67,7 @@ The orchestrator chose this category because the task benefits from depth over s
 </Category_Context>`
 
 export function resolveDeepCategoryPromptAppend(model: string | undefined): string {
-  if (model && isGpt5_5Model(model)) {
+  if (model && (isGpt5_5Model(model) || isGpt5_6Model(model))) {
     return DEEP_CATEGORY_PROMPT_APPEND_GPT_5_5
   }
   return DEEP_CATEGORY_PROMPT_APPEND
@@ -127,13 +127,13 @@ If your prompt lacks this structure, REWRITE IT before delegating.
 export const OPENAI_CATEGORIES: BuiltinCategoryDefinition[] = [
   {
     name: "ultrabrain",
-    config: { model: "openai/gpt-5.5", variant: "xhigh" },
+    config: { model: "openai/gpt-5.6-sol", variant: "xhigh" },
     description: "Use ONLY for genuinely hard, logic-heavy tasks. Give clear goals only, not step-by-step instructions.",
     promptAppend: ULTRABRAIN_CATEGORY_PROMPT_APPEND,
   },
   {
     name: "deep",
-    config: { model: "openai/gpt-5.5", variant: "medium" },
+    config: { model: "openai/gpt-5.6-sol", variant: "high" },
     description: "Goal-oriented autonomous problem-solving on hairy problems requiring deep research. ONE goal + ONE deliverable per call — multiple goals must fan out as parallel `deep` calls, never bundled into one.",
     promptAppend: DEEP_CATEGORY_PROMPT_APPEND,
     resolvePromptAppend: resolveDeepCategoryPromptAppend,

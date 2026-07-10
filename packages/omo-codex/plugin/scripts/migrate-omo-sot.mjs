@@ -3,8 +3,8 @@
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { pathToFileURL } from "node:url";
 
+import { isCliEntry } from "./entry-guard.mjs";
 import { addCodexCodegraphValues, hasOwn, isRecord, recordAt } from "./migrate-omo-sot/editor.mjs";
 import { parseJsonc } from "./migrate-omo-sot/jsonc.mjs";
 import { SCAFFOLD } from "./migrate-omo-sot/scaffold.mjs";
@@ -109,7 +109,7 @@ function isValidCodegraphValue(key, value) {
 	return typeof value === "boolean";
 }
 
-if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isCliEntry(import.meta.url)) {
 	migrateOmoSotConfig({ seed: process.argv.includes("--seed") })
 		.then((result) => {
 			for (const warning of result.warnings) process.stderr.write(`${warning}\n`);

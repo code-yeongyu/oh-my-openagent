@@ -260,4 +260,24 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(hephaestus.requiresModel).toBeUndefined()
     expect(hephaestus.requiresAnyModel).toBe(true)
   })
+
+  test("hephaestus has gpt-5.6-sol medium as primary before gpt-5.5 medium", () => {
+    // given
+    const hephaestus = AGENT_MODEL_REQUIREMENTS["hephaestus"]
+
+    // when
+    const [primary, secondary] = hephaestus.fallbackChain
+
+    // then
+    expect(primary).toEqual({
+      providers: ["openai", "vercel"],
+      model: "gpt-5.6-sol",
+      variant: "medium",
+    })
+    expect(secondary).toEqual({
+      providers: ["openai", "github-copilot", "opencode", "vercel"],
+      model: "gpt-5.5",
+      variant: "medium",
+    })
+  })
 })

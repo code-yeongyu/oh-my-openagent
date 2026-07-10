@@ -1034,6 +1034,41 @@ test("#given legacy shorthand and no session model on hook path #when full migra
 	assert.equal("enabled" in parsed.features.multi_agent_v2, false);
 });
 
+test("#given SoT migration failure #when hook migration runs #then config.toml repair still happens", async () => {
+	const { runAutoUpdateCheck } = await import("../scripts/auto-update.mjs");
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-sot-isolation-"));
+	const codexHome = join(root, "codex-home");
+	await mkdir(codexHome, { recursive: true });
+	const configPath = join(codexHome, "config.toml");
+	await writeFile(
+		configPath,
+		['model = "gpt-5.6-sol"', "", "[features.multi_agent_v2]", "enabled = false", ""].join("\n"),
+	);
+	await writeFile(
+		join(codexHome, "models_cache.json"),
+		JSON.stringify({ models: [{ slug: "gpt-5.6-sol", multi_agent_version: "v2" }] }),
+	);
+	// HOME pointing at a FILE makes migrateOmoSotConfig's mkdir(~/.omo) throw.
+	const brokenHome = join(root, "not-a-dir");
+	await writeFile(brokenHome, "");
+
+	await runAutoUpdateCheck({
+		env: {
+			CODEX_HOME: codexHome,
+			HOME: brokenHome,
+			USERPROFILE: brokenHome,
+			LAZYCODEX_AUTO_UPDATE_DISABLED: "1",
+			LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json"),
+			LAZYCODEX_AUTO_UPDATE_STATE_PATH: join(root, "state.json"),
+		},
+		sessionModel: "gpt-5.6-sol",
+		requireSessionModel: true,
+	});
+
+	const content = await readFile(configPath, "utf8");
+	assert.doesNotMatch(content, /^\s*enabled\s*=\s*false/m);
+});
+
 test("#given config default gpt-5.5 #when full migration gets SessionStart gpt-5.6-terra #then clears disable using session model", async () => {
 	const root = await mkdtemp(join(tmpdir(), "lazycodex-multi-agent-v2-session-model-"));
 	const codexHome = join(root, "codex-home");

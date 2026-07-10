@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
+
+import { isCliEntry } from "./entry-guard.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const defaultPluginRoot = dirname(scriptDir);
@@ -88,7 +90,7 @@ export async function syncVersion(options = {}) {
 	return { version, targets, changed };
 }
 
-if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isCliEntry(import.meta.url)) {
 	const result = await syncVersion();
 	console.log(`Synced OMO Codex manifests to version ${result.version} (${result.changed.length} updated)`);
 }

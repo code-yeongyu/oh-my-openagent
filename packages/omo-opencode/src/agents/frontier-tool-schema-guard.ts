@@ -1,12 +1,12 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import { isClaudeOpus47OrLaterModel, isGpt5_5Model } from "./types"
+import { isClaudeOpus47OrLaterModel, isGpt5_5Model, isGpt5_6Model } from "./types"
 import type { PermissionValue } from "../shared/permission-compat"
 
 const FRONTIER_TOOL_SCHEMA_NAMES = ["grep", "glob"] as const
 type MutablePermission = Record<string, PermissionValue | Record<string, PermissionValue>>
 
 export function getFrontierToolSchemaPermission(model: string): Record<string, "deny"> {
-  return isClaudeOpus47OrLaterModel(model) || isGpt5_5Model(model)
+  return isClaudeOpus47OrLaterModel(model) || isGpt5_5Model(model) || isGpt5_6Model(model)
     ? { grep: "deny" as const, glob: "deny" as const }
     : {}
 }

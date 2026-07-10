@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
+
+import { isCliEntry } from "./entry-guard.mjs";
 import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -263,6 +265,6 @@ async function syncSkills() {
 	}
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isCliEntry(import.meta.url)) {
 	await syncSkills();
 }
