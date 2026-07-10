@@ -87,6 +87,29 @@ describe("thread title PostToolUse guidance", () => {
 		expect(actual).toBe("");
 	});
 
+	it("#given MultiAgentV2 spawn_agent completed #when the hook runs #then it leaves task-name identity untouched", () => {
+		// given
+		const output = runPostToolUseHook({
+			hook_event_name: "PostToolUse",
+			session_id: "s-team",
+			turn_id: "t-team",
+			transcript_path: null,
+			cwd: "/repo",
+			model: "gpt-5.6-sol",
+			permission_mode: "default",
+			tool_name: "spawn_agent",
+			tool_use_id: "tool-spawn-agent",
+			tool_input: { task_name: "runtime_core", message: "Inspect runtime state" },
+			tool_response: { task_name: "/root/runtime_core" },
+		});
+
+		// when
+		const actual = output;
+
+		// then
+		expect(actual).toBe("");
+	});
+
 	it("#given worktree-backed thread creation is pending #when the hook runs #then it tells Codex to wait for the real thread before bootstrapping", () => {
 		// given
 		const output = runPostToolUseHook({

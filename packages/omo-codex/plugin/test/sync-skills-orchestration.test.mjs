@@ -207,7 +207,8 @@ test("#given synced aggregate Codex skills #when they describe background orches
 		["working progress message", /WORKING:/],
 		["blocked progress message", /BLOCKED:/],
 		["mailbox timeout framing", /timeout only means no new mailbox update arrived/],
-		["multi_agent_v1.wait_agent ref", /multi_agent_v1\.wait_agent/],
+		// Skills route by session tool surface: the namespaced V1 tool or the flat V2 tool both count.
+		["wait-agent tool ref", /multi_agent_v1\.wait_agent|`wait_agent`/],
 		["explicit fallback conditions", /Fallback only when|Mark a file for retry only when/],
 	];
 	const bannedPatterns = [
