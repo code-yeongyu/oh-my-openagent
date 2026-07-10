@@ -65,7 +65,7 @@
   "categories": {
     "quick": { "model": "opencode/gpt-5-nano" },
 
-    "unspecified-low": { "model": "anthropic/claude-sonnet-4-6" },
+    "unspecified-low": { "model": "openai/gpt-5.6-luna", "variant": "xhigh" },
 
     // High-effort planning tasks: maximum reasoning
     "unspecified-high": {
@@ -80,7 +80,7 @@
     "visual-engineering": { "model": "google/gemini-3.1-pro", "variant": "high" },
 
     // Deep research and analysis
-    "deep": { "model": "openai/gpt-5.6-sol", "variant": "high" },
+    "deep": { "model": "openai/gpt-5.6-terra", "variant": "xhigh" },
 
     // Strategic reasoning
     "ultrabrain": { "model": "openai/gpt-5.6-sol", "variant": "xhigh" },

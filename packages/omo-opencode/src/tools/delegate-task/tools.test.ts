@@ -181,8 +181,8 @@ describe("sisyphus-task", () => {
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("openai/gpt-5.6-sol")
-      expect(category.variant).toBe("high")
+      expect(category.model).toBe("openai/gpt-5.6-terra")
+      expect(category.variant).toBe("xhigh")
     })
 
     test("unspecified-high category uses claude-opus-4-7 max as primary", () => {
@@ -3778,7 +3778,8 @@ describe("sisyphus-task", () => {
       
       // then - default model from DEFAULT_CATEGORIES is used
       const category = expectResolvedCategoryConfig(resolved)
-      expect(category.config.model).toBe("anthropic/claude-sonnet-4-6")
+      expect(category.config.model).toBe("openai/gpt-5.6-luna")
+      expect(category.config.variant).toBe("xhigh")
     })
 
     test("category built-in model takes precedence over inheritedModel for builtin category", () => {

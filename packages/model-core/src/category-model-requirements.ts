@@ -47,6 +47,11 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["openai", "vercel"],
+        model: "gpt-5.6-terra",
+        variant: "xhigh",
+      },
+      {
+        providers: ["openai", "vercel"],
         model: "gpt-5.6-sol",
         variant: "high",
       },
@@ -108,6 +113,11 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   "unspecified-low": {
     fallbackChain: [
+      {
+        providers: ["openai", "vercel"],
+        model: "gpt-5.6-luna",
+        variant: "xhigh",
+      },
       {
         providers: ["anthropic", "github-copilot", "opencode", "vercel"],
         model: "claude-sonnet-4-6",

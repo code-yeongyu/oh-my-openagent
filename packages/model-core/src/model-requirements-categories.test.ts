@@ -18,22 +18,24 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(secondary?.variant).toBe("xhigh")
   })
 
-  test("deep has gpt-5.6-sol high as primary before gpt-5.5 medium", () => {
+  test("deep has gpt-5.6-terra xhigh as primary before gpt-5.6-sol high", () => {
     // given
     const deep = CATEGORY_MODEL_REQUIREMENTS["deep"]
 
     // when
-    const [primary, secondary] = deep.fallbackChain
+    const [primary, secondary, third] = deep.fallbackChain
 
     // then
-    expect(deep.fallbackChain.length).toBeGreaterThan(1)
-    expect(primary?.variant).toBe("high")
-    expect(primary?.model).toBe("gpt-5.6-sol")
+    expect(deep.fallbackChain.length).toBeGreaterThan(2)
+    expect(primary?.variant).toBe("xhigh")
+    expect(primary?.model).toBe("gpt-5.6-terra")
     expect(primary?.providers).toContain("openai")
     expect(primary?.providers).not.toContain("venice")
-    expect(secondary?.model).toBe("gpt-5.5")
-    expect(secondary?.variant).toBe("medium")
-    expect(secondary?.providers).toContain("github-copilot")
+    expect(secondary?.model).toBe("gpt-5.6-sol")
+    expect(secondary?.variant).toBe("high")
+    expect(third?.model).toBe("gpt-5.5")
+    expect(third?.variant).toBe("medium")
+    expect(third?.providers).toContain("github-copilot")
   })
 
   test("visual-engineering keeps gemini, glm, opus, opencode-go, and k2p5 fallback order", () => {
@@ -73,17 +75,20 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(secondary?.providers).toContain("anthropic")
   })
 
-  test("unspecified-low has claude-sonnet-4-6 as primary", () => {
+  test("unspecified-low has gpt-5.6-luna xhigh as primary before claude-sonnet-4-6", () => {
     // given
     const unspecifiedLow = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"]
 
     // when
-    const primary = unspecifiedLow.fallbackChain[0]
+    const [primary, secondary] = unspecifiedLow.fallbackChain
 
     // then
-    expect(unspecifiedLow.fallbackChain.length).toBeGreaterThan(0)
-    expect(primary?.model).toBe("claude-sonnet-4-6")
-    expect(primary?.providers[0]).toBe("anthropic")
+    expect(unspecifiedLow.fallbackChain.length).toBeGreaterThan(1)
+    expect(primary?.model).toBe("gpt-5.6-luna")
+    expect(primary?.variant).toBe("xhigh")
+    expect(primary?.providers[0]).toBe("openai")
+    expect(secondary?.model).toBe("claude-sonnet-4-6")
+    expect(secondary?.providers[0]).toBe("anthropic")
   })
 
   test("unspecified-high keeps opus primary before gpt-5.5 high", () => {
