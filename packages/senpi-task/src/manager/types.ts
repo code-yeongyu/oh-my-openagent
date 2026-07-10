@@ -84,6 +84,7 @@ export type StartResult =
       readonly task_id: string
       readonly status: "running" | "pending"
       readonly name: string
+      readonly resolved_model?: ResolvedModelRecord
       readonly queue_position?: number
       readonly name_warning?: string
     }
