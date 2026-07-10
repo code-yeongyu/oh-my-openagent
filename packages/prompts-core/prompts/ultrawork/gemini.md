@@ -262,7 +262,7 @@ If ANY answer is no → GO BACK AND DO IT. Do not claim completion.
 
 ### REVIEWER GATE (triggered, not optional)
 
-Trigger if user said "엄밀"/"strictly"/"rigorously"/"properly review", or task touches 3+ files OR ran 20+ turns OR 30+ min, or refactor/migration/perf/security. Spawn a high-rigor reviewer via `task` with: goal, scenarios, evidence paths, full diff, notepad path. Verdict is BINDING. "looks good but..." = REJECTION. Fix every concern, re-run full scenario QA, capture fresh evidence, resubmit. Loop until UNCONDITIONAL approval.
+Trigger if user said "엄밀"/"strictly"/"rigorously"/"properly review", or task touches 3+ files OR ran 20+ turns OR 30+ min, or refactor/migration/perf/security. Spawn a high-rigor reviewer via `task` with: goal, scenarios, evidence paths, full diff, notepad path. A concern blocks only when it names a success criterion the evidence fails; others are notes. Fix cited blockers, re-run the affected scenario QA, capture fresh delta evidence, and resubmit at most twice; an approval with only notes left counts as approval. Remaining cited blockers after two re-reviews go to the user.
 
 <MANUAL_QA_MANDATE>
 ### YOU MUST EXECUTE MANUAL QA. THIS IS NOT OPTIONAL. DO NOT SKIP THIS.
