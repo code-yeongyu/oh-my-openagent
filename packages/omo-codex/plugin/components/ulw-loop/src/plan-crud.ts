@@ -75,6 +75,7 @@ export async function createUlwLoopPlan(
 		);
 		const plan: UlwLoopPlan = {
 			version: 1,
+			evidenceLayoutVersion: 2,
 			createdAt: now,
 			updatedAt: now,
 			briefPath: ulwLoopBriefRelativePath(scope),

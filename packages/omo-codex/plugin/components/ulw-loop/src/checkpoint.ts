@@ -1,3 +1,4 @@
+import { ulwLoopAttemptEvidenceDir } from "./paths.js";
 import { existsSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -222,6 +223,9 @@ export async function checkpointUlwLoop(
 				qualityGate = validateQualityGate(await readJsonInput(args.qualityGateJson, repoRoot), {
 					repoRoot,
 					fs: QUALITY_GATE_FS,
+					...(plan.evidenceLayoutVersion === 2
+						? { currentAttemptDir: ulwLoopAttemptEvidenceDir(goal.id, goal.attempt, scope) }
+						: {}),
 				});
 			goal.status = "complete";
 			goal.completedAt = now;

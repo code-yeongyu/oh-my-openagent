@@ -71,3 +71,8 @@ export function repoRelative(absolutePath: string, repoRoot: string): string {
 		return absolutePath.slice(backslashPrefix.length).split("\\").join("/");
 	return absolutePath.split("\\").join("/");
 }
+
+export function ulwLoopAttemptEvidenceDir(goalId: string, attempt: number, scope?: UlwLoopScope): string {
+	const sessionId = normalizeUlwLoopSessionId(scope?.sessionId) ?? resolveUlwLoopSessionIdFromEnv() ?? "session";
+	return `.omo/evidence/ulw/${sessionId}/${goalId}/a${attempt}`;
+}
