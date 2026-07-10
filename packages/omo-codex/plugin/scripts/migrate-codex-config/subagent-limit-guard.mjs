@@ -1,4 +1,4 @@
-import { prefersMultiAgentV2, resolveMultiAgentVersionFromConfig } from "./multi-agent-v2-guard.mjs";
+import { prefersMultiAgentV2, readRootModel, resolveMultiAgentVersionFromConfig } from "./multi-agent-v2-guard.mjs";
 
 const CODEX_AGENTS_HEADER = "[agents]";
 const CODEX_MULTI_AGENT_V2_HEADER = "[features.multi_agent_v2]";
@@ -11,6 +11,12 @@ const CODEX_SUBAGENT_THREAD_LIMIT = "1000";
  * enabled in config, skip `agents.max_threads` because Codex rejects that key
  * while features.multi_agent_v2 is enabled.
  *
+ * When no model is resolvable at all (no session model and no root `model`
+ * in config.toml — Codex Desktop selects the model in the UI), never
+ * introduce `agents.max_threads`: it hard-fails thread/start on
+ * MultiAgentV2 sessions. An existing cap is still raised in place so the
+ * legacy low-cap repair keeps working and a hand-removed key stays removed.
+ *
  * @param {string} config
  * @param {{ multiAgentVersion?: string | null, sessionModel?: string | null, env?: NodeJS.ProcessEnv, modelsCachePath?: string }} [options]
  */
@@ -22,18 +28,32 @@ export function ensureSubagentConcurrencyLimit(config, options = {}) {
 	const v2Preferred = prefersMultiAgentV2(multiAgentVersion, options.sessionModel) || isMultiAgentV2Enabled(config);
 
 	let result = config;
-	if (!v2Preferred) {
-		result = ensureAgentsMaxThreads(result);
-	} else {
+	if (v2Preferred) {
 		result = removeAgentsMaxThreads(result);
+	} else if (multiAgentVersion == null && !hasModelEvidence(config, options)) {
+		result = raiseExistingAgentsMaxThreads(result);
+	} else {
+		result = ensureAgentsMaxThreads(result);
 	}
 	return ensureMultiAgentV2ThreadLimit(result);
+}
+
+function hasModelEvidence(config, options) {
+	const sessionModel = typeof options.sessionModel === "string" ? options.sessionModel.trim() : "";
+	return sessionModel.length > 0 || readRootModel(config) !== null;
 }
 
 function isMultiAgentV2Enabled(config) {
 	const section = findSection(config, CODEX_MULTI_AGENT_V2_HEADER);
 	if (!section) return false;
 	return /^\s*enabled\s*=\s*true[ \t]*(?:#[^\n]*)?$/m.test(section.text);
+}
+
+function raiseExistingAgentsMaxThreads(config) {
+	const section = findSection(config, CODEX_AGENTS_HEADER);
+	if (!section) return config;
+	if (!/^\s*max_threads\s*=/m.test(section.text)) return config;
+	return replaceOrInsertSetting(config, section, "max_threads", CODEX_SUBAGENT_THREAD_LIMIT);
 }
 
 function ensureAgentsMaxThreads(config) {

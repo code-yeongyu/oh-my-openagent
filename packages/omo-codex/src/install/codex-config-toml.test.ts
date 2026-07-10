@@ -533,6 +533,30 @@ describe("codex-config-toml", () => {
     expect(content).toContain("max_concurrent_threads_per_session = 1000")
   })
 
+  test("#given user-modified config without root model #when updating config #then does not introduce agents.max_threads", async () => {
+    // given: Codex Desktop selects the model in the UI; a user-modified config
+    // (reasoning profile not applied) keeps no root model, so the installer
+    // cannot prove the session is not a GPT-5.6 V2 model that rejects
+    // agents.max_threads at thread/start (#6002).
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-no-model-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(configPath, ['model_reasoning_effort = "high"', "", "[features]", "plugins = false", ""].join("\n"))
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).not.toMatch(/^\s*max_threads\s*=/m)
+    expect(content).toContain("max_concurrent_threads_per_session = 1000")
+  })
+
   test("#given managed agent role sections #when updating config #then preserves role config while raising only root agents max_threads", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-role-section-"))
@@ -798,3 +822,35 @@ describe("codex-config-toml", () => {
   })
 
 })
+
+  test("#given model_catalog_json declares a v2 family model as v1 #when updating config #then keeps agents.max_threads", async () => {
+    // given: Codex documents model_catalog_json as a complete replacement for
+    // models_cache.json (codex-rs load_model_catalog). A user forcing gpt-5.6-sol
+    // to v1 via that catalog must keep the v1 thread cap (lazycodex#120).
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-model-catalog-override-"))
+    const configPath = join(root, "config.toml")
+    const catalogPath = join(root, "custom-catalog.json")
+    await writeFile(configPath, [
+      'model = "gpt-5.6-sol"',
+      `model_catalog_json = "${catalogPath}"`,
+      "",
+      "[features]",
+      "multi_agent_v2 = false",
+      "",
+    ].join("\n"))
+    await writeFile(catalogPath, JSON.stringify({ models: [{ slug: "gpt-5.6-sol", multi_agent_version: "v1" }] }))
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).toContain("max_threads = 1000")
+    expect(content).toContain("max_concurrent_threads_per_session = 1000")
+  })
