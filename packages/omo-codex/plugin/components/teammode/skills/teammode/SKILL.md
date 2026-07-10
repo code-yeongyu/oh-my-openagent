@@ -19,7 +19,7 @@ Use a TEAM when EITHER holds:
 - one task still needs exploration, yet its GOAL is already clear - parallel investigation under
   a fixed objective.
 
-Use plain subagents (`$ulw` / `multi_agent_v1.spawn_agent`) - NOT a team - when EITHER holds:
+Use plain subagents (`$ulw` / `multi_agent_v1.spawn_agent` / flat `spawn_agent` on `multi_agent_v2`) - NOT a team - when EITHER holds:
 - the work IS perfectly isolated, so there is no coordination cost worth paying; or
 - the GOAL is still ambiguous, where one mind should resolve direction before any fan-out.
 
@@ -39,7 +39,7 @@ merge), not the keystrokes.
 ## Compose by part, ownership, or perspective - not by job title
 
 A team is ALWAYS two or more members - never a single-member team. One worker on an isolated
-job is a subagent (`multi_agent_v1.spawn_agent`), not a team; if you end up with a single member,
+job is a spawned subagent, not a team; if you end up with a single member,
 either split off a second distinct slice or drop the team and use a subagent.
 
 Compose the team from what you actually KNOW about the work. Ground the split in real knowledge
@@ -110,7 +110,7 @@ do not treat the intended mutation as complete; retry after the named command fi
    lose in the sidebar without this link.
 
 Every team member is a real Codex thread created with `codex_app.create_thread` - this is strict,
-not a preference. NEVER substitute `multi_agent_v1.spawn_agent`, or any other in-process subagent,
+not a preference. NEVER substitute a spawned in-process subagent (`multi_agent_v1.spawn_agent` or flat `spawn_agent`)
 for a team member: a spawned agent is an ephemeral helper that does not show up as a team thread,
 cannot carry the `[team name] <member name>` title, and cannot be inspected, titled, archived, or
 re-opened with the `codex_app.*` thread tools - which defeats the entire point of a durable team.

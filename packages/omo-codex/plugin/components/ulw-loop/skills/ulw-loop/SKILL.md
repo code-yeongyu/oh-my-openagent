@@ -46,4 +46,6 @@ The full workflow may mention OpenCode-style orchestration examples. In Codex, t
 | Wait for background result | `multi_agent_v1.wait_agent(...)` |
 | Clean up finished worker | `multi_agent_v1.close_agent(...)` |
 
+Flat `spawn_agent` requiring `task_name` instead (`multi_agent_v2`)? Rewrite rows: add `"task_name"`, `"fork_context":false` → `"fork_turns":"none"`, `wait_agent` takes only `timeout_ms`, no `close_agent` — finished agents end on their own.
+
 When translating `load_skills=[...]`, include the requested skill names in the spawned agent's `message`.

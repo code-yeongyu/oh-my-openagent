@@ -135,7 +135,7 @@ describe("start-work Stop hook", () => {
 		expect(parsed.reason).toMatch(/When unsure[^.]{0,30}HEAVY/);
 		expect(parsed.reason).toMatch(/mirrors its implementation/);
 		expect((parsed.reason.match(/malformed input, prompt injection/g) ?? []).length).toBe(1);
-		expect(parsed.reason.split(/\s+/).filter(Boolean).length).toBeLessThanOrEqual(1100);
+		expect(parsed.reason.split(/\s+/).filter(Boolean).length).toBeLessThanOrEqual(1135);
 	});
 
 	it("#given active codex work #when continuation directive is emitted #then PR lifecycle stays worktree-bound", () => {
