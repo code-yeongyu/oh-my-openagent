@@ -22,6 +22,8 @@ describe("engine isNeverTruncatedRule", () => {
 		it("#when checked #then they remain truncatable", () => {
 			expect(isNeverTruncatedRule("bundled-rules/windows-git-bash.md")).toBe(false);
 			expect(isNeverTruncatedRule(".omo/rules/typescript.md")).toBe(false);
+			expect(isNeverTruncatedRule(".omo/rules/hephaestus/large.md")).toBe(false);
+			expect(isNeverTruncatedRule("bundled-rules/hephaestus/future.md")).toBe(false);
 		});
 	});
 
