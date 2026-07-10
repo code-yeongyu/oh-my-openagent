@@ -756,7 +756,7 @@ test("#given global config with forced multi_agent_v2 #when full migration runs 
 test("#given enabled = true with an inline comment #when forcing disable #then flips to false and preserves the comment", () => {
 	const config = ["[features.multi_agent_v2]", "enabled = true # tuned by me", ""].join("\n");
 
-	const result = forceDisableMultiAgentV2(config, { multiAgentVersion: null });
+	const result = forceDisableMultiAgentV2(config, { multiAgentVersion: "v1" });
 
 	assert.match(result, /^enabled = false # tuned by me$/m);
 	assert.doesNotMatch(result, /enabled = true/);
@@ -767,7 +767,7 @@ test("#given enabled = true with an inline comment #when forcing disable #then f
 test("#given a section header with an inline comment #when forcing disable #then patches in place without duplicating the table", () => {
 	const config = ["[features.multi_agent_v2] # pinned by me", "enabled = true", ""].join("\n");
 
-	const result = forceDisableMultiAgentV2(config, { multiAgentVersion: null });
+	const result = forceDisableMultiAgentV2(config, { multiAgentVersion: "v1" });
 
 	assert.equal((result.match(/\[features\.multi_agent_v2\]/g) ?? []).length, 1);
 	assert.match(result, /enabled = false/);
@@ -779,19 +779,19 @@ test("#given an already-guarded commented config #when re-running #then output i
 	const configA = ["[features.multi_agent_v2]", "enabled = true # tuned by me", ""].join("\n");
 	const configB = ["[features.multi_agent_v2] # pinned by me", "enabled = true", ""].join("\n");
 
-	const firstA = forceDisableMultiAgentV2(configA, { multiAgentVersion: null });
-	const rerunA = forceDisableMultiAgentV2(firstA, { multiAgentVersion: null });
+	const firstA = forceDisableMultiAgentV2(configA, { multiAgentVersion: "v1" });
+	const rerunA = forceDisableMultiAgentV2(firstA, { multiAgentVersion: "v1" });
 	assert.equal(rerunA, firstA);
 
-	const firstB = forceDisableMultiAgentV2(configB, { multiAgentVersion: null });
-	const rerunB = forceDisableMultiAgentV2(firstB, { multiAgentVersion: null });
+	const firstB = forceDisableMultiAgentV2(configB, { multiAgentVersion: "v1" });
+	const rerunB = forceDisableMultiAgentV2(firstB, { multiAgentVersion: "v1" });
 	assert.equal(rerunB, firstB);
 });
 
 test("#given user-disabled with an inline comment #when forcing disable #then returns config unchanged", () => {
 	const config = ["[features.multi_agent_v2]", "enabled = false # I turned this off myself", ""].join("\n");
 
-	const result = forceDisableMultiAgentV2(config, { multiAgentVersion: null });
+	const result = forceDisableMultiAgentV2(config, { multiAgentVersion: "v1" });
 
 	assert.equal(result, config);
 });
@@ -799,7 +799,7 @@ test("#given user-disabled with an inline comment #when forcing disable #then re
 test("#given [features] shorthand true with an inline comment #when forcing disable #then removes the shorthand and appends one disabled table", () => {
 	const config = ["[features]", "plugins = true", "multi_agent_v2 = true # legacy", ""].join("\n");
 
-	const result = forceDisableMultiAgentV2(config, { multiAgentVersion: null });
+	const result = forceDisableMultiAgentV2(config, { multiAgentVersion: "v1" });
 
 	assert.doesNotMatch(result, /^\s*multi_agent_v2\s*=/m);
 	assert.equal((result.match(/\[features\.multi_agent_v2\]/g) ?? []).length, 1);
@@ -816,7 +816,7 @@ test("#given a following section header with an inline comment #when inserting e
 		"",
 	].join("\n");
 
-	const result = forceDisableMultiAgentV2(config, { multiAgentVersion: null });
+	const result = forceDisableMultiAgentV2(config, { multiAgentVersion: "v1" });
 
 	assert.match(result, /\[features\.multi_agent_v2\]\nenabled = false\n/);
 	assert.match(result, /\[mcp_servers\.x\][^\n]*\nenabled = true/);
@@ -1113,6 +1113,47 @@ test("#given config default gpt-5.5 #when full migration gets SessionStart gpt-5
 	assert.match(content, /max_concurrent_threads_per_session = 1000/);
 });
 
+test("#given no session model and no root model #when forcing disable #then leaves the enable state untouched", () => {
+	const config = ["[features]", "plugins = true", "", "[features.multi_agent_v2]", "enabled = true", ""].join("\n");
+
+	const result = forceDisableMultiAgentV2(config, { multiAgentVersion: null, sessionModel: null });
+
+	assert.match(result, /enabled = true/);
+	assert.doesNotMatch(result, /enabled = false/);
+	assert.doesNotMatch(result, /openai\/codex#26753/);
+});
+
+test("#given no session model and no root model #when config has no multi_agent_v2 section #then does not append a disable", () => {
+	const config = ["[features]", "plugins = true", ""].join("\n");
+
+	const result = forceDisableMultiAgentV2(config, { multiAgentVersion: null, sessionModel: null });
+
+	assert.equal(result, config);
+	assert.doesNotMatch(result, /\[features\.multi_agent_v2\]/);
+});
+
+test("#given user-modified config without root model #when full non-hook migration runs #then writes no disable and no new agents.max_threads", async () => {
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-multi-agent-v2-desktop-no-model-"));
+	const codexHome = join(root, "codex-home");
+	await mkdir(codexHome, { recursive: true });
+	const configPath = join(codexHome, "config.toml");
+	// Codex Desktop sessions select the model in the UI; config.toml has no root
+	// `model`, so migration cannot prove the session is not a GPT-5.6
+	// reserved-schema model (#6002).
+	await writeFile(configPath, ['model_reasoning_effort = "high"', "", "[features]", "plugins = true", ""].join("\n"));
+
+	await migrateCodexConfig({
+		env: { CODEX_HOME: codexHome, LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json") },
+		cwd: root,
+	});
+
+	const content = await readFile(configPath, "utf8");
+	assert.doesNotMatch(content, /^\s*enabled\s*=\s*false/m);
+	assert.doesNotMatch(content, /openai\/codex#26753/);
+	assert.doesNotMatch(content, /^\s*max_threads\s*=/m);
+	assert.match(content, /max_concurrent_threads_per_session = 1000/);
+});
+
 async function canCreateSymlink(type) {
 	const root = await mkdtemp(join(tmpdir(), "lazycodex-symlink-capability-"));
 	const target = join(root, "target");
@@ -1138,3 +1179,64 @@ async function canCreateSymlink(type) {
 		return false;
 	}
 }
+
+test("#given model_catalog_json declares a v2 model as v1 #when full migration runs #then keeps the managed disable and max_threads", async () => {
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-multi-agent-v2-catalog-override-"));
+	const codexHome = join(root, "codex-home");
+	await mkdir(codexHome, { recursive: true });
+	const configPath = join(codexHome, "config.toml");
+	const catalogPath = join(root, "custom-catalog.json");
+	// Codex Desktop user forces gpt-5.6-sol to v1 via an explicit replacement catalog.
+	await writeFile(configPath, [
+		'model = "gpt-5.6-sol"',
+		`model_catalog_json = "${catalogPath}"`,
+		"",
+		"[agents]",
+		"max_threads = 1000",
+		"max_depth = 2",
+		"",
+		"[features.multi_agent_v2]",
+		"enabled = false",
+		"max_concurrent_threads_per_session = 1000",
+		"",
+	].join("\n"));
+	// models_cache.json STILL says v2 (stale), but the explicit catalog wins and says v1.
+	await writeFile(join(codexHome, "models_cache.json"), JSON.stringify({ models: [{ slug: "gpt-5.6-sol", multi_agent_version: "v2" }] }));
+	await writeFile(catalogPath, JSON.stringify({ models: [{ slug: "gpt-5.6-sol", multi_agent_version: "v1" }] }));
+
+	await migrateCodexConfig({
+		env: { CODEX_HOME: codexHome, LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json") },
+		cwd: root,
+	});
+
+	const content = await readFile(configPath, "utf8");
+	assert.match(content, /enabled = false/, "explicit v1 catalog must keep the managed disable");
+	assert.match(content, /max_threads = 1000/, "explicit v1 catalog must keep agents.max_threads");
+	assert.match(content, /max_concurrent_threads_per_session = 1000/);
+	assert.match(content, /max_depth = 2/);
+});
+
+test("#given model_catalog_json declares a model as v2 #when full migration runs #then clears the managed disable", async () => {
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-multi-agent-v2-catalog-v2-"));
+	const codexHome = join(root, "codex-home");
+	await mkdir(codexHome, { recursive: true });
+	const configPath = join(codexHome, "config.toml");
+	const catalogPath = join(root, "custom-catalog.json");
+	await writeFile(configPath, [
+		'model = "custom-model"',
+		`model_catalog_json = "${catalogPath}"`,
+		"",
+		"[features.multi_agent_v2]",
+		"enabled = false",
+		"",
+	].join("\n"));
+	await writeFile(catalogPath, JSON.stringify({ models: [{ slug: "custom-model", multi_agent_version: "v2" }] }));
+
+	await migrateCodexConfig({
+		env: { CODEX_HOME: codexHome, LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json") },
+		cwd: root,
+	});
+
+	const content = await readFile(configPath, "utf8");
+	assert.doesNotMatch(content, /^\s*enabled\s*=\s*false/m, "explicit v2 catalog must clear the disable");
+});
