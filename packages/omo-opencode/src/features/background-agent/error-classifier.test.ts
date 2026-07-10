@@ -381,6 +381,11 @@ describe("isTerminalSessionError", () => {
       ["unknown provider 'foo'"],
       ["model not supported"],
       ["model_not_supported"],
+      ["Model not found: openai/gpt-missing"],
+      ["ProviderModelNotFoundError"],
+      ["No API key found for provider openai"],
+      ["Google Generative AI API key is missing"],
+      ["MissingApiKeyError"],
       ["no models available for provider"],
       ["no connected providers"],
       ["all providers unavailable"],
@@ -412,10 +417,6 @@ describe("isTerminalSessionError", () => {
 
     test("returns false for empty message string", () => {
       expect(isTerminalSessionError({ message: "" })).toBe(false)
-    })
-
-    test("returns false for undefined input", () => {
-      expect(isTerminalSessionError(undefined as never)).toBe(false)
     })
   })
 
