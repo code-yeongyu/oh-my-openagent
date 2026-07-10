@@ -74,6 +74,10 @@ export function createPluginInterface(args: {
     "experimental.chat.system.transform": createSystemTransformHandler(
       pluginConfig.default_mode,
       getUltraworkMessage,
+      {
+        backgroundManager: managers.backgroundManager,
+        blockOnBackgroundTasks: pluginConfig.experimental?.block_on_background_tasks,
+      },
     ),
 
     config: managers.configHandler,
