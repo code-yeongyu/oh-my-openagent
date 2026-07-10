@@ -16,5 +16,7 @@ describe("output tool factories", () => {
     expect(output.parameters).toBe(TaskOutputParams)
     expect(output.description.length).toBeGreaterThan(0)
     expect(output.label.length).toBeGreaterThan(0)
+    expect(typeof output.renderCall).toBe("function")
+    expect(typeof output.renderResult).toBe("function")
   })
 })
