@@ -185,6 +185,14 @@ describe("control tool renderers", () => {
       { kind: "team_message", team: { kind: "to_lead", message_id: "msg-1", delivery: "wake" } },
       { kind: "shutdown_requested", team_run_id: "team-1", member: "atlas" },
       { kind: "shutdown_responded", team_run_id: "team-1", member: "atlas", approved: false },
+      {
+        kind: "shutdown_failed",
+        operation: "reject",
+        team_run_id: "team-1",
+        member: "atlas",
+        code: "team_state_missing",
+        reason: "Team state is unavailable.",
+      },
     ]
 
     const lines = details.map((detail) => firstLine(renderTaskSendResult(toolResult("ok", detail), RESULT_OPTIONS, TEST_THEME), 120))
@@ -192,6 +200,29 @@ describe("control tool renderers", () => {
     expect(lines).toHaveLength(details.length)
     expect(lines.join("\n")).toContain("delivered st_1 as steer")
     expect(lines.join("\n")).toContain("shutdown rejected")
+  })
+
+  test("#given a structured shutdown failure #when rendering the result #then it shows concise safe context with the error theme", () => {
+    const line = firstLine(
+      renderTaskSendResult(
+        toolResult("safe", {
+          kind: "shutdown_failed",
+          operation: "approve",
+          team_run_id: "team-9",
+          member: "atlas",
+          code: "team_state_missing",
+          reason: "Team state is unavailable.",
+        }),
+        RESULT_OPTIONS,
+        TEST_THEME,
+      ),
+      120,
+    )
+
+    expect(line).toBe("[error]task_send shutdown approve failed team-9 member:atlas: Team state is unavailable.[/error]")
+    expect(line).not.toContain("ENOENT")
+    expect(line).not.toContain("/private/secret")
+    expect(line).not.toContain("state.json")
   })
 
   test("#given task_cancel arguments and result variants #when rendering #then identifier reason and status rows are concise", () => {
