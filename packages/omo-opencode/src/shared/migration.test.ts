@@ -654,6 +654,39 @@ describe("migrateModelVersions", () => {
     expect((migrated["hephaestus"] as Record<string, unknown>).model).toBe("openai/gpt-5.6-sol")
   })
 
+  test("#given momus pinned to the old gpt-5.5 default #when migrating #then only momus moves to gpt-5.6-sol xhigh", () => {
+    // given: momus carries the old installer default; oracle explicitly picked gpt-5.5
+    const agents = {
+      momus: { model: "openai/gpt-5.5", variant: "xhigh" },
+      oracle: { model: "openai/gpt-5.5", variant: "high" },
+    }
+
+    // when: Migrate model versions
+    const { migrated, changed, newMigrations } = migrateModelVersions(agents)
+
+    // then: momus adopts the gpt-5.6-sol xhigh default; oracle stays untouched
+    expect(changed).toBe(true)
+    expect(newMigrations).toEqual(["model-version:momus:openai/gpt-5.5->openai/gpt-5.6-sol"])
+    expect(migrated["momus"]).toEqual({ model: "openai/gpt-5.6-sol", variant: "xhigh" })
+    expect(migrated["oracle"]).toEqual({ model: "openai/gpt-5.5", variant: "high" })
+  })
+
+  test("#given the momus migration already applied #when migrating again #then the user revert is respected", () => {
+    // given: sidecar records the momus rollout as applied; user reverted to gpt-5.5
+    const agents = {
+      momus: { model: "openai/gpt-5.5", variant: "xhigh" },
+    }
+    const applied = new Set(["model-version:momus:openai/gpt-5.5->openai/gpt-5.6-sol"])
+
+    // when: Migrate model versions
+    const { migrated, changed, newMigrations } = migrateModelVersions(agents, applied)
+
+    // then: the one-shot migration does not re-apply
+    expect(changed).toBe(false)
+    expect(newMigrations).toEqual([])
+    expect(migrated["momus"]).toEqual({ model: "openai/gpt-5.5", variant: "xhigh" })
+  })
+
   test("#given current Anthropic models from bundled snapshot #when migrating #then preserves explicit user choices", () => {
     // given: These models remain present in the bundled model snapshot.
     const agents = {

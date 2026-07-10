@@ -264,6 +264,24 @@ describe("generateModelConfig", () => {
     })
   })
 
+  describe("Momus agent model resolution", () => {
+    test("Momus resolves to gpt-5.6-sol xhigh when OpenAI is available", () => {
+      // #given
+      const config = createConfig({ hasOpenAI: true })
+
+      // #when
+      const result = generateModelConfig(config)
+
+      // #then
+      expect(result.agents?.momus?.model).toBe("openai/gpt-5.6-sol")
+      expect(result.agents?.momus?.variant).toBe("xhigh")
+      expect(result.agents?.momus?.fallback_models?.[0]).toEqual({
+        model: "openai/gpt-5.5",
+        variant: "xhigh",
+      })
+    })
+  })
+
   describe("Hephaestus agent special cases", () => {
     test("Hephaestus is created when OpenAI is available (openai provider connected)", () => {
       // #given

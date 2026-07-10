@@ -589,9 +589,9 @@ Priority: **Claude > GPT > Claude-like models**
 
 | Agent          | Role                   | Default Chain                          | Notes                                                  |
 | -------------- | ---------------------- | -------------------------------------- | ------------------------------------------------------ |
-| **Hephaestus** | Deep autonomous worker | GPT-5.5 (medium) only                  | "Codex on steroids." No fallback. Requires GPT access. |
+| **Hephaestus** | Deep autonomous worker | openai\|vercel/gpt-5.6-sol (medium) → openai\|github-copilot\|opencode/gpt-5.5 (medium) | "Codex on steroids." GPT-only chain. Requires GPT access. |
 | **Oracle**     | Architecture/debugging | openai\|github-copilot\|opencode/gpt-5.5 (high) → google\|github-copilot\|opencode/gemini-3.1-pro (high) → anthropic\|github-copilot\|opencode/claude-opus-4-7 (max) → opencode-go/glm-5.2 | High-IQ strategic backup. GPT preferred. |
-| **Momus**      | High-accuracy reviewer | openai\|github-copilot\|opencode/gpt-5.5 (xhigh) → anthropic\|github-copilot\|opencode/claude-opus-4-7 (max) → google\|github-copilot\|opencode/gemini-3.1-pro (high) → opencode-go/glm-5.2 | Verification agent. GPT preferred. |
+| **Momus**      | High-accuracy reviewer | openai\|vercel/gpt-5.6-sol (xhigh) → openai\|github-copilot\|opencode/gpt-5.5 (xhigh) → anthropic\|github-copilot\|opencode/claude-opus-4-7 (max) → google\|github-copilot\|opencode/gemini-3.1-pro (high) → opencode-go/glm-5.2 | Verification agent. GPT preferred. |
 
 **Utility Agents** (speed over intelligence — do not "upgrade" them):
 
