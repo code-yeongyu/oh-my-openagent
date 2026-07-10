@@ -66,14 +66,19 @@ The orchestrator chose this category because the task benefits from depth over s
 **Status cadence: sparse.** The user is not on the other side of this conversation; the orchestrator is, and they will synthesize your progress. Send commentary only at meaningful phase transitions (starting exploration, starting implementation, starting verification, hitting a genuine blocker). Do not narrate every tool call; silence during focused work is expected.
 </Category_Context>`
 
-function isGpt5_5Model(model: string): boolean {
+function isGpt5_5OrLaterModel(model: string): boolean {
   const modelName = model.includes("/") ? (model.split("/").pop() ?? model) : model
   const normalized = modelName.toLowerCase()
-  return normalized.includes("gpt-5.5") || normalized.includes("gpt-5-5")
+  return (
+    normalized.includes("gpt-5.5") ||
+    normalized.includes("gpt-5-5") ||
+    normalized.includes("gpt-5.6") ||
+    normalized.includes("gpt-5-6")
+  )
 }
 
 export function resolveDeepCategoryPromptAppend(model: string | undefined): string {
-  if (model && isGpt5_5Model(model)) {
+  if (model && isGpt5_5OrLaterModel(model)) {
     return DEEP_CATEGORY_PROMPT_APPEND_GPT_5_5
   }
   return DEEP_CATEGORY_PROMPT_APPEND
@@ -133,13 +138,13 @@ If your prompt lacks this structure, REWRITE IT before delegating.
 export const OPENAI_CATEGORIES = [
   {
     name: "ultrabrain",
-    config: { model: "openai/gpt-5.5", variant: "xhigh" },
+    config: { model: "openai/gpt-5.6-sol", variant: "xhigh" },
     description: "Use ONLY for genuinely hard, logic-heavy tasks. Give clear goals only, not step-by-step instructions.",
     promptAppend: ULTRABRAIN_CATEGORY_PROMPT_APPEND,
   },
   {
     name: "deep",
-    config: { model: "openai/gpt-5.5", variant: "medium" },
+    config: { model: "openai/gpt-5.6-sol", variant: "high" },
     description: "Goal-oriented autonomous problem-solving on hairy problems requiring deep research. ONE goal + ONE deliverable per call — multiple goals must fan out as parallel `deep` calls, never bundled into one.",
     promptAppend: DEEP_CATEGORY_PROMPT_APPEND,
     resolvePromptAppend: resolveDeepCategoryPromptAppend,
