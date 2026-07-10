@@ -1,6 +1,7 @@
 import {
   excerptRendererText,
   normalizeRendererText,
+  rendererVisibleWidth,
   type ListScope,
   type ListedTask,
   type TaskRecord,
@@ -13,6 +14,7 @@ const UI_KEY = "omo-task"
 const MAX_WIDGET_ROWS = 5
 const DEFAULT_DEBOUNCE_MS = 250
 const PROGRESS_HEAD_MAX = 60
+const STATUS_LINE_MAX = 72
 type TimerHandle = ReturnType<typeof setTimeout> | number
 
 const TERMINAL_STATUSES: ReadonlySet<TaskStatus> = new Set(["completed", "error", "cancelled", "interrupted", "lost"])
@@ -85,7 +87,7 @@ export function formatTaskRow(record: TaskRecord): string {
   const reasoning = optionalRendererText(record.resolved_model?.reasoning_effort)
   if (reasoning !== undefined) parts.push(`reasoning:${reasoning}`)
   const variant = optionalRendererText(record.resolved_model?.variant)
-  if (variant !== undefined) parts.push(`variant:${variant}`)
+  if (variant !== undefined && variant !== reasoning) parts.push(`variant:${variant}`)
   parts.push(`mode:${normalizeRendererText(record.execution_mode)}`, `status:${normalizeRendererText(record.status)}`)
   if (record.pid !== undefined) parts.push(`pid:${record.pid}`)
   const progress = progressHead(record)
@@ -100,17 +102,62 @@ export function formatFooterStatus(records: readonly TaskRecord[]): string | und
   const errored = records.filter((record) => ERROR_STATUSES.has(record.status)).length
   const pieces = [`tasks:${records.length}`, `run:${running}`, `done:${done}`, `err:${errored}`]
   const active = records.find((record) => !isTerminal(record.status))
-  if (active !== undefined) pieces.push("|", formatTaskRow(active))
-  return pieces.join(" ")
+  if (active === undefined) return excerptRendererText(pieces.join(" "), STATUS_LINE_MAX)
+  const compactCounts = [`t${records.length}`, `r${running}`]
+  if (done > 0) compactCounts.push(`d${done}`)
+  if (errored > 0) compactCounts.push(`e${errored}`)
+  const prefix = compactCounts.join("/")
+  const rowWidth = STATUS_LINE_MAX - rendererVisibleWidth(prefix) - 1
+  return excerptRendererText(`${prefix} ${formatCompactTaskRow(active, rowWidth, false)}`, STATUS_LINE_MAX)
 }
 
 export function buildWidgetRows(records: readonly TaskRecord[]): string[] {
   const active = records.filter((record) => !isTerminal(record.status))
   if (active.length === 0) return []
-  const shown = active.slice(0, MAX_WIDGET_ROWS).map(formatTaskRow)
+  const shown = active.slice(0, MAX_WIDGET_ROWS).map(formatWidgetRow)
   const overflow = active.length - MAX_WIDGET_ROWS
   if (overflow > 0) shown.push(`+${overflow} more`)
   return shown
+}
+
+function formatWidgetRow(record: TaskRecord): string {
+  return formatCompactTaskRow(record, STATUS_LINE_MAX, true)
+}
+
+function formatCompactTaskRow(record: TaskRecord, maxWidth: number, includeName: boolean): string {
+  const context = compactTaskContext(record)
+  const identityWidth = Math.max(0, maxWidth - rendererVisibleWidth(context) - 1)
+  if (identityWidth === 0) return excerptRendererText(context, maxWidth)
+  const identity = compactTaskIdentity(record, identityWidth, includeName)
+  return excerptRendererText(`${identity}|${context}`, maxWidth)
+}
+
+function compactTaskIdentity(record: TaskRecord, maxWidth: number, includeName: boolean): string {
+  const name = optionalRendererText(record.name)
+  if (!includeName || name === undefined || maxWidth <= 5) return excerptRendererText(record.task_id, maxWidth)
+  const nameWidth = Math.min(9, maxWidth - 5)
+  const idWidth = maxWidth - nameWidth - 1
+  return compactTokens([
+    excerptRendererText(record.task_id, idWidth),
+    excerptRendererText(name, nameWidth),
+  ])
+}
+
+function compactTaskContext(record: TaskRecord): string {
+  const category = optionalRendererText(record.category)
+  const target = category === undefined ? `a:${optionalRendererText(record.agent_type) ?? "?"}` : `c:${category}`
+  const reasoning = optionalRendererText(record.resolved_model?.reasoning_effort)
+  return compactTokens([
+    excerptRendererText(target, 12),
+    excerptRendererText(modelDisplay(record), 15),
+    reasoning === undefined ? undefined : excerptRendererText(reasoning, 5),
+    excerptRendererText(record.execution_mode, 10),
+    excerptRendererText(record.status, 7),
+  ])
+}
+
+function compactTokens(parts: readonly (string | undefined)[]): string {
+  return parts.filter((part): part is string => part !== undefined).join(" ")
 }
 
 const globalTimers: StatusUiTimers = {
