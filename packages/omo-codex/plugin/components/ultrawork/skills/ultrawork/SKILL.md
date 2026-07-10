@@ -281,6 +281,19 @@ when `agent_type` IS exposed: low -> `lazycodex-worker-low`
 explorer/librarian carry their own TOMLs (gpt-5.6-luna/low). Difficulty
 (model power) is orthogonal to LIGHT/HEAVY rigor (process size).
 
+Treat child status as a progress signal, not a timeout counter. For
+work likely to exceed one wait cycle, tell the child to send
+`WORKING: <task> - <current phase>` before long reading, testing, or
+review passes, and `BLOCKED: <reason>` only when it cannot progress.
+Track spawned agent names locally. Use `multi_agent_v1.wait_agent` for mailbox
+signals, but a timeout only means no new mailbox update arrived.
+Treat a running child as alive and keep doing independent root work.
+Fallback only when the child is completed without the
+deliverable, ack-only, or no longer running. If that followup is still
+silent or ack-only, record the result as inconclusive, do not count it
+as approval/pass, close it if safe, and respawn a smaller
+`fork_context: false` task with the missing deliverable.
+
 # Subagent-dependent transition barrier
 Do not mark an `update_plan` step `completed` while an active child owns
 evidence for that step. Do not start dependent implementation until the
