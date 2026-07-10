@@ -136,12 +136,13 @@ function buildLedger(
 	codexGoal: unknown,
 	aggregateCompletion: UlwLoopAggregateCompletion | undefined,
 ): UlwLoopLedgerEntry {
+	const watch = qualityGate?.codeReview.codeQualityStatus === "WATCH";
 	const entry: UlwLoopLedgerEntry = {
 		at: now,
 		kind: ledgerKind(args.status, goal, aggregateCompletion),
 		goalId: goal.id,
 		status: goal.status,
-		evidence: args.evidence,
+		evidence: watch ? `${args.evidence} | codeQuality=WATCH: ${qualityGate.codeReview.evidence}` : args.evidence,
 	};
 	if (codexGoal !== undefined) entry.codexGoal = codexGoal;
 	if (qualityGate !== undefined) entry.qualityGate = qualityGate;

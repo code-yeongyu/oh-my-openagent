@@ -94,7 +94,8 @@ export interface UlwLoopManualQaAdversarialCase {
 	readonly criterionRef: string;
 	readonly scenario: string;
 	readonly expectedBehavior: string;
-	readonly verdict: "passed";
+	readonly verdict: "passed" | "not_applicable";
+	readonly reason?: string;
 	readonly artifactRefs: readonly string[];
 }
 
@@ -102,7 +103,7 @@ export interface UlwLoopQualityGate {
 	readonly codeReview: {
 		readonly by: string;
 		readonly recommendation: "APPROVE";
-		readonly codeQualityStatus: "CLEAR";
+		readonly codeQualityStatus: "CLEAR" | "WATCH";
 		readonly reportPath: string;
 		readonly evidence: string;
 		readonly blockers: readonly [];

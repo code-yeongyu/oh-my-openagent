@@ -117,6 +117,7 @@ function finalSection(plan: UlwLoopPlan, goal: UlwLoopItem, isFinal: boolean, ag
 		"- Only then spawn lazycodex-gate-reviewer (same fork settings), passing those artifact paths.",
 		"- Require clean codeReview, manualQa, gateReview, iteration, and criteriaCoverage. criteriaCoverage must summarize originalIntent, desiredOutcome, and userOutcomeReview; counts alone are not approval.",
 		"- On a reviewer REJECT, fix only the cited blockers, rerun the affected verification/Manual-QA, and re-review the delta at most TWICE; if blockers remain, record them and surface to the user.",
+		"- If codeQualityStatus is WATCH, include the WATCH notes verbatim in your final user-facing message.",
 		"- If any reviewer is blocked/inconclusive or the quality gate is not clean, do not call update_goal. Record blocker work first:",
 		`  ${blockerCommand}`,
 		aggregate
