@@ -28,7 +28,7 @@ type ResultRow = {
 const MESSAGE_EXCERPT_MAX = 56
 const REASON_EXCERPT_MAX = 40
 const ELLIPSIS = "..."
-const MIN_TRUNCATED_EXCERPT_WIDTH = ELLIPSIS.length + 1
+const MIN_MEANINGFUL_TRUNCATED_EXCERPT_WIDTH = 8
 
 export function renderTaskSendCall(args: TaskSendInput, theme: ControlRenderTheme): RenderComponent {
   return widthComponent((width) => theme.fg("toolTitle", taskSendCallLine(args, theme, width)))
@@ -121,7 +121,7 @@ function withExcerpt(
   const normalized = normalizeRendererText(value)
   if (normalized.length === 0) return base
   const available = Math.min(maxExcerpt, Math.max(0, width - rendererVisibleWidth(prefix) - quoteOverhead))
-  if (rendererVisibleWidth(normalized) > available && available < MIN_TRUNCATED_EXCERPT_WIDTH) return base
+  if (rendererVisibleWidth(normalized) > available && available < MIN_MEANINGFUL_TRUNCATED_EXCERPT_WIDTH) return base
   const excerpt = excerptRendererText(normalized, available)
   return `${prefix}${theme.italic(`"${excerpt}"`)}`
 }

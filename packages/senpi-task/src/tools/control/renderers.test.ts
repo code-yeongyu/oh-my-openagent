@@ -126,12 +126,12 @@ describe("control tool renderers", () => {
     expect(line).toContain("Renderer QA request")
   })
 
-  test("#given a structured shutdown request with no room for a meaningful reason #when rendering at 72 columns #then the optional reason field is omitted", () => {
+  test("#given a structured shutdown request with no room for a meaningful reason #when rendering at the Senpi edge width #then the optional reason field is omitted", () => {
     const line = firstLine(
       renderTaskSendCall(
         {
           to: "edge-member",
-          team_run_id: "edge-team-long",
+          team_run_id: "edge-team-72",
           message: {
             type: "shutdown_request",
             reason: "Renderer QA request after the mixed Korean and English edge pass",
@@ -139,15 +139,15 @@ describe("control tool renderers", () => {
         },
         ANSI_THEME,
       ),
-      72,
+      73,
     )
 
     expect(line).toContain("task_send shutdown:request")
     expect(line).toContain("to:edge-member")
-    expect(line).toContain("team:edge-team-long")
+    expect(line).toContain("team:edge-team-72")
     expect(line).not.toContain("reason:")
     expect(line).not.toContain('reason:"."')
-    expect(visibleWidth(line)).toBeLessThanOrEqual(72)
+    expect(visibleWidth(line)).toBeLessThanOrEqual(73)
   })
 
   test("#given pure interrupt task_send #when rendering the call #then it is meaningful without an empty message label", () => {
