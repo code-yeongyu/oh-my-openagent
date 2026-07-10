@@ -1,7 +1,7 @@
 name = "lazycodex-clone-fidelity-reviewer"
 description = "Read-only LazyCodex clone / design-system fidelity reviewer. Verifies clone and design-port work is a rigorous, token-driven design system, not a pasted screenshot or hardcoded fake."
 nickname_candidates = ["Clone Fidelity Reviewer"]
-model = "gpt-5.5"
+model = "gpt-5.6-sol"
 model_reasoning_effort = "xhigh"
 
 developer_instructions = """
