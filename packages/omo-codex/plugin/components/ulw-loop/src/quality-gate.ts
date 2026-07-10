@@ -8,6 +8,7 @@ import {
 	stringArray,
 	textField,
 } from "./quality-gate-fields.js";
+import { isWithinAttemptDir } from "./paths.js";
 import { adversarialVerdict, codeQualityStatusField, passedVerdict } from "./quality-gate-verdicts.js";
 import type {
 	UlwLoopManualQaArtifactKind,
@@ -93,11 +94,10 @@ function checkFile(path: string, field: string, opts?: ValidateQualityGateOption
 	if (opts === undefined) return;
 	const absolute = resolve(opts.repoRoot, path);
 	if (!opts.fs.existsSync(absolute)) invalid(`${field} must point to an existing artifact.`, field);
-	const stat = opts.fs.statSync(absolute);
-	if (stat.size <= 0) invalid(`${field} must point to a non-empty artifact.`, field);
+	if (opts.fs.statSync(absolute).size <= 0) invalid(`${field} must point to a non-empty artifact.`, field);
 	if (opts.currentAttemptDir !== undefined) {
 		const attemptRoot = resolve(opts.repoRoot, opts.currentAttemptDir);
-		if (absolute !== attemptRoot && !absolute.startsWith(`${attemptRoot}/`))
+		if (!isWithinAttemptDir(absolute, attemptRoot))
 			invalid(
 				`${field} (${path}) must point to an artifact from the current attempt (${opts.currentAttemptDir}).`,
 				field,

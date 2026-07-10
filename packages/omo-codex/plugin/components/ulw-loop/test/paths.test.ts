@@ -1,6 +1,9 @@
+import { posix, win32 } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
+	isWithinAttemptDir,
 	normalizeUlwLoopSessionId,
 	repoRelative,
 	ulwLoopBriefPath,
@@ -58,5 +61,37 @@ describe("repoRelative", () => {
 	it("returns absolute when path is outside repo", () => {
 		// when/then
 		expect(repoRelative("/elsewhere/file", "/repo")).toBe("/elsewhere/file");
+	});
+});
+
+describe("isWithinAttemptDir", () => {
+	const posixRoot = "/repo/.omo/evidence/ulw/s1/g1/a1";
+	const win32Root = "C:\\repo\\.omo\\evidence\\ulw\\s1\\g1\\a1";
+
+	it("#given a child artifact #when checked on posix #then it is contained", () => {
+		expect(isWithinAttemptDir(`${posixRoot}/cli-pass.txt`, posixRoot, posix)).toBe(true);
+	});
+
+	it("#given a child artifact #when checked with win32 separators #then it is contained", () => {
+		expect(isWithinAttemptDir(`${win32Root}\\cli-pass.txt`, win32Root, win32)).toBe(true);
+	});
+
+	it("#given the attempt root itself #when checked #then it is contained", () => {
+		expect(isWithinAttemptDir(posixRoot, posixRoot, posix)).toBe(true);
+		expect(isWithinAttemptDir(win32Root, win32Root, win32)).toBe(true);
+	});
+
+	it("#given a sibling dir sharing the prefix #when checked #then it is outside", () => {
+		expect(isWithinAttemptDir("/repo/.omo/evidence/ulw/s1/g1/a1x/f.txt", posixRoot, posix)).toBe(false);
+		expect(isWithinAttemptDir(`${win32Root}x\\f.txt`, win32Root, win32)).toBe(false);
+	});
+
+	it("#given a prior-attempt artifact #when checked #then it is outside", () => {
+		expect(isWithinAttemptDir("/repo/.omo/evidence/ulw/s1/g1/a0/f.txt", posixRoot, posix)).toBe(false);
+		expect(isWithinAttemptDir("C:\\repo\\.omo\\evidence\\ulw\\s1\\g1\\a0\\f.txt", win32Root, win32)).toBe(false);
+	});
+
+	it("#given a different-drive path #when checked on win32 #then it is outside", () => {
+		expect(isWithinAttemptDir("D:\\elsewhere\\f.txt", win32Root, win32)).toBe(false);
 	});
 });
