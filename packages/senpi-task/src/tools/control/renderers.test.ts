@@ -24,9 +24,14 @@ const ANSI_THEME: ControlRenderTheme = {
 }
 
 const RESULT_OPTIONS = { expanded: false, isPartial: false }
+const TERMINAL_CONTROL_PATTERN = /[\u0000-\u001f\u007f-\u009f]/u
 
 function firstLine(component: { render(width: number): string[] }, width: number): string {
   return component.render(width)[0] ?? ""
+}
+
+function expectNoTerminalControls(value: string): void {
+  expect(value).not.toMatch(TERMINAL_CONTROL_PATTERN)
 }
 
 describe("control tool renderers", () => {
@@ -245,5 +250,31 @@ describe("control tool renderers", () => {
     expect(lines.join("\n")).toContain("cancelled st_1")
     expect(lines.join("\n")).toContain("[warning]")
     expect(lines.join("\n")).toContain("[error]")
+  })
+
+  test("#given injected controls in task_send and task_cancel results #when rendered #then dynamic controls are removed before trusted theme styling", () => {
+    // given
+    const sendDetails: SendResultDetails = {
+      kind: "invalid_arguments",
+      reason: "잘못됨 \u001b[31m빨강\u001b[0m\u0007",
+    }
+    const cancelDetails: CancelResultDetails = {
+      kind: "not_found",
+      reason: "없음 \u001b]8;;https://example.com\u001b\\링크\u001b]8;;\u001b\\\u007f",
+    }
+
+    // when
+    const send = firstLine(renderTaskSendResult(toolResult("ignored", sendDetails), RESULT_OPTIONS, ANSI_THEME), 120)
+    const cancel = firstLine(renderTaskCancelResult(toolResult("ignored", cancelDetails), RESULT_OPTIONS, ANSI_THEME), 120)
+    const plainSend = firstLine(renderTaskSendResult(toolResult("ignored", sendDetails), RESULT_OPTIONS, TEST_THEME), 120)
+    const plainCancel = firstLine(renderTaskCancelResult(toolResult("ignored", cancelDetails), RESULT_OPTIONS, TEST_THEME), 120)
+
+    // then
+    expect(send).toStartWith("\u001b[33m")
+    expect(cancel).toStartWith("\u001b[33m")
+    expect(send).not.toContain("\u001b[31m")
+    expect(cancel).not.toContain("https://example.com")
+    expectNoTerminalControls(plainSend)
+    expectNoTerminalControls(plainCancel)
   })
 })

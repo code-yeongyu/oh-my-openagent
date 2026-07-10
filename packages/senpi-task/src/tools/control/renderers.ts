@@ -40,7 +40,7 @@ export function renderTaskSendResult(
   theme: ControlRenderTheme,
 ): RenderComponent {
   const row = taskSendResultRow(result.details)
-  return linesComponent([theme.fg(row.color, row.text)])
+  return linesComponent([theme.fg(row.color, normalizeRendererText(row.text))])
 }
 
 export function renderTaskCancelCall(args: TaskCancelInput, theme: ControlRenderTheme): RenderComponent {
@@ -53,7 +53,7 @@ export function renderTaskCancelResult(
   theme: ControlRenderTheme,
 ): RenderComponent {
   const row = taskCancelResultRow(result.details)
-  return linesComponent([theme.fg(row.color, row.text)])
+  return linesComponent([theme.fg(row.color, normalizeRendererText(row.text))])
 }
 
 function widthComponent(renderLine: (width: number) => string): RenderComponent {
