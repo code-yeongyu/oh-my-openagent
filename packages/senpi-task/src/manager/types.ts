@@ -1,7 +1,7 @@
 import type { ToolDefinition } from "@code-yeongyu/senpi"
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
-import type { TaskRecord, TaskStatus } from "../state"
+import type { ResolvedModelRecord, TaskRecord, TaskStatus } from "../state"
 import type {
   CancelOutcome,
   DestructionPort,
@@ -55,6 +55,7 @@ export type ManagerStartSpec = {
 
 export type ResolvedChildPlan = {
   readonly model: string
+  readonly resolved_model?: ResolvedModelRecord
   readonly agentExecutionMode?: ExecutionMode
   readonly agentType?: string
   readonly category?: string

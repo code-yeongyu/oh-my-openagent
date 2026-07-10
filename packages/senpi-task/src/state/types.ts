@@ -21,6 +21,19 @@ export const RESIDENCY_STATES = [
 export type ResidencyState = (typeof RESIDENCY_STATES)[number]
 export type Messageability = "steer" | "revive" | "not-continuable"
 
+export const RESOLVED_MODEL_SOURCES = ["category", "explicit"] as const
+
+export type ResolvedModelSource = (typeof RESOLVED_MODEL_SOURCES)[number]
+
+export type ResolvedModelRecord = {
+  readonly provider: string
+  readonly model_id: string
+  readonly display: string
+  readonly variant?: string
+  readonly reasoning_effort?: string
+  readonly source: ResolvedModelSource
+}
+
 export type TaskNotification = {
   readonly run_epoch: number
   readonly notified_epoch: number
@@ -36,6 +49,7 @@ export type TaskRecordInput = {
   readonly category?: string
   readonly execution_mode: string
   readonly model: string
+  readonly resolved_model?: ResolvedModelRecord
   readonly tool_allow?: readonly string[]
   readonly tool_deny?: readonly string[]
 }

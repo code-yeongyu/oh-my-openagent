@@ -1,7 +1,9 @@
-export { RESIDENCY_STATES, TASK_STATUSES } from "./types"
+export { RESIDENCY_STATES, RESOLVED_MODEL_SOURCES, TASK_STATUSES } from "./types"
 export type {
   Messageability,
   ResidencyState,
+  ResolvedModelRecord,
+  ResolvedModelSource,
   TaskNotification,
   TaskRecord,
   TaskRecordInput,
