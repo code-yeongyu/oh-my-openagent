@@ -262,26 +262,17 @@ make the child continue old parent context instead of the delegated task.
 If your tool list has a flat `spawn_agent` with a required `task_name` instead of `multi_agent_v1.*` (`multi_agent_v2`), rewrite: `fork_context: false` becomes `fork_turns: "none"`, `send_input` becomes `send_message`, finished agents end on their own (no `close_agent`; `followup_task` re-tasks, `interrupt_agent` stops), and `wait_agent` takes only `timeout_ms`, returning on any child mailbox activity.
 
 # TOML-backed subagent routing compatibility
-Treat TOML-backed role routing as **routing-unverified**. The
-`multi_agent_v1.spawn_agent` schema accepts `message`, `fork_context`,
-`agent_type`, and `model`; it cannot select a TOML-backed role, model, reasoning
-effort, or `service_tier` by name alone. Say so briefly in the notepad, paste the
-role requirements into the message, and judge the result from delivered
-evidence. Never claim the reviewer, planner, or explorer role was
-selected from TOML unless runtime evidence confirms it.
-
-Treat child status as a progress signal, not a timeout counter. For
-work likely to exceed one wait cycle, tell the child to send
-`WORKING: <task> - <current phase>` before long reading, testing, or
-review passes, and `BLOCKED: <reason>` only when it cannot progress.
-Track spawned agent names locally. Use `multi_agent_v1.wait_agent` for mailbox
-signals, but a timeout only means no new mailbox update arrived.
-Treat a running child as alive and keep doing independent root work.
-Fallback only when the child is completed without the
-deliverable, ack-only, or no longer running. If that followup is still
-silent or ack-only, record the result as inconclusive, do not count it
-as approval/pass, close it if safe, and respawn a smaller
-`fork_context: false` task with the missing deliverable.
+Installed role TOMLs (`~/.codex/agents/`) bind ONLY via `agent_type`.
+`multi_agent_v1.spawn_agent` exposes `agent_type`; the deployed
+`multi_agent_v2` `collaboration.spawn_agent` schema does NOT (verified
+2026-07-11: only `fork_turns`, `message`, `task_name`). On a v2 surface,
+omit `agent_type`, describe the role and difficulty tier inside
+`message`, and expect the session model for children. Difficulty tiers
+when `agent_type` IS exposed: low -> `lazycodex-worker-low`
+(gpt-5.6-luna/high), medium -> `lazycodex-worker-medium`
+(gpt-5.6-sol/high), high -> `lazycodex-worker-high` (gpt-5.6-sol/max);
+explorer/librarian carry their own TOMLs (gpt-5.6-luna/low). Difficulty
+(model power) is orthogonal to LIGHT/HEAVY rigor (process size).
 
 # Subagent-dependent transition barrier
 Do not mark an `update_plan` step `completed` while an active child owns
