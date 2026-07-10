@@ -7,6 +7,9 @@ import {
   type SenpiModelRegistryPort,
 } from "@oh-my-opencode/senpi-task"
 
+type ResolvedPlan = Extract<PlanResolution, { readonly kind: "resolved" }>["plan"]
+type ResolvedModelMetadata = NonNullable<ResolvedPlan["resolved_model"]>
+
 // The live senpi model registry surface the planner needs. ExtensionContext.modelRegistry satisfies
 // it structurally; a fake with getAvailable/find satisfies it in tests.
 export type TaskModelRegistry = SenpiModelRegistryPort<SenpiModelPort>
@@ -20,7 +23,14 @@ export type ResolveModelRegistry = () => TaskModelRegistry | undefined
 export function createTaskChildPlanner(omoConfig: OmoConfig, resolveRegistry: ResolveModelRegistry): ChildPlanner {
   return (spec): PlanResolution => {
     if (spec.model !== undefined && spec.model.length > 0) {
-      return { kind: "resolved", plan: { model: spec.model } }
+      const resolvedModel = explicitModelMetadata(spec.model)
+      return {
+        kind: "resolved",
+        plan: {
+          model: spec.model,
+          ...(resolvedModel !== undefined ? { resolved_model: resolvedModel } : {}),
+        },
+      }
     }
 
     const categoryName = spec.category ?? spec.subagent_type
@@ -50,6 +60,14 @@ function toPlanResolution(
       kind: "resolved",
       plan: {
         model: `${resolution.spec.provider}/${resolution.spec.modelId}`,
+        resolved_model: {
+          source: "category",
+          provider: resolution.spec.provider,
+          model_id: resolution.spec.modelId,
+          display: `${resolution.spec.provider}/${resolution.spec.modelId}`,
+          ...(resolution.spec.variant !== undefined ? { variant: resolution.spec.variant } : {}),
+          ...(resolution.spec.reasoningEffort !== undefined ? { reasoning_effort: resolution.spec.reasoningEffort } : {}),
+        },
         category: resolution.category,
         ...(resolution.spec.prompt_append !== undefined && { promptAppend: resolution.spec.prompt_append }),
       },
@@ -78,5 +96,18 @@ function toPlanResolution(
       message: `No available model for category "${categoryName}" (attempted ${resolution.attemptedModel ?? "none"}).`,
       availableCategories: resolution.availableCategories,
     },
+  }
+}
+
+function explicitModelMetadata(model: string): ResolvedModelMetadata | undefined {
+  const separatorIndex = model.indexOf("/")
+  if (separatorIndex <= 0 || separatorIndex === model.length - 1) {
+    return undefined
+  }
+  return {
+    source: "explicit",
+    provider: model.slice(0, separatorIndex),
+    model_id: model.slice(separatorIndex + 1),
+    display: model,
   }
 }
