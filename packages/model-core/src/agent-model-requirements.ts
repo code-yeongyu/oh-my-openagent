@@ -139,6 +139,11 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   momus: {
     fallbackChain: [
       {
+        providers: ["openai", "vercel"],
+        model: "gpt-5.6-sol",
+        variant: "xhigh",
+      },
+      {
         providers: ["openai", "github-copilot", "opencode", "vercel"],
         model: "gpt-5.5",
         variant: "xhigh",
