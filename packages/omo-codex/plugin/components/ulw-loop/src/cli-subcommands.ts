@@ -14,7 +14,7 @@ import { parseSteeringProposal, printSteerResult } from "./cli-steering.js";
 import { buildCodexGoalInstruction } from "./codex-goal-instruction.js";
 import { recordEvidence } from "./evidence.js";
 import { isEssentialCriterion } from "./goal-status.js";
-import type { UlwLoopScope } from "./paths.js";
+import { type UlwLoopScope, ulwLoopAttemptEvidenceDir } from "./paths.js";
 import { addUlwLoopGoal, createUlwLoopPlan, startNextUlwLoop, summarizeUlwLoopPlan } from "./plan-crud.js";
 import { readUlwLoopPlan } from "./plan-io.js";
 import { recordFinalReviewBlockers } from "./review-blockers.js";
@@ -62,8 +62,19 @@ export async function createGoals(
 
 export async function status(repoRoot: string, json: boolean, scope?: UlwLoopScope): Promise<number> {
 	const plan = await readUlwLoopPlan(repoRoot, scope);
-	if (json) printJson({ ok: true, plan, summary: summarizeUlwLoopPlan(plan) });
-	else printStatus(plan);
+	if (json) {
+		const active = plan.goals.find((goal) => goal.id === plan.activeGoalId);
+		const currentAttemptDir =
+			plan.evidenceLayoutVersion === 2 && active
+				? ulwLoopAttemptEvidenceDir(active.id, active.attempt, scope)
+				: undefined;
+		printJson({
+			ok: true,
+			plan,
+			summary: summarizeUlwLoopPlan(plan),
+			...(currentAttemptDir === undefined ? {} : { currentAttemptDir }),
+		});
+	} else printStatus(plan);
 	return 0;
 }
 
