@@ -14,9 +14,12 @@ Translate any OpenCode-only tool name in an inherited example to its Codex equiv
 | OpenCode example | Codex tool to use |
 | --- | --- |
 | final-review `task(...)` | `multi_agent_v1.spawn_agent({"message":"TASK: act as a rigorous reviewer. ...","agent_type":"lazycodex-gate-reviewer","fork_context":false})` |
-| worker `task(...)` | `multi_agent_v1.spawn_agent({"message":"TASK: act as <role>. ...","fork_context":false})` |
+| worker `task(...)` | `multi_agent_v1.spawn_agent({"message":"TASK: act as <role>. ...","fork_context":false})` — for implementation workers add `agent_type: "lazycodex-worker-<low|medium|high>"` when the spawn schema exposes `agent_type` |
 | `background_output(task_id="...")` | `multi_agent_v1.wait_agent(...)` for mailbox signals |
 | `team_*(...)` | `multi_agent_v1.spawn_agent` + `multi_agent_v1.send_input` + `multi_agent_v1.wait_agent` + `multi_agent_v1.close_agent` |
+
+### Delegation by difficulty (Codex tier workers)
+When tier worker agents are installed (Codex), size each implementation lane by difficulty and pass the matching `agent_type` where the spawn schema exposes it: LOW (one-file fix, boilerplate, config/copy) -> `lazycodex-worker-low`; MEDIUM (standard feature, few files, known patterns) -> `lazycodex-worker-medium`; HIGH (new module, cross-module refactor, concurrency/security/migration) -> `lazycodex-worker-high`. Explorer/librarian research lanes keep their own roles. Difficulty (model power) is orthogonal to the LIGHT/HEAVY rigor tier in step 4 — judge each on its own facts. On spawn surfaces without `agent_type` (deployed v2), state the tier inside `message`.
 
 When translating `load_skills=[...]`, name the skills inside the spawned agent's `message`. If a code block below conflicts with this section, this section wins.
 
