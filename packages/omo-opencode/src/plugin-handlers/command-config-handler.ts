@@ -51,6 +51,7 @@ export async function applyCommandConfig(params: {
       browserProvider: params.pluginConfig.browser_automation_engine?.provider ?? "playwright",
       disabledSkills,
       teamModeEnabled: params.pluginConfig.team_mode?.enabled ?? false,
+      playwrightMcpArgs: params.pluginConfig.browser_automation_engine?.playwright_mcp_args,
       systemMcpNames: getSystemMcpServerNames(),
     }),
   );

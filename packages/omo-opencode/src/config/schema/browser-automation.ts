@@ -16,6 +16,23 @@ export const BrowserAutomationConfigSchema = z.object({
    * - "playwright-cli": Uses Playwright CLI (@playwright/cli) - token-efficient CLI alternative
    */
   provider: BrowserAutomationProviderSchema.default("playwright"),
+  /**
+   * Extra CLI arguments appended to the default `@playwright/mcp@latest`
+   * invocation. Only applied when `provider` is `"playwright"`.
+   *
+   * The Playwright MCP server defaults to launching the `chrome` channel from
+   * a system-wide Chrome install (typically `/opt/google/chrome/chrome` on
+   * Linux). In sandboxed environments (containers, dev containers, CI runners,
+   * remote coding sandboxes) that binary is often absent, and Playwright's
+   * bundled Chromium under `PLAYWRIGHT_BROWSERS_PATH` must be used instead.
+   *
+   * Common overrides:
+   * - `["--headless", "--no-sandbox", "--executable-path", "/path/to/chromium"]`
+   *   to point at Playwright's bundled Chromium in a sandboxed container.
+   *
+   * See https://github.com/microsoft/playwright-mcp for the full flag list.
+   */
+  playwright_mcp_args: z.array(z.string()).optional(),
 })
 
 export type BrowserAutomationProvider = z.infer<
