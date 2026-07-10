@@ -1,7 +1,7 @@
 name = "plan"
 description = "Strategic planning consultant. Produces a single executable work plan from a vague or large request. Planner only - never implements. Writes the plan to .omo/plans/<slug>.md."
 nickname_candidates = ["Planner"]
-model = "gpt-5.5"
+model = "gpt-5.6-sol"
 model_reasoning_effort = "xhigh"
 
 developer_instructions = """
