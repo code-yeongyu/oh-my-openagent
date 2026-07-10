@@ -241,6 +241,7 @@ test("#given start-work skill #when synced for Codex #then the difficulty-tier d
 	assert.match(content, /lazycodex-worker-medium/);
 	assert.match(content, /Delegation by difficulty/);
 	assert.match(content, /Global Review and Debugging Gate/);
+	assert.doesNotMatch(content, /works the same on both surfaces/);
 });
 
 test("#given review-work skill #when some lanes do not finish #then aggregate result remains bounded", async () => {
