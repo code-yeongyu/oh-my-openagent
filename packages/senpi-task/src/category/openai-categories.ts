@@ -135,6 +135,29 @@ EXPECTED OUTPUT:
 If your prompt lacks this structure, REWRITE IT before delegating.
 </Caller_Warning>`
 
+const UNSPECIFIED_LOW_CATEGORY_PROMPT_APPEND = `<Category_Context>
+You are working on tasks that don't fit specific categories but require moderate effort.
+
+<Selection_Gate>
+BEFORE selecting this category, VERIFY ALL conditions:
+1. Task does NOT fit: quick (trivial), visual-engineering (UI), ultrabrain (deep logic), artistry (creative), writing (docs)
+2. Task requires more than trivial effort but is NOT system-wide
+3. Scope is contained within a few files/modules
+
+If task fits ANY other category, DO NOT select unspecified-low.
+This is NOT a default choice - it's for genuinely unclassifiable moderate-effort work.
+</Selection_Gate>
+</Category_Context>
+
+<Caller_Warning>
+THIS CATEGORY USES A LIGHTWEIGHT MODEL (gpt-5.6-luna).
+
+**PROVIDE CLEAR STRUCTURE:**
+1. MUST DO: Enumerate required actions explicitly
+2. MUST NOT DO: State forbidden actions to prevent scope creep
+3. EXPECTED OUTPUT: Define concrete success criteria
+</Caller_Warning>`
+
 export const OPENAI_CATEGORIES = [
   {
     name: "ultrabrain",
@@ -144,7 +167,7 @@ export const OPENAI_CATEGORIES = [
   },
   {
     name: "deep",
-    config: { model: "openai/gpt-5.6-sol", variant: "high" },
+    config: { model: "openai/gpt-5.6-terra", variant: "xhigh" },
     description: "Goal-oriented autonomous problem-solving on hairy problems requiring deep research. ONE goal + ONE deliverable per call — multiple goals must fan out as parallel `deep` calls, never bundled into one.",
     promptAppend: DEEP_CATEGORY_PROMPT_APPEND,
     resolvePromptAppend: resolveDeepCategoryPromptAppend,
@@ -154,5 +177,11 @@ export const OPENAI_CATEGORIES = [
     config: { model: "openai/gpt-5.4-mini" },
     description: "Trivial tasks - single file changes, typo fixes, simple modifications",
     promptAppend: QUICK_CATEGORY_PROMPT_APPEND,
+  },
+  {
+    name: "unspecified-low",
+    config: { model: "openai/gpt-5.6-luna", variant: "xhigh" },
+    description: "Tasks that don't fit other categories, low effort required",
+    promptAppend: UNSPECIFIED_LOW_CATEGORY_PROMPT_APPEND,
   },
 ] satisfies readonly BuiltinCategoryDefinition[]
