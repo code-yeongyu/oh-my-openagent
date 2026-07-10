@@ -45,6 +45,7 @@ type LaunchContext = {
 
 const NOOP_DESTRUCTION: DestructionPort = { destroyResidentTask: () => Promise.resolve() }
 
+// allow: SIZE_OK - one stateful manager keeps concurrency, queue, live-handle, and waiter invariants in one closure-backed implementation.
 class TaskManagerImpl implements TaskManager {
   readonly #options: TaskManagerOptions
   readonly #now: () => number
@@ -120,7 +121,10 @@ class TaskManagerImpl implements TaskManager {
     })
     const runner = this.#options.runners[executionMode]
     const context: LaunchContext = { record, managedSpec, runner, model: plan.model }
-    const nameParts = registration.warning !== undefined ? { name_warning: registration.warning } : {}
+    const startParts = {
+      ...(plan.resolved_model !== undefined ? { resolved_model: plan.resolved_model } : {}),
+      ...(registration.warning !== undefined ? { name_warning: registration.warning } : {}),
+    }
 
     if (this.#concurrency.hasFreeSlot(plan.model)) {
       this.#concurrency.acquire(plan.model, record.task_id)
@@ -128,7 +132,7 @@ class TaskManagerImpl implements TaskManager {
       if (!launched.ok) {
         return { kind: "start_failed", task_id: record.task_id, name: registration.name, error_message: launched.error }
       }
-      return { kind: "started", task_id: record.task_id, status: "running", name: registration.name, ...nameParts }
+      return { kind: "started", task_id: record.task_id, status: "running", name: registration.name, ...startParts }
     }
 
     const position = this.#concurrency.enqueue(plan.model, record.task_id, () => {
@@ -140,7 +144,7 @@ class TaskManagerImpl implements TaskManager {
       status: "pending",
       name: registration.name,
       queue_position: position,
-      ...nameParts,
+      ...startParts,
     }
   }
 
