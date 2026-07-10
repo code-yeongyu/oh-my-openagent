@@ -1,4 +1,4 @@
-import type { ListScope, ListedTask, TaskRecord, TaskStatus } from "@oh-my-opencode/senpi-task"
+import { excerptRendererText, type ListScope, type ListedTask, type TaskRecord, type TaskStatus } from "@oh-my-opencode/senpi-task"
 
 import type { CapturedUi } from "./runtime-context"
 
@@ -6,6 +6,7 @@ const UI_KEY = "omo-task"
 const MAX_WIDGET_ROWS = 5
 const DEFAULT_DEBOUNCE_MS = 250
 const PROGRESS_HEAD_MAX = 60
+type TimerHandle = ReturnType<typeof setTimeout> | number
 
 const TERMINAL_STATUSES: ReadonlySet<TaskStatus> = new Set(["completed", "error", "cancelled", "interrupted", "lost"])
 const ERROR_STATUSES: ReadonlySet<TaskStatus> = new Set(["error", "lost"])
@@ -25,8 +26,8 @@ export interface StatusUiRuntime {
 
 // Injectable timer seam so the 250ms debounce is deterministic under test; defaults to global timers.
 export interface StatusUiTimers {
-  set(callback: () => void, ms: number): unknown
-  clear(handle: unknown): void
+  set(callback: () => void, ms: number): TimerHandle
+  clear(handle: TimerHandle): void
 }
 
 export interface TaskStatusUiDeps {
@@ -47,22 +48,36 @@ function isTerminal(status: TaskStatus): boolean {
   return TERMINAL_STATUSES.has(status)
 }
 
-function agentLabel(record: TaskRecord): string {
-  return record.agent_type ?? record.category ?? "?"
+function trimmedNonEmpty(value: string | undefined): string | undefined {
+  const trimmed = value?.trim()
+  return trimmed === undefined || trimmed.length === 0 ? undefined : trimmed
+}
+
+function targetLabel(record: TaskRecord): string {
+  const category = trimmedNonEmpty(record.category)
+  if (category !== undefined) return `category:${category}`
+  return `agent:${trimmedNonEmpty(record.agent_type) ?? "?"}`
+}
+
+function modelDisplay(record: TaskRecord): string {
+  return trimmedNonEmpty(record.resolved_model?.display) ?? record.model
 }
 
 function progressHead(record: TaskRecord): string | undefined {
-  const text = record.final_response
-  if (text === undefined) return undefined
-  const trimmed = text.trim()
-  if (trimmed.length === 0) return undefined
-  return trimmed.length <= PROGRESS_HEAD_MAX ? trimmed : `${trimmed.slice(0, PROGRESS_HEAD_MAX)}...`
+  const trimmed = trimmedNonEmpty(record.final_response)
+  if (trimmed === undefined) return undefined
+  return excerptRendererText(trimmed, PROGRESS_HEAD_MAX)
 }
 
 export function formatTaskRow(record: TaskRecord): string {
   const parts = [record.task_id]
   if (record.name !== undefined) parts.push(record.name)
-  parts.push(`agent:${agentLabel(record)}`, record.status, `mode:${record.execution_mode}`, `model:${record.model}`)
+  parts.push(targetLabel(record), `model:${modelDisplay(record)}`)
+  const reasoning = trimmedNonEmpty(record.resolved_model?.reasoning_effort)
+  if (reasoning !== undefined) parts.push(`reasoning:${reasoning}`)
+  const variant = trimmedNonEmpty(record.resolved_model?.variant)
+  if (variant !== undefined) parts.push(`variant:${variant}`)
+  parts.push(`mode:${record.execution_mode}`, `status:${record.status}`)
   if (record.pid !== undefined) parts.push(`pid:${record.pid}`)
   const progress = progressHead(record)
   if (progress !== undefined) parts.push(`progress:${progress}`)
@@ -91,13 +106,13 @@ export function buildWidgetRows(records: readonly TaskRecord[]): string[] {
 
 const globalTimers: StatusUiTimers = {
   set: (callback, ms) => setTimeout(callback, ms),
-  clear: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+  clear: (handle) => clearTimeout(handle),
 }
 
 export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
   const timers = deps.timers ?? globalTimers
   const debounceMs = deps.debounceMs ?? DEFAULT_DEBOUNCE_MS
-  let pending: unknown
+  let pending: TimerHandle | undefined
 
   function syncNow(): void {
     const ui = deps.runtime.ui()
