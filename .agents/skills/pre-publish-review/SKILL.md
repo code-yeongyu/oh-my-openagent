@@ -89,6 +89,7 @@ For each change group, spawn one ultrabrain agent. Each gets only its portion of
 ```
 task(
   category="ultrabrain",
+  model="gpt-5.6-sol",
   run_in_background=true,
   load_skills=[],
   description="Deep analysis: {GROUP_NAME}",
@@ -165,6 +166,7 @@ Spawn a sub-agent that loads the `/review-work` skill. The review-work skill int
 ```
 task(
   category="unspecified-high",
+  model="gpt-5.6-sol",
   run_in_background=true,
   load_skills=["review-work"],
   description="Run /review-work on all unpublished changes",
@@ -195,6 +197,7 @@ The oracle gets the full picture — all commits, full diff stat, and changed fi
 ```
 task(
   subagent_type="oracle",
+  model="gpt-5.6-sol",
   run_in_background=true,
   load_skills=[],
   description="Oracle: overall release synthesis and version bump recommendation",
