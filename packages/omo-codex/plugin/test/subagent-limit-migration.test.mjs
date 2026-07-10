@@ -75,3 +75,35 @@ test("#given gpt-5.6 session model with no models_cache #when migrating #then do
 	assert.match(content, /max_depth = 4/);
 	assert.match(content, /max_concurrent_threads_per_session = 1000/);
 });
+
+test("#given config without any model #when migrating #then does not introduce agents.max_threads", async () => {
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-subagent-limit-no-model-"));
+	const configPath = join(root, "config.toml");
+	await writeFile(
+		configPath,
+		['model_reasoning_effort = "high"', "", "[agents]", "max_depth = 4", ""].join("\n"),
+	);
+
+	await migrateConfigFile(configPath, { env: { CODEX_HOME: root } });
+
+	const content = await readFile(configPath, "utf8");
+	assert.doesNotMatch(content, /^\s*max_threads\s*=/m);
+	assert.match(content, /max_depth = 4/);
+	assert.match(content, /max_concurrent_threads_per_session = 1000/);
+});
+
+test("#given config without any model but an existing low cap #when migrating #then still raises the existing cap", async () => {
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-subagent-limit-no-model-raise-"));
+	const configPath = join(root, "config.toml");
+	await writeFile(
+		configPath,
+		['model_reasoning_effort = "high"', "", "[agents]", "max_threads = 6", "max_depth = 4", ""].join("\n"),
+	);
+
+	await migrateConfigFile(configPath, { env: { CODEX_HOME: root } });
+
+	const content = await readFile(configPath, "utf8");
+	assert.match(content, /max_threads = 1000/);
+	assert.doesNotMatch(content, /max_threads = 6/);
+	assert.match(content, /max_depth = 4/);
+});
