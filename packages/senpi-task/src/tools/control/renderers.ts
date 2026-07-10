@@ -164,6 +164,11 @@ function taskSendResultRow(details: SendResultDetails): ResultRow {
         color: details.approved ? "success" : "warning",
         text: `task_send shutdown ${details.approved ? "approved" : "rejected"} ${details.team_run_id} member:${details.member}`,
       }
+    case "shutdown_failed":
+      return {
+        color: "error",
+        text: `task_send shutdown ${details.operation} failed ${details.team_run_id} member:${details.member}: ${details.reason}`,
+      }
     default:
       return assertNever(details)
   }
