@@ -47,7 +47,7 @@ const lazycodexAgentInvariants = new Map([
 	[
 		"lazycodex-gate-reviewer.toml",
 		{
-			effort: "xhigh",
+			effort: "ultra",
 			includes: [/APPROVE\/REJECT/, /blockers/, /\.omo\/evidence\/<goal>-gate-review\.md/],
 		},
 	],
