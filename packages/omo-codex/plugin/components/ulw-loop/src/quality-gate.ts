@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { isWithinAttemptDir } from "./paths.js";
 import {
 	emptyBlockers,
 	invalid,
@@ -8,7 +9,6 @@ import {
 	stringArray,
 	textField,
 } from "./quality-gate-fields.js";
-import { isWithinAttemptDir } from "./paths.js";
 import { adversarialVerdict, codeQualityStatusField, passedVerdict } from "./quality-gate-verdicts.js";
 import type {
 	UlwLoopManualQaArtifactKind,
