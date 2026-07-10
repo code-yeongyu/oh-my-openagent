@@ -8659,13 +8659,15 @@ import { readFileSync } from "node:fs";
 import { dirname as dirname7, isAbsolute as isAbsolute6, join as join18 } from "node:path";
 var CODEX_AGENTS_HEADER = "agents";
 var CODEX_MULTI_AGENT_V2_HEADER = "features.multi_agent_v2";
-var CODEX_SUBAGENT_THREAD_LIMIT = 1000;
+var DEFAULT_CODEX_SUBAGENT_THREAD_LIMIT = 1000;
+var MIN_CODEX_SUBAGENT_THREAD_LIMIT = 1;
+var MAX_CODEX_SUBAGENT_THREAD_LIMIT = 1000;
 function ensureCodexMultiAgentV2Config(config, options = {}) {
+  const maxThreadsValue = resolveCodexSubagentThreadLimit(options.env).toString();
   const featureFlag = removeFeatureFlagSetting(config, "multi_agent_v2");
   const v2Preferred = options.multiAgentVersion === "v2";
   const modelKnown = options.multiAgentVersion != null || readRootModel(featureFlag.config) !== null;
-  const agentsConfig = v2Preferred ? removeAgentsMaxThreads(featureFlag.config) : modelKnown ? ensureAgentsMaxThreads(featureFlag.config) : raiseExistingAgentsMaxThreads(featureFlag.config);
-  const maxThreadsValue = CODEX_SUBAGENT_THREAD_LIMIT.toString();
+  const agentsConfig = v2Preferred ? removeAgentsMaxThreads(featureFlag.config) : modelKnown ? ensureAgentsMaxThreads(featureFlag.config, maxThreadsValue) : raiseExistingAgentsMaxThreads(featureFlag.config, maxThreadsValue);
   const preserveDisable = featureFlag.value === false && !v2Preferred;
   const featureConfig = preserveDisable ? setMultiAgentV2Disable(agentsConfig) : v2Preferred ? removeMultiAgentV2Disable(agentsConfig) : agentsConfig;
   const section = findTomlSection(featureConfig, CODEX_MULTI_AGENT_V2_HEADER);
@@ -8677,6 +8679,19 @@ ${enabledSetting}max_concurrent_threads_per_session = ${maxThreadsValue}
 `);
   }
   return replaceOrInsertSetting(featureConfig, section, "max_concurrent_threads_per_session", maxThreadsValue);
+}
+function resolveCodexSubagentThreadLimit(env = {}) {
+  const raw = env.LAZYCODEX_SUBAGENT_THREAD_LIMIT ?? env.OMO_CODEX_SUBAGENT_THREAD_LIMIT;
+  if (raw === undefined)
+    return DEFAULT_CODEX_SUBAGENT_THREAD_LIMIT;
+  const normalized = raw.trim();
+  if (!/^\d+$/.test(normalized))
+    return DEFAULT_CODEX_SUBAGENT_THREAD_LIMIT;
+  const value = Number(normalized);
+  if (!Number.isSafeInteger(value) || value < MIN_CODEX_SUBAGENT_THREAD_LIMIT || value > MAX_CODEX_SUBAGENT_THREAD_LIMIT) {
+    return DEFAULT_CODEX_SUBAGENT_THREAD_LIMIT;
+  }
+  return value;
 }
 function resolveCodexMultiAgentVersion(config, configPath) {
   const model = readRootModel(config);
@@ -8746,8 +8761,7 @@ function removeFeatureFlagSetting(config, featureName) {
     value: readBooleanSetting(section.text, featureName)
   };
 }
-function ensureAgentsMaxThreads(config) {
-  const maxThreadsValue = CODEX_SUBAGENT_THREAD_LIMIT.toString();
+function ensureAgentsMaxThreads(config, maxThreadsValue) {
   const section = findTomlSection(config, CODEX_AGENTS_HEADER);
   if (!section) {
     return appendBlock(config, `[${CODEX_AGENTS_HEADER}]
@@ -8778,13 +8792,13 @@ function setMultiAgentV2Disable(config) {
     return config;
   return replaceOrInsertSetting(config, section, "enabled", "false");
 }
-function raiseExistingAgentsMaxThreads(config) {
+function raiseExistingAgentsMaxThreads(config, maxThreadsValue) {
   const section = findTomlSection(config, CODEX_AGENTS_HEADER);
   if (!section)
     return config;
   if (!/^\s*max_threads\s*=/m.test(section.text))
     return config;
-  return replaceOrInsertSetting(config, section, "max_threads", CODEX_SUBAGENT_THREAD_LIMIT.toString());
+  return replaceOrInsertSetting(config, section, "max_threads", maxThreadsValue);
 }
 function readBooleanSetting(sectionText, key) {
   const match = new RegExp(`^\\s*${escapeRegExp(key)}\\s*=\\s*(true|false)\\s*(?:#.*)?$`, "m").exec(sectionText);
@@ -8819,7 +8833,8 @@ async function updateCodexConfig(input) {
   config = removeUnsupportedCodexMultiAgentModeConfig(config);
   config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(input.repoRoot));
   config = ensureCodexMultiAgentV2Config(config, {
-    multiAgentVersion: resolveCodexMultiAgentVersion(config, input.configPath)
+    multiAgentVersion: resolveCodexMultiAgentVersion(config, input.configPath),
+    env: input.env
   });
   if (input.autonomousPermissions === true)
     config = ensureAutonomousPermissions(config);
@@ -10297,7 +10312,8 @@ async function runCodexInstaller(options = {}) {
     gitBashEnabled: platform === "win32" && gitBashResolution.found,
     trustedHookStates,
     agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
-    autonomousPermissions: options.autonomousPermissions !== false
+    autonomousPermissions: options.autonomousPermissions !== false,
+    env: env2
   });
   await seedAndMigrateOmoSot({ env: env2, log, repoRoot, runCommand });
   const projectCleanup = await repairProjectLocalCodexArtifactsBestEffort({

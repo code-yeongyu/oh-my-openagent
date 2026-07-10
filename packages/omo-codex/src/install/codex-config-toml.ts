@@ -32,6 +32,7 @@ export async function updateCodexConfig(input: {
   readonly agentConfigs?: readonly CodexAgentConfig[]
   readonly autonomousPermissions?: boolean
   readonly preserveMarketplaceSource?: boolean
+  readonly env?: NodeJS.ProcessEnv
 }): Promise<void> {
   await mkdir(dirname(input.configPath), { recursive: true })
   let config: string
@@ -61,6 +62,7 @@ export async function updateCodexConfig(input: {
   config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(input.repoRoot))
   config = ensureCodexMultiAgentV2Config(config, {
     multiAgentVersion: resolveCodexMultiAgentVersion(config, input.configPath),
+    env: input.env,
   })
   if (input.autonomousPermissions === true) config = ensureAutonomousPermissions(config)
   if (!(input.preserveMarketplaceSource === true && hasMarketplaceBlock(config, input.marketplaceName))) {

@@ -8,6 +8,24 @@ import test from "node:test";
 
 import { updateCodexConfig } from "./install-dist/install-local.mjs";
 
+test("#given a custom LazyCodex cap #when generated installer updates config #then applies 12 immediately", async () => {
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-custom-subagent-limit-"));
+	const configPath = join(root, "config.toml");
+
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "debug",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+		pluginNames: ["omo"],
+		env: { LAZYCODEX_SUBAGENT_THREAD_LIMIT: "12" },
+	});
+
+	const config = await readFile(configPath, "utf8");
+	assert.match(config, /max_threads = 12/);
+	assert.match(config, /max_concurrent_threads_per_session = 12/);
+});
+
 test("#given empty Codex config #when script installer updates config #then sets subagent thread limits without forcing MultiAgentV2", async () => {
 	// given
 	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-multi-agent-"));

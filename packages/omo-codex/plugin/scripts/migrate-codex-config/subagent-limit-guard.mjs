@@ -2,7 +2,7 @@ import { prefersMultiAgentV2, readRootModel, resolveMultiAgentVersionFromConfig 
 
 const CODEX_AGENTS_HEADER = "[agents]";
 const CODEX_MULTI_AGENT_V2_HEADER = "[features.multi_agent_v2]";
-const CODEX_SUBAGENT_THREAD_LIMIT = "1000";
+const DEFAULT_CODEX_SUBAGENT_THREAD_LIMIT = "1000";
 
 /**
  * Ensure subagent concurrency limits without writing settings that conflict
@@ -21,6 +21,7 @@ const CODEX_SUBAGENT_THREAD_LIMIT = "1000";
  * @param {{ multiAgentVersion?: string | null, sessionModel?: string | null, env?: NodeJS.ProcessEnv, modelsCachePath?: string }} [options]
  */
 export function ensureSubagentConcurrencyLimit(config, options = {}) {
+	const subagentThreadLimit = resolveSubagentThreadLimit(options.env);
 	const multiAgentVersion =
 		options.multiAgentVersion !== undefined
 			? options.multiAgentVersion
@@ -31,11 +32,28 @@ export function ensureSubagentConcurrencyLimit(config, options = {}) {
 	if (v2Preferred) {
 		result = removeAgentsMaxThreads(result);
 	} else if (multiAgentVersion == null && !hasModelEvidence(config, options)) {
-		result = raiseExistingAgentsMaxThreads(result);
+		result = raiseExistingAgentsMaxThreads(result, subagentThreadLimit);
 	} else {
-		result = ensureAgentsMaxThreads(result);
+		result = ensureAgentsMaxThreads(result, subagentThreadLimit);
 	}
-	return ensureMultiAgentV2ThreadLimit(result);
+	return ensureMultiAgentV2ThreadLimit(result, subagentThreadLimit);
+}
+
+/**
+ * Resolve the managed Codex subagent cap. The LazyCodex-prefixed variable is
+ * canonical; the OMO-prefixed name is accepted as a compatibility alias.
+ * Invalid explicit values fall back to the historical default.
+ *
+ * @param {NodeJS.ProcessEnv | undefined} env
+ */
+export function resolveSubagentThreadLimit(env = {}) {
+	const raw = env?.LAZYCODEX_SUBAGENT_THREAD_LIMIT ?? env?.OMO_CODEX_SUBAGENT_THREAD_LIMIT;
+	if (raw === undefined) return DEFAULT_CODEX_SUBAGENT_THREAD_LIMIT;
+	const normalized = raw.trim();
+	if (!/^\d+$/.test(normalized)) return DEFAULT_CODEX_SUBAGENT_THREAD_LIMIT;
+	const value = Number(normalized);
+	if (!Number.isSafeInteger(value) || value < 1 || value > 1000) return DEFAULT_CODEX_SUBAGENT_THREAD_LIMIT;
+	return String(value);
 }
 
 function hasModelEvidence(config, options) {
@@ -49,17 +67,17 @@ function isMultiAgentV2Enabled(config) {
 	return /^\s*enabled\s*=\s*true[ \t]*(?:#[^\n]*)?$/m.test(section.text);
 }
 
-function raiseExistingAgentsMaxThreads(config) {
+function raiseExistingAgentsMaxThreads(config, subagentThreadLimit) {
 	const section = findSection(config, CODEX_AGENTS_HEADER);
 	if (!section) return config;
 	if (!/^\s*max_threads\s*=/m.test(section.text)) return config;
-	return replaceOrInsertSetting(config, section, "max_threads", CODEX_SUBAGENT_THREAD_LIMIT);
+	return replaceOrInsertSetting(config, section, "max_threads", subagentThreadLimit);
 }
 
-function ensureAgentsMaxThreads(config) {
+function ensureAgentsMaxThreads(config, subagentThreadLimit) {
 	const section = findSection(config, CODEX_AGENTS_HEADER);
-	if (!section) return appendBlock(config, `${CODEX_AGENTS_HEADER}\nmax_threads = ${CODEX_SUBAGENT_THREAD_LIMIT}\n`);
-	return replaceOrInsertSetting(config, section, "max_threads", CODEX_SUBAGENT_THREAD_LIMIT);
+	if (!section) return appendBlock(config, `${CODEX_AGENTS_HEADER}\nmax_threads = ${subagentThreadLimit}\n`);
+	return replaceOrInsertSetting(config, section, "max_threads", subagentThreadLimit);
 }
 
 function removeAgentsMaxThreads(config) {
@@ -78,15 +96,15 @@ function removeAgentsMaxThreads(config) {
 	return config.slice(0, section.start) + patched + config.slice(section.end);
 }
 
-function ensureMultiAgentV2ThreadLimit(config) {
+function ensureMultiAgentV2ThreadLimit(config, subagentThreadLimit) {
 	const section = findSection(config, CODEX_MULTI_AGENT_V2_HEADER);
 	if (!section) {
 		return appendBlock(
 			config,
-			`${CODEX_MULTI_AGENT_V2_HEADER}\nmax_concurrent_threads_per_session = ${CODEX_SUBAGENT_THREAD_LIMIT}\n`,
+			`${CODEX_MULTI_AGENT_V2_HEADER}\nmax_concurrent_threads_per_session = ${subagentThreadLimit}\n`,
 		);
 	}
-	return replaceOrInsertSetting(config, section, "max_concurrent_threads_per_session", CODEX_SUBAGENT_THREAD_LIMIT);
+	return replaceOrInsertSetting(config, section, "max_concurrent_threads_per_session", subagentThreadLimit);
 }
 
 function replaceOrInsertSetting(config, section, key, value) {

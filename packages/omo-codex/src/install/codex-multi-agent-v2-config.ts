@@ -5,7 +5,9 @@ import { appendBlock, escapeRegExp, findTomlSection, removeSetting, replaceOrIns
 
 const CODEX_AGENTS_HEADER = "agents"
 const CODEX_MULTI_AGENT_V2_HEADER = "features.multi_agent_v2"
-const CODEX_SUBAGENT_THREAD_LIMIT = 1000
+const DEFAULT_CODEX_SUBAGENT_THREAD_LIMIT = 1000
+const MIN_CODEX_SUBAGENT_THREAD_LIMIT = 1
+const MAX_CODEX_SUBAGENT_THREAD_LIMIT = 1000
 
 export type CodexMultiAgentVersion = "v1" | "v2" | null
 
@@ -35,17 +37,20 @@ export type CodexMultiAgentVersion = "v1" | "v2" | null
  */
 export function ensureCodexMultiAgentV2Config(
   config: string,
-  options: { readonly multiAgentVersion?: CodexMultiAgentVersion } = {},
+  options: {
+    readonly multiAgentVersion?: CodexMultiAgentVersion
+    readonly env?: NodeJS.ProcessEnv
+  } = {},
 ): string {
+  const maxThreadsValue = resolveCodexSubagentThreadLimit(options.env).toString()
   const featureFlag = removeFeatureFlagSetting(config, "multi_agent_v2")
   const v2Preferred = options.multiAgentVersion === "v2"
   const modelKnown = options.multiAgentVersion != null || readRootModel(featureFlag.config) !== null
   const agentsConfig = v2Preferred
     ? removeAgentsMaxThreads(featureFlag.config)
     : modelKnown
-      ? ensureAgentsMaxThreads(featureFlag.config)
-      : raiseExistingAgentsMaxThreads(featureFlag.config)
-  const maxThreadsValue = CODEX_SUBAGENT_THREAD_LIMIT.toString()
+      ? ensureAgentsMaxThreads(featureFlag.config, maxThreadsValue)
+      : raiseExistingAgentsMaxThreads(featureFlag.config, maxThreadsValue)
   const preserveDisable = featureFlag.value === false && !v2Preferred
   const featureConfig = preserveDisable
     ? setMultiAgentV2Disable(agentsConfig)
@@ -61,6 +66,27 @@ export function ensureCodexMultiAgentV2Config(
     )
   }
   return replaceOrInsertSetting(featureConfig, section, "max_concurrent_threads_per_session", maxThreadsValue)
+}
+
+/**
+ * Resolve the managed Codex subagent cap. The LazyCodex-prefixed variable is
+ * canonical; the OMO-prefixed name is accepted as a compatibility alias.
+ * Invalid explicit values fall back to the historical default.
+ */
+export function resolveCodexSubagentThreadLimit(env: NodeJS.ProcessEnv = {}): number {
+  const raw = env.LAZYCODEX_SUBAGENT_THREAD_LIMIT ?? env.OMO_CODEX_SUBAGENT_THREAD_LIMIT
+  if (raw === undefined) return DEFAULT_CODEX_SUBAGENT_THREAD_LIMIT
+  const normalized = raw.trim()
+  if (!/^\d+$/.test(normalized)) return DEFAULT_CODEX_SUBAGENT_THREAD_LIMIT
+  const value = Number(normalized)
+  if (
+    !Number.isSafeInteger(value) ||
+    value < MIN_CODEX_SUBAGENT_THREAD_LIMIT ||
+    value > MAX_CODEX_SUBAGENT_THREAD_LIMIT
+  ) {
+    return DEFAULT_CODEX_SUBAGENT_THREAD_LIMIT
+  }
+  return value
 }
 
 /**
@@ -140,8 +166,7 @@ function removeFeatureFlagSetting(
   }
 }
 
-function ensureAgentsMaxThreads(config: string): string {
-  const maxThreadsValue = CODEX_SUBAGENT_THREAD_LIMIT.toString()
+function ensureAgentsMaxThreads(config: string, maxThreadsValue: string): string {
   const section = findTomlSection(config, CODEX_AGENTS_HEADER)
   if (!section) {
     return appendBlock(config, `[${CODEX_AGENTS_HEADER}]\nmax_threads = ${maxThreadsValue}\n`)
@@ -169,11 +194,11 @@ function setMultiAgentV2Disable(config: string): string {
   return replaceOrInsertSetting(config, section, "enabled", "false")
 }
 
-function raiseExistingAgentsMaxThreads(config: string): string {
+function raiseExistingAgentsMaxThreads(config: string, maxThreadsValue: string): string {
   const section = findTomlSection(config, CODEX_AGENTS_HEADER)
   if (!section) return config
   if (!/^\s*max_threads\s*=/m.test(section.text)) return config
-  return replaceOrInsertSetting(config, section, "max_threads", CODEX_SUBAGENT_THREAD_LIMIT.toString())
+  return replaceOrInsertSetting(config, section, "max_threads", maxThreadsValue)
 }
 
 function readBooleanSetting(sectionText: string, key: string): boolean | null {

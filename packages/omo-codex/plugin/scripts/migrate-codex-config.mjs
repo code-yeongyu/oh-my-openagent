@@ -60,7 +60,7 @@ export async function migrateConfigFile(
 	{
 		catalog = FALLBACK_CATALOG,
 		previousState,
-		env = process.env,
+		env = {},
 		sessionModel = null,
 		requireSessionModel = false,
 	} = {},
@@ -146,7 +146,7 @@ async function readConfig(configPath) {
 }
 
 if (isCliEntry(import.meta.url)) {
-	migrateCodexConfig().catch((error) => {
+	migrateCodexConfig({ env: process.env }).catch((error) => {
 		if (!(error instanceof Error)) throw error;
 		process.exit(0);
 	});

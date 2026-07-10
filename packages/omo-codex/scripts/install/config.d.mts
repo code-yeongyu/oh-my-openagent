@@ -31,6 +31,7 @@ export interface UpdateCodexConfigOptions {
 	autonomousPermissions?: boolean;
 	codegraphMcpEnabled?: boolean;
 	gitBashEnabled?: boolean;
+	env?: NodeJS.ProcessEnv;
 }
 
 export declare function updateCodexConfig(options: UpdateCodexConfigOptions): Promise<void>;

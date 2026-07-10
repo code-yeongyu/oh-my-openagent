@@ -5,6 +5,82 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { migrateConfigFile } from "../scripts/migrate-codex-config.mjs";
+import {
+	ensureSubagentConcurrencyLimit,
+	resolveSubagentThreadLimit,
+} from "../scripts/migrate-codex-config/subagent-limit-guard.mjs";
+
+test("#given SessionStart custom cap for a V2 model #when migrating #then writes 12 and removes agents.max_threads", async () => {
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-subagent-limit-custom-v2-"));
+	const configPath = join(root, "config.toml");
+	await writeFile(
+		configPath,
+		[
+			'model = "gpt-5.6-sol"',
+			"",
+			"[agents]",
+			"max_threads = 6",
+			"",
+			"[features.multi_agent_v2]",
+			"max_concurrent_threads_per_session = 6",
+			"",
+		].join("\n"),
+	);
+
+	await migrateConfigFile(configPath, {
+		env: { CODEX_HOME: root, LAZYCODEX_SUBAGENT_THREAD_LIMIT: "12" },
+		sessionModel: "gpt-5.6-sol",
+	});
+
+	const content = await readFile(configPath, "utf8");
+	assert.doesNotMatch(content, /^\s*max_threads\s*=/m);
+	assert.match(content, /max_concurrent_threads_per_session = 12/);
+});
+
+test("#given cap environment variables #when SessionStart resolves them #then canonical precedence, alias, bounds, and fallback are deterministic", () => {
+	assert.equal(resolveSubagentThreadLimit({ OMO_CODEX_SUBAGENT_THREAD_LIMIT: "12" }), "12");
+	assert.equal(
+		resolveSubagentThreadLimit({
+			LAZYCODEX_SUBAGENT_THREAD_LIMIT: "24",
+			OMO_CODEX_SUBAGENT_THREAD_LIMIT: "12",
+		}),
+		"24",
+	);
+	assert.equal(resolveSubagentThreadLimit({ LAZYCODEX_SUBAGENT_THREAD_LIMIT: "1" }), "1");
+	assert.equal(resolveSubagentThreadLimit({ LAZYCODEX_SUBAGENT_THREAD_LIMIT: "1000" }), "1000");
+	assert.equal(
+		resolveSubagentThreadLimit({
+			LAZYCODEX_SUBAGENT_THREAD_LIMIT: "0",
+			OMO_CODEX_SUBAGENT_THREAD_LIMIT: "12",
+		}),
+		"1000",
+	);
+	for (const invalid of ["0", "1001", "12.5"]) {
+		assert.equal(resolveSubagentThreadLimit({ LAZYCODEX_SUBAGENT_THREAD_LIMIT: invalid }), "1000");
+	}
+});
+
+test("#given ambient cap variables #when the direct SessionStart guard receives no env #then it keeps the default 1000", () => {
+	const previousLazyCodexLimit = process.env.LAZYCODEX_SUBAGENT_THREAD_LIMIT;
+	const previousOmoLimit = process.env.OMO_CODEX_SUBAGENT_THREAD_LIMIT;
+	try {
+		process.env.LAZYCODEX_SUBAGENT_THREAD_LIMIT = "12";
+		process.env.OMO_CODEX_SUBAGENT_THREAD_LIMIT = "24";
+
+		const content = ensureSubagentConcurrencyLimit('model = "gpt-5.5"\n', {
+			multiAgentVersion: "v1",
+		});
+
+		assert.match(content, /max_threads = 1000/);
+		assert.match(content, /max_concurrent_threads_per_session = 1000/);
+		assert.doesNotMatch(content, /max_threads = 12/);
+	} finally {
+		if (previousLazyCodexLimit === undefined) delete process.env.LAZYCODEX_SUBAGENT_THREAD_LIMIT;
+		else process.env.LAZYCODEX_SUBAGENT_THREAD_LIMIT = previousLazyCodexLimit;
+		if (previousOmoLimit === undefined) delete process.env.OMO_CODEX_SUBAGENT_THREAD_LIMIT;
+		else process.env.OMO_CODEX_SUBAGENT_THREAD_LIMIT = previousOmoLimit;
+	}
+});
 
 test("#given SessionStart config migration sees a low subagent cap #when migrating #then raises it to 1000", async () => {
 	const root = await mkdtemp(join(tmpdir(), "lazycodex-subagent-limit-migration-"));
