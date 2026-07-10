@@ -251,6 +251,30 @@ describe("createTaskStatusUi.syncNow", () => {
     expect(widget?.placement).toBe("belowEditor")
   })
 
+  it("#given controls across an active task #when syncing #then the row widget and footer are sanitized without damaging CJK text", () => {
+    // given
+    const task = record({
+      task_id: "st_\u001b[31mred\u001b[0m", name: "한국어\u0007 작업",
+      status: "running", category: "ultra\u001b[2Jbrain",
+      resolved_model: { provider: "openai", model_id: "gpt-5.6-sol", source: "category", display: "GPT\u001b]0;hidden\u001b\\-5.6 Sol", reasoning_effort: "xhigh\u0085", variant: "sol\u001bc" },
+      final_response: "첫째\t둘째\n界 \u001b]8;;https://example.com/unterminated",
+    })
+    const ui = fakeUi()
+    const statusUi = createTaskStatusUi({ manager: fakeManager([task]), runtime: runtimeOf(ui, "session-a", "tui") })
+
+    // when
+    statusUi.syncNow()
+
+    // then
+    const expectedRow = "st_red 한국어 작업 category:ultrabrain model:GPT-5.6 Sol reasoning:xhigh variant:sol mode:in-process status:running progress:첫째 둘째 界"
+    const footer = ui.statusCalls.at(-1) ?? ""
+    const widgetRow = ui.widgetCalls.at(-1)?.content?.[0] ?? ""
+    expect(widgetRow).toBe(expectedRow)
+    expect(footer).toContain(`| ${expectedRow}`)
+    expect(`${footer} ${widgetRow}`).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/u)
+    expect(rendererVisibleWidth(widgetRow.slice(widgetRow.indexOf("progress:") + "progress:".length))).toBeLessThanOrEqual(60)
+  })
+
   it("#given no captured ui context #when syncing #then it is a no-op", () => {
     // given a runtime whose ui was cleared on switch/shutdown
     const manager = fakeManager([record({ task_id: "st_1", status: "running" })])
