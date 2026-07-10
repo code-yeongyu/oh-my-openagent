@@ -26,6 +26,24 @@ const ANSI_THEME: ControlRenderTheme = {
 const RESULT_OPTIONS = { expanded: false, isPartial: false }
 const TERMINAL_CONTROL_PATTERN = /[\u0000-\u001f\u007f-\u009f]/u
 
+type SendResultRenderCase = readonly [name: string, details: SendResultDetails, expected: string]
+
+const SEND_RESULT_RENDER_CASES = [
+  ["steered", { kind: "steered", task_id: "st_1", status: "running", delivered: "steer" }, "[accent]task_send delivered st_1 as steer (running)[/accent]"],
+  ["revived", { kind: "revived", task_id: "st_1", run_epoch: 2 }, "[success]task_send revived st_1 epoch 2[/success]"],
+  ["queued", { kind: "queued", task_id: "st_1", queue_position: 3 }, "[muted]task_send queued st_1 position 3[/muted]"],
+  ["not_continuable", { kind: "not_continuable", task_id: "st_1", reason: "Task is cancelled.", suggestion: "Start a new task." }, "[warning]task_send not continuable st_1: Task is cancelled. Start a new task.[/warning]"],
+  ["scope_denied", { kind: "scope_denied", task_id: "st_1", owning_session_id: "owner", reason: "Denied." }, "[error]task_send denied st_1 owner:owner[/error]"],
+  ["not_found", { kind: "not_found", reason: "No task.", known_tasks: ["alpha"] }, "[error]task_send not found: No task. known:alpha[/error]"],
+  ["invalid_arguments", { kind: "invalid_arguments", reason: "message is required" }, "[error]task_send invalid: message is required[/error]"],
+  ["interrupted", { kind: "interrupted", task_id: "st_1", previous_status: "running" }, "[warning]task_send interrupted st_1 (was running)[/warning]"],
+  ["noop", { kind: "noop", task_id: "st_1", previous_status: "interrupted", reason: "Already interrupted." }, "[warning]task_send no change st_1 (interrupted): Already interrupted.[/warning]"],
+  ["team_message", { kind: "team_message", team: { kind: "to_lead", message_id: "msg-1", delivery: "wake" } }, "[success]task_send team message msg-1 to lead:wake[/success]"],
+  ["shutdown_requested", { kind: "shutdown_requested", team_run_id: "team-1", member: "atlas" }, "[warning]task_send shutdown requested team-1 member:atlas[/warning]"],
+  ["shutdown_responded", { kind: "shutdown_responded", team_run_id: "team-1", member: "atlas", approved: false }, "[warning]task_send shutdown rejected team-1 member:atlas[/warning]"],
+  ["shutdown_failed", { kind: "shutdown_failed", operation: "reject", team_run_id: "team-1", member: "atlas", code: "team_state_missing", reason: "Team state is unavailable." }, "[error]task_send shutdown reject failed team-1 member:atlas: Team state is unavailable.[/error]"],
+] satisfies readonly SendResultRenderCase[]
+
 function firstLine(component: { render(width: number): string[] }, width: number): string {
   return component.render(width)[0] ?? ""
 }
@@ -176,36 +194,14 @@ describe("control tool renderers", () => {
     expect(`${send}\n${shutdown}\n${cancel}`).not.toContain("[object Object]")
   })
 
-  test("#given every task_send result detail kind #when rendering results #then each maps to a concise row", () => {
-    const details: readonly SendResultDetails[] = [
-      { kind: "steered", task_id: "st_1", status: "running", delivered: "steer" },
-      { kind: "revived", task_id: "st_1", run_epoch: 2 },
-      { kind: "queued", task_id: "st_1", queue_position: 3 },
-      { kind: "not_continuable", task_id: "st_1", reason: "Task is cancelled.", suggestion: "Start a new task." },
-      { kind: "scope_denied", task_id: "st_1", owning_session_id: "owner", reason: "Denied." },
-      { kind: "not_found", reason: "No task.", known_tasks: ["alpha"] },
-      { kind: "invalid_arguments", reason: "message is required" },
-      { kind: "interrupted", task_id: "st_1", previous_status: "running" },
-      { kind: "noop", task_id: "st_1", previous_status: "interrupted", reason: "Already interrupted." },
-      { kind: "team_message", team: { kind: "to_lead", message_id: "msg-1", delivery: "wake" } },
-      { kind: "shutdown_requested", team_run_id: "team-1", member: "atlas" },
-      { kind: "shutdown_responded", team_run_id: "team-1", member: "atlas", approved: false },
-      {
-        kind: "shutdown_failed",
-        operation: "reject",
-        team_run_id: "team-1",
-        member: "atlas",
-        code: "team_state_missing",
-        reason: "Team state is unavailable.",
-      },
-    ]
+  test.each(SEND_RESULT_RENDER_CASES)(
+    "#given the %s task_send result mapping #when rendering #then the exact themed row is stable",
+    (_name, details, expected) => {
+      const line = firstLine(renderTaskSendResult(toolResult("ok", details), RESULT_OPTIONS, TEST_THEME), 120)
 
-    const lines = details.map((detail) => firstLine(renderTaskSendResult(toolResult("ok", detail), RESULT_OPTIONS, TEST_THEME), 120))
-
-    expect(lines).toHaveLength(details.length)
-    expect(lines.join("\n")).toContain("delivered st_1 as steer")
-    expect(lines.join("\n")).toContain("shutdown rejected")
-  })
+      expect(line).toBe(expected)
+    },
+  )
 
   test("#given a structured shutdown failure #when rendering the result #then it shows concise safe context with the error theme", () => {
     const line = firstLine(

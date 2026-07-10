@@ -57,12 +57,8 @@ function isTerminal(status: TaskStatus): boolean {
 
 function optionalRendererText(value: string | undefined): string | undefined {
   if (value === undefined) return undefined
-  const normalized = statusRendererText(value)
+  const normalized = normalizeRendererText(value)
   return normalized.length === 0 ? undefined : normalized
-}
-
-function statusRendererText(value: string): string {
-  return normalizeRendererText(value)
 }
 
 function targetLabel(record: TaskRecord): string {
@@ -72,7 +68,7 @@ function targetLabel(record: TaskRecord): string {
 }
 
 function modelDisplay(record: TaskRecord): string {
-  return optionalRendererText(record.resolved_model?.display) ?? statusRendererText(record.model)
+  return optionalRendererText(record.resolved_model?.display) ?? normalizeRendererText(record.model)
 }
 
 function progressHead(record: TaskRecord): string | undefined {
@@ -82,7 +78,7 @@ function progressHead(record: TaskRecord): string | undefined {
 }
 
 export function formatTaskRow(record: TaskRecord): string {
-  const parts = [statusRendererText(record.task_id)]
+  const parts = [normalizeRendererText(record.task_id)]
   const name = optionalRendererText(record.name)
   if (name !== undefined) parts.push(name)
   parts.push(targetLabel(record), `model:${modelDisplay(record)}`)
@@ -90,7 +86,7 @@ export function formatTaskRow(record: TaskRecord): string {
   if (reasoning !== undefined) parts.push(`reasoning:${reasoning}`)
   const variant = optionalRendererText(record.resolved_model?.variant)
   if (variant !== undefined) parts.push(`variant:${variant}`)
-  parts.push(`mode:${statusRendererText(record.execution_mode)}`, `status:${statusRendererText(record.status)}`)
+  parts.push(`mode:${normalizeRendererText(record.execution_mode)}`, `status:${normalizeRendererText(record.status)}`)
   if (record.pid !== undefined) parts.push(`pid:${record.pid}`)
   const progress = progressHead(record)
   if (progress !== undefined) parts.push(`progress:${progress}`)
