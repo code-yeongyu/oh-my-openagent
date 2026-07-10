@@ -12,6 +12,7 @@ export { createSkillMcpTool } from "./skill-mcp"
 import {
   createBackgroundOutput,
   createBackgroundCancel,
+  createWaitForBackgroundTasks,
   type BackgroundOutputManager,
   type BackgroundCancelClient,
 } from "./background-task"
@@ -34,11 +35,19 @@ export {
 export { createHashlineEditTool } from "./hashline-edit"
 export { createTeamSendMessageTool } from "../features/team-mode/tools/messaging"
 
-export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient): Record<string, ToolDefinition> {
+export function createBackgroundTools(
+  manager: BackgroundManager,
+  client: OpencodeClient,
+  options?: { blockOnBackgroundTasks?: boolean },
+): Record<string, ToolDefinition> {
   const outputManager: BackgroundOutputManager = manager
   const cancelClient: BackgroundCancelClient = client
-  return {
+  const tools: Record<string, ToolDefinition> = {
     background_output: createBackgroundOutput(outputManager, client),
     background_cancel: createBackgroundCancel(manager, cancelClient),
   }
+  if (options?.blockOnBackgroundTasks) {
+    tools["wait-for-background-tasks"] = createWaitForBackgroundTasks(manager)
+  }
+  return tools
 }
