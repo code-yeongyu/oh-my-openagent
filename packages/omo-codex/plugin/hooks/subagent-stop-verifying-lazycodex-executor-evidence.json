@@ -11,7 +11,7 @@
 						"commandWindows": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${PLUGIN_ROOT}\\components\\bootstrap\\scripts\\node-dispatch.ps1\" \"${PLUGIN_ROOT}\\components\\lazycodex-executor-verify\\dist\\cli.js\" hook subagent-stop"
 					}
 				],
-				"matcher": "^lazycodex-executor$"
+				"matcher": "^lazycodex-(executor|worker-(low|medium|high))$"
 			}
 		]
 	}
