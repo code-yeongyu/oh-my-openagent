@@ -297,7 +297,7 @@ transition, `create_goal` continuation, implementation tool call, plan
 drafting, approval-gate work, PR handoff, or final response. A timeout is
 not terminal status.
 Do not write the final answer, PR handoff, or completion summary while
-active child agents remain open. Use short `multi_agent_v1.wait_agent` cycles.
+active child agents remain open. Use `multi_agent_v1.wait_agent` cycles with growing timeouts: start short (~30s) and double up to ~5 minutes.
 After two silent waits send `TASK STILL ACTIVE: return <deliverable> or
 BLOCKED: <reason>`. After four silent or ack-only checks, close the lane as
 inconclusive, record that it is not approval, and respawn smaller only

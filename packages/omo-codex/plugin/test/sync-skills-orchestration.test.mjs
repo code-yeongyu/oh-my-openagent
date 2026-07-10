@@ -245,6 +245,8 @@ test("#given review-work skill #when some lanes do not finish #then aggregate re
 	assert.match(content, /Overall Verdict: PASSED \/ FAILED \/ INCONCLUSIVE/);
 	assert.match(content, /PASS\/FAIL\/INCONCLUSIVE \| HIGH\/MED\/LOW/);
 	assert.match(content, /Do not spin in repeated/);
+	assert.match(content, /bare REJECT\/FAIL token without findings is not a verdict/);
+	assert.match(content, /cites the violated goal criterion/);
 	assert.match(content, /Do not use `multi_agent_v1\.send_input` as an interrupt/);
 });
 
