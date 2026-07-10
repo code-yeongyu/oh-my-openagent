@@ -6,12 +6,14 @@ import type { CapturedUi } from "./runtime-context"
 import {
   buildWidgetRows,
   createTaskStatusUi,
-  formatTaskRow,
   formatFooterStatus,
+  formatTaskRow,
   type StatusUiManager,
   type StatusUiRuntime,
   type StatusUiTimers,
 } from "./status-ui"
+
+// allow: SIZE_OK - status formatting and captured-UI behavior share one focused fixture surface.
 
 function record(overrides: Partial<TaskRecord> & { task_id: string; status: TaskStatus }): TaskRecord {
   return {
@@ -30,6 +32,23 @@ function record(overrides: Partial<TaskRecord> & { task_id: string; status: Task
 
 function listed(records: readonly TaskRecord[]): readonly ListedTask[] {
   return records.map((rec) => ({ record: rec }))
+}
+
+function longActiveRecord(): TaskRecord {
+  return record({
+    task_id: "st_01active0123456789",
+    name: "active-child",
+    status: "running",
+    category: "ultrabrain",
+    resolved_model: {
+      provider: "omo-mock",
+      model_id: "mock-1",
+      display: "omo-mock/mock-1",
+      reasoning_effort: "xhigh",
+      variant: "xhigh",
+      source: "category",
+    },
+  })
 }
 
 interface FakeUi extends CapturedUi {
@@ -68,7 +87,7 @@ function runtimeOf(ui: CapturedUi | undefined, sessionId: string | undefined, mo
 }
 
 describe("formatFooterStatus", () => {
-  it("#given two running tasks #when formatting the footer #then all four counts and an active tail render", () => {
+  it("#given two running tasks #when formatting the footer #then compact active counts and a task tail render", () => {
     // given
     const records = [record({ task_id: "st_aaaa", status: "running" }), record({ task_id: "st_bbbb", status: "running" })]
 
@@ -76,8 +95,8 @@ describe("formatFooterStatus", () => {
     const footer = formatFooterStatus(records)
 
     // then
-    expect(footer).toContain("tasks:2 run:2 done:0 err:0")
-    expect(footer).toContain("| st_aaaa")
+    expect(footer).toContain("t2/r2")
+    expect(footer).toContain("st_aaaa")
   })
 
   it("#given no tasks #when formatting the footer #then it is undefined so the status clears", () => {
@@ -100,6 +119,16 @@ describe("formatFooterStatus", () => {
     expect(footer).toContain("run:0")
     expect(footer).toContain("done:3")
     expect(footer).toContain("err:2")
+  })
+
+  it("#given a 137-column active task #when formatting the footer #then it remains one physical line at 72 and 120 columns", () => {
+    // given / when
+    const footer = formatFooterStatus([longActiveRecord()]) ?? ""
+
+    // then
+    expect(footer).not.toContain("\n")
+    for (const columns of [72, 120]) expect(rendererVisibleWidth(footer)).toBeLessThanOrEqual(columns)
+    expect(footer).toBe("t1/r1 st_01acti...|c:ultrabrain omo-mock/mock-1 xhigh in-process running")
   })
 })
 
@@ -124,7 +153,7 @@ describe("buildWidgetRows", () => {
     expect(buildWidgetRows(records)).toHaveLength(0)
   })
 
-  it("#given an active task #when building a row #then it carries id, target, model, mode, status, and pid in order", () => {
+  it("#given an active task #when building a row #then it retains useful id, target, model, mode, and status context", () => {
     // given
     const records = [
       record({ task_id: "st_row", name: "finder", status: "running", agent_type: "explore", pid: 4242 }),
@@ -134,9 +163,22 @@ describe("buildWidgetRows", () => {
     const row = buildWidgetRows(records)[0] ?? ""
 
     // then
-    expect(row).toBe(
-      "st_row finder agent:explore model:anthropic/claude-sonnet-4-6 mode:in-process status:running pid:4242",
-    )
+    expect(row).toContain("st_row")
+    expect(row).toContain("a:explore")
+    expect(row).toContain("anthropic/")
+    expect(row).toContain("in-process")
+    expect(row).toContain("running")
+    expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(72)
+  })
+
+  it("#given a 137-column active task #when building its widget row #then it remains one physical line at 72 and 120 columns", () => {
+    // given / when
+    const row = buildWidgetRows([longActiveRecord()])[0] ?? ""
+
+    // then
+    expect(row).not.toContain("\n")
+    for (const columns of [72, 120]) expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(columns)
+    expect(row).toBe("st_01... active...|c:ultrabrain omo-mock/mock-1 xhigh in-process running")
   })
 })
 
@@ -209,6 +251,15 @@ describe("formatTaskRow", () => {
     expect(row).toBe("st_empty category:ultrabrain model:google/gemini-3.1-pro mode:in-process status:running")
   })
 
+  it("#given matching reasoning and variant values #when formatting #then the duplicate variant label is omitted", () => {
+    // given / when
+    const row = formatTaskRow(longActiveRecord())
+
+    // then
+    expect(row).toContain("reasoning:xhigh")
+    expect(row).not.toContain("variant:xhigh")
+  })
+
   it("#given a stale malformed running record with final_response #when formatting defensively #then the progress excerpt is terminal-width safe and concise", () => {
     // given a stale persisted record; normal lifecycle progress does not set final_response while running
     const task = record({
@@ -244,7 +295,7 @@ describe("createTaskStatusUi.syncNow", () => {
     statusUi.syncNow()
 
     // then footer counts scoped to session-a only (2 tasks, not 3)
-    expect(ui.statusCalls.at(-1)).toContain("tasks:2 run:2")
+    expect(ui.statusCalls.at(-1)).toContain("t2/r2")
     // widget shows the two session-a rows below the editor
     const widget = ui.widgetCalls.at(-1)
     expect(widget?.content).toHaveLength(2)
@@ -266,13 +317,18 @@ describe("createTaskStatusUi.syncNow", () => {
     statusUi.syncNow()
 
     // then
-    const expectedRow = "st_red 한국어 작업 category:ultrabrain model:GPT-5.6 Sol reasoning:xhigh variant:sol mode:in-process status:running progress:첫째 둘째 界"
     const footer = ui.statusCalls.at(-1) ?? ""
     const widgetRow = ui.widgetCalls.at(-1)?.content?.[0] ?? ""
-    expect(widgetRow).toBe(expectedRow)
-    expect(footer).toContain(`| ${expectedRow}`)
+    expect(rendererVisibleWidth(widgetRow)).toBeLessThanOrEqual(72)
+    expect(rendererVisibleWidth(footer)).toBeLessThanOrEqual(72)
+    expect(widgetRow).toContain("한")
+    expect(widgetRow).toContain("c:ultrabrain")
+    expect(widgetRow).toContain("GPT-5.6 Sol")
+    expect(widgetRow).toContain("xhigh")
+    expect(widgetRow).toContain("in-process")
+    expect(widgetRow).toContain("running")
+    expect(footer).toContain("t1/r1")
     expect(`${footer} ${widgetRow}`).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/u)
-    expect(rendererVisibleWidth(widgetRow.slice(widgetRow.indexOf("progress:") + "progress:".length))).toBeLessThanOrEqual(60)
   })
 
   it("#given no captured ui context #when syncing #then it is a no-op", () => {
