@@ -2,9 +2,19 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
 
+import type { Theme, ThemeColor } from "@code-yeongyu/senpi"
+
 import type { ResolvedModelRecord } from "../state"
+import { CTX, makeDeps } from "../tools/task/__fixtures__/task-tool-fakes"
+import { buildTaskExecute } from "../tools/task/execute"
+import { renderTaskResultLines } from "../tools/task/renderers"
 import { FakeRunner, baseSpec, cleanupProjects, categoryPlanner, flush, makeManager, settings } from "./__fixtures__/manager-fakes"
 import type { ChildPlanner } from "./types"
+
+const RENDERER_THEME = {
+  fg: (_color: ThemeColor, text: string) => text,
+  italic: (text: string) => `<i>${text}</i>`,
+} satisfies Pick<Theme, "fg" | "italic">
 
 afterEach(cleanupProjects)
 
@@ -169,5 +179,52 @@ describe("TaskManager.start", () => {
     expect(rawRecord).not.toContain("private prompt payload")
     expect(rawRecord).not.toContain('"prompt"')
     expect(rawRecord).not.toContain('"messages"')
+  })
+
+  test("#given a resolved ultrabrain plan whose runner throws #when the real task mapping renders start_failed #then resolved context reaches the error row without the prompt", async () => {
+    // given
+    const resolvedModel: ResolvedModelRecord = {
+      provider: "openai",
+      model_id: "gpt-5.6-sol",
+      display: "GPT-5.6 Sol",
+      reasoning_effort: "xhigh",
+      source: "category",
+    }
+    const planner: ChildPlanner = () => ({
+      kind: "resolved",
+      plan: { model: "openai/gpt-5.6-sol", resolved_model: resolvedModel, category: "ultrabrain" },
+    })
+    const runner = new FakeRunner()
+    runner.throwOnStart = true
+    const { manager } = makeManager({ planner, inProcess: runner })
+    const privatePrompt = "private prompt payload"
+
+    // when
+    const result = await buildTaskExecute(makeDeps(manager))(
+      "call-start-failed",
+      { prompt: privatePrompt, category: "ultrabrain", run_in_background: true },
+      undefined,
+      undefined,
+      CTX,
+    )
+    const [row] = renderTaskResultLines(result.details, RENDERER_THEME)
+
+    // then
+    expect(result.details).toEqual({
+      task_id: result.details.task_id,
+      status: "error",
+      mode: "spawn",
+      name: result.details.task_id,
+      category: "ultrabrain",
+      execution_mode: "in-process",
+      model: "openai/gpt-5.6-sol",
+      resolved_model: resolvedModel,
+      run_in_background: true,
+      reason: "runner boom",
+    })
+    expect(row).toBe(
+      `task category:ultrabrain (GPT-5.6 Sol reasoning:xhigh) <i>background</i> error id:${result.details.task_id} reason:runner boom`,
+    )
+    expect(JSON.stringify({ result, row })).not.toContain(privatePrompt)
   })
 })

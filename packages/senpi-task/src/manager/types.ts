@@ -95,7 +95,18 @@ export type StartResult =
       readonly max_depth: number
     }
   | { readonly kind: "plan_unresolved"; readonly error: PlanResolutionError }
-  | { readonly kind: "start_failed"; readonly task_id: string; readonly name: string; readonly error_message: string }
+  | {
+      readonly kind: "start_failed"
+      readonly task_id: string
+      readonly name: string
+      readonly category?: string
+      readonly subagent_type?: string
+      readonly execution_mode: ExecutionMode
+      readonly model: string
+      readonly resolved_model?: ResolvedModelRecord
+      readonly run_in_background: boolean
+      readonly error_message: string
+    }
   | { readonly kind: "residency_denied"; readonly reason: string }
 
 export type ContinueDelivery = "steer" | "followUp" | "revive"

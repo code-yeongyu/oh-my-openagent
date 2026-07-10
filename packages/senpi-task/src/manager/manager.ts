@@ -130,7 +130,18 @@ class TaskManagerImpl implements TaskManager {
       this.#concurrency.acquire(plan.model, record.task_id)
       const launched = await this.#launch(context)
       if (!launched.ok) {
-        return { kind: "start_failed", task_id: record.task_id, name: registration.name, error_message: launched.error }
+        return {
+          kind: "start_failed",
+          task_id: record.task_id,
+          name: registration.name,
+          ...(record.category !== undefined ? { category: record.category } : {}),
+          ...(record.agent_type !== undefined ? { subagent_type: record.agent_type } : {}),
+          execution_mode: executionMode,
+          model: record.model,
+          ...(record.resolved_model !== undefined ? { resolved_model: record.resolved_model } : {}),
+          run_in_background: spec.run_in_background === true,
+          error_message: launched.error,
+        }
       }
       return { kind: "started", task_id: record.task_id, status: "running", name: registration.name, ...startParts }
     }
