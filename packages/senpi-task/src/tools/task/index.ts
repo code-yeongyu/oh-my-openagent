@@ -3,7 +3,14 @@ export { TASK_PROMPT_GUIDELINES, TASK_PROMPT_SNIPPET, buildTaskToolDescription }
 export { buildTaskExecute } from "./execute"
 export { TaskToolParams } from "./params"
 export type { TaskToolParamsStatic } from "./params"
-export { linesComponent, statusThemeColor, taskCallLines, taskResultLines } from "./renderers"
+export {
+  excerptRendererText,
+  linesComponent,
+  rendererVisibleWidth,
+  statusThemeColor,
+  taskCallLines,
+  taskResultLines,
+} from "./renderers"
 export { buildSkillPrepend, createFsSkillLoader } from "./skills"
 export { TASK_TOOL_NAME, createTaskTool } from "./tool"
 export type {
