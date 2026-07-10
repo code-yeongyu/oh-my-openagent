@@ -1,5 +1,6 @@
 export {
   RESIDENCY_STATES,
+  RESOLVED_MODEL_SOURCES,
   TASK_STATUSES,
   createTaskRecord,
   markRecordLostForReconciliation,
@@ -9,6 +10,8 @@ export {
 export type {
   Messageability,
   ResidencyState,
+  ResolvedModelRecord,
+  ResolvedModelSource,
   TaskNotification,
   TaskRecord,
   TaskRecordInput,
@@ -240,9 +243,11 @@ export {
   buildTaskToolDescription,
   createFsSkillLoader,
   createTaskTool,
+  excerptRendererText,
   linesComponent,
   listTaskAgents,
   listTaskCategories,
+  rendererVisibleWidth,
   statusThemeColor,
   taskCallLines,
   taskResultLines,

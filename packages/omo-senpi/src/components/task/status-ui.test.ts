@@ -1,11 +1,12 @@
 import { describe, expect, it } from "bun:test"
 
-import type { ListedTask, TaskRecord, TaskStatus } from "@oh-my-opencode/senpi-task"
+import { rendererVisibleWidth, type ListedTask, type TaskRecord, type TaskStatus } from "@oh-my-opencode/senpi-task"
 
 import type { CapturedUi } from "./runtime-context"
 import {
   buildWidgetRows,
   createTaskStatusUi,
+  formatTaskRow,
   formatFooterStatus,
   type StatusUiManager,
   type StatusUiRuntime,
@@ -123,7 +124,7 @@ describe("buildWidgetRows", () => {
     expect(buildWidgetRows(records)).toHaveLength(0)
   })
 
-  it("#given an active task #when building a row #then it carries id, agent, state, mode, model", () => {
+  it("#given an active task #when building a row #then it carries id, target, model, mode, status, and pid in order", () => {
     // given
     const records = [
       record({ task_id: "st_row", name: "finder", status: "running", agent_type: "explore", pid: 4242 }),
@@ -133,12 +134,100 @@ describe("buildWidgetRows", () => {
     const row = buildWidgetRows(records)[0] ?? ""
 
     // then
-    expect(row).toContain("st_row")
-    expect(row).toContain("finder")
-    expect(row).toContain("agent:explore")
-    expect(row).toContain("running")
-    expect(row).toContain("mode:in-process")
-    expect(row).toContain("pid:4242")
+    expect(row).toBe(
+      "st_row finder agent:explore model:anthropic/claude-sonnet-4-6 mode:in-process status:running pid:4242",
+    )
+  })
+})
+
+describe("formatTaskRow", () => {
+  it("#given a category task with resolved model metadata #when formatting #then category, display model, reasoning, variant, mode, and status render in one order", () => {
+    // given
+    const task = record({
+      task_id: "st_resolved",
+      name: "planner",
+      status: "running",
+      category: "ultrabrain",
+      execution_mode: "rpc",
+      model: "category/raw-fallback",
+      resolved_model: {
+        provider: "openai",
+        model_id: "gpt-5.6-sol",
+        display: "openai/gpt-5.6-sol",
+        reasoning_effort: "xhigh",
+        variant: "sol",
+        source: "category",
+      },
+    })
+
+    // when
+    const row = formatTaskRow(task)
+
+    // then
+    expect(row).toBe(
+      "st_resolved planner category:ultrabrain model:openai/gpt-5.6-sol reasoning:xhigh variant:sol mode:rpc status:running",
+    )
+  })
+
+  it("#given a legacy task without resolved model metadata #when formatting #then raw model is preserved as the model label", () => {
+    // given
+    const task = record({
+      task_id: "st_legacy",
+      status: "running",
+      agent_type: "explore",
+      model: "anthropic/claude-sonnet-4-6",
+    })
+
+    // when
+    const row = formatTaskRow(task)
+
+    // then
+    expect(row).toBe("st_legacy agent:explore model:anthropic/claude-sonnet-4-6 mode:in-process status:running")
+  })
+
+  it("#given empty resolved model detail labels #when formatting #then empty reasoning and variant labels are omitted", () => {
+    // given
+    const task = record({
+      task_id: "st_empty",
+      status: "running",
+      category: "ultrabrain",
+      model: "category/raw-fallback",
+      resolved_model: {
+        provider: "google",
+        model_id: "gemini-3.1-pro",
+        display: "google/gemini-3.1-pro",
+        reasoning_effort: "",
+        variant: "",
+        source: "category",
+      },
+    })
+
+    // when
+    const row = formatTaskRow(task)
+
+    // then
+    expect(row).toBe("st_empty category:ultrabrain model:google/gemini-3.1-pro mode:in-process status:running")
+  })
+
+  it("#given wide CJK progress text #when formatting #then the progress excerpt is terminal-width safe and concise", () => {
+    // given
+    const task = record({
+      task_id: "st_cjk",
+      status: "running",
+      agent_type: "explore",
+      final_response: `${"界".repeat(40)}tail`,
+    })
+
+    // when
+    const row = formatTaskRow(task)
+    const progressPrefix = " progress:"
+    const progressIndex = row.indexOf(progressPrefix)
+    const progress = progressIndex >= 0 ? row.slice(progressIndex + progressPrefix.length) : ""
+
+    // then
+    expect(progress).toContain("...")
+    expect(progress).not.toContain("tail")
+    expect(rendererVisibleWidth(progress)).toBeLessThanOrEqual(60)
   })
 })
 
@@ -212,7 +301,7 @@ describe("createTaskStatusUi.scheduleSync", () => {
         return handle
       },
       clear: (handle) => {
-        active.delete(handle as number)
+        if (typeof handle === "number") active.delete(handle)
       },
     }
     const ui = fakeUi()
