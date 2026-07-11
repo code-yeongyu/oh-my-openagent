@@ -30,6 +30,17 @@ describe("root npm payload containment", () => {
     expect(files).toContain("!packages/omo-codex/plugin/**/node_modules")
     expect(files).toContain("!packages/omo-codex/plugin/components/workflow-selector")
   })
+
+  test("#given root files allowlist #when vendored MCP shipping is checked #then each ships its package.json alongside dist", () => {
+    // given
+    const files = readRootFiles()
+
+    // when / then
+    for (const vendoredMcp of ["lsp-tools-mcp", "lsp-daemon", "git-bash-mcp"] as const) {
+      expect(files).toContain(`packages/${vendoredMcp}/dist`)
+      expect(files).toContain(`packages/${vendoredMcp}/package.json`)
+    }
+  })
 })
 
 describe("lazycodex-ai publish payload containment", () => {
