@@ -45,4 +45,4 @@ Conventions for human contributors and AI agents working on this repository.
 ## Build and Hooks
 
 - Build output goes to `dist/`.
-- `hooks/hooks.json` runs `node ${PLUGIN_ROOT}/dist/cli.js hook user-prompt-submit --with-ultrawork`.
+- `hooks/hooks.json` wires `hook user-prompt-submit --with-ultrawork` (UserPromptSubmit), `hook pre-tool-use` (create_goal budget), `hook pre-tool-use-spawn` (spawn guards), and `hook stop` (auto-resume).
