@@ -42,7 +42,7 @@ Size each worker to the task. Put the intended role, rigor level, and specialty 
 | Deep debugging / race / perf / subtle cross-module reasoning | `TASK: act as a deep debugging worker. ...` |
 | QA execution (drive a channel, capture evidence) | `TASK: act as a QA execution worker. ...` |
 | Read-only codebase search | `TASK: act as an explorer. ...` |
-| Implementation — pick difficulty: LOW (one-file fix, boilerplate) / MEDIUM (standard feature, known patterns) / HIGH (new module, cross-module, concurrency/security/migration) | `TASK: act as a <low|medium|high>-difficulty implementation worker. ...` + `agent_type: "lazycodex-worker-<low|medium|high>"` when exposed |
+| Implementation — pick the tier by change SIZE: LOW small (one-file fix, boilerplate) / MEDIUM mid-sized (standard feature, a few files) / HIGH large (new module, cross-module, concurrency/security/migration, or a big complex problem with one clear goal) | `TASK: act as a <low|medium|high>-difficulty implementation worker. ...` + `agent_type: "lazycodex-worker-<low|medium|high>"` when exposed |
 | External library / docs research | `TASK: act as a librarian. ...` |
 | Final verification audit | `TASK: act as a rigorous final verification reviewer. ...` |
 
