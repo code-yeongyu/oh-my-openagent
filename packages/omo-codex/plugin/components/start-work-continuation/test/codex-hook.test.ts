@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -94,84 +94,6 @@ describe("start-work Stop hook", () => {
 
 		// then
 		expect(output).toBe("");
-	});
-
-	it("#given active codex work #when continuation directive is emitted #then subagent guidance is reliable", () => {
-		// given
-		const workspace = createWorkspace({
-			boulderJson: createBoulderJson({ sessionIds: ["codex:sess_abc"], status: "active" }),
-			planMarkdown: ["# Plan", "", "## TODOs", "- [ ] First"].join("\n"),
-		});
-		const fs = createMemoryFs();
-
-		// when
-		const output = runStopHook(createStopInput(workspace), fs);
-
-		// then
-		const parsed = parseBlockOutput(output);
-		expect(parsed.reason).toMatch(/TASK:/);
-		expect(parsed.reason).toMatch(/fork_context:\s*false/);
-		expect(parsed.reason).toMatch(/wait_agent.*mailbox signals/);
-		expect(parsed.reason).toMatch(/TASK STILL ACTIVE/);
-		expect(parsed.reason).toMatch(/respawn.*smaller/);
-		expect(parsed.reason).toMatch(/WORKING:/);
-	});
-
-	it("#given active codex work #when continuation directive is emitted #then QA weight is tier-scoped without echo bloat", () => {
-		// given
-		const workspace = createWorkspace({
-			boulderJson: createBoulderJson({ sessionIds: ["codex:sess_abc"], status: "active" }),
-			planMarkdown: ["# Plan", "", "## TODOs", "- [ ] First"].join("\n"),
-		});
-		const fs = createMemoryFs();
-
-		// when
-		const output = runStopHook(createStopInput(workspace), fs);
-
-		// then
-		const parsed = parseBlockOutput(output);
-		expect(parsed.reason).toMatch(/LIGHT/);
-		expect(parsed.reason).toMatch(/HEAVY/);
-		expect(parsed.reason).toMatch(/When unsure[^.]{0,30}HEAVY/);
-		expect(parsed.reason).toMatch(/mirrors its implementation/);
-		expect((parsed.reason.match(/malformed input, prompt injection/g) ?? []).length).toBe(1);
-		expect(parsed.reason.split(/\s+/).filter(Boolean).length).toBeLessThanOrEqual(1135);
-	});
-
-	it("#given active codex work #when continuation directive is emitted #then PR lifecycle stays worktree-bound", () => {
-		// given
-		const workspace = createWorkspace({
-			boulderJson: createBoulderJson({
-				sessionIds: ["codex:sess_abc"],
-				status: "active",
-				worktreePath: "/tmp/worktree",
-			}),
-			planMarkdown: ["# Plan", "", "## TODOs", "- [ ] First"].join("\n"),
-		});
-		const fs = createMemoryFs();
-
-		// when
-		const output = runStopHook(createStopInput(workspace), fs);
-
-		// then
-		const parsed = parseBlockOutput(output);
-		expect(parsed.reason).toContain("PR or branch implementation/review/merge work requires a task-owned git worktree");
-		expect(parsed.reason).toContain("Treat the main worktree as read-only context");
-		expect(parsed.reason).toContain("create/update the PR, wait for CI/review/Cubic gates, merge by default");
-		expect(parsed.reason).toContain("Do not create a PR, PR handoff, branch handoff, merge");
-	});
-
-	it("#given stop hook source #when inspected #then it remains Boulder-only without planning bootstrap logic", () => {
-		// given
-		const hook = readFileSync(new URL("../src/codex-hook.ts", import.meta.url), "utf8");
-
-		// then
-		expect(hook).toMatch(/readContinuationState/);
-		expect(hook).toMatch(/START_WORK_CONTINUATION_DIRECTIVE/);
-		expect(hook).toMatch(/decision:\s*"block"/);
-		expect(hook).not.toMatch(
-			/\bulw-plan\b|\bspawn_agent\b|\brequest_user_input\b|bootstrap|selectable plan|Phase 1|Create or update Boulder state/i,
-		);
 	});
 
 	it("#given active work belongs to another harness #when hook runs #then returns empty output", () => {

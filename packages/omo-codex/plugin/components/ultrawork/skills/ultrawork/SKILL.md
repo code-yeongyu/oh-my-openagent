@@ -231,6 +231,14 @@ Until every success criterion PASSES with its evidence captured:
    scenario captured failing when no test seam exists. It must fail
    for the RIGHT reason (not a syntax error, not a missing import).
    Paste RED output into the notepad. No production code yet.
+   PROSE TARGET (prompt, SKILL.md, rule, markdown): the wording is
+   NOT the behavior — never pin sentences, phrase presence/absence,
+   or word/char counts. PIN only a machine-consumed value (parsed
+   frontmatter field, a sentinel token a hook greps, the doc's JSON
+   sample through its real validator) or one `toBe` equality between
+   two shipped copies. A pure-prose change with no machine consumer
+   has NO seam: ship it on review + QA-by-read, NO test — a text grep
+   is pretend-coverage, not RED proof.
 3. GREEN: write the SMALLEST production change that flips RED→GREEN.
    Before GREEN work that depends on external review, PR, issue, or
    branch state, refresh current branch/PR/issue state and preserve existing ordering/policy;
