@@ -166,6 +166,23 @@ test("#given bundled Codex agents #when components/ultrawork/agents directory is
 	}
 });
 
+test("#given bundled agent TOMLs #when nickname_candidates are inspected #then they use only the codex-accepted charset", async () => {
+	// given: codex_app_server ignores a role whose nickname has characters outside
+	// ASCII letters, digits, spaces, hyphens, underscores (observed live in task-15 QA)
+	const agentsDir = join(root, "components", "ultrawork", "agents");
+	const files = (await readdir(agentsDir)).filter((name) => name.endsWith(".toml"));
+
+	// when/then
+	for (const file of files) {
+		const text = await readFile(join(agentsDir, file), "utf8");
+		for (const match of text.matchAll(/nickname_candidates\s*=\s*\[([^\]]*)\]/g)) {
+			for (const nickname of match[1].matchAll(/"([^"]*)"/g)) {
+				assert.match(nickname[1], /^[A-Za-z0-9 _-]+$/, `${file}: nickname "${nickname[1]}"`);
+			}
+		}
+	}
+});
+
 test("#given planner agent prompt #when inspected #then generated artifacts stay under .omo", async () => {
 	const prompt = await readFile(join(root, "components", "ultrawork", "agents", "plan.toml"), "utf8");
 
