@@ -1,5 +1,6 @@
+import { execFileSync } from "node:child_process"
 import { appendFileSync, existsSync, lstatSync, mkdirSync, realpathSync, readFileSync, statSync, symlinkSync } from "node:fs"
-import { join } from "node:path"
+import { dirname, join, resolve } from "node:path"
 
 import { canonicalizeCodegraphPath, resolveCodegraphWorkspacePaths, type CodegraphWorkspacePaths } from "./paths"
 import { writeCodegraphSourceMetadata } from "./store"
@@ -107,18 +108,36 @@ export function prepareCodegraphWorkspace(
 }
 
 export function ensureCodegraphGitignored(workspace: string): boolean {
-  const gitDir = join(workspace, ".git")
-  if (!existsSync(gitDir)) return false
+  if (!existsSync(join(workspace, ".git"))) return false
 
-  const excludePath = join(gitDir, "info", "exclude")
   try {
-    mkdirSync(join(gitDir, "info"), { recursive: true })
+    const isWorktree = execFileSync("git", ["rev-parse", "--is-inside-work-tree"], {
+      cwd: workspace,
+      encoding: "utf8",
+      shell: false,
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5_000,
+      windowsHide: true,
+    }).trim()
+    if (isWorktree !== "true") return false
+
+    const gitExcludePath = execFileSync("git", ["rev-parse", "--git-path", "info/exclude"], {
+      cwd: workspace,
+      encoding: "utf8",
+      shell: false,
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5_000,
+      windowsHide: true,
+    }).trim()
+    if (gitExcludePath.length === 0) return false
+
+    const excludePath = resolve(workspace, gitExcludePath)
+    mkdirSync(dirname(excludePath), { recursive: true })
     const existing = existsSync(excludePath) ? readFileSync(excludePath, "utf8") : ""
     if (existing.split(/\r?\n/).includes(".codegraph")) return true
     appendFileSync(excludePath, `${existing.endsWith("\n") || existing.length === 0 ? "" : "\n"}.codegraph\n`)
     return true
-  } catch (error) {
-    if (error instanceof Error) return false
-    throw error
+  } catch {
+    return false
   }
 }

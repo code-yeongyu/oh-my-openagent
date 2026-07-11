@@ -98,6 +98,7 @@ function buildCodegraphChildEnv(options = {}) {
 import { homedir as homedir5 } from "node:os";
 
 // ../../utils/src/codegraph/workspace.ts
+import { execFileSync } from "node:child_process";
 import { appendFileSync, existsSync as existsSync2, lstatSync as lstatSync2, mkdirSync, realpathSync as realpathSync3, readFileSync as readFileSync2, statSync, symlinkSync } from "node:fs";
 import { join as join5 } from "node:path";
 
@@ -305,12 +306,31 @@ function prepareCodegraphWorkspace(workspace, options = {}) {
   }
 }
 function ensureCodegraphGitignored(workspace) {
-  const gitDir = join5(workspace, ".git");
-  if (!existsSync2(gitDir))
+  if (!existsSync2(join5(workspace, ".git")))
     return false;
-  const excludePath = join5(gitDir, "info", "exclude");
   try {
-    mkdirSync(join5(gitDir, "info"), { recursive: true });
+    const isWorktree = execFileSync("git", ["rev-parse", "--is-inside-work-tree"], {
+      cwd: workspace,
+      encoding: "utf8",
+      shell: false,
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5e3,
+      windowsHide: true
+    }).trim();
+    if (isWorktree !== "true")
+      return false;
+    const gitExcludePath = execFileSync("git", ["rev-parse", "--git-path", "info/exclude"], {
+      cwd: workspace,
+      encoding: "utf8",
+      shell: false,
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5e3,
+      windowsHide: true
+    }).trim();
+    if (gitExcludePath.length === 0)
+      return false;
+    const excludePath = resolve(workspace, gitExcludePath);
+    mkdirSync(dirname2(excludePath), { recursive: true });
     const existing = existsSync2(excludePath) ? readFileSync2(excludePath, "utf8") : "";
     if (existing.split(/\r?\n/).includes(".codegraph"))
       return true;
@@ -319,10 +339,8 @@ function ensureCodegraphGitignored(workspace) {
 `}.codegraph
 `);
     return true;
-  } catch (error) {
-    if (error instanceof Error)
-      return false;
-    throw error;
+  } catch {
+    return false;
   }
 }
 

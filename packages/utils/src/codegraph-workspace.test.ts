@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test"
+import { execFileSync } from "node:child_process"
 import {
   chmodSync,
   existsSync,
@@ -118,17 +119,37 @@ describe("CodeGraph workspace helpers", () => {
     expect(result).toBe("my-repo-..-with-spaces")
   })
 
-  it("adds .codegraph to git info exclude without touching .gitignore", () => {
+  it("adds a single .codegraph exclusion for a valid Git worktree", () => {
     // given
     const workspace = tempDir("codegraph-gitignore")
-    mkdirSync(join(workspace, ".git", "info"), { recursive: true })
+    mkdirSync(workspace, { recursive: true })
+    execFileSync("git", ["init", workspace], { stdio: "ignore" })
+
+    // when
+    const firstResult = ensureCodegraphGitignored(workspace)
+    const secondResult = ensureCodegraphGitignored(workspace)
+
+    // then
+    const exclusions = readFileSync(join(workspace, ".git", "info", "exclude"), "utf8").split(/\r?\n/)
+    expect(firstResult).toBe(true)
+    expect(secondResult).toBe(true)
+    expect(exclusions.filter((exclusion) => exclusion === ".codegraph")).toHaveLength(1)
+    expect(existsSync(join(workspace, ".gitignore"))).toBe(false)
+
+    rmSync(workspace, { force: true, recursive: true })
+  })
+
+  it("does not mutate a workspace with an empty .git marker", () => {
+    // given
+    const workspace = tempDir("codegraph-empty-git")
+    mkdirSync(join(workspace, ".git"), { recursive: true })
 
     // when
     const result = ensureCodegraphGitignored(workspace)
 
     // then
-    expect(result).toBe(true)
-    expect(readFileSync(join(workspace, ".git", "info", "exclude"), "utf8")).toContain(".codegraph")
+    expect(result).toBe(false)
+    expect(existsSync(join(workspace, ".git", "info", "exclude"))).toBe(false)
 
     rmSync(workspace, { force: true, recursive: true })
   })
