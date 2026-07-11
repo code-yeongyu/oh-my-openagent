@@ -1,3 +1,4 @@
+import { SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { describe, expect, it } from "bun:test"
 import {
   getHighVariant,
@@ -31,7 +32,7 @@ describe("think-mode switcher", () => {
 
       it("should handle hyphens in Claude version numbers", () => {
         // given a Claude model ID with hyphen format
-        const variant = getHighVariant("claude-opus-4-7")
+        const variant = getHighVariant(SUPPORTED_MODELS.CLAUDE_OPUS_4_7)
 
         // then should return high variant
         expect(variant).toBe("claude-opus-4-7-high")
@@ -39,7 +40,7 @@ describe("think-mode switcher", () => {
 
       it("should handle claude-opus-4-7 high variant", () => {
         // given a Claude Opus 4.7 model ID
-        const variant = getHighVariant("claude-opus-4-7")
+        const variant = getHighVariant(SUPPORTED_MODELS.CLAUDE_OPUS_4_7)
 
         // then should return high variant
         expect(variant).toBe("claude-opus-4-7-high")
@@ -47,7 +48,7 @@ describe("think-mode switcher", () => {
 
       it("should handle dots in GPT version numbers", () => {
         // given a GPT model ID with dot format (gpt-5.4)
-        const variant = getHighVariant("gpt-5.4")
+        const variant = getHighVariant(SUPPORTED_MODELS.GPT_5_4)
 
         // then should return high variant
         expect(variant).toBe("gpt-5-4-high")
@@ -63,10 +64,10 @@ describe("think-mode switcher", () => {
 
       it("should handle Gemini preview variants", () => {
         // given Gemini preview model IDs
-        expect(getHighVariant("gemini-3.1-pro")).toBe(
+        expect(getHighVariant(SUPPORTED_MODELS.GEMINI_3_1_PRO)).toBe(
           "gemini-3-1-pro-high"
         )
-        expect(getHighVariant("gemini-3-flash")).toBe(
+        expect(getHighVariant(SUPPORTED_MODELS.GEMINI_3_FLASH)).toBe(
           "gemini-3-flash-high"
         )
       })
@@ -101,10 +102,10 @@ describe("think-mode switcher", () => {
 
     it("should return false for base models", () => {
       // given base model IDs without -high suffix
-      expect(isAlreadyHighVariant("claude-opus-4-7")).toBe(false)
+      expect(isAlreadyHighVariant(SUPPORTED_MODELS.CLAUDE_OPUS_4_7)).toBe(false)
       expect(isAlreadyHighVariant("claude-opus-4.7")).toBe(false)
-      expect(isAlreadyHighVariant("gpt-5.4")).toBe(false)
-      expect(isAlreadyHighVariant("gemini-3.1-pro")).toBe(false)
+      expect(isAlreadyHighVariant(SUPPORTED_MODELS.GPT_5_4)).toBe(false)
+      expect(isAlreadyHighVariant(SUPPORTED_MODELS.GEMINI_3_1_PRO)).toBe(false)
     })
 
     it("should return false for models with 'high' in name but not suffix", () => {

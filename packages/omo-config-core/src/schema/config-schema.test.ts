@@ -13,7 +13,7 @@ describe("omo config schema", () => {
           fallback_models: ["openai/gpt"],
           variant: "high",
           temperature: 0.2,
-          top_p: 0.9,
+          topP: 0.9,
           maxTokens: 12000,
           thinking: { type: "enabled", budgetTokens: 2048 },
           reasoningEffort: "high",

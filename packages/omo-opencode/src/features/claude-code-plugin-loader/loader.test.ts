@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS } from "@oh-my-opencode/model-core";
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
 import {
   clearPluginComponentsCache,
@@ -224,12 +225,12 @@ describe("loadAllPluginComponents", () => {
         loadPluginHooksConfigs,
       }
       await loadAllPluginComponentsWithDeps({ anthropicProvider: "kiro" }, deps)
-      await loadAllPluginComponentsWithDeps({ anthropicProvider: "anthropic" }, deps)
+      await loadAllPluginComponentsWithDeps({ anthropicProvider: SUPPORTED_PROVIDERS.ANTHROPIC }, deps)
 
       // then
       expect(discoverInstalledPlugins).toHaveBeenCalledTimes(2)
       expect(loadPluginAgents).toHaveBeenNthCalledWith(1, result.plugins, "kiro")
-      expect(loadPluginAgents).toHaveBeenNthCalledWith(2, result.plugins, "anthropic")
+      expect(loadPluginAgents).toHaveBeenNthCalledWith(2, result.plugins, SUPPORTED_PROVIDERS.ANTHROPIC)
     })
   })
 

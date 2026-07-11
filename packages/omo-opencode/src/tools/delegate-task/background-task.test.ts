@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 const bunTest = require("bun:test")
 const describeFn = bunTest.describe
 const testFn = bunTest.test
@@ -385,7 +386,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
       "explore",
       undefined,
       undefined,
-      [{ providers: ["openai"], model: "gpt-5.4" }],
+      [{ providers: [SUPPORTED_PROVIDERS.OPENAI], model: SUPPORTED_MODELS.GPT_5_4 }],
     )
 
     await new Promise(resolve => setTimeout(resolve, 5))

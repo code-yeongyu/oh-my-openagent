@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 import { describe, test, expect, beforeEach, afterEach, mock, spyOn } from "bun:test"
 
 function clearRequireCache(modulePath: string): void {
@@ -426,13 +427,13 @@ describe("executeSyncTask - cleanup on error paths", () => {
     }
 
     const initialModel = {
-      providerID: "anthropic",
-      modelID: "claude-opus-4-7",
-      variant: "max",
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+      modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
+      variant: SUPPORTED_VARIANTS.MAX,
     }
     const fallbackChain = [
-      { providers: ["anthropic"], model: "claude-opus-4-7", variant: "max" },
-      { providers: ["opencode-go"], model: "kimi-k2.6" },
+      { providers: [SUPPORTED_PROVIDERS.ANTHROPIC], model: SUPPORTED_MODELS.CLAUDE_OPUS_4_7, variant: SUPPORTED_VARIANTS.MAX },
+      { providers: [SUPPORTED_PROVIDERS.OPENCODE_GO], model: SUPPORTED_MODELS.KIMI_K2_6 },
     ]
 
     //#when
@@ -444,8 +445,8 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(result).toContain("Task completed")
     expect(result).toContain("Model: opencode-go/kimi-k2.6")
     expect(attemptedModels).toEqual([
-      { providerID: "anthropic", modelID: "claude-opus-4-7", variant: "max" },
-      { providerID: "opencode-go", modelID: "kimi-k2.6", variant: undefined },
+      { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7, variant: SUPPORTED_VARIANTS.MAX },
+      { providerID: SUPPORTED_PROVIDERS.OPENCODE_GO, modelID: SUPPORTED_MODELS.KIMI_K2_6, variant: undefined },
     ])
   })
 
@@ -493,14 +494,14 @@ describe("executeSyncTask - cleanup on error paths", () => {
     }
 
     const initialModel = {
-      providerID: "anthropic",
-      modelID: "claude-opus-4-7",
-      variant: "max",
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+      modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
+      variant: SUPPORTED_VARIANTS.MAX,
     }
     const fallbackChain = [
-      { providers: ["anthropic"], model: "claude-opus-4-7", variant: "max" },
-      { providers: ["opencode-go"], model: "kimi-k2.6" },
-      { providers: ["openai"], model: "gpt-5.4", variant: "medium" },
+      { providers: [SUPPORTED_PROVIDERS.ANTHROPIC], model: SUPPORTED_MODELS.CLAUDE_OPUS_4_7, variant: SUPPORTED_VARIANTS.MAX },
+      { providers: [SUPPORTED_PROVIDERS.OPENCODE_GO], model: SUPPORTED_MODELS.KIMI_K2_6 },
+      { providers: [SUPPORTED_PROVIDERS.OPENAI], model: SUPPORTED_MODELS.GPT_5_4, variant: SUPPORTED_VARIANTS.MEDIUM },
     ]
 
     //#when
@@ -511,9 +512,9 @@ describe("executeSyncTask - cleanup on error paths", () => {
     //#then
     expect(result).toBe("Final failure")
     expect(attemptedModels).toEqual([
-      { providerID: "anthropic", modelID: "claude-opus-4-7", variant: "max" },
-      { providerID: "opencode-go", modelID: "kimi-k2.6", variant: undefined },
-      { providerID: "openai", modelID: "gpt-5.4", variant: "medium" },
+      { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7, variant: SUPPORTED_VARIANTS.MAX },
+      { providerID: SUPPORTED_PROVIDERS.OPENCODE_GO, modelID: SUPPORTED_MODELS.KIMI_K2_6, variant: undefined },
+      { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4, variant: SUPPORTED_VARIANTS.MEDIUM },
     ])
   })
 
@@ -522,9 +523,9 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const { retrySyncPromptWithFallbacks } = require("./sync-task-fallback")
     const sendPrompt = mock(async () => "promptAsync skipped by gate: reserved")
     const initialModel = {
-      providerID: "anthropic",
-      modelID: "claude-opus-4-7",
-      variant: "max",
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+      modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
+      variant: SUPPORTED_VARIANTS.MAX,
     }
 
     //#when
@@ -533,8 +534,8 @@ describe("executeSyncTask - cleanup on error paths", () => {
       initialError: "JSON Parse error: Unexpected EOF",
       categoryModel: initialModel,
       fallbackChain: [
-        { providers: ["anthropic"], model: "claude-opus-4-7", variant: "max" },
-        { providers: ["openai"], model: "gpt-5.4", variant: "medium" },
+        { providers: [SUPPORTED_PROVIDERS.ANTHROPIC], model: SUPPORTED_MODELS.CLAUDE_OPUS_4_7, variant: SUPPORTED_VARIANTS.MAX },
+        { providers: [SUPPORTED_PROVIDERS.OPENAI], model: SUPPORTED_MODELS.GPT_5_4, variant: SUPPORTED_VARIANTS.MEDIUM },
       ],
       sendPrompt,
     })
@@ -668,11 +669,11 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const initialModel = {
       providerID: "genai-proxy-openai",
-      modelID: "gpt-5.4-mini",
+      modelID: SUPPORTED_MODELS.GPT_5_4_MINI,
       variant: undefined,
     }
     const fallbackChain = [
-      { providers: ["genai-proxy-openai"], model: "gpt-5.4-mini" },
+      { providers: ["genai-proxy-openai"], model: SUPPORTED_MODELS.GPT_5_4_MINI },
       { providers: ["genai-proxy-aws"], model: "us.anthropic.claude-haiku-4-5-20251001-v1:0" },
     ]
 
@@ -683,7 +684,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(createdSessions).toEqual(["ses_first", "ses_second"])
     expect(polledSessions).toEqual(["ses_first", "ses_second"])
     expect(attemptedModels).toEqual([
-      { providerID: "genai-proxy-openai", modelID: "gpt-5.4-mini", variant: undefined },
+      { providerID: "genai-proxy-openai", modelID: SUPPORTED_MODELS.GPT_5_4_MINI, variant: undefined },
       { providerID: "genai-proxy-aws", modelID: "us.anthropic.claude-haiku-4-5-20251001-v1:0", variant: undefined },
     ])
     expect(result).toContain("Result from ses_second")
@@ -958,11 +959,11 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const initialModel = {
       providerID: "genai-proxy-openai",
-      modelID: "gpt-5.4-mini",
+      modelID: SUPPORTED_MODELS.GPT_5_4_MINI,
       variant: undefined,
     }
     const fallbackChain = [
-      { providers: ["genai-proxy-openai"], model: "gpt-5.4-mini" },
+      { providers: ["genai-proxy-openai"], model: SUPPORTED_MODELS.GPT_5_4_MINI },
       { providers: ["genai-proxy-aws"], model: "us.anthropic.claude-haiku-4-5-20251001-v1:0" },
     ]
 
@@ -1032,11 +1033,11 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const initialModel = {
       providerID: "genai-proxy-openai",
-      modelID: "gpt-5.4-mini",
+      modelID: SUPPORTED_MODELS.GPT_5_4_MINI,
       variant: undefined,
     }
     const fallbackChain = [
-      { providers: ["genai-proxy-openai"], model: "gpt-5.4-mini" },
+      { providers: ["genai-proxy-openai"], model: SUPPORTED_MODELS.GPT_5_4_MINI },
       { providers: ["genai-proxy-aws"], model: "us.anthropic.claude-haiku-4-5-20251001-v1:0" },
     ]
 

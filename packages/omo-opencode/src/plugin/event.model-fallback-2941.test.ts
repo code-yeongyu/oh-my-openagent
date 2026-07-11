@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 declare const require: (name: string) => any
 const { afterEach, describe, expect, spyOn, test } = require("bun:test")
 
@@ -152,7 +153,7 @@ describe("createEventHandler - category runtime fallback suppression", () => {
 			{
 				sessionID,
 				agent: "sisyphus-junior",
-				model: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
+				model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 },
 			},
 			output,
 		)

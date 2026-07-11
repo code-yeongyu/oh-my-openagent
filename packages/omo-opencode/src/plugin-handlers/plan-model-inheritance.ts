@@ -2,7 +2,7 @@ const MODEL_SETTINGS_KEYS = [
   "model",
   "variant",
   "temperature",
-  "top_p",
+  "topP",
   "maxTokens",
   "thinking",
   "reasoningEffort",

@@ -1,9 +1,10 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 const { describe, test, expect } = require("bun:test")
 
 import { resolveMetadataModel } from "./resolve-metadata-model"
 
-const PRIMARY = { providerID: "openai", modelID: "gpt-5.4" }
-const FALLBACK = { providerID: "anthropic", modelID: "claude-sonnet-4-6" }
+const PRIMARY = { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 }
+const FALLBACK = { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 }
 
 describe("resolveMetadataModel", () => {
   describe("#given primary and fallback are both present", () => {
@@ -40,53 +41,53 @@ describe("resolveMetadataModel", () => {
 
   describe("#given primary has extra fields", () => {
     test("#when resolving #then preserves variant and strips unrelated fields", () => {
-      const extended = { providerID: "openai", modelID: "gpt-5.4", variant: "high", temperature: 0.7 } as const
+      const extended = { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4, variant: SUPPORTED_VARIANTS.HIGH, temperature: 0.7 } as const
 
       const result = resolveMetadataModel(extended, undefined)
 
-      expect(result).toEqual({ providerID: "openai", modelID: "gpt-5.4", variant: "high" })
+      expect(result).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4, variant: SUPPORTED_VARIANTS.HIGH })
     })
   })
 
   describe("#given primary has variant", () => {
     test("#when resolving metadata model #then variant is preserved", () => {
-      const primary = { providerID: "google", modelID: "gemini-3.1-pro", variant: "high" }
+      const primary = { providerID: SUPPORTED_PROVIDERS.GOOGLE, modelID: SUPPORTED_MODELS.GEMINI_3_1_PRO, variant: SUPPORTED_VARIANTS.HIGH }
 
       const result = resolveMetadataModel(primary, undefined)
 
-      expect(result).toEqual({ providerID: "google", modelID: "gemini-3.1-pro", variant: "high" })
+      expect(result).toEqual({ providerID: SUPPORTED_PROVIDERS.GOOGLE, modelID: SUPPORTED_MODELS.GEMINI_3_1_PRO, variant: SUPPORTED_VARIANTS.HIGH })
     })
   })
 
   describe("#given primary lacks variant but fallback has variant", () => {
     test("#when primary provided #then fallback variant is not used", () => {
-      const primary = { providerID: "google", modelID: "gemini-3.1-pro" }
-      const fallback = { providerID: "anthropic", modelID: "claude", variant: "max" }
+      const primary = { providerID: SUPPORTED_PROVIDERS.GOOGLE, modelID: SUPPORTED_MODELS.GEMINI_3_1_PRO }
+      const fallback = { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude", variant: SUPPORTED_VARIANTS.MAX }
 
       const result = resolveMetadataModel(primary, fallback)
 
-      expect(result).toEqual({ providerID: "google", modelID: "gemini-3.1-pro" })
+      expect(result).toEqual({ providerID: SUPPORTED_PROVIDERS.GOOGLE, modelID: SUPPORTED_MODELS.GEMINI_3_1_PRO })
       expect(result?.variant).toBeUndefined()
     })
   })
 
   describe("#given primary is undefined and fallback has variant", () => {
     test("#when resolving metadata model #then fallback variant is preserved", () => {
-      const fallback = { providerID: "anthropic", modelID: "claude", variant: "max" }
+      const fallback = { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude", variant: SUPPORTED_VARIANTS.MAX }
 
       const result = resolveMetadataModel(undefined, fallback)
 
-      expect(result).toEqual({ providerID: "anthropic", modelID: "claude", variant: "max" })
+      expect(result).toEqual({ providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude", variant: SUPPORTED_VARIANTS.MAX })
     })
   })
 
   describe("#given both lack variant", () => {
     test("#when resolving metadata model #then variant is not on result", () => {
-      const primary = { providerID: "openai", modelID: "gpt-5.4" }
+      const primary = { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 }
 
       const result = resolveMetadataModel(primary, undefined)
 
-      expect(result).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+      expect(result).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 })
       expect(result?.variant).toBeUndefined()
     })
   })

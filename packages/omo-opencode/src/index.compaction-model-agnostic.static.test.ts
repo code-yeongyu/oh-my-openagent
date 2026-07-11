@@ -1,3 +1,4 @@
+import { SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 
@@ -14,7 +15,7 @@ describe("experimental.session.compacting", () => {
 
     //#then
     expect(hookIndex).toBeGreaterThanOrEqual(0)
-    expect(`${content}\n${compactionContent}`.includes('modelID: "claude-opus-4-7"')).toBe(false)
+    expect(`${content}\n${compactionContent}`.includes('modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7')).toBe(false)
     expect(compactionContent.includes("output.context.push")).toBe(true)
     expect(compactionContent.includes("providerID:")).toBe(false)
     expect(compactionContent.includes("modelID:")).toBe(false)

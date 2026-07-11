@@ -6,11 +6,9 @@ import {
   transformModelForProvider,
 } from "@oh-my-opencode/model-core"
 
-export type DelegateFallbackEntry = {
-  readonly providers: string[]
-  readonly model: string
-  readonly variant?: string
-}
+import type { FallbackEntry } from "@oh-my-opencode/model-core"
+
+export type DelegateFallbackEntry = FallbackEntry
 
 export type DelegateModelResolutionInput = {
   readonly userModel?: string

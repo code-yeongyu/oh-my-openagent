@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { createKeywordDetectorHook } from "./index"
@@ -250,7 +251,7 @@ describe("keyword-detector hyperplan-ultrawork combo", () => {
 
     // when - combo fires with GPT model resolved
     await hook["chat.message"](
-      { sessionID, agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-5.4" } },
+      { sessionID, agent: "sisyphus", model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 } },
       output,
     )
 

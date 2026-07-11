@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { describe, expect, test } from "bun:test"
 
 import { classifyErrorType, extractAutoRetrySignal, extractStatusCode, isRetryableError } from "./error-classifier"
@@ -234,8 +235,8 @@ describe("runtime-fallback error classifier", () => {
     const error = {
       name: "ProviderModelNotFoundError",
       data: {
-        providerID: "anthropic",
-        modelID: "claude-opus-4-7",
+        providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+        modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
         message: "Model not found: anthropic/claude-opus-4-7.",
       },
     }

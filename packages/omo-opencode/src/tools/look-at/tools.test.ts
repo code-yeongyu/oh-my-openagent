@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { afterEach, describe, expect, test, mock } from "bun:test"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
@@ -311,7 +312,7 @@ describe("look-at tool", () => {
     // when LookAt tool executed
     // then model info should be passed to sync prompt
     test("passes multimodal-looker model to sync prompt when available", async () => {
-      setVisionCapableModelsCache(new Map([["google/gemini-3-flash", { providerID: "google", modelID: "gemini-3-flash" }]]))
+      setVisionCapableModelsCache(new Map([["google/gemini-3-flash", { providerID: SUPPORTED_PROVIDERS.GOOGLE, modelID: SUPPORTED_MODELS.GEMINI_3_FLASH }]]))
 
       let promptBody!: LookAtPromptBody
 
@@ -322,7 +323,7 @@ describe("look-at tool", () => {
               {
                 name: "multimodal-looker",
                 mode: "subagent",
-                model: { providerID: "google", modelID: "gemini-3-flash" },
+                model: { providerID: SUPPORTED_PROVIDERS.GOOGLE, modelID: SUPPORTED_MODELS.GEMINI_3_FLASH },
               },
             ],
           }),
@@ -364,8 +365,8 @@ describe("look-at tool", () => {
       )
 
       expect(promptBody.model).toEqual({
-        providerID: "google",
-        modelID: "gemini-3-flash",
+        providerID: SUPPORTED_PROVIDERS.GOOGLE,
+        modelID: SUPPORTED_MODELS.GEMINI_3_FLASH,
       })
     })
   })

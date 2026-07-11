@@ -1,3 +1,4 @@
+import { SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
@@ -54,15 +55,15 @@ describe("generateModelConfig", () => {
       expect(unsupportedEntries).toEqual([])
       expect(result.agents?.momus).toEqual({
         model: "github-copilot/gpt-5.5",
-        variant: "high",
+        variant: SUPPORTED_VARIANTS.HIGH,
         fallback_models: [
           {
             model: "github-copilot/claude-opus-4.7",
-            variant: "max",
+            variant: SUPPORTED_VARIANTS.MAX,
           },
           {
             model: "github-copilot/gemini-3.1-pro-preview",
-            variant: "high",
+            variant: SUPPORTED_VARIANTS.HIGH,
           },
         ],
       })
@@ -265,7 +266,7 @@ describe("generateModelConfig", () => {
   })
 
   describe("Momus agent model resolution", () => {
-    test("Momus resolves to gpt-5.6-sol xhigh when OpenAI is available", () => {
+    test("Momus resolves to gpt-5.6-sol ultra when OpenAI is available", () => {
       // #given
       const config = createConfig({ hasOpenAI: true })
 
@@ -274,7 +275,7 @@ describe("generateModelConfig", () => {
 
       // #then
       expect(result.agents?.momus?.model).toBe("openai/gpt-5.6-sol")
-      expect(result.agents?.momus?.variant).toBe("xhigh")
+      expect(result.agents?.momus?.variant).toBe("ultra")
       expect(result.agents?.momus?.fallback_models?.[0]).toEqual({
         model: "openai/gpt-5.5",
         variant: "xhigh",
@@ -305,7 +306,7 @@ describe("generateModelConfig", () => {
       // #then
       expect(result.agents?.hephaestus).toEqual({
         model: "github-copilot/gpt-5.5",
-        variant: "medium",
+        variant: SUPPORTED_VARIANTS.MEDIUM,
       })
     })
 

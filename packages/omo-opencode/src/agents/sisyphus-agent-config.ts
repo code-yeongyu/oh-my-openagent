@@ -1,3 +1,4 @@
+import { SUPPORTED_REASONING_EFFORTS } from "@oh-my-opencode/model-core";
 import type { AgentConfig } from "@opencode-ai/sdk";
 import { getFrontierToolSchemaPermission } from "./frontier-tool-schema-guard";
 import { buildClaudeThinkingConfig } from "./types";
@@ -37,7 +38,7 @@ export function buildGptSisyphusAgentConfig(
 ): AgentConfig {
   return {
     ...buildBaseSisyphusAgentConfig(mode, model, prompt),
-    reasoningEffort: "medium",
+    reasoningEffort: SUPPORTED_REASONING_EFFORTS.MEDIUM,
   };
 }
 

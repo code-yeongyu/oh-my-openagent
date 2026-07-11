@@ -1,3 +1,5 @@
+import { TEST_PROVIDERS } from "./testing/model-fixtures";
+import { SUPPORTED_PROVIDERS } from "./registry";
 declare const require: (name: string) => any
 const { describe, expect, test, beforeEach, afterEach, mock, spyOn } = require("bun:test")
 import * as connectedProvidersCache from "./connected-providers-cache"
@@ -43,45 +45,45 @@ describe("model-error-classifier", () => {
 
   test("selectFallbackProvider prefers first connected provider in preference order", () => {
     //#given
-    readConnectedProvidersCacheSpy?.mockReturnValue(["anthropic", "nvidia"])
+    readConnectedProvidersCacheSpy?.mockReturnValue([SUPPORTED_PROVIDERS.ANTHROPIC, SUPPORTED_PROVIDERS.NVIDIA])
 
     //#when
-    const provider = selectFallbackProvider(["anthropic", "nvidia"], "nvidia")
+    const provider = selectFallbackProvider([SUPPORTED_PROVIDERS.ANTHROPIC, SUPPORTED_PROVIDERS.NVIDIA], SUPPORTED_PROVIDERS.NVIDIA)
 
     //#then
-    expect(provider).toBe("anthropic")
+    expect(provider).toBe(SUPPORTED_PROVIDERS.ANTHROPIC)
   })
 
   test("selectFallbackProvider falls back to next connected provider when first is disconnected", () => {
     //#given
-    readConnectedProvidersCacheSpy?.mockReturnValue(["nvidia"])
+    readConnectedProvidersCacheSpy?.mockReturnValue([SUPPORTED_PROVIDERS.NVIDIA])
 
     //#when
-    const provider = selectFallbackProvider(["anthropic", "nvidia"])
+    const provider = selectFallbackProvider([SUPPORTED_PROVIDERS.ANTHROPIC, SUPPORTED_PROVIDERS.NVIDIA])
 
     //#then
-    expect(provider).toBe("nvidia")
+    expect(provider).toBe(SUPPORTED_PROVIDERS.NVIDIA)
   })
 
   test("selectFallbackProvider uses provider preference order when cache is missing", () => {
     //#given - no cache file
 
     //#when
-    const provider = selectFallbackProvider(["anthropic", "nvidia"], "nvidia")
+    const provider = selectFallbackProvider([SUPPORTED_PROVIDERS.ANTHROPIC, SUPPORTED_PROVIDERS.NVIDIA], SUPPORTED_PROVIDERS.NVIDIA)
 
     //#then
-    expect(provider).toBe("anthropic")
+    expect(provider).toBe(SUPPORTED_PROVIDERS.ANTHROPIC)
   })
 
   test("selectFallbackProvider uses connected preferred provider when fallback providers are unavailable", () => {
     //#given
-    readConnectedProvidersCacheSpy?.mockReturnValue(["provider-x"])
+    readConnectedProvidersCacheSpy?.mockReturnValue([TEST_PROVIDERS.PROVIDER_X])
 
     //#when
-    const provider = selectFallbackProvider(["provider-y"], "provider-x")
+    const provider = selectFallbackProvider([TEST_PROVIDERS.PROVIDER_Y], TEST_PROVIDERS.PROVIDER_X)
 
     //#then
-    expect(provider).toBe("provider-x")
+    expect(provider).toBe(TEST_PROVIDERS.PROVIDER_X)
   })
 
   test("treats QuotaExceededError (PascalCase name) as non-retryable STOP error", () => {

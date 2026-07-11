@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import type { AutoCompactState } from "./types"
 import {
@@ -122,8 +123,8 @@ describe("createAnthropicContextWindowLimitRecoveryHook regressions", () => {
 
       getLastAssistantMock.mockResolvedValueOnce({
         info: {
-          providerID: "anthropic",
-          modelID: "claude-sonnet-4-6",
+          providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+          modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
         },
         hasContent: true,
       })
@@ -137,8 +138,8 @@ describe("createAnthropicContextWindowLimitRecoveryHook regressions", () => {
       getLastAssistantMock.mockResolvedValueOnce({
         info: {
           summary: true,
-          providerID: "anthropic",
-          modelID: "claude-sonnet-4-6",
+          providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+          modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
         },
         hasContent: true,
       })

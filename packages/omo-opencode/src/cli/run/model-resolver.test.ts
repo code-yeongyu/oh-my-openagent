@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { describe, it, expect } from "bun:test"
@@ -34,7 +35,7 @@ describe("resolveRunModel", () => {
     const result = resolveRunModel(modelString)
 
     // then
-    expect(result).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4" })
+    expect(result).toEqual({ providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-sonnet-4" })
   })
 
   it("given nested slashes 'openai/gpt-5.5/preview', when resolved, then modelID is 'gpt-5.5/preview'", () => {
@@ -45,7 +46,7 @@ describe("resolveRunModel", () => {
     const result = resolveRunModel(modelString)
 
     // then
-    expect(result).toEqual({ providerID: "openai", modelID: "gpt-5.5/preview" })
+    expect(result).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-5.5/preview" })
   })
 
   it("given no slash 'claude-sonnet-4', when resolved, then throws Error", () => {

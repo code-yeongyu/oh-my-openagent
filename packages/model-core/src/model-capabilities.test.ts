@@ -1,5 +1,6 @@
 // allow: SIZE_OK - legacy generated snapshot contract with shared provider-cache stubs; add new behavior in focused sibling tests instead.
 
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "./registry";
 import type { ModelCapabilitiesSnapshot } from "./model-capabilities"
 import { afterEach, describe, expect, test, spyOn } from "bun:test"
 import { getModelCapabilities, getBundledModelCapabilitiesSnapshot } from "./model-capabilities"
@@ -19,8 +20,8 @@ describe("getModelCapabilities", () => {
     generatedAt: "2026-03-25T00:00:00.000Z",
     sourceUrl: "https://models.dev/api.json",
     models: {
-      "claude-opus-4-7": {
-        id: "claude-opus-4-7",
+      [SUPPORTED_MODELS.CLAUDE_OPUS_4_7]: {
+        id: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
         family: "claude-opus",
         reasoning: true,
         temperature: true,
@@ -34,8 +35,8 @@ describe("getModelCapabilities", () => {
         },
         toolCall: true,
       },
-      "gemini-3.1-pro": {
-        id: "gemini-3.1-pro",
+      [SUPPORTED_MODELS.GEMINI_3_1_PRO]: {
+        id: SUPPORTED_MODELS.GEMINI_3_1_PRO,
         family: "gemini",
         reasoning: true,
         temperature: true,
@@ -48,8 +49,8 @@ describe("getModelCapabilities", () => {
           output: 65_000,
         },
       },
-      "gpt-5.4": {
-        id: "gpt-5.4",
+      [SUPPORTED_MODELS.GPT_5_4]: {
+        id: SUPPORTED_MODELS.GPT_5_4,
         family: "gpt",
         reasoning: true,
         temperature: false,
@@ -62,8 +63,8 @@ describe("getModelCapabilities", () => {
           output: 128_000,
         },
       },
-      "minimax-m2.7": {
-        id: "minimax-m2.7",
+      [SUPPORTED_MODELS.MINIMAX_M2_7]: {
+        id: SUPPORTED_MODELS.MINIMAX_M2_7,
         family: "minimax",
         reasoning: true,
         temperature: true,
@@ -74,8 +75,8 @@ describe("getModelCapabilities", () => {
   test("uses runtime metadata before snapshot data", () => {
     findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
-      providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+      modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
       runtimeModel: {
         variants: {
           low: {},
@@ -87,7 +88,7 @@ describe("getModelCapabilities", () => {
     })
 
     expect(result).toMatchObject({
-      canonicalModelID: "claude-opus-4-7",
+      canonicalModelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
       family: "claude-opus",
       variants: ["low", "medium", "high"],
       supportsThinking: true,
@@ -106,8 +107,8 @@ describe("getModelCapabilities", () => {
   test("reads structured runtime capabilities from the SDK v2 shape", () => {
     findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
-      providerID: "openai",
-      modelID: "gpt-5.4",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
       runtimeModel: {
         capabilities: {
           reasoning: true,
@@ -126,7 +127,7 @@ describe("getModelCapabilities", () => {
     })
 
     expect(result).toMatchObject({
-      canonicalModelID: "gpt-5.4",
+      canonicalModelID: SUPPORTED_MODELS.GPT_5_4,
       reasoning: true,
       supportsThinking: true,
       supportsTemperature: false,
@@ -148,7 +149,7 @@ describe("getModelCapabilities", () => {
     findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
       providerID: "custom-proxy",
-      modelID: "gpt-5.4",
+      modelID: SUPPORTED_MODELS.GPT_5_4,
       runtimeModel: {
         supportsThinking: true,
       },
@@ -156,7 +157,7 @@ describe("getModelCapabilities", () => {
     })
 
     expect(result).toMatchObject({
-      canonicalModelID: "gpt-5.4",
+      canonicalModelID: SUPPORTED_MODELS.GPT_5_4,
       supportsThinking: true,
     })
     expect(result.diagnostics).toMatchObject({
@@ -167,8 +168,8 @@ describe("getModelCapabilities", () => {
   test("accepts runtime variant arrays without corrupting them into numeric keys", () => {
     findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
-      providerID: "openai",
-      modelID: "gpt-5.4",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
       runtimeModel: {
         variants: ["low", "medium", "high", "xhigh"],
       },
@@ -181,13 +182,13 @@ describe("getModelCapabilities", () => {
   test("normalizes the legacy Claude Opus thinking alias before snapshot lookup", () => {
     findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
-      providerID: "anthropic",
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
       modelID: "claude-opus-4-7-thinking",
       bundledSnapshot,
     })
 
     expect(result).toMatchObject({
-      canonicalModelID: "claude-opus-4-7",
+      canonicalModelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
       family: "claude-opus",
       supportsThinking: true,
       supportsTemperature: true,
@@ -206,13 +207,13 @@ describe("getModelCapabilities", () => {
   test("maps local gemini aliases to canonical models.dev entries", () => {
     findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
-      providerID: "google",
+      providerID: SUPPORTED_PROVIDERS.GOOGLE,
       modelID: "gemini-3.1-pro-high",
       bundledSnapshot,
     })
 
     expect(result).toMatchObject({
-      canonicalModelID: "gemini-3.1-pro",
+      canonicalModelID: SUPPORTED_MODELS.GEMINI_3_1_PRO,
       family: "gemini",
       supportsThinking: true,
       supportsTemperature: true,
@@ -230,14 +231,14 @@ describe("getModelCapabilities", () => {
 
   test("canonicalizes provider-prefixed gemini aliases without changing the transport-facing request", () => {
     const result = getModelCapabilities({
-      providerID: "google",
+      providerID: SUPPORTED_PROVIDERS.GOOGLE,
       modelID: "google/gemini-3.1-pro-high",
       bundledSnapshot,
     })
 
     expect(result).toMatchObject({
       requestedModelID: "google/gemini-3.1-pro-high",
-      canonicalModelID: "gemini-3.1-pro",
+      canonicalModelID: SUPPORTED_MODELS.GEMINI_3_1_PRO,
       family: "gemini",
       supportsThinking: true,
       supportsTemperature: true,
@@ -255,14 +256,14 @@ describe("getModelCapabilities", () => {
 
   test("canonicalizes provider-prefixed Claude thinking aliases to bare snapshot IDs", () => {
     const result = getModelCapabilities({
-      providerID: "anthropic",
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
       modelID: "anthropic/claude-opus-4-7-thinking",
       bundledSnapshot,
     })
 
     expect(result).toMatchObject({
       requestedModelID: "anthropic/claude-opus-4-7-thinking",
-      canonicalModelID: "claude-opus-4-7",
+      canonicalModelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
       family: "claude-opus",
       supportsThinking: true,
       supportsTemperature: true,
@@ -284,8 +285,8 @@ describe("getModelCapabilities", () => {
       ...bundledSnapshot,
       models: {
         ...bundledSnapshot.models,
-        "gpt-5.4": {
-          ...bundledSnapshot.models["gpt-5.4"],
+        [SUPPORTED_MODELS.GPT_5_4]: {
+          ...bundledSnapshot.models[SUPPORTED_MODELS.GPT_5_4],
           limit: {
             context: 1_050_000,
             output: 64_000,
@@ -295,14 +296,14 @@ describe("getModelCapabilities", () => {
     }
 
     const result = getModelCapabilities({
-      providerID: "openai",
-      modelID: "gpt-5.4",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
       bundledSnapshot,
       runtimeSnapshot,
     })
 
     expect(result).toMatchObject({
-      canonicalModelID: "gpt-5.4",
+      canonicalModelID: SUPPORTED_MODELS.GPT_5_4,
       maxOutputTokens: 64_000,
       supportsTemperature: false,
     })
@@ -315,7 +316,7 @@ describe("getModelCapabilities", () => {
 
   test("falls back to heuristic family rules when no snapshot entry exists", () => {
     const result = getModelCapabilities({
-      providerID: "openai",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
       modelID: "o3-mini",
       bundledSnapshot,
     })
@@ -336,7 +337,7 @@ describe("getModelCapabilities", () => {
 
   test("prefers snapshot reasoning over heuristic supportsThinking for MiniMax M2.7", () => {
     // given
-    const modelID = "minimax-m2.7"
+    const modelID = SUPPORTED_MODELS.MINIMAX_M2_7
 
     // when
     const result = getModelCapabilities({
@@ -352,7 +353,7 @@ describe("getModelCapabilities", () => {
 
   test("marks non-thinking Kimi K2.6 as not supporting thinking", () => {
     // given
-    const modelID = "kimi-k2.6"
+    const modelID = SUPPORTED_MODELS.KIMI_K2_6
 
     // when
     const result = getModelCapabilities({
@@ -431,14 +432,14 @@ describe("getModelCapabilities", () => {
   test("prefers snapshot reasoning over heuristic supportsThinking: false", () => {
     // given: a model matching the kimi heuristic (supportsThinking: false) but with reasoning: true in snapshot
     const capabilities = getModelCapabilities({
-      providerID: "moonshotai",
-      modelID: "kimi-k2.5",
+      providerID: SUPPORTED_PROVIDERS.MOONSHOTAI,
+      modelID: SUPPORTED_MODELS.KIMI_K2_5,
       bundledSnapshot: {
         generatedAt: "test",
         sourceUrl: "test",
         models: {
-          "kimi-k2.5": {
-            id: "kimi-k2.5",
+          [SUPPORTED_MODELS.KIMI_K2_5]: {
+            id: SUPPORTED_MODELS.KIMI_K2_5,
             family: "kimi",
             reasoning: true,
             temperature: true,
@@ -462,8 +463,8 @@ describe("getModelCapabilities", () => {
     ).mockReturnValue(undefined)
 
     const capabilities = getModelCapabilities({
-      providerID: "moonshotai",
-      modelID: "kimi-k2.5",
+      providerID: SUPPORTED_PROVIDERS.MOONSHOTAI,
+      modelID: SUPPORTED_MODELS.KIMI_K2_5,
       runtimeModel: {
         reasoning: true,
       },

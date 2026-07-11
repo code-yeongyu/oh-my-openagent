@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS } from "@oh-my-opencode/model-core";
 import { describe, expect, test } from "bun:test"
 
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../shared"
@@ -28,7 +29,7 @@ describe("createChatHeadersHandler", () => {
     await handler(
       {
         sessionID: "ses_1",
-        provider: { id: "github-copilot" },
+        provider: { id: SUPPORTED_PROVIDERS.GITHUB_COPILOT },
         message: {
           id: "msg_1",
           role: "user",
@@ -64,7 +65,7 @@ describe("createChatHeadersHandler", () => {
     await handler(
       {
         sessionID: "ses_1",
-        provider: { id: "openai" },
+        provider: { id: SUPPORTED_PROVIDERS.OPENAI },
         message: {
           id: "msg_2",
           role: "user",
@@ -95,7 +96,7 @@ describe("createChatHeadersHandler", () => {
     await handler(
       {
         sessionID: "ses_3",
-        provider: { id: "github-copilot" },
+        provider: { id: SUPPORTED_PROVIDERS.GITHUB_COPILOT },
         message: {
           id: "msg_3",
           role: "user",
@@ -131,7 +132,7 @@ describe("createChatHeadersHandler", () => {
     await handler(
       {
         sessionID: "ses_4",
-        provider: { id: "github-copilot" },
+        provider: { id: SUPPORTED_PROVIDERS.GITHUB_COPILOT },
         model: { api: { npm: "@ai-sdk/github-copilot" } },
         message: {
           id: "msg_4",

@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 import { describe, expect, test } from "bun:test"
 import { ParentWakeNotifier } from "./parent-wake-notifier"
 import {
@@ -362,8 +363,8 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
       "task retrying",
       {
         agent: "hephaestus",
-        model: { providerID: "openai", modelID: "gpt-5" },
-        variant: "xhigh",
+        model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-5" },
+        variant: SUPPORTED_VARIANTS.XHIGH,
         tools: { bash: true, edit: false },
       },
       false,
@@ -377,8 +378,8 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
     expect(promptAsyncCalls[0]?.body).toMatchObject({
       noReply: true,
       agent: "hephaestus",
-      model: { providerID: "openai", modelID: "gpt-5" },
-      variant: "xhigh",
+      model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-5" },
+      variant: SUPPORTED_VARIANTS.XHIGH,
       tools: { bash: true, edit: false },
     })
     expect(promptAsyncCalls[0]?.body.parts).toHaveLength(1)

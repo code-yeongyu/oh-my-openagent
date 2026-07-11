@@ -1,5 +1,5 @@
 import process from "node:process"
-
+import { SUPPORTED_PROVIDERS } from "./registry"
 const DEFAULT_ANTHROPIC_ACTUAL_LIMIT = 200_000
 const ANTHROPIC_GA_1M_LIMIT = 1_000_000
 
@@ -9,11 +9,13 @@ export type ContextLimitModelCacheState = {
 }
 
 function isAnthropicProvider(providerID: string, modelID: string): boolean {
+  // providerID values from registry are already lowercase; toLowerCase() is kept as a
+  // defensive measure for callers that pass untrusted / user-supplied provider strings.
   const normalized = providerID.toLowerCase()
-  return normalized === "anthropic"
-    || normalized === "google-vertex-anthropic"
-    || normalized === "aws-bedrock-anthropic"
-    || (normalized === "google" && modelID.toLowerCase().startsWith("claude-"))
+  return normalized === SUPPORTED_PROVIDERS.ANTHROPIC
+    || normalized === SUPPORTED_PROVIDERS.GOOGLE_VERTEX_ANTHROPIC
+    || normalized === SUPPORTED_PROVIDERS.AWS_BEDROCK_ANTHROPIC
+    || (normalized === SUPPORTED_PROVIDERS.GOOGLE && modelID.toLowerCase().startsWith("claude-"))
 }
 
 function getAnthropicActualLimit(modelCacheState?: ContextLimitModelCacheState): number {

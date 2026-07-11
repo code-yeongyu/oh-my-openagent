@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import type { OhMyOpenCodeConfig } from "../config"
 import type { DefaultModeConfig } from "../config/schema/default-mode"
@@ -131,7 +132,7 @@ async function renderSystemPrompt(defaultMode: DefaultModeConfig): Promise<strin
   await handler(
     {
       sessionID: "system-transform-session",
-      model: { id: "gpt-5.5", providerID: "openai" },
+      model: { id: SUPPORTED_MODELS.GPT_5_5, providerID: SUPPORTED_PROVIDERS.OPENAI },
     },
     output,
   )
@@ -183,7 +184,7 @@ async function collectRalphLoopCalls(
     {
       sessionID,
       agent: "sisyphus",
-      model: { providerID: "openai", modelID: "gpt-5.5" },
+      model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5 },
     },
     output,
   )

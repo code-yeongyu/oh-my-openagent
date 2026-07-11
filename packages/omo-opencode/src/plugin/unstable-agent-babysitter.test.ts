@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS } from "@oh-my-opencode/model-core";
 import { afterEach, describe, expect, test } from "bun:test"
 import { createUnstableAgentBabysitter } from "./unstable-agent-babysitter"
 import type { BackgroundTask } from "../features/background-agent"
@@ -21,7 +22,7 @@ function createTask(): BackgroundTask {
       lastMessage: "still working",
       lastMessageAt: new Date(Date.now() - 121000),
     },
-    model: { providerID: "google", modelID: "gemini-1.5" },
+    model: { providerID: SUPPORTED_PROVIDERS.GOOGLE, modelID: "gemini-1.5" },
   }
 }
 
@@ -48,7 +49,7 @@ describe("createUnstableAgentBabysitter", () => {
                         role: "assistant",
                         finish: "end_turn",
                         agent: "sisyphus",
-                        model: { providerID: "openai", modelID: "gpt-4" },
+                        model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-4" },
                       },
                     },
                   ]

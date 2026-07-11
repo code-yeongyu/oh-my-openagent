@@ -241,7 +241,7 @@ Available categories: ${categoryNames.join(", ")}`)
       variant: userCategories?.[args.category!]?.variant ?? effectiveEntry.variant ?? categoryModel.variant,
       reasoningEffort: effectiveEntry.reasoningEffort ?? categoryModel.reasoningEffort,
       temperature: effectiveEntry.temperature ?? categoryModel.temperature,
-      top_p: effectiveEntry.top_p ?? categoryModel.top_p,
+      topP: effectiveEntry.topP ?? categoryModel.topP,
       maxTokens: effectiveEntry.maxTokens ?? categoryModel.maxTokens,
       thinking: effectiveEntry.thinking ?? categoryModel.thinking,
     }

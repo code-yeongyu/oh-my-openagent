@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 import { afterEach, describe, expect, spyOn, test } from "bun:test"
 
@@ -128,7 +129,7 @@ describe("createEventHandler - model fallback", () => {
             },
             parentID: "msg_user_1",
             modelID: "claude-opus-4-7-thinking",
-            providerID: "anthropic",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
             mode: "Sisyphus - Ultraworker",
             agent: "Sisyphus - Ultraworker",
             path: { cwd: "/tmp", root: "/tmp" },
@@ -173,7 +174,7 @@ describe("createEventHandler - model fallback", () => {
             },
             parentID: "msg_user_eof",
             modelID: "claude-opus-4-7-thinking",
-            providerID: "anthropic",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
             agent: "Sisyphus - Ultraworker",
             path: { cwd: "/tmp", root: "/tmp" },
           },
@@ -276,7 +277,7 @@ describe("createEventHandler - model fallback", () => {
             role: "assistant",
             error: assistantError,
             modelID: "claude-opus-4-7-thinking",
-            providerID: "anthropic",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
             agent: "Sisyphus - Ultraworker",
           },
         },
@@ -288,7 +289,7 @@ describe("createEventHandler - model fallback", () => {
         type: "session.error",
         properties: {
           sessionID,
-          providerID: "anthropic",
+          providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
           modelID: "claude-opus-4-7-thinking",
           error: assistantError,
         },
@@ -340,7 +341,7 @@ describe("createEventHandler - model fallback", () => {
             role: "assistant",
             error: assistantError,
             modelID: "claude-opus-4-7-thinking",
-            providerID: "anthropic",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
             agent: "Sisyphus - Ultraworker",
           },
         },
@@ -403,7 +404,7 @@ describe("createEventHandler - model fallback", () => {
             role: "assistant",
             error: assistantError,
             modelID: "claude-opus-4-7-thinking",
-            providerID: "anthropic",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
             agent: "Sisyphus - Ultraworker",
           },
         },
@@ -452,7 +453,7 @@ describe("createEventHandler - model fallback", () => {
             role: "assistant",
             error: assistantError,
             modelID: "claude-opus-4-7-thinking",
-            providerID: "anthropic",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
             agent: "Sisyphus - Ultraworker",
           },
         },
@@ -522,7 +523,7 @@ describe("createEventHandler - model fallback", () => {
             time: { created: 1 },
             content: [],
             modelID: "claude-opus-4-7-thinking",
-            providerID: "anthropic",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
             agent: "Sisyphus - Ultraworker",
             path: { cwd: "/tmp", root: "/tmp" },
           },
@@ -552,7 +553,7 @@ describe("createEventHandler - model fallback", () => {
       {
         sessionID,
         agent: "sisyphus",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-7-thinking" },
       },
       output,
     )
@@ -561,8 +562,8 @@ describe("createEventHandler - model fallback", () => {
     expect(abortCalls).toEqual([sessionID])
     expect(promptCalls).toEqual([sessionID])
     expect(output.message["model"]).toMatchObject({
-      providerID: "opencode-go",
-      modelID: "kimi-k2.6",
+      providerID: SUPPORTED_PROVIDERS.OPENCODE_GO,
+      modelID: SUPPORTED_MODELS.KIMI_K2_6,
     })
     expect(output.message["variant"]).toBeUndefined()
   })
@@ -584,7 +585,7 @@ describe("createEventHandler - model fallback", () => {
             sessionID,
             role: "user",
             modelID: "claude-opus-4-7-thinking",
-            providerID: "anthropic",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
             agent: "Sisyphus - Ultraworker",
           },
         },
@@ -681,7 +682,7 @@ describe("createEventHandler - model fallback", () => {
             sessionID,
             role: "user",
             modelID: "claude-opus-4-7-thinking",
-            providerID: "anthropic",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
             agent: "Sisyphus - Ultraworker",
           },
         },
@@ -694,7 +695,7 @@ describe("createEventHandler - model fallback", () => {
       {
         sessionID,
         agent: "sisyphus",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-7-thinking" },
       },
       { message: {}, parts: [] },
     )
@@ -759,7 +760,7 @@ describe("createEventHandler - model fallback", () => {
               },
             },
             modelID: "claude-opus-4-7-thinking",
-            providerID: "anthropic",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
             agent: "Sisyphus - Ultraworker",
           },
         },
@@ -771,7 +772,7 @@ describe("createEventHandler - model fallback", () => {
       {
         sessionID,
         agent: "sisyphus",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-7-thinking" },
       },
       output,
     )
@@ -800,7 +801,7 @@ describe("createEventHandler - model fallback", () => {
       {
         sessionID,
         agent: "sisyphus",
-        model: { providerID: "opencode-go", modelID: "kimi-k2.6" },
+        model: { providerID: SUPPORTED_PROVIDERS.OPENCODE_GO, modelID: SUPPORTED_MODELS.KIMI_K2_6 },
       },
       staleOutput,
     )
@@ -835,7 +836,7 @@ describe("createEventHandler - model fallback", () => {
             id: "msg_user_status_runtime_enabled",
             sessionID,
             role: "user",
-            modelID: "claude-opus-4-7",
+            modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
             providerID: "quotio",
             agent: "Sisyphus - Ultraworker",
           },
@@ -915,7 +916,7 @@ describe("createEventHandler - model fallback", () => {
             role: "user",
             time: { created: 1 },
             content: [],
-            modelID: "claude-opus-4-7",
+            modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
             providerID: "quotio",
             agent: "Sisyphus - Ultraworker",
             path: { cwd: "/tmp", root: "/tmp" },
@@ -946,7 +947,7 @@ describe("createEventHandler - model fallback", () => {
       {
         sessionID,
         agent: "sisyphus",
-        model: { providerID: "quotio", modelID: "claude-opus-4-7" },
+        model: { providerID: "quotio", modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
       },
       output,
     )
@@ -956,7 +957,7 @@ describe("createEventHandler - model fallback", () => {
     expect(promptCalls).toEqual([sessionID])
     expect(output.message["model"]).toEqual({
       providerID: "quotio",
-      modelID: "gpt-5.5",
+      modelID: SUPPORTED_MODELS.GPT_5_5,
     })
     expect(output.message["variant"]).toBeUndefined()
   })
@@ -1060,7 +1061,7 @@ describe("createEventHandler - model fallback", () => {
         {
           sessionID,
           agent: "sisyphus",
-          model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+          model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-7-thinking" },
         },
         output,
       )
@@ -1068,22 +1069,22 @@ describe("createEventHandler - model fallback", () => {
     }
 
     //#when - first retry cycle
-    const first = await triggerRetryCycle("anthropic", "claude-opus-4-7-thinking")
+    const first = await triggerRetryCycle(SUPPORTED_PROVIDERS.ANTHROPIC, "claude-opus-4-7-thinking")
 
     //#then - first fallback entry applied (no-op skip: claude-opus-4-7 matches current model after normalization)
     expect(first.message["model"]).toMatchObject({
-      providerID: "opencode-go",
-      modelID: "kimi-k2.6",
+      providerID: SUPPORTED_PROVIDERS.OPENCODE_GO,
+      modelID: SUPPORTED_MODELS.KIMI_K2_6,
     })
     expect(first.message["variant"]).toBeUndefined()
 
     //#when - second retry cycle
-    const second = await triggerRetryCycle("opencode-go", "kimi-k2.6")
+    const second = await triggerRetryCycle(SUPPORTED_PROVIDERS.OPENCODE_GO, SUPPORTED_MODELS.KIMI_K2_6)
 
     //#then - second fallback entry applied (chain advanced past opencode-go/kimi-k2.6)
     expect(second.message["model"]).toMatchObject({
-      providerID: "kimi-for-coding",
-      modelID: "k2p5",
+      providerID: SUPPORTED_PROVIDERS.KIMI_FOR_CODING,
+      modelID: SUPPORTED_MODELS.KIMI_K2P5,
     })
     expect(second.message["variant"]).toBeUndefined()
     expect(abortCalls).toEqual([sessionID, sessionID])
@@ -1117,7 +1118,7 @@ describe("createEventHandler - model fallback", () => {
             },
             parentID: "msg_user_disabled_1",
             modelID: "claude-opus-4-7-thinking",
-            providerID: "anthropic",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
             agent: "Sisyphus - Ultraworker",
             path: { cwd: "/tmp", root: "/tmp" },
             cost: 0,

@@ -1,3 +1,4 @@
+import { SUPPORTED_MODELS } from "./registry";
 import { describe, expect, test } from "bun:test"
 
 import {
@@ -10,8 +11,8 @@ describe("model-capabilities-snapshot", () => {
     const raw = {
       openai: {
         models: {
-          "gpt-5.4": {
-            id: "gpt-5.4",
+          [SUPPORTED_MODELS.GPT_5_4]: {
+            id: SUPPORTED_MODELS.GPT_5_4,
             family: "gpt",
             reasoning: true,
             temperature: false,
@@ -32,8 +33,8 @@ describe("model-capabilities-snapshot", () => {
     const snapshot = buildModelCapabilitiesSnapshotFromModelsDev(raw)
 
     expect(snapshot.sourceUrl).toBe("https://models.dev/api.json")
-    expect(snapshot.models["gpt-5.4"]).toEqual({
-      id: "gpt-5.4",
+    expect(snapshot.models[SUPPORTED_MODELS.GPT_5_4]).toEqual({
+      id: SUPPORTED_MODELS.GPT_5_4,
       family: "gpt",
       reasoning: true,
       temperature: false,
@@ -54,7 +55,7 @@ describe("model-capabilities-snapshot", () => {
       invalidProvider: null,
       anthropic: {
         models: {
-          "claude-sonnet-4-6": {
+          [SUPPORTED_MODELS.CLAUDE_SONNET_4_6]: {
             reasoning: true,
           },
           "bad-model": "invalid",
@@ -62,7 +63,7 @@ describe("model-capabilities-snapshot", () => {
       },
       openai: {
         models: {
-          "gpt-5.4": {
+          [SUPPORTED_MODELS.GPT_5_4]: {
             id: "GPT-5.4",
             modalities: {
               input: ["text", 1],
@@ -74,11 +75,11 @@ describe("model-capabilities-snapshot", () => {
 
     const snapshot = buildModelCapabilitiesSnapshotFromModelsDev(raw)
 
-    expect(snapshot.models["claude-sonnet-4-6"]).toEqual({
-      id: "claude-sonnet-4-6",
+    expect(snapshot.models[SUPPORTED_MODELS.CLAUDE_SONNET_4_6]).toEqual({
+      id: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
       reasoning: true,
     })
-    expect(snapshot.models["gpt-5.4"]).toEqual({
+    expect(snapshot.models[SUPPORTED_MODELS.GPT_5_4]).toEqual({
       id: "GPT-5.4",
       modalities: {
         input: ["text"],
@@ -94,8 +95,8 @@ describe("model-capabilities-snapshot", () => {
         JSON.stringify({
           openai: {
             models: {
-              "gpt-5.4": {
-                id: "gpt-5.4",
+              [SUPPORTED_MODELS.GPT_5_4]: {
+                id: SUPPORTED_MODELS.GPT_5_4,
                 limit: {
                   output: 128_000,
                 },
@@ -112,6 +113,6 @@ describe("model-capabilities-snapshot", () => {
     const snapshot = await fetchModelCapabilitiesSnapshot({ sourceUrl, fetchImpl })
 
     expect(snapshot.sourceUrl).toBe(sourceUrl)
-    expect(snapshot.models["gpt-5.4"]?.limit?.output).toBe(128_000)
+    expect(snapshot.models[SUPPORTED_MODELS.GPT_5_4]?.limit?.output).toBe(128_000)
   })
 })

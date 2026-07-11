@@ -1,14 +1,16 @@
 import { z } from "zod"
 import { FallbackModelsSchema } from "./fallback-models"
 
-export const CategoryConfigSchema = z.object({
+export const CategoryConfigBaseSchema = z.object({
   /** Human-readable description of the category's purpose. Shown in task prompt. */
   description: z.string().optional(),
   model: z.string().optional(),
   fallback_models: FallbackModelsSchema.optional(),
   variant: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
-  top_p: z.number().min(0).max(1).optional(),
+  topP: z.number().min(0).max(1).optional(),
+  /** @deprecated Use `topP` instead. */
+  topp: z.number().min(0).max(1).optional(),
   maxTokens: z.number().optional(),
   thinking: z
     .object({
@@ -16,7 +18,7 @@ export const CategoryConfigSchema = z.object({
       budgetTokens: z.number().optional(),
     })
     .optional(),
-  reasoningEffort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh", "max"]).optional(),
+  reasoningEffort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]).optional(),
   textVerbosity: z.enum(["low", "medium", "high"]).optional(),
   tools: z.record(z.string(), z.boolean()).optional(),
   prompt_append: z.string().optional(),
@@ -25,6 +27,15 @@ export const CategoryConfigSchema = z.object({
   is_unstable_agent: z.boolean().optional(),
   /** Disable this category. Disabled categories are excluded from task delegation. */
   disable: z.boolean().optional(),
+})
+
+export const CategoryConfigSchema = CategoryConfigBaseSchema.transform((val) => {
+  if (val.topp !== undefined && val.topP === undefined) {
+    console.warn("[omo-opencode] CategoryConfig: 'topp' is deprecated, use 'topP' instead.")
+  }
+  const { topp, ...rest } = val
+  const resolved = val.topP ?? topp
+  return resolved !== undefined ? { ...rest, topP: resolved } : rest
 })
 
 export const BuiltinCategoryNameSchema = z.enum([
@@ -42,4 +53,3 @@ export const CategoriesConfigSchema = z.record(z.string(), CategoryConfigSchema)
 
 export type CategoryConfig = z.infer<typeof CategoryConfigSchema>
 export type CategoriesConfig = z.infer<typeof CategoriesConfigSchema>
-export type BuiltinCategoryName = z.infer<typeof BuiltinCategoryNameSchema>

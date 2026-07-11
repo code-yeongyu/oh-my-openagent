@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS } from "@oh-my-opencode/model-core";
 import { afterAll, describe, expect, it, mock } from "bun:test"
 
 mock.module("../../shared/system-directive", () => ({
@@ -71,7 +72,7 @@ describe("createCompactionContextInjector", () => {
               info: {
                 role: "user",
                 agent: "atlas",
-                model: { providerID: "openai", modelID: "gpt-5" },
+                model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-5" },
                 tools: { bash: "allow" },
               },
             },
@@ -81,7 +82,7 @@ describe("createCompactionContextInjector", () => {
               info: {
                 role: "user",
                 agent: "compaction",
-                model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
+                model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-1" },
               },
             },
           ],
@@ -90,7 +91,7 @@ describe("createCompactionContextInjector", () => {
               info: {
                 role: "user",
                 agent: "compaction",
-                model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
+                model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-1" },
               },
             },
           ],
@@ -99,7 +100,7 @@ describe("createCompactionContextInjector", () => {
               info: {
                 role: "user",
                 agent: "atlas",
-                model: { providerID: "openai", modelID: "gpt-5" },
+                model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-5" },
                 tools: { bash: true },
               },
             },
@@ -120,7 +121,7 @@ describe("createCompactionContextInjector", () => {
       expect(recoveryCall?.path).toEqual({ id: "ses_checkpoint" })
       expect(recoveryCall?.body.noReply).toBe(true)
       expect(recoveryCall?.body.agent).toBe("atlas")
-      expect(recoveryCall?.body.model).toEqual({ providerID: "openai", modelID: "gpt-5" })
+      expect(recoveryCall?.body.model).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-5" })
       expect(recoveryCall?.body.tools).toEqual({ bash: true })
       expect(recoveryCall?.body.parts[0]?.type).toBe("text")
       expect(recoveryCall?.body.parts[0]?.text).toContain("restore checkpointed session agent configuration")
@@ -139,7 +140,7 @@ describe("createCompactionContextInjector", () => {
               info: {
                 role: "user",
                 agent: "atlas",
-                model: { providerID: "openai", modelID: "gpt-5" },
+                model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-5" },
                 tools: { bash: "allow" },
               },
             },
@@ -149,7 +150,7 @@ describe("createCompactionContextInjector", () => {
               info: {
                 role: "user",
                 agent: "compaction",
-                model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
+                model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-1" },
               },
             },
           ],
@@ -158,7 +159,7 @@ describe("createCompactionContextInjector", () => {
               info: {
                 role: "user",
                 agent: "compaction",
-                model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
+                model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-1" },
               },
             },
           ],
@@ -167,7 +168,7 @@ describe("createCompactionContextInjector", () => {
               info: {
                 role: "user",
                 agent: "atlas",
-                model: { providerID: "openai", modelID: "gpt-5" },
+                model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-5" },
                 tools: { bash: true },
               },
             },
@@ -187,7 +188,7 @@ describe("createCompactionContextInjector", () => {
       expect(recoveryCall?.path).toEqual({ id: "ses_autocontinue_checkpoint" })
       expect(recoveryCall?.body.noReply).toBe(true)
       expect(recoveryCall?.body.agent).toBe("atlas")
-      expect(recoveryCall?.body.model).toEqual({ providerID: "openai", modelID: "gpt-5" })
+      expect(recoveryCall?.body.model).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-5" })
       expect(recoveryCall?.body.tools).toEqual({ bash: true })
       expect(recoveryCall?.body.parts[0]?.type).toBe("text")
       expect(recoveryCall?.body.parts[0]?.text).toContain("restore checkpointed session agent configuration")
@@ -202,7 +203,7 @@ describe("createCompactionContextInjector", () => {
       const sessionID = "ses_empty_checkpoint_capture"
       setCompactionAgentConfigCheckpoint(sessionID, {
         agent: "atlas",
-        model: { providerID: "openai", modelID: "gpt-5" },
+        model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-5" },
         tools: { bash: true },
       })
       const ctx = createMockContext([[], [], []], promptAsyncMock)

@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS , SUPPORTED_REASONING_EFFORTS } from "@oh-my-opencode/model-core";
 import { afterEach, describe, expect, mock, test } from "bun:test"
 import {
   clearSessionPromptParams,
@@ -402,12 +403,12 @@ describe("background-agent spawner fallback model promotion", () => {
       parentSessionId: "parent-1",
       parentMessageId: "message-1",
       model: {
-        providerID: "openai",
-        modelID: "gpt-5.4",
+        providerID: SUPPORTED_PROVIDERS.OPENAI,
+        modelID: SUPPORTED_MODELS.GPT_5_4,
         variant: "low",
-        reasoningEffort: "high",
+        reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
         temperature: 0.4,
-        top_p: 0.7,
+        topP: 0.7,
         maxTokens: 4096,
         thinking: { type: "disabled" },
       },
@@ -438,8 +439,8 @@ describe("background-agent spawner fallback model promotion", () => {
 
     //#then
     expect(promptArgs.body.model).toEqual({
-      providerID: "openai",
-      modelID: "gpt-5.4",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
     })
     expect(promptArgs.body.variant).toBe("low")
     expect(promptArgs.body.options).toBeUndefined()
@@ -448,7 +449,7 @@ describe("background-agent spawner fallback model promotion", () => {
       topP: 0.7,
       maxOutputTokens: 4096,
       options: {
-        reasoningEffort: "high",
+        reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
         thinking: { type: "disabled" },
       },
     })
@@ -475,7 +476,7 @@ describe("background-agent spawner fallback model promotion", () => {
       agent: "sisyphus-junior",
       parentSessionId: "ses_parent",
       parentMessageId: "msg_parent",
-      model: { providerID: "openai", modelID: "gpt-5.4", variant: "medium" },
+      model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4, variant: SUPPORTED_VARIANTS.MEDIUM },
     })
 
     const item = {
@@ -507,8 +508,8 @@ describe("background-agent spawner fallback model promotion", () => {
     expect(promptCalls).toHaveLength(1)
     expect(promptCalls[0]?.body?.agent).toBe("sisyphus-junior")
     expect(promptCalls[0]?.body?.model).toEqual({
-      providerID: "openai",
-      modelID: "gpt-5.4",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
     })
     expect(promptCalls[0]?.body?.variant).toBe("medium")
   })
@@ -889,7 +890,7 @@ describe("background-agent spawner fallback helper characterization", () => {
   test("rebuilds fallback tools while preserving prompt payload fields", () => {
     const originalBody = {
       agent: "Sisyphus-Junior",
-      model: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
+      model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 },
       parts: [{ type: "text", text: "Do work" }],
       tools: { task: true, read: true },
     }

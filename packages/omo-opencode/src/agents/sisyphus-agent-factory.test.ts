@@ -1,3 +1,4 @@
+import { SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { describe, expect, test } from "bun:test";
 import { createSisyphusAgent } from "./sisyphus";
 
@@ -52,7 +53,7 @@ describe("createSisyphusAgent", () => {
         },
         {
           model: "anthropic/claude-opus-4-7",
-          promptAnchors: ["<use_parallel_tool_calls>", "<Task_Management>", "claude-opus-4-7"],
+          promptAnchors: ["<use_parallel_tool_calls>", "<Task_Management>", SUPPORTED_MODELS.CLAUDE_OPUS_4_7],
         },
         {
           model: "anthropic/claude-opus-4-8",

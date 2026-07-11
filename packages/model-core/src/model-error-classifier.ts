@@ -1,6 +1,7 @@
 import type { FallbackEntry } from "./model-requirements"
 import type { ProviderCache } from "./provider-cache"
 import * as connectedProvidersCache from "./connected-providers-cache"
+import { SUPPORTED_PROVIDERS } from "./registry"
 
 /**
  * Error names that indicate a retryable model error.
@@ -257,5 +258,5 @@ export function selectFallbackProviderWithCache(
     }
   }
 
-  return providers[0] || preferredProviderID || "opencode"
+  return providers[0] || preferredProviderID || SUPPORTED_PROVIDERS.OPENCODE
 }

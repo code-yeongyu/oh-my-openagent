@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
@@ -6,7 +7,7 @@ import { createFallbackState, findNextAvailableFallback, stringifyRuntimeModelWi
 describe("runtime-fallback fallback state", () => {
   test("#given object-shaped current model #when finding the next fallback #then equivalent models are skipped without crashing", () => {
     // given
-    const state = createFallbackState({ providerID: "anthropic", modelID: "claude-sonnet-4-6" })
+    const state = createFallbackState({ providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 })
     const fallbackModels = ["github-copilot/claude-sonnet-4.6", "openai/gpt-5.4"]
 
     // when
@@ -18,7 +19,7 @@ describe("runtime-fallback fallback state", () => {
 
   test("#given model object without variant and top-level variant #when stringifying runtime model #then top-level variant is preserved", () => {
     // given
-    const model = { providerID: "github-copilot", modelID: "claude-haiku-4.5" }
+    const model = { providerID: SUPPORTED_PROVIDERS.GITHUB_COPILOT, modelID: "claude-haiku-4.5" }
 
     // when
     const runtimeModel = stringifyRuntimeModelWithVariant(model, "high")
@@ -29,7 +30,7 @@ describe("runtime-fallback fallback state", () => {
 
   test("#given model object with its own variant #when stringifying with a top-level variant #then model variant wins", () => {
     // given
-    const model = { providerID: "github-copilot", modelID: "claude-haiku-4.5", variant: "low" }
+    const model = { providerID: SUPPORTED_PROVIDERS.GITHUB_COPILOT, modelID: "claude-haiku-4.5", variant: "low" }
 
     // when
     const runtimeModel = stringifyRuntimeModelWithVariant(model, "high")

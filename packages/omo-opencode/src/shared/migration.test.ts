@@ -1,3 +1,4 @@
+import { SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { describe, test, expect, afterEach, beforeEach } from "bun:test"
@@ -635,10 +636,10 @@ describe("migrateModelVersions", () => {
   test("#given explicit gpt-5.5 pins on current entries (#3777) #when migrating #then preserves every user choice", () => {
     // given: current agent and category entries explicitly select gpt-5.5
     const configs = {
-      hephaestus: { model: "openai/gpt-5.5", variant: "medium" },
-      momus: { model: "openai/gpt-5.5", variant: "xhigh" },
-      deep: { model: "openai/gpt-5.5", variant: "medium" },
-      ultrabrain: { model: "openai/gpt-5.5", variant: "xhigh" },
+      hephaestus: { model: "openai/gpt-5.5", variant: SUPPORTED_VARIANTS.MEDIUM },
+      momus: { model: "openai/gpt-5.5", variant: SUPPORTED_VARIANTS.XHIGH },
+      deep: { model: "openai/gpt-5.5", variant: SUPPORTED_VARIANTS.MEDIUM },
+      ultrabrain: { model: "openai/gpt-5.5", variant: SUPPORTED_VARIANTS.XHIGH },
     }
 
     // when: Migrate model versions
@@ -912,7 +913,7 @@ describe("migrateAgentConfigToCategory", () => {
     const config = {
       model: "google/gemini-3.1-pro",
       temperature: 0.5,
-      top_p: 0.9,
+      topP: 0.9,
     }
 
     // when: Migrate agent config to category
@@ -923,7 +924,7 @@ describe("migrateAgentConfigToCategory", () => {
     expect(migrated.category).toBe("visual-engineering")
     expect(migrated.model).toBeUndefined()
     expect(migrated.temperature).toBe(0.5)
-    expect(migrated.top_p).toBe(0.9)
+    expect(migrated.topP).toBe(0.9)
   })
 
   test("does not migrate when model is not in map", () => {
@@ -985,7 +986,7 @@ describe("migrateAgentConfigToCategory", () => {
     const config = {
       model: "openai/gpt-5.4",
       temperature: 0.1,
-      top_p: 0.95,
+      topP: 0.95,
       maxTokens: 4096,
       prompt_append: "custom instruction",
     }
@@ -996,7 +997,7 @@ describe("migrateAgentConfigToCategory", () => {
     // then: All non-model fields should be preserved
     expect(migrated.category).toBe("ultrabrain")
     expect(migrated.temperature).toBe(0.1)
-    expect(migrated.top_p).toBe(0.95)
+    expect(migrated.topP).toBe(0.95)
     expect(migrated.maxTokens).toBe(4096)
     expect(migrated.prompt_append).toBe("custom instruction")
   })
@@ -1091,7 +1092,7 @@ describe("shouldDeleteAgentConfig", () => {
     const config = {
       category: "visual-engineering",
       temperature: 0.5, // Different from default
-      top_p: 0.8, // Different from default
+      topP: 0.8, // Different from default
       prompt_append: "custom prompt", // Custom field
     }
 

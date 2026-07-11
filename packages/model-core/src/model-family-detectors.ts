@@ -1,3 +1,5 @@
+import { SUPPORTED_PROVIDERS } from "./registry"
+
 function extractModelName(model: string): string {
   return model.includes("/") ? (model.split("/").pop() ?? model) : model
 }
@@ -81,7 +83,7 @@ export function isGlmModel(model: string): boolean {
   return modelName.includes("glm")
 }
 
-const GEMINI_PROVIDERS = ["google/", "google-vertex/"] as const
+const GEMINI_PROVIDERS = [`${SUPPORTED_PROVIDERS.GOOGLE}/`, `${SUPPORTED_PROVIDERS.GOOGLE_VERTEX}/`] as const
 
 export function isGeminiModel(model: string): boolean {
   if (GEMINI_PROVIDERS.some((prefix) => model.startsWith(prefix))) return true

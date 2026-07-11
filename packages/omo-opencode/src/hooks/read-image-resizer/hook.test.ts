@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
@@ -13,8 +14,8 @@ const mockParseImageDimensions = mock((): ImageDimensions | null => null)
 const mockCalculateTargetDimensions = mock((): ImageDimensions | null => null)
 const mockResizeImage = mock(async (): Promise<ResizeResult | null> => null)
 const mockGetSessionModel = mock((_sessionID: string) => ({
-  providerID: "anthropic",
-  modelID: "claude-sonnet-4-6",
+  providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+  modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
 } as { providerID: string; modelID: string } | undefined))
 
 let parseImageDimensionsSpy: { mockRestore: () => void } | undefined
@@ -58,7 +59,7 @@ describe("createReadImageResizerHook", () => {
     mockCalculateTargetDimensions.mockReset()
     mockResizeImage.mockReset()
     mockGetSessionModel.mockReset()
-    mockGetSessionModel.mockReturnValue({ providerID: "anthropic", modelID: "claude-sonnet-4-6" })
+    mockGetSessionModel.mockReturnValue({ providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 })
   })
 
   afterEach(() => {
@@ -92,7 +93,7 @@ describe("createReadImageResizerHook", () => {
 
   it("skips when provider is not anthropic", async () => {
     //#given
-    mockGetSessionModel.mockReturnValue({ providerID: "openai", modelID: "gpt-5.5" })
+    mockGetSessionModel.mockReturnValue({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5 })
     mockParseImageDimensions.mockReturnValue({ width: 3000, height: 2000 })
     mockCalculateTargetDimensions.mockReturnValue({ width: 1568, height: 1045 })
     const hook = createReadImageResizerHook(createMockContext())

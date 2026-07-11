@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -20,7 +21,7 @@ function createMockInput(sessionID: string, messageID?: string): AutoSlashComman
     sessionID,
     messageID: messageID ?? `msg-${Date.now()}-${Math.random()}`,
     agent: "test-agent",
-    model: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
+    model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 },
   }
 }
 
@@ -28,7 +29,7 @@ function createMockOutput(text: string): AutoSlashCommandHookOutput {
   return {
     message: {
       agent: "test-agent",
-      model: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
+      model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 },
       path: { cwd: "/test", root: "/test" },
       tools: {},
     },

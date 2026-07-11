@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS , SUPPORTED_REASONING_EFFORTS } from "@oh-my-opencode/model-core";
 declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
 import { resolveCategoryExecution } from "./category-resolver"
@@ -114,19 +115,19 @@ describe("resolveCategoryExecution", () => {
 		//#then
 		expect(result.error).toBeUndefined()
 		expect(result.fallbackChain).toEqual([
-			{ providers: ["quotio"], model: "kimi-k2.5", variant: undefined },
-			{ providers: ["openai"], model: "gpt-5.5", variant: "high" },
+			{ providers: ["quotio"], model: SUPPORTED_MODELS.KIMI_K2_5, variant: undefined },
+			{ providers: [SUPPORTED_PROVIDERS.OPENAI], model: SUPPORTED_MODELS.GPT_5_5, variant: SUPPORTED_VARIANTS.HIGH },
 		])
 	})
 
 	test("promotes object-style fallback model settings to categoryModel when fallback becomes initial model", async () => {
 		//#given
 		const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
-			models: { openai: ["gpt-5.4"] },
-			connected: ["openai"],
+			models: { openai: [SUPPORTED_MODELS.GPT_5_4] },
+			connected: [SUPPORTED_PROVIDERS.OPENAI],
 			updatedAt: "2026-03-03T00:00:00.000Z",
 		})
-		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue([SUPPORTED_PROVIDERS.OPENAI])
 		const args = {
 			category: "quick",
 			prompt: "test prompt",
@@ -143,9 +144,9 @@ describe("resolveCategoryExecution", () => {
 					{
 						model: "openai/gpt-5.4 high",
 						variant: "low",
-						reasoningEffort: "high",
+						reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
 						temperature: 0.4,
-						top_p: 0.7,
+						topP: 0.7,
 						maxTokens: 4096,
 						thinking: { type: "disabled" },
 					},
@@ -160,12 +161,12 @@ describe("resolveCategoryExecution", () => {
 		expect(result.error).toBeUndefined()
 		expect(result.actualModel).toBe("openai/gpt-5.4")
 		expect(result.categoryModel).toEqual({
-			providerID: "openai",
-			modelID: "gpt-5.4",
+			providerID: SUPPORTED_PROVIDERS.OPENAI,
+			modelID: SUPPORTED_MODELS.GPT_5_4,
 			variant: "low",
-			reasoningEffort: "high",
+			reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
 			temperature: 0.4,
-			top_p: 0.7,
+			topP: 0.7,
 			maxTokens: 4096,
 			thinking: { type: "disabled" },
 		})
@@ -203,9 +204,9 @@ describe("resolveCategoryExecution", () => {
 		}
 		expect(result.actualModel).toBe("openai/gpt-5.4")
 		expect(result.categoryModel).toEqual({
-			providerID: "openai",
-			modelID: "gpt-5.4",
-			variant: "high",
+			providerID: SUPPORTED_PROVIDERS.OPENAI,
+			modelID: SUPPORTED_MODELS.GPT_5_4,
+			variant: SUPPORTED_VARIANTS.HIGH,
 		})
 	})
 
@@ -213,10 +214,10 @@ describe("resolveCategoryExecution", () => {
 		//#given
 		const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
 			models: { openai: ["gpt-5.4-preview"] },
-			connected: ["openai"],
+			connected: [SUPPORTED_PROVIDERS.OPENAI],
 			updatedAt: "2026-03-03T00:00:00.000Z",
 		})
-		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue([SUPPORTED_PROVIDERS.OPENAI])
 		const args = {
 			category: "quick",
 			prompt: "test prompt",
@@ -234,7 +235,7 @@ describe("resolveCategoryExecution", () => {
 					{
 						model: "openai/gpt-5.4",
 						variant: "low",
-						reasoningEffort: "high",
+						reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
 					},
 				],
 			},
@@ -247,7 +248,7 @@ describe("resolveCategoryExecution", () => {
 		expect(result.error).toBeUndefined()
 		expect(result.actualModel).toBe("openai/gpt-5.4-preview")
 		expect(result.categoryModel).toEqual({
-			providerID: "openai",
+			providerID: SUPPORTED_PROVIDERS.OPENAI,
 			modelID: "gpt-5.4-preview",
 			variant: undefined,
 		})
@@ -259,10 +260,10 @@ describe("resolveCategoryExecution", () => {
 		//#given
 		const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
 			models: { openai: ["gpt-5.4-preview"] },
-			connected: ["openai"],
+			connected: [SUPPORTED_PROVIDERS.OPENAI],
 			updatedAt: "2026-03-03T00:00:00.000Z",
 		})
-		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue([SUPPORTED_PROVIDERS.OPENAI])
 		const args = {
 			category: "quick",
 			prompt: "test prompt",
@@ -279,9 +280,9 @@ describe("resolveCategoryExecution", () => {
 					{
 						model: "openai/gpt-5.4",
 						variant: "low",
-						reasoningEffort: "high",
+						reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
 						temperature: 0.6,
-						top_p: 0.5,
+						topP: 0.5,
 						maxTokens: 1234,
 						thinking: { type: "disabled" },
 					},
@@ -296,12 +297,12 @@ describe("resolveCategoryExecution", () => {
 		expect(result.error).toBeUndefined()
 		expect(result.actualModel).toBe("openai/gpt-5.4-preview")
 		expect(result.categoryModel).toEqual({
-			providerID: "openai",
+			providerID: SUPPORTED_PROVIDERS.OPENAI,
 			modelID: "gpt-5.4-preview",
 			variant: "low",
-			reasoningEffort: "high",
+			reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
 			temperature: 0.6,
-			top_p: 0.5,
+			topP: 0.5,
 			maxTokens: 1234,
 			thinking: { type: "disabled" },
 		})
@@ -313,10 +314,10 @@ describe("resolveCategoryExecution", () => {
 		//#given
 		const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
 			models: { openai: ["gpt-5.4-preview"] },
-			connected: ["openai"],
+			connected: [SUPPORTED_PROVIDERS.OPENAI],
 			updatedAt: "2026-03-03T00:00:00.000Z",
 		})
-		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue([SUPPORTED_PROVIDERS.OPENAI])
 		const args = {
 			category: "quick",
 			prompt: "test prompt",
@@ -333,12 +334,12 @@ describe("resolveCategoryExecution", () => {
 					{
 						model: "openai/gpt-5.4",
 						variant: "low",
-						reasoningEffort: "medium",
+						reasoningEffort: SUPPORTED_REASONING_EFFORTS.MEDIUM,
 					},
 					{
 						model: "openai/gpt-5.4-preview",
-						variant: "max",
-						reasoningEffort: "high",
+						variant: SUPPORTED_VARIANTS.MAX,
+						reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
 					},
 				],
 			},
@@ -351,10 +352,10 @@ describe("resolveCategoryExecution", () => {
 		expect(result.error).toBeUndefined()
 		expect(result.actualModel).toBe("openai/gpt-5.4-preview")
 		expect(result.categoryModel).toEqual({
-			providerID: "openai",
+			providerID: SUPPORTED_PROVIDERS.OPENAI,
 			modelID: "gpt-5.4-preview",
-			variant: "max",
-			reasoningEffort: "high",
+			variant: SUPPORTED_VARIANTS.MAX,
+			reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
 		})
 		cacheSpy.mockRestore()
 		agentsSpy.mockRestore()
@@ -364,10 +365,10 @@ describe("resolveCategoryExecution", () => {
 		//#given
 		const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
 			models: { openai: ["gpt-5.4o"] },
-			connected: ["openai"],
+			connected: [SUPPORTED_PROVIDERS.OPENAI],
 			updatedAt: "2026-03-03T00:00:00.000Z",
 		})
-		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue([SUPPORTED_PROVIDERS.OPENAI])
 		const args = {
 			category: "quick",
 			prompt: "test prompt",
@@ -384,7 +385,7 @@ describe("resolveCategoryExecution", () => {
 					{
 						model: "openai/gpt-5.4",
 						variant: "low",
-						reasoningEffort: "high",
+						reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
 					},
 				],
 			},
@@ -397,10 +398,10 @@ describe("resolveCategoryExecution", () => {
 		expect(result.error).toBeUndefined()
 		expect(result.actualModel).toBe("openai/gpt-5.4o")
 		expect(result.categoryModel).toEqual({
-			providerID: "openai",
+			providerID: SUPPORTED_PROVIDERS.OPENAI,
 			modelID: "gpt-5.4o",
 			variant: "low",
-			reasoningEffort: "high",
+			reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
 		})
 		cacheSpy.mockRestore()
 		agentsSpy.mockRestore()
@@ -409,11 +410,11 @@ describe("resolveCategoryExecution", () => {
 	test("prefers the most specific prefix match when fallback entries share a prefix", async () => {
 		//#given
 		const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
-			models: { openai: ["gpt-4o"] },
-			connected: ["openai"],
+			models: { openai: [SUPPORTED_MODELS.GPT_4O] },
+			connected: [SUPPORTED_PROVIDERS.OPENAI],
 			updatedAt: "2026-03-03T00:00:00.000Z",
 		})
-		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue([SUPPORTED_PROVIDERS.OPENAI])
 		const args = {
 			category: "deep",
 			prompt: "test prompt",
@@ -430,12 +431,12 @@ describe("resolveCategoryExecution", () => {
 					{
 						model: "openai/gpt-4",
 						variant: "low",
-						reasoningEffort: "medium",
+						reasoningEffort: SUPPORTED_REASONING_EFFORTS.MEDIUM,
 					},
 					{
 						model: "openai/gpt-4o",
-						variant: "max",
-						reasoningEffort: "high",
+						variant: SUPPORTED_VARIANTS.MAX,
+						reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
 					},
 				],
 			},
@@ -448,10 +449,10 @@ describe("resolveCategoryExecution", () => {
 		expect(result.error).toBeUndefined()
 		expect(result.actualModel).toBe("openai/gpt-4o")
 		expect(result.categoryModel).toEqual({
-			providerID: "openai",
-			modelID: "gpt-4o",
-			variant: "max",
-			reasoningEffort: "high",
+			providerID: SUPPORTED_PROVIDERS.OPENAI,
+			modelID: SUPPORTED_MODELS.GPT_4O,
+			variant: SUPPORTED_VARIANTS.MAX,
+			reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
 		})
 		cacheSpy.mockRestore()
 		agentsSpy.mockRestore()
@@ -510,8 +511,8 @@ describe("resolveCategoryExecution", () => {
 		expect(result.error).toBeUndefined()
 		expect(result.actualModel).toBe("anthropic/claude-sonnet-4-6")
 		expect(result.categoryModel).toEqual({
-			providerID: "anthropic",
-			modelID: "claude-sonnet-4-6",
+			providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+			modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
 			variant: undefined,
 		})
 		expect(result.fallbackChain).toBeUndefined()
@@ -530,7 +531,7 @@ describe("resolveCategoryExecution", () => {
 		}
 		const executorCtx = createMockExecutorContext()
 		executorCtx.userCategories = {
-			deep: { model: "openai/gpt-5.5", variant: "medium" },
+			deep: { model: "openai/gpt-5.5", variant: SUPPORTED_VARIANTS.MEDIUM },
 		}
 
 		//#when

@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 import { afterEach, describe, expect, test } from "bun:test"
 import { _resetForTesting, setMainSession } from "../../features/claude-code-session-state"
 import type { BackgroundTask } from "../../features/background-agent"
@@ -61,7 +62,7 @@ function createTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
       lastMessage: "still working",
       lastMessageAt: new Date(Date.now() - 121000),
     },
-    model: { providerID: "google", modelID: "gemini-1.5" },
+    model: { providerID: SUPPORTED_PROVIDERS.GOOGLE, modelID: "gemini-1.5" },
     ...overrides,
   }
 }
@@ -79,7 +80,7 @@ describe("unstable-agent-babysitter hook", () => {
     const ctx = createMockPluginInput({
       messagesBySession: {
         "main-1": [
-          { info: { agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-4" } } },
+          { info: { agent: "sisyphus", model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-4" } } },
         ],
         "bg-1": [
           { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] },
@@ -114,7 +115,7 @@ describe("unstable-agent-babysitter hook", () => {
     const ctx = createMockPluginInput({
       messagesBySession: {
         "main-1": [
-          { info: { agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-4" } } },
+          { info: { agent: "sisyphus", model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-4" } } },
         ],
         "bg-1": [
           { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] },
@@ -148,7 +149,7 @@ describe("unstable-agent-babysitter hook", () => {
     const ctx = createMockPluginInput({
       messagesBySession: {
         "main-1": [
-          { info: { agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-4" } } },
+          { info: { agent: "sisyphus", model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-4" } } },
         ],
         "bg-1": [
           { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "minimax thought" }] },
@@ -186,7 +187,7 @@ describe("unstable-agent-babysitter hook", () => {
       promptCalls,
     })
     const backgroundManager = createBackgroundManager([
-      createTask({ model: { providerID: "openai", modelID: "gpt-4" } }),
+      createTask({ model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-4" } }),
     ])
     const hook = createUnstableAgentBabysitterHook(ctx, {
       backgroundManager,
@@ -236,7 +237,7 @@ describe("unstable-agent-babysitter hook", () => {
     const ctx = createMockPluginInput({
       messagesBySession: {
         "main-1": [
-          { info: { agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-4" } } },
+          { info: { agent: "sisyphus", model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-4" } } },
         ],
         "bg-1": [
           { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] },
@@ -274,7 +275,7 @@ describe("unstable-agent-babysitter hook", () => {
     const ctx = createMockPluginInput({
       messagesBySession: {
         "main-1": [
-          { info: { agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-4" } } },
+          { info: { agent: "sisyphus", model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-4" } } },
         ],
         "bg-1": [
           { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] },
@@ -306,9 +307,9 @@ describe("unstable-agent-babysitter hook", () => {
     setMainSession("main-1")
     const promptCalls: Array<{ input: unknown }> = []
     const mainModel = {
-      providerID: "openai",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
       modelID: "gpt-4",
-      variant: "max",
+      variant: SUPPORTED_VARIANTS.MAX,
     }
     const ctx = createMockPluginInput({
       messagesBySession: {
@@ -338,7 +339,7 @@ describe("unstable-agent-babysitter hook", () => {
         variant?: string
       }
     }
-    expect(payload.body?.model).toEqual({ providerID: "openai", modelID: "gpt-4" })
+    expect(payload.body?.model).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-4" })
     expect(payload.body?.variant).toBe("max")
   })
 

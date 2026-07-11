@@ -1,3 +1,4 @@
+import { SUPPORTED_VARIANTS, SUPPORTED_REASONING_EFFORTS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { describe, test, expect, spyOn, beforeEach, afterEach, mock } from "bun:test"
@@ -905,14 +906,14 @@ describe("Prometheus category config resolution", () => {
     expect(config?.variant).toBe("xhigh")
   })
 
-  test("preserves all category properties (temperature, top_p, tools, etc.)", () => {
+  test("preserves all category properties (temperature, topP, tools, etc.)", () => {
     // given
     const categoryName = "custom-category"
     const userCategories: Record<string, CategoryConfig> = {
       "custom-category": {
         model: "test/model",
         temperature: 0.5,
-        top_p: 0.9,
+        topP: 0.9,
         maxTokens: 32000,
         tools: { tool1: true, tool2: false },
       },
@@ -925,7 +926,7 @@ describe("Prometheus category config resolution", () => {
     expect(config).toBeDefined()
     expect(config?.model).toBe("test/model")
     expect(config?.temperature).toBe(0.5)
-    expect(config?.top_p).toBe(0.9)
+    expect(config?.topP).toBe(0.9)
     expect(config?.maxTokens).toBe(32000)
     expect(config?.tools).toEqual({ tool1: true, tool2: false })
   })
@@ -941,13 +942,13 @@ describe("Prometheus direct override priority over category", () => {
       categories: {
         "test-planning": {
           model: "openai/gpt-5.4",
-          reasoningEffort: "xhigh",
+          reasoningEffort: SUPPORTED_REASONING_EFFORTS.XHIGH,
         },
       },
       agents: {
         prometheus: {
           category: "test-planning",
-          reasoningEffort: "low",
+          reasoningEffort: SUPPORTED_REASONING_EFFORTS.LOW,
         },
       },
     })
@@ -983,7 +984,7 @@ describe("Prometheus direct override priority over category", () => {
       categories: {
         "reasoning-cat": {
           model: "openai/gpt-5.4",
-          reasoningEffort: "high",
+          reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
         },
       },
       agents: {
@@ -1102,7 +1103,7 @@ describe("Plan agent model inheritance from prometheus", () => {
     //#given - prometheus resolves to claude-opus-4-7 with model settings
     spyOn(prometheusAgentConfigBuilder, "buildPrometheusAgentConfig").mockResolvedValue({
       model: "anthropic/claude-opus-4-7",
-      variant: "max",
+      variant: SUPPORTED_VARIANTS.MAX,
       mode: "primary",
       prompt: "prometheus prompt",
     })
@@ -1149,7 +1150,7 @@ describe("Plan agent model inheritance from prometheus", () => {
     spyOn(shared, unsafeTestValue("resolveModelPipeline")).mockReturnValue({
       model: "openai/gpt-5.4",
       provenance: "override",
-      variant: "high",
+      variant: SUPPORTED_VARIANTS.HIGH,
     })
     const pluginConfig = createPluginConfig({
       sisyphus_agent: {
@@ -1159,11 +1160,11 @@ describe("Plan agent model inheritance from prometheus", () => {
       agents: {
         prometheus: {
           model: "openai/gpt-5.4",
-          variant: "high",
+          variant: SUPPORTED_VARIANTS.HIGH,
           temperature: 0.3,
-          top_p: 0.9,
+          topP: 0.9,
           maxTokens: 16000,
-          reasoningEffort: "high",
+          reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
           textVerbosity: "medium",
           thinking: { type: "enabled", budgetTokens: 8000 },
         },
@@ -1192,7 +1193,7 @@ describe("Plan agent model inheritance from prometheus", () => {
     expect(agents.plan.model).toBe("openai/gpt-5.4")
     expect(agents.plan.variant).toBe("high")
     expect(agents.plan.temperature).toBe(0.3)
-    expect(agents.plan.top_p).toBe(0.9)
+    expect(agents.plan.topP).toBe(0.9)
     expect(agents.plan.maxTokens).toBe(16000)
     expect(agents.plan.reasoningEffort).toBe("high")
     expect(agents.plan.textVerbosity).toBe("medium")
@@ -1204,7 +1205,7 @@ describe("Plan agent model inheritance from prometheus", () => {
     spyOn(shared, unsafeTestValue("resolveModelPipeline")).mockReturnValue({
       model: "anthropic/claude-opus-4-7",
       provenance: "provider-fallback",
-      variant: "max",
+      variant: SUPPORTED_VARIANTS.MAX,
     })
     const pluginConfig = createPluginConfig({
       sisyphus_agent: {
@@ -1214,7 +1215,7 @@ describe("Plan agent model inheritance from prometheus", () => {
       agents: {
         plan: {
           model: "openai/gpt-5.4",
-          variant: "high",
+          variant: SUPPORTED_VARIANTS.HIGH,
           temperature: 0.5,
         },
       },
@@ -1247,7 +1248,7 @@ describe("Plan agent model inheritance from prometheus", () => {
     spyOn(shared, unsafeTestValue("resolveModelPipeline")).mockReturnValue({
       model: "anthropic/claude-opus-4-7",
       provenance: "provider-fallback",
-      variant: "max",
+      variant: SUPPORTED_VARIANTS.MAX,
     })
     const pluginConfig = createPluginConfig({
       sisyphus_agent: {

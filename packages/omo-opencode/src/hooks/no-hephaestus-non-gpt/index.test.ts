@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { describe, expect, spyOn, test } from "bun:test"
@@ -31,12 +32,12 @@ describe("no-hephaestus-non-gpt hook", () => {
     await hook["chat.message"]?.({
       sessionID: "ses_1",
       agent: HEPHAESTUS_DISPLAY,
-      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
     }, output1)
     await hook["chat.message"]?.({
       sessionID: "ses_1",
       agent: HEPHAESTUS_DISPLAY,
-      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
     }, output2)
 
     // then - toast is shown and agent is switched to sisyphus
@@ -67,7 +68,7 @@ describe("no-hephaestus-non-gpt hook", () => {
     await hook["chat.message"]?.({
       sessionID: "ses_opt_out",
       agent: HEPHAESTUS_DISPLAY,
-      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
     }, output)
 
     // then - warning toast is shown but agent is not switched
@@ -94,7 +95,7 @@ describe("no-hephaestus-non-gpt hook", () => {
     await hook["chat.message"]?.({
       sessionID: "ses_2",
       agent: HEPHAESTUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.5" },
+      model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5 },
     }, output)
 
     // then - no toast, agent unchanged
@@ -115,7 +116,7 @@ describe("no-hephaestus-non-gpt hook", () => {
     await hook["chat.message"]?.({
       sessionID: "ses_3",
       agent: SISYPHUS_DISPLAY,
-      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
     }, output)
 
     // then - no toast
@@ -137,7 +138,7 @@ describe("no-hephaestus-non-gpt hook", () => {
     // when - chat.message runs without input.agent
     await hook["chat.message"]?.({
       sessionID: "ses_4",
-      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
     }, output)
 
     // then - toast shown via session-agent fallback, switched to sisyphus

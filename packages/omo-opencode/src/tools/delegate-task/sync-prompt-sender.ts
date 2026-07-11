@@ -34,7 +34,7 @@ function buildPromptGenerationParams(model: DelegatedModelConfig | undefined): R
 
   return {
     ...(model.temperature !== undefined ? { temperature: model.temperature } : {}),
-    ...(model.top_p !== undefined ? { topP: model.top_p } : {}),
+    ...(model.topP !== undefined ? { topP: model.topP } : {}),
     ...(model.maxTokens !== undefined ? { maxOutputTokens: model.maxTokens } : {}),
     ...(Object.keys(promptOptions).length > 0 ? { options: promptOptions } : {}),
   }

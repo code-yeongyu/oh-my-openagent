@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
@@ -44,15 +45,15 @@ describe("model fallback hook", () => {
       modelFallback,
       "ses_model_fallback_main",
       "Sisyphus - Ultraworker",
-      "anthropic",
+      SUPPORTED_PROVIDERS.ANTHROPIC,
       "claude-opus-4-7-thinking",
     )
     expect(set).toBe(true)
 
     const output = {
       message: {
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
-        variant: "max",
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-7-thinking" },
+        variant: SUPPORTED_VARIANTS.MAX,
       },
       parts: [{ type: "text", text: "continue" }],
     }
@@ -63,8 +64,8 @@ describe("model fallback hook", () => {
     )
 
     expect(output.message["model"]).toEqual({
-      providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+      modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
     })
   })
 
@@ -78,13 +79,13 @@ describe("model fallback hook", () => {
     const sessionID = "ses_model_fallback_main"
 
     expect(
-      setPendingModelFallback(modelFallback, sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-7-thinking"),
+      setPendingModelFallback(modelFallback, sessionID, "Sisyphus - Ultraworker", SUPPORTED_PROVIDERS.ANTHROPIC, "claude-opus-4-7-thinking"),
     ).toBe(true)
 
     const firstOutput = {
       message: {
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
-        variant: "max",
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-7-thinking" },
+        variant: SUPPORTED_VARIANTS.MAX,
       },
       parts: [{ type: "text", text: "continue" }],
     }
@@ -92,25 +93,25 @@ describe("model fallback hook", () => {
     await hook["chat.message"]?.({ sessionID }, firstOutput)
 
     expect(firstOutput.message["model"]).toEqual({
-      providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+      modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
     })
 
     expect(
-      setPendingModelFallback(modelFallback, sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-7"),
+      setPendingModelFallback(modelFallback, sessionID, "Sisyphus - Ultraworker", SUPPORTED_PROVIDERS.ANTHROPIC, SUPPORTED_MODELS.CLAUDE_OPUS_4_7),
     ).toBe(true)
 
     const secondOutput: ChatMessageOutput = {
       message: {
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
       },
       parts: [{ type: "text", text: "continue" }],
     }
     await hook["chat.message"]?.({ sessionID }, secondOutput)
 
     expect(secondOutput.message["model"]).toEqual({
-      providerID: "opencode-go",
-      modelID: "kimi-k2.6",
+      providerID: SUPPORTED_PROVIDERS.OPENCODE_GO,
+      modelID: SUPPORTED_MODELS.KIMI_K2_6,
     })
     expect(secondOutput.message["variant"]).toBeUndefined()
   })
@@ -123,14 +124,14 @@ describe("model fallback hook", () => {
       modelFallback,
       sessionID,
       "Sisyphus - Ultraworker",
-      "anthropic",
+      SUPPORTED_PROVIDERS.ANTHROPIC,
       "claude-opus-4-7-thinking",
     )
     const secondSet = setPendingModelFallback(
       modelFallback,
       sessionID,
       "Sisyphus - Ultraworker",
-      "anthropic",
+      SUPPORTED_PROVIDERS.ANTHROPIC,
       "claude-opus-4-7-thinking",
     )
 
@@ -142,16 +143,16 @@ describe("model fallback hook", () => {
   test("isolates stored fallback chains from caller mutations on set and get", () => {
     const sessionID = "ses_model_fallback_defensive_copy"
     const originalChain = [
-      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      { providers: [SUPPORTED_PROVIDERS.ANTHROPIC], model: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
     ]
 
     setSessionFallbackChain(modelFallback, sessionID, originalChain)
-    originalChain.push({ providers: ["google"], model: "gemini-2.5-pro" })
+    originalChain.push({ providers: [SUPPORTED_PROVIDERS.GOOGLE], model: "gemini-2.5-pro" })
     const retrieved = getSessionFallbackChain(modelFallback, sessionID)
-    retrieved?.push({ providers: ["openai"], model: "gpt-5.4" })
+    retrieved?.push({ providers: [SUPPORTED_PROVIDERS.OPENAI], model: SUPPORTED_MODELS.GPT_5_4 })
 
     expect(getSessionFallbackChain(modelFallback, sessionID)).toEqual([
-      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      { providers: [SUPPORTED_PROVIDERS.ANTHROPIC], model: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
     ])
   })
 
@@ -167,7 +168,7 @@ describe("model fallback hook", () => {
     }>(modelFallback)
 
     setSessionFallbackChain(modelFallback, sessionID, [
-      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      { providers: [SUPPORTED_PROVIDERS.ANTHROPIC], model: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
       { providers: ["opencode"], model: "kimi-k2.5-free" },
     ])
 
@@ -176,14 +177,14 @@ describe("model fallback hook", () => {
         modelFallback,
         sessionID,
         "Sisyphus - Ultraworker",
-        "anthropic",
-        "claude-opus-4-7",
+        SUPPORTED_PROVIDERS.ANTHROPIC,
+        SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
       ),
     ).toBe(true)
 
     const output = {
       message: {
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
       },
       parts: [{ type: "text", text: "continue" }],
     }
@@ -209,8 +210,8 @@ describe("model fallback hook", () => {
     }>(modelFallback)
 
     setSessionFallbackChain(modelFallback, sessionID, [
-      { providers: ["quotio"], model: "claude-opus-4-7", variant: "max" },
-      { providers: ["quotio"], model: "gpt-5.5" },
+      { providers: ["quotio"], model: SUPPORTED_MODELS.CLAUDE_OPUS_4_7, variant: SUPPORTED_VARIANTS.MAX },
+      { providers: ["quotio"], model: SUPPORTED_MODELS.GPT_5_5 },
     ])
 
     expect(
@@ -219,14 +220,14 @@ describe("model fallback hook", () => {
         sessionID,
         "Sisyphus - Ultraworker",
         "quotio",
-        "claude-opus-4-7",
+        SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
       ),
     ).toBe(true)
 
     const output = {
       message: {
-        model: { providerID: "quotio", modelID: "claude-opus-4-7" },
-        variant: "max",
+        model: { providerID: "quotio", modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
+        variant: SUPPORTED_VARIANTS.MAX,
       },
       parts: [{ type: "text", text: "continue" }],
     }
@@ -235,7 +236,7 @@ describe("model fallback hook", () => {
 
     expect(output.message["model"]).toEqual({
       providerID: "quotio",
-      modelID: "gpt-5.5",
+      modelID: SUPPORTED_MODELS.GPT_5_5,
     })
     expect(output.message["variant"]).toBeUndefined()
     clearPendingModelFallback(modelFallback, sessionID)
@@ -301,8 +302,8 @@ describe("model fallback hook", () => {
       modelFallback,
       sessionID,
       "Sisyphus - Junior",
-      "anthropic",
-      "claude-sonnet-4-6",
+      SUPPORTED_PROVIDERS.ANTHROPIC,
+      SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
     )
 
     expect(set).toBe(false)
@@ -326,15 +327,15 @@ describe("model fallback hook", () => {
       hook,
       "ses_model_fallback_toast",
       "Sisyphus - Ultraworker",
-      "anthropic",
+      SUPPORTED_PROVIDERS.ANTHROPIC,
       "claude-opus-4-7-thinking",
     )
     expect(set).toBe(true)
 
     const output = {
       message: {
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
-        variant: "max",
+        model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-7-thinking" },
+        variant: SUPPORTED_VARIANTS.MAX,
       },
       parts: [{ type: "text", text: "continue" }],
     }
@@ -357,21 +358,21 @@ describe("model fallback hook", () => {
     }>(modelFallback)
 
     setSessionFallbackChain(modelFallback, sessionID, [
-      { providers: ["github-copilot"], model: "claude-sonnet-4-6" },
+      { providers: [SUPPORTED_PROVIDERS.GITHUB_COPILOT], model: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 },
     ])
 
     const set = setPendingModelFallback(
       modelFallback,
       sessionID,
       "Atlas - Plan Executor",
-      "github-copilot",
+      SUPPORTED_PROVIDERS.GITHUB_COPILOT,
       "claude-sonnet-4-5",
     )
     expect(set).toBe(true)
 
     const output = {
       message: {
-        model: { providerID: "github-copilot", modelID: "claude-sonnet-4-6" },
+        model: { providerID: SUPPORTED_PROVIDERS.GITHUB_COPILOT, modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 },
       },
       parts: [{ type: "text", text: "continue" }],
     }
@@ -379,7 +380,7 @@ describe("model fallback hook", () => {
     await hook["chat.message"]?.({ sessionID }, output)
 
     expect(output.message["model"]).toEqual({
-      providerID: "github-copilot",
+      providerID: SUPPORTED_PROVIDERS.GITHUB_COPILOT,
       modelID: "claude-sonnet-4.6",
     })
 
@@ -398,21 +399,21 @@ describe("model fallback hook", () => {
     }>(modelFallback)
 
     setSessionFallbackChain(modelFallback, sessionID, [
-      { providers: ["google"], model: "gemini-3.1-pro-preview" },
+      { providers: [SUPPORTED_PROVIDERS.GOOGLE], model: "gemini-3.1-pro-preview" },
     ])
 
     const set = setPendingModelFallback(
       modelFallback,
       sessionID,
       "Oracle",
-      "google",
+      SUPPORTED_PROVIDERS.GOOGLE,
       "gemini-3.1-pro-preview",
     )
     expect(set).toBe(true)
 
     const output = {
       message: {
-        model: { providerID: "google", modelID: "gemini-3.1-pro-preview" },
+        model: { providerID: SUPPORTED_PROVIDERS.GOOGLE, modelID: "gemini-3.1-pro-preview" },
       },
       parts: [{ type: "text", text: "continue" }],
     }
@@ -420,7 +421,7 @@ describe("model fallback hook", () => {
     await hook["chat.message"]?.({ sessionID }, output)
 
     expect(output.message["model"]).toEqual({
-      providerID: "google",
+      providerID: SUPPORTED_PROVIDERS.GOOGLE,
       modelID: "gemini-3.1-pro-preview",
     })
 

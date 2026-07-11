@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 const { beforeEach, describe, test, expect, mock } = require("bun:test")
 const { createCallOmoAgent } = require("./tools")
 const { clearCallableAgentsCache } = require("./agent-resolver")
@@ -290,8 +291,8 @@ describe("createCallOmoAgent", () => {
 
     const [launchArgs] = firstLaunchCall
     expect(launchArgs.fallbackChain).toEqual([
-      { providers: ["quotio"], model: "kimi-k2.5", variant: undefined },
-      { providers: ["openai"], model: "gpt-5.5", variant: "high" },
+      { providers: ["quotio"], model: SUPPORTED_MODELS.KIMI_K2_5, variant: undefined },
+      { providers: [SUPPORTED_PROVIDERS.OPENAI], model: SUPPORTED_MODELS.GPT_5_5, variant: SUPPORTED_VARIANTS.HIGH },
     ])
   })
 
@@ -364,7 +365,7 @@ describe("createCallOmoAgent", () => {
       {
         explore: {
           model: "openai/gpt-5.4",
-          variant: "high",
+          variant: SUPPORTED_VARIANTS.HIGH,
         },
       },
     )
@@ -389,9 +390,9 @@ describe("createCallOmoAgent", () => {
 
     const [launchArgs] = firstLaunchCall
     expect(launchArgs.model).toEqual({
-      providerID: "openai",
-      modelID: "gpt-5.4",
-      variant: "high",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
+      variant: SUPPORTED_VARIANTS.HIGH,
     })
   })
 
@@ -439,9 +440,9 @@ describe("createCallOmoAgent", () => {
 
     const [launchArgs] = firstLaunchCall
     expect(launchArgs.model).toEqual({
-      providerID: "openai",
-      modelID: "gpt-5.4",
-      variant: "high",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
+      variant: SUPPORTED_VARIANTS.HIGH,
     })
   })
 
@@ -494,8 +495,8 @@ describe("createCallOmoAgent", () => {
 
     const [launchArgs] = firstLaunchCall
     expect(launchArgs.model).toEqual({
-      providerID: "openai",
-      modelID: "gpt-5.4",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
     })
   })
 

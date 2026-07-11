@@ -1,7 +1,9 @@
+
 declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach, mock } = require("bun:test")
 import type { ConcurrencyManager } from "../background-agent/concurrency"
 import { initI18n } from "../../shared/i18n"
+import { SUPPORTED_MODELS } from "@oh-my-opencode/model-core"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
 type TaskToastManagerClass = typeof import("./manager").TaskToastManager
@@ -407,7 +409,7 @@ describe("TaskToastManager", () => {
 
       // when - runtime fallback applied by session
       toastManager.updateTaskModelBySession("ses_update_1", {
-        model: "nvidia/stepfun-ai/step-3.5-flash",
+        model: "nvidia/stepfun-ai-step-3.5-flash",
         type: "runtime-fallback",
       })
 
@@ -415,7 +417,7 @@ describe("TaskToastManager", () => {
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).toContain("[FALLBACK]")
-      expect(call.body.message).toContain("nvidia/stepfun-ai/step-3.5-flash")
+      expect(call.body.message).toContain("nvidia/stepfun-ai-step-3.5-flash")
       expect(call.body.message).toContain("(runtime fallback)")
     })
   })

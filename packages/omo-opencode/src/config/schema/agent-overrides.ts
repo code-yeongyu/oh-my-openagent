@@ -2,7 +2,7 @@ import { z } from "zod"
 import { FallbackModelsSchema } from "./fallback-models"
 import { AgentPermissionSchema } from "./internal/permission"
 
-export const AgentOverrideConfigSchema = z.object({
+const AgentOverrideConfigBaseSchema = z.object({
   /** @deprecated Use `category` instead. Model is inherited from category defaults. */
   model: z.string().optional(),
   fallback_models: FallbackModelsSchema.optional(),
@@ -12,7 +12,9 @@ export const AgentOverrideConfigSchema = z.object({
   /** Skill names to inject into agent prompt */
   skills: z.array(z.string()).optional(),
   temperature: z.number().min(0).max(2).optional(),
-  top_p: z.number().min(0).max(1).optional(),
+  topP: z.number().min(0).max(1).optional(),
+  /** @deprecated Use `topP` instead. */
+  topp: z.number().min(0).max(1).optional(),
   prompt: z.string().optional(),
   /** Text to append to agent prompt. Supports file:// URIs (file:///abs, file://./rel, file://~/home) */
   prompt_append: z.string().optional(),
@@ -37,7 +39,7 @@ export const AgentOverrideConfigSchema = z.object({
     })
     .optional(),
   /** Reasoning effort level (OpenAI). Overrides category and default settings. */
-  reasoningEffort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh", "max"]).optional(),
+  reasoningEffort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]).optional(),
   /** Text verbosity level. */
   textVerbosity: z.enum(["low", "medium", "high"]).optional(),
   /** Provider-specific options. Passed directly to OpenCode SDK. */
@@ -57,12 +59,32 @@ export const AgentOverrideConfigSchema = z.object({
     .optional(),
 })
 
+export const AgentOverrideConfigSchema = AgentOverrideConfigBaseSchema.transform((val) => {
+  if (val.topp !== undefined && val.topP === undefined) {
+    console.warn("[omo-opencode] AgentOverrideConfig: 'topp' is deprecated, use 'topP' instead.")
+  }
+  const { topp, ...rest } = val
+  return {
+    ...rest,
+    topP: val.topP ?? topp,
+  }
+})
+
 export const AgentOverridesSchema = z.object({
   build: AgentOverrideConfigSchema.optional(),
   plan: AgentOverrideConfigSchema.optional(),
   sisyphus: AgentOverrideConfigSchema.optional(),
-  hephaestus: AgentOverrideConfigSchema.extend({
+  hephaestus: AgentOverrideConfigBaseSchema.extend({
     allow_non_gpt_model: z.boolean().optional(),
+  }).transform((val) => {
+    if (val.topp !== undefined && val.topP === undefined) {
+      console.warn("[omo-opencode] AgentOverrideConfig: 'topp' is deprecated, use 'topP' instead.")
+    }
+    const { topp, ...rest } = val
+    return {
+      ...rest,
+      topP: val.topP ?? topp,
+    }
   }).optional(),
   "sisyphus-junior": AgentOverrideConfigSchema.optional(),
   "OpenCode-Builder": AgentOverrideConfigSchema.optional(),

@@ -1,8 +1,10 @@
 import { parseModelString } from "./model-string-parser"
 
+import type { Provider, SupportedModel } from "./registry"
+
 interface RuntimeFallbackModelRecord {
-  readonly providerID: string
-  readonly modelID: string
+  readonly providerID: Provider
+  readonly modelID: SupportedModel
   readonly variant?: unknown
 }
 

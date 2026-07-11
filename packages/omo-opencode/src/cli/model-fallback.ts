@@ -4,7 +4,7 @@ import {
 } from "./model-fallback-requirements"
 import type { FallbackModelObject } from "../config/schema/fallback-models"
 import type { FallbackEntry } from "../shared/model-requirements"
-import { getModelCapabilities, resolveCompatibleModelSettings } from "@oh-my-opencode/model-core"
+import { getModelCapabilities, resolveCompatibleModelSettings, type Variant } from "@oh-my-opencode/model-core"
 import type { InstallConfig } from "./types"
 
 import type { AgentConfig, CategoryConfig, GeneratedOmoConfig } from "./model-fallback-types"
@@ -25,10 +25,10 @@ export const ULTIMATE_FALLBACK = "opencode/gpt-5-nano"
 const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
 
 type CompatibleFallbackSettings = {
-  variant?: string
+  variant?: Variant
   reasoningEffort?: FallbackModelObject["reasoningEffort"]
   temperature?: number
-  top_p?: number
+  topP?: number
   maxTokens?: number
   thinking?: FallbackModelObject["thinking"]
 }
@@ -45,7 +45,7 @@ function resolveCompatibleFallbackSettings(
       variant: desired.variant,
       reasoningEffort: desired.reasoningEffort,
       temperature: desired.temperature,
-      topP: desired.top_p,
+      topP: desired.topP,
       maxTokens: desired.maxTokens,
       thinking: desired.thinking,
     },
@@ -56,7 +56,7 @@ function resolveCompatibleFallbackSettings(
     ...(compatibility.variant ? { variant: compatibility.variant } : {}),
     ...(compatibility.reasoningEffort ? { reasoningEffort: compatibility.reasoningEffort as FallbackModelObject["reasoningEffort"] } : {}),
     ...(compatibility.temperature !== undefined ? { temperature: compatibility.temperature } : {}),
-    ...(compatibility.topP !== undefined ? { top_p: compatibility.topP } : {}),
+    ...(compatibility.topP !== undefined ? { topP: compatibility.topP } : {}),
     ...(compatibility.maxTokens !== undefined ? { maxTokens: compatibility.maxTokens } : {}),
     ...(compatibility.thinking !== undefined ? { thinking: compatibility.thinking as FallbackModelObject["thinking"] } : {}),
   }
@@ -80,7 +80,7 @@ function toFallbackModelObject(entry: FallbackEntry, provider: string): Fallback
     variant: entry.variant,
     reasoningEffort: entry.reasoningEffort as FallbackModelObject["reasoningEffort"] | undefined,
     temperature: entry.temperature,
-    top_p: entry.top_p,
+    topP: entry.topP,
     maxTokens: entry.maxTokens,
     thinking: entry.thinking,
   })

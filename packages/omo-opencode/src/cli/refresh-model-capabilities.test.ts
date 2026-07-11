@@ -1,3 +1,4 @@
+import { SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { describe, expect, it, mock } from "bun:test"
 
 import { refreshModelCapabilities } from "./refresh-model-capabilities"
@@ -13,7 +14,7 @@ describe("refreshModelCapabilities", () => {
       generatedAt: "2026-03-25T00:00:00.000Z",
       sourceUrl: "https://mirror.example/api.json",
       models: {
-        "gpt-5.4": { id: "gpt-5.4" },
+        [SUPPORTED_MODELS.GPT_5_4]: { id: SUPPORTED_MODELS.GPT_5_4 },
       },
     }))
     let stdout = ""
@@ -48,8 +49,8 @@ describe("refreshModelCapabilities", () => {
       generatedAt: "2026-03-25T00:00:00.000Z",
       sourceUrl: "https://override.example/api.json",
       models: {
-        "gpt-5.4": { id: "gpt-5.4" },
-        "claude-opus-4-7": { id: "claude-opus-4-7" },
+        [SUPPORTED_MODELS.GPT_5_4]: { id: SUPPORTED_MODELS.GPT_5_4 },
+        [SUPPORTED_MODELS.CLAUDE_OPUS_4_7]: { id: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
       },
     }))
     let stdout = ""

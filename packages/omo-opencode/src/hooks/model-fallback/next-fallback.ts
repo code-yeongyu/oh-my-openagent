@@ -38,7 +38,7 @@ export function getNextReachableFallback(
   variant?: string
   reasoningEffort?: string
   temperature?: number
-  top_p?: number
+  topP?: number
   maxTokens?: number
   thinking?: { type: "enabled" | "disabled"; budgetTokens?: number }
 } | null {
@@ -74,7 +74,7 @@ export function getNextReachableFallback(
       variant: fallback.variant,
       reasoningEffort: fallback.reasoningEffort,
       temperature: fallback.temperature,
-      top_p: fallback.top_p,
+      topP: fallback.topP,
       maxTokens: fallback.maxTokens,
       thinking: fallback.thinking,
     }

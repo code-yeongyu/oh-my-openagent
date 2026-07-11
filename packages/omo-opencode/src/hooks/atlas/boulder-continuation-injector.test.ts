@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS , SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { registerAgentName, _resetForTesting } from "../../features/claude-code-session-state"
@@ -253,9 +254,9 @@ describe("injectBoulderContinuation", () => {
       return undefined
     })
     const recentModel = {
-      providerID: "anthropic",
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
       modelID: "claude-sonnet-4-20250514",
-      variant: "max",
+      variant: SUPPORTED_VARIANTS.MAX,
     }
     const messagesMock = mock(async () => ({
       data: [{
@@ -293,7 +294,7 @@ describe("injectBoulderContinuation", () => {
     expect(result).toBe("injected")
     expect(capturedRequests).toHaveLength(1)
     expect(capturedRequests[0]?.body?.model).toEqual({
-      providerID: "anthropic",
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
       modelID: "claude-sonnet-4-20250514",
     })
     expect(capturedRequests[0]?.body?.variant).toBe("max")

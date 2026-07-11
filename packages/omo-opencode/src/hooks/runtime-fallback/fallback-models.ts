@@ -1,5 +1,5 @@
 import type { OhMyOpenCodeConfig } from "../../config"
-import type { FallbackModelObject } from "../../config/schema/fallback-models"
+import type { FallbackModelObject } from "@oh-my-opencode/model-core"
 import { agentPattern } from "./agent-resolver"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"

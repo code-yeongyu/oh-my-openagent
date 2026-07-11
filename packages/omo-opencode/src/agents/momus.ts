@@ -1,3 +1,4 @@
+import { SUPPORTED_REASONING_EFFORTS } from "@oh-my-opencode/model-core";
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
 import { buildClaudeThinkingConfig, isGpt5_6Model, isGptModel } from "./types";
@@ -309,7 +310,7 @@ export function createMomusAgent(model: string): AgentConfig {
     return {
       ...base,
       prompt: MOMUS_GPT_PROMPT,
-      reasoningEffort: "medium",
+      reasoningEffort: SUPPORTED_REASONING_EFFORTS.MEDIUM,
       textVerbosity: "high",
     } as AgentConfig;
   }

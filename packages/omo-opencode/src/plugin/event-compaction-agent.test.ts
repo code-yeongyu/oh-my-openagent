@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { afterEach, describe, expect, it } from "bun:test"
 
 import { _resetForTesting, getSessionAgent, updateSessionAgent } from "../features/claude-code-session-state"
@@ -74,7 +75,7 @@ describe("createEventHandler compaction agent filtering", () => {
             role: "user",
             agent: "compaction",
             time: { created: Date.now() },
-            model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+            model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
           },
         },
       },
@@ -90,7 +91,7 @@ describe("createEventHandler compaction agent filtering", () => {
   it("does not overwrite the stored session model with compaction", async () => {
     // given
     const sessionID = "ses_compaction_model_poisoning"
-    setSessionModel(sessionID, { providerID: "openai", modelID: "gpt-5" })
+    setSessionModel(sessionID, { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-5" })
     const eventHandler = createMinimalEventHandler()
     const input: Parameters<ReturnType<typeof createEventHandler>>[0] = {
       event: {
@@ -101,7 +102,7 @@ describe("createEventHandler compaction agent filtering", () => {
             sessionID,
             role: "user",
             agent: "compaction",
-            providerID: "anthropic",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
             modelID: "claude-opus-4-1",
             time: { created: Date.now() },
           },
@@ -114,7 +115,7 @@ describe("createEventHandler compaction agent filtering", () => {
 
     // then
     expect(getSessionModel(sessionID)).toEqual({
-      providerID: "openai",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
       modelID: "gpt-5",
     })
   })
@@ -122,7 +123,7 @@ describe("createEventHandler compaction agent filtering", () => {
   it("does not overwrite the stored session model with whitespace around compaction marker", async () => {
     // given
     const sessionID = "ses_compaction_trim_poisoning"
-    setSessionModel(sessionID, { providerID: "openai", modelID: "gpt-5" })
+    setSessionModel(sessionID, { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-5" })
     const eventHandler = createMinimalEventHandler()
     const input: Parameters<ReturnType<typeof createEventHandler>>[0] = {
       event: {
@@ -133,7 +134,7 @@ describe("createEventHandler compaction agent filtering", () => {
             sessionID,
             role: "user",
             agent: " compaction ",
-            providerID: "anthropic",
+            providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
             modelID: "claude-opus-4-1",
             time: { created: Date.now() },
           },
@@ -146,7 +147,7 @@ describe("createEventHandler compaction agent filtering", () => {
 
     // then
     expect(getSessionModel(sessionID)).toEqual({
-      providerID: "openai",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
       modelID: "gpt-5",
     })
   })

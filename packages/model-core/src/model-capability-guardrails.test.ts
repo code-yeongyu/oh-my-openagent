@@ -1,3 +1,4 @@
+import { SUPPORTED_MODELS } from "./registry";
 import { describe, expect, test } from "bun:test"
 
 import type { ModelCapabilitiesSnapshot } from "./model-capabilities"
@@ -22,9 +23,9 @@ describe("model-capability-guardrails", () => {
 
     expect(modelIDs).toEqual([...modelIDs].sort())
     expect(new Set(modelIDs).size).toBe(modelIDs.length)
-    expect(modelIDs).toContain("claude-opus-4-7")
-    expect(modelIDs).toContain("gpt-5.5")
-    expect(modelIDs).toContain("kimi-k2.5")
+    expect(modelIDs).toContain(SUPPORTED_MODELS.CLAUDE_OPUS_4_7)
+    expect(modelIDs).toContain(SUPPORTED_MODELS.GPT_5_5)
+    expect(modelIDs).toContain(SUPPORTED_MODELS.KIMI_K2_5)
   })
 
   test("flags exact aliases whose canonical target disappears from the snapshot", () => {
@@ -73,7 +74,7 @@ describe("model-capability-guardrails", () => {
       expect.objectContaining({
         kind: "pattern-alias-collides-with-snapshot",
         modelID: "gemini-3.1-pro-high",
-        canonicalModelID: "gemini-3.1-pro",
+        canonicalModelID: SUPPORTED_MODELS.GEMINI_3_1_PRO,
       }),
     )
   })
@@ -116,7 +117,7 @@ describe("model-capability-guardrails", () => {
       expect.objectContaining({
         kind: "built-in-model-relies-on-alias",
         modelID: "gemini-3.1-pro-high",
-        canonicalModelID: "gemini-3.1-pro",
+        canonicalModelID: SUPPORTED_MODELS.GEMINI_3_1_PRO,
         ruleID: "gemini-3.1-pro-tier-alias",
       }),
     )

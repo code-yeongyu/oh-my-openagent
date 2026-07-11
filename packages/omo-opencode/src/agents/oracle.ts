@@ -1,3 +1,4 @@
+import { SUPPORTED_REASONING_EFFORTS } from "@oh-my-opencode/model-core";
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
 import { buildClaudeThinkingConfig, isGpt5_5Model, isGpt5_6Model, isGptModel } from "./types";
@@ -430,7 +431,7 @@ export function createOracleAgent(model: string): AgentConfig {
     return {
       ...base,
       prompt: ORACLE_GPT_5_5_PROMPT,
-      reasoningEffort: "medium",
+      reasoningEffort: SUPPORTED_REASONING_EFFORTS.MEDIUM,
       textVerbosity: "high",
     } as AgentConfig;
   }
@@ -439,7 +440,7 @@ export function createOracleAgent(model: string): AgentConfig {
     return {
       ...base,
       prompt: ORACLE_GPT_PROMPT,
-      reasoningEffort: "medium",
+      reasoningEffort: SUPPORTED_REASONING_EFFORTS.MEDIUM,
       textVerbosity: "high",
     } as AgentConfig;
   }

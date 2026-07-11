@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { beforeEach, describe, expect, it } from "bun:test"
 
 const { clearThinkModeState, createThinkModeHook } = await import("./index")
@@ -48,8 +49,8 @@ describe("createThinkModeHook", () => {
     const hook = createThinkModeHook()
     const input = createHookInput({
       sessionID,
-      providerID: "github-copilot",
-      modelID: "claude-opus-4-7",
+      providerID: SUPPORTED_PROVIDERS.GITHUB_COPILOT,
+      modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
     })
     const output = createHookOutput("Please think deeply about this")
 
@@ -66,8 +67,8 @@ describe("createThinkModeHook", () => {
     const hook = createThinkModeHook()
     const input = createHookInput({
       sessionID,
-      providerID: "github-copilot",
-      modelID: "gpt-5.4",
+      providerID: SUPPORTED_PROVIDERS.GITHUB_COPILOT,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
     })
     const output = createHookOutput("ultrathink about this")
 
@@ -84,8 +85,8 @@ describe("createThinkModeHook", () => {
     const hook = createThinkModeHook()
     const input = createHookInput({
       sessionID,
-      providerID: "github-copilot",
-      modelID: "claude-sonnet-4-6",
+      providerID: SUPPORTED_PROVIDERS.GITHUB_COPILOT,
+      modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
     })
     const output = createHookOutput("think through this", "max")
 
@@ -102,8 +103,8 @@ describe("createThinkModeHook", () => {
     const hook = createThinkModeHook()
     const input = createHookInput({
       sessionID,
-      providerID: "google",
-      modelID: "gemini-3.1-pro",
+      providerID: SUPPORTED_PROVIDERS.GOOGLE,
+      modelID: SUPPORTED_MODELS.GEMINI_3_1_PRO,
     })
     const output = createHookOutput("Please solve this directly")
 
@@ -120,7 +121,7 @@ describe("createThinkModeHook", () => {
     const hook = createThinkModeHook()
     const input = createHookInput({
       sessionID,
-      providerID: "openai",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
       modelID: "gpt-5-high",
     })
     const output = createHookOutput("think deeply")

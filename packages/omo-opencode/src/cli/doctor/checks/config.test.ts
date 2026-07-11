@@ -1,3 +1,4 @@
+import { SUPPORTED_MODELS , SUPPORTED_REASONING_EFFORTS } from "@oh-my-opencode/model-core";
 import { describe, it, expect } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -146,7 +147,7 @@ describe("config check", () => {
         writeFileSync(
           join(xdgCacheDir, "opencode", "models.json"),
           JSON.stringify({
-            openai: { models: { "gpt-5.4": {} } },
+            openai: { models: { [SUPPORTED_MODELS.GPT_5_4]: {} } },
           }, null, 2) + "\n",
           "utf-8",
         )
@@ -175,7 +176,7 @@ describe("config check", () => {
       }
     })
 
-    // regression: issue #4165 — doctor used to falsely flag reasoningEffort: "max"
+    // regression: issue #4165 — doctor used to falsely flag reasoningEffort: SUPPORTED_REASONING_EFFORTS.MAX
     // as an "Invalid configuration" error even though the schema and runtime accept it.
     it("does not flag reasoningEffort: 'max' as an invalid configuration", async () => {
       const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
@@ -191,7 +192,7 @@ describe("config check", () => {
           join(testConfigDir, "oh-my-openagent.json"),
           JSON.stringify({
             agents: {
-              sisyphus: { reasoningEffort: "max" },
+              sisyphus: { reasoningEffort: SUPPORTED_REASONING_EFFORTS.MAX },
             },
           }, null, 2) + "\n",
           "utf-8",

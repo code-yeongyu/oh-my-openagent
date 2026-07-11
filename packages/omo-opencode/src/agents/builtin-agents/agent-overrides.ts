@@ -25,7 +25,7 @@ export function applyCategoryOverride(
   if (categoryConfig.reasoningEffort !== undefined) result.reasoningEffort = categoryConfig.reasoningEffort
   if (categoryConfig.textVerbosity !== undefined) result.textVerbosity = categoryConfig.textVerbosity
   if (categoryConfig.thinking !== undefined) result.thinking = categoryConfig.thinking
-  if (categoryConfig.top_p !== undefined) result.top_p = categoryConfig.top_p
+  if (categoryConfig.topP !== undefined) result.topP = categoryConfig.topP
   if (categoryConfig.maxTokens !== undefined) result.maxTokens = categoryConfig.maxTokens
 
   if (categoryConfig.prompt_append && typeof result.prompt === "string") {

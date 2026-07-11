@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, test } from "bun:test"
@@ -43,7 +44,7 @@ describe("todo continuation registered agent resolution", () => {
       sessionID: "ses_todo_registered_atlas",
       resolvedInfo: {
         agent: "atlas",
-        model: { providerID: "openai", modelID: "gpt-5.5" },
+        model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5 },
       },
       sessionStateStore: unsafeTestValue(sessionStateStore),
     })
@@ -78,7 +79,7 @@ describe("todo continuation registered agent resolution", () => {
       sessionID: "ses_todo_registered_zwsp_atlas",
       resolvedInfo: {
         agent: "atlas",
-        model: { providerID: "openai", modelID: "gpt-5.5" },
+        model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5 },
       },
       sessionStateStore: unsafeTestValue(sessionStateStore),
     })

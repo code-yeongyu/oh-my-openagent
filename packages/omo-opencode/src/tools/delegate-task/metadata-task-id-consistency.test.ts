@@ -1,10 +1,11 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 const { describe, test, expect } = require("bun:test")
 
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ParentContext } from "./executor-types"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
-const MODEL = { providerID: "anthropic", modelID: "claude-sonnet-4-6" }
+const MODEL = { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 }
 
 type CapturedMetadata = { title?: string; metadata: Record<string, unknown> }
 

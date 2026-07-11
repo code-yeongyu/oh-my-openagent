@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
@@ -250,9 +251,9 @@ describe("createChatMessageHandler - cache warning behavior", () => {
     mkdirSync(getOmoOpenCodeCacheDir(), { recursive: true })
     writeFileSync(providerModelsCachePath, JSON.stringify({
       models: {
-        openai: [{ id: "gpt-5.4" }],
+        openai: [{ id: SUPPORTED_MODELS.GPT_5_4 }],
       },
-      connected: ["openai"],
+      connected: [SUPPORTED_PROVIDERS.OPENAI],
       updatedAt: new Date().toISOString(),
     }))
 
@@ -282,9 +283,9 @@ describe("createChatMessageHandler - cache warning behavior", () => {
     mkdirSync(getOpenCodeCacheDir(), { recursive: true })
     writeFileSync(modelsCachePath, JSON.stringify({
       openai: {
-        id: "openai",
+        id: SUPPORTED_PROVIDERS.OPENAI,
         models: {
-          "gpt-5.4": { id: "gpt-5.4" },
+          [SUPPORTED_MODELS.GPT_5_4]: { id: SUPPORTED_MODELS.GPT_5_4 },
         },
       },
     }))
@@ -730,7 +731,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     //#given - first message, no user-selected variant
     const args = createMockHandlerArgs({ shouldOverride: true })
     const handler = createChatMessageHandler(args)
-    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.5" })
+    const input = createMockInput("hephaestus", { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5 })
     const output = createMockOutput() // no variant set
 
     //#when
@@ -744,7 +745,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     //#given - first message, user already selected "xhigh" variant in OpenCode UI
     const args = createMockHandlerArgs({ shouldOverride: true })
     const handler = createChatMessageHandler(args)
-    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.5" })
+    const input = createMockInput("hephaestus", { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5 })
     const output = createMockOutput("xhigh") // user selected xhigh
 
     //#when
@@ -758,7 +759,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     //#given - not first message, variant already set
     const args = createMockHandlerArgs({ shouldOverride: false })
     const handler = createChatMessageHandler(args)
-    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.5" })
+    const input = createMockInput("hephaestus", { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5 })
     const output = createMockOutput("xhigh")
 
     //#when
@@ -772,7 +773,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     //#given - not first message, no variant from TUI
     const args = createMockHandlerArgs({ shouldOverride: false })
     const handler = createChatMessageHandler(args)
-    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.5" })
+    const input = createMockInput("hephaestus", { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5 })
     const output = createMockOutput() // no variant
 
     //#when
@@ -786,7 +787,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     //#given - first message with user-selected variant
     const args = createMockHandlerArgs({ shouldOverride: true })
     const handler = createChatMessageHandler(args)
-    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.5" })
+    const input = createMockInput("hephaestus", { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5 })
     const output = createMockOutput("xhigh")
 
     //#when
@@ -811,7 +812,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
       },
     }
     const handler = createChatMessageHandler(args)
-    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.5" })
+    const input = createMockInput("hephaestus", { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5 })
     const output = createMockOutput()
 
     //#when
@@ -825,7 +826,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
   test("reuses the stored model for subsequent messages in the main session when the UI sends none", async () => {
     //#given
     setMainSession("test-session")
-    setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.4" })
+    setSessionModel("test-session", { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 })
     const args = createMockHandlerArgs({ shouldOverride: false })
     const handler = createChatMessageHandler(args)
     const input = createMockInput("sisyphus")
@@ -835,14 +836,14 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     await handler(input, output)
 
     //#then
-    expect(output.message["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
-    expect(getSessionModel("test-session")).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+    expect(output.message["model"]).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 })
+    expect(getSessionModel("test-session")).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 })
   })
 
   test("does not reuse a stored model for the first message of a session", async () => {
     //#given
     setMainSession("test-session")
-    setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.4" })
+    setSessionModel("test-session", { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 })
     const args = createMockHandlerArgs({ shouldOverride: true })
     const handler = createChatMessageHandler(args)
     const input = createMockInput("sisyphus")
@@ -858,7 +859,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
   test("does not reuse the main-session model for subagent sessions", async () => {
     //#given
     setMainSession("main-session")
-    setSessionModel("main-session", { providerID: "openai", modelID: "gpt-5.4" })
+    setSessionModel("main-session", { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 })
     subagentSessions.add("subagent-session")
     const args = createMockHandlerArgs({ shouldOverride: false })
     const handler = createChatMessageHandler(args)
@@ -879,7 +880,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
   test("does not override explicit agent model overrides with stored session model", async () => {
     //#given
     setMainSession("test-session")
-    setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.4" })
+    setSessionModel("test-session", { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 })
     const args = createMockHandlerArgs({
       shouldOverride: false,
       pluginConfig: {
@@ -897,13 +898,13 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
 
     //#then
     expect(output.message["model"]).toBeUndefined()
-    expect(getSessionModel("test-session")).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+    expect(getSessionModel("test-session")).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 })
   })
 
   test("treats prefixed list-display agent names as explicit model overrides", async () => {
     //#given
     setMainSession("test-session")
-    setSessionModel("test-session", { providerID: "openai", modelID: "gpt-5.4" })
+    setSessionModel("test-session", { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 })
     const args = createMockHandlerArgs({
       shouldOverride: false,
       pluginConfig: {
@@ -921,17 +922,17 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
 
     //#then
     expect(output.message["model"]).toBeUndefined()
-    expect(getSessionModel("test-session")).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+    expect(getSessionModel("test-session")).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 })
     expect(getSessionAgent("test-session")).toBe("Prometheus - Plan Builder")
   })
 
   test("respects a mid-conversation model switch instead of reusing the previous stored model", async () => {
     //#given
     setMainSession("test-session")
-    setSessionModel("test-session", { providerID: "anthropic", modelID: "claude-opus-4-7" })
+    setSessionModel("test-session", { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 })
     const args = createMockHandlerArgs({ shouldOverride: false })
     const handler = createChatMessageHandler(args)
-    const nextModel = { providerID: "openai", modelID: "gpt-5.4" }
+    const nextModel = { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 }
     const input = createMockInput("sisyphus", nextModel)
     const output = createMockOutput()
 

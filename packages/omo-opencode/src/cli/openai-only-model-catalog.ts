@@ -1,3 +1,4 @@
+import { SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 import type { AgentConfig, CategoryConfig, GeneratedOmoConfig, ProviderAvailability } from "./model-fallback-types"
 
 const OPENAI_ONLY_AGENT_OVERRIDES: Record<string, AgentConfig> = {
@@ -6,10 +7,10 @@ const OPENAI_ONLY_AGENT_OVERRIDES: Record<string, AgentConfig> = {
 }
 
 const OPENAI_ONLY_CATEGORY_OVERRIDES: Record<string, CategoryConfig> = {
-  artistry: { model: "openai/gpt-5.5", variant: "xhigh" },
+  artistry: { model: "openai/gpt-5.5", variant: SUPPORTED_VARIANTS.XHIGH },
   quick: { model: "openai/gpt-5.4-mini" },
-  "visual-engineering": { model: "openai/gpt-5.5", variant: "high" },
-  writing: { model: "openai/gpt-5.5", variant: "medium" },
+  "visual-engineering": { model: "openai/gpt-5.5", variant: SUPPORTED_VARIANTS.HIGH },
+  writing: { model: "openai/gpt-5.5", variant: SUPPORTED_VARIANTS.MEDIUM },
 }
 
 export function isOpenAiOnlyAvailability(availability: ProviderAvailability): boolean {

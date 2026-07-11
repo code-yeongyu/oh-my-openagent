@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 /// <reference path="../../../../../bun-test.d.ts" />
 
 import { afterEach, describe, expect, test } from "bun:test"
@@ -37,7 +38,7 @@ describe("injectContinuation agent names", () => {
       sessionID: "ses_lowercase_builtin_agent",
       resolvedInfo: {
         agent: "hephaestus",
-        model: { providerID: "openai", modelID: "gpt-5.5" },
+        model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5 },
       },
       sessionStateStore,
     })
@@ -71,7 +72,7 @@ describe("injectContinuation agent names", () => {
       sessionID: "ses_invisible_lowercase_builtin_agent",
       resolvedInfo: {
         agent: "\u200Bhephaestus",
-        model: { providerID: "openai", modelID: "gpt-5.5" },
+        model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_5 },
       },
       sessionStateStore,
     })

@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS } from "./registry";
 import { describe, expect, test } from "bun:test"
 import { AGENT_MODEL_REQUIREMENTS } from "./model-requirements"
 
@@ -12,9 +13,9 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // then
     expect(oracle.fallbackChain).toBeArray()
     expect(oracle.fallbackChain.length).toBeGreaterThan(0)
-    expect(primary?.providers).toContain("openai")
-    expect(primary?.model).toBe("gpt-5.5")
-    expect(primary?.variant).toBe("high")
+    expect(primary?.providers).toContain(SUPPORTED_PROVIDERS.OPENAI)
+    expect(primary?.model).toBe(SUPPORTED_MODELS.GPT_5_5)
+    expect(primary?.variant).toBe(SUPPORTED_VARIANTS.HIGH)
   })
 
   test("sisyphus keeps opus primary before k2p5, kimi-k2.5, gpt-5.5 medium, and big-pickle", () => {
@@ -28,22 +29,22 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(sisyphus.fallbackChain).toHaveLength(7)
     expect(sisyphus.requiresAnyModel).toBe(true)
     expect(primary).toEqual({
-      providers: ["anthropic", "github-copilot", "opencode", "vercel"],
-      model: "claude-opus-4-7",
-      variant: "max",
+      providers: [SUPPORTED_PROVIDERS.ANTHROPIC, SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],
+      model: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
+      variant: SUPPORTED_VARIANTS.MAX,
     })
-    expect(second).toEqual({ providers: ["opencode-go", "vercel"], model: "kimi-k2.6" })
-    expect(third).toEqual({ providers: ["kimi-for-coding"], model: "k2p5" })
-    expect(fourth?.model).toBe("kimi-k2.5")
+    expect(second).toEqual({ providers: [SUPPORTED_PROVIDERS.OPENCODE_GO, SUPPORTED_PROVIDERS.VERCEL], model: SUPPORTED_MODELS.KIMI_K2_6 })
+    expect(third).toEqual({ providers: [SUPPORTED_PROVIDERS.KIMI_FOR_CODING], model: SUPPORTED_MODELS.KIMI_K2P5 })
+    expect(fourth?.model).toBe(SUPPORTED_MODELS.KIMI_K2_5)
     expect(fifth).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.5",
-      variant: "medium",
+      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],
+      model: SUPPORTED_MODELS.GPT_5_5,
+      variant: SUPPORTED_VARIANTS.MEDIUM,
     })
-    expect(sixth?.providers[0]).toBe("zai-coding-plan")
-    expect(sixth?.model).toBe("glm-5")
-    expect(last?.providers[0]).toBe("opencode")
-    expect(last?.model).toBe("big-pickle")
+    expect(sixth?.providers[0]).toBe(SUPPORTED_PROVIDERS.ZAI_CODING_PLAN)
+    expect(sixth?.model).toBe(SUPPORTED_MODELS.GLM_5)
+    expect(last?.providers[0]).toBe(SUPPORTED_PROVIDERS.OPENCODE)
+    expect(last?.model).toBe(SUPPORTED_MODELS.BIG_PICKLE)
   })
 
   test("librarian keeps fast OpenAI primary before qwen, minimax, haiku, and nano fallbacks", () => {
@@ -56,23 +57,23 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     // then
     expect(librarian.fallbackChain).toHaveLength(8)
-    expect(primary).toEqual({ providers: ["openai"], model: "gpt-5.4-mini-fast" })
-    expect(second?.providers).toContain("opencode-go")
-    expect(second?.providers).toContain("bailian-coding-plan")
-    expect(second?.model).toBe("qwen3.5-plus")
-    expect(third).toEqual({ providers: ["vercel"], model: "minimax-m2.7-highspeed" })
-    expect(fourth?.providers).toContain("opencode-go")
-    expect(fourth?.model).toBe("minimax-m3")
+    expect(primary).toEqual({ providers: [SUPPORTED_PROVIDERS.OPENAI], model: SUPPORTED_MODELS.GPT_5_4_MINI_FAST })
+    expect(second?.providers).toContain(SUPPORTED_PROVIDERS.OPENCODE_GO)
+    expect(second?.providers).toContain(SUPPORTED_PROVIDERS.BAILIAN_CODING_PLAN)
+    expect(second?.model).toBe(SUPPORTED_MODELS.QWEN_3_5_PLUS)
+    expect(third).toEqual({ providers: [SUPPORTED_PROVIDERS.VERCEL], model: SUPPORTED_MODELS.MINIMAX_M2_7_HIGHSPEED })
+    expect(fourth?.providers).toContain(SUPPORTED_PROVIDERS.OPENCODE_GO)
+    expect(fourth?.model).toBe(SUPPORTED_MODELS.MINIMAX_M3)
     expect(fifth).toEqual({
-      providers: ["minimax-coding-plan", "minimax-cn-coding-plan"],
-      model: "MiniMax-M3",
+      providers: [SUPPORTED_PROVIDERS.MINIMAX_CODING_PLAN, SUPPORTED_PROVIDERS.MINIMAX_CN_CODING_PLAN],
+      model: SUPPORTED_MODELS.MINIMAX_M3_NATIVE,
     })
-    expect(sixth?.providers).toContain("opencode-go")
-    expect(sixth?.model).toBe("minimax-m2.7")
-    expect(seventh?.providers).toContain("anthropic")
-    expect(seventh?.model).toBe("claude-haiku-4-5")
-    expect(eighth?.providers).toContain("openai")
-    expect(eighth?.model).toBe("gpt-5.4-nano")
+    expect(sixth?.providers).toContain(SUPPORTED_PROVIDERS.OPENCODE_GO)
+    expect(sixth?.model).toBe(SUPPORTED_MODELS.MINIMAX_M2_7)
+    expect(seventh?.providers).toContain(SUPPORTED_PROVIDERS.ANTHROPIC)
+    expect(seventh?.model).toBe(SUPPORTED_MODELS.CLAUDE_HAIKU_4_5)
+    expect(eighth?.providers).toContain(SUPPORTED_PROVIDERS.OPENAI)
+    expect(eighth?.model).toBe(SUPPORTED_MODELS.GPT_5_4_NANO)
   })
 
   test("explore keeps fast OpenAI primary before qwen, minimax, haiku, and nano fallbacks", () => {
@@ -84,23 +85,23 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     // then
     expect(explore.fallbackChain).toHaveLength(8)
-    expect(primary).toEqual({ providers: ["openai"], model: "gpt-5.4-mini-fast" })
-    expect(second?.providers).toContain("opencode-go")
-    expect(second?.providers).toContain("bailian-coding-plan")
-    expect(second?.model).toBe("qwen3.5-plus")
-    expect(third).toEqual({ providers: ["vercel"], model: "minimax-m2.7-highspeed" })
-    expect(fourth?.providers).toContain("opencode-go")
-    expect(fourth?.model).toBe("minimax-m3")
+    expect(primary).toEqual({ providers: [SUPPORTED_PROVIDERS.OPENAI], model: SUPPORTED_MODELS.GPT_5_4_MINI_FAST })
+    expect(second?.providers).toContain(SUPPORTED_PROVIDERS.OPENCODE_GO)
+    expect(second?.providers).toContain(SUPPORTED_PROVIDERS.BAILIAN_CODING_PLAN)
+    expect(second?.model).toBe(SUPPORTED_MODELS.QWEN_3_5_PLUS)
+    expect(third).toEqual({ providers: [SUPPORTED_PROVIDERS.VERCEL], model: SUPPORTED_MODELS.MINIMAX_M2_7_HIGHSPEED })
+    expect(fourth?.providers).toContain(SUPPORTED_PROVIDERS.OPENCODE_GO)
+    expect(fourth?.model).toBe(SUPPORTED_MODELS.MINIMAX_M3)
     expect(fifth).toEqual({
-      providers: ["minimax-coding-plan", "minimax-cn-coding-plan"],
-      model: "MiniMax-M3",
+      providers: [SUPPORTED_PROVIDERS.MINIMAX_CODING_PLAN, SUPPORTED_PROVIDERS.MINIMAX_CN_CODING_PLAN],
+      model: SUPPORTED_MODELS.MINIMAX_M3_NATIVE,
     })
-    expect(sixth?.providers).toContain("opencode-go")
-    expect(sixth?.model).toBe("minimax-m2.7")
-    expect(seventh?.providers).toContain("anthropic")
-    expect(seventh?.model).toBe("claude-haiku-4-5")
-    expect(eighth?.providers).toContain("openai")
-    expect(eighth?.model).toBe("gpt-5.4-nano")
+    expect(sixth?.providers).toContain(SUPPORTED_PROVIDERS.OPENCODE_GO)
+    expect(sixth?.model).toBe(SUPPORTED_MODELS.MINIMAX_M2_7)
+    expect(seventh?.providers).toContain(SUPPORTED_PROVIDERS.ANTHROPIC)
+    expect(seventh?.model).toBe(SUPPORTED_MODELS.CLAUDE_HAIKU_4_5)
+    expect(eighth?.providers).toContain(SUPPORTED_PROVIDERS.OPENAI)
+    expect(eighth?.model).toBe(SUPPORTED_MODELS.GPT_5_4_NANO)
   })
 
   test("multimodal-looker keeps vision-capable fallback order", () => {
@@ -113,15 +114,15 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // then
     expect(multimodalLooker.fallbackChain).toHaveLength(4)
     expect(primary).toEqual({
-      providers: ["openai", "opencode", "vercel"],
-      model: "gpt-5.5",
-      variant: "medium",
+      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],
+      model: SUPPORTED_MODELS.GPT_5_5,
+      variant: SUPPORTED_VARIANTS.MEDIUM,
     })
-    expect(secondary).toEqual({ providers: ["opencode-go", "vercel"], model: "kimi-k2.6" })
-    expect(tertiary?.model).toBe("glm-4.6v")
+    expect(secondary).toEqual({ providers: [SUPPORTED_PROVIDERS.OPENCODE_GO, SUPPORTED_PROVIDERS.VERCEL], model: SUPPORTED_MODELS.KIMI_K2_6 })
+    expect(tertiary?.model).toBe(SUPPORTED_MODELS.GLM_4_6V)
     expect(last).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5-nano",
+      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],
+      model: SUPPORTED_MODELS.GPT_5_NANO,
     })
   })
 
@@ -135,9 +136,9 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // then
     expect(prometheus.fallbackChain.length).toBeGreaterThan(1)
     expect(primary).toEqual({
-      providers: ["anthropic", "github-copilot", "opencode", "vercel"],
-      model: "claude-opus-4-7",
-      variant: "max",
+      providers: [SUPPORTED_PROVIDERS.ANTHROPIC, SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],
+      model: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
+      variant: SUPPORTED_VARIANTS.MAX,
     })
   })
 
@@ -148,24 +149,24 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // when
     const primary = metis.fallbackChain[0]
     const opusFallback = metis.fallbackChain[1]
-    const openAiFallback = metis.fallbackChain.find((entry) => entry.providers.includes("openai"))
+    const openAiFallback = metis.fallbackChain.find((entry) => entry.providers.includes(SUPPORTED_PROVIDERS.OPENAI))
 
     // then
     expect(metis.fallbackChain.length).toBeGreaterThan(1)
     expect(primary).toEqual({
-      providers: ["anthropic", "github-copilot", "opencode", "vercel"],
-      model: "claude-sonnet-4-6",
+      providers: [SUPPORTED_PROVIDERS.ANTHROPIC, SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],
+      model: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
     })
-    expect(opusFallback?.model).toBe("claude-opus-4-7")
-    expect(opusFallback?.variant).toBe("max")
+    expect(opusFallback?.model).toBe(SUPPORTED_MODELS.CLAUDE_OPUS_4_7)
+    expect(opusFallback?.variant).toBe(SUPPORTED_VARIANTS.MAX)
     expect(openAiFallback).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.5",
-      variant: "high",
+      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],
+      model: SUPPORTED_MODELS.GPT_5_5,
+      variant: SUPPORTED_VARIANTS.HIGH,
     })
   })
 
-  test("momus has gpt-5.6-sol xhigh as primary before gpt-5.5 xhigh", () => {
+  test("momus has gpt-5.6-sol ultra as primary before gpt-5.5 xhigh", () => {
     // given
     const momus = AGENT_MODEL_REQUIREMENTS["momus"]
 
@@ -175,14 +176,14 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // then
     expect(momus.fallbackChain.length).toBeGreaterThan(1)
     expect(primary).toEqual({
-      providers: ["openai", "vercel"],
-      model: "gpt-5.6-sol",
-      variant: "xhigh",
+      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.VERCEL],
+      model: SUPPORTED_MODELS.GPT_5_6_SOL,
+      variant: SUPPORTED_VARIANTS.ULTRA,
     })
     expect(secondary).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.5",
-      variant: "xhigh",
+      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],
+      model: SUPPORTED_MODELS.GPT_5_5,
+      variant: SUPPORTED_VARIANTS.XHIGH,
     })
   })
 
@@ -195,23 +196,23 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     // then
     expect(atlas.fallbackChain).toHaveLength(6)
-    expect(primary?.model).toBe("claude-sonnet-4-6")
-    expect(primary?.providers[0]).toBe("anthropic")
-    expect(secondary?.model).toBe("kimi-k2.6")
-    expect(secondary?.providers[0]).toBe("opencode-go")
+    expect(primary?.model).toBe(SUPPORTED_MODELS.CLAUDE_SONNET_4_6)
+    expect(primary?.providers[0]).toBe(SUPPORTED_PROVIDERS.ANTHROPIC)
+    expect(secondary?.model).toBe(SUPPORTED_MODELS.KIMI_K2_6)
+    expect(secondary?.providers[0]).toBe(SUPPORTED_PROVIDERS.OPENCODE_GO)
     expect(tertiary).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.5",
-      variant: "medium",
+      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],
+      model: SUPPORTED_MODELS.GPT_5_5,
+      variant: SUPPORTED_VARIANTS.MEDIUM,
     })
-    expect(fourth?.model).toBe("minimax-m3")
-    expect(fourth?.providers[0]).toBe("opencode-go")
+    expect(fourth?.model).toBe(SUPPORTED_MODELS.MINIMAX_M3)
+    expect(fourth?.providers[0]).toBe(SUPPORTED_PROVIDERS.OPENCODE_GO)
     expect(fifth).toEqual({
-      providers: ["minimax-coding-plan", "minimax-cn-coding-plan"],
-      model: "MiniMax-M3",
+      providers: [SUPPORTED_PROVIDERS.MINIMAX_CODING_PLAN, SUPPORTED_PROVIDERS.MINIMAX_CN_CODING_PLAN],
+      model: SUPPORTED_MODELS.MINIMAX_M3_NATIVE,
     })
-    expect(sixth?.model).toBe("minimax-m2.7")
-    expect(sixth?.providers[0]).toBe("opencode-go")
+    expect(sixth?.model).toBe(SUPPORTED_MODELS.MINIMAX_M2_7)
+    expect(sixth?.providers[0]).toBe(SUPPORTED_PROVIDERS.OPENCODE_GO)
   })
 
   test("sisyphus-junior keeps OpenAI fallback before minimax and big-pickle", () => {
@@ -220,29 +221,29 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     // when
     const openAiFallback = sisyphusJunior.fallbackChain.find((entry) =>
-      entry.providers.includes("openai")
+      entry.providers.includes(SUPPORTED_PROVIDERS.OPENAI)
     )
     const openAiFallbackIndex = sisyphusJunior.fallbackChain.findIndex((entry) =>
-      entry.providers.includes("openai")
+      entry.providers.includes(SUPPORTED_PROVIDERS.OPENAI)
     )
     const minimaxM3Index = sisyphusJunior.fallbackChain.findIndex(
-      (entry) => entry.model === "minimax-m3"
+      (entry) => entry.model === SUPPORTED_MODELS.MINIMAX_M3
     )
     const minimaxCodingPlanIndex = sisyphusJunior.fallbackChain.findIndex(
-      (entry) => entry.model === "MiniMax-M3"
+      (entry) => entry.model === SUPPORTED_MODELS.MINIMAX_M3_NATIVE
     )
     const minimaxIndex = sisyphusJunior.fallbackChain.findIndex(
-      (entry) => entry.model === "minimax-m2.7"
+      (entry) => entry.model === SUPPORTED_MODELS.MINIMAX_M2_7
     )
     const bigPickleIndex = sisyphusJunior.fallbackChain.findIndex(
-      (entry) => entry.model === "big-pickle"
+      (entry) => entry.model === SUPPORTED_MODELS.BIG_PICKLE
     )
 
     // then
     expect(openAiFallback).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.5",
-      variant: "medium",
+      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],
+      model: SUPPORTED_MODELS.GPT_5_5,
+      variant: SUPPORTED_VARIANTS.MEDIUM,
     })
     expect(openAiFallbackIndex).toBeGreaterThan(-1)
     expect(minimaxM3Index).toBeGreaterThan(openAiFallbackIndex)
@@ -257,10 +258,10 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     // when / then
     expect(hephaestus.requiresProvider).toEqual([
-      "openai",
-      "github-copilot",
-      "opencode",
-      "vercel",
+      SUPPORTED_PROVIDERS.OPENAI,
+      SUPPORTED_PROVIDERS.GITHUB_COPILOT,
+      SUPPORTED_PROVIDERS.OPENCODE,
+      SUPPORTED_PROVIDERS.VERCEL,
     ])
     expect(hephaestus.requiresProvider).not.toContain("venice")
     expect(hephaestus.fallbackChain[0]?.providers).not.toContain("venice")
@@ -277,14 +278,14 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     // then
     expect(primary).toEqual({
-      providers: ["openai", "vercel"],
-      model: "gpt-5.6-sol",
-      variant: "medium",
+      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.VERCEL],
+      model: SUPPORTED_MODELS.GPT_5_6_SOL,
+      variant: SUPPORTED_VARIANTS.MEDIUM,
     })
     expect(secondary).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.5",
-      variant: "medium",
+      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],
+      model: SUPPORTED_MODELS.GPT_5_5,
+      variant: SUPPORTED_VARIANTS.MEDIUM,
     })
   })
 })

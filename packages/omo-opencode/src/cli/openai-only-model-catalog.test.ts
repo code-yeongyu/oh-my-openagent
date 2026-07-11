@@ -1,3 +1,4 @@
+import { SUPPORTED_VARIANTS } from "@oh-my-opencode/model-core";
 import { describe, expect, test } from "bun:test"
 
 import { generateModelConfig } from "./model-fallback"
@@ -56,10 +57,10 @@ describe("generateModelConfig OpenAI-only model catalog", () => {
     const result = generateModelConfig(config)
 
     // #then
-    expect(result.categories?.artistry).toEqual({ model: "openai/gpt-5.5", variant: "xhigh" })
+    expect(result.categories?.artistry).toEqual({ model: "openai/gpt-5.5", variant: SUPPORTED_VARIANTS.XHIGH })
     expect(result.categories?.quick).toEqual({ model: "openai/gpt-5.4-mini" })
-    expect(result.categories?.["visual-engineering"]).toEqual({ model: "openai/gpt-5.5", variant: "high" })
-    expect(result.categories?.writing).toEqual({ model: "openai/gpt-5.5", variant: "medium" })
+    expect(result.categories?.["visual-engineering"]).toEqual({ model: "openai/gpt-5.5", variant: SUPPORTED_VARIANTS.HIGH })
+    expect(result.categories?.writing).toEqual({ model: "openai/gpt-5.5", variant: SUPPORTED_VARIANTS.MEDIUM })
   })
 
   test("does not apply OpenAI-only overrides when OpenCode Go is also available", () => {
@@ -72,8 +73,8 @@ describe("generateModelConfig OpenAI-only model catalog", () => {
     // #then
     expect(result.agents?.explore).toMatchObject({ model: "openai/gpt-5.4-mini-fast" })
     expect(result.agents?.librarian).toMatchObject({ model: "openai/gpt-5.4-mini-fast" })
-    expect(result.agents?.explore).not.toMatchObject({ variant: "medium" })
-    expect(result.agents?.librarian).not.toMatchObject({ variant: "medium" })
+    expect(result.agents?.explore).not.toMatchObject({ variant: SUPPORTED_VARIANTS.MEDIUM })
+    expect(result.agents?.librarian).not.toMatchObject({ variant: SUPPORTED_VARIANTS.MEDIUM })
     expect(result.categories?.quick).toMatchObject({ model: "openai/gpt-5.4-mini" })
   })
 
@@ -88,7 +89,7 @@ describe("generateModelConfig OpenAI-only model catalog", () => {
 
       // #then
       expect(isOpenAiOnlyAvailability(availability)).toBe(false)
-      expect(result.categories?.writing).not.toEqual({ model: "openai/gpt-5.5", variant: "medium" })
+      expect(result.categories?.writing).not.toEqual({ model: "openai/gpt-5.5", variant: SUPPORTED_VARIANTS.MEDIUM })
     })
   }
 })

@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 const { describe, test, expect, beforeEach, afterEach, mock, spyOn } = require("bun:test")
 
 const TEAM_TOOL_DENIALS = {
@@ -749,7 +750,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
           data: [
             { info: { id: "msg_001", role: "user", time: { created: 1000 }, agent: "oracle" } },
             {
-              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn", agent: "oracle", providerID: "openai", modelID: "gpt-5.4" },
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn", agent: "oracle", providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 },
               parts: [{ type: "text", text: "Response" }],
             },
           ],

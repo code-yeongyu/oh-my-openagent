@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { describe, expect, mock, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { resolveRecentPromptContextForSession } from "./recent-model-resolver"
@@ -14,8 +15,8 @@ describe("resolveRecentPromptContextForSession", () => {
               {
                 id: "msg_newer_in_array",
                 info: {
-                  providerID: "anthropic",
-                  modelID: "claude-sonnet-4-6",
+                  providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+                  modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
                   tools: { read: true },
                   time: { created: 10 },
                 },
@@ -23,8 +24,8 @@ describe("resolveRecentPromptContextForSession", () => {
               {
                 id: "msg_older_in_array",
                 info: {
-                  providerID: "openai",
-                  modelID: "gpt-5.4",
+                  providerID: SUPPORTED_PROVIDERS.OPENAI,
+                  modelID: SUPPORTED_MODELS.GPT_5_4,
                   tools: { edit: true },
                   time: { created: 100 },
                 },
@@ -39,7 +40,7 @@ describe("resolveRecentPromptContextForSession", () => {
     const result = await resolveRecentPromptContextForSession(ctx, "ses_123")
 
     // then
-    expect(result.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+    expect(result.model).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 })
     expect(result.tools).toEqual({ edit: true })
   })
 })

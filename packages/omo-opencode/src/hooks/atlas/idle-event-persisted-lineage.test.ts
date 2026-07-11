@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 declare const require: (name: string) => any
 const { afterEach, beforeEach, describe, expect, mock, test, afterAll } = require("bun:test")
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
@@ -110,7 +111,7 @@ describe("atlas hook idle-event persisted lineage", () => {
       },
       {
         [descendantSessionID]: [
-          { info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } },
+          { info: { agent: "atlas", providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 } },
         ],
       },
     )
@@ -146,7 +147,7 @@ describe("atlas hook idle-event persisted lineage", () => {
       },
       {
         [descendantSessionID]: [
-          { info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4" } },
+          { info: { agent: "sisyphus-junior", providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 } },
         ],
       },
     )
@@ -183,7 +184,7 @@ describe("atlas hook idle-event persisted lineage", () => {
             throw new Error("session lookup failed")
           },
           messages: async () => ({
-            data: [{ info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } }],
+            data: [{ info: { agent: "atlas", providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 } }],
           }),
           prompt: async (input: unknown) => {
             promptCalls.push(input)
@@ -228,7 +229,7 @@ describe("atlas hook idle-event persisted lineage", () => {
       },
       {
         [descendantSessionID]: [
-          { info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } },
+          { info: { agent: "atlas", providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 } },
         ],
       },
     )
@@ -264,7 +265,7 @@ describe("atlas hook idle-event persisted lineage", () => {
       },
       {
         [descendantSessionID]: [
-          { info: { agent: "sisyphus", providerID: "openai", modelID: "gpt-5.4" } },
+          { info: { agent: "sisyphus", providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 } },
         ],
       },
     )
@@ -299,7 +300,7 @@ describe("atlas hook idle-event persisted lineage", () => {
       },
       {
         [descendantSessionID]: [
-          { info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4" } },
+          { info: { agent: "sisyphus-junior", providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 } },
         ],
       },
     )

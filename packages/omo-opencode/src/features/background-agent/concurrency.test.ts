@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS } from "@oh-my-opencode/model-core";
 import { describe, test, expect, beforeEach } from "bun:test"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig } from "../../config/schema"
@@ -171,8 +172,8 @@ describe("ConcurrencyManager.getConcurrencyKey", () => {
     const secondKey = manager.getConcurrencyKey("anthropic/claude-opus-4-7")
 
     // then
-    expect(firstKey).toBe("anthropic")
-    expect(secondKey).toBe("anthropic")
+    expect(firstKey).toBe(SUPPORTED_PROVIDERS.ANTHROPIC)
+    expect(secondKey).toBe(SUPPORTED_PROVIDERS.ANTHROPIC)
   })
 
   test("should keep exact model key when model concurrency is configured", () => {

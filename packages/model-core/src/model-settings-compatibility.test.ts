@@ -1,3 +1,5 @@
+import { TEST_PROVIDERS, TEST_MODELS } from "./testing/model-fixtures";
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS, SUPPORTED_REASONING_EFFORTS, type Variant } from "./registry";
 import { describe, expect, test } from "bun:test"
 
 import { getModelCapabilities } from "./model-capabilities"
@@ -6,13 +8,13 @@ import { resolveCompatibleModelSettings } from "./model-settings-compatibility"
 describe("resolveCompatibleModelSettings", () => {
   test("keeps supported Claude Opus variant unchanged", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "anthropic",
-      modelID: "claude-opus-4-7",
-      desired: { variant: "max" },
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+      modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
+      desired: { variant: SUPPORTED_VARIANTS.MAX },
     })
 
     expect(result).toEqual({
-      variant: "max",
+      variant: SUPPORTED_VARIANTS.MAX,
       reasoningEffort: undefined,
       changes: [],
     })
@@ -20,14 +22,14 @@ describe("resolveCompatibleModelSettings", () => {
 
   test("uses model metadata first for variant support", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "anthropic",
-      modelID: "claude-opus-4-7",
-      desired: { variant: "max" },
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+      modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
+      desired: { variant: SUPPORTED_VARIANTS.MAX },
       capabilities: { variants: ["low", "medium", "high"] },
     })
 
     expect(result).toEqual({
-      variant: "high",
+      variant: SUPPORTED_VARIANTS.HIGH,
       reasoningEffort: undefined,
       changes: [
         {
@@ -42,9 +44,9 @@ describe("resolveCompatibleModelSettings", () => {
 
   test("prefers metadata over family heuristics even when family would allow a higher level", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "anthropic",
-      modelID: "claude-opus-4-7",
-      desired: { variant: "max" },
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+      modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
+      desired: { variant: SUPPORTED_VARIANTS.MAX },
       capabilities: { variants: ["low", "medium"] },
     })
 
@@ -61,9 +63,9 @@ describe("resolveCompatibleModelSettings", () => {
 
   test("downgrades unsupported Claude Sonnet max variant to high when metadata is absent", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "anthropic",
-      modelID: "claude-sonnet-4-6",
-      desired: { variant: "max" },
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+      modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
+      desired: { variant: SUPPORTED_VARIANTS.MAX },
     })
 
     expect(result.variant).toBe("high")
@@ -79,51 +81,51 @@ describe("resolveCompatibleModelSettings", () => {
 
   test("keeps supported GPT reasoningEffort unchanged", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "openai",
-      modelID: "gpt-5.4",
-      desired: { reasoningEffort: "high" },
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
+      desired: { reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH },
     })
 
     expect(result).toEqual({
       variant: undefined,
-      reasoningEffort: "high",
+      reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
       changes: [],
     })
   })
 
   test("keeps supported OpenAI reasoning-family effort for o-series models", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "openai",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
       modelID: "o3-mini",
-      desired: { reasoningEffort: "high" },
+      desired: { reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH },
     })
 
     expect(result).toEqual({
       variant: undefined,
-      reasoningEffort: "high",
+      reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
       changes: [],
     })
   })
 
   test("does not record case-only normalization as a compatibility downgrade", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "openai",
-      modelID: "gpt-5.4",
-      desired: { variant: "HIGH", reasoningEffort: "HIGH" },
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
+      desired: { variant: "high", reasoningEffort: "HIGH" },
     })
 
     expect(result).toEqual({
-      variant: "high",
-      reasoningEffort: "high",
+      variant: SUPPORTED_VARIANTS.HIGH,
+      reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
       changes: [],
     })
   })
 
   test("drops reasoningEffort for standard GPT models (gpt-4.1)", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "openai",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
       modelID: "gpt-4.1",
-      desired: { reasoningEffort: "high" },
+      desired: { reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH },
     })
 
     expect(result.reasoningEffort).toBeUndefined()
@@ -139,9 +141,9 @@ describe("resolveCompatibleModelSettings", () => {
 
   test("drops reasoningEffort for Claude family", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "anthropic",
-      modelID: "claude-sonnet-4-6",
-      desired: { reasoningEffort: "high" },
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+      modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
+      desired: { reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH },
     })
 
     expect(result.reasoningEffort).toBeUndefined()
@@ -157,13 +159,13 @@ describe("resolveCompatibleModelSettings", () => {
 
   test("handles combined variant and reasoningEffort normalization", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "anthropic",
-      modelID: "claude-sonnet-4-6",
-      desired: { variant: "max", reasoningEffort: "high" },
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+      modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
+      desired: { variant: SUPPORTED_VARIANTS.MAX, reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH },
     })
 
     expect(result).toEqual({
-      variant: "high",
+      variant: SUPPORTED_VARIANTS.HIGH,
       reasoningEffort: undefined,
       changes: [
         {
@@ -184,9 +186,9 @@ describe("resolveCompatibleModelSettings", () => {
 
   test("treats unknown model families conservatively by dropping unsupported settings", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "mystery",
-      modelID: "mystery-model-1",
-      desired: { variant: "max", reasoningEffort: "high" },
+      providerID: TEST_PROVIDERS.MYSTERY,
+      modelID: TEST_MODELS.MYSTERY_MODEL_1,
+      desired: { variant: SUPPORTED_VARIANTS.MAX, reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH },
     })
 
     expect(result).toEqual({
@@ -211,11 +213,11 @@ describe("resolveCompatibleModelSettings", () => {
 
   // Provider-agnostic detection: model ID is the source of truth, not provider ID
   test("detects Claude via any provider (provider-agnostic)", () => {
-    for (const providerID of ["anthropic", "aws-bedrock", "bedrock", "amazon-bedrock", "opencode", "my-custom-proxy", "google-vertex-anthropic"]) {
+    for (const providerID of [SUPPORTED_PROVIDERS.ANTHROPIC, "aws-bedrock", "bedrock", "amazon-bedrock", "opencode", "my-custom-proxy", "google-vertex-anthropic"]) {
       const result = resolveCompatibleModelSettings({
         providerID,
-        modelID: "claude-sonnet-4-6",
-        desired: { variant: "max" },
+        modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
+        desired: { variant: SUPPORTED_VARIANTS.MAX },
       })
 
       expect(result.variant).toBe("high")
@@ -227,7 +229,7 @@ describe("resolveCompatibleModelSettings", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "some-unknown-proxy",
       modelID: "claude-3-opus-20240229",
-      desired: { variant: "max" },
+      desired: { variant: SUPPORTED_VARIANTS.MAX },
     })
 
     expect(result.variant).toBe("max")
@@ -238,7 +240,7 @@ describe("resolveCompatibleModelSettings", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "azure-openai",
       modelID: "o3-mini",
-      desired: { reasoningEffort: "high" },
+      desired: { reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH },
     })
 
     expect(result.reasoningEffort).toBe("high")
@@ -252,11 +254,11 @@ describe("resolveCompatibleModelSettings", () => {
       expectedVariants: string[]
       hasReasoningEffort: boolean
     }> = [
-      { name: "Gemini", modelID: "gemini-3.1-pro", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
+      { name: "Gemini", modelID: SUPPORTED_MODELS.GEMINI_3_1_PRO, expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Grok", modelID: "grok-4.3", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: true },
-      { name: "Kimi (kimi)", modelID: "kimi-k2.5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
+      { name: "Kimi (kimi)", modelID: SUPPORTED_MODELS.KIMI_K2_5, expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Kimi (k2)", modelID: "k2-v2", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
-      { name: "GLM", modelID: "glm-5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
+      { name: "GLM", modelID: SUPPORTED_MODELS.GLM_5, expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Minimax", modelID: "minimax-m2.5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "DeepSeek", modelID: "deepseek-r2", expectedVariants: ["low", "medium", "high", "max"], hasReasoningEffort: true },
       { name: "Mistral", modelID: "mistral-large-next", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
@@ -270,10 +272,10 @@ describe("resolveCompatibleModelSettings", () => {
         const result = resolveCompatibleModelSettings({
           providerID: "any-provider",
           modelID,
-          desired: { variant: highest },
+          desired: { variant: highest as Variant },
         })
 
-        expect(result.variant).toBe(highest)
+        expect(result.variant).toBe(highest as Variant)
         expect(result.changes).toEqual([])
       })
 
@@ -287,10 +289,10 @@ describe("resolveCompatibleModelSettings", () => {
         const result = resolveCompatibleModelSettings({
           providerID: "any-provider",
           modelID,
-          desired: { variant: desiredVariant },
+          desired: { variant: desiredVariant as Variant },
         })
 
-        expect(result.variant).toBe(expectedDowngrade)
+        expect(result.variant).toBe(expectedDowngrade as Variant)
         expect(result.changes[0]?.reason).toBe("unsupported-by-model-family")
       })
 
@@ -298,7 +300,7 @@ describe("resolveCompatibleModelSettings", () => {
         const result = resolveCompatibleModelSettings({
           providerID: "any-provider",
           modelID,
-          desired: { reasoningEffort: "high" },
+          desired: { reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH },
         })
 
         if (hasReasoningEffort) {
@@ -314,35 +316,35 @@ describe("resolveCompatibleModelSettings", () => {
 
   test("GPT-5 keeps xhigh variant and reasoningEffort", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "openai",
-      modelID: "gpt-5.4",
-      desired: { variant: "xhigh", reasoningEffort: "xhigh" },
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
+      desired: { variant: SUPPORTED_VARIANTS.XHIGH, reasoningEffort: SUPPORTED_REASONING_EFFORTS.XHIGH },
     })
 
     expect(result).toEqual({
-      variant: "xhigh",
-      reasoningEffort: "xhigh",
+      variant: SUPPORTED_VARIANTS.XHIGH,
+      reasoningEffort: SUPPORTED_REASONING_EFFORTS.XHIGH,
       changes: [],
     })
   })
 
   test("GitHub Copilot GPT-5 high-tier variants downgrade to high", () => {
-    for (const modelID of ["gpt-5.4", "gpt-5.5"]) {
+    for (const modelID of [SUPPORTED_MODELS.GPT_5_4, SUPPORTED_MODELS.GPT_5_5]) {
       for (const requested of ["xhigh", "max"]) {
         const capabilities = getModelCapabilities({
-          providerID: "github-copilot",
+          providerID: SUPPORTED_PROVIDERS.GITHUB_COPILOT,
           modelID,
         })
         const result = resolveCompatibleModelSettings({
-          providerID: "github-copilot",
+          providerID: SUPPORTED_PROVIDERS.GITHUB_COPILOT,
           modelID,
-          desired: { variant: requested, reasoningEffort: requested },
+          desired: { variant: requested as Variant, reasoningEffort: requested },
           capabilities,
         })
 
         expect(result).toEqual({
-          variant: "high",
-          reasoningEffort: "high",
+          variant: SUPPORTED_VARIANTS.HIGH,
+          reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
           changes: [
             {
               field: "variant",
@@ -408,7 +410,7 @@ describe("resolveCompatibleModelSettings", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai-compatible",
       modelID: "deepseek-v4-pro",
-      desired: { reasoningEffort: "xhigh" },
+      desired: { reasoningEffort: SUPPORTED_REASONING_EFFORTS.XHIGH },
       capabilities,
     })
 
@@ -425,13 +427,13 @@ describe("resolveCompatibleModelSettings", () => {
 
   test("GPT-5 downgrades unsupported max variant to xhigh", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "openai",
-      modelID: "gpt-5.4",
-      desired: { variant: "max" },
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
+      desired: { variant: SUPPORTED_VARIANTS.MAX },
     })
 
     expect(result).toEqual({
-      variant: "xhigh",
+      variant: SUPPORTED_VARIANTS.XHIGH,
       reasoningEffort: undefined,
       changes: [
         {
@@ -446,51 +448,51 @@ describe("resolveCompatibleModelSettings", () => {
 
   test("GPT-5 keeps none reasoningEffort", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "openai",
-      modelID: "gpt-5.4",
-      desired: { reasoningEffort: "none" },
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
+      desired: { reasoningEffort: SUPPORTED_REASONING_EFFORTS.NONE },
     })
 
     expect(result).toEqual({
       variant: undefined,
-      reasoningEffort: "none",
+      reasoningEffort: SUPPORTED_REASONING_EFFORTS.NONE,
       changes: [],
     })
   })
 
   test("GPT-5 keeps minimal reasoningEffort", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "openai",
-      modelID: "gpt-5.4",
-      desired: { reasoningEffort: "minimal" },
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
+      desired: { reasoningEffort: SUPPORTED_REASONING_EFFORTS.MINIMAL },
     })
 
     expect(result).toEqual({
       variant: undefined,
-      reasoningEffort: "minimal",
+      reasoningEffort: SUPPORTED_REASONING_EFFORTS.MINIMAL,
       changes: [],
     })
   })
 
   test("o-series keeps none reasoningEffort", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "openai",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
       modelID: "o3-mini",
-      desired: { reasoningEffort: "none" },
+      desired: { reasoningEffort: SUPPORTED_REASONING_EFFORTS.NONE },
     })
 
     expect(result).toEqual({
       variant: undefined,
-      reasoningEffort: "none",
+      reasoningEffort: SUPPORTED_REASONING_EFFORTS.NONE,
       changes: [],
     })
   })
 
   test("o-series downgrades xhigh reasoningEffort to high", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "openai",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
       modelID: "o3-mini",
-      desired: { reasoningEffort: "xhigh" },
+      desired: { reasoningEffort: SUPPORTED_REASONING_EFFORTS.XHIGH },
     })
 
     expect(result.reasoningEffort).toBe("high")
@@ -506,9 +508,9 @@ describe("resolveCompatibleModelSettings", () => {
 
   test("GPT-5 keeps xhigh but would downgrade a hypothetical beyond-max level", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "openai",
-      modelID: "gpt-5.4",
-      desired: { reasoningEffort: "xhigh" },
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
+      desired: { reasoningEffort: SUPPORTED_REASONING_EFFORTS.XHIGH },
     })
 
     expect(result.reasoningEffort).toBe("xhigh")
@@ -517,9 +519,9 @@ describe("resolveCompatibleModelSettings", () => {
 
   test("o-series downgrades unsupported variant to high", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "openai",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
       modelID: "o3-mini",
-      desired: { variant: "max" },
+      desired: { variant: SUPPORTED_VARIANTS.MAX },
     })
 
     expect(result.variant).toBe("high")
@@ -535,8 +537,8 @@ describe("resolveCompatibleModelSettings", () => {
 
   test("drops unsupported temperature when capability metadata disables it", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "openai",
-      modelID: "gpt-5.4",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
       desired: { temperature: 0.7 },
       capabilities: { supportsTemperature: false },
     })
@@ -554,8 +556,8 @@ describe("resolveCompatibleModelSettings", () => {
 
   test("drops thinking when model capabilities say it is unsupported", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "openai",
-      modelID: "gpt-5.4",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
       desired: { thinking: { type: "enabled", budgetTokens: 4096 } },
       capabilities: { supportsThinking: false },
     })
@@ -575,13 +577,13 @@ describe("resolveCompatibleModelSettings", () => {
     // given
     const capabilities = getModelCapabilities({
       providerID: "volcengine",
-      modelID: "minimax-m2.7",
+      modelID: SUPPORTED_MODELS.MINIMAX_M2_7,
     })
 
     // when
     const result = resolveCompatibleModelSettings({
       providerID: "volcengine",
-      modelID: "minimax-m2.7",
+      modelID: SUPPORTED_MODELS.MINIMAX_M2_7,
       desired: { thinking: { type: "enabled", budgetTokens: 4096 } },
       capabilities,
     })
@@ -596,13 +598,13 @@ describe("resolveCompatibleModelSettings", () => {
     // given
     const capabilities = getModelCapabilities({
       providerID: "volcengine",
-      modelID: "kimi-k2.6",
+      modelID: SUPPORTED_MODELS.KIMI_K2_6,
     })
 
     // when
     const result = resolveCompatibleModelSettings({
       providerID: "volcengine",
-      modelID: "kimi-k2.6",
+      modelID: SUPPORTED_MODELS.KIMI_K2_6,
       desired: { thinking: { type: "enabled", budgetTokens: 4096 } },
       capabilities,
     })
@@ -617,13 +619,13 @@ describe("resolveCompatibleModelSettings", () => {
     for (const modelID of ["k2p6", "k2-p6", "k2.p6"]) {
       // given
       const capabilities = getModelCapabilities({
-        providerID: "kimi-for-coding",
+        providerID: SUPPORTED_PROVIDERS.KIMI_FOR_CODING,
         modelID,
       })
 
       // when
       const result = resolveCompatibleModelSettings({
-        providerID: "kimi-for-coding",
+        providerID: SUPPORTED_PROVIDERS.KIMI_FOR_CODING,
         modelID,
         desired: { thinking: { type: "enabled", budgetTokens: 4096 } },
         capabilities,
@@ -635,18 +637,18 @@ describe("resolveCompatibleModelSettings", () => {
     }
   })
   test("resolves variant for k2p models via kimi-thinking heuristic family", () => {
-    for (const modelID of ["k2p5", "k2p6", "k2-p6", "k2.p6"]) {
+    for (const modelID of [SUPPORTED_MODELS.KIMI_K2P5, "k2p6", "k2-p6", "k2.p6"]) {
       // given
       const capabilities = getModelCapabilities({
-        providerID: "kimi-for-coding",
+        providerID: SUPPORTED_PROVIDERS.KIMI_FOR_CODING,
         modelID,
       })
 
       // when
       const result = resolveCompatibleModelSettings({
-        providerID: "kimi-for-coding",
+        providerID: SUPPORTED_PROVIDERS.KIMI_FOR_CODING,
         modelID,
-        desired: { variant: "high" },
+        desired: { variant: SUPPORTED_VARIANTS.HIGH },
         capabilities,
       })
 
@@ -657,10 +659,10 @@ describe("resolveCompatibleModelSettings", () => {
   })
 
   test("detects k2p models as kimi-thinking family with thinking and variants", () => {
-    for (const modelID of ["k2p5", "k2p6", "k2-p6", "k2.p6"]) {
+    for (const modelID of [SUPPORTED_MODELS.KIMI_K2P5, "k2p6", "k2-p6", "k2.p6"]) {
       // given
       const capabilities = getModelCapabilities({
-        providerID: "kimi-for-coding",
+        providerID: SUPPORTED_PROVIDERS.KIMI_FOR_CODING,
         modelID,
       })
 
@@ -674,7 +676,7 @@ describe("resolveCompatibleModelSettings", () => {
   test("does not classify kimi-p style IDs as kimi-thinking", () => {
     // given
     const capabilities = getModelCapabilities({
-      providerID: "kimi-for-coding",
+      providerID: SUPPORTED_PROVIDERS.KIMI_FOR_CODING,
       modelID: "kimi-p6",
     })
 
@@ -685,8 +687,8 @@ describe("resolveCompatibleModelSettings", () => {
 
   test("clamps maxTokens to the model output limit", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "openai",
-      modelID: "gpt-5.4",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
       desired: { maxTokens: 200_000 },
       capabilities: { maxOutputTokens: 128_000 },
     })
@@ -704,8 +706,8 @@ describe("resolveCompatibleModelSettings", () => {
 
   test("#given capabilities.maxOutputTokens is 0 #then maxTokens preserved unchanged", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "openai",
-      modelID: "gpt-5.4",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
       desired: { maxTokens: 200_000 },
       capabilities: { maxOutputTokens: 0 },
     })
@@ -716,8 +718,8 @@ describe("resolveCompatibleModelSettings", () => {
 
   test("#given capabilities.maxOutputTokens is -1 #then maxTokens preserved unchanged", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "openai",
-      modelID: "gpt-5.4",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
       desired: { maxTokens: 200_000 },
       capabilities: { maxOutputTokens: -1 },
     })
@@ -728,8 +730,8 @@ describe("resolveCompatibleModelSettings", () => {
 
   test("#given desired.maxTokens is 0 #then maxTokens is dropped", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "openai",
-      modelID: "gpt-5.4",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
       desired: { maxTokens: 0 },
       capabilities: { maxOutputTokens: 128_000 },
     })
@@ -741,8 +743,8 @@ describe("resolveCompatibleModelSettings", () => {
   // Passthrough: undefined desired values produce no changes
   test("no-op when desired settings are empty", () => {
     const result = resolveCompatibleModelSettings({
-      providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
+      modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
       desired: {},
     })
 

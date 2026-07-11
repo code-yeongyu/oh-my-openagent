@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { describe, it, expect, mock, spyOn, afterEach } from "bun:test"
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -164,7 +165,7 @@ describe("checkCompletionConditions continuation coverage", () => {
     })))
     ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: path.id === "child-session"
-        ? [{ info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } }]
+        ? [{ info: { agent: "atlas", providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 } }]
         : [],
     })))
 
@@ -227,7 +228,7 @@ describe("checkCompletionConditions continuation coverage", () => {
     })))
     ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: path.id === "mismatch-subagent-session"
-        ? [{ info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4" } }]
+        ? [{ info: { agent: "sisyphus-junior", providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 } }]
         : [],
     })))
 
@@ -262,7 +263,7 @@ describe("checkCompletionConditions continuation coverage", () => {
     })))
     ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: path.id === "appended-mismatch-session"
-        ? [{ info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4" } }]
+        ? [{ info: { agent: "sisyphus-junior", providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 } }]
         : [],
     })))
 
@@ -294,7 +295,7 @@ describe("checkCompletionConditions continuation coverage", () => {
     }))
     ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: path.id === "ses_appended_descendant"
-        ? [{ info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } }]
+        ? [{ info: { agent: "atlas", providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 } }]
         : [],
     })))
 
@@ -410,7 +411,7 @@ describe("checkCompletionConditions continuation coverage", () => {
     })))
     ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: path.id === "ses_direct_child"
-        ? [{ info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4" } }]
+        ? [{ info: { agent: "sisyphus-junior", providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 } }]
         : [],
     })))
 
@@ -447,8 +448,8 @@ describe("checkCompletionConditions continuation coverage", () => {
     ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: path.id === "ses_child_after_compaction"
         ? [
-            { info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } },
-            { info: { agent: "compaction", providerID: "openai", modelID: "gpt-5.4" } },
+            { info: { agent: "atlas", providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 } },
+            { info: { agent: "compaction", providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 } },
           ]
         : [],
     })))
@@ -482,9 +483,9 @@ describe("checkCompletionConditions continuation coverage", () => {
     ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: path.id === "ses_sqlite_descendant"
         ? [
-            { id: "msg_0001", info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4", time: { created: 100 } } },
-            { id: "msg_0003", info: { agent: "compaction", providerID: "openai", modelID: "gpt-5.4", time: { created: 200 } } },
-            { id: "msg_0002", info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4", time: { created: 100 } } },
+            { id: "msg_0001", info: { agent: "atlas", providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4, time: { created: 100 } } },
+            { id: "msg_0003", info: { agent: "compaction", providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4, time: { created: 200 } } },
+            { id: "msg_0002", info: { agent: "sisyphus-junior", providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4, time: { created: 100 } } },
           ]
         : [],
     })))

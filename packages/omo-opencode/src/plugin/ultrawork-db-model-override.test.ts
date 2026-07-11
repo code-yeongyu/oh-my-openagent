@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
 import { Database } from "bun:sqlite"
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs"
@@ -119,27 +120,27 @@ describe("scheduleDeferredModelOverride", () => {
 
   test("should update model in DB after microtask flushes", async () => {
     //#given
-    insertMessage("msg_001", { providerID: "anthropic", modelID: "claude-sonnet-4-6" })
+    insertMessage("msg_001", { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 })
 
     //#when
     await scheduleDeferredModelOverride(
       "msg_001",
-      { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
     )
 
     //#then
     const model = readMessageModel("msg_001")
-    expect(model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+    expect(model).toEqual({ providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 })
   })
 
   test("should update variant and thinking fields when variant provided", async () => {
     //#given
-    insertMessage("msg_002", { providerID: "anthropic", modelID: "claude-sonnet-4-6" })
+    insertMessage("msg_002", { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 })
 
     //#when
     await scheduleDeferredModelOverride(
       "msg_002",
-      { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
       "max",
     )
 
@@ -154,7 +155,7 @@ describe("scheduleDeferredModelOverride", () => {
     //#when
     await scheduleDeferredModelOverride(
       "msg_nonexistent",
-      { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
     )
 
     //#then
@@ -177,7 +178,7 @@ describe("scheduleDeferredModelOverride", () => {
     //#when
     await scheduleDeferredModelOverride(
       "msg_retry_exhausted",
-      { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
     )
 
     //#then
@@ -196,17 +197,17 @@ describe("scheduleDeferredModelOverride", () => {
 
   test("should not update variant fields when variant is undefined", async () => {
     //#given
-    insertMessage("msg_003", { providerID: "anthropic", modelID: "claude-sonnet-4-6" })
+    insertMessage("msg_003", { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 })
 
     //#when
     await scheduleDeferredModelOverride(
       "msg_003",
-      { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
     )
 
     //#then
     const model = readMessageModel("msg_003")
-    expect(model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+    expect(model).toEqual({ providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 })
     expect(readMessageField("msg_003", "variant")).toBeNull()
     expect(readMessageField("msg_003", "thinking")).toBeNull()
   })
@@ -218,7 +219,7 @@ describe("scheduleDeferredModelOverride", () => {
     //#when
     await scheduleDeferredModelOverride(
       "msg_004",
-      { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
     )
 
     //#then
@@ -237,7 +238,7 @@ describe("scheduleDeferredModelOverride", () => {
     //#when
     await scheduleDeferredModelOverride(
       "msg_corrupt",
-      { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 },
     )
 
     //#then

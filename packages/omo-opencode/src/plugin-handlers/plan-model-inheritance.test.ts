@@ -1,3 +1,4 @@
+import { SUPPORTED_VARIANTS, SUPPORTED_REASONING_EFFORTS } from "@oh-my-opencode/model-core";
 import { describe, test, expect } from "bun:test"
 import { buildPlanDemoteConfig } from "./plan-model-inheritance"
 
@@ -19,17 +20,17 @@ describe("buildPlanDemoteConfig", () => {
     const prometheusConfig = {
       name: "prometheus",
       model: "anthropic/claude-opus-4-7",
-      variant: "max",
+      variant: SUPPORTED_VARIANTS.MAX,
       mode: "primary",
       prompt: "You are Prometheus...",
       permission: { edit: "allow" },
       description: "Plan agent (Prometheus)",
       color: "#FF5722",
       temperature: 0.1,
-      top_p: 0.95,
+      topP: 0.95,
       maxTokens: 32000,
       thinking: { type: "enabled", budgetTokens: 10000 },
-      reasoningEffort: "high",
+      reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
       textVerbosity: "medium",
       providerOptions: { key: "value" },
     }
@@ -42,7 +43,7 @@ describe("buildPlanDemoteConfig", () => {
     expect(result.model).toBe("anthropic/claude-opus-4-7")
     expect(result.variant).toBe("max")
     expect(result.temperature).toBe(0.1)
-    expect(result.top_p).toBe(0.95)
+    expect(result.topP).toBe(0.95)
     expect(result.maxTokens).toBe(32000)
     expect(result.thinking).toEqual({ type: "enabled", budgetTokens: 10000 })
     expect(result.reasoningEffort).toBe("high")
@@ -59,15 +60,15 @@ describe("buildPlanDemoteConfig", () => {
     //#given
     const prometheusConfig = {
       model: "anthropic/claude-opus-4-7",
-      variant: "max",
+      variant: SUPPORTED_VARIANTS.MAX,
       temperature: 0.1,
-      reasoningEffort: "high",
+      reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
     }
     const planOverride = {
       model: "openai/gpt-5.4",
-      variant: "high",
+      variant: SUPPORTED_VARIANTS.HIGH,
       temperature: 0.5,
-      reasoningEffort: "low",
+      reasoningEffort: SUPPORTED_REASONING_EFFORTS.LOW,
     }
 
     //#when
@@ -84,9 +85,9 @@ describe("buildPlanDemoteConfig", () => {
     //#given
     const prometheusConfig = {
       model: "anthropic/claude-opus-4-7",
-      variant: "max",
+      variant: SUPPORTED_VARIANTS.MAX,
       temperature: 0.1,
-      reasoningEffort: "high",
+      reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
     }
     const planOverride = {
       model: "openai/gpt-5.4",

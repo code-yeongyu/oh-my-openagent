@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "./registry";
 import process from "node:process"
 import { afterEach, describe, expect, it } from "bun:test"
 
@@ -32,7 +33,7 @@ describe("resolveActualContextLimit", () => {
     const modelContextLimitsCache = new Map<string, number>()
     modelContextLimitsCache.set("openai/gpt-5", 400_000)
 
-    const actualLimit = resolveActualContextLimit("openai", "gpt-5", {
+    const actualLimit = resolveActualContextLimit(SUPPORTED_PROVIDERS.OPENAI, "gpt-5", {
       anthropicContext1MEnabled: false,
       modelContextLimitsCache,
     })
@@ -44,7 +45,7 @@ describe("resolveActualContextLimit", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
 
-    const actualLimit = resolveActualContextLimit("anthropic", "claude-sonnet-4-6", {
+    const actualLimit = resolveActualContextLimit(SUPPORTED_PROVIDERS.ANTHROPIC, SUPPORTED_MODELS.CLAUDE_SONNET_4_6, {
       anthropicContext1MEnabled: false,
     })
 
@@ -55,7 +56,7 @@ describe("resolveActualContextLimit", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
 
-    const actualLimit = resolveActualContextLimit("anthropic", "claude-opus-4-8", {
+    const actualLimit = resolveActualContextLimit(SUPPORTED_PROVIDERS.ANTHROPIC, SUPPORTED_MODELS.CLAUDE_OPUS_4_8, {
       anthropicContext1MEnabled: false,
     })
 
@@ -66,7 +67,8 @@ describe("resolveActualContextLimit", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
 
-    const actualLimit = resolveActualContextLimit("anthropic", "claude-opus-4-8-high", {
+    // "claude-opus-4-8-high" is a composite variant alias, not a canonical SUPPORTED_MODELS entry.
+    const actualLimit = resolveActualContextLimit(SUPPORTED_PROVIDERS.ANTHROPIC, "claude-opus-4-8-high", {
       anthropicContext1MEnabled: false,
     })
 
@@ -77,7 +79,7 @@ describe("resolveActualContextLimit", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
 
-    const actualLimit = resolveActualContextLimit("google", "claude-sonnet-4-6", {
+    const actualLimit = resolveActualContextLimit(SUPPORTED_PROVIDERS.GOOGLE, SUPPORTED_MODELS.CLAUDE_SONNET_4_6, {
       anthropicContext1MEnabled: false,
     })
 
@@ -88,7 +90,7 @@ describe("resolveActualContextLimit", () => {
     const modelContextLimitsCache = new Map<string, number>()
     modelContextLimitsCache.set("google/gemini-3.1-pro", 1_048_576)
 
-    const actualLimit = resolveActualContextLimit("google", "gemini-3.1-pro", {
+    const actualLimit = resolveActualContextLimit(SUPPORTED_PROVIDERS.GOOGLE, SUPPORTED_MODELS.GEMINI_3_1_PRO, {
       anthropicContext1MEnabled: false,
       modelContextLimitsCache,
     })
@@ -102,7 +104,7 @@ describe("resolveActualContextLimit", () => {
     const modelContextLimitsCache = new Map<string, number>()
     modelContextLimitsCache.set("anthropic/claude-opus-4-7", 700_000)
 
-    const actualLimit = resolveActualContextLimit("anthropic", "claude-opus-4-7", {
+    const actualLimit = resolveActualContextLimit(SUPPORTED_PROVIDERS.ANTHROPIC, SUPPORTED_MODELS.CLAUDE_OPUS_4_7, {
       anthropicContext1MEnabled: false,
       modelContextLimitsCache,
     })
@@ -116,7 +118,8 @@ describe("resolveActualContextLimit", () => {
     const modelContextLimitsCache = new Map<string, number>()
     modelContextLimitsCache.set("anthropic/claude-sonnet-4-5", 200_000)
 
-    const actualLimit = resolveActualContextLimit("anthropic", "claude-sonnet-4-5", {
+    // "claude-sonnet-4-5" is an older model not in SUPPORTED_MODELS; kept as raw string intentionally.
+    const actualLimit = resolveActualContextLimit(SUPPORTED_PROVIDERS.ANTHROPIC, "claude-sonnet-4-5", {
       anthropicContext1MEnabled: false,
       modelContextLimitsCache,
     })
@@ -128,7 +131,8 @@ describe("resolveActualContextLimit", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     process.env[VERTEX_CONTEXT_ENV_KEY] = "true"
 
-    const actualLimit = resolveActualContextLimit("google-vertex-anthropic", "claude-sonnet-4-5", {
+    // "claude-sonnet-4-5" is an older model not in SUPPORTED_MODELS; kept as raw string intentionally.
+    const actualLimit = resolveActualContextLimit(SUPPORTED_PROVIDERS.GOOGLE_VERTEX_ANTHROPIC, "claude-sonnet-4-5", {
       anthropicContext1MEnabled: false,
     })
 

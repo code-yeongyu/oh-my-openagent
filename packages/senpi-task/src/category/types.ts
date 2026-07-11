@@ -25,7 +25,7 @@ export type ResolvedChildSpec<TModel extends SenpiModelPort> = {
   readonly modelId: string
   readonly variant?: string
   readonly temperature?: number
-  readonly top_p?: number
+  readonly topP?: number
   readonly maxTokens?: number
   readonly thinking?: OmoCategoryConfig["thinking"]
   readonly reasoningEffort?: OmoCategoryConfig["reasoningEffort"]

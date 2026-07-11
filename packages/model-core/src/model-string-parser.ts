@@ -1,14 +1,4 @@
-const KNOWN_VARIANTS = new Set([
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-  "max",
-  "minimal",
-  "none",
-  "auto",
-  "thinking",
-])
+import { isKnownVariant } from "./known-variants"
 
 export function parseVariantFromModelID(rawModelID: string): { modelID: string; variant?: string } {
   if (typeof rawModelID !== "string") {
@@ -30,7 +20,7 @@ export function parseVariantFromModelID(rawModelID: string): { modelID: string; 
   if (spaceVariant) {
     const modelID = spaceVariant[1]?.trim() ?? ""
     const variant = spaceVariant[2]?.trim().toLowerCase()
-    if (variant && KNOWN_VARIANTS.has(variant)) {
+    if (isKnownVariant(variant)) {
       return { modelID, variant }
     }
   }

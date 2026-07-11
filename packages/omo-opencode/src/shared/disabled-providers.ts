@@ -1,9 +1,9 @@
 import type { OhMyOpenCodeConfig } from "../config"
-import type { FallbackModelObject } from "../config/schema/fallback-models"
+import type { FallbackModelObject } from "@oh-my-opencode/model-core"
 import { addConfigLoadError } from "./config-errors"
 import { log } from "./logger"
 import { normalizeFallbackModels } from "./model-resolver"
-
+import type { Provider } from "@oh-my-opencode/model-core"
 const HOOK_NAME = "disabled-providers"
 
 export function getModelProvider(model: string): string | undefined {
@@ -15,7 +15,7 @@ export function getModelProvider(model: string): string | undefined {
 
 export function isProviderDisabled(
   model: string | undefined,
-  disabled: readonly string[],
+  disabled: readonly Provider[],
 ): boolean {
   if (!model || disabled.length === 0) return false
   const provider = getModelProvider(model)
@@ -26,7 +26,7 @@ export function isProviderDisabled(
 
 export function filterDisabledProviderModels<T extends string | FallbackModelObject>(
   models: readonly T[],
-  disabled: readonly string[],
+  disabled: readonly Provider[],
 ): T[] {
   if (disabled.length === 0) return [...models]
   return models.filter((entry) => {
@@ -42,7 +42,7 @@ type ModelHolder = {
 
 function findFirstAllowedReplacement(
   chain: (string | FallbackModelObject)[] | undefined,
-  disabled: readonly string[],
+  disabled: readonly Provider[],
 ): string | undefined {
   if (!chain) return undefined
   for (const entry of chain) {
@@ -52,7 +52,7 @@ function findFirstAllowedReplacement(
   return undefined
 }
 
-function applyToHolder(label: string, holder: ModelHolder, disabled: readonly string[]): void {
+function applyToHolder(label: string, holder: ModelHolder, disabled: readonly Provider[]): void {
   const normalizedChain = normalizeFallbackModels(holder.fallback_models)
   if (normalizedChain) {
     const filteredChain = filterDisabledProviderModels(normalizedChain, disabled)

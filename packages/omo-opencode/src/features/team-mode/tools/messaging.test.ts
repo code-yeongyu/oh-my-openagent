@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS , SUPPORTED_REASONING_EFFORTS } from "@oh-my-opencode/model-core";
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, test } from "bun:test"
@@ -511,7 +512,7 @@ describe("createTeamSendMessageTool", () => {
     const memberTwo = state.members.find((member) => member.name === "m2")
     if (!memberTwo) throw new Error("m2 runtime member missing")
     memberTwo.subagent_type = "atlas"
-    memberTwo.model = { providerID: "anthropic", modelID: "claude-opus-4-7", variant: "high" }
+    memberTwo.model = { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7, variant: SUPPORTED_VARIANTS.HIGH }
     await saveState(state, fixture.config)
 
     const { client, calls } = createRecordingClient()
@@ -528,7 +529,7 @@ describe("createTeamSendMessageTool", () => {
     expect(calls).toHaveLength(1)
     expect(calls[0].sessionId).toBe(fixture.memberTwoSessionId)
     expect(calls[0].agent).toBe("atlas")
-    expect(calls[0].model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
+    expect(calls[0].model).toEqual({ providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 })
     expect(calls[0].variant).toBe("high")
   })
 
@@ -568,12 +569,12 @@ describe("createTeamSendMessageTool", () => {
     memberTwo.subagent_type = "Sisyphus-Junior"
     memberTwo.category = "quick"
     memberTwo.model = {
-      providerID: "openai",
-      modelID: "gpt-5.4",
-      variant: "medium",
-      reasoningEffort: "high",
+      providerID: SUPPORTED_PROVIDERS.OPENAI,
+      modelID: SUPPORTED_MODELS.GPT_5_4,
+      variant: SUPPORTED_VARIANTS.MEDIUM,
+      reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
       temperature: 0.2,
-      top_p: 0.8,
+      topP: 0.8,
       maxTokens: 4096,
       thinking: { type: "enabled", budgetTokens: 2048 },
     }
@@ -592,7 +593,7 @@ describe("createTeamSendMessageTool", () => {
     // then
     expect(calls).toHaveLength(1)
     expect(calls[0].agent).toBe("Sisyphus-Junior")
-    expect(calls[0].model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+    expect(calls[0].model).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 })
     expect(calls[0].variant).toBe("medium")
     expect(SessionCategoryRegistry.get(fixture.memberTwoSessionId)).toBe("quick")
     expect(getSessionPromptParams(fixture.memberTwoSessionId)).toEqual({
@@ -600,7 +601,7 @@ describe("createTeamSendMessageTool", () => {
       topP: 0.8,
       maxOutputTokens: 4096,
       options: {
-        reasoningEffort: "high",
+        reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
         thinking: { type: "enabled", budgetTokens: 2048 },
       },
     })

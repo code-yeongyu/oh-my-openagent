@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS , SUPPORTED_VARIANTS , SUPPORTED_REASONING_EFFORTS } from "@oh-my-opencode/model-core";
 import { describe, test, it, expect } from "bun:test"
 import {
   parseFallbackModelEntry,
@@ -18,15 +19,15 @@ describe("fallback-chain-from-models", () => {
 
     //#then
     expect(parsed).toEqual({
-      providers: ["openai"],
-      model: "gpt-5.5",
-      variant: "high",
+      providers: [SUPPORTED_PROVIDERS.OPENAI],
+      model: SUPPORTED_MODELS.GPT_5_5,
+      variant: SUPPORTED_VARIANTS.HIGH,
     })
   })
 
   test("uses default provider when fallback model omits provider prefix", () => {
     //#given
-    const fallbackModel = "glm-5"
+    const fallbackModel = SUPPORTED_MODELS.GLM_5
 
     //#when
     const parsed = parseFallbackModelEntry(fallbackModel, "quotio")
@@ -34,14 +35,14 @@ describe("fallback-chain-from-models", () => {
     //#then
     expect(parsed).toEqual({
       providers: ["quotio"],
-      model: "glm-5",
+      model: SUPPORTED_MODELS.GLM_5,
       variant: undefined,
     })
   })
 
   test("uses opencode as absolute fallback provider when context provider is missing", () => {
     //#given
-    const fallbackModel = "gemini-3-flash"
+    const fallbackModel = SUPPORTED_MODELS.GEMINI_3_FLASH
 
     //#when
     const parsed = parseFallbackModelEntry(fallbackModel, undefined)
@@ -49,7 +50,7 @@ describe("fallback-chain-from-models", () => {
     //#then
     expect(parsed).toEqual({
       providers: ["opencode"],
-      model: "gemini-3-flash",
+      model: SUPPORTED_MODELS.GEMINI_3_FLASH,
       variant: undefined,
     })
   })
@@ -63,8 +64,8 @@ describe("fallback-chain-from-models", () => {
 
     //#then
     expect(chain).toEqual([
-      { providers: ["quotio"], model: "kimi-k2.5", variant: undefined },
-      { providers: ["quotio"], model: "gpt-5.5", variant: "medium" },
+      { providers: ["quotio"], model: SUPPORTED_MODELS.KIMI_K2_5, variant: undefined },
+      { providers: ["quotio"], model: SUPPORTED_MODELS.GPT_5_5, variant: SUPPORTED_VARIANTS.MEDIUM },
     ])
   })
 })
@@ -74,43 +75,43 @@ describe("parseFallbackModelEntry (extended)", () => {
   it("parses provider/model string", () => {
     const result = parseFallbackModelEntry("anthropic/claude-sonnet-4-6", undefined)
     expect(result).toEqual({
-      providers: ["anthropic"],
-      model: "claude-sonnet-4-6",
+      providers: [SUPPORTED_PROVIDERS.ANTHROPIC],
+      model: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
     })
   })
 
   it("parses model with parenthesized variant", () => {
     const result = parseFallbackModelEntry("anthropic/claude-sonnet-4-6(high)", undefined)
     expect(result).toEqual({
-      providers: ["anthropic"],
-      model: "claude-sonnet-4-6",
-      variant: "high",
+      providers: [SUPPORTED_PROVIDERS.ANTHROPIC],
+      model: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
+      variant: SUPPORTED_VARIANTS.HIGH,
     })
   })
 
   it("parses model with space variant", () => {
     const result = parseFallbackModelEntry("openai/gpt-5.4 xhigh", undefined)
     expect(result).toEqual({
-      providers: ["openai"],
-      model: "gpt-5.4",
-      variant: "xhigh",
+      providers: [SUPPORTED_PROVIDERS.OPENAI],
+      model: SUPPORTED_MODELS.GPT_5_4,
+      variant: SUPPORTED_VARIANTS.XHIGH,
     })
   })
 
   it("parses model with minimal space variant", () => {
     const result = parseFallbackModelEntry("openai/gpt-5.4 minimal", undefined)
     expect(result).toEqual({
-      providers: ["openai"],
-      model: "gpt-5.4",
+      providers: [SUPPORTED_PROVIDERS.OPENAI],
+      model: SUPPORTED_MODELS.GPT_5_4,
       variant: "minimal",
     })
   })
 
   it("uses context provider when no provider prefix", () => {
-    const result = parseFallbackModelEntry("claude-sonnet-4-6", "anthropic")
+    const result = parseFallbackModelEntry(SUPPORTED_MODELS.CLAUDE_SONNET_4_6, SUPPORTED_PROVIDERS.ANTHROPIC)
     expect(result).toEqual({
-      providers: ["anthropic"],
-      model: "claude-sonnet-4-6",
+      providers: [SUPPORTED_PROVIDERS.ANTHROPIC],
+      model: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
     })
   })
 
@@ -127,32 +128,32 @@ describe("parseFallbackModelObjectEntry", () => {
       undefined,
     )
     expect(result).toEqual({
-      providers: ["anthropic"],
-      model: "claude-sonnet-4-6",
+      providers: [SUPPORTED_PROVIDERS.ANTHROPIC],
+      model: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
     })
   })
 
   it("parses object with variant override", () => {
     const result = parseFallbackModelObjectEntry(
-      { model: "anthropic/claude-sonnet-4-6", variant: "high" },
+      { model: "anthropic/claude-sonnet-4-6", variant: SUPPORTED_VARIANTS.HIGH },
       undefined,
     )
     expect(result).toEqual({
-      providers: ["anthropic"],
-      model: "claude-sonnet-4-6",
-      variant: "high",
+      providers: [SUPPORTED_PROVIDERS.ANTHROPIC],
+      model: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
+      variant: SUPPORTED_VARIANTS.HIGH,
     })
   })
 
   it("object variant overrides inline variant", () => {
     const result = parseFallbackModelObjectEntry(
-      { model: "anthropic/claude-sonnet-4-6(low)", variant: "high" },
+      { model: "anthropic/claude-sonnet-4-6(low)", variant: SUPPORTED_VARIANTS.HIGH },
       undefined,
     )
     expect(result).toEqual({
-      providers: ["anthropic"],
-      model: "claude-sonnet-4-6",
-      variant: "high",
+      providers: [SUPPORTED_PROVIDERS.ANTHROPIC],
+      model: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
+      variant: SUPPORTED_VARIANTS.HIGH,
     })
   })
 
@@ -160,17 +161,17 @@ describe("parseFallbackModelObjectEntry", () => {
     const result = parseFallbackModelObjectEntry(
       {
         model: "openai/gpt-5.4",
-        variant: "high",
-        reasoningEffort: "high",
+        variant: SUPPORTED_VARIANTS.HIGH,
+        reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
         temperature: 0.5,
       },
       undefined,
     )
     expect(result).toEqual({
-      providers: ["openai"],
-      model: "gpt-5.4",
-      variant: "high",
-      reasoningEffort: "high",
+      providers: [SUPPORTED_PROVIDERS.OPENAI],
+      model: SUPPORTED_MODELS.GPT_5_4,
+      variant: SUPPORTED_VARIANTS.HIGH,
+      reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH,
       temperature: 0.5,
     })
   })
@@ -184,8 +185,8 @@ describe("parseFallbackModelObjectEntry", () => {
       undefined,
     )
     expect(result).toEqual({
-      providers: ["anthropic"],
-      model: "claude-sonnet-4-6",
+      providers: [SUPPORTED_PROVIDERS.ANTHROPIC],
+      model: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
       thinking: { type: "enabled", budgetTokens: 10000 },
     })
   })
@@ -194,22 +195,22 @@ describe("parseFallbackModelObjectEntry", () => {
     const result = parseFallbackModelObjectEntry(
       {
         model: "openai/gpt-5.4",
-        variant: "xhigh",
-        reasoningEffort: "xhigh",
+        variant: SUPPORTED_VARIANTS.XHIGH,
+        reasoningEffort: SUPPORTED_REASONING_EFFORTS.XHIGH,
         temperature: 0.3,
-        top_p: 0.9,
+        topP: 0.9,
         maxTokens: 8192,
         thinking: { type: "disabled" },
       },
       undefined,
     )
     expect(result).toEqual({
-      providers: ["openai"],
-      model: "gpt-5.4",
-      variant: "xhigh",
-      reasoningEffort: "xhigh",
+      providers: [SUPPORTED_PROVIDERS.OPENAI],
+      model: SUPPORTED_MODELS.GPT_5_4,
+      variant: SUPPORTED_VARIANTS.XHIGH,
+      reasoningEffort: SUPPORTED_REASONING_EFFORTS.XHIGH,
       temperature: 0.3,
-      top_p: 0.9,
+      topP: 0.9,
       maxTokens: 8192,
       thinking: { type: "disabled" },
     })
@@ -220,7 +221,7 @@ describe("buildFallbackChainFromModels (mixed)", () => {
   it("handles string input", () => {
     const result = buildFallbackChainFromModels("anthropic/claude-sonnet-4-6", undefined)
     expect(result).toEqual([
-      { providers: ["anthropic"], model: "claude-sonnet-4-6" },
+      { providers: [SUPPORTED_PROVIDERS.ANTHROPIC], model: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 },
     ])
   })
 
@@ -230,16 +231,16 @@ describe("buildFallbackChainFromModels (mixed)", () => {
       undefined,
     )
     expect(result).toEqual([
-      { providers: ["anthropic"], model: "claude-sonnet-4-6" },
-      { providers: ["openai"], model: "gpt-5.4" },
+      { providers: [SUPPORTED_PROVIDERS.ANTHROPIC], model: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 },
+      { providers: [SUPPORTED_PROVIDERS.OPENAI], model: SUPPORTED_MODELS.GPT_5_4 },
     ])
   })
 
   it("handles mixed array of strings and objects", () => {
     const result = buildFallbackChainFromModels(
       [
-        { model: "anthropic/claude-sonnet-4-6", variant: "high", reasoningEffort: "high" },
-        { model: "openai/gpt-5.4", reasoningEffort: "xhigh" },
+        { model: "anthropic/claude-sonnet-4-6", variant: SUPPORTED_VARIANTS.HIGH, reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH },
+        { model: "openai/gpt-5.4", reasoningEffort: SUPPORTED_REASONING_EFFORTS.XHIGH },
         "chutes/kimi-k2.5",
         { model: "chutes/glm-5", temperature: 0.7 },
         "google/gemini-3-flash",
@@ -247,11 +248,11 @@ describe("buildFallbackChainFromModels (mixed)", () => {
       undefined,
     )
     expect(result).toEqual([
-      { providers: ["anthropic"], model: "claude-sonnet-4-6", variant: "high", reasoningEffort: "high" },
-      { providers: ["openai"], model: "gpt-5.4", reasoningEffort: "xhigh" },
-      { providers: ["chutes"], model: "kimi-k2.5" },
-      { providers: ["chutes"], model: "glm-5", temperature: 0.7 },
-      { providers: ["google"], model: "gemini-3-flash" },
+      { providers: [SUPPORTED_PROVIDERS.ANTHROPIC], model: SUPPORTED_MODELS.CLAUDE_SONNET_4_6, variant: SUPPORTED_VARIANTS.HIGH, reasoningEffort: SUPPORTED_REASONING_EFFORTS.HIGH },
+      { providers: [SUPPORTED_PROVIDERS.OPENAI], model: SUPPORTED_MODELS.GPT_5_4, reasoningEffort: SUPPORTED_REASONING_EFFORTS.XHIGH },
+      { providers: ["chutes"], model: SUPPORTED_MODELS.KIMI_K2_5 },
+      { providers: ["chutes"], model: SUPPORTED_MODELS.GLM_5, temperature: 0.7 },
+      { providers: [SUPPORTED_PROVIDERS.GOOGLE], model: SUPPORTED_MODELS.GEMINI_3_FLASH },
     ])
   })
 
@@ -266,7 +267,7 @@ describe("buildFallbackChainFromModels (mixed)", () => {
       undefined,
     )
     expect(result).toEqual([
-      { providers: ["anthropic"], model: "claude-sonnet-4-6" },
+      { providers: [SUPPORTED_PROVIDERS.ANTHROPIC], model: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 },
     ])
   })
 })
@@ -284,7 +285,7 @@ describe("flattenToFallbackModelStrings", () => {
 
   it("flattens object with explicit variant", () => {
     expect(flattenToFallbackModelStrings([
-      { model: "anthropic/claude-sonnet-4-6", variant: "high" },
+      { model: "anthropic/claude-sonnet-4-6", variant: SUPPORTED_VARIANTS.HIGH },
     ])).toEqual(["anthropic/claude-sonnet-4-6(high)"])
   })
 
@@ -296,7 +297,7 @@ describe("flattenToFallbackModelStrings", () => {
 
   it("explicit variant overrides inline variant (no double-suffix)", () => {
     expect(flattenToFallbackModelStrings([
-      { model: "anthropic/claude-sonnet-4-6(low)", variant: "high" },
+      { model: "anthropic/claude-sonnet-4-6(low)", variant: SUPPORTED_VARIANTS.HIGH },
     ])).toEqual(["anthropic/claude-sonnet-4-6(high)"])
   })
 
@@ -327,7 +328,7 @@ describe("flattenToFallbackModelStrings", () => {
   it("handles mixed array", () => {
     expect(flattenToFallbackModelStrings([
       "anthropic/claude-sonnet-4-6",
-      { model: "openai/gpt-5.4", variant: "high" },
+      { model: "openai/gpt-5.4", variant: SUPPORTED_VARIANTS.HIGH },
       { model: "google/gemini-3-flash(low)" },
     ])).toEqual([
       "anthropic/claude-sonnet-4-6",
@@ -340,36 +341,36 @@ describe("flattenToFallbackModelStrings", () => {
 describe("findMostSpecificFallbackEntry", () => {
   it("picks exact match over prefix match", () => {
     const chain = [
-      { providers: ["openai"], model: "gpt-5.4" },
-      { providers: ["openai"], model: "gpt-5.4-preview" },
+      { providers: [SUPPORTED_PROVIDERS.OPENAI], model: SUPPORTED_MODELS.GPT_5_4 },
+      { providers: [SUPPORTED_PROVIDERS.OPENAI], model: "gpt-5.4-preview" },
     ]
-    const result = findMostSpecificFallbackEntry("openai", "gpt-5.4-preview", chain)
+    const result = findMostSpecificFallbackEntry(SUPPORTED_PROVIDERS.OPENAI, "gpt-5.4-preview", chain)
     expect(result?.model).toBe("gpt-5.4-preview")
   })
 
   it("returns prefix match when no exact match exists", () => {
     const chain = [
-      { providers: ["openai"], model: "gpt-5.4" },
+      { providers: [SUPPORTED_PROVIDERS.OPENAI], model: SUPPORTED_MODELS.GPT_5_4 },
     ]
-    const result = findMostSpecificFallbackEntry("openai", "gpt-5.4-preview", chain)
-    expect(result?.model).toBe("gpt-5.4")
+    const result = findMostSpecificFallbackEntry(SUPPORTED_PROVIDERS.OPENAI, "gpt-5.4-preview", chain)
+    expect(result?.model).toBe(SUPPORTED_MODELS.GPT_5_4)
   })
 
   it("returns undefined when no entry matches", () => {
     const chain = [
-      { providers: ["anthropic"], model: "claude-sonnet-4-6" },
+      { providers: [SUPPORTED_PROVIDERS.ANTHROPIC], model: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 },
     ]
-    expect(findMostSpecificFallbackEntry("openai", "gpt-5.4", chain)).toBeUndefined()
+    expect(findMostSpecificFallbackEntry(SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_MODELS.GPT_5_4, chain)).toBeUndefined()
   })
 
   it("sorts by matched prefix length, not insertion order", () => {
     // Both entries share the same provider so both match as prefixes;
     // the longer (more-specific) prefix must win regardless of array order.
     const chain = [
-      { providers: ["openai"], model: "gpt-5" },
-      { providers: ["openai"], model: "gpt-5.4-preview" },
+      { providers: [SUPPORTED_PROVIDERS.OPENAI], model: "gpt-5" },
+      { providers: [SUPPORTED_PROVIDERS.OPENAI], model: "gpt-5.4-preview" },
     ]
-    const result = findMostSpecificFallbackEntry("openai", "gpt-5.4-preview-2026", chain)
+    const result = findMostSpecificFallbackEntry(SUPPORTED_PROVIDERS.OPENAI, "gpt-5.4-preview-2026", chain)
     expect(result?.model).toBe("gpt-5.4-preview")
   })
 
@@ -377,21 +378,21 @@ describe("findMostSpecificFallbackEntry", () => {
     const chain = [
       { providers: ["OpenAI"], model: "GPT-5.4" },
     ]
-    const result = findMostSpecificFallbackEntry("openai", "gpt-5.4-preview", chain)
+    const result = findMostSpecificFallbackEntry(SUPPORTED_PROVIDERS.OPENAI, "gpt-5.4-preview", chain)
     expect(result?.model).toBe("GPT-5.4")
   })
 
   it("preserves variant and settings from matched entry", () => {
     const chain = [
-      { providers: ["openai"], model: "gpt-5.4", variant: "high", temperature: 0.7 },
-      { providers: ["openai"], model: "gpt-5.4-preview", variant: "low", reasoningEffort: "medium" },
+      { providers: [SUPPORTED_PROVIDERS.OPENAI], model: SUPPORTED_MODELS.GPT_5_4, variant: SUPPORTED_VARIANTS.HIGH, temperature: 0.7 },
+      { providers: [SUPPORTED_PROVIDERS.OPENAI], model: "gpt-5.4-preview", variant: "low", reasoningEffort: SUPPORTED_REASONING_EFFORTS.MEDIUM },
     ]
-    const result = findMostSpecificFallbackEntry("openai", "gpt-5.4-preview", chain)
+    const result = findMostSpecificFallbackEntry(SUPPORTED_PROVIDERS.OPENAI, "gpt-5.4-preview", chain)
     expect(result).toEqual({
-      providers: ["openai"],
+      providers: [SUPPORTED_PROVIDERS.OPENAI],
       model: "gpt-5.4-preview",
       variant: "low",
-      reasoningEffort: "medium",
+      reasoningEffort: SUPPORTED_REASONING_EFFORTS.MEDIUM,
     })
   })
 })
@@ -403,10 +404,10 @@ describe("findMostSpecificFallbackEntry", () => {
 describe("parseFallbackModelEntry: non-string input (issue #4145)", () => {
   test("returns undefined when caller forwards an object instead of a string", () => {
     //#given
-    const wrong = { model: "anthropic/claude-opus-4-7", variant: "high" } as unknown as string
+    const wrong = { model: "anthropic/claude-opus-4-7", variant: SUPPORTED_VARIANTS.HIGH } as unknown as string
 
     //#when
-    const parsed = parseFallbackModelEntry(wrong, "anthropic")
+    const parsed = parseFallbackModelEntry(wrong, SUPPORTED_PROVIDERS.ANTHROPIC)
 
     //#then: must not throw, must reject the malformed entry
     expect(parsed).toBeUndefined()
@@ -418,20 +419,20 @@ describe("parseFallbackModelEntry: non-string input (issue #4145)", () => {
     const undefinedInput = undefined as unknown as string
 
     //#when / #then
-    expect(parseFallbackModelEntry(nullInput, "anthropic")).toBeUndefined()
-    expect(parseFallbackModelEntry(undefinedInput, "anthropic")).toBeUndefined()
+    expect(parseFallbackModelEntry(nullInput, SUPPORTED_PROVIDERS.ANTHROPIC)).toBeUndefined()
+    expect(parseFallbackModelEntry(undefinedInput, SUPPORTED_PROVIDERS.ANTHROPIC)).toBeUndefined()
   })
 
   test("parseFallbackModelObjectEntry returns undefined when nested model field is non-string", () => {
     //#given: FallbackModelObject whose .model was somehow forwarded as a nested
     //object instead of a flat string (issue #4145 reproduction).
     const malformedObject = {
-      model: ({ model: "claude-opus-4-7" } as unknown) as string,
-      variant: "high",
+      model: ({ model: SUPPORTED_MODELS.CLAUDE_OPUS_4_7 } as unknown) as string,
+      variant: SUPPORTED_VARIANTS.HIGH,
     }
 
     //#when
-    const parsed = parseFallbackModelObjectEntry(malformedObject, "anthropic")
+    const parsed = parseFallbackModelObjectEntry(malformedObject, SUPPORTED_PROVIDERS.ANTHROPIC)
 
     //#then: must not throw, must reject the malformed entry
     expect(parsed).toBeUndefined()
@@ -445,13 +446,13 @@ describe("parseFallbackModelEntry: non-string input (issue #4145)", () => {
     ]
 
     //#when
-    const chain = buildFallbackChainFromModels(fallbackModels, "openai")
+    const chain = buildFallbackChainFromModels(fallbackModels, SUPPORTED_PROVIDERS.OPENAI)
 
     //#then: only the valid string survives, the number is dropped without crashing
     expect(chain).toEqual([
       {
-        providers: ["openai"],
-        model: "gpt-5.5",
+        providers: [SUPPORTED_PROVIDERS.OPENAI],
+        model: SUPPORTED_MODELS.GPT_5_5,
         variant: undefined,
       },
     ])

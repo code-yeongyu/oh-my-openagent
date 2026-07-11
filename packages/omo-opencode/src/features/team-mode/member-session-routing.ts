@@ -7,7 +7,7 @@ import type { RuntimeStateMember } from "./types"
 type PromptGenerationModel = {
   reasoningEffort?: string
   temperature?: number
-  top_p?: number
+  topP?: number
   maxTokens?: number
   thinking?: { type: "enabled" | "disabled"; budgetTokens?: number }
 }
@@ -35,7 +35,7 @@ function buildPromptGenerationParams(model: PromptGenerationModel | undefined): 
 
   return {
     ...(model.temperature !== undefined ? { temperature: model.temperature } : {}),
-    ...(model.top_p !== undefined ? { topP: model.top_p } : {}),
+    ...(model.topP !== undefined ? { topP: model.topP } : {}),
     ...(model.maxTokens !== undefined ? { maxOutputTokens: model.maxTokens } : {}),
     ...(Object.keys(promptOptions).length > 0 ? { options: promptOptions } : {}),
   }

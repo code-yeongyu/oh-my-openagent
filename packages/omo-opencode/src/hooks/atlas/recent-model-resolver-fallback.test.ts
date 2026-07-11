@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { afterAll, describe, expect, test } from "bun:test"
 import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -45,13 +46,13 @@ describe("resolveRecentPromptContextForSession fallback ordering", () => {
     mkdirSync(messageDir, { recursive: true })
     writeFileSync(join(messageDir, "msg_ffff0000_000001.json"), JSON.stringify({
       agent: "atlas",
-      model: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
+      model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: SUPPORTED_MODELS.CLAUDE_SONNET_4_6 },
       tools: { read: true },
       time: { created: 10 },
     }), "utf-8")
     writeFileSync(join(messageDir, "msg_00000000_000999.json"), JSON.stringify({
       agent: "atlas",
-      model: { providerID: "openai", modelID: "gpt-5.4" },
+      model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 },
       tools: { edit: true },
       time: { created: 100 },
     }), "utf-8")
@@ -75,7 +76,7 @@ describe("resolveRecentPromptContextForSession fallback ordering", () => {
     })
 
     // then
-    expect(result.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+    expect(result.model).toEqual({ providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: SUPPORTED_MODELS.GPT_5_4 })
     expect(result.tools).toEqual({ edit: true })
   })
 })

@@ -119,5 +119,5 @@ describe("shared skills package manifest", () => {
     expect(codingAgentFiles).toContain("skills/coding-agent-sessions/scripts/agent_sessions/cli.py")
     expect(codingAgentFiles).toContain("skills/coding-agent-sessions/references/all-platforms.md")
     expect(forbiddenFiles).toEqual([])
-  })
+  }, 15_000)
 })

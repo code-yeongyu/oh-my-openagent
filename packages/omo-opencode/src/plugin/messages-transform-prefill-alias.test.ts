@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { describe, expect, test } from "bun:test"
 import type { Message, Part } from "@opencode-ai/sdk"
 
@@ -71,7 +72,7 @@ describe("messages transform assistant prefill alias repair", () => {
       },
       {
         name: "opencode go anthropic npm alias",
-        providerID: "opencode-go",
+        providerID: SUPPORTED_PROVIDERS.OPENCODE_GO,
         modelID: "claude-opus-4-8",
       },
       {
@@ -81,7 +82,7 @@ describe("messages transform assistant prefill alias repair", () => {
       },
       {
         name: "github copilot claude alias",
-        providerID: "github-copilot",
+        providerID: SUPPORTED_PROVIDERS.GITHUB_COPILOT,
         modelID: "claude-sonnet-4.6",
       },
       {
@@ -91,32 +92,32 @@ describe("messages transform assistant prefill alias repair", () => {
       },
       {
         name: "openrouter anthropic namespace",
-        providerID: "openrouter",
+        providerID: SUPPORTED_PROVIDERS.OPENROUTER,
         modelID: "anthropic/claude-opus-4.8",
       },
       {
         name: "openrouter tilde anthropic namespace",
-        providerID: "openrouter",
+        providerID: SUPPORTED_PROVIDERS.OPENROUTER,
         modelID: "~anthropic/claude-sonnet-4.6",
       },
       {
         name: "openrouter scoped anthropic namespace",
-        providerID: "openrouter",
+        providerID: SUPPORTED_PROVIDERS.OPENROUTER,
         modelID: "@anthropic/claude-opus-4.8",
       },
       {
         name: "openrouter colon anthropic namespace",
-        providerID: "openrouter",
+        providerID: SUPPORTED_PROVIDERS.OPENROUTER,
         modelID: "anthropic:claude-sonnet-4.6",
       },
       {
         name: "vercel claude alias",
-        providerID: "vercel",
+        providerID: SUPPORTED_PROVIDERS.VERCEL,
         modelID: "claude-sonnet-4.6",
       },
       {
         name: "generic anthropic dotted namespace",
-        providerID: "litellm",
+        providerID: SUPPORTED_PROVIDERS.LITELLM,
         modelID: "anthropic.claude-opus-4-8",
       },
       {
@@ -178,10 +179,10 @@ describe("messages transform assistant prefill alias repair", () => {
   test("#given alias providers with models outside the unsupported Anthropic family #when messages transform runs #then it keeps the assistant tail unchanged", async () => {
     //#given
     const scenarios: Array<{ name: string; providerID: string; modelID: string }> = [
-      { name: "opencode non-claude model", providerID: "opencode", modelID: "big-pickle" },
+      { name: "opencode non-claude model", providerID: "opencode", modelID: SUPPORTED_MODELS.BIG_PICKLE },
       { name: "opencode older claude model", providerID: "opencode", modelID: "claude-sonnet-4-5" },
-      { name: "openrouter non-anthropic namespace", providerID: "openrouter", modelID: "openai/gpt-5.4" },
-      { name: "openrouter bare claude-looking id", providerID: "openrouter", modelID: "claude-opus-4-8" },
+      { name: "openrouter non-anthropic namespace", providerID: SUPPORTED_PROVIDERS.OPENROUTER, modelID: "openai/gpt-5.4" },
+      { name: "openrouter bare claude-looking id", providerID: SUPPORTED_PROVIDERS.OPENROUTER, modelID: "claude-opus-4-8" },
     ]
 
     for (const scenario of scenarios) {

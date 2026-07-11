@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS } from "@oh-my-opencode/model-core";
 import { afterEach, describe, expect, it } from "bun:test"
 
 import { _resetForTesting } from "../../features/claude-code-session-state"
@@ -42,21 +43,21 @@ describe("session prompt config resolver", () => {
   it("prefers the latest non-compaction model over poisoned session state", async () => {
     // given
     setSessionModel(sessionID, {
-      providerID: "anthropic",
+      providerID: SUPPORTED_PROVIDERS.ANTHROPIC,
       modelID: "claude-opus-4-1",
     })
     const ctx = createMockContext([
       {
         info: {
           agent: "atlas",
-          model: { providerID: "openai", modelID: "gpt-5" },
+          model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-5" },
           tools: { bash: "allow" },
         },
       },
       {
         info: {
           agent: "compaction",
-          model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
+          model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-1" },
         },
       },
     ])
@@ -67,7 +68,7 @@ describe("session prompt config resolver", () => {
     // then
     expect(promptConfig).toEqual({
       agent: "atlas",
-      model: { providerID: "openai", modelID: "gpt-5" },
+      model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-5" },
       tools: { bash: true },
     })
   })
@@ -78,13 +79,13 @@ describe("session prompt config resolver", () => {
       {
         info: {
           agent: "atlas",
-          model: { providerID: "openai", modelID: "gpt-5" },
+          model: { providerID: SUPPORTED_PROVIDERS.OPENAI, modelID: "gpt-5" },
         },
       },
       {
         info: {
           agent: "compaction",
-          model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
+          model: { providerID: SUPPORTED_PROVIDERS.ANTHROPIC, modelID: "claude-opus-4-1" },
         },
       },
     ])

@@ -1,3 +1,4 @@
+import { SUPPORTED_PROVIDERS, SUPPORTED_MODELS } from "@oh-my-opencode/model-core";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import {
   _resetForTesting,
@@ -173,7 +174,7 @@ describe("executeSync session cleanup", () => {
         createOrGetSession: mock(async () => ({ sessionID, isNew: false })),
         clearSessionFallbackChain,
       })
-      const fallbackChain = [{ providers: ["openai"], model: "gpt-5.4" }]
+      const fallbackChain = [{ providers: [SUPPORTED_PROVIDERS.OPENAI], model: SUPPORTED_MODELS.GPT_5_4 }]
 
       // when
       await executeSync(args, toolContext, createContext(promptAsync) as never, deps, fallbackChain)
