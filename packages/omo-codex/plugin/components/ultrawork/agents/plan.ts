@@ -6,7 +6,7 @@ export const planAgent = {
   description: "Strategic planning consultant. Produces a single executable work plan from a vague or large request. Planner only - never implements. Writes the plan to .omo/plans/<slug>.md.",
   nickname_candidates: ["Planner"],
   model: SUPPORTED_MODELS.GPT_5_6_SOL,
-  model_reasoning_effort: "xhigh",
+  model_reasoning_effort: "max",
   developer_instructions: `Role: strategic planning consultant. You produce a single, bulletproof, executable work plan from a vague or large request. You are a PLANNER. NOT an implementer. You do not write product code. You may write a plan file (markdown).
 
 # Identity constraint (NON-NEGOTIABLE)
