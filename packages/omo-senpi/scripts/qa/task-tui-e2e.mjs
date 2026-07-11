@@ -147,6 +147,7 @@ async function runScenario(name) {
 function runSelfTest() {
   if (parseArgs(["--scenario", "edge"]).scenario !== "edge") throw new Error("self-test: scenario parser failed")
   if (parseArgs(["--scenario", "active"]).scenario !== "active") throw new Error("self-test: active scenario parser failed")
+  if (parseArgs(["--scenario", "team"]).scenario !== "team") throw new Error("self-test: team scenario parser failed")
   try {
     parseArgs(["--scenario", "bogus"])
     throw new Error("self-test: bad scenario accepted")
@@ -157,10 +158,13 @@ function runSelfTest() {
   const receiptDir = join(prepared.sandbox.root, "receipt")
   const command = composeCommand("/tmp/senpi", prepared.sessionDir, "full")
   const activeCommand = composeCommand("/tmp/senpi", prepared.sessionDir, "active")
+  const teamCommand = composeCommand("/tmp/senpi", prepared.sessionDir, "team")
   const env = childEnv({ ...process.env, SENPI_CODING_AGENT_DIR: "/real/agent", OPENAI_API_KEY: "secret" }, prepared.sandbox, prepared.sessionDir, "/tmp/senpi")
   if (command.args.includes("-p") || command.args.includes("--mode")) throw new Error("self-test: TUI command must not force print/json mode")
   if (!command.args.includes(mockProviderEntry) || !command.args.includes("omo-mock") || !command.args.includes("mock-1")) throw new Error("self-test: mock provider command is incomplete")
   if (!activeCommand.args.includes(SCENARIOS.active.prompt)) throw new Error("self-test: active command prompt is incomplete")
+  if (!teamCommand.args.includes(SCENARIOS.team.prompt)) throw new Error("self-test: team command prompt is incomplete")
+  if (SCENARIOS.team.customMessages?.[0]?.customType !== "senpi-task.team-message") throw new Error("self-test: team custom message is incomplete")
   if (env.SENPI_CODING_AGENT_DIR !== prepared.sandbox.agentDir || env.OPENAI_API_KEY !== undefined) throw new Error("self-test: env isolation failed")
   const oldOutDir = process.env.TASK_TUI_E2E_OUT_DIR
   process.env.TASK_TUI_E2E_OUT_DIR = receiptDir
