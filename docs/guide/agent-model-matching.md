@@ -240,7 +240,7 @@ Used by: `visual-engineering`, `artistry`, Oracle (visual fallback), Multimodal-
 | Claude Opus/Sonnet | Kimi K2.7 → K2.6/K2.5 → GLM 5 → Big Pickle | Older GPT models |
 | GPT-5.4/5.5 | GPT-5.5 Codex → DeepSeek v3.2 | MiniMax (except for utility work) |
 | Gemini 3.1 Pro | Qwen 3.6-plus / 3.5-plus | Claude/Kimi (wrong reasoning style for visual) |
-| Grok Code Fast 1 (Explore) | GPT-5.4 Mini Fast → MiniMax M2.7 Highspeed → MiniMax M3 → Claude Haiku | Opus (massive cost waste) |
+| GPT-5.4 Mini Fast (Explore/Librarian) | Qwen 3.5-plus → MiniMax M2.7 Highspeed → MiniMax M3 → Claude Haiku | Opus (massive cost waste) |
 
 ---
 

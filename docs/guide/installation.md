@@ -486,7 +486,7 @@ GitHub Copilot is supported as a **fallback provider** when native providers are
 | ------------- | ---------------------------------- |
 | **Sisyphus**  | `github-copilot/claude-opus-4.7`   |
 | **Oracle**    | `github-copilot/gpt-5.5`           |
-| **Explore**   | `github-copilot/grok-code-fast-1`  |
+| **Explore**   | `github-copilot/claude-haiku-4-5`  |
 | **Atlas**     | `github-copilot/claude-sonnet-4.6` |
 
 Copilot acts as a proxy provider, routing requests to underlying models based on your subscription. Some agents (like Librarian) are not installed from Copilot alone and instead rely on other providers or runtime fallback.
@@ -565,7 +565,7 @@ Not all models behave the same way. Understanding "similar" families helps you m
 
 | Model                      | Provider(s)         | Speed          | Notes                                                                          |
 | -------------------------- | ------------------- | -------------- | ------------------------------------------------------------------------------ |
-| **Grok Code Fast 1**       | github-copilot, xai | Very fast      | Optimized for code grep/search. Default for Explore.                          |
+| **Grok Code Fast 1**       | github-copilot, xai | Very fast      | Optimized for code grep/search. Manual override option — not in the default chains. |
 | **Claude Haiku 4.5**       | anthropic, vercel   | Fast           | Good balance of speed and intelligence.                                       |
 | **MiniMax M2.7 Highspeed** | vercel, opencode    | Very fast      | High-speed MiniMax utility fallback used by runtime chains.                   |
 | **GPT-5.3-codex-spark**    | openai              | Extremely fast | Blazing but compacts too aggressively. Not recommended for omo agents.        |

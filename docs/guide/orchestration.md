@@ -274,7 +274,7 @@ Junior doesn't need to be the smartest - it needs to be reliable. With:
 3. Clear MUST DO / MUST NOT DO constraints
 4. Verification requirements
 
-Even a mid-tier execution model works when the harness is strict. The current fallback order is `claude-sonnet-4-6` → `kimi-k2.5` → `gpt-5.5` → `minimax-m3` → `minimax-m2.7` → `big-pickle`. The intelligence is in the **system**, not a single worker model.
+Even a mid-tier execution model works when the harness is strict. The current fallback order is `claude-sonnet-4-6` → `kimi-k2.6` → `gpt-5.5` → `minimax-m3` → `minimax-m2.7` → `big-pickle`. The intelligence is in the **system**, not a single worker model.
 
 ### System Reminder Mechanism
 
