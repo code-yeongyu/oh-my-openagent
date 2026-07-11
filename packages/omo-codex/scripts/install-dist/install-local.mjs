@@ -8559,12 +8559,18 @@ import { readFile as readFile10 } from "node:fs/promises";
 import { join as join17 } from "node:path";
 var FALLBACK_CODEX_MODEL_CATALOG = {
   current: {
-    model: "gpt-5.5",
-    modelContextWindow: 400000,
+    model: "gpt-5.6-sol",
+    modelContextWindow: 372000,
     modelReasoningEffort: "high",
     planModeReasoningEffort: "xhigh"
   },
   managedProfiles: [
+    {
+      model: "gpt-5.5",
+      modelContextWindow: 400000,
+      modelReasoningEffort: "high",
+      planModeReasoningEffort: "xhigh"
+    },
     {
       model: "gpt-5.5",
       modelContextWindow: 1e6,

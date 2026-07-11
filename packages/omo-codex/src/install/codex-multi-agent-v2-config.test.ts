@@ -46,11 +46,15 @@ describe("codex MultiAgentV2 config", () => {
 
   test("#given disabled boolean shorthand #when updating config #then explicit disable is preserved in table form", async () => {
     // given
+    // A pinned v1 model keeps the explicit disable materializing in table form;
+    // the stamped v2-preferred default would drop the disable instead.
     const root = await mkdtemp(join(tmpdir(), "omo-codex-mav2-disabled-shorthand-"))
     const configPath = join(root, "config.toml")
     await writeFile(
       configPath,
       [
+        'model = "gpt-5.5"',
+        "",
         "[features]",
         "multi_agent_v2 = false # user disabled the beta path",
         "plugins = false",
