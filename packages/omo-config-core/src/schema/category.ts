@@ -27,14 +27,14 @@ const BaseCategoryConfigSchema = z.object({
 
 export const OmoCategoryConfigSchema = BaseCategoryConfigSchema.extend({
   /** @deprecated Use `topP` instead. Will be removed in a future version. */
-  top_p: z.number().min(0).max(1).optional(),
+  topp: z.number().min(0).max(1).optional(),
 }).transform((val): z.infer<typeof BaseCategoryConfigSchema> => {
-  const { top_p, topP, ...rest } = val
-  if (top_p !== undefined && topP === undefined) {
-    console.warn("[config] DEPRECATED: 'top_p' in category config is deprecated, use 'topP' instead")
+  const { topp, topP, ...rest } = val
+  if (topp !== undefined && topP === undefined) {
+    console.warn("[config] DEPRECATED: 'topp' in category config is deprecated, use 'topP' instead")
   }
   const result: z.infer<typeof BaseCategoryConfigSchema> = { ...rest }
-  const finalTopP = topP ?? top_p
+  const finalTopP = topP ?? topp
   if (finalTopP !== undefined) {
     result.topP = finalTopP
   }
