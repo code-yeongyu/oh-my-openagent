@@ -113,6 +113,12 @@ describe("buildCodexGoalInstruction aggregate mode", () => {
 
 		expectTextToContainAll(text, FINAL_REVIEW_ROLES);
 		expectTextToContainAll(text, QUALITY_GATE_SECTIONS);
+		// staged spawn: reviewers first, gate only after their artifacts exist (P4a, 2026-07-11)
+		expect(text).toMatch(/wait for BOTH/);
+		expect(text).toContain("Only then spawn lazycodex-gate-reviewer");
+		expect(text.indexOf("wait for BOTH")).toBeLessThan(text.indexOf("Only then spawn lazycodex-gate-reviewer"));
+		expect(text).not.toMatch(/Spawn final reviewers with fork_context=false: lazycodex-code-reviewer, lazycodex-qa-executor, and lazycodex-gate-reviewer/);
+		expect(text).toMatch(/at most TWICE|re-review the delta at most twice/i);
 		expect(text).toMatch(/targeted verification/i);
 		expect(text).toMatch(/artifact path.*non-zero size/i);
 		expectTextToContainAll(text, ["original brief", "desired user-visible outcome", "userOutcomeReview"]);

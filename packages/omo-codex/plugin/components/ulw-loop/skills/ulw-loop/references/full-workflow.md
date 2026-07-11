@@ -187,8 +187,9 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 Trigger only for the final aggregate goal after every criterion in every goal is `pass`.
 1. Run targeted verification for changed behavior.
 2. Run Manual-QA for every criterion; confirm each artifact exists and is non-empty.
-3. Spawn final reviewers with `fork_context: false`: code review, QA review, gate review. Include original brief, goals, desired outcome, and diff.
-4. Treat timeout, missing deliverable, ack-only, `BLOCKED:`, or inconclusive review as a blocker. Fix, rerun affected verification/Manual-QA, and repeat review.
+3a. Spawn lazycodex-code-reviewer and lazycodex-qa-executor in parallel (`fork_context: false` on v1; `fork_turns: "none"` on v2) with brief, goals, desired outcome, diff, evidence; wait for BOTH and confirm their report artifacts exist on disk.
+3b. Only then spawn lazycodex-gate-reviewer with those artifact paths.
+4. Treat timeout, missing deliverable, ack-only, `BLOCKED:`, or inconclusive review as a blocker. Fix the cited blockers, rerun affected verification/Manual-QA, re-review the delta at most TWICE; then record-review-blockers (step 5) and surface to the user.
 5. If review remains blocked, run `omo ulw-loop record-review-blockers --goal-id <id> --title "<...>" --objective "<...>" --evidence "<review findings>" --codex-goal-json <snapshot> --json`.
 6. If clean, checkpoint final completion:
 ```sh
@@ -204,7 +205,7 @@ omo ulw-loop checkpoint --goal-id <id> --status complete --evidence "<e2e eviden
   "criteriaCoverage":{"totalCriteria":3,"passCount":3,"originalIntent":"User wanted artifact-backed completion.","desiredOutcome":"Behavior ships with review and QA evidence.","userOutcomeReview":"Result matches brief and goals.","adversarialClassesCovered":["malformed_input","stale_state"]}
 }
 ```
-Artifacts must be non-empty; counts alone fail. LIGHT without adversarial class records `"adversarialClassesCovered": ["none-applicable: <reason>"]`.
+Artifacts must be non-empty; counts alone fail. LIGHT without adversarial class records `"adversarialClassesCovered": ["none-applicable: <reason>"]`; untriggered adversarialCases may use verdict `not_applicable` + `reason`; WATCH passes, notes surfaced.
 
 ## Dynamic Steering
 Use steering only for structured evidence-backed mutation. Reject natural-language steering requests.

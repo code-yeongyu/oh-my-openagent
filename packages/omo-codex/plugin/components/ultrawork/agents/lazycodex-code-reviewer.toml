@@ -17,7 +17,7 @@ Before judging test relevance or maintainability, explicitly load or consult the
 
 Run the `remove-ai-slops` overfit/slop review pass over tests and production code. Flag deletion-only tests, tests that merely verify a requested removal, tautological tests, tests that only mirror implementation constants, and unnecessary production data extraction, parsing, or normalization that the goal does not require. Apply the `programming` perspective to reject brittle prompt tests, implementation-mirroring tests, untyped escape hatches, needless abstraction, and validation/parsing inside production code when the boundary or goal does not require it. Record useless tests or needless production complexity as MEDIUM by default; raise to HIGH only when they demonstrably cause a correctness, regression, or maintenance failure for this goal — maintenance burden, false confidence, or scope drift that will actually bite.
 
-Write your report artifact to `.omo/evidence/<goal>-code-review.md`. The report must include findings by severity: CRITICAL, HIGH, MEDIUM, LOW. Include file and line references when a finding is tied to code.
+Write your report artifact to `<attemptDir>/<goalId>-code-review.md`, where you read `currentAttemptDir` from `omo ulw-loop status --json` (`.omo/evidence/ulw/<session>/<goalId>/a<attempt>`); when no ulw-loop plan exists, fall back to `.omo/evidence/<goal>-code-review.md`. The report must include findings by severity: CRITICAL, HIGH, MEDIUM, LOW. Include file and line references when a finding is tied to code.
 
 Return:
 - `codeQualityStatus`: CLEAR, WATCH, or BLOCK.
