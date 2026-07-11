@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test"
 import { Theme, type MessageRenderer } from "@code-yeongyu/senpi"
 
 import { renderTaskCompletion } from "./renderers"
-import { renderTeamMessage } from "./team-renderers"
+import { renderTeamMessage, type TeamMessageDetails } from "./team-renderers"
 
 const TEST_FG_COLORS = {
   accent: "#000000",
@@ -70,11 +70,9 @@ const ADVERSARIAL_CONTENT = [
   "다섯째 한글 \u001bPunterminated-dcs",
   "여섯째 줄 보존",
 ].join("\n")
-const EXPECTED_LINES = ["첫줄 빨강 끝", "둘째 링크 界", "셋째 漢字", "넷째 줄 보존", "다섯째 한글", "여섯째 줄 보존"]
-
-function renderLines<T>(renderer: MessageRenderer<T>, customType: string, details: T): readonly string[] {
+function renderContentLines<T>(renderer: MessageRenderer<T>, customType: string, content: string, details: T): readonly string[] {
   const component = renderer(
-    { role: "custom", customType, content: ADVERSARIAL_CONTENT, display: true, details, timestamp: 0 },
+    { role: "custom", customType, content, display: true, details, timestamp: 0 },
     { expanded: false },
     TEST_THEME,
   )
@@ -86,27 +84,101 @@ function expectSanitizedLines(lines: readonly string[]): void {
   expect(lines.join("\n")).not.toContain("example.com")
   expect(lines.join("\n")).not.toContain("숨긴 제목")
   expect(lines.join("\n")).not.toContain("unterminated-dcs")
-  expect(lines).toEqual(EXPECTED_LINES)
 }
 
 describe("task-family custom message renderers", () => {
-  test("#given terminal control injection #when rendering task completion #then controls are removed and CJK line separation is preserved", () => {
-    // given the shared adversarial multiline content
+  test("#given terminal control injection #when rendering task completion #then structured CJK details are sanitized", () => {
+    // given
+    const details = [{
+      task_id: "st_1",
+      name: "작업자",
+      status: "completed" as const,
+      duration_ms: 10,
+      final_response_head: ADVERSARIAL_CONTENT,
+      continuation_hint: "task_send로 계속",
+    }]
 
     // when
-    const lines = renderLines(renderTaskCompletion, "senpi-task.completion", [])
+    const lines = renderContentLines(renderTaskCompletion, "senpi-task.completion", "<task-notification>raw</task-notification>", details)
 
     // then
     expectSanitizedLines(lines)
+    expect(lines.join("\n")).toContain("첫줄 빨강")
+    expect(lines.join("\n")).not.toContain("<task-notification>")
   })
 
-  test("#given terminal control injection #when rendering a team message #then controls are removed and CJK line separation is preserved", () => {
-    // given the shared adversarial multiline content
+  test("#given terminal control injection #when rendering a team message #then structured CJK details are sanitized", () => {
+    // given
+    const details: TeamMessageDetails = { from: "member-a", messageId: "m1", body: ADVERSARIAL_CONTENT }
 
     // when
-    const lines = renderLines(renderTeamMessage, "senpi-task.team-message", { from: "member-a", messageId: "m1" })
+    const lines = renderContentLines(renderTeamMessage, "senpi-task.team-message", "<peer_message>raw</peer_message>", details)
 
     // then
     expectSanitizedLines(lines)
+    expect(lines.join("\n")).toContain("첫줄 빨강")
+    expect(lines.join("\n")).not.toContain("<peer_message>")
+  })
+
+  test("#given structured completion details #when rendering #then user-facing task facts replace protocol tags", () => {
+    // given
+    const details = [{
+      task_id: "st_done",
+      name: "worker",
+      status: "completed" as const,
+      duration_ms: 1250,
+      tokens: 321,
+      final_response_head: "검증 작업을 완료했습니다.",
+      continuation_hint: 'Use task_send({ to: "st_done", message: "..." }) to continue.',
+    }]
+
+    // when
+    const lines = renderContentLines(
+      renderTaskCompletion,
+      "senpi-task.completion",
+      "<task-notification>\n<head>raw protocol body</head>\n</task-notification>",
+      details,
+    )
+    const text = lines.join("\n")
+
+    // then
+    expect(text).toContain("task completion")
+    expect(text).toContain("name:worker")
+    expect(text).toContain("id:st_done")
+    expect(text).toContain("status:completed")
+    expect(text).toContain("duration:1.25s")
+    expect(text).toContain("tokens:321")
+    expect(text).toContain("검증 작업을 완료했습니다.")
+    expect(text).toContain("task_send")
+    expect(text).not.toContain("<task-notification>")
+    expect(text).not.toContain("<head>")
+  })
+
+  test("#given a structured team message #when rendering #then sender summary and body replace the peer envelope", () => {
+    // given
+    const details: TeamMessageDetails & { readonly body: string; readonly summary: string } = {
+      from: "member-a",
+      messageId: "m1",
+      summary: "검토 완료",
+      body: "한국어 팀 메시지 본문과 the actual review result.",
+    }
+
+    // when
+    const lines = renderContentLines(
+      renderTeamMessage,
+      "senpi-task.team-message",
+      '<peer_message from="member-a" summary="검토 완료">\n한국어 팀 메시지 본문과 the actual review result.\n</peer_message>',
+      details,
+    )
+    const text = lines.join("\n")
+
+    // then
+    expect(text).toContain("team message")
+    expect(text).toContain("from:member-a")
+    expect(text).toContain("id:m1")
+    expect(text).toContain("summary:검토 완료")
+    expect(text).toContain("한국어 팀 메시지 본문")
+    expect(text).not.toContain("<peer_message")
+    expect(text).not.toContain("</peer_message>")
   })
 })

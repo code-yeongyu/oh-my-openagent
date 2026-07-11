@@ -1,5 +1,10 @@
 import { messageability } from "../state"
 import type { TaskRecord } from "../state"
+import {
+  excerptRendererPromptText,
+  joinRendererTokens,
+  normalizeRendererText,
+} from "../tools/task/renderers"
 import type { CompletionDetails, ParentNotifierMessage } from "./types"
 
 const FINAL_RESPONSE_HEAD_LIMIT = 700
@@ -24,10 +29,14 @@ export function buildCompletionDetails(record: TaskRecord, options: BuildDetails
 export function buildCompletionMessage(details: readonly CompletionDetails[]): ParentNotifierMessage {
   return {
     customType: "senpi-task.completion",
-    content: renderContent(details),
+    content: completionMessageLines(details).join("\n"),
     display: false,
     details,
   }
+}
+
+export function completionMessageLines(details: readonly CompletionDetails[]): readonly string[] {
+  return details.flatMap(completionDetailLines)
 }
 
 function responseHead(record: TaskRecord): string {
@@ -49,16 +58,26 @@ function continuationHint(record: TaskRecord): string {
   return `Use task_send({ to: "${record.task_id}", message: "..." }) to continue, or ${output}.`
 }
 
-function renderContent(details: readonly CompletionDetails[]): string {
-  const blocks = details.map(renderDetail).join("\n")
-  return `<task-notification>\n${blocks}\n</task-notification>`
+function completionDetailLines(detail: CompletionDetails): readonly string[] {
+  const summary = joinRendererTokens([
+    "task completion",
+    `name:${normalizeRendererText(detail.name)}`,
+    `id:${normalizeRendererText(detail.task_id)}`,
+    `status:${normalizeRendererText(detail.status)}`,
+    `duration:${formatDuration(detail.duration_ms)}`,
+    detail.tokens === undefined ? undefined : `tokens:${detail.tokens}`,
+  ])
+  const head = normalizeRendererText(detail.final_response_head)
+  const continuation = normalizeRendererText(detail.continuation_hint)
+  return [
+    summary,
+    ...(head.length === 0 ? [] : [`result:"${excerptRendererPromptText(head)}"`]),
+    ...(continuation.length === 0 ? [] : [`next:${excerptRendererPromptText(continuation)}`]),
+  ]
 }
 
-function renderDetail(detail: CompletionDetails): string {
-  const tokens = detail.tokens === undefined ? "" : ` tokens=${detail.tokens}`
-  return [
-    `- task "${detail.name}" (${detail.task_id}) ${detail.status} in ${detail.duration_ms}ms${tokens}`,
-    `  <head>${detail.final_response_head}</head>`,
-    `  ${detail.continuation_hint}`,
-  ].join("\n")
+function formatDuration(durationMs: number): string {
+  if (durationMs < 1_000) return `${durationMs}ms`
+  const seconds = (durationMs / 1_000).toFixed(2).replace(/\.00$/u, "").replace(/(\.\d)0$/u, "$1")
+  return `${seconds}s`
 }

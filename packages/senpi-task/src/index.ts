@@ -185,6 +185,7 @@ export type {
 export {
   buildCompletionDetails,
   buildCompletionMessage,
+  completionMessageLines,
   createCompletionNotifier,
   routeCompletion,
   shouldNotifyStatus,
@@ -244,7 +245,9 @@ export {
   buildTaskToolDescription,
   createFsSkillLoader,
   createTaskTool,
+  excerptRendererPromptText,
   excerptRendererText,
+  joinRendererTokens,
   linesComponent,
   listTaskAgents,
   listTaskCategories,

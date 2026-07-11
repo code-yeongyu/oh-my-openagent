@@ -4,7 +4,9 @@ export { buildTaskExecute } from "./execute"
 export { TaskToolParams } from "./params"
 export type { TaskToolParamsStatic } from "./params"
 export {
+  excerptRendererPromptText,
   excerptRendererText,
+  joinRendererTokens,
   linesComponent,
   normalizeRendererText,
   rendererVisibleWidth,
