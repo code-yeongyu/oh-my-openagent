@@ -15,7 +15,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(oracle.fallbackChain.length).toBeGreaterThan(0)
     expect(primary?.providers).toContain(SUPPORTED_PROVIDERS.OPENAI)
     expect(primary?.model).toBe(SUPPORTED_MODELS.GPT_5_5)
-    expect(primary?.variant).toBe("high")
+    expect(primary?.variant).toBe(SUPPORTED_VARIANTS.HIGH)
   })
 
   test("sisyphus keeps opus primary before k2p5, kimi-k2.5, gpt-5.5 medium, and big-pickle", () => {
@@ -29,7 +29,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(sisyphus.fallbackChain).toHaveLength(7)
     expect(sisyphus.requiresAnyModel).toBe(true)
     expect(primary).toEqual({
-      providers: [SUPPORTED_PROVIDERS.ANTHROPIC, SUPPORTED_PROVIDERS.GITHUB_COPILOT, "opencode", SUPPORTED_PROVIDERS.VERCEL],
+      providers: [SUPPORTED_PROVIDERS.ANTHROPIC, SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],
       model: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
       variant: SUPPORTED_VARIANTS.MAX,
     })
@@ -37,13 +37,13 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(third).toEqual({ providers: [SUPPORTED_PROVIDERS.KIMI_FOR_CODING], model: SUPPORTED_MODELS.KIMI_K2P5 })
     expect(fourth?.model).toBe(SUPPORTED_MODELS.KIMI_K2_5)
     expect(fifth).toEqual({
-      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.GITHUB_COPILOT, "opencode", SUPPORTED_PROVIDERS.VERCEL],
+      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],
       model: SUPPORTED_MODELS.GPT_5_5,
       variant: SUPPORTED_VARIANTS.MEDIUM,
     })
     expect(sixth?.providers[0]).toBe(SUPPORTED_PROVIDERS.ZAI_CODING_PLAN)
     expect(sixth?.model).toBe(SUPPORTED_MODELS.GLM_5)
-    expect(last?.providers[0]).toBe("opencode")
+    expect(last?.providers[0]).toBe(SUPPORTED_PROVIDERS.OPENCODE)
     expect(last?.model).toBe(SUPPORTED_MODELS.BIG_PICKLE)
   })
 
@@ -114,14 +114,14 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // then
     expect(multimodalLooker.fallbackChain).toHaveLength(4)
     expect(primary).toEqual({
-      providers: [SUPPORTED_PROVIDERS.OPENAI, "opencode", SUPPORTED_PROVIDERS.VERCEL],
+      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],
       model: SUPPORTED_MODELS.GPT_5_5,
       variant: SUPPORTED_VARIANTS.MEDIUM,
     })
     expect(secondary).toEqual({ providers: [SUPPORTED_PROVIDERS.OPENCODE_GO, SUPPORTED_PROVIDERS.VERCEL], model: SUPPORTED_MODELS.KIMI_K2_6 })
     expect(tertiary?.model).toBe(SUPPORTED_MODELS.GLM_4_6V)
     expect(last).toEqual({
-      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.GITHUB_COPILOT, "opencode", SUPPORTED_PROVIDERS.VERCEL],
+      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],
       model: SUPPORTED_MODELS.GPT_5_NANO,
     })
   })
@@ -136,7 +136,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // then
     expect(prometheus.fallbackChain.length).toBeGreaterThan(1)
     expect(primary).toEqual({
-      providers: [SUPPORTED_PROVIDERS.ANTHROPIC, SUPPORTED_PROVIDERS.GITHUB_COPILOT, "opencode", SUPPORTED_PROVIDERS.VERCEL],
+      providers: [SUPPORTED_PROVIDERS.ANTHROPIC, SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],
       model: SUPPORTED_MODELS.CLAUDE_OPUS_4_7,
       variant: SUPPORTED_VARIANTS.MAX,
     })
@@ -154,13 +154,13 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // then
     expect(metis.fallbackChain.length).toBeGreaterThan(1)
     expect(primary).toEqual({
-      providers: [SUPPORTED_PROVIDERS.ANTHROPIC, SUPPORTED_PROVIDERS.GITHUB_COPILOT, "opencode", SUPPORTED_PROVIDERS.VERCEL],
+      providers: [SUPPORTED_PROVIDERS.ANTHROPIC, SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],
       model: SUPPORTED_MODELS.CLAUDE_SONNET_4_6,
     })
     expect(opusFallback?.model).toBe(SUPPORTED_MODELS.CLAUDE_OPUS_4_7)
-    expect(opusFallback?.variant).toBe("max")
+    expect(opusFallback?.variant).toBe(SUPPORTED_VARIANTS.MAX)
     expect(openAiFallback).toEqual({
-      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.GITHUB_COPILOT, "opencode", SUPPORTED_PROVIDERS.VERCEL],
+      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],
       model: SUPPORTED_MODELS.GPT_5_5,
       variant: SUPPORTED_VARIANTS.HIGH,
     })
@@ -201,7 +201,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(secondary?.model).toBe(SUPPORTED_MODELS.KIMI_K2_6)
     expect(secondary?.providers[0]).toBe(SUPPORTED_PROVIDERS.OPENCODE_GO)
     expect(tertiary).toEqual({
-      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.GITHUB_COPILOT, "opencode", SUPPORTED_PROVIDERS.VERCEL],
+      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],
       model: SUPPORTED_MODELS.GPT_5_5,
       variant: SUPPORTED_VARIANTS.MEDIUM,
     })
@@ -241,7 +241,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     // then
     expect(openAiFallback).toEqual({
-      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.GITHUB_COPILOT, "opencode", SUPPORTED_PROVIDERS.VERCEL],
+      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],
       model: SUPPORTED_MODELS.GPT_5_5,
       variant: SUPPORTED_VARIANTS.MEDIUM,
     })
@@ -260,7 +260,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(hephaestus.requiresProvider).toEqual([
       SUPPORTED_PROVIDERS.OPENAI,
       SUPPORTED_PROVIDERS.GITHUB_COPILOT,
-      "opencode",
+      SUPPORTED_PROVIDERS.OPENCODE,
       SUPPORTED_PROVIDERS.VERCEL,
     ])
     expect(hephaestus.requiresProvider).not.toContain("venice")
@@ -278,14 +278,14 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     // then
     expect(primary).toEqual({
-      providers: ["openai", "vercel"],
-      model: "gpt-5.6-sol",
-      variant: "medium",
+      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.VERCEL],
+      model: SUPPORTED_MODELS.GPT_5_6_SOL,
+      variant: SUPPORTED_VARIANTS.MEDIUM,
     })
     expect(secondary).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.5",
-      variant: "medium",
+      providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],
+      model: SUPPORTED_MODELS.GPT_5_5,
+      variant: SUPPORTED_VARIANTS.MEDIUM,
     })
   })
 })
