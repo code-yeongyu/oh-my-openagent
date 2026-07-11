@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { isUlwLoopSubcommand, ulwLoopCommand } from "./cli-commands.js";
 import { runPreToolUseGoalBudgetGuardCli, runUlwLoopHookCli } from "./codex-hook.js";
+import { runStopResumeHookCli } from "./stop-resume-hook.js";
 
 const TOP_LEVEL_HELP =
 	"Usage:\n  omo ulw-loop <subcommand> [args]\n  omo hook user-prompt-submit [--with-ultrawork]  (Codex UserPromptSubmit hook)\n  omo help | --help | -h                          (this message)\n\nRun `omo ulw-loop help` for ulw-loop subcommands.\n";
@@ -23,6 +24,10 @@ async function main(): Promise<number> {
 		}
 		if (sub === "pre-tool-use") {
 			await runPreToolUseGoalBudgetGuardCli(process.stdin, process.stdout);
+			return 0;
+		}
+		if (sub === "stop") {
+			await runStopResumeHookCli(process.stdin, process.stdout);
 			return 0;
 		}
 		process.stderr.write(`[omo] unknown hook subcommand: ${sub ?? "(none)"}\n`);
