@@ -25,8 +25,8 @@ describe("codex-config-reasoning", () => {
 
     // then
     const content = await readFile(configPath, "utf8")
-    expect(content).toContain('model = "gpt-5.5"')
-    expect(content).toContain("model_context_window = 400000")
+    expect(content).toContain('model = "gpt-5.6-sol"')
+    expect(content).toContain("model_context_window = 372000")
     expect(content).toContain('model_reasoning_effort = "high"')
     expect(content).toContain('plan_mode_reasoning_effort = "xhigh"')
   })
@@ -64,8 +64,8 @@ describe("codex-config-reasoning", () => {
     expect(content.match(/^model_context_window\s*=/gm)).toHaveLength(1)
     expect(content.match(/^model_reasoning_effort\s*=/gm)).toHaveLength(1)
     expect(content.match(/^plan_mode_reasoning_effort\s*=/gm)).toHaveLength(1)
-    expect(content).toContain('model = "gpt-5.5"')
-    expect(content).toContain("model_context_window = 400000")
+    expect(content).toContain('model = "gpt-5.6-sol"')
+    expect(content).toContain("model_context_window = 372000")
     expect(content).toContain('model_reasoning_effort = "high"')
     expect(content).toContain('plan_mode_reasoning_effort = "xhigh"')
     expect(content).not.toContain("model_context_window = 272000")
@@ -152,7 +152,7 @@ describe("codex-config-reasoning", () => {
     const catalog = await readCodexModelCatalog(root)
 
     // then
-    expect(catalog.current.model).toBe("gpt-5.5")
+    expect(catalog.current.model).toBe("gpt-5.6-sol")
     expect(catalog.managedProfiles.map(profile => profile.model)).not.toContain("gpt-5.4")
   })
 })

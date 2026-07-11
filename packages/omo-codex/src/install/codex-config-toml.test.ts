@@ -81,6 +81,10 @@ describe("codex-config-toml", () => {
       .split(/^\[/m).slice(0, 1).join("")
     expect(v2Section).not.toContain("enabled")
     expect(content).toContain("max_concurrent_threads_per_session = 1000")
+    // The stamped gpt-5.6 default is a V2-preferred model: Codex rejects
+    // agents.max_threads while MultiAgentV2 is active, so a fresh install
+    // must not introduce it.
+    expect(content).not.toMatch(/^\s*max_threads\s*=/m)
   })
 
   test("#given stale queue multi-agent mode #when updating config #then removes unsupported root key", async () => {
@@ -169,11 +173,16 @@ describe("codex-config-toml", () => {
 
   test("#given existing MultiAgentV2 table #when updating config #then preserves user enabled flag and unrelated tuning while setting thread limit", async () => {
     // given
+    // A pinned v1 model keeps this exercising the preserve-user-disable path;
+    // an absent model would be stamped with the v2-preferred default, which
+    // intentionally clears the disable.
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-existing-"))
     const configPath = join(root, "config.toml")
     await writeFile(
       configPath,
       [
+        'model = "gpt-5.5"',
+        "",
         "[features.multi_agent_v2]",
         "enabled = false",
         "usage_hint_enabled = false",
@@ -380,11 +389,15 @@ describe("codex-config-toml", () => {
 
   test("#given legacy boolean MultiAgentV2 flag false #when updating config #then normalizes to a disabled table config", async () => {
     // given
+    // A pinned v1 model keeps the legacy boolean materializing as a disabled
+    // table; the stamped v2-preferred default would drop the disable instead.
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-legacy-false-"))
     const configPath = join(root, "config.toml")
     await writeFile(
       configPath,
       [
+        'model = "gpt-5.5"',
+        "",
         "[features]",
         "multi_agent_v2 = false",
         "plugins = false",
@@ -410,11 +423,15 @@ describe("codex-config-toml", () => {
 
   test("#given legacy agents max_threads #when updating config #then raises the root subagent thread cap", async () => {
     // given
+    // A pinned v1 model keeps the legacy low-cap raise path exercised; the
+    // stamped v2-preferred default would remove agents.max_threads instead.
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-legacy-threads-"))
     const configPath = join(root, "config.toml")
     await writeFile(
       configPath,
       [
+        'model = "gpt-5.5"',
+        "",
         "[agents]",
         "max_threads = 16",
         "max_depth = 4",
@@ -559,11 +576,15 @@ describe("codex-config-toml", () => {
 
   test("#given managed agent role sections #when updating config #then preserves role config while raising only root agents max_threads", async () => {
     // given
+    // A pinned v1 model keeps the legacy low-cap raise path exercised; the
+    // stamped v2-preferred default would remove agents.max_threads instead.
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-role-section-"))
     const configPath = join(root, "config.toml")
     await writeFile(
       configPath,
       [
+        'model = "gpt-5.5"',
+        "",
         "[agents]",
         "max_threads = 16",
         "",
