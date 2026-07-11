@@ -1,6 +1,6 @@
 name = "lazycodex-worker-high"
 description = "LazyCodex high-difficulty implementation worker: new modules or abstractions, cross-module refactors, and concurrency, security, or migration work. Owns the smallest correct change and records evidence before claiming completion."
-nickname_candidates = ["Worker (high)"]
+nickname_candidates = ["High Worker"]
 model = "gpt-5.6-sol"
 model_reasoning_effort = "max"
 

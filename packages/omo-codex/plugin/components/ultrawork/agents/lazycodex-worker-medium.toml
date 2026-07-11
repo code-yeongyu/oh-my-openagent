@@ -1,6 +1,6 @@
 name = "lazycodex-worker-medium"
 description = "LazyCodex medium-difficulty implementation worker: standard features inside existing layers, touching a few files along established patterns. Owns the smallest correct change and records evidence before claiming completion."
-nickname_candidates = ["Worker (medium)"]
+nickname_candidates = ["Medium Worker"]
 model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
 
