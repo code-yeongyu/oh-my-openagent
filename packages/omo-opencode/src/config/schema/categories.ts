@@ -1,7 +1,7 @@
 import { z } from "zod"
 import { FallbackModelsSchema } from "./fallback-models"
 
-const CategoryConfigBaseSchema = z.object({
+export const CategoryConfigBaseSchema = z.object({
   /** Human-readable description of the category's purpose. Shown in task prompt. */
   description: z.string().optional(),
   model: z.string().optional(),

@@ -7,13 +7,15 @@ import { OmoFallbackModelsSchema, OmoThinkingConfigSchema } from "./fallback-mod
  * existing camelCase keys: `topP`, `maxTokens`, `reasoningEffort`,
  * `textVerbosity`, and `thinking.budgetTokens`.
  */
-const BaseCategoryConfigSchema = z.object({
+export const BaseCategoryConfigSchema = z.object({
   description: z.string().optional(),
   model: z.string().optional(),
   fallback_models: OmoFallbackModelsSchema.optional(),
   variant: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
   topP: z.number().min(0).max(1).optional(),
+  /** @deprecated Use `topP` instead. Will be removed in a future version. */
+  topp: z.number().min(0).max(1).optional(),
   maxTokens: z.number().optional(),
   thinking: OmoThinkingConfigSchema.optional(),
   reasoningEffort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]).optional(),
@@ -25,10 +27,7 @@ const BaseCategoryConfigSchema = z.object({
   disable: z.boolean().optional(),
 })
 
-export const OmoCategoryConfigSchema = BaseCategoryConfigSchema.extend({
-  /** @deprecated Use `topP` instead. Will be removed in a future version. */
-  topp: z.number().min(0).max(1).optional(),
-}).transform((val): z.infer<typeof BaseCategoryConfigSchema> => {
+export const OmoCategoryConfigSchema = BaseCategoryConfigSchema.transform((val): z.infer<typeof BaseCategoryConfigSchema> => {
   const { topp, topP, ...rest } = val
   if (topp !== undefined && topP === undefined) {
     console.warn("[config] DEPRECATED: 'topp' in category config is deprecated, use 'topP' instead")
