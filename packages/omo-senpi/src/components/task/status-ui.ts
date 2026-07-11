@@ -15,6 +15,7 @@ const MAX_WIDGET_ROWS = 5
 const DEFAULT_DEBOUNCE_MS = 250
 const PROGRESS_HEAD_MAX = 60
 const STATUS_LINE_MAX = 72
+const WIDGET_LINE_MAX = 70
 type TimerHandle = ReturnType<typeof setTimeout> | number
 
 const TERMINAL_STATUSES: ReadonlySet<TaskStatus> = new Set(["completed", "error", "cancelled", "interrupted", "lost"])
@@ -121,7 +122,7 @@ export function buildWidgetRows(records: readonly TaskRecord[]): string[] {
 }
 
 function formatWidgetRow(record: TaskRecord): string {
-  return formatCompactTaskRow(record, STATUS_LINE_MAX, true)
+  return formatCompactTaskRow(record, WIDGET_LINE_MAX, true)
 }
 
 function formatCompactTaskRow(record: TaskRecord, maxWidth: number, includeName: boolean): string {
