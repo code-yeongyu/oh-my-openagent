@@ -1,7 +1,7 @@
 name = "metis"
 description = "Pre-planning analyst. Detects contradictions, ambiguity, missing constraints, and execution risks in a draft plan or request before the planner commits. Read-only."
 nickname_candidates = ["Analyst"]
-model = "gpt-5.5"
+model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
 developer_instructions = """
 

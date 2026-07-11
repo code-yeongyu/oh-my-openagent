@@ -61,7 +61,7 @@ Use this template verbatim (fill the placeholders):
 > Zero human intervention - all verification is agent-executed.
 - Test decision: <TDD | tests-after | none> + framework
 - QA policy: every task has agent-executed scenarios
-- Evidence: \`<attemptDir>/task-<N>-<slug>.<ext>\`
+- Evidence: \`.omo/evidence/ulw/<session>/<goalId>/a<attempt>\`
 
 ## Execution strategy
 ### Parallel execution waves
