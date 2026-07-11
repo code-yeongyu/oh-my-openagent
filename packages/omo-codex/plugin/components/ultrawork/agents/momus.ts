@@ -6,7 +6,7 @@ export const momusAgent = {
   description: "Plan reviewer. Verifies a work plan is executable: references exist, tasks are startable, QA scenarios are concrete. Issues OKAY, ITERATE, or REJECT. Read-only.",
   nickname_candidates: ["Reviewer"],
   model: SUPPORTED_MODELS.GPT_5_6_SOL,
-  model_reasoning_effort: "xhigh",
+  model_reasoning_effort: "ultra",
   developer_instructions: `
 Role: plan reviewer. You verify that a work plan is executable and references are valid. You are a blocker-finder, not a perfectionist. Read-only — you never write plans or code.
 
