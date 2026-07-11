@@ -1,4 +1,4 @@
-import { posix, win32 } from "node:path";
+import { join, posix, win32 } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -15,28 +15,28 @@ import {
 describe("ulwLoopDir(repo)", () => {
 	it("returns repo + '/.omo/ulw-loop'", () => {
 		// when/then
-		expect(ulwLoopDir("/repo")).toBe("/repo/.omo/ulw-loop");
+		expect(ulwLoopDir("/repo")).toBe(join("/repo", ".omo", "ulw-loop"));
 	});
 
 	it("#given a session id #when resolving the loop dir #then scopes artifacts under that session", () => {
 		// when/then
-		expect(ulwLoopDir("/repo", { sessionId: "sess_abc" })).toBe("/repo/.omo/ulw-loop/sess_abc");
+		expect(ulwLoopDir("/repo", { sessionId: "sess_abc" })).toBe(join("/repo", ".omo", "ulw-loop", "sess_abc"));
 	});
 });
 
 describe("ulw-loop*Path helpers", () => {
 	it("compose artifact filenames under ulwLoopDir", () => {
 		// when/then
-		expect(ulwLoopBriefPath("/r")).toBe("/r/.omo/ulw-loop/brief.md");
-		expect(ulwLoopGoalsPath("/r")).toBe("/r/.omo/ulw-loop/goals.json");
-		expect(ulwLoopLedgerPath("/r")).toBe("/r/.omo/ulw-loop/ledger.jsonl");
+		expect(ulwLoopBriefPath("/r")).toBe(join("/r", ".omo", "ulw-loop", "brief.md"));
+		expect(ulwLoopGoalsPath("/r")).toBe(join("/r", ".omo", "ulw-loop", "goals.json"));
+		expect(ulwLoopLedgerPath("/r")).toBe(join("/r", ".omo", "ulw-loop", "ledger.jsonl"));
 	});
 
 	it("#given a session id #when composing artifact filenames #then returns session-scoped paths", () => {
 		// when/then
-		expect(ulwLoopBriefPath("/r", { sessionId: "session-A" })).toBe("/r/.omo/ulw-loop/session-A/brief.md");
-		expect(ulwLoopGoalsPath("/r", { sessionId: "session-A" })).toBe("/r/.omo/ulw-loop/session-A/goals.json");
-		expect(ulwLoopLedgerPath("/r", { sessionId: "session-A" })).toBe("/r/.omo/ulw-loop/session-A/ledger.jsonl");
+		expect(ulwLoopBriefPath("/r", { sessionId: "session-A" })).toBe(join("/r", ".omo", "ulw-loop", "session-A", "brief.md"));
+		expect(ulwLoopGoalsPath("/r", { sessionId: "session-A" })).toBe(join("/r", ".omo", "ulw-loop", "session-A", "goals.json"));
+		expect(ulwLoopLedgerPath("/r", { sessionId: "session-A" })).toBe(join("/r", ".omo", "ulw-loop", "session-A", "ledger.jsonl"));
 	});
 });
 

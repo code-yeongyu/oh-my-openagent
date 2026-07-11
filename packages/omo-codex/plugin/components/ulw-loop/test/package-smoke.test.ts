@@ -141,7 +141,9 @@ describe("skills/ulw-loop/SKILL.md", () => {
 		expect(text).toContain('- "ulw-loop"');
 	});
 
-	it("#given PATH omo lacks ulw-loop #when bootstrap runs #then falls back to cached ulw-loop CLI", async () => {
+	it.skipIf(process.platform === "win32")(
+		"#given PATH omo lacks ulw-loop #when bootstrap runs #then falls back to cached ulw-loop CLI",
+		async () => {
 		const text = await readText("skills/ulw-loop/references/full-workflow.md");
 		const bootstrap = bootstrapScriptFrom(text);
 		const root = await mkdtemp(join(tmpdir(), "omo-ulw-loop-bootstrap-"));
