@@ -44,6 +44,23 @@ export const SCENARIOS = {
     ],
     childSteps: [{ type: "tool_call", name: "bash", arguments: { command: "sleep 30" } }],
   },
+  team: {
+    prompt: "Render one structured team message, then remain interactive for visual inspection.",
+    customMessages: [
+      {
+        customType: "senpi-task.team-message",
+        content: '<peer_message from="member-alpha" timestamp="100" messageId="team-visual-1" kind="message" correlationId="" summary="검토 완료">\n한국어 팀 메시지 본문과 the actual review result are visible without protocol tags.\n</peer_message>',
+        details: {
+          from: "member-alpha",
+          messageId: "team-visual-1",
+          summary: "검토 완료",
+          body: "한국어 팀 메시지 본문과 the actual review result are visible without protocol tags.",
+        },
+      },
+    ],
+    parentSteps: [{ type: "text", text: "team message renderer scenario complete" }],
+    childSteps: [{ type: "text", text: "team scenario has no child" }],
+  },
 }
 
 export function scenarioUsage() {
