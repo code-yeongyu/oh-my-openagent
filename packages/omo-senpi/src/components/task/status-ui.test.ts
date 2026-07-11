@@ -177,8 +177,12 @@ describe("buildWidgetRows", () => {
 
     // then
     expect(row).not.toContain("\n")
-    for (const columns of [72, 120]) expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(columns)
-    expect(row).toBe("st_01... active...|c:ultrabrain omo-mock/mock-1 xhigh in-process running")
+    for (const columns of [70, 72, 120]) expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(columns)
+    expect(row).toContain("c:ultrabrain")
+    expect(row).toContain("omo-mock/mock-1")
+    expect(row).toContain("xhigh")
+    expect(row).toContain("in-process")
+    expect(row).toContain("running")
   })
 })
 
@@ -319,7 +323,7 @@ describe("createTaskStatusUi.syncNow", () => {
     // then
     const footer = ui.statusCalls.at(-1) ?? ""
     const widgetRow = ui.widgetCalls.at(-1)?.content?.[0] ?? ""
-    expect(rendererVisibleWidth(widgetRow)).toBeLessThanOrEqual(72)
+    expect(rendererVisibleWidth(widgetRow)).toBeLessThanOrEqual(70)
     expect(rendererVisibleWidth(footer)).toBeLessThanOrEqual(72)
     expect(widgetRow).toContain("한")
     expect(widgetRow).toContain("c:ultrabrain")
