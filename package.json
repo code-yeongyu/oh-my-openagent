@@ -63,6 +63,7 @@
     "packages/lsp-tools-mcp/dist",
     "packages/lsp-daemon/package.json",
     "packages/lsp-daemon/dist",
+    "packages/git-bash-mcp/package.json",
     "packages/git-bash-mcp/dist",
     "packages/shared-skills/package.json",
     "packages/shared-skills/index.mjs",

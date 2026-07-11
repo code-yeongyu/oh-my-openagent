@@ -44,6 +44,39 @@ describe("codex-cache install", () => {
     15000,
   )
 
+  test(
+    "#given a component ships its own nested .mcp.json #when caching plugin #then only the plugin-root .mcp.json is cached",
+    async () => {
+      // given
+      const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-mcp-"))
+      const codexHome = join(root, "codex-home")
+      const sourceRoot = join(root, "plugin")
+      await mkdir(join(sourceRoot, "components", "lsp"), { recursive: true })
+      await writeFile(join(sourceRoot, "package.json"), JSON.stringify({ name: "@scope/omo", version: "0.1.0" }))
+      await writeFile(join(sourceRoot, ".mcp.json"), JSON.stringify({ mcpServers: { grep_app: { url: "https://mcp.grep.app" } } }))
+      // A standalone-plugin dev manifest whose relative daemon path dangles once flattened into the cache.
+      await writeFile(
+        join(sourceRoot, "components", "lsp", ".mcp.json"),
+        JSON.stringify({ mcpServers: { lsp: { command: "node", args: ["../../../../lsp-daemon/dist/cli.js", "mcp"] } } }),
+      )
+
+      // when
+      const installed = await installCachedPlugin({
+        codexHome,
+        marketplaceName: "debug",
+        name: "omo",
+        sourcePath: sourceRoot,
+        version: "0.1.0",
+        runCommand: async () => undefined,
+      })
+
+      // then
+      expect(await readFile(join(installed.path, ".mcp.json"), "utf8")).toContain("grep_app")
+      await expect(stat(join(installed.path, "components", "lsp", ".mcp.json"))).rejects.toThrow()
+    },
+    15000,
+  )
+
   test("#given source plugin references missing hook command target #when caching plugin #then previous active cache is preserved", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-hook-target-"))
