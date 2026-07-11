@@ -153,8 +153,49 @@ describe("createTaskTool", () => {
     // then
     expect(row).toContain("category:quick")
     expect(row).toContain("GPT-5.6 Sol")
-    expect(row).toContain("reasoning:xhigh")
+    expect(row).toContain("xhigh")
     expect(row).toContain(`${ANSI_ITALIC}foreground${ANSI_ITALIC_END}`)
+    expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(72)
+  })
+
+  test("#given an ultrabrain background result #when rendered at 72 columns #then every required context token remains complete", () => {
+    // given
+    const tool = createTaskTool(deps(fakeManager({})))
+    const renderResult = tool.renderResult
+    if (renderResult === undefined) throw new Error("task renderResult is missing")
+
+    // when
+    const component: unknown = Reflect.apply(renderResult, undefined, [
+      {
+        content: [{ type: "text", text: "running" }],
+        details: {
+          task_id: "st_019f4d02",
+          status: "running",
+          mode: "spawn",
+          category: "ultrabrain",
+          resolved_model: {
+            provider: "omo-mock",
+            model_id: "mock-1",
+            display: "omo-mock/mock-1",
+            reasoning_effort: "xhigh",
+            source: "category",
+          },
+          run_in_background: true,
+        },
+      },
+      { expanded: false, isPartial: false },
+      RENDERER_THEME,
+      {},
+    ])
+    const [row = ""] = renderedLines(component, 72)
+
+    // then
+    expect(row).toContain("category:ultrabrain")
+    expect(row).toContain("omo-mock/mock-1")
+    expect(row).toContain("xhigh")
+    expect(row).toContain(`${ANSI_ITALIC}background${ANSI_ITALIC_END}`)
+    expect(row).toContain("running")
+    expect(row).not.toContain("backgrou...")
     expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(72)
   })
 })

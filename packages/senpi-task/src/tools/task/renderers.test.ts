@@ -81,6 +81,18 @@ describe("taskCallLines", () => {
     expect(line).toContain("...")
     expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(72)
   })
+
+  test("#given a long Korean prompt #when excerpted #then truncation backs up to a word boundary", () => {
+    // given
+    const prompt = "한국어로 긴 작업 지시를 작성하고 여러 줄의 혼합 폭 텍스트를 확인하세요."
+
+    // when
+    const [line = ""] = taskCallLines({ prompt, category: "missing-cat", run_in_background: false })
+
+    // then
+    expect(line).toContain('"한국어로 긴 작업 지시를..."')
+    expect(line).not.toContain("작...")
+  })
 })
 
 describe("taskResultLines", () => {

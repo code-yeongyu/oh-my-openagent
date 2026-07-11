@@ -2,6 +2,7 @@ import type { AgentToolResult, Theme, ThemeColor, ToolRenderResultOptions } from
 import { truncateToWidth } from "@earendil-works/pi-tui"
 
 import {
+  excerptRendererPromptText,
   excerptRendererText,
   joinRendererTokens,
   linesComponent,
@@ -122,7 +123,9 @@ function withExcerpt(
   if (normalized.length === 0) return base
   const available = Math.min(maxExcerpt, Math.max(0, width - rendererVisibleWidth(prefix) - quoteOverhead))
   if (rendererVisibleWidth(normalized) > available && available < MIN_MEANINGFUL_TRUNCATED_EXCERPT_WIDTH) return base
-  const excerpt = excerptRendererText(normalized, available)
+  const excerpt = label === "message"
+    ? excerptRendererPromptText(normalized, available)
+    : excerptRendererText(normalized, available)
   return `${prefix}${theme.italic(`"${excerpt}"`)}`
 }
 

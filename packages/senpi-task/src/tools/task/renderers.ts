@@ -50,6 +50,17 @@ export function excerptRendererText(value: string, width = DEFAULT_EXCERPT_WIDTH
   return stripTerminalControls(truncateToWidth(normalized, width, ELLIPSIS))
 }
 
+export function excerptRendererPromptText(value: string, width = DEFAULT_EXCERPT_WIDTH): string {
+  const normalized = normalizeRendererText(value)
+  if (width <= 0) return ""
+  if (rendererVisibleWidth(normalized) <= width) return normalized
+  const contentWidth = Math.max(0, width - rendererVisibleWidth(ELLIPSIS))
+  const clipped = truncateToWidth(normalized, contentWidth, "")
+  const boundary = clipped.search(/\s+\S*$/u)
+  if (boundary > 0) return `${clipped.slice(0, boundary).trimEnd()}${ELLIPSIS}`
+  return stripTerminalControls(truncateToWidth(normalized, width, ELLIPSIS))
+}
+
 export function joinRendererTokens(tokens: readonly (string | undefined | false)[]): string {
   return tokens.filter((token) => typeof token === "string" && token.length > 0).join(" ")
 }
@@ -91,6 +102,18 @@ export function renderTaskCallLines(args: CallArgs, theme: RendererTheme): reado
 export function renderTaskResultLines(details: TaskToolDetails, theme: RendererTheme): readonly string[] {
   const mode = details.run_in_background === undefined ? undefined : theme.italic(formatTaskMode(details.run_in_background))
   return [taskResultLine(details, mode)]
+}
+
+export function renderTaskResultComponent(details: TaskToolDetails, theme: RendererTheme): LinesComponent {
+  return {
+    render: (width: number): string[] => {
+      if (width <= 0) return [""]
+      const mode = details.run_in_background === undefined ? undefined : theme.italic(formatTaskMode(details.run_in_background))
+      const line = taskResultLineForWidth(details, mode, width)
+      return [truncateToWidth(theme.fg(statusThemeColor(details.status), line), width, ELLIPSIS)]
+    },
+    invalidate: (): void => {},
+  }
 }
 
 export function linesComponent(lines: readonly string[]): LinesComponent {
@@ -178,7 +201,7 @@ function taskTargetToken(args: Pick<CallArgs, "category" | "subagent_type">): st
 function promptToken(prompt: string | undefined): string | undefined {
   const normalized = optionalRendererText(prompt)
   if (normalized === undefined) return undefined
-  return `"${excerptRendererText(normalized, TASK_PROMPT_EXCERPT_WIDTH)}"`
+  return `"${excerptRendererPromptText(normalized, TASK_PROMPT_EXCERPT_WIDTH)}"`
 }
 
 function taskCallLine(args: CallArgs, mode: string): string {
@@ -225,4 +248,62 @@ function taskResultLine(details: TaskToolDetails, mode: string | undefined): str
     details.queue_position === undefined ? undefined : `queue:${details.queue_position}`,
     reason === undefined ? undefined : `reason:${excerptRendererText(reason, TASK_REASON_EXCERPT_WIDTH)}`,
   ])
+}
+
+function taskResultLineForWidth(details: TaskToolDetails, mode: string | undefined, width: number): string {
+  const requiredWithoutModel = [
+    "task",
+    taskTargetToken(details),
+    mode,
+    formatTaskStatus(details.status),
+  ].filter((token): token is string => token !== undefined)
+  const requiredSpaces = requiredWithoutModel.length
+  const modelWidth = Math.max(
+    0,
+    width - requiredWithoutModel.reduce((total, token) => total + rendererVisibleWidth(token), 0) - requiredSpaces,
+  )
+  const required = [
+    "task",
+    taskTargetToken(details),
+    compactResolvedModelToken(details, modelWidth),
+    mode,
+    formatTaskStatus(details.status),
+  ].filter((token): token is string => token !== undefined)
+  let line = required.join(" ")
+
+  for (const token of taskResultOptionalTokens(details)) {
+    const candidate = `${line} ${token}`
+    if (rendererVisibleWidth(candidate) > width) break
+    line = candidate
+  }
+  return line
+}
+
+function compactResolvedModelToken(details: TaskToolDetails, maxWidth: number): string | undefined {
+  const resolved = details.resolved_model
+  if (resolved === undefined) return formatResolvedModel(details.model)
+  const reasoning = optionalRendererText(resolved.reasoning_effort)
+  const candidates = [
+    optionalRendererText(resolved.display),
+    optionalRendererText(`${resolved.provider}/${resolved.model_id}`),
+    optionalRendererText(resolved.model_id),
+    optionalRendererText(details.model),
+  ].filter((candidate): candidate is string => candidate !== undefined)
+  for (const candidate of candidates) {
+    const token = `(${joinRendererTokens([candidate, reasoning])})`
+    if (rendererVisibleWidth(token) <= maxWidth) return token
+  }
+  const shortest = candidates.toSorted((left, right) => rendererVisibleWidth(left) - rendererVisibleWidth(right))[0]
+  if (shortest === undefined) return undefined
+  return `(${excerptRendererText(joinRendererTokens([shortest, reasoning]), Math.max(0, maxWidth - 2))})`
+}
+
+function taskResultOptionalTokens(details: TaskToolDetails): readonly string[] {
+  const taskId = optionalRendererText(details.task_id)
+  const reason = optionalRendererText(details.reason)
+  return [
+    taskId === undefined ? undefined : `id:${taskId}`,
+    details.queue_position === undefined ? undefined : `queue:${details.queue_position}`,
+    reason === undefined ? undefined : `reason:${excerptRendererText(reason, TASK_REASON_EXCERPT_WIDTH)}`,
+  ].filter((token): token is string => token !== undefined)
 }

@@ -61,7 +61,7 @@ describe("control tool renderers", () => {
           deliver_as: "steer",
           message: "Please inspect the database migration and report only the risky steps. tail-marker",
         },
-        TEST_THEME,
+        ANSI_THEME,
       ),
       96,
     )
@@ -90,6 +90,26 @@ describe("control tool renderers", () => {
     expect(line).not.toContain("\n")
     expect(line).toContain("한국어 안내")
     expect(line).toContain("...")
+    expect(visibleWidth(line)).toBeLessThanOrEqual(72)
+  })
+
+  test("#given a long Korean continuation #when rendering task_send #then the excerpt ends at a word boundary", () => {
+    // given / when
+    const line = firstLine(
+      renderTaskSendCall(
+        {
+          to: "st_1",
+          deliver_as: "followUp",
+          message: "한국어로 긴 후속 작업 지시를 작성하고 동일한 세션의 맥락을 검증하세요.",
+        },
+        ANSI_THEME,
+      ),
+      72,
+    )
+
+    // then
+    expect(line).toContain('"한국어로 긴 후속 작업..."')
+    expect(line).not.toContain("지...")
     expect(visibleWidth(line)).toBeLessThanOrEqual(72)
   })
 
