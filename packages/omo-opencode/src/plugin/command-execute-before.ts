@@ -1,6 +1,7 @@
 import type { CreatedHooks } from "../create-hooks"
 import { isRalphLoopResumeArgument, parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
 import { log } from "../shared/logger"
+import { stopContinuation } from "./stop-continuation"
 
 type CommandExecuteBeforeInput = {
   command: string
@@ -23,18 +24,23 @@ function hasPartsOutput(value: unknown): value is CommandExecuteBeforeOutput {
 }
 
 export function createCommandExecuteBeforeHandler(args: {
+  directory: string
   hooks: CreatedHooks
 }): (
   input: CommandExecuteBeforeInput,
   output: CommandExecuteBeforeOutput,
 ) => Promise<void> {
-  const { hooks } = args
+  const { directory, hooks } = args
 
   return async (input, output): Promise<void> => {
     await hooks.autoSlashCommand?.["command.execute.before"]?.(input, output)
 
     const normalizedCommand = input.command.toLowerCase()
     const sessionID = input.sessionID
+    if (normalizedCommand === "stop-continuation" && sessionID) {
+      stopContinuation({ directory, hooks, sessionID })
+    }
+
     if (hooks.ralphLoop && sessionID) {
       if (normalizedCommand === "ralph-loop" || normalizedCommand === "ulw-loop") {
         const parsedArguments = parseRalphLoopArguments(input.arguments || "")
