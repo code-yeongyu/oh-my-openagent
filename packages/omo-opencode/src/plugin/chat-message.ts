@@ -1,6 +1,7 @@
 import type { OhMyOpenCodeConfig } from "../config"
 
 import { updateSessionAgent } from "../features/claude-code-session-state"
+import { detectSlashCommand, extractPromptText } from "../hooks/auto-slash-command/detector"
 import { isSyntheticOrInternalOnlyTextParts, log } from "../shared"
 import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
 import type { PluginContext } from "./types"
@@ -8,6 +9,7 @@ import { handleRalphLoopMessage } from "./chat-message/loop-commands"
 import { notifyWhenModelCacheIsMissing } from "./chat-message/model-cache-warning"
 import { recordSessionModel, getStoredMainSessionModel } from "./chat-message/session-model"
 import { runStartWorkHookIfApplicable } from "./chat-message/start-work-message"
+import { stopContinuation } from "./stop-continuation"
 import type {
   ChatMessageHandlerOutput,
   ChatMessageHooks,
@@ -94,6 +96,15 @@ export function createChatMessageHandler(args: {
 
     if (input.agent) {
       updateSessionAgent(input.sessionID, input.agent)
+    }
+
+    const slashCommand = detectSlashCommand(extractPromptText(output.parts))
+    if (slashCommand?.command === "stop-continuation") {
+      stopContinuation({
+        directory: ctx.directory,
+        hooks,
+        sessionID: input.sessionID,
+      })
     }
 
     const isFirstMessage = firstMessageVariantGate.shouldOverride(input.sessionID)
