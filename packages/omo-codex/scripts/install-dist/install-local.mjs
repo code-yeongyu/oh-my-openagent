@@ -9039,6 +9039,33 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
         current: { model: "gpt-5.6-sol", effort: "ultra" }
       }
     ]
+  ],
+  [
+    "plan",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "xhigh" },
+        current: { model: "gpt-5.6-sol", effort: "max" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-worker-medium",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "high" },
+        current: { model: "gpt-5.6-luna", effort: "max" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-qa-executor",
+    [
+      {
+        previous: { model: "gpt-5.6-terra", effort: "medium" },
+        current: { model: "gpt-5.6-luna", effort: "high" }
+      }
+    ]
   ]
 ]);
 function resolveManagedAgentReasoning(input) {
