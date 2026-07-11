@@ -332,6 +332,52 @@ describe("AgentOverrideConfigSchema", () => {
     })
   })
 
+  describe("topp -> topP normalisation (agent override)", () => {
+    test("legacy-only topp normalises to topP", () => {
+      // given
+      const config = { topp: 0.9 }
+
+      // when
+      const result = AgentOverrideConfigSchema.safeParse(config)
+
+      // then
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.topP).toBe(0.9)
+        expect((result.data as Record<string, unknown>)["topp"]).toBeUndefined()
+      }
+    })
+
+    test("canonical-only topP is preserved", () => {
+      // given
+      const config = { topP: 0.8 }
+
+      // when
+      const result = AgentOverrideConfigSchema.safeParse(config)
+
+      // then
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.topP).toBe(0.8)
+      }
+    })
+
+    test("when both topp and topP are set, topP wins", () => {
+      // given
+      const config = { topp: 0.9, topP: 0.8 }
+
+      // when
+      const result = AgentOverrideConfigSchema.safeParse(config)
+
+      // then
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.topP).toBe(0.8)
+        expect((result.data as Record<string, unknown>)["topp"]).toBeUndefined()
+      }
+    })
+  })
+
   describe("combined fields", () => {
     test("accepts category with skills", () => {
       // given
@@ -495,6 +541,52 @@ describe("CategoryConfigSchema", () => {
 
     // then
     expect(result.success).toBe(false)
+  })
+
+  describe("topp -> topP normalisation (category)", () => {
+    test("legacy-only topp normalises to topP", () => {
+      // given
+      const config = { topp: 0.9 }
+
+      // when
+      const result = CategoryConfigSchema.safeParse(config)
+
+      // then
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.topP).toBe(0.9)
+        expect((result.data as Record<string, unknown>)["topp"]).toBeUndefined()
+      }
+    })
+
+    test("canonical-only topP is preserved", () => {
+      // given
+      const config = { topP: 0.8 }
+
+      // when
+      const result = CategoryConfigSchema.safeParse(config)
+
+      // then
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.topP).toBe(0.8)
+      }
+    })
+
+    test("when both topp and topP are set, topP wins", () => {
+      // given
+      const config = { topp: 0.9, topP: 0.8 }
+
+      // when
+      const result = CategoryConfigSchema.safeParse(config)
+
+      // then
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.topP).toBe(0.8)
+        expect((result.data as Record<string, unknown>)["topp"]).toBeUndefined()
+      }
+    })
   })
 })
 
