@@ -39,6 +39,7 @@
 		"./hooks/post-compact-resetting-project-rule-cache.json",
 		"./hooks/post-compact-resetting-lsp-diagnostics-cache.json",
 		"./hooks/stop-checking-start-work-continuation.json",
+		"./hooks/stop-checking-ulw-loop-resume.json",
 		"./hooks/subagent-stop-checking-start-work-continuation.json",
 		"./hooks/subagent-stop-verifying-lazycodex-executor-evidence.json"
 	],
