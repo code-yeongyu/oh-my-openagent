@@ -284,4 +284,26 @@ describe("codex ultrawork hook", () => {
 		expect(directive).toMatch(/ratchet up only/i);
 		expect(directive).toMatch(/`plan` agent/);
 	});
+
+	it("#given directive #when inspected #then orders discovery before scope-gated planning", () => {
+		// given
+		const payload = {
+			hook_event_name: "UserPromptSubmit",
+			prompt: "ulw",
+		};
+
+		// when
+		const output = runUserPromptSubmitHook(payload, { skillFilePath: null });
+		const parsed = parseHookOutput(output);
+
+		// then
+		const directive = parsed.hookSpecificOutput.additionalContext;
+		expect(directive).toMatch(/fire the first discovery wave[\s\S]*?spawn the `plan` agent/i);
+		expect(directive).toMatch(/5\+ interdependent steps/);
+		expect(directive).toMatch(/[Nn]ever spawn `plan` before the discovery wave/);
+		expect(directive).toMatch(/tier sizes\s+evidence and review, never who plans/i);
+		expect(directive).not.toMatch(/HEAVY: spawn the `plan` agent/);
+		expect(directive).not.toMatch(/`plan` agent decides waves/);
+		expect(directive).not.toMatch(/Plan obsessively/);
+	});
 });
