@@ -66,7 +66,8 @@ describe("ulw-loop skill contract", () => {
 		expect(workflow.match(/malformed input, prompt injection/g)?.length ?? 0).toBe(1);
 			// budget raised 3697 -> 3775 (tier delegation rows) -> 3820 (staged final-gate spawn + WATCH/not_applicable doc), 2026-07-11
 	// -> workflow 3890 / skill 660 (commit-identity evidence binding + freeze-before-final-proof invariants, net after de-duping channel-list echoes), 2026-07-12
-		expect(wordCount(workflow)).toBeLessThanOrEqual(3890);
-		expect(wordCount(skill)).toBeLessThanOrEqual(660);
+		// -> workflow 3930 / skill 680 (V2-primary tool surface for gpt-5.6 sol/terra: spawn_agent/followup_task/send_message/wait_agent/interrupt_agent/list_agents + v1 fallback), 2026-07-12
+		expect(wordCount(workflow)).toBeLessThanOrEqual(3930);
+		expect(wordCount(skill)).toBeLessThanOrEqual(680);
 	});
 });
