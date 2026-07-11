@@ -66,6 +66,9 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: [SUPPORTED_PROVIDERS.OPENCODE_GO, SUPPORTED_PROVIDERS.VERCEL], model: SUPPORTED_MODELS.GLM_5_2 },
     ],
   },
+  // librarian and explore intentionally share the same fallback chain — they serve different
+  // orchestration roles (structured retrieval vs. open-ended exploration) but both require
+  // the same lightweight, fast model tier. Routing diverges at the agent-dispatch level.
   librarian: {
     fallbackChain: [
       { providers: [SUPPORTED_PROVIDERS.OPENAI], model: SUPPORTED_MODELS.GPT_5_4_MINI_FAST },
@@ -142,7 +145,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       {
         providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.VERCEL],
         model: SUPPORTED_MODELS.GPT_5_6_SOL,
-        variant: SUPPORTED_VARIANTS.XHIGH,
+        variant: SUPPORTED_VARIANTS.ULTRA,
       },
       {
         providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],

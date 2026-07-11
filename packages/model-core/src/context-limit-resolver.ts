@@ -9,6 +9,8 @@ export type ContextLimitModelCacheState = {
 }
 
 function isAnthropicProvider(providerID: string, modelID: string): boolean {
+  // providerID values from registry are already lowercase; toLowerCase() is kept as a
+  // defensive measure for callers that pass untrusted / user-supplied provider strings.
   const normalized = providerID.toLowerCase()
   return normalized === SUPPORTED_PROVIDERS.ANTHROPIC
     || normalized === SUPPORTED_PROVIDERS.GOOGLE_VERTEX_ANTHROPIC

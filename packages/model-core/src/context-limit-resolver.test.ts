@@ -67,6 +67,7 @@ describe("resolveActualContextLimit", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
 
+    // "claude-opus-4-8-high" is a composite variant alias, not a canonical SUPPORTED_MODELS entry.
     const actualLimit = resolveActualContextLimit(SUPPORTED_PROVIDERS.ANTHROPIC, "claude-opus-4-8-high", {
       anthropicContext1MEnabled: false,
     })
@@ -117,6 +118,7 @@ describe("resolveActualContextLimit", () => {
     const modelContextLimitsCache = new Map<string, number>()
     modelContextLimitsCache.set("anthropic/claude-sonnet-4-5", 200_000)
 
+    // "claude-sonnet-4-5" is an older model not in SUPPORTED_MODELS; kept as raw string intentionally.
     const actualLimit = resolveActualContextLimit(SUPPORTED_PROVIDERS.ANTHROPIC, "claude-sonnet-4-5", {
       anthropicContext1MEnabled: false,
       modelContextLimitsCache,
@@ -129,6 +131,7 @@ describe("resolveActualContextLimit", () => {
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     process.env[VERTEX_CONTEXT_ENV_KEY] = "true"
 
+    // "claude-sonnet-4-5" is an older model not in SUPPORTED_MODELS; kept as raw string intentionally.
     const actualLimit = resolveActualContextLimit(SUPPORTED_PROVIDERS.GOOGLE_VERTEX_ANTHROPIC, "claude-sonnet-4-5", {
       anthropicContext1MEnabled: false,
     })

@@ -53,7 +53,8 @@
                         "medium",
                         "high",
                         "xhigh",
-                        "max"
+                        "max",
+                        "ultra"
                       ]
                     },
                     "temperature": {
@@ -61,7 +62,7 @@
                       "minimum": 0,
                       "maximum": 2
                     },
-                    "top_p": {
+                    "topP": {
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1
@@ -120,7 +121,8 @@
                             "medium",
                             "high",
                             "xhigh",
-                            "max"
+                            "max",
+                            "ultra"
                           ]
                         },
                         "temperature": {
@@ -128,7 +130,7 @@
                           "minimum": 0,
                           "maximum": 2
                         },
-                        "top_p": {
+                        "topP": {
                           "type": "number",
                           "minimum": 0,
                           "maximum": 1
@@ -210,7 +212,8 @@
               "medium",
               "high",
               "xhigh",
-              "max"
+              "max",
+              "ultra"
             ]
           },
           "textVerbosity": {

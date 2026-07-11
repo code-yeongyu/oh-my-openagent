@@ -105,6 +105,7 @@ export const SUPPORTED_REASONING_EFFORTS = {
   HIGH: "high",
   XHIGH: "xhigh",
   MAX: "max",
+  ULTRA: "ultra",
 } as const;
 
 export type ReasoningEffort = typeof SUPPORTED_REASONING_EFFORTS[keyof typeof SUPPORTED_REASONING_EFFORTS];
@@ -115,6 +116,7 @@ export const SUPPORTED_VARIANTS = {
   HIGH: "high",
   XHIGH: "xhigh",
   MAX: "max",
+  ULTRA: "ultra",
   AUTO: "auto",
   THINKING: "thinking",
   MINIMAL: "minimal",
