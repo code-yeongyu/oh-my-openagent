@@ -52,7 +52,7 @@ const lazycodexAgentInvariants = new Map([
 		"plan.toml",
 		{
 			model: "gpt-5.6-sol",
-			effort: "xhigh",
+			effort: "max",
 			includes: [/strategic planning consultant/i, /\.omo\/plans\/<slug>\.md/, /never implements/i],
 		},
 	],
@@ -75,8 +75,8 @@ const lazycodexAgentInvariants = new Map([
 	[
 		"lazycodex-worker-medium.toml",
 		{
-			model: "gpt-5.6-sol",
-			effort: "high",
+			model: "gpt-5.6-luna",
+			effort: "max",
 			includes: [/EVIDENCE_RECORDED: <path>/, /medium-difficulty/i, /smallest correct change/i],
 		},
 	],
@@ -107,8 +107,8 @@ const lazycodexAgentInvariants = new Map([
 	[
 		"lazycodex-qa-executor.toml",
 		{
-			model: "gpt-5.6-terra",
-			effort: "medium",
+			model: "gpt-5.6-luna",
+			effort: "high",
 			includes: [/not_applicable/, /surfaceEvidence/, /adversarialCases/, /<attemptDir>\/<goalId>-manual-qa\.md/],
 		},
 	],

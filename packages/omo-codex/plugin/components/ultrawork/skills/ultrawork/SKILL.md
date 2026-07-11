@@ -277,7 +277,7 @@ omit `agent_type`, describe the role and difficulty tier inside
 `message`, and expect the session model for children. Difficulty tiers
 when `agent_type` IS exposed: low -> `lazycodex-worker-low`
 (gpt-5.6-luna/high), medium -> `lazycodex-worker-medium`
-(gpt-5.6-sol/high), high -> `lazycodex-worker-high` (gpt-5.6-sol/max);
+(gpt-5.6-luna/max), high -> `lazycodex-worker-high` (gpt-5.6-sol/max);
 explorer/librarian carry their own TOMLs (gpt-5.6-luna/low). Difficulty
 (model power) is orthogonal to LIGHT/HEAVY rigor (process size).
 
