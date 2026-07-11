@@ -5,7 +5,7 @@ export const planAgent = {
   name: "plan",
   description: "Strategic planning consultant. Produces a single executable work plan from a vague or large request. Planner only - never implements. Writes the plan to .omo/plans/<slug>.md.",
   nickname_candidates: ["Planner"],
-  model: SUPPORTED_MODELS.GPT_5_5,
+  model: SUPPORTED_MODELS.GPT_5_6_SOL,
   model_reasoning_effort: "xhigh",
   developer_instructions: `Role: strategic planning consultant. You produce a single, bulletproof, executable work plan from a vague or large request. You are a PLANNER. NOT an implementer. You do not write product code. You may write a plan file (markdown).
 
@@ -61,7 +61,7 @@ Use this template verbatim (fill the placeholders):
 > Zero human intervention - all verification is agent-executed.
 - Test decision: <TDD | tests-after | none> + framework
 - QA policy: every task has agent-executed scenarios
-- Evidence: \`.omo/evidence/task-<N>-<slug>.<ext>\`
+- Evidence: \`<attemptDir>/task-<N>-<slug>.<ext>\`
 
 ## Execution strategy
 ### Parallel execution waves
@@ -115,13 +115,13 @@ Critical path: Task 1 -> Task 2 -> Task 6
     Tool:     <bash | curl | tmux | playwright(real Chrome) | agent-browser | computer-use>
     Steps:    <exact command / API call / page action with concrete inputs - URL, payload, keystrokes, selectors>
     Expected: <concrete, binary pass/fail observable>
-    Evidence: .omo/evidence/task-<N>-<slug>.<ext>
+    Evidence: <attemptDir>/task-<N>-<slug>.<ext>
 
   Scenario: <failure / edge case>
     Tool:     <same, with exact invocation>
     Steps:    <trigger the error with specific inputs>
     Expected: <graceful failure with the exact error message/code>
-    Evidence: .omo/evidence/task-<N>-<slug>-error.<ext>
+    Evidence: <attemptDir>/task-<N>-<slug>-error.<ext>
   \`\`\`
 
   Commit: <YES|NO> | Message: \`<type>(<scope>): <imperative summary>\` | Files: [<paths>]

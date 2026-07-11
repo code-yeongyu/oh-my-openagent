@@ -5,7 +5,7 @@ export const librarianAgent = {
   name: "librarian",
   description: "External open-source codebase and documentation researcher. Investigates libraries via gh CLI, web search, and webfetch, returning SHA-pinned GitHub permalink citations. Read-only.",
   nickname_candidates: ["Librarian"],
-  model: "gpt-5.4-mini",
+  model: SUPPORTED_MODELS.GPT_5_6_LUNA,
   model_reasoning_effort: "low",
   developer_instructions: `
 # THE LIBRARIAN
