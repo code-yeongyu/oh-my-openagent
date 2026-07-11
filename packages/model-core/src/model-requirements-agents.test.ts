@@ -166,7 +166,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     })
   })
 
-  test("momus has gpt-5.6-sol xhigh as primary before gpt-5.5 xhigh", () => {
+  test("momus has gpt-5.6-sol ultra as primary before gpt-5.5 xhigh", () => {
     // given
     const momus = AGENT_MODEL_REQUIREMENTS["momus"]
 
@@ -178,7 +178,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary).toEqual({
       providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.VERCEL],
       model: SUPPORTED_MODELS.GPT_5_6_SOL,
-      variant: SUPPORTED_VARIANTS.XHIGH,
+      variant: SUPPORTED_VARIANTS.ULTRA,
     })
     expect(secondary).toEqual({
       providers: [SUPPORTED_PROVIDERS.OPENAI, SUPPORTED_PROVIDERS.GITHUB_COPILOT, SUPPORTED_PROVIDERS.OPENCODE, SUPPORTED_PROVIDERS.VERCEL],
