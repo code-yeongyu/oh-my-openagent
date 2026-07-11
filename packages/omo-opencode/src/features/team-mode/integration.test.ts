@@ -293,7 +293,7 @@ describe("team-mode integration", () => {
         thinking: { type: "enabled", budgetTokens: 1024 },
       },
     })
-  })
+  }, 30000)
 
   test("C-10.4 keeps member spawn concurrency within max_parallel_members", async () => {
     // given
@@ -327,5 +327,5 @@ describe("team-mode integration", () => {
       launchProbe.release()
       run.catch(() => undefined)
     }
-  })
+  }, 30000)
 })

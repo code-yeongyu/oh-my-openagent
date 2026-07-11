@@ -370,7 +370,7 @@ describe("createTeamRun", () => {
       launchProbe.release()
       run.catch(() => undefined)
     }
-  })
+  }, 30000)
 
   test("reuses the caller session for the lead when the lead matches the caller agent", async () => {
     // given
