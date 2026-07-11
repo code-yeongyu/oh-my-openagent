@@ -87,6 +87,18 @@ describe("resolveManagedAgentReasoning", () => {
 		expect(effort).toBe("high")
 	})
 
+	test("#given a preserved gate-reviewer sol/xhigh default #when resolving against sol/high #then the new bundled effort wins", () => {
+		// when
+		const effort = resolveManagedAgentReasoning({
+			agentName: "lazycodex-gate-reviewer",
+			bundledModel: "gpt-5.6-sol",
+			bundledEffort: "high",
+			preserved: { model: "gpt-5.6-sol", effort: "xhigh" },
+		})
+		// then
+		expect(effort).toBe("high")
+	})
+
 	test("#given a second resolve over already-migrated values #when resolving #then the result is stable", () => {
 		// when — after migration the installed file reads luna/low; resolving again must not flip anything
 		const effort = resolveManagedAgentReasoning({

@@ -116,7 +116,7 @@ const lazycodexAgentInvariants = new Map([
 		"lazycodex-gate-reviewer.toml",
 		{
 			model: "gpt-5.6-sol",
-			effort: "xhigh",
+			effort: "high",
 			includes: [/APPROVE\/REJECT/, /blockers/, /<attemptDir>\/<goalId>-gate-review\.md/, /currentAttemptDir/],
 		},
 	],
