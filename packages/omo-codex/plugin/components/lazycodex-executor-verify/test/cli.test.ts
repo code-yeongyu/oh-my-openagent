@@ -110,7 +110,7 @@ function createPayload(
 ): Record<string, string | boolean> {
 	return {
 		hook_event_name: "SubagentStop",
-		agent_type: "lazycodex-executor",
+		agent_type: "lazycodex-worker-medium",
 		agent_id: "agent_1",
 		session_id: "sess.1",
 		cwd,
