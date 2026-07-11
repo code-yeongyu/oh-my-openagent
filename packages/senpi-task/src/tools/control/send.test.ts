@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import type { InterruptOutcome, SendInput, SendOutcome } from "../../steering"
 import { baseSpec, cleanupProjects, makeManager } from "../../manager/__fixtures__/manager-fakes"
-import { runTaskSend } from "./send"
+import { createMemberScopedTaskSendTool, createTaskSendTool, runTaskSend } from "./send"
+import type { TeamToolsService } from "../team/types"
 import type { SendManager } from "./types"
 
 afterEach(cleanupProjects)
@@ -27,7 +28,43 @@ function spyManager(
   return { manager, sendCalls, interruptCalls }
 }
 
+function fail(name: string): never {
+  throw new Error(`fake TeamToolsService.${name} not configured`)
+}
+
+const fakeTeamToolsService: TeamToolsService = {
+  createTeam: () => Promise.resolve(fail("createTeam")),
+  deleteTeam: () => Promise.resolve(fail("deleteTeam")),
+  sendMessage: () => Promise.resolve(fail("sendMessage")),
+  status: () => Promise.resolve(fail("status")),
+  listTeams: () => Promise.resolve(fail("listTeams")),
+  createTask: () => Promise.resolve(fail("createTask")),
+  listTasks: () => Promise.resolve(fail("listTasks")),
+  updateTask: () => Promise.resolve(fail("updateTask")),
+  getTask: () => Promise.resolve(fail("getTask")),
+  requestShutdown: () => Promise.resolve(fail("requestShutdown")),
+  approveShutdown: () => Promise.resolve(fail("approveShutdown")),
+  rejectShutdown: () => Promise.resolve(fail("rejectShutdown")),
+}
+
 describe("runTaskSend", () => {
+  test("#given task_send tool factories #when tools are created #then both expose custom call and result renderers", () => {
+    const { manager } = spyManager({ kind: "not_found", reason: "unused", suggestion: "unused" })
+
+    const leadTool = createTaskSendTool({ manager })
+    const memberTool = createMemberScopedTaskSendTool({
+      manager,
+      service: fakeTeamToolsService,
+      teamRunId: "team-run-1",
+      from: "atlas",
+    })
+
+    expect(typeof leadTool.renderCall).toBe("function")
+    expect(typeof leadTool.renderResult).toBe("function")
+    expect(typeof memberTool.renderCall).toBe("function")
+    expect(typeof memberTool.renderResult).toBe("function")
+  })
+
   test("#given a running child #when a message is sent #then it is delivered as followUp by default", async () => {
     const { manager } = makeManager({})
     const started = await manager.start(baseSpec({ parent_session_id: "p1" }))

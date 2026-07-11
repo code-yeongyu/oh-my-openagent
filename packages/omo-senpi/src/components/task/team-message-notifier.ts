@@ -30,7 +30,17 @@ export function createTeamMessageNotifier(
         return
       }
       pi.sendMessage(
-        { customType: message.customType, content: message.content, display: message.display, details: { from: message.from, messageId: message.messageId } },
+        {
+          customType: message.customType,
+          content: message.content,
+          display: message.display,
+          details: {
+            from: message.from,
+            messageId: message.messageId,
+            ...(message.summary !== undefined && { summary: message.summary }),
+            body: message.body,
+          },
+        },
         { triggerTurn: true, deliverAs: "steer" },
       )
     },

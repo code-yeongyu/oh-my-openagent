@@ -5,6 +5,7 @@ import type { Static } from "typebox"
 import type { ListScope, ListedTask } from "../../manager"
 import type { TaskRecord } from "../../state"
 import { clampWaitTimeout, defaultResolveCallerSessionId, isTerminalStatus, toolResult } from "../control"
+import { renderTaskOutputCall, renderTaskOutputResult, taskOutputModelText } from "./renderers"
 import { renderTranscript } from "./render"
 import { buildTaskSnapshot } from "./snapshot"
 import { defaultTranscriptReader } from "./transcript"
@@ -153,7 +154,7 @@ function resolveTarget(candidates: readonly TaskRecord[], idOrName: string): Tas
 }
 
 function statusText(snapshot: TaskSnapshot): string {
-  const parts = [`${snapshot.task_id} [${snapshot.status}] model ${snapshot.model}`]
+  const parts = [`${snapshot.task_id} [${snapshot.status}] ${taskOutputModelText(snapshot)}`]
   if (snapshot.pid !== undefined) parts.push(`pid ${snapshot.pid}`)
   if (snapshot.lost !== undefined) parts.push(snapshot.lost.explanation)
   if (snapshot.error_message !== undefined) parts.push(`error: ${snapshot.error_message}`)
@@ -179,5 +180,7 @@ export function createTaskOutputTool(deps: TaskOutputDeps): ToolDefinition<typeo
     description: DESCRIPTION,
     parameters: TaskOutputParams,
     execute: (_toolCallId, params, _signal, _onUpdate, ctx) => runTaskOutput(deps, params, resolveCaller(ctx)),
+    renderCall: (args, theme) => renderTaskOutputCall(args, theme),
+    renderResult: (result, options, theme) => renderTaskOutputResult(result, options, theme),
   }
 }

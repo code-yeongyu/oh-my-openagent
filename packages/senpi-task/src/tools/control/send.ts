@@ -4,6 +4,7 @@ import { DEFAULT_SEND_DELIVERY } from "../../steering"
 import { runTeamSend } from "../team/messaging"
 import type { TeamToolsService } from "../team/types"
 import { defaultResolveCallerSessionId } from "./caller-session"
+import { renderTaskSendCall, renderTaskSendResult } from "./renderers"
 import { invalidArguments, mapSendOutcome, notFound, scopeDenied } from "./send-results"
 import { isStructuredMessage, TaskSendParams } from "./send-schema"
 import type { TaskSendInput } from "./send-schema"
@@ -129,6 +130,8 @@ export function createTaskSendTool(deps: TaskSendDeps): ToolDefinition<typeof Ta
     description: DESCRIPTION,
     parameters: TaskSendParams,
     execute: (_toolCallId, params, _signal, _onUpdate, ctx) => runTaskSend(deps.manager, params, resolveCaller(ctx), deps.teamRouting),
+    renderCall: (args, theme) => renderTaskSendCall(args, theme),
+    renderResult: (result, options, theme) => renderTaskSendResult(result, options, theme),
   }
 }
 
@@ -142,7 +145,7 @@ export type MemberScopedTaskSendDeps = {
 
 export function createMemberScopedTaskSendTool(deps: MemberScopedTaskSendDeps) {
   const resolveCaller = deps.resolveCallerSessionId ?? defaultResolveCallerSessionId
-  return defineTool({
+  return defineTool<typeof TaskSendParams, SendResultDetails>({
     name: "task_send",
     label: "Task Send",
     description: DESCRIPTION,
@@ -153,5 +156,7 @@ export function createMemberScopedTaskSendTool(deps: MemberScopedTaskSendDeps) {
         from: deps.from,
         teamRunId: deps.teamRunId,
       }),
+    renderCall: (args, theme) => renderTaskSendCall(args, theme),
+    renderResult: (result, options, theme) => renderTaskSendResult(result, options, theme),
   })
 }

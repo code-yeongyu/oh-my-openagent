@@ -39,6 +39,8 @@ function buildLeadMessage(
     display: false,
     from: message.from,
     messageId: message.messageId,
+    ...(message.summary !== undefined && { summary: message.summary }),
+    body: message.body,
   }
   void decision
   return { ...base, triggerTurn: true }

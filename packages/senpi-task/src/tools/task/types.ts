@@ -2,6 +2,7 @@ import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import type { AgentDefinition } from "../../agents"
 import type { TaskManager } from "../../manager"
+import type { ResolvedModelRecord } from "../../state"
 import type { TaskToolParamsStatic } from "./params"
 
 // The narrow slice of senpi's ExtensionContext the task tool reads. ExtensionContext satisfies it
@@ -60,6 +61,7 @@ export type TaskToolDetails = {
   readonly subagent_type?: string
   readonly execution_mode?: string
   readonly model?: string
+  readonly resolved_model?: ResolvedModelRecord
   readonly run_in_background?: boolean
   readonly queue_position?: number
   readonly reason?: string

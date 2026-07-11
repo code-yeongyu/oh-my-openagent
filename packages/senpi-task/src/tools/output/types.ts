@@ -1,7 +1,7 @@
 import type { AgentToolResult } from "@code-yeongyu/senpi"
 
 import type { TaskManager } from "../../manager"
-import type { TaskStatus } from "../../state"
+import type { ResolvedModelRecord, TaskStatus } from "../../state"
 import type { CallerSessionResolver, WaitBounds } from "../control"
 
 export type OutputManager = Pick<TaskManager, "get" | "list" | "waitFor">
@@ -31,6 +31,7 @@ export type TaskSnapshot = {
   readonly status: TaskStatus
   readonly execution_mode: string
   readonly model: string
+  readonly resolved_model?: ResolvedModelRecord
   readonly agent_type?: string
   readonly category?: string
   readonly parent_session_id: string

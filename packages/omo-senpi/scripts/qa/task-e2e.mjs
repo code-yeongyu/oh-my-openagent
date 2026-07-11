@@ -145,7 +145,7 @@ function runSyncFlow(senpiBin, checks, capture, pids) {
   const { run, events } = driveSenpi(senpiBin, scenario, "run a synchronous task and return its answer", pids)
   capture.syncStdout = run.stdout ?? ""
   const inline = findInlineFinal(events, SYNC_FINAL)
-  const noNotification = !JSON.stringify(events).includes("<task-notification>")
+  const noNotification = !JSON.stringify(events).includes("task completion")
   checks.sync_inline_no_notification = run.status === 0 && inline && noNotification ? "PASS" : "FAIL"
   return scenario.sandbox
 }
@@ -239,7 +239,10 @@ function findBlockingTaskOutput(events) {
 }
 
 function runSelfTest() {
-  const wakeEvents = parseJsonEvents(`banner\n${JSON.stringify({ type: "custom", content: "<task-notification>\n- task \"e2echild\" (st_abc) completed in 3ms\n  Use task_send({ to: \"st_abc\" }) to continue, or task_output({ task_id: \"st_abc\" }) to read the full result." })}`)
+  const wakeEvents = parseJsonEvents(`banner\n${JSON.stringify({
+    type: "custom",
+    content: "task completion name:e2echild id:st_abc status:completed duration:3ms\nresult:\"done\"\nnext:Use task_send({ to: \"st_abc\" }) to continue, or task_output({ task_id: \"st_abc\" }) to read the full result.",
+  })}`)
   if (!findWakeNotification(wakeEvents, "st_abc").ok) throw new Error("self-test: wake notification must be detected")
   if (findWakeNotification(wakeEvents, "st_missing").ok) throw new Error("self-test: wake must not match a foreign task id")
   if (!findRevived(parseJsonEvents(JSON.stringify({ type: "toolResult", details: { kind: "revived", task_id: "st_abc", run_epoch: 1 } })))) throw new Error("self-test: revived must be detected")

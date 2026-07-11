@@ -39,6 +39,8 @@ export type LeadTeamMessage = {
   readonly display: boolean
   readonly from: string
   readonly messageId: string
+  readonly summary?: string
+  readonly body: string
   readonly triggerTurn?: boolean
 }
 

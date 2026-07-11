@@ -24,6 +24,7 @@ export function buildRecordInput(input: {
     depth: spec.depth,
     execution_mode: executionMode,
     model: plan.model,
+    ...(plan.resolved_model !== undefined ? { resolved_model: plan.resolved_model } : {}),
     ...(agentType !== undefined ? { agent_type: agentType } : {}),
     ...(category !== undefined ? { category } : {}),
     ...(plan.toolAllowlist !== undefined ? { tool_allow: plan.toolAllowlist } : {}),

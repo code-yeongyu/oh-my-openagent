@@ -14,6 +14,7 @@ export function buildTaskSnapshot(record: TaskRecord, stateDir: string, now: num
     status: record.status,
     execution_mode: record.execution_mode,
     model: record.model,
+    ...(record.resolved_model !== undefined ? { resolved_model: record.resolved_model } : {}),
     parent_session_id: record.parent_session_id,
     root_session_id: record.root_session_id,
     age_ms: ageMs(record, now),

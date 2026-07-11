@@ -105,7 +105,7 @@ describe("buildCompletionDetails", () => {
 })
 
 describe("buildCompletionMessage", () => {
-  test("#given single detail #when message built #then compact task-notification content wraps it", () => {
+  test("#given single detail #when message built #then friendly task facts replace protocol markup", () => {
     // given
     const details = buildCompletionDetails(completedRecord())
 
@@ -115,8 +115,15 @@ describe("buildCompletionMessage", () => {
     // then
     expect(message.customType).toBe("senpi-task.completion")
     expect(message.details).toEqual([details])
-    expect(message.content).toContain("<task-notification>")
-    expect(message.content).toContain("summarize-logs")
+    expect(message.content).toContain("task completion")
+    expect(message.content).toContain("name:summarize-logs")
+    expect(message.content).toContain("id:st_deadbeef")
+    expect(message.content).toContain("status:completed")
+    expect(message.content).toContain("duration:3s")
+    expect(message.content).toContain('result:"the final answer"')
+    expect(message.content).toContain("task_send")
+    expect(message.content).not.toContain("<task-notification>")
+    expect(message.content).not.toContain("<head>")
   })
 
   test("#given two details #when message built #then both completions appear in one content block", () => {
@@ -131,5 +138,7 @@ describe("buildCompletionMessage", () => {
     expect(message.details).toHaveLength(2)
     expect(message.content).toContain("one")
     expect(message.content).toContain("two")
+    expect(message.content.match(/task completion/gu)).toHaveLength(2)
+    expect(message.content).not.toContain("<task-notification>")
   })
 })

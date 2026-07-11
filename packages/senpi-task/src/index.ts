@@ -1,5 +1,7 @@
+// allow: SIZE_OK - package-root public API barrel contains re-exports only and intentionally preserves one stable root import surface.
 export {
   RESIDENCY_STATES,
+  RESOLVED_MODEL_SOURCES,
   TASK_STATUSES,
   createTaskRecord,
   markRecordLostForReconciliation,
@@ -9,6 +11,8 @@ export {
 export type {
   Messageability,
   ResidencyState,
+  ResolvedModelRecord,
+  ResolvedModelSource,
   TaskNotification,
   TaskRecord,
   TaskRecordInput,
@@ -181,6 +185,7 @@ export type {
 export {
   buildCompletionDetails,
   buildCompletionMessage,
+  completionMessageLines,
   createCompletionNotifier,
   routeCompletion,
   shouldNotifyStatus,
@@ -240,9 +245,14 @@ export {
   buildTaskToolDescription,
   createFsSkillLoader,
   createTaskTool,
+  excerptRendererPromptText,
+  excerptRendererText,
+  joinRendererTokens,
   linesComponent,
   listTaskAgents,
   listTaskCategories,
+  normalizeRendererText,
+  rendererVisibleWidth,
   statusThemeColor,
   taskCallLines,
   taskResultLines,
