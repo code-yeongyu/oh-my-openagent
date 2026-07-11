@@ -173,10 +173,9 @@ describe("first-prompt-watchdog", () => {
     subagentSessions.clear()
   })
 
-  it("#given a subagent stays silent past the threshold and has a fallback configured #when the watchdog fires #then it aborts the in-flight request and dispatches the fallback model", async () => {
+  it("#given a main session stays silent past the threshold and has a fallback configured #when the watchdog fires #then it aborts the in-flight request and dispatches the fallback model", async () => {
     // given
-    const sessionID = "session-silent-subagent"
-    subagentSessions.add(sessionID)
+    const sessionID = "session-silent-main"
     const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
     const calls: RecordedCalls = { abort: [], autoRetry: [] }
     const helpers = createHelpers(calls, AGENT)
@@ -196,10 +195,9 @@ describe("first-prompt-watchdog", () => {
     watchdog.dispose()
   })
 
-  it("#given a subagent produces assistant text before the threshold #when progress is observed #then the watchdog is cancelled and no fallback is dispatched", async () => {
+  it("#given a main session produces assistant text before the threshold #when progress is observed #then the watchdog is cancelled and no fallback is dispatched", async () => {
     // given
-    const sessionID = "session-makes-progress"
-    subagentSessions.add(sessionID)
+    const sessionID = "session-main-makes-progress"
     const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
     const calls: RecordedCalls = { abort: [], autoRetry: [] }
     const helpers = createHelpers(calls, AGENT)
@@ -282,10 +280,10 @@ describe("first-prompt-watchdog", () => {
     watchdog.dispose()
   })
 
-  it("#given the session is not a subagent #when a user message is observed #then the watchdog never arms and nothing fires", async () => {
+  it("#given a subagent leaves subagentSessions before the threshold #when the watchdog fires #then it is suppressed", async () => {
     // given
-    const sessionID = "session-not-a-subagent"
-    // NOT added to subagentSessions
+    const sessionID = "session-removed-subagent"
+    subagentSessions.add(sessionID)
     const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
     const calls: RecordedCalls = { abort: [], autoRetry: [] }
     const helpers = createHelpers(calls, AGENT)
@@ -293,6 +291,8 @@ describe("first-prompt-watchdog", () => {
 
     // when
     watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await getFakeTimers().advanceBy(SAFE_WAIT_BEFORE_FIRE_MS)
+    subagentSessions.delete(sessionID)
     await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
 
     // then
@@ -324,10 +324,9 @@ describe("first-prompt-watchdog", () => {
     watchdog.dispose()
   })
 
-  it("#given a subagent silent past the threshold with no fallback configured #when the watchdog fires #then it logs but does not abort or dispatch (lets the existing error-event paths handle it if one arrives later)", async () => {
+  it("#given a main session is silent past the threshold with no fallback configured #when the watchdog fires #then it does not abort or dispatch (lets the existing error-event paths handle it if one arrives later)", async () => {
     // given
-    const sessionID = "session-no-fallback"
-    subagentSessions.add(sessionID)
+    const sessionID = "session-main-no-fallback"
     const deps = createDeps()
     const calls: RecordedCalls = { abort: [], autoRetry: [] }
     const helpers = createHelpers(calls, AGENT)

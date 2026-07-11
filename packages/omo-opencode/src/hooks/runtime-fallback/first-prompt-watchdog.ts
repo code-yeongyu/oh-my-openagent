@@ -133,11 +133,16 @@ export function createFirstPromptWatchdog(
     armed.delete(sessionID)
   }
 
-  const fire = async (sessionID: string, model: string | undefined, agent: string | undefined): Promise<void> => {
+  const fire = async (
+    sessionID: string,
+    model: string | undefined,
+    agent: string | undefined,
+    wasSubagent: boolean,
+  ): Promise<void> => {
     timers.delete(sessionID)
     armed.delete(sessionID)
 
-    if (!subagentSessions.has(sessionID)) {
+    if (wasSubagent && !subagentSessions.has(sessionID)) {
       log(`[${HOOK_NAME}] ${SOURCE}: session no longer a subagent at fire time, skipping`, { sessionID })
       return
     }
@@ -146,7 +151,7 @@ export function createFirstPromptWatchdog(
     const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, deps.pluginConfig)
 
     if (fallbackModels.length === 0) {
-      log(`[${HOOK_NAME}] ${SOURCE}: subagent silent past ${watchdogMs}ms with no fallback configured`, {
+      log(`[${HOOK_NAME}] ${SOURCE}: session silent past ${watchdogMs}ms with no fallback configured`, {
         sessionID,
         model,
         agent: resolvedAgent,
@@ -172,7 +177,7 @@ export function createFirstPromptWatchdog(
       deps.sessionLastAccess.set(sessionID, Date.now())
     }
 
-    log(`[${HOOK_NAME}] ${SOURCE}: subagent silent past ${watchdogMs}ms, dispatching fallback`, {
+    log(`[${HOOK_NAME}] ${SOURCE}: session silent past ${watchdogMs}ms, dispatching fallback`, {
       sessionID,
       model: state.currentModel,
       fallbackCount: fallbackModels.length,
@@ -196,16 +201,16 @@ export function createFirstPromptWatchdog(
   return {
     onUserMessage(sessionID, model, agent) {
       if (!sessionID) return
-      if (!subagentSessions.has(sessionID)) return
       if (armed.has(sessionID)) return
 
+      const wasSubagent = subagentSessions.has(sessionID)
       armed.add(sessionID)
       const timer = setTimeout(async () => {
-        await fire(sessionID, model, agent)
+        await fire(sessionID, model, agent, wasSubagent)
       }, watchdogMs)
       timers.set(sessionID, timer)
 
-      log(`[${HOOK_NAME}] ${SOURCE}: armed for subagent`, { sessionID, model, agent, watchdogMs })
+      log(`[${HOOK_NAME}] ${SOURCE}: armed`, { sessionID, model, agent, watchdogMs })
     },
     onAssistantProgress(sessionID) {
       if (!sessionID || !armed.has(sessionID)) return
