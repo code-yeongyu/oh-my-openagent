@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { isUlwLoopSubcommand, ulwLoopCommand } from "./cli-commands.js";
 import { runPreToolUseGoalBudgetGuardCli, runUlwLoopHookCli } from "./codex-hook.js";
+import { runSpawnGuardCli } from "./spawn-guard.js";
 import { runStopResumeHookCli } from "./stop-resume-hook.js";
 
 const TOP_LEVEL_HELP =
@@ -28,6 +29,10 @@ async function main(): Promise<number> {
 		}
 		if (sub === "stop") {
 			await runStopResumeHookCli(process.stdin, process.stdout);
+			return 0;
+		}
+		if (sub === "pre-tool-use-spawn") {
+			await runSpawnGuardCli(process.stdin, process.stdout);
 			return 0;
 		}
 		process.stderr.write(`[omo] unknown hook subcommand: ${sub ?? "(none)"}\n`);
