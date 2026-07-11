@@ -4,7 +4,7 @@ export const explorerAgent = {
   name: "explorer",
   description: "Codebase search specialist for Codex sessions. Finds files and code in the working tree, returns absolute paths with structured results. Read-only.",
   nickname_candidates: ["Explorer"],
-  model: SUPPORTED_MODELS.GPT_5_4_MINI,
+  model: SUPPORTED_MODELS.GPT_5_6_LUNA,
   model_reasoning_effort: "low",
   service_tier: "fast",
 
