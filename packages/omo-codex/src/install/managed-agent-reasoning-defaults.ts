@@ -71,6 +71,15 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       },
     ],
   ],
+  [
+    "lazycodex-gate-reviewer",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "xhigh" },
+        current: { model: "gpt-5.6-sol", effort: "high" },
+      },
+    ],
+  ],
 ])
 
 export function resolveManagedAgentReasoning(input: {
