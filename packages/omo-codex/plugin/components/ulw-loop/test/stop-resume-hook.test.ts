@@ -54,6 +54,15 @@ function writeGoals(goals: readonly Record<string, unknown>[], planOverrides: Re
 	writeFileSync(join(workDir, "transcript.jsonl"), "");
 }
 
+function writeBoulderPlan(remaining: boolean): string {
+	mkdirSync(join(workDir, ".omo", "plans"), { recursive: true });
+	writeFileSync(
+		join(workDir, ".omo", "plans", "p.md"),
+		remaining ? "## TODOs\n- [ ] pending task\n" : "## TODOs\n- [x] done task\n",
+	);
+	return ".omo/plans/p.md";
+}
+
 function pendingGoal(id = "g1", status = "pending"): Record<string, unknown> {
 	return {
 		id,
@@ -90,13 +99,42 @@ describe("runStopResumeHook", () => {
 		expect(runStopResumeHook({ hook_event_name: "Stop" })).toBe("");
 	});
 
-	it("#given an active boulder work for the session #when the hook runs #then defers to start-work-continuation", () => {
+	it("#given an active boulder work with remaining plan tasks #when the hook runs #then defers to start-work-continuation", () => {
 		writeGoals([pendingGoal()]);
-		mkdirSync(join(workDir, ".omo"), { recursive: true });
+		const plan = writeBoulderPlan(true);
 		writeFileSync(
 			join(workDir, ".omo", "boulder.json"),
-			JSON.stringify({ works: { w1: { session_ids: ["codex:s1"], status: "active" } } }),
+			JSON.stringify({ works: { w1: { session_ids: ["codex:s1"], status: "active", active_plan: plan } } }),
 		);
+
+		expect(runStopResumeHook(stopPayload())).toBe("");
+	});
+
+	it("#given an active boulder work whose plan is exhausted #when the hook runs #then resumes instead of deferring", () => {
+		writeGoals([pendingGoal()]);
+		const plan = writeBoulderPlan(false);
+		writeFileSync(
+			join(workDir, ".omo", "boulder.json"),
+			JSON.stringify({ works: { w1: { session_ids: ["codex:s1"], status: "active", active_plan: plan } } }),
+		);
+
+		expect(JSON.parse(runStopResumeHook(stopPayload())).decision).toBe("block");
+	});
+
+	it("#given a flat legacy boulder work with remaining plan tasks #when the hook runs #then still defers", () => {
+		writeGoals([pendingGoal()]);
+		const plan = writeBoulderPlan(true);
+		writeFileSync(
+			join(workDir, ".omo", "boulder.json"),
+			JSON.stringify({ session_ids: ["codex:s1"], status: "active", active_plan: plan }),
+		);
+
+		expect(runStopResumeHook(stopPayload())).toBe("");
+	});
+
+	it("#given a context-pressure marker in the transcript #when the hook runs #then no-ops", () => {
+		writeGoals([pendingGoal()]);
+		writeFileSync(join(workDir, "transcript.jsonl"), "note: context compacted mid-run\n");
 
 		expect(runStopResumeHook(stopPayload())).toBe("");
 	});
@@ -131,6 +169,14 @@ describe("runStopResumeHook", () => {
 		expect(counter.count).toBe(2);
 		expect(existsSync(join(sessionDir(), "auto-resume-g1.stuck"))).toBe(true);
 		expect(readFileSync(join(sessionDir(), "ledger.jsonl"), "utf8")).toBe("");
+	});
+
+	it("#given a session id needing normalization #when the hook blocks #then the directive carries the normalized flag", () => {
+		writeGoals([pendingGoal()]);
+
+		const output = runStopResumeHook(stopPayload({ session_id: "s1/" }));
+
+		expect(JSON.parse(output).reason).toContain("--session-id s1");
 	});
 
 	it("#given ledger movement between stops #when the hook fires again #then the cap resets", () => {

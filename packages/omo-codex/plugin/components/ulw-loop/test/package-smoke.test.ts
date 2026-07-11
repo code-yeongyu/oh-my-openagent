@@ -194,6 +194,7 @@ describe("source LOC budget", () => {
 		const files = [
 			"src/types.ts", "src/paths.ts", "src/plan-io.ts", "src/plan-crud.ts", "src/goal-status.ts",
 			"src/evidence.ts", "src/quality-gate.ts", "src/quality-gate-verdicts.ts", "src/checkpoint.ts", "src/review-blockers.ts",
+			"src/stop-resume-hook.ts", "src/spawn-guard.ts",
 			"src/steering.ts", "src/codex-goal-instruction.ts", "src/codex-goal-snapshot.ts", "src/codex-hook.ts",
 			"src/cli.ts", "src/cli-arg-parser.ts", "src/cli-output.ts", "src/cli-steering.ts", "src/cli-commands.ts",
 		];

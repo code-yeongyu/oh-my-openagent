@@ -111,9 +111,7 @@ function isNonEmptyFile(path: string): boolean {
 
 function hasOtherEvidenceFile(evidenceDir: string, excludedName: string): boolean {
 	try {
-		return readdirSync(evidenceDir).some(
-			(name) => name !== excludedName && isNonEmptyFile(join(evidenceDir, name)),
-		);
+		return readdirSync(evidenceDir).some((name) => name !== excludedName && isNonEmptyFile(join(evidenceDir, name)));
 	} catch (error) {
 		if (error instanceof Error) return false;
 		throw error;

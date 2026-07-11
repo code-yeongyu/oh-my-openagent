@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 
-import { ulwLoopDir } from "./paths.js";
+import { normalizeUlwLoopSessionId, ulwLoopDir } from "./paths.js";
 import type { UlwLoopItem, UlwLoopPlan } from "./types.js";
 
 // Turn-death recovery only: Codex emits Stop when a turn ends, so a run that
@@ -10,15 +10,29 @@ import type { UlwLoopItem, UlwLoopPlan } from "./types.js";
 
 const RESUME_CAP = 2;
 
+// Mirrors start-work-continuation's context-pressure bail-out: injecting a
+// resume directive into an already-overflowing context makes things worse.
+const CONTEXT_PRESSURE_MARKERS = [
+	"context compacted",
+	"context_length_exceeded",
+	"skill descriptions were shortened",
+	"context_too_large",
+	"codex ran out of room in the model's context window",
+	"your input exceeds the context window",
+	"long threads and multiple compactions",
+] as const;
+
 interface StopPayload {
 	readonly session_id: string;
 	readonly cwd: string;
+	readonly transcript_path: string;
 	readonly stop_hook_active: boolean;
 }
 
 export function runStopResumeHook(input: unknown): string {
 	const payload = parseStopPayload(input);
 	if (payload === null || payload.stop_hook_active) return "";
+	if (transcriptShowsContextPressure(payload.transcript_path)) return "";
 	if (boulderContinuationWillFire(payload.cwd, payload.session_id)) return "";
 	const stateDir = ulwLoopDir(payload.cwd, { sessionId: payload.session_id });
 	const plan = readPlan(join(stateDir, "goals.json"));
@@ -26,13 +40,14 @@ export function runStopResumeHook(input: unknown): string {
 	const goal = resumableGoal(plan);
 	if (goal === undefined) return "";
 	if (!consumeResumeBudget(stateDir, goal.id)) return "";
-	return JSON.stringify({ decision: "block", reason: renderResumeDirective(plan, goal, payload.session_id) });
+	const output: { decision: "block"; reason: string } = {
+		decision: "block",
+		reason: renderResumeDirective(plan, goal, payload.session_id),
+	};
+	return JSON.stringify(output);
 }
 
-export async function runStopResumeHookCli(
-	stdin: NodeJS.ReadableStream,
-	stdout: NodeJS.WritableStream,
-): Promise<void> {
+export async function runStopResumeHookCli(stdin: NodeJS.ReadableStream, stdout: NodeJS.WritableStream): Promise<void> {
 	try {
 		const chunks: Buffer[] = [];
 		for await (const chunk of stdin) chunks.push(Buffer.from(chunk));
@@ -70,7 +85,9 @@ function consumeResumeBudget(stateDir: string, goalId: string): boolean {
 }
 
 function renderResumeDirective(plan: UlwLoopPlan, goal: UlwLoopItem, sessionId: string): string {
-	const option = plan.goalsPath.includes(`/${sessionId}/`) ? ` --session-id ${sessionId}` : "";
+	const normalized = normalizeUlwLoopSessionId(sessionId);
+	const option =
+		normalized !== null && plan.goalsPath.includes(`/${normalized}/`) ? ` --session-id ${normalized}` : "";
 	return [
 		`The ulw-loop run in this session still has unfinished goals (next: ${goal.id} — ${goal.title}).`,
 		"The turn ended before the loop completed. Resume it now:",
@@ -118,18 +135,53 @@ function boulderContinuationWillFire(cwd: string, sessionId: string): boolean {
 	try {
 		const raw = JSON.parse(readFileSync(join(cwd, ".omo", "boulder.json"), "utf8")) as Record<string, unknown>;
 		const works = raw["works"];
-		if (typeof works !== "object" || works === null) return false;
-		return Object.values(works).some((work) => {
+		// The flat legacy shape has no works map: the top level is the single work.
+		const entries = typeof works === "object" && works !== null ? Object.values(works) : [raw];
+		return entries.some((work) => {
 			if (typeof work !== "object" || work === null) return false;
 			const entry = work as Record<string, unknown>;
 			const sessionIds = Array.isArray(entry["session_ids"]) ? entry["session_ids"] : [];
 			const continuable = entry["status"] === "active" || entry["status"] === "paused";
-			return continuable && sessionIds.includes(`codex:${sessionId}`);
+			return continuable && sessionIds.includes(`codex:${sessionId}`) && boulderPlanHasRemainingTask(cwd, entry);
 		});
 	} catch (error) {
 		if (error instanceof Error) return false;
 		throw error;
 	}
+}
+
+function transcriptShowsContextPressure(transcriptPath: string): boolean {
+	try {
+		const transcript = readFileSync(transcriptPath, "utf8").toLowerCase();
+		return CONTEXT_PRESSURE_MARKERS.some((marker) => transcript.includes(marker));
+	} catch (error) {
+		if (error instanceof Error) return false;
+		throw error;
+	}
+}
+
+// start-work-continuation only fires while its plan checklist has remaining
+// items; a boulder work whose plan is exhausted (or unreadable) leaves the
+// Stop event to this hook.
+function boulderPlanHasRemainingTask(cwd: string, entry: Record<string, unknown>): boolean {
+	const activePlan = entry["active_plan"];
+	if (typeof activePlan !== "string" || activePlan.trim().length === 0) return false;
+	const planPath = isAbsolute(activePlan) ? activePlan : join(cwd, activePlan);
+	const worktree = entry["worktree_path"];
+	const candidates =
+		typeof worktree === "string" && worktree.trim().length > 0 && !isAbsolute(activePlan)
+			? [join(isAbsolute(worktree) ? worktree : join(cwd, worktree), activePlan), planPath]
+			: [planPath];
+	for (const candidate of candidates) {
+		try {
+			return readFileSync(candidate, "utf8")
+				.split(/\r?\n/)
+				.some((line) => line.startsWith("- [ ] "));
+		} catch (error) {
+			if (!(error instanceof Error)) throw error;
+		}
+	}
+	return false;
 }
 
 function parseStopPayload(value: unknown): StopPayload | null {
@@ -150,6 +202,7 @@ function parseStopPayload(value: unknown): StopPayload | null {
 	return {
 		session_id: record["session_id"] as string,
 		cwd: record["cwd"] as string,
+		transcript_path: record["transcript_path"] as string,
 		stop_hook_active: record["stop_hook_active"] as boolean,
 	};
 }
