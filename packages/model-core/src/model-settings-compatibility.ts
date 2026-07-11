@@ -1,5 +1,5 @@
 import { detectHeuristicModelFamily } from "./model-capability-heuristics"
-import type { Variant } from "./registry"
+import { SUPPORTED_VARIANTS, type Variant } from "./registry"
 
 type CompatibilityField = "variant" | "reasoningEffort" | "temperature" | "topP" | "maxTokens" | "thinking"
 
@@ -49,7 +49,18 @@ export type ModelSettingsCompatibilityResult = {
   changes: ModelSettingsCompatibilityChange[]
 }
 
-const VARIANT_LADDER = ["low", "medium", "high", "xhigh", "max", "ultra"]
+// Ordered lowest → highest. Explicit ordering is intentional: ladder position
+// determines downgrade direction, so we use typed constants from the registry
+// rather than Object.values() to guarantee stable order and catch renames at
+// compile time.
+const VARIANT_LADDER: Variant[] = [
+  SUPPORTED_VARIANTS.LOW,
+  SUPPORTED_VARIANTS.MEDIUM,
+  SUPPORTED_VARIANTS.HIGH,
+  SUPPORTED_VARIANTS.XHIGH,
+  SUPPORTED_VARIANTS.MAX,
+  SUPPORTED_VARIANTS.ULTRA,
+]
 const REASONING_LADDER = ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
 
 function downgradeWithinLadder(value: string, allowed: string[], ladder: string[]): string | undefined {
