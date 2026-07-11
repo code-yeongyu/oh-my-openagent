@@ -34,10 +34,8 @@ export const CategoryConfigSchema = CategoryConfigBaseSchema.transform((val) => 
     console.warn("[omo-opencode] CategoryConfig: 'topp' is deprecated, use 'topP' instead.")
   }
   const { topp, ...rest } = val
-  return {
-    ...rest,
-    topP: val.topP ?? topp,
-  }
+  const resolved = val.topP ?? topp
+  return resolved !== undefined ? { ...rest, topP: resolved } : rest
 })
 
 export const BuiltinCategoryNameSchema = z.enum([
@@ -52,7 +50,3 @@ export const BuiltinCategoryNameSchema = z.enum([
 ])
 
 export const CategoriesConfigSchema = z.record(z.string(), CategoryConfigSchema)
-
-export type CategoryConfig = z.infer<typeof CategoryConfigSchema>
-export type CategoriesConfig = z.infer<typeof CategoriesConfigSchema>
-export type BuiltinCategoryName = z.infer<typeof BuiltinCategoryNameSchema>

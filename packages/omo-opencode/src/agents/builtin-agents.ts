@@ -40,8 +40,8 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   momus: createMomusAgent,
   // Note: Atlas is handled specially in createBuiltinAgents()
   // because it needs OrchestratorContext, not just a model string
-  atlas: createAtlasAgent as AgentFactory,
-  "sisyphus-junior": createSisyphusJuniorAgentWithOverrides as AgentFactory,
+  atlas: createAtlasAgent as unknown as AgentFactory,
+  "sisyphus-junior": createSisyphusJuniorAgentWithOverrides as unknown as AgentFactory,
 }
 
 /**
