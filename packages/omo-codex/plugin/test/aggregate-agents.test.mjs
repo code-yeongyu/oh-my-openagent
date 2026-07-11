@@ -57,14 +57,6 @@ const lazycodexAgentInvariants = new Map([
 		},
 	],
 	[
-		"lazycodex-executor.toml",
-		{
-			model: "gpt-5.6-sol",
-			effort: "high",
-			includes: [/EVIDENCE_RECORDED: <path>/, /scenario/i, /artifact/i],
-		},
-	],
-	[
 		"lazycodex-worker-low.toml",
 		{
 			model: "gpt-5.6-luna",
@@ -138,7 +130,6 @@ test("#given bundled Codex agents #when components/ultrawork/agents directory is
 		"explorer.toml",
 		"lazycodex-clone-fidelity-reviewer.toml",
 		"lazycodex-code-reviewer.toml",
-		"lazycodex-executor.toml",
 		"lazycodex-gate-reviewer.toml",
 		"lazycodex-qa-executor.toml",
 		"lazycodex-worker-high.toml",

@@ -42,7 +42,7 @@ describe("resolveManagedAgentReasoning", () => {
 	test("#given an unlisted agent #when resolving #then the preserved effort is untouched", () => {
 		// when
 		const effort = resolveManagedAgentReasoning({
-			agentName: "lazycodex-executor",
+			agentName: "custom-unlisted-agent",
 			bundledModel: "gpt-5.6-sol",
 			bundledEffort: "high",
 			preserved: { model: "gpt-5.6-sol", effort: "medium" },
