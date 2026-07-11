@@ -4,6 +4,7 @@ import {
   excerptRendererPromptText,
   joinRendererTokens,
   normalizeRendererText,
+  rendererVisibleWidth,
 } from "../tools/task/renderers"
 import type { CompletionDetails, ParentNotifierMessage } from "./types"
 
@@ -35,8 +36,8 @@ export function buildCompletionMessage(details: readonly CompletionDetails[]): P
   }
 }
 
-export function completionMessageLines(details: readonly CompletionDetails[]): readonly string[] {
-  return details.flatMap(completionDetailLines)
+export function completionMessageLines(details: readonly CompletionDetails[], width?: number): readonly string[] {
+  return details.flatMap((detail) => completionDetailLines(detail, width))
 }
 
 function responseHead(record: TaskRecord): string {
@@ -58,7 +59,7 @@ function continuationHint(record: TaskRecord): string {
   return `Use task_send({ to: "${record.task_id}", message: "..." }) to continue, or ${output}.`
 }
 
-function completionDetailLines(detail: CompletionDetails): readonly string[] {
+function completionDetailLines(detail: CompletionDetails, width: number | undefined): readonly string[] {
   const summary = joinRendererTokens([
     "task completion",
     `name:${normalizeRendererText(detail.name)}`,
@@ -69,11 +70,22 @@ function completionDetailLines(detail: CompletionDetails): readonly string[] {
   ])
   const head = normalizeRendererText(detail.final_response_head)
   const continuation = normalizeRendererText(detail.continuation_hint)
+  const resultPrefix = 'result:"'
+  const nextPrefix = "next:"
   return [
-    summary,
-    ...(head.length === 0 ? [] : [`result:"${excerptRendererPromptText(head)}"`]),
-    ...(continuation.length === 0 ? [] : [`next:${excerptRendererPromptText(continuation)}`]),
+    width === undefined ? summary : excerptRendererPromptText(summary, width),
+    ...(head.length === 0
+      ? []
+      : [`${resultPrefix}${excerptRendererPromptText(head, availableExcerptWidth(width, resultPrefix, '"'))}"`]),
+    ...(continuation.length === 0
+      ? []
+      : [`${nextPrefix}${excerptRendererPromptText(continuation, availableExcerptWidth(width, nextPrefix, ""))}`]),
   ]
+}
+
+function availableExcerptWidth(width: number | undefined, prefix: string, suffix: string): number | undefined {
+  if (width === undefined) return undefined
+  return Math.max(0, width - rendererVisibleWidth(prefix) - rendererVisibleWidth(suffix))
 }
 
 function formatDuration(durationMs: number): string {

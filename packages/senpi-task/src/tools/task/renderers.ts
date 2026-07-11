@@ -20,6 +20,8 @@ type LinesComponent = {
   invalidate(): void
 }
 
+type WidthAwareLines = (width: number) => readonly string[]
+
 type RendererTheme = Pick<Theme, "fg" | "italic">
 
 const STATUS_COLORS: Readonly<Record<string, ThemeColor>> = {
@@ -116,9 +118,16 @@ export function renderTaskResultComponent(details: TaskToolDetails, theme: Rende
   }
 }
 
-export function linesComponent(lines: readonly string[]): LinesComponent {
+export function linesComponent(lines: readonly string[] | WidthAwareLines): LinesComponent {
   return {
-    render: (width: number): string[] => lines.map((line) => (width <= 0 ? "" : truncateToWidth(line, width, ELLIPSIS))),
+    render: (width: number): string[] => {
+      const widthAware = typeof lines === "function"
+      const renderedLines = widthAware ? lines(width) : lines
+      return renderedLines.map((line) => {
+        if (width <= 0) return ""
+        return widthAware ? line : truncateToWidth(line, width, ELLIPSIS)
+      })
+    },
     invalidate: (): void => {},
   }
 }

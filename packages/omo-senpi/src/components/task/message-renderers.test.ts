@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { Theme, type MessageRenderer } from "@code-yeongyu/senpi"
+import { normalizeRendererText, rendererVisibleWidth } from "@oh-my-opencode/senpi-task"
 
 import { renderTaskCompletion } from "./renderers"
 import { renderTeamMessage, type TeamMessageDetails } from "./team-renderers"
@@ -70,13 +71,19 @@ const ADVERSARIAL_CONTENT = [
   "다섯째 한글 \u001bPunterminated-dcs",
   "여섯째 줄 보존",
 ].join("\n")
-function renderContentLines<T>(renderer: MessageRenderer<T>, customType: string, content: string, details: T): readonly string[] {
+function renderContentLines<T>(
+  renderer: MessageRenderer<T>,
+  customType: string,
+  content: string,
+  details: T,
+  width = 2_000,
+): readonly string[] {
   const component = renderer(
     { role: "custom", customType, content, display: true, details, timestamp: 0 },
     { expanded: false },
     TEST_THEME,
   )
-  return component?.render(2_000) ?? []
+  return component?.render(width) ?? []
 }
 
 function expectSanitizedLines(lines: readonly string[]): void {
@@ -180,5 +187,43 @@ describe("task-family custom message renderers", () => {
     expect(text).toContain("한국어 팀 메시지 본문")
     expect(text).not.toContain("<peer_message")
     expect(text).not.toContain("</peer_message>")
+  })
+
+  test("#given a long team body #when rendering at 48 cells #then the actual-width excerpt preserves English word boundaries", () => {
+    // given
+    const body = "Context confirms that the actual review result are visible after the final checks and remain available for inspection. Additional evidence stays attached."
+    const details: TeamMessageDetails = { from: "member-a", messageId: "m1", body }
+
+    // when
+    const lines = renderContentLines(renderTeamMessage, "senpi-task.team-message", "<peer_message>raw</peer_message>", details, 48)
+    const normalizedLines = lines.map(normalizeRendererText)
+    const messageLine = normalizedLines.find((line) => line.startsWith('message:"')) ?? ""
+
+    // then
+    expect(messageLine).toContain("the actual")
+    expect(messageLine).not.toMatch(/\b(?:rev|vis)\.\.\.$/u)
+    for (const line of lines) expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(48)
+  })
+
+  test("#given a long completion continuation #when rendering at 54 cells #then the actual-width excerpt preserves English word boundaries", () => {
+    // given
+    const details = [{
+      task_id: "st_done",
+      name: "worker",
+      status: "completed" as const,
+      duration_ms: 1250,
+      final_response_head: "검증 작업을 완료했습니다.",
+      continuation_hint: 'Use task_output({ task_id: "st_done" }) to read the full result after inspecting the complete transcript and all attached evidence.',
+    }]
+
+    // when
+    const lines = renderContentLines(renderTaskCompletion, "senpi-task.completion", "<task-notification>raw</task-notification>", details, 54)
+    const normalizedLines = lines.map(normalizeRendererText)
+    const continuationLine = normalizedLines.find((line) => line.startsWith("next:")) ?? ""
+
+    // then
+    expect(continuationLine).toContain("to")
+    expect(continuationLine).not.toMatch(/\b(?:durati|rea|read|ful)\.\.\.$/u)
+    for (const line of lines) expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(54)
   })
 })
