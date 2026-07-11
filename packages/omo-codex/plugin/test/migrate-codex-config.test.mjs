@@ -54,8 +54,8 @@ test("#given stale root reasoning config #when ensuring config #then replaces st
 	assert.equal(result.match(/^model_context_window\s*=/gm)?.length, 1);
 	assert.equal(result.match(/^model_reasoning_effort\s*=/gm)?.length, 1);
 	assert.equal(result.match(/^plan_mode_reasoning_effort\s*=/gm)?.length, 1);
-	assert.match(result, /model = "gpt-5\.5"/);
-	assert.match(result, /model_context_window = 400000/);
+	assert.match(result, /model = "gpt-5\.6-sol"/);
+	assert.match(result, /model_context_window = 372000/);
 	assert.match(result, /model_reasoning_effort = "high"/);
 	assert.match(result, /plan_mode_reasoning_effort = "xhigh"/);
 	assert.doesNotMatch(result, /gpt-5\.2/);
@@ -79,8 +79,8 @@ test("#given section settings reuse managed root keys #when ensuring config #the
 		].join("\n"),
 	);
 
-	assert.match(result, /^model = "gpt-5\.5"$/m);
-	assert.match(result, /^model_context_window = 400000$/m);
+	assert.match(result, /^model = "gpt-5\.6-sol"$/m);
+	assert.match(result, /^model_context_window = 372000$/m);
 	assert.match(result, /\[model_providers\.openai\]\nmodel = "provider-scoped-value"\nmodel_context_window = 123456/);
 	assert.match(result, /\[profiles\.review\]\nmodel_reasoning_effort = "medium"\nplan_mode_reasoning_effort = "medium"/);
 });
@@ -161,8 +161,8 @@ test("#given global and project-local stale Codex configs #when migrating #then 
 	});
 
 	assert.deepEqual(result.changed.sort(), [join(codexHome, "config.toml"), projectConfig].sort());
-	assert.match(await readFile(join(codexHome, "config.toml"), "utf8"), /model = "gpt-5\.5"/);
-	assert.match(await readFile(projectConfig, "utf8"), /model_context_window = 400000/);
+	assert.match(await readFile(join(codexHome, "config.toml"), "utf8"), /model = "gpt-5\.6-sol"/);
+	assert.match(await readFile(projectConfig, "utf8"), /model_context_window = 372000/);
 });
 
 test("#given model catalog is unavailable and stale 272k config #when migrating #then fallback catalog still upgrades it", async () => {
@@ -183,8 +183,8 @@ test("#given model catalog is unavailable and stale 272k config #when migrating 
 
 	const content = await readFile(join(codexHome, "config.toml"), "utf8");
 	assert.deepEqual(result.changed, [join(codexHome, "config.toml")]);
-	assert.match(content, /model = "gpt-5\.5"/);
-	assert.match(content, /model_context_window = 400000/);
+	assert.match(content, /model = "gpt-5\.6-sol"/);
+	assert.match(content, /model_context_window = 372000/);
 });
 
 test("#given model catalog is malformed and stale config #when migrating #then fallback catalog still upgrades it", async () => {
@@ -206,8 +206,8 @@ test("#given model catalog is malformed and stale config #when migrating #then f
 
 	const content = await readFile(join(codexHome, "config.toml"), "utf8");
 	assert.deepEqual(result.changed, [join(codexHome, "config.toml")]);
-	assert.match(content, /model = "gpt-5\.5"/);
-	assert.match(content, /model_context_window = 400000/);
+	assert.match(content, /model = "gpt-5\.6-sol"/);
+	assert.match(content, /model_context_window = 372000/);
 });
 
 test("#given user-customized Codex model config #when migrating #then user values are preserved without root multi-agent mode", async () => {
@@ -262,7 +262,7 @@ test("#given managed config state is malformed #when migrating #then migration i
 	const content = await readFile(join(codexHome, "config.toml"), "utf8");
 	const state = JSON.parse(await readFile(statePath, "utf8"));
 	assert.deepEqual(result.changed, [join(codexHome, "config.toml")]);
-	assert.match(content, /model_context_window = 400000/);
+	assert.match(content, /model_context_window = 372000/);
 	assert.equal(state.files[join(codexHome, "config.toml")].managed, true);
 });
 
@@ -670,15 +670,15 @@ test("#given global config starts with inline-comment features table #when full 
 	const content = await readFile(configPath, "utf8");
 	const parsed = parseTomlWithPython(content);
 	assert.equal("multi_agent_mode" in parsed, false);
-	assert.equal(parsed.model, "gpt-5.5");
-	assert.equal(parsed.model_context_window, 400000);
+	assert.equal(parsed.model, "gpt-5.6-sol");
+	assert.equal(parsed.model_context_window, 372000);
 	assert.equal(parsed.model_reasoning_effort, "high");
 	assert.equal(parsed.plan_mode_reasoning_effort, "xhigh");
 	assert.equal(parsed.features.plugins, true);
 	assert.equal("multi_agent_mode" in parsed.features, false);
 	assert.equal("model" in parsed.features, false);
 	assert.equal("model_context_window" in parsed.features, false);
-	assert.match(content, /^model = "gpt-5\.5"\nmodel_context_window = 400000/m);
+	assert.match(content, /^model = "gpt-5\.6-sol"\nmodel_context_window = 372000/m);
 	assert.doesNotMatch(content, /^\s*multi_agent_mode\s*=/m);
 	assert.match(content, /\[features\] # keep comment\nplugins = true/);
 });
