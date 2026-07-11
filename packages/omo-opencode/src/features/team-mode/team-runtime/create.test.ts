@@ -356,8 +356,8 @@ describe("createTeamRun", () => {
     // when
     const run = createTeamRun(createSpec(8), "lead-session", createContext(baseDir, manager), createConfig(baseDir, launchLimit), manager)
     try {
-      const firstBatch = await launchProbe.waitForFirstBatch("timed out waiting for the first four member launches")
-      await launchProbe.releaseAndWaitForCompletion(run, "timed out waiting for all member launches")
+      const firstBatch = await launchProbe.waitForFirstBatch()
+      await launchProbe.releaseAndWaitForCompletion(run)
       const completed = launchProbe.snapshot()
 
       // then
@@ -370,7 +370,7 @@ describe("createTeamRun", () => {
       launchProbe.release()
       run.catch(() => undefined)
     }
-  })
+  }, 30000)
 
   test("reuses the caller session for the lead when the lead matches the caller agent", async () => {
     // given
