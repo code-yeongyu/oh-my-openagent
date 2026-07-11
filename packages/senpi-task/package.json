@@ -24,10 +24,14 @@
   },
   "peerDependencies": {
     "@code-yeongyu/senpi": "2026.7.5-2",
+    "@earendil-works/pi-tui": "0.80.3",
     "typebox": "*"
   },
   "peerDependenciesMeta": {
     "@code-yeongyu/senpi": {
+      "optional": true
+    },
+    "@earendil-works/pi-tui": {
       "optional": true
     },
     "typebox": {
@@ -36,6 +40,7 @@
   },
   "devDependencies": {
     "@code-yeongyu/senpi": "2026.7.5-2",
+    "@earendil-works/pi-tui": "0.80.3",
     "typebox": "1.1.38"
   },
   "sideEffects": false

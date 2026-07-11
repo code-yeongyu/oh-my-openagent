@@ -2,6 +2,7 @@ import type { AgentToolResult } from "@code-yeongyu/senpi"
 
 import type { TaskManager } from "../../manager"
 import type { TaskStatus } from "../../state"
+import type { SenpiShutdownErrorCode } from "../../team"
 import type { TeamSendDetails } from "../team/messaging"
 
 // The minimal read of the harness context the control tools need to name the calling session. The
@@ -31,6 +32,14 @@ export type SendResultDetails =
   | { readonly kind: "team_message"; readonly team: TeamSendDetails }
   | { readonly kind: "shutdown_requested"; readonly team_run_id: string; readonly member: string }
   | { readonly kind: "shutdown_responded"; readonly team_run_id: string; readonly member: string; readonly approved: boolean }
+  | {
+      readonly kind: "shutdown_failed"
+      readonly operation: "request" | "approve" | "reject"
+      readonly team_run_id: string
+      readonly member: string
+      readonly code: SenpiShutdownErrorCode | "team_state_missing"
+      readonly reason: string
+    }
 
 export type CancelResultDetails =
   | { readonly kind: "cancelled"; readonly task_id: string; readonly previous_status: TaskStatus; readonly status: TaskStatus }

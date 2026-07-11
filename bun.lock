@@ -322,14 +322,17 @@
       },
       "devDependencies": {
         "@code-yeongyu/senpi": "2026.7.5-2",
+        "@earendil-works/pi-tui": "0.80.3",
         "typebox": "1.1.38",
       },
       "peerDependencies": {
         "@code-yeongyu/senpi": "2026.7.5-2",
+        "@earendil-works/pi-tui": "0.80.3",
         "typebox": "*",
       },
       "optionalPeers": [
         "@code-yeongyu/senpi",
+        "@earendil-works/pi-tui",
         "typebox",
       ],
     },

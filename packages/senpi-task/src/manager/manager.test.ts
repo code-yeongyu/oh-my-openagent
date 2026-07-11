@@ -2,7 +2,19 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
 
+import type { Theme, ThemeColor } from "@code-yeongyu/senpi"
+
+import type { ResolvedModelRecord } from "../state"
+import { CTX, makeDeps } from "../tools/task/__fixtures__/task-tool-fakes"
+import { buildTaskExecute } from "../tools/task/execute"
+import { renderTaskResultLines } from "../tools/task/renderers"
 import { FakeRunner, baseSpec, cleanupProjects, categoryPlanner, flush, makeManager, settings } from "./__fixtures__/manager-fakes"
+import type { ChildPlanner } from "./types"
+
+const RENDERER_THEME = {
+  fg: (_color: ThemeColor, text: string) => text,
+  italic: (text: string) => `<i>${text}</i>`,
+} satisfies Pick<Theme, "fg" | "italic">
 
 afterEach(cleanupProjects)
 
@@ -127,5 +139,92 @@ describe("TaskManager.start", () => {
     // then
     expect(processRunner.startedSpecs).toHaveLength(1)
     expect(inProcess.startedSpecs).toHaveLength(0)
+  })
+
+  test("#given a resolved model plan #when started #then manager metadata surfaces persist resolved_model without prompt payloads", async () => {
+    // given
+    const resolvedModel: ResolvedModelRecord = {
+      provider: "anthropic",
+      model_id: "claude-sonnet-4-20250514",
+      display: "Claude Sonnet 4",
+      variant: "sonnet",
+      reasoning_effort: "medium",
+      source: "category",
+    }
+    const planner: ChildPlanner = (spec) => ({
+      kind: "resolved",
+      plan: {
+        model: spec.model ?? "anthropic/claude",
+        resolved_model: resolvedModel,
+        ...(spec.category !== undefined ? { category: spec.category } : {}),
+      },
+    })
+    const { manager, store } = makeManager({ planner })
+
+    // when
+    const result = await manager.start(baseSpec({ prompt: "private prompt payload" }))
+
+    // then
+    expect(result.kind).toBe("started")
+    if (result.kind !== "started") throw new Error("expected started")
+    expect(result.resolved_model).toEqual(resolvedModel)
+
+    const persisted = store.load(result.task_id)
+    expect(persisted?.resolved_model).toEqual(resolvedModel)
+    expect(manager.get(result.task_id)?.resolved_model).toEqual(resolvedModel)
+    expect(manager.list({ scope: "all" })[0]?.record.resolved_model).toEqual(resolvedModel)
+
+    const rawRecord = readFileSync(join(store.stateDir, "tasks", `${result.task_id}.json`), "utf8")
+    expect(rawRecord).toContain('"resolved_model"')
+    expect(rawRecord).not.toContain("private prompt payload")
+    expect(rawRecord).not.toContain('"prompt"')
+    expect(rawRecord).not.toContain('"messages"')
+  })
+
+  test("#given a resolved ultrabrain plan whose runner throws #when the real task mapping renders start_failed #then resolved context reaches the error row without the prompt", async () => {
+    // given
+    const resolvedModel: ResolvedModelRecord = {
+      provider: "openai",
+      model_id: "gpt-5.6-sol",
+      display: "GPT-5.6 Sol",
+      reasoning_effort: "xhigh",
+      source: "category",
+    }
+    const planner: ChildPlanner = () => ({
+      kind: "resolved",
+      plan: { model: "openai/gpt-5.6-sol", resolved_model: resolvedModel, category: "ultrabrain" },
+    })
+    const runner = new FakeRunner()
+    runner.throwOnStart = true
+    const { manager } = makeManager({ planner, inProcess: runner })
+    const privatePrompt = "private prompt payload"
+
+    // when
+    const result = await buildTaskExecute(makeDeps(manager))(
+      "call-start-failed",
+      { prompt: privatePrompt, category: "ultrabrain", run_in_background: true },
+      undefined,
+      undefined,
+      CTX,
+    )
+    const [row] = renderTaskResultLines(result.details, RENDERER_THEME)
+
+    // then
+    expect(result.details).toEqual({
+      task_id: result.details.task_id,
+      status: "error",
+      mode: "spawn",
+      name: result.details.task_id,
+      category: "ultrabrain",
+      execution_mode: "in-process",
+      model: "openai/gpt-5.6-sol",
+      resolved_model: resolvedModel,
+      run_in_background: true,
+      reason: "Task runner failed to start.",
+    })
+    expect(row).toBe(
+      `task category:ultrabrain (GPT-5.6 Sol reasoning:xhigh) <i>background</i> error id:${result.details.task_id} reason:Task runner failed to start.`,
+    )
+    expect(JSON.stringify({ result, row })).not.toContain(privatePrompt)
   })
 })

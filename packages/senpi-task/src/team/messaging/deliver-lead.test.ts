@@ -36,6 +36,8 @@ member alpha needs a decision
       display: false,
       from: "alpha",
       messageId: "55555555-5555-4555-8555-555555555555",
+      summary: "decision",
+      body: "member alpha needs a decision",
       triggerTurn: true,
     })
   })

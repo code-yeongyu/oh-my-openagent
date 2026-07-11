@@ -35,6 +35,8 @@ function recordDetails(record: TaskRecord, mode: TaskToolMode): TaskToolDetails 
     ...(record.agent_type !== undefined && { subagent_type: record.agent_type }),
     execution_mode: record.execution_mode,
     model: record.model,
+    ...(record.resolved_model !== undefined && { resolved_model: record.resolved_model }),
+    run_in_background: false,
   }
 }
 
@@ -110,6 +112,7 @@ function startedDetails(
     ...(params.subagent_type !== undefined && { subagent_type: params.subagent_type }),
     execution_mode: executionMode,
     ...(params.model !== undefined && { model: params.model }),
+    ...(started.resolved_model !== undefined && { resolved_model: started.resolved_model }),
     run_in_background: params.run_in_background === true,
     ...(started.queue_position !== undefined && { queue_position: started.queue_position }),
   }
@@ -141,7 +144,19 @@ async function runSpawn(
     return result(started.reason, { task_id: "", status: "denied", mode: "spawn", reason: started.reason })
   }
   if (started.kind === "start_failed") {
-    return result(started.error_message, { task_id: started.task_id, status: "error", mode: "spawn", name: started.name, reason: started.error_message })
+    return result(started.error_message, {
+      task_id: started.task_id,
+      status: "error",
+      mode: "spawn",
+      name: started.name,
+      ...(started.category !== undefined && { category: started.category }),
+      ...(started.subagent_type !== undefined && { subagent_type: started.subagent_type }),
+      execution_mode: started.execution_mode,
+      model: started.model,
+      ...(started.resolved_model !== undefined && { resolved_model: started.resolved_model }),
+      run_in_background: started.run_in_background,
+      reason: started.error_message,
+    })
   }
   if (started.kind === "residency_denied") {
     return result(started.reason, { task_id: "", status: "residency_denied", mode: "spawn", reason: started.reason })

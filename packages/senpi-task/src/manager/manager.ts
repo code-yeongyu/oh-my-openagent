@@ -1,5 +1,6 @@
 import { log } from "@oh-my-opencode/utils"
 
+import { isRunnerError } from "../runners/in-process/runner-error"
 import { createTaskRecord, parseTaskId } from "../state"
 import type { TaskRecord } from "../state"
 import { createSteeringEngine } from "../steering"
@@ -44,7 +45,27 @@ type LaunchContext = {
 }
 
 const NOOP_DESTRUCTION: DestructionPort = { destroyResidentTask: () => Promise.resolve() }
+const GENERIC_START_FAILURE_MESSAGE = "Task runner failed to start."
 
+function publicStartFailureMessage(error: unknown): string {
+  try {
+    if (!isRunnerError(error)) return GENERIC_START_FAILURE_MESSAGE
+    switch (error.failure.kind) {
+      case "depth-exceeded":
+        return "In-process child depth limit exceeded."
+      case "session-create-failed":
+        return "In-process child session creation failed."
+      case "child-prompt-failed":
+        return "In-process child prompt failed to start."
+      default:
+        return GENERIC_START_FAILURE_MESSAGE
+    }
+  } catch {
+    return GENERIC_START_FAILURE_MESSAGE
+  }
+}
+
+// allow: SIZE_OK - one stateful manager keeps concurrency, queue, live-handle, and waiter invariants in one closure-backed implementation.
 class TaskManagerImpl implements TaskManager {
   readonly #options: TaskManagerOptions
   readonly #now: () => number
@@ -120,15 +141,29 @@ class TaskManagerImpl implements TaskManager {
     })
     const runner = this.#options.runners[executionMode]
     const context: LaunchContext = { record, managedSpec, runner, model: plan.model }
-    const nameParts = registration.warning !== undefined ? { name_warning: registration.warning } : {}
+    const startParts = {
+      ...(plan.resolved_model !== undefined ? { resolved_model: plan.resolved_model } : {}),
+      ...(registration.warning !== undefined ? { name_warning: registration.warning } : {}),
+    }
 
     if (this.#concurrency.hasFreeSlot(plan.model)) {
       this.#concurrency.acquire(plan.model, record.task_id)
       const launched = await this.#launch(context)
       if (!launched.ok) {
-        return { kind: "start_failed", task_id: record.task_id, name: registration.name, error_message: launched.error }
+        return {
+          kind: "start_failed",
+          task_id: record.task_id,
+          name: registration.name,
+          ...(record.category !== undefined ? { category: record.category } : {}),
+          ...(record.agent_type !== undefined ? { subagent_type: record.agent_type } : {}),
+          execution_mode: executionMode,
+          model: record.model,
+          ...(record.resolved_model !== undefined ? { resolved_model: record.resolved_model } : {}),
+          run_in_background: spec.run_in_background === true,
+          error_message: launched.error,
+        }
       }
-      return { kind: "started", task_id: record.task_id, status: "running", name: registration.name, ...nameParts }
+      return { kind: "started", task_id: record.task_id, status: "running", name: registration.name, ...startParts }
     }
 
     const position = this.#concurrency.enqueue(plan.model, record.task_id, () => {
@@ -140,7 +175,7 @@ class TaskManagerImpl implements TaskManager {
       status: "pending",
       name: registration.name,
       queue_position: position,
-      ...nameParts,
+      ...startParts,
     }
   }
 
@@ -212,8 +247,8 @@ class TaskManagerImpl implements TaskManager {
     let handle: ManagedChildHandle
     try {
       handle = await runner.start(managedSpec)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
+    } catch (error) { // no-excuse-ok: catch - runner boundary converts every thrown value into a public classification.
+      const message = publicStartFailureMessage(error)
       this.#releaseSlot(record.task_id, model, record.notification.run_epoch)
       this.#options.store.transition(record.task_id, { type: "fail", timestamp: nowIso(this.#now), error_message: message })
       this.#options.store.appendEvent(record.task_id, { type: "task_start_failed", payload: { error_message: message } })

@@ -55,7 +55,7 @@ describe("team-message notifier + shared idle coordinator", () => {
     const completionNotifier = createParentNotifier(pi, coordinator, () => true)
 
     // when: both become ready inside the same batch window
-    teamNotifier.enqueue({ customType: "senpi-task.team-message", content: "beta: shipped", display: false, from: "beta", messageId: "m1", triggerTurn: true })
+    teamNotifier.enqueue({ customType: "senpi-task.team-message", content: "beta: shipped", display: false, from: "beta", messageId: "m1", body: "beta: shipped", triggerTurn: true })
     completionNotifier.enqueue({
       customType: "senpi-task.completion",
       content: "st_1 completed",
@@ -84,7 +84,7 @@ describe("team-message notifier + shared idle coordinator", () => {
     const delivered: Delivered[] = []
     const { coordinator, runDeferred } = deferredCoordinator(delivered)
     const teamNotifier = createTeamMessageNotifier(fakePi(), coordinator, () => true)
-    const wake = { customType: "senpi-task.team-message", content: "beta: done", display: false, from: "beta", messageId: "m1", triggerTurn: true } as const
+    const wake = { customType: "senpi-task.team-message", content: "beta: done", display: false, from: "beta", messageId: "m1", body: "beta: done", triggerTurn: true } as const
 
     // when: the engine's enqueue-with-retry double-fires the SAME message id
     teamNotifier.enqueue(wake)
@@ -104,7 +104,7 @@ describe("team-message notifier + shared idle coordinator", () => {
     const teamNotifier = createTeamMessageNotifier(pi, coordinator, () => true)
 
     // when
-    teamNotifier.enqueue({ customType: "senpi-task.team-message", content: "beta: steering", display: false, from: "beta", messageId: "m3", triggerTurn: true })
+    teamNotifier.enqueue({ customType: "senpi-task.team-message", content: "beta: steering", display: false, from: "beta", messageId: "m3", body: "beta: steering", triggerTurn: true })
     runDeferred()
 
     // then: the coordinator steers the injection; nothing bypasses the batch
@@ -120,12 +120,12 @@ describe("team-message notifier + shared idle coordinator", () => {
     const teamNotifier = createTeamMessageNotifier(pi)
 
     // when
-    teamNotifier.enqueue({ customType: "senpi-task.team-message", content: "beta: fyi", display: false, from: "beta", messageId: "m2", triggerTurn: true })
+    teamNotifier.enqueue({ customType: "senpi-task.team-message", content: "beta: fyi", display: false, from: "beta", messageId: "m2", body: "beta: fyi", triggerTurn: true })
 
     // then
     expect(pi.sent).toHaveLength(1)
     expect(pi.sent[0]?.message.customType).toBe("senpi-task.team-message")
-    expect(pi.sent[0]?.message.details).toEqual({ from: "beta", messageId: "m2" })
+    expect(pi.sent[0]?.message.details).toEqual({ from: "beta", messageId: "m2", body: "beta: fyi" })
     expect(pi.sent[0]?.options).toMatchObject({ triggerTurn: true, deliverAs: "steer" })
   })
 })
