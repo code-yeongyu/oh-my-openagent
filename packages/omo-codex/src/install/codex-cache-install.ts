@@ -111,7 +111,16 @@ function shouldCopyPluginPath(path: string, root: string): boolean {
   const relative = path === root ? "" : path.slice(root.length + sep.length)
   if (relative === "") return true
   const parts = relative.split(sep)
-  return !parts.some((part) => part === ".git" || part === "node_modules")
+  if (parts.some((part) => part === ".git" || part === "node_modules")) return false
+  return !isNestedComponentMcpManifest(parts)
+}
+
+// Codex loads MCP servers only from the plugin-root .mcp.json (.codex-plugin/plugin.json declares
+// "mcpServers": "./.mcp.json"). A component's own nested .mcp.json is a standalone-plugin dev
+// manifest whose relative daemon path (e.g. ../../../../lsp-daemon/dist/cli.js) resolves in the repo
+// layout but dangles in the flattened cache layout, so it must never be copied into the cache.
+function isNestedComponentMcpManifest(parts: readonly string[]): boolean {
+  return parts.length > 1 && parts.at(-1) === ".mcp.json"
 }
 
 const removedSparkshellReferencePattern = /\b(?:sparkshell|spark[-_\s]+shell)\b/i
