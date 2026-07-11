@@ -153,6 +153,26 @@ describe("CodeGraph workspace helpers", () => {
 
     rmSync(workspace, { force: true, recursive: true })
   })
+  it("does not mutate an invalid nested .git marker or its parent repository", () => {
+    // given
+    const parent = tempDir("codegraph-parent-git")
+    const workspace = join(parent, "nested")
+    mkdirSync(workspace, { recursive: true })
+    execFileSync("git", ["init", parent], { stdio: "ignore" })
+    mkdirSync(join(workspace, ".git"), { recursive: true })
+    const parentExcludePath = join(parent, ".git", "info", "exclude")
+    const parentExclusionsBefore = readFileSync(parentExcludePath, "utf8")
+
+    // when
+    const result = ensureCodegraphGitignored(workspace)
+
+    // then
+    expect(result).toBe(false)
+    expect(existsSync(join(workspace, ".git", "info", "exclude"))).toBe(false)
+    expect(readFileSync(parentExcludePath, "utf8")).toBe(parentExclusionsBefore)
+
+    rmSync(parent, { force: true, recursive: true })
+  })
 
   it("does not synthesize git info exclude for non-git workspaces", () => {
     // given

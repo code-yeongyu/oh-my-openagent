@@ -120,6 +120,15 @@ export function ensureCodegraphGitignored(workspace: string): boolean {
       windowsHide: true,
     }).trim()
     if (isWorktree !== "true") return false
+    const gitTopLevel = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+      cwd: workspace,
+      encoding: "utf8",
+      shell: false,
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5_000,
+      windowsHide: true,
+    }).trim()
+    if (gitTopLevel.length === 0 || realpathSync.native(gitTopLevel) !== realpathSync.native(workspace)) return false
 
     const gitExcludePath = execFileSync("git", ["rev-parse", "--git-path", "info/exclude"], {
       cwd: workspace,

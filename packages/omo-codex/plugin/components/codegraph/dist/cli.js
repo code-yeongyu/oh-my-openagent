@@ -319,6 +319,16 @@ function ensureCodegraphGitignored(workspace) {
     }).trim();
     if (isWorktree !== "true")
       return false;
+    const gitTopLevel = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+      cwd: workspace,
+      encoding: "utf8",
+      shell: false,
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5e3,
+      windowsHide: true
+    }).trim();
+    if (gitTopLevel.length === 0 || realpathSync2.native(gitTopLevel) !== realpathSync2.native(workspace))
+      return false;
     const gitExcludePath = execFileSync("git", ["rev-parse", "--git-path", "info/exclude"], {
       cwd: workspace,
       encoding: "utf8",
