@@ -5903,7 +5903,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "4.16.2",
+    version: "4.16.3",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -8139,6 +8139,9 @@ function stripTomlLineComment(line) {
 var LEGACY_MANAGED_CODEX_AGENT_NAMES_TO_PURGE = ["codex-ultrawork-reviewer"];
 var CURRENT_MANAGED_CODEX_AGENT_NAMES = [
   "explorer",
+  "lazycodex-worker-high",
+  "lazycodex-worker-low",
+  "lazycodex-worker-medium",
   "librarian",
   "metis",
   "momus",
@@ -9004,32 +9007,52 @@ import { join as join20 } from "node:path";
 var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
   [
     "explorer",
-    {
-      previous: { model: "gpt-5.4-mini", effort: "low" },
-      current: { model: "gpt-5.6-terra", effort: "medium" }
-    }
+    [
+      {
+        previous: { model: "gpt-5.4-mini", effort: "low" },
+        current: { model: "gpt-5.6-terra", effort: "medium" }
+      },
+      {
+        previous: { model: "gpt-5.6-terra", effort: "medium" },
+        current: { model: "gpt-5.6-luna", effort: "low" }
+      }
+    ]
   ],
   [
     "librarian",
-    {
-      previous: { model: "gpt-5.4-mini", effort: "low" },
-      current: { model: "gpt-5.6-terra", effort: "medium" }
-    }
+    [
+      {
+        previous: { model: "gpt-5.4-mini", effort: "low" },
+        current: { model: "gpt-5.6-terra", effort: "medium" }
+      },
+      {
+        previous: { model: "gpt-5.6-terra", effort: "medium" },
+        current: { model: "gpt-5.6-luna", effort: "low" }
+      }
+    ]
   ],
   [
     "momus",
-    {
-      previous: { model: "gpt-5.5", effort: "xhigh" },
-      current: { model: "gpt-5.6-sol", effort: "ultra" }
-    }
+    [
+      {
+        previous: { model: "gpt-5.5", effort: "xhigh" },
+        current: { model: "gpt-5.6-sol", effort: "ultra" }
+      }
+    ]
   ]
 ]);
 function resolveManagedAgentReasoning(input) {
-  const upgrade = MANAGED_REASONING_DEFAULT_UPGRADES.get(input.agentName);
-  if (upgrade !== undefined && input.preserved.model === upgrade.previous.model && input.preserved.effort === upgrade.previous.effort && input.bundledModel === upgrade.current.model && input.bundledEffort === upgrade.current.effort) {
-    return upgrade.current.effort;
+  const steps = MANAGED_REASONING_DEFAULT_UPGRADES.get(input.agentName);
+  if (steps === undefined)
+    return input.preserved.effort;
+  const latest = steps[steps.length - 1];
+  if (latest === undefined)
+    return input.preserved.effort;
+  if (input.bundledModel !== latest.current.model || input.bundledEffort !== latest.current.effort) {
+    return input.preserved.effort;
   }
-  return input.preserved.effort;
+  const preservedMatchesAnyStep = steps.some((step) => input.preserved.model === step.previous.model && input.preserved.effort === step.previous.effort);
+  return preservedMatchesAnyStep ? latest.current.effort : input.preserved.effort;
 }
 
 // packages/omo-codex/src/install/preserved-agent-settings.ts

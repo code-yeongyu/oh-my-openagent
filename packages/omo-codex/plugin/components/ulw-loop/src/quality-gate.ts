@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { isWithinAttemptDir } from "./paths.js";
 import {
 	emptyBlockers,
 	invalid,
@@ -8,6 +9,7 @@ import {
 	stringArray,
 	textField,
 } from "./quality-gate-fields.js";
+import { adversarialVerdict, codeQualityStatusField, passedVerdict } from "./quality-gate-verdicts.js";
 import type {
 	UlwLoopManualQaArtifactKind,
 	UlwLoopManualQaArtifactRef,
@@ -36,6 +38,7 @@ export interface QualityGateFs {
 export interface ValidateQualityGateOptions {
 	readonly repoRoot: string;
 	readonly fs: QualityGateFs;
+	readonly currentAttemptDir?: string;
 }
 
 function reviewerRoleField<T extends string>(value: unknown, expected: T, field: string): T {
@@ -70,11 +73,6 @@ function kindField(value: unknown, field: string): UlwLoopManualQaArtifactKind {
 	invalid(`${field} must be a supported artifact kind.`, field);
 }
 
-function passedVerdict(value: unknown, field: string): "passed" {
-	if (value === "not_applicable") invalid(`${field} must not be not_applicable.`, field);
-	return literal(value, "passed", field);
-}
-
 function artifactCompatible(surface: UlwLoopManualQaSurface, kind: UlwLoopManualQaArtifactKind): boolean {
 	switch (surface) {
 		case "cli":
@@ -96,8 +94,15 @@ function checkFile(path: string, field: string, opts?: ValidateQualityGateOption
 	if (opts === undefined) return;
 	const absolute = resolve(opts.repoRoot, path);
 	if (!opts.fs.existsSync(absolute)) invalid(`${field} must point to an existing artifact.`, field);
-	const stat = opts.fs.statSync(absolute);
-	if (stat.size <= 0) invalid(`${field} must point to a non-empty artifact.`, field);
+	if (opts.fs.statSync(absolute).size <= 0) invalid(`${field} must point to a non-empty artifact.`, field);
+	if (opts.currentAttemptDir !== undefined) {
+		const attemptRoot = resolve(opts.repoRoot, opts.currentAttemptDir);
+		if (!isWithinAttemptDir(absolute, attemptRoot))
+			invalid(
+				`${field} (${path}) must point to an artifact from the current attempt (${opts.currentAttemptDir}).`,
+				field,
+			);
+	}
 }
 
 function artifactMap(refs: readonly UlwLoopManualQaArtifactRef[]): Map<string, UlwLoopManualQaArtifactRef> {
@@ -160,7 +165,7 @@ export function validateQualityGate(input: unknown, opts?: ValidateQualityGateOp
 		codeReview: {
 			by: reviewerRoleField(codeReview["by"], REVIEWER_ROLES.codeReview, "codeReview.by"),
 			recommendation: literal(codeReview["recommendation"], "APPROVE", "codeReview.recommendation"),
-			codeQualityStatus: literal(codeReview["codeQualityStatus"], "CLEAR", "codeReview.codeQualityStatus"),
+			codeQualityStatus: codeQualityStatusField(codeReview["codeQualityStatus"], "codeReview.codeQualityStatus"),
 			reportPath: codeReportPath,
 			evidence: textField(codeReview["evidence"], "codeReview.evidence"),
 			blockers: emptyBlockers(codeReview["blockers"], "codeReview.blockers"),
@@ -246,12 +251,14 @@ function parseAdversarialCases(
 			`manualQa.adversarialCases[${index}].artifactRefs`,
 			byId,
 		);
+		const verdictInfo = adversarialVerdict(row, `manualQa.adversarialCases[${index}]`);
 		return {
 			id: textField(row["id"], `manualQa.adversarialCases[${index}].id`),
 			criterionRef: textField(row["criterionRef"], `manualQa.adversarialCases[${index}].criterionRef`),
 			scenario: textField(row["scenario"], `manualQa.adversarialCases[${index}].scenario`),
 			expectedBehavior: textField(row["expectedBehavior"], `manualQa.adversarialCases[${index}].expectedBehavior`),
-			verdict: passedVerdict(row["verdict"], `manualQa.adversarialCases[${index}].verdict`),
+			verdict: verdictInfo.verdict,
+			...(verdictInfo.reason === undefined ? {} : { reason: verdictInfo.reason }),
 			artifactRefs: artifacts.map((artifact) => artifact.id),
 		};
 	});
