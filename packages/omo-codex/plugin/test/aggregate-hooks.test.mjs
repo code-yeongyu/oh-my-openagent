@@ -174,7 +174,12 @@ test("#given aggregate OMO plugin is enabled #when hooks are inspected #then she
 	assert.match(text, /Resetting Git Bash MCP Reminder/);
 	assert.match(text, /components\/ulw-loop\/dist\/cli\.js/);
 	assert.match(text, /hook pre-tool-use/);
-	assert.deepEqual(preToolUseGroups.map((group) => group.matcher), ["^Bash$", "^create_goal$"]);
+	assert.deepEqual(preToolUseGroups.map((group) => group.matcher), [
+		"^Bash$",
+		"^create_goal$",
+		"^(spawn_agent|collaborationspawn_agent|collaboration\\.spawn_agent)$",
+	]);
+	assert.match(text, /hook pre-tool-use-spawn/);
 });
 
 test("#given aggregate OMO plugin has a dedicated ultrawork trigger #when hooks are inspected #then ulw-loop does not duplicate ultrawork injection", async () => {

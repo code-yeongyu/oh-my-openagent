@@ -30,6 +30,7 @@
 		"./hooks/user-prompt-submit-checking-ulw-loop-steering.json",
 		"./hooks/pre-tool-use-recommending-git-bash-mcp.json",
 		"./hooks/pre-tool-use-enforcing-unlimited-goal-budget.json",
+		"./hooks/pre-tool-use-guarding-ulw-loop-spawns.json",
 		"./hooks/post-tool-use-checking-comments.json",
 		"./hooks/post-tool-use-checking-lsp-diagnostics.json",
 		"./hooks/post-tool-use-checking-codegraph-init-guidance.json",
