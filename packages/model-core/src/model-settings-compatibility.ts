@@ -49,7 +49,7 @@ export type ModelSettingsCompatibilityResult = {
   changes: ModelSettingsCompatibilityChange[]
 }
 
-const VARIANT_LADDER = ["low", "medium", "high", "xhigh", "max"]
+const VARIANT_LADDER = ["low", "medium", "high", "xhigh", "max", "ultra"]
 const REASONING_LADDER = ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
 
 function downgradeWithinLadder(value: string, allowed: string[], ladder: string[]): string | undefined {
