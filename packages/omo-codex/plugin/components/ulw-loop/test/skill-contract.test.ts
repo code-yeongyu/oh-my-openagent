@@ -65,7 +65,8 @@ describe("ulw-loop skill contract", () => {
 		// then
 		expect(workflow.match(/malformed input, prompt injection/g)?.length ?? 0).toBe(1);
 			// budget raised 3697 -> 3775 (tier delegation rows) -> 3820 (staged final-gate spawn + WATCH/not_applicable doc), 2026-07-11
-	expect(wordCount(workflow)).toBeLessThanOrEqual(3820);
-		expect(wordCount(skill)).toBeLessThanOrEqual(625);
+	// -> workflow 3890 / skill 660 (commit-identity evidence binding + freeze-before-final-proof invariants, net after de-duping channel-list echoes), 2026-07-12
+		expect(wordCount(workflow)).toBeLessThanOrEqual(3890);
+		expect(wordCount(skill)).toBeLessThanOrEqual(660);
 	});
 });

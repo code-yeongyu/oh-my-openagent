@@ -23,12 +23,10 @@ Run each criterion's real-surface proof yourself through the channel that faithf
 3. **Browser use** — in Codex, use `browser:control-in-app-browser` first when available and the scenario does not need an authenticated or persistent user browser profile. Otherwise use Chrome to drive the REAL page; if unavailable, use agent-browser. Capture action log + screenshot path. Never downgrade a browser-facing criterion.
 4. **Computer use** — for desktop/GUI apps, drive the running app via OS automation (computer-use, AppleScript, xdotool, etc.); capture action log + screenshot.
 
-For TUI visual QA, render the terminal through the real xterm.js web terminal and
-screenshot it - NEVER a `tmux capture-pane` dump (it degrades color and wide-glyph
-width). In this repo run `node script/qa/web-terminal-visual-qa.mjs --command
-"<cmd>" --input "{Enter}" --evidence-dir <dir>` (live pty + xterm.js in Chrome;
-`--from-file` replays a raw stream) and record `terminal.png`, `terminal.txt`, and
-`metadata.json`. Mandatory when a PR or review must inspect the terminal screen.
+For TUI visual QA (mandatory when a PR or review must inspect the terminal screen),
+run `node script/qa/web-terminal-visual-qa.mjs --command "<cmd>" --input "{Enter}"
+--evidence-dir <dir>` (live pty + xterm.js in Chrome; `--from-file` replays a raw
+stream) and record `terminal.png`, `terminal.txt`, and `metadata.json`.
 
 Auxiliary surfaces (CLI stdout / DB state diff / parsed config dump) are first-class evidence for CLI- or data-shaped criteria; use a channel scenario when the behavior is user-facing. `--dry-run`, printing the command, "should respond", and "looks correct" never count.
 
@@ -134,7 +132,7 @@ Research-shape goals change the cycle: BEFORE each investigation, read this goal
 For each criterion, define upfront: `id`, exact `scenario` (tool + inputs + binary pass/fail), `expectedEvidence` artifact path, adversarial classes, stop condition, and Manual-QA channel. Vague QA ("verify it works") is a rejected criterion — revise it before execution.
 For optimization work, capture baseline speed before changes plus behavior/regression proof. Every attempt records speed, behavior/regression, and the keep/revert/iterate decision.
 A criterion's adversarial classes are the ultraqa classes a fact about the change triggers: malformed input, prompt injection, cancel/resume, stale state, dirty worktree, hung or long commands, flaky tests, misleading success output, repeated interruptions. Record untriggered classes as not-applicable in one line.
-Use channel-table evidence verbs (tmux transcript, curl status+body, screenshot, action log, CLI stdout, DB diff, parsed config dump) — not vibes.
+Use channel-table evidence verbs — not vibes.
 
 **Plan for maximum parallelism (HEAVY goals).** Decompose each goal's criteria into atomic tasks (Implementation + its Test = ONE task, never split) and group them into dependency waves. Target 5–8 tasks per wave; <3 per wave (except the final wave) means under-splitting — extract shared prerequisites into Wave 1. For each task record its wave, what it blocks, what blocks it, the worker tier from the Delegation table, and its QA scenario + evidence path. Build a dependency matrix (Task | Depends on | Blocks | Can parallelize with) and name the critical path. Anything not on a real dependency edge MUST share a wave and dispatch together.
 Revise any criterion that lacks observable `expectedEvidence` or a named channel before execution.
@@ -167,9 +165,9 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 5. EXECUTE-AS-SCENARIO: ACTUALLY run the Manual-QA scenario the criterion named (channel table above). Run it yourself for the orchestrator check; for heavier flows dispatch a dedicated QA execution worker (`lazycodex-worker-medium` by default; `lazycodex-worker-high` when the QA flow itself is hard) whose ONLY job is to drive the channel and write the artifact to the named evidence path. If the scenario FAILS, respawn the implementing worker with the captured failure — do not hand-patch around it.
 6. CAPTURE: collect the observable artifact path: transcript, stdout, screenshot, assertion, status+body, diff, or parsed dump. No artifact written at the evidence path — not done; record BLOCKED and respawn QA.
 7. CLEAN (PAIRED, NEVER SKIP): tear down every runtime artifact step 5 spawned BEFORE recording — server PIDs (`kill`, verify `kill -0` fails), `tmux` sessions (`tmux kill-session -t ulw-qa-<criterion>`; confirm `tmux ls`), browser / Playwright contexts (`.close()`), containers (`docker rm -f`), bound ports (`lsof -i :<port>` empty), temp sockets / files / dirs (`rm -rf` the `mktemp` paths), QA-only env vars, AND `multi_agent_v1.close_agent` on every finished worker. Register each teardown as its own todo the moment the QA spawns the resource (scripts, tmux assets, browsers / agent-browser sessions, PIDs, ports) so none is forgotten. Embed a one-line cleanup receipt in the evidence string, e.g. `cleanup: killed 12345; tmux kill-session ulw-qa-foo; rm -rf /tmp/ulw.aB12cD; multi_agent_v1.close_agent w-3`. Missing receipt → record BLOCKED, not PASS.
-8. RECORD exactly one result:
-   - PASS: `omo ulw-loop record-evidence --goal-id <id> --criterion-id <id> --status pass --evidence "<observable> | <cleanup receipt>" --json`
-   - FAIL: `omo ulw-loop record-evidence --goal-id <id> --criterion-id <id> --status fail --evidence "<observable> | <cleanup receipt>" --notes "<diagnosis>" --json`
+8. RECORD one result immediately from the artifact you just wrote — never from memory or a later turn — stamping the capture commit `$(git rev-parse --short HEAD)` into the evidence:
+   - PASS: `omo ulw-loop record-evidence --goal-id <id> --criterion-id <id> --status pass --evidence "<observable> @<short-sha> | <cleanup receipt>" --json`
+   - FAIL: `omo ulw-loop record-evidence --goal-id <id> --criterion-id <id> --status fail --evidence "<observable> @<short-sha> | <cleanup receipt>" --notes "<diagnosis>" --json`
    - BLOCKED: `omo ulw-loop record-evidence --goal-id <id> --criterion-id <id> --status blocked --evidence "<observable>" --notes "<safety/blocker/leftover-state>" --json`
 9. If actual does not match expected, diagnose, respawn the right-sized worker with the failure context to fix minimally, and rerun the SAME criterion (including a fresh cleanup).
 10. After 3 same-criterion failures, exit the goal with diagnosis.
@@ -186,10 +184,10 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 ## Final Quality Gate
 Trigger only for the final aggregate goal after every criterion in every goal is `pass`.
 1. Run targeted verification for changed behavior.
-2. Run Manual-QA for every criterion; confirm each artifact exists and is non-empty.
+2. FREEZE first — no more edits or rebases. At the frozen `git rev-parse HEAD`, re-run Manual-QA for any PASS criterion whose stamped commit is not HEAD, so every criterion is proven at HEAD; each artifact exists and is non-empty.
 3a. Spawn lazycodex-code-reviewer and lazycodex-qa-executor in parallel (`fork_context: false` on v1; `fork_turns: "none"` on v2) with brief, goals, desired outcome, diff, evidence; wait for BOTH and confirm their report artifacts exist on disk.
 3b. Only then spawn lazycodex-gate-reviewer with those artifact paths.
-4. Treat timeout, missing deliverable, ack-only, `BLOCKED:`, or inconclusive review as a blocker. Fix the cited blockers, rerun affected verification/Manual-QA, re-review the delta at most TWICE; then record-review-blockers (step 5) and surface to the user.
+4. Treat timeout, missing deliverable, ack-only, `BLOCKED:`, or inconclusive review as a blocker. Any fix restarts the freeze at the new HEAD: re-run ONLY the proofs it invalidated and stamp the fresh output — never regenerate all evidence or relabel stale output to HEAD — re-review the delta at most TWICE; then record-review-blockers (step 5) and surface to the user.
 5. If review remains blocked, run `omo ulw-loop record-review-blockers --goal-id <id> --title "<...>" --objective "<...>" --evidence "<review findings>" --codex-goal-json <snapshot> --json`.
 6. If clean, checkpoint final completion:
 ```sh
@@ -226,17 +224,17 @@ Structured prompt directives accepted: `OMO_ULW_LOOP_STEER: { ... }`, `omo.ulw-l
 ## Constraints
 1. NEVER call `update_goal` mid-aggregate; only on final story after the quality gate passes.
 2. NEVER call `create_goal` when `get_goal` shows a different active goal.
-3. NEVER mark `criterion.status == "pass"` without captured observable evidence in `record-evidence`.
+3. Evidence is bound to the commit it was captured at; a later fix, rebase, or merge invalidates it — re-run the QA at the current HEAD and re-record. NEVER mark PASS from memory, and NEVER relabel, pin, refresh, or regenerate prior output to a moved HEAD.
 4. NEVER bypass the criteria gate: non-final aggregate completion requires all essential criteria; final aggregate completion requires all criteria across the whole plan.
 5. Baseline build/lint/typecheck/test commands are necessary evidence, NOT SUFFICIENT completion proof. Criteria coverage with observable evidence is the gate.
 6. Treat `.omo/ulw-loop/ledger.jsonl` as the durable audit trail; checkpoint after every success or failure.
 7. Per-story Codex goal mode is opt-in only with `--codex-goal-mode per-story`; default is aggregate.
 8. Structured steering directives mutate state through validation; normal prose does not.
-9. Evidence MUST be observable from the real surface: tmux transcript, curl status+body, Browser plugin action result or browser/Playwright assertion, CLI stdout, DB state diff, parsed config dump.
+9. Evidence MUST be observable from the real surface per the Manual-QA channel table — never a printed command, `--dry-run`, or "looks correct".
 10. Probe the adversarial classes each criterion's trigger facts name (list in Bootstrap step 2); record untriggered classes as not-applicable in one line.
 11. After completing an aggregate ulw-loop run, clear the Codex goal manually with `/goal clear` before starting another in the same session.
 12. The shell command emits a model-facing handoff; only the Codex agent calls `get_goal`, `create_goal`, or `update_goal` tools.
-13. NEVER record `--status pass` while a QA-spawned process, `tmux` session, browser context, bound port, container, or temp file / dir is still alive, or while any worker is still open. The evidence string MUST include the cleanup receipt. Leftover runtime state = BLOCKED, not PASS.
+13. NEVER record PASS while any QA-spawned process, `tmux` session, browser context, bound port, container, temp path, or open worker is still alive; the evidence MUST carry the cleanup receipt. Leftover state = BLOCKED.
 14. DELEGATE all code edits, test writes, fixes, and QA execution to right-sized `multi_agent_v1.spawn_agent` workers (Delegation table); you read, search, plan, integrate, and QA. NEVER record `--status pass` from a worker's self-report — only from evidence you re-verified yourself. Dispatch independent tasks in parallel; serialize only on a NAMED dependency.
 15. Every verified work unit that touched git-tracked files must leave either an atomic `git-master`-style commit hash or explicit no-commit blocker evidence before the next unit starts.
 
