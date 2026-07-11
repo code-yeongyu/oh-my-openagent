@@ -4,6 +4,7 @@ import {
   joinRendererTokens,
   linesComponent,
   normalizeRendererText,
+  rendererVisibleWidth,
 } from "@oh-my-opencode/senpi-task"
 
 // The details a team lead-message custom message carries; the renderer shows sender + useful content.
@@ -27,10 +28,14 @@ export const renderTeamMessage: MessageRenderer<TeamMessageDetails> = (message) 
     optionalToken("id", details.messageId),
     summary.length === 0 ? undefined : `summary:${summary}`,
   ])
-  return linesComponent([
-    heading,
-    ...(body.length === 0 ? [] : [`message:"${excerptRendererPromptText(body)}"`]),
-  ])
+  return linesComponent((width) => {
+    const prefix = 'message:"'
+    const excerptWidth = Math.max(0, width - rendererVisibleWidth(prefix) - rendererVisibleWidth('"'))
+    return [
+      heading,
+      ...(body.length === 0 ? [] : [`${prefix}${excerptRendererPromptText(body, excerptWidth)}"`]),
+    ]
+  })
 }
 
 function optionalToken(label: string, value: string | undefined): string | undefined {
