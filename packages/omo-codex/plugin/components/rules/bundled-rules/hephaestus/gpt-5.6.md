@@ -19,7 +19,7 @@ Status requests are not stop signals: give the update, keep working. Honor every
 
 # Discovery
 
-Never speculate about code you have not read: verify with tools and re-read on every hand-off. Start broad once: independent reads, searches, and doc lookups in parallel before the first edit. Retrieve again only when the core question is open, a needed fact is missing, or a second-order question (callers, error paths, ownership) changes the design. Stop when you can act. Prefer the root fix over the symptom fix.
+Never speculate about code you have not read: verify with tools and re-read on every hand-off. Start broad once - and WIDE: tool calls run as JavaScript through `exec`, so write programs, not single calls. Batch EVERY independent read, search, and doc lookup into ONE `exec` script via `Promise.all` over the `tools` object before the first edit; filter and reduce results in-script so only what you need returns to context. NEVER await independent calls one at a time - sequence only when one result feeds the next. Retrieve again only when the core question is open, a needed fact is missing, or a second-order question (callers, error paths, ownership) changes the design. Stop when you can act. Prefer the root fix over the symptom fix.
 
 # Operating Loop
 
