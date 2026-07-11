@@ -303,7 +303,8 @@
                 "medium",
                 "high",
                 "xhigh",
-                "max"
+                "max",
+                "ultra"
               ]
             },
             "textVerbosity": {
@@ -550,7 +551,8 @@
                 "medium",
                 "high",
                 "xhigh",
-                "max"
+                "max",
+                "ultra"
               ]
             },
             "textVerbosity": {
@@ -797,7 +799,8 @@
                 "medium",
                 "high",
                 "xhigh",
-                "max"
+                "max",
+                "ultra"
               ]
             },
             "textVerbosity": {
@@ -1044,7 +1047,8 @@
                 "medium",
                 "high",
                 "xhigh",
-                "max"
+                "max",
+                "ultra"
               ]
             },
             "textVerbosity": {
@@ -1294,7 +1298,8 @@
                 "medium",
                 "high",
                 "xhigh",
-                "max"
+                "max",
+                "ultra"
               ]
             },
             "textVerbosity": {
@@ -1541,7 +1546,8 @@
                 "medium",
                 "high",
                 "xhigh",
-                "max"
+                "max",
+                "ultra"
               ]
             },
             "textVerbosity": {
@@ -1788,7 +1794,8 @@
                 "medium",
                 "high",
                 "xhigh",
-                "max"
+                "max",
+                "ultra"
               ]
             },
             "textVerbosity": {
@@ -2035,7 +2042,8 @@
                 "medium",
                 "high",
                 "xhigh",
-                "max"
+                "max",
+                "ultra"
               ]
             },
             "textVerbosity": {
@@ -2282,7 +2290,8 @@
                 "medium",
                 "high",
                 "xhigh",
-                "max"
+                "max",
+                "ultra"
               ]
             },
             "textVerbosity": {
@@ -2529,7 +2538,8 @@
                 "medium",
                 "high",
                 "xhigh",
-                "max"
+                "max",
+                "ultra"
               ]
             },
             "textVerbosity": {
@@ -2776,7 +2786,8 @@
                 "medium",
                 "high",
                 "xhigh",
-                "max"
+                "max",
+                "ultra"
               ]
             },
             "textVerbosity": {
@@ -3023,7 +3034,8 @@
                 "medium",
                 "high",
                 "xhigh",
-                "max"
+                "max",
+                "ultra"
               ]
             },
             "textVerbosity": {
@@ -3270,7 +3282,8 @@
                 "medium",
                 "high",
                 "xhigh",
-                "max"
+                "max",
+                "ultra"
               ]
             },
             "textVerbosity": {
@@ -3517,7 +3530,8 @@
                 "medium",
                 "high",
                 "xhigh",
-                "max"
+                "max",
+                "ultra"
               ]
             },
             "textVerbosity": {
@@ -3765,7 +3779,8 @@
               "medium",
               "high",
               "xhigh",
-              "max"
+              "max",
+              "ultra"
             ]
           },
           "textVerbosity": {
@@ -3866,6 +3881,12 @@
             "minimum": 0,
             "maximum": 1
           },
+          "top_p": {
+            "description": "@deprecated Use topP instead.",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
           "maxTokens": {
             "type": "number"
           },
@@ -3897,7 +3918,8 @@
               "medium",
               "high",
               "xhigh",
-              "max"
+              "max",
+              "ultra"
             ]
           },
           "textVerbosity": {
