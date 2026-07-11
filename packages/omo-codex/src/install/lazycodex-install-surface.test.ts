@@ -19,7 +19,6 @@ const STALE_CODEX_COMPONENT_BINS = [
 const LAZYCODEX_AGENT_ROLE_NAMES = [
   "lazycodex-clone-fidelity-reviewer",
   "lazycodex-code-reviewer",
-  "lazycodex-executor",
   "lazycodex-gate-reviewer",
   "lazycodex-qa-executor",
   "lazycodex-worker-high",

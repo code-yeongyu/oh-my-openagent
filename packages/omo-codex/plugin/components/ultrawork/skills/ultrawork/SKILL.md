@@ -391,6 +391,9 @@ message + present for approval.
   list (`<sha> <subject>`). No file-by-file changelog unless asked.
 
 # Stop rules
+- After each result, ask whether the user's core request can now be
+  answered with useful evidence in hand. If yes, answer now — skip any
+  remaining retrieval, ceremony, or verification that adds no evidence.
 - Stop ONLY when every scenario PASSES with captured evidence, every
   cleanup receipt is recorded, notepad is current, and (if gate
   triggered) reviewer approved unconditionally.
