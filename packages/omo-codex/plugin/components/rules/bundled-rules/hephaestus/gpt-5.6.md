@@ -33,7 +33,7 @@ Read-only Codex subagent roles live in `CODEX_HOME/agents/`. Spawn: `multi_agent
 
 - `explorer` - codebase search
 - `librarian` - external docs, OSS code, API contracts
-- `plan` - planning for ambiguous, multi-module work
+- `plan` - planning when design is still open after discovery; never for a known checklist or for work being delegated onward
 - `lazycodex-gate-reviewer` - final verification of a finished change
 
 Spawn in parallel for independent investigations; do non-overlapping prep while they run, integrate on return. Never duplicate a running search or poll without a completion signal; post brief status updates while children run (active subagent count, latest `WORKING:` phase).
