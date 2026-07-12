@@ -52,6 +52,26 @@ export type TaskToolDeps = {
 
 export type TaskToolMode = "spawn"
 
+type ResolvedSpawnItemBase = {
+  readonly prompt: string
+  readonly description?: string
+  readonly name?: string
+  readonly model?: string
+  readonly load_skills: readonly string[]
+}
+
+export type ResolvedSpawnItem =
+  | (ResolvedSpawnItemBase & { readonly kind: "category"; readonly category: string })
+  | (ResolvedSpawnItemBase & { readonly kind: "subagent_type"; readonly subagentType: string })
+
+export type TaskToolItemDetail = {
+  readonly task_id: string
+  readonly name?: string
+  readonly status: string
+  readonly error_message?: string
+  readonly queue_position?: number
+}
+
 export type TaskToolDetails = {
   readonly task_id: string
   readonly status: string
@@ -64,6 +84,7 @@ export type TaskToolDetails = {
   readonly resolved_model?: ResolvedModelRecord
   readonly run_in_background?: boolean
   readonly queue_position?: number
+  readonly items?: readonly TaskToolItemDetail[]
   readonly reason?: string
 }
 

@@ -1,5 +1,5 @@
 import type { TaskRecord, TaskStatus } from "../state"
-import type { PersistedTaskEvent } from "../store"
+import type { ListTaskRecordsResult, PersistedTaskEvent } from "../store"
 
 export type TransitionReason = "compacting" | "session_switching" | "session_shutdown"
 
@@ -46,13 +46,19 @@ export type ParentNotifier = {
 
 export type CompletionNotifierStore = {
   readonly load: (taskId: string) => TaskRecord | null
+  readonly list: () => ListTaskRecordsResult
   readonly replace: (record: TaskRecord) => void
   readonly appendEvent: (taskId: string, event: PersistedTaskEvent) => string
 }
 
+export type CompletionRetrySchedule = (fn: () => void, delayMs: number) => () => void
+
 export type CompletionNotifierDeps = {
   readonly notifier: ParentNotifier
   readonly store: CompletionNotifierStore
+  readonly schedule?: CompletionRetrySchedule
+  readonly getParentState?: () => ParentState
+  readonly getCurrentSessionId?: () => string | undefined
 }
 
 export type CompletionRequest = {
@@ -77,6 +83,11 @@ export type FlushInput = {
   readonly replaced: boolean
 }
 
+export type ReconcileFailedNotificationsInput = {
+  readonly sessionId: string
+  readonly parentState: ParentState
+}
+
 export type FlushResult =
   | { readonly kind: "flushed"; readonly count: number }
   | { readonly kind: "dropped"; readonly count: number }
@@ -86,5 +97,6 @@ export type FlushResult =
 export type CompletionNotifier = {
   notifyTerminal(request: CompletionRequest): NotifyResult
   flushBuffered(input: FlushInput): FlushResult
+  reconcileFailedNotifications(input: ReconcileFailedNotificationsInput): void
   bufferedCount(sessionId: string): number
 }

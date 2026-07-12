@@ -21,6 +21,7 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
   const errorMessage = readOptionalString(value, "error_message")
   const killed = readOptionalBoolean(value, "killed")
   const resolvedModel = readOptionalResolvedModel(value)
+  const spawnSpec = readOptionalSpawnSpec(value)
 
   return {
     task_id: parseTaskId(readString(value, "task_id")),
@@ -40,11 +41,25 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
     ...(toolAllow === undefined ? {} : { tool_allow: toolAllow }),
     ...(toolDeny === undefined ? {} : { tool_deny: toolDeny }),
     ...(resolvedModel === undefined ? {} : { resolved_model: resolvedModel }),
+    ...(spawnSpec === undefined ? {} : { spawn_spec: spawnSpec }),
     ...(pid === undefined ? {} : { pid }),
     ...(childSessionId === undefined ? {} : { child_session_id: childSessionId }),
     ...(finalResponse === undefined ? {} : { final_response: finalResponse }),
     ...(errorMessage === undefined ? {} : { error_message: errorMessage }),
     ...(killed === undefined ? {} : { killed }),
+  }
+}
+
+function readOptionalSpawnSpec(record: Record<string, unknown>): TaskRecord["spawn_spec"] {
+  const value = record["spawn_spec"]
+  if (value === undefined) return undefined
+  if (!isRecord(value)) throw new Error("spawn_spec is not an object")
+  const extensions = readOptionalStringArray(value, "extensions")
+  const memberEnv = readOptionalStringRecord(value, "member_env")
+  return {
+    cwd: readString(value, "cwd"),
+    ...(extensions === undefined ? {} : { extensions }),
+    ...(memberEnv === undefined ? {} : { member_env: memberEnv }),
   }
 }
 
@@ -156,6 +171,21 @@ function readOptionalStringArray(record: Record<string, unknown>, key: string): 
     throw new Error(`${key} is not a string array`)
   }
   return value
+}
+
+function readOptionalStringRecord(
+  record: Record<string, unknown>,
+  key: string,
+): Readonly<Record<string, string>> | undefined {
+  const value = record[key]
+  if (value === undefined) return undefined
+  if (!isRecord(value)) throw new Error(`${key} is not a string record`)
+  const parsed: Record<string, string> = {}
+  for (const [entryKey, entryValue] of Object.entries(value)) {
+    if (typeof entryValue !== "string") throw new Error(`${key}.${entryKey} is not a string`)
+    parsed[entryKey] = entryValue
+  }
+  return parsed
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

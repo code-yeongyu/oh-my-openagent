@@ -185,11 +185,11 @@ function notFoundText(details: Extract<SendResultDetails, { readonly kind: "not_
 function teamMessageRow(details: Extract<SendResultDetails, { readonly kind: "team_message" }>["team"]): ResultRow {
   switch (details.kind) {
     case "to_lead":
-      return { color: teamDeliveryColor(details.delivery), text: `task_send team message ${details.message_id} to lead:${details.delivery}` }
+      return { color: "success", text: `task_send team message ${details.message_id} enqueued to lead` }
     case "to_members":
       return {
         color: "success",
-        text: `task_send team message ${details.message_id} members:${details.deliveries.length}`,
+        text: `task_send team message ${details.message_id} enqueued to ${details.recipients.length} member(s)`,
       }
     case "recipient_backpressure":
     case "invalid_recipient":
@@ -199,20 +199,6 @@ function teamMessageRow(details: Extract<SendResultDetails, { readonly kind: "te
       return { color: "error", text: `task_send team ${details.kind} to:${details.to}: ${details.reason}` }
     default:
       return assertNever(details)
-  }
-}
-
-function teamDeliveryColor(delivery: "wake" | "deliver_streaming" | "buffered" | "failed"): ThemeColor {
-  switch (delivery) {
-    case "wake":
-    case "deliver_streaming":
-      return "success"
-    case "buffered":
-      return "muted"
-    case "failed":
-      return "error"
-    default:
-      return assertNever(delivery)
   }
 }
 

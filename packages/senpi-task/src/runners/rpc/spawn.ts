@@ -10,6 +10,10 @@ const SESSION_DIR_ENV = "SENPI_CODING_AGENT_SESSION_DIR"
 const SENPI_BIN_ENV = "SENPI_BIN"
 const RPC_ENTRY_SPECIFIER = "@code-yeongyu/senpi/rpc-entry"
 
+export type RpcSpawnSpec = RpcRunnerSpec & {
+  readonly memberEnv?: Readonly<Record<string, string>>
+}
+
 export type RpcSpawnDescriptor = {
   readonly command: string
   readonly args: readonly string[]
@@ -120,10 +124,11 @@ function defaultRuntime(): RpcSpawnRuntime {
  * cannot break child resolution; when no executable is found it falls back to the documented
  * `execPath + rpc-entry` path (rpc-entry re-injects `--mode rpc`, so the child args follow the entry).
  */
-export function buildRpcSpawn(spec: RpcRunnerSpec, runtime?: Partial<RpcSpawnRuntime>): RpcSpawnDescriptor {
+export function buildRpcSpawn(spec: RpcSpawnSpec, runtime?: Partial<RpcSpawnRuntime>): RpcSpawnDescriptor {
   const resolved: RpcSpawnRuntime = { ...defaultRuntime(), ...runtime }
   const env: NodeJS.ProcessEnv = {
     ...resolved.parentEnv,
+    ...(spec.memberEnv ?? {}),
     [SESSION_DIR_ENV]: resolveChildSessionDir(spec.state_dir, spec.task_id),
   }
   const childArgs = buildChildArgs(spec)

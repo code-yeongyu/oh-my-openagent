@@ -28,7 +28,7 @@ describe("runTaskSend team routing", () => {
       sendMessage: async () => ({
         kind: "to_members",
         messageId: "msg-1",
-        deliveries: [{ kind: "steered", member: "beta", messageId: "msg-1" }],
+        recipients: ["beta"],
       }),
     })
 
@@ -49,7 +49,7 @@ describe("runTaskSend team routing", () => {
   test("#given a team route without a run id #when child lookup misses #then it fails before service calls", async () => {
     const { manager } = spyManager({ kind: "not_found", reason: "No task found for \"beta\".", suggestion: "unused" })
     const service = createFakeTeamService({
-      sendMessage: async () => ({ kind: "to_members", messageId: "unused", deliveries: [] }),
+      sendMessage: async () => ({ kind: "to_members", messageId: "unused", recipients: [] }),
     })
 
     const result = await runTaskSend(
@@ -68,7 +68,7 @@ describe("runTaskSend team routing", () => {
   test("#given the member-scoped factory #when created #then it exposes the shared task_send surface", () => {
     const { manager } = spyManager({ kind: "not_found", reason: "No task found for \"lead\".", suggestion: "unused" })
     const service = createFakeTeamService({
-      sendMessage: async () => ({ kind: "to_lead", messageId: "msg-2", lead: { kind: "delivered", decision: "wake" } }),
+      sendMessage: async () => ({ kind: "to_lead", messageId: "msg-2" }),
     })
     const tool = createMemberScopedTaskSendTool({
       manager,
@@ -85,7 +85,7 @@ describe("runTaskSend team routing", () => {
   test("#given member routing with a bound run id #when params include another run id #then the bound run id wins", async () => {
     const { manager } = spyManager({ kind: "not_found", reason: "No task found for \"lead\".", suggestion: "unused" })
     const service = createFakeTeamService({
-      sendMessage: async () => ({ kind: "to_lead", messageId: "msg-2", lead: { kind: "delivered", decision: "wake" } }),
+      sendMessage: async () => ({ kind: "to_lead", messageId: "msg-2" }),
     })
 
     await runTaskSend(manager, { to: "lead", message: "done", team_run_id: "wrong-run" }, "member-session", {

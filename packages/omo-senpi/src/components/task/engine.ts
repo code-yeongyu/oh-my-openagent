@@ -1,5 +1,6 @@
 import type { ToolDefinition } from "@code-yeongyu/senpi"
 import { OmoTaskSettingsSchema, type OmoConfig, type OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
+import { log } from "@oh-my-opencode/utils"
 import {
   InProcessRunner,
   RpcProcessRunner,
@@ -15,6 +16,7 @@ import {
   type AgentDefinition,
   type CompletionNotifier,
   type ManagedRunner,
+  type PersistedTaskEvent,
   type SpawnAdmission,
   type TaskLifecycle,
   type TaskManager,
@@ -39,6 +41,7 @@ export interface TaskEngine {
   readonly omoConfig: OmoConfig
   readonly settings: OmoTaskSettings
   readonly stateDir: string
+  readonly appendTaskEvent: (taskId: string, event: PersistedTaskEvent) => void
   // Subscribe to every store mutation (spawn/transition/replace/remove). The UI status sync attaches
   // here so the footer/widget refresh on background task activity. Returns an unsubscribe.
   onStoreMutation(listener: () => void): () => void
@@ -92,7 +95,21 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   const notifier = createCompletionNotifier({
     notifier: parentNotifier,
     store: baseStore,
+    getParentState: () => runtime.parentState(),
+    getCurrentSessionId: () => runtime.sessionId(),
   })
+
+  const appendTaskEvent = (taskId: string, event: PersistedTaskEvent): void => {
+    try {
+      baseStore.appendEvent(taskId, event)
+    } catch (error) {
+      log("omo-senpi task event append failed", {
+        taskId,
+        eventType: event.type,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
 
   let managerRef: TaskManager | undefined
   const getManager = (): TaskManager => {
@@ -136,6 +153,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     omoConfig: deps.omoConfig,
     settings,
     stateDir: baseStore.stateDir,
+    appendTaskEvent,
     onStoreMutation: (listener) => {
       mutationListeners.add(listener)
       return () => mutationListeners.delete(listener)
