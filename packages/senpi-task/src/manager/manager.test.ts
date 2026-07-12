@@ -4,12 +4,27 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import type { Theme, ThemeColor } from "@code-yeongyu/senpi"
 
+import { createTaskLifecycle } from "../lifecycle"
+import type { ResidentHandle, ResidencyRegistry } from "../lifecycle"
 import type { ResolvedModelRecord } from "../state"
+import { createTaskRecordStore } from "../store"
 import { CTX, makeDeps } from "../tools/task/__fixtures__/task-tool-fakes"
 import { buildTaskExecute } from "../tools/task/execute"
 import { renderTaskResultLines } from "../tools/task/renderers"
-import { FakeRunner, baseSpec, cleanupProjects, categoryPlanner, flush, makeManager, settings } from "./__fixtures__/manager-fakes"
-import type { ChildPlanner } from "./types"
+import type { ManagedChildHandle } from "./child-handle"
+import {
+  FakeRunner,
+  baseSpec,
+  cleanupProjects,
+  categoryPlanner,
+  flush,
+  makeHandle,
+  makeManager,
+  settings,
+  tempProject,
+} from "./__fixtures__/manager-fakes"
+import { createTaskManager } from "./manager"
+import type { ChildPlanner, ManagedRunner, SpawnAdmission, TaskManager } from "./types"
 
 const RENDERER_THEME = {
   fg: (_color: ThemeColor, text: string) => text,
@@ -17,6 +32,61 @@ const RENDERER_THEME = {
 } satisfies Pick<Theme, "fg" | "italic">
 
 afterEach(cleanupProjects)
+
+function toResidentHandle(handle: ManagedChildHandle | undefined): ResidentHandle | undefined {
+  if (handle === undefined) return undefined
+  const kind = handle.pid === undefined ? "in-process" : "rpc"
+  return {
+    task_id: handle.task_id,
+    kind,
+    pid: handle.pid,
+    abort: () => handle.abort(),
+    dispose: () => handle.dispose(),
+    terminate: () => (kind === "rpc" ? handle.abort() : Promise.resolve()),
+  }
+}
+
+function makeLifecycleManager(runner: ManagedRunner, config = settings({ default_concurrency: 1, max_depth: 1 })) {
+  const project = tempProject()
+  const store = createTaskRecordStore({ project_dir: project })
+  let managerRef: TaskManager | undefined
+  const getManager = (): TaskManager => {
+    if (managerRef === undefined) throw new Error("manager accessed before test composition finished")
+    return managerRef
+  }
+  const registry: ResidencyRegistry = {
+    get: (taskId) => toResidentHandle(getManager().getResidentHandle(taskId)),
+    entries: () =>
+      getManager()
+        .residentTaskIds()
+        .map((taskId) => toResidentHandle(getManager().getResidentHandle(taskId)))
+        .filter((handle): handle is ResidentHandle => handle !== undefined),
+    forget: (taskId) => getManager().forget(taskId),
+    hasPendingSends: () => false,
+  }
+  const lifecycle = createTaskLifecycle({ store, registry, config })
+  const manager = createTaskManager({
+    store,
+    runners: { "in-process": runner, process: runner },
+    planner: categoryPlanner(),
+    config,
+    cwd: project,
+    destruction: { destroyResidentTask: (taskId) => lifecycle.destroyResidentTask(taskId, "cancel") },
+    admit: async (parentSessionId): Promise<SpawnAdmission> => {
+      const admission = await lifecycle.admitResident(parentSessionId)
+      switch (admission.kind) {
+        case "admitted":
+          return { kind: "admitted" }
+        case "evicted":
+          return { kind: "evicted", evicted_task_id: admission.evicted_task_id }
+        case "rejected":
+          return { kind: "rejected", message: admission.error.message }
+      }
+    },
+  })
+  managerRef = manager
+  return { manager, store }
+}
 
 describe("TaskManager.start", () => {
   test("#given a valid spec #when started #then it returns a st_ id and running status with a persisted record", async () => {
@@ -328,5 +398,163 @@ describe("TaskManager.waitFor", () => {
     // then
     expect((await waiting).final_response).toBe("done")
     expect(manager.waiterKeyCount()).toBe(0)
+  })
+})
+
+describe("TaskManager pending cancellation", () => {
+  test("#given a queued task at the residency cap w2pend #when cancelled #then its wait settles cancelled and a later spawn is admitted", async () => {
+    // given
+    const runner = new FakeRunner()
+    const { manager, store } = makeLifecycleManager(
+      runner,
+      settings({ default_concurrency: 1, max_depth: 1, residency_max_children: 2 }),
+    )
+    const first = await manager.start(baseSpec({ name: "running" }))
+    const queued = await manager.start(baseSpec({ name: "queued", run_in_background: true }))
+    if (first.kind !== "started" || queued.kind !== "started") throw new Error("expected started")
+    expect(queued.status).toBe("pending")
+    const waiting = manager.waitFor(queued.task_id)
+
+    // when
+    const cancelled = await manager.cancelTask(queued.task_id, "queue no longer needed")
+
+    // then
+    if (cancelled.kind !== "cancelled") throw new Error("expected cancelled")
+    expect(cancelled.previous_status).toBe("pending")
+    expect((await waiting).status).toBe("cancelled")
+    expect(store.load(queued.task_id)?.status).toBe("cancelled")
+    expect(store.load(queued.task_id)?.residency_state).toBe("disposed")
+    expect(manager.list({ scope: "all" }).find((entry) => entry.record.task_id === queued.task_id)?.queue_position).toBeUndefined()
+
+    const later = await manager.start(baseSpec({ name: "later" }))
+    expect(later.kind).toBe("started")
+    if (later.kind !== "started") throw new Error("expected later spawn admitted")
+    expect(later.status).toBe("pending")
+    expect(runner.startedSpecs).toHaveLength(1)
+  })
+
+  test("#given a grant whose start transition loses to cancel w2pend #when the slot transfers #then the runner is skipped and the slot is released", async () => {
+    // given
+    const project = tempProject()
+    const backing = createTaskRecordStore({ project_dir: project })
+    let cancelBeforeStartTaskId: string | undefined
+    const store = {
+      ...backing,
+      transition: (taskId: string, transition: Parameters<typeof backing.transition>[1]) => {
+        if (transition.type === "start" && taskId === cancelBeforeStartTaskId) {
+          cancelBeforeStartTaskId = undefined
+          backing.transition(taskId, { type: "cancel", timestamp: new Date().toISOString() })
+        }
+        return backing.transition(taskId, transition)
+      },
+    }
+    const runner = new FakeRunner()
+    const config = settings({ default_concurrency: 1, max_depth: 1 })
+    const manager = createTaskManager({
+      store,
+      runners: { "in-process": runner, process: runner },
+      planner: categoryPlanner(),
+      config,
+      cwd: project,
+    })
+    const first = await manager.start(baseSpec({ name: "first" }))
+    const queued = await manager.start(baseSpec({ name: "queued" }))
+    if (first.kind !== "started" || queued.kind !== "started") throw new Error("expected started")
+    cancelBeforeStartTaskId = queued.task_id
+
+    // when
+    runner.handles.get(first.task_id)?.settle({ status: "completed", finalResponse: "done" })
+    await flush()
+
+    // then
+    expect(store.load(queued.task_id)?.status).toBe("cancelled")
+    expect(runner.startedSpecs).toHaveLength(1)
+    const later = await manager.start(baseSpec({ name: "later" }))
+    if (later.kind !== "started") throw new Error("expected started")
+    expect(later.status).toBe("running")
+    expect(runner.startedSpecs).toHaveLength(2)
+  })
+
+  test("#given cancel lands while runner start awaits w2pend #when the handle arrives #then destruction tears it down, settles the wait, and releases the slot", async () => {
+    // given
+    let startCount = 0
+    let firstHandle: ReturnType<typeof makeHandle> | undefined
+    let delayedHandle: ManagedChildHandle | undefined
+    let abortCalls = 0
+    let disposeCalls = 0
+    let markSecondStarted: () => void = () => {}
+    const secondStarted = new Promise<void>((resolve) => {
+      markSecondStarted = resolve
+    })
+    let resolveSecondStart: (handle: ManagedChildHandle) => void = () => {}
+    const secondStart = new Promise<ManagedChildHandle>((resolve) => {
+      resolveSecondStart = resolve
+    })
+    const runner: ManagedRunner = {
+      start: (spec) => {
+        startCount += 1
+        if (startCount === 1) {
+          firstHandle = makeHandle(spec.taskId)
+          return Promise.resolve(firstHandle.handle)
+        }
+        if (startCount === 2) {
+          const fake = makeHandle(spec.taskId)
+          delayedHandle = {
+            ...fake.handle,
+            abort: async () => {
+              abortCalls += 1
+            },
+            dispose: async () => {
+              disposeCalls += 1
+            },
+          }
+          markSecondStarted()
+          return secondStart
+        }
+        return Promise.resolve(makeHandle(spec.taskId).handle)
+      },
+    }
+    const { manager, store } = makeLifecycleManager(runner)
+    const first = await manager.start(baseSpec({ name: "first" }))
+    const queued = await manager.start(baseSpec({ name: "queued" }))
+    if (first.kind !== "started" || queued.kind !== "started") throw new Error("expected started")
+    const waiting = manager.waitFor(queued.task_id)
+    if (firstHandle === undefined) throw new Error("expected first handle")
+    firstHandle.settle({ status: "completed", finalResponse: "done" })
+    await secondStarted
+
+    // when
+    const cancelled = await manager.cancelTask(queued.task_id, "cancel during start")
+    if (delayedHandle === undefined) throw new Error("expected delayed handle")
+    resolveSecondStart(delayedHandle)
+    await flush()
+
+    // then
+    expect(cancelled.kind).toBe("cancelled")
+    expect(abortCalls).toBe(1)
+    expect(disposeCalls).toBe(1)
+    expect(manager.residentTaskIds()).not.toContain(queued.task_id)
+    expect((await waiting).status).toBe("cancelled")
+    expect(store.load(queued.task_id)?.residency_state).toBe("disposed")
+    const later = await manager.start(baseSpec({ name: "later" }))
+    if (later.kind !== "started") throw new Error("expected started")
+    expect(later.status).toBe("running")
+  })
+
+  test("#given a running task with one queued behind it w2pend #when the running task is cancelled #then the queued task receives the released slot", async () => {
+    // given
+    const { manager, store } = makeManager({ config: settings({ default_concurrency: 1, max_depth: 1 }) })
+    const running = await manager.start(baseSpec({ name: "running" }))
+    const queued = await manager.start(baseSpec({ name: "queued" }))
+    if (running.kind !== "started" || queued.kind !== "started") throw new Error("expected started")
+
+    // when
+    const cancelled = await manager.cancelTask(running.task_id, "stop")
+    await flush()
+
+    // then
+    expect(cancelled.kind).toBe("cancelled")
+    expect(store.load(running.task_id)?.status).toBe("cancelled")
+    expect(store.load(queued.task_id)?.status).toBe("running")
   })
 })

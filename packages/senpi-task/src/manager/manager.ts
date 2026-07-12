@@ -96,6 +96,14 @@ class TaskManagerImpl implements TaskManager {
     const port: SteeringPort = {
       store: options.store,
       liveHandle: (taskId) => this.#live.get(taskId)?.handle,
+      dequeuePending: (taskId) => {
+        const rec = this.#tryLoad(taskId)
+        if (rec === null || rec === undefined) return false
+        const removed = this.#concurrency.remove(rec.model, taskId)
+        this.#background.delete(taskId)
+        this.#settleWaiters(taskId)
+        return removed
+      },
       reacquireForRevive: (taskId) => this.#reacquireForRevive(taskId),
       destruction: options.destruction ?? NOOP_DESTRUCTION,
       now: this.#now,
@@ -274,7 +282,12 @@ class TaskManagerImpl implements TaskManager {
 
   async #launch(context: LaunchContext): Promise<{ ok: true } | { ok: false; error: string }> {
     const { record, managedSpec, runner, model } = context
-    this.#options.store.transition(record.task_id, { type: "start", timestamp: nowIso(this.#now) })
+    const startResult = this.#options.store.transition(record.task_id, { type: "start", timestamp: nowIso(this.#now) })
+    if (!startResult.applied) {
+      this.#releaseSlot(record.task_id, model, record.notification.run_epoch)
+      this.#settleWaiters(record.task_id)
+      return { ok: false, error: "task was cancelled before launch" }
+    }
 
     let handle: ManagedChildHandle
     try {
@@ -286,6 +299,15 @@ class TaskManagerImpl implements TaskManager {
       this.#options.store.appendEvent(record.task_id, { type: "task_start_failed", payload: { error_message: message } })
       this.#settleWaiters(record.task_id)
       return { ok: false, error: message }
+    }
+
+    const current = this.#tryLoad(record.task_id)
+    if (current?.status === "cancelled") {
+      this.#live.set(record.task_id, { handle, model })
+      await (this.#options.destruction ?? NOOP_DESTRUCTION).destroyResidentTask(record.task_id, "cancel")
+      this.#releaseSlot(record.task_id, model, record.notification.run_epoch)
+      this.#settleWaiters(record.task_id)
+      return { ok: false, error: "task was cancelled during launch" }
     }
 
     this.#live.set(record.task_id, { handle, model })
