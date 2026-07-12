@@ -111,4 +111,36 @@ describe("daemon-client retry discipline", () => {
 		expect(result.content[0]?.text).toContain("daemon connection closed");
 		expect(requestCount).toBe(1);
 	});
+
+	it.each([
+		{ label: "null", result: null },
+		{ label: "array", result: [] },
+		{ label: "non-array content", result: { content: "not-an-array" } },
+	])(
+		"#given an invalid daemon result $label #when the response is received #then it is rejected without retry",
+		async ({ result: invalidResult }) => {
+			const paths = tempPaths();
+			mkdirSync(paths.dir, { recursive: true });
+
+			let requestCount = 0;
+			const server = createServer((socket) => {
+				const decoder = createLineDecoder(() => {
+					requestCount += 1;
+					socket.write(encodeJsonLine({ jsonrpc: "2.0", id: 1, result: invalidResult }));
+				});
+				socket.on("data", (chunk) => decoder.push(chunk));
+			});
+			servers.push(server);
+			await new Promise<void>((resolve) => server.listen(paths.socket, resolve));
+
+			const result = await callToolViaDaemon("status", {}, {
+				paths,
+				ensure: async () => {},
+				requestTimeoutMs: 2000,
+			});
+
+			expect(result.content[0]?.text).toContain("invalid daemon response");
+			expect(requestCount).toBe(1);
+		},
+	);
 });

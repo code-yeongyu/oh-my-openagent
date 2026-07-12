@@ -1,5 +1,6 @@
 import { handleLspMcpRequest, type JsonRpcResponse } from "@oh-my-opencode/lsp-core/mcp";
 import { type RequestContext, runWithRequestContext } from "@oh-my-opencode/lsp-core/request-context";
+import { isPlainRecord } from "@oh-my-opencode/mcp-stdio-core/record";
 
 export const CONTEXT_KEY = "_context";
 
@@ -9,11 +10,11 @@ export interface RoutedRequest {
 }
 
 export function extractRequestContext(raw: unknown): RoutedRequest {
-	if (!isRecord(raw) || raw["method"] !== "tools/call") return { input: raw, context: undefined };
+	if (!isPlainRecord(raw) || raw["method"] !== "tools/call") return { input: raw, context: undefined };
 	const params = raw["params"];
-	if (!isRecord(params)) return { input: raw, context: undefined };
+	if (!isPlainRecord(params)) return { input: raw, context: undefined };
 	const args = params["arguments"];
-	if (!isRecord(args)) return { input: raw, context: undefined };
+	if (!isPlainRecord(args)) return { input: raw, context: undefined };
 	const context = parseContext(args[CONTEXT_KEY]);
 	if (!context) return { input: raw, context: undefined };
 
@@ -30,7 +31,7 @@ export function handleDaemonMessage(raw: unknown): Promise<JsonRpcResponse | und
 }
 
 function parseContext(value: unknown): RequestContext | undefined {
-	if (!isRecord(value)) return undefined;
+	if (!isPlainRecord(value)) return undefined;
 	const context: RequestContext = {};
 	const cwd = value["cwd"];
 	if (typeof cwd === "string") context.cwd = cwd;
@@ -39,10 +40,6 @@ function parseContext(value: unknown): RequestContext | undefined {
 	return context.cwd === undefined && context.env === undefined ? undefined : context;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function isStringRecord(value: unknown): value is Record<string, string> {
-	return isRecord(value) && Object.values(value).every((item) => typeof item === "string");
+	return isPlainRecord(value) && Object.values(value).every((item) => typeof item === "string");
 }
