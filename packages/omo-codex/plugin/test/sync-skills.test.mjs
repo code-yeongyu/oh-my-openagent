@@ -261,7 +261,7 @@ test("#given synced ulw-loop skill #when worker guidance is inspected #then cont
 		["progress status contract", /WORKING:/],
 		["long-running plan/reviewer background guidance", /Plan and reviewer agents may run for a long time/],
 		["bounded plan/reviewer polling", /wait_agent.*cycles/],
-		["single long wait guard", /single long blocking wait/],
+		["exponential backoff wait guard", /double the timeout up to ~5 minutes/],
 		["git-master checkpointing", /git-master/],
 		["touched-path commit-style probe", /touched-path commit history/],
 		["verified work-unit commit", /verified work unit/],

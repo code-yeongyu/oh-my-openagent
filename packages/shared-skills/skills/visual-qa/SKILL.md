@@ -39,7 +39,11 @@ The verdict is per page. One failing page fails the whole surface, so "most page
 
 ### Evidence must be fresh
 
-Every gate runs on captures produced AFTER the last edit to the rendered source. If any screenshot, PDF, capture, or QA JSON is older than the source file it claims to verify, it is stale and invalid - regenerate it before trusting it. Never report a PASS from an artifact you did not just produce against the current build.
+Every gate runs on captures produced AFTER the last edit to the rendered source. If any screenshot, PDF, capture, or QA JSON is older than the source file it claims to verify, it is stale and invalid - regenerate it before trusting it. Never report a PASS from an artifact you did not just produce against the current build. Between review rounds, re-capture only the pages a fix touched; the final approving round always judges a complete fresh set.
+
+### Capture hygiene - validate before dispatching reviewers
+
+Before any reviewer sees an image, verify each capture yourself: the file signature matches its extension (a JPEG named `.png` is invalid), the frame is fully composited (no black or missing regions from the screenshot compositor), and dimensions match the requested viewport. A defective capture wastes an entire review round on the pipeline instead of the product - fix the capture tooling and re-shoot before dispatch, and record the tooling defect in the QA log instead of looping the reviewer on it.
 
 ### Web
 
@@ -103,7 +107,7 @@ Dispatch through your harness's own subagent tool. In OpenCode: `task(subagent_t
 
 Send BOTH calls in a single message so they run concurrently. Each oracle is read-only: it reviews and reports, it cannot modify files. Each returns PASS, REVISE, or FAIL with concrete, located findings. Pass A proves the surface is a real design-system implementation, not a mock-only or faked-image substitute. Pass B directly opens screenshots and inspects source/content for visual and CJK defects.
 
-Paste evidence directly into each prompt: source code, the plain-text TUI captures, the script JSON, and the screenshot paths plus your described observations for web. The two passes differ in depth by charter, not by any model or effort setting, which cannot be pinned per call.
+Paste evidence directly into each prompt: source code, the plain-text TUI captures, the script JSON, and the screenshot paths plus your described observations for web. Never fork parent history into a reviewer - the message carries everything it needs. Require each blocking finding to be tagged `[product]` (the rendered UI is wrong) or `[evidence]` (the capture artifact is defective - wrong signature, partial compositing, stale file); the loop treats the two differently. The two passes differ in depth by charter, not by any model or effort setting, which cannot be pinned per call.
 
 ### Pass A - Design-system and functional integrity (deeper, strict)
 
@@ -147,7 +151,7 @@ OUTPUT:
 VERDICT: PASS | REVISE | FAIL
 CONFIDENCE: HIGH | MEDIUM | LOW
 SUMMARY: 1-3 sentences
-FINDINGS: for each, [dimension] [severity] what is wrong, where (file/line or capture region), and the concrete fix
+FINDINGS: for each, [product|evidence] [dimension] [severity] what is wrong, where (file/line or capture region), and the concrete fix
 WHAT IS GOOD: correct aspects that must not regress
 BLOCKING: items that must be fixed; empty if PASS
 """
@@ -203,7 +207,7 @@ VERDICT: PASS | REVISE | FAIL
 CONFIDENCE: HIGH | MEDIUM | LOW
 SUMMARY: 1-3 sentences
 EVIDENCE TRACE: each hotspot or overflow line mapped to its visual cause
-FINDINGS: for each, [severity] what is wrong, where (hotspot grid or capture line:col), and the concrete fix
+FINDINGS: for each, [product|evidence] [severity] what is wrong, where (hotspot grid or capture line:col), and the concrete fix
 BLOCKING: items that must be fixed; empty if PASS
 """
 )
@@ -221,7 +225,7 @@ This is a hard stop rule, not a guideline. The UI is NOT done until ALL of these
 - That reviewer judged a FRESH capture of every enumerated page from Step 2 - no stale artifacts, no skipped pages.
 - Every CJK and layout finding is resolved in the rendered output, not merely noted.
 
-If any page fails, you are not done: fix it, re-capture the full set, re-dispatch the reviewer, and repeat. Loop until the independent reviewer passes on the current build. Do not stop because the automated script reports zero issues - the script aims the reviewer, it does not replace it, and it routinely passes text while the rendered page is still broken. Do not stop because an earlier pass approved an older build. The only non-loop exit is to list the exact remaining gaps and get explicit user acceptance; never self-certify a silent PASS.
+If any page fails, you are not done - but treat the two blocker kinds differently. `[product]` findings: fix the source, re-capture the pages the fix touched, and dispatch a FRESH reviewer (never a followup to the previous one - stale reviewer context re-litigates settled findings). `[evidence]` findings: the product is not implicated - repair the capture pipeline, re-shoot only the defective artifacts, verify them against the live build, and re-dispatch without touching product code. Loop until the independent reviewer passes on the current build, and make the final approving round judge a complete fresh capture set. Do not stop because the automated script reports zero issues - the script aims the reviewer, it does not replace it. Do not stop because an earlier pass approved an older build. The only non-loop exit is to list the exact remaining gaps and get explicit user acceptance; never self-certify a silent PASS.
 
 ```markdown
 # Visual QA - Verdict: GOOD | NEEDS WORK

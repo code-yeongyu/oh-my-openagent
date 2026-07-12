@@ -26,7 +26,7 @@ This skill is intentionally compact. The full workflow lives in `references/full
 - Evidence is bound to its capture commit; a later fix, rebase, or merge makes it stale — re-run at the current HEAD and re-record, never relabel or regenerate. Record only after cleanup receipts exist.
 - Delegate code edits, test writes, fixes, and QA execution to right-sized Codex subagents when the workflow requires it.
 - Every `spawn_agent` message starts with `TASK:`, then names `DELIVERABLE`, `SCOPE`, and `VERIFY`; put role and specialty instructions inside `message`; use `fork_turns: "none"` (v1: `fork_context: false`) unless full history is truly required.
-- Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short `wait_agent` cycles. Never use a single long blocking wait for them.
+- Plan and reviewer agents may run for a long time; spawn them in the background and keep doing independent root work. Between `wait_agent` calls, back off — double the timeout up to ~5 minutes — instead of spinning short cycles.
 - For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long reading, testing, or review passes, and `BLOCKED: <reason>` only when it cannot progress.
 - Track spawned agent names locally. Use `wait_agent` for mailbox signals, not proof of completion. A timeout only means no new mailbox update arrived. Treat a running child as alive.
 - While children run, surface the active subagent count, agent names, and latest `WORKING:` phase.

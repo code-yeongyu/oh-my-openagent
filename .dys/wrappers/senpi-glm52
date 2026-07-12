@@ -1,0 +1,2 @@
+#!/usr/bin/env sh
+exec senpi --model zhipu-coding/glm-5.2 --thinking high --approve "$@"

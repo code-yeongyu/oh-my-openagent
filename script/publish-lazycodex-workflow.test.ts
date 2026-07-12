@@ -91,8 +91,8 @@ describe("LazyCodex publish workflow", () => {
     const syncBuildsCodexPlugin =
       workflow.includes("bun run --cwd packages/omo-codex/plugin build") &&
       workflow.indexOf("bun run --cwd packages/omo-codex/plugin build") < workflow.indexOf("bun run script/sync-lazycodex-marketplace.ts")
-    const npmPublishBuildsLspDistBeforeMainPackage =
-      buildMainPackageStep.includes("bun run build:lsp-tools-mcp && bun run build")
+    const npmPublishBuildsReleaseStampedInstallerAndLspDistBeforeMainPackage =
+      buildMainPackageStep.includes("bun run build:codex-install && bun run build:lsp-tools-mcp && bun run build")
     const syncStampsMetadataBeforeBuild =
       syncMarketplaceStep.indexOf("jq --arg v \"$VERSION\" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json") >= 0 &&
       syncMarketplaceStep.indexOf("jq --arg v \"$VERSION\" '.version = $v' packages/omo-codex/plugin/package.json") >= 0 &&
@@ -155,7 +155,7 @@ describe("LazyCodex publish workflow", () => {
     expect(publishAliasDefaultsOn, "LazyCodex npm alias publish must stay enabled by default").toBe(true)
     expect(syncsLazycodexMarketplace, "release must sync the LazyCodex marketplace bundle").toBe(true)
     expect(syncBuildsMcpDists, "release must build bundled MCP dists before LazyCodex marketplace sync").toBe(true)
-    expect(npmPublishBuildsLspDistBeforeMainPackage, "release must build LSP dist before npm packages include it").toBe(true)
+    expect(npmPublishBuildsReleaseStampedInstallerAndLspDistBeforeMainPackage, "release must regenerate the Codex installer and build LSP dist before npm packages include them").toBe(true)
     expect(syncInstallsCodexPluginDeps, "release must install nested Codex plugin deps before building the aggregate plugin").toBe(true)
     expect(syncBuildsCodexPlugin, "release must build the aggregate Codex plugin before LazyCodex marketplace sync").toBe(true)
     expect(syncStampsMetadataBeforeBuild, "release must stamp Codex plugin metadata before LazyCodex marketplace build").toBe(true)
@@ -268,8 +268,8 @@ describe("LazyCodex publish workflow", () => {
     )
     const publishMainJob = sliceWorkflowSection(workflow, "  publish-main:", "  publish-platform:")
     const lazycodexShipsRootCliDistAfterBuild =
-      publishMainJob.indexOf("bun run build:lsp-tools-mcp && bun run build:lsp-daemon && bun run build") >= 0 &&
-      publishMainJob.indexOf("bun run build:lsp-tools-mcp && bun run build:lsp-daemon && bun run build") <
+      publishMainJob.indexOf("bun run build:codex-install && bun run build:lsp-tools-mcp && bun run build:lsp-daemon && bun run build") >= 0 &&
+      publishMainJob.indexOf("bun run build:codex-install && bun run build:lsp-tools-mcp && bun run build:lsp-daemon && bun run build") <
         publishMainJob.indexOf("name: Publish lazycodex-ai")
     const shimKeepsLazycodexMappedForSharedWrapper = platformResolver.includes("lazycodex: \"oh-my-openagent\"")
 

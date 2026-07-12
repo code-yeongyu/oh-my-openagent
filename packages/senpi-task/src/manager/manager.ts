@@ -2,7 +2,7 @@ import { join } from "node:path"
 import { log } from "@oh-my-opencode/utils"
 
 import { registerLifecycleReattachPorts, type ReattachResult, type RespawnResult } from "../lifecycle/port"
-import { isRunnerError } from "../runners/in-process/runner-error"
+import { RunnerError } from "../runners/in-process/runner-error"
 import { RpcProcessRunner } from "../runners/rpc-process"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import { createTaskRecord, parseTaskId } from "../state"
@@ -73,7 +73,7 @@ const GENERIC_START_FAILURE_MESSAGE = "Task runner failed to start."
 
 function publicStartFailureMessage(error: unknown): string {
   try {
-    if (!isRunnerError(error)) return GENERIC_START_FAILURE_MESSAGE
+    if (!RunnerError.is(error)) return GENERIC_START_FAILURE_MESSAGE
     switch (error.failure.kind) {
       case "depth-exceeded":
         return "In-process child depth limit exceeded."
