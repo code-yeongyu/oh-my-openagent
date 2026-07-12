@@ -1,6 +1,7 @@
 import { connect } from "node:net";
 
 import type { ToolExecutionResult } from "@oh-my-opencode/lsp-core/tools";
+import { isPlainRecord } from "@oh-my-opencode/mcp-stdio-core/record";
 
 import { ensureDaemonRunning } from "./ensure-daemon.js";
 import { type DaemonPaths, daemonPaths } from "./paths.js";
@@ -135,18 +136,14 @@ function sendToolCall(
 }
 
 function toToolResult(message: unknown): ToolExecutionResult | null {
-	if (!isRecord(message) || message["id"] !== REQUEST_ID) return null;
+	if (!isPlainRecord(message) || message["id"] !== REQUEST_ID) return null;
 	const result = message["result"];
-	if (!isRecord(result) || !Array.isArray(result["content"])) return null;
+	if (!isPlainRecord(result) || !Array.isArray(result["content"])) return null;
 	return {
 		content: result["content"] as ToolExecutionResult["content"],
 		isError: result["isError"] === true,
 		details: result["details"],
 	};
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function errorText(error: unknown): string {
