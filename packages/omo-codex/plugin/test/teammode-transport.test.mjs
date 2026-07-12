@@ -67,17 +67,19 @@ test("#given flat V2 tools are available #when the leader reads teammode #then t
 	assert.match(skill, /Codex App.*fallback/i);
 });
 
-test("#given neither transport's tools are visible #when the leader reads teammode #then tool_search runs before concluding and the fallback is a plain-subagent split without team state", () => {
+test("#given neither transport's tools are visible #when the leader reads teammode #then search hits are revalidated and fallback is capability-aware without team state", () => {
 	const skill = readFileSync(join(root, "components", "teammode", "skills", "teammode", "SKILL.md"), "utf8");
 
 	const searchIndex = skill.indexOf("tool_search");
 	const unavailableIndex = skill.indexOf("Teammode unavailable");
 	assert.notEqual(searchIndex, -1, "skill must route hidden tools through the tool_search check");
-	assert.notEqual(unavailableIndex, -1, "skill must give the leader an unavailable announcement template");
+	assert.notEqual(unavailableIndex, -1, "skill must give the leader unavailable announcement templates");
 	assert.ok(searchIndex < unavailableIndex, "tool_search must precede the unavailable conclusion");
-	assert.match(skill, /plain fire-and-forget subagents/i, "the no-transport fallback must be a plain-subagent split");
+	assert.match(skill, /revalidate.*COMPLETE.*compatible transport set/is, "a deferred-tool hit must be revalidated as a complete transport");
+	assert.match(skill, /another visible plain-subagent mechanism.*spawn.*communicate.*observe/is, "plain-subagent fallback requires a complete visible lifecycle");
+	assert.match(skill, /Otherwise continue serially.*capability limitation/is, "missing all transports must continue serially rather than promise workers");
 	assert.match(skill, /Do NOT run `init`/, "the fallback must not create team state");
-	assert.doesNotMatch(skill, /STOP before `init`/, "the hard pre-init stop is replaced by the subagent fallback");
+	assert.doesNotMatch(skill, /splitting the work across plain fire-and-forget subagents/i, "the skill must not promise unavailable plain subagents");
 });
 
 test("#given a MultiAgentV2 team #when the leader spawns members #then per-member model routing is a decision rule that defaults to session inherit", () => {
