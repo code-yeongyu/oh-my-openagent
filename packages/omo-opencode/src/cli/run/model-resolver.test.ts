@@ -80,4 +80,25 @@ describe("resolveRunModel", () => {
     // then
     expect(resolve).toThrow()
   })
+  it("given pipe syntax 'cpa|opencode-go/kimi-k2.6', when resolved, then returns first provider", () => {
+    // given
+    const modelString = "cpa|opencode-go/kimi-k2.6"
+
+    // when
+    const result = resolveRunModel(modelString)
+
+    // then
+    expect(result).toEqual({ providerID: "cpa", modelID: "kimi-k2.6" })
+  })
+
+  it("given pipe syntax with nested slashes 'anthropic|cpa/claude-opus-4-8', when resolved, then returns first provider and full modelID", () => {
+    // given
+    const modelString = "anthropic|cpa/claude-opus-4-8"
+
+    // when
+    const result = resolveRunModel(modelString)
+
+    // then
+    expect(result).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-8" })
+  })
 })

@@ -1,3 +1,4 @@
+import { splitProvidersAndModel, parseVariantFromModelID } from "./model-string-parser"
 import type { FallbackEntry } from "./model-requirements"
 import type { FallbackModelObject } from "./fallback-model-object"
 import { normalizeFallbackModels } from "./model-resolver"
@@ -40,13 +41,14 @@ export function parseFallbackModelEntry(
   const trimmed = model.trim()
   if (!trimmed) return undefined
 
-  const parts = trimmed.split("/")
-  const providerID =
-    parts.length >= 2 ? parts[0].trim() : (contextProviderID?.trim() || defaultProviderID)
-  const rawModelID = parts.length >= 2 ? parts.slice(1).join("/").trim() : trimmed
+  const { providers, modelID } = splitProvidersAndModel(trimmed)
+  const providerID = providers.length > 0
+    ? providers[0]
+    : (contextProviderID?.trim() || defaultProviderID)
+  const rawModelID = modelID || trimmed
   if (!providerID || !rawModelID) return undefined
 
-  const parsed = parseVariantFromModel(rawModelID)
+  const parsed = parseVariantFromModelID(rawModelID)
   if (!parsed.modelID) return undefined
 
   return {
@@ -72,9 +74,8 @@ export function parseFallbackModelObjectEntry(
     top_p: obj.top_p,
     maxTokens: obj.maxTokens,
     thinking: obj.thinking,
-  }
 }
-
+}
 /**
  * Find the most specific FallbackEntry whose `provider/model` is a prefix of
  * the resolved `provider/modelID`.  Longest match wins so that e.g.
@@ -115,13 +116,35 @@ export function buildFallbackChainFromModels(
   if (!normalized || normalized.length === 0) return undefined
 
   const parsed = normalized
-    .map((entry) => {
+    .flatMap((entry) => {
       if (typeof entry === "string") {
-        return parseFallbackModelEntry(entry, contextProviderID, defaultProviderID)
+        const { providers, modelID } = splitProvidersAndModel(entry)
+        if (providers.length > 1) {
+          const parsedVariant = parseVariantFromModelID(modelID)
+          if (!parsedVariant.modelID) return []
+          return providers.map((p) =>
+            ({ providers: [p], model: parsedVariant.modelID, variant: parsedVariant.variant } as FallbackEntry)
+          )
+        }
+        return parseFallbackModelEntry(entry, contextProviderID, defaultProviderID) || []
       }
-      return parseFallbackModelObjectEntry(entry, contextProviderID, defaultProviderID)
+      const { providers, modelID } = splitProvidersAndModel(entry.model)
+      if (providers.length > 1) {
+        const parsedVariant = parseVariantFromModelID(modelID)
+        if (!parsedVariant.modelID) return []
+        return providers.map((p) => ({
+          providers: [p],
+          model: parsedVariant.modelID,
+          variant: entry.variant ?? parsedVariant.variant,
+          reasoningEffort: entry.reasoningEffort,
+          temperature: entry.temperature,
+          top_p: entry.top_p,
+          maxTokens: entry.maxTokens,
+          thinking: entry.thinking,
+        } as FallbackEntry))
+      }
+      return parseFallbackModelObjectEntry(entry, contextProviderID, defaultProviderID) || []
     })
-    .filter((entry): entry is FallbackEntry => entry !== undefined)
 
   if (parsed.length === 0) return undefined
   return parsed

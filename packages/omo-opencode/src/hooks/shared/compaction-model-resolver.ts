@@ -1,3 +1,5 @@
+import { splitProvidersAndModel } from "../../shared/model-string-parser"
+
 import type { OhMyOpenCodeConfig } from "../../config"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
@@ -21,14 +23,13 @@ export function resolveCompactionModel(
   if (!compactionConfig?.model) {
     return { providerID: originalProviderID, modelID: originalModelID }
   }
-
-  const modelParts = compactionConfig.model.split("/")
-  if (modelParts.length < 2) {
+  const { providers, modelID } = splitProvidersAndModel(compactionConfig.model)
+  if (providers.length === 0 || !modelID) {
     return { providerID: originalProviderID, modelID: originalModelID }
   }
 
   return {
-    providerID: modelParts[0],
-    modelID: modelParts.slice(1).join("/"),
+    providerID: providers[0],
+    modelID,
   }
 }

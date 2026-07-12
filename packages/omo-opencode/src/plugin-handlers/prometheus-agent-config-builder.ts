@@ -1,3 +1,5 @@
+import { splitProvidersAndModel } from "../shared/model-string-parser"
+
 import type { CategoryConfig } from "../config/schema";
 import { PROMETHEUS_PERMISSION, getPrometheusPrompt } from "../agents/prometheus";
 import { resolvePromptAppend } from "../agents/builtin-agents/resolve-file-uri";
@@ -31,11 +33,10 @@ function isModelInFallbackChain(
   if (!model || !fallbackChain || fallbackChain.length === 0) {
     return false;
   }
+  const { modelID } = splitProvidersAndModel(model || "")
+  if (!modelID) return false;
 
-  const modelParts = model.split("/");
-  const modelName = modelParts.length >= 2 ? modelParts.slice(1).join("/") : model;
-
-  return fallbackChain.some((entry) => entry.model === modelName);
+  return fallbackChain.some((entry) => entry.model === modelID);
 }
 
 export async function buildPrometheusAgentConfig(params: {
