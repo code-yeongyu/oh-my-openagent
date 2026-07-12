@@ -151,7 +151,7 @@ OUTPUT:
 VERDICT: PASS | REVISE | FAIL
 CONFIDENCE: HIGH | MEDIUM | LOW
 SUMMARY: 1-3 sentences
-FINDINGS: for each, [dimension] [severity] what is wrong, where (file/line or capture region), and the concrete fix
+FINDINGS: for each, [product|evidence] [dimension] [severity] what is wrong, where (file/line or capture region), and the concrete fix
 WHAT IS GOOD: correct aspects that must not regress
 BLOCKING: items that must be fixed; empty if PASS
 """
@@ -207,7 +207,7 @@ VERDICT: PASS | REVISE | FAIL
 CONFIDENCE: HIGH | MEDIUM | LOW
 SUMMARY: 1-3 sentences
 EVIDENCE TRACE: each hotspot or overflow line mapped to its visual cause
-FINDINGS: for each, [severity] what is wrong, where (hotspot grid or capture line:col), and the concrete fix
+FINDINGS: for each, [product|evidence] [severity] what is wrong, where (hotspot grid or capture line:col), and the concrete fix
 BLOCKING: items that must be fixed; empty if PASS
 """
 )
