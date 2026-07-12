@@ -70,9 +70,10 @@ export function createCompletionNotifier(deps: CompletionNotifierDeps): Completi
     if (fresh.notification.notified_epoch >= entry.epoch) return finishRetryChain(entry)
 
     const decision = routeCompletion(getParentState())
-    if (fresh.parent_session_id !== getCurrentSessionId()) return
+    if (fresh.parent_session_id !== getCurrentSessionId()) return finishRetryChain(entry)
     if (decision.kind === "buffer") {
       pushBuffered(buffered, fresh.parent_session_id, entry)
+      finishRetryChain(entry)
       return
     }
 
