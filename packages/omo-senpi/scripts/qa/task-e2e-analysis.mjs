@@ -42,11 +42,20 @@ export function parseJsonEvents(stdout) {
     if (line.trim().length === 0) continue
     try {
       events.push(JSON.parse(line))
-    } catch {
-      // non-JSON startup banner line
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error
     }
   }
   return events
+}
+
+export function findBatchFanout(events, minimumChildren) {
+  for (const event of events) {
+    if (event?.type !== "tool_execution_end" || event.toolName !== "task") continue
+    const items = event.result?.details?.items
+    if (Array.isArray(items) && items.length >= minimumChildren) return items
+  }
+  return []
 }
 
 // All distinct st_ task ids that appear anywhere in the event stream.

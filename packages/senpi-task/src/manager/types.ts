@@ -30,6 +30,8 @@ export type ManagedStartSpec = {
   readonly instructions?: string
   readonly toolAllowlist?: readonly string[]
   readonly memberScopedTools?: readonly ToolDefinition[]
+  readonly extensions?: readonly string[]
+  readonly memberEnv?: Readonly<Record<string, string>>
 }
 
 export type ManagedRunner = {
@@ -51,6 +53,8 @@ export type ManagerStartSpec = {
   readonly allowed_subagents?: readonly string[]
   readonly run_in_background?: boolean
   readonly memberScopedTools?: readonly ToolDefinition[]
+  readonly extensions?: readonly string[]
+  readonly memberEnv?: Readonly<Record<string, string>>
 }
 
 export type ResolvedChildPlan = {

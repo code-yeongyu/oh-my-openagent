@@ -2,13 +2,14 @@ import type { OmoConfig, OmoTaskSettings } from "@oh-my-opencode/omo-config-core
 import {
   TEAM_LEAD_SENTINEL,
   claimTeamTask,
-  createMemberScopedTaskSendTool,
   createTeam,
   createTeamTask,
   deleteTeam,
   getTeamTask,
   listTeamTasks,
   reconcileTeamMailboxOnSessionStart,
+  parseExtensionEntries,
+  resolveMemberExtensionEntryPath,
   refreshTeamMemberStatuses,
   requestShutdown,
   approveShutdown,
@@ -95,9 +96,10 @@ export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
         leadSessionId,
         spawnDepth: TEAM_MEMBER_SPAWN_DEPTH,
         ...(deps.now !== undefined ? { now: deps.now } : {}),
-        memberScopedTools: (memberName, teamRunId) => [
-          createMemberScopedTaskSendTool({ manager: deps.manager, service, teamRunId, from: memberName }),
-        ],
+        memberExtension: {
+          entryPath: resolveMemberExtensionEntryPath(),
+          inheritedExtensions: parseExtensionEntries(process.argv),
+        },
       })
     },
     deleteTeam: (input) => deleteTeam(input.teamRunId, { manager: deps.manager, stateDir, taskSettings: deps.settings }),
@@ -159,5 +161,9 @@ export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
 export function createTeamMailboxReconciler(deps: TeamServiceDeps): () => Promise<void> {
   const stateDir = stateDirConfig(deps)
   const config: TeamCoreConfig = toTeamCoreConfig(deps.settings, teamStorageBaseDir(stateDir))
-  return () => reconcileTeamMailboxOnSessionStart({ stateDir, config })
+  return () => reconcileTeamMailboxOnSessionStart({
+    stateDir,
+    config,
+    currentLeadSessionId: deps.runtime.sessionId(),
+  })
 }

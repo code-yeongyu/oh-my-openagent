@@ -4,11 +4,6 @@ import type { TaskRecord, TaskRecordInput } from "../state"
 import type { ManagedStartSpec, ManagerStartSpec, ResolvedChildPlan } from "./types"
 import type { ExecutionMode } from "./execution-mode"
 
-export type RpcLaunchOptions = {
-  readonly extensions?: readonly string[]
-  readonly memberEnv?: Readonly<Record<string, string>>
-}
-
 export function nowIso(now: () => number): string {
   return new Date(now()).toISOString()
 }
@@ -38,14 +33,17 @@ export function buildRecordInput(input: {
 
 export function buildManagedSpec(input: {
   readonly record: TaskRecord
-  readonly spec: ManagerStartSpec & RpcLaunchOptions
+  readonly spec: ManagerStartSpec
   readonly plan: ResolvedChildPlan
   readonly cwd: string
   readonly stateDir: string
-}): ManagedStartSpec & RpcLaunchOptions {
+}): ManagedStartSpec {
   const { record, spec, plan, cwd, stateDir } = input
   const prompt = plan.promptAppend ? `${spec.prompt}\n\n${plan.promptAppend}` : spec.prompt
   const instructions = spec.instructions ?? plan.instructions
+  const memberEnv = spec.memberEnv === undefined
+    ? undefined
+    : { ...spec.memberEnv, SENPI_TASK_MEMBER_TASK_ID: record.task_id }
   return {
     taskId: record.task_id,
     cwd: spec.cwd ?? cwd,
@@ -60,7 +58,7 @@ export function buildManagedSpec(input: {
     ...(plan.toolAllowlist !== undefined ? { toolAllowlist: plan.toolAllowlist } : {}),
     ...(spec.memberScopedTools !== undefined ? { memberScopedTools: spec.memberScopedTools } : {}),
     ...(spec.extensions !== undefined ? { extensions: spec.extensions } : {}),
-    ...(spec.memberEnv !== undefined ? { memberEnv: spec.memberEnv } : {}),
+    ...(memberEnv !== undefined ? { memberEnv } : {}),
   }
 }
 

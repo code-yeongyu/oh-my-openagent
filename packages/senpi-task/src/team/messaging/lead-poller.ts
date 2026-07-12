@@ -11,7 +11,7 @@ import { TEAM_LEAD_SENTINEL } from "../normalize"
 import { buildPeerMessageEnvelope } from "./message"
 import type { WaitClaim, WaitRegistry } from "./wait-registry"
 
-const CONSUMER_LEASE_STALE_MS = 30_000
+const DEAD_PID_LEASE_STALE_MS = 0
 const RESERVED_PREFIX = ".delivering-"
 const RESERVED_SUFFIX = ".json"
 
@@ -49,7 +49,7 @@ export function createLeadPoller(deps: LeadPollerDeps): LeadPoller {
   let stopped = false
   const state: LeadPollState = { pending, isStopped: () => stopped }
   const withLease = <T>(fn: () => Promise<T>): Promise<T> => withInboxConsumerLease(
-    deps.teamRunId, TEAM_LEAD_SENTINEL, deps.config, fn, { staleAfterMs: CONSUMER_LEASE_STALE_MS },
+    deps.teamRunId, TEAM_LEAD_SENTINEL, deps.config, fn, { staleAfterMs: DEAD_PID_LEASE_STALE_MS },
   )
 
   return {

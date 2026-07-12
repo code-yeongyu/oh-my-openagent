@@ -11,6 +11,7 @@ import { createTaskRecordStore } from "../../store"
 import type { WaitBounds } from "../../tools/control/clamp"
 import { WaitRegistry } from "../messaging/wait-registry"
 import { createMemberSelfPoller, type MemberSelfPoller } from "./self-poller"
+import { createQaAfterInjectHold } from "./qa-inject-hold"
 import { createMemberTaskSendTool, createMemberTeamWaitTool } from "./tools"
 
 const MEMBER_POLL_INTERVAL_MS = 1_000
@@ -57,6 +58,7 @@ export class MemberExtensionShutdownError extends Error {
 type ActiveRuntime = {
   readonly poller: MemberSelfPoller
   readonly registry: WaitRegistry<Message>
+  started: boolean
   pollTimer?: ReturnType<typeof setInterval>
   ackTimer?: ReturnType<typeof setInterval>
 }
@@ -131,6 +133,7 @@ export default async function registerMemberExtension(pi: ExtensionAPI): Promise
   const parsed = parseMemberExtensionEnv(process.env)
   const store = createTaskRecordStore({ project_dir: parsed.stateDir, task: { state_dir: parsed.stateDir } })
   const registry = new WaitRegistry<Message>()
+  const afterInject = createQaAfterInjectHold(process.env)
   const appendEvent = (event: Parameters<typeof store.appendEvent>[1]): void => {
     store.appendEvent(parsed.taskId, event)
   }
@@ -142,8 +145,9 @@ export default async function registerMemberExtension(pi: ExtensionAPI): Promise
     waitRegistry: registry,
     sendUserMessage: (content) => pi.sendUserMessage(content, { deliverAs: "followUp" }),
     appendEvent,
+    ...(afterInject !== undefined ? { afterInject } : {}),
   })
-  const runtime: ActiveRuntime = { poller, registry }
+  const runtime: ActiveRuntime = { poller, registry, started: false }
   activeRuntimes.set(pi, runtime)
 
   pi.registerTool(createMemberTaskSendTool({
@@ -155,22 +159,30 @@ export default async function registerMemberExtension(pi: ExtensionAPI): Promise
     appendEvent: (taskId, event) => store.appendEvent(taskId, event),
   }))
   pi.registerTool(createMemberTeamWaitTool({ poller, waitRegistry: registry, waitBounds: parsed.waitBounds }))
+  pi.on("session_start", () => startRuntime(runtime))
   pi.on("session_shutdown", () => stopRuntime(pi, runtime))
+}
 
+async function startRuntime(runtime: ActiveRuntime): Promise<void> {
+  if (runtime.started) return
+  runtime.started = true
   try {
-    await poller.recoverReservations()
-    await poller.pollOnce()
-    runtime.pollTimer = setInterval(() => runSafely("poll", poller.pollOnce()), MEMBER_POLL_INTERVAL_MS)
-    runtime.ackTimer = setInterval(() => runSafely("ack", poller.checkPendingAcks()), ACK_POLL_INTERVAL_MS)
+    await runtime.poller.recoverReservations()
+    if (!runtime.started) return
+    runtime.pollTimer = setInterval(() => runSafely("poll", runtime.poller.pollOnce()), MEMBER_POLL_INTERVAL_MS)
+    runtime.ackTimer = setInterval(() => runSafely("ack", runtime.poller.checkPendingAcks()), ACK_POLL_INTERVAL_MS)
   } catch (error) {
-    stopRuntime(pi, runtime)
+    runtime.started = false
     throw error
   }
 }
 
 function stopRuntime(pi: ExtensionAPI, runtime: ActiveRuntime): void {
+  runtime.started = false
   if (runtime.pollTimer !== undefined) clearInterval(runtime.pollTimer)
   if (runtime.ackTimer !== undefined) clearInterval(runtime.ackTimer)
+  delete runtime.pollTimer
+  delete runtime.ackTimer
   runtime.poller.shutdown()
   runtime.registry.cancelAll(new MemberExtensionShutdownError())
   activeRuntimes.delete(pi)

@@ -1,11 +1,14 @@
 import { mkdir } from "node:fs/promises"
 
-import type { ToolDefinition } from "@code-yeongyu/senpi"
 import type { TeamSpec } from "@oh-my-opencode/team-core/types"
 
 import type { ManagerStartSpec, StartResult } from "../manager"
 import { projectMemberStatus, type RuntimeMemberStatus } from "./member-projection"
-import { SenpiTeamRuntimeError, type TeamRuntimeManagerPort } from "./runtime-types"
+import {
+  SenpiTeamRuntimeError,
+  type SpawnMemberExtensionConfig,
+  type TeamRuntimeManagerPort,
+} from "./runtime-types"
 
 type TeamMember = TeamSpec["members"][number]
 
@@ -24,7 +27,7 @@ export type SpawnMembersInput = {
   readonly maxParallel: number
   readonly deadlineAt: number
   readonly now: () => number
-  readonly memberScopedTools?: (memberName: string, teamRunId: string) => readonly ToolDefinition[]
+  readonly memberExtension?: SpawnMemberExtensionConfig
 }
 
 export type SpawnMembersResult = {
@@ -107,7 +110,10 @@ async function spawnOneMember(input: SpawnMembersInput, member: TeamMember): Pro
 }
 
 function buildMemberStartSpec(input: SpawnMembersInput, member: TeamMember): ManagerStartSpec {
-  const scopedTools = input.memberScopedTools?.(member.name, input.teamRunId)
+  const launch = input.memberExtension
+  const extensions = launch === undefined
+    ? undefined
+    : [...new Set([...(launch.inheritedExtensions ?? []), launch.entryPath])]
   return {
     prompt: member.prompt ?? `You are team member '${member.name}' in team '${input.spec.name}'.`,
     parent_session_id: input.leadSessionId,
@@ -118,7 +124,13 @@ function buildMemberStartSpec(input: SpawnMembersInput, member: TeamMember): Man
     run_in_background: true,
     ...(member.kind === "category" ? { category: member.category } : { subagent_type: member.subagent_type }),
     ...(member.worktreePath !== undefined ? { cwd: member.worktreePath } : {}),
-    ...(scopedTools !== undefined ? { memberScopedTools: scopedTools } : {}),
+    ...(extensions !== undefined ? { extensions } : {}),
+    ...(launch !== undefined ? {
+      memberEnv: {
+        SENPI_TASK_MEMBER: `${input.teamRunId}::${member.name}`,
+        SENPI_TASK_TEAM_CONFIG: launch.teamConfig,
+      },
+    } : {}),
   }
 }
 
