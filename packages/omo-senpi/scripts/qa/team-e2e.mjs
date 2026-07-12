@@ -74,7 +74,7 @@ function killGroups() {
 
 async function runMain(senpiBin, outDir) {
   const sandbox = createSandbox()
-  const obsDir = join(outDir, "main-obs")
+  const obsDir = resolve(outDir, "main-obs")
   seedProject(sandbox)
   const run = await runSenpi({ senpiBin, sandbox, prompt: "drive the full team e2e lifecycle", script: LEAD_SCRIPT, obsDir })
   writeFileSync(join(outDir, "main-stdout.json.log"), run.stdout)
@@ -84,7 +84,7 @@ async function runMain(senpiBin, outDir) {
 
 async function runDuraRevive(senpiBin, outDir) {
   const sandbox = createSandbox()
-  const obsDir = join(outDir, "dura-obs")
+  const obsDir = resolve(outDir, "dura-obs")
   seedProject(sandbox)
   const active = startRun({ senpiBin, sandbox, prompt: "durability revive drain drive", script: DURA_REVIVE_SCRIPT, obsDir })
   let state
@@ -142,10 +142,10 @@ async function runReclaim(senpiBin, outDir) {
   }
 }
 
-function createOutDir() {
-  const configured = process.env.TEAM_E2E_OUT_DIR?.trim()
-  if (configured) return { outDir: configured, cleanup: false }
-  return { outDir: mkdtempSync(join(tmpdir(), "omo-senpi-team-e2e-")), cleanup: true }
+export function createOutDir(configured = process.env.TEAM_E2E_OUT_DIR) {
+  const requested = configured?.trim()
+  if (requested) return { outDir: resolve(requested), cleanup: false }
+  return { outDir: resolve(mkdtempSync(join(tmpdir(), "omo-senpi-team-e2e-"))), cleanup: true }
 }
 
 async function main() {

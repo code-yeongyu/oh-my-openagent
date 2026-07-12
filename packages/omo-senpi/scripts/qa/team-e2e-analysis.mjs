@@ -1,4 +1,4 @@
-import { existsSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import {
@@ -35,6 +35,7 @@ export async function analyzeMain(run, sandbox, obsDir) {
     (value) => value.processed && value.events === 1,
     10_000,
   )
+  mkdirSync(obsDir, { recursive: true })
   writeFileSync(join(obsDir, "team-wait-evidence.json"), `${JSON.stringify(evidence, null, 2)}\n`)
   return {
     createTwoMembersActive: create?.details?.kind === "created" && (create.details.members?.length ?? 0) === 2,

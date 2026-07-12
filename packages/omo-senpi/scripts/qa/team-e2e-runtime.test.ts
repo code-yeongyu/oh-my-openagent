@@ -1,6 +1,22 @@
 import { describe, expect, it } from "bun:test"
+import { isAbsolute, join, resolve } from "node:path"
 
+import { createOutDir } from "./team-e2e.mjs"
 import * as runtime from "./team-e2e-runtime.mjs"
+
+describe("team e2e output paths", () => {
+  it("#given a configured relative output path #when the capture directory is created #then it is absolute", () => {
+    // given
+    const configured = join(".omo", "evidence", "relative-team-e2e")
+
+    // when
+    const output = createOutDir(configured)
+
+    // then
+    expect(output).toEqual({ outDir: resolve(configured), cleanup: false })
+    expect(isAbsolute(output.outDir)).toBe(true)
+  })
+})
 
 describe("team e2e process cleanup", () => {
   it("#given completed and live process groups #when cleanup runs #then it skips empty groups and kills concrete survivors", () => {

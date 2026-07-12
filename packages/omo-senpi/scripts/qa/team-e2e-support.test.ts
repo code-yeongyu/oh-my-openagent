@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -34,6 +34,23 @@ describe("team e2e session evidence", () => {
 
     // then
     expect(checks.memberEnvelopeEchoed).toBe(true)
+  })
+
+  it("#given a missing observation directory #when main evidence is analyzed #then the evidence directory is created", async () => {
+    // given
+    const fixture = createFixture()
+    seedWaitEvidence(fixture)
+    rmSync(fixture.obsDir, { recursive: true, force: true })
+
+    // when
+    await analyzeMain(
+      { events: fixture.events, status: 0 },
+      { cwd: fixture.project },
+      fixture.obsDir,
+    )
+
+    // then
+    expect(existsSync(join(fixture.obsDir, "team-wait-evidence.json"))).toBe(true)
   })
 
   it("#given one JSON-escaped peer envelope #when crash evidence counts the message id #then it reports exactly one envelope", () => {

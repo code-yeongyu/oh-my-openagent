@@ -152,6 +152,8 @@ function runNegativeFlow(senpiBin, checks, capture, pids) {
 }
 
 function main() {
+  const configuredOutDir = process.env.TASK_E2E_OUT_DIR?.trim()
+  const outDir = configuredOutDir ? resolve(configuredOutDir) : undefined
   const beforeDigest = digestDirectory(realSenpiAgentDir)
   const beforeSnapshot = snapshotDir(realSenpiAgentDir)
   const providedAgentDir = process.env.SENPI_CODING_AGENT_DIR ? "IGNORED" : "unset"
@@ -194,12 +196,11 @@ function main() {
     mainExit: capture.main?.exit,
     batchTaskIds: capture.batchTaskIds,
   }
-  writeEvidenceMaybe(capture, payload)
+  writeEvidenceMaybe(outDir, capture, payload)
   console.log(JSON.stringify(payload))
 }
 
-function writeEvidenceMaybe(capture, payload) {
-  const outDir = process.env.TASK_E2E_OUT_DIR
+function writeEvidenceMaybe(outDir, capture, payload) {
   if (outDir === undefined) return
   mkdirSync(outDir, { recursive: true })
   writeFileSync(join(outDir, "verdict.json"), `${JSON.stringify(payload, null, 2)}\n`)
