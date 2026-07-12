@@ -16,6 +16,7 @@ export type MessagingEngineDeps = {
   readonly teamRunId: string
   readonly stateDir: StateDirConfig
   readonly config: TeamCoreConfig
+  readonly activeMembers: readonly string[]
   readonly appendEvent?: (taskId: string, event: PersistedTaskEvent) => void
   readonly now?: () => number
   readonly newMessageId?: () => string
