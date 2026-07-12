@@ -42,17 +42,23 @@ Inspect your active tool list and select:
    `set_thread_title`, `set_thread_archived`).
 3. **Neither set visible** - if a `tool_search` tool is active, search for the missing sets
    (e.g. `spawn_agent`, `codex_app`) before concluding: some environments defer tools behind
-   tool search. A hit routes back to case 1 or 2.
+   tool search. A hit is only a lead: revalidate that the visible result is the COMPLETE,
+   mutually compatible transport set from case 1 or 2 before selecting it. Do not combine
+   partial hits from different transports.
 4. **Neither set exists** - teammode cannot run here. Do NOT run `init` or fake a team with
-   partial tooling. Announce it, then split the work across plain fire-and-forget subagents
-   with non-overlapping scopes instead.
+   partial tooling. If another visible plain-subagent mechanism can independently spawn,
+   communicate with, and observe plain workers, announce that exact mechanism and use it for
+   non-overlapping scopes. Otherwise continue serially and report the capability limitation;
+   never promise or imply plain subagents that this session cannot create.
 
 Then, BEFORE running `init` (or instead of it in case 4), tell the user in one line what this
 environment provides and which route you picked:
 - `Teammode transport: MultiAgentV2 (flat spawn_agent with task_name).`
 - `Teammode transport: Codex App threads (flat V2 tools not present in this session).`
 - `Teammode unavailable: neither MultiAgentV2 nor codex_app tools exist in this session -
-  splitting the work across plain subagents.`
+  using <visible plain-subagent mechanism> for independent scopes.`
+- `Teammode unavailable: neither MultiAgentV2 nor codex_app tools exist in this session, and
+  no compatible plain-subagent mechanism is available - continuing serially.`
 
 Pass the choice to `init` as `--transport multi_agent_v2` or `--transport codex_app`. The
 transport is recorded in `team.json` and is IMMUTABLE for the team's lifetime: a V2 spawn
