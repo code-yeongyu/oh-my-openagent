@@ -34,12 +34,14 @@ async function setup(memberMap: MemberTaskMap) {
 function deps(
   stateDir: ReturnType<typeof stateDirConfig>,
   config: ReturnType<typeof toTeamCoreConfig>,
+  memberMap: MemberTaskMap,
   options: Pick<MessagingEngineDeps, "appendEvent" | "newMessageId"> = {},
 ): MessagingEngineDeps {
   return {
     teamRunId: TEAM_RUN_ID,
     stateDir,
     config,
+    activeMembers: Object.keys(memberMap),
     ...options,
   }
 }
@@ -67,7 +69,7 @@ describe("sendTeamMessage pull-only delivery", () => {
     // when
     const result = await sendTeamMessage(
       { from: "alpha", to: "beta", body: "ping" },
-      deps(stateDir, config, { newMessageId: () => messageId }),
+      deps(stateDir, config, map, { newMessageId: () => messageId }),
     )
 
     // then
@@ -85,7 +87,7 @@ describe("sendTeamMessage pull-only delivery", () => {
     // when
     const result = await sendTeamMessage(
       { from: "alpha", to: "lead", body: "need a call" },
-      deps(stateDir, config, { newMessageId: () => messageId }),
+      deps(stateDir, config, map, { newMessageId: () => messageId }),
     )
 
     // then
@@ -104,7 +106,7 @@ describe("sendTeamMessage pull-only delivery", () => {
     // when
     const result = await sendTeamMessage(
       { from: "lead", to: "*", body: "all-hands" },
-      deps(stateDir, config, {
+      deps(stateDir, config, map, {
         newMessageId: () => messageId,
         appendEvent: (taskId, event) => appended.push({ taskId, event }),
       }),
@@ -129,7 +131,7 @@ describe("sendTeamMessage pull-only delivery", () => {
     // when
     await sendTeamMessage(
       { from: "alpha", to: "beta", body: "status" },
-      deps(stateDir, config, {
+      deps(stateDir, config, map, {
         newMessageId: () => messageId,
         appendEvent: (taskId, event) => appended.push({ taskId, event }),
       }),
@@ -156,7 +158,7 @@ describe("sendTeamMessage pull-only delivery", () => {
     // when
     const result = await sendTeamMessage(
       { from: "lead", to: "beta", body: "continue" },
-      deps(stateDir, config, { newMessageId: () => messageId }),
+      deps(stateDir, config, map, { newMessageId: () => messageId }),
     )
 
     // then
@@ -172,7 +174,7 @@ describe("sendTeamMessage pull-only delivery", () => {
     // when
     const attempt = sendTeamMessage(
       { from: "alpha", to: "beta", body: "x" },
-      deps(stateDir, constrained, { newMessageId: () => "66666666-6666-4666-8666-666666666666" }),
+      deps(stateDir, constrained, map, { newMessageId: () => "66666666-6666-4666-8666-666666666666" }),
     )
 
     // then

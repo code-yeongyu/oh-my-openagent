@@ -22,12 +22,11 @@ export async function sendTeamMessage(
   const message = buildTeamMessage(input, messageOptions)
   const runtimeDir = resolveTeamRuntimeDirs(deps.stateDir, deps.teamRunId).runtimeDir
   const memberTaskMap = await readMemberTaskMap(runtimeDir)
-  const activeMembers = Object.keys(memberTaskMap)
   const isLead = input.from === TEAM_LEAD_SENTINEL
 
   const sent = await sendMessage(message, deps.teamRunId, deps.config, {
     isLead,
-    activeMembers,
+    activeMembers: [...deps.activeMembers],
     ...(input.to === TEAM_LEAD_SENTINEL ? { leadRecipient: TEAM_LEAD_SENTINEL } : {}),
   })
 
