@@ -37,7 +37,7 @@ one-shot: a lane ends at its verdict; a re-review after fixes is a fresh
 spawn scoped to the delta plus current evidence, never a `followup_task`
 to a long-lived reviewer carrying stale context.
 
-Plan and reviewer agents may run for a long time; spawn them in the background and keep doing independent root work. Between `multi_agent_v1.wait_agent` calls, back off - double the timeout up to ~5 minutes - instead of spinning short cycles.
+Plan and reviewer agents may run for a long time; spawn them in the background and keep doing independent root work. Between `multi_agent_v1.wait_agent` calls, back off — double the timeout up to ~5 minutes — instead of spinning short cycles.
 
 Treat child status as a progress signal, not a timeout counter. For
 work likely to exceed one wait cycle, require the child to send
