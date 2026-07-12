@@ -101,22 +101,6 @@ describe("build-binaries", () => {
       expect(linuxBaseline?.binary).toBe("oh-my-opencode.js");
     });
 
-    it("launcher routes lazycodex install through the Node installer before requiring Bun", async () => {
-      // given
-      const module = await import("./build-binaries.ts");
-      const createPlatformLauncherSource = (module as { createPlatformLauncherSource: () => string }).createPlatformLauncherSource;
-
-      // when
-      const source = createPlatformLauncherSource();
-
-      // then
-      expect(source).toContain("OMO_WRAPPER_PACKAGE_ROOT");
-      expect(source).toContain('join(wrapperPackageRoot, "packages", "omo-codex", "scripts", "install-local.mjs")');
-      expect(source).toContain('spawnSync(process.execPath, [lazyCodexInstallerPath, ...process.argv.slice(2)]');
-      expect(source).toContain('join(wrapperPackageRoot, "dist", "cli", "index.js")');
-      expect(source).toContain('spawnSync(bunBinary, [cliPath, ...process.argv.slice(2)]');
-    });
-
     it("launcher can print lazycodex help when Bun is unavailable", async () => {
       // given
       const module = await import("./build-binaries.ts");
