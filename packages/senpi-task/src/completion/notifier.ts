@@ -147,8 +147,7 @@ export function createCompletionNotifier(deps: CompletionNotifierDeps): Completi
   }
 
   function reconcileFailedNotifications(input: ReconcileFailedNotificationsInput): void {
-    const listed = deps.store.list?.()
-    if (listed === undefined) return
+    const listed = deps.store.list()
     for (const record of listed.records) {
       const epoch = record.notification.run_epoch
       if (record.parent_session_id !== input.sessionId) continue

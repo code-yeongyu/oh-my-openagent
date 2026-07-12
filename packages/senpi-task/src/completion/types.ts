@@ -46,7 +46,7 @@ export type ParentNotifier = {
 
 export type CompletionNotifierStore = {
   readonly load: (taskId: string) => TaskRecord | null
-  readonly list?: () => ListTaskRecordsResult
+  readonly list: () => ListTaskRecordsResult
   readonly replace: (record: TaskRecord) => void
   readonly appendEvent: (taskId: string, event: PersistedTaskEvent) => string
 }
