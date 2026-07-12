@@ -1676,9 +1676,9 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - default "medium" variant is applied
+    // #then - default "high" variant is applied
     expect(agents.hephaestus).toBeDefined()
-    expect(agents.hephaestus.variant).toBe("medium")
+    expect(agents.hephaestus.variant).toBe("high")
     providerModelsSpy.mockRestore()
     connectedSpy.mockRestore()
     fetchSpy.mockRestore()
