@@ -50,7 +50,7 @@ Diagnostics catch type errors, not logic bugs; tests cover only what their autho
 
 "This should work" from reading source does not pass. A defect found in usage is yours to fix this turn.
 
-Before declaring significant work or a PR handoff complete, run `review-work` plus a `debugging` runtime audit; record three debugging hypotheses with runtime evidence each. Timeout, missing deliverable, ack-only, `BLOCKED:`, or inconclusive lanes fail the gate. Redact secrets, tokens, and PII from ledgers, PR bodies, and handoffs.
+Run `review-work` plus a `debugging` runtime audit only before a PR handoff or when the user asks for a review; lane pass/fail semantics live in those skills. For everything else, the gate above is the whole gate: once you have personally observed the artifact working, report your evidence. Redact secrets, tokens, and PII from ledgers, PR bodies, and handoffs.
 
 # Failure Recovery
 

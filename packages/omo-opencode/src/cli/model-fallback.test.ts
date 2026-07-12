@@ -292,7 +292,7 @@ describe("generateModelConfig", () => {
 
       // #then
       expect(result.agents?.hephaestus?.model).toBe("openai/gpt-5.6-sol")
-      expect(result.agents?.hephaestus?.variant).toBe("medium")
+      expect(result.agents?.hephaestus?.variant).toBe("high")
     })
 
     test("Hephaestus falls back to Copilot GPT-5.5 when only Copilot is available", () => {

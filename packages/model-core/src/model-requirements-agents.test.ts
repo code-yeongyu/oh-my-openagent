@@ -268,7 +268,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(hephaestus.requiresAnyModel).toBe(true)
   })
 
-  test("hephaestus has gpt-5.6-sol medium as primary before gpt-5.5 medium", () => {
+  test("hephaestus has gpt-5.6-sol high as primary before gpt-5.5 medium", () => {
     // given
     const hephaestus = AGENT_MODEL_REQUIREMENTS["hephaestus"]
 
@@ -279,7 +279,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary).toEqual({
       providers: ["openai", "vercel"],
       model: "gpt-5.6-sol",
-      variant: "medium",
+      variant: "high",
     })
     expect(secondary).toEqual({
       providers: ["openai", "github-copilot", "opencode", "vercel"],
