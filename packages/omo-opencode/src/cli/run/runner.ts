@@ -20,7 +20,7 @@ import { resolveRunnableRunAgent } from "./runnable-agent-resolver"
 
 export { resolveRunAgent }
 
-const EVENT_PROCESSOR_SHUTDOWN_TIMEOUT_MS = 2_000
+const EVENT_PROCESSOR_SHUTDOWN_TIMEOUT_MS = 10_000
 
 export async function waitForEventProcessorShutdown(
   eventProcessor: Promise<void>,
@@ -113,7 +113,12 @@ export async function run(options: RunOptions): Promise<number> {
       const eventState = createEventState()
       eventState.agentColorsByName = await loadAgentProfileColors(client)
       const eventProcessor = processEvents(ctx, events.stream, eventState).catch(
-        () => {},
+        (err: unknown) => {
+          eventState.eventProcessorDied = true
+          if (options.verbose) {
+            console.error(pc.red(`[event-processor] SSE stream error: ${err instanceof Error ? err.message : String(err)}`))
+          }
+        },
       )
 
       const promptResult = await dispatchInternalPrompt({
@@ -151,6 +156,10 @@ export async function run(options: RunOptions): Promise<number> {
         throw new Error(`Session ${sessionID} is not idle; promptAsync skipped by gate: ${promptResult.status}`)
       }
       await waitForPromptStart(ctx, eventState, abortController)
+      if (options.verbose) {
+        console.log(pc.dim(`Event watchdog: ${((options as any).eventWatchdogMs ?? 30000) / 1000}s, consecutive checks: 3`))
+      }
+
       const exitCode = await pollForCompletion(ctx, eventState, abortController, {
         requireMeaningfulWork: true,
       })

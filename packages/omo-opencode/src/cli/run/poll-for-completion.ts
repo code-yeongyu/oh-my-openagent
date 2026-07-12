@@ -5,7 +5,7 @@ import { checkCompletionConditions } from "./completion"
 import { isRecord, normalizeSDKResponse } from "../../shared"
 
 const DEFAULT_POLL_INTERVAL_MS = 500
-const DEFAULT_REQUIRED_CONSECUTIVE = 1
+const DEFAULT_REQUIRED_CONSECUTIVE = 3
 const ERROR_GRACE_CYCLES = 3
 const MIN_STABILIZATION_MS = 1_000
 const DEFAULT_EVENT_WATCHDOG_MS = 30_000 // 30 seconds
@@ -93,6 +93,12 @@ export async function pollForCompletion(
       continue
     } else {
       errorCycleCount = 0
+    }
+
+    // If the SSE event processor died (connection lost), mark session as failed
+    if (eventState.eventProcessorDied) {
+      console.error(pc.red("\n\nSSE event processor died — connection to opencode server lost."))
+      return 1
     }
 
     let mainSessionStatus: "idle" | "busy" | "retry" | null = null

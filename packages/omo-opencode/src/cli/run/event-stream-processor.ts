@@ -36,7 +36,9 @@ export async function processEvents(
       }
 
       // Update last event timestamp for watchdog detection
-      state.lastEventTimestamp = Date.now()
+      if (isMainSessionEvent(ctx, payload)) {
+        state.lastEventTimestamp = Date.now()
+      }
 
       handleSessionError(ctx, payload, state)
       handleSessionIdle(ctx, payload, state)

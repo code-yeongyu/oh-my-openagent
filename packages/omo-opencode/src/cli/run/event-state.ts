@@ -44,6 +44,8 @@ export interface EventState {
   messageStartedAtById: Record<string, number>
   /** Prevent duplicate completion metadata lines per message */
   completionMetaPrintedByMessageId: Record<string, boolean>
+  /** Set to true when the SSE event processor dies (connection lost) */
+  eventProcessorDied: boolean
 }
 
 export function createEventState(): EventState {
@@ -75,5 +77,6 @@ export function createEventState(): EventState {
     currentMessageId: null,
     messageStartedAtById: {},
     completionMetaPrintedByMessageId: {},
+    eventProcessorDied: false,
   }
 }
