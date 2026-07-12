@@ -67,6 +67,29 @@ test("#given flat V2 tools are available #when the leader reads teammode #then t
 	assert.match(skill, /Codex App.*fallback/i);
 });
 
+test("#given neither transport's tools are visible #when the leader reads teammode #then search hits are revalidated and fallback is capability-aware without team state", () => {
+	const skill = readFileSync(join(root, "components", "teammode", "skills", "teammode", "SKILL.md"), "utf8");
+
+	const searchIndex = skill.indexOf("tool_search");
+	const unavailableIndex = skill.indexOf("Teammode unavailable");
+	assert.notEqual(searchIndex, -1, "skill must route hidden tools through the tool_search check");
+	assert.notEqual(unavailableIndex, -1, "skill must give the leader unavailable announcement templates");
+	assert.ok(searchIndex < unavailableIndex, "tool_search must precede the unavailable conclusion");
+	assert.match(skill, /revalidate.*COMPLETE.*compatible transport set/is, "a deferred-tool hit must be revalidated as a complete transport");
+	assert.match(skill, /another visible plain-subagent mechanism.*spawn.*communicate.*observe/is, "plain-subagent fallback requires a complete visible lifecycle");
+	assert.match(skill, /Otherwise continue serially.*capability limitation/is, "missing all transports must continue serially rather than promise workers");
+	assert.match(skill, /Do NOT run `init`/, "the fallback must not create team state");
+	assert.doesNotMatch(skill, /splitting the work across plain fire-and-forget subagents/i, "the skill must not promise unavailable plain subagents");
+});
+
+test("#given a MultiAgentV2 team #when the leader spawns members #then per-member model routing is a decision rule that defaults to session inherit", () => {
+	const skill = readFileSync(join(root, "components", "teammode", "skills", "teammode", "SKILL.md"), "utf8");
+
+	assert.doesNotMatch(skill, /Do not set `agent_type`, `model`, or `reasoning_effort`/, "the stale blanket prohibition must be gone");
+	assert.match(skill, /`model` \/ `reasoning_effort` only when/i, "model\/effort must be gated behind a task-requirement decision rule");
+	assert.match(skill, /inherit the session model/i, "omitting model\/effort must default to session inherit");
+});
+
 test("#given MultiAgentV2 transport #when members are added and bound #then task names and canonical agent paths form the address book", () => {
 	const tempRoot = createTeamRoot("omo-codex-teammode-v2-transport-");
 	try {

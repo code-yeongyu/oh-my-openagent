@@ -62,7 +62,7 @@ Before acting, survey the skills available in this system: scan their descriptio
 | explore agent | Need codebase patterns you don't have | `task(subagent_type="explore", load_skills=[], run_in_background=true, ...)` |
 | librarian agent | External library docs, OSS examples | `task(subagent_type="librarian", load_skills=[], run_in_background=true, ...)` |
 | oracle agent | Stuck on architecture/debugging after 2+ attempts | `task(subagent_type="oracle", load_skills=[], run_in_background=false, ...)` |
-| plan agent | Complex multi-step with dependencies (5+ steps) | `task(subagent_type="plan", load_skills=[], run_in_background=false, ...)` |
+| plan agent | Discovery leaves unresolved design uncertainty: unclear boundaries, competing decompositions, or uncertain dependency order | `task(subagent_type="plan", load_skills=[], run_in_background=false, ...)` |
 | task category | Specialized work matching a category | `task(category="...", load_skills=[...], run_in_background=true)` |
 
 <tool_usage_rules>
@@ -97,8 +97,8 @@ deep_context = background_output(task_id=...)
 // Merge ALL findings for comprehensive understanding
 ```
 
-**Plan agent (size the scope first):**
-- Count distinct surfaces, files, steps. Invoke for 5+ interdependent steps / multi-file / unclear scope; skip only for genuinely trivial single-step work.
+**Plan agent (size by what is UNDECIDED, not by step count):**
+- Invoke only when open design decisions remain after context gathering — unclear boundaries, several viable decompositions, or a multi-file build whose dependency order is not obvious. A known procedure, however many steps, and work you are delegating to another session never justify it.
 - Invoke AFTER gathering context from both tracks.
 - Then execute in the plan's exact wave order + parallel grouping and run the verification it specifies.
 
