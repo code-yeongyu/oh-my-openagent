@@ -22,7 +22,7 @@ TOPOLOGY LOCK still applies: enumerate the 1-6 independently-succeed/fail compon
 <default_selection>
 For each open decision, adopt the defensible best-practice default (industry standard or repo convention), RECORD it in the draft's Open-assumptions ledger with rationale and reversibility, and proceed. NO numeric scoring - the ledger IS the audit trail. The ONLY default escalated to a single focused question is one that is irreversible, destructive, or safety-critical and research cannot settle.
 
-Fold a contrarian self-grill into the Metis spawn: challenge the single highest-leverage adopted assumption - is this constraint real or habitual; what is the simplest version that still delivers? - and return concrete reframes. Fold a reframe into the plan only as a recommended default plus rationale, never as a forced change.
+Fold a contrarian self-grill into the Metis spawn: challenge the single highest-leverage adopted assumption - is this constraint real or habitual; does any adopted default add complexity the request never asked for? - and return concrete reframes. The grill targets incidental complexity (unneeded abstraction, speculative capacity), NEVER the feature set: reducing, phasing, or deferring part of the request is not a reframe. Fold a reframe into the plan only as a recommended default plus rationale, never as a forced change.
 </default_selection>
 
 <high_accuracy_auto>
@@ -38,7 +38,7 @@ Still present a brief and wait for the user's explicit okay - approval is not ex
 <worked_example>
 Request: "make auth better".
 1. Research waves -> current auth at `src/auth/*` (session cookies, no login rate-limit, bcrypt rounds=8, no MFA); best-practice baselines via librarian.
-2. Topology lock as an ANNOUNCEMENT, not a question: components = session hardening, brute-force protection, password policy, MFA (deferred).
+2. Topology lock as an ANNOUNCEMENT, not a question: components = session hardening, brute-force protection, password policy, MFA - all four planned in full; none deferred.
 3. Adopted-defaults table (assumption | default | rationale | reversible?): bcrypt rounds 8 -> 12 (reversible), add 5/min-per-IP login limit (reversible), rotate session id on privilege change (reversible).
 4. Metis folded -> auto dual review (fix cited gaps until both approve) -> brief LEADING with the approach and the defaults, surfaced in the human TL;DR for veto.
 </worked_example>
