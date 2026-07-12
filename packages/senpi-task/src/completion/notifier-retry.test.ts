@@ -226,6 +226,31 @@ describe("createCompletionNotifier scheduled retries", () => {
     })).toBe(true)
   })
 
+  test("#given a retry dropped for another session w2notif #when its session reconciles #then backoff restarts at the base delay", () => {
+    // given
+    const record = baseRecord()
+    const { store } = fakeStore([record])
+    const parent = scriptedNotifier(Number.POSITIVE_INFINITY)
+    const scheduler = fakeScheduler()
+    let currentSessionId = "session-b"
+    const completion = createCompletionNotifier(notifierDeps({
+      store,
+      notifier: parent.notifier,
+      scheduler,
+      getCurrentSessionId: () => currentSessionId,
+    }))
+    completion.notifyTerminal({ record, parentState: { kind: "idle" }, runInBackground: true })
+    scheduler.run(0)
+
+    // when
+    currentSessionId = "session-a"
+    completion.reconcileFailedNotifications({ sessionId: "session-a", parentState: { kind: "idle" } })
+
+    // then
+    expect(scheduler.calls[1]?.delayMs).toBeGreaterThanOrEqual(500)
+    expect(scheduler.calls[1]?.delayMs).toBeLessThan(700)
+  })
+
   test("#given session A owns a failed retry w2notif #when session B is current #then retry drops until A reconciles", () => {
     // given
     const record = baseRecord()

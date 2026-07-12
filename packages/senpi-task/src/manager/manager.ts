@@ -70,6 +70,7 @@ type ReattachingTaskManager = TaskManager & {
 
 const NOOP_DESTRUCTION: DestructionPort = { destroyResidentTask: () => Promise.resolve() }
 const GENERIC_START_FAILURE_MESSAGE = "Task runner failed to start."
+const RESPAWN_CLEANUP_FAILURE_REASON = "rpc respawn cleanup failed"
 
 function publicStartFailureMessage(error: unknown): string {
   try {
@@ -296,19 +297,19 @@ class TaskManagerImpl implements TaskManager {
       })
       const switchSession = handle.switchSession
       if (switchSession === undefined) {
-        await this.#disposeFailedRespawn(handle)
+        if (!(await this.#disposeFailedRespawn(handle))) return { ok: false, reason: RESPAWN_CLEANUP_FAILURE_REASON }
         return { ok: false, reason: "respawned RPC handle cannot switch sessions" }
       }
       const switched = await switchSession(resumeSessionPath)
       if (switched.cancelled) {
-        await this.#disposeFailedRespawn(handle)
+        if (!(await this.#disposeFailedRespawn(handle))) return { ok: false, reason: RESPAWN_CLEANUP_FAILURE_REASON }
         return { ok: false, reason: "switch_session was cancelled" }
       }
       return { ok: true, handle: adaptRpcHandle(handle) }
     } catch (error) {
-      if (handle !== undefined) await this.#disposeFailedRespawn(handle)
+      const cleanedUp = handle === undefined || await this.#disposeFailedRespawn(handle)
       log("senpi-task rpc respawn failed", { taskId: record.task_id, error: String(error) })
-      return { ok: false, reason: "rpc respawn failed" }
+      return { ok: false, reason: cleanedUp ? "rpc respawn failed" : RESPAWN_CLEANUP_FAILURE_REASON }
     }
   }
 
@@ -393,11 +394,13 @@ class TaskManagerImpl implements TaskManager {
   // Test-only observability for proving waitFor never retains empty waiter-map keys.
   waiterKeyCount(): number { return this.#waiters.size }
 
-  async #disposeFailedRespawn(handle: RpcChildHandle): Promise<void> {
+  async #disposeFailedRespawn(handle: RpcChildHandle): Promise<boolean> {
     try {
       await discardRpcHandle(handle)
-    } catch (error) {
+      return true
+    } catch (error) { // no-excuse-ok: catch - cleanup failure is logged and returned through RespawnResult.
       log("senpi-task failed respawn cleanup rejected", { taskId: handle.task_id, error: String(error) })
+      return false
     }
   }
 
