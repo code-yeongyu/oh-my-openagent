@@ -1649,19 +1649,19 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
      cacheSpy.mockRestore?.()
    })
   test("Hephaestus variant override respects user config over hardcoded default", async () => {
-    // #given - user provides variant in config
+    // #given - user provides a non-default variant in config
     const providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue(null)
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set())
     const overrides = {
-      hephaestus: { variant: "high" },
+      hephaestus: { variant: "medium" },
     }
 
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - user variant takes precedence over hardcoded "medium"
+    // #then - user variant takes precedence over hardcoded "high"
     expect(agents.hephaestus).toBeDefined()
-    expect(agents.hephaestus.variant).toBe("high")
+    expect(agents.hephaestus.variant).toBe("medium")
     providerModelsSpy.mockRestore()
     fetchSpy.mockRestore()
   })
