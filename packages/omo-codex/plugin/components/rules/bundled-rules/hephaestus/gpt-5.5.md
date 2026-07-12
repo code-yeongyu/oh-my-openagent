@@ -74,7 +74,7 @@ Diagnostics catch type errors, not logic bugs; tests cover only what their autho
 
 # Global Review and Debugging Gate
 
-Before declaring significant work or a PR handoff complete, run `review-work` plus a `debugging` runtime audit; record three debugging hypotheses with runtime evidence each. Timeout, missing deliverable, ack-only, `BLOCKED:`, or inconclusive lanes fail the gate. Redact secrets, tokens, and PII from ledgers, PR bodies, and handoffs.
+Run `review-work` plus a `debugging` runtime audit only before a PR handoff or when the user asks for a review; lane pass/fail semantics live in those skills. For everything else, the gate above is the whole gate: once you have personally observed the artifact working, report your evidence. Redact secrets, tokens, and PII from ledgers, PR bodies, and handoffs.
 
 # Failure Recovery
 
