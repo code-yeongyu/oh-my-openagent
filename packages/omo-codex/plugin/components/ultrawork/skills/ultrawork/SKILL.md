@@ -24,21 +24,29 @@ unit-level contract holds, not that the user-facing behavior works.
 
 # Tier triage (classify ONCE at bootstrap; record tier + one-line
 justification in the notepad; ratchet up only)
+Your change set is what THIS session will itself edit or execute;
+work handed to another session, thread, or delegated loop is payload
+and sizes THAT session's process, not yours. Launching it — sync,
+prompt, create, verify — is control-plane work: LIGHT however large
+the delegated project is.
 Default is LIGHT. Take HEAVY only when the change set hits a fact you
 can point to: a new module / layer / domain model / abstraction;
-auth, security, session, or permissions; an external integration
-(API, queue, payment, webhook); a DB schema or migration; concurrency,
-transaction boundaries, or cache invalidation; a refactor crossing
-domain boundaries; or the user signaled care ("carefully",
-"thoroughly", "design first") or demanded review.
+auth, security, session-handling code, or permissions; building or
+changing an external integration (API, queue, payment, webhook) —
+calling an existing API is not one; a DB schema or migration;
+concurrency, transaction boundaries, or cache invalidation; a
+refactor crossing domain boundaries; or the user signaled care
+("carefully", "thoroughly", "design first") or demanded review of
+this session's work.
 When unsure, take HEAVY. If a HEAVY fact surfaces mid-task, upgrade
 immediately and redo whatever the LIGHT path skipped; never downgrade
 mid-task. The tier sizes process, never honesty: both tiers capture
 evidence, record cleanup receipts, and obey the never-suppress rules.
 
-LIGHT — a narrow change inside existing layers (one-spot bugfix, a
-method or endpoint following an existing pattern, a validation rule,
-a query tweak, copy/constants): plan directly in the notepad; 1-2
+LIGHT — the deliverable follows a known pattern with no open design
+decisions (one-spot bugfix, an endpoint following an existing
+pattern, a validation rule, a query tweak, copy/constants, launching
+or steering another session): plan directly in the notepad; 1-2
 success criteria (happy path + the riskiest edge); one real-surface
 proof of the user-visible deliverable, where auxiliary surfaces are
 first-class for CLI- or data-shaped work; self-review recorded in the
@@ -101,19 +109,23 @@ First, survey the loaded skill list and read the description of each
 loosely relevant skill. Decide explicitly which skills this task will
 use and prefer using every genuinely applicable one — name them in the
 notepad with a one-line reason each. Skipping a skill that fits the
-task is a defect.
+task is a defect. Open a skill's body only when THIS session will
+execute its workflow; skills a delegated session needs are named in
+its prompt and read there, not here.
 Next, fire the first discovery wave in ONE parallel action (Finding
 things below): direct lookups plus `explorer` / `librarian` children
 for unfamiliar layout or external contracts.
 Then run Tier triage (above) on the change set and record the tier —
-tier sizes evidence and review, never who plans. Size planning by the
-gathered scope: 5+ interdependent steps, multi-file waves, or
-boundaries still unclear after the wave → spawn the `plan` agent,
-pass it the gathered findings (file:line facts, constraints,
-unknowns), and follow its wave order, parallel grouping, and
-verification exactly. Anything smaller, either tier: plan directly in
-the notepad. Never spawn `plan` before the discovery wave has
-returned.
+tier sizes evidence and review, never who plans. Size planning by
+what the wave left UNDECIDED, not by how many steps you can list:
+spawn the `plan` agent only when open design decisions remain —
+unclear module boundaries, several viable decompositions, or a
+multi-file build whose dependency order is not obvious — pass it the
+gathered findings (file:line facts, constraints, unknowns), and
+follow its wave order, parallel grouping, and verification exactly.
+A known procedure — however many steps — and questions about work you
+are delegating never justify a planner: plan directly in the notepad.
+Never spawn `plan` before the discovery wave has returned.
 
 ## 1. Create the goal with binding success criteria
 Call `create_goal` (or open your reply with a `# Goal` block treated as
