@@ -2,10 +2,11 @@ import type { AgentToolResult, AgentToolUpdateCallback } from "@code-yeongyu/sen
 
 import { resolveExecutionMode, type ExecutionMode, type ManagerStartSpec, type StartResult } from "../../manager"
 import type { TaskRecord } from "../../state"
+import { executeBatch } from "./execute-batch"
 import type { TaskToolParamsStatic } from "./params"
 import { createFsSkillLoader } from "./skills"
-import type { TaskToolContext, TaskToolDeps, TaskToolDetails, TaskToolMode } from "./types"
-import { validateTaskTarget } from "./validation"
+import type { ResolvedSpawnItem, TaskToolContext, TaskToolDeps, TaskToolDetails, TaskToolMode } from "./types"
+import { resolveSpawnItems, validateBatchShape, validateTaskTarget } from "./validation"
 
 type TaskExecute = (
   toolCallId: string,
@@ -17,8 +18,10 @@ type TaskExecute = (
 
 type ResolvedManagerStartSpec = ManagerStartSpec & { readonly execution_mode: ExecutionMode }
 
+type SingleSpawnParams = Omit<TaskToolParamsStatic, "prompt" | "tasks"> & { readonly prompt: string }
+
 type RunSpawnInput = {
-  readonly params: TaskToolParamsStatic
+  readonly params: SingleSpawnParams
   readonly signal: AbortSignal | undefined
   readonly ctx: TaskToolContext
 }
@@ -52,7 +55,7 @@ function syncResult(record: TaskRecord, mode: TaskToolMode): AgentToolResult<Tas
 }
 
 function buildStartSpec(
-  params: TaskToolParamsStatic,
+  params: SingleSpawnParams,
   target: { readonly category: string } | { readonly subagentType: string },
   parentSessionId: string,
   deps: TaskToolDeps,
@@ -106,7 +109,7 @@ function resolvedTaskExecutionMode(
 
 function startedDetails(
   started: Extract<StartResult, { kind: "started" }>,
-  params: TaskToolParamsStatic,
+  params: SingleSpawnParams,
   executionMode: ExecutionMode,
 ): TaskToolDetails {
   return {
@@ -190,8 +193,54 @@ async function runSpawn(
   }
 }
 
+function singleSpawnParams(item: ResolvedSpawnItem, runInBackground: boolean | undefined): SingleSpawnParams {
+  return {
+    prompt: item.prompt,
+    ...(item.kind === "category" ? { category: item.category } : { subagent_type: item.subagentType }),
+    ...(item.description !== undefined && { description: item.description }),
+    ...(item.name !== undefined && { name: item.name }),
+    ...(item.model !== undefined && { model: item.model }),
+    load_skills: [...item.load_skills],
+    ...(runInBackground !== undefined && { run_in_background: runInBackground }),
+  }
+}
+
+function invalidArguments(message: string): AgentToolResult<TaskToolDetails> {
+  return result(message, { task_id: "", status: "invalid_arguments", mode: "spawn", reason: message })
+}
+
 export function buildTaskExecute(deps: TaskToolDeps): TaskExecute {
   return async (_toolCallId, params, signal, _onUpdate, ctx) => {
-    return runSpawn(deps, { params, signal, ctx })
+    const shape = validateBatchShape(params)
+    if (shape.kind === "error") return invalidArguments(shape.error.message)
+
+    const resolved = resolveSpawnItems(params)
+    if (resolved.kind === "error") {
+      if (shape.kind === "single" && resolved.error.code === "item_target") {
+        const target = validateTaskTarget(params)
+        if (target.kind === "error") return invalidArguments(target.error.message)
+      }
+      return invalidArguments(resolved.error.message)
+    }
+
+    const first = resolved.items[0]
+    if (first === undefined) return invalidArguments("Provide at least one task item.")
+    if (resolved.items.length === 1) {
+      return runSpawn(deps, { params: singleSpawnParams(first, params.run_in_background), signal, ctx })
+    }
+
+    const parentSessionId = ctx.sessionManager.getSessionId()
+    return executeBatch({
+      manager: deps.manager,
+      items: resolved.items,
+      signal,
+      runInBackground: params.run_in_background === true,
+      startItem: async (item) => {
+        const itemParams = singleSpawnParams(item, params.run_in_background)
+        const target = item.kind === "category" ? { category: item.category } : { subagentType: item.subagentType }
+        const spec = buildStartSpec(itemParams, target, parentSessionId, deps, ctx.cwd)
+        return deps.manager.start(spec)
+      },
+    })
   }
 }

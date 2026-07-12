@@ -1,7 +1,7 @@
 import type { Theme, ThemeColor } from "@code-yeongyu/senpi"
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui"
 
-import type { TaskToolDetails } from "./types"
+import type { TaskToolDetails, TaskToolItemDetail } from "./types"
 
 const DEFAULT_EXCERPT_WIDTH = 120
 const TASK_PROMPT_EXCERPT_WIDTH = 30
@@ -94,7 +94,7 @@ export function taskCallLines(args: CallArgs): readonly string[] {
 
 export function taskResultLines(details: TaskToolDetails): readonly string[] {
   const mode = details.run_in_background === undefined ? undefined : formatTaskMode(details.run_in_background)
-  return [taskResultLine(details, mode)]
+  return [taskResultLine(details, mode), ...(details.items ?? []).map(taskItemResultLine)]
 }
 
 export function renderTaskCallLines(args: CallArgs, theme: RendererTheme): readonly string[] {
@@ -103,7 +103,7 @@ export function renderTaskCallLines(args: CallArgs, theme: RendererTheme): reado
 
 export function renderTaskResultLines(details: TaskToolDetails, theme: RendererTheme): readonly string[] {
   const mode = details.run_in_background === undefined ? undefined : theme.italic(formatTaskMode(details.run_in_background))
-  return [taskResultLine(details, mode)]
+  return [taskResultLine(details, mode), ...(details.items ?? []).map(taskItemResultLine)]
 }
 
 export function renderTaskResultComponent(details: TaskToolDetails, theme: RendererTheme): LinesComponent {
@@ -112,7 +112,11 @@ export function renderTaskResultComponent(details: TaskToolDetails, theme: Rende
       if (width <= 0) return [""]
       const mode = details.run_in_background === undefined ? undefined : theme.italic(formatTaskMode(details.run_in_background))
       const line = taskResultLineForWidth(details, mode, width)
-      return [truncateToWidth(theme.fg(statusThemeColor(details.status), line), width, ELLIPSIS)]
+      const aggregate = truncateToWidth(theme.fg(statusThemeColor(details.status), line), width, ELLIPSIS)
+      const items = (details.items ?? []).map((item) =>
+        truncateToWidth(theme.fg(statusThemeColor(item.status), taskItemResultLine(item)), width, ELLIPSIS),
+      )
+      return [aggregate, ...items]
     },
     invalidate: (): void => {},
   }
@@ -256,6 +260,20 @@ function taskResultLine(details: TaskToolDetails, mode: string | undefined): str
     taskId === undefined ? undefined : `id:${taskId}`,
     details.queue_position === undefined ? undefined : `queue:${details.queue_position}`,
     reason === undefined ? undefined : `reason:${excerptRendererText(reason, TASK_REASON_EXCERPT_WIDTH)}`,
+  ])
+}
+
+function taskItemResultLine(item: TaskToolItemDetail): string {
+  const taskId = optionalRendererText(item.task_id)
+  const name = optionalRendererText(item.name)
+  const error = optionalRendererText(item.error_message)
+  return joinRendererTokens([
+    "item",
+    name === undefined ? undefined : `name:${name}`,
+    formatTaskStatus(item.status),
+    taskId === undefined ? undefined : `id:${taskId}`,
+    item.queue_position === undefined ? undefined : `queue:${item.queue_position}`,
+    error === undefined ? undefined : `error:${excerptRendererText(error, TASK_REASON_EXCERPT_WIDTH)}`,
   ])
 }
 
