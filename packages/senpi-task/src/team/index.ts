@@ -38,34 +38,18 @@ export type { MemberStatusPort, RefreshTeamMemberStatusesDeps, RuntimeMemberStat
 export { memberTaskName, spawnTeamMembers } from "./spawn-members"
 export type { SpawnMembersInput, SpawnMembersResult, SpawnedMember } from "./spawn-members"
 export {
-  ackMemberInjection,
-  buildMemberUnreadInjection,
   buildPeerMessageEnvelope,
   buildTeamMessage,
   DEFAULT_STALE_RESERVATION_TTL_MS,
-  deliverToLead,
-  deliverToMember,
   reclaimStaleTeamReservations,
   reconcileTeamMailboxOnSessionStart,
-  releaseMemberInjection,
   sendTeamMessage,
 } from "./messaging"
 export type {
-  AckMemberInjectionInput,
-  BuildMemberUnreadInjectionInput,
   BuildTeamMessageOptions,
-  DeliverToLeadInput,
-  DeliverToMemberInput,
-  LeadDeliveryResult,
-  LeadMessageNotifier,
-  LeadTeamMessage,
-  MemberDeliveryResult,
-  MemberLiveHandle,
-  MessagingDeliveryPort,
   MessagingEngineDeps,
   ReclaimResult,
   ReconcileTeamMailboxDeps,
-  ReleaseMemberInjectionInput,
   SendTeamMessageInput,
   SendTeamMessageResult,
 } from "./messaging"
