@@ -9,6 +9,7 @@ import {
 } from "@oh-my-opencode/team-core/team-state-store"
 
 import { readMemberTaskMap, writeMemberTaskMap, type MemberTaskMap } from "./member-map"
+import { resolveStateDir } from "../store"
 import type { TeamSpecSource } from "./registry"
 import { toTeamCoreConfig, toTeamCoreSpecSource, type TeamCoreConfig } from "./runtime-config"
 import {
@@ -68,7 +69,17 @@ export async function createTeam(
     maxParallel: deps.taskSettings.team.max_parallel_members,
     deadlineAt: now() + deps.taskSettings.team.max_wall_clock_minutes * MS_PER_MINUTE,
     now,
-    ...(deps.memberScopedTools !== undefined ? { memberScopedTools: deps.memberScopedTools } : {}),
+    ...(deps.memberExtension !== undefined ? {
+      memberExtension: {
+        ...deps.memberExtension,
+        teamConfig: JSON.stringify({
+          ...config,
+          stateDir: resolveStateDir(deps.stateDir),
+          members: spec.members.map((member) => member.name),
+          wait: deps.taskSettings.wait,
+        }),
+      },
+    } : {}),
   })
 
   if (result.failure !== undefined) {

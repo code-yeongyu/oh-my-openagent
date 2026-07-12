@@ -28,7 +28,11 @@ export type {
   DeleteTeamResult,
   TeamRuntimeManagerPort,
 } from "./runtime-types"
-export type { SenpiTeamRuntimeErrorCode } from "./runtime-types"
+export type {
+  SenpiTeamRuntimeErrorCode,
+  SpawnMemberExtensionConfig,
+  TeamMemberExtensionConfig,
+} from "./runtime-types"
 export { toTeamCoreConfig, toTeamCoreSpecSource } from "./runtime-config"
 export type { TeamCoreConfig, TeamCoreSpecSource } from "./runtime-config"
 export { memberTaskMapPath, readMemberTaskMap, writeMemberTaskMap } from "./member-map"
@@ -40,19 +44,39 @@ export type { SpawnMembersInput, SpawnMembersResult, SpawnedMember } from "./spa
 export {
   buildPeerMessageEnvelope,
   buildTeamMessage,
+  createLeadPoller,
   DEFAULT_STALE_RESERVATION_TTL_MS,
   reclaimStaleTeamReservations,
   reconcileTeamMailboxOnSessionStart,
   sendTeamMessage,
+  WaitRegistry,
 } from "./messaging"
 export type {
   BuildTeamMessageOptions,
+  LeadInjection,
+  LeadInjectionSink,
+  LeadPollFilter,
+  LeadPoller,
+  LeadPollerDeps,
   MessagingEngineDeps,
   ReclaimResult,
   ReconcileTeamMailboxDeps,
   SendTeamMessageInput,
   SendTeamMessageResult,
+  WaitClaim,
+  WaitFilter,
+  WaitMessage,
+  WaitRegistration,
 } from "./messaging"
+export {
+  MEMBER_EXTENSION_BUNDLE_NAME,
+  parseMemberExtensionEnv,
+  resolveMemberExtensionEntryPath,
+} from "./member-extension"
+export type {
+  MemberExtensionConfigErrorCode,
+  ParsedMemberExtensionEnv,
+} from "./member-extension"
 export {
   canClaimTeamTask,
   claimTeamTask,

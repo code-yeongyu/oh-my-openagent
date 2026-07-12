@@ -19,7 +19,7 @@ import type { PersistedTaskEvent } from "../../store"
 import { buildPeerMessageEnvelope } from "../messaging/message"
 import type { WaitClaim, WaitRegistry } from "../messaging/wait-registry"
 
-const CONSUMER_LEASE_STALE_MS = 30_000
+const DEAD_PID_LEASE_STALE_MS = 0
 const RESERVED_PREFIX = ".delivering-"
 const RESERVED_SUFFIX = ".json"
 
@@ -31,6 +31,7 @@ export type MemberSelfPollerDeps = {
   readonly waitRegistry: WaitRegistry<Message>
   readonly sendUserMessage: (content: string) => void
   readonly appendEvent?: (event: PersistedTaskEvent) => void
+  readonly afterInject?: (message: Message) => Promise<void>
 }
 
 export type MemberPollFilter = Readonly<{ from?: string }>
@@ -69,7 +70,7 @@ export function createMemberSelfPoller(deps: MemberSelfPollerDeps): MemberSelfPo
     deps.memberName,
     deps.config,
     fn,
-    { staleAfterMs: CONSUMER_LEASE_STALE_MS },
+    { staleAfterMs: DEAD_PID_LEASE_STALE_MS },
   )
 
   const checkPendingUnderLease = async (): Promise<void> => {
@@ -144,6 +145,7 @@ async function processMessage(
 
   state.pending.set(message.messageId, { message, reservation })
   deps.sendUserMessage(buildPeerMessageEnvelope(message))
+  await deps.afterInject?.(message)
 }
 
 async function resolveWait(

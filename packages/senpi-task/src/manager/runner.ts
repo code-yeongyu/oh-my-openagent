@@ -4,7 +4,6 @@ import type { ChildHandle as InProcessChildHandle } from "../runners/in-process/
 import type { ChildSpec } from "../runners/in-process"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import { adaptInProcessHandle, adaptRpcHandle, type ManagedChildHandle } from "./child-handle"
-import type { RpcLaunchOptions } from "./manager-helpers"
 import type { ManagedRunner, ManagedStartSpec } from "./types"
 
 // The senpi-typed per-child context the component (todo 17) supplies: it owns agent-dir resolution
@@ -40,8 +39,8 @@ export function createInProcessManagedRunner(
 
 export function createRpcManagedRunner(runner: RpcRunnerLike): ManagedRunner {
   return {
-    start(spec: ManagedStartSpec & RpcLaunchOptions): Promise<ManagedChildHandle> {
-      const rpcSpec: RpcRunnerSpec & RpcLaunchOptions = {
+    start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
+      const rpcSpec: RpcRunnerSpec = {
         task_id: spec.taskId,
         cwd: spec.cwd,
         state_dir: spec.stateDir,

@@ -88,6 +88,42 @@ afterEach(() => {
 })
 
 describe("member self-poller", () => {
+  test("#given an after-inject hold w2mem #when delivery reaches the crash window #then reservation stays uncommitted until released", async () => {
+    // given
+    const harness = createHarness()
+    const value = message("11111111-1111-4111-8111-111111111111")
+    await seed(harness, value)
+    let releaseHold = (): void => undefined
+    const hold = new Promise<void>((resolve) => { releaseHold = resolve })
+    let reportEntered = (): void => undefined
+    const entered = new Promise<void>((resolve) => { reportEntered = resolve })
+    const selfPoller = createMemberSelfPoller({
+      teamRunId: TEAM_RUN_ID,
+      memberName: "alice",
+      config: harness.config,
+      sessionDir: harness.sessionDir,
+      waitRegistry: harness.registry,
+      sendUserMessage: (content) => harness.injected.push(content),
+      appendEvent: (event) => harness.events.push(event),
+      afterInject: async () => {
+        reportEntered()
+        await hold
+      },
+    })
+
+    // when
+    const polling = selfPoller.pollOnce()
+    await entered
+
+    // then
+    expect(harness.injected).toEqual([buildPeerMessageEnvelope(value)])
+    expect(existsSync(join(harness.inboxDir, `.delivering-${value.messageId}.json`))).toBe(true)
+    expect(existsSync(join(harness.inboxDir, "processed", `${value.messageId}.json`))).toBe(false)
+
+    releaseHold()
+    await polling
+  })
+
   test("#given an unread message w2mem #when its envelope reaches the session JSONL #then commit happens only after persistence", async () => {
     // given
     const harness = createHarness()
