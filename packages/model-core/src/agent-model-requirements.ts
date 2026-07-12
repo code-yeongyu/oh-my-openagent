@@ -34,7 +34,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       {
         providers: ["openai", "vercel"],
         model: "gpt-5.6-sol",
-        variant: "medium",
+        variant: "high",
       },
       {
         providers: ["openai", "github-copilot", "opencode", "vercel"],
