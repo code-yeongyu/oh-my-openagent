@@ -251,11 +251,13 @@ export function resolveSpawnSyncInvocation(command, args, platform = process.pla
   }
 }
 
-function parseNpmPackJson(output) {
-  for (let index = output.indexOf("["); index !== -1; index = output.indexOf("[", index + 1)) {
+export function parseNpmPackJson(output) {
+  for (let index = 0; index < output.length; index += 1) {
+    if (output[index] !== "[" && output[index] !== "{") continue
     try {
       const parsed = JSON.parse(output.slice(index))
-      if (Array.isArray(parsed) && parsed[0]?.files !== undefined) return parsed
+      const entries = Array.isArray(parsed) ? parsed : parsed && typeof parsed === "object" ? Object.values(parsed) : []
+      if (entries[0]?.files !== undefined) return entries
     } catch (error) {
       if (error instanceof SyntaxError) continue
       throw error
