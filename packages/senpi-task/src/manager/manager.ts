@@ -44,6 +44,12 @@ type LaunchContext = {
   readonly model: string
 }
 
+type TaskWaiter = {
+  readonly resolve: (record: TaskRecord) => void
+  readonly reject: (reason: unknown) => void
+  readonly cleanup: () => void
+}
+
 const NOOP_DESTRUCTION: DestructionPort = { destroyResidentTask: () => Promise.resolve() }
 const GENERIC_START_FAILURE_MESSAGE = "Task runner failed to start."
 
@@ -75,7 +81,7 @@ class TaskManagerImpl implements TaskManager {
   // Release guard keyed by `${taskId}:${runEpoch}` so a revived task (new epoch) can re-acquire a
   // slot and still have its LATER release counted instead of swallowed by an already-released id.
   readonly #released = new Set<string>()
-  readonly #waiters = new Map<string, Array<(record: TaskRecord) => void>>()
+  readonly #waiters = new Map<string, TaskWaiter[]>()
   readonly #background = new Set<string>()
   readonly #steering: SteeringEngine
 
@@ -229,16 +235,42 @@ class TaskManagerImpl implements TaskManager {
 
   wasBackground(taskId: string): boolean { return this.#background.has(taskId) }
 
-  waitFor(taskId: string): Promise<TaskRecord> {
+  waitFor(taskId: string, options?: { readonly signal?: AbortSignal }): Promise<TaskRecord> {
+    const signal = options?.signal
+    if (signal?.aborted) return Promise.reject(signal.reason ?? new Error("waitFor aborted"))
     const id = parseTaskId(taskId)
     const current = this.#tryLoad(id)
     if (current !== null && current !== undefined && isTerminalRecord(current)) return Promise.resolve(current)
-    return new Promise((resolve) => {
-      const list = this.#waiters.get(id) ?? []
-      list.push(resolve)
+    const list = this.#waiters.get(id) ?? []
+    if (signal === undefined) {
+      // task_output races completion.then() against a timeout without a catch; keeping this path
+      // resolve-only is safe until that caller starts passing an AbortSignal.
+      return new Promise((resolve) => {
+        list.push({ resolve, reject: () => undefined, cleanup: () => undefined })
+        this.#waiters.set(id, list)
+      })
+    }
+    return new Promise((resolve, reject) => {
+      const onAbort = (): void => {
+        const index = list.indexOf(waiter)
+        if (index < 0) return
+        list.splice(index, 1)
+        if (list.length === 0) this.#waiters.delete(id)
+        waiter.reject(signal.reason ?? new Error("waitFor aborted"))
+      }
+      const waiter: TaskWaiter = {
+        resolve,
+        reject,
+        cleanup: () => signal.removeEventListener("abort", onAbort),
+      }
+      list.push(waiter)
       this.#waiters.set(id, list)
+      signal.addEventListener("abort", onAbort, { once: true })
     })
   }
+
+  // Test-only observability for proving waitFor never retains empty waiter-map keys.
+  waiterKeyCount(): number { return this.#waiters.size }
 
   async #launch(context: LaunchContext): Promise<{ ok: true } | { ok: false; error: string }> {
     const { record, managedSpec, runner, model } = context
@@ -325,7 +357,14 @@ class TaskManagerImpl implements TaskManager {
   #settleWaiters(taskId: string): void {
     const record = this.#tryLoad(taskId)
     if (record === null || record === undefined) return
-    for (const resolve of this.#waiters.get(taskId)?.splice(0) ?? []) resolve(record)
+    const waiters = this.#waiters.get(taskId)
+    if (waiters === undefined) return
+    const settling = waiters.splice(0)
+    if (waiters.length === 0) this.#waiters.delete(taskId)
+    for (const waiter of settling) {
+      waiter.cleanup()
+      waiter.resolve(record)
+    }
   }
 
   #tryLoad(taskId: string): TaskRecord | null {
@@ -337,6 +376,6 @@ class TaskManagerImpl implements TaskManager {
   }
 }
 
-export function createTaskManager(options: TaskManagerOptions): TaskManager {
+export function createTaskManager(options: TaskManagerOptions): TaskManager & { waiterKeyCount(): number } {
   return new TaskManagerImpl(options)
 }

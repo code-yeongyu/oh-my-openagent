@@ -228,3 +228,105 @@ describe("TaskManager.start", () => {
     expect(JSON.stringify({ result, row })).not.toContain(privatePrompt)
   })
 })
+
+describe("TaskManager.waitFor", () => {
+  test("#given a running task with an abortable wait w2waitfor #when the signal aborts #then the wait rejects and its waiter key is removed", async () => {
+    // given
+    const { manager } = makeManager({})
+    const started = await manager.start(baseSpec())
+    if (started.kind !== "started") throw new Error("expected started")
+    const controller = new AbortController()
+    const reason = new Error("parent aborted")
+    const waiting = manager.waitFor(started.task_id, { signal: controller.signal })
+    expect(manager.waiterKeyCount()).toBe(1)
+
+    // when
+    const observed = waiting.catch((error: unknown) => error)
+    controller.abort(reason)
+
+    // then
+    expect(await observed).toBe(reason)
+    expect(manager.waiterKeyCount()).toBe(0)
+  })
+
+  test("#given an abortable wait that resolves terminal w2waitfor #when the signal aborts afterwards #then abort is a no-op without an unhandled rejection", async () => {
+    // given
+    const { manager, inProcess } = makeManager({})
+    const started = await manager.start(baseSpec())
+    if (started.kind !== "started") throw new Error("expected started")
+    const handle = inProcess.handles.get(started.task_id)
+    if (handle === undefined) throw new Error("expected handle")
+    const controller = new AbortController()
+    const waiting = manager.waitFor(started.task_id, { signal: controller.signal })
+    expect(manager.waiterKeyCount()).toBe(1)
+    handle.settle({ status: "completed", finalResponse: "done" })
+    const completed = await waiting
+
+    // when
+    controller.abort(new Error("late abort"))
+    await flush()
+
+    // then
+    expect(completed.status).toBe("completed")
+    expect(manager.waiterKeyCount()).toBe(0)
+  })
+
+  test("#given a pre-aborted signal w2waitfor #when waitFor is called #then it rejects immediately without registering a waiter", async () => {
+    // given
+    const { manager } = makeManager({})
+    const started = await manager.start(baseSpec())
+    if (started.kind !== "started") throw new Error("expected started")
+    const controller = new AbortController()
+    const reason = new Error("already aborted")
+    controller.abort(reason)
+
+    // when
+    const waiting = manager.waitFor(started.task_id, { signal: controller.signal })
+
+    // then
+    expect(manager.waiterKeyCount()).toBe(0)
+    expect(waiting).rejects.toBe(reason)
+  })
+
+  test("#given two concurrent waiters for one task w2waitfor #when one signal aborts #then the surviving waiter still resolves on settle", async () => {
+    // given
+    const { manager, inProcess } = makeManager({})
+    const started = await manager.start(baseSpec())
+    if (started.kind !== "started") throw new Error("expected started")
+    const handle = inProcess.handles.get(started.task_id)
+    if (handle === undefined) throw new Error("expected handle")
+    const controller = new AbortController()
+    const reason = new Error("first waiter aborted")
+    const abandoned = manager.waitFor(started.task_id, { signal: controller.signal })
+    const surviving = manager.waitFor(started.task_id)
+    expect(manager.waiterKeyCount()).toBe(1)
+
+    // when
+    const observed = abandoned.catch((error: unknown) => error)
+    controller.abort(reason)
+    expect(await observed).toBe(reason)
+    handle.settle({ status: "completed", finalResponse: "survived" })
+
+    // then
+    expect((await surviving).final_response).toBe("survived")
+    expect(manager.waiterKeyCount()).toBe(0)
+  })
+
+  test("#given a running task and a signal-less wait w2waitfor #when the task settles #then waitFor resolves as before", async () => {
+    // given
+    const { manager, inProcess } = makeManager({})
+    const started = await manager.start(baseSpec())
+    if (started.kind !== "started") throw new Error("expected started")
+    const handle = inProcess.handles.get(started.task_id)
+    if (handle === undefined) throw new Error("expected handle")
+    const waiting = manager.waitFor(started.task_id)
+    expect(manager.waiterKeyCount()).toBe(1)
+
+    // when
+    handle.settle({ status: "completed", finalResponse: "done" })
+
+    // then
+    expect((await waiting).final_response).toBe("done")
+    expect(manager.waiterKeyCount()).toBe(0)
+  })
+})

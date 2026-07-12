@@ -162,7 +162,7 @@ export type TaskManager = {
   cancelTask(idOrName: string, reason?: string): Promise<CancelOutcome>
   get(taskId: string): TaskRecord | undefined
   list(scope: ListScope): readonly ListedTask[]
-  waitFor(taskId: string): Promise<TaskRecord>
+  waitFor(taskId: string, options?: { readonly signal?: AbortSignal }): Promise<TaskRecord>
   // W1-V F3: prune a live handle (and its per-epoch release/background bookkeeping) so the lifecycle
   // destruction port and eviction path never leave a stale handle behind or grow #live unbounded.
   forget(taskId: string): void
