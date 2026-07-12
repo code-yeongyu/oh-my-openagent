@@ -69,6 +69,21 @@ export class TaskConcurrency {
     return index === -1 ? undefined : index + 1
   }
 
+  // Dequeue a queued (unsettled) waiter by task id. SPLICES it out of the array rather than
+  // merely marking it settled: queuePosition and release() walk the raw array, so a
+  // settled-but-present entry would inflate every later waiter's position. A queued task
+  // never acquired a slot, so #counts stays untouched. Returns false when no unsettled
+  // waiter for (model, taskId) exists. Compatible with release() because release() already
+  // skips settled entries while shifting the head.
+  remove(model: string, taskId: string): boolean {
+    const queue = this.#queues.get(this.getKey(model))
+    if (queue === undefined) return false
+    const index = queue.findIndex((waiter) => waiter.taskId === taskId && !waiter.settled)
+    if (index === -1) return false
+    queue.splice(index, 1)
+    return true
+  }
+
   release(model: string): void {
     const key = this.getKey(model)
     const queue = this.#queues.get(key)
