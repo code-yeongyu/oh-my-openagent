@@ -1,2 +1,0 @@
-#!/usr/bin/env sh
-exec senpi --model anthropic/claude-opus-4-8 --thinking xhigh --approve "$@"
