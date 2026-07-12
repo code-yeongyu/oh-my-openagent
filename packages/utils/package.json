@@ -61,6 +61,10 @@
       "types": "./src/internal-initiator-marker.ts",
       "import": "./src/internal-initiator-marker.ts"
     },
+    "./skill-path-resolver": {
+      "types": "./src/skill-path-resolver.ts",
+      "import": "./src/skill-path-resolver.ts"
+    },
     "./migration": {
       "types": "./src/migration.ts",
       "import": "./src/migration.ts"

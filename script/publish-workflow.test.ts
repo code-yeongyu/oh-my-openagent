@@ -104,6 +104,22 @@ describe("test workflows", () => {
     expect(typecheckBuildsLspToolsMcp, "publish typecheck job must build lsp-tools-mcp before bun run typecheck").toBe(true)
   })
 
+  test("builds publish-main from the prepared release SHA", () => {
+    // #given
+    const workflow = readFileSync(publishWorkflowPath, "utf8")
+    const publishMainJob = sliceWorkflowSection(workflow, "  publish-main:", "  publish-platform:")
+
+    // #when
+    const checksOutPreparedRelease = publishMainJob.includes("ref: ${{ needs.prepare-release-state.outputs.release_sha }}")
+    const regeneratesInstallerBeforeMainBuild = publishMainJob.includes(
+      "bun run build:codex-install && bun run build:lsp-tools-mcp && bun run build:lsp-daemon && bun run build",
+    )
+
+    // #then
+    expect(checksOutPreparedRelease, "publish-main must build the release-state commit after version synchronization").toBe(true)
+    expect(regeneratesInstallerBeforeMainBuild, "publish-main must regenerate the embedded Codex installer from that release commit").toBe(true)
+  })
+
   test("runs Codex compatibility checks before publish jobs", () => {
     // #given
     const workflow = readFileSync(publishWorkflowPath, "utf8")

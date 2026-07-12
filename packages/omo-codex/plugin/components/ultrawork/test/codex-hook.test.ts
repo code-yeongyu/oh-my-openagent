@@ -285,7 +285,7 @@ describe("codex ultrawork hook", () => {
 		expect(directive).toMatch(/`plan` agent/);
 	});
 
-	it("#given directive #when inspected #then orders discovery before scope-gated planning", () => {
+	it("#given directive #when discovery leaves known execution steps #then planning stays direct unless design uncertainty remains", () => {
 		// given
 		const payload = {
 			hook_event_name: "UserPromptSubmit",
@@ -298,12 +298,15 @@ describe("codex ultrawork hook", () => {
 
 		// then
 		const directive = parsed.hookSpecificOutput.additionalContext;
-		expect(directive).toMatch(/fire the first discovery wave[\s\S]*?spawn the `plan` agent/i);
-		expect(directive).toMatch(/5\+ interdependent steps/);
+		const discoveryIndex = directive.search(/fire the first discovery wave/i);
+		const uncertaintyIndex = directive.search(/what the wave left UNDECIDED/i);
+		const directPlanIndex = directive.search(/known procedure[\s\S]*plan directly/i);
+		expect(discoveryIndex).toBeGreaterThanOrEqual(0);
+		expect(uncertaintyIndex).toBeGreaterThan(discoveryIndex);
+		expect(directPlanIndex).toBeGreaterThan(uncertaintyIndex);
+		expect(directive).toMatch(/unclear module boundaries[\s\S]*viable decompositions[\s\S]*dependency order/i);
+		expect(directive).toMatch(/A known procedure.*however many steps.*never justify a planner/is);
 		expect(directive).toMatch(/[Nn]ever spawn `plan` before the discovery wave/);
 		expect(directive).toMatch(/tier sizes\s+evidence and review, never who plans/i);
-		expect(directive).not.toMatch(/HEAVY: spawn the `plan` agent/);
-		expect(directive).not.toMatch(/`plan` agent decides waves/);
-		expect(directive).not.toMatch(/Plan obsessively/);
 	});
 });
