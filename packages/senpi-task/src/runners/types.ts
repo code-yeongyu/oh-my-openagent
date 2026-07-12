@@ -1,10 +1,24 @@
-import type { AgentSessionEvent } from "@code-yeongyu/senpi"
+import type { AgentSessionEvent, SessionEntry } from "@code-yeongyu/senpi"
+
+export type RpcSwitchSessionResult = { readonly cancelled: boolean }
+
+export type RpcEntriesResult = {
+  readonly entries: readonly SessionEntry[]
+  readonly leafId: string | null
+}
+
+export type RpcSpawnSpec = {
+  readonly cwd: string
+  readonly extensions?: readonly string[]
+  readonly memberEnv?: Readonly<Record<string, string>>
+}
 
 export type RpcRunnerSpec = {
   readonly task_id: string
   readonly cwd: string
   readonly state_dir: string
   readonly prompt: string
+  readonly resumeSessionPath?: string
   // The provider/modelId the child must resolve. A separate OS process cannot share the parent's
   // in-memory registry, so the model is threaded onto the child command line (`--model`).
   readonly model?: string
@@ -12,6 +26,7 @@ export type RpcRunnerSpec = {
   // then ONLY these are loaded, so a keyless local provider (or a production `-e` extension) the parent
   // registered is reproducible in the detached child without inheriting the parent's whole package set.
   readonly extensions?: readonly string[]
+  readonly memberEnv?: Readonly<Record<string, string>>
 }
 
 export type ChildEventListener = (event: AgentSessionEvent) => void
@@ -54,6 +69,9 @@ export type TerminateOptions = {
 }
 
 export type RpcChildHandle = ChildHandle & {
+  readonly spawnSpec?: RpcSpawnSpec
+  switchSession?(sessionPath: string): Promise<RpcSwitchSessionResult>
+  getEntries?(since?: string): Promise<RpcEntriesResult>
   terminate(options?: TerminateOptions): Promise<void>
   exitOutcome(): ChildExitOutcome | undefined
   waitForExit(): Promise<ChildExitOutcome>

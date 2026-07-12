@@ -1,6 +1,6 @@
 import type { ChildHandle as InProcessChildHandle, RunnerOutcome } from "../runners/in-process/child-handle"
 import { mapExitOutcomeToError } from "../runners/rpc/exit-mapping"
-import type { RpcChildHandle } from "../runners/types"
+import type { RpcChildHandle, RpcEntriesResult, RpcSpawnSpec, RpcSwitchSessionResult } from "../runners/types"
 
 export type { RunnerOutcome } from "../runners/in-process/child-handle"
 
@@ -24,13 +24,17 @@ export type ManagedChildHandle = {
   readonly task_id: string
   readonly sessionId: string | undefined
   readonly pid: number | undefined
+  readonly spawnSpec?: RpcSpawnSpec
   steer(text: string): Promise<void>
   followUp(text: string): Promise<void>
   abort(): Promise<void>
   subscribe(listener: ManagedChildListener): () => void
   waitForOutcome(): Promise<RunnerOutcome>
+  switchSession?(sessionPath: string): Promise<RpcSwitchSessionResult>
+  getEntries?(since?: string): Promise<RpcEntriesResult>
   // Partial assistant text captured so far (used by interrupt to preserve work-in-progress).
   lastAssistantText(): string | undefined
+  terminate?(): Promise<void>
   dispose(): Promise<void>
 }
 
@@ -53,6 +57,8 @@ export function adaptInProcessHandle(handle: InProcessChildHandle): ManagedChild
 }
 
 export function adaptRpcHandle(handle: RpcChildHandle): ManagedChildHandle {
+  const switchSession = handle.switchSession
+  const getEntries = handle.getEntries
   return {
     task_id: handle.task_id,
     get sessionId() {
@@ -61,13 +67,33 @@ export function adaptRpcHandle(handle: RpcChildHandle): ManagedChildHandle {
     get pid() {
       return handle.pid
     },
+    ...(handle.spawnSpec === undefined ? {} : { spawnSpec: handle.spawnSpec }),
     steer: (text) => handle.steer(text),
     followUp: (text) => handle.followUp(text),
     abort: () => handle.abort(),
     subscribe: (listener) => handle.subscribe(listener),
     waitForOutcome: () => rpcOutcome(handle),
+    ...(switchSession === undefined ? {} : { switchSession: (sessionPath: string) => switchSession(sessionPath) }),
+    ...(getEntries === undefined ? {} : { getEntries: (since?: string) => getEntries(since) }),
     lastAssistantText: () => handle.lastAssistantText(),
+    terminate: () => handle.terminate(),
     dispose: () => handle.dispose(),
+  }
+}
+
+export async function discardManagedHandle(handle: ManagedChildHandle): Promise<void> {
+  try {
+    if (handle.terminate !== undefined) await handle.terminate()
+  } finally {
+    await handle.dispose()
+  }
+}
+
+export async function discardRpcHandle(handle: RpcChildHandle): Promise<void> {
+  try {
+    await handle.terminate()
+  } finally {
+    await handle.dispose()
   }
 }
 
