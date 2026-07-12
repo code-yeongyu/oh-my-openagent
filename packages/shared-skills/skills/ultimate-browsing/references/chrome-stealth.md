@@ -2,8 +2,8 @@
 
 Real interaction (clicks, forms, screenshots, video, persistent login) for pages that defeat Tier 1/1.5. Two runtime tools, both installed on demand — neither is vendored in this skill:
 
-- **CloakBrowser** (`pip`) — stealth Chromium with source-level C++ fingerprint patches. The Python wrapper source is MIT; the downloaded Chromium binary is covered by CloakBrowser's separate binary license and is not redistributed by this package. Passes Cloudflare Turnstile, FingerprintJS, BrowserScan, and 30+ detectors. Pin **0.4.0**.
-- **agent-browser** (`npm`, Apache-2.0) — native CDP automation CLI that drives CloakBrowser. AX-tree snapshots, `@eN` refs, click/fill/type/scroll, screenshots, video, cookie/state/session management. Pin **0.29.1**.
+- **CloakBrowser** (`pip`) — stealth Chromium with source-level C++ fingerprint patches. The Python wrapper source is MIT; the downloaded Chromium binary is covered by CloakBrowser's separate binary license and is not redistributed by this package. Passes Cloudflare Turnstile, FingerprintJS, BrowserScan, and 30+ detectors. Pin **0.4.10**.
+- **agent-browser** (`npm`, Apache-2.0) — native CDP automation CLI that drives CloakBrowser. AX-tree snapshots, `@eN` refs, click/fill/type/scroll, screenshots, video, cookie/state/session management. Pin **0.31.1**.
 
 ```
 CloakBrowser (stealth Chromium) <- CDP port 9242 -> agent-browser CLI
@@ -18,22 +18,22 @@ CloakBrowser (stealth Chromium) <- CDP port 9242 -> agent-browser CLI
 CloakBrowser runs in a dedicated Python venv. Cross-platform: macOS, Linux, and Windows all supported by both tools (use the venv path convention for your OS).
 
 ```bash
-# CloakBrowser (MIT wrapper source; separate binary license, pin 0.4.0):
+# CloakBrowser (MIT wrapper source; separate binary license, pin 0.4.10):
 uv venv .cloak-venv --python 3.13
 # macOS/Linux: source .cloak-venv/bin/activate    Windows: .cloak-venv\Scripts\activate
-uv pip install "cloakbrowser==0.4.0"
+uv pip install "cloakbrowser==0.4.10"
 python -c "import cloakbrowser; cloakbrowser.ensure_binary()"   # downloads stealth Chromium on first import
 
-# agent-browser (Apache-2.0, pin 0.29.1):
-npm i -g agent-browser@0.29.1 && agent-browser install
-agent-browser --version   # 0.29.1
+# agent-browser (Apache-2.0, pin 0.31.1):
+npm i -g agent-browser@0.31.1 && agent-browser install
+agent-browser --version   # 0.31.1
 ```
 
 Verify CloakBrowser:
 
 ```bash
 python -c "import cloakbrowser; print(cloakbrowser.__version__, cloakbrowser.CHROMIUM_VERSION, cloakbrowser.binary_info()['installed'])"
-# -> 0.4.0  <chromium-version>  True
+# -> 0.4.10  <chromium-version>  True
 ```
 
 ## Launch + drive
@@ -76,7 +76,7 @@ agent-browser skills list                # everything available on the installed
 agent-browser --cdp 9242 eval 'navigator.webdriver'   # must print false
 ```
 
-Tested May 2026: bot.sannysoft.com all-green, browserscan.net "Normal" (15/15), nowsecure.nl Turnstile bypassed.
+Verified 2026-07 with CloakBrowser 0.4.10 + agent-browser 0.31.1: `navigator.webdriver` reads the boolean false with no init-script, bot.sannysoft.com all-green, browserscan.net "Normal" (15/15), nowsecure.nl Turnstile bypassed.
 
 ## Cookie login (cross-platform)
 
@@ -115,6 +115,6 @@ lsof -ti:9242 | xargs kill -9
 # agent-browser can't connect:
 curl -s http://127.0.0.1:9242/json/version | head -5   # empty -> CloakBrowser not running
 # Update either tool:
-uv pip install --upgrade "cloakbrowser==0.4.0" && python -c "import cloakbrowser; cloakbrowser.ensure_binary()"
-npm i -g agent-browser@0.29.1
+uv pip install --upgrade "cloakbrowser==0.4.10" && python -c "import cloakbrowser; cloakbrowser.ensure_binary()"
+npm i -g agent-browser@0.31.1
 ```
