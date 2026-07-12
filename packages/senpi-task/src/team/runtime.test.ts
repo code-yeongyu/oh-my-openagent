@@ -62,7 +62,7 @@ describe("createTeam", () => {
     expect(Object.keys(created.memberTaskIds).sort()).toEqual(["alpha", "beta", "gamma"])
     expect(manager.started).toHaveLength(3)
     for (const spec of manager.started) {
-      expect(spec.execution_mode).toBe("in-process")
+      expect(spec.execution_mode).toBe("process")
       expect(spec.run_in_background).toBe(true)
       expect(spec.parent_session_id).toBe("lead-session")
       expect(spec.depth).toBe(1)

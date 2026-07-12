@@ -38,10 +38,10 @@ export function memberTaskName(teamRunId: string, memberName: string): string {
 
 /**
  * Spawns team members as senpi-task children through the manager, capped at `maxParallel` cooperating
- * workers over a shared index, enforcing the create deadline before each pull. Members are ALWAYS
- * in-process (v1) and run in the background. The FIRST failure (a rejected start, a thrown start, or
- * a deadline breach) flips the shared flag so the remaining workers drain out and the caller rolls
- * back the members already spawned.
+ * workers over a shared index, enforcing the create deadline before each pull. Members run as durable
+ * background processes so their sessions remain recoverable across parent or child crashes. The FIRST
+ * failure (a rejected start, a thrown start, or a deadline breach) flips the shared flag so the remaining
+ * workers drain out and the caller rolls back the members already spawned.
  */
 export async function spawnTeamMembers(input: SpawnMembersInput): Promise<SpawnMembersResult> {
   const spawned = new Map<string, SpawnedMember>()
@@ -114,7 +114,7 @@ function buildMemberStartSpec(input: SpawnMembersInput, member: TeamMember): Man
     root_session_id: input.leadSessionId,
     depth: input.spawnDepth,
     name: memberTaskName(input.teamRunId, member.name),
-    execution_mode: "in-process",
+    execution_mode: "process",
     run_in_background: true,
     ...(member.kind === "category" ? { category: member.category } : { subagent_type: member.subagent_type }),
     ...(member.worktreePath !== undefined ? { cwd: member.worktreePath } : {}),

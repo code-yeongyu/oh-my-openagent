@@ -8,6 +8,7 @@ export type ActiveTeamSummary = {
   readonly status: string
   readonly memberCount: number
   readonly scope: "project" | "user"
+  readonly leadSessionId?: string
 }
 
 export type TeamTaskStatus = Task["status"]
