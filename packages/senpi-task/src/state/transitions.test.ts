@@ -15,12 +15,12 @@ function pendingRecord(): TaskRecord {
 }
 
 describe("transitionTaskRecord lifecycle graph", () => {
-  test("#given pending task #when terminal transitions arrive before start #then they are rejected", () => {
+  test("#given pending task #when running-only terminals (complete/fail/interrupt) arrive before start #then they are rejected", () => {
     // given
+    // cancel-from-pending is legal (see the w2trans suite below); complete/fail/interrupt stay running-only.
     const terminalTransitions: readonly TaskTransition[] = [
       { type: "complete", timestamp: "2026-07-06T00:00:00.000Z", final_response: "done" },
       { type: "fail", timestamp: "2026-07-06T00:00:00.000Z", error_message: "failed" },
-      { type: "cancel", timestamp: "2026-07-06T00:00:00.000Z", error_message: "cancelled" },
       { type: "interrupt", timestamp: "2026-07-06T00:00:00.000Z", error_message: "interrupted" },
     ]
 
@@ -28,11 +28,10 @@ describe("transitionTaskRecord lifecycle graph", () => {
     const results = terminalTransitions.map((transition) => transitionTaskRecord(pendingRecord(), transition))
 
     // then
-    expect(results.map((result) => result.applied)).toEqual([false, false, false, false])
-    expect(results.map((result) => result.record.status)).toEqual(["pending", "pending", "pending", "pending"])
+    expect(results.map((result) => result.applied)).toEqual([false, false, false])
+    expect(results.map((result) => result.record.status)).toEqual(["pending", "pending", "pending"])
     const auditTypes: readonly string[] = results.map((result) => result.audit.type)
     expect(auditTypes).toEqual([
-      "invalid_transition_ignored",
       "invalid_transition_ignored",
       "invalid_transition_ignored",
       "invalid_transition_ignored",
@@ -239,5 +238,110 @@ describe("transitionTaskRecord lifecycle graph", () => {
     expect(lateComplete.applied).toBe(false)
     expect(lateComplete.record.status).toBe("interrupted")
     expect(lateComplete.audit.type).toBe("late_transition_ignored")
+  })
+})
+
+describe("transitionTaskRecord cancel-from-pending", () => {
+  test(" w2trans #given pending task #when cancel transition arrives #then it is applied and status becomes cancelled", () => {
+    // given
+    const pending = pendingRecord()
+
+    // when
+    const result = transitionTaskRecord(pending, { type: "cancel", timestamp: "2026-07-06T00:00:01.000Z" })
+
+    // then
+    expect(result.applied).toBe(true)
+    expect(result.record.status).toBe("cancelled")
+    expect(result.audit.type).toBe("transition_applied")
+  })
+
+  test(" w2trans #given pending task #when interrupt transition arrives #then it is rejected as invalid (running-only)", () => {
+    // given
+    const pending = pendingRecord()
+
+    // when
+    const result = transitionTaskRecord(pending, {
+      type: "interrupt",
+      timestamp: "2026-07-06T00:00:01.000Z",
+      error_message: "interrupted",
+    })
+
+    // then
+    expect(result.applied).toBe(false)
+    expect(result.record.status).toBe("pending")
+    expect(result.audit.type).toBe("invalid_transition_ignored")
+  })
+
+  test(" w2trans #given running task #when cancel transition arrives #then it is still applied (regression)", () => {
+    // given
+    const running = transitionTaskRecord(pendingRecord(), {
+      type: "start",
+      timestamp: "2026-07-06T00:00:00.000Z",
+      pid: 1234,
+    }).record
+
+    // when
+    const result = transitionTaskRecord(running, {
+      type: "cancel",
+      timestamp: "2026-07-06T00:00:01.000Z",
+      error_message: "cancelled",
+    })
+
+    // then
+    expect(result.applied).toBe(true)
+    expect(result.record.status).toBe("cancelled")
+  })
+
+  test(" w2trans #given terminal task (completed or cancelled) #when cancel arrives #then it is rejected by terminal idempotence", () => {
+    // given
+    const running = transitionTaskRecord(pendingRecord(), {
+      type: "start",
+      timestamp: "2026-07-06T00:00:00.000Z",
+      pid: 1234,
+    }).record
+    const completed = transitionTaskRecord(running, {
+      type: "complete",
+      timestamp: "2026-07-06T00:00:01.000Z",
+      final_response: "done",
+    }).record
+    const cancelled = transitionTaskRecord(running, {
+      type: "cancel",
+      timestamp: "2026-07-06T00:00:01.000Z",
+      error_message: "cancelled",
+    }).record
+    const cancelTransition: TaskTransition = {
+      type: "cancel",
+      timestamp: "2026-07-06T00:00:02.000Z",
+      error_message: "double cancel",
+    }
+
+    // when
+    const completedCancel = transitionTaskRecord(completed, cancelTransition)
+    const cancelledCancel = transitionTaskRecord(cancelled, cancelTransition)
+
+    // then
+    expect(completedCancel.applied).toBe(false)
+    expect(completedCancel.record.status).toBe("completed")
+    expect(completedCancel.audit.type).toBe("late_transition_ignored")
+    expect(cancelledCancel.applied).toBe(false)
+    expect(cancelledCancel.record.status).toBe("cancelled")
+    expect(cancelledCancel.audit.type).toBe("late_transition_ignored")
+  })
+
+  test(" w2trans #given pending task #when cancel carries error_message #then the reason is stamped onto the cancelled record", () => {
+    // given
+    const pending = pendingRecord()
+
+    // when
+    const result = transitionTaskRecord(pending, {
+      type: "cancel",
+      timestamp: "2026-07-06T00:00:01.000Z",
+      error_message: "cancelled while queued",
+    })
+
+    // then
+    expect(result.applied).toBe(true)
+    expect(result.record.status).toBe("cancelled")
+    expect(result.record.error_message).toBe("cancelled while queued")
   })
 })
