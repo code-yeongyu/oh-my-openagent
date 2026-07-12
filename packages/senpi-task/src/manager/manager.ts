@@ -1,6 +1,6 @@
 import { log } from "@oh-my-opencode/utils"
 
-import { isRunnerError } from "../runners/in-process/runner-error"
+import { RunnerError } from "../runners/in-process/runner-error"
 import { createTaskRecord, parseTaskId } from "../state"
 import type { TaskRecord } from "../state"
 import { createSteeringEngine } from "../steering"
@@ -49,7 +49,7 @@ const GENERIC_START_FAILURE_MESSAGE = "Task runner failed to start."
 
 function publicStartFailureMessage(error: unknown): string {
   try {
-    if (!isRunnerError(error)) return GENERIC_START_FAILURE_MESSAGE
+    if (!RunnerError.is(error)) return GENERIC_START_FAILURE_MESSAGE
     switch (error.failure.kind) {
       case "depth-exceeded":
         return "In-process child depth limit exceeded."
