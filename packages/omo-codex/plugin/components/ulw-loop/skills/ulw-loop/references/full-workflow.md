@@ -55,7 +55,7 @@ Every worker message MUST carry: goal + exact files in scope; the PIN + failing-
 Codex subagent reliability:
 - Start every `spawn_agent` message with `TASK: <imperative assignment>`, then name `DELIVERABLE`, `SCOPE`, and `VERIFY`. State that it is an executable assignment, not a context handoff.
 - Use `fork_turns: "none"` (v1: `fork_context: false`) unless full history is truly required; paste only the context the child needs. Full-history forks can make the child continue old parent context instead of the delegated task.
-- Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short `wait_agent` cycles. Never use a single long blocking wait for them.
+- Plan and reviewer agents may run for a long time; spawn them in the background and keep doing independent root work. Between `wait_agent` calls, back off — double the timeout up to ~5 minutes — instead of spinning short cycles.
 - For work likely to exceed one wait cycle, require the child to send `WORKING: <task> - <current phase>` before long reading, testing, or review passes, and `BLOCKED: <reason>` only when it cannot progress.
 - While any child is active, keep the parent visibly alive with active subagent count, agent names, latest `WORKING:` phase, and whether the parent is waiting for mailbox updates.
 - Track spawned agent names locally. Use `wait_agent` for mailbox signals, not proof of completion. A timeout only means no new mailbox update arrived. Treat a running child as alive.
