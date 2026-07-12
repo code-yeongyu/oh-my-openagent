@@ -1,6 +1,8 @@
 import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
+import type { Message } from "@oh-my-opencode/team-core/types"
 import {
   TEAM_LEAD_SENTINEL,
+  WaitRegistry,
   buildLeadTeamTools,
   createTaskCancelTool,
   createTaskOutputTool,
@@ -8,6 +10,7 @@ import {
   createTaskTool,
   defaultResolveCallerSessionId,
   type TeamToolsService,
+  type WaitBounds,
 } from "@oh-my-opencode/senpi-task"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
@@ -72,7 +75,7 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
       pi.registerMessageRenderer?.(TEAM_MESSAGE_MESSAGE_TYPE, renderTeamMessage)
       const teamTools = createTeamToolContext(pi, ctx, engine)
       registerTaskTools(pi, engine, teamTools.service)
-      registerTeamTools(pi, teamTools.service)
+      registerTeamTools(pi, teamTools.service, engine.settings.wait)
       const reconcileTeamMailbox = teamTools.reconcileTeamMailbox
       registerTaskCommands(pi, engine.manager)
 
@@ -134,8 +137,17 @@ function createTeamToolContext(
   return { service, reconcileTeamMailbox: createTeamMailboxReconciler(serviceDeps) }
 }
 
-function registerTeamTools(pi: SenpiExtensionAPI, service: TeamToolsService): void {
-  for (const tool of buildLeadTeamTools({ service })) pi.registerTool({ ...tool })
+function registerTeamTools(pi: SenpiExtensionAPI, service: TeamToolsService, waitBounds: WaitBounds): void {
+  const registry = new WaitRegistry<Message>()
+  for (const tool of buildLeadTeamTools({
+    service,
+    waitBounds,
+    registry,
+    resolveLeadPoller: () => undefined,
+    resolveTeamRunId: async (explicit) => explicit === undefined
+      ? { ok: false, reason: "Pass team_run_id until lead poller wiring is active." }
+      : { ok: true, teamRunId: explicit },
+  })) pi.registerTool({ ...tool })
 }
 
 interface EventBridgeState {
