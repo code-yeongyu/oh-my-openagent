@@ -7,7 +7,6 @@ import {
   readMemberTaskMap,
   resolveTeamRuntimeDirs,
   validateSenpiTeamMembers,
-  type MessagingDeliveryPort,
   type SenpiTeamMemberPorts,
   type ShutdownMessenger,
   type StateDirConfig,
@@ -68,15 +67,7 @@ export async function resolveTeamSpec(
   throw new SenpiTeamSpecError(message, "INVALID_SPEC", teamName)
 }
 
-export function buildMessagingDelivery(manager: TaskManager): MessagingDeliveryPort {
-  return {
-    get: (taskId) => manager.get(taskId),
-    liveHandle: (taskId) => manager.getResidentHandle(taskId),
-    sendToTask: (input) => manager.sendToTask(input),
-  }
-}
-
-async function memberTaskId(manager: TaskManager, stateDir: StateDirConfig, teamRunId: string, memberName: string): Promise<string | undefined> {
+async function memberTaskId(stateDir: StateDirConfig, teamRunId: string, memberName: string): Promise<string | undefined> {
   const runtimeDir = resolveTeamRuntimeDirs(stateDir, teamRunId).runtimeDir
   const map = await readMemberTaskMap(runtimeDir)
   return map[memberName]
@@ -86,7 +77,7 @@ async function memberTaskId(manager: TaskManager, stateDir: StateDirConfig, team
 // the member->task mapping from the run sidecar. A member with no live task is a silent no-op.
 export function makeShutdownMessenger(manager: TaskManager, stateDir: StateDirConfig, teamRunId: string): ShutdownMessenger {
   return async (message) => {
-    const taskId = await memberTaskId(manager, stateDir, teamRunId, message.to)
+    const taskId = await memberTaskId(stateDir, teamRunId, message.to)
     if (taskId === undefined) return
     await manager.sendToTask({ idOrName: taskId, message: `[team ${message.kind}] ${message.body}`, deliverAs: "followUp" })
   }
@@ -95,7 +86,7 @@ export function makeShutdownMessenger(manager: TaskManager, stateDir: StateDirCo
 // Cancels a member's background child (approve-shutdown teardown), resolving its task via the sidecar.
 export function makeCancelMemberTask(manager: TaskManager, stateDir: StateDirConfig, teamRunId: string): (memberName: string) => Promise<void> {
   return async (memberName) => {
-    const taskId = await memberTaskId(manager, stateDir, teamRunId, memberName)
+    const taskId = await memberTaskId(stateDir, teamRunId, memberName)
     if (taskId === undefined) return
     await manager.cancelTask(taskId, `team ${teamRunId} shutdown approved`)
   }

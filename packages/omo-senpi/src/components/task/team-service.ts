@@ -19,7 +19,6 @@ import {
   toTeamCoreConfig,
   updateTeamTaskStatus,
   type ActiveTeamSummary,
-  type LeadMessageNotifier,
   type StateDirConfig,
   type TaskManager,
   type TeamCoreConfig,
@@ -30,7 +29,6 @@ import { listActiveTeams } from "@oh-my-opencode/team-core/team-state-store"
 import type { TaskRuntimeContext } from "./runtime-context"
 import {
   buildMemberPorts,
-  buildMessagingDelivery,
   makeCancelMemberTask,
   makeShutdownMessenger,
   resolveTeamSpec,
@@ -47,7 +45,6 @@ export interface TeamServiceDeps {
   readonly omoConfig: OmoConfig
   readonly cwd: string
   readonly agentNames: ReadonlySet<string>
-  readonly leadNotifier: LeadMessageNotifier
   readonly now?: () => number
   readonly newMessageId?: () => string
 }
@@ -76,6 +73,7 @@ function toTeams(rows: Awaited<ReturnType<typeof listActiveTeams>>): readonly Ac
     status: row.status,
     memberCount: row.memberCount,
     scope: row.scope,
+    ...(row.leadSessionId !== undefined ? { leadSessionId: row.leadSessionId } : {}),
   }))
 }
 
@@ -83,7 +81,6 @@ export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
   const stateDir = stateDirConfig(deps)
   const config: TeamCoreConfig = toTeamCoreConfig(deps.settings, teamStorageBaseDir(stateDir))
   const ports = buildMemberPorts(deps.omoConfig, deps.agentNames)
-  const delivery = buildMessagingDelivery(deps.manager)
   const omoTeams = deps.omoConfig.teams as Record<string, unknown> | undefined
   const runtimeDir = (teamRunId: string) => resolveTeamRuntimeDirs(stateDir, teamRunId).runtimeDir
 
@@ -109,9 +106,6 @@ export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
         teamRunId,
         stateDir,
         config,
-        delivery,
-        leadNotifier: deps.leadNotifier,
-        parentState: () => deps.runtime.parentState(),
         ...(deps.now !== undefined ? { now: deps.now } : {}),
         ...(deps.newMessageId !== undefined ? { newMessageId: deps.newMessageId } : {}),
       }),
