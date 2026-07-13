@@ -1,6 +1,6 @@
 import type { Theme } from "@code-yeongyu/senpi";
 
-import { uriToPath } from "./formatters.js";
+import { uriToPath } from "./render-format.js";
 import { Text } from "./rendering.js";
 import {
 	COLLAPSED_HEAD,
@@ -13,9 +13,8 @@ import {
 	renderPositionCall,
 	unique,
 } from "./renderers-common.js";
-import type { LspFindReferencesDetails } from "./tools/find-references.js";
-import type { LspGotoDefinitionDetails } from "./tools/goto-definition.js";
-import { shorten } from "./utils.js";
+import type { LspFindReferencesDetails, LspGotoDefinitionDetails } from "./descriptors.js";
+import { shorten } from "./render-format.js";
 
 export function renderGotoDefinitionCall(args: PositionArgs, theme: Theme): Text {
 	return new Text(renderPositionCall("lsp_goto_definition", args, theme), 0, 0);

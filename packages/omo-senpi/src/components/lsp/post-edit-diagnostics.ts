@@ -1,8 +1,15 @@
-export type DiagnosticsRunner = (filePath: string) => Promise<string>;
+import {
+	collectPostEditDiagnostics,
+	createPostEditNotConfiguredCache,
+	resetPostEditNotConfiguredCache,
+	type PostEditDiagnosticsOutcome,
+	type PostEditNotConfiguredCache,
+} from "@oh-my-opencode/lsp-core/post-edit";
+
+export type DiagnosticsRunner = (filePath: string) => Promise<PostEditDiagnosticsOutcome>;
 
 const MUTATION_TOOL_NAMES = new Set(["write", "edit", "apply_patch"]);
-const CLEAN_DIAGNOSTICS_TEXT = "No diagnostics found";
-const UNSUPPORTED_EXTENSION_TEXT = "No LSP server configured for extension:";
+const POST_EDIT_DIAGNOSTICS_CONCURRENCY = 4;
 export const POST_EDIT_DIAGNOSTICS_WIDGET_KEY = "omo-senpi-lsp";
 
 type WidgetPlacement = "aboveEditor" | "belowEditor";
@@ -30,6 +37,41 @@ interface DiagnosticBlock {
 	diagnostics: string;
 }
 
+export interface LspPostEditSessionState {
+	getOrCreate(sessionId: string | undefined): PostEditNotConfiguredCache;
+	onSessionStart(sessionId: string | undefined): void;
+	reset(sessionId: string | undefined): void;
+	delete(sessionId: string | undefined): void;
+}
+
+export function createLspPostEditSessionState(): LspPostEditSessionState {
+	const caches = new Map<string, PostEditNotConfiguredCache>();
+	return {
+		getOrCreate(sessionId: string | undefined): PostEditNotConfiguredCache {
+			if (sessionId === undefined) return createPostEditNotConfiguredCache();
+			let cache = caches.get(sessionId);
+			if (cache === undefined) {
+				cache = createPostEditNotConfiguredCache();
+				caches.set(sessionId, cache);
+			}
+			return cache;
+		},
+		onSessionStart(sessionId: string | undefined): void {
+			if (sessionId !== undefined && !caches.has(sessionId)) {
+				caches.set(sessionId, createPostEditNotConfiguredCache());
+			}
+		},
+		reset(sessionId: string | undefined): void {
+			if (sessionId === undefined) return;
+			resetPostEditNotConfiguredCache(this.getOrCreate(sessionId));
+		},
+		delete(sessionId: string | undefined): void {
+			if (sessionId === undefined) return;
+			caches.delete(sessionId);
+		},
+	};
+}
+
 export function shouldRunPostEditDiagnostics(event: ToolResultLike): boolean {
 	return !event.isError && MUTATION_TOOL_NAMES.has(event.toolName);
 }
@@ -37,18 +79,20 @@ export function shouldRunPostEditDiagnostics(event: ToolResultLike): boolean {
 export async function appendPostEditDiagnostics(
 	event: ToolResultLike,
 	runDiagnostics: DiagnosticsRunner,
+	cache?: PostEditNotConfiguredCache,
 ): Promise<PostEditDiagnosticsResult | undefined> {
 	if (!shouldRunPostEditDiagnostics(event)) return undefined;
 
 	const filePaths = extractMutatedFilePaths(event);
 	if (filePaths.length === 0) return undefined;
 
-	const blocks: DiagnosticBlock[] = [];
-	for (const filePath of filePaths) {
-		const diagnostics = (await runDiagnostics(filePath)).trim();
-		if (isCleanPostEditDiagnostics(diagnostics)) continue;
-		blocks.push({ filePath, diagnostics });
-	}
+	const result = await collectPostEditDiagnostics({
+		filePaths,
+		runDiagnostics,
+		cache,
+		maxConcurrency: POST_EDIT_DIAGNOSTICS_CONCURRENCY,
+	});
+	const blocks: readonly DiagnosticBlock[] = result.blocks;
 
 	if (blocks.length === 0) {
 		return { widgetLines: undefined };
@@ -64,14 +108,6 @@ export async function appendPostEditDiagnostics(
 		],
 		widgetLines: undefined,
 	};
-}
-
-function isCleanPostEditDiagnostics(diagnostics: string): boolean {
-	return (
-		diagnostics.length === 0 ||
-		diagnostics === CLEAN_DIAGNOSTICS_TEXT ||
-		diagnostics.startsWith(UNSUPPORTED_EXTENSION_TEXT)
-	);
 }
 
 export function syncPostEditDiagnosticsWidget(
