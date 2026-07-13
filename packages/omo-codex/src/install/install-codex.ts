@@ -163,7 +163,15 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     })
   }
 
-  await reapLspDaemons(codexHome).catch(() => [])
+  const legacyDaemonCleanup = await reapLspDaemons(codexHome).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error)
+    log(`Warning: skipped legacy Codex LSP daemon cleanup: ${message}`)
+    return []
+  })
+  for (const cleanup of legacyDaemonCleanup) {
+    if (cleanup.status !== "deferred") continue
+    log(`Warning: deferred legacy Codex LSP daemon cleanup for v${cleanup.version}: ${cleanup.reason}`)
+  }
 
   const marketplaceRoot = join(codexHome, "plugins", "cache", marketplace.name)
   await writeCachedMarketplaceManifest({
