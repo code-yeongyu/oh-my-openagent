@@ -33,8 +33,8 @@ export function parseEvents(stdout) {
     if (trimmed.length === 0) continue
     try {
       events.push(JSON.parse(trimmed))
-    } catch {
-      // non-JSON banner line
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error
     }
   }
   return events
@@ -74,8 +74,57 @@ export function runtimeDir(cwd, teamRunId) {
   return join(runtimeRootDir(cwd), teamRunId)
 }
 
+export function taskStateDir(cwd) {
+  return join(cwd, ".omo", "senpi-task")
+}
+
 export function memberInboxDir(cwd, teamRunId, memberName) {
   return join(runtimeRootDir(cwd), teamRunId, "inboxes", memberName)
+}
+
+export function memberTaskId(cwd, teamRunId, memberName) {
+  const map = readJsonIfPresent(join(runtimeDir(cwd, teamRunId), "senpi-task-members.json"))
+  const taskId = map?.[memberName]
+  return typeof taskId === "string" ? taskId : undefined
+}
+
+export function taskRecord(cwd, taskId) {
+  return readJsonIfPresent(join(taskStateDir(cwd), "tasks", `${taskId}.json`))
+}
+
+export function taskEventText(cwd, taskId) {
+  return readText(join(taskStateDir(cwd), "logs", `${taskId}.jsonl`)) ?? ""
+}
+
+export function processedMessagePath(cwd, teamRunId, recipient, messageId) {
+  return join(memberInboxDir(cwd, teamRunId, recipient), "processed", `${messageId}.json`)
+}
+
+export function sessionEnvelopeCount(cwd, taskId, messageId) {
+  const marker = `messageId=\"${messageId}\"`
+  return sessionStringValues(cwd, taskId)
+    .filter((value) => value.includes("<peer_message ") && value.includes(marker))
+    .length
+}
+
+export function sessionContainsText(cwd, taskId, needle) {
+  return sessionStringValues(cwd, taskId).some((value) => value.includes(needle))
+}
+
+export function deliveredEventCount(cwd, taskId, messageId) {
+  let count = 0
+  for (const line of taskEventText(cwd, taskId).split(/\r?\n/)) {
+    if (line.trim().length === 0) continue
+    let event
+    try {
+      event = JSON.parse(line)
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error
+      continue
+    }
+    if (event?.type === "team_message_delivered" && event.payload?.message_id === messageId) count += 1
+  }
+  return count
 }
 
 // The teamRunId directories team-core minted under this run's runtime root (usually exactly one).
@@ -129,4 +178,35 @@ export function readText(path) {
 export function readJsonIfPresent(path) {
   const text = readText(path)
   return text === undefined ? undefined : JSON.parse(text)
+}
+
+function sessionStringValues(cwd, taskId) {
+  const sessionDir = join(taskStateDir(cwd), "children", taskId, "sessions", taskId)
+  if (!existsSync(sessionDir)) return []
+  const values = []
+  for (const entry of readdirSync(sessionDir)) {
+    if (!entry.endsWith(".jsonl")) continue
+    for (const line of readFileSync(join(sessionDir, entry), "utf8").split(/\r?\n/)) {
+      if (line.trim().length === 0) continue
+      try {
+        collectStrings(JSON.parse(line), values)
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) throw error
+      }
+    }
+  }
+  return values
+}
+
+function collectStrings(value, output) {
+  if (typeof value === "string") {
+    output.push(value)
+    return
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectStrings(item, output)
+    return
+  }
+  if (value === null || typeof value !== "object") return
+  for (const item of Object.values(value)) collectStrings(item, output)
 }

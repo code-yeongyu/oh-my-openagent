@@ -2,7 +2,8 @@ import type { ChildProcess } from "node:child_process"
 import type { AgentSessionEvent, RpcCommand, RpcExtensionUIRequest, RpcResponse } from "@code-yeongyu/senpi"
 import { log } from "@oh-my-opencode/utils"
 
-import type { ChildEventListener } from "../types"
+import type { ChildEventListener, RpcEntriesResult, RpcSwitchSessionResult } from "../types"
+import { RpcCommandError } from "./errors"
 import { tailStderr } from "./exit-mapping"
 import { buildAutoUiResponse } from "./ui-auto-answer"
 
@@ -73,6 +74,19 @@ export class RpcProtocolClient {
         reject(error)
       })
     })
+  }
+
+  async switchSession(sessionPath: string): Promise<RpcSwitchSessionResult> {
+    const response = await this.send({ type: "switch_session", sessionPath })
+    if (response.success && response.command === "switch_session") return response.data
+    throw commandError(response, "switch_session")
+  }
+
+  async getEntries(since?: string): Promise<RpcEntriesResult> {
+    const command: RpcCommand = since === undefined ? { type: "get_entries" } : { type: "get_entries", since }
+    const response = await this.send(command)
+    if (response.success && response.command === "get_entries") return response.data
+    throw commandError(response, "get_entries")
   }
 
   onEvent(listener: ChildEventListener): () => void {
@@ -177,4 +191,9 @@ export class RpcProtocolClient {
       listener(error)
     }
   }
+}
+
+function commandError(response: RpcResponse, expectedCommand: string): RpcCommandError {
+  if (!response.success) return new RpcCommandError(expectedCommand, response.error)
+  return new RpcCommandError(expectedCommand, `unexpected response command: ${response.command}`)
 }

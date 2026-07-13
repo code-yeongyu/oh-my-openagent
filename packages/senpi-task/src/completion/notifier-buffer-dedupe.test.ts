@@ -32,6 +32,7 @@ function fakeStore(seed: TaskRecord) {
       records.set(record.task_id, record)
     },
     appendEvent: (_taskId: string, _event: PersistedTaskEvent): string => "log.jsonl",
+    list: () => ({ records: [...records.values()], diagnostics: [] }),
   }
 }
 

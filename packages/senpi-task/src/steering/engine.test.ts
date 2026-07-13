@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
+import type { ManagedChildHandle } from "../manager/child-handle"
 import type { TaskRecord } from "../state"
 import {
   cleanupSteering,
@@ -8,6 +9,7 @@ import {
   type RunnerFlavor,
   type SteeringHarness,
 } from "./__fixtures__/steering-fakes"
+import { createSteeringEngine } from "./engine"
 
 afterEach(cleanupSteering)
 
@@ -234,5 +236,61 @@ describe("steering engine scope + resolution guards", () => {
     // then
     expect(outcome.kind).toBe("steered")
     expect(fake.steerCalls).toEqual(["go"])
+  })
+})
+
+describe("steering pending cancellation", () => {
+  test("#given a pending child with queued sends w2pend #when cancelled then notified started #then the queue is dropped without delivery", async () => {
+    // given
+    const harness = makeHarness()
+    const record = harness.seedRecord()
+    const live = new Map<string, ManagedChildHandle>()
+    const dequeued: string[] = []
+    const destroyed: string[] = []
+    const engine = createSteeringEngine({
+      store: harness.store,
+      liveHandle: (taskId) => live.get(taskId),
+      reacquireForRevive: () => {},
+      dequeuePending: (taskId) => {
+        dequeued.push(taskId)
+        return true
+      },
+      destruction: {
+        destroyResidentTask: async (taskId) => {
+          destroyed.push(taskId)
+        },
+      },
+      now: Date.now,
+    })
+    await engine.sendToTask({ idOrName: record.task_id, message: "first" })
+    await engine.sendToTask({ idOrName: record.task_id, message: "second" })
+
+    // when
+    const cancelled = await engine.cancelTask(record.task_id, "not needed")
+    const fake = makeFakeHandle(record.task_id, "in-process")
+    live.set(record.task_id, fake.handle)
+    await engine.notifyStarted(record.task_id)
+
+    // then
+    if (cancelled.kind !== "cancelled") throw new Error("expected cancelled")
+    expect(cancelled.previous_status).toBe("pending")
+    expect(harness.store.load(record.task_id)?.status).toBe("cancelled")
+    expect(dequeued).toEqual([record.task_id])
+    expect(destroyed).toEqual([record.task_id])
+    expect(fake.followUpCalls).toEqual([])
+    expect(fake.steerCalls).toEqual([])
+  })
+
+  test("#given a pending child w2pend #when interrupted #then it remains pending with a noop outcome", async () => {
+    // given
+    const harness = makeHarness()
+    const record = harness.seedRecord()
+
+    // when
+    const interrupted = await harness.engine.interruptTask(record.task_id)
+
+    // then
+    expect(interrupted.kind).toBe("noop")
+    expect(harness.store.load(record.task_id)?.status).toBe("pending")
   })
 })

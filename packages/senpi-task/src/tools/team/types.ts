@@ -1,6 +1,9 @@
-import type { RuntimeState, Task } from "@oh-my-opencode/team-core/types"
+import type { Message, RuntimeState, Task } from "@oh-my-opencode/team-core/types"
 
 import type { CreateTeamResult, DeleteTeamResult, SendTeamMessageInput, SendTeamMessageResult } from "../../team"
+import type { LeadPoller } from "../../team/messaging/lead-poller"
+import type { WaitRegistry } from "../../team/messaging/wait-registry"
+import type { WaitBounds } from "../control"
 
 export type ActiveTeamSummary = {
   readonly teamRunId: string
@@ -8,6 +11,7 @@ export type ActiveTeamSummary = {
   readonly status: string
   readonly memberCount: number
   readonly scope: "project" | "user"
+  readonly leadSessionId?: string
 }
 
 export type TeamTaskStatus = Task["status"]
@@ -47,6 +51,18 @@ export type TeamToolsService = {
   rejectShutdown(teamRunId: string, member: string, reason: string): Promise<RuntimeState>
 }
 
+type TeamWaitDeps = {
+  readonly waitBounds: WaitBounds
+  readonly registry: WaitRegistry<Message>
+  readonly resolveLeadPoller: (teamRunId: string) => LeadPoller | undefined
+  readonly resolveTeamRunId: (explicit?: string) => Promise<
+    | { readonly ok: true; readonly teamRunId: string }
+    | { readonly ok: false; readonly reason: string }
+  >
+}
+
 export type TeamToolDeps = {
   readonly service: TeamToolsService
-}
+} & Partial<TeamWaitDeps>
+
+export type LeadTeamToolDeps = TeamToolDeps & TeamWaitDeps

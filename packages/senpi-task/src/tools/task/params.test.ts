@@ -28,7 +28,7 @@ describe("TaskToolParams", () => {
     expect(propertyKeys).not.toContain("task_id")
   })
 
-  test("#given the schema #when required fields are read #then only prompt is required", () => {
-    expect(TaskToolParams.required).toEqual(["prompt"])
+  test("#given the schema #when required fields are read #then neither prompt nor tasks is schema-required (the prompt-XOR-tasks rule is enforced by validateBatchShape)", () => {
+    expect(TaskToolParams.required).toBeUndefined()
   })
 })

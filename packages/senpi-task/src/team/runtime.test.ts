@@ -36,6 +36,43 @@ function threeMemberSpec() {
 }
 
 describe("createTeam", () => {
+  test("#given a member extension launch config #when a team member starts #then extension and durable identity env reach the manager spec", async () => {
+    // given
+    const stateDir = stateDirConfig(tempProjectDir())
+    const settings = taskSettings()
+    const manager = new FakeTeamManager()
+    const spec = normalizeSenpiTeamSpec(
+      { members: [{ name: "alpha", kind: "category", category: "quick", prompt: "task alpha" }] },
+      "squad",
+    )
+
+    // when
+    const created = await createTeam(spec, "project", {
+      manager,
+      stateDir,
+      taskSettings: settings,
+      leadSessionId: "lead-session",
+      spawnDepth: 1,
+      memberExtension: {
+        entryPath: "/tmp/omo-member.js",
+        inheritedExtensions: ["/tmp/mock-provider.ts"],
+      },
+    })
+
+    // then
+    const started = manager.started[0]
+    expect(started?.extensions).toEqual(["/tmp/mock-provider.ts", "/tmp/omo-member.js"])
+    expect(started?.memberEnv?.["SENPI_TASK_MEMBER"]).toBe(`${created.runtimeState.teamRunId}::alpha`)
+    const config = JSON.parse(started?.memberEnv?.["SENPI_TASK_TEAM_CONFIG"] ?? "null")
+    expect(config).toMatchObject({
+      stateDir: join(stateDir.project_dir, ".omo", "senpi-task"),
+      base_dir: join(stateDir.project_dir, ".omo", "senpi-task", "teams"),
+      members: ["alpha"],
+      wait: settings.wait,
+    })
+    expect(started?.memberScopedTools).toBeUndefined()
+  })
+
   test("#given a 3-member spec #when created #then the team is active with 3 mapped running members", async () => {
     // given
     const stateDir = stateDirConfig(tempProjectDir())
@@ -62,7 +99,7 @@ describe("createTeam", () => {
     expect(Object.keys(created.memberTaskIds).sort()).toEqual(["alpha", "beta", "gamma"])
     expect(manager.started).toHaveLength(3)
     for (const spec of manager.started) {
-      expect(spec.execution_mode).toBe("in-process")
+      expect(spec.execution_mode).toBe("process")
       expect(spec.run_in_background).toBe(true)
       expect(spec.parent_session_id).toBe("lead-session")
       expect(spec.depth).toBe(1)

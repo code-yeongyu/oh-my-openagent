@@ -28,7 +28,11 @@ export type {
   DeleteTeamResult,
   TeamRuntimeManagerPort,
 } from "./runtime-types"
-export type { SenpiTeamRuntimeErrorCode } from "./runtime-types"
+export type {
+  SenpiTeamRuntimeErrorCode,
+  SpawnMemberExtensionConfig,
+  TeamMemberExtensionConfig,
+} from "./runtime-types"
 export { toTeamCoreConfig, toTeamCoreSpecSource } from "./runtime-config"
 export type { TeamCoreConfig, TeamCoreSpecSource } from "./runtime-config"
 export { memberTaskMapPath, readMemberTaskMap, writeMemberTaskMap } from "./member-map"
@@ -38,37 +42,41 @@ export type { MemberStatusPort, RefreshTeamMemberStatusesDeps, RuntimeMemberStat
 export { memberTaskName, spawnTeamMembers } from "./spawn-members"
 export type { SpawnMembersInput, SpawnMembersResult, SpawnedMember } from "./spawn-members"
 export {
-  ackMemberInjection,
-  buildMemberUnreadInjection,
   buildPeerMessageEnvelope,
   buildTeamMessage,
+  createLeadPoller,
   DEFAULT_STALE_RESERVATION_TTL_MS,
-  deliverToLead,
-  deliverToMember,
   reclaimStaleTeamReservations,
   reconcileTeamMailboxOnSessionStart,
-  releaseMemberInjection,
   sendTeamMessage,
+  WaitRegistry,
 } from "./messaging"
 export type {
-  AckMemberInjectionInput,
-  BuildMemberUnreadInjectionInput,
   BuildTeamMessageOptions,
-  DeliverToLeadInput,
-  DeliverToMemberInput,
-  LeadDeliveryResult,
-  LeadMessageNotifier,
-  LeadTeamMessage,
-  MemberDeliveryResult,
-  MemberLiveHandle,
-  MessagingDeliveryPort,
+  LeadInjection,
+  LeadInjectionSink,
+  LeadPollFilter,
+  LeadPoller,
+  LeadPollerDeps,
   MessagingEngineDeps,
   ReclaimResult,
   ReconcileTeamMailboxDeps,
-  ReleaseMemberInjectionInput,
   SendTeamMessageInput,
   SendTeamMessageResult,
+  WaitClaim,
+  WaitFilter,
+  WaitMessage,
+  WaitRegistration,
 } from "./messaging"
+export {
+  MEMBER_EXTENSION_BUNDLE_NAME,
+  parseMemberExtensionEnv,
+  resolveMemberExtensionEntryPath,
+} from "./member-extension"
+export type {
+  MemberExtensionConfigErrorCode,
+  ParsedMemberExtensionEnv,
+} from "./member-extension"
 export {
   canClaimTeamTask,
   claimTeamTask,

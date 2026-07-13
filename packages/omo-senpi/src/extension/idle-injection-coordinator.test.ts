@@ -131,4 +131,24 @@ describe("IdleInjectionCoordinator", () => {
     coordinator.scheduleFlush()
     expect(scheduledCount).toBe(2)
   })
+
+  it("#given an injection callback w2lead #when the queue flushes #then onFlushed runs synchronously after delivery returns", () => {
+    // given
+    const order: string[] = []
+    const coordinator = new IdleInjectionCoordinator(() => {
+      order.push("deliver")
+    })
+    coordinator.enqueue({
+      key: "team-message:m1",
+      source: "team-message",
+      content: "alpha: ready",
+      onFlushed: () => order.push("flushed"),
+    })
+
+    // when
+    coordinator.flushOnIdle()
+
+    // then
+    expect(order).toEqual(["deliver", "flushed"])
+  })
 })

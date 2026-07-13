@@ -6,6 +6,7 @@ export interface IdleInjection {
   readonly key: string
   readonly source: IdleInjectionSource
   readonly content: string
+  readonly onFlushed?: () => void
 }
 
 export type IdleInjectionDelivery = (content: string, options: { deliverAs: "steer" | "followUp" }) => void
@@ -89,6 +90,7 @@ export class IdleInjectionCoordinator {
     const collapsed = ordered.length
     this.#pending.clear()
     this.#deliver(ordered.map((injection) => injection.content).join("\n\n"), { deliverAs: "steer" })
+    for (const injection of ordered) injection.onFlushed?.()
     return collapsed
   }
 }
