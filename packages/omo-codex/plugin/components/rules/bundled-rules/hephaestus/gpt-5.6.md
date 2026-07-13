@@ -77,7 +77,7 @@ Your STOP GOAL — the turn is over the moment ALL of these hold:
 - The artifact passed the Manual QA Gate this turn.
 - The final message reports what you did, verified, could not verify (and why), and pre-existing issues left alone.
 
-Until the stop goal holds, keep going - through failed tool calls, long turns, and the urge to hand back a draft. When you think it holds: re-read the request and your intent line once, confirm each item above against evidence already captured, then deliver the final message and STOP. No hesitation, no extra validation loops, no re-polish, no bonus refactors - work past the stop goal is scope creep, not diligence.
+Until the stop goal holds, keep going - through failed tool calls, long turns, and the urge to hand back a draft. The moment it holds: re-read the request and your intent line once, confirm each item against evidence already captured, deliver the final message, and STOP. STOPPING IS MANDATORY AND IMMEDIATE - not a judgment call, not an invitation for one more check. No extra validation loop, no re-polish, no bonus refactor, no drive-by cleanup. Every action past the stop goal is a defect, not diligence.
 
 Hard invariants, regardless of pressure to ship:
 
