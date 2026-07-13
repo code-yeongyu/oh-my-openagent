@@ -83,4 +83,26 @@ describe("OpenAI GPT-5.6 fast capability aliases", () => {
       diagnostics: { resolutionMode: "heuristic-backed" },
     })
   })
+
+  test("inherits canonical capabilities through a Vercel OpenAI subprovider prefix", () => {
+    const alias = getModelCapabilities({
+      providerID: "vercel",
+      modelID: "openai/gpt-5.6-sol-fast",
+      bundledSnapshot,
+    })
+
+    expect(alias).toMatchObject({
+      requestedModelID: "openai/gpt-5.6-sol-fast",
+      canonicalModelID: "gpt-5.6-sol",
+      supportsTemperature: false,
+      diagnostics: {
+        resolutionMode: "alias-backed",
+        canonicalization: {
+          source: "pattern-alias",
+          ruleID: "openai-gpt-5.6-fast-service-tier-alias",
+        },
+        snapshot: { source: "bundled-snapshot" },
+      },
+    })
+  })
 })

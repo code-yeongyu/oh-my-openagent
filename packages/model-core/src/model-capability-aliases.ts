@@ -84,6 +84,8 @@ export function resolveModelIDAlias(modelID: string, providerID?: string): Model
   const requestedModelID = normalizeLookupModelID(modelID)
   const aliasLookupModelID = stripProviderPrefixForAliasLookup(requestedModelID)
   const normalizedProviderID = providerID ? normalizeLookupModelID(providerID) : undefined
+  const providerPrefixEnd = requestedModelID.indexOf("/")
+  const embeddedProviderID = providerPrefixEnd > 0 ? requestedModelID.slice(0, providerPrefixEnd) : undefined
   const exactRule = EXACT_ALIAS_RULES_BY_MODEL.get(aliasLookupModelID)
   if (exactRule) {
     return {
@@ -95,8 +97,12 @@ export function resolveModelIDAlias(modelID: string, providerID?: string): Model
   }
 
   for (const rule of PATTERN_ALIAS_RULES) {
-    if (rule.providerIDs && (!normalizedProviderID || !rule.providerIDs.includes(normalizedProviderID))) {
-      continue
+    if (rule.providerIDs) {
+      const matchesProviderID = normalizedProviderID !== undefined && rule.providerIDs.includes(normalizedProviderID)
+      const matchesEmbeddedProviderID = embeddedProviderID !== undefined && rule.providerIDs.includes(embeddedProviderID)
+      if (!matchesProviderID && !matchesEmbeddedProviderID) {
+        continue
+      }
     }
     if (!rule.match(aliasLookupModelID)) {
       continue
