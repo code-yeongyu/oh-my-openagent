@@ -21,6 +21,7 @@ export type WaitClaim<TMessage extends WaitMessage> = {
 type WaitState = "waiting" | "claimed" | "settled" | "cancelled"
 
 type WaitEntry<TMessage extends WaitMessage> = {
+  readonly teamRunId: string | undefined
   readonly filter: WaitFilter
   readonly resolvePromise: (message: TMessage) => void
   readonly rejectPromise: (reason: unknown) => void
@@ -34,14 +35,18 @@ export class WaitRegistry<TMessage extends WaitMessage = WaitMessage> {
     return this.#entries.filter((entry) => entry.state === "waiting" || entry.state === "claimed").length
   }
 
-  register(filter: WaitFilter = {}): WaitRegistration<TMessage> {
+  register(filter?: WaitFilter): WaitRegistration<TMessage>
+  register(teamRunId: string, filter?: WaitFilter): WaitRegistration<TMessage>
+  register(teamRunIdOrFilter: string | WaitFilter = {}, filter: WaitFilter = {}): WaitRegistration<TMessage> {
+    const teamRunId = typeof teamRunIdOrFilter === "string" ? teamRunIdOrFilter : undefined
+    const resolvedFilter = typeof teamRunIdOrFilter === "string" ? filter : teamRunIdOrFilter
     let resolvePromise: (message: TMessage) => void = () => undefined
     let rejectPromise: (reason: unknown) => void = () => undefined
     const promise = new Promise<TMessage>((resolve, reject) => {
       resolvePromise = resolve
       rejectPromise = reject
     })
-    const entry: WaitEntry<TMessage> = { filter, resolvePromise, rejectPromise, state: "waiting" }
+    const entry: WaitEntry<TMessage> = { teamRunId, filter: resolvedFilter, resolvePromise, rejectPromise, state: "waiting" }
     this.#entries.push(entry)
 
     return {
@@ -50,9 +55,15 @@ export class WaitRegistry<TMessage extends WaitMessage = WaitMessage> {
     }
   }
 
-  takeMatch(message: TMessage): WaitClaim<TMessage> | undefined {
+  takeMatch(message: TMessage): WaitClaim<TMessage> | undefined
+  takeMatch(teamRunId: string, message: TMessage): WaitClaim<TMessage> | undefined
+  takeMatch(teamRunIdOrMessage: string | TMessage, candidateMessage?: TMessage): WaitClaim<TMessage> | undefined {
+    const teamRunId = typeof teamRunIdOrMessage === "string" ? teamRunIdOrMessage : undefined
+    const message = typeof teamRunIdOrMessage === "string" ? candidateMessage : teamRunIdOrMessage
+    if (message === undefined) return undefined
     const entry = this.#entries.find((candidate) => (
       candidate.state === "waiting"
+      && candidate.teamRunId === teamRunId
       && (candidate.filter.from === undefined || candidate.filter.from === message.from)
     ))
     if (entry === undefined) return undefined

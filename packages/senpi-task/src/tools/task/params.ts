@@ -1,5 +1,7 @@
 import { Type, type Static } from "typebox"
 
+export const MAX_TASK_BATCH_ITEMS = 16
+
 export const TaskToolParams = Type.Object({
   prompt: Type.Optional(
     Type.String({ description: "The instruction for the child task. MUST be written in English." }),
@@ -34,7 +36,7 @@ export const TaskToolParams = Type.Object({
         model: Type.Optional(Type.String({ description: "Model override for this task." })),
         load_skills: Type.Optional(Type.Array(Type.String(), { description: "Skills loaded for this task." })),
       }),
-      { minItems: 1 },
+      { minItems: 1, maxItems: MAX_TASK_BATCH_ITEMS },
     ),
   ),
 })

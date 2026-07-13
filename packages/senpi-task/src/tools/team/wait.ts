@@ -47,7 +47,7 @@ export async function runTeamWait(
 
   const timeoutMs = clampWaitTimeout(input.timeout_ms, deps.waitBounds)
   const filter = input.from === undefined ? {} : { from: input.from }
-  const registration = deps.registry.register(filter)
+  const registration = deps.registry.register(resolved.teamRunId, filter)
   try {
     await poller.pollOnce(filter)
     const outcome = await waitForMessage(registration, timeoutMs, signal)

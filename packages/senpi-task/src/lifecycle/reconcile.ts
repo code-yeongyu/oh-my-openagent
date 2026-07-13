@@ -98,7 +98,7 @@ async function reattachRecord(
   record: TaskRecord,
   sessionPath: string,
 ): Promise<ReconcileOutcome> {
-  const ports = getLifecycleReattachPorts(context.store)
+  const ports = context.reattachPorts ?? getLifecycleReattachPorts(context.store)
   if (ports === undefined) {
     markLost(context, record, "reattach ports unavailable")
     return { task_id: record.task_id, kind: "lost", reason: "reattach ports unavailable" }

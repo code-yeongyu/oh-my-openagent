@@ -4,8 +4,10 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { FakeRunner, flush } from "../manager/__fixtures__/manager-fakes"
 import { createTaskManager } from "../manager/manager"
+import { createTeamMemberRespawnLaunchResolver } from "../team/member-respawn"
 import { resolveChildSessionDir } from "../runners/rpc/spawn"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
+import type { ManagedChildHandle } from "../manager/child-handle"
 import type { TaskRecord, TaskStatus } from "../state"
 import type { TaskRecordStore } from "../store"
 import { createTaskLifecycle } from "./create"
@@ -155,6 +157,50 @@ describe("reconcileOnSessionStart reattach", () => {
     expect(store.load("st_00000001")?.notification.run_epoch).toBe(1)
     expect(manager.getResidentHandle("st_00000001")?.pid).toBe(1001)
   })
+  test(" w2reattach #given injected reattach ports and a registered store fallback #when reconciled #then the injected ports take precedence", async () => {
+    // given
+    const { store, sessionPath } = createHarness({ taskId: "st_0000000d" })
+    const calls: string[] = []
+    const injectedHandle: ManagedChildHandle = {
+      task_id: "st_0000000d",
+      sessionId: "injected-session",
+      pid: 1001,
+      steer: async () => undefined,
+      followUp: async () => undefined,
+      abort: async () => undefined,
+      subscribe: () => () => undefined,
+      waitForOutcome: async () => ({ status: "completed", finalResponse: "" }),
+      lastAssistantText: () => undefined,
+      dispose: async () => undefined,
+    }
+    const lifecycle = createTaskLifecycle({
+      store,
+      registry: new FakeRegistry(),
+      config: settings(),
+      now,
+      signaller: fakeSignaller(new Set(), []),
+      respawn: async (record, path) => {
+        calls.push(`respawn:${record.task_id}:${path}`)
+        return { ok: true, handle: injectedHandle }
+      },
+      reattach: async (record, handle) => {
+        calls.push(`reattach:${record.task_id}:${handle.sessionId}`)
+        return { ok: true }
+      },
+    })
+
+    // when
+    const result = await lifecycle.reconcileOnSessionStart()
+
+    // then
+    if (sessionPath === undefined) throw new Error("expected a persisted session path")
+    expect(result.outcomes[0]?.kind).toBe("resumed")
+    expect(calls).toEqual([
+      `respawn:st_0000000d:${sessionPath}`,
+      "reattach:st_0000000d:injected-session",
+    ])
+  })
+
 
   test(" w2reattach #given a dead process without a session #when reconciled #then it remains lost without respawn", async () => {
     // given
@@ -273,7 +319,7 @@ describe("reconcileOnSessionStart reattach", () => {
     expect(manager.getResidentHandle("st_0000000b")?.pid).toBe(1001)
   })
 
-  test(" w2reattach #given a process runner reports its effective launch facts #when production start persists the record #then inherited extensions survive reconcile", async () => {
+  test(" w2reattach #given a process runner reports effective launch inputs #when persisted record is reloaded #then only safe spawn facts survive", async () => {
     // given
     const processRunner = new EffectiveSpawnRunner()
     const { store, manager } = createHarness({ taskId: "st_0000000c", processRunner })
@@ -283,11 +329,7 @@ describe("reconcileOnSessionStart reattach", () => {
 
     // then
     if (result.kind !== "started") throw new Error("expected started task")
-    expect(store.load(result.task_id)?.spawn_spec).toEqual({
-      cwd: "/tmp/project",
-      extensions: ["/tmp/inherited-extension.ts"],
-      member_env: { SENPI_TASK_MEMBER: "run-1::alpha" },
-    })
+    expect(store.load(result.task_id)?.spawn_spec).toEqual({ cwd: "/tmp/project" })
   })
 
   test(" w2reattach #given switch_session is cancelled #when reconciled #then the fresh child is torn down and the record stays lost", async () => {
@@ -304,6 +346,94 @@ describe("reconcileOnSessionStart reattach", () => {
     expect(respawnRunner.controls[0]?.terminated()).toBe(1)
     expect(respawnRunner.controls[0]?.disposed()).toBe(1)
     expect(manager.getResidentHandle("st_00000008")).toBeUndefined()
+  })
+
+  test(" w2reattach #given one trusted launch resolver rejection #when reconciling multiple process tasks #then later tasks still reattach", async () => {
+    // given
+    const store = tempStore()
+    const rejectedRecord = seedProcessRecord(store, "st_0000000d")
+    const healthyRecord = seedProcessRecord(store, "st_0000000e")
+    persistSessions(store, rejectedRecord.task_id)
+    persistSessions(store, healthyRecord.task_id)
+    const respawnRunner = new FakeRespawnRunner()
+    const inProcess = new FakeRunner()
+    createTaskManager({
+      store,
+      runners: { "in-process": inProcess, process: inProcess },
+      planner: () => ({ kind: "resolved", plan: { model: "anthropic/claude" } }),
+      config: settings(),
+      cwd: "/tmp/project",
+      rpcRespawnRunner: respawnRunner,
+      trustedRespawnLaunch: async (record) => {
+        if (record.task_id === rejectedRecord.task_id) throw new Error("current team runtime unavailable")
+        return undefined
+      },
+    })
+    const lifecycle = createTaskLifecycle({
+      store,
+      registry: new FakeRegistry(),
+      config: settings(),
+      now,
+      signaller: fakeSignaller(new Set(), []),
+      orphanKillDelayMs: 0,
+    })
+
+    // when
+    const result = await lifecycle.reconcileOnSessionStart()
+
+    // then
+    expect(result.outcomes.find((outcome) => outcome.task_id === rejectedRecord.task_id)?.kind).toBe("lost")
+    expect(result.outcomes.find((outcome) => outcome.task_id === healthyRecord.task_id)?.kind).toBe("resumed")
+    expect(respawnRunner.startedSpecs.map((spec) => spec.task_id)).toEqual([healthyRecord.task_id])
+  })
+
+  test(" w2reattach #given a team member whose current runtime is missing #when reconciling #then it is lost without blocking later records", async () => {
+    // given
+    const store = tempStore()
+    const teamRecord = {
+      ...seedProcessRecord(store, "st_0000000f"),
+      name: "team:11111111-1111-4111-8111-111111111111:alpha",
+    }
+    store.replace(teamRecord)
+    const healthyRecord = seedProcessRecord(store, "st_00000010")
+    persistSessions(store, teamRecord.task_id)
+    persistSessions(store, healthyRecord.task_id)
+    const respawnRunner = new FakeRespawnRunner()
+    const inProcess = new FakeRunner()
+    createTaskManager({
+      store,
+      runners: { "in-process": inProcess, process: inProcess },
+      planner: () => ({ kind: "resolved", plan: { model: "anthropic/claude" } }),
+      config: settings(),
+      cwd: "/tmp/project",
+      rpcRespawnRunner: respawnRunner,
+      trustedRespawnLaunch: createTeamMemberRespawnLaunchResolver({
+        stateDir: { project_dir: store.stateDir },
+        taskSettings: settings(),
+        memberExtension: {
+          entryPath: "/trusted/member-extension.js",
+          inheritedExtensions: ["/trusted/provider-extension.js"],
+        },
+      }),
+    })
+    const lifecycle = createTaskLifecycle({
+      store,
+      registry: new FakeRegistry(),
+      config: settings(),
+      now,
+      signaller: fakeSignaller(new Set(), []),
+      orphanKillDelayMs: 0,
+    })
+
+    // when
+    const result = await lifecycle.reconcileOnSessionStart()
+
+    // then
+    expect(result.outcomes.find((outcome) => outcome.task_id === teamRecord.task_id)?.kind).toBe("lost")
+    expect(result.outcomes.find((outcome) => outcome.task_id === healthyRecord.task_id)?.kind).toBe("resumed")
+    expect(respawnRunner.startedSpecs.map((spec) => spec.task_id)).toEqual([healthyRecord.task_id])
+    expect(respawnRunner.startedSpecs[0]?.extensions).toEqual(["/trusted/provider-extension.js"])
+    expect(respawnRunner.startedSpecs[0]?.memberEnv).toBeUndefined()
   })
 
   test(" w2reattach #given one concurrency slot and two queued tasks #when a reattached task completes #then only the first queued task starts", async () => {
