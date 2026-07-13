@@ -76,6 +76,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     const plugin = await installCachedPlugin({
       buildSource,
       codexHome,
+      env,
       marketplaceName: marketplace.name,
       name: entry.name,
       runCommand,
