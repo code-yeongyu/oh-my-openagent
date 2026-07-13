@@ -138,6 +138,7 @@ Task engine settings; every field has a default, so the whole object is optional
 | `residency_max_children` | positive int | `8` |
 | `ttl_ms` | positive int | `86400000` (24h) |
 | `state_dir` | string | unset (defaults to `<project>/.omo/senpi-task`) |
+| `reattach_on_reconcile` | boolean | unset (reattach enabled unless explicitly `false`) |
 | `wait.min_ms` | positive int | `5000` |
 | `wait.default_ms` | positive int | `60000` |
 | `wait.max_ms` | positive int | `600000` |
@@ -145,7 +146,7 @@ Task engine settings; every field has a default, so the whole object is optional
 | `team.max_parallel_members` | int 1..8 | `4` |
 | `team.max_wall_clock_minutes` | positive int | `120` |
 
-`state_dir` defaults to `<project_dir>/.omo/senpi-task` when unset (`packages/senpi-task/src/store/state-dir.ts`). Completion delivery is not configurable: every child completion is batched with any other ready notifications and steered into the parent's running turn at the next tool-call boundary; see the completion routing table in [`packages/senpi-task/AGENTS.md`](../../packages/senpi-task/AGENTS.md).
+`state_dir` defaults to `<project_dir>/.omo/senpi-task` when unset (`packages/senpi-task/src/store/state-dir.ts`). `reattach_on_reconcile` defaults to enabled behavior: durable process tasks with a persisted session are respawned and rebound during reconciliation; set it to `false` only to retain the legacy lost-task behavior. Completion delivery is not configurable: every child completion is batched with any other ready notifications and steered into the parent's running turn at the next tool-call boundary; see the completion routing table in [`packages/senpi-task/AGENTS.md`](../../packages/senpi-task/AGENTS.md).
 
 ### `teams`
 
@@ -219,6 +220,5 @@ This is deliberate: `omo.json` landed **senpi-first**. Adopting it in the OpenCo
 
 ## Follow-ups
 
-- No generated `assets/omo.schema.json` artifact or published `$schema` URL exists yet; the `$schema` key is accepted but points at nothing shipped in this repo.
 - `member.backendType: "tmux"` and non-project (user-global) team storage are schema-level only and are not exercised by the current Senpi runtime; use `in-process` members in project `.omo/` teams.
 - OpenCode-edition adoption of `omo.json` and a `oh-my-openagent.json` migration path are not implemented.
