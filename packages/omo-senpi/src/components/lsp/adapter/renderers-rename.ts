@@ -10,8 +10,8 @@ import {
 	type ResultLike,
 	renderPositionCall,
 } from "./renderers-common.js";
-import type { LspPrepareRenameDetails, LspRenameDetails } from "./tools/rename.js";
-import { shorten } from "./utils.js";
+import type { LspPrepareRenameDetails, LspRenameDetails } from "./descriptors.js";
+import { shorten } from "./render-format.js";
 
 interface RenameArgs extends PositionArgs {
 	newName: string;

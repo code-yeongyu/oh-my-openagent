@@ -1,4 +1,5 @@
 import type { Theme } from "@code-yeongyu/senpi";
+import type { DocumentSymbol, SymbolInfo } from "@oh-my-opencode/lsp-core";
 
 import { Text } from "./rendering.js";
 import {
@@ -10,9 +11,8 @@ import {
 	type ResultLike,
 	symbolKindName,
 } from "./renderers-common.js";
-import type { LspSymbolsDetails } from "./tools/symbols.js";
-import type { DocumentSymbol, SymbolInfo } from "./types.js";
-import { shorten } from "./utils.js";
+import type { LspSymbolsDetails } from "./descriptors.js";
+import { shorten } from "./render-format.js";
 
 interface SymbolsArgs {
 	filePath: string;

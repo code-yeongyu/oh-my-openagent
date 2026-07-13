@@ -1,9 +1,9 @@
 import type { Theme } from "@code-yeongyu/senpi";
 
-import { uriToPath } from "./formatters.js";
+import type { Location, LocationLink } from "@oh-my-opencode/lsp-core"
+
+import { shorten, uriToPath } from "./render-format.js";
 import { SYMBOL_KIND_MAP } from "./language-mappings.js";
-import type { Location, LocationLink } from "./types.js";
-import { shorten } from "./utils.js";
 
 export const COLLAPSED_HEAD = 3;
 export const EXPANDED_HEAD = 20;
@@ -32,7 +32,7 @@ export function locText(loc: Location | LocationLink): string {
 	return `${shorten(uriToPath(loc.uri), PATH_BUDGET)}:${loc.range.start.line + 1}:${loc.range.start.character}`;
 }
 
-export function unique<T>(items: T[], key: (item: T) => string): T[] {
+export function unique<T>(items: readonly T[], key: (item: T) => string): T[] {
 	const seen = new Set<string>();
 	const out: T[] = [];
 	for (const item of items) {

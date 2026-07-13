@@ -1,4 +1,5 @@
 import type { Theme } from "@code-yeongyu/senpi";
+import type { Diagnostic } from "@oh-my-opencode/lsp-core";
 
 import { Text, truncateToWidth } from "./rendering.js";
 import {
@@ -9,9 +10,8 @@ import {
 	type ResultLike,
 	unique,
 } from "./renderers-common.js";
-import type { LspDiagnosticsDetails } from "./tools/diagnostics.js";
-import type { Diagnostic } from "./types.js";
-import { shorten } from "./utils.js";
+import type { LspDiagnosticsDetails } from "./descriptors.js";
+import { shorten } from "./render-format.js";
 
 interface DiagnosticsArgs {
 	filePath: string;
