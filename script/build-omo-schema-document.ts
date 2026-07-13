@@ -7,6 +7,7 @@ export const OMO_SCHEMA_ID =
 export function createOmoJsonSchema(): Record<string, unknown> {
   const jsonSchema = z.toJSONSchema(OmoConfigSchema, {
     target: "draft-7",
+    io: "input",
     unrepresentable: "any",
   }) as Record<string, unknown>
 
