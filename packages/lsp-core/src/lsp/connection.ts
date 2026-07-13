@@ -2,12 +2,19 @@ import { pathToFileURL } from "node:url";
 
 import { LspClientTransport } from "./transport.js";
 
-const INITIALIZE_SETTLE_MS = 300;
+interface InitializeCapabilities {
+	readonly diagnosticProvider?: unknown;
+}
+
+function supportsDiagnosticPull(capabilities: InitializeCapabilities | undefined): boolean {
+	if (capabilities === undefined) return false;
+	return Object.hasOwn(capabilities, "diagnosticProvider");
+}
 
 export class LspClientConnection extends LspClientTransport {
 	async initialize(): Promise<void> {
 		const rootUri = pathToFileURL(this.root).href;
-		await this.sendRequest(
+		const result = await this.sendRequest<{ readonly capabilities?: InitializeCapabilities }>(
 			"initialize",
 			{
 				processId: process.pid,
@@ -24,7 +31,6 @@ export class LspClientConnection extends LspClientTransport {
 						rename: {
 							prepareSupport: true,
 							prepareSupportDefaultBehavior: 1,
-							honorsChangeAnnotations: true,
 						},
 						codeAction: {
 							codeActionLiteralSupport: {
@@ -53,9 +59,10 @@ export class LspClientConnection extends LspClientTransport {
 						symbol: {},
 						workspaceFolders: true,
 						configuration: true,
-						applyEdit: true,
+						...(this.hasWorkspaceApplyEditHandler() ? { applyEdit: true } : {}),
 						workspaceEdit: {
 							documentChanges: true,
+							resourceOperations: ["create", "rename", "delete"],
 						},
 					},
 				},
@@ -63,11 +70,10 @@ export class LspClientConnection extends LspClientTransport {
 			},
 			{ timeoutMs: this.initializeTimeoutMs },
 		);
+		this.setDiagnosticPullSupported(supportsDiagnosticPull(result?.capabilities));
 		await this.sendNotification("initialized");
 		await this.sendNotification("workspace/didChangeConfiguration", {
 			settings: { json: { validate: { enable: true } } },
 		});
-		// Some servers accept initialized before their diagnostics/indexing handlers are ready.
-		await new Promise((r) => setTimeout(r, INITIALIZE_SETTLE_MS));
 	}
 }
