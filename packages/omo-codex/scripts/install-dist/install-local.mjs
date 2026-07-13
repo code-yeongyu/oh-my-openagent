@@ -96,14 +96,14 @@ var init_atomic_write = __esm(() => {
 
 // packages/telemetry-core/src/activity-state.ts
 import { existsSync as existsSync5, mkdirSync as mkdirSync2, readFileSync as readFileSync2 } from "node:fs";
-import { basename as basename6, join as join33 } from "node:path";
+import { basename as basename7, join as join33 } from "node:path";
 function resolveTelemetryStateDir(product, options = {}) {
   const dataDir = resolveXdgDataDir(product.cacheDirName, {
     env: options.env,
     osProvider: options.osProvider
   });
   const xdgStateDir = options.env?.XDG_DATA_HOME === undefined ? undefined : join33(options.env.XDG_DATA_HOME, product.cacheDirName);
-  if (dataDir === xdgStateDir || xdgStateDir === undefined && basename6(dataDir) === product.cacheDirName) {
+  if (dataDir === xdgStateDir || xdgStateDir === undefined && basename7(dataDir) === product.cacheDirName) {
     return dataDir;
   }
   return join33(dataDir, product.cacheDirName);
@@ -337,18 +337,18 @@ var init_env = __esm(() => {
 });
 
 // packages/telemetry-core/src/machine-id.ts
-import { createHash as createHash2 } from "node:crypto";
+import { createHash as createHash3 } from "node:crypto";
 import os2 from "node:os";
 function getDefaultTelemetryOsProvider() {
   return os2;
 }
 function getTelemetryDistinctId(machineIdPrefix, osProvider = getDefaultTelemetryOsProvider()) {
-  return createHash2("sha256").update(`${machineIdPrefix}${osProvider.hostname()}`).digest("hex");
+  return createHash3("sha256").update(`${machineIdPrefix}${osProvider.hostname()}`).digest("hex");
 }
 var init_machine_id = () => {};
 
 // node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/module.node.mjs
-import { dirname as dirname10, posix, sep as sep7 } from "node:path";
+import { dirname as dirname10, posix as posix2, sep as sep7 } from "node:path";
 function createModulerModifier() {
   const getModuleFromFileName = createGetModuleFromFilename();
   return async (frames) => {
@@ -363,7 +363,7 @@ function createGetModuleFromFilename(basePath = process.argv[1] ? dirname10(proc
     if (!filename)
       return;
     const normalizedFilename = isWindows ? normalizeWindowsPath(filename) : filename;
-    let { dir, base: file, ext } = posix.parse(normalizedFilename);
+    let { dir, base: file, ext } = posix2.parse(normalizedFilename);
     if (ext === ".js" || ext === ".mjs" || ext === ".cjs")
       file = file.slice(0, -1 * ext.length);
     const decodedFile = decodeURIComponent(file);
@@ -6122,7 +6122,7 @@ var init_telemetry = __esm(() => {
 });
 
 // packages/omo-codex/src/install/install-local-cli.ts
-import { readFile as readFile21 } from "node:fs/promises";
+import { readFile as readFile22 } from "node:fs/promises";
 import { dirname as dirname12, join as join39, resolve as resolve10 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
@@ -9947,69 +9947,319 @@ function formatUnknownError(error) {
 }
 
 // packages/omo-codex/src/install/lsp-daemon-reaper.ts
-import { readFile as readFile18, readdir as readdir9, rm as rm10 } from "node:fs/promises";
+import { createHash as createHash2 } from "node:crypto";
+import { lstat as lstat11, readFile as readFile19, readdir as readdir10, rm as rm10 } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join as join27, posix } from "node:path";
+
+// packages/omo-codex/src/install/lsp-daemon-reaper-attestation.ts
+import { execFile } from "node:child_process";
+import { readFile as readFile18, readdir as readdir9, readlink as readlink5 } from "node:fs/promises";
 import { connect } from "node:net";
-import { join as join27 } from "node:path";
-async function reapLspDaemons(codexHome, deps = {}) {
-  const killProcess = deps.killProcess ?? sendSigterm;
-  const isDaemonLive = deps.isDaemonLive ?? probeSocketLive;
-  const daemonRoot = join27(codexHome, "codex-lsp", "daemon");
-  const reaped = [];
-  let entries;
-  try {
-    entries = await readdir9(daemonRoot);
-  } catch {
-    return reaped;
-  }
-  for (const entry of entries) {
-    const versionDir = join27(daemonRoot, entry);
-    const pid = await readPidFile(join27(versionDir, "daemon.pid"));
-    const socketPath = await readEndpointFile(join27(versionDir, "daemon.endpoint"));
-    if (pid !== null && socketPath !== null && await isDaemonLive(socketPath) && killProcess(pid)) {
-      reaped.push(pid);
-    }
-    await rm10(versionDir, { recursive: true, force: true });
-  }
-  return reaped;
-}
-async function readEndpointFile(path) {
-  try {
-    const content = (await readFile18(path, "utf8")).trim();
-    return content.length > 0 ? content : null;
-  } catch {
-    return null;
-  }
-}
-async function readPidFile(path) {
-  try {
-    const pid = Number.parseInt((await readFile18(path, "utf8")).trim(), 10);
-    return Number.isInteger(pid) && pid > 0 ? pid : null;
-  } catch {
-    return null;
-  }
-}
-function probeSocketLive(socketPath, timeoutMs = 500) {
-  return new Promise((resolve8) => {
-    const socket = connect(socketPath);
-    const done = (ok) => {
+import { basename as basename6 } from "node:path";
+var PROBE_TIMEOUT_MS = 500;
+async function probeLegacyJsonRpcEndpoint(endpoint, timeoutMs = PROBE_TIMEOUT_MS) {
+  return await new Promise((resolve8) => {
+    const socket = connect(endpoint);
+    let settled = false;
+    let buffer = "";
+    const finish = (value) => {
+      if (settled)
+        return;
+      settled = true;
+      clearTimeout(timer);
       socket.destroy();
-      resolve8(ok);
+      resolve8(value);
     };
-    const timer = setTimeout(() => done(false), timeoutMs);
-    timer.unref();
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    timer.unref?.();
     socket.once("connect", () => {
-      clearTimeout(timer);
-      done(true);
+      socket.write(`${JSON.stringify(legacyStatusRequest())}
+`);
     });
-    socket.once("error", () => {
-      clearTimeout(timer);
-      done(false);
+    socket.on("data", (chunk) => {
+      buffer += chunk.toString("utf8");
+      const newlineIndex = buffer.indexOf(`
+`);
+      if (newlineIndex < 0)
+        return;
+      finish(isJsonRpcResponse(buffer.slice(0, newlineIndex).trim()));
+    });
+    socket.once("error", () => finish(false));
+  });
+}
+async function attestLegacyDaemonOwnership(input, deps = {}) {
+  if (input.platform === "linux")
+    return await attestLinuxOwnership(input, deps);
+  if (input.platform === "darwin")
+    return await attestMacOwnership(input, deps);
+  return false;
+}
+async function attestLinuxOwnership(input, deps) {
+  const readFileImpl = deps.readFile ?? readFile18;
+  const readDirImpl = deps.readDir ?? readdir9;
+  const readLinkImpl = deps.readLink ?? readlink5;
+  const procNetUnix = await readText(readFileImpl, "/proc/net/unix");
+  if (procNetUnix === null)
+    return false;
+  const inode = inodeForEndpoint(procNetUnix, input.endpoint);
+  if (inode === null)
+    return false;
+  const fdEntries = await readDirImpl(`/proc/${input.pid}/fd`).catch(() => null);
+  if (fdEntries === null)
+    return false;
+  let ownsEndpoint = false;
+  for (const fdEntry of fdEntries) {
+    const target = await readLinkImpl(`/proc/${input.pid}/fd/${fdEntry}`).catch(() => null);
+    if (target !== `socket:[${inode}]`)
+      continue;
+    ownsEndpoint = true;
+    break;
+  }
+  if (!ownsEndpoint)
+    return false;
+  const cmdline = await readBinary(readFileImpl, `/proc/${input.pid}/cmdline`);
+  if (cmdline === null)
+    return false;
+  return isNodeCliDaemonArgv(splitCmdline(cmdline));
+}
+async function attestMacOwnership(input, deps) {
+  const executeFileImpl = deps.executeFile ?? execFile;
+  const filteredLsofOutput = await executeForStdout(executeFileImpl, "/usr/sbin/lsof", [
+    "-a",
+    "-n",
+    "-P",
+    "-p",
+    String(input.pid),
+    "-U",
+    "-Fn",
+    "--",
+    input.endpoint
+  ]);
+  const lsofOutput = filteredLsofOutput ?? await executeForStdout(executeFileImpl, "/usr/sbin/lsof", [
+    "-a",
+    "-n",
+    "-P",
+    "-p",
+    String(input.pid),
+    "-U",
+    "-Fn"
+  ]);
+  if (lsofOutput === null || !lsofShowsUnixEndpoint(lsofOutput, input.pid, input.endpoint))
+    return false;
+  const commandOutput = await executeForStdout(executeFileImpl, "/bin/ps", ["-p", String(input.pid), "-o", "command="]);
+  if (commandOutput === null)
+    return false;
+  return isNodeCliDaemonCommand(commandOutput.trim());
+}
+function legacyStatusRequest() {
+  return {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/call",
+    params: { name: "status", arguments: {} }
+  };
+}
+function isJsonRpcResponse(line) {
+  if (line.length === 0)
+    return false;
+  try {
+    const parsed = JSON.parse(line);
+    return parsed.jsonrpc === "2.0" && parsed.id === 1 && (Object.hasOwn(parsed, "result") || Object.hasOwn(parsed, "error"));
+  } catch {
+    return false;
+  }
+}
+function inodeForEndpoint(procNetUnix, endpoint) {
+  for (const line of procNetUnix.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0 || trimmed.startsWith("Num"))
+      continue;
+    const fields = trimmed.split(/\s+/);
+    if (fields.length < 8 || fields[7] !== endpoint)
+      continue;
+    return fields[6] ?? null;
+  }
+  return null;
+}
+function splitCmdline(buffer) {
+  return buffer.toString("utf8").split("\x00").filter((value) => value.length > 0);
+}
+function isNodeCliDaemonArgv(argv) {
+  if (argv.length < 2 || !argv.includes("daemon"))
+    return false;
+  const executable = basename6(argv[0] ?? "");
+  if (!/^node(?:\.exe)?$/i.test(executable))
+    return false;
+  return argv.some((value) => value === "cli.js" || value.endsWith("/cli.js") || value.endsWith("\\cli.js"));
+}
+function lsofShowsUnixEndpoint(output, pid, endpoint) {
+  const lines = output.split(/\r?\n/).filter((line) => line.length > 0);
+  const endpointName = basename6(endpoint);
+  return lines.includes(`p${pid}`) && lines.some((line) => line === `n${endpoint}` || line === `n${endpointName}`);
+}
+function isNodeCliDaemonCommand(command) {
+  return /\bnode(?:\.exe)?\b/i.test(command) && /\bcli\.js\b/.test(command) && /\bdaemon\b/.test(command);
+}
+async function executeForStdout(executeFileImpl, file, args) {
+  return await new Promise((resolve8) => {
+    executeFileImpl(file, [...args], { encoding: "utf8", maxBuffer: 1024 * 1024, timeout: 1000 }, (error, stdout) => {
+      if (error !== null) {
+        resolve8(null);
+        return;
+      }
+      resolve8(stdout);
     });
   });
+}
+async function readText(readFileImpl, path) {
+  return await readFileImpl(path, "utf8").catch(() => null);
+}
+async function readBinary(readFileImpl, path) {
+  return await readFileImpl(path).catch(() => null);
+}
+
+// packages/omo-codex/src/install/lsp-daemon-reaper.ts
+var LEGACY_EXIT_WAIT_TIMEOUT_MS = 5000;
+var LEGACY_VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/;
+async function reapLspDaemons(codexHome, deps = {}) {
+  const daemonRoot = join27(codexHome, "codex-lsp", "daemon");
+  const platform = deps.platform ?? process.platform;
+  const tmpDir = deps.tmpDir ?? tmpdir();
+  const probe = deps.probeLegacyJsonRpc ?? probeLegacyJsonRpcEndpoint;
+  const attest = deps.attestLegacyDaemonOwnership ?? ((input) => attestLegacyDaemonOwnership(input));
+  const killProcess = deps.killProcess ?? sendSigterm;
+  const waitForProcessExit = deps.waitForProcessExit ?? defaultWaitForProcessExit;
+  const entries = await readdir10(daemonRoot, { withFileTypes: true }).catch(() => []);
+  const results = [];
+  for (const entry of [...entries].sort((left, right) => left.name.localeCompare(right.name))) {
+    const versionPath = join27(daemonRoot, entry.name);
+    const parsedVersion = parseVersionEntry(entry.name);
+    if (parsedVersion === null || !entry.isDirectory()) {
+      await removeVersionDir(versionPath);
+      results.push(removed(entry.name, "removed invalid legacy version entry"));
+      continue;
+    }
+    const metadata = await readLegacyMetadata({ versionPath, version: parsedVersion, codexHome, platform, tmpDir });
+    if (metadata.kind === "remove") {
+      await removeVersionDir(versionPath);
+      results.push(removed(parsedVersion, metadata.reason));
+      continue;
+    }
+    if (!await probe(metadata.endpoint)) {
+      await removeVersionDir(versionPath);
+      results.push(removed(parsedVersion, "removed stale legacy daemon state"));
+      continue;
+    }
+    if (platform === "win32") {
+      results.push(deferred(parsedVersion, "legacy named pipe responded but Windows cannot prove pid ownership safely"));
+      continue;
+    }
+    const owned = await attest({ pid: metadata.pid, endpoint: metadata.endpoint, platform });
+    if (!owned) {
+      results.push(deferred(parsedVersion, "legacy endpoint responded but pid ownership was not proven"));
+      continue;
+    }
+    if (!killProcess(metadata.pid)) {
+      await removeVersionDir(versionPath);
+      results.push(removed(parsedVersion, "removed stale legacy daemon state"));
+      continue;
+    }
+    if (!await waitForProcessExit(metadata.pid, LEGACY_EXIT_WAIT_TIMEOUT_MS)) {
+      results.push(deferred(parsedVersion, `timed out waiting ${LEGACY_EXIT_WAIT_TIMEOUT_MS}ms for the proven legacy daemon to exit`));
+      continue;
+    }
+    await removeVersionDir(versionPath);
+    results.push(terminated(parsedVersion, "terminated proven owned legacy daemon"));
+  }
+  return results;
+}
+function parseVersionEntry(entryName) {
+  if (!entryName.startsWith("v"))
+    return null;
+  const version = entryName.slice(1);
+  return LEGACY_VERSION_PATTERN.test(version) ? version : null;
+}
+async function readLegacyMetadata(input) {
+  const pidText = await readRegularTrimmedFile(join27(input.versionPath, "daemon.pid"));
+  if (pidText === "non_regular")
+    return { kind: "remove", reason: "removed non-regular legacy daemon metadata" };
+  if (pidText === null)
+    return { kind: "remove", reason: "removed malformed legacy daemon metadata" };
+  const pid = Number.parseInt(pidText, 10);
+  if (!Number.isInteger(pid) || pid <= 0)
+    return { kind: "remove", reason: "removed malformed legacy daemon metadata" };
+  const endpointText = await readRegularTrimmedFile(join27(input.versionPath, "daemon.endpoint"));
+  if (endpointText === "non_regular")
+    return { kind: "remove", reason: "removed non-regular legacy daemon metadata" };
+  if (endpointText === null)
+    return { kind: "remove", reason: "removed malformed legacy daemon metadata" };
+  const allowedEndpoints = legacyEndpointCandidates({
+    version: input.version,
+    versionPath: input.versionPath,
+    platform: input.platform,
+    tmpDir: input.tmpDir
+  });
+  if (!allowedEndpoints.includes(endpointText)) {
+    return { kind: "remove", reason: "removed legacy daemon state with an endpoint outside the frozen vectors" };
+  }
+  return { kind: "valid", pid, endpoint: endpointText };
+}
+function legacyEndpointCandidates(input) {
+  if (input.platform === "win32") {
+    const normalizedVersionPath = input.versionPath.replaceAll("/", "\\");
+    const digest = shortDigest(normalizedVersionPath);
+    return [`\\\\.\\pipe\\omo-lsp-${input.version}-${digest}`];
+  }
+  const natural = posix.join(input.versionPath, "daemon.sock");
+  const hashed = posix.join(input.tmpDir, `omo-lsp-${input.version}-${shortDigest(input.versionPath)}.sock`);
+  return [natural, hashed];
+}
+async function readRegularTrimmedFile(path) {
+  const stats = await lstat11(path).catch(() => null);
+  if (stats === null)
+    return null;
+  if (!stats.isFile())
+    return "non_regular";
+  const content = (await readFile19(path, "utf8")).trim();
+  return content.length > 0 ? content : null;
+}
+function shortDigest(value) {
+  return createHash2("sha256").update(value).digest("hex").slice(0, 16);
+}
+async function removeVersionDir(path) {
+  await rm10(path, { recursive: true, force: true });
+}
+function removed(version, reason) {
+  return { version, status: "removed", reason };
+}
+function terminated(version, reason) {
+  return { version, status: "terminated", reason };
+}
+function deferred(version, reason) {
+  return { version, status: "deferred", reason };
 }
 function sendSigterm(pid) {
   try {
     process.kill(pid, "SIGTERM");
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function defaultWaitForProcessExit(pid, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  for (;; ) {
+    if (!processIsRunning(pid))
+      return true;
+    if (Date.now() >= deadline)
+      return false;
+    await new Promise((resolve8) => setTimeout(resolve8, 100));
+  }
+}
+function processIsRunning(pid) {
+  try {
+    process.kill(pid, 0);
     return true;
   } catch {
     return false;
@@ -10032,7 +10282,7 @@ function resolveCodexInstallerBinDir(input) {
 }
 
 // packages/omo-codex/src/install/codex-git-bash-hooks.ts
-import { readFile as readFile19, writeFile as writeFile11 } from "node:fs/promises";
+import { readFile as readFile20, writeFile as writeFile11 } from "node:fs/promises";
 import { join as join29 } from "node:path";
 var WINDOWS_ONLY_GIT_BASH_HOOKS = new Set([
   "./hooks/pre-tool-use-recommending-git-bash-mcp.json",
@@ -10042,7 +10292,7 @@ async function removeGitBashHooksOffWindows(input) {
   if (input.platform === "win32")
     return;
   const manifestPath = join29(input.pluginRoot, ".codex-plugin", "plugin.json");
-  const parsed = JSON.parse(await readFile19(manifestPath, "utf8"));
+  const parsed = JSON.parse(await readFile20(manifestPath, "utf8"));
   if (!isPlainRecord(parsed) || !Array.isArray(parsed.hooks))
     return;
   const hooks = parsed.hooks.filter((hook) => typeof hook !== "string" || !WINDOWS_ONLY_GIT_BASH_HOOKS.has(hook));
@@ -10352,7 +10602,16 @@ async function runCodexInstaller(options = {}) {
       pluginNames: marketplace.plugins.map((plugin) => plugin.name)
     });
   }
-  await reapLspDaemons(codexHome).catch(() => []);
+  const legacyDaemonCleanup = await reapLspDaemons(codexHome).catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    log(`Warning: skipped legacy Codex LSP daemon cleanup: ${message}`);
+    return [];
+  });
+  for (const cleanup of legacyDaemonCleanup) {
+    if (cleanup.status !== "deferred")
+      continue;
+    log(`Warning: deferred legacy Codex LSP daemon cleanup for v${cleanup.version}: ${cleanup.reason}`);
+  }
   const marketplaceRoot = join35(codexHome, "plugins", "cache", marketplace.name);
   await writeCachedMarketplaceManifest({
     marketplaceName: marketplace.name,
@@ -10992,7 +11251,7 @@ function readVersionManifest(path2) {
   }
 }
 // packages/omo-codex/src/install/codex-git-bash-mcp-env.ts
-import { readFile as readFile20, writeFile as writeFile12 } from "node:fs/promises";
+import { readFile as readFile21, writeFile as writeFile12 } from "node:fs/promises";
 import { join as join38 } from "node:path";
 var GIT_BASH_ENV_KEY2 = "OMO_CODEX_GIT_BASH_PATH";
 var CODEGRAPH_RELATIVE_ARGS2 = new Set(["components/codegraph/dist/serve.js", "./components/codegraph/dist/serve.js"]);
@@ -11000,7 +11259,7 @@ async function stampGitBashMcpEnv(input) {
   const manifestPath = join38(input.pluginRoot, ".mcp.json");
   if (!await fileExistsStrict(manifestPath))
     return false;
-  const parsed = JSON.parse(await readFile20(manifestPath, "utf8"));
+  const parsed = JSON.parse(await readFile21(manifestPath, "utf8"));
   if (!isPlainRecord(parsed) || !isPlainRecord(parsed["mcpServers"]))
     return false;
   let changed = stampCodegraphMcpPath(parsed["mcpServers"], input.pluginRoot);
@@ -11045,13 +11304,17 @@ function resolveDefaultRepoRoot() {
   return resolveDefaultRepoRootForEntrypoint(fileURLToPath2(import.meta.url));
 }
 async function runLazyCodexInstallLocalCli(input) {
+  const logWarning = (message) => {
+    if (message.startsWith("Warning:"))
+      input.log(message);
+  };
   const parsed = parseLazyCodexInstallCliArgs(input.argv);
   if (parsed.kind === "help") {
     input.log(formatLazyCodexInstallHelp());
     return 0;
   }
   if (parsed.kind === "version") {
-    const packageJson = JSON.parse(await readFile21(join39(input.defaultRepoRoot, "package.json"), "utf8"));
+    const packageJson = JSON.parse(await readFile22(join39(input.defaultRepoRoot, "package.json"), "utf8"));
     const version2 = typeof packageJson.version === "string" ? packageJson.version : "unknown";
     input.log(`lazycodex-ai ${version2}`);
     return 0;
@@ -11069,7 +11332,8 @@ async function runLazyCodexInstallLocalCli(input) {
       const result2 = await installMarketplaceLocally({
         repoRoot: resolve10(parsed.repoRoot),
         autonomousPermissions: true,
-        env: input.env
+        env: input.env,
+        log: logWarning
       });
       input.log(`Installed ${result2.installed.length} plugin(s) from ${result2.marketplaceName}.`);
       return 0;
@@ -11080,7 +11344,8 @@ async function runLazyCodexInstallLocalCli(input) {
   const result = await installMarketplaceLocally({
     repoRoot,
     autonomousPermissions: parsed.autonomousPermissions,
-    env: input.env
+    env: input.env,
+    log: logWarning
   });
   input.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`);
   return 0;

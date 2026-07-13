@@ -1,21 +1,24 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 
-import { callDiagnosticsViaDaemon, currentRequestContext } from "@code-yeongyu/lsp-daemon";
+import { callDiagnosticsViaDaemon } from "@code-yeongyu/lsp-daemon/client";
+import { collectPostEditDiagnostics, type PostEditDiagnosticsOutcome } from "@oh-my-opencode/lsp-core/post-edit";
+import { parseLspRequestContext, type LspRequestContext } from "@oh-my-opencode/lsp-core/request-context";
 
 import { ensureLspDaemonCliEnv } from "./daemon-cli-path.js";
 import {
 	isLspDaemonUnreachableDiagnostics,
-	isUnavailableLspDiagnostics,
 	markLspSessionCompacted,
-	recordLspDiagnosticsObservations,
+	readLspPostEditCache,
 	sessionIdFrom,
-	shouldSkipUnavailableLspDiagnostics,
+	writeLspPostEditCache,
 } from "./lsp-session-state.js";
 import { extractMutatedFilePaths } from "./mutated-file-paths.js";
 
 export { extractMutatedFilePaths } from "./mutated-file-paths.js";
 
-export type DiagnosticsRunner = (filePath: string) => Promise<string>;
+export type DiagnosticsRunner = (filePath: string) => Promise<PostEditDiagnosticsOutcome>;
 
 export interface CodexPostToolUseInput {
 	session_id?: unknown;
@@ -43,13 +46,10 @@ interface PostToolUseHookOutput {
 	};
 }
 
-const CLEAN_DIAGNOSTICS_TEXT = "No diagnostics found";
-const UNSUPPORTED_EXTENSION_TEXT = "No LSP server configured for extension:";
 const DIAGNOSTIC_START_PATTERN = /(?:error|warning|information|hint)\[[^\]\r\n]+\] \(\d+\) at \d+:\d+:/g;
 const DIAGNOSTIC_CHUNK_PATTERN = /^(?:error|warning|information|hint)\[[^\]\r\n]+\] \(\d+\) at \d+:\d+:/;
 const DEFAULT_MAX_HOOK_FEEDBACK_CHARS = 8000;
 const CONTEXT_PRESSURE_MAX_HOOK_FEEDBACK_CHARS = 1200;
-const MAX_CONCURRENT_DIAGNOSTICS = 4;
 const CONTEXT_PRESSURE_MARKERS = [
 	"context compacted",
 	"context_length_exceeded",
@@ -60,10 +60,43 @@ const CONTEXT_PRESSURE_MARKERS = [
 	"long threads and multiple compactions",
 ] as const;
 
-export async function runLspDiagnosticsText(filePath: string): Promise<string> {
+export async function runLspDiagnosticsText(filePath: string): Promise<PostEditDiagnosticsOutcome> {
 	ensureLspDaemonCliEnv();
-	const result = await callDiagnosticsViaDaemon(filePath, { context: currentRequestContext() });
+	const result = await callDiagnosticsViaDaemon(filePath, { context: codexLspRequestContext() });
+	return postEditOutcomeFromDaemonResult(result);
+}
+
+function postEditOutcomeFromDaemonResult(result: {
+	readonly content: readonly { readonly type: string; readonly text?: string }[];
+	readonly details?: unknown;
+}): PostEditDiagnosticsOutcome {
+	const availability = notConfiguredAvailability(result.details);
+	if (availability !== undefined) return { kind: "not_configured", extension: availability.extension };
 	return result.content.map((block) => block.text).join("\n");
+}
+
+function notConfiguredAvailability(details: unknown): { readonly extension: string } | undefined {
+	if (!isRecord(details)) return undefined;
+	const availability = details["availability"];
+	if (!isRecord(availability)) return undefined;
+	if (availability["kind"] !== "not_configured") return undefined;
+	const extension = availability["extension"];
+	return typeof extension === "string" && extension.length > 0 ? { extension } : undefined;
+}
+
+export function codexLspRequestContext(
+	env: Record<string, string | undefined> = process.env,
+	cwd: string = process.cwd(),
+): LspRequestContext {
+	const canonicalCwd = realpathSync(resolve(cwd));
+	const codexHome = resolve(env["CODEX_HOME"]?.trim() || join(homedir(), ".codex"));
+	return parseLspRequestContext({
+		cwd: canonicalCwd,
+		projectConfigPaths: [join(canonicalCwd, ".codex", "lsp-client.json")],
+		userConfigPath: join(codexHome, "lsp-client.json"),
+		installDecisionsPath: join(codexHome, "lsp-install-decisions.json"),
+		capabilities: { installDecisionTool: true },
+	});
 }
 
 export async function runLspPostToolUseHook(
@@ -71,24 +104,13 @@ export async function runLspPostToolUseHook(
 	runDiagnostics: DiagnosticsRunner = runLspDiagnosticsText,
 ): Promise<string> {
 	const sessionId = sessionIdFrom(input);
-	const filePaths = extractMutatedFilePaths(input).filter(
-		(filePath) => !shouldSkipUnavailableLspDiagnostics(filePath, sessionId),
-	);
+	const filePaths = extractMutatedFilePaths(input);
 	if (filePaths.length === 0) return "";
 
-	const blocks: DiagnosticBlock[] = [];
-	const observations: Array<{ filePath: string; unavailable: boolean }> = [];
-	for (const { filePath, diagnostics } of await collectDiagnostics(filePaths, runDiagnostics)) {
-		// A daemon outage is transient (connect-or-spawn retries on the next request);
-		// recording it would silence this extension for the rest of the session.
-		if (isLspDaemonUnreachableDiagnostics(diagnostics)) continue;
-		const unavailable = isUnavailableLspDiagnostics(diagnostics);
-		observations.push({ filePath, unavailable });
-		if (isCleanDiagnostics(diagnostics)) continue;
-		if (unavailable) continue;
-		blocks.push({ filePath, diagnostics });
-	}
-	recordLspDiagnosticsObservations(sessionId, observations);
+	const cache = readLspPostEditCache(sessionId);
+	const result = await collectPostEditDiagnostics({ filePaths, runDiagnostics, cache });
+	writeLspPostEditCache(sessionId, cache);
+	const blocks = result.blocks.filter(({ diagnostics }) => !isLspDaemonUnreachableDiagnostics(diagnostics));
 
 	if (blocks.length === 0) return "";
 
@@ -108,42 +130,6 @@ export async function runLspPostToolUseHook(
 export async function runLspPostCompactHook(input: CodexPostCompactInput): Promise<string> {
 	markLspSessionCompacted(sessionIdFrom(input));
 	return "";
-}
-
-async function collectDiagnostics(
-	filePaths: readonly string[],
-	runDiagnostics: DiagnosticsRunner,
-): Promise<DiagnosticBlock[]> {
-	const results: DiagnosticBlock[] = [];
-	let nextIndex = 0;
-	const workerCount = Math.min(MAX_CONCURRENT_DIAGNOSTICS, filePaths.length);
-	async function worker(): Promise<void> {
-		for (;;) {
-			const index = nextIndex;
-			nextIndex += 1;
-			const filePath = filePaths[index];
-			if (filePath === undefined) return;
-			results[index] = { filePath, diagnostics: await collectFileDiagnostics(filePath, runDiagnostics) };
-		}
-	}
-	await Promise.all(Array.from({ length: workerCount }, () => worker()));
-	return results;
-}
-
-async function collectFileDiagnostics(filePath: string, runDiagnostics: DiagnosticsRunner): Promise<string> {
-	try {
-		return (await runDiagnostics(filePath)).trim();
-	} catch (error) {
-		return formatDiagnosticsError(error);
-	}
-}
-
-function formatDiagnosticsError(error: unknown): string {
-	if (error instanceof Error) {
-		const message = error.message.trim();
-		if (message.length > 0) return message;
-	}
-	return String(error).trim();
 }
 
 function formatDiagnosticBlock({ filePath, diagnostics }: DiagnosticBlock): string {
@@ -219,14 +205,6 @@ function limitHookText(text: string, maxChars: number): string {
 	if (marker.length >= maxChars) return marker.slice(0, maxChars);
 	const head = text.slice(0, maxChars - marker.length).replace(/[ \t\r\n]+$/, "");
 	return `${head}${marker}`;
-}
-
-function isCleanDiagnostics(diagnostics: string): boolean {
-	return (
-		diagnostics.length === 0 ||
-		diagnostics === CLEAN_DIAGNOSTICS_TEXT ||
-		diagnostics.startsWith(UNSUPPORTED_EXTENSION_TEXT)
-	);
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

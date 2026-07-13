@@ -1,0 +1,174 @@
+/// <reference path="../../../../bun-test.d.ts" />
+/// <reference types="bun-types" />
+
+import { createHash } from "node:crypto"
+import type { ChildProcessByStdio } from "node:child_process"
+import { execFileSync, spawn } from "node:child_process"
+import { mkdtempSync, writeFileSync } from "node:fs"
+import { mkdir, rm, symlink, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import type { Readable } from "node:stream"
+
+export interface LegacyDaemonFixture {
+  readonly codexHome: string
+  readonly version: string
+  readonly versionDir: string
+  readonly endpoint: string
+}
+
+export type SpawnedChild = ChildProcessByStdio<null, Readable, Readable>
+
+function nodeBinary(): string {
+  return process.env.NODE_BINARY ?? execFileSync("which", ["node"], { encoding: "utf8" }).trim()
+}
+
+export function createLegacyCodexHome(prefix: string): string {
+  return mkdtempSync(join("/tmp", prefix))
+}
+
+export function versionDirFor(codexHome: string, version: string): string {
+  return join(codexHome, "codex-lsp", "daemon", `v${version}`)
+}
+
+export function legacyEndpointFor(input: {
+  readonly codexHome: string
+  readonly version: string
+  readonly kind: "natural" | "hashed" | "windowsPipe"
+  readonly tempDir?: string
+}): string {
+  const versionDir = versionDirFor(input.codexHome, input.version)
+  if (input.kind === "natural") return join(versionDir, "daemon.sock")
+  if (input.kind === "windowsPipe") {
+    const digest = createHash("sha256").update(versionDir.replaceAll("/", "\\")).digest("hex").slice(0, 16)
+    return `\\\\.\\pipe\\omo-lsp-${input.version}-${digest}`
+  }
+  const digest = createHash("sha256").update(versionDir).digest("hex").slice(0, 16)
+  return join(input.tempDir ?? tmpdir(), `omo-lsp-${input.version}-${digest}.sock`)
+}
+
+export async function writeLegacyVersionState(input: {
+  readonly codexHome: string
+  readonly version: string
+  readonly pid: string
+  readonly endpoint: string
+}): Promise<LegacyDaemonFixture> {
+  const versionDir = versionDirFor(input.codexHome, input.version)
+  await mkdir(versionDir, { recursive: true })
+  await writeFile(join(versionDir, "daemon.pid"), `${input.pid}\n`)
+  await writeFile(join(versionDir, "daemon.endpoint"), `${input.endpoint}\n`)
+  return { codexHome: input.codexHome, version: input.version, versionDir, endpoint: input.endpoint }
+}
+
+export async function writeSymlinkedLegacyMetadata(input: {
+  readonly codexHome: string
+  readonly version: string
+  readonly targetPath: string
+}): Promise<LegacyDaemonFixture> {
+  const versionDir = versionDirFor(input.codexHome, input.version)
+  await mkdir(versionDir, { recursive: true })
+  await writeFile(input.targetPath, "123\n")
+  await symlink(input.targetPath, join(versionDir, "daemon.pid"))
+  await symlink(input.targetPath, join(versionDir, "daemon.endpoint"))
+  return {
+    codexHome: input.codexHome,
+    version: input.version,
+    versionDir,
+    endpoint: legacyEndpointFor({ codexHome: input.codexHome, version: input.version, kind: "natural" }),
+  }
+}
+
+export function startLegacyDaemonProcess(input: {
+  readonly endpoint: string
+  readonly ignoreSigterm?: boolean
+  readonly holdSocketOpen?: boolean
+}): SpawnedChild {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "legacy-lsp-daemon-child-"))
+  const cliPath = join(fixtureRoot, "cli.js")
+  const source = [
+    'const { createServer } = require("node:net")',
+    'const { mkdirSync, unlinkSync } = require("node:fs")',
+    'const { dirname } = require("node:path")',
+    "const endpoint = process.env.LEGACY_ENDPOINT",
+    "const holdSocketOpen = process.env.LEGACY_HOLD_SOCKET_OPEN === \"1\"",
+    "if (process.env.LEGACY_IGNORE_SIGTERM === \"1\") process.on(\"SIGTERM\", () => {})",
+    "mkdirSync(dirname(endpoint), { recursive: true })",
+    "try { unlinkSync(endpoint) } catch {}",
+    "const server = createServer((socket) => {",
+    "  let buffer = ''",
+    "  socket.on('data', (chunk) => {",
+    "    buffer += chunk.toString('utf8')",
+    "    for (;;) {",
+    "      const newlineIndex = buffer.indexOf('\\n')",
+    "      if (newlineIndex < 0) break",
+    "      const line = buffer.slice(0, newlineIndex).trim()",
+    "      buffer = buffer.slice(newlineIndex + 1)",
+    "      if (line.length === 0) continue",
+    "      const message = JSON.parse(line)",
+    "      socket.write(`${JSON.stringify({ jsonrpc: '2.0', id: 1, result: { content: [{ type: 'text', text: 'ok' }] } })}\\n`)",
+    "      if (!holdSocketOpen) socket.end()",
+    "    }",
+    "  })",
+    "})",
+    "const closeAndExit = () => server.close(() => process.exit(0))",
+    "if (process.env.LEGACY_IGNORE_SIGTERM !== '1') process.on('SIGTERM', closeAndExit)",
+    "process.on('SIGINT', closeAndExit)",
+    "server.listen(endpoint, () => process.stdout.write('ready\\n'))",
+  ].join("\n")
+  writeFileSync(cliPath, `${source}\n`)
+  const child = spawn(nodeBinary(), [cliPath, "daemon"], {
+    env: {
+      ...process.env,
+      LEGACY_ENDPOINT: input.endpoint,
+      LEGACY_IGNORE_SIGTERM: input.ignoreSigterm === true ? "1" : "0",
+      LEGACY_HOLD_SOCKET_OPEN: input.holdSocketOpen === true ? "1" : "0",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  })
+  return child
+}
+
+export function startIdleNodeProcess(): SpawnedChild {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "legacy-lsp-daemon-idle-"))
+  const scriptPath = join(fixtureRoot, "idle.js")
+  writeFileSync(scriptPath, "setInterval(() => undefined, 1_000)\n")
+  return spawn(nodeBinary(), [scriptPath], { stdio: ["ignore", "pipe", "pipe"] })
+}
+
+export async function waitForChildReady(child: SpawnedChild): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error("legacy daemon fixture did not report ready")), 5_000)
+    const onData = (chunk: Buffer): void => {
+      if (!chunk.toString("utf8").includes("ready")) return
+      clearTimeout(timeout)
+      child.stdout.off("data", onData)
+      resolve()
+    }
+    child.stdout.on("data", onData)
+    child.once("exit", (code, signal) => {
+      clearTimeout(timeout)
+      reject(new Error(`legacy daemon fixture exited before ready (code=${code ?? "null"} signal=${signal ?? "null"})`))
+    })
+  })
+}
+
+export async function waitForChildExit(child: SpawnedChild, timeoutMs: number): Promise<boolean> {
+  if (child.exitCode !== null) return true
+  return await new Promise<boolean>((resolve) => {
+    const timer = setTimeout(() => resolve(false), timeoutMs)
+    child.once("exit", () => {
+      clearTimeout(timer)
+      resolve(true)
+    })
+  })
+}
+
+export async function stopChild(child: SpawnedChild): Promise<void> {
+  if (child.exitCode !== null) return
+  child.kill("SIGKILL")
+  await waitForChildExit(child, 1_000)
+}
+
+export async function removePathIfPresent(path: string): Promise<void> {
+  await rm(path, { recursive: true, force: true })
+}
