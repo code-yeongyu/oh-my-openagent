@@ -598,7 +598,28 @@
         "required": [
           "members"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "if": {
+          "properties": {
+            "members": {
+              "type": "array",
+              "minItems": 2
+            }
+          },
+          "required": [
+            "members"
+          ]
+        },
+        "then": {
+          "properties": {
+            "leadAgentId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "leadAgentId"
+          ]
+        }
       }
     }
   },

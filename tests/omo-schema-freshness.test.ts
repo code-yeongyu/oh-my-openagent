@@ -26,6 +26,20 @@ function createCommittedSchemaValidator(): ReturnType<Ajv["compile"]> {
   return new Ajv({ strict: true }).compile(schema)
 }
 
+function createTwoMemberTeamConfig(leadAgentId?: string): unknown {
+  return {
+    teams: {
+      builders: {
+        ...(leadAgentId === undefined ? {} : { leadAgentId }),
+        members: [
+          { name: "lead", kind: "category", category: "quick", prompt: "Lead" },
+          { name: "member", kind: "subagent_type", subagent_type: "sisyphus" },
+        ],
+      },
+    },
+  }
+}
+
 describe("omo schema freshness", () => {
   test("#given the current Zod schema #when regenerated #then it matches the committed artifact", () => {
     // given
@@ -98,6 +112,47 @@ describe("omo schema freshness", () => {
     // then
     expect(valid).toBe(false)
     expect(validate.errors?.some((error) => error.keyword === "additionalProperties")).toBe(true)
+  })
+
+  test("#given a multi-member team without a lead #when validated #then runtime and shipped schemas reject it", () => {
+    // given
+    const validate = createCommittedSchemaValidator()
+    const config = createTwoMemberTeamConfig()
+
+    // when
+    const runtimeResult = OmoConfigSchema.safeParse(config)
+    const artifactResult = validate(config)
+
+    // then
+    expect(runtimeResult.success).toBe(false)
+    if (runtimeResult.success) throw new Error("Expected runtime team validation to fail")
+    expect(runtimeResult.error.issues.some((issue) => issue.path.join(".") === "teams.builders.leadAgentId")).toBe(
+      true,
+    )
+    expect(artifactResult).toBe(false)
+    expect(
+      validate.errors?.some(
+        (error) =>
+          error.keyword === "required" &&
+          error.instancePath === "/teams/builders" &&
+          error.params.missingProperty === "leadAgentId",
+      ),
+    ).toBe(true)
+  })
+
+  test("#given a multi-member team with a lead #when validated #then runtime and shipped schemas accept it", () => {
+    // given
+    const validate = createCommittedSchemaValidator()
+    const config = createTwoMemberTeamConfig("lead")
+
+    // when
+    const runtimeResult = OmoConfigSchema.safeParse(config)
+    const artifactResult = validate(config)
+
+    // then
+    expect(runtimeResult.success).toBe(true)
+    if (!artifactResult) throw new Error(JSON.stringify(validate.errors))
+    expect(artifactResult).toBe(true)
   })
 
   test("#given the docs example #when read #then it points at the documented dev-branch schema URL", () => {
