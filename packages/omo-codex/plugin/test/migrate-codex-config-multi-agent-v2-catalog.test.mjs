@@ -6,19 +6,24 @@ import test from "node:test";
 
 import { migrateCodexConfig } from "../scripts/migrate-codex-config.mjs";
 
-test("#given relative model_catalog_json declares gpt-5.6 model as v1 #when migrating #then resolves catalog from config directory", async () => {
-	const root = await mkdtemp(join(tmpdir(), "lazycodex-v2-relative-catalog-"));
+test("#given model_catalog_json declares a v2 model as v1 #when full migration runs #then keeps the managed disable and max_threads", async () => {
+	const root = await mkdtemp(
+		join(tmpdir(), "lazycodex-multi-agent-v2-catalog-override-"),
+	);
 	const codexHome = join(root, "codex-home");
 	await mkdir(codexHome, { recursive: true });
 	const configPath = join(codexHome, "config.toml");
+	const catalogPath = join(root, "custom-catalog.json");
+	// Codex Desktop user forces gpt-5.6-sol to v1 via an explicit replacement catalog.
 	await writeFile(
 		configPath,
 		[
 			'model = "gpt-5.6-sol"',
-			'model_catalog_json = "custom-catalog.json"',
+			`model_catalog_json = '${catalogPath}'`,
 			"",
 			"[agents]",
 			"max_threads = 1000",
+			"max_depth = 2",
 			"",
 			"[features.multi_agent_v2]",
 			"enabled = false",
@@ -26,6 +31,7 @@ test("#given relative model_catalog_json declares gpt-5.6 model as v1 #when migr
 			"",
 		].join("\n"),
 	);
+	// models_cache.json STILL says v2 (stale), but the explicit catalog wins and says v1.
 	await writeFile(
 		join(codexHome, "models_cache.json"),
 		JSON.stringify({
@@ -33,7 +39,7 @@ test("#given relative model_catalog_json declares gpt-5.6 model as v1 #when migr
 		}),
 	);
 	await writeFile(
-		join(codexHome, "custom-catalog.json"),
+		catalogPath,
 		JSON.stringify({
 			models: [{ slug: "gpt-5.6-sol", multi_agent_version: "v1" }],
 		}),
@@ -48,30 +54,44 @@ test("#given relative model_catalog_json declares gpt-5.6 model as v1 #when migr
 	});
 
 	const content = await readFile(configPath, "utf8");
-	assert.match(content, /enabled = false/);
-	assert.match(content, /max_threads = 1000/);
+	assert.match(
+		content,
+		/enabled = false/,
+		"explicit v1 catalog must keep the managed disable",
+	);
+	assert.match(
+		content,
+		/max_threads = 1000/,
+		"explicit v1 catalog must keep agents.max_threads",
+	);
+	assert.match(content, /max_concurrent_threads_per_session = 1000/);
+	assert.match(content, /max_depth = 2/);
 });
 
-test("#given no SessionStart model and root gpt-5.6 model without catalog #when migrating #then clears stale V2 disable", async () => {
+test("#given model_catalog_json declares a model as v2 #when full migration runs #then clears the managed disable", async () => {
 	const root = await mkdtemp(
-		join(tmpdir(), "lazycodex-v2-root-gpt56-nocache-"),
+		join(tmpdir(), "lazycodex-multi-agent-v2-catalog-v2-"),
 	);
 	const codexHome = join(root, "codex-home");
 	await mkdir(codexHome, { recursive: true });
 	const configPath = join(codexHome, "config.toml");
+	const catalogPath = join(root, "custom-catalog.json");
 	await writeFile(
 		configPath,
 		[
-			'model = "gpt-5.6-terra"',
-			"",
-			"[agents]",
-			"max_threads = 1000",
+			'model = "custom-model"',
+			`model_catalog_json = "${catalogPath}"`,
 			"",
 			"[features.multi_agent_v2]",
 			"enabled = false",
-			"max_concurrent_threads_per_session = 1000",
 			"",
 		].join("\n"),
+	);
+	await writeFile(
+		catalogPath,
+		JSON.stringify({
+			models: [{ slug: "custom-model", multi_agent_version: "v2" }],
+		}),
 	);
 
 	await migrateCodexConfig({
@@ -83,7 +103,9 @@ test("#given no SessionStart model and root gpt-5.6 model without catalog #when 
 	});
 
 	const content = await readFile(configPath, "utf8");
-	assert.doesNotMatch(content, /^\s*enabled\s*=\s*false/m);
-	assert.match(content, /^\s*max_threads\s*=\s*1000$/m);
-	assert.match(content, /max_concurrent_threads_per_session = 1000/);
+	assert.doesNotMatch(
+		content,
+		/^\s*enabled\s*=\s*false/m,
+		"explicit v2 catalog must clear the disable",
+	);
 });

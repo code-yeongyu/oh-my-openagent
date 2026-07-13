@@ -4,7 +4,10 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import { isCliEntry } from "./entry-guard.mjs";
-import { FALLBACK_CATALOG, readModelCatalog } from "./migrate-codex-config/catalog.mjs";
+import {
+	FALLBACK_CATALOG,
+	readModelCatalog,
+} from "./migrate-codex-config/catalog.mjs";
 import { configPaths } from "./migrate-codex-config/config-paths.mjs";
 import { removeStaleContext7PlaceholderMcpServer } from "./migrate-codex-config/context7-placeholder-guard.mjs";
 import { removeUnsupportedRootMultiAgentMode } from "./migrate-codex-config/multi-agent-mode-guard.mjs";
@@ -12,13 +15,27 @@ import {
 	forceDisableMultiAgentV2,
 	resolveMultiAgentVersionFromConfig,
 } from "./migrate-codex-config/multi-agent-v2-guard.mjs";
-import { ensureCodexReasoningConfig as applyReasoningProfile, readRootSettings } from "./migrate-codex-config/root-settings.mjs";
-import { readState, resolveStatePath, writeState } from "./migrate-codex-config/state.mjs";
-import { ensureSubagentConcurrencyLimit } from "./migrate-codex-config/subagent-limit-guard.mjs";
+import {
+	ensureCodexReasoningConfig as applyReasoningProfile,
+	readRootSettings,
+} from "./migrate-codex-config/root-settings.mjs";
+import {
+	readState,
+	resolveStatePath,
+	writeState,
+} from "./migrate-codex-config/state.mjs";
+import {
+	ensureSubagentConcurrencyLimit,
+	hasManagedMultiAgentV2ThreadLimit,
+} from "./migrate-codex-config/subagent-limit-guard.mjs";
+import { isTomlLexicallyValid } from "./migrate-codex-config/toml-lexical-lines.mjs";
 
 export { readModelCatalog } from "./migrate-codex-config/catalog.mjs";
 
-export function ensureCodexReasoningConfig(config, profile = FALLBACK_CATALOG.current) {
+export function ensureCodexReasoningConfig(
+	config,
+	profile = FALLBACK_CATALOG.current,
+) {
 	return applyReasoningProfile(config, profile);
 }
 
@@ -66,6 +83,14 @@ export async function migrateConfigFile(
 	} = {},
 ) {
 	const before = await readConfig(configPath);
+	if (!isTomlLexicallyValid(before)) {
+		return {
+			changed: false,
+			written: readRootSettings(before),
+			managed: previousState?.managed === true,
+			multiAgentModeChanged: false,
+		};
+	}
 	const decision = shouldApplyCatalog(before, catalog, previousState);
 
 	let config = before;
@@ -76,8 +101,18 @@ export async function migrateConfigFile(
 		reasoningApplied = config !== before;
 	}
 
-	const multiAgentOptions = { env, sessionModel, requireSessionModel, configPath };
-	const multiAgentVersion = resolveMultiAgentVersionFromConfig(config, multiAgentOptions);
+	const multiAgentOptions = {
+		env,
+		sessionModel,
+		requireSessionModel,
+		configPath,
+	};
+	const multiAgentVersion = resolveMultiAgentVersionFromConfig(
+		config,
+		multiAgentOptions,
+	);
+	const removeManagedMultiAgentV2ThreadLimit =
+		hasManagedMultiAgentV2ThreadLimit(config);
 	const afterMultiAgentGuard = forceDisableMultiAgentV2(config, {
 		...multiAgentOptions,
 		multiAgentVersion,
@@ -89,18 +124,25 @@ export async function migrateConfigFile(
 	const multiAgentModeChanged = afterMultiAgentModeGuard !== config;
 	if (multiAgentModeChanged) config = afterMultiAgentModeGuard;
 
-	const afterContext7PlaceholderGuard = removeStaleContext7PlaceholderMcpServer(config);
+	const afterContext7PlaceholderGuard =
+		removeStaleContext7PlaceholderMcpServer(config);
 	const context7PlaceholderChanged = afterContext7PlaceholderGuard !== config;
 	if (context7PlaceholderChanged) config = afterContext7PlaceholderGuard;
 
 	const afterSubagentLimit = ensureSubagentConcurrencyLimit(config, {
 		...multiAgentOptions,
 		multiAgentVersion,
+		removeManagedMultiAgentV2ThreadLimit,
 	});
 	const subagentLimitChanged = afterSubagentLimit !== config;
 	if (subagentLimitChanged) config = afterSubagentLimit;
 
-	const changed = reasoningApplied || multiAgentChanged || multiAgentModeChanged || context7PlaceholderChanged || subagentLimitChanged;
+	const changed =
+		reasoningApplied ||
+		multiAgentChanged ||
+		multiAgentModeChanged ||
+		context7PlaceholderChanged ||
+		subagentLimitChanged;
 	if (changed) {
 		await mkdir(dirname(configPath), { recursive: true });
 		await writeFile(configPath, `${config.trimEnd()}\n`);
@@ -113,13 +155,19 @@ export async function migrateConfigFile(
 
 function shouldApplyCatalog(config, catalog, previousState) {
 	const current = readRootSettings(config);
-	if (Object.keys(current).length === 0) return { apply: true, reason: "empty" };
-	if (matchesProfile(current, catalog.current)) return { apply: false, reason: "current", managed: true };
-	if (previousState?.managed === true && matchesProfile(current, previousState.written)) {
+	if (Object.keys(current).length === 0)
+		return { apply: false, reason: "inherited-default", managed: false };
+	if (matchesProfile(current, catalog.current))
+		return { apply: false, reason: "current", managed: true };
+	if (
+		previousState?.managed === true &&
+		matchesProfile(current, previousState.written)
+	) {
 		return { apply: true, reason: "managed-state" };
 	}
 	for (const profile of catalog.managedProfiles) {
-		if (matchesProfile(current, profile.match)) return { apply: true, reason: profile.version };
+		if (matchesProfile(current, profile.match))
+			return { apply: true, reason: profile.version };
 	}
 	return { apply: false, reason: "user-modified", managed: false };
 }
@@ -140,7 +188,8 @@ async function readConfig(configPath) {
 	try {
 		return await readFile(configPath, "utf8");
 	} catch (error) {
-		if (error instanceof Error && "code" in error && error.code === "ENOENT") return "";
+		if (error instanceof Error && "code" in error && error.code === "ENOENT")
+			return "";
 		throw error;
 	}
 }

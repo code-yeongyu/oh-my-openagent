@@ -10,29 +10,40 @@
  * catalog invert that failure mode: forcing `enabled = false` makes every
  * turn 400 with a reserved `collaboration.spawn_agent` schema mismatch
  * (lazycodex#118 / oh-my-openagent#6002 / openai/codex#31097), and
- * `hide_spawn_agent_metadata = false` (written by OMO installers <= 4.15.x)
- * mismatches the same reserved schema by re-adding agent_type/model
- * properties to spawn_agent. For those models this guard clears the managed
- * disable and the stale metadata override, leaving V2 unset so Codex can
- * follow model metadata.
+ * stale routing pairs can leave Codex on the wrong spawn-agent tool surface.
+ * For those models this guard clears the managed disable and converges the
+ * V2 table to the reserved-schema-safe agents namespace pair.
  *
- * When the selected model is unknown or declares V1, keep the #26753
- * force-disable path.
+ * When no model is selected in config or visible from SessionStart, install
+ * only the inert namespace/metadata compatibility pair. Explicit V1 models
+ * keep the #26753 force-disable path.
  *
  * Opt out of the whole migration with LAZYCODEX_CONFIG_MIGRATION_DISABLED=1
  * (or OMO_CODEX_CONFIG_MIGRATION_DISABLED=1).
  */
-import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, isAbsolute, join } from "node:path";
 
-const MANAGED_COMMENT_MARKER = "openai/codex#26753";
-const MANAGED_DISABLE_COMMENT = [
-	"# Managed by LazyCodex: multi_agent_v2 is re-disabled on every Codex session start",
-	`# because enabling it fails every turn with HTTP 400 (${MANAGED_COMMENT_MARKER}).`,
-	"# Opt out: LAZYCODEX_CONFIG_MIGRATION_DISABLED=1 (or OMO_CODEX_CONFIG_MIGRATION_DISABLED=1).",
-	"",
-].join("\n");
+import {
+	clearMultiAgentV2DisableForReservedSchema,
+	ensureV2CompatibilitySettings,
+	forceDisableLegacyEncryptedV2,
+	removeFeaturesShorthand,
+} from "./multi-agent-v2-config-editor.mjs";
+import {
+	prefersMultiAgentV2,
+	readRootModel,
+	readRootModelCatalogPath,
+	resolveMultiAgentVersionForModel,
+	resolveMultiAgentVersionFromConfig,
+} from "./multi-agent-v2-model-resolution.mjs";
+import { isTomlLexicallyValid } from "./toml-lexical-lines.mjs";
+
+export {
+	prefersMultiAgentV2,
+	readRootModel,
+	readRootModelCatalogPath,
+	resolveMultiAgentVersionForModel,
+	resolveMultiAgentVersionFromConfig,
+};
 
 /**
  * @param {string} config
@@ -46,6 +57,7 @@ const MANAGED_DISABLE_COMMENT = [
  * }} [options]
  */
 export function forceDisableMultiAgentV2(config, options = {}) {
+	if (!isTomlLexicallyValid(config)) return config;
 	// Always normalize the legacy `[features]` boolean shorthand first: leaving
 	// `multi_agent_v2 = true|false` in place while a later guard appends the
 	// `[features.multi_agent_v2]` table would define the same name as both a
@@ -67,7 +79,9 @@ export function forceDisableMultiAgentV2(config, options = {}) {
 	// session model, do not force-disable — writing enabled=false would break a
 	// GPT-5.6 reserved collaboration.spawn_agent session.
 	if (options.requireSessionModel === true && !sessionModel) {
-		return normalized;
+		return readRootModel(normalized) === null
+			? ensureV2CompatibilitySettings(normalized)
+			: normalized;
 	}
 
 	// No model evidence at all (no session model AND no root `model` in
@@ -75,8 +89,12 @@ export function forceDisableMultiAgentV2(config, options = {}) {
 	// cannot prove the session is not a GPT-5.6 reserved-schema model, and
 	// writing `enabled = false` would 400 every turn on those sessions
 	// (#6002). Leave the enable state untouched.
-	if (multiAgentVersion == null && !sessionModel && !readRootModel(normalized)) {
-		return normalized;
+	if (
+		multiAgentVersion == null &&
+		!sessionModel &&
+		!readRootModel(normalized)
+	) {
+		return ensureV2CompatibilitySettings(normalized);
 	}
 
 	// Unknown catalog entry for an explicit session model: skip force-disable
@@ -88,211 +106,8 @@ export function forceDisableMultiAgentV2(config, options = {}) {
 	return forceDisableLegacyEncryptedV2(normalized);
 }
 
-/**
- * True when the effective model should run MultiAgentV2: the catalog says
- * "v2", or the catalog is unavailable but the model is a GPT-5.6 family
- * model (which reserves the collaboration.spawn_agent schema).
- * @param {"v1" | "v2" | null | undefined} multiAgentVersion
- * @param {string | null | undefined} sessionModel
- */
-export function prefersMultiAgentV2(multiAgentVersion, sessionModel) {
-	return multiAgentVersion === "v2" || (multiAgentVersion == null && isGpt56Family(normalizeModel(sessionModel)));
-}
-
-/**
- * Resolve the effective model against Codex `models_cache.json`.
- * Prefers SessionStart `model` over the root `model` in config.toml.
- * @param {string} config
- * @param {{ sessionModel?: string | null, env?: NodeJS.ProcessEnv, modelsCachePath?: string, configPath?: string }} [options]
- * @returns {"v1" | "v2" | null}
- */
-export function resolveMultiAgentVersionFromConfig(config, options = {}) {
-	const model = normalizeModel(options.sessionModel) || readRootModel(config);
-	if (!model) return null;
-	const version = resolveMultiAgentVersionForModel(model, {
-		...options,
-		modelsCachePath: options.modelsCachePath?.trim() || resolveModelCatalogPath(readRootModelCatalogPath(config), options) || undefined,
-	});
-	return version ?? (isGpt56Family(model) ? "v2" : null);
-}
-
-/**
- * @param {string} model
- * @param {{ env?: NodeJS.ProcessEnv, modelsCachePath?: string }} [options]
- * @returns {"v1" | "v2" | null}
- */
-export function resolveMultiAgentVersionForModel(model, options = {}) {
-	const cachePath =
-		options.modelsCachePath?.trim() ||
-		join(options.env?.CODEX_HOME?.trim() || join(homedir(), ".codex"), "models_cache.json");
-
-	try {
-		const cache = JSON.parse(readFileSync(cachePath, "utf8"));
-		const models = Array.isArray(cache?.models) ? cache.models : [];
-		const entry = models.find((item) => item?.slug === model || item?.id === model);
-		const version = entry?.multi_agent_version;
-		if (version === "v1" || version === "v2") return version;
-		return null;
-	} catch {
-		return null;
-	}
-}
-
-export function readRootModel(config) {
-	const double = config.match(/^\s*model\s*=\s*"([^"]+)"/m);
-	if (double) return double[1];
-	const single = config.match(/^\s*model\s*=\s*'([^']+)'/m);
-	return single?.[1] ?? null;
-}
-
-// Codex documents `model_catalog_json` as a COMPLETE replacement for the
-// fetched models_cache.json (codex-rs/core/src/config/mod.rs load_model_catalog
-// -> load_catalog_json -> ModelsResponse). When set, Codex resolves the model
-// only from that file, so the guard must too — otherwise Codex and the guard
-// disagree on the multi-agent version (lazycodex#120).
-export function readRootModelCatalogPath(config) {
-	const double = config.match(/^\s*model_catalog_json\s*=\s*"([^"]+)"/m);
-	if (double) return double[1];
-	const single = config.match(/^\s*model_catalog_json\s*=\s*'([^']+)'/m);
-	return single?.[1] ?? null;
-}
-
-function resolveModelCatalogPath(configuredPath, options) {
-	const trimmed = normalizeModel(configuredPath);
-	if (!trimmed) return null;
-	if (isAbsolute(trimmed)) return trimmed;
-	const baseDir = options.configPath ? dirname(options.configPath) : options.env?.CODEX_HOME?.trim() || join(homedir(), ".codex");
-	return join(baseDir, trimmed);
-}
-
 function normalizeModel(value) {
 	if (typeof value !== "string") return null;
 	const trimmed = value.trim();
 	return trimmed.length > 0 ? trimmed : null;
-}
-
-function isGpt56Family(model) {
-	return typeof model === "string" && /^gpt-5\.6\b/i.test(model);
-}
-
-function clearMultiAgentV2DisableForReservedSchema(config) {
-	// `config` arrives shorthand-normalized from forceDisableMultiAgentV2.
-	const result = removeManagedDisableComments(config);
-
-	const section = findSection(result, "[features.multi_agent_v2]");
-	if (!section) return result;
-
-	// Two settings poison the reserved collaboration.spawn_agent schema on V2
-	// models (verified against codex-cli 0.144.1 + gpt-5.6-sol):
-	// - `enabled = false` forces the legacy V1 tool surface on some Codex
-	//   versions (#6002's failure shape);
-	// - `hide_spawn_agent_metadata = false` (written by OMO installers
-	//   <= 4.15.x to expose agent_type) re-adds agent_type/model/... to
-	//   spawn_agent, mismatching the reserved schema -> HTTP 400 every turn.
-	// Remove both; `hide_spawn_agent_metadata = true` matches the Codex
-	// default and is left alone.
-	const cleared = section.text
-		.replace(/^\s*enabled\s*=\s*false[ \t]*(?:#[^\n]*)?\n?/gm, "")
-		.replace(/^\s*hide_spawn_agent_metadata\s*=\s*false[ \t]*(?:#[^\n]*)?\n?/gm, "");
-	if (cleared === section.text) return result;
-	return result.slice(0, section.start) + cleared + result.slice(section.end);
-}
-
-// `config` arrives shorthand-normalized from forceDisableMultiAgentV2.
-function forceDisableLegacyEncryptedV2(config) {
-	const section = findSection(config, "[features.multi_agent_v2]");
-
-	if (!section) {
-		return ensureManagedComment(appendDisabledSection(config));
-	}
-
-	const enabledTruePattern = /^(\s*)enabled\s*=\s*true[ \t]*(#[^\n]*)?$/m;
-	if (enabledTruePattern.test(section.text)) {
-		const patched = section.text.replace(enabledTruePattern, (_match, indent, comment) =>
-			comment ? `${indent}enabled = false ${comment}` : `${indent}enabled = false`,
-		);
-		return ensureManagedComment(config.slice(0, section.start) + patched + config.slice(section.end));
-	}
-
-	if (/^\s*enabled\s*=\s*false[ \t]*(?:#[^\n]*)?$/m.test(section.text)) return config;
-
-	const headerEnd = section.text.indexOf("\n");
-	const insertAt = headerEnd === -1 ? section.text.length : headerEnd + 1;
-	const patched = `${section.text.slice(0, insertAt)}${headerEnd === -1 ? "\n" : ""}enabled = false\n${section.text.slice(insertAt)}`;
-	return ensureManagedComment(config.slice(0, section.start) + patched + config.slice(section.end));
-}
-
-function ensureManagedComment(config) {
-	if (config.includes(MANAGED_COMMENT_MARKER)) return config;
-	const section = findSection(config, "[features.multi_agent_v2]");
-	if (!section) return config;
-	return config.slice(0, section.start) + MANAGED_DISABLE_COMMENT + config.slice(section.start);
-}
-
-function removeManagedDisableComments(config) {
-	if (!config.includes(MANAGED_COMMENT_MARKER) && !config.includes("Managed by LazyCodex: multi_agent_v2")) {
-		return config;
-	}
-
-	const lines = config.split("\n");
-	const kept = [];
-	for (const line of lines) {
-		const trimmed = line.trim();
-		if (
-			trimmed.startsWith("#") &&
-			(trimmed.includes(MANAGED_COMMENT_MARKER) ||
-				trimmed.includes("Managed by LazyCodex: multi_agent_v2") ||
-				trimmed.includes("because enabling it fails every turn with HTTP 400") ||
-				trimmed.includes("LAZYCODEX_CONFIG_MIGRATION_DISABLED=1") ||
-				trimmed.includes("OMO_CODEX_CONFIG_MIGRATION_DISABLED=1"))
-		) {
-			continue;
-		}
-		kept.push(line);
-	}
-	return kept.join("\n").replace(/\n{3,}/g, "\n\n");
-}
-
-function removeFeaturesShorthand(config) {
-	const section = findSection(config, "[features]");
-	if (!section) return config;
-
-	const shorthandPattern = /^\s*multi_agent_v2\s*=\s*(?:true|false)[ \t]*(?:#[^\n]*)?[ \t]*\n?/m;
-	if (!shorthandPattern.test(section.text)) return config;
-
-	const patched = section.text.replace(shorthandPattern, "");
-	return config.slice(0, section.start) + patched + config.slice(section.end);
-}
-
-function appendDisabledSection(config) {
-	const trimmed = config.trimEnd();
-	const prefix = trimmed.length === 0 ? "" : `${trimmed}\n\n`;
-	return `${prefix}[features.multi_agent_v2]\nenabled = false\n`;
-}
-
-// Strips a trailing # comment from a TOML line fragment (best-effort; quoted keys containing # are out of scope).
-function stripTrailingComment(line) {
-	const idx = line.indexOf("#");
-	return idx === -1 ? line : line.slice(0, idx).trim();
-}
-
-function findSection(config, headerLine) {
-	const lines = config.match(/[^\n]*\n?|$/g) ?? [];
-	let offset = 0;
-	let start = -1;
-	for (const line of lines) {
-		if (line.length === 0) break;
-		const trimmed = line.trim();
-		if (start === -1) {
-			if (stripTrailingComment(trimmed) === headerLine) start = offset;
-		} else {
-			const bare = stripTrailingComment(trimmed);
-			if (bare.startsWith("[") && bare.endsWith("]")) {
-				return { start, end: offset, text: config.slice(start, offset) };
-			}
-		}
-		offset += line.length;
-	}
-	if (start === -1) return null;
-	return { start, end: config.length, text: config.slice(start) };
 }
