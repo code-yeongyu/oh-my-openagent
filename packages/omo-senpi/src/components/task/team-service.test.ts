@@ -1,17 +1,23 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
+import { AuthStorage, ModelRegistry } from "@code-yeongyu/senpi"
 
 import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
 import { createRuntimeState, transitionRuntimeState } from "@oh-my-opencode/team-core/team-state-store"
 import {
   createTaskRecordStore,
   normalizeSenpiTeamSpec,
+  resolveMemberExtensionEntryPath,
   resolveTeamMemberInboxDir,
   resolveTeamRuntimeDirs,
   teamStorageBaseDir,
   toTeamCoreConfig,
+  type ManagedChildHandle,
+  type ManagedRunner,
+  type ManagedStartSpec,
+  type RunnerOutcome,
 } from "@oh-my-opencode/senpi-task"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
@@ -63,6 +69,73 @@ async function activeTeamHarness() {
   return { runtimeState, service, stateDir }
 }
 
+function extensionOrderHarness() {
+  const cwd = mkdtempSync(join(tmpdir(), "omo-senpi-team-service-extensions-"))
+  tempRoots.push(cwd)
+  mkdirSync(join(cwd, ".omo"), { recursive: true })
+  writeFileSync(join(cwd, ".omo", "omo.json"), `${JSON.stringify({
+    categories: { quick: { model: "omo-mock/mock-1" } },
+  })}\n`)
+  const started: ManagedStartSpec[] = []
+  const runner: ManagedRunner = {
+    start: (spec) => {
+      started.push(spec)
+      return Promise.resolve(fakeManagedHandle(spec))
+    },
+  }
+  const omoConfig = loadOmoConfig({ cwd }).config
+  const engine = composeTaskEngine({
+    pi: new FakeExtensionAPI(),
+    omoConfig,
+    cwd,
+    sharedParentTools: () => [],
+    runnerFactories: { inProcess: () => runner, process: () => runner },
+  })
+  const modelRegistry = ModelRegistry.inMemory(AuthStorage.inMemory())
+  modelRegistry.registerProvider("omo-mock", {
+    api: "openai-completions",
+    baseUrl: "https://example.test",
+    apiKey: "test-key",
+    models: [{
+      id: "mock-1",
+      name: "Mock model",
+      reasoning: false,
+      input: ["text"],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 1,
+      maxTokens: 1,
+    }],
+  })
+  engine.runtime.captureFrom({
+    modelRegistry,
+    sessionManager: { getSessionId: () => "lead-session" },
+  })
+  const service = createTeamService({
+    manager: engine.manager,
+    runtime: engine.runtime,
+    settings: engine.settings,
+    omoConfig,
+    cwd,
+    agentNames: new Set(Object.keys(engine.agents)),
+  })
+  return { service, started }
+}
+
+function fakeManagedHandle(spec: ManagedStartSpec): ManagedChildHandle {
+  return {
+    task_id: spec.taskId,
+    pid: undefined,
+    sessionId: undefined,
+    steer: () => Promise.resolve(),
+    followUp: () => Promise.resolve(),
+    abort: () => Promise.resolve(),
+    subscribe: () => () => undefined,
+    waitForOutcome: () => new Promise<RunnerOutcome>(() => undefined),
+    lastAssistantText: () => undefined,
+    dispose: () => Promise.resolve(),
+  }
+}
+
 describe("createTeamService lead messaging", () => {
   test("#given a mapped recipient task #when the lead sends #then the correlation event is persisted on the recipient task", async () => {
     // given
@@ -100,5 +173,31 @@ describe("createTeamService lead messaging", () => {
     expect(result).toEqual({ kind: "to_members", messageId: MESSAGE_ID, recipients: ["beta"] })
     expect(existsSync(join(resolveTeamMemberInboxDir(stateDir, runtimeState.teamRunId, "beta"), `${MESSAGE_ID}.json`))).toBe(true)
     expect(existsSync(join(createTaskRecordStore(stateDir).stateDir, "logs", `${MEMBER_TASK_ID}.jsonl`))).toBe(false)
+  })
+
+  test("#given main and provider extensions #when a team member starts #then member tools load before inherited OMO extensions", async () => {
+    // given
+    const originalArgv = process.argv
+    process.argv = ["node", "senpi", "-e", "/tmp/omo.js", "--extension", "/tmp/mock-provider.ts"]
+    try {
+      const { service, started } = extensionOrderHarness()
+
+      // when
+      await service.createTeam({
+        inlineSpec: {
+          name: "extension-order",
+          members: [{ name: "beta", kind: "category", category: "quick", prompt: "work" }],
+        },
+      })
+
+      // then
+      expect(started[0]?.extensions).toEqual([
+        resolveMemberExtensionEntryPath(),
+        "/tmp/omo.js",
+        "/tmp/mock-provider.ts",
+      ])
+    } finally {
+      process.argv = originalArgv
+    }
   })
 })

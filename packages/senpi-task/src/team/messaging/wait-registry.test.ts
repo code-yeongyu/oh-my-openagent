@@ -32,6 +32,22 @@ describe("WaitRegistry", () => {
     await expect(aliceOnly.promise).resolves.toEqual({ id: "m3", from: "alice" })
     expect(registry.size).toBe(0)
   })
+  test("#given waits for independent team runs w2mem #when a team message is claimed #then it cannot consume another team's wait", async () => {
+    // given
+    const registry = new WaitRegistry<TestMessage>()
+    const teamA = registry.register("team-a")
+    const teamB = registry.register("team-b")
+
+    // when
+    const claim = registry.takeMatch("team-b", { id: "m1", from: "alice" })
+
+    // then
+    expect(claim?.message.id).toBe("m1")
+    expect(claim?.resolve()).toBe(true)
+    await expect(teamB.promise).resolves.toEqual({ id: "m1", from: "alice" })
+    expect(teamA.cancel()).toBe(true)
+  })
+
 
   test("#given cancelled and claimed waits w2mem #when cleanup runs #then cancelled waits never match and abandoned claims rejoin FIFO", async () => {
     // given

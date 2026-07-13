@@ -13,6 +13,7 @@ type FakePoller = LeadPollerPort & { readonly teamRunId: string; polls: number; 
 function harness() {
   let sessionId: string | undefined = "session-a"
   let state: ReturnType<TaskRuntimeContext["parentState"]> = { kind: "idle" }
+  let sessionFile: string | undefined = "/tmp/lead.jsonl"
   let teams = [ownedTeam("run-owned"), ownedTeam("run-foreign", "session-b")]
   const created: Array<{ readonly input: LeadPollerFactoryInput; readonly poller: FakePoller }> = []
   const mapReads: string[] = []
@@ -27,7 +28,7 @@ function harness() {
     listTeams: async () => teams,
     runtime: {
       sessionId: () => sessionId,
-      sessionFile: () => "/tmp/lead.jsonl",
+      sessionFile: () => sessionFile,
       parentState: () => state,
     },
     config: toTeamCoreConfig(OmoTaskSettingsSchema.parse({}), "/tmp/teams"),
@@ -74,6 +75,7 @@ function harness() {
     get intervalDisposals() { return intervalDisposals },
     setSessionId: (value: string | undefined) => { sessionId = value },
     setState: (value: ReturnType<TaskRuntimeContext["parentState"]>) => { state = value },
+    setSessionFile: (value: string | undefined) => { sessionFile = value },
     setTeams: (value: typeof teams) => { teams = value },
   }
 }
@@ -96,6 +98,40 @@ describe("lead poller lifecycle", () => {
     expect(h.created[0]?.poller.polls).toBe(2)
     expect(h.mapReads).toEqual(["/tmp/runtime/run-owned"])
     expect(h.created[0]?.input.eventTaskId(messageFrom("alpha"))).toBe("st_alpha")
+  })
+
+  test("#given an owned lead without a captured session file #when the lifecycle ticks #then it does not reserve inbox delivery until persistence is possible", async () => {
+    // given
+    const h = harness()
+    h.setSessionFile(undefined)
+
+    // when
+    await h.lifecycle.tick()
+
+    // then
+    expect(h.created).toHaveLength(0)
+
+    // when the session file is captured
+    h.setSessionFile("/tmp/lead.jsonl")
+    await h.lifecycle.tick()
+
+    // then
+    expect(h.created[0]?.poller.polls).toBe(1)
+  })
+
+  test("#given a lead without a captured session file #when team_wait resolves its owned run #then no poller is available to reserve delivery", async () => {
+    // given
+    const h = harness()
+    h.setSessionFile(undefined)
+
+    // when
+    const resolved = await h.lifecycle.resolveTeamRunId()
+    const poller = h.lifecycle.resolveLeadPoller("run-owned")
+
+    // then
+    expect(resolved).toEqual({ ok: true, teamRunId: "run-owned" })
+    expect(h.created).toHaveLength(0)
+    expect(poller).toBeUndefined()
   })
 
   test("#given a compacting parent #when the lifecycle ticks #then the owned poller is suspended", async () => {

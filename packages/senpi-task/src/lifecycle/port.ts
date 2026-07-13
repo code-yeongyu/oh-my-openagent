@@ -80,3 +80,8 @@ export type LifecycleDeps = {
   // Delay before escalating an orphan SIGTERM to SIGKILL during reconciliation. Defaults to 5s.
   readonly orphanKillDelayMs?: number
 }
+
+export function injectedLifecycleReattachPorts(deps: LifecycleDeps): LifecycleReattachPorts | undefined {
+  if (deps.respawn === undefined || deps.reattach === undefined) return undefined
+  return { respawn: deps.respawn, reattach: deps.reattach }
+}

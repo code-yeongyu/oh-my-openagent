@@ -104,6 +104,7 @@ export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
   const ports = buildMemberPorts(deps.omoConfig, deps.agentNames)
   const omoTeams = deps.omoConfig.teams as Record<string, unknown> | undefined
   const runtimeDir = (teamRunId: string) => resolveTeamRuntimeDirs(stateDir, teamRunId).runtimeDir
+  const memberExtensionEntryPath = resolveMemberExtensionEntryPath()
 
   const service: TeamToolsService = {
     async createTeam(input) {
@@ -117,8 +118,8 @@ export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
         spawnDepth: TEAM_MEMBER_SPAWN_DEPTH,
         ...(deps.now !== undefined ? { now: deps.now } : {}),
         memberExtension: {
-          entryPath: resolveMemberExtensionEntryPath(),
-          inheritedExtensions: parseExtensionEntries(process.argv),
+          entryPath: memberExtensionEntryPath,
+          inheritedExtensions: [memberExtensionEntryPath, ...parseExtensionEntries(process.argv)],
         },
       })
     },

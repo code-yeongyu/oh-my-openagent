@@ -54,13 +54,7 @@ function readOptionalSpawnSpec(record: Record<string, unknown>): TaskRecord["spa
   const value = record["spawn_spec"]
   if (value === undefined) return undefined
   if (!isRecord(value)) throw new Error("spawn_spec is not an object")
-  const extensions = readOptionalStringArray(value, "extensions")
-  const memberEnv = readOptionalStringRecord(value, "member_env")
-  return {
-    cwd: readString(value, "cwd"),
-    ...(extensions === undefined ? {} : { extensions }),
-    ...(memberEnv === undefined ? {} : { member_env: memberEnv }),
-  }
+  return { cwd: readString(value, "cwd") }
 }
 
 function readOptionalResolvedModel(record: Record<string, unknown>): ResolvedModelRecord | undefined {
@@ -173,20 +167,6 @@ function readOptionalStringArray(record: Record<string, unknown>, key: string): 
   return value
 }
 
-function readOptionalStringRecord(
-  record: Record<string, unknown>,
-  key: string,
-): Readonly<Record<string, string>> | undefined {
-  const value = record[key]
-  if (value === undefined) return undefined
-  if (!isRecord(value)) throw new Error(`${key} is not a string record`)
-  const parsed: Record<string, string> = {}
-  for (const [entryKey, entryValue] of Object.entries(value)) {
-    if (typeof entryValue !== "string") throw new Error(`${key}.${entryKey} is not a string`)
-    parsed[entryKey] = entryValue
-  }
-  return parsed
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)

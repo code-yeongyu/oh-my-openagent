@@ -120,7 +120,7 @@ async function processMessage(deps: LeadPollerDeps, message: Message, state: Lea
     return
   }
 
-  const waitClaim = deps.waitRegistry.takeMatch(message)
+  const waitClaim = deps.waitRegistry.takeMatch(deps.teamRunId, message)
   if (waitClaim !== undefined) {
     await resolveWait(deps, { message, reservation, phase: "awaiting_persistence" }, waitClaim)
     return

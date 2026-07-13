@@ -82,12 +82,14 @@ test("#given neither transport's tools are visible #when the leader reads teammo
 	assert.doesNotMatch(skill, /splitting the work across plain fire-and-forget subagents/i, "the skill must not promise unavailable plain subagents");
 });
 
-test("#given a MultiAgentV2 team #when the leader spawns members #then per-member model routing is a decision rule that defaults to session inherit", () => {
+test("#given a MultiAgentV2 team #when the leader spawns members #then guidance limits calls to exposed V2 fields", () => {
 	const skill = readFileSync(join(root, "components", "teammode", "skills", "teammode", "SKILL.md"), "utf8");
 
-	assert.doesNotMatch(skill, /Do not set `agent_type`, `model`, or `reasoning_effort`/, "the stale blanket prohibition must be gone");
-	assert.match(skill, /`model` \/ `reasoning_effort` only when/i, "model\/effort must be gated behind a task-requirement decision rule");
-	assert.match(skill, /inherit the session model/i, "omitting model\/effort must default to session inherit");
+	assert.match(skill, /using only the V2 schema fields/i);
+	assert.match(skill, /`task_name`[\s\S]*`message`[\s\S]*`fork_turns`/);
+	assert.match(skill, /role, priority, or task-specific routing instruction in `message`/i);
+	assert.match(skill, /V2 does not accept[\s\S]*`agent_type`, `model`, `reasoning_effort`, or `service_tier`/);
+	assert.match(skill, /inherit the[\s\S]*session model/i);
 });
 
 test("#given MultiAgentV2 transport #when members are added and bound #then task names and canonical agent paths form the address book", () => {
