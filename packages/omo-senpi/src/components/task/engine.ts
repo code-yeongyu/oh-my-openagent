@@ -11,8 +11,10 @@ import {
   createTaskLifecycle,
   parseExtensionEntries,
   createTaskManager,
+  createTeamMemberRespawnLaunchResolver,
   createTaskRecordStore,
   mapOmoConfigAgents,
+  resolveMemberExtensionEntryPath,
   type AgentDefinition,
   type CompletionNotifier,
   type ManagedRunner,
@@ -141,6 +143,17 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     cwd: deps.cwd,
     destruction: { destroyResidentTask: (taskId) => lifecycle.destroyResidentTask(taskId, "cancel") },
     admit: (parentSessionId) => admitAdapter(lifecycle, parentSessionId),
+    trustedRespawnLaunch: createTeamMemberRespawnLaunchResolver({
+      stateDir: {
+        project_dir: deps.cwd,
+        ...(settings.state_dir === undefined ? {} : { task: { state_dir: settings.state_dir } }),
+      },
+      taskSettings: settings,
+      memberExtension: {
+        entryPath: resolveMemberExtensionEntryPath(),
+        inheritedExtensions: parseExtensionEntries(process.argv),
+      },
+    }),
   })
   managerRef = manager
 

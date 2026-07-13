@@ -21,6 +21,7 @@ import {
   snapshotDir,
 } from "./task-e2e-analysis.mjs"
 import {
+  BATCH_FINAL,
   BATCH_SCRIPT,
   CHILD_FIRST,
   CHILD_SECOND,
@@ -128,8 +129,7 @@ function runBatchFlow(senpiBin, checks, capture, pids) {
   const taskIds = readStoreTaskIds(scenario.stateDir)
   const items = findBatchFanout(events, 2)
   capture.batchStdout = run.stdout ?? ""
-  capture.batchTaskIds = taskIds
-  checks.batch_fanout_two_children = run.status === 0 && items.length >= 2 && taskIds.length >= 2 ? "PASS" : "FAIL"
+  checks.batch_fanout_two_children = run.status === 0 && taskIds.length >= 2 && batchChildrenCompleted(events, items) ? "PASS" : "FAIL"
   return scenario.sandbox
 }
 
@@ -216,6 +216,12 @@ function findBlockingTaskOutput(events) {
   return JSON.stringify(events).includes('"name":"task_output"') && JSON.stringify(events).includes('"block":true')
 }
 
+function batchChildrenCompleted(events, items) {
+  if (items.length !== 2 || !items.every((item) => item?.status === "completed")) return false
+  const output = JSON.stringify(events)
+  return output.includes(`${BATCH_FINAL} one`) && output.includes(`${BATCH_FINAL} two`)
+}
+
 function runSelfTest() {
   const wakeEvents = parseJsonEvents(`banner\n${JSON.stringify({
     type: "custom",
@@ -234,6 +240,58 @@ function runSelfTest() {
     result: { details: { items: [{ task_id: "st_1" }, { task_id: "st_2" }] } },
   })), 2)
   if (batchItems.length !== 2) throw new Error("self-test: two-child batch fanout must be detected")
+  const completedBatchEvents = parseJsonEvents(JSON.stringify({
+    type: "tool_execution_end",
+    toolName: "task",
+    result: {
+      content: [{ type: "text", text: `${BATCH_FINAL} one\n${BATCH_FINAL} two` }],
+      details: {
+        status: "completed",
+        items: [
+          { task_id: "st_1", status: "completed" },
+          { task_id: "st_2", status: "completed" },
+        ],
+      },
+    },
+  }))
+  const completedItems = findBatchFanout(completedBatchEvents, 2)
+  if (!batchChildrenCompleted(completedBatchEvents, completedItems)) {
+    throw new Error("self-test: completed batch children with both outputs must pass")
+  }
+  const pendingBatchEvents = parseJsonEvents(JSON.stringify({
+    type: "tool_execution_end",
+    toolName: "task",
+    result: {
+      content: [{ type: "text", text: `${BATCH_FINAL} one\n${BATCH_FINAL} two` }],
+      details: {
+        status: "completed",
+        items: [
+          { task_id: "st_1", status: "completed" },
+          { task_id: "st_2", status: "running" },
+        ],
+      },
+    },
+  }))
+  if (batchChildrenCompleted(pendingBatchEvents, findBatchFanout(pendingBatchEvents, 2))) {
+    throw new Error("self-test: a pending batch child must fail")
+  }
+  const incompleteOutputBatchEvents = parseJsonEvents(JSON.stringify({
+    type: "tool_execution_end",
+    toolName: "task",
+    result: {
+      content: [{ type: "text", text: `${BATCH_FINAL} one` }],
+      details: {
+        status: "completed",
+        items: [
+          { task_id: "st_1", status: "completed" },
+          { task_id: "st_2", status: "completed" },
+        ],
+      },
+    },
+  }))
+  if (batchChildrenCompleted(incompleteOutputBatchEvents, findBatchFanout(incompleteOutputBatchEvents, 2))) {
+    throw new Error("self-test: a missing batch output must fail")
+  }
   const signatures = jsonlSignatures([
     JSON.stringify({ type: "transition_applied", payload: { type: "transition_applied", status: "running", residency_state: "resident" } }),
     JSON.stringify({ type: "assistant_message", payload: { text: CHILD_FIRST } }),
