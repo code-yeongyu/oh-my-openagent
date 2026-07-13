@@ -109,7 +109,7 @@ test("#given explicit v1 model catalog with a historical managed V2 cap #when ge
 		configPath,
 		[
 			'model = "gpt-5.6-sol"',
-			`model_catalog_json = "${catalogPath}"`,
+			`model_catalog_json = ${JSON.stringify(catalogPath)}`,
 			"",
 			"[features]",
 			"multi_agent_v2 = false",
@@ -167,7 +167,7 @@ test("#given explicit v2 model_catalog_json and stale models_cache v1 #when gene
 		configPath,
 		[
 			'model = "gpt-5.6-sol"',
-			`model_catalog_json = "${catalogPath}"`,
+			`model_catalog_json = ${JSON.stringify(catalogPath)}`,
 			"",
 			"[features]",
 			"multi_agent_v2 = false",

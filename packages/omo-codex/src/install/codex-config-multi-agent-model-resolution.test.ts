@@ -163,7 +163,7 @@ test("#given model_catalog_json declares a v2 family model as v1 #when updating 
 		configPath,
 		[
 			'model = "gpt-5.6-sol"',
-			`model_catalog_json = "${catalogPath}"`,
+			`model_catalog_json = ${JSON.stringify(catalogPath)}`,
 			"",
 			"[features]",
 			"multi_agent_v2 = false",

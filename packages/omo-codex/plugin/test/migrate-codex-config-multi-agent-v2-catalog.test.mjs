@@ -80,7 +80,7 @@ test("#given model_catalog_json declares a model as v2 #when full migration runs
 		configPath,
 		[
 			'model = "custom-model"',
-			`model_catalog_json = "${catalogPath}"`,
+			`model_catalog_json = ${JSON.stringify(catalogPath)}`,
 			"",
 			"[features.multi_agent_v2]",
 			"enabled = false",
