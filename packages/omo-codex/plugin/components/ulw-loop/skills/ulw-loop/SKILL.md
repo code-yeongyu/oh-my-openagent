@@ -35,15 +35,15 @@ This skill is intentionally compact. The full workflow lives in `references/full
 
 ## Codex Tool Mapping
 
-Codex exposes ONE subagent surface per session — check your tool list. GPT-5.6 (sol/terra) get the flat MultiAgentV2 tools (primary); GPT-5.5 and gpt-5.6-luna get the namespaced `multi_agent_v1.*` set (fallback row). The workflow's orchestration examples map to:
+Codex exposes ONE subagent surface per session — check your tool list. GPT-5.6-compatible sessions get namespaced MultiAgentV2 `agents.*` tools (primary); GPT-5.5 and gpt-5.6-luna get the namespaced `multi_agent_v1.*` set (fallback row). The workflow's orchestration examples map to:
 
 | Intent | MultiAgentV2 (gpt-5.6 sol/terra) |
 | --- | --- |
-| Spawn a worker | `spawn_agent({"task_name":"<lower_snake_id>","message":"TASK: act as <role>. ...","fork_turns":"none"})` — `task_name`+`message` required; `fork_turns:"none"` = no parent history; do NOT set `agent_type`/`model`/`reasoning_effort` |
-| Re-task an idle worker (wakes it) | `followup_task({"target":"<name>","message":"..."})` |
-| Send context without interrupting | `send_message({"target":"<name>","message":"..."})` |
-| Wait for a mailbox signal | `wait_agent({"timeout_ms":<ms>})` — any live worker; a timeout only means no new update |
-| Enumerate / stop a runaway | `list_agents()` / `interrupt_agent({"target":"<name>"})` — no `close_agent`; finished workers end on their own |
+| Spawn a worker | `agents.spawn_agent({"task_name":"<lower_snake_id>","message":"TASK: act as <role>. ...","agent_type":"lazycodex-worker-medium","fork_turns":"none"})` — `task_name`+`message` required; `agent_type` selects the installed role and lets its TOML choose model/effort/tier; use optional `model`, `reasoning_effort`, and `service_tier` only for an intentional override such as `agents.spawn_agent({"task_name":"hard_refactor","message":"TASK: act as a high-power worker. ...","agent_type":"lazycodex-worker-high","model":"gpt-5.6-sol","reasoning_effort":"max","service_tier":"fast","fork_turns":"none"})`; `fork_turns:"none"` = no parent history |
+| Re-task an idle worker (wakes it) | `agents.followup_task({"target":"<name>","message":"..."})`; upstream evidence indicates this may reset a pinned child to the parent model, so spawn a fresh typed child when model fidelity matters |
+| Send context without interrupting | `agents.send_message({"target":"<name>","message":"..."})` |
+| Wait for a mailbox signal | `agents.wait_agent({"timeout_ms":<ms>})` — any live worker; a timeout only means no new update |
+| Enumerate / stop a runaway | `agents.list_agents()` / `agents.interrupt_agent({"target":"<name>"})` — no `close_agent`; finished workers end on their own |
 
 V1 fallback (gpt-5.5, gpt-5.6-luna): `multi_agent_v1.spawn_agent({...,"fork_context":false})`, `multi_agent_v1.send_input` (re-task), `multi_agent_v1.wait_agent({"targets":[...],"timeout_ms":...})`, `multi_agent_v1.close_agent`.
 

@@ -324,33 +324,46 @@ child's run; a child without a stop condition wanders past its goal.
 State that it is an executable assignment, not a context handoff. Use `fork_context: false` unless full history is truly
 required; paste only the context the child needs. Full-history forks can
 make the child continue old parent context instead of the delegated task.
-If your tool list has a flat `spawn_agent` with a required `task_name` instead of `multi_agent_v1.*` (`multi_agent_v2`), rewrite: `fork_context: false` becomes `fork_turns: "none"`, `send_input` becomes `send_message`, finished agents end on their own (no `close_agent`; `followup_task` re-tasks, `interrupt_agent` stops), and `wait_agent` takes only `timeout_ms`, returning on any child mailbox activity.
+If your tool list has GPT-5.6-compatible MultiAgentV2 `agents.*` tools
+instead of `multi_agent_v1.*`, rewrite:
+`multi_agent_v1.spawn_agent({...,"fork_context":false})` becomes
+`agents.spawn_agent({"task_name":"<lower_snake_id>","message":"TASK: act as <role>. ...","agent_type":"lazycodex-worker-medium","fork_turns":"none"})`.
+Use `task_name`, `message`, `agent_type`, and `fork_turns:"none"` for typed
+spawns; omit `model`, `reasoning_effort`, and `service_tier` by default so the
+installed role TOML controls child routing. Use those optional fields only when
+intentionally bypassing the role default, e.g.
+`agents.spawn_agent({"task_name":"hard_refactor","message":"TASK: act as a high-power worker. ...","agent_type":"lazycodex-worker-high","model":"gpt-5.6-sol","reasoning_effort":"max","service_tier":"fast","fork_turns":"none"})`.
+Map lifecycle calls to the same namespace: `send_input` ->
+`agents.send_message`, `followup_task` -> `agents.followup_task`,
+`interrupt_agent` -> `agents.interrupt_agent`, and `wait_agent` ->
+`agents.wait_agent({"timeout_ms":...})`. Current upstream evidence indicates
+`followup_task` may reset a pinned child to the parent model; when model
+fidelity matters, spawn a fresh typed child instead of using `followup_task`.
 
 # TOML-backed subagent routing compatibility
 Installed role TOMLs (`~/.codex/agents/`) bind ONLY via `agent_type`.
-`multi_agent_v1.spawn_agent` exposes `agent_type`; the deployed
-`multi_agent_v2` `collaboration.spawn_agent` schema does NOT (verified
-2026-07-11: only `fork_turns`, `message`, `task_name`). On a v2 surface,
-omit `agent_type`, describe the role and difficulty tier inside
-`message`, and expect the session model for children. Difficulty tiers
-when `agent_type` IS exposed: low -> `lazycodex-worker-low`
-(gpt-5.6-luna/high), medium -> `lazycodex-worker-medium`
-(gpt-5.6-luna/max), high -> `lazycodex-worker-high` (gpt-5.6-sol/max);
-explorer/librarian carry their own TOMLs (gpt-5.6-luna/low). Difficulty
-(model power) is orthogonal to LIGHT/HEAVY rigor (process size).
+`multi_agent_v1.spawn_agent` exposes `agent_type`; GPT-5.6-compatible
+MultiAgentV2 exposes it on `agents.spawn_agent` with optional `model` and
+optional `reasoning_effort`. Default role tuples: low ->
+`lazycodex-worker-low` (gpt-5.6-terra/high), medium ->
+`lazycodex-worker-medium` (gpt-5.6-terra/high), high ->
+`lazycodex-worker-high` (gpt-5.6-sol/max), explorer -> `explorer`
+(gpt-5.6-terra/medium), librarian -> `librarian`
+(gpt-5.6-terra/medium). Difficulty (model power) is orthogonal to
+LIGHT/HEAVY rigor (process size).
 
 Treat child status as a progress signal, not a timeout counter. For
 work likely to exceed one wait cycle, tell the child to send
 `WORKING: <task> - <current phase>` before long reading, testing, or
 review passes, and `BLOCKED: <reason>` only when it cannot progress.
-Track spawned agent names locally. Use `multi_agent_v1.wait_agent` for mailbox
-signals, but a timeout only means no new mailbox update arrived.
+Track spawned agent names locally. Use the active surface's wait tool for
+mailbox signals, but a timeout only means no new mailbox update arrived.
 Treat a running child as alive and keep doing independent root work.
 Fallback only when the child is completed without the
 deliverable, ack-only, or no longer running. If that followup is still
 silent or ack-only, record the result as inconclusive, do not count it
-as approval/pass, close it if safe, and respawn a smaller
-`fork_context: false` task with the missing deliverable.
+as approval/pass, end the lane if safe, and respawn a smaller
+context-isolated task with the missing deliverable.
 
 # Subagent-dependent transition barrier
 Do not mark an `update_plan` step `completed` while an active child owns
@@ -359,18 +372,19 @@ audit, research, or review result is integrated or explicitly recorded
 as inconclusive. Do not generate a plan before spawned research lanes
 that feed the plan have returned or been closed as inconclusive.
 Spawn every independent child for the current wave first. After the wave
-is launched, run `multi_agent_v1.wait_agent` for each spawned child until
-each reaches terminal status (`completed`, `failed`, `blocked`, or
+is launched, use the active surface's wait tool for each spawned child
+until each reaches terminal status (`completed`, `failed`, `blocked`, or
 explicitly recorded inconclusive) before any dependent `update_plan`
 transition, `create_goal` continuation, implementation tool call, plan
 drafting, approval-gate work, PR handoff, or final response. A timeout is
 not terminal status.
 Do not write the final answer, PR handoff, or completion summary while
-active child agents remain open. Use `multi_agent_v1.wait_agent` cycles with growing timeouts: start short (~30s) and double up to ~5 minutes.
-After two silent waits send `TASK STILL ACTIVE: return <deliverable> or
-BLOCKED: <reason>`. After four silent or ack-only checks, close the lane as
-inconclusive, record that it is not approval, and respawn smaller only
-if the deliverable is still required.
+active child agents remain open. Use bounded wait cycles with growing
+timeouts: start short (~30s) and double up to ~5 minutes. After two
+silent waits send `TASK STILL ACTIVE: return <deliverable> or BLOCKED:
+<reason>` through the active surface's message tool. After four silent
+or ack-only checks, end the lane as inconclusive, record that it is not
+approval, and respawn smaller only if the deliverable is still required.
 
 # Verification gate (TRIGGERED, NOT OPTIONAL)
 
@@ -382,10 +396,9 @@ diff, run diagnostics, confirm each criterion's evidence, and state in
 one line why the tier held.
 
 Procedure (NON-NEGOTIABLE):
-1. Spawn a child with `fork_context: false` and a self-contained reviewer
-   assignment in `message`. The `multi_agent_v1.spawn_agent` schema cannot select a
-   TOML-backed reviewer role, so paste the reviewer requirements into
-   the message.
+1. Spawn a typed reviewer through the active surface with
+   `agent_type:"lazycodex-gate-reviewer"`, isolated context, and a
+   self-contained assignment in `message`.
    Pass: goal, success-criteria, scenario evidence, full diff, notepad
    path.
 2. Verify each reviewer concern yourself. A concern blocks only when
@@ -395,7 +408,7 @@ Procedure (NON-NEGOTIABLE):
 3. Fix every criterion-cited blocker. Re-run ONLY the scenario QA
    affected by the fix; capture fresh evidence for the delta. Update
    notepad.
-4. Re-submit to the SAME reviewer at most twice, passing only the
+4. Re-submit to the reviewer role at most twice, passing only the
    delta diff, the blockers it cited, and the already-approved criteria
    marked out-of-scope. An approval whose only remaining items are
    notes counts as approval.
