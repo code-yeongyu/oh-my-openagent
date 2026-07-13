@@ -373,6 +373,9 @@
         "state_dir": {
           "type": "string"
         },
+        "reattach_on_reconcile": {
+          "type": "boolean"
+        },
         "wait": {
           "default": {
             "min_ms": 5000,

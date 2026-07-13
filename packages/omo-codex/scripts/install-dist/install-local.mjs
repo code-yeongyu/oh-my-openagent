@@ -8095,6 +8095,14 @@ function parseAgentHeaderName(header) {
   const path = parseTomlDottedKey(header);
   return path?.[0] === "agents" ? path[1] ?? null : null;
 }
+function parseJsonString(value) {
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === "string" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 function parseHookStateHeaderKey(header) {
   const path = parseTomlDottedKey(header);
   if (path?.[0] !== "hooks" || path[1] !== "state")
@@ -9249,16 +9257,6 @@ function isSectionHeader3(line) {
 }
 function agentNameFromToml(fileName) {
   return fileName.endsWith(".toml") ? fileName.slice(0, -".toml".length) : fileName;
-}
-function parseJsonString(value) {
-  try {
-    const parsed = JSON.parse(value);
-    return typeof parsed === "string" ? parsed : null;
-  } catch (error) {
-    if (error instanceof Error)
-      return null;
-    return null;
-  }
 }
 async function exists2(path) {
   try {
