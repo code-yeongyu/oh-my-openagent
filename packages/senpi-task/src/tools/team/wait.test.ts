@@ -53,7 +53,7 @@ describe("lead team_wait", () => {
       resolveLeadPoller: () => ({
         pollOnce: async () => {
           polls += 1
-          registry.takeMatch(VALUE)?.resolve()
+          registry.takeMatch(TEAM_RUN_ID, VALUE)?.resolve()
         },
         shutdown: () => undefined,
       }),
@@ -79,7 +79,7 @@ describe("lead team_wait", () => {
       ...baseDeps(registry),
       resolveLeadPoller: () => ({
         pollOnce: async () => {
-          registry.takeMatch(VALUE)?.resolve()
+          registry.takeMatch(TEAM_RUN_ID, VALUE)?.resolve()
         },
         shutdown: () => undefined,
       }),
