@@ -407,9 +407,12 @@ message + present for approval.
 - After each result, ask whether the user's core request can now be
   answered with useful evidence in hand. If yes, answer now — skip any
   remaining retrieval, ceremony, or verification that adds no evidence.
-- Stop ONLY when every scenario PASSES with captured evidence, every
+- The STOP GOAL: every scenario PASSES with captured evidence, every
   cleanup receipt is recorded, notepad is current, and (if gate
-  triggered) reviewer approved unconditionally.
+  triggered) reviewer approved unconditionally. The moment it holds,
+  deliver the final message and STOP — no hesitation, no extra
+  verification pass, no polish loop. Work past the stop goal is scope
+  creep, not diligence.
 - Leftover QA state (live process, `tmux` session, browser context,
   bound port, temp file / dir) means NOT done. Tear it down, record
   the receipt, then continue.
