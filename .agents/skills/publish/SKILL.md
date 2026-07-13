@@ -1,9 +1,17 @@
 ---
 name: publish
-description: "Publish oh-my-opencode to npm via GitHub Actions workflow. Argument: <patch|minor|major>. Triggers: publish, release, deploy, npm publish."
+description: "Publish oh-my-opencode to npm by triggering the GitHub Actions publish workflow and verifying its artifacts. Ship-only: never runs pre-publish-review or re-reviews merged code unless the user explicitly asks. Argument: <patch|minor|major>. Triggers: publish, release, deploy, npm publish."
 ---
 
 You are the release manager for oh-my-opencode. Execute the FULL publish workflow from start to finish.
+
+## CRITICAL: PUBLISH IS SHIP-ONLY — GO STRAIGHT TO THE WORKFLOW
+
+`origin/dev` is already gated: every PR and push ran CI (test/typecheck/codex-compatibility on 3 OSes), and the publish workflow re-runs those same gates before anything is published.
+
+- **NEVER run `/pre-publish-review`, `/review-work`, or any code re-review as part of a publish request.** Those run ONLY when the user explicitly asks for a review.
+- **NEVER "fix" code, open PRs, or enter fix-and-re-audit loops during a publish.** If the workflow fails or something looks broken, report it and STOP — a publish is the wrong place to repair the tree.
+- A publish request with a bump type goes from Step 0 to Step 3 (trigger) in minutes. The only human-scale work is release notes, drafted while CI runs.
 
 ## CRITICAL: FULL WORKFLOW MEANS THREE RELEASE SURFACES
 
@@ -11,7 +19,7 @@ Publishing is complete only after all release surfaces are verified:
 
 | Release layer | Surface | Required proof |
 |---|---|---|
-| `omo pure components` | Core/MCP/shared-skill changes inside the published package payload | `/get-unpublished-changes` and pre-publish review include layer-specific version impact. |
+| `omo pure components` | Core/MCP/shared-skill changes inside the published package payload | Release notes call out layer-specific version impact (from the workflow changelog, or `/get-unpublished-changes` when the user requested it). |
 | `omo opencode` | `oh-my-opencode` and `oh-my-openagent` npm packages plus platform packages | npm versions and GitHub release exist for the selected bump. |
 | `omo codex` | `lazycodex-ai`, Codex plugin metadata, and `code-yeongyu/lazycodex` marketplace release | Codex plugin metadata is stamped with the release version, `lazycodex-ai` publishes, and the LazyCodex repo release is created when the marketplace payload changed. |
 
@@ -58,8 +66,7 @@ Publishing is not complete until the Discord release announcement has been attem
   { "id": "discord-announce", "content": "MANDATORY: post release announcement to Discord channel immediately after release notes are finalized", "status": "pending", "priority": "high" },
   { "id": "verify-npm", "content": "Verify npm package published successfully", "status": "pending", "priority": "high" },
   { "id": "verify-lazycodex", "content": "Verify lazycodex-ai publish, Codex plugin metadata version stamp, and code-yeongyu/lazycodex release/sync", "status": "pending", "priority": "high" },
-  { "id": "wait-platform-workflow", "content": "Wait for publish-platform workflow completion", "status": "pending", "priority": "high" },
-  { "id": "verify-platform-binaries", "content": "Verify all 7 platform binary packages published", "status": "pending", "priority": "high" },
+  { "id": "verify-platform-binaries", "content": "Spot-check platform binary packages on npm", "status": "pending", "priority": "high" },
   { "id": "final-confirmation", "content": "Final confirmation to user with links", "status": "pending", "priority": "low" }
 ]
 ```
@@ -70,10 +77,7 @@ Publishing is not complete until the Discord release announcement has been attem
 
 ## STEP 1: CONFIRM BUMP TYPE
 
-If bump type provided as argument, confirm with user:
-> "Version bump type: `{bump}`. Proceed? (y/n)"
-
-Wait for user confirmation before proceeding.
+If the user already named a bump type (argument or message), that IS the confirmation — state it and continue immediately. Only ask and wait when no bump type was given.
 
 ---
 
@@ -90,7 +94,7 @@ Run: `git status --porcelain`
 
 Check if there are unpushed commits:
 ```bash
-git log origin/master..HEAD --oneline
+git log @{u}..HEAD --oneline
 ```
 
 **If there are unpushed commits, you MUST sync before triggering workflow:**
@@ -118,14 +122,21 @@ gh run list --workflow=publish --limit=1 --json databaseId,status --jq '.[0]'
 
 ## STEP 4: WAIT FOR WORKFLOW COMPLETION
 
-Poll workflow status every 30 seconds until completion:
+The publish run is a single workflow with sequential stages. Expected timeline (from recent real runs, ~30 min total):
+
+| Stage (job) | What it does | Typical |
+|---|---|---|
+| `test` / `typecheck` / `codex-compatibility` (3 OS) | Re-runs the CI gates on the release source | 4–8 min (Windows is the long pole) |
+| `prepare-release-state` | Stamps versions, opens + auto-merges the `release: vX.Y.Z` PR, waits for that PR's required CI checks | 10–15 min (dominant stage) |
+| `publish-platform` (build + publish, 12 targets) | Builds and publishes both platform package families | 3–4 min |
+| `publish-main` → `release` | Publishes `oh-my-opencode` / `oh-my-openagent` / `lazycodex-ai`, creates the GitHub release, syncs `code-yeongyu/lazycodex` | 4–6 min |
+
+Poll job-level status every 30 seconds and report stage transitions to the user:
 ```bash
-gh run view {run_id} --json status,conclusion --jq '{status: .status, conclusion: .conclusion}'
+gh run view {run_id} --json status,conclusion,jobs --jq '{status, conclusion, stage: ([.jobs[] | select(.status=="in_progress") | .name] | join(", "))}'
 ```
 
-Status flow: `queued` → `in_progress` → `completed`
-
-**IMPORTANT: Use polling loop, NOT sleep commands.**
+**IMPORTANT: Use polling loop, NOT sleep commands.** Use the waiting time to draft the enhanced release summary (Step 6) — do not sit idle, and do not start any review activity.
 
 If conclusion is `failure`, show error and stop:
 ```bash
@@ -366,54 +377,17 @@ Compare with expected version. If not matching after 2 minutes, warn user about 
 
 ---
 
-## STEP 8.5: WAIT FOR PLATFORM WORKFLOW COMPLETION
+## STEP 8.5: SPOT-CHECK PLATFORM BINARY PACKAGES
 
-The main publish workflow triggers a separate `publish-platform` workflow for platform-specific binaries.
-
-1. Find the publish-platform workflow run triggered by the main workflow:
-```bash
-gh run list --workflow=publish-platform --limit=1 --json databaseId,status,conclusion --jq '.[0]'
-```
-
-2. Poll workflow status every 30 seconds until completion:
-```bash
-gh run view {platform_run_id} --json status,conclusion --jq '{status: .status, conclusion: .conclusion}'
-```
-
-**IMPORTANT: Use polling loop, NOT sleep commands.**
-
-If conclusion is `failure`, show error logs:
-```bash
-gh run view {platform_run_id} --log-failed
-```
-
----
-
-## STEP 8.6: VERIFY PLATFORM BINARY PACKAGES
-
-After publish-platform workflow completes, verify all 7 platform packages are published:
+Platform packages are built and published by the `publish-platform` jobs INSIDE the same publish run — there is no separate workflow to wait for, and `publish-main` already refuses to publish unless matching platform binaries exist. Spot-check a representative sample:
 
 ```bash
-PLATFORMS="darwin-arm64 darwin-x64 linux-x64 linux-arm64 linux-x64-musl linux-arm64-musl windows-x64"
-for PLATFORM in $PLATFORMS; do
-  npm view "oh-my-opencode-${PLATFORM}" version
+for PKG in oh-my-opencode-darwin-arm64 oh-my-openagent-linux-x64 oh-my-opencode-windows-x64; do
+  npm view "$PKG" version
 done
 ```
 
-All 7 packages should show the same version as the main package (`${NEW_VERSION}`).
-
-**Expected packages:**
-| Package | Description |
-|---------|-------------|
-| `oh-my-opencode-darwin-arm64` | macOS Apple Silicon |
-| `oh-my-opencode-darwin-x64` | macOS Intel |
-| `oh-my-opencode-linux-x64` | Linux x64 (glibc) |
-| `oh-my-opencode-linux-arm64` | Linux ARM64 (glibc) |
-| `oh-my-opencode-linux-x64-musl` | Linux x64 (musl/Alpine) |
-| `oh-my-opencode-linux-arm64-musl` | Linux ARM64 (musl/Alpine) |
-| `oh-my-opencode-windows-x64` | Windows x64 |
-
-If any platform package version doesn't match, warn the user and suggest checking the publish-platform workflow logs.
+Each should show `${NEW_VERSION}`. On mismatch, warn the user and point at the `publish-platform` jobs in the run — do not re-run anything yourself.
 
 ---
 
@@ -423,7 +397,7 @@ Report success to user with:
 - New version number
 - GitHub release URL: https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v{version}
 - npm package URL: https://www.npmjs.com/package/oh-my-opencode
-- Platform packages status: List all 7 platform packages with their versions
+- Platform packages status: spot-checked platform package versions
 
 ---
 
@@ -433,8 +407,7 @@ Report success to user with:
 - **Release not found**: Wait and retry, may be propagation delay
 - **npm not updated**: npm can take 1-5 minutes to propagate, inform user
 - **Permission denied**: User may need to re-authenticate with `gh auth login`
-- **Platform workflow fails**: Show logs from publish-platform workflow, check which platform failed
-- **Platform package missing**: Some platforms may fail due to cross-compilation issues, suggest re-running publish-platform workflow manually
+- **Platform jobs fail**: Show logs from the `publish-platform` jobs in the same run, name the failing target, and stop — `publish-main` is blocked by design until they pass
 
 ## LANGUAGE
 
