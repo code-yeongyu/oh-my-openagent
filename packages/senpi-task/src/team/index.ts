@@ -41,6 +41,8 @@ export { projectMemberStatus, refreshTeamMemberStatuses } from "./member-project
 export type { MemberStatusPort, RefreshTeamMemberStatusesDeps, RuntimeMemberStatus } from "./member-projection"
 export { memberTaskName, spawnTeamMembers } from "./spawn-members"
 export type { SpawnMembersInput, SpawnMembersResult, SpawnedMember } from "./spawn-members"
+export { createTeamMemberRespawnLaunchResolver, TeamMemberRespawnLaunchError } from "./member-respawn"
+export type { TeamMemberRespawnLaunchErrorCode, TeamMemberRespawnLaunchResolverOptions } from "./member-respawn"
 export {
   buildPeerMessageEnvelope,
   buildTeamMessage,
