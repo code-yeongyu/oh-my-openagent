@@ -151,7 +151,7 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 
 | get_goal result | action |
 |-----------------|--------|
-| no active goal | Call `create_goal` with objective only from `instruction.json.objective`; do not copy lifecycle fields such as `status`. |
+| no active goal | You MUST call `create_goal` — goal registration goes through the tool, never prose — with objective only from `instruction.json.objective`; do not copy lifecycle fields such as `status`. |
 | same aggregate objective active | Continue the current ulw-loop story. |
 | different goal active | STOP. Checkpoint blocked and surface the conflict. |
 4. If retrying failed work, run `omo ulw-loop complete-goals --retry-failed --json`.
@@ -239,7 +239,7 @@ Structured prompt directives accepted: `OMO_ULW_LOOP_STEER: { ... }`, `omo.ulw-l
 15. Every verified work unit that touched git-tracked files must leave either an atomic `git-master`-style commit hash or explicit no-commit blocker evidence before the next unit starts.
 
 ## Stop Rules
-- STOP GOAL: all goals complete plus every plan criterion `pass` plus final quality gate clean. The moment it holds, checkpoint, report, and STOP — no extra review cycles, no evidence regeneration, no polish.
+- STOP GOAL: all goals complete plus every plan criterion `pass` plus final quality gate clean. The decisive test — outranking every other consideration — is whether the completion conditions are FUNDAMENTALLY fulfilled and the user's problem ACTUALLY SOLVED in observable behavior; a `pass` ledger never substitutes for it. The moment both hold, checkpoint, report, and STOP — no extra review cycles, no evidence regeneration, no polish.
 - 3x same criterion failure: checkpoint failed, surface diagnosis.
 - 5 cycles on one goal without required criteria passing: checkpoint failed, surface.
 - Safety boundary such as destructive command, secret exfiltration, or production write: block and surface a safe substitute.
