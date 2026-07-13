@@ -1,6 +1,49 @@
 const { describe, test, expect, mock } = require("bun:test")
 
 describe("executeBackgroundContinuation - subagent metadata", () => {
+  test("reports an error instead of false success when the task is already running", async () => {
+    //#given - manager rejects a continuation that cannot be delivered
+    const mockManager = {
+      resume: async () => {
+        throw new Error(
+          "Task bg_running is currently running and cannot accept a continuation prompt. " +
+          "Wait for it to complete before resuming it with task_id.",
+        )
+      },
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-running",
+      metadata: mock(() => Promise.resolve()),
+    }
+
+    const args = {
+      task_id: "ses_running_123",
+      prompt: "apply updated instructions",
+      description: "update running task",
+      load_skills: [],
+      run_in_background: true,
+    }
+
+    //#when
+    const { executeBackgroundContinuation } = require("./background-continuation")
+    const result = await executeBackgroundContinuation(
+      args,
+      mockCtx,
+      { manager: mockManager },
+      {
+        sessionID: "parent-session",
+        messageID: "msg-parent",
+        agent: "sisyphus",
+      },
+    )
+
+    //#then - the tool cannot claim a continuation that was never delivered
+    expect(result).toContain("currently running and cannot accept a continuation prompt")
+    expect(result).not.toContain("Background task continued")
+  })
+
   test("includes subagent in task_metadata when task has agent", async () => {
     //#given - mock manager.resume returning task with agent info
     const mockManager = {
