@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { handleLspMcpRequest } from "../src/mcp.js";
+import { createStandaloneMcpRequestContext, runWithRequestContext } from "../src/request-context.js";
 
 const expectedToolSurface = [
 	{
@@ -152,7 +153,9 @@ describe("LSP MCP tool surface", () => {
 		};
 
 		// when
-		const callResponse = await handleLspMcpRequest(request);
+		const callResponse = await runWithRequestContext(createStandaloneMcpRequestContext(), () =>
+			handleLspMcpRequest(request),
+		);
 		const listResponse = await handleLspMcpRequest({ jsonrpc: "2.0", id: 23, method: "tools/list" });
 
 		// then
