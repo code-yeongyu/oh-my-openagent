@@ -31,6 +31,12 @@ function expectResolved(result: ReturnType<typeof resolveCategory<FakeModel>>): 
   return result
 }
 
+const gpt56CategoryCases = [
+  { category: "ultrabrain", modelId: "gpt-5.6-sol" },
+  { category: "deep", modelId: "gpt-5.6-terra" },
+  { category: "unspecified-low", modelId: "gpt-5.6-luna" },
+] as const
+
 describe("resolveCategory", () => {
   test("#given a builtin category and omo overlay #when resolved #then user config wins and prompt text is appended", () => {
     // given
@@ -135,14 +141,44 @@ describe("resolveCategory", () => {
     })
   })
 
-  test("#given only Copilot GPT-5.6 models #when deep categories resolve #then each uses its high rung", () => {
-    const cases = [
-      { category: "ultrabrain", modelId: "gpt-5.6-sol" },
-      { category: "deep", modelId: "gpt-5.6-terra" },
-      { category: "unspecified-low", modelId: "gpt-5.6-luna" },
-    ] as const
+  test("#given only transformed Vercel GPT-5.6 models #when deep categories resolve #then each keeps xhigh", () => {
+    for (const { category, modelId } of gpt56CategoryCases) {
+      const gatewayModelId = `openai/${modelId}`
+      const result = expectResolved(resolveCategory(category, {}, registry([model("vercel", gatewayModelId)])))
 
-    for (const { category, modelId } of cases) {
+      expect(result.spec.provider).toBe("vercel")
+      expect(result.spec.modelId).toBe(gatewayModelId)
+      expect(result.spec.variant).toBe("xhigh")
+      expect(result.modelSelection.fallbackEntry).toEqual({
+        providers: ["openai", "vercel"],
+        model: modelId,
+        variant: "xhigh",
+      })
+    }
+  })
+
+  test("#given transformed Vercel and Copilot GPT-5.6 models #when deep categories resolve #then Vercel xhigh wins", () => {
+    for (const { category, modelId } of gpt56CategoryCases) {
+      const gatewayModelId = `openai/${modelId}`
+      const models = registry([
+        model("github-copilot", modelId),
+        model("vercel", gatewayModelId),
+      ])
+      const result = expectResolved(resolveCategory(category, {}, models))
+
+      expect(result.spec.provider).toBe("vercel")
+      expect(result.spec.modelId).toBe(gatewayModelId)
+      expect(result.spec.variant).toBe("xhigh")
+      expect(result.modelSelection.fallbackEntry).toEqual({
+        providers: ["openai", "vercel"],
+        model: modelId,
+        variant: "xhigh",
+      })
+    }
+  })
+
+  test("#given only Copilot GPT-5.6 models #when deep categories resolve #then each uses its high rung", () => {
+    for (const { category, modelId } of gpt56CategoryCases) {
       const result = expectResolved(resolveCategory(category, {}, registry([model("github-copilot", modelId)])))
 
       expect(result.spec.provider).toBe("github-copilot")
@@ -154,6 +190,19 @@ describe("resolveCategory", () => {
         variant: "high",
       })
     }
+  })
+
+  test("#given GPT-5.6 is unavailable #when deep resolves with Copilot GPT-5.5 #then the legacy medium fallback remains", () => {
+    const result = expectResolved(resolveCategory("deep", {}, registry([model("github-copilot", "gpt-5.5")])))
+
+    expect(result.spec.provider).toBe("github-copilot")
+    expect(result.spec.modelId).toBe("gpt-5.5")
+    expect(result.spec.variant).toBe("medium")
+    expect(result.modelSelection.fallbackEntry).toEqual({
+      providers: ["openai", "github-copilot", "opencode", "vercel"],
+      model: "gpt-5.5",
+      variant: "medium",
+    })
   })
 
   test("#given no category or fallback model resolves and a system default is available #when resolved #then delegate-core reaches the system default", () => {
