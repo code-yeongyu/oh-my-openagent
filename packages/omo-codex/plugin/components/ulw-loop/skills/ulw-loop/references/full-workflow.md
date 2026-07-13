@@ -239,7 +239,7 @@ Structured prompt directives accepted: `OMO_ULW_LOOP_STEER: { ... }`, `omo.ulw-l
 15. Every verified work unit that touched git-tracked files must leave either an atomic `git-master`-style commit hash or explicit no-commit blocker evidence before the next unit starts.
 
 ## Stop Rules
-- All goals complete plus every plan criterion `pass` plus final quality gate clean: DONE.
+- STOP GOAL: all goals complete plus every plan criterion `pass` plus final quality gate clean. The moment it holds, checkpoint, report, and STOP — no extra review cycles, no evidence regeneration, no polish.
 - 3x same criterion failure: checkpoint failed, surface diagnosis.
 - 5 cycles on one goal without required criteria passing: checkpoint failed, surface.
 - Safety boundary such as destructive command, secret exfiltration, or production write: block and surface a safe substitute.
