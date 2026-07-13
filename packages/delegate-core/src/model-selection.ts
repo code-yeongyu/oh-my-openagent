@@ -237,15 +237,6 @@ export function resolveModelForDelegateTask(
             return { model: match, variant: entry.variant, fallbackEntry: entry, matchedFallback: true }
           }
         }
-
-        const crossProviderMatch = fuzzyMatchModel(entry.model, new Set(input.availableModels))
-        if (crossProviderMatch) {
-          if (explicitHighModel && entry.variant === "high" && crossProviderMatch === explicitHighBaseModel) {
-            return { model: explicitHighModel, fallbackEntry: entry, matchedFallback: true }
-          }
-
-          return { model: crossProviderMatch, variant: entry.variant, fallbackEntry: entry, matchedFallback: true }
-        }
       }
     }
   }

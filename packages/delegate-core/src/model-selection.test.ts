@@ -51,4 +51,23 @@ describe("resolveModelForDelegateTask", () => {
       matchedFallback: true,
     })
   })
+
+  test("#given provider-specific rungs for one model #when the later provider is available #then preserves its variant", () => {
+    const copilotEntry = { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "high" }
+
+    const result = resolveModelForDelegateTask({
+      availableModels: new Set(["github-copilot/gpt-5.6-sol"]),
+      fallbackChain: [
+        { providers: ["openai", "vercel"], model: "gpt-5.6-sol", variant: "xhigh" },
+        copilotEntry,
+      ],
+    }, noCacheDeps)
+
+    expect(result).toEqual({
+      model: "github-copilot/gpt-5.6-sol",
+      variant: "high",
+      fallbackEntry: copilotEntry,
+      matchedFallback: true,
+    })
+  })
 })

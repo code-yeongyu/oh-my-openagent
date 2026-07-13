@@ -135,6 +135,27 @@ describe("resolveCategory", () => {
     })
   })
 
+  test("#given only Copilot GPT-5.6 models #when deep categories resolve #then each uses its high rung", () => {
+    const cases = [
+      { category: "ultrabrain", modelId: "gpt-5.6-sol" },
+      { category: "deep", modelId: "gpt-5.6-terra" },
+      { category: "unspecified-low", modelId: "gpt-5.6-luna" },
+    ] as const
+
+    for (const { category, modelId } of cases) {
+      const result = expectResolved(resolveCategory(category, {}, registry([model("github-copilot", modelId)])))
+
+      expect(result.spec.provider).toBe("github-copilot")
+      expect(result.spec.modelId).toBe(modelId)
+      expect(result.spec.variant).toBe("high")
+      expect(result.modelSelection.fallbackEntry).toEqual({
+        providers: ["github-copilot"],
+        model: modelId,
+        variant: "high",
+      })
+    }
+  })
+
   test("#given no category or fallback model resolves and a system default is available #when resolved #then delegate-core reaches the system default", () => {
     // given
     const models = registry([model("local", "system-default")])
