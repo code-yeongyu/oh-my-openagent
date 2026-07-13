@@ -171,6 +171,8 @@ export type {
   TaskConcurrencyConfig,
   TaskManager,
   TaskManagerOptions,
+  TrustedRespawnLaunch,
+  TrustedRespawnLaunchResolver,
 } from "./manager"
 export { defineAgent, loadAgents, mapOmoConfigAgents, registerAgent, resolveToolRule } from "./agents"
 export type {
@@ -353,6 +355,8 @@ export {
   reclaimStaleTeamReservations,
   reconcileTeamMailboxOnSessionStart,
   resolveMemberExtensionEntryPath,
+  createTeamMemberRespawnLaunchResolver,
+  TeamMemberRespawnLaunchError,
   sendTeamMessage,
   WaitRegistry,
 } from "./team"
@@ -426,6 +430,8 @@ export type {
   TeamCoreConfig,
   TeamMemberExtensionConfig,
   TeamRuntimeManagerPort,
+  TeamMemberRespawnLaunchResolverOptions,
+  TeamMemberRespawnLaunchErrorCode,
 } from "./team"
 
 export * from "./tools/team"
