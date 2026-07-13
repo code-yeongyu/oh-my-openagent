@@ -1,8 +1,8 @@
 name = "explorer"
 description = "Codebase search specialist for Codex sessions. Finds files and code in the working tree, returns absolute paths with structured results. Read-only."
 nickname_candidates = ["Explorer"]
-model = "gpt-5.6-luna"
-model_reasoning_effort = "low"
+model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"
 service_tier = "fast"
 
 developer_instructions = """

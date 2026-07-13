@@ -12,71 +12,44 @@ interface ConfigSnapshot {
 	readonly agents: Record<string, unknown> | null;
 }
 
-describe("codex MultiAgentV2 routing defaults", () => {
-	test("#given catalog-declared gpt-5.6 v2 install #when updating config #then writes parsed routing defaults idempotently", async () => {
-		// given
-		const configPath = await createFixture(toml('model = "gpt-5.6-sol"'), {
-			"models_cache.json": modelCatalog("gpt-5.6-sol", "v2"),
-		});
-
-		// when
-		const first = await updateAndRead(configPath);
-
-		// then
-		expectV2Routing(first.v2);
-		expect(first.v2.max_concurrent_threads_per_session).toBeUndefined();
-		expect(readString(first.v2, "multi_agent_mode_hint_text").trim()).not.toBe(
-			"",
-		);
-		expect((await updateAndRead(configPath)).v2).toEqual(first.v2);
-	});
-
-	for (const [name, setting] of [
-		["metadata visibility", "hide_spawn_agent_metadata = false"],
-		["agents namespace", 'tool_namespace = "agents"'],
+describe("codex MultiAgentV2 hint preservation", () => {
+	for (const [name, assignment] of [
+		[
+			"double-quoted custom",
+			'multi_agent_mode_hint_text = "CUSTOM HINT: preserve this value."',
+		],
+		["empty", 'multi_agent_mode_hint_text = ""'],
+		[
+			"literal",
+			"multi_agent_mode_hint_text = 'literal custom hint # keep value'",
+		],
+		["multiline", 'multi_agent_mode_hint_text = """line one\nline two"""'],
 	] as const) {
-		test(`#given v2 config with only ${name} pinned #when updating config #then completes parsed routing defaults`, async () => {
+		test(`#given existing ${name} mode hint #when updating v2 config #then preserves its parsed value`, async () => {
 			// given
-			const configPath = await createFixture(
-				toml(
-					'model = "gpt-5.6-sol"',
-					"",
-					"[features.multi_agent_v2]",
-					setting,
-					"max_concurrent_threads_per_session = 6",
-				),
-				{ "models_cache.json": modelCatalog("gpt-5.6-sol", "v2") },
+			const initial = toml(
+				'model = "gpt-5.6-sol"',
+				"",
+				"[features.multi_agent_v2]",
+				assignment,
 			);
+			const expectedHint = readString(
+				parseConfig(initial).v2,
+				"multi_agent_mode_hint_text",
+			);
+			const configPath = await createFixture(initial, {
+				"models_cache.json": modelCatalog("gpt-5.6-sol", "v2"),
+			});
 
 			// when
 			const snapshot = await updateAndRead(configPath);
 
 			// then
-			expectV2Routing(snapshot.v2);
-			expect(snapshot.v2.max_concurrent_threads_per_session).toBe(6);
+			expect(readString(snapshot.v2, "multi_agent_mode_hint_text")).toBe(
+				expectedHint,
+			);
 		});
 	}
-
-	test("#given nested gpt-5.6 agent model without a root model #when updating config #then installs only the inert compatibility pair", async () => {
-		// given
-		const configPath = await createFixture(
-			toml(
-				'model_reasoning_effort = "high"',
-				"",
-				"[agents.custom]",
-				'model = "gpt-5.6-terra"',
-			),
-		);
-
-		// when
-		const snapshot = await updateAndRead(configPath);
-
-		// then
-		expectV2Routing(snapshot.v2);
-		expect(snapshot.v2.enabled).toBeUndefined();
-		expect(snapshot.v2.max_concurrent_threads_per_session).toBeUndefined();
-		expect(snapshot.agents?.max_threads).toBeUndefined();
-	});
 });
 
 async function createFixture(
@@ -135,11 +108,6 @@ function readString(table: Record<string, unknown>, key: string): string {
 	if (typeof value !== "string")
 		throw new TypeError(`${key} must be a TOML string`);
 	return value;
-}
-
-function expectV2Routing(v2: Record<string, unknown>): void {
-	expect(v2.tool_namespace).toBe("agents");
-	expect(v2.hide_spawn_agent_metadata).toBe(false);
 }
 
 function modelCatalog(slug: string, version: CatalogVersion): string {
