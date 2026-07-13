@@ -185,7 +185,7 @@ describe("spawnTmuxPane runner integration", () => {
 			// then
 			const cmd = getSplitWindowCommand()
 			expect(cmd).toContain("opencode attach")
-			expect(cmd).toContain("--session session-cmux-1")
+			expect(cmd).toContain("--session 'session-cmux-1'")
 			expect(cmd).toContain("--dir")
 			expect(cmd).not.toContain("Focus this pane to attach.")
 			expect(cmd).not.toContain("while :; do sleep 86400; done")
@@ -219,7 +219,7 @@ describe("spawnTmuxPane runner integration", () => {
 			const cmd = getSplitWindowCommand()
 			expect(cmd).toContain("opencode attach")
 			expect(cmd).toContain("/home/user/my")
-			expect(cmd).toContain("--dir /home/user/my project/sub dir")
+			expect(cmd).toContain("--dir '/home/user/my project/sub dir'")
 		})
 	})
 })
