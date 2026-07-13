@@ -8,6 +8,7 @@ const MODEL_SETTINGS_KEYS = [
   "reasoningEffort",
   "textVerbosity",
   "providerOptions",
+  "fallback_models",
 ] as const
 
 export function buildPlanDemoteConfig(
