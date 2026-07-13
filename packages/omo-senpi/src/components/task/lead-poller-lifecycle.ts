@@ -84,11 +84,11 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
       pollers.delete(teamRunId)
     }
 
-    if (sessionId === undefined) return owned
+    if (sessionId === undefined || deps.runtime.sessionFile() === undefined) return owned
     for (const team of owned) {
       if (pollers.has(team.teamRunId)) continue
       const memberTaskMap = await readMap(deps.runtimeDir(team.teamRunId))
-      if (stopped || deps.runtime.sessionId() !== sessionId) break
+      if (stopped || deps.runtime.sessionId() !== sessionId || deps.runtime.sessionFile() === undefined) break
       const poller = createPoller({
         teamRunId: team.teamRunId,
         config: deps.config,
@@ -105,9 +105,11 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
 
   const tick = (): Promise<void> => {
     if (stopped) return Promise.resolve()
+    if (deps.runtime.sessionFile() === undefined) return Promise.resolve()
     if (tickInFlight !== undefined) return tickInFlight
     const pending = (async () => {
       const owned = await synchronize()
+      if (deps.runtime.sessionFile() === undefined) return
       if (isTransition(deps.runtime.parentState())) return
       for (const team of owned) {
         const poller = resolveLeadPoller(team.teamRunId)
@@ -121,7 +123,7 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
   }
 
   const resolveLeadPoller = (teamRunId: string): LeadPollerPort | undefined => {
-    if (stopped || isTransition(deps.runtime.parentState())) return undefined
+    if (stopped || deps.runtime.sessionFile() === undefined || isTransition(deps.runtime.parentState())) return undefined
     const entry = pollers.get(teamRunId)
     if (entry === undefined || entry.ownerSessionId !== deps.runtime.sessionId()) return undefined
     return entry.poller

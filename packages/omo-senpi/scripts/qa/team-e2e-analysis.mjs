@@ -20,7 +20,7 @@ export async function analyzeMain(run, sandbox, obsDir) {
   const runId = create?.details?.team_run_id
   const memberNames = (create?.details?.members ?? []).map((member) => member.name).sort()
   const claimed = taskUpdates.some((result) => result.details?.kind === "claimed" || result.details?.task?.status === "claimed")
-  const completed = taskUpdates.some((result) => result.details?.task?.status === "completed" || result.details?.kind === "updated")
+  const completed = completedTeamTaskUpdates(taskUpdates).length === 1
   const teamEnqueues = teamMessageEnqueues(send)
   const shutdownRequests = shutdownDetails(send, "shutdown_requested")
   const shutdownResponses = shutdownDetails(send, "shutdown_responded")
@@ -68,6 +68,10 @@ export function teamMessageEnqueues(sendResults) {
     if (team?.kind !== "to_members" || !Array.isArray(team.recipients)) return []
     return [{ messageId: team.message_id, recipients: team.recipients }]
   })
+}
+
+export function completedTeamTaskUpdates(taskUpdates) {
+  return taskUpdates.filter((result) => result.details?.kind === "updated" && result.details?.task?.status === "completed")
 }
 
 function waitEvidence(cwd, runId, taskId, messageId) {
