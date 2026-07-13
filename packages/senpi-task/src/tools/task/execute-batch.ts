@@ -2,6 +2,7 @@ import type { AgentToolResult } from "@code-yeongyu/senpi"
 
 import type { StartResult, TaskManager } from "../../manager"
 import type { TaskRecord } from "../../state"
+import { MAX_TASK_BATCH_ITEMS } from "./params"
 import type { ResolvedSpawnItem, TaskToolDetails, TaskToolItemDetail } from "./types"
 
 type StartedResult = Extract<StartResult, { kind: "started" }>
@@ -70,14 +71,24 @@ function startedDetail(start: StartedResult): TaskToolItemDetail {
 async function startAll(input: ExecuteBatchInput): Promise<readonly BatchStart[]> {
   const starts: BatchStart[] = []
   for (const item of input.items) {
-    const start = await input.startItem(item)
-    starts.push(
-      start.kind === "started"
-        ? { kind: "started", item, result: start }
-        : { kind: "failed", item, detail: failedStartDetail(item, start) },
-    )
+    try {
+      const start = await input.startItem(item)
+      starts.push(
+        start.kind === "started"
+          ? { kind: "started", item, result: start }
+          : { kind: "failed", item, detail: failedStartDetail(item, start) },
+      )
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      starts.push({ kind: "failed", item, detail: itemError(item, "", message) })
+    }
   }
   return starts
+}
+
+function oversizedBatchResult(): AgentToolResult<TaskToolDetails> {
+  const reason = `tasks supports at most ${MAX_TASK_BATCH_ITEMS} items.`
+  return result(reason, { task_id: "", status: "invalid_arguments", mode: "spawn", reason })
 }
 
 function backgroundText(starts: readonly BatchStart[], status: "running" | "error"): string {
@@ -189,6 +200,7 @@ export async function executeBatch(input: ExecuteBatchInput): Promise<AgentToolR
     const reason = "Parent aborted before spawn"
     return result(reason, { task_id: "", status: "cancelled", mode: "spawn", reason })
   }
+  if (input.items.length > MAX_TASK_BATCH_ITEMS) return oversizedBatchResult()
   const starts = await startAll(input)
   return input.runInBackground ? backgroundResult(starts) : syncResult(input, starts)
 }

@@ -186,6 +186,25 @@ describe("parseTaskRecord persisted boundary", () => {
       expect(result.diagnostics).toEqual([{ type: "parse_error", path, message: testCase.message }])
     }
   })
+  test("#given persisted spawn extensions and member env #when listed #then untrusted launch inputs are discarded", () => {
+    // given
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+    writePersistedRecord(project, "st_01d00006", {
+      spawn_spec: {
+        cwd: "/safe/project",
+        extensions: ["/tmp/malicious-extension.ts"],
+        member_env: { MALICIOUS_MEMBER_ENV: "execute-me" },
+      },
+    })
+
+    // when
+    const result = store.list()
+
+    // then
+    expect(result.diagnostics).toEqual([])
+    expect(result.records[0]?.spawn_spec).toEqual({ cwd: "/safe/project" })
+  })
 
   test("#given a persisted killed:true error record #when listed #then the killed FACT survives the parse round-trip", () => {
     // given: a subsequent residency transition (dispose) reloads through the parser, so killed must be preserved

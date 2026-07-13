@@ -324,7 +324,8 @@ describe("LazyCodex publish workflow", () => {
       smokeStep.includes("npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous") &&
       smokeStep.includes('case "$npx_doctor_output" in "$expected_doctor_output_prefix"*) true ;; *) false ;; esac') &&
       smokeStep.includes('case "$npx_doctor_output" in *"--sandbox danger-full-access"*) true ;; *) false ;; esac') &&
-      smokeStep.includes("Use $omo:lcx-doctor") &&
+      smokeStep.includes('expected_doctor_hint="Use \\$omo:lcx-doctor"') &&
+      smokeStep.includes('case "$npx_doctor_output" in *"$expected_doctor_hint"*) true ;; *) false ;; esac') &&
       smokeStep.includes('case "$npx_doctor_output" in *"--model"*|*"gpt-5.5-codex-mini"*) false ;; *) true ;; esac') &&
       !smokeStep.includes("npx --yes --package oh-my-openagent omo install") &&
       !smokeStep.includes("--platform=claude-code") &&

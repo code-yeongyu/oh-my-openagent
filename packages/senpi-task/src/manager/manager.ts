@@ -285,6 +285,9 @@ class TaskManagerImpl implements TaskManager {
 
     let handle: RpcChildHandle | undefined
     try {
+      const trustedLaunch = this.#options.trustedRespawnLaunch === undefined
+        ? undefined
+        : await this.#options.trustedRespawnLaunch(record)
       handle = this.#rpcRespawnRunner.start({
         task_id: record.task_id,
         cwd: spawnSpec.cwd,
@@ -292,8 +295,8 @@ class TaskManagerImpl implements TaskManager {
         prompt: "",
         resumeSessionPath,
         model: record.model,
-        ...(spawnSpec.extensions === undefined ? {} : { extensions: spawnSpec.extensions }),
-        ...(spawnSpec.member_env === undefined ? {} : { memberEnv: spawnSpec.member_env }),
+        ...(trustedLaunch?.extensions === undefined ? {} : { extensions: trustedLaunch.extensions }),
+        ...(trustedLaunch?.memberEnv === undefined ? {} : { memberEnv: trustedLaunch.memberEnv }),
       })
       const switchSession = handle.switchSession
       if (switchSession === undefined) {
@@ -306,7 +309,7 @@ class TaskManagerImpl implements TaskManager {
         return { ok: false, reason: "switch_session was cancelled" }
       }
       return { ok: true, handle: adaptRpcHandle(handle) }
-    } catch (error) {
+    } catch (error) { // no-excuse-ok: catch - RPC respawn boundary converts failures into a typed result.
       const cleanedUp = handle === undefined || await this.#disposeFailedRespawn(handle)
       log("senpi-task rpc respawn failed", { taskId: record.task_id, error: String(error) })
       return { ok: false, reason: cleanedUp ? "rpc respawn failed" : RESPAWN_CLEANUP_FAILURE_REASON }

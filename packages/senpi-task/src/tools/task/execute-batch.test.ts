@@ -97,6 +97,58 @@ describe("buildTaskExecute batch fanout", () => {
     ])
   })
 
+  test(" w2batch #given an oversized batch #when executed #then it rejects before starting any item", async () => {
+    // given
+    let startCalls = 0
+    const manager = createFakeManager({
+      start: async (): Promise<StartResult> => {
+        startCalls += 1
+        throw new Error("batch start must not run")
+      },
+    })
+    const tasks = Array.from({ length: 17 }, () => ({ prompt: "one" }))
+
+    // when
+    const output = await buildTaskExecute(makeDeps(manager))(
+      "oversized-batch", { category: "quick", tasks }, undefined, undefined, CTX,
+    )
+
+    // then
+    expect(startCalls).toBe(0)
+    expect(output.details).toMatchObject({ task_id: "", status: "invalid_arguments", mode: "spawn" })
+  })
+
+  test(" w2batch #given a thrown middle start #when later items can start #then every item outcome is preserved", async () => {
+    // given
+    let startIndex = 0
+    const manager = createFakeManager({
+      start: async (): Promise<StartResult> => {
+        const index = startIndex
+        startIndex += 1
+        if (index === 1) throw new Error("middle start exploded")
+        const taskId = IDS[index]
+        if (taskId === undefined) throw new Error("unexpected extra start")
+        return started(taskId, `item-${index + 1}`)
+      },
+      waitFor: async (taskId): Promise<TaskRecord> =>
+        makeRecord({ task_id: taskId, status: "completed", final_response: `done:${taskId}` }),
+    })
+
+    // when
+    const output = await buildTaskExecute(makeDeps(manager))(
+      "throwing-batch", { category: "quick", tasks: [{ prompt: "one" }, { prompt: "two" }, { prompt: "three" }] }, undefined, undefined, CTX,
+    )
+
+    // then
+    expect(startIndex).toBe(3)
+    expect(output.details.status).toBe("error")
+    expect(output.details.items).toMatchObject([
+      { task_id: IDS[0], status: "completed" },
+      { task_id: "", status: "error", error_message: "middle start exploded" },
+      { task_id: IDS[2], status: "completed" },
+    ])
+  })
+
   test(" w2batch #given background capacity one #when three items start #then all ids and queue positions return as running", async () => {
     // given
     const starts = [started(IDS[0], "one"), started(IDS[1], "two", "pending", 1), started(IDS[2], "three", "pending", 2)]

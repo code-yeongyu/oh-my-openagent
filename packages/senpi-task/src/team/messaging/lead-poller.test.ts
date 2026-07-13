@@ -183,7 +183,7 @@ describe("lead poller", () => {
     const harness = createHarness()
     const value = message("66666666-6666-4666-8666-666666666666")
     await seed(harness, value)
-    const registration = harness.registry.register({ from: "alpha" })
+    const registration = harness.registry.register(TEAM_RUN_ID, { from: "alpha" })
     const observed = registration.promise.then(() => existsSync(processedPath(harness, value)))
 
     // when

@@ -140,12 +140,13 @@ teams, and a refused command never changes `team.json`.
 **MultiAgentV2 teams:**
 1. If a member needs an isolated worktree, run `worktree-add` BEFORE spawning it - flat
    `spawn_agent` has no cwd argument, so the path must ride in the bootstrap message.
-2. Spawn each member with flat `spawn_agent`: `task_name` is that member's `--task-name`,
-   `message` is the bootstrap printed by `add-member` / `member-prompt`, and
-   `fork_turns: "none"` (members read `guide.md` for context; full parent history is not
-   their context model). Leave `agent_type` unset. Set `model` / `reasoning_effort` only when
-   the task requires specific per-member routing (verify the applied values from the spawn
-   result); otherwise omit them and members inherit the session model.
+2. Spawn each member with flat `spawn_agent` using only the V2 schema fields:
+   `task_name` is that member's `--task-name`, `message` is the bootstrap printed by
+   `add-member` / `member-prompt`, and `fork_turns` is `"none"` (members read
+   `guide.md` for context; full parent history is not their context model). Put any
+   role, priority, or task-specific routing instruction in `message`; V2 does not accept
+   `agent_type`, `model`, `reasoning_effort`, or `service_tier`, so members inherit the
+   session model.
 3. `bind-agent --agent-path` with the canonical task name the spawn returned (normally
    `/root/<task_name>`); binding confirms the runtime identity matches the roster and records
    the member's cwd. Members are durable: they persist as subagent threads, survive idling,
