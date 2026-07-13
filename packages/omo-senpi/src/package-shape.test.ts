@@ -92,7 +92,27 @@ describe("omo-senpi package shape", () => {
       "@oh-my-opencode/comment-checker-core": "workspace:*",
       "@oh-my-opencode/telemetry-core": "workspace:*",
       "@oh-my-opencode/prompts-core": "workspace:*",
+      "@oh-my-opencode/lsp-core": "workspace:*",
+      "@code-yeongyu/lsp-daemon": "file:../lsp-daemon",
     })
+    expect(Object.keys(dependencies)).not.toContain(["vscode", "jsonrpc"].join("-"))
+    expect(Object.keys(readStringRecord(rootManifest, "dependencies"))).not.toContain(["vscode", "jsonrpc"].join("-"))
+  })
+
+  test("#given the packaged senpi plugin manifest #when audited #then license and notice files ship with generated artifacts", async () => {
+    // given
+    const manifest = await readJsonObject("packages/omo-senpi/plugin/package.json")
+
+    // when
+    const files = readStringArray(manifest, "files")
+
+    // then
+    expect(files).toContain("extensions")
+    expect(files).toContain("skills")
+    expect(files).toContain("runtime")
+    expect(files).toContain("README.md")
+    expect(files).toContain("NOTICE")
+    expect(files).toContain("LICENSE")
   })
 
   test("#given root workspace metadata #when audited #then the senpi adapter is registered", async () => {
@@ -106,6 +126,7 @@ describe("omo-senpi package shape", () => {
 
     // then
     expect(workspaces).toContain("packages/omo-senpi")
+    expect(workspaces).not.toContain("packages/lsp-daemon")
     expect(devDependencies["@oh-my-opencode/omo-senpi"]).toBe("workspace:*")
     expect(typecheckPackages).toContain("tsgo --noEmit -p packages/omo-senpi/tsconfig.json")
   })
