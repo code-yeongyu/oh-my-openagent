@@ -64,7 +64,10 @@ bun test packages/omo-config-core
 
 Co-located `*.test.ts` cover the schema (`src/schema/config-schema.test.ts`), the loader precedence and diagnostics (`src/loader/loader.test.ts`), the deep-merge and pollution guard (`src/loader/merge.test.ts`), and the writer plus its symlink/atomicity security path (`src/writer/writer.test.ts`, `src/writer/writer-security.test.ts`). Parent: [`packages/AGENTS.md`](../AGENTS.md).
 
+## GENERATED SCHEMA
+
+- `assets/omo.schema.json` is generated from `OmoConfigSchema` by `bun run build:omo-schema`; `tests/omo-schema-freshness.test.ts` enforces byte freshness and the documented raw dev-branch URL at `https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json`.
+
 ## FOLLOW-UPS
 
-- A generated `assets/omo.schema.json` artifact and a documented `$schema` URL are a separate task (the schema already accepts and ignores a `$schema` string key at `src/schema/config.ts:8`). Until it lands, do not reference a checked-in JSON schema file.
 - The category schema must stay in field parity with `packages/omo-opencode/src/config/schema/categories.ts`; a drift guard belongs with the OpenCode-migration phase, not here.

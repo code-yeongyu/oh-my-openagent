@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, test } from "bun:test"
+import Ajv from "ajv"
 import { OmoConfigSchema } from "../packages/omo-config-core/src/schema"
 import { createOmoJsonSchema } from "../script/build-omo-schema-document"
 
@@ -15,6 +16,28 @@ function extractSchemaExample(markdown: string): unknown {
     if (body.includes("\"$schema\"")) return JSON.parse(body)
   }
   throw new Error("no $schema-bearing json example found in omo-json.md")
+}
+
+function createCommittedSchemaValidator(): ReturnType<Ajv["compile"]> {
+  const schema: unknown = JSON.parse(readFileSync(SCHEMA_PATH, "utf-8"))
+  if (typeof schema !== "object" || schema === null) {
+    throw new Error("assets/omo.schema.json must contain a JSON object")
+  }
+  return new Ajv({ strict: true }).compile(schema)
+}
+
+function createTwoMemberTeamConfig(leadAgentId?: string): unknown {
+  return {
+    teams: {
+      builders: {
+        ...(leadAgentId === undefined ? {} : { leadAgentId }),
+        members: [
+          { name: "lead", kind: "category", category: "quick", prompt: "Lead" },
+          { name: "member", kind: "subagent_type", subagent_type: "sisyphus" },
+        ],
+      },
+    },
+  }
 }
 
 describe("omo schema freshness", () => {
@@ -39,6 +62,97 @@ describe("omo schema freshness", () => {
     // then
     expect(result.success).toBe(true)
     if (!result.success) throw new Error(result.error.message)
+  })
+
+  test("#given a minimal task opt-out #when validated by the shipped schema #then defaulted siblings remain optional", () => {
+    // given
+    const validate = createCommittedSchemaValidator()
+    const config = { task: { reattach_on_reconcile: false } }
+
+    // when
+    const valid = validate(config)
+
+    // then
+    if (!valid) throw new Error(JSON.stringify(validate.errors))
+    expect(valid).toBe(true)
+  })
+
+  test("#given the documented partial omo.json #when validated by the shipped schema #then it validates", () => {
+    // given
+    const validate = createCommittedSchemaValidator()
+    const example = extractSchemaExample(readFileSync(DOC_PATH, "utf-8"))
+
+    // when
+    const valid = validate(example)
+
+    // then
+    if (!valid) throw new Error(JSON.stringify(validate.errors))
+    expect(valid).toBe(true)
+  })
+
+  test("#given an unknown task key #when validated by the shipped schema #then strictness is retained", () => {
+    // given
+    const validate = createCommittedSchemaValidator()
+    const config = {
+      task: {
+        default_execution_mode: "in-process",
+        default_concurrency: 5,
+        max_depth: 1,
+        residency_max_children: 8,
+        ttl_ms: 86400000,
+        wait: { min_ms: 5000, default_ms: 60000, max_ms: 600000 },
+        team: { max_members: 8, max_parallel_members: 4, max_wall_clock_minutes: 120 },
+        unexpected: true,
+      },
+    }
+
+    // when
+    const valid = validate(config)
+
+    // then
+    expect(valid).toBe(false)
+    expect(validate.errors?.some((error) => error.keyword === "additionalProperties")).toBe(true)
+  })
+
+  test("#given a multi-member team without a lead #when validated #then runtime and shipped schemas reject it", () => {
+    // given
+    const validate = createCommittedSchemaValidator()
+    const config = createTwoMemberTeamConfig()
+
+    // when
+    const runtimeResult = OmoConfigSchema.safeParse(config)
+    const artifactResult = validate(config)
+
+    // then
+    expect(runtimeResult.success).toBe(false)
+    if (runtimeResult.success) throw new Error("Expected runtime team validation to fail")
+    expect(runtimeResult.error.issues.some((issue) => issue.path.join(".") === "teams.builders.leadAgentId")).toBe(
+      true,
+    )
+    expect(artifactResult).toBe(false)
+    expect(
+      validate.errors?.some(
+        (error) =>
+          error.keyword === "required" &&
+          error.instancePath === "/teams/builders" &&
+          error.params.missingProperty === "leadAgentId",
+      ),
+    ).toBe(true)
+  })
+
+  test("#given a multi-member team with a lead #when validated #then runtime and shipped schemas accept it", () => {
+    // given
+    const validate = createCommittedSchemaValidator()
+    const config = createTwoMemberTeamConfig("lead")
+
+    // when
+    const runtimeResult = OmoConfigSchema.safeParse(config)
+    const artifactResult = validate(config)
+
+    // then
+    expect(runtimeResult.success).toBe(true)
+    if (!artifactResult) throw new Error(JSON.stringify(validate.errors))
+    expect(artifactResult).toBe(true)
   })
 
   test("#given the docs example #when read #then it points at the documented dev-branch schema URL", () => {

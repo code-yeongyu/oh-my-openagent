@@ -373,6 +373,9 @@
         "state_dir": {
           "type": "string"
         },
+        "reattach_on_reconcile": {
+          "type": "boolean"
+        },
         "wait": {
           "default": {
             "min_ms": 5000,
@@ -400,11 +403,6 @@
               "maximum": 9007199254740991
             }
           },
-          "required": [
-            "min_ms",
-            "default_ms",
-            "max_ms"
-          ],
           "additionalProperties": false
         },
         "team": {
@@ -434,23 +432,9 @@
               "maximum": 9007199254740991
             }
           },
-          "required": [
-            "max_members",
-            "max_parallel_members",
-            "max_wall_clock_minutes"
-          ],
           "additionalProperties": false
         }
       },
-      "required": [
-        "default_execution_mode",
-        "default_concurrency",
-        "max_depth",
-        "residency_max_children",
-        "ttl_ms",
-        "wait",
-        "team"
-      ],
       "additionalProperties": false
     },
     "teams": {
@@ -547,8 +531,6 @@
                   },
                   "required": [
                     "name",
-                    "backendType",
-                    "isActive",
                     "kind",
                     "category",
                     "prompt"
@@ -604,8 +586,6 @@
                   },
                   "required": [
                     "name",
-                    "backendType",
-                    "isActive",
                     "kind",
                     "subagent_type"
                   ],
@@ -616,10 +596,30 @@
           }
         },
         "required": [
-          "version",
           "members"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "if": {
+          "properties": {
+            "members": {
+              "type": "array",
+              "minItems": 2
+            }
+          },
+          "required": [
+            "members"
+          ]
+        },
+        "then": {
+          "properties": {
+            "leadAgentId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "leadAgentId"
+          ]
+        }
       }
     }
   },
