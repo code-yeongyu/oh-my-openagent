@@ -147,6 +147,9 @@ The criteria MUST list, upfront:
 - For each criterion, the failing-first proof (test id or scenario)
   that will be captured RED BEFORE the implementation and GREEN after.
   Evidence added after the green code does NOT satisfy this.
+- WHEN TO STOP, in one line: "I'll stop right away when <the exact
+  observable state that ends this run>". The Stop rules bind to this
+  line — the moment it holds, you stop.
 
 These scenarios are the contract. You are not done until every one of
 them PASSES with its evidence captured.
