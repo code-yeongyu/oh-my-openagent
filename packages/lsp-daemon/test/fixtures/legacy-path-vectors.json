@@ -1,0 +1,50 @@
+{
+	"schemaVersion": 1,
+	"capturedCommit": "616d30bddcc7982f539602611ea2508c25360eb9",
+	"sourceSha256": "dd749af7e71f406acf9a8a93fe8fc7dd8850d2984e15808b920f7f54794f7bd5",
+	"version": "0.1.0",
+	"naturalUnix": {
+		"inputs": {
+			"platform": "darwin",
+			"home": "/Users/legacy",
+			"tmpdir": "/tmp"
+		},
+		"expected": {
+			"baseDir": "/Users/legacy/.codex/codex-lsp/daemon",
+			"versionDir": "/Users/legacy/.codex/codex-lsp/daemon/v0.1.0",
+			"socket": "/Users/legacy/.codex/codex-lsp/daemon/v0.1.0/daemon.sock",
+			"lock": "/Users/legacy/.codex/codex-lsp/daemon/v0.1.0/daemon.lock",
+			"pid": "/Users/legacy/.codex/codex-lsp/daemon/v0.1.0/daemon.pid",
+			"log": "/Users/legacy/.codex/codex-lsp/daemon/v0.1.0/daemon.log"
+		}
+	},
+	"hashedUnix": {
+		"inputs": {
+			"platform": "linux",
+			"home": "/Users/legacy/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/home",
+			"tmpdir": "/tmp"
+		},
+		"expected": {
+			"baseDir": "/Users/legacy/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/home/.codex/codex-lsp/daemon",
+			"versionDir": "/Users/legacy/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/home/.codex/codex-lsp/daemon/v0.1.0",
+			"socket": "/tmp/omo-lsp-0.1.0-8131658693c4df96.sock",
+			"lock": "/Users/legacy/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/home/.codex/codex-lsp/daemon/v0.1.0/daemon.lock",
+			"pid": "/Users/legacy/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/home/.codex/codex-lsp/daemon/v0.1.0/daemon.pid",
+			"log": "/Users/legacy/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/deep-segment/home/.codex/codex-lsp/daemon/v0.1.0/daemon.log"
+		}
+	},
+	"windowsNamedPipe": {
+		"inputs": {
+			"platform": "win32",
+			"home": "C:\\Users\\legacy"
+		},
+		"expected": {
+			"baseDir": "C:\\Users\\legacy\\.codex\\codex-lsp\\daemon",
+			"versionDir": "C:\\Users\\legacy\\.codex\\codex-lsp\\daemon\\v0.1.0",
+			"socket": "\\\\.\\pipe\\omo-lsp-0.1.0-9d4def6f95ee8a34",
+			"lock": "C:\\Users\\legacy\\.codex\\codex-lsp\\daemon\\v0.1.0\\daemon.lock",
+			"pid": "C:\\Users\\legacy\\.codex\\codex-lsp\\daemon\\v0.1.0\\daemon.pid",
+			"log": "C:\\Users\\legacy\\.codex\\codex-lsp\\daemon\\v0.1.0\\daemon.log"
+		}
+	}
+}
