@@ -35,6 +35,14 @@ const REQUIRED_PLUGIN_ARTIFACTS = [
   join("extensions", "omo.js"),
   join("skills", "ultrawork", "SKILL.md"),
   join("skills", "ulw-loop", "SKILL.md"),
+  join("runtime", "lsp-daemon", "dist", "cli.js"),
+  join("runtime", "lsp-daemon", "dist", "index.js"),
+  join("runtime", "lsp-daemon", "dist", "index.d.ts"),
+  join("runtime", "lsp-daemon", "dist", "daemon-client.js"),
+  join("runtime", "lsp-daemon", "dist", "daemon-client.d.ts"),
+  join("runtime", "lsp-daemon", "dist", "package.json"),
+  join("runtime", "lsp-daemon", "dist", ".omo-runtime-manifest.json"),
+  join("scripts", "install.mjs"),
 ] as const
 
 export async function runSenpiInstaller(options: SenpiInstallOptions = {}): Promise<SenpiInstallResult> {
@@ -85,10 +93,12 @@ function resolveInstallContext(options: SenpiInstallOptions): {
   readonly agentDir: string
   readonly settingsPath: string
   readonly pluginPath: string
+  readonly allowBuild: boolean
   readonly runCommand: (command: string, args: readonly string[], options: { readonly cwd: string }) => Promise<void>
 } {
   const env = options.env ?? process.env
-  const repoRoot = resolve(options.repoRoot ?? findRepoRoot(dirname(fileURLToPath(import.meta.url))))
+  const allowBuild = options.pluginPath === undefined
+  const repoRoot = resolve(options.repoRoot ?? (allowBuild ? findRepoRoot(dirname(fileURLToPath(import.meta.url))) : dirname(resolve(options.pluginPath))))
   const agentDir = resolve(options.agentDir ?? env.SENPI_CODING_AGENT_DIR ?? join(homedir(), ".senpi", "agent"))
   const pluginPath = resolve(options.pluginPath ?? join(repoRoot, "packages", "omo-senpi", "plugin"))
   return {
@@ -97,6 +107,7 @@ function resolveInstallContext(options: SenpiInstallOptions): {
     agentDir,
     settingsPath: join(agentDir, "settings.json"),
     pluginPath,
+    allowBuild,
     runCommand: options.runCommand ?? defaultRunCommand,
   }
 }
@@ -104,9 +115,14 @@ function resolveInstallContext(options: SenpiInstallOptions): {
 async function ensurePluginArtifacts(context: ReturnType<typeof resolveInstallContext>): Promise<void> {
   const missing = await hasMissingPluginArtifact(context.pluginPath)
   if (!missing) return
+  if (!context.allowBuild) {
+    throw new Error(`Packed omo-senpi plugin is missing required runtime artifacts at ${context.pluginPath}`)
+  }
 
   await context.runCommand("node", [join(context.pluginPath, "scripts", "build-extension.mjs")], { cwd: context.repoRoot })
   await context.runCommand("node", [join(context.pluginPath, "scripts", "sync-skills.mjs")], { cwd: context.repoRoot })
+  await context.runCommand("node", [join(context.pluginPath, "scripts", "build-install.mjs")], { cwd: context.repoRoot })
+  await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-lsp-daemon-runtime.mjs")], { cwd: context.repoRoot })
 }
 
 async function hasMissingPluginArtifact(pluginPath: string): Promise<boolean> {
