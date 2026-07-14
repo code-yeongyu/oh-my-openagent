@@ -235,7 +235,12 @@ test("#given bundled LSP hook CLI in installed layout #when diagnostics run #the
 		assert.equal(existsSync(join(daemonDir, `v${JSON.parse(readFileSync(join(daemonDist, "package.json"), "utf8")).version}`, "daemon.log")), true);
 	} finally {
 		await stopTestDaemons(join(tempRoot, "daemon"));
-		rmSync(tempRoot, { recursive: true, force: true });
+		rmSync(tempRoot, {
+			recursive: true,
+			force: true,
+			maxRetries: 5,
+			retryDelay: 100,
+		});
 	}
 });
 
