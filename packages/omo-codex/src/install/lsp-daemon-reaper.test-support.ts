@@ -7,7 +7,7 @@ import { execFileSync, spawn } from "node:child_process"
 import { mkdtempSync, writeFileSync } from "node:fs"
 import { mkdir, rm, symlink, writeFile } from "node:fs/promises"
 import { platform, tmpdir } from "node:os"
-import { delimiter, join } from "node:path"
+import { join } from "node:path"
 import type { Readable } from "node:stream"
 
 export interface LegacyDaemonFixture {
@@ -37,15 +37,17 @@ function firstCommandLine(command: string, args: readonly string[]): string | nu
   }
 }
 
-function normalizeWindowsNodeCandidate(candidate: string): string {
-  const path = candidate.split(delimiter)[0] ?? candidate
+export function normalizeWindowsNodeCandidate(candidate: string): string {
+  const path = candidate.split(";")[0]?.trim() ?? candidate
   const msysPath = /^\/([a-zA-Z])\/(.*)$/.exec(path)
   if (!msysPath) return path
-  return `${msysPath[1]}:\\${msysPath[2].replaceAll("/", "\\")}`
+  const nativePath = `${msysPath[1].toUpperCase()}:\\${msysPath[2].replaceAll("/", "\\")}`
+  return /\.[^\\/]+$/.test(nativePath) ? nativePath : `${nativePath}.exe`
 }
 
 export function createLegacyCodexHome(prefix: string): string {
-  return mkdtempSync(join("/tmp", prefix))
+  const root = platform() === "win32" ? tmpdir() : "/tmp"
+  return mkdtempSync(join(root, prefix))
 }
 
 export function versionDirFor(codexHome: string, version: string): string {

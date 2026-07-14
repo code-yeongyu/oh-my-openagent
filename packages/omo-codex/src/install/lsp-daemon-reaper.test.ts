@@ -10,6 +10,7 @@ import { reapLspDaemons } from "./lsp-daemon-reaper"
 import {
   createLegacyCodexHome,
   legacyEndpointFor,
+  normalizeWindowsNodeCandidate,
   removePathIfPresent,
   writeLegacyVersionState,
   writeSymlinkedLegacyMetadata,
@@ -27,6 +28,25 @@ function trackRoot(root: string): string {
 }
 
 describe("reapLspDaemons", () => {
+  test("#given a legacy fixture home #when creating it #then it uses the platform-safe temp root that the reaper also validates", () => {
+    const codexHome = trackRoot(createLegacyCodexHome("omo-reap-temp-root-"))
+    const expectedRoot = process.platform === "win32" ? tmpdir() : "/tmp"
+
+    expect(codexHome.startsWith(expectedRoot)).toBe(true)
+  })
+
+  test("#given Git Bash resolves node as an MSYS path #when normalizing for Windows spawn #then it returns a native executable path", () => {
+    const nodePath = normalizeWindowsNodeCandidate("/c/hostedtoolcache/windows/node/24.18.0/x64/node")
+
+    expect(nodePath).toBe("C:\\hostedtoolcache\\windows\\node\\24.18.0\\x64\\node.exe")
+  })
+
+  test("#given PowerShell resolves node as a native path #when normalizing for Windows spawn #then it preserves the executable path", () => {
+    const nodePath = normalizeWindowsNodeCandidate("C:\\hostedtoolcache\\windows\\node\\24.18.0\\x64\\node.exe")
+
+    expect(nodePath).toBe("C:\\hostedtoolcache\\windows\\node\\24.18.0\\x64\\node.exe")
+  })
+
   test("#given a stale hashed Unix endpoint #when reaping #then it removes the dead legacy directory idempotently", async () => {
     const codexHome = trackRoot(createLegacyCodexHome("omo-reap-stale-"))
     const version = await writeLegacyVersionState({
