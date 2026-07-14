@@ -52,7 +52,9 @@ describe("reapLspDaemons live ownership", () => {
         endpoint,
       })
 
-      const reaped = await reapLspDaemons(codexHome)
+      const reaped = await reapLspDaemons(codexHome, {
+        attestLegacyDaemonOwnership: async (input) => input.pid === daemon.pid,
+      })
 
       expect(reaped).toEqual([
         {
@@ -82,7 +84,9 @@ describe("reapLspDaemons live ownership", () => {
         endpoint,
       })
 
-      const reaped = await reapLspDaemons(codexHome)
+      const reaped = await reapLspDaemons(codexHome, {
+        attestLegacyDaemonOwnership: async (input) => input.pid === daemon.pid,
+      })
 
       expect(reaped).toEqual([
         {
@@ -111,7 +115,9 @@ describe("reapLspDaemons live ownership", () => {
         endpoint,
       })
 
-      const reaped = await reapLspDaemons(codexHome)
+      const reaped = await reapLspDaemons(codexHome, {
+        attestLegacyDaemonOwnership: async (input) => input.pid === daemon.pid,
+      })
 
       expect(reaped).toEqual([
         {

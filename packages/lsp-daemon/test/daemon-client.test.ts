@@ -15,8 +15,8 @@ describe("currentRequestContext", () => {
 
 		expect(context.cwd).toBe(process.cwd());
 		expect(context.projectConfigPaths).toEqual([join(process.cwd(), ".codex", "lsp-client.json")]);
-		expect(context.userConfigPath).toBe("/home/me/.codex/lsp-client.json");
-		expect(context.installDecisionsPath).toBe("/home/me/.codex/lsp-install-decisions.json");
+		expect(context.userConfigPath).toBe(join("/home/me", ".codex", "lsp-client.json"));
+		expect(context.installDecisionsPath).toBe(join("/home/me", ".codex", "lsp-install-decisions.json"));
 		expect(context.capabilities).toEqual({ installDecisionTool: true });
 	});
 
