@@ -823,18 +823,19 @@ Alternativement : **Phase 13** : Ajouter les `.d.ts` pour le packaging npm (peut
 - **2026-07-13 — Wave 5 Case B RE-PASS ✅** : server boot `--hostname 127.0.0.1 --port 9643`, health HTTP 200, `opencode server listening`. Evidence `serve3-boot.log`.
 - **2026-07-13 — Wave 5 STATUT FINAL** : Magic Context est **fonctionnel** (mémoire inter-sessions + contexte cache-aware) dans MaTrix, vérifié par QA réelle OpenCode (sandbox XDG isolé). 2 root causes corrigées + bundle 5.60 MB. `I0`/`J0b` toujours DIFFÉRÉS. Dossier evidence : `.omo/evidence/20260712-magic-context-qa/`.
 - **2026-07-14 — CONSOLIDATION Magic Context + rebranding DÉMARRÉE** : les Waves 1–5 MC sont **codées en legacy** (`MaTrix-test` main, commits `ecdf85b96` + `0c7e3a1d9`, source `engine/packages/omo-opencode/src/features/magic-context/`). Consolidation vers le fork propre **`matrix-port`** (base `upstream/dev`) EN COURS — port additif + re-câblage manuel de `create-transform-hooks.ts` / `messages-transform.ts` / `tool-registry.ts` (la base upstream diffère du legacy). Build + typecheck + tests obligatoires ; **PAS de self-test `sse-hook-probe.sh --self-test`** (serveur non-terminant → a crashé opencode le 2026-07-14). Rebranding (Morpheus/Neo/Tank/Operator/Ghost/Link/Analyst/Keymaker/AgentSmith) localisé dans `engine/.../agents/builtin-agents.ts` + `morpheus*`.
-  - **PR ouvertes** : #6124 (anti-loop, upstream), #6125 (port KLC + §18 veille, upstream) — #6125 mise à jour le 2026-07-14 avec le §18.
+  - **PR ouvertes** : #6124 (anti-loop, upstream), #6125 (port KLC + §18 veille, upstream), #6126 (consolidation Magic Context, upstream → `shirofx:matrix-magic-context`).
   - **⚠️ SÉCURITÉ** : token GitHub (scopes repo+workflow) exposé dans l'historique de session → **À RÉVOQUER** sur GitHub après la session. (Voir journal vault `KLC_Vault/...` pour la référence ; ne jamais ré-écrire en clair ici.)
   - **⚠️ LEÇON CRASH** : ne jamais relancer `scripts/sse-hook-probe.sh --self-test` (spawn serveur opencode non-terminant + `pkill` timeout → crash shell). QA live = sandbox XDG isolé + evidence disque, pas ce self-test.
+  - **2026-07-14 — CONSOLIDATION Magic Context TERMINÉE** : port additif (40 fichiers `features/magic-context/` + `config/schema/magic-context.ts` + wiring 4 composers) → commit `47d31f557` branche `matrix-magic-context` → **PR #6126**. Build green, typecheck clean, 10 MC tests pass, hooks KLC intacts. Rebranding toujours à consolider (scopage en cours, ghost `bg_e5cbc346`).
 
 ---
 
 ## Prochaine étape recommandée
 
-> **MISE À JOUR 2026-07-14** : les Waves 1–5 de Magic Context sont **TERMINÉES dans l'historique divergent `MaTrix-legacy`** (voir §17.6) mais **pas encore consolidées dans le fork propre upstream-based** (`matrix-port`). Le vrai « travail majeur suivant » est la **consolidation**, pas un nouveau démarrage.
+> **MISE À JOUR 2026-07-14 (~20:30 UTC)** : **Magic Context (Waves 1–5) est CONSOLIDÉE** dans le fork propre `matrix-port` → branche `matrix-magic-context` → **PR #6126** (build green, typecheck clean, 10 MC tests pass). Reste la **consolidation du rebranding agents** (scopage du blast radius en cours via ghost `bg_e5cbc346`). Le workstream « Forces outils tiers » (§18) suit le rebranding.
 
 **TRAVAIL MAJEUR SUIVANT — Consolidation dans le fork propre (voir §17 + §18)** :
-1. **Consolider Magic Context** (Waves 1–5, déjà codées en legacy) + **rebranding agents** (Morpheus/Neo/Tank/Operator/Ghost/Link/Analyst/Keymaker/AgentSmith — déjà faits en legacy) dans le worktree `matrix-port` (base `upstream/dev`), avec build + QA, puis PR. Même méthode que le port KLC (#6125).
+1. ~~**Consolider Magic Context** (Waves 1–5)~~ **✅ FAIT → PR #6126**. **Restant : consolider le rebranding agents** (Morpheus/Neo/Tank/Operator/Ghost/Link/Analyst/Keymaker/AgentSmith — déjà faits en legacy) dans `matrix-port` (base `upstream/dev`), build + QA, puis PR. Même méthode que KLC (#6125) / Magic Context (#6126). Scopage en cours (ghost `bg_e5cbc346`).
 2. **Ouvrir le workstream « Forces outils tiers » (§18)** issu de la veille `BENCHMARKS.md` : porter les forces de Hermes/OMO que MaTrix n'a pas encore.
 
 ### §18 — Forces outils tiers (veille `BENCHMARKS.md`)
