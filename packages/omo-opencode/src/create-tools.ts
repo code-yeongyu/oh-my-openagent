@@ -8,6 +8,7 @@ import type { Managers } from "./create-managers"
 import { createAvailableCategories } from "./plugin/available-categories"
 import { createSkillContext } from "./plugin/skill-context"
 import { createToolRegistry } from "./plugin/tool-registry"
+import { createMagicContextDeps } from "./features/magic-context/deps"
 
 type CreateToolsResult = {
   filteredTools: ToolsRecord
@@ -33,12 +34,14 @@ export async function createTools(args: {
 
   const availableCategories = createAvailableCategories(pluginConfig)
 
+  const magicContextDeps = createMagicContextDeps(pluginConfig.magic_context, ctx.directory)
   const { filteredTools, taskSystemEnabled } = createToolRegistry({
     ctx,
     pluginConfig,
     managers,
     skillContext,
     availableCategories,
+    magicContextDeps: magicContextDeps ?? undefined,
   })
 
   return {

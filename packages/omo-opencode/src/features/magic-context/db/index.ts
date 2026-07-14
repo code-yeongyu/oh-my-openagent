@@ -1,0 +1,11 @@
+export { createDb, closeQuietly } from "./sqlite"
+export type { Database, Statement, CreateDbOptions } from "./sqlite"
+export { runMigrations } from "./migrate"
+export { SCHEMA_VERSION, SCHEMA_DDL } from "./schema"
+
+export * as sessions from "./queries/sessions"
+export * as compartments from "./queries/compartments"
+export * as memories from "./queries/memories"
+export * as history from "./queries/history"
+export * as notes from "./queries/notes"
+export * as commits from "./queries/commits"
