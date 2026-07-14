@@ -53,9 +53,20 @@ describe("reapLspDaemons", () => {
 
     const unixEndpoint = liveLegacyEndpointFor({ codexHome, version: "0.1.0", platform: "linux" })
     const windowsEndpoint = liveLegacyEndpointFor({ codexHome, version: "0.1.0", platform: "win32" })
+    const unixSuffix = process.platform === "win32"
+      ? "\\codex-lsp\\daemon\\v0.1.0/daemon.sock"
+      : "/codex-lsp/daemon/v0.1.0/daemon.sock"
 
-    expect(unixEndpoint.endsWith("/codex-lsp/daemon/v0.1.0/daemon.sock")).toBe(true)
+    expect(unixEndpoint.endsWith(unixSuffix)).toBe(true)
     expect(windowsEndpoint.startsWith("\\\\.\\pipe\\omo-lsp-0.1.0-")).toBe(true)
+  })
+
+  test("#given a native Windows temp Codex home #when selecting a Unix legacy endpoint #then it preserves the Windows version path and appends the socket leaf", () => {
+    const codexHome = "D:\\a\\_temp\\omo-reap-live-endpoint-native"
+
+    const endpoint = legacyEndpointFor({ codexHome, version: "0.1.0", kind: "natural", platform: "linux" })
+
+    expect(endpoint).toBe("D:\\a\\_temp\\omo-reap-live-endpoint-native\\codex-lsp\\daemon\\v0.1.0/daemon.sock")
   })
 
   test("#given a stale hashed Unix endpoint #when reaping #then it removes the dead legacy directory idempotently", async () => {
