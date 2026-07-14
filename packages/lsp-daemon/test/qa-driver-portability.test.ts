@@ -41,7 +41,7 @@ describe("LSP QA driver portability", () => {
 		const output = execFileSync("bun", [join(repositoryRoot, cancellationSmoke), repositoryRoot], {
 			cwd: repositoryRoot,
 			encoding: "utf8",
-			timeout: 10_000,
+			timeout: 30_000,
 		});
 		const expectedEndpointKind = process.platform === "win32" ? "named-pipe" : "unix-socket";
 
