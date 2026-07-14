@@ -288,10 +288,27 @@ describe("createLspMcpConfig", () => {
       join(cwd, ".omo", "lsp.json"),
       join(cwd, ".omo", "lsp-client.json"),
     ])
-    expect(config.environment?.LSP_TOOLS_MCP_USER_CONFIG).toContain("opencode/lsp.json")
-    expect(config.environment?.LSP_TOOLS_MCP_INSTALL_DECISIONS).toContain("opencode/lsp-install-decisions.json")
+    expectPathSuffix(config.environment?.LSP_TOOLS_MCP_USER_CONFIG, ["opencode", "lsp.json"])
+    expectPathSuffix(config.environment?.LSP_TOOLS_MCP_INSTALL_DECISIONS, [
+      "opencode",
+      "lsp-install-decisions.json",
+    ])
+  })
+
+  it("matches user config path suffixes across POSIX and Windows separators", () => {
+    // given
+    const posixUserConfig = "/tmp/omo-test-home/.config/opencode/lsp.json"
+    const windowsUserConfig = "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\omo-test-home\\.config\\opencode\\lsp.json"
+
+    // then
+    expectPathSuffix(posixUserConfig, ["opencode", "lsp.json"])
+    expectPathSuffix(windowsUserConfig, ["opencode", "lsp.json"])
   })
 })
+
+function expectPathSuffix(pathValue: string | undefined, expectedSuffix: readonly string[]): void {
+  expect(pathValue?.split(/[\\/]+/).slice(-expectedSuffix.length)).toEqual(expectedSuffix)
+}
 
 function writeDaemonPackageJson(packageRoot: string, version: string = DAEMON_PACKAGE_VERSION): void {
   mkdirSync(join(packageRoot, "packages", "lsp-daemon"), { recursive: true })
