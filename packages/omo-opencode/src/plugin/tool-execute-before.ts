@@ -12,6 +12,8 @@ import { stopContinuation } from "./stop-continuation"
 
 import type { CreatedHooks } from "../create-hooks"
 import type { BackgroundManager } from "../features/background-agent"
+import { resolveAntiLoopSettings, validateTaskDispatch, buildTaskDispatchError } from "../features/anti-loop/task-dispatch-guard"
+import type { OhMyOpenCodeConfig } from "../config/schema/oh-my-opencode-config"
 
 const BACKGROUND_WAIT_BLOCK_MESSAGE = [
   "Background task wait is already managed by the plugin.",
@@ -43,11 +45,13 @@ export function createToolExecuteBeforeHandler(args: {
   ctx: PluginContext
   hooks: CreatedHooks
   backgroundManager?: Pick<BackgroundManager, "hasActiveChildTasks" | "hasPendingParentWake">
+  pluginConfig?: OhMyOpenCodeConfig
 }): (
   input: { tool: string; sessionID: string; callID: string },
   output: { args: Record<string, unknown> },
 ) => Promise<void> {
   const { ctx, hooks, backgroundManager } = args
+  const antiLoopSettings = resolveAntiLoopSettings(args.pluginConfig?.background_task)
 
   function buildUltraworkOracleVerificationPrompt(prompt: string, originalTask: string, verificationAttemptId: string): string {
     const verificationPrompt = [
@@ -142,6 +146,11 @@ export function createToolExecuteBeforeHandler(args: {
     }
 
     if (input.tool === "task") {
+      const antiLoopResult = validateTaskDispatch(input.sessionID, output.args, antiLoopSettings)
+      if (!antiLoopResult.ok) {
+        throw new Error(buildTaskDispatchError(antiLoopResult.cause ?? "malformed task() arguments", antiLoopResult.tripped))
+      }
+
       const category = typeof output.args.category === "string" ? output.args.category : undefined
       const subagentType = typeof output.args.subagent_type === "string" ? output.args.subagent_type : undefined
       const taskId = typeof output.args.task_id === "string" ? output.args.task_id : undefined

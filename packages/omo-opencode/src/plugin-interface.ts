@@ -95,6 +95,7 @@ export function createPluginInterface(args: {
       ctx,
       hooks,
       backgroundManager: managers.backgroundManager,
+      pluginConfig,
     }),
 
     "tool.execute.after": createToolExecuteAfterHandler({
