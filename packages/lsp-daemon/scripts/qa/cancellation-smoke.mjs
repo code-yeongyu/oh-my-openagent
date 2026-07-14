@@ -29,6 +29,7 @@ const daemonMessages = [];
 const activeRequests = new Map();
 const sockets = new Set();
 let daemonServer;
+let summary;
 
 try {
 	const paths = resolveDaemonPaths(
@@ -152,7 +153,7 @@ try {
 		daemonEndpointKind === (process.platform === "win32" ? "named-pipe" : "unix-socket"),
 		`production daemon endpoint kind did not match ${process.platform}`,
 	);
-	const summary = {
+	summary = {
 		workspaceHash: sha256(readFileSync(source)),
 		daemonEndpointKind,
 		daemonProxyId: daemonRequest.id,
@@ -165,13 +166,17 @@ try {
 		resultText: result.content[0]?.text ?? "",
 		auth: "redacted",
 	};
-	console.log(JSON.stringify(summary, null, 2));
 } finally {
-	for (const socket of sockets) socket.destroy();
-	if (daemonServer) await closeServer(daemonServer);
-	await disposeDefaultLspManager();
-	rmSync(tempRoot, { recursive: true, force: true });
+	await traceCleanupStage("daemon-sockets", () => {
+		for (const socket of sockets) socket.destroy();
+	});
+	if (daemonServer) await traceCleanupStage("daemon-server", () => closeServer(daemonServer));
+	await traceCleanupStage("lsp-manager", () => disposeDefaultLspManager());
+	await traceCleanupStage("temp-root", () => rmSync(tempRoot, { recursive: true, force: true }));
 }
+assert(summary, "cancellation summary missing after cleanup");
+process.stderr.write(`[cleanup:active-resources:${JSON.stringify(process.getActiveResourcesInfo())}]\n`);
+console.log(JSON.stringify(summary, null, 2));
 
 function fakeLspServerSource() {
 	return String.raw`
@@ -322,6 +327,12 @@ function listen(server, path) {
 
 function closeServer(server) {
 	return new Promise((resolve) => server.close(() => resolve()));
+}
+
+async function traceCleanupStage(stage, cleanup) {
+	process.stderr.write(`[cleanup:${stage}:start]\n`);
+	await cleanup();
+	process.stderr.write(`[cleanup:${stage}:complete]\n`);
 }
 
 function assert(condition, message) {
