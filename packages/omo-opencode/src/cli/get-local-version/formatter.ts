@@ -44,6 +44,10 @@ export function formatVersionOutput(info: VersionInfo): string {
       lines.push(`  ${SYMBOLS.dev} ${color.cyan("Running in local development mode")}`)
       lines.push(`  ${color.dim("Using file:// protocol from config")}`)
       break
+    case "dev":
+      lines.push(`  ${SYMBOLS.dev} ${color.cyan("Running a local dev build")}`)
+      lines.push(`  ${color.dim("Installed from source; update checks are skipped")}`)
+      break
     case "pinned":
       lines.push(`  ${SYMBOLS.pin} ${color.magenta(`Version pinned to ${info.pinnedVersion}`)}`)
       lines.push(`  ${color.dim("Update check skipped for pinned versions")}`)
