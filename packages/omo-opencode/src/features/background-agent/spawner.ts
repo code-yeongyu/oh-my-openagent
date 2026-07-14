@@ -186,11 +186,10 @@ export async function resumeTask(
   const sessionID = task.sessionId
 
   if (task.status === "running") {
-    log("[background-agent] Resume skipped - task already running:", {
-      taskId: task.id,
-      sessionID,
-    })
-    return
+    throw new Error(
+      `Task ${task.id} is currently running and cannot accept a continuation prompt. ` +
+      "Wait for it to complete before resuming it with task_id.",
+    )
   }
 
   const concurrencyKey = task.concurrencyGroup ?? task.agent
