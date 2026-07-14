@@ -107,8 +107,8 @@ Every `task()` prompt MUST include ALL 6 sections:
 
 ## 3. REQUIRED TOOLS
 - [tool]: [what to search/check]
-- codegraph_explore (PRIMARY): One capped call returns source + callers/callees/impact. Use FIRST when codegraph_* tools are available. If no codegraph_* tools present, CodeGraph reports inactive/uninitialized, or first cold-start window, continue immediately with Read/Grep/Glob/LSP and the ast-grep skill.
-- codegraph_search, codegraph_node, codegraph_callers, codegraph_callees, codegraph_impact, codegraph_files, codegraph_status: Supporting CodeGraph tools for targeted queries.
+- CodeGraph explore (PRIMARY): One capped call returns source + callers/callees/impact. Use FIRST when CodeGraph tools are available, but call the exact CodeGraph tool name shown in your current tool list: OpenCode commonly exposes `codegraph_codegraph_explore`, Codex MCP form may expose `mcp__codegraph__codegraph_explore`, and bare `codegraph_explore` is valid only when that exact bare name is exposed. If no CodeGraph tools are present, CodeGraph reports inactive/uninitialized, or first cold-start window, continue immediately with Read/Grep/Glob/LSP and the ast-grep skill.
+- Supporting CodeGraph tools follow the same exact-name rule for targeted queries: for example `codegraph_codegraph_node`, `mcp__codegraph__codegraph_node`, or bare `codegraph_node` only when that exact bare name is exposed.
 - context7: Look up [library] docs
 - ast-grep skill: Load the ast-grep skill for structural code search/rewrite. Use `sg --pattern '[pattern]' --lang [lang]` or `python3 scripts/ast_grep_helper.py search`.
 

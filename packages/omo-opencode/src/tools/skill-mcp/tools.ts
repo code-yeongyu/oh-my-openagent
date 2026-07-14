@@ -79,7 +79,7 @@ function formatBuiltinMcpHint(mcpName: string): string | null {
   return (
     `"${mcpName}" is a builtin MCP, not a skill MCP.\n` +
     `skill_mcp can only call MCP servers declared by loaded skills; do not retry this builtin through skill_mcp.\n` +
-    `Use the native builtin tool names when OpenCode exposes them:\n` +
+    `Use the exact native builtin tool name shown in OpenCode's current tool list; CodeGraph is commonly namespaced by the MCP server name:\n` +
     nativeTools.map((toolName) => `  - ${toolName}`).join("\n")
   )
 }

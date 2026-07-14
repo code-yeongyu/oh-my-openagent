@@ -28,7 +28,11 @@ describe("skill_mcp builtin MCP hint", () => {
 
     await expect(
       tool.execute({ mcp_name: "codegraph", tool_name: "codegraph_status" }, mockContext),
-    ).rejects.toThrow(/codegraph_status/)
+    ).rejects.toThrow(/codegraph_codegraph_status/)
+
+    await expect(
+      tool.execute({ mcp_name: "codegraph", tool_name: "codegraph_status" }, mockContext),
+    ).rejects.toThrow(/exact native builtin tool name shown in OpenCode's current tool list/)
 
     await expect(
       tool.execute({ mcp_name: "codegraph", tool_name: "codegraph_status" }, mockContext),

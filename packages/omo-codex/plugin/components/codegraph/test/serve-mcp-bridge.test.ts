@@ -183,8 +183,10 @@ describe("runCodegraphServe MCP protocol bridge", () => {
 			const text = stringProperty(recordValue(arrayProperty(callResult, "content")[0]), "text");
 			expect(text).toContain("Container symbols intentionally return structural outlines");
 			expect(text).toContain("specific member symbol");
+			expect(text).toContain("exact exposed CodeGraph node tool");
 			expect(text).toContain("file mode");
 			expect(text).toContain("symbolsOnly=false");
+			expect(text).not.toContain("call codegraph_node");
 			expect(text).not.toContain("Read tool");
 		} finally {
 			rmSync(tempRoot, { recursive: true, force: true });

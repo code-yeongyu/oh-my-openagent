@@ -2112,7 +2112,7 @@ class CodegraphBridgeStdioError extends Error {
 }
 var CODEGRAPH_NODE_DESCRIPTION = "Inspect one named symbol or file. In symbol mode, includeCode=true includes leaf-symbol source when available. Container symbols such as classes, interfaces, structs, enums, modules, and namespaces return structural outlines with member lists by design. For container source, request a specific member symbol or use file mode with symbolsOnly=false plus offset/limit.";
 var CODEGRAPH_NODE_INCLUDE_CODE_DESCRIPTION = "Symbol mode: include leaf-symbol source when available. Container symbols such as classes, interfaces, structs, enums, modules, and namespaces intentionally return structural outlines with members; request a specific member symbol or use file mode with symbolsOnly=false plus offset/limit for source.";
-var CODEGRAPH_CONTAINER_OUTLINE_GUIDANCE = "Container symbols intentionally return structural outlines with members. For source, request a specific member symbol or call codegraph_node in file mode with symbolsOnly=false plus offset/limit around the symbol location.";
+var CODEGRAPH_CONTAINER_OUTLINE_GUIDANCE = "Container symbols intentionally return structural outlines with members. For source, request a specific member symbol or call the exact exposed CodeGraph node tool in file mode with symbolsOnly=false plus offset/limit around the symbol location.";
 async function runBridgedCodegraphProcess(command, args, options) {
   const invocation = resolveServeProcessInvocation(command, args);
   const child = spawn(invocation.command, invocation.args, {

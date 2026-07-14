@@ -211,8 +211,12 @@ production code before its failing test → rewrite.
 Never guess from memory — locate with the right tool, and re-read before
 you claim or change. Fire 3+ independent lookups in one action;
 serialize only when one output strictly feeds the next.
-- CodeGraph, when `codegraph_*` tools exist -> use `codegraph_explore`
-  first for how/where/what/flow questions and before edits; if absent,
+- CodeGraph, when CodeGraph tools exist -> use the exact CodeGraph tool
+  name shown in your current tool list first for how/where/what/flow
+  questions and before edits. OpenCode commonly exposes
+  `codegraph_codegraph_explore`, Codex MCP form may expose
+  `mcp__codegraph__codegraph_explore`, and bare `codegraph_explore` is valid
+  only when that exact bare name is exposed. If absent,
   inactive/uninitialized, or cold-start unavailable, keep moving with
   Read/Grep/Glob/LSP and the ast-grep skill.
 - Repo-wide inspection, CLI smoke tests, git/history, bounded command
