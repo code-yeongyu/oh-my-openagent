@@ -3038,6 +3038,7 @@ function writeChunk(output, chunk) {
           return;
         settled = true;
         if (error) {
+          queueMicrotask(() => output.removeListener("error", onError));
           reject(error);
           return;
         }
@@ -3200,9 +3201,16 @@ async function writeResponse(response, context) {
     await writeStdioJsonRpcResponse(context.output, response, context.responseMode);
     return true;
   } catch (error) {
+    if (!isTerminalOutputError(error))
+      throw error;
     context.log("output_error", { message: messageFromError(error) });
     return false;
   }
+}
+function isTerminalOutputError(error) {
+  if (!(error instanceof Error) || !("code" in error))
+    return false;
+  return error.code === "EPIPE" || error.code === "ERR_STREAM_DESTROYED" || error.code === "ERR_STREAM_WRITE_AFTER_END";
 }
 function createIdleTimer(idleTimeoutMs, log, onIdleTimeout) {
   let timer = null;
@@ -3295,7 +3303,17 @@ async function runBridgedCodegraphProcess(command, args, options) {
     childOutput.destroy();
   };
   childExit.then(destroyChildPipes, destroyChildPipes);
-  return Promise.race([childExit, bridgeDone.then(() => childExit)]);
+  try {
+    return await Promise.race([childExit, bridgeDone.then(() => childExit)]);
+  } catch (error) {
+    destroyChildPipes();
+    if (child.exitCode === null && child.signalCode === null)
+      child.kill("SIGKILL");
+    await childExit.catch(() => {
+      return;
+    });
+    throw error;
+  }
 }
 async function forwardClientToCodegraph(input, childInput, pendingResponses, setDefaultResponseMode) {
   for await (const message of readStdioJsonRpcMessages(input)) {

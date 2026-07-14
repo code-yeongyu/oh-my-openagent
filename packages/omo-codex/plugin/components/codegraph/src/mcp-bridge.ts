@@ -74,7 +74,14 @@ export async function runBridgedCodegraphProcess(
 		childOutput.destroy();
 	};
 	void childExit.then(destroyChildPipes, destroyChildPipes);
-	return Promise.race([childExit, bridgeDone.then(() => childExit)]);
+	try {
+		return await Promise.race([childExit, bridgeDone.then(() => childExit)]);
+	} catch (error) {
+		destroyChildPipes();
+		if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+		await childExit.catch(() => undefined);
+		throw error;
+	}
 }
 
 async function forwardClientToCodegraph(
