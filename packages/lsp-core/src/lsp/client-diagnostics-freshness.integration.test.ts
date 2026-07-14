@@ -148,7 +148,7 @@ describe("LspClient diagnostics freshness", () => {
 				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
 				diagnosticResponses: [
 					{
-						delayMs: 20,
+						delayMs: 200,
 						report: { kind: "full", resultId: "v1", items: [diagnostic("pull-stale")] },
 					},
 					{
@@ -156,7 +156,7 @@ describe("LspClient diagnostics freshness", () => {
 					},
 				],
 			},
-			{ diagnosticsFreshnessTimeoutMs: 80, versionlessPublishQuiescenceMs: 5 },
+			{ diagnosticsFreshnessTimeoutMs: 800, versionlessPublishQuiescenceMs: 5 },
 		);
 		await context.client.openFile(context.source);
 
@@ -209,7 +209,7 @@ describe("LspClient diagnostics freshness", () => {
 				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
 				diagnosticResponses: [{ action: "close" }],
 			},
-			{ diagnosticsFreshnessTimeoutMs: 50, versionlessPublishQuiescenceMs: 5 },
+			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5 },
 		);
 		await context.client.openFile(context.source);
 
@@ -229,7 +229,7 @@ describe("LspClient diagnostics freshness", () => {
 				],
 				diagnosticResponses: [{ error: { code: -32601, message: "Method not found" } }],
 			},
-			{ diagnosticsFreshnessTimeoutMs: 50, versionlessPublishQuiescenceMs: 5 },
+			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5 },
 		);
 
 		const result = await context.client.diagnostics(context.source);
