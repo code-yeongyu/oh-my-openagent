@@ -27,11 +27,8 @@ export function isDirectoryPath(filePath: string): boolean {
 
 export function findWorkspaceRoot(filePath: string): string {
 	const abs = resolve(contextCwd(), filePath);
-	let dir = abs;
-
-	if (!isDirectoryPath(dir)) {
-		dir = dirname(dir);
-	}
+	const fallbackRoot = isDirectoryPath(abs) ? abs : dirname(abs);
+	let dir = fallbackRoot;
 
 	let prevDir = "";
 	while (dir !== prevDir) {
@@ -44,7 +41,7 @@ export function findWorkspaceRoot(filePath: string): string {
 		dir = dirname(dir);
 	}
 
-	return dirname(abs);
+	return fallbackRoot;
 }
 
 export function formatServerLookupError(result: Exclude<ServerLookupResult, { status: "found" }>): string {
