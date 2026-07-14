@@ -10,7 +10,7 @@ Small Node ESM helpers that are intentionally separate from the primary Bun/Type
 |------|---------|
 | `check-third-party-notices.mjs` | Validate third-party notice coverage for source and shipped payloads |
 | `third-party-notice-requirements.mjs` | Declarative notice requirements and path/package matching |
-| `check-third-party-notices.test.mjs` | Node test coverage for notice discovery and failure cases |
+| `check-third-party-notices.test.mjs` | Node test coverage for spawn invocation resolution on Windows and non-Windows |
 
 ## COMMANDS
 
@@ -21,6 +21,8 @@ node scripts/check-third-party-notices.mjs --ship
 ```
 
 `bun run test:codex` invokes the `--ship` check after building the Codex payload. Release workflows also rely on this surface before publication.
+
+The checker test covers only spawn invocation resolution on Windows and non-Windows; it does not cover notice discovery or failure cases. The default checker command is not a claim that the checker currently passes.
 
 ## CONVENTIONS
 
