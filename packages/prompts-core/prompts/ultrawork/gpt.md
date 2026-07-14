@@ -122,6 +122,7 @@ Define 3+ scenarios covering: **happy path**, **edge** (boundary / empty / malfo
 - Binary pass condition ("returns 200 with schema-matching body"), not "should work".
 - The real surface that proves it.
 - The test file + test id (written test-first; see TDD).
+- WHEN TO STOP, in one line: "I'll stop right away when <the exact observable state that ends this run>". The Stop rules bind to this line — the moment it holds, you stop.
 
 Scenarios are the contract. Done = every scenario PASSES with RED→GREEN proof AND real-surface artifact captured.
 
@@ -167,13 +168,12 @@ Name the exact tool + exact invocation per scenario (literal `curl` / `send-keys
 
 Trigger if user said "엄밀"/"strictly"/"rigorously"/"properly review", or task touches 3+ files OR ran 20+ turns OR 30+ min, or it's a refactor/migration/perf/security change. Spawn a high-rigor reviewer via `task` with goal + scenarios + evidence + diff. A concern blocks only when it cites a success criterion the evidence fails — others are notes. Fix cited blockers, re-run only the affected QA, and re-submit the delta at most twice; an approval with only notes left counts as approval. If cited blockers remain after two re-reviews, surface them to the user before declaring done.
 
-## COMPLETION CRITERIA
+## STOP RULES
 
-Done when ALL of:
-1. Every scenario PASSES with RED→GREEN proof AND real-surface artifact captured.
-2. Full test suite green; lsp_diagnostics clean on changed files.
-3. Code matches existing patterns; no scope creep.
-4. Reviewer gate (if triggered) returned unconditional approval.
+- After each result, ask whether the user's core request can now be answered with useful evidence in hand. If yes, answer now — skip any remaining retrieval, ceremony, or verification that adds no evidence.
+- The STOP GOAL: every scenario PASSES with RED→GREEN proof AND real-surface artifact captured; full suite green and `lsp_diagnostics` clean on changed files; QA teardown receipts recorded; no scope creep; and (if triggered) the reviewer gate approved unconditionally. Above ALL of that, the decisive test — outranking every other consideration — is: is the user's problem ACTUALLY SOLVED in observable behavior? If no, you are NOT done, whatever the checklist says. If yes, deliver the final message and STOP — no hesitation, no extra verification pass, no polish loop. Work past the stop goal is scope creep, not diligence.
+- After 2 identical failed attempts at one step, surface what was tried and ask the user before another retry.
+- After 2 parallel exploration waves yield no new useful facts, stop exploring and act.
 
 **Deliver exactly what was asked. No more, no less.**
 
