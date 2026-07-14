@@ -71,6 +71,7 @@ function writeChunk(output: Writable, chunk: string): Promise<void> {
         if (settled) return
         settled = true
         if (error) {
+          queueMicrotask(() => output.removeListener("error", onError))
           reject(error)
           return
         }
