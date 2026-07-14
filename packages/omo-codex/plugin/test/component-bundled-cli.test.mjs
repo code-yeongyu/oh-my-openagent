@@ -235,12 +235,7 @@ test("#given bundled LSP hook CLI in installed layout #when diagnostics run #the
 		assert.equal(existsSync(join(daemonDir, `v${JSON.parse(readFileSync(join(daemonDist, "package.json"), "utf8")).version}`, "daemon.log")), true);
 	} finally {
 		await stopTestDaemons(join(tempRoot, "daemon"));
-		rmSync(tempRoot, {
-			recursive: true,
-			force: true,
-			maxRetries: 5,
-			retryDelay: 100,
-		});
+		rmSync(tempRoot, { recursive: true, force: true });
 	}
 });
 
@@ -452,11 +447,24 @@ async function stopTestDaemons(daemonRoot) {
 		if (!existsSync(pidPath)) continue;
 		const pid = Number(readFileSync(pidPath, "utf8").trim());
 		if (!Number.isInteger(pid) || pid <= 0) continue;
-		try {
-			process.kill(pid, "SIGTERM");
-		} catch (error) {
-			if (error instanceof Error && "code" in error && error.code === "ESRCH") continue;
-			throw error;
+		if (process.platform === "win32") {
+			const result = spawnSync("taskkill", ["/pid", String(pid), "/f", "/t"], {
+				encoding: "utf8",
+				windowsHide: true,
+			});
+			if (result.error) throw result.error;
+			if (result.status !== 0 && processIsRunning(pid)) {
+				throw new Error(
+					`taskkill failed for test daemon ${pid}: exit=${result.status} stderr=${result.stderr.trim()}`,
+				);
+			}
+		} else {
+			try {
+				process.kill(pid, "SIGTERM");
+			} catch (error) {
+				if (error instanceof Error && "code" in error && error.code === "ESRCH") continue;
+				throw error;
+			}
 		}
 		await waitForProcessExit(pid);
 	}
