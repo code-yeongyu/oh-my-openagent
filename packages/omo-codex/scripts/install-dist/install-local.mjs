@@ -9605,6 +9605,10 @@ async function readDistributionManifest(repoRoot) {
   }
 }
 function resolveLazyCodexPluginVersion(input) {
+  const override = input.versionOverride?.trim();
+  if (override !== undefined && override.length > 0) {
+    return override;
+  }
   if (input.marketplaceName === "sisyphuslabs" && input.pluginName === "omo" && input.distributionManifest !== undefined) {
     return input.distributionManifest.version;
   }
@@ -10245,6 +10249,7 @@ async function runCodexInstaller(options = {}) {
     return;
   });
   const buildSource = await shouldBuildSourcePackages(repoRoot);
+  const versionOverride = env2.LAZYCODEX_DEV_VERSION?.trim() || undefined;
   const gitBashResolution = await prepareGitBashForInstall({
     platform,
     env: env2,
@@ -10271,7 +10276,8 @@ async function runCodexInstaller(options = {}) {
       manifestVersion: manifest.version,
       marketplaceName: marketplace.name,
       pluginName: entry.name,
-      distributionManifest
+      distributionManifest,
+      versionOverride
     });
     validatePathSegment(version2, "plugin version");
     log(`Building ${entry.name}@${version2}`);
