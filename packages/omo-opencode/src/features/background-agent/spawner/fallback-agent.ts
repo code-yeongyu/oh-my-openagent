@@ -34,7 +34,7 @@ export function buildFallbackBody(
     agent: fallbackAgent,
     tools: {
       task: false,
-      call_omo_agent: true,
+      call_omo_agent: originalBody.model?.providerID !== "anthropic",
       question: false,
       ...getAgentToolRestrictions(fallbackAgent, options),
     },

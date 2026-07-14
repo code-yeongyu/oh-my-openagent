@@ -947,7 +947,7 @@ describe("background-agent spawner fallback helper characterization", () => {
       agent: "general",
       tools: {
         task: false,
-        call_omo_agent: true,
+        call_omo_agent: false,
         question: false,
       },
     })

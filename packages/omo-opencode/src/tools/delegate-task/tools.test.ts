@@ -4812,8 +4812,8 @@ describe("buildSyncPromptTools (issue #5182)", () => {
     expect(storedTools!.glob).toBe(false)
     // hardcoded restriction (task: false for sisyphus-junior) still applies
     expect(storedTools!.task).toBe(false)
-    // unconditionally allowed tools remain unchanged
-    expect(storedTools!.call_omo_agent).toBe(true)
+    // Anthropic-backed delegated sessions cannot spawn nested OMO agents
+    expect(storedTools!.call_omo_agent).toBe(false)
     expect(storedTools!.question).toBe(false)
     // buildSyncPromptTools only processes denials, not allows,
     // so read:true from tools config does not appear in the result

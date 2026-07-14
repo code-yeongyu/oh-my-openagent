@@ -154,11 +154,12 @@ export async function executeSyncContinuation(
     await publishToolMetadata(ctx, syncContMeta)
 
     const allowTask = isPlanFamily(resumeAgent)
+    const allowCallOmoAgent = resumeModel?.providerID !== "anthropic"
     const tddEnabled = sisyphusAgentConfig?.tdd
     const effectivePrompt = buildTaskPrompt(args.prompt, resumeAgent, tddEnabled)
     const tools = {
       task: allowTask,
-      call_omo_agent: true,
+      call_omo_agent: allowCallOmoAgent,
       question: false,
       ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
     }

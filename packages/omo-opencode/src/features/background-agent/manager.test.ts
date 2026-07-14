@@ -8238,6 +8238,52 @@ describe("BackgroundManager - tool permission spread order", () => {
     manager.shutdown()
   })
 
+  test("disables call_omo_agent when launching an Anthropic-backed task", async () => {
+    //#given
+    let capturedTools: Record<string, unknown> | undefined
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/test/dir" } }),
+        create: async () => ({ data: { id: "session-anthropic-launch" } }),
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          capturedTools = args.body.tools as Record<string, unknown>
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const task: BackgroundTask = {
+      id: "task-anthropic-launch",
+      status: "pending",
+      queuedAt: new Date(),
+      description: "Anthropic launch",
+      prompt: "work",
+      agent: "sisyphus",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+      model: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
+    }
+
+    //#when
+    await (cast<{ startTask: (item: { task: BackgroundTask; input: import("./types").LaunchInput }) => Promise<void> }>(manager))
+      .startTask({
+        task,
+        input: {
+          description: task.description,
+          prompt: task.prompt,
+          agent: task.agent,
+          parentSessionId: task.parentSessionId,
+          parentMessageId: task.parentMessageId,
+          model: task.model,
+        },
+      })
+
+    //#then
+    expect(capturedTools?.call_omo_agent).toBe(false)
+
+    manager.shutdown()
+  })
+
   test("startTask updates tracked session agent when launch falls back to general", async () => {
     //#given
     const promptCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
@@ -8379,6 +8425,48 @@ describe("BackgroundManager - tool permission spread order", () => {
     expect(promptCall).toBeDefined()
     expect(promptCall?.body.agent).toBe("explore")
     expect(promptCall?.body.model).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4-20250514" })
+
+    manager.shutdown()
+  })
+
+  test("disables call_omo_agent when resuming an Anthropic-backed task", async () => {
+    //#given
+    let promptCall: { path: { id: string }; body: Record<string, unknown> } | undefined
+    const client = {
+      session: {
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptCall = args
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const task: BackgroundTask = {
+      id: "task-anthropic-resume",
+      sessionId: "session-anthropic-resume",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+      description: "Anthropic resume",
+      prompt: "resume",
+      agent: "sisyphus",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      model: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    await manager.resume({
+      sessionId: task.sessionId,
+      prompt: "continue",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+    })
+
+    //#then
+    expect((promptCall?.body.tools as Record<string, boolean> | undefined)?.call_omo_agent).toBe(false)
 
     manager.shutdown()
   })

@@ -53,6 +53,7 @@ function isUnexpectedEofError(error: unknown): boolean {
 export function buildSyncPromptTools(
   agentToUse: string,
   permission?: Record<string, "ask" | "allow" | "deny">,
+  model?: DelegatedModelConfig,
 ): Record<string, boolean> {
   const userDenied: Record<string, boolean> = {}
   if (permission) {
@@ -62,7 +63,7 @@ export function buildSyncPromptTools(
   }
   return {
     task: isPlanFamily(agentToUse),
-    call_omo_agent: true,
+    call_omo_agent: model?.providerID !== "anthropic",
     question: false,
     ...userDenied,
     ...getAgentToolRestrictions(agentToUse),
@@ -89,7 +90,7 @@ export async function sendSyncPrompt(
   const userPermission = input.categoryModel?.tools
     ? migrateToolsToPermission(input.categoryModel.tools)
     : undefined
-  const tools = buildSyncPromptTools(input.agentToUse, userPermission)
+  const tools = buildSyncPromptTools(input.agentToUse, userPermission, input.categoryModel)
   setSessionTools(input.sessionID, tools)
 
   applySessionPromptParams(input.sessionID, input.categoryModel)
