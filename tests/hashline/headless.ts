@@ -10,32 +10,11 @@ import { normalizeHashlineEdits } from "../../packages/omo-opencode/src/tools/ha
 import { applyHashlineEditsWithReport } from "../../packages/omo-opencode/src/tools/hashline-edit/edit-operations"
 import { canonicalizeFileText, restoreFileText } from "../../packages/omo-opencode/src/tools/hashline-edit/file-text-canonicalization"
 import { HASHLINE_EDIT_DESCRIPTION } from "../../packages/omo-opencode/src/tools/hashline-edit/tool-description"
+import { parseHashlineTestEnvironment } from "./test-environment"
 
 const DEFAULT_MODEL = "minimax-m2.5-free"
 const MAX_STEPS = 50
 const sessionId = `hashline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-
-export type HashlineTestEnvironment = Readonly<{
-  baseURL: string
-  apiKey: string
-}>
-
-const hashlineTestEnvironmentSchema = z.object({
-  HASHLINE_TEST_BASE_URL: z.string().min(1).url(),
-  HASHLINE_TEST_API_KEY: z.string().min(1).refine((value) => value.trim().length > 0, {
-    message: "must not be blank",
-  }),
-})
-
-export function parseHashlineTestEnvironment(
-  environment: Readonly<Record<string, string | undefined>>,
-): HashlineTestEnvironment {
-  const parsed = hashlineTestEnvironmentSchema.parse(environment)
-  return {
-    baseURL: parsed.HASHLINE_TEST_BASE_URL,
-    apiKey: parsed.HASHLINE_TEST_API_KEY,
-  }
-}
 
 const emit = (event: Record<string, unknown>) =>
   console.log(JSON.stringify({ sessionId, timestamp: new Date().toISOString(), ...event }))
