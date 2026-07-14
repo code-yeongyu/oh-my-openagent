@@ -21,6 +21,8 @@ import {
   createFsyncSkipWarningHook,
   createNotepadWriteGuardHook,
   createPlanFormatValidatorHook,
+  createErrorSignalLoggerHook,
+  createKanbanTrackerHook,
 } from "../../hooks"
 import {
   getOpenCodeVersion,
@@ -49,6 +51,8 @@ export type ToolGuardHooks = {
   teamToolGating: ReturnType<typeof createTeamToolGating> | null
   notepadWriteGuard: ReturnType<typeof createNotepadWriteGuardHook> | null
   planFormatValidator: ReturnType<typeof createPlanFormatValidatorHook> | null
+  errorSignalLogger: ReturnType<typeof createErrorSignalLoggerHook> | null
+  kanbanTracker: ReturnType<typeof createKanbanTrackerHook> | null
 }
 
 export function createToolGuardHooks(args: {
@@ -157,6 +161,14 @@ export function createToolGuardHooks(args: {
     ? safeHook("notepad-write-guard", () => createNotepadWriteGuardHook())
     : null
 
+  const errorSignalLogger = isHookEnabled("error-signal-logger")
+    ? safeHook("error-signal-logger", () => createErrorSignalLoggerHook())
+    : null
+
+  const kanbanTracker = isHookEnabled("kanban-tracker")
+    ? safeHook("kanban-tracker", () => createKanbanTrackerHook())
+    : null
+
   return {
     commentChecker,
     toolOutputTruncator,
@@ -176,5 +188,7 @@ export function createToolGuardHooks(args: {
     teamToolGating,
     notepadWriteGuard,
     planFormatValidator,
+    errorSignalLogger,
+    kanbanTracker,
   }
 }

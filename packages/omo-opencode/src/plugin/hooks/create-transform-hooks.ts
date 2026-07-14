@@ -5,6 +5,7 @@ import type { RalphLoopHook } from "../../hooks/ralph-loop"
 
 import {
   createClaudeCodeHooksHook,
+  createCostTrackerHook,
   createKeywordDetectorHook,
   createMonitorStatusInjectorHook,
   createTeamMailboxInjector,
@@ -25,6 +26,7 @@ export type TransformHooks = {
   teamMailboxInjector: ReturnType<typeof createTeamMailboxInjector> | null
   toolPairValidator: ReturnType<typeof createToolPairValidatorHook> | null
   monitorStatusInjector: ReturnType<typeof createMonitorStatusInjectorHook> | null
+  costTracker: ReturnType<typeof createCostTrackerHook> | null
 }
 
 export function createTransformHooks(args: {
@@ -107,6 +109,14 @@ export function createTransformHooks(args: {
       )
     : null
 
+  const costTracker = isHookEnabled("cost-tracker")
+    ? safeCreateHook(
+        "cost-tracker",
+        () => createCostTrackerHook(),
+        { enabled: safeHookEnabled },
+      )
+    : null
+
   return {
     claudeCodeHooks,
     keywordDetector,
@@ -115,5 +125,6 @@ export function createTransformHooks(args: {
     teamMailboxInjector,
     toolPairValidator,
     monitorStatusInjector,
+    costTracker,
   }
 }

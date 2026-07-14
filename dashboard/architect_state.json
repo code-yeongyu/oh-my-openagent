@@ -1,0 +1,17 @@
+{
+  "status": "active",
+  "cycle": 0,
+  "lastScan": null,
+  "errorsDetected": 0,
+  "pendingProposals": 0,
+  "upstreamDiff": 0,
+  "upstreamStatus": "idle",
+  "lastUpstreamCheck": null,
+  "upstreamLatest": "",
+  "currentVersion": "",
+  "sessionsScanned": 0,
+  "errorPatterns": [],
+  "recommendations": [],
+  "proposals": [],
+  "history": []
+}
