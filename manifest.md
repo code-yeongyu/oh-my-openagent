@@ -827,7 +827,32 @@ Alternativement : **Phase 13** : Ajouter les `.d.ts` pour le packaging npm (peut
 
 ## Prochaine étape recommandée
 
-**TRAVAIL MAJEUR SUIVANT — Portage Magic Context (voir §17)** : démarrer la Wave 1 (tâches `A0` SQLite shim + schéma ~50 tables, `C0` config Zod, `K0` vérif SDK 1.15.13→1.17.6). Les 6 décisions sont déjà validées (§17.4). Lancer `A0` + `C0` + `K0` en parallèle via subagents `deep`. Référence : plan détaillé en §17.3 / §17.5.
+> **MISE À JOUR 2026-07-14** : les Waves 1–5 de Magic Context sont **TERMINÉES dans l'historique divergent `MaTrix-legacy`** (voir §17.6) mais **pas encore consolidées dans le fork propre upstream-based** (`matrix-port`). Le vrai « travail majeur suivant » est la **consolidation**, pas un nouveau démarrage.
+
+**TRAVAIL MAJEUR SUIVANT — Consolidation dans le fork propre (voir §17 + §18)** :
+1. **Consolider Magic Context** (Waves 1–5, déjà codées en legacy) + **rebranding agents** (Morpheus/Neo/Tank/Operator/Ghost/Link/Analyst/Keymaker/AgentSmith — déjà faits en legacy) dans le worktree `matrix-port` (base `upstream/dev`), avec build + QA, puis PR. Même méthode que le port KLC (#6125).
+2. **Ouvrir le workstream « Forces outils tiers » (§18)** issu de la veille `BENCHMARKS.md` : porter les forces de Hermes/OMO que MaTrix n'a pas encore.
+
+### §18 — Forces outils tiers (veille `BENCHMARKS.md`)
+
+*Source : `KLC_Vault/03-Projets/MaTrix/BENCHMARKS.md` — benchmark code-level MaTrix vs OMO vs Hermes (2026-07-14), généré par veille agents suite à demande de Shiro. Non noté ici avant cette date.*
+
+**Verdict veille** : MaTrix est FORT sur sécurité/gouvernance (CostGovernor, ApprovalGate, SecretsVault, LearningSanitizer), mémoire FTS5 sanitisée, sandbox Docker 0-secret, OS portable. MaTrix est **À LA TRAÎNE vs Hermes** sur : dashboard UI (19 pages vs `/v1/runs`), messagerie multi-platform (1 vs 20+), curator/lifecycle skills, vérification post-edit, couverture tests.
+
+**Features à copier (priorisées) — workstream à ouvrir :**
+
+| # | Feature | Source | Valeur | État |
+|---|---------|--------|--------|------|
+| T1 | **Curator** (lifecycle skills : auto-archive/patch) | Hermes | Haute | À faire |
+| T2 | **Verification chain** (nudge post-edit « vérifie ton code ») | Hermes | Haute | À faire |
+| T3 | **Multi-platform gateway** (Discord/Slack au-delà Telegram) | Hermes / OMO OpenClaw | Moyenne | À faire |
+| T4 | **Dashboard Mission Control** (UI sur `/v1/runs` + SSE) | Hermes | Moyenne/Haute | À faire |
+| T5 | **Learning graph / Journey** (visualisation skills+mémoire) | Hermes | Basse | Nice-to-have |
+| T6 | **IntentGate** dans le router (classification intention avant dispatch) | OMO | Moyenne | À faire |
+| T7 | **Category-based model routing** (visual→cheap, deep→strong) | OMO | Moyenne | À faire |
+| T8 | **Rebranding agents Matrix** (Morpheus/Neo/Tank/…) | Interne | — | FAIT en legacy, à consolider (voir point 1) |
+
+**Backlog hygiène routeur (quick wins, BENCHMARKS §5)** : web_search fallback (Brave/SerpAPI), suppression `SYNTH_SYSTEM_PROMPT` dupliqué, fix mismatch timeout 15s↔30s, tests `matrix_memory`/`matrix_sandbox`/`cua_mcp`, réduction `noqa: BLE001`, préservation état SIGHUP, sanitization captures CU.
 
 **Secondaire — Résoudre l'accès au dashboard** : vérifier la connectivité Tailscale entre ton PC et KLC (ping, Test-NetConnection, port 4321). Une fois le dashboard accessible, tu pourras :
 1. Ajouter ton API Ollama depuis l'onglet Providers
