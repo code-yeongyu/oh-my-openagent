@@ -238,7 +238,7 @@ task(
 )
 ```
 
-**On failure**: review-work reports blocking issues with specific files and line numbers. Fix each blocking issue per the iteration discipline below.
+**On failure**: a failing lane — from the full review-work run or a directly dispatched scoped reviewer — reports blocking issues with specific files and line numbers, and fails Gate B. Fix each blocking issue per the iteration discipline below.
 
 ### Gate C: Cubic Approval
 
