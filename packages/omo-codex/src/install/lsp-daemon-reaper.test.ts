@@ -10,6 +10,7 @@ import { reapLspDaemons } from "./lsp-daemon-reaper"
 import {
   createLegacyCodexHome,
   legacyEndpointFor,
+  liveLegacyEndpointFor,
   normalizeWindowsNodeCandidate,
   removePathIfPresent,
   writeLegacyVersionState,
@@ -47,13 +48,23 @@ describe("reapLspDaemons", () => {
     expect(nodePath).toBe("C:\\hostedtoolcache\\windows\\node\\24.18.0\\x64\\node.exe")
   })
 
+  test("#given legacy live endpoint selection #when targeting Unix and Windows #then it chooses a platform-valid fixture endpoint", () => {
+    const codexHome = trackRoot(createLegacyCodexHome("omo-reap-live-endpoint-"))
+
+    const unixEndpoint = liveLegacyEndpointFor({ codexHome, version: "0.1.0", platform: "linux" })
+    const windowsEndpoint = liveLegacyEndpointFor({ codexHome, version: "0.1.0", platform: "win32" })
+
+    expect(unixEndpoint.endsWith("/codex-lsp/daemon/v0.1.0/daemon.sock")).toBe(true)
+    expect(windowsEndpoint.startsWith("\\\\.\\pipe\\omo-lsp-0.1.0-")).toBe(true)
+  })
+
   test("#given a stale hashed Unix endpoint #when reaping #then it removes the dead legacy directory idempotently", async () => {
     const codexHome = trackRoot(createLegacyCodexHome("omo-reap-stale-"))
     const version = await writeLegacyVersionState({
       codexHome,
       version: "0.1.0",
       pid: "333",
-      endpoint: legacyEndpointFor({ codexHome, version: "0.1.0", kind: "hashed", tempDir: tmpdir() }),
+      endpoint: legacyEndpointFor({ codexHome, version: "0.1.0", kind: "hashed", platform: "linux", tempDir: tmpdir() }),
     })
 
     const deps = { platform: "linux" as const, tmpDir: tmpdir() }
@@ -68,6 +79,27 @@ describe("reapLspDaemons", () => {
       },
     ])
     expect(secondRun).toEqual([])
+    expect(existsSync(version.versionDir)).toBe(false)
+  })
+
+  test("#given a Unix hashed endpoint under Windows reaper semantics #when reaping #then it fails closed as outside the frozen vectors", async () => {
+    const codexHome = trackRoot(createLegacyCodexHome("omo-reap-stale-win32-"))
+    const version = await writeLegacyVersionState({
+      codexHome,
+      version: "0.1.0",
+      pid: "333",
+      endpoint: legacyEndpointFor({ codexHome, version: "0.1.0", kind: "hashed", platform: "linux", tempDir: tmpdir() }),
+    })
+
+    const reaped = await reapLspDaemons(codexHome, { platform: "win32", tmpDir: tmpdir() })
+
+    expect(reaped).toEqual([
+      {
+        version: "0.1.0",
+        status: "removed",
+        reason: "removed legacy daemon state with an endpoint outside the frozen vectors",
+      },
+    ])
     expect(existsSync(version.versionDir)).toBe(false)
   })
 
