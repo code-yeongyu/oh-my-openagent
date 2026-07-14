@@ -1,3 +1,7 @@
+import type { ServerLookupResult } from "./types.js";
+
+export type FailedServerLookupResult = Exclude<ServerLookupResult, { status: "found" }>;
+
 export class LspConnectionClosedError extends Error {
 	override readonly name = "LspConnectionClosedError";
 
@@ -42,6 +46,13 @@ export class LspInvalidPathError extends Error {
 
 export class LspServerLookupError extends Error {
 	override readonly name = "LspServerLookupError";
+
+	constructor(
+		message: string,
+		readonly lookup?: FailedServerLookupResult,
+	) {
+		super(message);
+	}
 }
 
 export class LspServerInitializingError extends Error {

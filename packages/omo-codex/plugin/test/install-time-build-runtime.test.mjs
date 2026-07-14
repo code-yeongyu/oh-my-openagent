@@ -31,3 +31,13 @@ test("#given aggregate build scripts #when inspected #then npm subprocesses reso
 	assert.match(installTimeBuildScripts, /shell: process\.platform === "win32"/);
 	assert.doesNotMatch(installTimeBuildScripts, /npm\.cmd/);
 });
+
+test("#given bundled MCP runtime builds #when a locked runtime has no node_modules #then npm ci bootstraps it before build", async () => {
+	// given
+	const buildBundledMcpRuntimesScript = await readFile(join(root, "scripts", "build-bundled-mcp-runtimes.mjs"), "utf8");
+
+	// then
+	assert.match(buildBundledMcpRuntimesScript, /package-lock\.json/);
+	assert.match(buildBundledMcpRuntimesScript, /spawnSync\("npm", \["ci"\]/);
+	assert.match(buildBundledMcpRuntimesScript, /!existsSync\(join\(runtime\.packageRoot, "node_modules"\)\)/);
+});

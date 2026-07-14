@@ -22,7 +22,10 @@
   "files": [
     "extensions",
     "skills",
+    "runtime",
+    "scripts/install.mjs",
     "README.md",
+    "NOTICE",
     "LICENSE"
   ]
 }
