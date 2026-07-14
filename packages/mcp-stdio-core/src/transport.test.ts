@@ -34,12 +34,12 @@ describe("stdio JSON-RPC transport", () => {
     ])
   })
 
-  test("#given response mode #when written #then framing bytes are stable", () => {
+  test("#given response mode #when written #then framing bytes are stable", async () => {
     const output = new PassThrough()
     const chunks: string[] = []
     output.on("data", (chunk: Buffer | string) => chunks.push(String(chunk)))
 
-    writeStdioJsonRpcResponse(output, { jsonrpc: "2.0", id: 1, result: {} }, "framed")
+    await writeStdioJsonRpcResponse(output, { jsonrpc: "2.0", id: 1, result: {} }, "framed")
 
     expect(chunks.join("")).toBe('Content-Length: 36\r\n\r\n{"jsonrpc":"2.0","id":1,"result":{}}')
   })

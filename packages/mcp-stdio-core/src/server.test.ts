@@ -38,6 +38,36 @@ describe("JSON-RPC stdio server", () => {
     expect(await received).toBe('{"jsonrpc":"2.0","id":null,"error":{"code":-32601,"message":"Method not found"}}\n')
     await server
   })
+
+  test("#given parent output closes during a response #when the stdio server writes #then the child settles without an uncaught stream error", async () => {
+    const serverUrl = new URL("./server.ts", import.meta.url).href
+    const script = `
+      import { Readable, Writable } from "node:stream";
+      import { successResponse } from ${JSON.stringify(new URL("./responses.ts", import.meta.url).href)};
+      import { runJsonRpcStdioServer } from ${JSON.stringify(serverUrl)};
+
+      const output = new Writable({
+        write(_chunk, _encoding, callback) {
+          callback(Object.assign(new Error("parent output closed"), { code: "EPIPE" }));
+        },
+      });
+      await runJsonRpcStdioServer({
+        input: Readable.from(['{"jsonrpc":"2.0","id":"closed","method":"ping"}\\n']),
+        output,
+        handlerOptions: undefined,
+        handler: async () => successResponse("closed", { acknowledged: true }),
+      });
+      process.stderr.write("server-settled\\n");
+    `
+    const child = Bun.spawn([process.execPath, "-e", script], {
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+
+    const [exitCode, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()])
+
+    expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "server-settled\n" })
+  })
 })
 
 function nextOutput(output: PassThrough): Promise<string> {
