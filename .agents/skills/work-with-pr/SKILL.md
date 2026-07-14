@@ -190,7 +190,7 @@ while true:
   1. Wait for CI          → Gate A
   2. If CI fails          → back to Phase 1: read logs, fix + re-QA, commit, push, continue
   3. Gate B: run the review lanes the PR head SHA still needs (rules
-     in Gate B below); a SHA with all 5 lanes covered passes without a re-run
+     in Gate B below)
   4. If review fails      → back to Phase 1: fix blocking issues + re-QA, commit, push, continue
   5. Check Cubic          → Gate C
   6. If Cubic has issues   → back to Phase 1: fix + re-QA, commit, push, continue
@@ -226,7 +226,7 @@ The review-work skill launches 5 parallel sub-agents (goal verification, QA, cod
 
 **A passing review lane binds to the commit SHA it reviewed.** Gate B requires all 5 lanes green at the PR head SHA, but a lane that SHA already passed during this task is never re-run: an earlier Gate B pass covers all five; ulw-loop's final quality gate covers code quality, QA, and goal verification, leaving security and context mining still to run. Record each reuse as "Gate B: <lane> reused from <source> at <sha>", run only the missing lanes, and give a SHA with no prior coverage the full 5-lane run.
 
-When a run is needed, invoke review-work after CI passes — there's no point reviewing code that doesn't build:
+When lanes are needed, run them after CI passes — there's no point reviewing code that doesn't build. A SHA with no prior coverage gets the full review-work run below; a partial gap gets ONLY the missing lanes, each dispatched directly as a scoped reviewer subagent (never via review-work, which always launches all 5):
 
 ```
 task(
