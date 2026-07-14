@@ -17,6 +17,8 @@ import {
   createContextInjectorMessagesTransformHook,
 } from "../../features/context-injector"
 import { safeCreateHook } from "../../shared/safe-create-hook"
+import { createMagicContextDeps } from "../../features/magic-context/deps"
+import { createMagicContextTransformHook } from "../../features/magic-context/transform"
 
 export type TransformHooks = {
   claudeCodeHooks: ReturnType<typeof createClaudeCodeHooksHook> | null
@@ -27,6 +29,7 @@ export type TransformHooks = {
   toolPairValidator: ReturnType<typeof createToolPairValidatorHook> | null
   monitorStatusInjector: ReturnType<typeof createMonitorStatusInjectorHook> | null
   costTracker: ReturnType<typeof createCostTrackerHook> | null
+  magicContextInjector: ReturnType<typeof createMagicContextTransformHook>
 }
 
 export function createTransformHooks(args: {
@@ -108,14 +111,17 @@ export function createTransformHooks(args: {
         { enabled: safeHookEnabled },
       )
     : null
-
   const costTracker = isHookEnabled("cost-tracker")
     ? safeCreateHook(
         "cost-tracker",
-        () => createCostTrackerHook(),
+        () =>
+          createCostTrackerHook(),
         { enabled: safeHookEnabled },
       )
     : null
+
+  const magicContextDeps = createMagicContextDeps(pluginConfig.magic_context, ctx.directory)
+  const magicContextInjector = createMagicContextTransformHook(pluginConfig.magic_context, magicContextDeps)
 
   return {
     claudeCodeHooks,
@@ -126,5 +132,6 @@ export function createTransformHooks(args: {
     toolPairValidator,
     monitorStatusInjector,
     costTracker,
+    magicContextInjector,
   }
 }

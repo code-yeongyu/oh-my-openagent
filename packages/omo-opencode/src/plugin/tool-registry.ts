@@ -18,6 +18,7 @@ import {
   getTaskSystemEnabled,
 } from "./tool-registry-gated-tools"
 import { createTeamModeToolsRecord } from "./tool-registry-team-tools"
+import { createMagicContextTools, type MagicContextToolsDeps } from "../features/magic-context/tools"
 export { trimToolsToCap } from "./tool-registry-trimming"
 import { trimToolsToCap } from "./tool-registry-trimming"
 
@@ -34,6 +35,7 @@ export function createToolRegistry(args: {
   availableCategories: AvailableCategory[]
   interactiveBashEnabled?: boolean
   toolFactories?: Partial<ToolRegistryFactories>
+  magicContextDeps?: MagicContextToolsDeps
 }): ToolRegistryResult {
   const {
     ctx,
@@ -43,6 +45,7 @@ export function createToolRegistry(args: {
     availableCategories,
     interactiveBashEnabled = isInteractiveBashEnabled(),
     toolFactories,
+    magicContextDeps,
   } = args
   const factories: ToolRegistryFactories = {
     ...defaultToolRegistryFactories,
@@ -63,6 +66,7 @@ export function createToolRegistry(args: {
     ...createMonitorToolsRecord({ pluginConfig, ctx, managers, factories }),
     ...createTaskToolsRecord({ taskSystemEnabled, pluginConfig, ctx, factories }),
     ...createHashlineToolsRecord({ pluginConfig, ctx, factories }),
+    ...(pluginConfig.magic_context && magicContextDeps ? createMagicContextTools(pluginConfig.magic_context, magicContextDeps) : {}),
   }
 
   const allToolNames = Object.keys(allTools)
