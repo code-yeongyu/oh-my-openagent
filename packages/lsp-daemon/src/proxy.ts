@@ -18,6 +18,7 @@ export interface ProxyOptions {
 	env?: Record<string, string | undefined>;
 	homeDir?: string;
 	ensure?: CallToolOptions["ensure"];
+	signal?: AbortSignal;
 }
 
 interface ToolCall {
@@ -39,15 +40,20 @@ export async function runMcpStdioProxy(options: ProxyOptions = {}): Promise<void
 		...(options.homeDir === undefined ? {} : { homeDir: options.homeDir }),
 	};
 	const context = options.context ?? createStandaloneMcpRequestContext(contextInput);
-	const callOptions: CallToolOptions = { paths, context, ...(options.ensure ? { ensure: options.ensure } : {}) };
+	const callOptions: CallToolOptions = {
+		paths,
+		context,
+		...(options.ensure ? { ensure: options.ensure } : {}),
+		...(options.signal ? { signal: options.signal } : {}),
+	};
 
 	await runJsonRpcStdioServer({
-			input,
-			output,
-			idleTimeoutMs: 0,
-			handler: (request, requestOptions) =>
-				runWithRequestContext(context, () => handleProxyRequest(request, requestOptions)),
-			handlerOptions: callOptions,
+		input,
+		output,
+		idleTimeoutMs: 0,
+		handler: (request, requestOptions) =>
+			runWithRequestContext(context, () => handleProxyRequest(request, requestOptions)),
+		handlerOptions: callOptions,
 		onHandlerError: (error: unknown) => {
 			process.stderr.write(`[lsp-daemon] proxy error: ${error instanceof Error ? error.message : String(error)}\n`);
 		},
