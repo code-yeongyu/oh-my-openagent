@@ -33,6 +33,7 @@ const HOOK_EVENTS_BY_COMPONENT = {
 };
 const MCP_ONLY_COMPONENTS = new Set(["codegraph"]);
 const HOOK_CLI_TEST_TIMEOUT_MS = 45_000;
+const DAEMON_EXIT_TIMEOUT_MS = 5_000;
 
 test("#given required component CLI contracts #when workspaces are inspected #then every contract component is covered", async () => {
 	// given
@@ -135,7 +136,7 @@ test("#given representative component hook payloads #when executed through dist 
 	}
 });
 
-test("#given bundled LSP hook CLI in installed layout #when diagnostics run #then it spawns sibling daemon target", () => {
+test("#given bundled LSP hook CLI in installed layout #when diagnostics run #then it spawns sibling daemon target", async () => {
 	const tempRoot = mkdtempSync(join(tmpdir(), "omo-codex-lsp-installed-"));
 	try {
 		const lspDist = join(tempRoot, "components", "lsp", "dist");
@@ -233,7 +234,7 @@ test("#given bundled LSP hook CLI in installed layout #when diagnostics run #the
 		assert.match(readFileSync(eventsPath, "utf8"), /textDocument\/publishDiagnostics/);
 		assert.equal(existsSync(join(daemonDir, `v${JSON.parse(readFileSync(join(daemonDist, "package.json"), "utf8")).version}`, "daemon.log")), true);
 	} finally {
-		stopTestDaemons(join(tempRoot, "daemon"));
+		await stopTestDaemons(join(tempRoot, "daemon"));
 		rmSync(tempRoot, { recursive: true, force: true });
 	}
 });
@@ -439,7 +440,7 @@ function writeFakeLspDaemonCli(path) {
 	);
 }
 
-function stopTestDaemons(daemonRoot) {
+async function stopTestDaemons(daemonRoot) {
 	if (!existsSync(daemonRoot)) return;
 	for (const versionDir of readdirSync(daemonRoot)) {
 		const pidPath = join(daemonRoot, versionDir, "daemon.pid");
@@ -452,6 +453,24 @@ function stopTestDaemons(daemonRoot) {
 			if (error instanceof Error && "code" in error && error.code === "ESRCH") continue;
 			throw error;
 		}
+		await waitForProcessExit(pid);
+	}
+}
+
+async function waitForProcessExit(pid) {
+	const deadline = Date.now() + DAEMON_EXIT_TIMEOUT_MS;
+	while (processIsRunning(pid)) {
+		if (Date.now() >= deadline) throw new Error(`Timed out waiting for test daemon ${pid} to exit`);
+		await new Promise((resolve) => setTimeout(resolve, 50));
+	}
+}
+
+function processIsRunning(pid) {
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch {
+		return false;
 	}
 }
 
