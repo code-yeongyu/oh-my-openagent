@@ -123,7 +123,7 @@ Define 3+ scenarios covering: **happy path**, **edge** (boundary / empty / malfo
 - The real surface that proves it.
 - The test file + test id (written test-first; see TDD).
 
-Scenarios are the contract. Done = every scenario PASSES with RED→GREEN proof AND real-surface artifact captured. Then declare WHEN TO STOP for the whole run, in one line: "I'll stop right away when <the exact observable state that ends this run — every scenario passed with its evidence captured>". The Stop rules bind to this line — the moment it holds, you stop.
+Scenarios are the contract. Done = every scenario PASSES with RED→GREEN proof AND real-surface artifact captured. Then declare WHEN TO STOP for the whole run, in one line: "I'll stop right away when <the exact observable state that ends this run>" — its end state MUST be the full STOP GOAL from the Stop rules, never scenario completion alone. The Stop rules bind to this line — the moment it holds, you stop.
 
 ## TDD (MANDATORY on every production change)
 
