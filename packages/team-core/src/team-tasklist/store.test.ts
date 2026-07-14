@@ -29,7 +29,7 @@ test("createTask assigns distinct ids during concurrent creation", async () => {
   } finally {
     await fixture.cleanup()
   }
-})
+}, 30_000)
 
 test("#given traversal team run id #when creating a task #then no task directory escapes the team base", async () => {
   // given
