@@ -1,8 +1,10 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test } from "bun:test";
 import type { CategoryConfig } from "../../config/schema";
 import { maybeCreateHephaestusConfig } from "../builtin-agents/hephaestus-agent";
 import type { AgentOverrides } from "../types";
-import { getHephaestusPromptSource } from "./index";
+import { getHephaestusPrompt, getHephaestusPromptSource } from "./index";
 
 const EXPLICIT_VARIANT = "xhigh";
 const SYSTEM_DEFAULT_MODEL = "openai/gpt-5.5";
@@ -17,7 +19,7 @@ const SUPPORTED_MODEL_IDS = [
 
 describe("maybeCreateHephaestusConfig GPT-5.6 registration", () => {
 	for (const model of SUPPORTED_MODEL_IDS) {
-		test(`#given ${model} overrides a different system default #when Hephaestus registers #then the override and GPT-5.6 prompt source are preserved`, () => {
+		test(`#given ${model} overrides a different system default #when Hephaestus registers #then the override, variant, and GPT-5.6 prompt are preserved`, () => {
 			// given
 			const agentOverrides: AgentOverrides = {
 				hephaestus: {
@@ -46,6 +48,7 @@ describe("maybeCreateHephaestusConfig GPT-5.6 registration", () => {
 			expect(config?.model).toBe(model);
 			expect(config?.variant).toBe(EXPLICIT_VARIANT);
 			expect(getHephaestusPromptSource(config?.model)).toBe("gpt-5-6");
+			expect(config?.prompt).toBe(getHephaestusPrompt(model));
 		});
 	}
 
