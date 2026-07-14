@@ -84,8 +84,8 @@ Before acting, survey the skills available in this system: scan their descriptio
 **ALWAYS run both tracks in parallel:**
 ```
 // Fire background agents for deep exploration
-task(subagent_type="explore", load_skills=[], prompt="I'm implementing [TASK] and need to understand [KNOWLEDGE GAP]. Find [X] patterns in the codebase - file paths, implementation approach, conventions used, and how modules connect. I'll use this to [DOWNSTREAM DECISION]. Focus on production code in src/. Return file paths with brief descriptions.", run_in_background=true)
-task(subagent_type="librarian", load_skills=[], prompt="I'm working with [TECHNOLOGY] and need [SPECIFIC INFO]. Find official docs and production examples for [Y] - API reference, configuration, recommended patterns, and pitfalls. Skip tutorials. I'll use this to [DECISION THIS INFORMS].", run_in_background=true)
+task(subagent_type="explore", load_skills=[], prompt="CONTEXT: implementing [TASK]; gap: [KNOWLEDGE GAP]. GOAL: find [X] patterns in the codebase - file paths, implementation approach, conventions, module connections - to unblock [DOWNSTREAM DECISION]. Focus on production code in src/. STOP WHEN: the findings answer the gap or two search rounds add nothing new. EVIDENCE: file:line refs with one-line descriptions.", run_in_background=true)
+task(subagent_type="librarian", load_skills=[], prompt="CONTEXT: working with [TECHNOLOGY]; need [SPECIFIC INFO]. GOAL: official docs and production examples for [Y] - API reference, configuration, recommended patterns, pitfalls - to unblock [DECISION THIS INFORMS]. Skip tutorials. STOP WHEN: the cited sources answer [SPECIFIC INFO] or sources repeat. EVIDENCE: source links with the claim each supports.", run_in_background=true)
 
 // WHILE THEY RUN - use direct tools for immediate context
 grep(pattern="relevant_pattern", path="src/")
@@ -104,7 +104,7 @@ deep_context = background_output(task_id=...)
 
 **Execute:**
 - Surgical, minimal changes matching existing patterns
-- If delegating: provide exhaustive context and success criteria
+- If delegating: every child prompt carries GOAL, STOP WHEN (the exact observable condition that ends its run — the child stops the moment it holds), and EVIDENCE (what it returns so you can verify, not trust) — plus exhaustive context. Judge the child by its returned EVIDENCE against its STOP WHEN, never by its self-report.
 
 **Verify (per-scenario, not just "at the end"):**
 - RED→GREEN proof captured (test id + assertion msg in both states)
@@ -122,9 +122,8 @@ Define 3+ scenarios covering: **happy path**, **edge** (boundary / empty / malfo
 - Binary pass condition ("returns 200 with schema-matching body"), not "should work".
 - The real surface that proves it.
 - The test file + test id (written test-first; see TDD).
-- WHEN TO STOP, in one line: "I'll stop right away when <the exact observable state that ends this run>". The Stop rules bind to this line — the moment it holds, you stop.
 
-Scenarios are the contract. Done = every scenario PASSES with RED→GREEN proof AND real-surface artifact captured.
+Scenarios are the contract. Done = every scenario PASSES with RED→GREEN proof AND real-surface artifact captured. Then declare WHEN TO STOP for the whole run, in one line: "I'll stop right away when <the exact observable state that ends this run — every scenario passed with its evidence captured>". The Stop rules bind to this line — the moment it holds, you stop.
 
 ## TDD (MANDATORY on every production change)
 
