@@ -167,16 +167,14 @@ try {
 		auth: "redacted",
 	};
 } finally {
-	await traceCleanupStage("daemon-sockets", () => {
-		for (const socket of sockets) socket.destroy();
-	});
-	if (daemonServer) await traceCleanupStage("daemon-server", () => closeServer(daemonServer));
-	await traceCleanupStage("lsp-manager", () => disposeDefaultLspManager());
-	await traceCleanupStage("temp-root", () => rmSync(tempRoot, { recursive: true, force: true }));
+	for (const socket of sockets) socket.destroy();
+	if (daemonServer) await closeServer(daemonServer);
+	await disposeDefaultLspManager();
+	rmSync(tempRoot, { recursive: true, force: true });
 }
 assert(summary, "cancellation summary missing after cleanup");
-process.stderr.write(`[cleanup:active-resources:${JSON.stringify(process.getActiveResourcesInfo())}]\n`);
-console.log(JSON.stringify(summary, null, 2));
+await new Promise((resolve) => process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`, resolve));
+process.exit(0);
 
 function fakeLspServerSource() {
 	return String.raw`
@@ -327,12 +325,6 @@ function listen(server, path) {
 
 function closeServer(server) {
 	return new Promise((resolve) => server.close(() => resolve()));
-}
-
-async function traceCleanupStage(stage, cleanup) {
-	process.stderr.write(`[cleanup:${stage}:start]\n`);
-	await cleanup();
-	process.stderr.write(`[cleanup:${stage}:complete]\n`);
 }
 
 function assert(condition, message) {
