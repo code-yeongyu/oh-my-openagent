@@ -41,6 +41,8 @@ SSE_ATTEMPT_SECONDS=2
 BUILD_LOCK_DIR=""
 SOURCE_PACKAGE_STAMP=""
 SOURCE_PACKAGE_STAMP_CREATED=0
+CANCELLATION_SMOKE_RELATIVE="packages/lsp-daemon/scripts/qa/cancellation-smoke.mjs"
+COMMIT_BARRIER_SMOKE_RELATIVE="packages/lsp-daemon/scripts/qa/commit-barrier-smoke.mjs"
 
 log() { printf '[opencode-lsp-e2e] %s\n' "$*" >&2; }
 fail() { log "FAIL: $*"; return 1; }
@@ -109,6 +111,21 @@ require_bins() {
     fi
   done
   [ "$missing" -eq 0 ]
+}
+
+verify_tracked_cancellation_probes() {
+  local dependency ignored_evidence_root=".omo""/evidence"
+  if grep -Fq "$ignored_evidence_root" "${BASH_SOURCE[0]}"; then
+    fail "LSP QA driver references ignored evidence state"
+    return 1
+  fi
+  for dependency in "$CANCELLATION_SMOKE_RELATIVE" "$COMMIT_BARRIER_SMOKE_RELATIVE"; do
+    [ -f "$REPO_ROOT/$dependency" ] || { fail "missing cancellation QA dependency: $dependency"; return 1; }
+    git -C "$REPO_ROOT" ls-files --error-unmatch -- "$dependency" >/dev/null 2>&1 || {
+      fail "cancellation QA dependency is not tracked: $dependency"
+      return 1
+    }
+  done
 }
 
 hash_path() {
@@ -920,24 +937,21 @@ NODE
 }
 
 run_cancellation_contract_probe() {
-  local cancellation_smoke="$REPO_ROOT/.omo/evidence/20260713-lsp-daemon-migration/task-7-cancellation/product-phase/manual/cancellation-smoke.mjs"
-  local commit_smoke="$REPO_ROOT/.omo/evidence/20260713-lsp-daemon-migration/task-7-cancellation/product-phase/manual/commit-barrier-smoke.mjs"
-  [ -f "$cancellation_smoke" ] || { fail "missing product cancellation smoke"; return 1; }
-  [ -f "$commit_smoke" ] || { fail "missing product commit-barrier smoke"; return 1; }
+  local cancellation_smoke="$REPO_ROOT/$CANCELLATION_SMOKE_RELATIVE"
+  local commit_smoke="$REPO_ROOT/$COMMIT_BARRIER_SMOKE_RELATIVE"
+  verify_tracked_cancellation_probes || return 1
 
-  run_bounded 90 "$EVIDENCE_DIR/cancellation-smoke-output.json" bun "$cancellation_smoke" || return 1
-  run_bounded 90 "$EVIDENCE_DIR/commit-barrier-smoke-output.json" bun "$commit_smoke" || return 1
+  run_bounded 90 "$EVIDENCE_DIR/cancellation-smoke-output.json" bun "$cancellation_smoke" "$REPO_ROOT" || return 1
+  run_bounded 90 "$EVIDENCE_DIR/commit-barrier-smoke-output.json" bun "$commit_smoke" "$REPO_ROOT" || return 1
 
   bun --input-type=module - \
     "$EVIDENCE_DIR/cancellation-smoke-output.json" \
     "$EVIDENCE_DIR/commit-barrier-smoke-output.json" \
-    "$REPO_ROOT/.omo/evidence/20260713-lsp-daemon-migration/task-7-cancellation/product-phase/ProductPhaseClaim.json" \
     "$EVIDENCE_DIR/cancellation-contract.json" "$SCENARIO" "opencode" <<'NODE'
 import { readFileSync, writeFileSync } from "node:fs";
-const [cancelPath, commitPath, claimPath, outputPath, scenario, harness] = process.argv.slice(2);
+const [cancelPath, commitPath, outputPath, scenario, harness] = process.argv.slice(2);
 const cancel = JSON.parse(readFileSync(cancelPath, "utf8"));
 const commit = JSON.parse(readFileSync(commitPath, "utf8"));
-const claim = JSON.parse(readFileSync(claimPath, "utf8"));
 const result = {
   result: "PASS",
   scenario,
@@ -956,12 +970,12 @@ const result = {
   },
   daemonTimeout: {
     bounded: true,
-    provenBy: "product focused daemon timeout and LSP timeout tests in ProductPhaseClaim.greenEvidence",
+    provenBy: "packages/lsp-daemon/test/daemon-client-retry.test.ts and packages/lsp-core/src/lsp/json-rpc-connection-cancellation.test.ts",
   },
   socketDisconnect: {
     abortsServerWork: true,
     activeDaemonControllersAfter: 0,
-    provenBy: "product focused request-routing socket-close test in ProductPhaseClaim.greenEvidence",
+    provenBy: "packages/lsp-daemon/test/request-routing.test.ts",
   },
   pendingAndLateResponse: {
     lspPendingRequestsAfter: cancel.directPendingAfterLateResponse,
@@ -969,7 +983,7 @@ const result = {
   },
   directoryDiagnostics: {
     stoppedSchedulingBetweenFiles: true,
-    provenBy: "packages/lsp-core/src/lsp/directory-diagnostics.test.ts and ProductPhaseClaim.greenEvidence",
+    provenBy: "packages/lsp-core/src/lsp/directory-diagnostics.test.ts",
   },
   delayedRenamePreCommitGate: {
     cancelTarget: commit.preGate.cancelTarget,
@@ -991,7 +1005,7 @@ const result = {
   readOnlyPreWriteConnectionFailureRetry: {
     retryCount: 1,
     requestCount: 1,
-    provenBy: "packages/lsp-daemon/test/daemon-client-retry.test.ts and ProductPhaseClaim.greenEvidence",
+    provenBy: "packages/lsp-daemon/test/daemon-client-retry.test.ts",
   },
   sequentialProxyIds: {
     distinct: true,
@@ -1006,7 +1020,6 @@ const result = {
     cwdCanonical: true,
   },
   dirtyWorktreePreservation: {
-    productPhasePreExistingDirtyScope: claim.scope?.preExistingDirtyScope,
     driverMustPreserveDirtyWorktree: true,
   },
   noLeftovers: {
@@ -1015,9 +1028,8 @@ const result = {
   },
   promptInjectionApplicability: "not_applicable: deterministic fake-server protocol output is parsed as JSON evidence, not accepted as prose instructions",
   artifacts: {
-    cancellationSmoke: "cancellation-smoke-output.json",
-    commitBarrierSmoke: "commit-barrier-smoke-output.json",
-    productClaim: ".omo/evidence/20260713-lsp-daemon-migration/task-7-cancellation/product-phase/ProductPhaseClaim.json",
+    cancellationSmoke: "packages/lsp-daemon/scripts/qa/cancellation-smoke.mjs",
+    commitBarrierSmoke: "packages/lsp-daemon/scripts/qa/commit-barrier-smoke.mjs",
   },
 };
 const required = [
@@ -2416,6 +2428,7 @@ run_self_test() {
   local fixture_run child sandbox_path attempts health_pid health_port accepted_count previous_opencode_pid
   local sse_pid sse_port previous_sse_ready previous_sse_attempt
   local terminal_pid terminal_port previous_scenario previous_evidence_dir terminal_killer
+  local qa_dependencies_portable=true
   root="$(mktemp -d -t oqa-lsp-e2e.XXXXXX)" || return 1
   SANDBOX_ROOT="$root"
   before_omo="$(hash_path "$REAL_OMO_ROOT")"
@@ -2428,6 +2441,11 @@ run_self_test() {
   grep -q -- '--scenario requires a value' "$out" || failures=$((failures + 1))
   if bash "${BASH_SOURCE[0]}" --scenario ../bad --evidence-dir "$root/bad" >>"$out" 2>&1; then failures=$((failures + 1)); fi
   if bash "${BASH_SOURCE[0]}" --scenario ok --evidence-dir relative >>"$out" 2>&1; then failures=$((failures + 1)); fi
+
+  if ! verify_tracked_cancellation_probes >>"$out" 2>&1; then
+    qa_dependencies_portable=false
+    failures=$((failures + 1))
+  fi
 
   for fixture in fake-pass fake-skip; do
     local ev="$root/$fixture"
@@ -2763,8 +2781,9 @@ NODE
   [ "$before_db" = "$after_db" ] || failures=$((failures + 1))
   [ "$before_status" = "$after_status" ] || failures=$((failures + 1))
 
-  printf '{"result":"%s","selfTest":true,"malformedArgsRejected":true,"fakePassRejected":true,"skipRejected":true,"hungCommandBounded":true,"healthTimeoutReadinessBounded":true,"sseStartupRetryDeterministic":true,"partialStagingCleanedTwice":true,"interruptCleanupRepeated":true,"cancellationResultFieldsMandatory":true,"clientPackageResultFieldsMandatory":true,"dirtyWorktreePreserved":%s,"realHomesUnchanged":%s}\n' \
+  printf '{"result":"%s","selfTest":true,"malformedArgsRejected":true,"fakePassRejected":true,"skipRejected":true,"hungCommandBounded":true,"healthTimeoutReadinessBounded":true,"sseStartupRetryDeterministic":true,"partialStagingCleanedTwice":true,"interruptCleanupRepeated":true,"qaDependenciesPortable":%s,"cancellationResultFieldsMandatory":true,"clientPackageResultFieldsMandatory":true,"dirtyWorktreePreserved":%s,"realHomesUnchanged":%s}\n' \
     "$( [ "$failures" -eq 0 ] && echo PASS || echo FAIL )" \
+    "$qa_dependencies_portable" \
     "$( [ "$before_status" = "$after_status" ] && echo true || echo false )" \
     "$( [ "$before_omo" = "$after_omo" ] && [ "$before_db" = "$after_db" ] && echo true || echo false )"
   cleanup_all || failures=$((failures + 1))
