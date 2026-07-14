@@ -35,7 +35,7 @@ The refactor splits packages into strict layers by runtime boundary:
 | Platform | Generated Node launcher packages per target | Deployment artifacts. Never imported. |
 | Web | Marketing site | Independent application. |
 
-**Dependency rule:** The DAG flows downward only. Adapters depend on Core, MCP, and Skills. Nothing depends on Adapters. Platform and Web are leaves.
+**Dependency rule:** The intended DAG flows downward: Adapters depend on Core, MCP, and Skills, while Platform and Web are leaves. During the transition, `@oh-my-opencode/omo-opencode` depends on `@oh-my-opencode/omo-codex` for Codex installer/distribution integration; this adapter-to-adapter edge is temporary and outside the target layering.
 
 **Migration principle:** Existing behavior is preserved. Nothing breaks. Each extraction is a pure move: copy logic into Core, make the original location re-export from Core, verify tests still pass, then delete the duplicate in the other repositories.
 
@@ -45,7 +45,7 @@ The refactor splits packages into strict layers by runtime boundary:
 - `omo` consumes these packages via workspace dependencies, with adapter shims left at original `packages/omo-opencode/src/` locations where OpenCode-facing import paths or runtime wiring still need stable anchors.
 - The `lsp-tools-mcp` and `lsp-daemon` packages are vendored in-tree and now consume `lsp-core` plus `mcp-stdio-core` instead of deep-importing each other's source internals.
 
-Layering achieved: Core (19 pure-TS packages, including `omo-config-core`) → MCP packages → Adapters (OpenCode, Codex, Senpi, standalone Pi goal/webfetch) → generated platform launcher packages. The adapter boundaries keep future harnesses able to consume the same Core layer.
+Current layering: Core (19 pure-TS packages, including `omo-config-core`) -> MCP packages -> Adapters (OpenCode, Codex, Senpi, standalone Pi goal/webfetch) -> generated platform launcher packages, with the transitional OpenCode-to-Codex dependency documented above. The adapter boundaries keep future harnesses able to consume the same Core layer.
 
 The Pi Engine DI abstraction was deferred. It can be revisited once the adapter migration is complete.
 
