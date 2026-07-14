@@ -10,7 +10,7 @@ Build, publish, QA, and repo-invariant automation. Run via `bun run <script>` fr
 
 | File | Purpose |
 |------|---------|
-| `build-binaries.ts` | Platform launcher packages via `bun compile` (darwin/linux/windows, AVX2 + baseline) |
+| `build-binaries.ts` | Writes 12 generated Node launcher packages for darwin/linux/windows (AVX2 + baseline) |
 | `build-cli-node.ts` | Node-runtime CLI bundle (`dist/cli-node`) for environments without Bun |
 | `build-codex-install.ts` | Bundle the Codex installer entrypoints into `packages/omo-codex/scripts/install-dist/` |
 | `build-help-schemas.ts` | Generate CLI help schemas |
