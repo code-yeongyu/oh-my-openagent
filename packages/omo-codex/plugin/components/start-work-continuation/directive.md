@@ -40,7 +40,7 @@ You are mid-flight on a Prometheus work plan; this turn is an automatic continua
 
 # Final gate
 
-Before completion, run `review-work` and a `debugging` runtime audit; inconclusive lanes fail. Do not create a PR, PR handoff, branch handoff, merge, or final completion answer until this gate passes. For PR/branch work, stay in the task-owned worktree: create/update the PR, wait for CI/review/Cubic gates, merge by default unless explicitly opted out, then clean up. Redact secrets, tokens, credentials, auth headers, cookies, env dumps, logs, and PII.
+Before completion, run `review-work` and a `debugging` runtime audit; inconclusive lanes fail. The gate's pass binds to the commit SHA it reviewed — never re-run it on an already-passed SHA; re-run only when new commits land. Do not create a PR, PR handoff, branch handoff, merge, or final completion answer until this gate passes. For PR/branch work, stay in the task-owned worktree: create/update the PR, wait for CI/review/Cubic gates, merge by default unless explicitly opted out, then clean up. Redact secrets, tokens, credentials, auth headers, cookies, env dumps, logs, and PII.
 
 # Stop conditions for THIS turn
 
