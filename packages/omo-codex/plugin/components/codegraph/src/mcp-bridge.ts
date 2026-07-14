@@ -110,14 +110,14 @@ async function forwardCodegraphToClient(
 ): Promise<void> {
 	for await (const message of readStdioJsonRpcMessages(childOutput)) {
 		if (message.kind === "parse_error") {
-			writeStdioJsonRpcResponse(output, errorResponse(null, -32700, "Parse error", message.message), defaultResponseMode());
+			await writeStdioJsonRpcResponse(output, errorResponse(null, -32700, "Parse error", message.message), defaultResponseMode());
 			continue;
 		}
 		const key = responseModeKey(message.payload);
 		const pendingResponse = key === null ? undefined : pendingResponses.get(key);
 		const responseMode = pendingResponse?.responseMode ?? defaultResponseMode();
 		if (key !== null) pendingResponses.delete(key);
-		writeStdioJsonRpcResponse(output, clarifyCodegraphResponse(message.payload, pendingResponse), responseMode);
+		await writeStdioJsonRpcResponse(output, clarifyCodegraphResponse(message.payload, pendingResponse), responseMode);
 	}
 }
 
