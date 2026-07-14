@@ -2,7 +2,7 @@
 
 > **HOLD THE FUCK UP. THIS ENTIRE GODDAMN CODEBASE IS BEING RIPPED APART AND REBUILT RIGHT NOW. A MASSIVE MULTI-HARNESS AGENT OS REFACTOR IS IN PROGRESS — WE ARE RESTRUCTURING EVERYTHING TO SUPPORT MULTIPLE AGENT HARNESSES (OPENCODE, CODEX, PI, AND OTHERS). DO NOT TRUST THE STRUCTURE BELOW AS STABLE. READ THE [ROADMAP](./ROADMAP.md) BEFORE YOU TOUCH ANYTHING OR SO HELP ME GOD.**
 
-**Generated:** 2026-07-03 | **Commit:** 25bb0d5ac | **Branch:** dev | **Release:** v4.15.1
+**Generated:** 2026-07-14 | **Commit:** e3dfc6746 | **Branch:** dev | **Release:** v4.18.0
 
 ## STOP. QA IS MANDATORY. NON-NEGOTIABLE. EVERY SINGLE TIME YOU TOUCH AN OPENCODE- OR CODEX-CONNECTED COMPONENT.
 
@@ -48,13 +48,13 @@ Unless the user EXPLICITLY says otherwise, or the task is an urgent must-fix-now
 
 OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 11 agents, 54-62 lifecycle hooks (base / +monitor / +team-mode) across 61 dirs, 12-35 registry tools (gated by config flags including team-mode; +6 `lsp_*` tools served via the built-in lsp MCP), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), Boulder feature (boulder-state work tracking + cli/boulder subcommand), configurable agent ordering, and Claude Code compatibility.
 
-**The package layering refactor moved the entire plugin out of root `src/` into [`packages/omo-opencode/src/`](packages/omo-opencode/src/AGENTS.md)** (a 100% git rename — there is NO root `src/` anymore). That adapter tree is now the OpenCode-facing shim over 18 Core packages + 3 MCP packages + the Codex adapter. Build entry: `packages/omo-opencode/src/index.ts`, a thin wrapper that delegates to `packages/omo-opencode/src/testing/create-plugin-module.ts` `createPluginModule()` → staged plugin init (see INITIALIZATION FLOW). Ships in two editions of one product: **Ultimate** (omo for OpenCode, this plugin = `packages/omo-opencode/`) and **Light** (omo for Codex CLI = [`packages/omo-codex/`](packages/omo-codex/AGENTS.md), distributed as the `lazycodex` alias; see CODEX LIGHT EDITION below).
+**The package layering refactor moved the entire plugin out of root `src/` into [`packages/omo-opencode/src/`](packages/omo-opencode/src/AGENTS.md)** (a 100% git rename — there is NO root `src/` anymore). That adapter tree is now the OpenCode-facing shim over 19 Core packages + 3 MCP packages + the Codex adapter. Build entry: `packages/omo-opencode/src/index.ts`, a thin wrapper that delegates to `packages/omo-opencode/src/testing/create-plugin-module.ts` `createPluginModule()` → staged plugin init (see INITIALIZATION FLOW). Ships in two editions of one product: **Ultimate** (omo for OpenCode, this plugin = `packages/omo-opencode/`) and **Light** (omo for Codex CLI = [`packages/omo-codex/`](packages/omo-codex/AGENTS.md), distributed as the `lazycodex` alias; see CODEX LIGHT EDITION below).
 
 ## STRUCTURE
 
 ```
 oh-my-opencode/                      # workspace root (no root src/ — it moved into packages/omo-opencode)
-├── packages/                        # 39 sibling pkgs, layered: Core → MCP → Skills → Adapters → Platform/Web. See packages/AGENTS.md
+├── packages/                        # 42 sibling pkgs across Core/MCP/Skills/Adapters/Pi/Platform/Web. See packages/AGENTS.md
 │   ├── omo-opencode/                # ★ THE OpenCode plugin adapter (formerly root src/). Build entry: src/index.ts
 │   │   └── src/                     # plugin source and OpenCode-facing adapter shims. Full breakdown → packages/omo-opencode/src/AGENTS.md
 │   │       ├── index.ts             # Plugin entry; thin wrapper re-exporting createPluginModule() from src/testing/
@@ -74,16 +74,18 @@ oh-my-opencode/                      # workspace root (no root src/ — it moved
 │   ├── omo-codex/                   # Codex CLI Light edition (lazycodex); vendored Codex plugin `omo` + TS installer + telemetry
 │   ├── omo-senpi/                   # Senpi native TS extension adapter (local-path Pi package); 6 components incl. task (drives senpi-task + omo-config-core)
 │   ├── senpi-task/                  # Senpi-coupled task engine: state machine, store, in-process/RPC runners, lifecycle, completion, teams, 7 task + 12 team tools
+│   ├── pi-goal/ pi-webfetch/        # Standalone Pi extensions: Codex-style goal tracking + bounded URL retrieval
 │   ├── utils/ model-core/ prompts-core/ rules-engine/ agents-md-core/ comment-checker-core/ hashline-core/ boulder-state/ telemetry-core/ lsp-core/ mcp-stdio-core/ tmux-core/ claude-code-compat-core/ skills-loader-core/ mcp-client-core/ openclaw-core/ team-core/ delegate-core/ omo-config-core/   # 19 Core (pure-TS) pkgs
 │   ├── lsp-tools-mcp/ git-bash-mcp/ lsp-daemon/   # 3 MCP-layer pkgs (stdio); LSP packages consume lsp-core + mcp-stdio-core
 │   ├── shared-skills/               # Cross-harness SKILL.md bundle shared by OpenCode + Codex
 │   ├── web/                         # Marketing site (Next.js 15 + Cloudflare Workers); own bun.lock; only @/* alias zone in the repo
 │   └── oh-my-opencode-<os>-<arch>[-variant]/   # 12 platform binaries (bin/ + package.json only; generated, never hand-edited)
-├── bin/                             # Platform-detection JS shim (5 bin aliases: oh-my-opencode, oh-my-openagent, omo, lazycodex, lazycodex-ai)
-├── script/                          # Build/publish automation (singular, not scripts/)
+├── bin/                             # Platform-detection JS shim; 5 public aliases. See bin/AGENTS.md
+├── script/                          # Bun/TS build/publish automation (singular). See script/AGENTS.md
+├── scripts/                         # Node ESM third-party-notice helpers. See scripts/AGENTS.md
 ├── docs/                            # User-facing docs (guide/, reference/, examples/, legal/, manifesto.md, troubleshooting/)
-├── assets/                          # oh-my-opencode.schema.json (auto-generated from Zod)
-├── test-support/ tests/             # Shared test fixtures + cross-package integration tests
+├── assets/                          # Generated config/help schemas. See assets/AGENTS.md
+├── test-support/ tests/             # Shared helpers + repo-level integration tests. See tests/AGENTS.md
 ├── signatures/                      # CLA signature registry (cla.json)
 ├── postinstall.mjs                  # Verifies platform binary + OpenCode version
 ├── test-setup.ts                    # Bun test preload (resets state between tests)
@@ -186,7 +188,7 @@ Teams live as directories under `~/.omo/teams/{name}/config.json` (user) or `<pr
 
 ## CODEX LIGHT EDITION (omo-codex / lazycodex)
 
-oh-my-openagent ships in two editions of one product. **Ultimate** = this OpenCode plugin (omo for OpenCode = `packages/omo-opencode/`). **Light** = omo for the OpenAI Codex CLI, vendored under [`packages/omo-codex/`](packages/omo-codex/AGENTS.md). "omo in Codex" / "omo for Codex" = **lazycodex**, and the public GitHub repo [`code-yeongyu/lazycodex`](https://github.com/code-yeongyu/lazycodex) IS this: a thin distribution layer over `omo-codex` (site lazycodex.ai; "Codex for no-brainers, just prompt with `ultrawork`"; Codex edition "coming June 2026", currently OpenCode-only).
+oh-my-openagent ships in two editions of one product. **Ultimate** = this OpenCode plugin (omo for OpenCode = `packages/omo-opencode/`). **Light** = omo for the OpenAI Codex CLI, vendored under [`packages/omo-codex/`](packages/omo-codex/AGENTS.md). "omo in Codex" / "omo for Codex" = **lazycodex**, and the public GitHub repo [`code-yeongyu/lazycodex`](https://github.com/code-yeongyu/lazycodex) is the thin marketplace/distribution layer over `omo-codex` (site lazycodex.ai; "Codex for no-brainers, just prompt with `ultrawork`").
 
 - **Package:** `@oh-my-opencode/omo-codex` (private, versioned with the repo): "Codex harness adapter. Vendored Codex plugin namespace `omo` + TypeScript installer + telemetry." Plugin bundle pkg = `@sisyphuslabs/omo-codex-plugin`. Reuses `@oh-my-opencode/utils`, shared Core packages, and generated SKILL.md outputs from `@oh-my-opencode/shared-skills` plus component-local skills.
 - **Marketplace identity (precision):** Codex sees marketplace `sisyphuslabs`, plugin `omo`, enabled as `omo@sisyphuslabs`. `lazycodex` is ONLY the repo/npm/bin alias, never the marketplace name.
