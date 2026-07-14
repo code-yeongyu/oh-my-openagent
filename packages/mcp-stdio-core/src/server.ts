@@ -102,9 +102,15 @@ async function writeResponse(
     await writeStdioJsonRpcResponse(context.output, response, context.responseMode)
     return true
   } catch (error) {
+    if (!isTerminalOutputError(error)) throw error
     context.log("output_error", { message: messageFromError(error) })
     return false
   }
+}
+
+function isTerminalOutputError(error: unknown): boolean {
+  if (!(error instanceof Error) || !("code" in error)) return false
+  return error.code === "EPIPE" || error.code === "ERR_STREAM_DESTROYED" || error.code === "ERR_STREAM_WRITE_AFTER_END"
 }
 
 interface ResponseWriteContext {
