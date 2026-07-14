@@ -7,7 +7,7 @@ import { execFileSync, spawn } from "node:child_process"
 import { mkdtempSync, writeFileSync } from "node:fs"
 import { mkdir, rm, symlink, writeFile } from "node:fs/promises"
 import { platform, tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, posix, win32 } from "node:path"
 import type { Readable } from "node:stream"
 
 export interface LegacyDaemonFixture {
@@ -52,7 +52,7 @@ export function createLegacyCodexHome(prefix: string): string {
 }
 
 export function versionDirFor(codexHome: string, version: string): string {
-  return join(codexHome, "codex-lsp", "daemon", `v${version}`)
+  return pathJoinForRoot(codexHome, "codex-lsp", "daemon", `v${version}`)
 }
 
 export function legacyEndpointFor(input: {
@@ -84,7 +84,15 @@ export function liveLegacyEndpointFor(input: {
 }
 
 function endpointPathJoin(targetPlatform: NodeJS.Platform, root: string, leaf: string): string {
-  return targetPlatform === "win32" ? join(root, leaf) : `${root.replace(/\/+$/u, "")}/${leaf}`
+  return targetPlatform === "win32" ? win32.join(root, leaf) : posix.join(root, leaf)
+}
+
+function pathJoinForRoot(root: string, ...segments: readonly string[]): string {
+  return isNativeWindowsPath(root) ? win32.join(root, ...segments) : join(root, ...segments)
+}
+
+function isNativeWindowsPath(path: string): boolean {
+  return /^[A-Za-z]:[\\/]/u.test(path) || path.startsWith("\\\\")
 }
 
 function legacyWindowsPipeEndpoint(versionDir: string, version: string): string {
