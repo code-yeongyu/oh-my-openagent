@@ -1028,6 +1028,10 @@ const result = {
   },
   promptInjectionApplicability: "not_applicable: deterministic fake-server protocol output is parsed as JSON evidence, not accepted as prose instructions",
   artifacts: {
+    cancellationSmoke: "cancellation-smoke-output.json",
+    commitBarrierSmoke: "commit-barrier-smoke-output.json",
+  },
+  sources: {
     cancellationSmoke: "packages/lsp-daemon/scripts/qa/cancellation-smoke.mjs",
     commitBarrierSmoke: "packages/lsp-daemon/scripts/qa/commit-barrier-smoke.mjs",
   },
