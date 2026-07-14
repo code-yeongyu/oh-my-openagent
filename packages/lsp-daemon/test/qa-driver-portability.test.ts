@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -46,5 +46,36 @@ describe("LSP QA driver portability", () => {
 		const expectedEndpointKind = process.platform === "win32" ? "named-pipe" : "unix-socket";
 
 		expect(JSON.parse(output)).toMatchObject({ daemonEndpointKind: expectedEndpointKind });
+	});
+
+	it("#given a closed output reader #when the cancellation smoke reports its result #then it cannot exit successfully", async () => {
+		const result = await new Promise<{ readonly code: number | null; readonly signal: NodeJS.Signals | null }>(
+			(resolve, reject) => {
+				const child = spawn("bun", [join(repositoryRoot, cancellationSmoke), repositoryRoot], {
+					cwd: repositoryRoot,
+					stdio: ["ignore", "pipe", "ignore"],
+				});
+				const output = child.stdout;
+				if (output === null) {
+					reject(new Error("cancellation smoke stdout pipe was not created"));
+					return;
+				}
+				const timeout = setTimeout(() => {
+					child.kill();
+					reject(new Error("cancellation smoke did not settle after its output reader closed"));
+				}, 10_000);
+				child.once("error", (error) => {
+					clearTimeout(timeout);
+					reject(error);
+				});
+				child.once("close", (code, signal) => {
+					clearTimeout(timeout);
+					resolve({ code, signal });
+				});
+				output.destroy();
+			},
+		);
+
+		expect(result.code === 0 && result.signal === null).toBe(false);
 	});
 });

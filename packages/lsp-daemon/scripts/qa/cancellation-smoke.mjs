@@ -173,7 +173,12 @@ try {
 	rmSync(tempRoot, { recursive: true, force: true });
 }
 assert(summary, "cancellation summary missing after cleanup");
-await new Promise((resolve) => process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`, resolve));
+await new Promise((resolve, reject) => {
+	process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`, (error) => {
+		if (error) reject(error);
+		else resolve();
+	});
+});
 process.exit(0);
 
 function fakeLspServerSource() {
