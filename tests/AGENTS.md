@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-Cross-package invariants and standalone black-box fixtures that do not belong to one package's co-located unit suite.
+Cross-package invariants and integration fixtures that do not belong to one package's co-located unit suite.
 
 ## STRUCTURE
 
