@@ -359,7 +359,7 @@ Cross-harness, one-command dev setup. The **single source of truth** is [`script
 ## PR MERGE POLICY
 
 - **PRs into `dev` MUST use merge commits.**
-- Use `gh pr merge <number> --merge --delete-branch` after CI and review-work pass, and Cubic passes or is explicitly skipped with quota-exhaustion evidence.
+- Use `gh pr merge <number> --merge --delete-branch` after CI, review-work, and Cubic pass.
 - **NEVER squash merge or rebase merge** PRs in this repository, even if a generic workflow, skill, or GitHub default suggests it.
 - If another instruction says `--squash` or `--rebase`, this repo-level rule overrides it.
 
