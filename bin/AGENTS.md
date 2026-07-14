@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-Node-side launch surface for every public CLI alias. It resolves the platform package, handles baseline fallback, and starts the compiled binary; it is not the TypeScript CLI implementation.
+Node-side launch surface for every public CLI alias. The root shim resolves a platform package and spawns its generated `bin/oh-my-opencode.js` launcher payload; it is not the TypeScript CLI implementation.
 
 ## WHERE TO LOOK
 
@@ -16,11 +16,11 @@ Node-side launch surface for every public CLI alias. It resolves the platform pa
 
 ## RUNTIME FLOW
 
-`oh-my-opencode.js` derives the invocation name, optionally routes the LazyCodex Node installer, resolves the matching `oh-my-opencode-*` or `oh-my-openagent-*` optional dependency, then spawns its `bin/oh-my-opencode` payload. On x64 it can fall back from the optimized package to `-baseline` after `SIGILL`.
+`oh-my-opencode.js` derives the invocation name, optionally routes the LazyCodex Node installer, resolves the matching `oh-my-opencode-*` or `oh-my-openagent-*` optional dependency, then spawns its `bin/oh-my-opencode.js` launcher payload. That generated Node launcher runs root `dist/cli` with Bun and falls back to root `dist/cli-node` with Node. On x64 the shim can fall back from the optimized package to `-baseline` after `SIGILL`.
 
 ## CONVENTIONS
 
-- Keep this surface Node-compatible; users execute it before the Bun-compiled binary is available.
+- Keep this surface Node-compatible; the root shim and generated launcher payloads are plain Node scripts.
 - Preserve all five aliases. Alias-to-platform-family behavior is shared with `postinstall.mjs` and publish-time package rewrites.
 - Keep error output actionable: report the detected platform and the ordered package candidates.
 - Tests run from the root with `bun test bin` or as part of `bun test`.
@@ -29,5 +29,5 @@ Node-side launch surface for every public CLI alias. It resolves the platform pa
 
 - Do not import adapter source from `packages/omo-opencode/src/`; this shim must remain usable from the published package layout.
 - Do not hard-code one npm package family. `oh-my-opencode` and `oh-my-openagent` wrappers share the launcher.
-- Do not edit compiled binaries under `packages/oh-my-opencode-*/bin/`; build them through `script/build-binaries.ts`.
+- Do not edit generated launcher payloads under `packages/oh-my-opencode-*/bin/`; regenerate them through `script/build-binaries.ts`.
 - Do not remove baseline fallback without updating platform tests and publish-platform coverage.

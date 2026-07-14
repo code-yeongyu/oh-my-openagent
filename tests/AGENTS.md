@@ -23,12 +23,13 @@ tests/
 |---------|---------|---------|
 | Root invariants | `bun test tests/omo-config-category-drift.test.ts tests/omo-schema-freshness.test.ts` | Fast cross-package contract checks |
 | Full root suite | `bun test` | Includes these tests through root `bunfig.toml` |
-| Hashline fixture | Run commands from `tests/hashline/package.json` | Exercises edit operations and multi-model behavior outside adapter internals |
+| Hashline fixture | Run commands from a disposable temp copy of `tests/hashline/` | Exercises edit operations and multi-model behavior outside adapter internals; makes live network/model calls and may write model-selected paths relative to cwd |
 
 ## CONVENTIONS
 
 - Keep package-specific tests beside package source; use this directory only for real cross-package or standalone-fixture boundaries.
 - Treat `tests/hashline/` as its own Bun package. Preserve its lockfile and headless entry rather than importing it into the root test preload.
+- The Hashline fixture performs live network/model calls and may write model-selected paths relative to cwd. Run it only from a disposable temp directory, set explicit `HASHLINE_TEST_BASE_URL` and `HASHLINE_TEST_API_KEY`, and never point it at user/project files or real credentials.
 - Freshness tests compare generated artifacts to source-derived output; regenerate the artifact instead of changing the expected value manually.
 - Pure prose changes do not get phrase-pin tests. Test machine-consumed schemas, registration, or runtime behavior.
 
@@ -36,4 +37,4 @@ tests/
 
 - Do not turn `tests/` into a second home for ordinary package unit tests.
 - Do not remove, skip, or isolate a failing cross-package invariant to make the root suite green.
-- Do not expand synthetic AGENTS.md benchmark fixtures under `packages/omo-opencode/src/__tests__/perf/fixtures/`; they are intentionally minimal test data.
+- The synthetic AGENTS.md benchmark fixture under `packages/omo-opencode/src/__tests__/perf/fixtures/` is governed by its own local guide; this guide only cross-references it and does not govern its contents.
