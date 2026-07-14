@@ -64,7 +64,7 @@ This order is not dogma. If the loop performs better another way, we change it. 
 
 ## Multi-Harness Support (Exploratory)
 
-We may support additional harnesses: Claude Code, Codex, Pi, Amp, Droid, and others. Not confirmed. The current codebase is strongly coupled to OpenCode. Extracting the pure logic into a harness-neutral layer is a prerequisite if we ever do this.
+Codex and Senpi adapters have landed, along with standalone Pi goal and webfetch adapters. Future harnesses such as Claude Code, Amp, Droid, and others remain exploratory and are not confirmed. The current codebase is still strongly coupled to OpenCode in its largest adapter. Extracting the pure logic into a harness-neutral layer remains a useful prerequisite for any future harness.
 
 Most harnesses share common lifecycle hooks: pre-tool-use guards, post-tool-use transforms, system message injection, model parameter overrides. One could abstract these into a unified hook layer. Rule injection could become a harness-agnostic primitive that adapts to each plugin API.
 
