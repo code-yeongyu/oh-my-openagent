@@ -35,6 +35,7 @@ type MessagesTransformHooks = {
   teamMailboxInjector?: CreatedHooks["teamMailboxInjector"]
   toolPairValidator?: CreatedHooks["toolPairValidator"]
   monitorStatusInjector?: CreatedHooks["monitorStatusInjector"]
+  costTracker?: CreatedHooks["costTracker"]
 }
 type MessagesTransformHookKey = keyof MessagesTransformHooks
 type MessagesTransformHookEntry = {
@@ -53,6 +54,7 @@ const MESSAGES_TRANSFORM_HOOKS = [
   { key: "teamMailboxInjector", name: "teamMailboxInjector" },
   { key: "toolPairValidator", name: "toolPairValidator" },
   { key: "monitorStatusInjector", name: "monitorStatusInjector" },
+  { key: "costTracker", name: "costTracker" },
 ] satisfies readonly MessagesTransformHookEntry[]
 
 function getSessionID(message: MessageWithParts): string | undefined {

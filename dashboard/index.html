@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MaTrix — Mission Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tokens.css">
+<style>
+.app { display:flex;flex-direction:column;height:100vh;position:relative;z-index:1;overflow:hidden; }
+.navbar { display:flex;align-items:center;gap:var(--space-5);padding:var(--space-3) var(--space-5);background:var(--bg-glass);backdrop-filter:var(--blur-xl);border-bottom:1px solid var(--border-glass);flex-shrink:0;z-index:10; }
+.navbar-brand { display:flex;align-items:center;gap:var(--space-2);font-weight:700;font-size:var(--font-size-lg);color:#F8FAFC;letter-spacing:-0.02em; }
+.navbar-brand span { color:var(--brand-violet); }
+.navbar-brand small { font-size:var(--font-size-xs);color:var(--text-muted);font-weight:400; }
+.navbar-tabs { display:flex;gap:var(--space-1);margin-left:auto; }
+.navbar-tab { padding:var(--space-2) var(--space-3);border:none;background:transparent;color:var(--text-muted);font-family:var(--font-display);font-size:var(--font-size-sm);font-weight:500;cursor:pointer;border-radius:var(--radius-md);transition:all var(--transition-fast);white-space:nowrap; }
+.navbar-tab:hover { color:#E2E8F0;background:rgba(255,255,255,0.05); }
+.navbar-tab.active { color:var(--brand-violet-glow);background:rgba(139,92,246,0.1); }
+.navbar-status { display:flex;align-items:center;gap:var(--space-3);margin-left:var(--space-3);font-size:var(--font-size-xs);color:var(--text-muted); }
+.navbar-status .dot { width:6px;height:6px;border-radius:50%;background:var(--status-success);box-shadow:0 0 6px var(--status-success);animation:pulse-dot 2s ease-in-out infinite; }
+.content { flex:1;overflow-y:auto;padding:var(--space-5); }
+.tab-pane { display:none; }
+.tab-pane.active { display:block; }
+.status-strip { display:grid;grid-template-columns:repeat(5,1fr);gap:var(--space-3);margin-bottom:var(--space-5); }
+.overview-bottom { display:grid;grid-template-columns:1.2fr 1fr;gap:var(--space-4);margin-top:var(--space-4); }
+.agent-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:var(--space-3); }
+.kanban-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-4); }
+.kanban-column { display:flex;flex-direction:column;gap:var(--space-2);min-height:300px; }
+.kanban-column-header { display:flex;align-items:center;justify-content:space-between;padding:var(--space-2) var(--space-3);border-bottom:1px solid var(--border-glass);margin-bottom:var(--space-2); }
+.kanban-card { background:var(--bg-glass);border:1px solid var(--border-glass);border-radius:var(--radius-md);padding:var(--space-3);cursor:pointer;transition:all var(--transition-fast); }
+.kanban-card:hover { background:var(--bg-glass-hover);border-color:var(--border-glass-hover); }
+.kanban-card .title { font-size:var(--font-size-sm);font-weight:500;margin-bottom:var(--space-1); }
+.kanban-card .meta { display:flex;align-items:center;gap:var(--space-2);font-size:var(--font-size-xs);color:var(--text-muted); }
+.content-layout { display:grid;grid-template-columns:260px 1fr;gap:var(--space-4);height:100%; }
+.content-sidebar { background:var(--bg-glass);border:1px solid var(--border-glass);border-radius:var(--radius-lg);padding:var(--space-3);overflow-y:auto; }
+.content-sidebar-group { margin-bottom:var(--space-3); }
+.content-sidebar-group .group-title { font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;padding:var(--space-1) var(--space-2);margin-bottom:var(--space-1); }
+.content-sidebar-item { display:block;padding:var(--space-2);border-radius:var(--radius-sm);font-size:var(--font-size-sm);color:#E2E8F0;cursor:pointer;text-decoration:none;transition:background var(--transition-fast); }
+.content-sidebar-item:hover { background:rgba(255,255,255,0.05); }
+.content-sidebar-item.active { background:rgba(139,92,246,0.15);color:var(--brand-violet-glow); }
+.content-preview { background:var(--bg-glass);border:1px solid var(--border-glass);border-radius:var(--radius-lg);padding:var(--space-4);overflow-y:auto; }
+.content-preview pre { font-family:var(--font-mono);font-size:var(--font-size-sm);line-height:1.6;white-space:pre-wrap;color:#E2E8F0; }
+.schedule-grid { display:grid;gap:var(--space-3); }
+.job-card { display:flex;align-items:center;gap:var(--space-4);padding:var(--space-3);background:var(--bg-glass);border:1px solid var(--border-glass);border-radius:var(--radius-md);transition:all var(--transition-fast); }
+.job-card:hover { background:var(--bg-glass-hover); }
+.cost-table { width:100%;border-collapse:collapse; }
+.cost-table th { text-align:left;padding:var(--space-2) var(--space-3);font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:500;border-bottom:1px solid var(--border-glass); }
+.cost-table td { padding:var(--space-2) var(--space-3);font-size:var(--font-size-sm);border-bottom:1px solid rgba(255,255,255,0.03); }
+.cost-table tr:hover td { background:rgba(255,255,255,0.02); }
+.health-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-4); }
+.health-card { text-align:center;padding:var(--space-5); }
+.health-card .value { font-size:var(--font-size-4xl);font-weight:700;font-family:var(--font-mono); }
+@keyframes pulse-dot { 0%,100% { opacity:1;transform:scale(1); } 50% { opacity:0.6;transform:scale(0.8); } }
+@keyframes spin { to { transform:rotate(360deg); } }
+@keyframes fadeIn { from { opacity:0;transform:translateY(8px); } to { opacity:1;transform:translateY(0); } }
+.tab-pane.active { animation:fadeIn var(--transition-normal); }
+.radar-container { position:relative;width:160px;height:160px; }
+.radar-svg { width:100%;height:100%; }
+.text-mono { font-family:var(--font-mono); }
+.text-muted { color:var(--text-muted); }
+.text-xs { font-size:var(--font-size-xs); }
+.text-sm { font-size:var(--font-size-sm); }
+.flex { display:flex; }
+.flex-col { flex-direction:column; }
+.gap-2 { gap:var(--space-2); }
+.gap-3 { gap:var(--space-3); }
+.gap-4 { gap:var(--space-4); }
+.items-center { align-items:center; }
+.justify-between { justify-content:space-between; }
+.mt-4 { margin-top:var(--space-4); }
+.mb-4 { margin-bottom:var(--space-4); }
+.p-4 { padding:var(--space-4); }
+.modal-overlay { display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);backdrop-filter:var(--blur-medium);z-index:100;align-items:center;justify-content:center; }
+.modal-overlay.show { display:flex; }
+.modal { background:var(--bg-surface);border:1px solid var(--border-glass);border-radius:var(--radius-xl);padding:var(--space-5);width:400px; }
+.modal h3 { margin-bottom:var(--space-4); }
+.modal input, .modal select, .modal textarea { width:100%;padding:var(--space-2) var(--space-3);background:rgba(255,255,255,0.05);border:1px solid var(--border-glass);border-radius:var(--radius-md);color:#E2E8F0;font-family:var(--font-display);font-size:var(--font-size-sm);margin-bottom:var(--space-3); }
+.modal textarea { resize:vertical;min-height:60px; }
+.modal-actions { display:flex;gap:var(--space-2);justify-content:flex-end;margin-top:var(--space-3); }
+.btn { padding:var(--space-2) var(--space-4);border:none;border-radius:var(--radius-md);font-family:var(--font-display);font-size:var(--font-size-sm);font-weight:500;cursor:pointer;transition:all var(--transition-fast); }
+.btn-primary { background:var(--brand-violet);color:#fff; }
+.btn-primary:hover { background:var(--brand-violet-glow); }
+.input { width:100%;padding:var(--space-2) var(--space-3);background:rgba(255,255,255,0.05);border:1px solid var(--border-glass);border-radius:var(--radius-md);color:#E2E8F0;font-family:var(--font-display);font-size:var(--font-size-sm);transition:border-color var(--transition-fast); }
+.input:focus { outline:none;border-color:var(--brand-violet-glow); }
+.btn-secondary { background:rgba(255,255,255,0.08);color:#E2E8F0; }
+.btn-secondary:hover { background:rgba(255,255,255,0.12); }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <span>🧠</span>
+      MaTrix
+      <small>Mission Control</small>
+    </div>
+    <div class="navbar-status">
+      <span class="dot"></span>
+      <span id="liveStatus">Live</span>
+      <span id="lastUpdate">—</span>
+    </div>
+    <div class="navbar-tabs">
+      <button class="navbar-tab active" data-tab="overview">Overview</button>
+      <button class="navbar-tab" data-tab="agents">Agents</button>
+      <button class="navbar-tab" data-tab="tasks">Tasks</button>
+      <button class="navbar-tab" data-tab="costs">Costs</button>
+      <button class="navbar-tab" data-tab="health">Health</button>
+      <button class="navbar-tab" data-tab="schedule">Schedule</button>
+      <button class="navbar-tab" data-tab="content">Content</button>
+      <button class="navbar-tab" data-tab="evolution">🧬 Evolution</button>
+      <button class="navbar-tab" data-tab="moa">🧩 MoA</button>
+      <button class="navbar-tab" data-tab="swarm">🐝 Swarm</button>
+      <button class="navbar-tab" data-tab="control">🎮 Control</button>
+    </div>
+  </nav>
+
+  <div class="content">
+
+    <!-- ═══ OVERVIEW ═══ -->
+    <div class="tab-pane active" id="tab-overview">
+      <div style="display:grid;grid-template-columns:160px 1fr 1fr;gap:var(--space-5);margin-bottom:var(--space-5);" id="overview-top">
+        <div class="glass-card" style="grid-column:1;display:flex;align-items:center;justify-content:center;">
+          <div class="radar-container" id="radarContainer"></div>
+        </div>
+        <div class="glass-card" id="directiveCard">
+          <div style="font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:var(--space-3);">Current Directive</div>
+          <div id="currentDirective" style="font-family:var(--font-mono);font-size:var(--font-size-sm);color:var(--brand-cyan);line-height:1.6;"></div>
+        </div>
+        <div class="glass-card" id="vpsMini">
+          <div style="font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:var(--space-3);">VPS Health</div>
+          <div id="vpsMiniBars"></div>
+        </div>
+      </div>
+      <div class="status-strip" id="statusStrip"></div>
+      <div class="overview-bottom">
+        <div class="glass-card" id="throughputCard">
+          <div style="font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-3);">Throughput</div>
+          <div id="throughputContent"><div class="loading">Chargement...</div></div>
+        </div>
+        <div class="glass-card" id="lastActivityCard">
+          <div style="font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-3);">Latest Actions</div>
+          <div id="latestActions"><div class="loading">Chargement...</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ AGENTS ═══ -->
+    <div class="tab-pane" id="tab-agents">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:0.05em;">Subagents</div>
+          <div style="font-size:var(--font-size-xl);font-weight:600;">The Crew.</div>
+        </div>
+        <div class="flex gap-3" id="agentStatusSummary"></div>
+      </div>
+      <div class="agent-grid" id="agentCards"></div>
+      <div class="mt-4 glass-card" id="agentLogSection">
+        <div style="font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-3);">Agent Log</div>
+        <div id="agentLogContent"></div>
+      </div>
+    </div>
+
+    <!-- ═══ TASKS ═══ -->
+    <div class="tab-pane" id="tab-tasks">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:0.05em;">Operator Board</div>
+          <div style="font-size:var(--font-size-xl);font-weight:600;">Personal Kanban</div>
+        </div>
+        <button class="btn btn-primary" id="addTaskBtn">+ Add Task</button>
+      </div>
+      <div class="kanban-grid" id="kanbanBoard"></div>
+    </div>
+
+    <!-- ═══ COSTS ═══ -->
+    <div class="tab-pane" id="tab-costs">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:0.05em;">LLM Usage</div>
+          <div style="font-size:var(--font-size-xl);font-weight:600;">Cost Tracking</div>
+        </div>
+        <div id="costSummary" class="flex gap-4"></div>
+      </div>
+      <div class="glass-card">
+        <div style="font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-3);">Session Costs</div>
+        <div id="costTableContent"><div class="loading">Chargement...</div></div>
+      </div>
+    </div>
+
+    <!-- ═══ HEALTH ═══ -->
+    <div class="tab-pane" id="tab-health">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:0.05em;">System</div>
+          <div style="font-size:var(--font-size-xl);font-weight:600;">VPS Health</div>
+        </div>
+        <div id="hostnameDisplay" class="text-xs text-muted"></div>
+      </div>
+      <div class="health-grid" id="healthGauges"></div>
+      <div class="mt-4 glass-card">
+        <div style="font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-3);">System Details</div>
+        <div id="healthDetails"></div>
+      </div>
+    </div>
+
+    <!-- ═══ SCHEDULE ═══ -->
+    <div class="tab-pane" id="tab-schedule">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:0.05em;">Automation</div>
+          <div style="font-size:var(--font-size-xl);font-weight:600;">Cron Schedule</div>
+        </div>
+        <div id="cronCount" class="text-xs text-muted"></div>
+      </div>
+      <div class="glass-card">
+        <div style="font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-3);">MaTrix Jobs</div>
+        <div id="cronHermesJobs"></div>
+      </div>
+      <div class="mt-4 glass-card">
+        <div style="font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-3);">System Jobs</div>
+        <div id="cronSystemJobs"></div>
+      </div>
+    </div>
+
+    <!-- ═══ CONTENT ═══ -->
+    <div class="tab-pane" id="tab-content">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:0.05em;">Library</div>
+          <div style="font-size:var(--font-size-xl);font-weight:600;">Content Docs</div>
+        </div>
+        <div id="contentCount" class="text-xs text-muted"></div>
+      </div>
+      <div class="content-layout">
+        <div class="content-sidebar" id="contentSidebar">
+          <div class="loading">Chargement...</div>
+        </div>
+        <div class="content-preview" id="contentPreview">
+          <div style="color:var(--text-muted);text-align:center;padding:var(--space-7);">Sélectionnez un document pour le prévisualiser</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ EVOLUTION ═══ -->
+    <div class="tab-pane" id="tab-evolution">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:0.05em;">Auto-Évolution</div>
+          <div style="font-size:var(--font-size-xl);font-weight:600;">Self-Improvement Loop 🧬</div>
+        </div>
+        <div class="flex gap-3 items-center">
+          <span id="evolutionRunResult" class="text-xs text-muted"></span>
+          <button class="btn btn-primary" onclick="runCycle()">🧬 Lancer un cycle</button>
+        </div>
+      </div>
+      <div class="status-strip" id="evolutionStatusStrip" style="margin-bottom:var(--space-5);"></div>
+      <div class="overview-bottom">
+        <div class="glass-card">
+          <div style="font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-3);">📚 Learnings injectés (L2 → agents)</div>
+          <div id="evolutionLearnings"><div class="loading">Chargement...</div></div>
+        </div>
+        <div class="glass-card">
+          <div style="font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-3);">⚠️ Erreurs captées (L1)</div>
+          <div id="evolutionErrors"><div class="loading">Chargement...</div></div>
+        </div>
+      </div>
+      <div class="glass-card" style="margin-top:var(--space-5);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3);">
+          <div style="font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">📡 Historique des exécutions (router)</div>
+          <button class="btn btn-ghost text-xs" onclick="loadRuns()">↻ Rafraîchir</button>
+        </div>
+        <div id="evolutionRuns" style="display:flex;flex-direction:column;gap:var(--space-2);max-height:420px;overflow-y:auto;"><div class="loading">Chargement...</div></div>
+      </div>
+    </div>
+
+    <!-- ═══ MoA ═══ -->
+    <div class="tab-pane" id="tab-moa">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:0.05em;">Mixture of Agents</div>
+          <div style="font-size:var(--font-size-xl);font-weight:600;">Router MoA 🧩</div>
+        </div>
+        <div id="moaStatus" class="text-xs text-muted"></div>
+      </div>
+      <div class="glass-card" style="margin-bottom:var(--space-5);">
+        <div style="font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-3);">Prompt</div>
+        <textarea id="moaPrompt" class="input" rows="3" placeholder="Pose ta question — elle sera envoyée en parallèle à plusieurs modèles, puis synthétisée..." style="width:100%;resize:vertical;font-family:var(--font-mono);"></textarea>
+        <div style="display:flex;gap:var(--space-4);flex-wrap:wrap;margin-top:var(--space-3);">
+          <div style="flex:1;min-width:240px;">
+            <div style="font-size:var(--font-size-xs);color:var(--text-muted);margin-bottom:var(--space-1);">Candidats (séparés par virgule)</div>
+            <input id="moaCandidates" class="input" value="deepseek-v4-flash-free, mimo-v2.5-free" style="width:100%;font-family:var(--font-mono);" />
+          </div>
+          <div style="min-width:200px;">
+            <div style="font-size:var(--font-size-xs);color:var(--text-muted);margin-bottom:var(--space-1);">Synthétiseur</div>
+            <input id="moaSynthesizer" class="input" value="hy3-free" style="width:100%;font-family:var(--font-mono);" />
+          </div>
+        </div>
+        <div class="flex gap-3 items-center mt-4">
+          <button class="btn btn-primary" onclick="runMoA()">🧩 Lancer MoA</button>
+          <span id="moaTiming" class="text-xs text-muted"></span>
+        </div>
+      </div>
+      <div class="overview-bottom">
+        <div class="glass-card">
+          <div style="font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-3);">🎯 Réponse synthétisée</div>
+          <div id="moaResult" style="font-family:var(--font-mono);font-size:var(--font-size-sm);line-height:1.6;color:#E2E8F0;white-space:pre-wrap;min-height:80px;">—</div>
+        </div>
+        <div class="glass-card">
+          <div style="font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-3);">🔀 Candidats</div>
+          <div id="moaCandidatesList"><div class="text-sm text-muted" style="text-align:center;padding:var(--space-4);">Lance un MoA pour voir les modèles sollicités</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ SWARM ═══ -->
+    <div class="tab-pane" id="tab-swarm">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:0.05em;">Agent Swarm</div>
+          <div style="font-size:var(--font-size-xl);font-weight:600;">Swarm d'Agents 🐝</div>
+        </div>
+        <div id="swarmStatus" class="text-xs text-muted"></div>
+      </div>
+      <div class="glass-card" style="margin-bottom:var(--space-5);">
+        <div style="font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-3);">Objectif</div>
+        <textarea id="swarmGoal" class="input" rows="3" placeholder="Decris le but — il est envoye en parallele a plusieurs agents, puis synthetise..." style="width:100%;resize:vertical;font-family:var(--font-mono);"></textarea>
+        <div style="margin-top:var(--space-3);">
+          <div style="font-size:var(--font-size-xs);color:var(--text-muted);margin-bottom:var(--space-1);">Agents (coche ceux a mobiliser)</div>
+          <div id="swarmAgentGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:var(--space-2);">
+            <label style="display:flex;align-items:center;gap:6px;font-size:var(--font-size-xs);color:#E2E8F0;cursor:pointer;"><input type="checkbox" class="swarm-agent" value="morpheus"> Morpheus</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:var(--font-size-xs);color:#E2E8F0;cursor:pointer;"><input type="checkbox" class="swarm-agent" value="neo"> Neo</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:var(--font-size-xs);color:#E2E8F0;cursor:pointer;"><input type="checkbox" class="swarm-agent" value="tank" checked> Tank</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:var(--font-size-xs);color:#E2E8F0;cursor:pointer;"><input type="checkbox" class="swarm-agent" value="oracle" checked> Oracle</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:var(--font-size-xs);color:#E2E8F0;cursor:pointer;"><input type="checkbox" class="swarm-agent" value="keymaker"> Keymaker</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:var(--font-size-xs);color:#E2E8F0;cursor:pointer;"><input type="checkbox" class="swarm-agent" value="agent-smith"> Agent Smith</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:var(--font-size-xs);color:#E2E8F0;cursor:pointer;"><input type="checkbox" class="swarm-agent" value="operator"> Operator</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:var(--font-size-xs);color:#E2E8F0;cursor:pointer;"><input type="checkbox" class="swarm-agent" value="trinity"> Trinity</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:var(--font-size-xs);color:#E2E8F0;cursor:pointer;"><input type="checkbox" class="swarm-agent" value="cypher" checked> Cypher</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:var(--font-size-xs);color:#E2E8F0;cursor:pointer;"><input type="checkbox" class="swarm-agent" value="sentinel" checked> Sentinel</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:var(--font-size-xs);color:#E2E8F0;cursor:pointer;"><input type="checkbox" class="swarm-agent" value="ghost"> Ghost</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:var(--font-size-xs);color:#E2E8F0;cursor:pointer;"><input type="checkbox" class="swarm-agent" value="link"> Link</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:var(--font-size-xs);color:#E2E8F0;cursor:pointer;"><input type="checkbox" class="swarm-agent" value="analyst"> Analyst</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:var(--font-size-xs);color:#E2E8F0;cursor:pointer;"><input type="checkbox" class="swarm-agent" value="mouse"> Mouse</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:var(--font-size-xs);color:#E2E8F0;cursor:pointer;"><input type="checkbox" class="swarm-agent" value="dreamer"> Dreamer</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:var(--font-size-xs);color:#E2E8F0;cursor:pointer;"><input type="checkbox" class="swarm-agent" value="architect"> Architect</label>
+          </div>
+        </div>
+        <div style="display:flex;gap:var(--space-4);flex-wrap:wrap;margin-top:var(--space-3);">
+          <div style="min-width:200px;">
+            <div style="font-size:var(--font-size-xs);color:var(--text-muted);margin-bottom:var(--space-1);">Synthétiseur</div>
+            <input id="swarmSynthesizer" class="input" value="hy3-free" style="width:100%;font-family:var(--font-mono);" />
+          </div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:var(--font-size-xs);color:#E2E8F0;cursor:pointer;align-self:flex-end;">
+            <input type="checkbox" id="swarmTools" checked> Activer les outils 🔧
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:var(--font-size-xs);color:#E2E8F0;cursor:pointer;align-self:flex-end;">
+            <input type="checkbox" id="swarmStream"> Streaming SSE 📡
+          </label>
+        </div>
+        <div class="flex gap-3 items-center mt-4">
+          <button class="btn btn-primary" onclick="runSwarm()">🐝 Lancer le Swarm</button>
+          <span id="swarmTiming" class="text-xs text-muted"></span>
+        </div>
+      </div>
+      <div class="glass-card" style="margin-bottom:var(--space-5);">
+        <div style="font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-3);">🎯 Réponse synthétisée</div>
+        <div id="swarmResult" style="font-family:var(--font-mono);font-size:var(--font-size-sm);line-height:1.6;color:#E2E8F0;white-space:pre-wrap;min-height:80px;">—</div>
+      </div>
+      <div class="glass-card">
+        <div style="font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-3);">🐝 Réponses par agent</div>
+        <div id="swarmAgentsList"><div class="text-sm text-muted" style="text-align:center;padding:var(--space-4);">Lance un Swarm pour voir les contributions de chaque agent</div></div>
+      </div>
+    </div>
+
+    <!-- ═══ CONTROL ═══ -->
+    <div class="tab-pane" id="tab-control">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:0.05em;">Command Center</div>
+          <div style="font-size:var(--font-size-xl);font-weight:600;">Mission Control 🎮</div>
+        </div>
+        <div id="controlStatus" class="text-xs text-muted"></div>
+      </div>
+      <div class="glass-card mb-4">
+        <div style="font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-3);">⚡ Dispatcher un agent Matrix</div>
+        <div class="control-grid">
+          <div>
+            <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:var(--space-1);">Agent cible</label>
+            <select id="dispatchAgent" class="control-select" style="width:100%;">
+              <option value="morpheus">Morpheus — Orchestrateur</option>
+              <option value="neo">Neo — Exécuteur</option>
+              <option value="tank">Tank — Deep Worker</option>
+              <option value="oracle">Oracle — Planificateur</option>
+              <option value="keymaker">Keymaker — Pré-Plan</option>
+              <option value="operator">Operator — Kanban</option>
+              <option value="trinity">Trinity — Design</option>
+              <option value="cypher">Cypher — SEO/Copy</option>
+              <option value="sentinel">Sentinel — QA</option>
+              <option value="architect">Architect — Évolution</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:var(--space-1);">Tâche à exécuter</label>
+            <input type="text" id="dispatchTask" class="control-input" placeholder="Décris la tâche..." style="width:100%;" />
+          </div>
+        </div>
+        <div style="margin-top:var(--space-2);display:flex;gap:var(--space-2);">
+          <button class="btn btn-primary" onclick="sendDispatch()">🚀 Lancer</button>
+          <span id="dispatchResult" style="font-size:11px;color:var(--text-muted);align-self:center;"></span>
+        </div>
+      </div>
+      <div class="glass-card mb-4">
+        <div class="flex items-center justify-between" style="margin-bottom:var(--space-3);">
+          <span style="font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">⏱ Sessions actives</span>
+          <span id="activeCount" class="text-xs text-muted"></span>
+        </div>
+        <div id="activeSessionsList"><div class="loading">Chargement...</div></div>
+      </div>
+      <div class="glass-card">
+        <div style="font-size:var(--font-size-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-3);">⚠️ Erreurs détectées</div>
+        <div id="errorList"><div class="loading">Chargement...</div></div>
+      </div>
+      <div class="flex gap-3 mt-4">
+        <button class="btn btn-danger" onclick="restartOpenCode()">🔄 Redémarrer OpenCode</button>
+      </div>
+    </div>
+
+  </div><!-- end .content -->
+</div><!-- end .app -->
+
+<!-- Add Task Modal -->
+<div class="modal-overlay" id="taskModal">
+  <div class="modal">
+    <h3>Ajouter une tâche</h3>
+    <input type="text" id="taskTitle" placeholder="Titre de la tâche" />
+    <select id="taskPriority">
+      <option value="low">Basse</option>
+      <option value="medium" selected>Moyenne</option>
+      <option value="high">Haute</option>
+    </select>
+    <textarea id="taskNotes" placeholder="Notes (optionnel)"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeTaskModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveTask()">Ajouter</button>
+    </div>
+  </div>
+</div>
+
+<script src="/components.js"></script>
+<script src="/agent-control.js"></script>
+<script>
+const C = MaTrix;
+const AGENTS = [
+  { id: 'morpheus', label: 'Orchestrator', color: 'var(--agent-morpheus)' },
+  { id: 'neo', label: 'Coder', color: 'var(--agent-neo)' },
+  { id: 'tank', label: 'Deep Worker', color: 'var(--agent-tank)' },
+  { id: 'oracle', label: 'Planner', color: 'var(--agent-oracle)' },
+  { id: 'keymaker', label: 'Integrator', color: 'var(--agent-keymaker)' },
+  { id: 'agent-smith', label: 'Reviewer', color: 'var(--agent-smith)' },
+  { id: 'operator', label: 'Kanban', color: 'var(--agent-operator)' },
+  { id: 'trinity', label: 'Design UI', color: 'var(--agent-trinity)' },
+  { id: 'cypher', label: 'SEO/Copy', color: 'var(--agent-cypher)' },
+  { id: 'sentinel', label: 'QA', color: 'var(--agent-sentinel)' },
+  { id: 'ghost', label: 'Search', color: 'var(--agent-ghost)' },
+  { id: 'link', label: 'Research', color: 'var(--agent-link)' },
+  { id: 'analyst', label: 'Media', color: 'var(--agent-analyst)' },
+  { id: 'mouse', label: 'Docs', color: 'var(--agent-mouse)' },
+  { id: 'dreamer', label: 'Memory', color: 'var(--agent-dreamer)' },
+  { id: 'architect', label: 'Evolution', color: 'var(--agent-architect)' },
+];
+
+let data = null;
+let currentContentDoc = null;
+
+document.querySelectorAll('.navbar-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.navbar-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+function connectSSE() {
+  const es = new EventSource('/events');
+  es.onmessage = (e) => {
+    try {
+      data = JSON.parse(e.data);
+      updateDashboard(data);
+    } catch (err) {}
+  };
+  es.onerror = () => {
+    document.getElementById('liveStatus').textContent = 'Reconnecting...';
+    setTimeout(connectSSE, 3000);
+  };
+}
+
+function updateDashboard(d) {
+  document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+  updateOverview(d);
+  updateAgents(d);
+  if (document.getElementById('tab-tasks').classList.contains('active')) updateTasks();
+  updateCosts(d);
+  updateHealth(d);
+  updateSchedule(d);
+  if (d.content) updateContentSidebar(d.content);
+  updateControl(d);
+  updateEvolution(d);
+}
+
+/* ═══ OVERVIEW ═══ */
+function updateOverview(d) {
+  const radarEl = document.getElementById('radarContainer');
+  radarEl.innerHTML = `<svg viewBox="0 0 140 140" class="radar-svg">
+    <circle cx="70" cy="70" r="60" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
+    <circle cx="70" cy="70" r="45" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
+    <circle cx="70" cy="70" r="30" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
+    <circle cx="70" cy="70" r="15" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
+    <line x1="70" y1="10" x2="70" y2="130" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
+    <line x1="10" y1="70" x2="130" y2="70" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
+    <circle cx="70" cy="70" r="3" fill="var(--brand-violet-glow)" opacity="0.8"/>
+    ${AGENTS.slice(0, 8).map((a, i) => {
+      const angle = (i / 8) * Math.PI * 2 - Math.PI / 2;
+      const r = 30 + Math.random() * 25;
+      const x = 70 + r * Math.cos(angle);
+      const y = 70 + r * Math.sin(angle);
+      return `<circle cx="${x}" cy="${y}" r="4" fill="${a.color}" opacity="0.8">
+        <animate attributeName="opacity" values="0.4;0.9;0.4" dur="${2 + i * 0.3}s" repeatCount="indefinite"/>
+      </circle>`;
+    }).join('')}
+  </svg>`;
+
+  const arch = d.architect || {};
+  const latestActivity = d.activity && d.activity.length > 0 ? d.activity[0] : null;
+  let archHtml = '';
+  if (latestActivity) {
+    archHtml = `<strong style="color:var(--brand-violet-glow)">${latestActivity.agent || 'Agent'}</strong> · ${(latestActivity.task || latestActivity.message || 'Tâche en cours').substring(0, 80)}`;
+  } else {
+    const recs = arch.recommendations || [];
+    const recList = recs.slice(0, 3).map(r => `
+      <div style="display:flex;align-items:center;gap:var(--space-1);font-size:10px;padding:2px 0;">
+        <span style="color:${r.priority === 'high' ? 'var(--status-error)' : r.priority === 'medium' ? 'var(--brand-amber)' : 'var(--text-muted)'};flex-shrink:0;">${r.priority === 'high' ? '🔴' : r.priority === 'medium' ? '⚡' : '✅'}</span>
+        <span style="color:var(--text-muted);">${r.message}</span>
+      </div>
+    `).join('');
+    archHtml = `<div style="display:flex;flex-direction:column;gap:var(--space-1);">
+      <span style="color:var(--brand-violet);font-weight:600;">🧠 The Architect</span>
+      <span class="text-muted" style="font-size:var(--font-size-xs);">
+        Cycle #${arch.cycle || 0} · Dernier scan: ${arch.lastScan ? new Date(arch.lastScan).toLocaleTimeString() : '—'} · Erreurs: ${arch.errorsDetected || 0} · Propositions: ${arch.pendingProposals || 0}
+      </span>
+      <span style="font-size:var(--font-size-xs);color:${arch.upstreamDiff > 0 ? 'var(--brand-amber)' : 'var(--text-muted)'};">Upstream OMO: ${arch.upstreamDiff > 0 ? '⚠️ ' + arch.upstreamDiff + ' version(s) derrière' : '✓ À jour'} ${arch.lastUpstreamCheck ? '· Vérifié: ' + new Date(arch.lastUpstreamCheck).toLocaleTimeString() : ''}</span>
+      ${recList ? '<div style="margin-top:var(--space-1);border-top:1px solid rgba(255,255,255,0.06);padding-top:var(--space-1);">' + recList + '</div>' : ''}
+    </div>`;
+  }
+  document.getElementById('currentDirective').innerHTML = archHtml;
+
+  const vps = d.vps;
+  document.getElementById('vpsMiniBars').innerHTML = `
+    ${C.ProgressBar({ pct: vps.cpu, color: 'var(--brand-cyan)', label: 'CPU' })}
+    <div style="height:var(--space-2)"></div>
+    ${C.ProgressBar({ pct: vps.ram.pct, color: 'var(--brand-mint)', label: 'RAM' })}
+    <div style="height:var(--space-2)"></div>
+    ${C.ProgressBar({ pct: vps.disk.pct, color: 'var(--brand-amber)', label: 'Disk' })}
+  `;
+
+  const sessions = d.sessions?.stats || {};
+  const activityList = d.activity || [];
+  const errors = activityList.filter(a => a.status === 'failed' || a.status === 'error').length;
+  const uptime = vps.uptime ? `${Math.floor(vps.uptime / 3600)}h ${Math.floor((vps.uptime % 3600) / 60)}m` : 'N/A';
+  document.getElementById('statusStrip').innerHTML = [
+    { label: 'Queue', value: activityList.length, accent: 'var(--status-active)' },
+    { label: 'Sessions', value: sessions.total_sessions || 0, accent: 'var(--brand-cyan)' },
+    { label: 'Errors', value: errors, accent: errors > 0 ? 'var(--status-error)' : 'var(--status-success)' },
+    { label: 'Today', value: uptime, accent: 'var(--brand-amber)' },
+    { label: 'Uptime', value: uptime, accent: 'var(--brand-violet-glow)' },
+  ].map(s => C.StatCard(s)).join('');
+
+  const dayStats = d.activity_by_day || [];
+  const vals = dayStats.length > 0 ? dayStats.slice(-14).map((d) => d.total || 0) : [];
+  document.getElementById('throughputContent').innerHTML = `
+    <div style="font-size:var(--font-size-3xl);font-weight:700;font-family:var(--font-mono);color:var(--brand-cyan);">${activityList.length}</div>
+    <div style="font-size:var(--font-size-xs);color:var(--text-muted);">Total agent actions</div>
+    ${vals.length > 0 ? C.ThinBar({ values: vals, color: 'var(--brand-cyan)' }) : '<div class="text-xs text-muted mt-4">Données insuffisantes pour le graphique</div>'}
+  `;
+
+  document.getElementById('latestActions').innerHTML = activityList.slice(0, 8).map((a) => `
+    <div style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-1) 0;font-size:var(--font-size-xs);border-bottom:1px solid rgba(255,255,255,0.03);">
+      <span style="width:6px;height:6px;border-radius:50%;background:${a.status === 'completed' || a.status === 'done' ? 'var(--status-success)' : a.status === 'failed' || a.status === 'error' ? 'var(--status-error)' : 'var(--status-idle)'};flex-shrink:0;"></span>
+      <strong style="color:var(--agent-morpheus);font-size:10px;">${(a.agent || '?').substring(0, 8)}</strong>
+      <span style="color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${(a.task || a.message || '').substring(0, 50)}</span>
+    </div>
+  `).join('');
+}
+
+/* ═══ AGENTS ═══ */
+function updateAgents(d) {
+  const stats = d.agentStats || {};
+  const agents = AGENTS;
+  const activeCount = Object.values(stats).filter((s) => s.total > 0).length;
+  document.getElementById('agentStatusSummary').innerHTML = `
+    <span class="text-xs" style="color:var(--status-active);"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--status-active);margin-right:var(--space-1);"></span>${activeCount} Active</span>
+    <span class="text-xs" style="color:var(--status-idle);"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--status-idle);margin-right:var(--space-1);"></span>${agents.length - activeCount} Idle</span>
+  `;
+
+  const hasActivity = Object.keys(stats).length > 0;
+  if (!hasActivity) {
+    document.getElementById('agentCards').innerHTML = '<div class="text-muted" style="text-align:center;padding:var(--space-5);">En attente d\'activité — les agents s\'afficheront ici avec leurs statistiques.</div>';
+    return;
+  }
+  document.getElementById('agentCards').innerHTML = agents.map((a) => {
+    const s = stats[a.id];
+    return `
+      <div class="glass-card" style="border-top:2px solid ${a.color};">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-2);">
+          <strong style="font-size:var(--font-size-sm);color:#F8FAFC;">${a.label}</strong>
+          <span style="font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--text-muted);">${a.id}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:var(--space-3);font-size:var(--font-size-xs);color:var(--text-muted);">
+          <span>Tasks: <strong style="color:#F8FAFC;">${s ? s.total : 0}</strong></span>
+          ${s && s.failed > 0 ? '<span style="color:var(--status-error);">Failed: ' + s.failed + '</span>' : ''}
+        </div>
+        ${s && s.lastSeen ? '<div style="font-size:10px;color:var(--text-muted);margin-top:var(--space-1);">Last: ' + new Date(s.lastSeen).toLocaleTimeString() + '</div>' : ''}
+        ${s && s.lastTask ? '<div style="font-size:10px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:var(--space-1);">' + s.lastTask.substring(0, 60) + '</div>' : ''}
+      </div>`;
+  }).join('');
+
+  const activity = d.activity || [];
+  document.getElementById('agentLogContent').innerHTML = `
+    <table class="cost-table">
+      <thead><tr>
+        <th>Time</th><th>Agent</th><th>Task</th><th>Model</th><th>Status</th>
+      </tr></thead>
+      <tbody>${activity.slice(0, 20).map((a) => {
+        const color = a.status === 'completed' || a.status === 'done' ? 'var(--status-success)' : a.status === 'failed' || a.status === 'error' ? 'var(--status-error)' : 'var(--status-idle)';
+        return `<tr>
+          <td style="font-family:var(--font-mono);font-size:var(--font-size-xs);">${a.created_at ? new Date(a.created_at).toLocaleTimeString() : '-'}</td>
+          <td style="font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--agent-morpheus);">${a.agent || '?'}</td>
+          <td style="font-size:var(--font-size-xs);">${(a.task || a.message || '').substring(0, 40)}</td>
+          <td style="font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--text-muted);">${a.model || '-'}</td>
+          <td><span class="badge" style="display:inline-flex;align-items:center;gap:4px;background:${color}20;color:${color};padding:1px 6px;border-radius:var(--radius-full);font-size:10px;font-weight:500;">${C.AgentStatusDot({ status: a.status === 'completed' || a.status === 'done' ? 'active' : a.status === 'failed' || a.status === 'error' ? 'error' : 'working' })}${(a.status || 'unknown').substring(0, 10)}</span></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+}
+
+/* ═══ TASKS ═══ */
+function updateTasks() {
+  fetch('/api/board')
+    .then((r) => r.json())
+    .then((tasks) => renderKanban(tasks))
+    .catch(() => {});
+}
+
+function renderKanban(tasks) {
+  const cols = ['pending', 'in_progress', 'done'];
+  const labels = { pending: 'Pending', in_progress: 'In Progress', done: 'Done' };
+  const counts = { pending: 0, in_progress: 0, done: 0 };
+  tasks.forEach((t) => { if (counts[t.status] !== undefined) counts[t.status]++; });
+  document.getElementById('kanbanBoard').innerHTML = cols.map((col) => `
+    <div class="glass-card kanban-column">
+      <div class="kanban-column-header">
+        <span style="font-family:var(--font-mono);font-size:var(--font-size-xs);text-transform:uppercase;letter-spacing:0.05em;">${labels[col]}</span>
+        <span class="badge" style="background:rgba(255,255,255,0.06);color:var(--text-muted);padding:1px 8px;border-radius:var(--radius-full);font-size:10px;">${counts[col]}</span>
+      </div>
+      ${tasks.filter((t) => t.status === col).map((t) => {
+        const pColors = { low: 'var(--text-muted)', medium: 'var(--brand-amber)', high: 'var(--brand-red)' };
+        return `<div class="kanban-card" data-id="${t.id}">
+          <div class="title">${t.title}</div>
+          <div class="meta">
+            <span style="color:${pColors[t.priority] || 'var(--text-muted)'};">${(t.priority || 'medium').toUpperCase()}</span>
+            ${t.notes ? '<span>· ' + t.notes.substring(0, 30) + '</span>' : ''}
+          </div>
+          <div style="display:flex;gap:var(--space-1);margin-top:var(--space-2);">
+            ${col !== 'pending' ? '<button class="btn" style="padding:2px 6px;font-size:10px;background:rgba(255,255,255,0.06);border-radius:4px;" onclick="moveTask(\'' + t.id + '\', \'' + (col === 'in_progress' ? 'pending' : 'in_progress') + '\')">◀</button>' : ''}
+            ${col !== 'done' ? '<button class="btn" style="padding:2px 6px;font-size:10px;background:rgba(255,255,255,0.06);border-radius:4px;" onclick="moveTask(\'' + t.id + '\', \'' + (col === 'pending' ? 'in_progress' : 'done') + '\')">▶</button>' : ''}
+            <button class="btn" style="padding:2px 6px;font-size:10px;background:rgba(255,255,255,0.06);border-radius:4px;color:var(--status-error);" onclick="deleteTask('${t.id}')">✕</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  `).join('');
+}
+
+function moveTask(id, newStatus) {
+  fetch('/api/board/update?id=' + id, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: newStatus }),
+  }).then(() => updateTasks());
+}
+
+function deleteTask(id) {
+  if (!confirm('Supprimer cette tâche ?')) return;
+  fetch('/api/board/delete?id=' + id, { method: 'POST' }).then(() => updateTasks());
+}
+
+function openTaskModal() { document.getElementById('taskModal').classList.add('show'); }
+function closeTaskModal() { document.getElementById('taskModal').classList.remove('show'); }
+function saveTask() {
+  const title = document.getElementById('taskTitle').value.trim();
+  if (!title) return;
+  fetch('/api/board', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      title,
+      priority: document.getElementById('taskPriority').value,
+      notes: document.getElementById('taskNotes').value.trim(),
+    }),
+  }).then(() => {
+    closeTaskModal();
+    document.getElementById('taskTitle').value = '';
+    document.getElementById('taskNotes').value = '';
+    updateTasks();
+  });
+}
+document.getElementById('addTaskBtn').addEventListener('click', openTaskModal);
+
+/* ═══ COSTS ═══ */
+function updateCosts(d) {
+  const sessions = d.sessions?.stats || {};
+  const totalTokens = (sessions.total_input_tokens || 0) + (sessions.total_output_tokens || 0);
+  const costEstimate = (sessions.total_input_tokens || 0) * 0.00015 + (sessions.total_output_tokens || 0) * 0.0006;
+  document.getElementById('costSummary').innerHTML = `
+    <div class="text-xs text-muted">Total Tokens: <strong style="color:var(--brand-cyan);">${totalTokens.toLocaleString()}</strong></div>
+    <div class="text-xs text-muted">Est. Cost: <strong style="color:var(--brand-amber);">$${costEstimate.toFixed(3)}</strong></div>
+  `;
+  const activity = d.activity || [];
+  document.getElementById('costTableContent').innerHTML = `
+    <table class="cost-table">
+      <thead><tr><th>Time</th><th>Agent</th><th>Input Tokens</th><th>Output Tokens</th><th>Cost</th></tr></thead>
+      <tbody>${activity.slice(0, 15).map((a) => {
+        const cost = ((a.input_tokens || 0) * 0.00015 + (a.output_tokens || 0) * 0.0006);
+        return `<tr>
+          <td style="font-family:var(--font-mono);font-size:var(--font-size-xs);">${a.created_at ? new Date(a.created_at).toLocaleTimeString() : '-'}</td>
+          <td style="font-size:var(--font-size-xs);color:var(--agent-morpheus);">${a.agent || '?'}</td>
+          <td style="font-family:var(--font-mono);font-size:var(--font-size-xs);">${(a.input_tokens || 0).toLocaleString()}</td>
+          <td style="font-family:var(--font-mono);font-size:var(--font-size-xs);">${(a.output_tokens || 0).toLocaleString()}</td>
+          <td style="font-family:var(--font-mono);font-size:var(--font-size-xs);color:${cost > 0.01 ? 'var(--brand-amber)' : 'var(--text-muted)'};">$${cost.toFixed(4)}</td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="5" class="text-xs text-muted">Aucune donnée de coût disponible</td></tr>'}</tbody>
+    </table>`;
+}
+
+/* ═══ HEALTH ═══ */
+function updateHealth(d) {
+  const vps = d.vps;
+  document.getElementById('hostnameDisplay').textContent = 'Host: ' + (vps.hostname || 'klc');
+  document.getElementById('healthGauges').innerHTML = `
+    <div class="glass-card health-card">
+      <div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-2);">CPU</div>
+      <div class="value" style="color:${vps.cpu > 85 ? 'var(--brand-red)' : vps.cpu > 70 ? 'var(--brand-amber)' : 'var(--brand-cyan)'};">${vps.cpu}%</div>
+      ${C.ProgressBar({ pct: vps.cpu, height: '8px' })}
+    </div>
+    <div class="glass-card health-card">
+      <div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-2);">RAM</div>
+      <div class="value" style="color:${vps.ram.pct > 85 ? 'var(--brand-red)' : vps.ram.pct > 70 ? 'var(--brand-amber)' : 'var(--brand-mint)'};">${vps.ram.pct}%</div>
+      <div style="font-size:var(--font-size-xs);color:var(--text-muted);">${vps.ram.used}G / ${vps.ram.total}G</div>
+      ${C.ProgressBar({ pct: vps.ram.pct, height: '8px', color: 'var(--brand-mint)' })}
+    </div>
+    <div class="glass-card health-card">
+      <div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:0.05em;margin-bottom:var(--space-2);">Disk</div>
+      <div class="value" style="color:${vps.disk.pct > 85 ? 'var(--brand-red)' : vps.disk.pct > 70 ? 'var(--brand-amber)' : 'var(--brand-amber)'};">${vps.disk.pct}%</div>
+      <div style="font-size:var(--font-size-xs);color:var(--text-muted);">${vps.disk.used}G / ${vps.disk.total}G</div>
+      ${C.ProgressBar({ pct: vps.disk.pct, height: '8px', color: 'var(--brand-amber)' })}
+    </div>`;
+  document.getElementById('healthDetails').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:var(--space-3);font-size:var(--font-size-sm);">
+      <div><span class="text-muted">Uptime:</span> ${Math.floor(vps.uptime / 86400)}d ${Math.floor((vps.uptime % 86400) / 3600)}h ${Math.floor((vps.uptime % 3600) / 60)}m</div>
+      <div><span class="text-muted">Hostname:</span> ${vps.hostname || 'klc'}</div>
+      <div><span class="text-muted">RAM Total:</span> ${vps.ram.total}G</div>
+      <div><span class="text-muted">Disk Total:</span> ${vps.disk.total}G</div>
+    </div>`;
+}
+
+/* ═══ SCHEDULE ═══ */
+function updateSchedule(d) {
+  const crons = d.crons || [];
+  document.getElementById('cronCount').textContent = crons.length + ' jobs total';
+  const renderJobs = (jobs, containerId) => {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = jobs.length === 0
+      ? '<div class="text-sm text-muted" style="text-align:center;padding:var(--space-4);">Aucun job planifié</div>'
+      : jobs.map((j) => '<div class="job-card"><span class="badge" style="background:' + (j.source === 'hermes' ? 'var(--brand-violet)20' : 'rgba(255,255,255,0.06)') + ';color:' + (j.source === 'hermes' ? 'var(--brand-violet-glow)' : 'var(--text-muted)') + ';padding:1px 6px;border-radius:var(--radius-full);font-size:10px;">' + j.source + '</span><span style="font-family:var(--font-mono);font-size:var(--font-size-xs);color:var(--text-muted);">' + j.file + '</span><span style="font-family:var(--font-mono);font-size:var(--font-size-xs);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (j.line || '').substring(0, 80) + '</span></div>').join('');
+  };
+  renderJobs(crons.filter((c) => c.source === 'hermes'), 'cronHermesJobs');
+  renderJobs(crons.filter((c) => c.source === 'system'), 'cronSystemJobs');
+}
+
+/* ═══ CONTENT ═══ */
+function updateContentSidebar(content) {
+  if (!content || content.length === 0) {
+    document.getElementById('contentSidebar').innerHTML = '<div class="text-xs text-muted" style="padding:var(--space-3);">Aucun document</div>';
+    document.getElementById('contentCount').textContent = '0 documents';
+    return;
+  }
+  document.getElementById('contentCount').textContent = content.length + ' documents';
+  const grouped = {};
+  for (const doc of content) {
+    if (!grouped[doc.agent]) grouped[doc.agent] = [];
+    grouped[doc.agent].push(doc);
+  }
+  document.getElementById('contentSidebar').innerHTML = Object.entries(grouped).map(([agent, docs]) => '<div class="content-sidebar-group"><div class="group-title">' + agent + '</div>' + docs.map((d) => '<a class="content-sidebar-item' + (currentContentDoc === d.path ? ' active' : '') + '" href="#" onclick="previewDoc(\'' + d.path + '\', this);return false;">' + d.title + '</a>').join('') + '</div>').join('');
+}
+
+function previewDoc(path, el) {
+  currentContentDoc = path;
+  document.querySelectorAll('.content-sidebar-item').forEach((i) => i.classList.remove('active'));
+  if (el) el.classList.add('active');
+  document.getElementById('contentPreview').innerHTML = '<div class="loading">Chargement...</div>';
+  fetch('/api/content?path=' + encodeURIComponent(path))
+    .then((r) => r.text())
+    .then((html) => { document.getElementById('contentPreview').innerHTML = html; })
+    .catch(() => { document.getElementById('contentPreview').innerHTML = '<div class="text-sm text-muted">Erreur de chargement</div>'; });
+}
+
+/* ═══ EVOLUTION ═══ */
+function updateEvolution(d) {
+  const ev = d.evolution;
+  if (!ev) return;
+  const strip = [
+    { label: 'L1 Capture', value: ev.l1.active ? 'ON' : 'OFF', accent: ev.l1.active ? 'var(--status-success)' : 'var(--status-error)', subtext: ev.l1.label },
+    { label: 'L2 Injection', value: ev.l2.active ? 'ON' : 'OFF', accent: ev.l2.active ? 'var(--status-success)' : 'var(--status-error)', subtext: ev.l2.label },
+    { label: 'Learnings', value: ev.learningsCount, accent: 'var(--brand-violet-glow)', subtext: 'injectés aux agents' },
+    { label: 'Erreurs captées', value: ev.errorsCount, accent: ev.errorsCount > 0 ? 'var(--brand-amber)' : 'var(--status-success)', subtext: 'signaux L1' },
+    { label: 'Cycle', value: ev.cronActive ? 'AUTO' : 'MANUEL', accent: ev.cronActive ? 'var(--status-active)' : 'var(--status-idle)', subtext: ev.lastCycle ? 'dernier ' + new Date(ev.lastCycle).toLocaleString() : 'jamais' },
+  ].map(s => C.StatCard(s)).join('');
+  document.getElementById('evolutionStatusStrip').innerHTML = strip;
+
+  document.getElementById('evolutionLearnings').innerHTML = ev.learnings.length === 0
+    ? '<div class="text-sm text-muted" style="text-align:center;padding:var(--space-4);">Aucun learning capté pour l\'instant</div>'
+    : ev.learnings.map(l => '<div class="glass-card" style="padding:var(--space-3);margin-bottom:var(--space-2);border-left:2px solid var(--brand-violet-glow);"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-1);"><strong style="font-size:var(--font-size-sm);color:#F8FAFC;font-family:var(--font-mono);">' + l.target + '</strong><span class="badge" style="background:var(--brand-violet-glow)20;color:var(--brand-violet-glow);padding:1px 6px;border-radius:var(--radius-full);font-size:10px;">' + l.occurrences + 'x · ' + Math.round(l.confidence * 100) + '%</span></div><div style="font-size:var(--font-size-xs);color:var(--text-muted);line-height:1.5;">' + l.rule + '</div>' + (l.created_at ? '<div style="font-size:10px;color:var(--text-muted);margin-top:var(--space-1);">' + new Date(l.created_at).toLocaleString() + '</div>' : '') + '</div>').join('');
+
+  document.getElementById('evolutionErrors').innerHTML = ev.recentErrors.length === 0
+    ? '<div class="text-sm text-muted" style="text-align:center;padding:var(--space-4);">Aucune erreur captée</div>'
+    : ev.recentErrors.map(e => '<div style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-1) 0;font-size:var(--font-size-xs);border-bottom:1px solid rgba(255,255,255,0.03);"><span style="width:6px;height:6px;border-radius:50%;background:var(--status-error);flex-shrink:0;"></span><span style="font-family:var(--font-mono);color:var(--agent-morpheus);font-size:10px;flex-shrink:0;">' + (e.agent || '?').substring(0, 18) + '</span><span style="color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (e.message || '').substring(0, 70) + '</span></div>').join('');
+}
+
+function loadRuns() {
+  const el = document.getElementById('evolutionRuns');
+  if (!el) return;
+  fetch('/api/runs')
+    .then(r => r.json())
+    .then(runs => {
+      if (!Array.isArray(runs) || runs.length === 0) {
+        el.innerHTML = '<div class="text-sm text-muted" style="text-align:center;padding:var(--space-4);">Aucune exécution enregistrée</div>';
+        return;
+      }
+      el.innerHTML = runs.slice().reverse().map(r => {
+        const when = new Date(r.ts).toLocaleString();
+        const agents = (r.agents || []).map(a => '<span class="badge" style="background:var(--brand-violet-glow)20;color:var(--brand-violet-glow);padding:1px 6px;border-radius:var(--radius-full);font-size:10px;">' + a + '</span>').join(' ');
+        const tools = (r.tools && r.tools.length) ? '<span class="badge" style="background:var(--brand-amber)20;color:var(--brand-amber);padding:1px 5px;border-radius:var(--radius-full);font-size:9px;margin-left:4px;">🔧 ' + r.tools.length + '</span>' : '';
+        return '<div class="glass-card" style="padding:var(--space-3);border-left:2px solid var(--brand-cyan);"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-1);"><strong style="font-size:var(--font-size-sm);color:#F8FAFC;font-family:var(--font-mono);text-transform:uppercase;">' + r.type + '</strong><span class="text-xs text-muted">' + when + ' · ' + r.latency_ms + 'ms · ' + r.answer_len + ' car.</span></div><div style="margin-bottom:var(--space-1);">' + agents + tools + '</div><div style="font-size:var(--font-size-xs);color:var(--text-muted);line-height:1.5;white-space:pre-wrap;overflow:hidden;text-overflow:ellipsis;">' + (r.prompt || '') + '</div></div>';
+      }).join('');
+    })
+    .catch(() => { el.innerHTML = '<div class="text-sm text-muted" style="text-align:center;padding:var(--space-4);">Erreur de chargement</div>'; });
+}
+
+function runCycle() {
+  const r = document.getElementById('evolutionRunResult');
+  r.textContent = 'Déclenchement...';
+  fetch('/api/evolution/run', { method: 'POST' })
+    .then(res => res.json())
+    .then(d => { r.textContent = d.success ? (d.message || 'OK') : (d.message || 'Erreur'); })
+    .catch(() => { r.textContent = 'Erreur réseau'; });
+}
+
+function runMoA() {
+  const prompt = document.getElementById('moaPrompt').value.trim();
+  const candidatesRaw = document.getElementById('moaCandidates').value.trim();
+  const synthesizer = document.getElementById('moaSynthesizer').value.trim();
+  const statusEl = document.getElementById('moaStatus');
+  const timingEl = document.getElementById('moaTiming');
+  const resultEl = document.getElementById('moaResult');
+  const candEl = document.getElementById('moaCandidatesList');
+  if (!prompt) { statusEl.textContent = '⚠️ Prompt vide'; return; }
+  const candidates = candidatesRaw.split(',').map(s => s.trim()).filter(Boolean);
+  const body = { messages: [{ role: 'user', content: prompt }], moa: { candidates, synthesizer: synthesizer || 'hy3-free' } };
+  statusEl.textContent = '⏳ Appel du routeur MoA...';
+  resultEl.textContent = '—';
+  candEl.innerHTML = '<div class="text-sm text-muted" style="text-align:center;padding:var(--space-4);">En cours...</div>';
+  const t0 = performance.now();
+  fetch('/api/moa', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+    .then(async (res) => {
+      const data = await res.json().catch(() => ({}));
+      const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
+      timingEl.textContent = elapsed + 's';
+      if (!res.ok) { statusEl.textContent = '❌ Erreur ' + res.status; resultEl.textContent = data.error || 'Échec MoA'; return; }
+      const content = data.choices?.[0]?.message?.content || '';
+      resultEl.textContent = content;
+      const ok = (res.headers.get('x-klc-moa-candidates') || '').split(',').filter(Boolean);
+      const failed = (res.headers.get('x-klc-moa-failed') || '').split(',').filter(Boolean);
+      const synth = res.headers.get('x-klc-moa-synthesizer') || synthesizer;
+      const badges = ok.map(c => '<span class="badge" style="background:var(--status-success)20;color:var(--status-success);padding:2px 8px;border-radius:var(--radius-full);font-size:11px;margin:2px;">✓ ' + c + '</span>').join(' ');
+      const failBadges = failed.map(c => '<span class="badge" style="background:var(--status-error)20;color:var(--status-error);padding:2px 8px;border-radius:var(--radius-full);font-size:11px;margin:2px;">✗ ' + c + '</span>').join(' ');
+      candEl.innerHTML = '<div style="margin-bottom:var(--space-2);font-size:var(--font-size-xs);color:var(--text-muted);">Synthétiseur : <strong style="color:var(--brand-cyan);">' + synth + '</strong></div><div>' + badges + failBadges + '</div>';
+      statusEl.textContent = '✅ ' + ok.length + ' candidat(s) · ' + failed.length + ' échec(s)';
+    })
+    .catch((e) => { statusEl.textContent = '❌ Erreur réseau'; resultEl.textContent = String(e); });
+}
+
+function buildSwarmAgentCards(agentAnswers) {
+  return (agentAnswers || []).map(a => {
+    const tools = (a.tools || []).map(t => '<span class="badge" style="background:var(--brand-amber)20;color:var(--brand-amber);padding:1px 5px;border-radius:var(--radius-full);font-size:9px;margin:1px;">🔧 ' + t + '</span>').join(' ');
+    return '<div class="glass-card" style="padding:var(--space-3);margin-bottom:var(--space-2);border-left:2px solid var(--brand-violet-glow);"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-1);"><strong style="font-size:var(--font-size-sm);color:#F8FAFC;font-family:var(--font-mono);">' + a.agent + '</strong><span class="badge" style="background:var(--brand-cyan)20;color:var(--brand-cyan);padding:1px 6px;border-radius:var(--radius-full);font-size:10px;">' + a.model + '</span></div>' + (tools ? '<div style="margin-bottom:var(--space-1);">' + tools + '</div>' : '') + '<div style="font-size:var(--font-size-xs);color:var(--text-muted);line-height:1.5;white-space:pre-wrap;">' + (a.answer || '') + '</div></div>';
+  }).join('');
+}
+
+function runSwarm() {
+  const goal = document.getElementById('swarmGoal').value.trim();
+  const synthesizer = document.getElementById('swarmSynthesizer').value.trim();
+  const statusEl = document.getElementById('swarmStatus');
+  const timingEl = document.getElementById('swarmTiming');
+  const resultEl = document.getElementById('swarmResult');
+  const agentsEl = document.getElementById('swarmAgentsList');
+  if (!goal) { statusEl.textContent = '⚠️ Objectif vide'; return; }
+  const agents = Array.from(document.querySelectorAll('.swarm-agent:checked')).map(c => c.value);
+  if (agents.length === 0) { statusEl.textContent = '⚠️ Aucun agent sélectionné'; return; }
+  const body = { messages: [{ role: 'user', content: goal }], agents, synthesizer: synthesizer || 'hy3-free', enable_tools: document.getElementById('swarmTools').checked, stream: document.getElementById('swarmStream').checked };
+  statusEl.textContent = '⏳ Swarm de ' + agents.length + ' agents...';
+  resultEl.textContent = '—';
+  agentsEl.innerHTML = '<div class="text-sm text-muted" style="text-align:center;padding:var(--space-4);">En cours...</div>';
+  const t0 = performance.now();
+  if (body.stream) { streamSwarm(body, { statusEl, timingEl, resultEl, agentsEl, t0 }); return; }
+  fetch('/api/swarm', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+    .then(async (res) => {
+      const data = await res.json().catch(() => ({}));
+      const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
+      timingEl.textContent = elapsed + 's';
+      if (!res.ok) { statusEl.textContent = '❌ Erreur ' + res.status; resultEl.textContent = data.error || 'Échec Swarm'; return; }
+      const content = data.choices?.[0]?.message?.content || '';
+      resultEl.textContent = content;
+      const ok = (res.headers.get('x-klc-swarm-agents') || '').split(',').filter(Boolean);
+      const failed = (res.headers.get('x-klc-swarm-failed') || '').split(',').filter(Boolean);
+      const synth = res.headers.get('x-klc-moa-synthesizer') || synthesizer;
+      const agentCards = buildSwarmAgentCards(data.agents);
+      const failBadges = failed.map(c => '<span class="badge" style="background:var(--status-error)20;color:var(--status-error);padding:2px 8px;border-radius:var(--radius-full);font-size:11px;margin:2px;">✗ ' + c + '</span>').join(' ');
+      agentsEl.innerHTML = (failBadges ? '<div style="margin-bottom:var(--space-2);">' + failBadges + '</div>' : '') + (agentCards || '<div class="text-sm text-muted">Aucune réponse</div>');
+      const toolsUsed = (res.headers.get('x-klc-tools-used') || '').split(',').filter(Boolean);
+      statusEl.textContent = '✅ ' + ok.length + ' agent(s) · ' + failed.length + ' échec(s) · synth: ' + synth + (toolsUsed.length ? ' · 🔧 ' + toolsUsed.length : '');
+    })
+    .catch((e) => { statusEl.textContent = '❌ Erreur réseau'; resultEl.textContent = String(e); });
+}
+
+async function streamSwarm(body, ui) {
+  const { statusEl, timingEl, resultEl, agentsEl, t0 } = ui;
+  try {
+    const resp = await fetch('/api/swarm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!resp.ok) { statusEl.textContent = '❌ Erreur ' + resp.status; resultEl.textContent = await resp.text(); return; }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '', meta = null, acc = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop();
+      for (const ev of parts) {
+        const line = ev.trim();
+        if (!line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (payload === '[DONE]') continue;
+        try {
+          const json = JSON.parse(payload);
+          if (json.type === 'meta') { meta = json; agentsEl.innerHTML = buildSwarmAgentCards(json.agents || []); }
+          else if (json.delta !== undefined) { acc += json.delta; resultEl.textContent = acc; }
+        } catch (e) {}
+      }
+    }
+    const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
+    timingEl.textContent = elapsed + 's';
+    statusEl.textContent = '✅ ' + (meta?.agents || []).length + ' agent(s) · stream terminé';
+  } catch (e) { statusEl.textContent = '❌ Erreur réseau'; resultEl.textContent = String(e); }
+}
+
+/* ═══ INIT ═══ */
+connectSSE();
+loadRuns();
+setInterval(loadRuns, 10000);
+fetch('/api/snapshot')
+  .then((r) => r.json())
+  .then((d) => { data = d; updateDashboard(d); });
+setInterval(() => {
+  if (document.getElementById('tab-tasks').classList.contains('active')) updateTasks();
+}, 5000);
+console.log('🧠 MaTrix Mission Control loaded');
+</script>
+</body>
+</html>
