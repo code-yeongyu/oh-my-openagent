@@ -112,6 +112,7 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
       taskId,
       sisyphusAgentConfig,
       categoryModel: effectiveCategoryModel,
+      inheritedModel: parentContext.model,
     })
     if (promptError) {
       const promptResult = await retrySyncPromptWithFallbacks({
@@ -130,6 +131,7 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
             taskId,
             sisyphusAgentConfig,
             categoryModel: fallbackModel,
+            inheritedModel: parentContext.model,
           })
         },
       })

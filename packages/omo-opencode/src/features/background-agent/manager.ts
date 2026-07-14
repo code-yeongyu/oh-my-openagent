@@ -32,6 +32,7 @@ import {
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { setSessionTools } from "../../shared/session-tools-store"
+import { canUseCallOmoAgent } from "../../shared/delegated-agent-tool-policy"
 import { clearSessionAgent, setSessionAgent, subagentSessions, updateSessionAgent } from "../claude-code-session-state"
 import { MESSAGE_STORAGE } from "../hook-message-injector"
 import { getTaskToastManager } from "../task-toast-manager"
@@ -915,7 +916,7 @@ The fallback retry session is now created and can be inspected directly.
 
     const launchTools = {
       task: false,
-      call_omo_agent: true,
+      call_omo_agent: canUseCallOmoAgent(launchModel, input.parentModel),
       question: false,
       ...userDenied,
       ...getAgentToolRestrictions(input.agent, {
@@ -1419,7 +1420,7 @@ The fallback retry session is now created and can be inspected directly.
           tools: (() => {
             const tools = {
               task: false,
-              call_omo_agent: true,
+              call_omo_agent: canUseCallOmoAgent(resumeModel, existingTask.parentModel),
               question: false,
               ...getAgentToolRestrictions(existingTask.agent, {
                 includeTeamToolDenylist: existingTask.teamRunId === undefined,

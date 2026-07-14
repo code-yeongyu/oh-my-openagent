@@ -9,6 +9,7 @@ import { migrateToolsToPermission } from "../../shared/permission-compat"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { routePromptRetry } from "../../shared/session-route"
 import { setSessionTools } from "../../shared/session-tools-store"
+import { canUseCallOmoAgent } from "../../shared/delegated-agent-tool-policy"
 import { isPlanFamily } from "./constants"
 import { formatDetailedError } from "./error-formatting"
 import { buildTaskPrompt } from "./prompt-builder"
@@ -53,6 +54,8 @@ function isUnexpectedEofError(error: unknown): boolean {
 export function buildSyncPromptTools(
   agentToUse: string,
   permission?: Record<string, "ask" | "allow" | "deny">,
+  model?: DelegatedModelConfig,
+  inheritedModel?: Pick<DelegatedModelConfig, "providerID" | "modelID">,
 ): Record<string, boolean> {
   const userDenied: Record<string, boolean> = {}
   if (permission) {
@@ -62,7 +65,7 @@ export function buildSyncPromptTools(
   }
   return {
     task: isPlanFamily(agentToUse),
-    call_omo_agent: true,
+    call_omo_agent: canUseCallOmoAgent(model, inheritedModel),
     question: false,
     ...userDenied,
     ...getAgentToolRestrictions(agentToUse),
@@ -77,6 +80,7 @@ export async function sendSyncPrompt(
     args: DelegateTaskArgs
     systemContent: string | undefined
     categoryModel: DelegatedModelConfig | undefined
+    inheritedModel?: Pick<DelegatedModelConfig, "providerID" | "modelID">
     directory: string
     toastManager: { removeTask: (id: string) => void } | null | undefined
     taskId: string | undefined
@@ -89,7 +93,7 @@ export async function sendSyncPrompt(
   const userPermission = input.categoryModel?.tools
     ? migrateToolsToPermission(input.categoryModel.tools)
     : undefined
-  const tools = buildSyncPromptTools(input.agentToUse, userPermission)
+  const tools = buildSyncPromptTools(input.agentToUse, userPermission, input.categoryModel, input.inheritedModel)
   setSessionTools(input.sessionID, tools)
 
   const loweredReasoning = applySessionPromptParams(input.sessionID, input.categoryModel)

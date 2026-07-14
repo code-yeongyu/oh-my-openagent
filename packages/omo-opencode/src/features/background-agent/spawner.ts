@@ -110,6 +110,7 @@ export async function startTask(
     agent: normalizedAgent,
     system: input.skillContent,
     model: input.model,
+    inheritedModel: input.parentModel,
     prompt: input.prompt,
     includeTeamToolDenylist: input.teamRunId === undefined,
   })
@@ -227,6 +228,7 @@ export async function resumeTask(
     kind: "resume",
     agent: task.agent,
     model: task.model,
+    inheritedModel: task.parentModel,
     prompt: input.prompt,
     includeTeamToolDenylist: task.teamRunId === undefined,
   })
