@@ -1778,19 +1778,79 @@ NODE
 }
 
 run_mcp_status_call() {
-  local label="$1" output="$2"
+  local label="$1" output="$2" stderr_output="$EVIDENCE_DIR/${1}.stderr.log"
   shift 2
-  printf '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"lsp_status","arguments":{}}}\n' |
-    env \
-      HOME="$HOME" \
-      XDG_CONFIG_HOME="$XDG_CONFIG_HOME" \
-      OMO_LSP_DAEMON_DIR="$OMO_LSP_DAEMON_DIR" \
-      ${OMO_LSP_DAEMON_CLI+OMO_LSP_DAEMON_CLI="$OMO_LSP_DAEMON_CLI"} \
-      ${OMO_LSP_DAEMON_VERSION+OMO_LSP_DAEMON_VERSION="$OMO_LSP_DAEMON_VERSION"} \
-      LSP_TOOLS_MCP_PROJECT_CONFIG="$SANDBOX_ROOT/project/.opencode/lsp.json:$SANDBOX_ROOT/project/.omo/lsp.json:$SANDBOX_ROOT/project/.omo/lsp-client.json" \
-      LSP_TOOLS_MCP_USER_CONFIG="$XDG_CONFIG_HOME/opencode/lsp.json" \
-      LSP_TOOLS_MCP_INSTALL_DECISIONS="$XDG_CONFIG_HOME/opencode/lsp-install-decisions.json" \
-      "$@" >"$output" 2>"$EVIDENCE_DIR/${label}.stderr.log"
+  env \
+    HOME="$HOME" \
+    XDG_CONFIG_HOME="$XDG_CONFIG_HOME" \
+    OMO_LSP_DAEMON_DIR="$OMO_LSP_DAEMON_DIR" \
+    ${OMO_LSP_DAEMON_CLI+OMO_LSP_DAEMON_CLI="$OMO_LSP_DAEMON_CLI"} \
+    ${OMO_LSP_DAEMON_VERSION+OMO_LSP_DAEMON_VERSION="$OMO_LSP_DAEMON_VERSION"} \
+    LSP_TOOLS_MCP_PROJECT_CONFIG="$SANDBOX_ROOT/project/.opencode/lsp.json:$SANDBOX_ROOT/project/.omo/lsp.json:$SANDBOX_ROOT/project/.omo/lsp-client.json" \
+    LSP_TOOLS_MCP_USER_CONFIG="$XDG_CONFIG_HOME/opencode/lsp.json" \
+    LSP_TOOLS_MCP_INSTALL_DECISIONS="$XDG_CONFIG_HOME/opencode/lsp-install-decisions.json" \
+    node --input-type=module - "$output" "$stderr_output" "$@" <<'NODE'
+import { spawn } from "node:child_process";
+import { writeFileSync } from "node:fs";
+
+const [output, stderrOutput, command, ...args] = process.argv.slice(2);
+if (!command) process.exit(125);
+
+const child = spawn(command, args, { env: process.env, stdio: ["pipe", "pipe", "pipe"] });
+let stdout = "";
+let stderr = "";
+let responseSeen = false;
+let forceTimer;
+
+child.stdout.setEncoding("utf8");
+child.stderr.setEncoding("utf8");
+child.stdout.on("data", (chunk) => {
+  stdout += chunk;
+  if (!responseSeen && stdout.includes("\n")) {
+    responseSeen = true;
+    child.stdin.end();
+  }
+});
+child.stderr.on("data", (chunk) => {
+  stderr += chunk;
+});
+child.stdin.on("error", (error) => {
+  stderr += `${error instanceof Error ? error.stack ?? error.message : String(error)}\n`;
+});
+
+const request = { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "lsp_status", arguments: {} } };
+child.stdin.write(`${JSON.stringify(request)}\n`);
+
+let timedOut = false;
+const timer = setTimeout(() => {
+  timedOut = true;
+  child.kill("SIGTERM");
+  forceTimer = setTimeout(() => child.kill("SIGKILL"), 3000);
+}, 30000);
+const outcome = await new Promise((resolve) => {
+  let settled = false;
+  const finish = (value) => {
+    if (settled) return;
+    settled = true;
+    resolve(value);
+  };
+  child.once("error", (error) => finish({ error }));
+  child.once("close", (code, signal) => finish({ code, signal }));
+});
+clearTimeout(timer);
+if (forceTimer) clearTimeout(forceTimer);
+writeFileSync(output, stdout);
+writeFileSync(stderrOutput, stderr);
+
+if (timedOut) process.exit(124);
+if ("error" in outcome) {
+  console.error(outcome.error);
+  process.exit(126);
+}
+if (!responseSeen) process.exit(1);
+if (typeof outcome.code === "number") process.exit(outcome.code);
+process.exit(outcome.signal ? 128 : 1);
+NODE
 }
 
 capture_current_daemon_owner() {
