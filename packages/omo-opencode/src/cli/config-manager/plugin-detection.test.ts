@@ -7,6 +7,7 @@ import { join } from "node:path"
 import { resetConfigContext } from "./config-context"
 import { detectCurrentConfig } from "./detect-current-config"
 import { addPluginToOpenCodeConfig } from "./add-plugin-to-opencode-config"
+import { parseOpenCodeConfigFileWithError } from "./parse-opencode-config-file"
 import * as pluginNameWithVersion from "./plugin-name-with-version"
 
 const sourcePlugin = new URL("../../index.ts", import.meta.url).href
@@ -212,6 +213,24 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
     const savedContent = readFileSync(testConfigPath, "utf-8")
     expect(savedContent.includes('"plugin": [\n    "oh-my-openagent"\n  ]')).toBe(true)
     expect(savedContent.includes("oh-my-opencode")).toBe(false)
+  })
+
+  it("adds a plugin after a commented JSONC plugin example", async () => {
+    // given
+    testConfigPath = join(testConfigDir, "opencode.jsonc")
+    writeFileSync(
+      testConfigPath,
+      '{\n  // "plugin": ["oh-my-opencode"]\n  "provider": {}\n}\n',
+      "utf-8",
+    )
+
+    // when
+    const result = await addPluginToOpenCodeConfig("3.11.0")
+
+    // then
+    expect(result.success).toBe(true)
+    expect(parseOpenCodeConfigFileWithError(testConfigPath).config?.plugin).toEqual(["oh-my-openagent"])
+    expect(readFileSync(testConfigPath, "utf-8")).toContain('// "plugin": ["oh-my-opencode"]')
   })
 
   it("mirrors an existing source plugin entry into profile configs", async () => {
