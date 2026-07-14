@@ -170,6 +170,7 @@ Violations caught by `../../scripts/typescript/check-no-excuse-rules.ts`. Run af
 | `no-explicit-any-return` | `(): any` or `(): Promise<any>` return types | `// no-excuse-ok: any` |
 | `empty-catch` | `catch { }` or `catch (e) { }` with empty body | `// no-excuse-ok: catch` |
 | `catch-without-narrowing` | `catch (e)` used without `instanceof` or re-throw | `// no-excuse-ok: catch` |
+| `no-prose-assertion` | Natural-language `toContain`, `not.toContain`, string `toMatch`, long-string `toBe`, or `toMatchSnapshot` in `*.test.*`, `*.spec.*`, and `__tests__` files | `// no-excuse-ok: no-prose-assertion` |
 
 Biome enforces additional rules (noExplicitAny, noNonNullAssertion, noDefaultExport, useImportType). The script catches what Biome cannot.
 

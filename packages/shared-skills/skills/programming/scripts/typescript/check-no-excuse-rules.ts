@@ -15,6 +15,7 @@
  *   no-explicit-any-return  - `(): any` return types (opt out: `// no-excuse-ok: any`)
  *   empty-catch             - `catch { }` or `catch (e) { }` with empty body
  *   catch-without-narrowing - catch block that uses error without instanceof narrowing
+ *   no-prose-assertion      - natural-language assertions in test files
  *
  * Usage:
  *   bun run scripts/check-no-excuse-rules.ts <file-or-dir>...
@@ -43,6 +44,7 @@ type RuleId =
   | "no-explicit-any-return"
   | "empty-catch"
   | "catch-without-narrowing"
+  | "no-prose-assertion"
 
 type Violation = {
   readonly ruleId: RuleId
@@ -60,6 +62,10 @@ const IGNORED_DIRECTORIES = new Set([
 
 const OPT_OUT_RE = /\/\/\s*no-excuse-ok:\s*any/
 const CATCH_OK_RE = /\/\/\s*no-excuse-ok:\s*catch/
+const PROSE_ASSERTION_OK_RE = /\/\/\s*no-excuse-ok:\s*no-prose-assertion/
+const PROSE_STRING_ASSERTION_MATCHERS = new Set(["toContain", "toMatch", "toBe"])
+const MACHINE_STRING_RE = /[<>{}\[\]\\/:=]|(?:^|\s)--/
+const PROSE_WORD_RE = /[A-Za-z][A-Za-z0-9'-]*/g
 
 function isIncludedFile(filePath: string): boolean {
   return INCLUDED_EXTENSIONS.has(path.extname(filePath).toLowerCase())
@@ -67,6 +73,15 @@ function isIncludedFile(filePath: string): boolean {
 
 function isDeclarationFile(filePath: string): boolean {
   return filePath.endsWith(".d.ts") || filePath.endsWith(".d.mts") || filePath.endsWith(".d.cts")
+}
+
+function isTestFile(filePath: string): boolean {
+  return /\.(test|spec)\.[^.]+$/i.test(path.basename(filePath)) || /(^|[\\/])__tests__([\\/]|$)/.test(filePath)
+}
+
+function isNaturalLanguageProse(value: string): boolean {
+  if (MACHINE_STRING_RE.test(value)) return false
+  return (value.match(PROSE_WORD_RE)?.length ?? 0) >= 3
 }
 
 function discoverFiles(inputs: string[]): string[] {
@@ -192,6 +207,31 @@ function analyzeFile(filePath: string): Violation[] {
           const p = pos(node)
           violations.push({ ruleId: "no-explicit-any-return", filePath, ...p, message: "`(): any` return — use a specific type" })
         }
+      }
+    }
+
+    // ── prose assertions in test files ──
+    if (isTestFile(filePath) && ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+      const matcher = node.expression.name.text
+      const argument = node.arguments[0]
+      const isOptedOut = PROSE_ASSERTION_OK_RE.test(getLineText(sourceFile, sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line))
+      const stringArgument = argument !== undefined && ts.isStringLiteral(argument) ? argument : null
+      const isProseArgument = stringArgument !== null && isNaturalLanguageProse(stringArgument.text)
+      const shouldFlag = matcher === "toMatchSnapshot"
+        || (PROSE_STRING_ASSERTION_MATCHERS.has(matcher) && isProseArgument && (
+          matcher === "toContain"
+          || matcher === "toMatch"
+          || (matcher === "toBe" && stringArgument !== null && stringArgument.text.length >= 24)
+        ))
+
+      if (shouldFlag && !isOptedOut) {
+        const p = pos(node)
+        violations.push({
+          ruleId: "no-prose-assertion",
+          filePath,
+          ...p,
+          message: `\`${matcher}\` prose assertion — assert parsed behavior, structure, or rule data instead`,
+        })
       }
     }
 
