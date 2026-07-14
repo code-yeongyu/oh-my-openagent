@@ -22,7 +22,7 @@
 
 Each contains only a `bin/oh-my-opencode.js` launcher and a `package.json`. [`script/build-binaries.ts`](../script/build-binaries.ts) writes the same generated Node-compatible launcher payload from `createPlatformLauncherSource()` to all 12 packages; these are not distinct native binaries, and the build does not perform native compilation. Published by the `publish-platform.yml` workflow.
 
-`-baseline` and `-musl` suffixes are package-selection compatibility metadata, not distinct native binaries: baseline selects pure x86_64 (no AVX2) for older CPUs, while musl selects musl libc compatibility for Alpine. The `windows-arm64` entry targets Windows-on-ARM via x64 emulation / Node fallback. Runtime selection happens in `bin/` and `postinstall.mjs`.
+`-baseline` and `-musl` suffixes remain package-selection and compatibility metadata. Current generated launcher payloads are identical Node scripts; the suffixes preserve x64 CPU and musl libc compatibility routing, respectively. The `windows-arm64` entry targets Windows-on-ARM through x64 emulation, with the launcher’s Node fallback available when Bun cannot run. Runtime selection happens in `bin/` and `postinstall.mjs`.
 
 ## MCP PACKAGES
 

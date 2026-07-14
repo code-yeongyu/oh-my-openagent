@@ -16,7 +16,7 @@ Node-side launch surface for every public CLI alias. The root shim resolves a pl
 
 ## RUNTIME FLOW
 
-`oh-my-opencode.js` derives the invocation name, optionally routes the LazyCodex Node installer, resolves the matching `oh-my-opencode-*` or `oh-my-openagent-*` optional dependency, then spawns its `bin/oh-my-opencode.js` launcher payload. That generated Node launcher runs root `dist/cli` with Bun and falls back to root `dist/cli-node` with Node. On x64 the shim can fall back from the optimized package to `-baseline` after `SIGILL`.
+`oh-my-opencode.js` derives the invocation name, optionally routes the LazyCodex Node installer, resolves an ordered list of `oh-my-opencode-*` or `oh-my-openagent-*` platform package candidates, then spawns the first installed package's generated `bin/oh-my-opencode.js` launcher. Each generated Node launcher runs root `dist/cli` with Bun and, when Bun is missing or exits with `SIGILL`, falls back to root `dist/cli-node` with Node. The root shim retains ordered package fallback compatibility, including x64 `-baseline` candidates, but current generated platform payloads are identical Node scripts, so a Bun `SIGILL` is normally handled inside the selected launcher rather than by switching to a baseline package.
 
 ## CONVENTIONS
 
