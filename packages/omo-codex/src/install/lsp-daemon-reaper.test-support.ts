@@ -18,6 +18,7 @@ export interface LegacyDaemonFixture {
 }
 
 export type SpawnedChild = ChildProcessByStdio<null, Readable, Readable>
+type LegacyEndpointKind = "natural" | "hashed" | "windowsPipe"
 
 function nodeBinary(): string {
   if (process.env.NODE_BINARY) return process.env.NODE_BINARY
@@ -57,17 +58,42 @@ export function versionDirFor(codexHome: string, version: string): string {
 export function legacyEndpointFor(input: {
   readonly codexHome: string
   readonly version: string
-  readonly kind: "natural" | "hashed" | "windowsPipe"
+  readonly kind: LegacyEndpointKind
+  readonly platform?: NodeJS.Platform
   readonly tempDir?: string
 }): string {
   const versionDir = versionDirFor(input.codexHome, input.version)
-  if (input.kind === "natural") return join(versionDir, "daemon.sock")
-  if (input.kind === "windowsPipe") {
-    const digest = createHash("sha256").update(versionDir.replaceAll("/", "\\")).digest("hex").slice(0, 16)
-    return `\\\\.\\pipe\\omo-lsp-${input.version}-${digest}`
-  }
+  if (input.kind === "natural") return endpointPathJoin(input.platform ?? platform(), versionDir, "daemon.sock")
+  if (input.kind === "windowsPipe") return legacyWindowsPipeEndpoint(versionDir, input.version)
   const digest = createHash("sha256").update(versionDir).digest("hex").slice(0, 16)
-  return join(input.tempDir ?? tmpdir(), `omo-lsp-${input.version}-${digest}.sock`)
+  return endpointPathJoin(input.platform ?? platform(), input.tempDir ?? tmpdir(), `omo-lsp-${input.version}-${digest}.sock`)
+}
+
+export function liveLegacyEndpointFor(input: {
+  readonly codexHome: string
+  readonly version: string
+  readonly platform?: NodeJS.Platform
+}): string {
+  const targetPlatform = input.platform ?? platform()
+  return legacyEndpointFor({
+    codexHome: input.codexHome,
+    version: input.version,
+    kind: targetPlatform === "win32" ? "windowsPipe" : "natural",
+    platform: targetPlatform,
+  })
+}
+
+function endpointPathJoin(targetPlatform: NodeJS.Platform, root: string, leaf: string): string {
+  return targetPlatform === "win32" ? join(root, leaf) : `${root.replace(/\/+$/u, "")}/${leaf}`
+}
+
+function legacyWindowsPipeEndpoint(versionDir: string, version: string): string {
+  const digest = createHash("sha256").update(versionDir.replaceAll("/", "\\")).digest("hex").slice(0, 16)
+  return `\\\\.\\pipe\\omo-lsp-${version}-${digest}`
+}
+
+function isWindowsNamedPipeEndpoint(endpoint: string): boolean {
+  return endpoint.startsWith("\\\\.\\pipe\\")
 }
 
 export async function writeLegacyVersionState(input: {
@@ -114,9 +140,10 @@ export function startLegacyDaemonProcess(input: {
     'const { dirname } = require("node:path")',
     "const endpoint = process.env.LEGACY_ENDPOINT",
     "const holdSocketOpen = process.env.LEGACY_HOLD_SOCKET_OPEN === \"1\"",
+    "const isWindowsPipe = endpoint.startsWith('\\\\\\\\.\\\\pipe\\\\')",
     "if (process.env.LEGACY_IGNORE_SIGTERM === \"1\") process.on(\"SIGTERM\", () => {})",
-    "mkdirSync(dirname(endpoint), { recursive: true })",
-    "try { unlinkSync(endpoint) } catch {}",
+    "if (!isWindowsPipe) mkdirSync(dirname(endpoint), { recursive: true })",
+    "if (!isWindowsPipe) { try { unlinkSync(endpoint) } catch {} }",
     "const server = createServer((socket) => {",
     "  let buffer = ''",
     "  socket.on('data', (chunk) => {",
@@ -193,5 +220,6 @@ export async function stopChild(child: SpawnedChild): Promise<void> {
 }
 
 export async function removePathIfPresent(path: string): Promise<void> {
+  if (isWindowsNamedPipeEndpoint(path)) return
   await rm(path, { recursive: true, force: true })
 }

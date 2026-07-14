@@ -7,7 +7,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { findRepoRoot, findRepoRootFromImporter, resolveCodexInstallerBinDir, runCodexInstaller } from "./install-codex"
 import { createRepoWithBuiltComponentBins } from "./install-codex-test-fixtures"
-import { createLegacyCodexHome, legacyEndpointFor, startIdleNodeProcess, startLegacyDaemonProcess, stopChild, waitForChildReady, writeLegacyVersionState } from "./lsp-daemon-reaper.test-support"
+import { createLegacyCodexHome, liveLegacyEndpointFor, startIdleNodeProcess, startLegacyDaemonProcess, stopChild, waitForChildReady, writeLegacyVersionState } from "./lsp-daemon-reaper.test-support"
 
 const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
 
@@ -260,7 +260,7 @@ describe("install-codex", () => {
     const codexHome = createLegacyCodexHome("omo-codex-home-legacy-daemon-")
     const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-legacy-daemon-"))
     const home = await mkdtemp(join(tmpdir(), "omo-codex-user-home-legacy-daemon-"))
-    const endpoint = legacyEndpointFor({ codexHome, version: "0.1.0", kind: "natural" })
+    const endpoint = liveLegacyEndpointFor({ codexHome, version: "0.1.0" })
     const daemon = startLegacyDaemonProcess({ endpoint })
     const unrelated = startIdleNodeProcess()
     await waitForChildReady(daemon)
@@ -286,7 +286,8 @@ describe("install-codex", () => {
 
       // then
       expect(logs.some((line) => line.includes("Warning: deferred legacy Codex LSP daemon cleanup for v0.1.0"))).toBe(true)
-      expect(logs.some((line) => line.includes("pid ownership was not proven"))).toBe(true)
+      const expectedReason = process.platform === "win32" ? "Windows cannot prove pid ownership safely" : "pid ownership was not proven"
+      expect(logs.some((line) => line.includes(expectedReason))).toBe(true)
       expect((await stat(version.versionDir)).isDirectory()).toBe(true)
       await expect(stat(join(home, ".omo", "lsp-daemon"))).rejects.toThrow()
     } finally {

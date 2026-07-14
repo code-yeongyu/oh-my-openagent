@@ -7,6 +7,7 @@ import { reapLspDaemons } from "./lsp-daemon-reaper"
 import {
   createLegacyCodexHome,
   legacyEndpointFor,
+  liveLegacyEndpointFor,
   removePathIfPresent,
   startIdleNodeProcess,
   startLegacyDaemonProcess,
@@ -18,6 +19,7 @@ import {
 } from "./lsp-daemon-reaper.test-support"
 
 const posixOnly = process.platform === "win32" ? test.skip : test
+const windowsOnly = process.platform === "win32" ? test : test.skip
 
 const cleanupRoots: string[] = []
 const cleanupChildren: SpawnedChild[] = []
@@ -166,6 +168,35 @@ describe("reapLspDaemons live ownership", () => {
         },
       ])
       expect(existsSync(version.versionDir)).toBe(false)
+    },
+    { timeout: 15_000 },
+  )
+
+  windowsOnly(
+    "#given a live Windows named pipe legacy daemon #when reaping #then it defers without sending POSIX signals",
+    async () => {
+      const codexHome = trackRoot(createLegacyCodexHome("omo-reap-win32-live-"))
+      const endpoint = liveLegacyEndpointFor({ codexHome, version: "0.1.0" })
+      const daemon = trackChild(startLegacyDaemonProcess({ endpoint }))
+      await waitForChildReady(daemon)
+      const version = await writeLegacyVersionState({
+        codexHome,
+        version: "0.1.0",
+        pid: String(daemon.pid ?? 0),
+        endpoint,
+      })
+
+      const reaped = await reapLspDaemons(codexHome)
+
+      expect(reaped).toEqual([
+        {
+          version: "0.1.0",
+          status: "deferred",
+          reason: "legacy named pipe responded but Windows cannot prove pid ownership safely",
+        },
+      ])
+      expect(await waitForChildExit(daemon, 250)).toBe(false)
+      expect(existsSync(version.versionDir)).toBe(true)
     },
     { timeout: 15_000 },
   )
