@@ -141,7 +141,7 @@ browser_evaluate → () => document.body.innerText  (Light Mode — 먼저)
 
 | 패턴 | 감지 방법 | 처리 |
 |------|----------|------|
-| X SPA 셸 (247KB) | 200 OK + `Sign in to X` 또는 `hasResults: false` | 실패 — WebSearch+oEmbed 폴백 |
+| X SPA 셸 (247KB) | 200 OK + `Sign in to X` 또는 `hasResults: false` | 실패 — 웹 검색 도구+oEmbed 폴백 |
 | CAPTCHA 페이지 | 200 OK + `captcha\|recaptcha\|hcaptcha\|cf-turnstile` | 실패 — 다음 Phase |
 | 소프트 페이월 | 200 OK + `member-only\|subscribe to read\|구독하세요` | 부분 성공 — 메타만 채택 |
 | DDG 소프트 리밋 | 202 Accepted + body 15KB 미만 | 실패 — 다른 엔진 폴백 |

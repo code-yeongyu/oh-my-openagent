@@ -5,10 +5,10 @@
 ## 검색 (트윗 발견)
 
 ```python
-WebSearch(query="site:x.com {검색어}")
+<사용 가능한 web search tool>(query="site:x.com {검색어}")  # Claude Code: WebSearch / OpenCode 계열: websearch_web_search_exa 등 — 하네스마다 실제 tool 이름이 다르므로 현재 세션의 tool 목록에서 확인할 것
 ```
 
-WebSearch는 X 포스트를 검색 결과로 반환한다. 제목, snippet, URL을 획득할 수 있지만 트윗 전문이나 engagement 수치는 없다.
+웹 검색 도구는 X 포스트를 검색 결과로 반환한다. 제목, snippet, URL을 획득할 수 있지만 트윗 전문이나 engagement 수치는 없다.
 
 ## 타임라인 조회 — Syndication API
 
@@ -89,7 +89,7 @@ curl -sL "https://publish.twitter.com/oembed?url=https://x.com/{user}/status/{tw
 ## 조합 패턴 (검색 → 상세)
 
 ```
-1단계: WebSearch(query="site:x.com {키워드}") → 트윗 URL 획득
+1단계: 웹 검색 도구(query="site:x.com {키워드}") → 트윗 URL 획득
 2단계: curl oEmbed API → 트윗 전문 획득
 ```
 
