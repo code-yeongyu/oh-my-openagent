@@ -1,10 +1,10 @@
-import type { Readable, Writable } from "node:stream";
 import { existsSync, realpathSync } from "node:fs";
 import { basename, delimiter, dirname, isAbsolute } from "node:path";
-import { jsonRpcId, runJsonRpcStdioServer, successResponse } from "@oh-my-opencode/mcp-stdio-core";
-import { isPlainRecord } from "@oh-my-opencode/mcp-stdio-core/record";
+import type { Readable, Writable } from "node:stream";
 import { handleLspMcpRequest, type JsonRpcId, type JsonRpcResponse } from "@oh-my-opencode/lsp-core/mcp";
 import { createStandaloneMcpRequestContext, runWithRequestContext } from "@oh-my-opencode/lsp-core/request-context";
+import { jsonRpcId, runJsonRpcStdioServer, successResponse } from "@oh-my-opencode/mcp-stdio-core";
+import { isPlainRecord } from "@oh-my-opencode/mcp-stdio-core/record";
 
 import { type CallToolOptions, callToolViaDaemon, type DaemonToolContext } from "./daemon-client.js";
 import { type DaemonPaths, daemonPaths } from "./paths.js";
@@ -33,24 +33,24 @@ export async function runMcpStdioProxy(options: ProxyOptions = {}): Promise<void
 	const abortFromInput = (): void => lifecycleController.abort();
 	input.once("end", abortFromInput);
 	input.once("close", abortFromInput);
-	const paths = options.paths ?? daemonPaths();
-	const env = options.env ?? process.env;
-	const cwd = options.cwd ?? inferOpenCodeProjectCwd(env["LSP_TOOLS_MCP_PROJECT_CONFIG"]);
-	const contextEnv = cwd === undefined ? env : canonicalizeContextEnv(env);
-	const contextInput = {
-		env: contextEnv,
-		...(cwd === undefined ? {} : { cwd }),
-		...(options.homeDir === undefined ? {} : { homeDir: options.homeDir }),
-	};
-	const context = options.context ?? createStandaloneMcpRequestContext(contextInput);
-	const callOptions: CallToolOptions = {
-		paths,
-		context,
-		...(options.ensure ? { ensure: options.ensure } : {}),
-		signal: lifecycleController.signal,
-	};
 
 	try {
+		const paths = options.paths ?? daemonPaths();
+		const env = options.env ?? process.env;
+		const cwd = options.cwd ?? inferOpenCodeProjectCwd(env["LSP_TOOLS_MCP_PROJECT_CONFIG"]);
+		const contextEnv = cwd === undefined ? env : canonicalizeContextEnv(env);
+		const contextInput = {
+			env: contextEnv,
+			...(cwd === undefined ? {} : { cwd }),
+			...(options.homeDir === undefined ? {} : { homeDir: options.homeDir }),
+		};
+		const context = options.context ?? createStandaloneMcpRequestContext(contextInput);
+		const callOptions: CallToolOptions = {
+			paths,
+			context,
+			...(options.ensure ? { ensure: options.ensure } : {}),
+			signal: lifecycleController.signal,
+		};
 		await runJsonRpcStdioServer({
 			input,
 			output,
@@ -59,7 +59,9 @@ export async function runMcpStdioProxy(options: ProxyOptions = {}): Promise<void
 				runWithRequestContext(context, () => handleProxyRequest(request, requestOptions)),
 			handlerOptions: callOptions,
 			onHandlerError: (error: unknown) => {
-				process.stderr.write(`[lsp-daemon] proxy error: ${error instanceof Error ? error.message : String(error)}\n`);
+				process.stderr.write(
+					`[lsp-daemon] proxy error: ${error instanceof Error ? error.message : String(error)}\n`,
+				);
 			},
 		});
 	} finally {
@@ -73,7 +75,11 @@ async function handleProxyRequest(parsed: unknown, callOptions: CallToolOptions)
 	if (!toolCall) return handleLspMcpRequest(parsed);
 
 	const result = await callToolViaDaemon(toolCall.name, toolCall.args, callOptions);
-	return successResponse(toolCall.id, { content: result.content, isError: result.isError ?? false, details: result.details });
+	return successResponse(toolCall.id, {
+		content: result.content,
+		isError: result.isError ?? false,
+		details: result.details,
+	});
 }
 
 function asToolCall(parsed: unknown): ToolCall | null {

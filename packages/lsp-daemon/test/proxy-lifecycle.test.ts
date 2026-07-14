@@ -78,6 +78,75 @@ describe("mcp stdio proxy lifecycle", () => {
 		expect(cancelledRequestId).toBe(daemonRequestId);
 		expect(sockets.size).toBe(0);
 	});
+
+	it("#given daemon startup is pending #when parent input ends #then the proxy cancels startup without retrying", async () => {
+		const paths = tempPaths();
+		const input = new PassThrough();
+		const outputChunks: string[] = [];
+		const responseWritten = deferred();
+		const ensureStarted = deferred();
+		const ensureRelease = deferred();
+		let ensureAttempts = 0;
+		let observedSignal: AbortSignal | undefined;
+		const proxy = runMcpStdioProxy({
+			input,
+			output: new Writable({
+				write(chunk, _encoding, callback): void {
+					outputChunks.push(chunk.toString());
+					responseWritten.resolve();
+					callback();
+				},
+			}),
+			paths,
+			ensure: async (_paths: DaemonPaths, signal?: AbortSignal) => {
+				ensureAttempts += 1;
+				observedSignal = signal;
+				ensureStarted.resolve();
+				await ensureRelease.promise;
+				throw new Error("synthetic ensure failure");
+			},
+		});
+		input.write(
+			`${JSON.stringify({ jsonrpc: "2.0", id: 42, method: "tools/call", params: { name: "status", arguments: {} } })}\n`,
+		);
+		await bounded(ensureStarted.promise, "proxy did not begin daemon startup");
+
+		input.emit("end");
+		const responseWrittenBeforeEnsureRelease = await settlesWithin(responseWritten.promise, 100);
+		input.end();
+		ensureRelease.resolve();
+		await bounded(proxy, "proxy did not settle after releasing the startup probe");
+
+		const response = JSON.parse(outputChunks.join("").trim()) as Record<string, unknown>;
+		const result = response["result"] as {
+			readonly content?: readonly { readonly text?: string }[];
+			readonly isError?: boolean;
+		};
+		expect(responseWrittenBeforeEnsureRelease).toBe(true);
+		expect(response["id"]).toBe(42);
+		expect(result.isError).toBe(true);
+		expect(result.content?.[0]?.text).toContain("cancelled");
+		expect(ensureAttempts).toBe(1);
+		expect(observedSignal?.aborted).toBe(true);
+	});
+
+	it("#given synchronous proxy setup failure #when the proxy rejects #then parent lifecycle listeners are removed", async () => {
+		const input = new PassThrough();
+		const initialEndListeners = input.listenerCount("end");
+		const initialCloseListeners = input.listenerCount("close");
+		const options = {
+			input,
+			output: discardOutput(),
+			get paths(): DaemonPaths {
+				throw new Error("synthetic setup failure");
+			},
+		};
+
+		await expect(runMcpStdioProxy(options)).rejects.toThrow("synthetic setup failure");
+
+		expect(input.listenerCount("end")).toBe(initialEndListeners);
+		expect(input.listenerCount("close")).toBe(initialCloseListeners);
+	});
 });
 
 function tempPaths(): DaemonPaths {
@@ -125,6 +194,24 @@ async function bounded<T>(promise: Promise<T>, message: string): Promise<T> {
 			promise,
 			new Promise<never>((_resolve, reject) => {
 				timer = setTimeout(() => reject(new Error(message)), 1_000);
+				timer.unref();
+			}),
+		]);
+	} finally {
+		if (timer !== undefined) clearTimeout(timer);
+	}
+}
+
+async function settlesWithin(promise: Promise<unknown>, timeoutMs: number): Promise<boolean> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	try {
+		return await Promise.race([
+			promise.then(
+				() => true,
+				() => true,
+			),
+			new Promise<boolean>((resolve) => {
+				timer = setTimeout(() => resolve(false), timeoutMs);
 				timer.unref();
 			}),
 		]);
