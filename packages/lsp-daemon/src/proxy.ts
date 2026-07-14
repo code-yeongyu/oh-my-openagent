@@ -18,7 +18,6 @@ export interface ProxyOptions {
 	env?: Record<string, string | undefined>;
 	homeDir?: string;
 	ensure?: CallToolOptions["ensure"];
-	signal?: AbortSignal;
 }
 
 interface ToolCall {
@@ -30,6 +29,10 @@ interface ToolCall {
 export async function runMcpStdioProxy(options: ProxyOptions = {}): Promise<void> {
 	const input = options.input ?? process.stdin;
 	const output = options.output ?? process.stdout;
+	const lifecycleController = new AbortController();
+	const abortFromInput = (): void => lifecycleController.abort();
+	input.once("end", abortFromInput);
+	input.once("close", abortFromInput);
 	const paths = options.paths ?? daemonPaths();
 	const env = options.env ?? process.env;
 	const cwd = options.cwd ?? inferOpenCodeProjectCwd(env["LSP_TOOLS_MCP_PROJECT_CONFIG"]);
@@ -44,20 +47,25 @@ export async function runMcpStdioProxy(options: ProxyOptions = {}): Promise<void
 		paths,
 		context,
 		...(options.ensure ? { ensure: options.ensure } : {}),
-		...(options.signal ? { signal: options.signal } : {}),
+		signal: lifecycleController.signal,
 	};
 
-	await runJsonRpcStdioServer({
-		input,
-		output,
-		idleTimeoutMs: 0,
-		handler: (request, requestOptions) =>
-			runWithRequestContext(context, () => handleProxyRequest(request, requestOptions)),
-		handlerOptions: callOptions,
-		onHandlerError: (error: unknown) => {
-			process.stderr.write(`[lsp-daemon] proxy error: ${error instanceof Error ? error.message : String(error)}\n`);
-		},
-	});
+	try {
+		await runJsonRpcStdioServer({
+			input,
+			output,
+			idleTimeoutMs: 0,
+			handler: (request, requestOptions) =>
+				runWithRequestContext(context, () => handleProxyRequest(request, requestOptions)),
+			handlerOptions: callOptions,
+			onHandlerError: (error: unknown) => {
+				process.stderr.write(`[lsp-daemon] proxy error: ${error instanceof Error ? error.message : String(error)}\n`);
+			},
+		});
+	} finally {
+		input.removeListener("end", abortFromInput);
+		input.removeListener("close", abortFromInput);
+	}
 }
 
 async function handleProxyRequest(parsed: unknown, callOptions: CallToolOptions): Promise<JsonRpcResponse | undefined> {

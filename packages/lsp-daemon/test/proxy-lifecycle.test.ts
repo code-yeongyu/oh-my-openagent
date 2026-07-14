@@ -23,7 +23,7 @@ afterEach(async () => {
 });
 
 describe("mcp stdio proxy lifecycle", () => {
-	it("#given an in-flight daemon request #when parent input closes and the lifecycle aborts #then the proxy cancels that request and closes its socket", async () => {
+	it("#given an in-flight daemon request #when parent input closes #then the proxy cancels that request and closes its socket", async () => {
 		const paths = tempPaths();
 		const requestAccepted = deferred();
 		const cancellationObserved = deferred();
@@ -55,22 +55,21 @@ describe("mcp stdio proxy lifecycle", () => {
 		await listen(daemon, paths.socket);
 
 		const input = new PassThrough();
-		const controller = new AbortController();
 		const proxyOptions = {
 			input,
 			output: discardOutput(),
 			paths,
 			ensure: noSpawn,
-			signal: controller.signal,
 		};
-		const proxy = runMcpStdioProxy(proxyOptions);
+		const proxy = runMcpStdioProxy(proxyOptions).catch((error: unknown) => {
+			if (!(error instanceof Error) || Reflect.get(error, "code") !== "ERR_STREAM_PREMATURE_CLOSE") throw error;
+		});
 		input.write(
 			`${JSON.stringify({ jsonrpc: "2.0", id: 41, method: "tools/call", params: { name: "status", arguments: {} } })}\n`,
 		);
 		await bounded(requestAccepted.promise, "fake daemon did not accept the proxy request");
 
-		input.end();
-		controller.abort();
+		input.destroy();
 
 		await bounded(
 			Promise.all([proxy, cancellationObserved.promise, connectionClosed.promise]),

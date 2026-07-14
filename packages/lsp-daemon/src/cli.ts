@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { argv, stderr, stdin } from "node:process";
+import { argv, stderr } from "node:process";
 
 import { runMcpStdioProxy } from "./proxy.js";
 import { runDaemon } from "./run-daemon.js";
@@ -12,16 +12,7 @@ async function main(): Promise<void> {
 		return;
 	}
 	if (command === "mcp") {
-		const controller = new AbortController();
-		const abort = (): void => controller.abort();
-		stdin.once("end", abort);
-		stdin.once("close", abort);
-		try {
-			await runMcpStdioProxy({ signal: controller.signal });
-		} finally {
-			stdin.removeListener("end", abort);
-			stdin.removeListener("close", abort);
-		}
+		await runMcpStdioProxy();
 		return;
 	}
 
