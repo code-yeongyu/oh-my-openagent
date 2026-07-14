@@ -1,0 +1,152 @@
+/* ═══════════════════════════════════════════
+   MaTrix Mission Control — Design System
+   tokens.css v1.0
+   ═══════════════════════════════════════════ */
+
+:root {
+  /* ── Couleurs de base ── */
+  --bg-base: #0f0f17;
+  --bg-surface: #1a1a2e;
+  --bg-glass: rgba(26, 26, 46, 0.65);
+  --bg-glass-hover: rgba(26, 26, 46, 0.85);
+  --border-glass: rgba(255, 255, 255, 0.08);
+  --border-glass-hover: rgba(255, 255, 255, 0.15);
+
+  /* ── Palette Brand ── */
+  --brand-violet: #8B5CF6;
+  --brand-violet-glow: #A78BFA;
+  --brand-cyan: #7DD3FC;
+  --brand-mint: #5EE2B5;
+  --brand-amber: #FBBF24;
+  --brand-red: #EF4444;
+  --brand-pink: #F472B6;
+  --brand-magenta: #E879F9;
+  --brand-orange: #FB923C;
+  --brand-blue: #60A5FA;
+
+  /* ── Accents agents (16 couleurs) ── */
+  --agent-morpheus: #A78BFA;
+  --agent-neo: #5EE2B5;
+  --agent-tank: #7DD3FC;
+  --agent-oracle: #FBBF24;
+  --agent-keymaker: #FB923C;
+  --agent-smith: #EF4444;
+  --agent-operator: #60A5FA;
+  --agent-trinity: #F472B6;
+  --agent-cypher: #E879F9;
+  --agent-sentinel: #34D399;
+  --agent-ghost: #94A3B8;
+  --agent-link: #38BDF8;
+  --agent-analyst: #A78BFA;
+  --agent-mouse: #FCD34D;
+  --agent-dreamer: #818CF8;
+  --agent-architect: #F59E0B;
+
+  /* ── Statuts ── */
+  --status-active: var(--brand-mint);
+  --status-idle: var(--brand-amber);
+  --status-dormant: #6B7280;
+  --status-error: var(--brand-red);
+  --status-success: var(--brand-mint);
+  --status-warning: var(--brand-amber);
+
+  /* ── Typographie ── */
+  --font-display: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-size-xs: 10px;
+  --font-size-sm: 12px;
+  --font-size-base: 13px;
+  --font-size-lg: 15px;
+  --font-size-xl: 18px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 32px;
+  --font-size-4xl: 42px;
+
+  /* ── Espacement ── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* ── Bordures ── */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* ── Glassmorphism ── */
+  --blur-light: blur(4px);
+  --blur-medium: blur(8px);
+  --blur-heavy: blur(16px);
+  --blur-xl: blur(24px);
+
+  /* ── Ombres ── */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.4);
+  --shadow-lg: 0 10px 25px rgba(0,0,0,0.5);
+  --shadow-glow-violet: 0 0 20px rgba(139,92,246,0.3);
+  --shadow-glow-cyan: 0 0 20px rgba(125,211,252,0.3);
+
+  /* ── Transitions ── */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 400ms ease;
+}
+
+/* ── Réinitialisation & Base ── */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg-base);
+  color: #E2E8F0;
+  font-family: var(--font-display);
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Scrollbar personnalisée ── */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.25);
+}
+
+/* ── Fond animé (orbes) ── */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(139,92,246,0.12), transparent 60%),
+    radial-gradient(ellipse at 80% 100%, rgba(125,211,252,0.08), transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(94,226,181,0.04), transparent 40%);
+  pointer-events: none;
+  z-index: 0;
+}
