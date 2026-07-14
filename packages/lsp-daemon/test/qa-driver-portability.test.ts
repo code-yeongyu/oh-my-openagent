@@ -14,6 +14,7 @@ const runtimeDependencies = [
 	"packages/lsp-daemon/scripts/qa/cancellation-smoke.mjs",
 	"packages/lsp-daemon/scripts/qa/commit-barrier-smoke.mjs",
 ] as const;
+const cancellationSmoke = runtimeDependencies[0];
 
 describe("LSP QA driver portability", () => {
 	it("#given a fresh clone #when cancellation QA runs #then every runtime dependency is tracked outside evidence", () => {
@@ -34,5 +35,16 @@ describe("LSP QA driver portability", () => {
 			.sort();
 
 		expect(trackedFiles).toEqual(expectedTrackedFiles);
+	});
+
+	it("#given the native platform #when the cancellation smoke runs #then it binds the production endpoint kind", () => {
+		const output = execFileSync("bun", [join(repositoryRoot, cancellationSmoke), repositoryRoot], {
+			cwd: repositoryRoot,
+			encoding: "utf8",
+			timeout: 10_000,
+		});
+		const expectedEndpointKind = process.platform === "win32" ? "named-pipe" : "unix-socket";
+
+		expect(JSON.parse(output)).toMatchObject({ daemonEndpointKind: expectedEndpointKind });
 	});
 });

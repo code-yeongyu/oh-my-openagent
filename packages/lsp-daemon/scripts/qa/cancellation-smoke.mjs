@@ -12,6 +12,9 @@ if (!repositoryRoot) throw new Error("repository root argument is required");
 const root = realpathSync(repositoryRoot);
 
 const { callToolViaDaemon } = await import(pathToFileURL(join(root, "packages/lsp-daemon/src/daemon-client.ts")).href);
+const { daemonPaths: resolveDaemonPaths, OMO_LSP_DAEMON_DIR } = await import(
+	pathToFileURL(join(root, "packages/lsp-daemon/src/paths.ts")).href
+);
 const { handleDaemonMessage } = await import(pathToFileURL(join(root, "packages/lsp-daemon/src/request-routing.ts")).href);
 const { createLineDecoder, encodeJsonLine } = await import(
 	pathToFileURL(join(root, "packages/lsp-daemon/src/socket-jsonrpc.ts")).href
@@ -28,7 +31,10 @@ const sockets = new Set();
 let daemonServer;
 
 try {
-	const paths = daemonPaths(tempRoot);
+	const paths = resolveDaemonPaths(
+		{ [OMO_LSP_DAEMON_DIR]: join(tempRoot, "daemon") },
+		{ version: "manual", cliPath: join(root, "packages/lsp-daemon/src/cli.ts") },
+	);
 	mkdirSync(paths.dir, { recursive: true });
 	const token = "manual-smoke-token";
 	writeFileSync(paths.auth, `${token}\n`, { mode: 0o600 });
@@ -141,8 +147,14 @@ try {
 	assert(activeRequests.size === 0, "daemon active request map leaked");
 
 	const direct = await directJsonRpcCancellationCheck();
+	const daemonEndpointKind = paths.socket.startsWith("\\\\.\\pipe\\") ? "named-pipe" : "unix-socket";
+	assert(
+		daemonEndpointKind === (process.platform === "win32" ? "named-pipe" : "unix-socket"),
+		`production daemon endpoint kind did not match ${process.platform}`,
+	);
 	const summary = {
 		workspaceHash: sha256(readFileSync(source)),
+		daemonEndpointKind,
 		daemonProxyId: daemonRequest.id,
 		daemonCancelTarget: daemonCancel.params.id,
 		lspRequestId: lspRequest.id,
@@ -159,22 +171,6 @@ try {
 	if (daemonServer) await closeServer(daemonServer);
 	await disposeDefaultLspManager();
 	rmSync(tempRoot, { recursive: true, force: true });
-}
-
-function daemonPaths(base) {
-	const dir = join(base, "daemon");
-	return {
-		version: "manual",
-		cliPath: join(root, "packages/lsp-daemon/src/cli.ts"),
-		dir,
-		socket: join(dir, "daemon.sock"),
-		lock: join(dir, "daemon.lock"),
-		pid: join(dir, "daemon.pid"),
-		auth: join(dir, "daemon.auth"),
-		endpoint: join(dir, "daemon.endpoint"),
-		owner: join(dir, "daemon.owner"),
-		log: join(dir, "daemon.log"),
-	};
 }
 
 function fakeLspServerSource() {
