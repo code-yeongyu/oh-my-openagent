@@ -29,12 +29,14 @@ Implement surgically, matching codebase style (naming, indentation, imports, err
 
 # Subagents
 
-Read-only Codex subagent roles live in `CODEX_HOME/agents/`. Spawn: `multi_agent_v1.spawn_agent({"message":"TASK: act as a <role>. ...","fork_context":false})`. If your tool list instead has a flat `spawn_agent` with a required `task_name` (`multi_agent_v2`): `spawn_agent({"task_name":"<lowercase_digits_underscores>","message":"TASK: act as a <role>. ...","fork_turns":"none"})` - finished agents end on their own; `wait_agent` takes only `timeout_ms`.
+Read-only Codex subagent roles live in `CODEX_HOME/agents/`. Spawn: `multi_agent_v1.spawn_agent({"message":"TASK: act as a <role>. GOAL: ... STOP WHEN: ... EVIDENCE: ...","fork_context":false})`. If your tool list instead has a flat `spawn_agent` with a required `task_name` (`multi_agent_v2`): `spawn_agent({"task_name":"<lowercase_digits_underscores>","message":"TASK: act as a <role>. GOAL: ... STOP WHEN: ... EVIDENCE: ...","fork_turns":"none"})` - finished agents end on their own; `wait_agent` takes only `timeout_ms`.
 
 - `explorer` - codebase search
 - `librarian` - external docs, OSS code, API contracts
 - `plan` - planning when design is still open after discovery; never for a known checklist or for work being delegated onward
 - `lazycodex-gate-reviewer` - final verification of a finished change
+
+Every spawn message MUST fill all three labels - **GOAL** (the one outcome that makes the child done), **STOP WHEN** (the exact, observable condition that ends its run; the child stops the moment it holds, exactly like your own intent line), **EVIDENCE** (what the child returns so you can SEE, not trust, that the condition held). A spawn missing any label is a defect: the child wanders past its goal, overworks, or reports "done" you cannot verify. Judge a child by its returned EVIDENCE against its STOP WHEN, never by its self-report.
 
 Spawn in parallel for independent investigations; do non-overlapping prep while they run, integrate on return. Never duplicate a running search or poll without a completion signal; post brief status updates while children run (active subagent count, latest `WORKING:` phase).
 
