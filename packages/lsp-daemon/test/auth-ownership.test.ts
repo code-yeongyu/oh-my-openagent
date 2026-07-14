@@ -1,14 +1,28 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+	chmodSync,
+	existsSync,
+	lstatSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	realpathSync,
+	rmSync,
+	statSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import * as path from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { callToolViaDaemon } from "../src/daemon-client.js";
 import { DaemonAlreadyRunningError, DaemonStartupDeferredError, startDaemonServer } from "../src/daemon-server.js";
 import { probeDaemon } from "../src/ensure-daemon.js";
+import { ensurePrivateDirectory } from "../src/ipc-protocol.js";
 import { readDaemonOwner, removeDaemonMetadataForOwner } from "../src/ownership.js";
-import type { DaemonPaths } from "../src/paths.js";
+import { type DaemonPaths, daemonPaths, OMO_LSP_DAEMON_DIR } from "../src/paths.js";
 import { createLineDecoder, encodeJsonLine } from "../src/socket-jsonrpc.js";
 import { daemonTestPaths } from "./daemon-path-fixture.js";
 
@@ -24,6 +38,25 @@ function tempPaths(): DaemonPaths {
 	const root = mkdtempSync(join(tmpdir(), "lsp-daemon-auth-"));
 	tempDirectories.push(root);
 	return daemonTestPaths(root);
+}
+
+function fallbackTempPaths(): DaemonPaths {
+	const root = mkdtempSync("/tmp/omo-lsp-security-smoke-");
+	tempDirectories.push(root);
+	const longBase = join(root, "state", "..", "state", "x".repeat(130));
+	const endpointTmp = join(root, "tmp");
+	return daemonPaths(
+		{ [OMO_LSP_DAEMON_DIR]: longBase },
+		{ cliPath: join(root, "packaged-cli.js"), version: "test" },
+		{
+			platform: "linux",
+			homedir: () => root,
+			tmpdir: () => endpointTmp,
+			getuid: () => (typeof process.getuid === "function" ? process.getuid() : undefined),
+			username: () => "qa-user",
+			path,
+		},
+	);
 }
 
 function existingContext(root: string) {
@@ -125,6 +158,72 @@ describe("daemon IPC authentication and ownership", () => {
 		expect(statSync(paths.owner).mode & 0o777).toBe(0o600);
 		expect(statSync(paths.endpoint).mode & 0o777).toBe(0o600);
 		expect(statSync(paths.pid).mode & 0o777).toBe(0o600);
+		expect(statSync(paths.socket).mode & 0o777).toBe(0o600);
+	});
+
+	it("given a pre-created hashed fallback endpoint directory symlink when daemon starts then startup fails before binding", async () => {
+		if (process.platform === "win32") return;
+		const paths = fallbackTempPaths();
+		const endpointDir = dirname(paths.socket);
+		const hostileTarget = mkdtempSync(join(tmpdir(), "lsp-daemon-hostile-target-"));
+		tempDirectories.push(hostileTarget);
+		mkdirSync(dirname(endpointDir), { recursive: true });
+		symlinkSync(hostileTarget, endpointDir, "dir");
+
+		await expect(startDaemonServer(paths, { onIdleShutdown: () => {} })).rejects.toMatchObject({
+			code: "unsafe_private_directory",
+			reason: "symlink",
+		});
+		expect(existsSync(paths.socket)).toBe(false);
+	});
+
+	it("given a pre-created regular file at the hashed fallback endpoint directory when daemon starts then startup fails closed", async () => {
+		if (process.platform === "win32") return;
+		const paths = fallbackTempPaths();
+		const endpointDir = dirname(paths.socket);
+		mkdirSync(dirname(endpointDir), { recursive: true });
+		writeFileSync(endpointDir, "hostile-file");
+
+		await expect(startDaemonServer(paths, { onIdleShutdown: () => {} })).rejects.toMatchObject({
+			code: "unsafe_private_directory",
+			reason: "not_directory",
+		});
+		expect(existsSync(paths.socket)).toBe(false);
+	});
+
+	it("given a pre-existing private directory owned by another uid when checking ownership then it is rejected deterministically", () => {
+		if (process.platform === "win32" || typeof process.getuid !== "function") return;
+		const root = mkdtempSync(join(tmpdir(), "lsp-daemon-wrong-owner-"));
+		tempDirectories.push(root);
+		const currentUid = process.getuid();
+		const realStats = lstatSync(root);
+
+		expect(() =>
+			ensurePrivateDirectory(root, {
+				currentUid: () => currentUid,
+				lstat: (target) => ({
+					...lstatSync(target),
+					isDirectory: () => realStats.isDirectory(),
+					isSymbolicLink: () => realStats.isSymbolicLink(),
+					uid: currentUid + 1,
+				}),
+			}),
+		).toThrow(expect.objectContaining({ code: "unsafe_private_directory", reason: "wrong_owner" }));
+	});
+
+	it("given a current-user hashed fallback endpoint directory with loose mode when daemon starts then it is accepted and made private", async () => {
+		if (process.platform === "win32") return;
+		const paths = fallbackTempPaths();
+		const endpointDir = dirname(paths.socket);
+		mkdirSync(endpointDir, { recursive: true, mode: 0o777 });
+		chmodSync(endpointDir, 0o777);
+
+		const server = await startDaemonServer(paths, { onIdleShutdown: () => {} });
+		openServers.push(server);
+
+		expect(lstatSync(endpointDir).isSymbolicLink()).toBe(false);
+		expect(paths.socket).not.toContain("..");
+		expect(statSync(endpointDir).mode & 0o777).toBe(0o700);
 		expect(statSync(paths.socket).mode & 0o777).toBe(0o600);
 	});
 

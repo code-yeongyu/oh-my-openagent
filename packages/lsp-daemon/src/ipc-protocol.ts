@@ -1,5 +1,18 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
-import { chmodSync, closeSync, mkdirSync, openSync, readFileSync, unlinkSync, writeSync } from "node:fs";
+import {
+	chmodSync,
+	closeSync,
+	constants,
+	fchmodSync,
+	fstatSync,
+	lstatSync,
+	mkdirSync,
+	openSync,
+	readFileSync,
+	type Stats,
+	unlinkSync,
+	writeSync,
+} from "node:fs";
 import { dirname } from "node:path";
 
 import { isPlainRecord } from "@oh-my-opencode/mcp-stdio-core/record";
@@ -32,6 +45,25 @@ export type AuthenticatedMessage = {
 };
 
 const AUTH_TOKEN_BYTES = 32;
+
+export type PrivateDirectoryStats = Pick<Stats, "dev" | "ino" | "uid" | "isDirectory" | "isSymbolicLink">;
+
+export interface PrivateDirectoryOptions {
+	readonly currentUid?: () => number | undefined;
+	readonly lstat?: (path: string) => PrivateDirectoryStats;
+}
+
+export class UnsafePrivateDirectoryError extends Error {
+	override readonly name = "UnsafePrivateDirectoryError";
+	readonly code = "unsafe_private_directory";
+
+	constructor(
+		readonly path: string,
+		readonly reason: "changed_during_chmod" | "not_directory" | "symlink" | "wrong_owner",
+	) {
+		super(`unsafe private directory ${path}: ${reason}`);
+	}
+}
 
 export function authEnvelope(token: string): DaemonAuthEnvelope {
 	return { protocolVersion: OMO_DAEMON_PROTOCOL_VERSION, token };
@@ -96,9 +128,25 @@ export function writePrivateFile(path: string, data: string): void {
 	setPrivateFileMode(path);
 }
 
-export function ensurePrivateDirectory(path: string): void {
-	mkdirSync(path, { recursive: true, mode: 0o700 });
-	if (process.platform !== "win32") chmodSync(path, 0o700);
+export function ensurePrivateDirectory(path: string, options: PrivateDirectoryOptions = {}): void {
+	try {
+		mkdirSync(path, { recursive: true, mode: 0o700 });
+	} catch (error) {
+		if (errorCode(error) !== "EEXIST") throw error;
+	}
+	if (process.platform === "win32") return;
+	const before = validatePrivateDirectory(path, options);
+	const fd = openSync(path, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+	try {
+		fchmodSync(fd, 0o700);
+		const after = validatePrivateDirectory(path, options);
+		const openStats = fstatSync(fd);
+		if (!sameDirectory(before, after) || !sameDirectory(before, openStats)) {
+			throw new UnsafePrivateDirectoryError(path, "changed_during_chmod");
+		}
+	} finally {
+		closeSync(fd);
+	}
 }
 
 export function setPrivateFileMode(path: string): void {
@@ -131,6 +179,25 @@ function errorCode(error: unknown): string | undefined {
 	if (!error || typeof error !== "object" || !("code" in error)) return undefined;
 	const code = Reflect.get(error, "code");
 	return typeof code === "string" ? code : undefined;
+}
+
+function validatePrivateDirectory(path: string, options: PrivateDirectoryOptions): PrivateDirectoryStats {
+	const stats = options.lstat ? options.lstat(path) : lstatPrivateDirectory(path);
+	if (stats.isSymbolicLink()) throw new UnsafePrivateDirectoryError(path, "symlink");
+	if (!stats.isDirectory()) throw new UnsafePrivateDirectoryError(path, "not_directory");
+	const currentUid = options.currentUid ? options.currentUid() : process.getuid?.();
+	if (currentUid !== undefined && stats.uid !== currentUid) {
+		throw new UnsafePrivateDirectoryError(path, "wrong_owner");
+	}
+	return stats;
+}
+
+function lstatPrivateDirectory(path: string): PrivateDirectoryStats {
+	return lstatSync(path);
+}
+
+function sameDirectory(a: PrivateDirectoryStats, b: PrivateDirectoryStats): boolean {
+	return a.dev === b.dev && a.ino === b.ino;
 }
 
 function tokenMatches(candidate: string, expected: string): boolean {
