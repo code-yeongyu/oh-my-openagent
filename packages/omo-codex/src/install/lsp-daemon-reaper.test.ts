@@ -36,8 +36,9 @@ describe("reapLspDaemons", () => {
       endpoint: legacyEndpointFor({ codexHome, version: "0.1.0", kind: "hashed", tempDir: tmpdir() }),
     })
 
-    const firstRun = await reapLspDaemons(codexHome)
-    const secondRun = await reapLspDaemons(codexHome)
+    const deps = { platform: "linux" as const, tmpDir: tmpdir() }
+    const firstRun = await reapLspDaemons(codexHome, deps)
+    const secondRun = await reapLspDaemons(codexHome, deps)
 
     expect(firstRun).toEqual([
       {

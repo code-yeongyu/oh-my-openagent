@@ -6,8 +6,8 @@ import type { ChildProcessByStdio } from "node:child_process"
 import { execFileSync, spawn } from "node:child_process"
 import { mkdtempSync, writeFileSync } from "node:fs"
 import { mkdir, rm, symlink, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { platform, tmpdir } from "node:os"
+import { delimiter, join } from "node:path"
 import type { Readable } from "node:stream"
 
 export interface LegacyDaemonFixture {
@@ -20,7 +20,28 @@ export interface LegacyDaemonFixture {
 export type SpawnedChild = ChildProcessByStdio<null, Readable, Readable>
 
 function nodeBinary(): string {
-  return process.env.NODE_BINARY ?? execFileSync("which", ["node"], { encoding: "utf8" }).trim()
+  if (process.env.NODE_BINARY) return process.env.NODE_BINARY
+  if (platform() === "win32") {
+    const candidate = firstCommandLine("where.exe", ["node"]) ?? firstCommandLine("which", ["node"])
+    if (candidate) return normalizeWindowsNodeCandidate(candidate)
+  }
+  return execFileSync("which", ["node"], { encoding: "utf8" }).trim()
+}
+
+function firstCommandLine(command: string, args: readonly string[]): string | null {
+  try {
+    const output = execFileSync(command, [...args], { encoding: "utf8" })
+    return output.split(/\r?\n/).find((line) => line.trim().length > 0)?.trim() ?? null
+  } catch {
+    return null
+  }
+}
+
+function normalizeWindowsNodeCandidate(candidate: string): string {
+  const path = candidate.split(delimiter)[0] ?? candidate
+  const msysPath = /^\/([a-zA-Z])\/(.*)$/.exec(path)
+  if (!msysPath) return path
+  return `${msysPath[1]}:\\${msysPath[2].replaceAll("/", "\\")}`
 }
 
 export function createLegacyCodexHome(prefix: string): string {

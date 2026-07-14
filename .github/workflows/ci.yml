@@ -237,7 +237,7 @@ jobs:
           mkdir -p "$PACK_DIR"
           npm pack --pack-destination "$PACK_DIR" packages/omo-senpi/plugin
           npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts
-          tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+          bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
           bun test packages/omo-senpi
 
       - name: Write job summary

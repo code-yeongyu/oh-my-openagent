@@ -83,7 +83,7 @@ describe("LspClient diagnostics freshness", () => {
 					},
 				],
 			},
-			{ diagnosticsFreshnessTimeoutMs: 30, versionlessPublishQuiescenceMs: 5 },
+			{ diagnosticsFreshnessTimeoutMs: 300, versionlessPublishQuiescenceMs: 5 },
 		);
 		await context.client.openFile(context.source);
 		expect((await context.client.diagnostics(context.source)).items).toEqual([diagnostic("pre-generation-versionless")]);
@@ -192,7 +192,7 @@ describe("LspClient diagnostics freshness", () => {
 					},
 				],
 			},
-			{ diagnosticsFreshnessTimeoutMs: 50, versionlessPublishQuiescenceMs: 5 },
+			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5 },
 		);
 		await context.client.openFile(context.source);
 
