@@ -34,6 +34,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
   const runCommand = options.runCommand ?? defaultRunCommand
   const log = options.log ?? (() => undefined)
   const buildSource = await shouldBuildSourcePackages(repoRoot)
+  const versionOverride = env.LAZYCODEX_DEV_VERSION?.trim() || undefined
 
   const gitBashResolution = await prepareGitBashForInstall({
     platform,
@@ -69,6 +70,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
       marketplaceName: marketplace.name,
       pluginName: entry.name,
       distributionManifest,
+      versionOverride,
     })
     validatePathSegment(version, "plugin version")
     log(`Building ${entry.name}@${version}`)

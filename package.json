@@ -107,6 +107,7 @@
     "build": "bun run script/build.ts",
     "build:cli-node": "bun run script/build-cli-node.ts",
     "build:codex-install": "bun run script/build-codex-install.ts",
+    "install:codex-dev": "bun run script/build-codex-install.ts && bun run script/install-codex-dev.ts",
     "build:codex-plugin": "npm --prefix packages/omo-codex/plugin ci && bun run --cwd packages/omo-codex/plugin build",
     "build:senpi-plugin": "node packages/omo-senpi/plugin/scripts/build-extension.mjs && node packages/omo-senpi/plugin/scripts/sync-skills.mjs && node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check",
     "build:materialize-frontend": "node packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs --strict",
