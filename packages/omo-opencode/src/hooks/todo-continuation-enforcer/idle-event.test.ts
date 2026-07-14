@@ -228,4 +228,63 @@ describe("handleSessionIdle", () => {
       store.cancelCountdown(sessionID)
     }
   })
+
+  it("skips todo continuation when the last user message is a system directive (loop breaker, #6109)", async () => {
+    // given
+    const sessionID = "ses_directive_loop_breaker"
+    const { store, trackCalls, state } = createStateStore()
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({
+            data: [
+              {
+                info: { role: "user" },
+                parts: [{ type: "text", text: "do the original task", synthetic: false }],
+              },
+              {
+                info: { role: "assistant" },
+                parts: [{ type: "text", text: "doing the original task..." }],
+              },
+              {
+                info: { role: "user" },
+                parts: [
+                  {
+                    type: "text",
+                    text: "[SYSTEM DIRECTIVE: OH-MY-OPENCODE - TODO CONTINUATION]\n\ncontinue",
+                    synthetic: true,
+                  },
+                ],
+              },
+              {
+                info: { role: "assistant", finish: "stop" },
+                parts: [{ type: "text", text: "no longer responding" }],
+              },
+            ],
+          }),
+          todo: async () => ({
+            data: [
+              { id: "todo-1", content: "Finish init-deep", status: "pending", priority: "high" },
+            ],
+          }),
+        },
+      },
+      directory: "/tmp/test",
+    }
+
+    try {
+      // when
+      await handleSessionIdle({
+        ctx: ctx as never,
+        sessionID,
+        sessionStateStore: store,
+      })
+
+      // then — no continuation path reached
+      expect(trackCalls).toEqual([])
+      expect(state.countdownStartedAt).toBeUndefined()
+    } finally {
+      store.cancelCountdown(sessionID)
+    }
+  })
 })

@@ -5,6 +5,7 @@ import { normalizeSDKResponse } from "../../shared"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
 import { latestAssistantTurnBlocksInternalPrompt } from "../../shared/prompt-async-gate/pending-tool-turn"
+import { isSystemDirective } from "../../shared/system-directive"
 
 import { isLastAssistantMessageAborted } from "./abort-detection"
 import { acknowledgeCompactionGuard, isCompactionGuardActive } from "./compaction-guard"
@@ -101,6 +102,10 @@ export async function handleSessionIdle(args: {
     }
     if (latestAssistantTurnBlocksInternalPrompt(prefetchedMessages)) {
       log(`[${HOOK_NAME}] Skipped: pending internal continuation response`, { sessionID })
+      return
+    }
+    if (lastUserMessageIsSystemDirective(prefetchedMessages)) {
+      log(`[${HOOK_NAME}] Skipped: last user message is a system directive (loop breaker)`, { sessionID })
       return
     }
   } catch (error) {
@@ -233,4 +238,21 @@ export async function handleSessionIdle(args: {
     sessionStateStore,
     isContinuationStopped,
   })
+}
+
+// Returns true when the most recent user message is itself an OMO system
+// directive. Used to break directive-response loops (#6109).
+export function lastUserMessageIsSystemDirective(
+  messages: ReadonlyArray<{ info?: { role?: string }; parts?: ReadonlyArray<{ type?: string; text?: string; synthetic?: boolean }> }> | undefined,
+): boolean {
+  if (!messages || messages.length === 0) return false
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]
+    if (m?.info?.role !== "user") continue
+    const parts = m.parts ?? []
+    return parts.some(
+      (p) => p.type === "text" && typeof p.text === "string" && isSystemDirective(p.text),
+    )
+  }
+  return false
 }
