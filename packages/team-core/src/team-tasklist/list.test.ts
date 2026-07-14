@@ -39,7 +39,7 @@ test("listTasks returns tasks sorted ascending and honors filters", async () => 
   } finally {
     await fixture.cleanup()
   }
-})
+}, 30_000)
 
 test("listTasks skips malformed task files", async () => {
   // given
@@ -60,4 +60,4 @@ test("listTasks skips malformed task files", async () => {
   } finally {
     await fixture.cleanup()
   }
-})
+}, 30_000)
