@@ -16,8 +16,7 @@ const runtimes = [
 	{
 		label: "lsp-daemon",
 		packageRoot: join(repoPackagesRoot, "lsp-daemon"),
-		requiredOutputs: ["dist/cli.js", "dist/index.js", "dist/index.d.ts"],
-		install: true,
+		requiredOutputs: ["dist/cli.js", "dist/client.js", "dist/client.d.ts", "dist/index.js", "dist/index.d.ts"],
 	},
 	{
 		label: "git-bash-mcp",
@@ -42,7 +41,7 @@ function buildRuntime(runtime) {
 		return;
 	}
 
-	if (runtime.install === true && !existsSync(join(runtime.packageRoot, "node_modules"))) {
+	if (existsSync(join(runtime.packageRoot, "package-lock.json")) && !existsSync(join(runtime.packageRoot, "node_modules"))) {
 		const install = spawnSync("npm", ["ci"], {
 			cwd: runtime.packageRoot,
 			shell: process.platform === "win32",

@@ -1,42 +1,22 @@
 import { describe, expect, it } from "vitest";
 
-import {
-	DaemonUnreachableError,
-	type EnsureDaemonDeps,
-	ensureDaemonRunning,
-	resolveDaemonCliPath,
-} from "../src/ensure-daemon.js";
-import type { LockHandle } from "../src/lock.js";
-import { daemonPaths } from "../src/paths.js";
+import { DaemonUnreachableError, type EnsureDaemonDeps, ensureDaemonRunning } from "../src/ensure-daemon.js";
+import { daemonTestPaths } from "./daemon-path-fixture.js";
 
-const PATHS = daemonPaths({ CODEX_LSP_DAEMON_DIR: "/tmp/ensure-test" }, "9.9.9");
+const PATHS = daemonTestPaths("/tmp/ensure-test", "9.9.9");
 
 interface Harness {
 	deps: EnsureDaemonDeps;
-	counts: { spawn: number; cleanup: number; lockAcquired: number; lockReleased: number };
+	counts: { spawn: number };
 }
 
-function makeHarness(config: { probeQueue: boolean[]; lockAvailable: boolean; onSpawnPush?: boolean[] }): Harness {
+function makeHarness(config: { probeQueue: boolean[]; onSpawnPush?: boolean[] }): Harness {
 	const queue = [...config.probeQueue];
-	const counts = { spawn: 0, cleanup: 0, lockAcquired: 0, lockReleased: 0 };
+	const counts = { spawn: 0 };
 	let now = 0;
-
-	const handle: LockHandle = {
-		release: () => {
-			counts.lockReleased += 1;
-		},
-	};
 
 	const deps: EnsureDaemonDeps = {
 		probe: () => Promise.resolve(queue.shift() ?? false),
-		acquireLock: () => {
-			if (!config.lockAvailable) return null;
-			counts.lockAcquired += 1;
-			return handle;
-		},
-		cleanupStaleSocket: () => {
-			counts.cleanup += 1;
-		},
 		spawnDaemon: () => {
 			counts.spawn += 1;
 			for (const value of config.onSpawnPush ?? []) queue.push(value);
@@ -52,51 +32,34 @@ function makeHarness(config: { probeQueue: boolean[]; lockAvailable: boolean; on
 }
 
 describe("ensureDaemonRunning", () => {
-	it("#given explicit daemon CLI env #when resolving spawn target #then uses that path", () => {
-		expect(resolveDaemonCliPath({ CODEX_LSP_DAEMON_CLI: "/tmp/omo-lsp-daemon-cli.js" })).toBe(
-			"/tmp/omo-lsp-daemon-cli.js",
-		);
-	});
-
-	it("#given blank daemon CLI env #when resolving spawn target #then falls back to bundled cli", () => {
-		expect(resolveDaemonCliPath({ CODEX_LSP_DAEMON_CLI: "  " })).toMatch(/cli\.js$/);
-	});
-
 	it("#given daemon already reachable #when ensure #then does not lock or spawn", async () => {
-		const { deps, counts } = makeHarness({ probeQueue: [true], lockAvailable: true });
+		const { deps, counts } = makeHarness({ probeQueue: [true] });
 		await ensureDaemonRunning(PATHS, deps);
 		expect(counts.spawn).toBe(0);
-		expect(counts.lockAcquired).toBe(0);
 	});
 
-	it("#given not running and lock free #when ensure #then cleans stale socket, spawns, and waits", async () => {
+	it("#given not running #when ensure #then spawns without owning the daemon lock and waits", async () => {
 		const { deps, counts } = makeHarness({
 			probeQueue: [false, false],
-			lockAvailable: true,
 			onSpawnPush: [true],
 		});
 		await ensureDaemonRunning(PATHS, deps);
-		expect(counts.cleanup).toBe(1);
 		expect(counts.spawn).toBe(1);
-		expect(counts.lockReleased).toBe(1);
 	});
 
-	it("#given another process holds the lock #when ensure #then waits without spawning", async () => {
+	it("#given another candidate wins after spawn #when ensure #then authenticated polling observes it", async () => {
 		const { deps, counts } = makeHarness({
 			probeQueue: [false, false, true],
-			lockAvailable: false,
 		});
 		await ensureDaemonRunning(PATHS, deps);
-		expect(counts.spawn).toBe(0);
-		expect(counts.lockAcquired).toBe(0);
+		expect(counts.spawn).toBe(1);
 	});
 
-	it("#given spawn never becomes reachable #when ensure #then throws and releases the lock", async () => {
-		const { deps, counts } = makeHarness({ probeQueue: [false, false], lockAvailable: true });
+	it("#given spawn never becomes reachable #when ensure #then throws", async () => {
+		const { deps, counts } = makeHarness({ probeQueue: [false, false] });
 		await expect(
 			ensureDaemonRunning(PATHS, deps, { readyTimeoutMs: 300, pollIntervalMs: 100 }),
 		).rejects.toBeInstanceOf(DaemonUnreachableError);
 		expect(counts.spawn).toBe(1);
-		expect(counts.lockReleased).toBe(1);
 	});
 });

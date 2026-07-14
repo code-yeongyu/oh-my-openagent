@@ -1,15 +1,18 @@
 import { Readable, Writable } from "node:stream";
 import { describe, expect, it } from "vitest";
 
-import { type DaemonPaths, daemonPaths } from "../src/paths.js";
+import type { DaemonPaths } from "../src/paths.js";
 import { runMcpStdioProxy } from "../src/proxy.js";
+import { daemonTestPaths } from "./daemon-path-fixture.js";
 
 describe("lsp-daemon MCP proxy protocol pins", () => {
 	it("given initialize request when proxied then exact server info and capabilities stay stable", async () => {
 		const out: string[] = [];
 
 		await runMcpStdioProxy({
-			input: inputStream([{ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05" } }]),
+			input: inputStream([
+				{ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05" } },
+			]),
 			output: collectingWritable(out),
 			paths: inertPaths(),
 			ensure: noSpawn,
@@ -51,7 +54,7 @@ describe("lsp-daemon MCP proxy protocol pins", () => {
 const noSpawn = (): Promise<void> => Promise.resolve();
 
 function inertPaths(): DaemonPaths {
-	return daemonPaths({ CODEX_LSP_DAEMON_DIR: "/tmp/omo-lsp-daemon-protocol-pin" }, "test");
+	return daemonTestPaths("/tmp/omo-lsp-daemon-protocol-pin");
 }
 
 function inputStream(messages: readonly object[]): Readable {
