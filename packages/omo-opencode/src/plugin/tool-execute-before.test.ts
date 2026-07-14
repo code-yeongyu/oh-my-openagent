@@ -272,6 +272,50 @@ describe("createToolExecuteBeforeHandler", () => {
       expect(output.args.subagent_type).toBe("oracle")
     })
   })
+
+  describe("task() anti-loop dispatch guard", () => {
+    const emptyHooks = {}
+
+    function createCtx() {
+      return {
+        client: {
+          session: {
+            messages: async () => ({ data: [] }),
+          },
+        },
+      }
+    }
+
+    function makeHandler() {
+      return createToolExecuteBeforeHandler({
+        ctx: createCtx(),
+        hooks: emptyHooks,
+        pluginConfig: { background_task: { circuitBreaker: { enabled: true, consecutiveThreshold: 2 } } },
+      })
+    }
+
+    test("throws on task() missing all routing fields (malformed dispatch)", async () => {
+      const handler = makeHandler()
+      const input = { tool: "task", sessionID: "ses_loop", callID: "call_1" }
+      const output = { args: { prompt: "do something" } as Record<string, unknown> }
+      await expect(handler(input, output)).rejects.toThrow(/pre-dispatch validation/)
+    })
+
+    test("does not throw on a valid task() with category", async () => {
+      const handler = makeHandler()
+      const input = { tool: "task", sessionID: "ses_ok", callID: "call_1" }
+      const output = { args: { category: "quick", prompt: "do something" } as Record<string, unknown> }
+      await expect(handler(input, output)).resolves.toBeUndefined()
+    })
+
+    test("trips the circuit breaker after repeated identical malformed task()", async () => {
+      const handler = makeHandler()
+      const input = { tool: "task", sessionID: "ses_trip", callID: "call_1" }
+      const makeOutput = () => ({ args: { prompt: "do something" } as Record<string, unknown> })
+      await expect(handler(input, makeOutput())).rejects.toThrow(/pre-dispatch validation/)
+      await expect(handler(input, makeOutput())).rejects.toThrow(/TRIPPED/)
+    })
+  })
 })
 
 describe("createToolRegistry", () => {
