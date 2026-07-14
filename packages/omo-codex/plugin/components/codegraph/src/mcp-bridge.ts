@@ -63,19 +63,24 @@ export async function runBridgedCodegraphProcess(
 			resolveExit(signal === null ? 0 : 1);
 		});
 	});
-	const bridgeDone = Promise.all([
-		forwardClientToCodegraph(options.input, childInput, pendingResponses, (mode) => {
-			defaultResponseMode = mode;
-		}),
-		forwardCodegraphToClient(childOutput, options.output, pendingResponses, () => defaultResponseMode),
-	]);
+	const clientForwardingDone = forwardClientToCodegraph(options.input, childInput, pendingResponses, (mode) => {
+		defaultResponseMode = mode;
+	});
+	const responseForwardingDone = forwardCodegraphToClient(
+		childOutput,
+		options.output,
+		pendingResponses,
+		() => defaultResponseMode,
+	);
+	const bridgeDone = Promise.all([clientForwardingDone, responseForwardingDone]);
+	const childAndResponsesDone = Promise.all([childExit, responseForwardingDone]).then(([exitCode]) => exitCode);
 	const destroyChildPipes = (): void => {
 		childInput.destroy();
 		childOutput.destroy();
 	};
 	void childExit.then(destroyChildPipes, destroyChildPipes);
 	try {
-		return await Promise.race([childExit, bridgeDone.then(() => childExit)]);
+		return await Promise.race([childAndResponsesDone, bridgeDone.then(() => childExit)]);
 	} catch (error) {
 		destroyChildPipes();
 		if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
