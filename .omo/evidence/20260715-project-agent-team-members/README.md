@@ -12,10 +12,13 @@ Focused regression command:
 
 ```text
 bun test \
-  packages/omo-opencode/src/features/team-mode/team-runtime/project-agent-member.test.ts \
   packages/omo-opencode/src/features/team-mode/team-runtime/prepare-team-members.test.ts \
   packages/omo-opencode/src/features/team-mode/team-runtime/create.test.ts \
-  packages/omo-opencode/src/features/team-mode/team-runtime/shutdown.test.ts
+  packages/omo-opencode/src/features/team-mode/team-runtime/cleanup-team-run-resources.test.ts \
+  packages/omo-opencode/src/features/background-agent/manager-session-permission.test.ts \
+  packages/omo-opencode/src/features/background-agent/manager.polling.test.ts \
+  packages/omo-opencode/src/features/background-agent/task-poller.test.ts \
+  packages/omo-opencode/src/features/background-agent/manager-resume-directory.test.ts
 ```
 
 The driver launched the real installed `opencode run` command with the local plugin source, an isolated XDG environment, a local fake OpenAI Responses provider, and a nested Git fixture containing `.opencode/agents/repository-reviewer.md`.
@@ -40,20 +43,22 @@ The parent model invoked the real `team_create` tool. The inline team reused a b
 - The child received the tool result and completed with a normal follow-up response.
 - The fake provider exited before the driver completed.
 - The successful-run sandbox was removed after evidence capture and assertion verification.
-- The host OpenCode session count remained `3745` before and after.
+- The host OpenCode session count remained `3779` before and after.
 
-The focused regression command completed with `55 pass`, `0 fail`, and `136 expect() calls` across the four affected regression files. Those tests prove the finalized review fixes:
+The focused regression command completed with `98 pass`, `0 fail`, and `239 expect() calls` across the seven affected regression files. Those tests prove the finalized review fixes:
 
 - A required Team tool with effective `ask` is rejected without permission elevation.
 - Explicit `allow` rules for all five required Team tools after a wildcard `ask` admit the project agent.
-- Recursive `mkdir` return values identify the first root created by preflight and return no ownership for an already-existing path.
-- On Windows, namespaced recursive-`mkdir` ownership returns are canonicalized deterministically: `\\?\C:\...` becomes an ordinary drive path and `\\?\UNC\server\share\...` becomes an ordinary UNC path.
-- Namespace normalization applies only to the ownership root returned by `mkdir`; the requested member execution directory is unchanged. Non-Windows behavior is unchanged.
+- Preflight recursively creates only missing parents, then atomically claims the exact member leaf with non-recursive `mkdir`.
+- A newly created exact member leaf is owned, while a pre-existing directory is unowned and an existing file rejects.
+- Concurrent sibling creation records independent exact-leaf ownership instead of assigning a shared ancestor to one run.
 - Absolute `worktreePath` and optional `ownedWorktreeRoot` metadata are persisted together before inbox creation and survive later runtime patches.
-- Runtime-state and inbox failures preserve pre-existing worktree sentinels while rollback removes newly owned roots.
+- Runtime-state and inbox failures preserve pre-existing worktree sentinels and shared parents while rollback removes only newly owned member leaves.
 - Normal and force deletion preserve legacy or pre-existing `worktreePath`-only directories.
 - Normal and force deletion remove roots only when `ownedWorktreeRoot` proves ownership.
-- Overlapping rollback ownership roots remain ancestor-deduplicated.
+- Background tasks persist their effective inherited or explicit launch directory and retain it in the completed archive.
+- Output validation, missing-session checks, stale activity refreshes, and both session-existence fallback branches route through each task's directory.
+- Resume routing remains pinned to the existing task directory behavior.
 
 `opencode-run.jsonl` contains the completed `team_create` event and runtime state. It records the exact `repository-reviewer` identity, `gpt-project-agent` model with `xhigh` variant, child session ID, and prepared member worktree path.
 
@@ -61,9 +66,9 @@ The focused regression command completed with `55 pass`, `0 fail`, and `136 expe
 
 ## Why this is enough
 
-The real run exercises the user-visible path rather than calling resolver functions directly: OpenCode loads the final project agent registry, OMO validates and preflights the member, Team Mode creates the child session, and the child reaches the provider under its exact model and prompt. The generic fallback assertion and child model observation cover accidental substitution. The structured child tool part, delivery result, and live inbox snapshot prove Team messaging executed and persisted with the correct identity and recipient. The tool list covers Team protocol capability, repository write denial, and question denial. The before and after host database counts prove isolation. The cleanup assertions prove the provider stopped and the successful sandbox no longer exists.
+The real run exercises the user-visible path rather than calling resolver functions directly: OpenCode loads the final project agent registry, OMO validates and preflights the member, Team Mode creates the child session in its member worktree, and the child reaches the provider under its exact model and prompt. The generic fallback assertion and child model observation cover accidental substitution. The structured child tool part, delivery result, and live inbox snapshot prove Team messaging executed and persisted with the correct identity and recipient. The tool list covers Team protocol capability, repository write denial, and question denial. The before and after host database counts prove isolation. The cleanup assertions prove the provider stopped and the successful sandbox no longer exists.
 
-The focused suites complement the real run with deterministic coverage of permission precedence, Windows drive/UNC ownership normalization, and destructive cleanup edge cases that are unsafe or impractical to manufacture inside one live session. Together they prove both the normal end-to-end project-agent flow and the fail-safe ownership behavior: execution routing keeps its requested directory, uncertain or legacy paths leak safely, and only canonical roots atomically proven and durably persisted as owned are removed.
+The focused suites complement the real run with deterministic coverage of atomic exact-leaf ownership, concurrent sibling creation, destructive cleanup edge cases, and all child-session probe paths that are unsafe or impractical to manufacture inside one live session. Together they prove both the normal end-to-end project-agent flow and the fail-safe ownership behavior: execution and polling stay in the member directory, uncertain or legacy paths leak safely, and only exact leaves atomically proven and durably persisted as owned are removed.
 
 ## What was omitted
 

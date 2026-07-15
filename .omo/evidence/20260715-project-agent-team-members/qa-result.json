@@ -20,14 +20,14 @@
     "successfulSandboxRemoved": true
   },
   "cleanup": {
-    "sandboxPath": "/home/nikita/work/Projects/ai/op/oh-my-openagent-wt/fix-project-agent-team-members/.omo/evidence/20260715-project-agent-team-members/sandbox-3809557",
+    "sandboxPath": "/home/nikita/work/Projects/ai/op/oh-my-openagent-wt/fix-project-agent-team-members/.omo/evidence/20260715-project-agent-team-members/sandbox-23997",
     "sandboxPreservedForFailure": false
   },
   "hostDbPath": "/home/nikita/.local/share/opencode/opencode.db",
-  "hostSessionCountBefore": "3745",
-  "hostSessionCountAfter": "3745",
-  "isolatedDbPath": "/home/nikita/work/Projects/ai/op/oh-my-openagent-wt/fix-project-agent-team-members/.omo/evidence/20260715-project-agent-team-members/sandbox-3809557/data/opencode/opencode.db",
-  "projectRoot": "/home/nikita/work/Projects/ai/op/oh-my-openagent-wt/fix-project-agent-team-members/.omo/evidence/20260715-project-agent-team-members/sandbox-3809557/project",
+  "hostSessionCountBefore": "3779",
+  "hostSessionCountAfter": "3779",
+  "isolatedDbPath": "/home/nikita/work/Projects/ai/op/oh-my-openagent-wt/fix-project-agent-team-members/.omo/evidence/20260715-project-agent-team-members/sandbox-23997/data/opencode/opencode.db",
+  "projectRoot": "/home/nikita/work/Projects/ai/op/oh-my-openagent-wt/fix-project-agent-team-members/.omo/evidence/20260715-project-agent-team-members/sandbox-23997/project",
   "childEntry": {
     "call": 4,
     "branch": "project-agent-child-message",
@@ -35,7 +35,7 @@
     "hasProjectPrompt": true,
     "hasChildTask": true,
     "hasToolResult": false,
-    "teamRunId": "f710d874-951a-4550-a9cf-c00e2dc467e3",
+    "teamRunId": "b0b76f86-afa5-4d73-a8e0-bb63273b3928",
     "tools": [
       "background_cancel",
       "background_output",
@@ -154,7 +154,7 @@
     "hasProjectPrompt": true,
     "hasChildTask": true,
     "hasToolResult": true,
-    "teamRunId": "f710d874-951a-4550-a9cf-c00e2dc467e3",
+    "teamRunId": "b0b76f86-afa5-4d73-a8e0-bb63273b3928",
     "tools": [
       "background_cancel",
       "background_output",
@@ -267,9 +267,9 @@
     ]
   },
   "childSession": {
-    "id": "ses_09998054affe5C4p1ndiQaZ5yo",
-    "parent_id": "ses_0999826deffe6IzpYqpKS5Q1O3",
-    "directory": "/home/nikita/work/Projects/ai/op/oh-my-openagent-wt/fix-project-agent-team-members/.omo/evidence/20260715-project-agent-team-members/sandbox-3809557/project/member-worktree",
+    "id": "ses_09959f5eaffecgTBpUm79rbqoz",
+    "parent_id": "ses_0995a26ceffeMbY5u6wG80IxfC",
+    "directory": "/home/nikita/work/Projects/ai/op/oh-my-openagent-wt/fix-project-agent-team-members/.omo/evidence/20260715-project-agent-team-members/sandbox-23997/project/member-worktree",
     "title": "Create team member qa-project-agent-team/reviewer (@repository-reviewer subagent)"
   },
   "teamSendMessagePart": {
@@ -279,18 +279,18 @@
     "state": {
       "status": "completed",
       "input": {
-        "teamRunId": "f710d874-951a-4550-a9cf-c00e2dc467e3",
+        "teamRunId": "b0b76f86-afa5-4d73-a8e0-bb63273b3928",
         "to": "lead",
         "body": "QA_TEAM_MESSAGE"
       },
-      "output": "{\"messageId\":\"88ee4ae0-bb4b-447d-9f72-4f8de9b6fe0a\",\"deliveredTo\":[\"lead\"]}",
+      "output": "{\"messageId\":\"ed971405-7cbe-49eb-a151-ad8f5b7e72f2\",\"deliveredTo\":[\"lead\"]}",
       "metadata": {
         "truncated": false
       },
       "title": "",
       "time": {
-        "start": 1784129522057,
-        "end": 1784129522342
+        "start": 1784133590035,
+        "end": 1784133590556
       }
     },
     "metadata": {
@@ -301,11 +301,11 @@
   },
   "persistedTeamMessage": {
     "version": 1,
-    "messageId": "88ee4ae0-bb4b-447d-9f72-4f8de9b6fe0a",
+    "messageId": "ed971405-7cbe-49eb-a151-ad8f5b7e72f2",
     "from": "reviewer",
     "to": "lead",
     "kind": "message",
     "body": "QA_TEAM_MESSAGE",
-    "timestamp": 1784129522200
+    "timestamp": 1784133590174
   }
 }
