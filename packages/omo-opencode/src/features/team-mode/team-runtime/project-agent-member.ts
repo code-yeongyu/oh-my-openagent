@@ -1,7 +1,8 @@
 import { z } from "zod"
 
-import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
+import { getAgentConfigKey } from "../../../shared/agent-display-names"
 import type { DelegatedModelConfig } from "../../../shared/model-resolution-types"
+import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import { AGENT_ELIGIBILITY_REGISTRY } from "../types"
 import type { Member } from "../types"
 
@@ -22,6 +23,7 @@ const AgentPermissionRuleSchema = z.object({
 const OpenCodeAgentSchema = z.looseObject({
   name: z.string(),
   mode: z.enum(["subagent", "primary", "all"]),
+  native: z.boolean().nullish(),
   hidden: z.boolean().nullish(),
   permission: z.array(AgentPermissionRuleSchema),
   model: z.object({
@@ -107,7 +109,8 @@ export async function resolveProjectAgentMember(
   ctx: Pick<ExecutorContext, "client">,
   options: ProjectAgentMemberOptions,
 ): Promise<ProjectAgentMemberResolution | undefined> {
-  if (AGENT_ELIGIBILITY_REGISTRY[member.subagent_type] !== undefined) {
+  const canonicalSubagentType = getAgentConfigKey(member.subagent_type)
+  if (AGENT_ELIGIBILITY_REGISTRY[canonicalSubagentType] !== undefined) {
     return undefined
   }
 
@@ -117,6 +120,9 @@ export async function resolveProjectAgentMember(
     throw new ProjectAgentMemberError(
       `Project agent '${member.subagent_type}' is absent from the final OpenCode agent registry for '${options.directory}'.`,
     )
+  }
+  if (agent.native !== false) {
+    return undefined
   }
   if (agent.hidden === true) {
     throw new ProjectAgentMemberError(`Project agent '${member.subagent_type}' is hidden and cannot join a team.`)

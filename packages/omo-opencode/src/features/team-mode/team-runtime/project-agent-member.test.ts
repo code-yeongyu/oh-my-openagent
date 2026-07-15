@@ -4,6 +4,7 @@ import { describe, expect, mock, test } from "bun:test"
 
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import type { OmoAgentClient } from "../../../tools/delegate-task/types"
+import { getAgentDisplayName } from "../../../shared/agent-display-names"
 import type { Member } from "../types"
 import { ProjectAgentMemberError, resolveProjectAgentMember } from "./project-agent-member"
 
@@ -16,6 +17,7 @@ type AgentRule = {
 type ProjectAgentFixture = {
   readonly name: string
   readonly mode: "subagent" | "primary" | "all"
+  readonly native?: boolean | null
   readonly hidden?: boolean
   readonly permission: readonly AgentRule[]
   readonly model?: {
@@ -68,6 +70,7 @@ function createProjectAgent(overrides: Partial<ProjectAgentFixture> = {}): Proje
   return {
     name: "repository-reviewer",
     mode: "subagent",
+    native: false,
     permission: [{ permission: "*", pattern: "*", action: "allow" }],
     model: { providerID: "openai", modelID: "gpt-5.6-sol" },
     variant: "xhigh",
@@ -231,6 +234,43 @@ describe("project agent Team Mode member resolution", () => {
 
     // then
     expect(appAgents).not.toHaveBeenCalled()
+    expect(result).toBeUndefined()
+  })
+
+  for (const configKey of ["atlas", "prometheus"] as const) {
+    test(`keeps the ${configKey} display alias on the built-in resolution path`, async () => {
+      // given
+      const displayName = getAgentDisplayName(configKey)
+      const appAgents = mock(async () => ({ data: [createProjectAgent({ name: displayName })] }))
+      const member = { ...createMember(), subagent_type: displayName }
+
+      // when
+      const result = await resolveProjectAgentMember(member, createContext(appAgents), {
+        directory: "/repository-member-worktree",
+        isLead: false,
+      })
+
+      // then
+      expect(appAgents).not.toHaveBeenCalled()
+      expect(result).toBeUndefined()
+    })
+  }
+
+  test("does not admit a native generic agent as a dynamic project member", async () => {
+    // given
+    const appAgents = mock(async () => ({
+      data: [createProjectAgent({ name: "general", native: true })],
+    }))
+    const member = { ...createMember(), subagent_type: "general" }
+
+    // when
+    const result = await resolveProjectAgentMember(member, createContext(appAgents), {
+      directory: "/repository-member-worktree",
+      isLead: false,
+    })
+
+    // then
+    expect(appAgents).toHaveBeenCalledWith({ query: { directory: "/repository-member-worktree" } })
     expect(result).toBeUndefined()
   })
 })

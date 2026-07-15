@@ -5,6 +5,7 @@ import type { Member, TeamSpec } from "../types"
 type SubagentMember = Extract<Member, { kind: "subagent_type" }>
 
 export type TeamMemberEligibilityPolicy = {
+  readonly canonicalizeSubagentType?: (subagentType: string) => string
   readonly isAdditionalSubagentEligible: (member: SubagentMember) => boolean
 }
 
@@ -102,7 +103,9 @@ export function validateMemberEligibility(
     return
   }
 
-  const eligibility = AGENT_ELIGIBILITY_REGISTRY[member.subagent_type]
+  const canonicalSubagentType = eligibilityPolicy?.canonicalizeSubagentType?.(member.subagent_type)
+    ?? member.subagent_type
+  const eligibility = AGENT_ELIGIBILITY_REGISTRY[canonicalSubagentType]
   if (!eligibility) {
     if (eligibilityPolicy?.isAdditionalSubagentEligible(member) === true) {
       return

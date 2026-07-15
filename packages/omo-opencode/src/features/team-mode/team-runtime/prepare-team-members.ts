@@ -1,6 +1,7 @@
 import { access, mkdir, rm } from "node:fs/promises"
 import path from "node:path"
 
+import { getAgentConfigKey } from "../../../shared/agent-display-names"
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import { AGENT_ELIGIBILITY_REGISTRY } from "../types"
 import type { TeamSpec } from "../types"
@@ -59,7 +60,8 @@ async function resolveMemberDirectory(
 }
 
 function canReuseCallerAsLead(member: TeamSpec["members"][number]): boolean {
-  return member.kind === "category" || AGENT_ELIGIBILITY_REGISTRY[member.subagent_type] !== undefined
+  return member.kind === "category"
+    || AGENT_ELIGIBILITY_REGISTRY[getAgentConfigKey(member.subagent_type)] !== undefined
 }
 
 function createCleanupReport(): TeamRunCleanupReport {
