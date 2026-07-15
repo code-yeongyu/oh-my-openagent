@@ -446,4 +446,88 @@ describe("createSkillContext", () => {
       getSystemMcpServerNamesSpy.mockRestore()
     }
   })
+
+  it("defaults the browser provider to openchrome-aside when browser_automation_engine is unset", async () => {
+    // given
+    const discoverConfigSourceSkillsSpy = spyOn(skillLoader, "discoverConfigSourceSkills").mockResolvedValue([])
+    const discoverUserClaudeSkillsSpy = spyOn(skillLoader, "discoverUserClaudeSkills").mockResolvedValue([])
+    const discoverProjectClaudeSkillsSpy = spyOn(skillLoader, "discoverProjectClaudeSkills").mockResolvedValue([])
+    const discoverOpencodeGlobalSkillsSpy = spyOn(skillLoader, "discoverOpencodeGlobalSkills").mockResolvedValue([])
+    const discoverOpencodeProjectSkillsSpy = spyOn(skillLoader, "discoverOpencodeProjectSkills").mockResolvedValue([])
+    const discoverProjectAgentsSkillsSpy = spyOn(skillLoader, "discoverProjectAgentsSkills").mockResolvedValue([])
+    const discoverGlobalAgentsSkillsSpy = spyOn(skillLoader, "discoverGlobalAgentsSkills").mockResolvedValue([])
+    const getSystemMcpServerNamesSpy = spyOn(mcpLoader, "getSystemMcpServerNames").mockReturnValue(new Set<string>())
+
+    const pluginConfig = OhMyOpenCodeConfigSchema.parse({})
+
+    try {
+      // when
+      const result = await createSkillContext({
+        directory: testDirectory,
+        pluginConfig,
+      })
+
+      // then
+      expect(result.browserProvider).toBe("openchrome-aside")
+      expect(result.mergedSkills.some((skill) => skill.name === "playwright")).toBe(true)
+    } finally {
+      discoverConfigSourceSkillsSpy.mockRestore()
+      discoverUserClaudeSkillsSpy.mockRestore()
+      discoverProjectClaudeSkillsSpy.mockRestore()
+      discoverOpencodeGlobalSkillsSpy.mockRestore()
+      discoverOpencodeProjectSkillsSpy.mockRestore()
+      discoverProjectAgentsSkillsSpy.mockRestore()
+      discoverGlobalAgentsSkillsSpy.mockRestore()
+      getSystemMcpServerNamesSpy.mockRestore()
+    }
+  })
+
+  it("keeps a discovered playwright skill when browser provider is openchrome-aside", async () => {
+    // given - a user-authored playwright SKILL.md on disk must survive under the new default
+    const discoveredPlaywrightDir = join(testDirectory, ".claude", "skills", "playwright")
+    mkdirSync(discoveredPlaywrightDir, { recursive: true })
+    writeFileSync(
+      join(discoveredPlaywrightDir, "SKILL.md"),
+      [
+        "---",
+        "name: playwright",
+        "description: Discovered user playwright skill",
+        "---",
+        "Discovered user playwright body.",
+        "",
+      ].join("\n"),
+    )
+
+    const discoverConfigSourceSkillsSpy = spyOn(skillLoader, "discoverConfigSourceSkills").mockResolvedValue([])
+    const discoverUserClaudeSkillsSpy = spyOn(skillLoader, "discoverUserClaudeSkills").mockResolvedValue([])
+    const discoverOpencodeGlobalSkillsSpy = spyOn(skillLoader, "discoverOpencodeGlobalSkills").mockResolvedValue([])
+    const discoverProjectAgentsSkillsSpy = spyOn(skillLoader, "discoverProjectAgentsSkills").mockResolvedValue([])
+    const discoverGlobalAgentsSkillsSpy = spyOn(skillLoader, "discoverGlobalAgentsSkills").mockResolvedValue([])
+    const getSystemMcpServerNamesSpy = spyOn(mcpLoader, "getSystemMcpServerNames").mockReturnValue(new Set<string>())
+
+    const pluginConfig = OhMyOpenCodeConfigSchema.parse({
+      browser_automation_engine: { provider: "openchrome-aside" },
+    })
+
+    try {
+      // when
+      const result = await createSkillContext({
+        directory: testDirectory,
+        pluginConfig,
+      })
+
+      // then - the user's discovered playwright skill survives gating AND overrides the builtin
+      expect(result.browserProvider).toBe("openchrome-aside")
+      const playwright = result.mergedSkills.find((skill) => skill.name === "playwright")
+      expect(playwright).toBeDefined()
+      expect(playwright?.definition.description).toContain("Discovered user playwright skill")
+    } finally {
+      discoverConfigSourceSkillsSpy.mockRestore()
+      discoverUserClaudeSkillsSpy.mockRestore()
+      discoverOpencodeGlobalSkillsSpy.mockRestore()
+      discoverProjectAgentsSkillsSpy.mockRestore()
+      discoverGlobalAgentsSkillsSpy.mockRestore()
+      getSystemMcpServerNamesSpy.mockRestore()
+    }
+  })
 })

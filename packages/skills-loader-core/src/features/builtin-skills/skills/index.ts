@@ -1,5 +1,6 @@
 export { playwrightSkill, agentBrowserSkill } from "./playwright"
 export { playwrightCliSkill } from "./playwright-cli"
+export { openchromeAsideSkill } from "./openchrome-aside-skill"
 export { frontendSkill } from "./frontend"
 export { gitMasterSkill } from "./git-master"
 export { devBrowserSkill } from "./dev-browser"

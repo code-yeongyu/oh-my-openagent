@@ -43,16 +43,23 @@ function mapScopeToLocation(scope: SkillScope): AvailableSkill["location"] {
   return "plugin"
 }
 
+function activeBrowserSkillName(browserProvider: BrowserAutomationProvider): string {
+  if (browserProvider === "agent-browser") return "agent-browser"
+  if (browserProvider === "dev-browser") return "dev-browser"
+  return "playwright"
+}
+
 function filterProviderGatedSkills(
   skills: LoadedSkill[],
   browserProvider: BrowserAutomationProvider,
 ): LoadedSkill[] {
+  const activeName = activeBrowserSkillName(browserProvider)
   return skills.filter((skill) => {
     if (!PROVIDER_GATED_SKILL_NAMES.has(skill.name)) {
       return true
     }
 
-    return skill.name === browserProvider
+    return skill.name === activeName
   })
 }
 
@@ -97,7 +104,7 @@ export async function createSkillContext(args: {
   const { directory, pluginConfig, hostSkills } = args
 
   const browserProvider: BrowserAutomationProvider =
-    pluginConfig.browser_automation_engine?.provider ?? "playwright"
+    pluginConfig.browser_automation_engine?.provider ?? "openchrome-aside"
 
   const disabledSkills = collectDisabledSkillAliases(pluginConfig)
 

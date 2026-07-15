@@ -65,7 +65,7 @@ describe("resolveSkillContent", () => {
 		// then: returns template string
 		expect(result).not.toBeNull()
 		expect(typeof result).toBe("string")
-		expect(result).toContain("Playwright Browser Automation")
+		expect(result).toContain("Browser Automation")
 	})
 
 	it("should return null for non-existent skill", () => {
@@ -101,7 +101,7 @@ describe("resolveMultipleSkills", () => {
 		expect(result.resolved.size).toBe(2)
 		expect(result.notFound).toEqual([])
 		expect(result.resolved.get("frontend")).toContain("router, not a rulebook")
-		expect(result.resolved.get("playwright")).toContain("Playwright Browser Automation")
+		expect(result.resolved.get("playwright")).toContain("Browser Automation")
 	})
 
 	it("should handle partial success - some skills not found", () => {
@@ -115,7 +115,7 @@ describe("resolveMultipleSkills", () => {
 		expect(result.resolved.size).toBe(2)
 		expect(result.notFound).toEqual(["nonexistent", "another-missing"])
 		expect(result.resolved.get("frontend")).toContain("router, not a rulebook")
-		expect(result.resolved.get("playwright")).toContain("Playwright Browser Automation")
+		expect(result.resolved.get("playwright")).toContain("Browser Automation")
 	})
 
 	it("should handle empty array", () => {

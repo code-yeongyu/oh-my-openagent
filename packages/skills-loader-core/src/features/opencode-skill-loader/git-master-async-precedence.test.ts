@@ -64,7 +64,7 @@ describe("git-master async precedence", () => {
 		expect(result.notFound).toEqual([])
 		expect(result.resolved.get("git-master")).toContain("custom git master content")
 		expect(result.resolved.get("git-master")).not.toContain("Git Master Agent")
-		expect(result.resolved.get("playwright")).toContain("Playwright Browser Automation")
+		expect(result.resolved.get("playwright")).toContain("Browser Automation")
 	})
 
 	it("preserves requested batch order when git-master uses the fast path", async () => {

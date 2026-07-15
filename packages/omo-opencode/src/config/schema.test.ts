@@ -750,10 +750,22 @@ describe("BrowserAutomationProviderSchema", () => {
     expect(result.success).toBe(true)
     expect(result.data).toBe("playwright-cli")
   })
+
+  test("accepts 'openchrome-aside' as valid provider", () => {
+    // given
+    const input = "openchrome-aside"
+
+    // when
+    const result = BrowserAutomationProviderSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.data).toBe("openchrome-aside")
+  })
 })
 
 describe("BrowserAutomationConfigSchema", () => {
-  test("defaults provider to 'playwright' when not specified", () => {
+  test("defaults provider to 'openchrome-aside' when not specified", () => {
     // given
     const input = {}
 
@@ -761,7 +773,7 @@ describe("BrowserAutomationConfigSchema", () => {
     const result = BrowserAutomationConfigSchema.parse(input)
 
     // then
-    expect(result.provider).toBe("playwright")
+    expect(result.provider).toBe("openchrome-aside")
   })
 
   test("accepts agent-browser provider", () => {

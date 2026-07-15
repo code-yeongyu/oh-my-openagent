@@ -6739,13 +6739,14 @@
       "type": "object",
       "properties": {
         "provider": {
-          "default": "playwright",
+          "default": "openchrome-aside",
           "type": "string",
           "enum": [
             "playwright",
             "agent-browser",
             "dev-browser",
-            "playwright-cli"
+            "playwright-cli",
+            "openchrome-aside"
           ]
         }
       },

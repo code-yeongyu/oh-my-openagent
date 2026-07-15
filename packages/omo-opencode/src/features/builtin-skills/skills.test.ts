@@ -5,7 +5,7 @@ import { createBuiltinSkills } from "./skills"
 import { agentBrowserSkill, playwrightSkill } from "./skills/playwright"
 
 describe("createBuiltinSkills", () => {
-	test("returns playwright skill by default", () => {
+	test("returns the tiered openchrome-aside browser skill (named playwright) by default", () => {
 		// given - no options (default)
 
 		// when
@@ -16,6 +16,8 @@ describe("createBuiltinSkills", () => {
 		expect(browserSkill).toBeDefined()
 		expect(browserSkill?.description).toContain("browser")
 		expect(browserSkill?.mcpConfig?.playwright).toBeDefined()
+		expect(browserSkill?.template).toContain("### 1. aside")
+		expect(browserSkill?.template).toContain("### 2. openchrome")
 	})
 
 	test("exports browser skill contracts with stable tool surfaces", () => {
@@ -333,5 +335,27 @@ describe("createBuiltinSkills", () => {
 		expect(playwrightSkill?.allowedTools).toContain("Bash(playwright-cli:*)")
 		expect(playwrightSkill?.mcpConfig).toBeUndefined()
 		expect(agentBrowserSkill).toBeUndefined()
+	})
+
+	test("returns tiered openchrome-aside skill when browserProvider is 'openchrome-aside'", () => {
+		// given
+		const options = { browserProvider: "openchrome-aside" as const }
+
+		// when
+		const skills = createBuiltinSkills(options)
+
+		// then
+		const browserSkill = skills.find((s) => s.name === "playwright")
+		const agentBrowserSkill = skills.find((s) => s.name === "agent-browser")
+		const devBrowserSkill = skills.find((s) => s.name === "dev-browser")
+		expect(browserSkill).toBeDefined()
+		expect(browserSkill?.description).toContain("browser")
+		expect(browserSkill?.template).toContain("### 1. aside")
+		expect(browserSkill?.template).toContain("### 2. openchrome")
+		expect(browserSkill?.mcpConfig?.playwright).toBeDefined()
+		expect(browserSkill?.allowedTools).toBeUndefined()
+		expect(agentBrowserSkill).toBeUndefined()
+		expect(devBrowserSkill).toBeUndefined()
+		expect(skills).toHaveLength(10)
 	})
 })

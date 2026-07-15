@@ -39,7 +39,7 @@ export function clearSkillCache(): void {
 }
 
 export async function getAllSkills(options?: SkillResolutionOptions): Promise<LoadedSkill[]> {
-	const browserProvider = options?.browserProvider ?? "playwright"
+	const browserProvider = options?.browserProvider ?? "openchrome-aside"
 	const teamModeEnabled = options?.teamModeEnabled ?? false
 	const directory = options?.directory ?? ""
 	const cacheKey = `${directory}:${browserProvider}:${teamModeEnabled ? "team-on" : "team-off"}`
@@ -81,13 +81,20 @@ export async function getAllSkills(options?: SkillResolutionOptions): Promise<Lo
 	// Provider-gated skill names that should be filtered based on browserProvider
 	const providerGatedSkillNames = new Set(["agent-browser", "playwright"])
 
+	const activeBrowserSkillName =
+		browserProvider === "agent-browser"
+			? "agent-browser"
+			: browserProvider === "dev-browser"
+				? "dev-browser"
+				: "playwright"
+
 	// Filter discovered skills to exclude provider-gated names that don't match the selected provider
 	const filteredDiscoveredSkills = discoveredSkills.filter((skill) => {
 		if (!providerGatedSkillNames.has(skill.name)) {
 			return true
 		}
-		// For provider-gated skills, only include if it matches the selected provider
-		return skill.name === browserProvider
+		// For provider-gated skills, only include if it matches the active browser skill name
+		return skill.name === activeBrowserSkillName
 	})
 
 	const discoveredNames = new Set(filteredDiscoveredSkills.map((skill) => skill.name))
