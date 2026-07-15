@@ -18,7 +18,7 @@ function clone<TValue>(value: TValue): TValue {
   return structuredClone(value)
 }
 
-function createToolContext(sessionID: string, agent = "test-agent"): ToolContext {
+function createToolContext(sessionID: string, agent = "Sisyphus"): ToolContext {
   return {
     sessionID,
     messageID: randomUUID(),

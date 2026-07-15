@@ -79,7 +79,7 @@ describe("team lifecycle tools", () => {
       config,
       backgroundManager,
       undefined,
-      { callerAgentTypeId: undefined, parentMessageID: expect.any(String) },
+      { callerAgentTypeId: "sisyphus", parentMessageID: expect.any(String) },
     )
   })
 
@@ -141,7 +141,7 @@ describe("team lifecycle tools", () => {
       config,
       expect.anything(),
       undefined,
-      { callerAgentTypeId: undefined, parentMessageID: expect.any(String) },
+      { callerAgentTypeId: "sisyphus", parentMessageID: expect.any(String) },
     )
     expect(result.runtimeState.members).toHaveLength(2)
     expect(result.runtimeState.members[0]).toMatchObject({ name: "lead", agentType: "leader" })
@@ -162,7 +162,7 @@ describe("team lifecycle tools", () => {
       config,
       expect.anything(),
       undefined,
-      { callerAgentTypeId: undefined, parentMessageID: expect.any(String) },
+      { callerAgentTypeId: "sisyphus", parentMessageID: expect.any(String) },
     )
   })
 
@@ -182,17 +182,19 @@ describe("team lifecycle tools", () => {
     expect(errorMessage).toContain("leadSessionId")
   })
 
-  test("team_create checks participant conflicts against the effective leadSessionId override", async () => {
+  test("team_create rejects a leadSessionId override that differs from the caller session", async () => {
     // given
     const teamCreateTool = createTeamCreateToolForTest()
-    await teamCreateTool.execute({ inline_spec: createSpec(), leadSessionId: "effective-lead-session" }, createToolContext("caller-session-a"))
-    const betaSpec = { ...createSpec(), name: "beta-team" }
 
     // when
-    const result = teamCreateTool.execute({ inline_spec: betaSpec, leadSessionId: "effective-lead-session" }, createToolContext("caller-session-b"))
+    const result = teamCreateTool.execute(
+      { inline_spec: createSpec(), leadSessionId: "different-session" },
+      createToolContext("caller-session"),
+    )
 
     // then
-    expect(result).rejects.toThrow("team_create denied: session is already a participant")
+    await expect(result).rejects.toThrow()
+    expect(createTeamRunMock).not.toHaveBeenCalled()
   })
 
   test("team_delete propagates active-member errors", async () => {
