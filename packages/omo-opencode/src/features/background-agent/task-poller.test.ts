@@ -560,6 +560,94 @@ describe("checkAndInterruptStaleTasks", () => {
     expect(mockClient.session.get).not.toHaveBeenCalled()
   })
 
+  it("uses the task directory when refreshing active session activity", async () => {
+    //#given
+    const task = createRunningTask({
+      directory: "/member-worktree",
+      startedAt: new Date(Date.now() - 300_000),
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(Date.now() - 200_000),
+      },
+    })
+    mockClient.session.get.mockResolvedValue({ data: { time: { updated: Date.now() } } })
+
+    //#when
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      directory: "/parent-worktree",
+      config: { staleTimeoutMs: 180_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: { "ses-1": { type: "running" } },
+    })
+
+    //#then
+    expect(task.status).toBe("running")
+    expect(mockClient.session.get).toHaveBeenCalledWith({
+      path: { id: "ses-1" },
+      query: { directory: "/member-worktree" },
+    })
+  })
+
+  it("uses the task directory for a missing session existence check before any progress", async () => {
+    //#given
+    const task = createRunningTask({
+      directory: "/member-worktree",
+      startedAt: new Date(Date.now() - 120_000),
+      progress: undefined,
+      consecutiveMissedPolls: 2,
+    })
+
+    //#when
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      directory: "/parent-worktree",
+      config: { messageStalenessTimeoutMs: 600_000, sessionGoneTimeoutMs: 60_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: {},
+    })
+
+    //#then
+    expect(mockClient.session.get).toHaveBeenCalledWith({
+      path: { id: "ses-1" },
+      query: { directory: "/member-worktree" },
+    })
+  })
+
+  it("uses the task directory for a missing session existence check after progress", async () => {
+    //#given
+    const task = createRunningTask({
+      directory: "/member-worktree",
+      startedAt: new Date(Date.now() - 300_000),
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(Date.now() - 120_000),
+      },
+      consecutiveMissedPolls: 2,
+    })
+
+    //#when
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      directory: "/parent-worktree",
+      config: { staleTimeoutMs: 180_000, sessionGoneTimeoutMs: 60_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: {},
+    })
+
+    //#then
+    expect(mockClient.session.get).toHaveBeenCalledWith({
+      path: { id: "ses-1" },
+      query: { directory: "/member-worktree" },
+    })
+  })
+
   it("should NOT cancel task when session.get confirms the session still exists", async () => {
     //#given - repeated missing polls but direct lookup still succeeds
     const task = createRunningTask({

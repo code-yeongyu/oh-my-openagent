@@ -197,8 +197,6 @@ export async function checkAndInterruptStaleTasks(args: {
   const now = Date.now()
 
   const messageStalenessMs = config?.messageStalenessTimeoutMs ?? DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS
-  const getSessionActivity = args.getSessionActivity
-    ?? ((id: string) => getSessionActivityFromClient(client, id, directory))
   const staleInterruptions: Array<Promise<void>> = []
 
   for (const task of tasks) {
@@ -207,6 +205,9 @@ export async function checkAndInterruptStaleTasks(args: {
     const startedAt = task.startedAt
     const sessionID = task.sessionId
     if (!startedAt || !sessionID) continue
+    const taskDirectory = task.directory ?? directory
+    const getSessionActivity = args.getSessionActivity
+      ?? ((id: string) => getSessionActivityFromClient(client, id, taskDirectory))
 
     const sessionStatus = sessionStatuses?.[sessionID]?.type
     const sessionMissing = sessionStatuses !== undefined && sessionStatus === undefined
@@ -237,7 +238,7 @@ export async function checkAndInterruptStaleTasks(args: {
       }
 
       if (sessionGone) {
-        const existence = await checkSessionExistence(client, sessionID, directory)
+        const existence = await checkSessionExistence(client, sessionID, taskDirectory)
         if (existence === "exists") {
           task.consecutiveMissedPolls = 0
           continue
@@ -287,7 +288,7 @@ export async function checkAndInterruptStaleTasks(args: {
     if (task.status !== "running") continue
 
     if (sessionGone) {
-      const existence = await checkSessionExistence(client, sessionID, directory)
+      const existence = await checkSessionExistence(client, sessionID, taskDirectory)
       if (existence === "exists") {
         task.consecutiveMissedPolls = 0
         continue
