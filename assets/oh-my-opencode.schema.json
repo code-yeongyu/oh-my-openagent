@@ -6562,6 +6562,18 @@
           "default": true,
           "type": "boolean"
         },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excluded_roots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "install_dir": {
           "type": "string"
         },

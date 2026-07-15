@@ -52,6 +52,8 @@ describe("OhMyOpenCodeConfigSchema codegraph", () => {
         codegraph: {
           auto_provision: false,
           enabled: true,
+          exclude: ["pixie/", "bcc/"],
+          excluded_roots: ["~/scratch/codegraph"],
           install_dir: "~/.omo/codegraph",
           telemetry: false,
           watch_debounce_ms: 250,

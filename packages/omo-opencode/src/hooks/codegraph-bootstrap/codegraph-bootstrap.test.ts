@@ -1,8 +1,7 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdtempSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs"
 import { join, resolve } from "node:path"
 
 import { prepareCodegraphWorkspace } from "@oh-my-opencode/utils"
@@ -12,6 +11,12 @@ import {
   createCodegraphBootstrapHook,
   type CodegraphBootstrapDeps,
 } from "./index"
+
+function createAllowedWorkspace(name: string): string {
+  const workspace = join(process.cwd(), `.tmp-omo-codegraph-${name}-${crypto.randomUUID()}`)
+  mkdirSync(workspace, { recursive: true })
+  return workspace
+}
 
 function createDeps(events: string[], overrides: Partial<CodegraphBootstrapDeps> = {}): CodegraphBootstrapDeps {
   return {
@@ -178,8 +183,8 @@ describe("createCodegraphBootstrapHook", () => {
 
   test("#given a PATH CodeGraph binary but the host Node is unsupported #when background work runs #then it leaves the project untouched", async () => {
     // given
-    const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-opencode-unsupported-node-"))
-    const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-opencode-unsupported-node-home-"))
+    const workspace = createAllowedWorkspace("unsupported-node")
+    const homeDir = createAllowedWorkspace("unsupported-node-home")
     const events: string[] = []
     const hook = createCodegraphBootstrapHook(
       { directory: workspace },
@@ -217,8 +222,8 @@ describe("createCodegraphBootstrapHook", () => {
 
   test("#given CodeGraph is missing and auto provision is enabled on unsupported Node #when background work runs #then it does not provision or mutate the project", async () => {
     // given
-    const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-opencode-unsupported-provision-"))
-    const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-opencode-unsupported-provision-home-"))
+    const workspace = createAllowedWorkspace("unsupported-provision")
+    const homeDir = createAllowedWorkspace("unsupported-provision-home")
     const events: string[] = []
     const hook = createCodegraphBootstrapHook(
       { directory: workspace },
@@ -259,8 +264,8 @@ describe("createCodegraphBootstrapHook", () => {
 
   test("#given CodeGraph is unavailable and auto provisioning is disabled #when background work runs #then it leaves the project untouched", async () => {
     // given
-    const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-opencode-unavailable-"))
-    const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-opencode-unavailable-home-"))
+    const workspace = createAllowedWorkspace("unavailable")
+    const homeDir = createAllowedWorkspace("unavailable-home")
     const events: string[] = []
     const hook = createCodegraphBootstrapHook(
       { directory: workspace },
@@ -292,6 +297,65 @@ describe("createCodegraphBootstrapHook", () => {
     } finally {
       rmSync(workspace, { recursive: true, force: true })
       rmSync(homeDir, { recursive: true, force: true })
+    }
+  })
+
+  test("#given project root is excluded by policy #when background work runs #then it skips before mutating the project", async () => {
+    // given
+    const excludedRoot = createAllowedWorkspace("excluded-root")
+    const projectRoot = join(excludedRoot, "repo")
+    mkdirSync(projectRoot, { recursive: true })
+    const events: string[] = []
+    const hook = createCodegraphBootstrapHook(
+      { directory: projectRoot },
+      { enabled: true, excluded_roots: [excludedRoot] },
+      createDeps(events, {
+        schedule: (task) => {
+          void task()
+        },
+      }),
+    )
+
+    try {
+      // when
+      hook.event({ event: { type: "session.created", properties: { worktree: projectRoot } } })
+      await waitForBackground()
+
+      // then
+      expect(events).toContain("log:[codegraph-bootstrap] Project excluded by CodeGraph policy; skipping bootstrap")
+      expect(events.some((event) => event.startsWith("prepare:"))).toBe(false)
+      expect(events.some((event) => event.startsWith("run:"))).toBe(false)
+    } finally {
+      rmSync(excludedRoot, { recursive: true, force: true })
+    }
+  })
+
+  test("#given exclude patterns are configured #when background work runs #then codegraph.json is written before init", async () => {
+    // given
+    const workspace = createAllowedWorkspace("exclude-patterns")
+    const events: string[] = []
+    const hook = createCodegraphBootstrapHook(
+      { directory: workspace },
+      { enabled: true, exclude: ["pixie/", "bcc/"] },
+      createDeps(events, {
+        schedule: (task) => {
+          void task()
+        },
+      }),
+    )
+
+    try {
+      // when
+      hook.event({ event: { type: "session.created", properties: { worktree: workspace } } })
+      await waitForBackground()
+
+      // then
+      expect(JSON.parse(readFileSync(join(workspace, "codegraph.json"), "utf8"))).toEqual({
+        exclude: ["pixie/", "bcc/"],
+      })
+      expect(events).toContain("run:/bin/codegraph:init")
+    } finally {
+      rmSync(workspace, { recursive: true, force: true })
     }
   })
 

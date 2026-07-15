@@ -5,10 +5,12 @@ import { join } from "node:path"
 import {
   buildCodegraphEnv,
   ensureCodegraphGitignored,
+  ensureCodegraphProjectConfig,
   ensureCodegraphProvisioned,
   prepareCodegraphWorkspace,
   resolveCodegraphCommand,
   resolveCodegraphNodeSupport,
+  shouldExcludeCodegraphProject,
   type BuildCodegraphEnvOptions,
   type CodegraphCommandResolution,
   type CodegraphNodeSupport,
@@ -132,12 +134,27 @@ async function resolveOrProvisionCommand(
   return { argsPrefix: [], command: provisioned.binPath, exists: true, source: "provisioned" }
 }
 
+function isProjectExcludedByPolicy(projectRoot: string, config: Partial<CodegraphConfig>): boolean {
+  const exclusion = shouldExcludeCodegraphProject(projectRoot, {
+    excludedRoots: config.excluded_roots,
+    homeDir: homedir(),
+  })
+  return exclusion.excluded
+}
+
 async function runBootstrap(
   projectRoot: string,
   config: Partial<CodegraphConfig>,
   deps: CodegraphBootstrapDeps,
 ): Promise<void> {
   try {
+    if (isProjectExcludedByPolicy(projectRoot, config)) {
+      deps.log("[codegraph-bootstrap] Project excluded by CodeGraph policy; skipping bootstrap", { projectRoot })
+      return
+    }
+
+    ensureCodegraphProjectConfig(projectRoot, { exclude: config.exclude })
+
     const autoInit = config.auto_init !== false
     const codegraphPath = join(projectRoot, ".codegraph")
     if (!autoInit && !existsSync(codegraphPath)) {

@@ -155,6 +155,26 @@ describe("createCodegraphMcpConfig", () => {
     expect(config.environment?.[DO_NOT_TRACK_ENV]).toBe("1")
   })
 
+  it("keeps the registration disabled when the project is excluded by policy", () => {
+    // given
+    const codegraphPath = "/opt/omo/codegraph/bin/codegraph"
+    const homeDir = "/tmp/omo-codegraph-excluded-home"
+    const excludedRoot = `${homeDir}/research-cache`
+    const projectRoot = `${excludedRoot}/repo`
+
+    // when
+    const config = createCodegraphMcpConfig({
+      cwd: projectRoot,
+      config: { enabled: true, excluded_roots: ["~/research-cache"] },
+      fileExists: () => false,
+      homeDir,
+      resolveExecutable: createResolver({ codegraph: codegraphPath }),
+    })
+
+    // then
+    expect(config.enabled).toBe(false)
+  })
+
   it("uses configured install_dir for provisioned lookup and MCP environment", () => {
     // given
     const installDir = "/custom/codegraph"
