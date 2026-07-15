@@ -53,6 +53,47 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
     })
   }
 
+  test("warm cache resolves transformed Vercel GPT-5.6 with xhigh", () => {
+    // given
+    const availableModels = new Set(["vercel/openai/gpt-5.6-sol"])
+
+    // when
+    const result = resolveModelWithFallback({
+      fallbackChain: AGENT_MODEL_REQUIREMENTS.momus.fallbackChain,
+      availableModels,
+      systemDefaultModel: "system/default",
+    })
+
+    // then
+    expect(result).toEqual({
+      model: "vercel/openai/gpt-5.6-sol",
+      source: "provider-fallback",
+      variant: "xhigh",
+    })
+  })
+
+  test("warm cache keeps transformed Vercel xhigh ahead of Copilot high", () => {
+    // given
+    const availableModels = new Set([
+      "github-copilot/gpt-5.6-sol",
+      "vercel/openai/gpt-5.6-sol",
+    ])
+
+    // when
+    const result = resolveModelWithFallback({
+      fallbackChain: AGENT_MODEL_REQUIREMENTS.momus.fallbackChain,
+      availableModels,
+      systemDefaultModel: "system/default",
+    })
+
+    // then
+    expect(result).toEqual({
+      model: "vercel/openai/gpt-5.6-sol",
+      source: "provider-fallback",
+      variant: "xhigh",
+    })
+  })
+
   test("Copilot is never added to a GPT-5.6 xhigh rung", () => {
     // given
     const requirements = [
