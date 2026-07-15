@@ -5,7 +5,8 @@ const logPath = process.env.QA_PROVIDER_LOG
 const portPath = process.env.QA_PROVIDER_PORT_FILE
 let callCount = 0
 let parentToolCallIssued = false
-let childRequestObserved = false
+let childToolCallIssued = false
+let childCompletionObserved = false
 
 function sleep(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds))
@@ -90,6 +91,10 @@ function toolNames(body) {
   return body.tools.flatMap((tool) => typeof tool?.name === "string" ? [tool.name] : [])
 }
 
+function findTeamRunId(serialized) {
+  return serialized.match(/TeamRunId:\s*([\w-]+)/)?.[1]
+}
+
 const server = http.createServer(async (request, response) => {
   if (request.method === "GET" && request.url === "/health") {
     response.writeHead(200, { "content-type": "text/plain" }).end("ok")
@@ -109,12 +114,14 @@ const server = http.createServer(async (request, response) => {
   const hasToolResult = inputSerialized.includes("function_call_output") || inputSerialized.includes("tool_result")
   const isTitle = inputSerialized.includes("Generate a title")
   const isChild = serialized.includes("QA_PROJECT_AGENT_PROMPT_MARKER") || serialized.includes("QA_CHILD_TASK")
+  const teamRunId = findTeamRunId(serialized)
   let branch = "default"
   if (isTitle) branch = "title"
   else if (inputSerialized.includes("QA_TRIGGER_PROJECT_AGENT_TEAM") && !hasToolResult && !parentToolCallIssued) {
     branch = "parent-team-create"
   } else if (inputSerialized.includes("QA_TRIGGER_PROJECT_AGENT_TEAM")) branch = "parent-complete"
-  else if (isChild) branch = "project-agent-child"
+  else if (isChild && !hasToolResult && !childToolCallIssued) branch = "project-agent-child-message"
+  else if (isChild) branch = "project-agent-child-complete"
 
   appendFileSync(logPath, `${JSON.stringify({
     call: callCount,
@@ -122,6 +129,8 @@ const server = http.createServer(async (request, response) => {
     model,
     hasProjectPrompt: serialized.includes("QA_PROJECT_AGENT_PROMPT_MARKER"),
     hasChildTask: serialized.includes("QA_CHILD_TASK"),
+    hasToolResult,
+    teamRunId,
     tools: toolNames(body),
   })}\n`)
 
@@ -138,15 +147,28 @@ const server = http.createServer(async (request, response) => {
             name: "reviewer",
             subagent_type: "repository-reviewer",
             worktreePath: "./member-worktree",
-            prompt: "QA_CHILD_TASK: reply exactly QA_CHILD_DONE",
+            prompt: "QA_CHILD_TASK: send QA_TEAM_MESSAGE to lead with team_send_message, then reply exactly QA_CHILD_DONE",
           },
         ],
       },
     }, model))
     return
   }
-  if (branch === "project-agent-child") {
-    childRequestObserved = true
+  if (branch === "project-agent-child-message") {
+    childToolCallIssued = true
+    if (!teamRunId) {
+      response.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify({ error: "missing TeamRunId" }))
+      return
+    }
+    sendEvents(response, toolCallEvents(callCount, "team_send_message", `team_send_message_${callCount}`, {
+      teamRunId,
+      to: "lead",
+      body: "QA_TEAM_MESSAGE",
+    }, model))
+    return
+  }
+  if (branch === "project-agent-child-complete") {
+    childCompletionObserved = true
     sendEvents(response, textEvents(callCount, "QA_CHILD_DONE", model))
     return
   }
@@ -155,7 +177,7 @@ const server = http.createServer(async (request, response) => {
     return
   }
   if (branch === "parent-complete") {
-    for (let attempt = 0; attempt < 100 && !childRequestObserved; attempt += 1) await sleep(100)
+    for (let attempt = 0; attempt < 100 && !childCompletionObserved; attempt += 1) await sleep(100)
     sendEvents(response, textEvents(callCount, "QA_PARENT_DONE", model))
     return
   }

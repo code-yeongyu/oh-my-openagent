@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from "node:child_process"
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -11,10 +11,33 @@ const configRoot = path.join(sandboxRoot, "config")
 const dataRoot = path.join(sandboxRoot, "data")
 const stateRoot = path.join(sandboxRoot, "state")
 const cacheRoot = path.join(sandboxRoot, "cache")
+const teamStateRoot = path.join(sandboxRoot, "team-state")
 const providerLog = path.join(evidenceDir, "provider-requests.jsonl")
 const providerPortFile = path.join(sandboxRoot, "provider-port")
 
 writeFileSync(providerLog, "")
+
+function readProviderEntries() {
+  return readFileSync(providerLog, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line))
+}
+
+async function capturePersistedLeadMessage() {
+  for (let attempt = 0; attempt < 9_000; attempt += 1) {
+    const teamRunId = readProviderEntries().find((entry) => entry.branch === "project-agent-child-message")?.teamRunId
+    if (teamRunId) {
+      const inboxDir = path.join(teamStateRoot, "runtime", teamRunId, "inboxes", "lead")
+      if (existsSync(inboxDir)) {
+        const messages = readdirSync(inboxDir)
+          .filter((name) => name.endsWith(".json"))
+          .map((name) => JSON.parse(readFileSync(path.join(inboxDir, name), "utf8")))
+        const message = messages.find((candidate) => candidate.body === "QA_TEAM_MESSAGE")
+        if (message) return message
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+  return undefined
+}
 
 for (const directory of [
   path.join(projectRoot, ".opencode", "agents"),
@@ -109,7 +132,7 @@ writeFileSync(path.join(configRoot, "opencode", "oh-my-openagent.json"), JSON.st
   team_mode: {
     enabled: true,
     tmux_visualization: false,
-    base_dir: path.join(sandboxRoot, "team-state"),
+    base_dir: teamStateRoot,
     max_parallel_members: 2,
     max_wall_clock_minutes: 1,
   },
@@ -131,6 +154,7 @@ let runStdout = ""
 let runStderr = ""
 run.stdout.on("data", (chunk) => { runStdout += chunk.toString() })
 run.stderr.on("data", (chunk) => { runStderr += chunk.toString() })
+const persistedMessageCapture = capturePersistedLeadMessage()
 const runExitCode = await new Promise((resolve, reject) => {
   const timer = setTimeout(() => {
     run.kill("SIGTERM")
@@ -141,14 +165,7 @@ const runExitCode = await new Promise((resolve, reject) => {
     resolve(code)
   })
 })
-
-for (let attempt = 0; attempt < 100; attempt += 1) {
-  const providerEntries = existsSync(providerLog)
-    ? readFileSync(providerLog, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line))
-    : []
-  if (providerEntries.some((entry) => entry.branch === "project-agent-child")) break
-  await new Promise((resolve) => setTimeout(resolve, 50))
-}
+const persistedTeamMessage = await persistedMessageCapture
 
 provider.kill("SIGTERM")
 await new Promise((resolve) => provider.on("exit", resolve))
@@ -156,6 +173,10 @@ writeFileSync(path.join(evidenceDir, "provider-stdout.log"), providerStdout)
 writeFileSync(path.join(evidenceDir, "provider-stderr.log"), providerStderr)
 writeFileSync(path.join(evidenceDir, "opencode-run.jsonl"), runStdout)
 writeFileSync(path.join(evidenceDir, "opencode-run.stderr.log"), runStderr)
+writeFileSync(
+  path.join(evidenceDir, "lead-inbox-messages.json"),
+  `${JSON.stringify(persistedTeamMessage ? [persistedTeamMessage] : [], null, 2)}\n`,
+)
 
 const isolatedDbPath = execFileSync("opencode", ["db", "path"], {
   cwd: projectRoot,
@@ -168,14 +189,32 @@ const isolatedSessionRows = execFileSync(
   { encoding: "utf8" },
 ).trim()
 writeFileSync(path.join(evidenceDir, "isolated-sessions.json"), `${isolatedSessionRows || "[]"}\n`)
+const isolatedSessions = JSON.parse(isolatedSessionRows || "[]")
+const memberWorktree = path.join(projectRoot, "member-worktree")
+const childSession = isolatedSessions.find((session) => session.directory === memberWorktree)
+const childSessionId = childSession?.id ?? "missing-child-session"
+const escapedChildSessionId = childSessionId.replaceAll("'", "''")
+const childPartRows = execFileSync(
+  "sqlite3",
+  ["-json", isolatedDbPath, `SELECT data FROM part WHERE session_id = '${escapedChildSessionId}' ORDER BY time_created, id;`],
+  { encoding: "utf8" },
+).trim()
+const childParts = JSON.parse(childPartRows || "[]").map((row) => JSON.parse(row.data))
+writeFileSync(path.join(evidenceDir, "child-session-parts.json"), `${JSON.stringify(childParts, null, 2)}\n`)
 
 const hostSessionCountAfter = execFileSync(
   "sqlite3",
   [hostDbPath, "SELECT count(*) FROM session;"],
   { encoding: "utf8" },
 ).trim()
-const providerEntries = readFileSync(providerLog, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line))
-const childEntry = providerEntries.find((entry) => entry.branch === "project-agent-child")
+const providerEntries = readProviderEntries()
+const childEntry = providerEntries.find((entry) => entry.branch === "project-agent-child-message")
+const childCompletionEntry = providerEntries.find((entry) => entry.branch === "project-agent-child-complete")
+const teamSendMessagePart = childParts.find((part) => part.type === "tool" && part.tool === "team_send_message")
+const teamMessageInput = teamSendMessagePart?.state?.input
+const teamMessageOutput = typeof teamSendMessagePart?.state?.output === "string"
+  ? JSON.parse(teamSendMessagePart.state.output)
+  : undefined
 const requiredTeamTools = [
   "team_send_message",
   "team_task_list",
@@ -190,8 +229,15 @@ const assertions = {
   childReceivedProjectPrompt: childEntry?.hasProjectPrompt === true,
   childReceivedAssignedTask: childEntry?.hasChildTask === true,
   childHasRequiredTeamTools: requiredTeamTools.every((tool) => childEntry?.tools.includes(tool)),
+  childRepositoryWriteToolsDenied: ["apply_patch", "edit", "write"].every((tool) => !childEntry?.tools.includes(tool)),
   childQuestionToolDenied: childEntry?.tools.includes("question") === false,
   genericModelWasNotUsedForChild: childEntry?.model !== "gpt-fake",
+  childUsedMemberWorktree: childSession?.directory === memberWorktree,
+  childTeamSendMessageCompleted: teamSendMessagePart?.state?.status === "completed",
+  childTeamMessageTargetedLead: teamMessageInput?.to === "lead",
+  childToolReportedLeadDelivery: teamMessageOutput?.deliveredTo?.includes("lead") === true,
+  childCompletedAfterToolResult: childCompletionEntry?.hasToolResult === true,
+  leadInboxPersistedReviewerMessage: persistedTeamMessage?.from === "reviewer" && persistedTeamMessage?.to === "lead",
   hostSessionCountUnchanged: hostSessionCountBefore === hostSessionCountAfter,
 }
 const result = {
@@ -202,6 +248,10 @@ const result = {
   isolatedDbPath,
   projectRoot,
   childEntry,
+  childCompletionEntry,
+  childSession,
+  teamSendMessagePart,
+  persistedTeamMessage,
 }
 writeFileSync(path.join(evidenceDir, "qa-result.json"), `${JSON.stringify(result, null, 2)}\n`)
 if (Object.values(assertions).some((passed) => !passed)) {
