@@ -5,6 +5,7 @@ import { mergeCategories } from "../../../shared/merge-categories"
 import { normalizeTeamSpecInput } from "@oh-my-opencode/team-core/team-registry/loader"
 import { validateSpec } from "@oh-my-opencode/team-core/team-registry/validator"
 import { TeamSpecSchema, type TeamSpec } from "@oh-my-opencode/team-core/types"
+import { DEFERRED_OPEN_CODE_AGENT_ELIGIBILITY } from "../open-code-agent-eligibility"
 
 export const TEAM_CREATE_USAGE = "team_create requires exactly one of teamName or inline_spec. Use team_create({ teamName: \"existing-team\" }) or team_create({ inline_spec: { name: \"team-name\", members: [{ name: \"worker\", category: \"quick\", prompt: \"Do the assigned work.\" }] } })."
 
@@ -84,6 +85,6 @@ export function parseInlineTeamSpec(
   }
 
   const parsedSpec = parsedSpecResult.data
-  validateSpec(parsedSpec)
+  validateSpec(parsedSpec, DEFERRED_OPEN_CODE_AGENT_ELIGIBILITY)
   return parsedSpec
 }

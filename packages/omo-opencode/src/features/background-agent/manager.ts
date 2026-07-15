@@ -55,6 +55,7 @@ import {
   resolvePromptContextFromSessionMessages,
 } from "./compaction-aware-message-resolver"
 import { ConcurrencyManager } from "./concurrency"
+import { createBackgroundSession } from "./create-background-session"
 import {
   POLLING_INTERVAL_MS,
   type QueueItem,
@@ -595,6 +596,8 @@ export class BackgroundManager {
         description: input.description,
         prompt: input.prompt,
         agent: input.agent,
+        directory: input.directory,
+        exactAgent: input.exactAgent,
         spawnDepth: spawnReservation.spawnContext.childDepth,
         parentSessionId: input.parentSessionId,
         parentMessageId: input.parentMessageId,
@@ -747,45 +750,11 @@ export class BackgroundManager {
 
     const concurrencyKey = this.getConcurrencyKeyFromInput(input)
 
-    const parentSession = await this.client.session.get({
-      path: { id: input.parentSessionId },
-      query: { directory: this.directory },
-    }).catch((err) => {
-      log(`[background-agent] Failed to get parent session: ${err}`)
-      return null
+    const { sessionID, launchDirectory } = await createBackgroundSession({
+      client: this.client,
+      launch: input,
+      managerDirectory: this.directory,
     })
-    const parentDirectory = parentSession?.data?.directory ?? this.directory
-    log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${parentDirectory}`)
-
-    const createResult = await this.client.session.create({
-      body: {
-        parentID: input.parentSessionId,
-        title: `${input.description} (@${input.agent} subagent)`,
-        ...(input.sessionPermission ? { permission: input.sessionPermission } : {}),
-        ...(input.model
-          ? {
-              model: {
-                id: input.model.modelID,
-                providerID: input.model.providerID,
-                ...(input.model.variant ? { variant: input.model.variant } : {}),
-              },
-            }
-          : {}),
-      } as Record<string, unknown>,
-      query: {
-        directory: parentDirectory,
-      },
-    })
-
-    if (createResult.error) {
-      throw new Error(`Failed to create background session: ${createResult.error}`)
-    }
-
-    if (!createResult.data?.id) {
-      throw new Error("Failed to create background session: API returned no session ID")
-    }
-
-    const sessionID = createResult.data.id
 
     if (task.status === "cancelled") {
       clearDelegatedChildSessionBootstrap(sessionID)
@@ -833,7 +802,7 @@ export class BackgroundManager {
 
     if (task.retryNotification) {
       const attemptNumber = boundAttempt.attemptNumber
-      const retrySessionUrl = buildLocalSessionUrl(parentDirectory, sessionID)
+      const retrySessionUrl = buildLocalSessionUrl(launchDirectory, sessionID)
       const previousAttempt = getPreviousAttempt(task, boundAttempt.attemptId)
       const failedSessionID = previousAttempt?.sessionId ?? task.retryNotification.previousSessionID
       const failedSessionLine = failedSessionID
@@ -940,9 +909,9 @@ The fallback retry session is now created and can be inspected directly.
     promptWithRetryInDirectory(this.client, {
       path: { id: sessionID },
       body: promptBody,
-    }, parentDirectory).catch(async (error) => {
+    }, launchDirectory).catch(async (error) => {
       // Retry with fallback agent if the original agent was unregistered (e.g., after a model switch)
-      if (isAgentNotFoundError(error) && input.agent !== FALLBACK_AGENT) {
+      if (isAgentNotFoundError(error) && input.agent !== FALLBACK_AGENT && input.exactAgent !== true) {
         log("[background-agent] Agent not found, retrying with fallback agent", {
           original: input.agent,
           fallback: FALLBACK_AGENT,
@@ -967,7 +936,7 @@ The fallback retry session is now created and can be inspected directly.
           await promptWithRetryInDirectory(this.client, {
             path: { id: sessionID },
             body: fallbackBody,
-          }, parentDirectory)
+          }, launchDirectory)
           task.agent = FALLBACK_AGENT
           return
         } catch (retryError) {

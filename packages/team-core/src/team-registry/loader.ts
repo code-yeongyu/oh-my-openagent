@@ -11,9 +11,14 @@ import type { TeamSpec } from "../types"
 import { normalizeTeamSpecInput } from "./team-spec-input-normalizer"
 import { discoverTeamSpecs, getTeamSpecPath, resolveBaseDir } from "./paths"
 import { TeamSpecValidationError, validateSpec } from "./validator"
+import type { TeamMemberEligibilityPolicy } from "./validator"
 
 type DiscoveredTeamSpec = Awaited<ReturnType<typeof discoverTeamSpecs>>[number]
 type JsonRecord = Record<string, unknown>
+
+export type LoadTeamSpecOptions = NormalizeTeamSpecInputOptions & {
+  readonly eligibilityPolicy?: TeamMemberEligibilityPolicy
+}
 
 function isJsonRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -101,7 +106,7 @@ function createZodValidationError(rawSpec: unknown, error: ZodError): TeamSpecVa
 
 async function loadTeamSpecFromEntry(
   entry: DiscoveredTeamSpec,
-  options?: NormalizeTeamSpecInputOptions,
+  options?: LoadTeamSpecOptions,
 ): Promise<TeamSpec> {
   let rawText: string
   try {
@@ -131,7 +136,7 @@ async function loadTeamSpecFromEntry(
     throw createZodValidationError(normalizedRawSpec, parsedSpec.error)
   }
 
-  validateSpec(parsedSpec.data)
+  validateSpec(parsedSpec.data, options?.eligibilityPolicy)
   return parsedSpec.data
 }
 
@@ -142,7 +147,7 @@ export async function loadTeamSpec(
   teamName: string,
   config: TeamModeConfig,
   projectRoot: string,
-  options?: NormalizeTeamSpecInputOptions,
+  options?: LoadTeamSpecOptions,
 ): Promise<TeamSpec> {
   const discoveredTeamSpecs = await discoverTeamSpecs(config, projectRoot)
   const matchedTeamSpec = discoveredTeamSpecs.find((entry) => entry.name === teamName)
@@ -164,15 +169,16 @@ export async function loadTeamSpec(
 export async function loadAllTeamSpecs(
   config: TeamModeConfig,
   projectRoot: string,
+  options?: LoadTeamSpecOptions,
 ): Promise<Array<{ name: string; scope: "project" | "user"; spec?: TeamSpec; error?: Error }>> {
   const discoveredTeamSpecs = await discoverTeamSpecs(config, projectRoot)
 
   return Promise.all(discoveredTeamSpecs.map(async (entry) => {
     try {
-      const spec = await loadTeamSpecFromEntry(entry)
+      const spec = await loadTeamSpecFromEntry(entry, options)
       return { name: entry.name, scope: entry.scope, spec }
     } catch (error) {
-      const normalizedError = normalizeError(error)
+      const normalizedError = error instanceof Error ? error : new Error(String(error))
       log("team-spec load failed", {
         event: "team-spec-load-failed",
         teamName: entry.name,

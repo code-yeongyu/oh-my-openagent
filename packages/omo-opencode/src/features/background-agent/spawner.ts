@@ -52,7 +52,8 @@ export async function startTask(
     return null
   })
   const parentDirectory = parentSession?.data?.directory ?? directory
-  log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${parentDirectory}`)
+  const launchDirectory = input.directory ?? parentDirectory
+  log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${launchDirectory}`)
 
   const createResult = await client.session.create({
     body: {
@@ -60,7 +61,7 @@ export async function startTask(
       ...(input.sessionPermission ? { permission: input.sessionPermission } : {}),
     } as Record<string, unknown>,
     query: {
-      directory: parentDirectory,
+      directory: launchDirectory,
     },
   }).catch((error: unknown) => {
     concurrencyManager.release(concurrencyKey)
@@ -119,8 +120,8 @@ export async function startTask(
   const promptChain = promptWithRetryInDirectory(client, {
     path: { id: sessionID },
     body: promptBody,
-  }, parentDirectory).catch(async (error) => {
-    if (isAgentNotFoundError(error) && input.agent !== FALLBACK_AGENT) {
+  }, launchDirectory).catch(async (error) => {
+    if (isAgentNotFoundError(error) && input.agent !== FALLBACK_AGENT && input.exactAgent !== true) {
       log("[background-agent] Agent not found, retrying with fallback agent", {
         original: input.agent,
         fallback: FALLBACK_AGENT,
@@ -136,7 +137,7 @@ export async function startTask(
         await promptWithRetryInDirectory(client, {
           path: { id: sessionID },
           body: fallbackBody,
-        }, parentDirectory)
+        }, launchDirectory)
         task.agent = FALLBACK_AGENT
         return
       } catch (retryError) {
@@ -248,7 +249,7 @@ export async function resumeTask(
     path: { id: sessionID },
     body: resumeBody,
   }, directory).catch(async (error) => {
-    if (isAgentNotFoundError(error) && task.agent !== FALLBACK_AGENT) {
+    if (isAgentNotFoundError(error) && task.agent !== FALLBACK_AGENT && task.exactAgent !== true) {
       log("[background-agent] Resume agent not found, retrying with fallback agent", {
         original: task.agent,
         fallback: FALLBACK_AGENT,

@@ -51,6 +51,8 @@ export interface BackgroundTask {
   description: string
   prompt: string
   agent: string
+  directory?: string
+  exactAgent?: boolean
   spawnDepth?: number
   status: BackgroundTaskStatus
   queuedAt?: Date
@@ -113,6 +115,8 @@ export interface LaunchInput {
   description: string
   prompt: string
   agent: string
+  directory?: string
+  exactAgent?: boolean
   parentSessionId: string
   parentMessageId: string
   teamRunId?: string

@@ -1,20 +1,27 @@
+/// <reference types="bun-types" />
+
 import { readFileSync } from "node:fs"
-declare const require: (name: string) => any
-const { describe, expect, mock, test, beforeEach } = require("bun:test")
+import { beforeEach, describe, expect, mock, test } from "bun:test"
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import type { Member } from "../types"
+import {
+  createResolveMember,
+  TeamMemberResolutionError,
+  type ResolveMemberDependencies,
+} from "./resolve-member"
 
-const resolveCategoryExecutionMock = mock()
-const resolveSubagentExecutionMock = mock()
-const buildSystemContentMock = mock(() => "resolved-system-content")
+const resolveCategoryExecutionMock = mock<ResolveMemberDependencies["resolveCategoryExecution"]>()
+const resolveSubagentExecutionMock = mock<ResolveMemberDependencies["resolveSubagentExecution"]>()
+const buildSystemContentMock = mock<ResolveMemberDependencies["buildSystemContent"]>(
+  () => "resolved-system-content",
+)
 
-mock.module("./resolve-member-dependencies", () => ({
-  resolveCategoryExecution: resolveCategoryExecutionMock,
-  resolveSubagentExecution: resolveSubagentExecutionMock,
-  buildSystemContent: buildSystemContentMock,
-}))
-
-const { resolveMember, TeamMemberResolutionError } = await import("./resolve-member?resolve-member-test")
+const resolveMember = createResolveMember({
+  resolveCategoryExecution: (...args) => resolveCategoryExecutionMock(...args),
+  resolveSubagentExecution: (...args) => resolveSubagentExecutionMock(...args),
+  buildSystemContent: (...args) => buildSystemContentMock(...args),
+  resolveProjectAgentMember: async () => undefined,
+})
 
 function createExecutorContext(): ExecutorContext {
   return {
@@ -49,11 +56,18 @@ describe("resolveMember", () => {
       categoryModel: { providerID: "openai", modelID: "gpt-5.4" },
       categoryPromptAppend: "appendix",
       maxPromptTokens: 512,
+      modelInfo: undefined,
+      actualModel: "openai/gpt-5.4",
+      isUnstableAgent: false,
       fallbackChain: [{ providers: ["openai"], model: "gpt-5.4-mini" }],
     })
 
     // when
-    const result = await resolveMember(member, createExecutorContext(), "deep, quick")
+    const result = await resolveMember(member, createExecutorContext(), {
+      categoryExamples: "deep, quick",
+      directory: "/tmp/team-mode-test",
+      isLead: false,
+    })
 
     // then
     expect(resolveCategoryExecutionMock).toHaveBeenCalledTimes(1)
@@ -94,11 +108,18 @@ describe("resolveMember", () => {
       categoryModel: { providerID: "openai", modelID: "gpt-5.5", variant: "xhigh" },
       categoryPromptAppend: "appendix",
       maxPromptTokens: 256,
+      modelInfo: undefined,
+      actualModel: "openai/gpt-5.5",
+      isUnstableAgent: false,
       fallbackChain: [],
     })
 
     // when
-    await resolveMember(member, ctxWithJuniorOverride, "ultrabrain, deep")
+    await resolveMember(member, ctxWithJuniorOverride, {
+      categoryExamples: "ultrabrain, deep",
+      directory: "/tmp/team-mode-test",
+      isLead: false,
+    })
 
     // then
     const [, executorCtxArg] = resolveCategoryExecutionMock.mock.calls[0]
@@ -123,7 +144,12 @@ describe("resolveMember", () => {
     })
 
     // when
-    const result = await resolveMember(member, createExecutorContext(), "deep, quick", "sisyphus")
+    const result = await resolveMember(member, createExecutorContext(), {
+      categoryExamples: "deep, quick",
+      directory: "/tmp/team-mode-test",
+      isLead: false,
+      parentAgent: "sisyphus",
+    })
 
     // then
     expect(resolveSubagentExecutionMock).toHaveBeenCalledTimes(1)
@@ -148,24 +174,28 @@ describe("resolveMember", () => {
     expect(result.systemContent).toBe("resolved-system-content")
   })
 
-  test("throws TeamMemberResolutionError without category fallback when subagent resolution fails", async () => {
+  test("throws TeamMemberResolutionError without category fallback when built-in subagent resolution fails", async () => {
     // given
     const member = {
       backendType: "in-process",
       isActive: true,
       kind: "subagent_type",
-      name: "unknown",
-      subagent_type: "unknown-agent",
+      name: "atlas-error",
+      subagent_type: "atlas",
     } satisfies Member
 
     resolveSubagentExecutionMock.mockRejectedValue(new Error("unknown agent"))
 
     // when
-    const result = resolveMember(member, createExecutorContext(), "deep, quick")
+    const result = resolveMember(member, createExecutorContext(), {
+      categoryExamples: "deep, quick",
+      directory: "/tmp/team-mode-test",
+      isLead: false,
+    })
 
     // then
     await expect(result).rejects.toBeInstanceOf(TeamMemberResolutionError)
-    await expect(result).rejects.toThrow("Failed to resolve member 'unknown': unknown agent")
+    await expect(result).rejects.toThrow("Failed to resolve member 'atlas-error': unknown agent")
     expect(resolveCategoryExecutionMock).not.toHaveBeenCalled()
   })
 
@@ -193,6 +223,9 @@ describe("resolveMember", () => {
       categoryModel: { providerID: "openai", modelID: "gpt-5.4" },
       categoryPromptAppend: "appendix",
       maxPromptTokens: 128,
+      modelInfo: undefined,
+      actualModel: "openai/gpt-5.4",
+      isUnstableAgent: false,
       fallbackChain: [],
     })
     resolveSubagentExecutionMock.mockResolvedValue({
@@ -203,8 +236,16 @@ describe("resolveMember", () => {
     const source = readFileSync(new URL("./resolve-member.ts", import.meta.url), "utf8")
 
     // when
-    await resolveMember(categoryMember, createExecutorContext(), "deep, quick")
-    await resolveMember(subagentMember, createExecutorContext(), "deep, quick")
+    await resolveMember(categoryMember, createExecutorContext(), {
+      categoryExamples: "deep, quick",
+      directory: "/tmp/team-mode-test",
+      isLead: false,
+    })
+    await resolveMember(subagentMember, createExecutorContext(), {
+      categoryExamples: "deep, quick",
+      directory: "/tmp/team-mode-test",
+      isLead: false,
+    })
 
     // then
     expect(buildSystemContentMock).toHaveBeenCalledTimes(2)
@@ -220,7 +261,7 @@ describe("resolveMember", () => {
       maxPromptTokens: undefined,
       model: { providerID: "openai", modelID: "gpt-5.4-mini" },
     })
-    expect(source).toContain("buildSystemContent({")
+    expect(source).toContain("dependencies.buildSystemContent")
     expect(source).not.toContain("member.prompt +")
     expect(source).not.toContain("+ member.prompt")
     expect(source).not.toContain(".join(")

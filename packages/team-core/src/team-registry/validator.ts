@@ -2,6 +2,12 @@ import { AGENT_ELIGIBILITY_REGISTRY } from "../types"
 
 import type { Member, TeamSpec } from "../types"
 
+type SubagentMember = Extract<Member, { kind: "subagent_type" }>
+
+export type TeamMemberEligibilityPolicy = {
+  readonly isAdditionalSubagentEligible: (member: SubagentMember) => boolean
+}
+
 const MAX_TEAM_MEMBERS = 8
 const HYPERPLAN_REQUIRED_CATEGORIES = [
   "unspecified-low",
@@ -24,7 +30,7 @@ export class TeamSpecValidationError extends Error {
   }
 }
 
-export function validateSpec(spec: TeamSpec): void {
+export function validateSpec(spec: TeamSpec, eligibilityPolicy?: TeamMemberEligibilityPolicy): void {
   if (spec.members.length > MAX_TEAM_MEMBERS) {
     throw new TeamSpecValidationError(
       `Team '${spec.name}' exceeds max 8 members.`,
@@ -47,7 +53,7 @@ export function validateSpec(spec: TeamSpec): void {
     }
 
     seenMemberNames.add(member.name)
-    validateMemberEligibility(member)
+    validateMemberEligibility(member, eligibilityPolicy)
     validateDualSupport(member)
 
     if (member.name === spec.leadAgentId) {
@@ -88,13 +94,20 @@ function validateHyperplanComposition(spec: TeamSpec): void {
   }
 }
 
-export function validateMemberEligibility(member: Member): void {
+export function validateMemberEligibility(
+  member: Member,
+  eligibilityPolicy?: TeamMemberEligibilityPolicy,
+): void {
   if (member.kind !== "subagent_type") {
     return
   }
 
   const eligibility = AGENT_ELIGIBILITY_REGISTRY[member.subagent_type]
   if (!eligibility) {
+    if (eligibilityPolicy?.isAdditionalSubagentEligible(member) === true) {
+      return
+    }
+
     throw new TeamSpecValidationError(
       UNKNOWN_SUBAGENT_MESSAGE.replace("<name>", member.subagent_type),
       "UNKNOWN_SUBAGENT_TYPE",

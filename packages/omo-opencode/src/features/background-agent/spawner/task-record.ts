@@ -8,6 +8,8 @@ export function buildTaskRecord(input: LaunchInput, id: string, queuedAt: Date):
     description: input.description,
     prompt: input.prompt,
     agent: input.agent,
+    directory: input.directory,
+    exactAgent: input.exactAgent,
     parentSessionId: input.parentSessionId,
     parentMessageId: input.parentMessageId,
     teamRunId: input.teamRunId,

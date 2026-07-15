@@ -58,6 +58,8 @@ function cloneRegisteredTask(task: BackgroundTask): BackgroundTask {
     description: task.description,
     prompt: "[redacted]",
     agent: task.agent,
+    directory: task.directory,
+    exactAgent: task.exactAgent,
     spawnDepth: task.spawnDepth,
     sessionId: task.sessionId,
     status: task.status,

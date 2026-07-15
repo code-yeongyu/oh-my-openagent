@@ -6,6 +6,7 @@ import { loadTeamSpec } from "@oh-my-opencode/team-core/team-registry/loader"
 import { aggregateStatus } from "../team-runtime/status"
 import { discoverTeamSpecs } from "@oh-my-opencode/team-core/team-registry/paths"
 import { listActiveTeams } from "@oh-my-opencode/team-core/team-state-store/store"
+import { DEFERRED_OPEN_CODE_AGENT_ELIGIBILITY } from "../open-code-agent-eligibility"
 
 type QueryToolDeps = {
   aggregateStatus: typeof aggregateStatus
@@ -72,7 +73,9 @@ export function createTeamListTool(config: TeamModeConfig, client: OpencodeClien
 
       const declaredTeamSpecsByName = new Map(
         await Promise.all(filteredDeclaredTeamSpecs.map(async (teamSpec) => {
-          const loadedTeamSpec = await deps.loadTeamSpec(teamSpec.name, config, projectRoot)
+          const loadedTeamSpec = await deps.loadTeamSpec(teamSpec.name, config, projectRoot, {
+            eligibilityPolicy: DEFERRED_OPEN_CODE_AGENT_ELIGIBILITY,
+          })
           return [teamSpec.name, loadedTeamSpec.members.length] as const
         })),
       )

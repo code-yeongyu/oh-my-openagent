@@ -11,6 +11,7 @@ import { createTeamRun } from "../team-runtime/create"
 import { listActiveTeams, loadRuntimeState } from "@oh-my-opencode/team-core/team-state-store/store"
 import { AGENT_ELIGIBILITY_REGISTRY } from "@oh-my-opencode/team-core/types"
 import { findParticipantRuntime, sanitizeRuntimeState, type TeamLifecycleToolContext } from "./lifecycle-participant"
+import { DEFERRED_OPEN_CODE_AGENT_ELIGIBILITY } from "../open-code-agent-eligibility"
 import {
   parseInlineTeamSpec,
   parseTeamCreateArgs,
@@ -88,7 +89,10 @@ export function createTeamCreateTool(
       }
       const defaultCategoryName = resolveDefaultInlineCategory(executorConfig?.userCategories)
       const spec = args.teamName
-        ? await deps.loadTeamSpec(args.teamName, config, projectRoot, { callerTeamLead })
+        ? await deps.loadTeamSpec(args.teamName, config, projectRoot, {
+          callerTeamLead,
+          eligibilityPolicy: DEFERRED_OPEN_CODE_AGENT_ELIGIBILITY,
+        })
         : parseInlineTeamSpec(args.inline_spec, { callerTeamLead, defaultCategoryName })
       const participantRuntime = await findParticipantRuntime(leadSessionId, config, deps)
       if (participantRuntime && (participantRuntime.teamName !== spec.name || participantRuntime.leadSessionId !== leadSessionId)) {

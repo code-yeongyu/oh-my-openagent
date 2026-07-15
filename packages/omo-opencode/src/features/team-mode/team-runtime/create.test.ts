@@ -16,18 +16,27 @@ import { BackgroundManager } from "../../background-agent/manager"
 import { loadRuntimeState, transitionRuntimeState } from "../team-state-store/store"
 import { clearTeamSessionRegistry, lookupTeamSession } from "../team-session-registry"
 import type { TeamSpec } from "../types"
+import type { ResolvedMember, ResolveMemberOptions } from "./resolve-member"
 import {
   clearSessionTeamRunCleanupRegistry,
   getSessionCreatedTeamRunIds,
 } from "./session-cleanup"
 import { createLaunchConcurrencyProbe } from "../test-support/async-test-helpers"
 
-const resolveMemberMock = mock(async (member: TeamSpec["members"][number]) => ({
+type ResolveMember = (
+  member: TeamSpec["members"][number],
+  context: ExecutorContext,
+  options: ResolveMemberOptions,
+) => Promise<ResolvedMember>
+
+const createResolvedMember: ResolveMember = async (member) => ({
+  memberName: member.name,
   agentToUse: `${member.name}-agent`,
   model: { providerID: "openai", modelID: "gpt-5.4-mini" },
   fallbackChain: undefined,
   systemContent: `system:${member.name}`,
-}))
+})
+const resolveMemberMock = mock<ResolveMember>(createResolvedMember)
 
 mock.module("./resolve-member", () => ({ resolveMember: resolveMemberMock }))
 
@@ -97,7 +106,8 @@ describe("createTeamRun", () => {
   const temporaryDirectories: string[] = []
 
   beforeEach(() => {
-    resolveMemberMock.mockClear()
+    resolveMemberMock.mockReset()
+    resolveMemberMock.mockImplementation(createResolvedMember)
     clearTeamSessionRegistry()
     clearSessionTeamRunCleanupRegistry()
   })
@@ -128,6 +138,39 @@ describe("createTeamRun", () => {
     expect(runtimeState.status).toBe("active")
     expect(runtimeState.members.map((member) => member.sessionId)).toEqual(["session-1", "session-2", "session-3"])
     expect((launchMock.mock.calls as Array<[LaunchInput]>).every(([input]) => input.suppressTmuxSpawn === true)).toBe(true)
+  })
+
+  test("resolves every member before launching any child and leaves no runtime or worktree residue when preflight fails", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-preflight-"))
+    temporaryDirectories.push(baseDir)
+    const { manager, launchMock } = createManager(baseDir, async () => ({
+      id: "unexpected-task",
+      sessionId: "unexpected-session",
+      status: "running",
+    } as BackgroundTask))
+    resolveMemberMock.mockImplementation(async (member: TeamSpec["members"][number]) => {
+      if (member.name === "member-2") {
+        throw new Error("member registry validation failed")
+      }
+      return createResolvedMember(member)
+    })
+
+    // when
+    const result = createTeamRun(
+      createSpec(2, true),
+      "lead-session",
+      createContext(baseDir, manager),
+      createConfig(baseDir),
+      manager,
+    )
+
+    // then
+    await expect(result).rejects.toThrow("member registry validation failed")
+    expect(resolveMemberMock).toHaveBeenCalledTimes(2)
+    expect(launchMock).not.toHaveBeenCalled()
+    expect(await readdir(path.join(baseDir, "worktrees"))).toEqual([])
+    expect(await readdir(path.join(baseDir, "runtime"))).toEqual([])
   })
 
   test("#given a new team runtime #when createTeamRun succeeds #then it registers the run for session cleanup", async () => {
@@ -297,6 +340,88 @@ describe("createTeamRun", () => {
     // then
     expect(await pathExists(path.resolve(baseDir, "./worktrees/member-1"))).toBe(false)
     expect(await pathExists(path.resolve(baseDir, "./worktrees/member-2"))).toBe(false)
+  })
+
+  test("launches each member with its exact resolved identity, model, worktree directory, and question denial", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-exact-launch-"))
+    temporaryDirectories.push(baseDir)
+    const { manager, launchMock } = createManager(baseDir, async () => ({
+      id: "task-1",
+      sessionId: "session-1",
+      status: "running",
+    } as BackgroundTask))
+    const spec = createSpec(1, true)
+    spec.members[0] = {
+      kind: "subagent_type",
+      name: "member-1",
+      subagent_type: "repository-reviewer",
+      backendType: "in-process",
+      isActive: true,
+      worktreePath: "./worktrees/member-1",
+    }
+    resolveMemberMock.mockResolvedValue({
+      memberName: "member-1",
+      agentToUse: "repository-reviewer",
+      exactAgent: true,
+      model: { providerID: "openai", modelID: "gpt-5.6-sol", variant: "xhigh" },
+      fallbackChain: undefined,
+      systemContent: undefined,
+    })
+
+    // when
+    await createTeamRun(spec, "lead-session", createContext(baseDir, manager), createConfig(baseDir), manager)
+
+    // then
+    const launchInput = (launchMock.mock.calls as Array<[LaunchInput]>)[0]?.[0]
+    expect(launchInput).toMatchObject({
+      agent: "repository-reviewer",
+      directory: path.resolve(baseDir, "./worktrees/member-1"),
+      exactAgent: true,
+      model: { providerID: "openai", modelID: "gpt-5.6-sol", variant: "xhigh" },
+      skillContent: undefined,
+      sessionPermission: [{ permission: "question", action: "deny", pattern: "*" }],
+    })
+    expect(resolveMemberMock.mock.calls[0]?.[2]).toMatchObject({
+      directory: path.resolve(baseDir, "./worktrees/member-1"),
+      isLead: true,
+    })
+  })
+
+  test("does not reuse a built-in caller session when the declared lead is a project agent", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-project-lead-"))
+    temporaryDirectories.push(baseDir)
+    const { manager, launchMock } = createManager(baseDir, async () => ({
+      id: "unexpected-task",
+      sessionId: "unexpected-session",
+      status: "running",
+    } as BackgroundTask))
+    const spec = createSpec(1)
+    spec.members[0] = {
+      kind: "subagent_type",
+      name: "member-1",
+      subagent_type: "repository-reviewer",
+      backendType: "in-process",
+      isActive: true,
+    }
+    resolveMemberMock.mockRejectedValue(new Error("project agents are member-only"))
+
+    // when
+    const result = createTeamRun(
+      spec,
+      "lead-session",
+      createContext(baseDir, manager),
+      createConfig(baseDir),
+      manager,
+      undefined,
+      { callerAgentTypeId: "sisyphus" },
+    )
+
+    // then
+    await expect(result).rejects.toThrow("project agents are member-only")
+    expect(resolveMemberMock.mock.calls[0]?.[2]).toMatchObject({ isLead: true })
+    expect(launchMock).not.toHaveBeenCalled()
   })
 
   test("returns the existing runtime on repeated calls with the same spec and lead session", async () => {

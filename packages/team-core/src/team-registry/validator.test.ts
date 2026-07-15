@@ -48,6 +48,26 @@ function createBaseTeamSpec(): TeamSpec {
 }
 
 describe("team-registry validator", () => {
+  test("accepts an additional subagent when the injected eligibility policy permits it", () => {
+    // given
+    const teamSpec = createBaseTeamSpec()
+    teamSpec.members[1] = {
+      kind: "subagent_type",
+      name: "repository-reviewer",
+      subagent_type: "repository-reviewer",
+      backendType: "in-process",
+      isActive: true,
+    }
+
+    // when
+    const validate = () => validateSpec(teamSpec, {
+      isAdditionalSubagentEligible: (member) => member.subagent_type === "repository-reviewer",
+    })
+
+    // then
+    expect(validate).not.toThrow()
+  })
+
   test("rejects members that specify both category and subagent_type", () => {
     // given
     const teamSpec = {
