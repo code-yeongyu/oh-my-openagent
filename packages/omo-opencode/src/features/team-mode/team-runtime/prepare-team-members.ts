@@ -30,6 +30,23 @@ export class TeamMemberPreflightError extends Error {
   }
 }
 
+export function normalizeMkdirOwnershipPath(
+  createdPath: string | undefined,
+  platform: NodeJS.Platform,
+): string | undefined {
+  if (platform !== "win32" || !createdPath) return createdPath
+
+  const namespacePrefix = "\\\\?\\"
+  const uncNamespacePrefix = `${namespacePrefix}UNC\\`
+  if (createdPath.startsWith(uncNamespacePrefix)) {
+    return `\\\\${createdPath.slice(uncNamespacePrefix.length)}`
+  }
+  if (!createdPath.startsWith(namespacePrefix)) return createdPath
+
+  const ordinaryPath = createdPath.slice(namespacePrefix.length)
+  return /^[A-Za-z]:\\/.test(ordinaryPath) ? ordinaryPath : createdPath
+}
+
 export async function resolveMemberDirectory(
   worktreePath: string | undefined,
   projectRoot: string,
@@ -39,7 +56,10 @@ export async function resolveMemberDirectory(
   }
 
   const directory = path.isAbsolute(worktreePath) ? worktreePath : path.resolve(projectRoot, worktreePath)
-  const cleanupRoot = await mkdir(directory, { recursive: true })
+  const cleanupRoot = normalizeMkdirOwnershipPath(
+    await mkdir(directory, { recursive: true }),
+    process.platform,
+  )
   return { directory, cleanupRoot }
 }
 

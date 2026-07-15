@@ -5,7 +5,42 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
-import { resolveMemberDirectory } from "./prepare-team-members"
+import { normalizeMkdirOwnershipPath, resolveMemberDirectory } from "./prepare-team-members"
+
+describe("normalizeMkdirOwnershipPath", () => {
+  test("removes a Windows drive-letter namespace prefix", () => {
+    // given
+    const createdPath = "\\\\?\\C:\\repo\\worktrees\\member"
+
+    // when
+    const result = normalizeMkdirOwnershipPath(createdPath, "win32")
+
+    // then
+    expect(result).toBe("C:\\repo\\worktrees\\member")
+  })
+
+  test("converts a Windows UNC namespace prefix to an ordinary UNC path", () => {
+    // given
+    const createdPath = "\\\\?\\UNC\\server\\share\\worktrees\\member"
+
+    // when
+    const result = normalizeMkdirOwnershipPath(createdPath, "win32")
+
+    // then
+    expect(result).toBe("\\\\server\\share\\worktrees\\member")
+  })
+
+  test("leaves namespace-like paths unchanged on non-Windows platforms", () => {
+    // given
+    const createdPath = "\\\\?\\C:\\repo\\worktrees\\member"
+
+    // when
+    const result = normalizeMkdirOwnershipPath(createdPath, "linux")
+
+    // then
+    expect(result).toBe(createdPath)
+  })
+})
 
 describe("resolveMemberDirectory", () => {
   const temporaryDirectories: string[] = []
