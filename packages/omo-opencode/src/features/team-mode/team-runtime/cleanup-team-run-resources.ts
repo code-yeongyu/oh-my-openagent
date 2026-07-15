@@ -1,4 +1,5 @@
 import { rm } from "node:fs/promises"
+import path from "node:path"
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import type { BackgroundManager } from "../../background-agent/manager"
@@ -6,13 +7,8 @@ import type { TmuxSessionManager } from "../../tmux-subagent/manager"
 import { removeTeamLayout } from "../team-layout-tmux/layout"
 import { unregisterTeamSessionsByTeam } from "../team-session-registry"
 import { loadRuntimeState, transitionRuntimeState } from "../team-state-store/store"
-import type { TeamRunCreateError } from "./create"
 import { unregisterTeamRunForSessionCleanup } from "./session-team-run-registry"
-
-type SpawnedMemberResource = {
-  taskId?: string
-  worktreePath?: string
-}
+import type { SpawnedMemberResource, TeamRunCleanupReport } from "./team-run-create-types"
 
 function normalizeError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error))
@@ -34,6 +30,68 @@ function getLayoutCleanupTarget(runtimeState: Awaited<ReturnType<typeof loadRunt
     : runtimeState.tmuxLayout
 }
 
+function createCleanupReport(): TeamRunCleanupReport {
+  return {
+    cancelledTaskIds: [],
+    removedLayout: false,
+    removedWorktrees: [],
+    errors: [],
+  }
+}
+
+function isOwnedRootInside(candidate: string, potentialParent: string): boolean {
+  const relativePath = path.relative(potentialParent, candidate)
+  return relativePath !== ""
+    && relativePath !== ".."
+    && !relativePath.startsWith(`..${path.sep}`)
+    && !path.isAbsolute(relativePath)
+}
+
+function getOwnedWorktreeRoots(resources: SpawnedMemberResource[]): string[] {
+  const roots = [...new Set(resources.toReversed().flatMap((resource) => (
+    resource.ownedWorktreeRoot ? [resource.ownedWorktreeRoot] : []
+  )))]
+  return roots.filter((root) => !roots.some((candidateParent) => (
+    candidateParent !== root && isOwnedRootInside(root, candidateParent)
+  )))
+}
+
+async function removePreparedResourcePaths(args: {
+  resources: SpawnedMemberResource[]
+  inboxDirs: string[]
+  cleanupReport: TeamRunCleanupReport
+}): Promise<void> {
+  for (const ownedWorktreeRoot of getOwnedWorktreeRoots(args.resources)) {
+    try {
+      await rm(ownedWorktreeRoot, { recursive: true, force: true })
+      args.cleanupReport.removedWorktrees.push(ownedWorktreeRoot)
+    } catch (cleanupError) {
+      args.cleanupReport.errors.push(`worktree ${ownedWorktreeRoot}: ${normalizeError(cleanupError).message}`)
+    }
+  }
+
+  for (const inboxDir of [...args.inboxDirs].reverse()) {
+    try {
+      await rm(inboxDir, { recursive: true, force: true })
+    } catch (cleanupError) {
+      args.cleanupReport.errors.push(`inbox ${inboxDir}: ${normalizeError(cleanupError).message}`)
+    }
+  }
+}
+
+export async function cleanupPreparedTeamRunResources(args: {
+  resources: SpawnedMemberResource[]
+  inboxDirs?: string[]
+}): Promise<TeamRunCleanupReport> {
+  const cleanupReport = createCleanupReport()
+  await removePreparedResourcePaths({
+    resources: args.resources,
+    inboxDirs: args.inboxDirs ?? [],
+    cleanupReport,
+  })
+  return cleanupReport
+}
+
 export async function cleanupTeamRunResources(args: {
   teamRunId: string
   config: TeamModeConfig
@@ -41,13 +99,9 @@ export async function cleanupTeamRunResources(args: {
   bgMgr: BackgroundManager
   tmuxMgr?: TmuxSessionManager
   createdLayout: boolean
-}): Promise<TeamRunCreateError["cleanupReport"]> {
-  const cleanupReport: TeamRunCreateError["cleanupReport"] = {
-    cancelledTaskIds: [],
-    removedLayout: false,
-    removedWorktrees: [],
-    errors: [],
-  }
+  inboxDirs?: string[]
+}): Promise<TeamRunCleanupReport> {
+  const cleanupReport = createCleanupReport()
 
   for (const resource of [...args.resources].reverse()) {
     if (resource.taskId) {
@@ -63,15 +117,13 @@ export async function cleanupTeamRunResources(args: {
       }
     }
 
-    if (resource.worktreePath) {
-      try {
-        await rm(resource.worktreePath, { recursive: true, force: true })
-        cleanupReport.removedWorktrees.push(resource.worktreePath)
-      } catch (cleanupError) {
-        cleanupReport.errors.push(`worktree ${resource.worktreePath}: ${normalizeError(cleanupError).message}`)
-      }
-    }
   }
+
+  await removePreparedResourcePaths({
+    resources: args.resources,
+    inboxDirs: args.inboxDirs ?? [],
+    cleanupReport,
+  })
 
   if (args.createdLayout && args.tmuxMgr) {
     try {

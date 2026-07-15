@@ -12,7 +12,7 @@ import type { RuntimeState, TeamSpec } from "../types"
 import { shouldReuseCallerLeadSession } from "../resolve-caller-team-lead"
 import { sweepStaleTeamSessions } from "../team-layout-tmux/sweep-stale-team-sessions"
 import { activateTeamLayout } from "./activate-team-layout"
-import { cleanupTeamRunResources } from "./cleanup-team-run-resources"
+import { cleanupPreparedTeamRunResources, cleanupTeamRunResources } from "./cleanup-team-run-resources"
 import {
   buildMemberPrompt,
   findExistingRuntime,
@@ -28,6 +28,18 @@ import { assertNoUnresolvedTeamMembers } from "./unresolved-team-members"
 type CreateTeamRunOptions = {
   callerAgentTypeId?: string
   parentMessageID?: string
+}
+
+type CreateTeamRunDependencies = {
+  createRuntimeState: typeof createRuntimeState
+  createInbox: (inboxDir: string) => Promise<void>
+}
+
+const defaultCreateTeamRunDependencies: CreateTeamRunDependencies = {
+  createRuntimeState,
+  createInbox: async (inboxDir) => {
+    await mkdir(inboxDir, { recursive: true })
+  },
 }
 
 export class TeamRunCreateError extends Error {
@@ -58,7 +70,9 @@ export async function createTeamRun(
   bgMgr: BackgroundManager,
   tmuxMgr?: TmuxSessionManager,
   options?: CreateTeamRunOptions,
+  dependencies: Partial<CreateTeamRunDependencies> = {},
 ): Promise<RuntimeState> {
+  const createDependencies = { ...defaultCreateTeamRunDependencies, ...dependencies }
   const existingRuntime = await findExistingRuntime(spec, leadSessionId, config)
   if (existingRuntime) return existingRuntime
 
@@ -81,40 +95,50 @@ export async function createTeamRun(
     throw error
   }
 
-  let runtimeState = await createRuntimeState(
-    spec,
-    leadSessionId,
-    await resolveSpecSource(spec, ctx.directory, config),
-    config,
-  )
-  registerTeamRunForSessionCleanup(runtimeState.teamRunId)
-  if (reusesCallerLeadSession && spec.leadAgentId) {
-    const callerLeadSubagentType = options?.callerAgentTypeId
-    registerTeamSession(leadSessionId, {
-      teamRunId: runtimeState.teamRunId,
-      memberName: spec.leadAgentId,
-      role: "lead",
-    })
-    runtimeState = await updateMemberInRuntimeState({
-      teamRunId: runtimeState.teamRunId,
-      memberName: spec.leadAgentId,
-      patch: (member) => ({
-        ...member,
-        sessionId: leadSessionId,
-        status: "running",
-        ...(callerLeadSubagentType ? { subagent_type: callerLeadSubagentType } : {}),
-      }),
-      config,
-    })
-  }
-  await Promise.all(spec.members.map((member) =>
-    mkdir(getInboxDir(baseDir, runtimeState.teamRunId, member.name), { recursive: true }),
-  ))
-
   const resources = preparedMembers.map((preparedMember) => preparedMember.resource)
+  let runtimeState: RuntimeState
+  try {
+    runtimeState = await createDependencies.createRuntimeState(
+      spec,
+      leadSessionId,
+      await resolveSpecSource(spec, ctx.directory, config),
+      config,
+    )
+  } catch (error) {
+    const cleanupReport = await cleanupPreparedTeamRunResources({ resources })
+    throw new TeamRunCreateError(createErrorMessage, cleanupReport, normalizeError(error))
+  }
+
+  const createdInboxDirs: string[] = []
   let createdLayout = false
 
   try {
+    registerTeamRunForSessionCleanup(runtimeState.teamRunId)
+    if (reusesCallerLeadSession && spec.leadAgentId) {
+      const callerLeadSubagentType = options?.callerAgentTypeId
+      registerTeamSession(leadSessionId, {
+        teamRunId: runtimeState.teamRunId,
+        memberName: spec.leadAgentId,
+        role: "lead",
+      })
+      runtimeState = await updateMemberInRuntimeState({
+        teamRunId: runtimeState.teamRunId,
+        memberName: spec.leadAgentId,
+        patch: (member) => ({
+          ...member,
+          sessionId: leadSessionId,
+          status: "running",
+          ...(callerLeadSubagentType ? { subagent_type: callerLeadSubagentType } : {}),
+        }),
+        config,
+      })
+    }
+    for (const member of spec.members) {
+      const inboxDir = getInboxDir(baseDir, runtimeState.teamRunId, member.name)
+      createdInboxDirs.push(inboxDir)
+      await createDependencies.createInbox(inboxDir)
+    }
+
     let nextMemberIndex = 0
     let failure: Error | undefined
     const workerCount = Math.min(config.max_parallel_members, preparedMembers.length)
@@ -230,6 +254,7 @@ export async function createTeamRun(
       bgMgr,
       tmuxMgr,
       createdLayout,
+      inboxDirs: createdInboxDirs,
     })
     throw new TeamRunCreateError(createErrorMessage, cleanupReport, normalizeError(error))
   }

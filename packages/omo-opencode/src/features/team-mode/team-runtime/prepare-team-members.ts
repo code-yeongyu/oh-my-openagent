@@ -1,10 +1,11 @@
-import { access, mkdir, rm } from "node:fs/promises"
+import { access, mkdir } from "node:fs/promises"
 import path from "node:path"
 
 import { getAgentConfigKey } from "../../../shared/agent-display-names"
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import { AGENT_ELIGIBILITY_REGISTRY } from "../types"
 import type { TeamSpec } from "../types"
+import { cleanupPreparedTeamRunResources } from "./cleanup-team-run-resources"
 import { resolveMember, type ResolvedMember } from "./resolve-member"
 import type { SpawnedMemberResource, TeamRunCleanupReport } from "./team-run-create-types"
 
@@ -64,34 +65,27 @@ function canReuseCallerAsLead(member: TeamSpec["members"][number]): boolean {
     || AGENT_ELIGIBILITY_REGISTRY[getAgentConfigKey(member.subagent_type)] !== undefined
 }
 
-function createCleanupReport(): TeamRunCleanupReport {
-  return {
-    cancelledTaskIds: [],
-    removedLayout: false,
-    removedWorktrees: [],
-    errors: [],
-  }
-}
-
 export async function prepareTeamMembers(input: {
   readonly spec: TeamSpec
   readonly ctx: ExecutorContext
   readonly reusesCallerLeadSession: boolean
 }): Promise<readonly PreparedTeamMember[]> {
-  const cleanupReport = createCleanupReport()
-  const cleanupRoots: string[] = []
+  const resources: SpawnedMemberResource[] = []
 
   try {
     const memberDirectories = []
     for (const member of input.spec.members) {
       const preparedDirectory = await resolveMemberDirectory(member.worktreePath, input.ctx.directory)
-      if (preparedDirectory.cleanupRoot) cleanupRoots.push(preparedDirectory.cleanupRoot)
-      memberDirectories.push({ member, ...preparedDirectory })
+      const resource: SpawnedMemberResource = {
+        ...(member.worktreePath ? { worktreePath: preparedDirectory.directory } : {}),
+        ...(preparedDirectory.cleanupRoot ? { ownedWorktreeRoot: preparedDirectory.cleanupRoot } : {}),
+      }
+      resources.push(resource)
+      memberDirectories.push({ member, directory: preparedDirectory.directory, resource })
     }
 
     const categoryExamples = Object.keys(input.ctx.userCategories ?? {}).join(", ")
-    return await Promise.all(memberDirectories.map(async ({ member, directory }) => {
-      const resource = member.worktreePath ? { worktreePath: directory } : {}
+    return await Promise.all(memberDirectories.map(async ({ member, directory, resource }) => {
       const reusesCaller = input.reusesCallerLeadSession
         && member.name === input.spec.leadAgentId
         && canReuseCallerAsLead(member)
@@ -108,15 +102,7 @@ export async function prepareTeamMembers(input: {
       return { kind: "launch", member, directory, resource, resolvedMember }
     }))
   } catch (error) {
-    for (const cleanupRoot of cleanupRoots.toReversed()) {
-      try {
-        await rm(cleanupRoot, { recursive: true, force: true })
-        cleanupReport.removedWorktrees.push(cleanupRoot)
-      } catch (cleanupError) {
-        const message = cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
-        cleanupReport.errors.push(`worktree ${cleanupRoot}: ${message}`)
-      }
-    }
+    const cleanupReport = await cleanupPreparedTeamRunResources({ resources })
     const cause = error instanceof Error ? error : new Error(String(error))
     throw new TeamMemberPreflightError(cause, cleanupReport)
   }

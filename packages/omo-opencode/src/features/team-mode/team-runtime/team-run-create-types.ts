@@ -1,6 +1,7 @@
 export type SpawnedMemberResource = {
   taskId?: string
   worktreePath?: string
+  ownedWorktreeRoot?: string
 }
 
 export type TeamRunCleanupReport = {

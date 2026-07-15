@@ -3,7 +3,7 @@
 // allow: SIZE_OK - team runtime creation tests share filesystem and tmux mock state; this release adds small lock/spawn coverage and future edits should split by runtime phase.
 
 import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
-import { access, mkdtemp, readdir, rm } from "node:fs/promises"
+import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
@@ -13,6 +13,7 @@ import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import type { BackgroundTask, LaunchInput } from "../../background-agent/types"
 import { BackgroundManager } from "../../background-agent/manager"
+import { getInboxDir } from "../team-registry/paths"
 import { loadRuntimeState, transitionRuntimeState } from "../team-state-store/store"
 import { clearTeamSessionRegistry, lookupTeamSession } from "../team-session-registry"
 import type { TeamSpec } from "../types"
@@ -63,6 +64,12 @@ function createSpec(memberCount: number, withWorktrees = false): TeamSpec {
       ...(withWorktrees ? { worktreePath: `./worktrees/member-${index + 1}` } : {}),
     })),
   }
+}
+
+function setMemberWorktree(spec: TeamSpec, memberIndex: number, worktreePath: string): void {
+  const member = spec.members[memberIndex]
+  if (!member) throw new Error(`missing member at index ${memberIndex}`)
+  spec.members[memberIndex] = { ...member, worktreePath }
 }
 
 function createContext(baseDir: string, manager: BackgroundManager): ExecutorContext & { client: { session: { create: ReturnType<typeof mock> } } } {
@@ -340,6 +347,155 @@ describe("createTeamRun", () => {
     // then
     expect(await pathExists(path.resolve(baseDir, "./worktrees/member-1"))).toBe(false)
     expect(await pathExists(path.resolve(baseDir, "./worktrees/member-2"))).toBe(false)
+  })
+
+  test("preserves a pre-existing worktree and removes only the owned root when runtime state creation fails", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-state-failure-"))
+    temporaryDirectories.push(baseDir)
+    const { manager, launchMock } = createManager(baseDir, async () => ({
+      id: "unexpected-task",
+      sessionId: "unexpected-session",
+      status: "running",
+    } as BackgroundTask))
+    const spec = createSpec(2, true)
+    const existingWorktree = path.join(baseDir, "existing-worktree")
+    const sentinelPath = path.join(existingWorktree, "sentinel.txt")
+    await mkdir(existingWorktree, { recursive: true })
+    await writeFile(sentinelPath, "keep-runtime-state")
+    setMemberWorktree(spec, 0, existingWorktree)
+    const ownedWorktreeRoot = path.resolve(baseDir, "./worktrees/member-2")
+
+    // when
+    const result = createTeamRun(
+      spec,
+      "lead-session",
+      createContext(baseDir, manager),
+      createConfig(baseDir),
+      manager,
+      undefined,
+      undefined,
+      { createRuntimeState: async () => { throw new Error("runtime state failed") } },
+    )
+
+    // then
+    try {
+      await result
+      throw new Error("expected createTeamRun to reject")
+    } catch (error) {
+      if (!(error instanceof TeamRunCreateError)) throw error
+      expect(error.message).toContain("runtime state failed")
+      expect(error.cleanupReport.removedWorktrees).toEqual([ownedWorktreeRoot])
+    }
+    expect(launchMock).not.toHaveBeenCalled()
+    expect(await readFile(sentinelPath, "utf8")).toBe("keep-runtime-state")
+    expect(await pathExists(ownedWorktreeRoot)).toBe(false)
+    expect(await readdir(path.join(baseDir, "worktrees"))).toEqual([])
+    expect(await readdir(path.join(baseDir, "runtime"))).toEqual([])
+    expect(getSessionCreatedTeamRunIds()).toEqual([])
+  })
+
+  test("preserves a pre-existing worktree and removes only the owned root when inbox creation fails", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-inbox-failure-"))
+    temporaryDirectories.push(baseDir)
+    const { manager, launchMock } = createManager(baseDir, async () => ({
+      id: "unexpected-task",
+      sessionId: "unexpected-session",
+      status: "running",
+    } as BackgroundTask))
+    const spec = createSpec(2, true)
+    const existingWorktree = path.join(baseDir, "existing-worktree")
+    const sentinelPath = path.join(existingWorktree, "sentinel.txt")
+    await mkdir(existingWorktree, { recursive: true })
+    await writeFile(sentinelPath, "keep-inbox")
+    spec.members[0] = {
+      kind: "subagent_type",
+      name: "member-1",
+      subagent_type: "sisyphus",
+      backendType: "in-process",
+      isActive: true,
+      worktreePath: existingWorktree,
+    }
+    const ownedWorktreeRoot = path.resolve(baseDir, "./worktrees/member-2")
+    const attemptedInboxes: string[] = []
+
+    // when
+    const result = createTeamRun(
+      spec,
+      "lead-session",
+      createContext(baseDir, manager),
+      createConfig(baseDir),
+      manager,
+      undefined,
+      { callerAgentTypeId: "sisyphus" },
+      {
+        createInbox: async (inboxDir) => {
+          attemptedInboxes.push(inboxDir)
+          await mkdir(inboxDir, { recursive: true })
+          if (attemptedInboxes.length === 2) throw new Error("inbox creation failed")
+        },
+      },
+    )
+
+    // then
+    try {
+      await result
+      throw new Error("expected createTeamRun to reject")
+    } catch (error) {
+      if (!(error instanceof TeamRunCreateError)) throw error
+      expect(error.message).toContain("inbox creation failed")
+      expect(error.cleanupReport.removedWorktrees).toEqual([ownedWorktreeRoot])
+    }
+    const runtimeState = await loadSingleRuntimeState(baseDir)
+    expect(runtimeState.status).toBe("failed")
+    expect(lookupTeamSession("lead-session")).toBeUndefined()
+    expect(getSessionCreatedTeamRunIds()).toEqual([])
+    expect(launchMock).not.toHaveBeenCalled()
+    expect(await readFile(sentinelPath, "utf8")).toBe("keep-inbox")
+    expect(await pathExists(ownedWorktreeRoot)).toBe(false)
+    expect(attemptedInboxes).toEqual([
+      getInboxDir(baseDir, runtimeState.teamRunId, "member-1"),
+      getInboxDir(baseDir, runtimeState.teamRunId, "member-2"),
+    ])
+    expect(await Promise.all(attemptedInboxes.map(pathExists))).toEqual([false, false])
+  })
+
+  test("removes an overlapping owned worktree root once and reports only that root", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-overlapping-roots-"))
+    temporaryDirectories.push(baseDir)
+    const { manager } = createManager(baseDir, async () => ({
+      id: "unexpected-task",
+      sessionId: "unexpected-session",
+      status: "running",
+    } as BackgroundTask))
+    const spec = createSpec(2)
+    setMemberWorktree(spec, 0, "./shared/member-1")
+    setMemberWorktree(spec, 1, "./shared/member-2")
+    const ownedWorktreeRoot = path.resolve(baseDir, "./shared")
+
+    // when
+    const result = createTeamRun(
+      spec,
+      "lead-session",
+      createContext(baseDir, manager),
+      createConfig(baseDir),
+      manager,
+      undefined,
+      undefined,
+      { createRuntimeState: async () => { throw new Error("runtime state failed") } },
+    )
+
+    // then
+    try {
+      await result
+      throw new Error("expected createTeamRun to reject")
+    } catch (error) {
+      if (!(error instanceof TeamRunCreateError)) throw error
+      expect(error.cleanupReport.removedWorktrees).toEqual([ownedWorktreeRoot])
+    }
+    expect(await pathExists(ownedWorktreeRoot)).toBe(false)
   })
 
   test("launches each member with its exact resolved identity, model, worktree directory, and question denial", async () => {
