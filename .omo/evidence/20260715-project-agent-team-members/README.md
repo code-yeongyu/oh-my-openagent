@@ -26,7 +26,9 @@ The parent model invoked the real `team_create` tool. The inline team reused a b
 - `child-session-parts.json` records `team_send_message` with completed state, recipient `lead`, and a successful `deliveredTo: ["lead"]` result.
 - `lead-inbox-messages.json` captures the persisted message while the run was live, with sender `reviewer`, recipient `lead`, and body `QA_TEAM_MESSAGE`.
 - The child received the tool result and completed with a normal follow-up response.
-- The host OpenCode session count remained `3701` before and after.
+- The fake provider exited before the driver completed.
+- The successful-run sandbox was removed after evidence capture and assertion verification.
+- The host OpenCode session count remained `3704` before and after.
 
 `opencode-run.jsonl` contains the completed `team_create` event and runtime state. It records the exact `repository-reviewer` identity, `gpt-project-agent` model with `xhigh` variant, child session ID, and prepared member worktree path.
 
@@ -34,7 +36,7 @@ The parent model invoked the real `team_create` tool. The inline team reused a b
 
 ## Why this is enough
 
-The run exercises the user-visible path rather than calling resolver functions directly: OpenCode loads the final project agent registry, OMO validates and preflights the member, Team Mode creates the child session, and the child reaches the provider under its exact model and prompt. The generic fallback assertion and child model observation cover accidental substitution. The structured child tool part, delivery result, and live inbox snapshot prove Team messaging executed and persisted with the correct identity and recipient. The tool list covers Team protocol capability, repository write denial, and question denial. The before and after host database counts prove isolation.
+The run exercises the user-visible path rather than calling resolver functions directly: OpenCode loads the final project agent registry, OMO validates and preflights the member, Team Mode creates the child session, and the child reaches the provider under its exact model and prompt. The generic fallback assertion and child model observation cover accidental substitution. The structured child tool part, delivery result, and live inbox snapshot prove Team messaging executed and persisted with the correct identity and recipient. The tool list covers Team protocol capability, repository write denial, and question denial. The before and after host database counts prove isolation. The cleanup assertions prove the provider stopped and the successful sandbox no longer exists.
 
 Unit and regression suites separately cover rejected hidden, primary, disabled, incomplete, explicit-deny, missing, lead, and canonical-collision cases, plus cleanup when preflight fails.
 
@@ -42,7 +44,7 @@ Unit and regression suites separately cover rejected hidden, primary, disabled, 
 
 No credentials, auth headers, environment dumps, or raw provider request bodies were recorded. The fake provider uses a non-secret placeholder key. Provider evidence stores only selected booleans, model IDs, branch names, and tool names.
 
-The isolated sandbox directories and databases are cleanup-only artifacts and are not included in the committed evidence.
+On success, the driver copies reviewer-useful logs, database-derived session rows, child tool parts, and the live inbox snapshot into this evidence directory, then removes its `sandbox-<pid>` directory. On failed assertions, it records `sandboxPreservedForFailure: true` and preserves that sandbox for diagnosis. Uncaught exceptions and termination signals invoke a process-boundary handler that terminates the fake provider and saves its stdout and stderr; a failure sandbox remains available for investigation.
 
 ## Artifact index
 

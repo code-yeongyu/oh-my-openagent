@@ -1,5 +1,6 @@
 import { execFileSync, spawn } from "node:child_process"
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
+import { once } from "node:events"
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -37,6 +38,17 @@ async function capturePersistedLeadMessage() {
     await new Promise((resolve) => setTimeout(resolve, 10))
   }
   return undefined
+}
+
+function terminateProvider(provider) {
+  if (provider.exitCode === null && provider.signalCode === null) provider.kill("SIGTERM")
+}
+
+async function stopProvider(provider) {
+  if (provider.exitCode !== null || provider.signalCode !== null) return
+  const exited = once(provider, "exit")
+  terminateProvider(provider)
+  await exited
 }
 
 for (const directory of [
@@ -84,6 +96,8 @@ const isolatedEnvironment = {
   OMO_DISABLE_PROCESS_CLEANUP: "1",
 }
 
+let providerStdout = ""
+let providerStderr = ""
 const provider = spawn(process.execPath, [path.join(evidenceDir, "fake-provider.mjs")], {
   cwd: repositoryRoot,
   env: {
@@ -93,8 +107,19 @@ const provider = spawn(process.execPath, [path.join(evidenceDir, "fake-provider.
   },
   stdio: ["ignore", "pipe", "pipe"],
 })
-let providerStdout = ""
-let providerStderr = ""
+const terminateProviderAtBoundary = () => {
+  terminateProvider(provider)
+  writeFileSync(path.join(evidenceDir, "provider-stdout.log"), providerStdout)
+  writeFileSync(path.join(evidenceDir, "provider-stderr.log"), providerStderr)
+}
+process.once("exit", terminateProviderAtBoundary)
+process.once("uncaughtExceptionMonitor", terminateProviderAtBoundary)
+for (const [signal, exitCode] of [["SIGINT", 130], ["SIGTERM", 143]]) {
+  process.once(signal, () => {
+    terminateProviderAtBoundary()
+    process.exit(exitCode)
+  })
+}
 provider.stdout.on("data", (chunk) => { providerStdout += chunk.toString() })
 provider.stderr.on("data", (chunk) => { providerStderr += chunk.toString() })
 
@@ -167,8 +192,7 @@ const runExitCode = await new Promise((resolve, reject) => {
 })
 const persistedTeamMessage = await persistedMessageCapture
 
-provider.kill("SIGTERM")
-await new Promise((resolve) => provider.on("exit", resolve))
+await stopProvider(provider)
 writeFileSync(path.join(evidenceDir, "provider-stdout.log"), providerStdout)
 writeFileSync(path.join(evidenceDir, "provider-stderr.log"), providerStderr)
 writeFileSync(path.join(evidenceDir, "opencode-run.jsonl"), runStdout)
@@ -239,22 +263,33 @@ const assertions = {
   childCompletedAfterToolResult: childCompletionEntry?.hasToolResult === true,
   leadInboxPersistedReviewerMessage: persistedTeamMessage?.from === "reviewer" && persistedTeamMessage?.to === "lead",
   hostSessionCountUnchanged: hostSessionCountBefore === hostSessionCountAfter,
+  providerStopped: provider.exitCode !== null || provider.signalCode !== null,
 }
-const result = {
-  assertions,
-  hostDbPath,
-  hostSessionCountBefore,
-  hostSessionCountAfter,
-  isolatedDbPath,
-  projectRoot,
-  childEntry,
-  childCompletionEntry,
-  childSession,
-  teamSendMessagePart,
-  persistedTeamMessage,
+function createResult(cleanup) {
+  return {
+    assertions,
+    cleanup,
+    hostDbPath,
+    hostSessionCountBefore,
+    hostSessionCountAfter,
+    isolatedDbPath,
+    projectRoot,
+    childEntry,
+    childCompletionEntry,
+    childSession,
+    teamSendMessagePart,
+    persistedTeamMessage,
+  }
 }
-writeFileSync(path.join(evidenceDir, "qa-result.json"), `${JSON.stringify(result, null, 2)}\n`)
 if (Object.values(assertions).some((passed) => !passed)) {
+  const failedResult = createResult({ sandboxPath: sandboxRoot, sandboxPreservedForFailure: true })
+  writeFileSync(path.join(evidenceDir, "qa-result.json"), `${JSON.stringify(failedResult, null, 2)}\n`)
   throw new Error(`QA assertions failed: ${JSON.stringify(assertions)}`)
 }
+
+rmSync(sandboxRoot, { recursive: true, force: true })
+assertions.successfulSandboxRemoved = !existsSync(sandboxRoot)
+const result = createResult({ sandboxPath: sandboxRoot, sandboxPreservedForFailure: false })
+writeFileSync(path.join(evidenceDir, "qa-result.json"), `${JSON.stringify(result, null, 2)}\n`)
+if (!assertions.successfulSandboxRemoved) throw new Error(`successful QA sandbox was not removed: ${sandboxRoot}`)
 process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
