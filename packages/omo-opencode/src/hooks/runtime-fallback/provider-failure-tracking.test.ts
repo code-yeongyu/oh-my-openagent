@@ -7,6 +7,10 @@ import {
   findNextAvailableFallback,
   prepareFallback,
 } from "./fallback-state"
+import {
+  snapshotFallbackState,
+  restoreFallbackState,
+} from "./fallback-state-snapshot"
 
 describe("provider-level failure tracking", () => {
   describe("extractProviderFromModel", () => {
@@ -141,5 +145,45 @@ describe("provider-level failure tracking", () => {
       expect(result.success).toBe(true)
       expect(state.failedProviders.has("openai")).toBe(false)
     })
+  })
+})
+
+describe("fallback-state-snapshot round-trip", () => {
+  test("preserves failedProviders across snapshot/restore", () => {
+    const state = createFallbackState("openai/gpt-4o")
+    markProviderFailed("openai/gpt-4o", state)
+    state.failedModels.set("openai/gpt-4o", Date.now())
+    state.attemptCount = 2
+    state.currentModel = "anthropic/claude-3.5-sonnet"
+    state.fallbackIndex = 1
+
+    const snapshot = snapshotFallbackState(state)
+    
+    // Mutate original state
+    state.failedProviders.clear()
+    state.failedModels.clear()
+    state.attemptCount = 0
+
+    // Restore from snapshot
+    restoreFallbackState(state, snapshot)
+
+    expect(state.failedProviders.has("openai")).toBe(true)
+    expect(state.failedModels.has("openai/gpt-4o")).toBe(true)
+    expect(state.attemptCount).toBe(2)
+    expect(state.currentModel).toBe("anthropic/claude-3.5-sonnet")
+    expect(state.fallbackIndex).toBe(1)
+  })
+
+  test("snapshot is independent copy (no shared references)", () => {
+    const state = createFallbackState("openai/gpt-4o")
+    markProviderFailed("openai/gpt-4o", state)
+    
+    const snapshot = snapshotFallbackState(state)
+    
+    // Mutating original should not affect snapshot
+    state.failedProviders.set("anthropic", Date.now())
+    
+    expect(snapshot.failedProviders.has("anthropic")).toBe(false)
+    expect(snapshot.failedProviders.size).toBe(1)
   })
 })
