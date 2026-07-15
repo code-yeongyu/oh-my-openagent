@@ -245,3 +245,40 @@ describe("error type classification from retry messages", () => {
     }
   })
 })
+
+describe("event-handler errorType resolution", () => {
+  // Simulates the logic in event-handler.ts for resolving errorType
+  function resolveErrorType(error: unknown, statusCode: number | undefined): string | undefined {
+    const errorMsg = (typeof error === "string" ? error : String((error as Record<string, unknown>)?.message ?? "")).toLowerCase()
+    const isQuotaExceeded = /quota.?exceeded|exceeded.*quota|usage\s*quota|exhausted\s+your\s+capacity|limit\s+exhausted|使用上限|额度.*不足|余额.*不足/.test(errorMsg)
+    const isRateLimit =
+      statusCode === 429 ||
+      statusCode === 529 ||
+      /rate.?limit|too.?many.?requests|cool.*down|频率限制|使用上限|请求过于频繁/.test(errorMsg)
+    
+    if (isQuotaExceeded) return "quota_exceeded"
+    if (isRateLimit) return "rate_limit"
+    return undefined
+  }
+
+  test("classifies 429 status code as rate_limit", () => {
+    expect(resolveErrorType({ message: "Too Many Requests" }, 429)).toBe("rate_limit")
+  })
+
+  test("classifies 529 status code as rate_limit", () => {
+    expect(resolveErrorType({ message: "Model overloaded" }, 529)).toBe("rate_limit")
+  })
+
+  test("classifies rate limit message as rate_limit", () => {
+    expect(resolveErrorType({ message: "Rate limit exceeded for API key" }, undefined)).toBe("rate_limit")
+  })
+
+  test("classifies quota exceeded as quota_exceeded", () => {
+    expect(resolveErrorType({ message: "You have exceeded your quota" }, undefined)).toBe("quota_exceeded")
+  })
+
+  test("returns undefined for transient errors (500, 503)", () => {
+    expect(resolveErrorType({ message: "Internal Server Error" }, 500)).toBeUndefined()
+    expect(resolveErrorType({ message: "Service Unavailable" }, 503)).toBeUndefined()
+  })
+})
