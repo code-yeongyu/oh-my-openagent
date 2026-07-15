@@ -158,6 +158,81 @@ describe("BackgroundManager verifySessionExists", () => {
   })
 })
 
+describe("BackgroundManager task directory routing", () => {
+  test("uses the task directory when validating session output", async () => {
+    //#given
+    const messages = mock(async () => ({
+      data: [{
+        info: { role: "assistant", finish: "end_turn", id: "msg-2" },
+        parts: [{ type: "text", text: "done" }],
+      }],
+    }))
+    const manager = createManagerWithClient({
+      status: async () => ({ data: { "ses-member-output": { type: "idle" } } }),
+      messages,
+    })
+    const task = createRunningTask("ses-member-output")
+    task.directory = "/member-worktree"
+    injectTask(manager, task)
+
+    //#when
+    await manager["pollRunningTasks"]()
+    await manager.shutdown()
+
+    //#then
+    expect(messages).toHaveBeenCalledWith({
+      path: { id: "ses-member-output" },
+      query: { directory: "/member-worktree" },
+    })
+  })
+
+  test("uses the task directory when checking a missing session", async () => {
+    //#given
+    const getSession = mock(async () => ({
+      error: { message: "Session not found", status: 404 },
+      data: undefined,
+    }))
+    const manager = createManagerWithClient({
+      get: getSession,
+      messages: async () => ({ data: [] }),
+    })
+    const task = createRunningTask("ses-member-missing")
+    task.directory = "/member-worktree"
+    task.consecutiveMissedPolls = MIN_SESSION_GONE_POLLS - 1
+    injectTask(manager, task)
+
+    //#when
+    await manager["pollRunningTasks"]()
+    await manager.shutdown()
+
+    //#then
+    expect(getSession).toHaveBeenCalledWith({
+      path: { id: "ses-member-missing" },
+      query: { directory: "/member-worktree" },
+    })
+  })
+
+  test("preserves the task directory in the completed task archive", async () => {
+    //#given
+    const manager = createManagerWithClient()
+    const task: BackgroundTask = {
+      ...createRunningTask("ses-member-archived"),
+      directory: "/member-worktree",
+      status: "completed",
+      completedAt: new Date(),
+    }
+
+    //#when
+    manager["removeTask"](task)
+    const archivedTask = manager.getTask(task.id)
+    await manager.shutdown()
+
+    //#then
+    expect(archivedTask?.directory).toBe("/member-worktree")
+    expect(archivedTask?.prompt).toBe("[redacted]")
+  })
+})
+
 describe("BackgroundManager pollRunningTasks", () => {
   describe("#given a running task whose session is no longer in status response", () => {
     test("#when pollRunningTasks runs #then completes the task instead of leaving it running", async () => {

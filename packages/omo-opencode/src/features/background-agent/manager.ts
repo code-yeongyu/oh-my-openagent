@@ -462,6 +462,7 @@ export class BackgroundManager {
       model: task.model,
       error: task.error,
       category: task.category,
+      directory: task.directory,
     }
 
     this.completedTaskArchive.set(task.id, archivedTask)
@@ -755,6 +756,7 @@ export class BackgroundManager {
       launch: input,
       managerDirectory: this.directory,
     })
+    task.directory = launchDirectory
 
     if (task.status === "cancelled") {
       clearDelegatedChildSessionBootstrap(sessionID)
@@ -1788,7 +1790,10 @@ The fallback retry session is now created and can be inspected directly.
           return resolved?.isCurrent ? resolved.task : undefined
         },
         idleDeferralTimers: this.idleDeferralTimers,
-        validateSessionHasOutput: (id) => this.validateSessionHasOutput(id),
+        validateSessionHasOutput: (id) => {
+          const task = this.resolveTaskAttemptBySession(id)?.task
+          return this.validateSessionHasOutput(id, task?.directory)
+        },
         checkSessionTodos: (id) => this.checkSessionTodos(id),
         tryCompleteTask: (task, source) => this.tryCompleteTask(task, source),
         emitIdleEvent: (sessionID) => this.handleEvent({ type: "session.idle", properties: { sessionID } }),
@@ -2050,7 +2055,7 @@ The fallback retry session is now created and can be inspected directly.
 
     const sessionId = task.sessionId
     if (sessionId) {
-      const sessionStillAlive = await this.verifySessionExists(sessionId)
+      const sessionStillAlive = await this.verifySessionExists(sessionId, task.directory)
       if (sessionStillAlive && !isTerminalSessionError(errorInfo)) {
         this.logger("[background-agent] session.error received but session still alive, treating as transient:", {
           taskId: task.id,
@@ -2211,7 +2216,7 @@ The task was re-queued on a fallback model after a retryable failure.
    * Validates that a session has actual assistant/tool output before marking complete.
    * Prevents premature completion when session.idle fires before agent responds.
    */
-  private async validateSessionHasOutput(sessionID: string): Promise<boolean> {
+  private async validateSessionHasOutput(sessionID: string, directory = this.directory): Promise<boolean> {
     if (this.observedOutputSessions.has(sessionID)) {
       return true
     }
@@ -2219,7 +2224,7 @@ The task was re-queued on a fallback model after a retryable failure.
     try {
       const response = await messagesInDirectory(this.client, {
         path: { id: sessionID },
-      }, this.directory)
+      }, directory)
 
       const messages = normalizeSDKResponse(response, [] as Array<{ info?: { role?: string } }>, { preferResponseOnMissingData: true })
 
@@ -2913,8 +2918,8 @@ The task was re-queued on a fallback model after a retryable failure.
     })
   }
 
-  private async verifySessionExists(sessionID: string): Promise<boolean> {
-    return verifySessionStillExists(this.client, sessionID, this.directory)
+  private async verifySessionExists(sessionID: string, directory = this.directory): Promise<boolean> {
+    return verifySessionStillExists(this.client, sessionID, directory)
   }
 
   private async failCrashedTask(task: BackgroundTask, errorMessage: string): Promise<void> {
@@ -3049,10 +3054,10 @@ The task was re-queued on a fallback model after a retryable failure.
           const completionSource = sessionStatus?.type === "idle"
             ? "polling (idle status)"
             : "polling (session gone from status)"
-          const hasValidOutput = await this.validateSessionHasOutput(sessionID)
+          const hasValidOutput = await this.validateSessionHasOutput(sessionID, task.directory)
           if (!hasValidOutput) {
             if (sessionGoneThresholdReached) {
-              const sessionExists = await this.verifySessionExists(sessionID)
+              const sessionExists = await this.verifySessionExists(sessionID, task.directory)
               if (!sessionExists) {
                 log("[background-agent] Session no longer exists (crashed), marking task as error:", task.id)
                 await this.failCrashedTask(task, "Subagent session no longer exists (process likely crashed). The session disappeared without producing any output.")

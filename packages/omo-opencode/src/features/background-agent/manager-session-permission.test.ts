@@ -114,6 +114,39 @@ describe("BackgroundManager session permission", () => {
     expect(promptCalls[0]?.query).toEqual({ directory: "/parent" })
   })
 
+  test("persists the inherited parent directory on the background task", async () => {
+    // given
+    let markSessionCreated: (() => void) | undefined
+    const sessionCreated = new Promise<void>((resolve) => {
+      markSessionCreated = resolve
+    })
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/parent" } }),
+        create: async () => ({ data: { id: "ses_child" } }),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }) })
+
+    // when
+    const launchedTask = await manager.launch({
+      description: "Inherited directory task",
+      prompt: "Do something",
+      agent: "explore",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
+      onSessionCreated: () => markSessionCreated?.(),
+    })
+    await sessionCreated
+    const persistedTask = manager.getTask(launchedTask.id)
+    await manager.shutdown()
+
+    // then
+    expect(persistedTask?.directory).toBe("/parent")
+  })
+
   test("passes query directory when loading the parent session", async () => {
     // given
     const getCalls: Array<Record<string, unknown>> = []
