@@ -1,17 +1,20 @@
 import { execFileSync, spawn } from "node:child_process"
 import { once } from "node:events"
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const evidenceDir = path.dirname(fileURLToPath(import.meta.url))
 const repositoryRoot = path.resolve(evidenceDir, "../../..")
-const sandboxRoot = path.join(evidenceDir, `sandbox-${process.pid}`)
+const sandboxRoot = mkdtempSync(path.join(tmpdir(), "omo-project-agent-team-qa-"))
+const homeRoot = sandboxRoot
 const projectRoot = path.join(sandboxRoot, "project")
 const configRoot = path.join(sandboxRoot, "config")
 const dataRoot = path.join(sandboxRoot, "data")
 const stateRoot = path.join(sandboxRoot, "state")
 const cacheRoot = path.join(sandboxRoot, "cache")
+const codexHome = path.join(sandboxRoot, "codex-home")
 const teamStateRoot = path.join(sandboxRoot, "team-state")
 const providerLog = path.join(evidenceDir, "provider-requests.jsonl")
 const providerPortFile = path.join(sandboxRoot, "provider-port")
@@ -52,15 +55,23 @@ async function stopProvider(provider) {
 }
 
 for (const directory of [
+  homeRoot,
   path.join(projectRoot, ".opencode", "agents"),
   path.join(configRoot, "opencode"),
   dataRoot,
   stateRoot,
   cacheRoot,
+  codexHome,
 ]) mkdirSync(directory, { recursive: true })
 execFileSync("git", ["init", "--quiet"], { cwd: projectRoot })
 
-const hostDbPath = execFileSync("opencode", ["db", "path"], { encoding: "utf8" }).trim()
+const gitHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repositoryRoot, encoding: "utf8" }).trim()
+const gitStatus = execFileSync("git", ["status", "--short"], { cwd: repositoryRoot, encoding: "utf8" }).trim().split("\n").filter(Boolean)
+
+const hostHome = process.env.HOME
+if (!hostHome) throw new Error("HOME is required to locate the host OpenCode database for the read-only count guard")
+const hostDataRoot = process.env.XDG_DATA_HOME ?? path.join(hostHome, ".local", "share")
+const hostDbPath = path.join(hostDataRoot, "opencode", "opencode.db")
 const hostSessionCountBefore = execFileSync(
   "sqlite3",
   [hostDbPath, "SELECT count(*) FROM session;"],
@@ -86,15 +97,31 @@ You are the exact repository-reviewer project agent. Complete the assigned Team 
 
 const isolatedEnvironment = {
   ...process.env,
+  HOME: homeRoot,
+  USERPROFILE: homeRoot,
   XDG_CONFIG_HOME: configRoot,
   XDG_DATA_HOME: dataRoot,
   XDG_STATE_HOME: stateRoot,
   XDG_CACHE_HOME: cacheRoot,
+  CODEX_HOME: codexHome,
   OPENCODE_DISABLE_AUTOUPDATE: "1",
   OPENCODE_DISABLE_MODELS_FETCH: "1",
   OMO_DISABLE_TELEMETRY: "1",
   OMO_DISABLE_PROCESS_CLEANUP: "1",
 }
+for (const inheritedKey of [
+  "OPENCODE_CONFIG",
+  "OPENCODE_CONFIG_DIR",
+  "OPENCODE_CONFIG_CONTENT",
+  "OPENCODE_SERVER_PASSWORD",
+  "ANTHROPIC_API_KEY",
+  "OPENAI_API_KEY",
+  "GOOGLE_GENERATIVE_AI_API_KEY",
+  "GEMINI_API_KEY",
+  "CODEX_API_KEY",
+  "GH_TOKEN",
+  "GITHUB_TOKEN",
+]) delete isolatedEnvironment[inheritedKey]
 
 let providerStdout = ""
 let providerStderr = ""
@@ -131,6 +158,7 @@ const providerPort = readFileSync(providerPortFile, "utf8").trim()
 
 writeFileSync(path.join(configRoot, "opencode", "opencode.jsonc"), JSON.stringify({
   plugin: [`file://${path.join(repositoryRoot, "packages/omo-opencode/src/index.ts")}`],
+  default_agent: "Sisyphus - ultraworker",
   model: "openai/gpt-fake",
   provider: {
     openai: {
@@ -167,7 +195,6 @@ const run = spawn("opencode", [
   "run",
   "--format", "json",
   "--model", "openai/gpt-fake",
-  "--agent", "sisyphus",
   "--dir", projectRoot,
   "QA_TRIGGER_PROJECT_AGENT_TEAM: create the requested team and wait for its member to start.",
 ], {
@@ -234,6 +261,13 @@ const hostSessionCountAfter = execFileSync(
 const providerEntries = readProviderEntries()
 const childEntry = providerEntries.find((entry) => entry.branch === "project-agent-child-message")
 const childCompletionEntry = providerEntries.find((entry) => entry.branch === "project-agent-child-complete")
+const runEvents = runStdout.trim().split("\n").filter(Boolean).map((line) => JSON.parse(line))
+const teamCreateEvent = runEvents.find((event) => event.type === "tool_use" && event.part?.tool === "team_create")
+const teamCreateOutput = typeof teamCreateEvent?.part?.state?.output === "string"
+  ? JSON.parse(teamCreateEvent.part.state.output)
+  : undefined
+const reviewerRuntime = teamCreateOutput?.runtimeState?.members?.find((member) => member.name === "reviewer")
+const childInitialText = childParts.find((part) => part.type === "text")?.text
 const teamSendMessagePart = childParts.find((part) => part.type === "tool" && part.tool === "team_send_message")
 const teamMessageInput = teamSendMessagePart?.state?.input
 const teamMessageOutput = typeof teamSendMessagePart?.state?.output === "string"
@@ -248,7 +282,11 @@ const requiredTeamTools = [
 ]
 const assertions = {
   runExitedSuccessfully: runExitCode === 0,
+  canonicalLeadIdentitySelected: !runStderr.includes("not found") && providerEntries.some((entry) => entry.branch === "parent-team-create" && entry.model === "gpt-fake"),
   parentInvokedTeamCreate: providerEntries.some((entry) => entry.branch === "parent-team-create"),
+  provenanceVerifiedBuiltinLeadAuthorized: teamCreateEvent?.part?.state?.status === "completed",
+  childRuntimeIdentityExact: reviewerRuntime?.subagent_type === "repository-reviewer" && reviewerRuntime?.name === "reviewer",
+  childRuntimeModelVariantExact: reviewerRuntime?.model?.providerID === "openai" && reviewerRuntime?.model?.modelID === "gpt-project-agent" && reviewerRuntime?.model?.variant === "xhigh",
   childUsedExactProjectModel: childEntry?.model === "gpt-project-agent",
   childReceivedProjectPrompt: childEntry?.hasProjectPrompt === true,
   childReceivedAssignedTask: childEntry?.hasChildTask === true,
@@ -257,6 +295,13 @@ const assertions = {
   childQuestionToolDenied: childEntry?.tools.includes("question") === false,
   genericModelWasNotUsedForChild: childEntry?.model !== "gpt-fake",
   childUsedMemberWorktree: childSession?.directory === memberWorktree,
+  childReceivedTeamGuidance: typeof childInitialText === "string"
+    && childInitialText.includes("# Team Communication")
+    && childInitialText.includes("You MUST use the `team_send_message` tool")
+    && childInitialText.includes("For ALL team_* tool calls, use the TeamRunId shown above")
+    && childInitialText.includes("## Lead-only tools you must NOT call")
+    && ["team_send_message", "team_task_list", "team_task_get", "team_task_update"]
+      .every((tool) => childInitialText.includes(`\`${tool}\``)),
   childTeamSendMessageCompleted: teamSendMessagePart?.state?.status === "completed",
   childTeamMessageTargetedLead: teamMessageInput?.to === "lead",
   childToolReportedLeadDelivery: teamMessageOutput?.deliveredTo?.includes("lead") === true,
@@ -269,6 +314,8 @@ function createResult(cleanup) {
   return {
     assertions,
     cleanup,
+    gitHead,
+    gitStatus,
     hostDbPath,
     hostSessionCountBefore,
     hostSessionCountAfter,
@@ -276,13 +323,16 @@ function createResult(cleanup) {
     projectRoot,
     childEntry,
     childCompletionEntry,
+    reviewerRuntime,
     childSession,
     teamSendMessagePart,
     persistedTeamMessage,
   }
 }
 if (Object.values(assertions).some((passed) => !passed)) {
-  const failedResult = createResult({ sandboxPath: sandboxRoot, sandboxPreservedForFailure: true })
+  rmSync(sandboxRoot, { recursive: true, force: true })
+  assertions.failedSandboxRemoved = !existsSync(sandboxRoot)
+  const failedResult = createResult({ sandboxPath: sandboxRoot, sandboxPreservedForFailure: false })
   writeFileSync(path.join(evidenceDir, "qa-result.json"), `${JSON.stringify(failedResult, null, 2)}\n`)
   throw new Error(`QA assertions failed: ${JSON.stringify(assertions)}`)
 }

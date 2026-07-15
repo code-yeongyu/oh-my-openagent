@@ -1,89 +1,168 @@
-# Project Agent Team Mode QA
+# Project Agent Team Mode QA: PASS
+
+## Verdict
+
+The refreshed real OpenCode QA passes at source HEAD `4f9e62f517ec70bbc668aa1450e093d21c0a1731` plus the current uncommitted PR changes.
+
+The real `opencode run --format json` process selected the canonical OMO `Sisyphus - ultraworker` lead, authorized `team_create`, launched the exact project-defined `repository-reviewer` member, delivered its Team message, observed normal child completion, preserved the host OpenCode session count, stopped the fake provider, and removed the isolated sandbox.
 
 ## What was tested
 
-Command:
+### Real OpenCode harness
 
 ```text
 node .omo/evidence/20260715-project-agent-team-members/run-qa.mjs
 ```
 
-Focused regression command:
+The runner:
+
+- loads `packages/omo-opencode/src/index.ts` directly through a `file://` URL, not a published package or stale build;
+- creates an external `/tmp/omo-project-agent-team-qa-*` sandbox with fresh `HOME`, `USERPROFILE`, all XDG roots, and `CODEX_HOME`;
+- removes inherited OpenCode config overrides and provider credentials;
+- initializes a fresh Git project containing only the QA project-agent fixture;
+- selects the canonical `Sisyphus - ultraworker` default agent;
+- uses a local fake OpenAI Responses provider that records selected metadata only;
+- reads the host database only through direct, read-only `SELECT count(*) FROM session` guards;
+- removes the temporary sandbox on pass or assertion failure.
+
+The spawned CLI command is equivalent to:
+
+```text
+opencode run \
+  --format json \
+  --model openai/gpt-fake \
+  --dir <isolated-project> \
+  "QA_TRIGGER_PROJECT_AGENT_TEAM: create the requested team and wait for its member to start."
+```
+
+### Focused final-blocker suite
 
 ```text
 bun test \
+  packages/omo-opencode/src/plugin-handlers/agent-config-handler.test.ts \
+  packages/omo-opencode/src/features/team-mode/resolve-caller-team-lead.test.ts \
+  packages/omo-opencode/src/features/team-mode/tools/lifecycle-authority.test.ts \
+  packages/omo-opencode/src/features/team-mode/tools/lifecycle-inline-spec.test.ts \
+  packages/omo-opencode/src/features/team-mode/team-runtime/project-agent-member.test.ts \
   packages/omo-opencode/src/features/team-mode/team-runtime/prepare-team-members.test.ts \
+  packages/omo-opencode/src/features/team-mode/team-runtime/worktree-ownership.test.ts \
   packages/omo-opencode/src/features/team-mode/team-runtime/create.test.ts \
   packages/omo-opencode/src/features/team-mode/team-runtime/cleanup-team-run-resources.test.ts \
-  packages/omo-opencode/src/features/background-agent/manager-session-permission.test.ts \
-  packages/omo-opencode/src/features/background-agent/manager.polling.test.ts \
-  packages/omo-opencode/src/features/background-agent/task-poller.test.ts \
-  packages/omo-opencode/src/features/background-agent/manager-resume-directory.test.ts
+  packages/omo-opencode/src/features/team-mode/team-runtime/shutdown.test.ts \
+  packages/omo-opencode/src/features/team-mode/team-runtime/delete-team-bg-cancel.test.ts \
+  packages/omo-opencode/src/features/background-agent/manager-session-permission.test.ts
 ```
 
-The driver launched the real installed `opencode run` command with the local plugin source, an isolated XDG environment, a local fake OpenAI Responses provider, and a nested Git fixture containing `.opencode/agents/repository-reviewer.md`.
+### Provenance/authority and token-ownership supplements
 
-The driver loads `packages/omo-opencode/src/index.ts` directly, so it exercised the current uncommitted source rather than a stale build artifact. A separate build was not required by this driver.
+```text
+bun test --verbose \
+  packages/omo-opencode/src/plugin-handlers/agent-config-handler.test.ts \
+  packages/omo-opencode/src/features/team-mode/resolve-caller-team-lead.test.ts \
+  packages/omo-opencode/src/features/team-mode/tools/lifecycle-authority.test.ts
 
-The parent model invoked the real `team_create` tool. The inline team reused a built-in lead and launched `repository-reviewer` from `./member-worktree` as a read-only project-defined member. The child then invoked the real `team_send_message` tool before completing normally.
+bun test --verbose \
+  packages/omo-opencode/src/features/team-mode/team-runtime/prepare-team-members.test.ts \
+  packages/omo-opencode/src/features/team-mode/team-runtime/worktree-ownership.test.ts \
+  packages/omo-opencode/src/features/team-mode/team-runtime/cleanup-team-run-resources.test.ts \
+  packages/omo-opencode/src/features/team-mode/team-runtime/shutdown.test.ts \
+  packages/omo-opencode/src/features/team-mode/team-runtime/delete-team-bg-cancel.test.ts
+```
+
+### Broad and documentation checks
+
+```text
+bun test packages/omo-opencode/src/features/team-mode packages/omo-opencode/src/features/background-agent
+bun test packages/omo-opencode/src/shared/markdown-link-audit.test.ts
+bash /home/nikita/work/Projects/ai/op/oh-my-openagent/.agents/skills/opencode-qa/scripts/lib/common.sh --self-check
+```
 
 ## What was observed
 
-`qa-result.json` records all 18 assertions as true:
+### Real-harness proof
 
-- `team_create` completed through the real OpenCode tool path.
-- The child used `gpt-project-agent`, not the parent or generic `gpt-fake` model.
-- The provider request contained `QA_PROJECT_AGENT_PROMPT_MARKER`, proving OpenCode applied the project agent prompt.
-- The provider request contained the assigned child task.
-- The child exposed all five required Team Mode tools.
-- The child did not expose `apply_patch`, `edit`, or `write`.
-- The child did not expose the `question` tool.
-- `child-session-parts.json` records `team_send_message` with completed state, recipient `lead`, and a successful `deliveredTo: ["lead"]` result.
-- `lead-inbox-messages.json` captures the persisted message while the run was live, with sender `reviewer`, recipient `lead`, and body `QA_TEAM_MESSAGE`.
-- The child received the tool result and completed with a normal follow-up response.
-- The fake provider exited before the driver completed.
-- The successful-run sandbox was removed after evidence capture and assertion verification.
-- The host OpenCode session count remained `3779` before and after.
+`qa-result.json` records **23/23 assertions passing**:
 
-The focused regression command completed with `98 pass`, `0 fail`, and `239 expect() calls` across the seven affected regression files. Those tests prove the finalized review fixes:
+- OpenCode exited successfully and the provider observed the parent `team_create` call.
+- The legitimate OMO Sisyphus lead was authorized through the final registry even though OMO plugin entries do not depend on OpenCode `native: true` metadata.
+- Runtime state records member name `reviewer` and exact subagent identity `repository-reviewer`.
+- Runtime state records `openai/gpt-project-agent` with variant `xhigh`.
+- The child provider request contains `QA_PROJECT_AGENT_PROMPT_MARKER` and the assigned `QA_CHILD_TASK`.
+- The child exposes all five required member tools: `team_send_message`, `team_task_list`, `team_task_get`, `team_task_update`, and `team_status`.
+- The child does not expose `apply_patch`, `edit`, `write`, or `question`.
+- `isolated-sessions.json` places the child in the exact `member-worktree` directory.
+- `child-session-parts.json` contains the Team communication contract, TeamRunId instructions, member-tool guidance, and lead-only restrictions.
+- `team_send_message` completed for recipient `lead` and returned `deliveredTo: ["lead"]`.
+- `lead-inbox-messages.json` records sender `reviewer`, recipient `lead`, and body `QA_TEAM_MESSAGE` while the run was live.
+- The child received the tool result and completed with `QA_CHILD_DONE`.
+- Runtime state includes `ownedWorktreeRoot`, `worktreeOwnershipToken`, and `worktreeCanonicalPath` for the exact member leaf.
+- Host OpenCode session count remained **3850 -> 3850**.
+- The fake provider stopped and the successful sandbox was removed.
 
-- A required Team tool with effective `ask` is rejected without permission elevation.
-- Explicit `allow` rules for all five required Team tools after a wildcard `ask` admit the project agent.
-- Preflight recursively creates only missing parents, then atomically claims the exact member leaf with non-recursive `mkdir`.
-- A newly created exact member leaf is owned, while a pre-existing directory is unowned and an existing file rejects.
-- Concurrent sibling creation records independent exact-leaf ownership instead of assigning a shared ancestor to one run.
-- Absolute `worktreePath` and optional `ownedWorktreeRoot` metadata are persisted together before inbox creation and survive later runtime patches.
-- Runtime-state and inbox failures preserve pre-existing worktree sentinels and shared parents while rollback removes only newly owned member leaves.
-- Normal and force deletion preserve legacy or pre-existing `worktreePath`-only directories.
-- Normal and force deletion remove roots only when `ownedWorktreeRoot` proves ownership.
-- Background tasks persist their effective inherited or explicit launch directory and retain it in the completed archive.
-- Output validation, missing-session checks, stale activity refreshes, and both session-existence fallback branches route through each task's directory.
-- Resume routing remains pinned to the existing task directory behavior.
+### Focused deterministic proof
 
-`opencode-run.jsonl` contains the completed `team_create` event and runtime state. It records the exact `repository-reviewer` identity, `gpt-project-agent` model with `xhigh` variant, child session ID, and prepared member worktree path.
+- `focused-final-blockers.log`: **160 pass, 0 fail, 357 expect() calls, 12 files**.
+- `provenance-authority-supplemental.log`: **56 pass, 0 fail, 103 expect() calls, 3 files**.
+- `token-ownership-supplemental.log`: **43 pass, 0 fail, 98 expect() calls, 5 files**.
+- `team-background-suite.log`: **1123 pass, 1 skip, 0 fail, 2808 expect() calls, 112 files**.
+- `markdown-link-audit.log`: **16 pass, 0 fail, 21 expect() calls, 1 file**.
+- `opencode-qa-common-self-check.log`: all dependency, DB-path, SQL-escape, free-port, isolated XDG/HOME, shim, and cleanup checks passed.
+- `node --check` passed for `run-qa.mjs` and `fake-provider.mjs`; `git diff --check` passed.
+- Initial and final worktree status match outside this evidence directory. This task changed no production source, tests, docs, packages, generated Codex files, or git history.
 
-`isolated-sessions.json` captures the parent and child rows from the throwaway OpenCode database. `provider-requests.jsonl` captures only request metadata needed to prove identity, model, prompt, task, tool visibility, and completion after the tool result.
+The provenance and authority tests prove what the real success path intentionally does not attempt:
+
+- protected OMO final-registry identities remain eligible when `native` is `false` or absent;
+- numerically prefixed user collisions are filtered before final display-name remapping;
+- project collisions using a configured display alias are filtered while the real OMO entry is preserved;
+- a prefixed project caller is denied when the protected Sisyphus identity is absent after collision filtering;
+- ambiguous final-registry identities fail closed;
+- undefined, unknown, and hard-reject callers cannot create teams.
+
+The ownership and cancellation tests prove unsafe or impractical live failure paths:
+
+- token markers are created for a newly owned exact leaf and removed only on a matching token and canonical path;
+- pre-existing leaves, shared parents, legacy unmarked paths, and tampered-token paths are preserved;
+- concurrent same-leaf reservation conflicts while sibling leaves receive independent ownership;
+- cancellation returning `false` or throwing retains active resources and session registrations;
+- normal and force cleanup remove only ownership-proven leaves.
 
 ## Why this is enough
 
-The real run exercises the user-visible path rather than calling resolver functions directly: OpenCode loads the final project agent registry, OMO validates and preflights the member, Team Mode creates the child session in its member worktree, and the child reaches the provider under its exact model and prompt. The generic fallback assertion and child model observation cover accidental substitution. The structured child tool part, delivery result, and live inbox snapshot prove Team messaging executed and persisted with the correct identity and recipient. The tool list covers Team protocol capability, repository write denial, and question denial. The before and after host database counts prove isolation. The cleanup assertions prove the provider stopped and the successful sandbox no longer exists.
+The real harness proves the full user-visible success path through the installed OpenCode CLI and current plugin source: final-registry authorization, exact project-agent resolution, permission-shaped tool exposure, worktree launch, Team guidance, live mailbox delivery, completion, and isolation cleanup.
 
-The focused suites complement the real run with deterministic coverage of atomic exact-leaf ownership, concurrent sibling creation, destructive cleanup edge cases, and all child-session probe paths that are unsafe or impractical to manufacture inside one live session. Together they prove both the normal end-to-end project-agent flow and the fail-safe ownership behavior: execution and polling stay in the member directory, uncertain or legacy paths leak safely, and only exact leaves atomically proven and durably persisted as owned are removed.
+The focused tests complement that success path with adversarial provenance collisions, permission inheritance denial, atomic ownership-token behavior, concurrent reservation, cancellation failures, and destructive cleanup boundaries. These cases should not be manufactured inside the successful real session because doing so would weaken isolation or make destructive behavior harder to review.
 
-## What was omitted
+## What was omitted and redacted
 
-No credentials, auth headers, environment dumps, raw provider request bodies, or host database contents were recorded. The fake provider uses a non-secret placeholder key. Provider evidence stores only selected booleans, model IDs, branch names, and tool names. Test output is limited to aggregate pass/fail/assertion counts.
+- No raw provider request bodies were retained.
+- No tokens, auth headers, credentials, private config, environment dumps, or host database rows were recorded.
+- The fake provider uses only a non-secret placeholder API key.
+- Provider evidence contains selected model IDs, branch labels, booleans, Team run IDs, and tool names.
+- Temporary sandbox paths remain in structured evidence for traceability, but the directories themselves were removed.
 
-On success, the driver copies reviewer-useful logs, database-derived session rows, child tool parts, and the live inbox snapshot into this evidence directory, then removes its `sandbox-<pid>` directory. On failed assertions, it records `sandboxPreservedForFailure: true` and preserves that sandbox for diagnosis. Uncaught exceptions and termination signals invoke a process-boundary handler that terminates the fake provider and saves its stdout and stderr; a failure sandbox remains available for investigation.
+## Residual risks
+
+- The provider is deterministic and local. This proves OpenCode/plugin integration without testing a remote model vendor.
+- Failure-path ownership and cancellation behavior is deterministic test proof rather than a destructive live CLI scenario.
+- The full root suite was not rerun in this evidence refresh. The focused and broad affected suites, Markdown audit, OpenCode self-check, and real CLI path were rerun.
+- File-level LSP diagnostics could not address this secondary worktree because the diagnostics request root is the primary checkout. The requested Node syntax checks passed.
 
 ## Artifact index
 
-- `qa-result.json`: assertion summary and host isolation counts.
-- `opencode-run.jsonl`: structured parent turn and `team_create` output.
-- `opencode-run.stderr.log`: CLI warning stream retained for reviewer visibility.
-- `provider-requests.jsonl`: sanitized provider request metadata.
-- `provider-stdout.log` and `provider-stderr.log`: fake provider process output.
-- `isolated-sessions.json`: isolated OpenCode session rows.
-- `child-session-parts.json`: structured child-session parts, including completed `team_send_message` execution.
-- `lead-inbox-messages.json`: live persisted lead inbox message snapshot.
-- `run-qa.mjs` and `fake-provider.mjs`: reproducible QA harness.
+- `README.md`: commands, real/focused proof distinction, observations, omissions, and residual risks.
+- `qa-result.json`: 23 passing assertions, source state, runtime member metadata, host counts, and cleanup state.
+- `opencode-run.jsonl`: structured parent turn with completed `team_create` and runtime state.
+- `opencode-run.stderr.log`: real CLI warning stream.
+- `provider-requests.jsonl`: sanitized provider metadata.
+- `provider-stdout.log`, `provider-stderr.log`: fake provider lifecycle output.
+- `isolated-sessions.json`: isolated parent and child session rows.
+- `child-session-parts.json`: Team guidance, completed message tool call, and child completion.
+- `lead-inbox-messages.json`: live persisted reviewer-to-lead message.
+- `focused-final-blockers.log`: focused final-blocker suite.
+- `provenance-authority-supplemental.log`: provenance collision and caller-authority suite.
+- `token-ownership-supplemental.log`: ownership-token, preservation, cancellation, and cleanup suite.
+- `team-background-suite.log`: broad Team/background suite.
+- `markdown-link-audit.log`: Markdown audit.
+- `opencode-qa-common-self-check.log`: official OpenCode QA harness self-check.
+- `run-qa.mjs`, `fake-provider.mjs`: reproducible redacted harness.
