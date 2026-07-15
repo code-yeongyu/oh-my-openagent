@@ -86,6 +86,31 @@ describe("OhMyOpenCodeConfigSchema telemetry", () => {
   })
 })
 
+describe("OhMyOpenCodeConfigSchema continuation", () => {
+  it("accepts continuation timing overrides when provided", () => {
+    // given
+    const rawConfig = {
+      continuation: {
+        cooldownMs: 5000,
+        abortWindowMs: 3000,
+        maxStagnationCount: 3,
+        maxConsecutiveFailures: 5,
+        failureResetWindowMs: 300000,
+        countdownSeconds: 2,
+      },
+    }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig)
+
+    // then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.continuation).toEqual(rawConfig.continuation)
+    }
+  })
+})
+
 describe("OhMyOpenCodeConfigSchema tui", () => {
   it("defaults the TUI sidebar to enabled", () => {
     // given

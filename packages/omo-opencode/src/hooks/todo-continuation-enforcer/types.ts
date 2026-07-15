@@ -1,10 +1,20 @@
 import type { BackgroundManager } from "../../features/background-agent"
 import type { ToolPermission } from "../../features/hook-message-injector"
 
+export interface ContinuationTimingConfig {
+  cooldownMs?: number
+  abortWindowMs?: number
+  maxStagnationCount?: number
+  maxConsecutiveFailures?: number
+  failureResetWindowMs?: number
+  countdownSeconds?: number
+}
+
 export interface TodoContinuationEnforcerOptions {
   backgroundManager?: BackgroundManager
   skipAgents?: string[]
   isContinuationStopped?: (sessionID: string) => boolean
+  continuationConfig?: ContinuationTimingConfig
 }
 
 export interface TodoContinuationEnforcer {
