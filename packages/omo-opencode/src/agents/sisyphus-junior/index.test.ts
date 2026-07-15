@@ -156,6 +156,19 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       expect(result.thinking).toBeUndefined()
     })
 
+    test("#given GPT model with variant override #when agent is created #then respects user variant", () => {
+      const override = {
+        model: "openai/gpt-5.6-sol",
+        variant: "xhigh",
+        reasoningEffort: "xhigh",
+      }
+
+      const result = createSisyphusJuniorAgentWithOverrides(override)
+
+      expect(result.variant).toBe("xhigh")
+      expect(result.reasoningEffort).toBe("xhigh")
+    })
+
     test("#given Claude model #when agent is created #then injects thinking", () => {
       // given
       const override = { model: "anthropic/claude-sonnet-4-6" }
