@@ -72,6 +72,20 @@ const hostHome = process.env.HOME
 if (!hostHome) throw new Error("HOME is required to locate the host OpenCode database for the read-only count guard")
 const hostDataRoot = process.env.XDG_DATA_HOME ?? path.join(hostHome, ".local", "share")
 const hostDbPath = path.join(hostDataRoot, "opencode", "opencode.db")
+function readHostSessions() {
+  const rows = execFileSync(
+    "sqlite3",
+    ["-json", hostDbPath, "SELECT id, directory FROM session;"],
+    { encoding: "utf8" },
+  ).trim()
+  return JSON.parse(rows || "[]")
+}
+function isWithinDirectory(root, candidate) {
+  const relative = path.relative(path.resolve(root), path.resolve(candidate))
+  return relative === "" || (!path.isAbsolute(relative) && relative !== ".." && !relative.startsWith(`..${path.sep}`))
+}
+const hostSessionsBefore = readHostSessions()
+const hostSessionIdsBefore = new Set(hostSessionsBefore.map((session) => session.id))
 const hostSessionCountBefore = execFileSync(
   "sqlite3",
   [hostDbPath, "SELECT count(*) FROM session;"],
@@ -258,6 +272,8 @@ const hostSessionCountAfter = execFileSync(
   [hostDbPath, "SELECT count(*) FROM session;"],
   { encoding: "utf8" },
 ).trim()
+const hostSessionsAfter = readHostSessions()
+const newHostSessions = hostSessionsAfter.filter((session) => !hostSessionIdsBefore.has(session.id))
 const providerEntries = readProviderEntries()
 const childEntry = providerEntries.find((entry) => entry.branch === "project-agent-child-message")
 const childCompletionEntry = providerEntries.find((entry) => entry.branch === "project-agent-child-complete")
@@ -307,7 +323,7 @@ const assertions = {
   childToolReportedLeadDelivery: teamMessageOutput?.deliveredTo?.includes("lead") === true,
   childCompletedAfterToolResult: childCompletionEntry?.hasToolResult === true,
   leadInboxPersistedReviewerMessage: persistedTeamMessage?.from === "reviewer" && persistedTeamMessage?.to === "lead",
-  hostSessionCountUnchanged: hostSessionCountBefore === hostSessionCountAfter,
+  hostDatabaseExcludedQaSandbox: newHostSessions.every((session) => !isWithinDirectory(projectRoot, session.directory)),
   providerStopped: provider.exitCode !== null || provider.signalCode !== null,
 }
 function createResult(cleanup) {
@@ -319,6 +335,8 @@ function createResult(cleanup) {
     hostDbPath,
     hostSessionCountBefore,
     hostSessionCountAfter,
+    hostSessionCountUnchanged: hostSessionCountBefore === hostSessionCountAfter,
+    newHostSessions,
     isolatedDbPath,
     projectRoot,
     childEntry,

@@ -20,75 +20,32 @@
     "childToolReportedLeadDelivery": true,
     "childCompletedAfterToolResult": true,
     "leadInboxPersistedReviewerMessage": true,
-    "hostSessionCountUnchanged": true,
+    "hostDatabaseExcludedQaSandbox": true,
     "providerStopped": true,
     "successfulSandboxRemoved": true
   },
   "cleanup": {
-    "sandboxPath": "/tmp/omo-project-agent-team-qa-pX4EzN",
+    "sandboxPath": "/tmp/omo-project-agent-team-qa-QOg7qQ",
     "sandboxPreservedForFailure": false
   },
-  "gitHead": "4f9e62f517ec70bbc668aa1450e093d21c0a1731",
+  "gitHead": "7e19e17e4352cffe3ac33a91a370e73aa6995972",
   "gitStatus": [
-    "M .omo/evidence/20260715-project-agent-team-members/README.md",
-    " M .omo/evidence/20260715-project-agent-team-members/child-session-parts.json",
+    "M .omo/evidence/20260715-project-agent-team-members/child-session-parts.json",
     " M .omo/evidence/20260715-project-agent-team-members/isolated-sessions.json",
     " M .omo/evidence/20260715-project-agent-team-members/lead-inbox-messages.json",
     " M .omo/evidence/20260715-project-agent-team-members/opencode-run.jsonl",
-    " M .omo/evidence/20260715-project-agent-team-members/opencode-run.stderr.log",
     " M .omo/evidence/20260715-project-agent-team-members/provider-requests.jsonl",
     " M .omo/evidence/20260715-project-agent-team-members/provider-stdout.log",
     " M .omo/evidence/20260715-project-agent-team-members/qa-result.json",
-    " M .omo/evidence/20260715-project-agent-team-members/run-qa.mjs",
-    " M AGENTS.md",
-    " M docs/guide/installation.md",
-    " M docs/guide/orchestration.md",
-    " M docs/guide/team-mode.md",
-    " M packages/omo-opencode/src/features/AGENTS.md",
-    " M packages/omo-opencode/src/features/background-agent/create-background-session.ts",
-    " M packages/omo-opencode/src/features/background-agent/manager-session-permission.test.ts",
-    " M packages/omo-opencode/src/features/background-agent/manager.test.ts",
-    " M packages/omo-opencode/src/features/team-mode/AGENTS.md",
-    " M packages/omo-opencode/src/features/team-mode/integration.test.ts",
-    " M packages/omo-opencode/src/features/team-mode/resolve-caller-team-lead.test.ts",
-    " M packages/omo-opencode/src/features/team-mode/resolve-caller-team-lead.ts",
-    " M packages/omo-opencode/src/features/team-mode/team-registry/loader-member-name-normalization.test.ts",
-    " M packages/omo-opencode/src/features/team-mode/team-registry/team-spec-input-normalizer.test.ts",
-    " M packages/omo-opencode/src/features/team-mode/team-runtime/cleanup-team-run-resources.test.ts",
-    " M packages/omo-opencode/src/features/team-mode/team-runtime/cleanup-team-run-resources.ts",
-    " M packages/omo-opencode/src/features/team-mode/team-runtime/create-helpers.ts",
-    " M packages/omo-opencode/src/features/team-mode/team-runtime/create.test.ts",
-    " M packages/omo-opencode/src/features/team-mode/team-runtime/create.ts",
-    " M packages/omo-opencode/src/features/team-mode/team-runtime/delete-team-bg-cancel.test.ts",
-    " M packages/omo-opencode/src/features/team-mode/team-runtime/delete-team.ts",
-    " M packages/omo-opencode/src/features/team-mode/team-runtime/prepare-team-members.test.ts",
-    " M packages/omo-opencode/src/features/team-mode/team-runtime/prepare-team-members.ts",
-    " M packages/omo-opencode/src/features/team-mode/team-runtime/project-agent-member.test.ts",
-    " M packages/omo-opencode/src/features/team-mode/team-runtime/project-agent-member.ts",
-    " M packages/omo-opencode/src/features/team-mode/team-runtime/resolve-member.ts",
-    " M packages/omo-opencode/src/features/team-mode/team-runtime/session-cleanup.ts",
-    " M packages/omo-opencode/src/features/team-mode/team-runtime/shutdown-helpers.ts",
-    " M packages/omo-opencode/src/features/team-mode/team-runtime/shutdown-test-fixtures.ts",
-    " M packages/omo-opencode/src/features/team-mode/team-runtime/shutdown.test.ts",
-    " M packages/omo-opencode/src/features/team-mode/team-runtime/team-run-create-types.ts",
-    " M packages/omo-opencode/src/features/team-mode/tools/lifecycle-authority.test.ts",
-    " M packages/omo-opencode/src/features/team-mode/tools/lifecycle-create-tool.ts",
-    " M packages/omo-opencode/src/features/team-mode/tools/lifecycle-inline-spec.test.ts",
-    " M packages/omo-opencode/src/features/team-mode/tools/lifecycle-test-fixture.ts",
-    " M packages/omo-opencode/src/plugin-handlers/agent-config-assembly.ts",
-    " M packages/omo-opencode/src/plugin-handlers/agent-config-handler.test.ts",
-    " M packages/omo-opencode/src/plugin-handlers/agent-override-protection.ts",
-    " M packages/omo-opencode/src/tools/delegate-task/types.ts",
-    " M packages/team-core/src/types.ts",
-    "?? packages/omo-opencode/src/features/team-mode/final-open-code-agent-registry.ts",
-    "?? packages/omo-opencode/src/features/team-mode/team-runtime/worktree-ownership.test.ts",
-    "?? packages/omo-opencode/src/features/team-mode/team-runtime/worktree-ownership.ts"
+    " M .omo/evidence/20260715-project-agent-team-members/run-qa.mjs"
   ],
   "hostDbPath": "/home/nikita/.local/share/opencode/opencode.db",
-  "hostSessionCountBefore": "3850",
-  "hostSessionCountAfter": "3850",
-  "isolatedDbPath": "/tmp/omo-project-agent-team-qa-pX4EzN/data/opencode/opencode.db",
-  "projectRoot": "/tmp/omo-project-agent-team-qa-pX4EzN/project",
+  "hostSessionCountBefore": "3920",
+  "hostSessionCountAfter": "3920",
+  "hostSessionCountUnchanged": true,
+  "newHostSessions": [],
+  "isolatedDbPath": "/tmp/omo-project-agent-team-qa-QOg7qQ/data/opencode/opencode.db",
+  "projectRoot": "/tmp/omo-project-agent-team-qa-QOg7qQ/project",
   "childEntry": {
     "call": 4,
     "branch": "project-agent-child-message",
@@ -96,12 +53,11 @@
     "hasProjectPrompt": true,
     "hasChildTask": true,
     "hasToolResult": false,
-    "teamRunId": "065f7357-0ca0-4266-bcc8-af20910fd817",
+    "teamRunId": "6d2dbacf-9023-4a88-92aa-3e5ff312120b",
     "tools": [
       "background_cancel",
       "background_output",
       "bash",
-      "call_omo_agent",
       "codegraph_codegraph_explore",
       "context7_query-docs",
       "context7_resolve-library-id",
@@ -152,12 +108,11 @@
     "hasProjectPrompt": true,
     "hasChildTask": true,
     "hasToolResult": true,
-    "teamRunId": "065f7357-0ca0-4266-bcc8-af20910fd817",
+    "teamRunId": "6d2dbacf-9023-4a88-92aa-3e5ff312120b",
     "tools": [
       "background_cancel",
       "background_output",
       "bash",
-      "call_omo_agent",
       "codegraph_codegraph_explore",
       "context7_query-docs",
       "context7_resolve-library-id",
@@ -203,7 +158,7 @@
   },
   "reviewerRuntime": {
     "name": "reviewer",
-    "sessionId": "ses_098b0b7b0ffe3VyvKAp10vR7QM",
+    "sessionId": "ses_097d2a93effeTX9kUI0vzqOEmS",
     "agentType": "general-purpose",
     "subagent_type": "repository-reviewer",
     "model": {
@@ -212,15 +167,12 @@
       "variant": "xhigh"
     },
     "status": "running",
-    "worktreePath": "/tmp/omo-project-agent-team-qa-pX4EzN/project/member-worktree",
-    "ownedWorktreeRoot": "/tmp/omo-project-agent-team-qa-pX4EzN/project/member-worktree",
-    "worktreeOwnershipToken": "bbe432c6-e039-4f90-93d6-162759379344",
-    "worktreeCanonicalPath": "/tmp/omo-project-agent-team-qa-pX4EzN/project/member-worktree"
+    "worktreePath": "/tmp/omo-project-agent-team-qa-QOg7qQ/project/member-worktree"
   },
   "childSession": {
-    "id": "ses_098b0b7b0ffe3VyvKAp10vR7QM",
-    "parent_id": "ses_098b0f02dffeCJpvtCZX1rkOCw",
-    "directory": "/tmp/omo-project-agent-team-qa-pX4EzN/project/member-worktree",
+    "id": "ses_097d2a93effeTX9kUI0vzqOEmS",
+    "parent_id": "ses_097d2ebe2ffeH0STUMpoWWnSuw",
+    "directory": "/tmp/omo-project-agent-team-qa-QOg7qQ/project/member-worktree",
     "title": "Create team member qa-project-agent-team/reviewer (@repository-reviewer subagent)"
   },
   "teamSendMessagePart": {
@@ -230,18 +182,18 @@
     "state": {
       "status": "completed",
       "input": {
-        "teamRunId": "065f7357-0ca0-4266-bcc8-af20910fd817",
+        "teamRunId": "6d2dbacf-9023-4a88-92aa-3e5ff312120b",
         "to": "lead",
         "body": "QA_TEAM_MESSAGE"
       },
-      "output": "{\"messageId\":\"728d7325-aab1-41e5-839d-a16f380205a5\",\"deliveredTo\":[\"lead\"]}",
+      "output": "{\"messageId\":\"c2bd818b-90a9-4d42-a426-5d774bfdf5fd\",\"deliveredTo\":[\"lead\"]}",
       "metadata": {
         "truncated": false
       },
       "title": "",
       "time": {
-        "start": 1784144680344,
-        "end": 1784144680388
+        "start": 1784159234902,
+        "end": 1784159234953
       }
     },
     "metadata": {
@@ -252,11 +204,11 @@
   },
   "persistedTeamMessage": {
     "version": 1,
-    "messageId": "728d7325-aab1-41e5-839d-a16f380205a5",
+    "messageId": "c2bd818b-90a9-4d42-a426-5d774bfdf5fd",
     "from": "reviewer",
     "to": "lead",
     "kind": "message",
     "body": "QA_TEAM_MESSAGE",
-    "timestamp": 1784144680355
+    "timestamp": 1784159234914
   }
 }

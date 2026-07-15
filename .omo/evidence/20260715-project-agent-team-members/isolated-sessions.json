@@ -1,2 +1,2 @@
-[{"id":"ses_098b0f02dffeCJpvtCZX1rkOCw","parent_id":null,"directory":"/tmp/omo-project-agent-team-qa-pX4EzN/project","title":"project agent team qa"},
-{"id":"ses_098b0b7b0ffe3VyvKAp10vR7QM","parent_id":"ses_098b0f02dffeCJpvtCZX1rkOCw","directory":"/tmp/omo-project-agent-team-qa-pX4EzN/project/member-worktree","title":"Create team member qa-project-agent-team/reviewer (@repository-reviewer subagent)"}]
+[{"id":"ses_097d2ebe2ffeH0STUMpoWWnSuw","parent_id":null,"directory":"/tmp/omo-project-agent-team-qa-QOg7qQ/project","title":"project agent team qa"},
+{"id":"ses_097d2a93effeTX9kUI0vzqOEmS","parent_id":"ses_097d2ebe2ffeH0STUMpoWWnSuw","directory":"/tmp/omo-project-agent-team-qa-QOg7qQ/project/member-worktree","title":"Create team member qa-project-agent-team/reviewer (@repository-reviewer subagent)"}]

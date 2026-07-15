@@ -1,7 +1,7 @@
 bun test v1.3.14 (0d9b296a)
 
- 1123 pass
- 1 skip
+ 1297 pass
+ 2 skip
  0 fail
- 2808 expect() calls
-Ran 1124 tests across 112 files. [32.39s]
+ 3192 expect() calls
+Ran 1299 tests across 144 files. [32.85s]
