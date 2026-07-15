@@ -28,7 +28,7 @@ The parent model invoked the real `team_create` tool. The inline team reused a b
 - The child received the tool result and completed with a normal follow-up response.
 - The fake provider exited before the driver completed.
 - The successful-run sandbox was removed after evidence capture and assertion verification.
-- The host OpenCode session count remained `3712` before and after.
+- The host OpenCode session count remained `3726` before and after.
 
 `opencode-run.jsonl` contains the completed `team_create` event and runtime state. It records the exact `repository-reviewer` identity, `gpt-project-agent` model with `xhigh` variant, child session ID, and prepared member worktree path.
 
