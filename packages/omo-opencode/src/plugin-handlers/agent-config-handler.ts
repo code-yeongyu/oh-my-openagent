@@ -17,7 +17,7 @@ export async function applyAgentConfig(
   const allDiscoveredSkills = await discoverAgentSkills(params);
   const sources = loadAgentSources(params);
   const browserProvider =
-    params.pluginConfig.browser_automation_engine?.provider ?? "playwright";
+    params.pluginConfig.browser_automation_engine?.provider ?? "openchrome-aside";
   const currentModel = params.config.model as string | undefined;
   const disabledSkills = collectDisabledSkillAliases(params.pluginConfig);
   const useTaskSystem = isTaskSystemEnabled(params.pluginConfig);

@@ -123,6 +123,20 @@ describe("applyAgentConfig .agents skills", () => {
     expect(discoveredSkills.map(skill => skill.name)).toContain("global-agent-skill")
   })
 
+  test("passes the openchrome-aside browser provider to builtin agents by default", async () => {
+    // when
+    await applyAgentConfig({
+      config: { model: "anthropic/claude-opus-4-7", agent: {} },
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp/project" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then - browserProvider (9th arg) defaults to the tiered provider, not vanilla playwright
+    const browserProvider = createBuiltinAgentsSpy.mock.calls[0]?.[8] as string
+    expect(browserProvider).toBe("openchrome-aside")
+  })
+
   test("discovers skills from host config.skills.paths set by other plugins", async () => {
     // given - second call to discoverConfigSourceSkills returns host config skills
     discoverConfigSourceSkillsSpy

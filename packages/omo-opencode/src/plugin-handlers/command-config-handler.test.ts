@@ -256,6 +256,24 @@ describe("applyCommandConfig", () => {
     expect(commandConfig["init-deep"]?.template).toContain("<skill-instruction>");
   });
 
+  test("registers the tiered openchrome-aside browser skill (named playwright) by default", async () => {
+    // given - default config, no browser_automation_engine set
+    const config: Record<string, unknown> = { command: {} };
+
+    // when
+    await applyCommandConfig({
+      config,
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    });
+
+    // then - the default /playwright command carries the tiered aside->openchrome stack
+    const commandConfig = config.command as Record<string, { template?: string }>;
+    expect(commandConfig["playwright"]?.template).toContain("### 1. aside");
+    expect(commandConfig["playwright"]?.template).toContain("### 2. openchrome");
+  });
+
   test("#given disabled_commands contains remove-ai-slops #when applying command config #then the skill-backed command does not resurrect", async () => {
     // given
     const pluginConfig: OhMyOpenCodeConfig = {

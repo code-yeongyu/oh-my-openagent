@@ -48,7 +48,7 @@ export async function applyCommandConfig(params: {
   });
   const builtinSkillCommands = builtinSkillsToCommandDefinitionRecord(
     resolveActiveBuiltinSkills({
-      browserProvider: params.pluginConfig.browser_automation_engine?.provider ?? "playwright",
+      browserProvider: params.pluginConfig.browser_automation_engine?.provider ?? "openchrome-aside",
       disabledSkills,
       teamModeEnabled: params.pluginConfig.team_mode?.enabled ?? false,
       systemMcpNames: getSystemMcpServerNames(),
