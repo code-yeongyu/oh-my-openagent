@@ -45,6 +45,49 @@ describe("background-agent spawner agent-not-found fallback", () => {
     releaseAllPromptAsyncReservationsForTesting()
   })
 
+  test("omits prompt tools when launching a Team member", async () => {
+    //#given
+    const promptCalls: PromptRequest[] = []
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/tmp/team-member" } }),
+        create: async () => ({ data: { id: "session-fallback" } }),
+        promptAsync: async (args: PromptRequest) => {
+          promptCalls.push(args)
+          return { data: {} }
+        },
+      },
+    }
+    const task = createTask({
+      description: "Team member",
+      prompt: "Do team work",
+      agent: "repository-reviewer",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
+      teamRunId: "team-run",
+    })
+
+    //#when
+    await startTask({ task, input: {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionId: task.parentSessionId,
+      parentMessageId: task.parentMessageId,
+      teamRunId: task.teamRunId,
+    } } as never, {
+      client,
+      directory: "/tmp/team-member",
+      concurrencyManager: { release: () => {} },
+      tmuxEnabled: false,
+      onTaskError: mock(() => {}),
+    } as never)
+    await waitForCondition(() => promptCalls.length === 1)
+
+    //#then
+    expect(promptCalls[0]?.body.tools).toBeUndefined()
+  })
+
   test("retries with 'general' agent when promptAsync fails with Agent not found", async () => {
     //#given
     const promptCalls: PromptRequest[] = []

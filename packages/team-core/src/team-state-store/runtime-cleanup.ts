@@ -3,6 +3,14 @@ import { rm, stat } from "node:fs/promises"
 import type { TeamModeConfig } from "../config"
 import { getRuntimeStateDir, resolveBaseDir } from "../team-registry/paths"
 import type { RuntimeState } from "../types"
+import { removeOwnedWorktreeDirectories } from "../team-worktree/ownership"
+
+export class RuntimeWorktreeCleanupError extends Error {
+  constructor(public readonly cleanupErrors: readonly string[]) {
+    super(`worktree cleanup refused: ${cleanupErrors.join("; ")}`)
+    this.name = "RuntimeWorktreeCleanupError"
+  }
+}
 
 function isEnoentError(error: unknown): boolean {
   return typeof error === "object"
@@ -28,8 +36,10 @@ export async function removeRuntimeDirectory(teamRunId: string, config: TeamMode
 }
 
 export async function cleanupMemberWorktrees(runtimeState: RuntimeState): Promise<void> {
-  await Promise.all(runtimeState.members.map(async (member) => {
-    if (!member.worktreePath) return
-    await rm(member.worktreePath, { recursive: true, force: true })
-  }))
+  const cleanup = await removeOwnedWorktreeDirectories(runtimeState.members.map((member) => ({
+    ownedWorktreeRoot: member.ownedWorktreeRoot,
+    worktreeOwnershipToken: member.worktreeOwnershipToken,
+    worktreeCanonicalPath: member.worktreeCanonicalPath,
+  })))
+  if (cleanup.errors.length > 0) throw new RuntimeWorktreeCleanupError(cleanup.errors)
 }

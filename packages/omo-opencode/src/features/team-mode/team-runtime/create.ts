@@ -25,6 +25,7 @@ import { prepareTeamMembers, TeamMemberPreflightError } from "./prepare-team-mem
 import { registerTeamRunForSessionCleanup } from "./session-team-run-registry"
 import type { TeamRunCleanupReport } from "./team-run-create-types"
 import { assertNoUnresolvedTeamMembers } from "./unresolved-team-members"
+import { resolveTeamParentPermission } from "./team-parent-permission"
 
 type CreateTeamRunOptions = {
   callerAgentTypeId?: string
@@ -87,19 +88,18 @@ export async function createTeamRun(
   const createErrorMessage = `Failed to create team run '${spec.name}'`
 
   let preparedMembers: Awaited<ReturnType<typeof prepareTeamMembers>>
+  let inheritedParentPermission: Awaited<ReturnType<typeof resolveTeamParentPermission>>
   try {
-    const parentSession = await ctx.client.session.get({
-      path: { id: leadSessionId },
-      query: { directory: ctx.directory },
+    inheritedParentPermission = await resolveTeamParentPermission({
+      ctx,
+      leadSessionId,
+      callerAgentTypeId: options?.callerAgentTypeId,
     })
-    if (parentSession.error || !parentSession.data) {
-      throw new Error(`Failed to load parent session permission for '${leadSessionId}'.`)
-    }
     preparedMembers = await prepareTeamMembers({
       spec,
       ctx,
       reusesCallerLeadSession,
-      parentSessionPermission: [...(parentSession.data.permission ?? [])],
+      parentSessionPermission: inheritedParentPermission,
       teamSessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
     })
   } catch (error) {
@@ -205,7 +205,10 @@ export async function createTeamRun(
             fallbackChain: preparedMember.resolvedMember.fallbackChain,
             skillContent: preparedMember.resolvedMember.systemContent,
             category: member.kind === "category" ? member.category : undefined,
-            sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
+            sessionPermission: [
+              ...inheritedParentPermission,
+              ...QUESTION_DENIED_SESSION_PERMISSION,
+            ],
             onSessionCreated: async (sessionId) => {
               registerTeamSession(sessionId, {
                 teamRunId: runtimeState.teamRunId,

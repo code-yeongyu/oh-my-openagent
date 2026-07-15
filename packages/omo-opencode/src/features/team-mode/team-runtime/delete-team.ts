@@ -21,6 +21,7 @@ export type DeleteTeamDeps = {
 }
 
 export type DeleteTeamBackgroundManager = Pick<BackgroundManager, "getTasksByParentSession" | "cancelTask">
+  & Partial<Pick<BackgroundManager, "getTask">>
 
 const defaultDeleteTeamDeps: DeleteTeamDeps = {
   canVisualize,
@@ -50,6 +51,7 @@ const FORCE_COMPLETABLE_MEMBER_STATUSES = new Set<RuntimeState["members"][number
 const FORCE_BYPASS_DELETING_STATUSES = new Set<RuntimeState["status"]>(["creating", "orphaned"])
 
 const ACTIVE_BACKGROUND_TASK_STATUSES = new Set(["pending", "running"])
+const TERMINAL_BACKGROUND_TASK_STATUSES = new Set(["completed", "error", "cancelled", "interrupt"])
 function ignoreStaleTeamSessionSweepFailure(error: unknown): void {
   if (error instanceof Error) return
 }
@@ -99,12 +101,22 @@ export async function deleteTeam(
 
     const cancellationFailures: string[] = []
     for (const task of teamTasks) {
+      if (TERMINAL_BACKGROUND_TASK_STATUSES.has(task.status)) continue
+      if (!ACTIVE_BACKGROUND_TASK_STATUSES.has(task.status)) {
+        cancellationFailures.push(`${task.id}: task state is unknown`)
+        continue
+      }
       try {
         const cancelled = await bgMgr.cancelTask(task.id, {
           source: "team-mode-delete",
           reason: `delete team ${teamRunId}`,
         })
-        if (cancelled !== true) cancellationFailures.push(`${task.id}: cancellation was not confirmed`)
+        if (cancelled !== true) {
+          const currentTask = bgMgr.getTask?.(task.id)
+          if (!currentTask || !TERMINAL_BACKGROUND_TASK_STATUSES.has(currentTask.status)) {
+            cancellationFailures.push(`${task.id}: cancellation was not confirmed`)
+          }
+        }
       } catch (error) {
         cancellationFailures.push(`${task.id}: ${error instanceof Error ? error.message : String(error)}`)
       }

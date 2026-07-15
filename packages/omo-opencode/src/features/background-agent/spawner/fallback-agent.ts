@@ -32,11 +32,11 @@ export function buildFallbackBody(
   return {
     ...originalBody,
     agent: fallbackAgent,
-    tools: {
+    ...(originalBody.tools ? { tools: {
       task: false,
       call_omo_agent: true,
       question: false,
       ...getAgentToolRestrictions(fallbackAgent, options),
-    },
+    } } : {}),
   }
 }

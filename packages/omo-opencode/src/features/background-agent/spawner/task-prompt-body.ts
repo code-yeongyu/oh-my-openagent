@@ -11,6 +11,7 @@ type TaskPromptBodyOptions =
       readonly system: LaunchInput["skillContent"]
       readonly prompt: string
       readonly includeTeamToolDenylist: boolean
+      readonly includePromptTools: boolean
     }
   | {
       readonly kind: "resume"
@@ -18,6 +19,7 @@ type TaskPromptBodyOptions =
       readonly model: PromptModel
       readonly prompt: string
       readonly includeTeamToolDenylist: boolean
+      readonly includePromptTools: boolean
     }
 
 export type TaskPromptBody = {
@@ -28,7 +30,7 @@ export type TaskPromptBody = {
   }
   readonly variant?: string
   readonly system?: string | undefined
-  readonly tools: Record<string, boolean>
+  readonly tools?: Record<string, boolean>
   readonly parts: Array<{
     readonly type: "text"
     readonly text: string
@@ -50,14 +52,18 @@ export function buildTaskPromptBody(options: TaskPromptBodyOptions): TaskPromptB
     ...(promptModel ? { model: promptModel } : {}),
     ...(promptVariant ? { variant: promptVariant } : {}),
     ...(options.kind === "launch" ? { system: options.system } : {}),
-    tools: {
-      task: false,
-      call_omo_agent: true,
-      question: false,
-      ...getAgentToolRestrictions(options.agent, {
-        includeTeamToolDenylist: options.includeTeamToolDenylist,
-      }),
-    },
+    ...(options.includePromptTools ? {
+      tools: buildTaskTools(options.agent, options.includeTeamToolDenylist),
+    } : {}),
     parts: [createInternalAgentTextPart(options.prompt)],
+  }
+}
+
+export function buildTaskTools(agent: string, includeTeamToolDenylist: boolean): Record<string, boolean> {
+  return {
+    task: false,
+    call_omo_agent: true,
+    question: false,
+    ...getAgentToolRestrictions(agent, { includeTeamToolDenylist }),
   }
 }

@@ -1,6 +1,6 @@
 export type SessionPermissionRule = {
   permission: string
-  action: "allow" | "deny"
+  action: "allow" | "ask" | "deny"
   pattern: string
 }
 

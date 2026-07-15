@@ -3,7 +3,7 @@
 // allow: SIZE_OK - team runtime creation tests share filesystem and tmux mock state; this release adds small lock/spawn coverage and future edits should split by runtime phase.
 
 import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
-import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
+import { access, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
@@ -79,7 +79,11 @@ function createContext(
 ): ExecutorContext & { client: { session: { create: ReturnType<typeof mock>; get: ReturnType<typeof mock> } } } {
   return {
     client: {
-      app: { agents: mock(async () => ({ data: [] })) },
+      app: { agents: mock(async () => ({ data: [{
+        name: "sisyphus",
+        mode: "primary",
+        permission: [],
+      }] })) },
       session: {
         create: mock(async () => ({ data: { id: "forbidden" } })),
         get: mock(async () => ({ data: { id: "lead-session", directory: baseDir, permission: parentPermission } })),
@@ -111,6 +115,23 @@ async function pathExists(targetPath: string): Promise<boolean> {
     return true
   } catch {
     return false
+  }
+}
+
+async function canonicalizePathForComparison(targetPath: string): Promise<string> {
+  const missingSegments: string[] = []
+  let existingAncestor = targetPath
+  while (true) {
+    try {
+      const canonicalAncestor = await realpath(existingAncestor)
+      return path.normalize(path.join(canonicalAncestor, ...missingSegments.toReversed()))
+    } catch (error) {
+      if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error
+      const parent = path.dirname(existingAncestor)
+      if (parent === existingAncestor) throw error
+      missingSegments.push(path.basename(existingAncestor))
+      existingAncestor = parent
+    }
   }
 }
 
@@ -162,6 +183,47 @@ describe("createTeamRun", () => {
         { permission: "question", pattern: "*", action: "deny" },
       ],
     })
+  })
+
+  test("carries parent-agent denies and parent-session rules into preflight and child creation", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-agent-permission-"))
+    temporaryDirectories.push(baseDir)
+    const { manager, launchMock } = createManager(baseDir, async (input) => ({
+      id: `task-${input.agent}`,
+      sessionId: `${input.agent}-session`,
+      status: "running",
+    } as BackgroundTask))
+    const parentPermission = [{ permission: "write", pattern: "*", action: "deny" as const }]
+    const context = createContext(baseDir, manager, parentPermission)
+    const appAgents = context.client.app.agents as ReturnType<typeof mock>
+    appAgents.mockResolvedValue({ data: [{
+      name: "lead-agent",
+      mode: "primary",
+      native: false,
+      permission: [
+        { permission: "*", pattern: "*", action: "allow" },
+        { permission: "bash", pattern: "*", action: "deny" },
+      ],
+    }] })
+
+    // when
+    await createTeamRun(createSpec(2), "lead-session", context, createConfig(baseDir), manager, undefined, {
+      callerAgentTypeId: "lead-agent",
+    })
+
+    // then
+    const inheritedPermission = [
+      { permission: "bash", pattern: "*", action: "deny" },
+      ...parentPermission,
+    ]
+    expect(resolveMemberMock.mock.calls[0]?.[2]).toMatchObject({
+      parentSessionPermission: inheritedPermission,
+    })
+    expect((launchMock.mock.calls[0]?.[0] as LaunchInput | undefined)?.sessionPermission).toEqual([
+      ...inheritedPermission,
+      { permission: "question", pattern: "*", action: "deny" },
+    ])
   })
 
   afterAll(async () => {
@@ -426,7 +488,9 @@ describe("createTeamRun", () => {
     } catch (error) {
       if (!(error instanceof TeamRunCreateError)) throw error
       expect(error.message).toContain("runtime state failed")
-      expect(error.cleanupReport.removedWorktrees).toEqual([ownedWorktreeRoot])
+      expect(await Promise.all(error.cleanupReport.removedWorktrees.map(canonicalizePathForComparison))).toEqual([
+        await canonicalizePathForComparison(ownedWorktreeRoot),
+      ])
     }
     expect(launchMock).not.toHaveBeenCalled()
     expect(await readFile(sentinelPath, "utf8")).toBe("keep-runtime-state")
@@ -499,7 +563,9 @@ describe("createTeamRun", () => {
     } catch (error) {
       if (!(error instanceof TeamRunCreateError)) throw error
       expect(error.message).toContain("inbox creation failed")
-      expect(error.cleanupReport.removedWorktrees).toEqual([ownedWorktreeRoot])
+      expect(await Promise.all(error.cleanupReport.removedWorktrees.map(canonicalizePathForComparison))).toEqual([
+        await canonicalizePathForComparison(ownedWorktreeRoot),
+      ])
     }
     const runtimeState = await loadSingleRuntimeState(baseDir)
     const expectedMetadata = [
@@ -562,7 +628,9 @@ describe("createTeamRun", () => {
       throw new Error("expected createTeamRun to reject")
     } catch (error) {
       if (!(error instanceof TeamRunCreateError)) throw error
-      expect(error.cleanupReport.removedWorktrees).toEqual([ownedWorktreeRoot])
+      expect(await Promise.all(error.cleanupReport.removedWorktrees.map(canonicalizePathForComparison))).toEqual([
+        await canonicalizePathForComparison(ownedWorktreeRoot),
+      ])
     }
     expect(await pathExists(ownedWorktreeRoot)).toBe(false)
     expect(await readFile(siblingSentinel, "utf8")).toBe("keep-sibling")

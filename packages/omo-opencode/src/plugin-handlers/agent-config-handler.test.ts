@@ -10,6 +10,7 @@ import * as agentLoader from "../features/claude-code-agent-loader"
 import * as skillLoader from "../features/opencode-skill-loader"
 import type { LoadedSkill } from "../features/opencode-skill-loader"
 import { getAgentDisplayName, getAgentListDisplayName } from "../shared/agent-display-names"
+import { clearProjectAgentOrigins, hasProjectAgentOrigin } from "../shared"
 import {
   isAgentRegistered,
   registerAgentName,
@@ -107,6 +108,7 @@ describe("applyAgentConfig builtin override protection", () => {
 
   beforeEach(() => {
     resetSessionStateForTesting()
+    clearProjectAgentOrigins()
 
     createBuiltinAgentsSpy = spyOn(agents, "createBuiltinAgents").mockResolvedValue({
       sisyphus: builtinSisyphusConfig,
@@ -167,6 +169,7 @@ describe("applyAgentConfig builtin override protection", () => {
 
   afterEach(() => {
     resetSessionStateForTesting()
+    clearProjectAgentOrigins()
 
     createBuiltinAgentsSpy.mockRestore()
     createSisyphusJuniorAgentSpy.mockRestore()
@@ -204,6 +207,38 @@ describe("applyAgentConfig builtin override protection", () => {
     for (const key of Object.keys(result)) {
       expect(key).not.toMatch(/[()]/)
     }
+  })
+
+  test("records only surviving .opencode project-file agents for the configured directory", async () => {
+    // given
+    const projectFileAgent = { name: "repository-reviewer", prompt: "project file", mode: "subagent" }
+    loadOpencodeProjectAgentsSpy.mockReturnValue({ "repository-reviewer": projectFileAgent })
+    loadProjectAgentsSpy.mockReturnValue({ "claude-project-agent": { ...projectFileAgent, name: "claude-project-agent" } })
+    loadUserAgentsSpy.mockReturnValue({ "user-agent": { ...projectFileAgent, name: "user-agent" } })
+    loadOpencodeGlobalAgentsSpy.mockReturnValue({ "global-agent": { ...projectFileAgent, name: "global-agent" } })
+    loadAgentDefinitionsSpy.mockReturnValue({ "definition-agent": { ...projectFileAgent, name: "definition-agent" } })
+    readOpencodeConfigAgentsSpy.mockReturnValue({ "config-agent": { ...projectFileAgent, name: "config-agent" } })
+
+    // when
+    await applyAgentConfig({
+      config: createBaseConfig(),
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/repository-worktree" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then
+    expect(hasProjectAgentOrigin("/repository-worktree", "repository-reviewer")).toBe(true)
+    for (const excludedAgent of [
+      "claude-project-agent",
+      "user-agent",
+      "global-agent",
+      "definition-agent",
+      "config-agent",
+    ]) {
+      expect(hasProjectAgentOrigin("/repository-worktree", excludedAgent)).toBe(false)
+    }
+    expect(hasProjectAgentOrigin("/different-worktree", "repository-reviewer")).toBe(false)
   })
 
   test("normalizes display-name default_agent to runtime agent name", async () => {
@@ -355,6 +390,35 @@ describe("applyAgentConfig builtin override protection", () => {
       name: configuredAlias,
     })
     expect((result[configuredAlias] as AgentConfig).prompt).toBe("builtin prompt")
+  })
+
+  test("filters a custom source whose configured display identity collides with an OMO agent", async () => {
+    // given
+    loadProjectAgentsSpy.mockReturnValue({
+      impostor: {
+        name: "impostor",
+        prompt: "collision prompt",
+        mode: "subagent",
+      },
+    })
+    const pluginConfig = {
+      ...createPluginConfig(),
+      agents: { impostor: { displayName: BUILTIN_SISYPHUS_DISPLAY_NAME } },
+    } as OhMyOpenCodeConfig
+
+    // when
+    const result = await applyAgentConfig({
+      config: createBaseConfig(),
+      pluginConfig,
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then
+    expect(result[BUILTIN_SISYPHUS_DISPLAY_NAME]).toEqual({
+      ...builtinSisyphusConfig,
+      name: BUILTIN_SISYPHUS_DISPLAY_NAME,
+    })
   })
 
   test("filters user agents whose key differs from a builtin key only by case", async () => {

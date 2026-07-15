@@ -325,9 +325,13 @@ export class BackgroundManager {
     this.registerProcessCleanup()
   }
 
-  private async abortSessionWithLogging(sessionID: string, reason: string): Promise<boolean> {
+  private async abortSessionWithLogging(
+    sessionID: string,
+    reason: string,
+    directory = this.findBySession(sessionID)?.directory ?? this.directory,
+  ): Promise<boolean> {
     try {
-      const aborted = await abortWithTimeout(this.client, sessionID)
+      const aborted = await abortWithTimeout(this.client, sessionID, { directory })
       if (!aborted) {
         log(`[background-agent] Session abort did not complete during ${reason}:`, {
           sessionID,
@@ -904,7 +908,7 @@ The fallback retry session is now created and can be inspected directly.
       ...(launchModel ? { model: launchModel } : {}),
       ...(launchVariant ? { variant: launchVariant } : {}),
       system: input.skillContent,
-      tools: launchTools,
+      ...(input.teamRunId === undefined ? { tools: launchTools } : {}),
       parts: [createInternalAgentTextPart(input.prompt)],
     }
 
@@ -923,7 +927,15 @@ The fallback retry session is now created and can be inspected directly.
           const fallbackBody = buildFallbackBody(promptBody, FALLBACK_AGENT, {
             includeTeamToolDenylist: input.teamRunId === undefined,
           })
-          const fallbackTools = fallbackBody.tools as Record<string, boolean>
+          const fallbackTools = {
+            task: false,
+            call_omo_agent: true,
+            question: false,
+            ...userDenied,
+            ...getAgentToolRestrictions(FALLBACK_AGENT, {
+              includeTeamToolDenylist: input.teamRunId === undefined,
+            }),
+          }
           setSessionTools(sessionID, fallbackTools)
           updateSessionAgent(sessionID, FALLBACK_AGENT)
           registerDelegatedChildSessionBootstrap({
@@ -1368,6 +1380,16 @@ The fallback retry session is now created and can be inspected directly.
       applySessionPromptParams(existingTask.sessionId!, existingTask.model)
     }
 
+    const resumeTools = {
+      task: false,
+      call_omo_agent: true,
+      question: false,
+      ...getAgentToolRestrictions(existingTask.agent, {
+        includeTeamToolDenylist: existingTask.teamRunId === undefined,
+      }),
+    }
+    setSessionTools(existingTask.sessionId, resumeTools)
+
     dispatchInternalPrompt({
       mode: "async",
       client: this.client,
@@ -1381,18 +1403,7 @@ The fallback retry session is now created and can be inspected directly.
           agent: existingTask.agent,
           ...(resumeModel ? { model: resumeModel } : {}),
           ...(resumeVariant ? { variant: resumeVariant } : {}),
-          tools: (() => {
-            const tools = {
-              task: false,
-              call_omo_agent: true,
-              question: false,
-              ...getAgentToolRestrictions(existingTask.agent, {
-                includeTeamToolDenylist: existingTask.teamRunId === undefined,
-              }),
-            }
-            setSessionTools(existingTask.sessionId!, tools)
-            return tools
-          })(),
+          ...(existingTask.teamRunId === undefined ? { tools: resumeTools } : {}),
           parts: [createInternalAgentTextPart(input.prompt)],
         },
         query: { directory: existingTask.directory ?? this.directory },
@@ -1477,6 +1488,7 @@ The fallback retry session is now created and can be inspected directly.
     try {
       const response = await this.client.session.todo({
         path: { id: sessionID },
+        query: { directory: this.findBySession(sessionID)?.directory ?? this.directory },
       })
       const todos = normalizeSDKResponse(response, [] as Todo[], { preferResponseOnMissingData: true })
       if (!todos || todos.length === 0) {
@@ -2985,8 +2997,18 @@ The task was re-queued on a fallback model after a retryable failure.
         }
       } else {
         try {
-          const statusResult = await this.client.session.status()
-          allStatuses = normalizeSDKResponse(statusResult, {})
+          const directories = new Set(
+            Array.from(this.tasks.values())
+              .filter((task) => task.status === "running")
+              .map((task) => task.directory ?? this.directory),
+          )
+          if (directories.size === 0) directories.add(this.directory)
+          const mergedStatuses: SessionStatusMap = {}
+          for (const directory of directories) {
+            const statusResult = await this.client.session.status({ query: { directory } })
+            Object.assign(mergedStatuses, normalizeSDKResponse(statusResult, {}))
+          }
+          allStatuses = mergedStatuses
         } catch (error) {
           if (!this.loggedSessionStatusUnavailable) {
             log("[background-agent] Error polling session statuses:", { error })
@@ -3115,7 +3137,9 @@ The task was re-queued on a fallback model after a retryable failure.
       if (task.status === "running" && task.sessionId) {
         abortRequests.push({
           sessionID: task.sessionId,
-          promise: abortWithTimeout(this.client, task.sessionId),
+            promise: abortWithTimeout(this.client, task.sessionId, {
+              directory: task.directory ?? this.directory,
+            }),
         })
       }
     }

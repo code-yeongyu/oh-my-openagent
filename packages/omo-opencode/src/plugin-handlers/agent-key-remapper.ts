@@ -26,6 +26,9 @@ export function remapAgentKeysToDisplayNames(
 
   for (const [key, value] of Object.entries(agents)) {
     const displayName = getAgentListDisplayName(key, overrides)
+    if (Object.hasOwn(result, displayName)) {
+      throw new RangeError(`Ambiguous agent display identity: ${displayName}`)
+    }
     if (displayName && displayName !== key) {
       result[displayName] = rewriteAgentNameForListDisplay(key, value, overrides)
       // Regression guard: do not also assign result[key].

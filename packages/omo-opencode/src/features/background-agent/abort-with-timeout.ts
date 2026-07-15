@@ -11,13 +11,18 @@ function getAbortResponseError(response: unknown): unknown | undefined {
 export async function abortWithTimeout(
   client: OpencodeClient,
   sessionID: string,
-  timeoutMs = 10_000,
+  options: number | { readonly timeoutMs?: number; readonly directory?: string } = 10_000,
 ): Promise<boolean> {
+  const timeoutMs = typeof options === "number" ? options : options.timeoutMs ?? 10_000
+  const directory = typeof options === "number" ? undefined : options.directory
   let timeoutHandle: ReturnType<typeof setTimeout> | undefined
 
   try {
     const result = await Promise.race([
-      client.session.abort({ path: { id: sessionID } }).then(
+      client.session.abort({
+        path: { id: sessionID },
+        ...(directory ? { query: { directory } } : {}),
+      }).then(
         (response) => {
           const error = getAbortResponseError(response)
           if (error !== undefined) {

@@ -11,6 +11,7 @@ import type { TeamModeConfig } from "../config"
 import type { TeamSessionContext } from "../session-client"
 import { getInboxDir, resolveBaseDir } from "../team-registry/paths"
 import type { TeamSpec } from "../types"
+import { reserveOwnedWorktreeDirectory } from "../team-worktree/ownership"
 import { resumeAllTeams } from "./resume"
 import { createRuntimeState, loadRuntimeState, saveRuntimeState, transitionRuntimeState } from "./store"
 
@@ -132,7 +133,7 @@ describe("resumeAllTeams", () => {
     mock.restore()
   })
 
-  test("marks stuck creating teams failed after reload recovery", async () => {
+  test("marks stuck creating teams failed without removing an unowned member worktree", async () => {
     // given
     const baseDir = await createTemporaryBaseDir()
     temporaryDirectories.push(baseDir)
@@ -161,13 +162,41 @@ describe("resumeAllTeams", () => {
       cleaned: 0,
       errors: [],
     })
-    let statError: NodeJS.ErrnoException | null = null
+    expect((await stat(worktreePath)).isDirectory()).toBe(true)
+  })
+
+  test("marks stuck creating teams failed and removes a fully owned member worktree", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const runtimeState = await createRuntimeState(createSpec(), "ses_lead", "user", config)
+    const reservation = await reserveOwnedWorktreeDirectory(
+      path.join(baseDir, "worktrees", runtimeState.teamRunId, "worker"),
+      baseDir,
+    )
+    if (!reservation.ownership) throw new Error("expected owned worktree reservation")
+    await saveRuntimeState({
+      ...runtimeState,
+      createdAt: Date.now() - 40 * 60 * 1000,
+      members: runtimeState.members.map((member) => member.name === "worker"
+        ? { ...member, worktreePath: reservation.directory, ...reservation.ownership }
+        : member),
+    }, config)
+
+    // when
+    const report = await resumeAllTeams(createTeamSessionContext(baseDir), config)
+
+    // then
+    expect(report.marked_failed).toBe(1)
+    expect(report.errors).toEqual([])
+    let worktreeStatErrorCode: string | undefined
     try {
-      await stat(worktreePath)
+      await stat(reservation.directory)
     } catch (error) {
-      statError = error as NodeJS.ErrnoException
+      worktreeStatErrorCode = getErrorCode(error)
     }
-    expect(statError?.code).toBe("ENOENT")
+    expect(worktreeStatErrorCode).toBe("ENOENT")
   })
 
   test("leaves fresh creating teams pending during reload recovery", async () => {
@@ -534,7 +563,7 @@ describe("resumeAllTeams", () => {
     expect(report.marked_orphaned).toBe(1)
   })
 
-  test("finishes deleting teams and removes the runtime directory", async () => {
+  test("finishes deleting teams without removing an unowned member worktree", async () => {
     // given
     const baseDir = await createTemporaryBaseDir()
     temporaryDirectories.push(baseDir)
@@ -576,12 +605,83 @@ describe("resumeAllTeams", () => {
     }
     expect(runtimeStatErrorCode).toBe("ENOENT")
 
-    let worktreeStatErrorCode: string | undefined
-    try {
-      await stat(worktreePath)
-    } catch (error) {
-      worktreeStatErrorCode = getErrorCode(error)
-    }
-    expect(worktreeStatErrorCode).toBe("ENOENT")
+    expect((await stat(worktreePath)).isDirectory()).toBe(true)
+  })
+
+  test("refuses dormant deleting cleanup when ownership metadata is mismatched", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const runtimeState = await createRuntimeState(createSpec(), "ses_lead", "user", config)
+    await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
+      ...currentRuntimeState,
+      status: "active",
+    }), config)
+    await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
+      ...currentRuntimeState,
+      status: "deleting",
+    }), config)
+    const reservation = await reserveOwnedWorktreeDirectory(
+      path.join(baseDir, "worktrees", runtimeState.teamRunId, "worker"),
+      baseDir,
+    )
+    if (!reservation.ownership) throw new Error("expected owned worktree reservation")
+    await saveRuntimeState({
+      ...await loadRuntimeState(runtimeState.teamRunId, config),
+      members: runtimeState.members.map((member) => member.name === "worker"
+        ? {
+            ...member,
+            worktreePath: reservation.directory,
+            ...reservation.ownership,
+            worktreeOwnershipToken: "mismatched-token",
+          }
+        : member),
+    }, config)
+
+    // when
+    const report = await resumeAllTeams(createTeamSessionContext(baseDir), config)
+
+    // then
+    expect(report.cleaned).toBe(0)
+    expect(report.errors).toHaveLength(1)
+    expect((await stat(reservation.directory)).isDirectory()).toBe(true)
+    expect((await loadRuntimeState(runtimeState.teamRunId, config)).status).toBe("deleting")
+  })
+
+  test("finishes dormant deleting cleanup when an owned target and both markers are already absent", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const runtimeState = await createRuntimeState(createSpec(), "ses_lead", "user", config)
+    await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
+      ...currentRuntimeState,
+      status: "active",
+    }), config)
+    await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
+      ...currentRuntimeState,
+      status: "deleting",
+    }), config)
+    const reservation = await reserveOwnedWorktreeDirectory(
+      path.join(baseDir, "worktrees", runtimeState.teamRunId, "worker"),
+      baseDir,
+    )
+    if (!reservation.ownership) throw new Error("expected owned worktree reservation")
+    await saveRuntimeState({
+      ...await loadRuntimeState(runtimeState.teamRunId, config),
+      members: runtimeState.members.map((member) => member.name === "worker"
+        ? { ...member, worktreePath: reservation.directory, ...reservation.ownership }
+        : member),
+    }, config)
+    await rm(reservation.directory, { recursive: true, force: true })
+    await rm(`${reservation.directory}.omo-team-owner.json`, { force: true })
+
+    // when
+    const report = await resumeAllTeams(createTeamSessionContext(baseDir), config)
+
+    // then
+    expect(report.cleaned).toBe(1)
+    expect(report.errors).toEqual([])
   })
 })

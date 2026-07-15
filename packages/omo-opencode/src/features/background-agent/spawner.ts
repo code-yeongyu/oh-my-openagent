@@ -10,7 +10,7 @@ import type { OnSubagentSessionCreated, OpencodeClient, QueueItem } from "./cons
 import type { BackgroundTask, LaunchInput, ResumeInput } from "./types"
 import { buildFallbackBody, FALLBACK_AGENT, isAgentNotFoundError } from "./spawner/fallback-agent"
 import { buildTaskRecord } from "./spawner/task-record"
-import { buildTaskPromptBody } from "./spawner/task-prompt-body"
+import { buildTaskPromptBody, buildTaskTools } from "./spawner/task-prompt-body"
 
 export { buildFallbackBody, FALLBACK_AGENT, isAgentNotFoundError }
 
@@ -113,8 +113,9 @@ export async function startTask(
     model: input.model,
     prompt: input.prompt,
     includeTeamToolDenylist: input.teamRunId === undefined,
+    includePromptTools: input.teamRunId === undefined,
   })
-  setSessionTools(sessionID, promptBody.tools)
+  setSessionTools(sessionID, buildTaskTools(normalizedAgent, input.teamRunId === undefined))
 
   // Must fire BEFORE tmux callback: attach client needs session activity to render TUI.
   const promptChain = promptWithRetryInDirectory(client, {
@@ -131,7 +132,7 @@ export async function startTask(
         const fallbackBody = buildFallbackBody(promptBody, FALLBACK_AGENT, {
           includeTeamToolDenylist: input.teamRunId === undefined,
         })
-        const fallbackTools = fallbackBody.tools as Record<string, boolean>
+        const fallbackTools = buildTaskTools(FALLBACK_AGENT, input.teamRunId === undefined)
         setSessionTools(sessionID, fallbackTools)
         updateSessionAgent(sessionID, FALLBACK_AGENT)
         await promptWithRetryInDirectory(client, {
@@ -242,8 +243,9 @@ export async function resumeTask(
     model: task.model,
     prompt: input.prompt,
     includeTeamToolDenylist: task.teamRunId === undefined,
+    includePromptTools: task.teamRunId === undefined,
   })
-  setSessionTools(sessionID, resumeBody.tools)
+  setSessionTools(sessionID, buildTaskTools(task.agent, task.teamRunId === undefined))
 
   promptWithRetryInDirectory(client, {
     path: { id: sessionID },
@@ -259,7 +261,7 @@ export async function resumeTask(
         const fallbackBody = buildFallbackBody(resumeBody, FALLBACK_AGENT, {
           includeTeamToolDenylist: task.teamRunId === undefined,
         })
-        const fallbackTools = fallbackBody.tools as Record<string, boolean>
+        const fallbackTools = buildTaskTools(FALLBACK_AGENT, task.teamRunId === undefined)
         setSessionTools(sessionID, fallbackTools)
         updateSessionAgent(sessionID, FALLBACK_AGENT)
         await promptWithRetryInDirectory(client, {

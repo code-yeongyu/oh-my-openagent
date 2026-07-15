@@ -1,6 +1,8 @@
 import { createBuiltinAgents } from "../agents";
 import { collectDisabledSkillAliases } from "../plugin/skill-context";
 import { isTaskSystemEnabled } from "../shared";
+import { registerProjectAgentOrigins } from "../shared";
+import { getAgentListDisplayName } from "../shared/agent-display-names";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import { assembleAgentConfig } from "./agent-config-assembly";
 import { finalizeAgentConfig } from "./agent-config-finalizer";
@@ -41,7 +43,7 @@ export async function applyAgentConfig(
   const disabledAgentNames = new Set(
     (migratedDisabledAgents ?? []).map((agent: string) => agent.toLowerCase()),
   );
-  const { configuredDefaultAgent } = await assembleAgentConfig({
+  const { configuredDefaultAgent, projectAgentSourceKeys } = await assembleAgentConfig({
     config: params.config,
     pluginConfig: params.pluginConfig,
     builtinAgents,
@@ -51,9 +53,16 @@ export async function applyAgentConfig(
     disabledAgentNames,
   });
 
-  return finalizeAgentConfig({
+  const agentResult = finalizeAgentConfig({
     config: params.config,
     pluginConfig: params.pluginConfig,
     configuredDefaultAgent,
   });
+  registerProjectAgentOrigins(
+    params.ctx.directory,
+    projectAgentSourceKeys
+      .map((key) => getAgentListDisplayName(key, params.pluginConfig.agents))
+      .filter((name) => Object.hasOwn(agentResult, name)),
+  );
+  return agentResult;
 }

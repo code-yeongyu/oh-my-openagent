@@ -173,6 +173,7 @@ describe("cleanupTeamRunResources", () => {
           if (failure === "throw") throw new Error("cancel transport failed")
           return false
         },
+        getTask: () => undefined,
       })
 
       // when
@@ -186,11 +187,16 @@ describe("cleanupTeamRunResources", () => {
 
       // then
       expect(report.cancelledTaskIds).toEqual([])
-      expect(report.errors).toEqual([failure === "throw"
-        ? "cancel task-a: cancel transport failed"
-        : "cancel task-a: cancellation was not confirmed"])
-      await expect(access(reservation.directory)).resolves.toBeNull()
-      expect(lookupTeamSession("worker-session")).toBeDefined()
+      expect(report.errors).toEqual(failure === "throw"
+        ? ["cancel task-a: cancel transport failed"]
+        : [])
+      if (failure === "throw") {
+        await expect(access(reservation.directory)).resolves.toBeNull()
+        expect(lookupTeamSession("worker-session")).toBeDefined()
+      } else {
+        await expect(access(reservation.directory)).rejects.toBeDefined()
+        expect(lookupTeamSession("worker-session")).toBeUndefined()
+      }
     })
   }
 })

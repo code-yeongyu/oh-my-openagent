@@ -90,7 +90,10 @@ export async function cleanupTeamRunResources(args: {
           skipNotification: true,
         })
         if (cancelled !== true) {
-          cleanupReport.errors.push(`cancel ${resource.taskId}: cancellation was not confirmed`)
+          const currentTask = args.bgMgr.getTask(resource.taskId)
+          if (currentTask?.status === "running" || currentTask?.status === "pending") {
+            cleanupReport.errors.push(`cancel ${resource.taskId}: cancellation was not confirmed`)
+          }
         } else {
           cleanupReport.cancelledTaskIds.push(resource.taskId)
         }

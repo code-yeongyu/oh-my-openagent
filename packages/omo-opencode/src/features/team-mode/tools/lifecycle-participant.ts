@@ -37,11 +37,24 @@ function resolveRegisteredParticipant(
 }
 
 export function sanitizeRuntimeState(runtimeState: RuntimeState): Omit<RuntimeState, "members"> & {
-  members: Array<Omit<RuntimeState["members"][number], "lastInjectedTurnMarker" | "pendingInjectedMessageIds">>
+  members: Array<Omit<RuntimeState["members"][number],
+    | "lastInjectedTurnMarker"
+    | "pendingInjectedMessageIds"
+    | "ownedWorktreeRoot"
+    | "worktreeOwnershipToken"
+    | "worktreeCanonicalPath"
+  >>
 } {
   return {
     ...runtimeState,
-    members: runtimeState.members.map(({ lastInjectedTurnMarker: _turnMarker, pendingInjectedMessageIds: _pendingIds, ...member }) => member),
+    members: runtimeState.members.map(({
+      lastInjectedTurnMarker: _turnMarker,
+      pendingInjectedMessageIds: _pendingIds,
+      ownedWorktreeRoot: _ownedRoot,
+      worktreeOwnershipToken: _ownershipToken,
+      worktreeCanonicalPath: _canonicalPath,
+      ...member
+    }) => member),
   }
 }
 

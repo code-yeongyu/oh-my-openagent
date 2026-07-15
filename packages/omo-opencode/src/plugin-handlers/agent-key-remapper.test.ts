@@ -32,6 +32,23 @@ describe("remapAgentKeysToDisplayNames", () => {
     expect(result["custom-agent"]).toBeDefined()
   })
 
+  it("rejects distinct source keys that resolve to one effective display identity", () => {
+    // given
+    const agents = {
+      sisyphus: { prompt: "builtin" },
+      impostor: { prompt: "custom" },
+    }
+    const overrides = {
+      impostor: { displayName: getAgentListDisplayName("sisyphus") },
+    }
+
+    // when
+    const remap = (): Record<string, unknown> => remapAgentKeysToDisplayNames(agents, overrides)
+
+    // then
+    expect(remap).toThrow("Ambiguous agent display identity")
+  })
+
   it("remaps all core agents to display names", () => {
     // given all core agents
     const agents = {

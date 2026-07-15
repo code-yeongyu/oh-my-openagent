@@ -224,6 +224,17 @@ describe("stripAgentListSortPrefix", () => {
   it("strips leading and trailing wrapper characters after sort prefix removal", () => {
     expect(stripAgentListSortPrefix("\\Hephaestus - Deep Agent\\")).toBe("Hephaestus - Deep Agent")
   })
+
+  it("strips every repeated visible sort prefix", () => {
+    // given
+    const agentName = "1|02|300|Sisyphus - ultraworker"
+
+    // when
+    const result = stripAgentListSortPrefix(agentName)
+
+    // then
+    expect(result).toBe("Sisyphus - ultraworker")
+  })
 })
 
 describe("normalizeAgentForPrompt", () => {

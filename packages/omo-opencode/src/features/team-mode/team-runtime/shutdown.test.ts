@@ -527,8 +527,8 @@ describe("team-runtime shutdown", () => {
     })
     const bgMgr = {
       getTasksByParentSession: () => [
-        { id: "team-task-a", sessionId: "session-a", parentMessageId: `team-create:${fixture.teamRunId}:member-a` },
-        { id: "team-task-b", sessionId: "session-b", parentMessageId: `team-create:${fixture.teamRunId}:member-b` },
+        { id: "team-task-a", status: "running", sessionId: "session-a", parentMessageId: `team-create:${fixture.teamRunId}:member-a` },
+        { id: "team-task-b", status: "running", sessionId: "session-b", parentMessageId: `team-create:${fixture.teamRunId}:member-b` },
       ],
       cancelTask: cancelTaskMock,
     }

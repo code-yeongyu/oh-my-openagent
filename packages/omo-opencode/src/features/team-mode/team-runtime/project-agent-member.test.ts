@@ -1,10 +1,11 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, mock, test } from "bun:test"
+import { beforeEach, describe, expect, mock, test } from "bun:test"
 
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import type { OmoAgentClient } from "../../../tools/delegate-task/types"
 import { getAgentDisplayName } from "../../../shared/agent-display-names"
+import { clearProjectAgentOrigins, registerProjectAgentOrigins } from "../../../shared"
 import type { Member } from "../types"
 import { ProjectAgentMemberError, resolveProjectAgentMember } from "./project-agent-member"
 
@@ -80,6 +81,30 @@ function createProjectAgent(overrides: Partial<ProjectAgentFixture> = {}): Proje
 }
 
 describe("project agent Team Mode member resolution", () => {
+  beforeEach(() => {
+    clearProjectAgentOrigins()
+    registerProjectAgentOrigins("/repository-member-worktree", [
+      "repository-reviewer",
+      "sisyphus",
+      getAgentDisplayName("atlas"),
+      getAgentDisplayName("prometheus"),
+    ])
+  })
+
+  test("rejects a final-registry agent without project-file provenance", async () => {
+    // given
+    const appAgents = mock(async () => ({ data: [createProjectAgent()] }))
+
+    // when
+    const result = resolveProjectAgentMember(createMember(), createContext(appAgents), {
+      directory: "/unregistered-member-worktree",
+      isLead: false,
+    })
+
+    // then
+    await expect(result).rejects.toThrow(".opencode/agents")
+  })
+
   test("accepts nullable optional fields emitted by the final OpenCode agent registry", async () => {
     // given
     const appAgents = mock(async () => ({

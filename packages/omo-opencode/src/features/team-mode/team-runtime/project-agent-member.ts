@@ -1,4 +1,5 @@
 import { getAgentConfigKey } from "../../../shared/agent-display-names"
+import { hasProjectAgentOrigin } from "../../../shared"
 import type { DelegatedModelConfig } from "../../../shared/model-resolution-types"
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import { AGENT_ELIGIBILITY_REGISTRY } from "../types"
@@ -98,6 +99,11 @@ export async function resolveProjectAgentMember(
   if (!agent) {
     throw new ProjectAgentMemberError(
       `Project agent '${member.subagent_type}' is absent from the final OpenCode agent registry for '${options.directory}'.`,
+    )
+  }
+  if (!hasProjectAgentOrigin(options.directory, agent.name)) {
+    throw new ProjectAgentMemberError(
+      `Agent '${member.subagent_type}' did not originate from .opencode/agents for '${options.directory}'.`,
     )
   }
   if (agent.native !== false) {

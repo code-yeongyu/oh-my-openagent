@@ -27,7 +27,7 @@ export const AGENT_DISPLAY_NAMES: Record<string, string> = {
 }
 
 const INVISIBLE_AGENT_CHARACTERS_REGEX = /[\u200B\u200C\u200D\uFEFF]/g
-const VISIBLE_AGENT_LIST_SORT_PREFIX_REGEX = /^\d+\|/
+const VISIBLE_AGENT_LIST_SORT_PREFIX_REGEX = /^(?:\d+\|)+/
 const AGENT_WRAPPER_CHARS_REGEX = /^[\\/"']+|[\\/"']+$/g
 
 export function stripInvisibleAgentCharacters(agentName: string): string {

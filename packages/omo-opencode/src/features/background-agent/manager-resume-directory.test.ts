@@ -88,13 +88,9 @@ test("resumes an exact project agent from its saved worktree directory", async (
         agent: "repository-reviewer",
         model: { providerID: "openai", modelID: "gpt-5.6-sol" },
         variant: "xhigh",
-        tools: {
-          task: false,
-          call_omo_agent: true,
-          question: false,
-        },
       },
     })
+    expect(promptCalls[0]?.body?.tools).toBeUndefined()
     expect(task.exactAgent).toBe(true)
     expect(task.sessionPermission).toEqual(QUESTION_DENIED_SESSION_PERMISSION)
   } finally {

@@ -132,7 +132,7 @@ describe("resumeAllTeams", () => {
     mock.restore()
   })
 
-  test("marks stuck creating teams failed after reload recovery", async () => {
+  test("marks stuck creating teams failed without removing an unowned worktree", async () => {
     // given
     const baseDir = await createTemporaryBaseDir()
     temporaryDirectories.push(baseDir)
@@ -161,13 +161,7 @@ describe("resumeAllTeams", () => {
       cleaned: 0,
       errors: [],
     })
-    let statError: NodeJS.ErrnoException | null = null
-    try {
-      await stat(worktreePath)
-    } catch (error) {
-      statError = error as NodeJS.ErrnoException
-    }
-    expect(statError?.code).toBe("ENOENT")
+    expect((await stat(worktreePath)).isDirectory()).toBe(true)
   })
 
   test("leaves fresh creating teams pending during reload recovery", async () => {
@@ -534,7 +528,7 @@ describe("resumeAllTeams", () => {
     expect(report.marked_orphaned).toBe(1)
   })
 
-  test("finishes deleting teams and removes the runtime directory", async () => {
+  test("finishes deleting teams without removing an unowned worktree", async () => {
     // given
     const baseDir = await createTemporaryBaseDir()
     temporaryDirectories.push(baseDir)
@@ -576,12 +570,6 @@ describe("resumeAllTeams", () => {
     }
     expect(runtimeStatErrorCode).toBe("ENOENT")
 
-    let worktreeStatErrorCode: string | undefined
-    try {
-      await stat(worktreePath)
-    } catch (error) {
-      worktreeStatErrorCode = getErrorCode(error)
-    }
-    expect(worktreeStatErrorCode).toBe("ENOENT")
+    expect((await stat(worktreePath)).isDirectory()).toBe(true)
   })
 })
