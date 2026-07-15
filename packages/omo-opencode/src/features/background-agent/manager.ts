@@ -1393,7 +1393,7 @@ The fallback retry session is now created and can be inspected directly.
           })(),
           parts: [createInternalAgentTextPart(input.prompt)],
         },
-        query: { directory: this.directory },
+        query: { directory: existingTask.directory ?? this.directory },
       },
     }).then((promptResult) => {
       if (promptResult.status === "failed") {
