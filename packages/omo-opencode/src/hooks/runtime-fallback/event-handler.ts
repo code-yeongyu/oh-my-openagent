@@ -266,12 +266,15 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       sessionLastAccess.set(sessionID, Date.now())
     }
 
+    const errorType = classifyErrorType(error)
+    
     await dispatchFallbackRetry(deps, helpers, {
       sessionID,
       state,
       fallbackModels,
       resolvedAgent,
       source: "session.error",
+      errorType,
     })
   }
 

@@ -1,5 +1,6 @@
 import {
   areRuntimeFallbackModelsEquivalent,
+  parseModelString,
   stringifyRuntimeFallbackModel,
   stringifyRuntimeFallbackModelWithVariant,
 } from "@oh-my-opencode/model-core"
@@ -23,6 +24,7 @@ export function createFallbackState(originalModel: unknown): FallbackState {
     currentModel: model,
     fallbackIndex: -1,
     failedModels: new Map<string, number>(),
+    failedProviders: new Map<string, number>(),
     attemptCount: 0,
     pendingFallbackModel: undefined,
   }
@@ -33,6 +35,36 @@ export function isModelInCooldown(model: string, state: FallbackState, cooldownS
   if (failedAt === undefined) return false
   const cooldownMs = cooldownSeconds * 1000
   return Date.now() - failedAt < cooldownMs
+}
+
+/**
+ * Extract provider ID from model string (e.g., "openai/gpt-4o" -> "openai")
+ */
+export function extractProviderFromModel(model: string): string | undefined {
+  const parsed = parseModelString(model)
+  return parsed?.providerID
+}
+
+/**
+ * Check if a provider is in cooldown (all models from this provider should be skipped)
+ */
+export function isProviderInCooldown(model: string, state: FallbackState, cooldownSeconds: number): boolean {
+  const provider = extractProviderFromModel(model)
+  if (!provider) return false
+  const failedAt = state.failedProviders.get(provider)
+  if (failedAt === undefined) return false
+  const cooldownMs = cooldownSeconds * 1000
+  return Date.now() - failedAt < cooldownMs
+}
+
+/**
+ * Mark a provider as failed (for provider-wide quota exhaustion like 429)
+ */
+export function markProviderFailed(model: string, state: FallbackState): void {
+  const provider = extractProviderFromModel(model)
+  if (!provider) return
+  state.failedProviders.set(provider, Date.now())
+  log(`[${HOOK_NAME}] Provider marked as failed`, { provider })
 }
 
 export function findNextAvailableFallback(
@@ -51,6 +83,16 @@ export function findNextAvailableFallback(
       continue
     }
 
+    // Check provider-level cooldown first (faster than model-level check)
+    if (isProviderInCooldown(candidate, state, cooldownSeconds)) {
+      log(`[${HOOK_NAME}] Skipping fallback model - provider in cooldown`, { 
+        model: candidate, 
+        provider: extractProviderFromModel(candidate),
+        index: i 
+      })
+      continue
+    }
+
     if (!isModelInCooldown(candidate, state, cooldownSeconds)) {
       return candidate
     }
@@ -63,7 +105,8 @@ export function prepareFallback(
   sessionID: string,
   state: FallbackState,
   fallbackModels: string[],
-  config: Required<RuntimeFallbackConfig>
+  config: Required<RuntimeFallbackConfig>,
+  options?: { isProviderFailure?: boolean }
 ): FallbackResult {
   if (state.attemptCount >= config.max_fallback_attempts) {
     log(`[${HOOK_NAME}] Max fallback attempts reached`, { sessionID, attempts: state.attemptCount })
@@ -82,6 +125,7 @@ export function prepareFallback(
     from: state.currentModel,
     to: nextModel,
     attempt: state.attemptCount + 1,
+    isProviderFailure: options?.isProviderFailure ?? false,
   })
 
   const failedModel = state.currentModel
@@ -89,6 +133,12 @@ export function prepareFallback(
 
   state.fallbackIndex = fallbackModels.indexOf(nextModel)
   state.failedModels.set(failedModel, now)
+  
+  // Mark provider as failed for provider-wide errors (quota exhaustion, rate limits)
+  if (options?.isProviderFailure) {
+    markProviderFailed(failedModel, state)
+  }
+  
   state.attemptCount++
   state.currentModel = nextModel
   state.pendingFallbackModel = nextModel

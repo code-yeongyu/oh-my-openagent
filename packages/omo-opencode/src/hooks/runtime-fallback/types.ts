@@ -42,6 +42,7 @@ export interface FallbackState {
   currentModel: string
   fallbackIndex: number
   failedModels: Map<string, number>
+  failedProviders: Map<string, number> // Provider-level failure tracking for quota exhaustion
   attemptCount: number
   pendingFallbackModel?: string
   pendingFallbackPromptMayHaveBeenAccepted?: boolean
