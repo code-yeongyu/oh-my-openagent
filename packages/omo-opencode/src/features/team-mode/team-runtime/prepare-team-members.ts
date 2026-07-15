@@ -1,4 +1,4 @@
-import { access, mkdir } from "node:fs/promises"
+import { mkdir } from "node:fs/promises"
 import path from "node:path"
 
 import { getAgentConfigKey } from "../../../shared/agent-display-names"
@@ -30,16 +30,7 @@ export class TeamMemberPreflightError extends Error {
   }
 }
 
-async function pathExists(targetPath: string): Promise<boolean> {
-  try {
-    await access(targetPath)
-    return true
-  } catch {
-    return false
-  }
-}
-
-async function resolveMemberDirectory(
+export async function resolveMemberDirectory(
   worktreePath: string | undefined,
   projectRoot: string,
 ): Promise<{ readonly directory: string; readonly cleanupRoot?: string }> {
@@ -48,15 +39,7 @@ async function resolveMemberDirectory(
   }
 
   const directory = path.isAbsolute(worktreePath) ? worktreePath : path.resolve(projectRoot, worktreePath)
-  let cleanupRoot: string | undefined
-  let candidate = directory
-  while (!(await pathExists(candidate))) {
-    cleanupRoot = candidate
-    const parent = path.dirname(candidate)
-    if (parent === candidate) break
-    candidate = parent
-  }
-  await mkdir(directory, { recursive: true })
+  const cleanupRoot = await mkdir(directory, { recursive: true })
   return { directory, cleanupRoot }
 }
 

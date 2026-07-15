@@ -143,6 +143,7 @@ const RuntimeStateMemberSchema = z.object({
   status: z.enum(["pending", "running", "idle", "errored", "completed", "shutdown_approved"]),
   color: z.string().optional(),
   worktreePath: z.string().optional(),
+  ownedWorktreeRoot: z.string().optional(),
   lastInjectedTurnMarker: z.string().optional(),
   pendingInjectedMessageIds: z.array(z.string()).default([]),
 }).strict()
