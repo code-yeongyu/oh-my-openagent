@@ -28,9 +28,15 @@ With only the resolver source change stashed, the 3 tests fail again (`10 pass /
 ### Related caller suites (`related-suites.txt`)
 `bun test` over `hooks/auto-slash-command`, `tools/slashcommand`, and the resolver test: `97 pass / 0 fail`. This covers the second caller, `executor.ts` `formatCommandTemplate`.
 
+### Real OpenCode run - AGENTS.md-mandated surface (`real-opencode-qa.md`, `real-opencode-fix-rendered.txt`, `real-opencode-dev-rendered.txt`)
+The runtime bundle `dist/index.js` was loaded into a real `opencode` v1.18.1 process in an isolated XDG sandbox, and `/probetoken` was driven end to end through the auto-slash-command executor (`chat.message` -> `formatCommandTemplate` -> `resolveFileReferencesInText`). The rendered wrapper actually sent to the model was captured from a request-logging fake model:
+- Before fix (dev bundle): 6 `[file not found: ...]` fragments - `(@path)`, `@ts-ignore`, and `@latest` corrupted; the real `@realref.txt` still inlines.
+- After fix (head bundle): 0 corruption fragments; `(@path)`, `@ts-ignore`, `@latest` preserved verbatim; the real `@realref.txt` still inlines.
+- Isolation proof: `opencode db path` resolved inside the sandbox; the real `~/.local/share/opencode/opencode.db` session count was 2564 before and 2564 after.
+
 ## Why it is enough
 The defect lives entirely in `resolveFileReferencesInText`. The fix is existence-gated: an `@token` that does not resolve to an existing file is left verbatim, so documentation prose (`(@path)`, `@ts-ignore`) survives while real `@file` references still inline. Regex-narrowing cannot separate these cases because `@path` is itself path-shaped; file existence is the only reliable signal. Both the unit tests and the integration test drive the real production functions (no shims, no hand-built payloads), fail on unmodified dev for the behavioral reason, and pass on head; the negative control confirms the dependency. Security rejections (`[path rejected: ...]`) and the directory marker are unchanged, and the recursion guard only fires when a replacement was actually made.
 
 ## What was omitted
-- A full `opencode run` TUI session: the local `bun run build` is blocked on this host by the vendored `lsp-tools-mcp` / `lsp-daemon` declaration build, which is unrelated to this change. The live surface is therefore exercised through the real rendering function `formatLoadedCommand`, which is the exact code path OpenCode invokes to render a slash command.
-- No secrets or tokens appear in the captured logs; the only machine-specific strings are ephemeral OS temp directories created and removed by the tests and driver.
+- The full `opencode run` proof is now included above and in `real-opencode-qa.md`. Only the runtime bundle was built (`bun build packages/omo-opencode/src/index.ts`), not the full `bun run build`, because the vendored `lsp-tools-mcp` / `lsp-daemon` declaration build fails on this host and is unrelated to this change; the runtime bundle is all OpenCode loads to run the plugin.
+- The raw ~127 KB request logs (full OpenCode system prompt) are not committed - only the extracted rendered command wrapper, which is the surface this fix affects. No secrets or tokens appear; sandbox paths are shown as `<SANDBOX>`.
