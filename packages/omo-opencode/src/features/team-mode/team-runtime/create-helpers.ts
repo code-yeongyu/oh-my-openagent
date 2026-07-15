@@ -110,6 +110,8 @@ export async function persistPreparedMemberResources(input: {
         ...member,
         ...(resource.worktreePath ? { worktreePath: resource.worktreePath } : {}),
         ...(resource.ownedWorktreeRoot ? { ownedWorktreeRoot: resource.ownedWorktreeRoot } : {}),
+        ...(resource.worktreeOwnershipToken ? { worktreeOwnershipToken: resource.worktreeOwnershipToken } : {}),
+        ...(resource.worktreeCanonicalPath ? { worktreeCanonicalPath: resource.worktreeCanonicalPath } : {}),
       }
     }),
   }), input.config)

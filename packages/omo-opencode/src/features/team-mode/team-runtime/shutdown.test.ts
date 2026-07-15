@@ -20,6 +20,7 @@ import {
   getSessionCreatedTeamRunIds,
   registerTeamRunForSessionCleanup,
 } from "./session-cleanup"
+import { reserveOwnedWorktreeDirectory } from "./worktree-ownership"
 
 const { approveShutdown, deleteTeam, rejectShutdown, requestShutdownOfMember } = await import("./shutdown")
 
@@ -208,6 +209,32 @@ describe("team-runtime shutdown", () => {
     expect(await readFile(sentinelPath, "utf8")).toBe("keep-normal")
   })
 
+  test("preserves legacy ownedWorktreeRoot without token while deleting the runtime record", async () => {
+    // given
+    const fixture = await createFixture({ ownedWorktrees: false })
+    temporaryDirectories.push(fixture.baseDir)
+    const legacyWorktree = fixture.worktreePaths[0]
+    if (!legacyWorktree) throw new Error("missing fixture worktree")
+    const sentinelPath = path.join(legacyWorktree, "sentinel.txt")
+    await mkdir(legacyWorktree, { recursive: true })
+    await writeFile(sentinelPath, "keep-legacy-owned-root")
+    await transitionRuntimeState(fixture.teamRunId, (runtimeState) => ({
+      ...runtimeState,
+      members: runtimeState.members.map((member) => member.name === "member-a"
+        ? { ...member, ownedWorktreeRoot: legacyWorktree, status: "shutdown_approved" }
+        : { ...member, status: member.agentType === "leader" ? member.status : "shutdown_approved" }),
+    }), fixture.config)
+    const runtimeStateDirectory = getRuntimeStateDir(resolveBaseDir(fixture.config), fixture.teamRunId)
+
+    // when
+    const result = await deleteTeam(fixture.teamRunId, fixture.config)
+
+    // then
+    expect(result.removedWorktrees).toEqual([])
+    expect(await readFile(sentinelPath, "utf8")).toBe("keep-legacy-owned-root")
+    await expect(access(runtimeStateDirectory)).rejects.toBeDefined()
+  })
+
   test("#given a team run is tracked for session cleanup #when deleteTeam succeeds #then it unregisters the run", async () => {
     // given
     const fixture = await createFixture()
@@ -339,10 +366,12 @@ describe("team-runtime shutdown", () => {
     const fixture = await createFixture()
     temporaryDirectories.push(fixture.baseDir)
     const leadWorktreePath = path.join(fixture.baseDir, "fixture-worktrees", "lead")
+    const leadReservation = await reserveOwnedWorktreeDirectory(leadWorktreePath, fixture.baseDir)
+    if (!leadReservation.ownership) throw new Error("expected lead ownership")
     await transitionRuntimeState(fixture.teamRunId, (runtimeState) => ({
       ...runtimeState,
       members: runtimeState.members.map((member) => member.name === "lead"
-        ? { ...member, worktreePath: leadWorktreePath, ownedWorktreeRoot: leadWorktreePath }
+        ? { ...member, worktreePath: leadWorktreePath, ...leadReservation.ownership }
         : member),
     }), fixture.config)
     await mkdir(leadWorktreePath, { recursive: true })
@@ -364,6 +393,39 @@ describe("team-runtime shutdown", () => {
       () => undefined,
     )
   })
+
+  for (const force of [false, true] as const) {
+    test(`refuses ${force ? "force" : "normal"} deletion when persisted worktree ownership token is tampered`, async () => {
+      // given
+      const fixture = await createFixture()
+      temporaryDirectories.push(fixture.baseDir)
+      const protectedFile = path.join(fixture.worktreePaths[0] ?? "", "keep.txt")
+      await writeFile(protectedFile, "keep")
+      await updateMemberStatuses(fixture.teamRunId, fixture.config, {
+        "member-a": force ? "running" : "completed",
+        "member-b": force ? "running" : "completed",
+      })
+      await transitionRuntimeState(fixture.teamRunId, (runtimeState) => ({
+        ...runtimeState,
+        members: runtimeState.members.map((member) => member.name === "member-a"
+          ? { ...member, worktreeOwnershipToken: "tampered-token" }
+          : member),
+      }), fixture.config)
+
+      // when
+      const result = deleteTeam(
+        fixture.teamRunId,
+        fixture.config,
+        undefined,
+        undefined,
+        force ? { force: true } : undefined,
+      )
+
+      // then
+      await expect(result).rejects.toThrow("ownership token marker")
+      expect(await readFile(protectedFile, "utf8")).toBe("keep")
+    })
+  }
 
   test("force continues cleanup when removeTeamLayout throws", async () => {
     // given

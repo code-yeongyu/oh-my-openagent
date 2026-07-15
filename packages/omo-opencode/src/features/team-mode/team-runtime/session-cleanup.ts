@@ -55,6 +55,7 @@ export async function cleanupSessionTeamRuns(args: {
       if (result.removedLayout) {
         report.removedLayoutTeamRunIds.push(teamRunId)
       }
+      unregisterTeamRunForSessionCleanup(teamRunId)
     } catch (error) {
       const normalizedError = normalizeError(error)
       report.errors.push(`${teamRunId}: ${normalizedError.message}`)
@@ -62,8 +63,6 @@ export async function cleanupSessionTeamRuns(args: {
         teamRunId,
         error: normalizedError.message,
       })
-    } finally {
-      unregisterTeamRunForSessionCleanup(teamRunId)
     }
   }
 

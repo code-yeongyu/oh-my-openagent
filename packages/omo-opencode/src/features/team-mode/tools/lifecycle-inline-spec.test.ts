@@ -8,6 +8,8 @@ import path from "node:path"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 
 import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
+import type { OpencodeClient } from "../../../tools/delegate-task/types"
+import { unsafeTestValue } from "../../../../../../test-support/unsafe-test-value"
 import type { RuntimeState, TeamSpec } from "@oh-my-opencode/team-core/types"
 import { parseTeamCreateArgs } from "./lifecycle-inline-spec"
 
@@ -75,12 +77,25 @@ function createConfig() {
   })
 }
 
+const client = unsafeTestValue<OpencodeClient>({
+  app: {
+    agents: async () => ({
+      data: [{
+        name: "Sisyphus - ultraworker",
+        mode: "primary",
+        native: false,
+        permission: [],
+      }],
+    }),
+  },
+})
+
 function createTeamCreateToolForTest(
   factory: typeof import("./lifecycle").createTeamCreateTool,
   config: ReturnType<typeof createConfig>,
   executorConfig?: Parameters<typeof factory>[4],
 ) {
-  return factory(config, {} as never, {} as never, undefined, executorConfig, {
+  return factory(config, client, {} as never, undefined, executorConfig, {
     createTeamRun: createTeamRunMock,
     loadTeamSpec: async () => {
       throw new Error("loadTeamSpec should not be called for inline_spec tests")

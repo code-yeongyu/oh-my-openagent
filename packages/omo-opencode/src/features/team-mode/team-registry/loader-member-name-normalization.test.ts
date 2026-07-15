@@ -83,7 +83,11 @@ describe("loadTeamSpec member name normalization", () => {
       "caller-lead",
       TeamModeConfigSchema.parse({ base_dir: fixturePaths.userBaseDir }),
       fixturePaths.projectRoot,
-      { callerTeamLead: resolveCallerTeamLead("\u200BSisyphus - Ultraworker") },
+      {
+        callerTeamLead: resolveCallerTeamLead("\u200BSisyphus - Ultraworker", [
+          { name: "Sisyphus - ultraworker", native: true },
+        ]),
+      },
     )
 
     // then

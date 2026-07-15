@@ -88,7 +88,20 @@ export async function createTeamRun(
 
   let preparedMembers: Awaited<ReturnType<typeof prepareTeamMembers>>
   try {
-    preparedMembers = await prepareTeamMembers({ spec, ctx, reusesCallerLeadSession })
+    const parentSession = await ctx.client.session.get({
+      path: { id: leadSessionId },
+      query: { directory: ctx.directory },
+    })
+    if (parentSession.error || !parentSession.data) {
+      throw new Error(`Failed to load parent session permission for '${leadSessionId}'.`)
+    }
+    preparedMembers = await prepareTeamMembers({
+      spec,
+      ctx,
+      reusesCallerLeadSession,
+      parentSessionPermission: [...(parentSession.data.permission ?? [])],
+      teamSessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
+    })
   } catch (error) {
     if (error instanceof TeamMemberPreflightError) {
       throw new TeamRunCreateError(createErrorMessage, error.cleanupReport, getPreflightCause(error))

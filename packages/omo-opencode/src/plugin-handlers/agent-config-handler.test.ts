@@ -299,6 +299,64 @@ describe("applyAgentConfig builtin override protection", () => {
     })
   })
 
+  test("filters a numerically prefixed user collision while preserving the builtin Sisyphus entry", async () => {
+    // given
+    const prefixedCollisionName = `1|${BUILTIN_SISYPHUS_DISPLAY_NAME}`
+    loadUserAgentsSpy.mockReturnValue({
+      [prefixedCollisionName]: {
+        name: prefixedCollisionName,
+        prompt: "prefixed collision prompt",
+        mode: "subagent",
+      },
+    })
+
+    // when
+    const result = await applyAgentConfig({
+      config: createBaseConfig(),
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then
+    expect(result[prefixedCollisionName]).toBeUndefined()
+    expect(result[BUILTIN_SISYPHUS_DISPLAY_NAME]).toEqual({
+      ...builtinSisyphusConfig,
+      name: getAgentDisplayName("sisyphus"),
+    })
+  })
+
+  test("filters a project collision with the configured display alias while preserving the OMO entry", async () => {
+    // given
+    const configuredAlias = "总指挥"
+    loadProjectAgentsSpy.mockReturnValue({
+      [configuredAlias]: {
+        name: configuredAlias,
+        prompt: "configured alias collision prompt",
+        mode: "subagent",
+      },
+    })
+    const pluginConfig = {
+      ...createPluginConfig(),
+      agents: { sisyphus: { displayName: configuredAlias } },
+    } as OhMyOpenCodeConfig
+
+    // when
+    const result = await applyAgentConfig({
+      config: createBaseConfig(),
+      pluginConfig,
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then
+    expect(result[configuredAlias]).toEqual({
+      ...builtinSisyphusConfig,
+      name: configuredAlias,
+    })
+    expect((result[configuredAlias] as AgentConfig).prompt).toBe("builtin prompt")
+  })
+
   test("filters user agents whose key differs from a builtin key only by case", async () => {
     // given
     loadUserAgentsSpy.mockReturnValue({

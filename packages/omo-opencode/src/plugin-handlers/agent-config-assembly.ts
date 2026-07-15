@@ -2,6 +2,7 @@ import type { AgentConfig } from "@opencode-ai/sdk";
 import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junior";
 import type { OhMyOpenCodeConfig } from "../config";
 import {
+  AGENT_DISPLAY_NAMES,
   getAgentConfigKey,
   getAgentDisplayName,
   normalizeAgentForPromptKey,
@@ -83,6 +84,25 @@ function filterCustomAgentSources(
       protectedBuiltinAgentNames,
     ),
   };
+}
+
+function createProtectedBuiltinAgentNameSet(
+  params: AssembleAgentConfigParams,
+  activeAgentConfig: Record<string, unknown>,
+): Set<string> {
+  const builtinConfigKeys = new Set([
+    ...Object.keys(AGENT_DISPLAY_NAMES),
+    ...Object.keys(params.builtinAgents),
+    ...Object.keys(activeAgentConfig),
+  ]);
+  const protectedIdentities = Array.from(builtinConfigKeys).flatMap((configKey) => [
+    configKey,
+    getAgentDisplayName(configKey),
+    getAgentDisplayName(configKey, params.pluginConfig.agents),
+  ]);
+  // Final-registry identity is trustworthy only because every custom source is
+  // filtered against this complete OMO name set before display-name remapping.
+  return createProtectedAgentNameSet(protectedIdentities);
 }
 
 function orderedCustomAgentSources(
@@ -180,10 +200,7 @@ async function assembleSisyphusEnabledConfig(params: AssembleAgentConfigParams):
         params.pluginConfig.agents?.plan as Record<string, unknown> | undefined,
       )
     : undefined;
-  const protectedBuiltinAgentNames = createProtectedAgentNameSet([
-    ...Object.keys(agentConfig),
-    ...Object.keys(params.builtinAgents),
-  ]);
+  const protectedBuiltinAgentNames = createProtectedBuiltinAgentNameSet(params, agentConfig);
   const filteredSources = filterCustomAgentSources(params.sources, protectedBuiltinAgentNames);
   const filteredConfigAgents = configAgent
     ? defaultSubagentMode(
@@ -215,7 +232,7 @@ async function assembleSisyphusEnabledConfig(params: AssembleAgentConfigParams):
 }
 
 function assembleSisyphusDisabledConfig(params: AssembleAgentConfigParams): void {
-  const protectedBuiltinAgentNames = createProtectedAgentNameSet(Object.keys(params.builtinAgents));
+  const protectedBuiltinAgentNames = createProtectedBuiltinAgentNameSet(params, params.builtinAgents);
   const filteredSources = filterCustomAgentSources(params.sources, protectedBuiltinAgentNames);
   const filteredConfigAgents = params.sources.configAgent
     ? defaultSubagentMode(

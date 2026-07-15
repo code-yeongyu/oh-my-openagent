@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto"
-import { rm } from "node:fs/promises"
 
 import type { Message, RuntimeState } from "../types"
 
@@ -63,16 +62,4 @@ export function findLatestShutdownRequestIndex(
   }
 
   return -1
-}
-
-export async function removeWorktrees(ownedRoots: Array<string | undefined>): Promise<string[]> {
-  const removedWorktrees: string[] = []
-
-  for (const ownedRoot of new Set(ownedRoots)) {
-    if (!ownedRoot) continue
-    await rm(ownedRoot, { recursive: true, force: true })
-    removedWorktrees.push(ownedRoot)
-  }
-
-  return removedWorktrees
 }

@@ -5,17 +5,56 @@ import { tmpdir } from "node:os"
 
 import type { PluginInput } from "@opencode-ai/plugin"
 
+import type { OmoAgentClient } from "../../tools/delegate-task/types"
+import { createBackgroundSession } from "./create-background-session"
 import { BackgroundManager } from "./manager"
+import type { LaunchInput } from "./types"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
 describe("BackgroundManager session permission", () => {
+  test("does not create a child when parent session metadata cannot be loaded", async () => {
+    // given
+    const createCalls: Array<Record<string, unknown>> = []
+    const client = unsafeTestValue<OmoAgentClient>({
+      session: {
+        get: async () => { throw new Error("parent lookup failed") },
+        create: async (input: Record<string, unknown>) => {
+          createCalls.push(input)
+          return { data: { id: "ses_child" } }
+        },
+      },
+    })
+    const launch = unsafeTestValue<LaunchInput>({
+      description: "Fail closed",
+      agent: "explore",
+      parentSessionId: "ses_parent",
+      sessionPermission: [
+        { permission: "question", action: "deny", pattern: "*" },
+      ],
+    })
+
+    // when
+    const result = createBackgroundSession({ client, launch, managerDirectory: "/project" })
+
+    // then
+    await expect(result).rejects.toThrow("parent lookup failed")
+    expect(createCalls).toEqual([])
+  })
+
   test("uses an explicit launch directory instead of the parent session directory", async () => {
     // given
     const createCalls: Array<Record<string, unknown>> = []
     const promptCalls: Array<Record<string, unknown>> = []
     const client = {
       session: {
-        get: async () => ({ data: { directory: "/parent" } }),
+        get: async () => ({
+          data: {
+            directory: "/parent",
+            permission: [
+              { permission: "team_status", action: "deny", pattern: "*" },
+            ],
+          },
+        }),
         create: async (input: Record<string, unknown>) => {
           createCalls.push(input)
           return { data: { id: "ses_child" } }
@@ -87,7 +126,14 @@ describe("BackgroundManager session permission", () => {
     const promptCalls: Array<Record<string, unknown>> = []
     const client = {
       session: {
-        get: async () => ({ data: { directory: "/parent" } }),
+        get: async () => ({
+          data: {
+            directory: "/parent",
+            permission: [
+              { permission: "team_status", action: "deny", pattern: "*" },
+            ],
+          },
+        }),
         create: async () => ({ data: { id: "ses_child" } }),
         promptAsync: async (input: Record<string, unknown>) => {
           promptCalls.push(input)
@@ -194,7 +240,14 @@ describe("BackgroundManager session permission", () => {
     const createCalls: Array<Record<string, unknown>> = []
     const client = {
       session: {
-        get: async () => ({ data: { directory: "/parent" } }),
+        get: async () => ({
+          data: {
+            directory: "/parent",
+            permission: [
+              { permission: "team_status", action: "deny", pattern: "*" },
+            ],
+          },
+        }),
         create: async (input: Record<string, unknown>) => {
           createCalls.push(input)
           return { data: { id: "ses_child" } }
@@ -225,6 +278,7 @@ describe("BackgroundManager session permission", () => {
       parentID: "ses_parent",
       title: "Test task (@explore subagent)",
       permission: [
+        { permission: "team_status", action: "deny", pattern: "*" },
         { permission: "question", action: "deny", pattern: "*" },
       ],
     })

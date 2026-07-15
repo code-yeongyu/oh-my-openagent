@@ -3573,7 +3573,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
   })
 
   describe("task transitions pending→running when slot available", () => {
-    test("does not override parent session permission when creating child session", async () => {
+    test("passes parent session permission unchanged when creating child session", async () => {
       // given
       const createCalls: Array<{ body?: { permission?: unknown } }> = []
       const parentPermission = [
@@ -3615,7 +3615,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       // then
       expect(createCalls).toHaveLength(1)
-      expect(createCalls[0]?.body?.permission).toBeUndefined()
+      expect(createCalls[0]?.body?.permission).toEqual(parentPermission)
     })
 
     test("should transition first task to running immediately", async () => {

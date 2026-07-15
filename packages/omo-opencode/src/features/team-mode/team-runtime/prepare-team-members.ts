@@ -1,13 +1,14 @@
-import { mkdir, stat } from "node:fs/promises"
-import path from "node:path"
-
 import { getAgentConfigKey } from "../../../shared/agent-display-names"
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import { AGENT_ELIGIBILITY_REGISTRY } from "../types"
 import type { TeamSpec } from "../types"
+import type { FinalOpenCodeAgent } from "../final-open-code-agent-registry"
+import { parseFinalOpenCodeAgentRegistry } from "../final-open-code-agent-registry"
 import { cleanupPreparedTeamRunResources } from "./cleanup-team-run-resources"
+import { ProjectAgentMemberError } from "./project-agent-member"
 import { resolveMember, type ResolvedMember } from "./resolve-member"
 import type { SpawnedMemberResource, TeamRunCleanupReport } from "./team-run-create-types"
+import { reserveOwnedWorktreeDirectory, type WorktreeOwnership } from "./worktree-ownership"
 
 type PreparedMemberBase = {
   readonly member: TeamSpec["members"][number]
@@ -33,41 +34,41 @@ export class TeamMemberPreflightError extends Error {
 export async function resolveMemberDirectory(
   worktreePath: string | undefined,
   projectRoot: string,
-): Promise<{ readonly directory: string; readonly cleanupRoot?: string }> {
+): Promise<{ readonly directory: string } & Partial<WorktreeOwnership>> {
   if (!worktreePath) {
     return { directory: projectRoot }
   }
-
-  const directory = path.isAbsolute(worktreePath) ? worktreePath : path.resolve(projectRoot, worktreePath)
-  const parentDirectory = path.dirname(directory)
-  if (parentDirectory !== path.parse(directory).root) {
-    await mkdir(parentDirectory, { recursive: true })
-  }
-
-  try {
-    await mkdir(directory)
-    return { directory, cleanupRoot: directory }
-  } catch (error) {
-    if (!(error instanceof Error) || !("code" in error) || error.code !== "EEXIST") {
-      throw error
-    }
-    const metadata = await stat(directory)
-    if (!metadata.isDirectory()) {
-      throw error
-    }
-    return { directory, cleanupRoot: undefined }
+  const reservation = await reserveOwnedWorktreeDirectory(worktreePath, projectRoot)
+  return {
+    directory: reservation.directory,
+    ...(reservation.ownership ?? {}),
   }
 }
 
-function canReuseCallerAsLead(member: TeamSpec["members"][number]): boolean {
-  return member.kind === "category"
-    || AGENT_ELIGIBILITY_REGISTRY[getAgentConfigKey(member.subagent_type)] !== undefined
+async function canReuseCallerAsLead(
+  member: TeamSpec["members"][number],
+  ctx: ExecutorContext,
+  directory: string,
+): Promise<boolean> {
+  if (member.kind === "category") return true
+  if (AGENT_ELIGIBILITY_REGISTRY[getAgentConfigKey(member.subagent_type)] === undefined) return false
+  const registry = parseFinalOpenCodeAgentRegistry(
+    await ctx.client.app.agents({ query: { directory } }),
+  )
+  if (registry.find((agent) => agent.name === member.subagent_type)?.native === false) {
+    throw new ProjectAgentMemberError(
+      `Project agent '${member.subagent_type}' is member-only and cannot be selected or reused as a team lead.`,
+    )
+  }
+  return true
 }
 
 export async function prepareTeamMembers(input: {
   readonly spec: TeamSpec
   readonly ctx: ExecutorContext
   readonly reusesCallerLeadSession: boolean
+  readonly parentSessionPermission: FinalOpenCodeAgent["permission"]
+  readonly teamSessionPermission: FinalOpenCodeAgent["permission"]
 }): Promise<readonly PreparedTeamMember[]> {
   const resources: SpawnedMemberResource[] = []
 
@@ -77,7 +78,11 @@ export async function prepareTeamMembers(input: {
       const preparedDirectory = await resolveMemberDirectory(member.worktreePath, input.ctx.directory)
       const resource: SpawnedMemberResource = {
         ...(member.worktreePath ? { worktreePath: preparedDirectory.directory } : {}),
-        ...(preparedDirectory.cleanupRoot ? { ownedWorktreeRoot: preparedDirectory.cleanupRoot } : {}),
+        ...(preparedDirectory.ownedWorktreeRoot ? {
+          ownedWorktreeRoot: preparedDirectory.ownedWorktreeRoot,
+          worktreeOwnershipToken: preparedDirectory.worktreeOwnershipToken,
+          worktreeCanonicalPath: preparedDirectory.worktreeCanonicalPath,
+        } : {}),
       }
       resources.push(resource)
       memberDirectories.push({ member, directory: preparedDirectory.directory, resource })
@@ -87,7 +92,7 @@ export async function prepareTeamMembers(input: {
     return await Promise.all(memberDirectories.map(async ({ member, directory, resource }) => {
       const reusesCaller = input.reusesCallerLeadSession
         && member.name === input.spec.leadAgentId
-        && canReuseCallerAsLead(member)
+        && await canReuseCallerAsLead(member, input.ctx, directory)
       if (reusesCaller) {
         return { kind: "reused-lead", member, directory, resource }
       }
@@ -97,6 +102,8 @@ export async function prepareTeamMembers(input: {
         directory,
         isLead: member.name === input.spec.leadAgentId,
         parentAgent: input.spec.leadAgentId,
+        parentSessionPermission: input.parentSessionPermission,
+        teamSessionPermission: input.teamSessionPermission,
       })
       return { kind: "launch", member, directory, resource, resolvedMember }
     }))

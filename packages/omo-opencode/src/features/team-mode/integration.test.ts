@@ -163,7 +163,17 @@ describe("team-mode integration", () => {
     const aliveSessionIds = new Set(["ses_alive"])
     const config = createConfig(baseDir)
     const manager = createManager()
-    const context = createContext(baseDir, manager, aliveSessionIds)
+    const client = createClient(aliveSessionIds)
+    const pendingCreationLookups = new Set(["ses_alive", "ses_dead", "ses_stuck", "ses_delete"])
+    client.session.get.mockImplementation(async ({ path: { id } }: { path: { id: string } }) => {
+      if (pendingCreationLookups.delete(id)) {
+        return { data: { id, directory: baseDir, permission: [] } }
+      }
+      return aliveSessionIds.has(id)
+        ? { data: { id } }
+        : { error: Object.assign(new Error("session not found"), { status: 404 }) }
+    })
+    const context: ExecutorContext = { client, manager, directory: baseDir }
     const aliveRuntime = await createTeamRun(createSpec("alive-team", "lead", [{ kind: "subagent_type", name: "lead", subagent_type: "sisyphus", backendType: "in-process", isActive: true }]), "ses_alive", context, config, manager)
     const deadRuntime = await createTeamRun(createSpec("dead-team", "lead", [{ kind: "subagent_type", name: "lead", subagent_type: "atlas", backendType: "in-process", isActive: true }]), "ses_dead", context, config, manager)
     const stuckRuntime = await createTeamRun(createSpec("stuck-team", "lead", [{ kind: "subagent_type", name: "lead", subagent_type: "atlas", backendType: "in-process", isActive: true }]), "ses_stuck", context, config, manager)

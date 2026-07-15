@@ -1,5 +1,4 @@
 import { rm } from "node:fs/promises"
-import path from "node:path"
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import type { BackgroundManager } from "../../background-agent/manager"
@@ -9,6 +8,7 @@ import { unregisterTeamSessionsByTeam } from "../team-session-registry"
 import { loadRuntimeState, transitionRuntimeState } from "../team-state-store/store"
 import { unregisterTeamRunForSessionCleanup } from "./session-team-run-registry"
 import type { SpawnedMemberResource, TeamRunCleanupReport } from "./team-run-create-types"
+import { removeOwnedWorktreeDirectories } from "./worktree-ownership"
 
 function normalizeError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error))
@@ -39,36 +39,14 @@ function createCleanupReport(): TeamRunCleanupReport {
   }
 }
 
-function isOwnedRootInside(candidate: string, potentialParent: string): boolean {
-  const relativePath = path.relative(potentialParent, candidate)
-  return relativePath !== ""
-    && relativePath !== ".."
-    && !relativePath.startsWith(`..${path.sep}`)
-    && !path.isAbsolute(relativePath)
-}
-
-function getOwnedWorktreeRoots(resources: SpawnedMemberResource[]): string[] {
-  const roots = [...new Set(resources.toReversed().flatMap((resource) => (
-    resource.ownedWorktreeRoot ? [resource.ownedWorktreeRoot] : []
-  )))]
-  return roots.filter((root) => !roots.some((candidateParent) => (
-    candidateParent !== root && isOwnedRootInside(root, candidateParent)
-  )))
-}
-
 async function removePreparedResourcePaths(args: {
   resources: SpawnedMemberResource[]
   inboxDirs: string[]
   cleanupReport: TeamRunCleanupReport
 }): Promise<void> {
-  for (const ownedWorktreeRoot of getOwnedWorktreeRoots(args.resources)) {
-    try {
-      await rm(ownedWorktreeRoot, { recursive: true, force: true })
-      args.cleanupReport.removedWorktrees.push(ownedWorktreeRoot)
-    } catch (cleanupError) {
-      args.cleanupReport.errors.push(`worktree ${ownedWorktreeRoot}: ${normalizeError(cleanupError).message}`)
-    }
-  }
+  const worktreeCleanup = await removeOwnedWorktreeDirectories(args.resources.toReversed())
+  args.cleanupReport.removedWorktrees.push(...worktreeCleanup.removedWorktrees)
+  args.cleanupReport.errors.push(...worktreeCleanup.errors)
 
   for (const inboxDir of [...args.inboxDirs].reverse()) {
     try {
@@ -106,17 +84,25 @@ export async function cleanupTeamRunResources(args: {
   for (const resource of [...args.resources].reverse()) {
     if (resource.taskId) {
       try {
-        await args.bgMgr.cancelTask(resource.taskId, {
+        const cancelled = await args.bgMgr.cancelTask(resource.taskId, {
           source: "team-create-rollback",
           reason: "creating_rollback",
           skipNotification: true,
         })
-        cleanupReport.cancelledTaskIds.push(resource.taskId)
+        if (cancelled !== true) {
+          cleanupReport.errors.push(`cancel ${resource.taskId}: cancellation was not confirmed`)
+        } else {
+          cleanupReport.cancelledTaskIds.push(resource.taskId)
+        }
       } catch (cancelError) {
         cleanupReport.errors.push(`cancel ${resource.taskId}: ${normalizeError(cancelError).message}`)
       }
     }
 
+  }
+
+  if (cleanupReport.errors.some((error) => error.startsWith("cancel "))) {
+    return cleanupReport
   }
 
   await removePreparedResourcePaths({

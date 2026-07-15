@@ -1,10 +1,13 @@
-import { z } from "zod"
-
 import { getAgentConfigKey } from "../../../shared/agent-display-names"
 import type { DelegatedModelConfig } from "../../../shared/model-resolution-types"
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import { AGENT_ELIGIBILITY_REGISTRY } from "../types"
 import type { Member } from "../types"
+import {
+  FinalOpenCodeAgentRegistryError,
+  parseFinalOpenCodeAgentRegistry,
+  type FinalOpenCodeAgent,
+} from "../final-open-code-agent-registry"
 
 const REQUIRED_TEAM_MEMBER_TOOLS = [
   "team_send_message",
@@ -14,33 +17,7 @@ const REQUIRED_TEAM_MEMBER_TOOLS = [
   "team_status",
 ] as const
 
-const AgentPermissionRuleSchema = z.object({
-  permission: z.string(),
-  pattern: z.string(),
-  action: z.enum(["allow", "ask", "deny"]),
-})
-
-const OpenCodeAgentSchema = z.looseObject({
-  name: z.string(),
-  mode: z.enum(["subagent", "primary", "all"]),
-  native: z.boolean().nullish(),
-  hidden: z.boolean().nullish(),
-  permission: z.array(AgentPermissionRuleSchema),
-  model: z.object({
-    providerID: z.string(),
-    modelID: z.string(),
-  }).nullish(),
-  variant: z.string().nullish(),
-  prompt: z.string().nullish(),
-})
-
-const OpenCodeAgentRegistryResponseSchema = z.union([
-  z.array(OpenCodeAgentSchema),
-  z.object({ data: z.array(OpenCodeAgentSchema) }),
-])
-
 type SubagentMember = Extract<Member, { kind: "subagent_type" }>
-type OpenCodeAgent = z.infer<typeof OpenCodeAgentSchema>
 
 export type ProjectAgentMemberResolution = {
   readonly memberName: string
@@ -54,6 +31,8 @@ export type ProjectAgentMemberResolution = {
 export type ProjectAgentMemberOptions = {
   readonly directory: string
   readonly isLead: boolean
+  readonly parentSessionPermission?: FinalOpenCodeAgent["permission"]
+  readonly teamSessionPermission?: FinalOpenCodeAgent["permission"]
 }
 
 export class ProjectAgentMemberError extends Error {
@@ -74,25 +53,16 @@ function matchesOpenCodeWildcard(value: string, pattern: string): boolean {
   return new RegExp(`^${expression}$`, flags).test(normalizedValue)
 }
 
-function isToolAllowed(agent: OpenCodeAgent, tool: string): boolean {
-  const effectiveRule = agent.permission.findLast((rule) => matchesOpenCodeWildcard(tool, rule.permission))
+function isToolAllowed(rules: FinalOpenCodeAgent["permission"], tool: string): boolean {
+  const effectiveRule = rules.findLast((rule) => matchesOpenCodeWildcard(tool, rule.permission))
   return effectiveRule?.pattern === "*" && effectiveRule.action === "allow"
 }
 
-function getMissingTeamTools(agent: OpenCodeAgent): readonly string[] {
-  return REQUIRED_TEAM_MEMBER_TOOLS.filter((tool) => !isToolAllowed(agent, tool))
+function getMissingTeamTools(rules: FinalOpenCodeAgent["permission"]): readonly string[] {
+  return REQUIRED_TEAM_MEMBER_TOOLS.filter((tool) => !isToolAllowed(rules, tool))
 }
 
-function parseAgentRegistry(response: unknown): readonly OpenCodeAgent[] {
-  const result = OpenCodeAgentRegistryResponseSchema.safeParse(response)
-  if (!result.success) {
-    throw new ProjectAgentMemberError(`OpenCode returned an invalid final agent registry: ${result.error.message}`)
-  }
-
-  return Array.isArray(result.data) ? result.data : result.data.data
-}
-
-function resolveProjectAgentModel(agent: OpenCodeAgent): DelegatedModelConfig | undefined {
+function resolveProjectAgentModel(agent: FinalOpenCodeAgent): DelegatedModelConfig | undefined {
   if (!agent.model) {
     return undefined
   }
@@ -109,13 +79,22 @@ export async function resolveProjectAgentMember(
   ctx: Pick<ExecutorContext, "client">,
   options: ProjectAgentMemberOptions,
 ): Promise<ProjectAgentMemberResolution | undefined> {
+  let registry: readonly FinalOpenCodeAgent[]
+  try {
+    registry = parseFinalOpenCodeAgentRegistry(
+      await ctx.client.app.agents({ query: { directory: options.directory } }),
+    )
+  } catch (error) {
+    if (error instanceof FinalOpenCodeAgentRegistryError) {
+      throw new ProjectAgentMemberError(error.message)
+    }
+    throw error
+  }
+  const agent = registry.find((candidate) => candidate.name === member.subagent_type)
   const canonicalSubagentType = getAgentConfigKey(member.subagent_type)
-  if (AGENT_ELIGIBILITY_REGISTRY[canonicalSubagentType] !== undefined) {
+  if (!agent && AGENT_ELIGIBILITY_REGISTRY[canonicalSubagentType] !== undefined) {
     return undefined
   }
-
-  const registry = parseAgentRegistry(await ctx.client.app.agents({ query: { directory: options.directory } }))
-  const agent = registry.find((candidate) => candidate.name === member.subagent_type)
   if (!agent) {
     throw new ProjectAgentMemberError(
       `Project agent '${member.subagent_type}' is absent from the final OpenCode agent registry for '${options.directory}'.`,
@@ -140,7 +119,12 @@ export async function resolveProjectAgentMember(
     )
   }
 
-  const missingTools = getMissingTeamTools(agent)
+  const effectivePermission = [
+    ...agent.permission,
+    ...(options.parentSessionPermission ?? []),
+    ...(options.teamSessionPermission ?? []),
+  ]
+  const missingTools = getMissingTeamTools(effectivePermission)
   if (missingTools.length > 0) {
     throw new ProjectAgentMemberError(
       `Project agent '${member.subagent_type}' does not allow required Team Mode tools: ${missingTools.join(", ")}.`,

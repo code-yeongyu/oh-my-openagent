@@ -8,6 +8,7 @@ import { sendMessage } from "../team-mailbox/send"
 import { getInboxDir, getRuntimeStateDir, resolveBaseDir } from "../team-registry/paths"
 import { saveRuntimeState, transitionRuntimeState } from "../team-state-store/store"
 import { MessageSchema, type RuntimeState, type TeamSpec } from "../types"
+import { reserveOwnedWorktreeDirectory } from "./worktree-ownership"
 
 let fixtureCounter = 0
 
@@ -64,6 +65,12 @@ export async function createFixture(options?: {
   const baseDir = await mkdtemp(path.join(tmpdir(), `team-runtime-shutdown-${fixtureCounter}-`))
   const config = createConfig(baseDir)
   const worktreeRoot = path.join(baseDir, "fixture-worktrees")
+  const worktreePaths = [path.join(worktreeRoot, "member-a"), path.join(worktreeRoot, "member-b")]
+  const ownership = (options?.ownedWorktrees ?? true)
+    ? await Promise.all(worktreePaths.map(async (worktreePath) => (
+        await reserveOwnedWorktreeDirectory(worktreePath, baseDir)
+      ).ownership))
+    : [undefined, undefined]
   const teamRunId = createUuid(fixtureCounter)
   const runtimeState: RuntimeState = {
     version: 1,
@@ -81,7 +88,7 @@ export async function createFixture(options?: {
         status: "pending",
         pendingInjectedMessageIds: [],
         worktreePath: path.join(worktreeRoot, "member-a"),
-        ...((options?.ownedWorktrees ?? true) ? { ownedWorktreeRoot: path.join(worktreeRoot, "member-a") } : {}),
+        ...(ownership[0] ?? {}),
       },
       {
         name: "member-b",
@@ -89,7 +96,7 @@ export async function createFixture(options?: {
         status: "pending",
         pendingInjectedMessageIds: [],
         worktreePath: path.join(worktreeRoot, "member-b"),
-        ...((options?.ownedWorktrees ?? true) ? { ownedWorktreeRoot: path.join(worktreeRoot, "member-b") } : {}),
+        ...(ownership[1] ?? {}),
       },
     ],
     shutdownRequests: [],
@@ -108,7 +115,7 @@ export async function createFixture(options?: {
     baseDir,
     config,
     teamRunId: runtimeState.teamRunId,
-    worktreePaths: [path.join(worktreeRoot, "member-a"), path.join(worktreeRoot, "member-b")],
+    worktreePaths,
   }
 }
 

@@ -5,6 +5,11 @@ import { describe, expect, test } from "bun:test"
 import { resolveCallerTeamLead } from "../resolve-caller-team-lead"
 import { normalizeTeamSpecInput } from "./team-spec-input-normalizer"
 
+const FINAL_AGENT_REGISTRY = [
+  { name: "Sisyphus - ultraworker", native: true },
+  { name: "explore", native: true },
+] as const
+
 describe("normalizeTeamSpecInput", () => {
   test("injects the caller as lead when no lead is specified", () => {
     // given
@@ -15,7 +20,7 @@ describe("normalizeTeamSpecInput", () => {
 
     // when
     const normalizedSpec = normalizeTeamSpecInput(rawSpec, {
-      callerTeamLead: resolveCallerTeamLead("\u200BSisyphus - Ultraworker"),
+      callerTeamLead: resolveCallerTeamLead("\u200BSisyphus - Ultraworker", FINAL_AGENT_REGISTRY),
     })
 
     // then
@@ -41,7 +46,7 @@ describe("normalizeTeamSpecInput", () => {
 
     // when
     const normalizedSpec = normalizeTeamSpecInput(rawSpec, {
-      callerTeamLead: resolveCallerTeamLead("Sisyphus - Ultraworker"),
+      callerTeamLead: resolveCallerTeamLead("Sisyphus - Ultraworker", FINAL_AGENT_REGISTRY),
     })
 
     // then
@@ -60,7 +65,7 @@ describe("normalizeTeamSpecInput", () => {
 
     // when
     const normalizedSpec = normalizeTeamSpecInput(rawSpec, {
-      callerTeamLead: resolveCallerTeamLead("Sisyphus - Ultraworker"),
+      callerTeamLead: resolveCallerTeamLead("Sisyphus - Ultraworker", FINAL_AGENT_REGISTRY),
     })
 
     // then
@@ -82,7 +87,7 @@ describe("normalizeTeamSpecInput", () => {
 
     // when
     const result = () => normalizeTeamSpecInput(rawSpec, {
-      callerTeamLead: resolveCallerTeamLead("explore"),
+      callerTeamLead: resolveCallerTeamLead("explore", FINAL_AGENT_REGISTRY),
     })
 
     // then
@@ -101,7 +106,7 @@ describe("normalizeTeamSpecInput", () => {
 
     // when
     const result = () => normalizeTeamSpecInput(rawSpec, {
-      callerTeamLead: resolveCallerTeamLead("explore"),
+      callerTeamLead: resolveCallerTeamLead("explore", FINAL_AGENT_REGISTRY),
     })
 
     // then
@@ -122,7 +127,7 @@ describe("normalizeTeamSpecInput", () => {
 
     // when
     const normalizedSpec = normalizeTeamSpecInput(rawSpec, {
-      callerTeamLead: resolveCallerTeamLead("Sisyphus - Ultraworker"),
+      callerTeamLead: resolveCallerTeamLead("Sisyphus - Ultraworker", FINAL_AGENT_REGISTRY),
     })
 
     // then
@@ -148,7 +153,7 @@ describe("normalizeTeamSpecInput", () => {
 
     // when
     const normalizedSpec = normalizeTeamSpecInput(rawSpec, {
-      callerTeamLead: resolveCallerTeamLead("Sisyphus - Ultraworker"),
+      callerTeamLead: resolveCallerTeamLead("Sisyphus - Ultraworker", FINAL_AGENT_REGISTRY),
       defaultCategoryName: "analysis",
     })
 
@@ -173,7 +178,7 @@ describe("normalizeTeamSpecInput", () => {
 
     // when
     const normalizedSpec = normalizeTeamSpecInput(rawSpec, {
-      callerTeamLead: resolveCallerTeamLead("Sisyphus - Ultraworker"),
+      callerTeamLead: resolveCallerTeamLead("Sisyphus - Ultraworker", FINAL_AGENT_REGISTRY),
     })
 
     // then

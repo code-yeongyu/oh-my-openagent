@@ -186,6 +186,54 @@ describe("project agent Team Mode member resolution", () => {
     await expect(result).rejects.toThrow("team_status")
   })
 
+  for (const action of ["deny", "ask"] as const) {
+    test(`rejects a member when inherited parent permission resolves a required tool to ${action}`, async () => {
+      // given
+      const appAgents = mock(async () => ({ data: [createProjectAgent()] }))
+
+      // when
+      const result = resolveProjectAgentMember(createMember(), createContext(appAgents), {
+        directory: "/repository-member-worktree",
+        isLead: false,
+        parentSessionPermission: [
+          { permission: "team_status", pattern: "*", action },
+        ],
+        teamSessionPermission: [
+          { permission: "question", pattern: "*", action: "deny" },
+        ],
+      })
+
+      // then
+      await expect(result).rejects.toThrow("team_status")
+    })
+  }
+
+  test("accepts a member when inherited parent rules explicitly allow all required tools after agent deny", async () => {
+    // given
+    const appAgents = mock(async () => ({
+      data: [createProjectAgent({
+        permission: [{ permission: "*", pattern: "*", action: "deny" }],
+      })],
+    }))
+
+    // when
+    const result = await resolveProjectAgentMember(createMember(), createContext(appAgents), {
+      directory: "/repository-member-worktree",
+      isLead: false,
+      parentSessionPermission: REQUIRED_TEAM_TOOLS.map((permission) => ({
+        permission,
+        pattern: "*",
+        action: "allow" as const,
+      })),
+      teamSessionPermission: [
+        { permission: "question", pattern: "*", action: "deny" },
+      ],
+    })
+
+    // then
+    expect(result?.agentToUse).toBe("repository-reviewer")
+  })
+
   test("accepts a member when explicit all-five allows follow wildcard ask", async () => {
     // given
     const appAgents = mock(async () => ({
@@ -264,7 +312,7 @@ describe("project agent Team Mode member resolution", () => {
     await expect(result).rejects.toThrow("member-only")
   })
 
-  test("keeps canonical collisions on the built-in resolution path", async () => {
+  test("resolves a project collision before canonical built-in fallback", async () => {
     // given
     const appAgents = mock(async () => ({ data: [createProjectAgent({ name: "sisyphus" })] }))
     const member = { ...createMember(), subagent_type: "sisyphus" }
@@ -276,12 +324,12 @@ describe("project agent Team Mode member resolution", () => {
     })
 
     // then
-    expect(appAgents).not.toHaveBeenCalled()
-    expect(result).toBeUndefined()
+    expect(appAgents).toHaveBeenCalledWith({ query: { directory: "/repository-member-worktree" } })
+    expect(result).toMatchObject({ agentToUse: "sisyphus", exactAgent: true })
   })
 
   for (const configKey of ["atlas", "prometheus"] as const) {
-    test(`keeps the ${configKey} display alias on the built-in resolution path`, async () => {
+    test(`resolves a project collision using the ${configKey} display alias before built-in fallback`, async () => {
       // given
       const displayName = getAgentDisplayName(configKey)
       const appAgents = mock(async () => ({ data: [createProjectAgent({ name: displayName })] }))
@@ -294,8 +342,8 @@ describe("project agent Team Mode member resolution", () => {
       })
 
       // then
-      expect(appAgents).not.toHaveBeenCalled()
-      expect(result).toBeUndefined()
+      expect(appAgents).toHaveBeenCalledWith({ query: { directory: "/repository-member-worktree" } })
+      expect(result).toMatchObject({ agentToUse: displayName, exactAgent: true })
     })
   }
 

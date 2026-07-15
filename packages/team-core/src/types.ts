@@ -144,6 +144,8 @@ const RuntimeStateMemberSchema = z.object({
   color: z.string().optional(),
   worktreePath: z.string().optional(),
   ownedWorktreeRoot: z.string().optional(),
+  worktreeOwnershipToken: z.string().optional(),
+  worktreeCanonicalPath: z.string().optional(),
   lastInjectedTurnMarker: z.string().optional(),
   pendingInjectedMessageIds: z.array(z.string()).default([]),
 }).strict()

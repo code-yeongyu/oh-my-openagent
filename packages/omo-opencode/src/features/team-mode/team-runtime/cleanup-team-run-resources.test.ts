@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
-import { mkdir, mkdtemp, rm } from "node:fs/promises"
+import { access, mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
@@ -18,6 +18,7 @@ import { saveRuntimeState } from "../team-state-store/store"
 import type { RuntimeState } from "../types"
 import { cleanupTeamRunResources } from "./cleanup-team-run-resources"
 import { unsafeTestValue } from "../../../../../../test-support/unsafe-test-value"
+import { reserveOwnedWorktreeDirectory } from "./worktree-ownership"
 
 const temporaryDirectories: string[] = []
 
@@ -155,4 +156,41 @@ describe("cleanupTeamRunResources", () => {
       paneIds: ["%10", "%11"],
     }, expect.anything())
   })
+
+  for (const failure of ["false", "throw"] as const) {
+    test(`retains rollback resources when cancellation returns ${failure}`, async () => {
+      // given
+      const baseDir = await mkdtemp(path.join(tmpdir(), "cleanup-team-run-cancel-"))
+      temporaryDirectories.push(baseDir)
+      const teamRunId = "66666666-6666-4666-8666-666666666666"
+      await mkdir(path.join(baseDir, "runtime", teamRunId), { recursive: true })
+      await saveRuntimeState(createRuntimeState(teamRunId), createConfig(baseDir))
+      const reservation = await reserveOwnedWorktreeDirectory(path.join(baseDir, "member"), baseDir)
+      if (!reservation.ownership) throw new Error("expected ownership")
+      registerTeamSession("worker-session", { teamRunId, memberName: "worker-1", role: "member" })
+      const bgMgr = unsafeTestValue<BackgroundManager>({
+        cancelTask: async () => {
+          if (failure === "throw") throw new Error("cancel transport failed")
+          return false
+        },
+      })
+
+      // when
+      const report = await cleanupTeamRunResources({
+        teamRunId,
+        config: createConfig(baseDir),
+        resources: [{ taskId: "task-a", ...reservation.ownership }],
+        bgMgr,
+        createdLayout: false,
+      })
+
+      // then
+      expect(report.cancelledTaskIds).toEqual([])
+      expect(report.errors).toEqual([failure === "throw"
+        ? "cancel task-a: cancel transport failed"
+        : "cancel task-a: cancellation was not confirmed"])
+      await expect(access(reservation.directory)).resolves.toBeNull()
+      expect(lookupTeamSession("worker-session")).toBeDefined()
+    })
+  }
 })

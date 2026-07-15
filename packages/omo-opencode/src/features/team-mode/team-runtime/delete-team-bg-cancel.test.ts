@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, mock, test } from "bun:test"
-import { rm } from "node:fs/promises"
+import { access, rm } from "node:fs/promises"
 
 import type { BackgroundTask } from "../../background-agent/types"
 import { deleteTeam, type DeleteTeamBackgroundManager } from "./delete-team"
@@ -158,4 +158,33 @@ describe("deleteTeam cancels only this team's background tasks", () => {
     const cancelledTaskId = cancelTaskMock.mock.calls[0]?.[0]
     expect(cancelledTaskId).toBe("team-task-a")
   })
+
+  for (const failure of ["false", "throw"] as const) {
+    test(`retains team resources when force-delete cancellation returns ${failure}`, async () => {
+      // given
+      const fixture = await createFixture()
+      temporaryDirectories.push(fixture.baseDir)
+      const task = createBackgroundTask({
+        id: "team-task-a",
+        sessionId: "session-a",
+        parentMessageId: `team-create:${fixture.teamRunId}:member-a`,
+      })
+      const bgMgr = {
+        getTasksByParentSession: mock(() => [task]),
+        cancelTask: mock(async () => {
+          if (failure === "throw") throw new Error("cancel transport failed")
+          return false
+        }),
+      } satisfies DeleteTeamBackgroundManager
+
+      // when
+      const result = deleteTeam(fixture.teamRunId, fixture.config, undefined, bgMgr, { force: true })
+
+      // then
+      await expect(result).rejects.toThrow(failure === "throw"
+        ? "team-task-a: cancel transport failed"
+        : "team-task-a: cancellation was not confirmed")
+      await expect(access(fixture.worktreePaths[0] ?? "")).resolves.toBeNull()
+    })
+  }
 })

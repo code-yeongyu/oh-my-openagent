@@ -3,6 +3,7 @@ import type { DelegatedModelConfig } from "../../../shared/model-resolution-type
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import type { DelegateTaskArgs } from "../../../tools/delegate-task/types"
 import type { Member } from "../types"
+import type { FinalOpenCodeAgent } from "../final-open-code-agent-registry"
 import {
   buildSystemContent,
   resolveCategoryExecution,
@@ -31,6 +32,8 @@ export type ResolveMemberOptions = {
   readonly directory: string
   readonly isLead: boolean
   readonly parentAgent?: string
+  readonly parentSessionPermission?: FinalOpenCodeAgent["permission"]
+  readonly teamSessionPermission?: FinalOpenCodeAgent["permission"]
 }
 
 export type ResolveMemberDependencies = {
@@ -120,6 +123,8 @@ export function createResolveMember(
       const projectAgentMember = await dependencies.resolveProjectAgentMember(member, ctx, {
         directory: options.directory,
         isLead: options.isLead,
+        parentSessionPermission: options.parentSessionPermission,
+        teamSessionPermission: options.teamSessionPermission,
       })
       if (projectAgentMember) {
         return projectAgentMember

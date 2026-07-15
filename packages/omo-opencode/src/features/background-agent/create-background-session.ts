@@ -14,19 +14,23 @@ export async function createBackgroundSession(input: {
   const parentSession = await input.client.session.get({
     path: { id: input.launch.parentSessionId },
     query: { directory: input.managerDirectory },
-  }).catch((error: unknown) => {
-    log(`[background-agent] Failed to get parent session: ${error}`)
-    return null
   })
-  const parentDirectory = parentSession?.data?.directory ?? input.managerDirectory
+  if (parentSession.error || !parentSession.data) {
+    throw new Error(`Failed to load parent session '${input.launch.parentSessionId}'.`)
+  }
+  const sessionPermission = [
+    ...(parentSession.data.permission ?? []),
+    ...(input.launch.sessionPermission ?? []),
+  ]
+  const parentDirectory = parentSession.data.directory ?? input.managerDirectory
   const launchDirectory = input.launch.directory ?? parentDirectory
-  log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${launchDirectory}`)
+  log(`[background-agent] Parent dir: ${parentSession.data.directory}, using: ${launchDirectory}`)
 
   const createResult = await input.client.session.create({
     body: {
       parentID: input.launch.parentSessionId,
       title: `${input.launch.description} (@${input.launch.agent} subagent)`,
-      ...(input.launch.sessionPermission ? { permission: input.launch.sessionPermission } : {}),
+      ...(sessionPermission.length > 0 ? { permission: sessionPermission } : {}),
       ...(input.launch.model
         ? {
             model: {

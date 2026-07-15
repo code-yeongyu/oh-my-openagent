@@ -12,6 +12,7 @@ import { listActiveTeams, loadRuntimeState } from "@oh-my-opencode/team-core/tea
 import { AGENT_ELIGIBILITY_REGISTRY } from "@oh-my-opencode/team-core/types"
 import { findParticipantRuntime, sanitizeRuntimeState, type TeamLifecycleToolContext } from "./lifecycle-participant"
 import { DEFERRED_OPEN_CODE_AGENT_ELIGIBILITY } from "../open-code-agent-eligibility"
+import { parseFinalOpenCodeAgentRegistry } from "../final-open-code-agent-registry"
 import {
   parseInlineTeamSpec,
   parseTeamCreateArgs,
@@ -82,16 +83,24 @@ export function createTeamCreateTool(
       const leadSessionId = runtimeContext.sessionID
       if (!leadSessionId) throw new Error("team_create requires leadSessionId or tool context sessionID")
       const projectRoot = typeof runtimeContext.directory === "string" ? runtimeContext.directory : process.cwd()
-      const callerTeamLead = resolveCallerTeamLead(runtimeContext.agent)
-      if (callerTeamLead.displayName !== undefined) {
-        const callerAgentKey = getAgentConfigKey(callerTeamLead.displayName)
-        const callerRegistryEntry = AGENT_ELIGIBILITY_REGISTRY[callerAgentKey]
-        if (callerRegistryEntry?.verdict === "hard-reject") {
-          throw new Error(`team_create denied: caller '${callerAgentKey}' is a hard-reject agent and cannot create teams regardless of an explicit 'lead' in the spec. ${callerRegistryEntry.rejectionMessage ?? `Agent '${callerAgentKey}' is not eligible to lead a team.`}`)
+      const finalAgentRegistry = parseFinalOpenCodeAgentRegistry(
+        await client.app.agents({ query: { directory: projectRoot } }),
+      )
+      const callerTeamLead = resolveCallerTeamLead(
+        runtimeContext.agent,
+        finalAgentRegistry,
+        executorConfig?.agentOverrides,
+      )
+      if (!callerTeamLead.isEligibleForTeamLead) {
+        const callerDisplayName = callerTeamLead.displayName ?? "unknown"
+        const callerAgentKey = getAgentConfigKey(callerDisplayName)
+        if (callerTeamLead.displayName !== undefined) {
+          const callerRegistryEntry = AGENT_ELIGIBILITY_REGISTRY[callerAgentKey]
+          if (callerRegistryEntry?.verdict === "hard-reject") {
+            throw new Error(`team_create denied: caller '${callerAgentKey}' is a hard-reject agent and cannot create teams regardless of an explicit 'lead' in the spec. ${callerRegistryEntry.rejectionMessage ?? `Agent '${callerAgentKey}' is not eligible to lead a team.`}`)
+          }
         }
-        if (!callerTeamLead.isEligibleForTeamLead) {
-          throw new Error(`team_create denied: caller '${callerAgentKey}' is not eligible to lead a team. Project-defined agents are member-only; use an eligible built-in caller.`)
-        }
+        throw new Error(`team_create denied: caller '${callerAgentKey}' is not an eligible built-in caller. Project-defined agents are member-only; use an eligible built-in caller.`)
       }
       const defaultCategoryName = resolveDefaultInlineCategory(executorConfig?.userCategories)
       const spec = args.teamName

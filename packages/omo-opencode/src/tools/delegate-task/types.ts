@@ -21,7 +21,14 @@ type SessionCreateResult =
   | { readonly data?: undefined; readonly error: unknown }
 
 type SessionGetResult = {
-  readonly data?: { readonly directory?: string }
+  readonly data?: {
+    readonly directory?: string
+    readonly permission?: readonly {
+      readonly permission: string
+      readonly pattern: string
+      readonly action: "allow" | "ask" | "deny"
+    }[]
+  }
   readonly error?: unknown
 }
 type SessionGetInput = SessionPathInput & {

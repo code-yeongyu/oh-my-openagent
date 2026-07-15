@@ -72,9 +72,19 @@ function setMemberWorktree(spec: TeamSpec, memberIndex: number, worktreePath: st
   spec.members[memberIndex] = { ...member, worktreePath }
 }
 
-function createContext(baseDir: string, manager: BackgroundManager): ExecutorContext & { client: { session: { create: ReturnType<typeof mock> } } } {
+function createContext(
+  baseDir: string,
+  manager: BackgroundManager,
+  parentPermission: readonly { permission: string; pattern: string; action: "allow" | "ask" | "deny" }[] = [],
+): ExecutorContext & { client: { session: { create: ReturnType<typeof mock>; get: ReturnType<typeof mock> } } } {
   return {
-    client: { session: { create: mock(async () => ({ data: { id: "forbidden" } })) } } as ExecutorContext["client"] & { session: { create: ReturnType<typeof mock> } },
+    client: {
+      app: { agents: mock(async () => ({ data: [] })) },
+      session: {
+        create: mock(async () => ({ data: { id: "forbidden" } })),
+        get: mock(async () => ({ data: { id: "lead-session", directory: baseDir, permission: parentPermission } })),
+      },
+    } as ExecutorContext["client"] & { session: { create: ReturnType<typeof mock>; get: ReturnType<typeof mock> } },
     manager,
     directory: baseDir,
   }
@@ -121,6 +131,37 @@ describe("createTeamRun", () => {
 
   afterEach(() => {
     clearSessionTeamRunCleanupRegistry()
+  })
+
+  test("passes inherited parent permission before Team restrictions during member preflight", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-parent-permission-"))
+    temporaryDirectories.push(baseDir)
+    const { manager } = createManager(baseDir, async (input) => ({
+      id: `task-${input.agent}`,
+      sessionId: `${input.agent}-session`,
+      status: "running",
+    } as BackgroundTask))
+    const parentPermission = [
+      { permission: "team_status", pattern: "*", action: "deny" as const },
+    ]
+
+    // when
+    await createTeamRun(
+      createSpec(1),
+      "lead-session",
+      createContext(baseDir, manager, parentPermission),
+      createConfig(baseDir),
+      manager,
+    )
+
+    // then
+    expect(resolveMemberMock.mock.calls[0]?.[2]).toMatchObject({
+      parentSessionPermission: parentPermission,
+      teamSessionPermission: [
+        { permission: "question", pattern: "*", action: "deny" },
+      ],
+    })
   })
 
   afterAll(async () => {

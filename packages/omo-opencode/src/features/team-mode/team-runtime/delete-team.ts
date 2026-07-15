@@ -1,3 +1,5 @@
+import { rm } from "node:fs/promises"
+
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import { log } from "../../../shared/logger"
 import type { BackgroundManager } from "../../background-agent/manager"
@@ -8,8 +10,9 @@ import { getRuntimeStateDir, resolveBaseDir } from "../team-registry/paths"
 import { unregisterTeamSessionsByTeam } from "../team-session-registry"
 import { listActiveTeams, loadRuntimeState, saveRuntimeState, transitionRuntimeState } from "../team-state-store/store"
 import type { RuntimeState } from "../types"
-import { DELETABLE_MEMBER_STATUSES, removeWorktrees } from "./shutdown-helpers"
+import { DELETABLE_MEMBER_STATUSES } from "./shutdown-helpers"
 import { unregisterTeamRunForSessionCleanup } from "./session-team-run-registry"
+import { removeOwnedWorktreeDirectories } from "./worktree-ownership"
 
 export type DeleteTeamDeps = {
   canVisualize: typeof canVisualize
@@ -94,10 +97,21 @@ export async function deleteTeam(
       return await deleteTeamResources(teamRunId, config, runtimeState, tmuxMgr, options, deps)
     }
 
-    await Promise.all(teamTasks.map((task) => bgMgr.cancelTask(task.id, {
-      source: "team-mode-delete",
-      reason: `delete team ${teamRunId}`,
-    })))
+    const cancellationFailures: string[] = []
+    for (const task of teamTasks) {
+      try {
+        const cancelled = await bgMgr.cancelTask(task.id, {
+          source: "team-mode-delete",
+          reason: `delete team ${teamRunId}`,
+        })
+        if (cancelled !== true) cancellationFailures.push(`${task.id}: cancellation was not confirmed`)
+      } catch (error) {
+        cancellationFailures.push(`${task.id}: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+    if (cancellationFailures.length > 0) {
+      throw new Error(`team cancellation failed: ${cancellationFailures.join("; ")}`)
+    }
   }
 
   return await deleteTeamResources(teamRunId, config, runtimeState, tmuxMgr, options, deps)
@@ -175,7 +189,15 @@ async function deleteTeamResources(
     }
   }
 
-  const removedWorktrees = await removeWorktrees(runtimeState.members.map((member) => member.ownedWorktreeRoot))
+  const worktreeCleanup = await removeOwnedWorktreeDirectories(runtimeState.members.map((member) => ({
+    ownedWorktreeRoot: member.ownedWorktreeRoot,
+    worktreeOwnershipToken: member.worktreeOwnershipToken,
+    worktreeCanonicalPath: member.worktreeCanonicalPath,
+  })))
+  if (worktreeCleanup.errors.length > 0) {
+    throw new Error(`worktree cleanup refused: ${worktreeCleanup.errors.join("; ")}`)
+  }
+  const removedWorktrees = worktreeCleanup.removedWorktrees
 
   if (runtimeState.status !== "deleted") {
     await transitionRuntimeState(teamRunId, (currentRuntimeState) => (
@@ -185,7 +207,7 @@ async function deleteTeamResources(
     ), config)
   }
 
-  await removeWorktrees([getRuntimeStateDir(resolveBaseDir(config), teamRunId)])
+  await rm(getRuntimeStateDir(resolveBaseDir(config), teamRunId), { recursive: true, force: true })
 
   unregisterTeamSessionsByTeam(teamRunId)
   unregisterTeamRunForSessionCleanup(teamRunId)
