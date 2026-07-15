@@ -438,7 +438,7 @@ Skill sets provide specialized workflows with embedded MCP servers and detailed 
 | Skill set              | Trigger                                                 | Description                                                                                                                                                                                                                                                                                                                                   |
 | ---------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **git-master**         | commit, rebase, squash, "who wrote", "when was X added" | Git expert. Detects commit styles, splits atomic commits, formulates rebase strategies. Three specializations: Commit Architect (atomic commits, dependency ordering), Rebase Surgeon (history rewriting, conflict resolution), and History Archaeologist (finding when/where specific changes were introduced).                              |
-| **playwright**         | Browser tasks, testing, screenshots                     | Browser automation via Playwright MCP. MUST USE for browser verification, browsing, web scraping, testing, and screenshots.                                                                                                                                                                                                                   |
+| **playwright**         | Browser tasks, testing, screenshots                     | Browser automation via a tiered stack (aside LLM ask mode by default, openchrome real Chrome, Playwright MCP fallback), selected by `browser_automation_engine.provider`. MUST USE for browser verification, browsing, web scraping, testing, and screenshots.                                                                                                                                                                                                                   |
 | **agent-browser**      | Browser tasks on agent-browser                          | Browser automation via the `agent-browser` CLI. Covers navigation, snapshots, screenshots, network inspection, and scripted interactions.                                                                                                                                                                                                     |
 | **dev-browser**        | Stateful browser scripting                              | Browser automation with persistent page state for iterative workflows and authenticated sessions.                                                                                                                                                                                                                                             |
 | **frontend**           | UI/UX tasks, styling                                    | Designer-turned-developer persona. Crafts strong UI/UX even without design mockups. Emphasizes bold aesthetic direction, distinctive typography, cohesive color palettes.                                                                                                                                                                     |
@@ -482,9 +482,33 @@ Skill sets provide specialized workflows with embedded MCP servers and detailed 
 
 ### Browser Automation Options
 
-Oh-My-OpenAgent provides two browser automation providers, configurable via `browser_automation_engine.provider`.
+Oh-My-OpenAgent selects the browser automation engine via `browser_automation_engine.provider`. The default (`openchrome-aside`) is a tiered stack: it leads with the aside AI browser's LLM ask mode, uses openchrome for deterministic real-Chrome precision, and falls back to Playwright MCP when neither is installed. Every provider is exposed through the same `playwright` skill trigger. Other providers (`playwright-cli`, `dev-browser`) are listed in the [configuration reference](configuration.md#browser-automation).
 
-#### Option 1: Playwright MCP (Default)
+#### Option 1: openchrome + aside (Default)
+
+Tiered stack; no configuration needed because it is the default.
+
+```json
+{
+  "browser_automation_engine": {
+    "provider": "openchrome-aside"
+  }
+}
+```
+
+- **Tier 1 (primary): aside LLM ask mode.** `aside "<task>"` drives a real, logged-in browser from a natural-language task. Install: `curl -fsSL https://releases.aside.com/install.sh | bash`.
+- **Tier 2 (precision): openchrome.** Deterministic real Chrome over CDP through the `oc` CLI (or its MCP). Install: `npm install -g openchrome-mcp`.
+- **Tier 3 (fallback): Playwright MCP.** Always available via npx, so browser automation still works with zero setup when aside and openchrome are absent.
+
+#### Option 2: Playwright MCP
+
+```json
+{
+  "browser_automation_engine": {
+    "provider": "playwright"
+  }
+}
+```
 
 ```yaml
 mcp:
@@ -493,13 +517,7 @@ mcp:
     args: ["@playwright/mcp@latest"]
 ```
 
-**Usage**:
-
-```
-/playwright Navigate to example.com and take a screenshot
-```
-
-#### Option 2: Agent Browser CLI (Vercel)
+#### Option 3: Agent Browser CLI (Vercel)
 
 ```json
 {
@@ -515,13 +533,7 @@ mcp:
 bun add -g agent-browser
 ```
 
-**Usage**:
-
-```
-Use agent-browser to navigate to example.com and extract the main heading
-```
-
-**Capabilities (Both Providers)**:
+**Capabilities (All Providers)**:
 
 - Navigate and interact with web pages
 - Take screenshots and PDFs

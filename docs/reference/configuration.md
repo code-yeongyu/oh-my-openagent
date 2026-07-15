@@ -557,15 +557,20 @@ Available commands: `init-deep`, `ralph-loop`, `ulw-loop`, `cancel-ralph`, `refa
 
 ### Browser Automation
 
-| Provider               | Interface | Installation                                        |
-| ---------------------- | --------- | --------------------------------------------------- |
-| `playwright` (default) | MCP tools | Auto-installed via npx                              |
-| `agent-browser`        | Bash CLI  | `bun add -g agent-browser && agent-browser install` |
+The `browser_automation_engine.provider` field selects the browser skill implementation. The default `openchrome-aside` is a tiered stack: aside LLM ask mode first, openchrome for deterministic real Chrome, and Playwright MCP as a zero-setup fallback when aside and openchrome are not installed. Every provider is exposed through the `playwright` skill trigger.
+
+| Provider                     | Interface                              | Installation                                                    |
+| ---------------------------- | -------------------------------------- | --------------------------------------------------------------- |
+| `openchrome-aside` (default) | aside/oc CLI + Playwright MCP fallback | aside CLI + `npm install -g openchrome-mcp`; fallback needs none |
+| `playwright`                 | MCP tools                              | Auto-installed via npx                                          |
+| `agent-browser`              | Bash CLI                               | `bun add -g agent-browser && agent-browser install`             |
+| `playwright-cli`             | Bash CLI                               | `playwright-cli install`                                        |
+| `dev-browser`                | Persistent Chromium                    | Chromium via npx                                                |
 
 Switch provider:
 
 ```json
-{ "browser_automation_engine": { "provider": "agent-browser" } }
+{ "browser_automation_engine": { "provider": "playwright" } }
 ```
 
 ### Tmux Integration
