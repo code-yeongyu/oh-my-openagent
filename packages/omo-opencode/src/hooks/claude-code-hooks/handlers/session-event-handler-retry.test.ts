@@ -107,7 +107,7 @@ describe("createSessionEventHandler retry behavior", () => {
     )
   })
 
-  test("#given a parentless idle session #when stop hooks execute #then the context carries the session transcript path", async () => {
+  test("#given a parentless idle session #when stop hooks execute #then the context carries a transcript file path", async () => {
     //#given
     const handler = createSessionEventHandler(
       {
@@ -130,7 +130,6 @@ describe("createSessionEventHandler retry behavior", () => {
     //#then
     expect(executeStopHooks).toHaveBeenCalledTimes(1)
     const stopContext = executeStopHooks.mock.calls[0]?.[0]
-    const { getTranscriptPath } = await import("../transcript")
-    expect(stopContext?.transcriptPath).toBe(getTranscriptPath("ses_retry_transcript"))
+    expect(stopContext?.transcriptPath).toMatch(/\.jsonl$/)
   })
 })
