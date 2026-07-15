@@ -122,7 +122,9 @@ export async function resolveProjectAgentMember(
     )
   }
   if (agent.native !== false) {
-    return undefined
+    throw new ProjectAgentMemberError(
+      `Native OpenCode agent '${member.subagent_type}' is outside Team Mode's static eligibility registry and cannot join a team.`,
+    )
   }
   if (agent.hidden === true) {
     throw new ProjectAgentMemberError(`Project agent '${member.subagent_type}' is hidden and cannot join a team.`)

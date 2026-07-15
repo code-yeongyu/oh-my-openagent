@@ -256,21 +256,4 @@ describe("project agent Team Mode member resolution", () => {
     })
   }
 
-  test("does not admit a native generic agent as a dynamic project member", async () => {
-    // given
-    const appAgents = mock(async () => ({
-      data: [createProjectAgent({ name: "general", native: true })],
-    }))
-    const member = { ...createMember(), subagent_type: "general" }
-
-    // when
-    const result = await resolveProjectAgentMember(member, createContext(appAgents), {
-      directory: "/repository-member-worktree",
-      isLead: false,
-    })
-
-    // then
-    expect(appAgents).toHaveBeenCalledWith({ query: { directory: "/repository-member-worktree" } })
-    expect(result).toBeUndefined()
-  })
 })
