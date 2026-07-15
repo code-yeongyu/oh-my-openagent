@@ -419,6 +419,11 @@ describe("createTeamRun", () => {
     }
     const ownedWorktreeRoot = path.resolve(baseDir, "./worktrees/member-2")
     const attemptedInboxes: string[] = []
+    let metadataBeforeInbox: Array<{
+      name: string
+      worktreePath: string | undefined
+      ownedWorktreeRoot: string | undefined
+    }> | undefined
 
     // when
     const result = createTeamRun(
@@ -431,6 +436,14 @@ describe("createTeamRun", () => {
       { callerAgentTypeId: "sisyphus" },
       {
         createInbox: async (inboxDir) => {
+          if (attemptedInboxes.length === 0) {
+            const persistedState = await loadSingleRuntimeState(baseDir)
+            metadataBeforeInbox = persistedState.members.map((member) => ({
+              name: member.name,
+              worktreePath: member.worktreePath,
+              ownedWorktreeRoot: member.ownedWorktreeRoot,
+            }))
+          }
           attemptedInboxes.push(inboxDir)
           await mkdir(inboxDir, { recursive: true })
           if (attemptedInboxes.length === 2) throw new Error("inbox creation failed")
@@ -448,7 +461,17 @@ describe("createTeamRun", () => {
       expect(error.cleanupReport.removedWorktrees).toEqual([ownedWorktreeRoot])
     }
     const runtimeState = await loadSingleRuntimeState(baseDir)
+    const expectedMetadata = [
+      { name: "member-1", worktreePath: existingWorktree, ownedWorktreeRoot: undefined },
+      { name: "member-2", worktreePath: ownedWorktreeRoot, ownedWorktreeRoot },
+    ]
     expect(runtimeState.status).toBe("failed")
+    expect(metadataBeforeInbox).toEqual(expectedMetadata)
+    expect(runtimeState.members.map((member) => ({
+      name: member.name,
+      worktreePath: member.worktreePath,
+      ownedWorktreeRoot: member.ownedWorktreeRoot,
+    }))).toEqual(expectedMetadata)
     expect(lookupTeamSession("lead-session")).toBeUndefined()
     expect(getSessionCreatedTeamRunIds()).toEqual([])
     expect(launchMock).not.toHaveBeenCalled()

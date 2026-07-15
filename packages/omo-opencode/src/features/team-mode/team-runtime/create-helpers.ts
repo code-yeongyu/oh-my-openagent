@@ -7,6 +7,7 @@ import { buildTeammateCommunicationAddendum } from "../member-guidance"
 import { getTeamSpecPath, resolveBaseDir } from "../team-registry/paths"
 import { listActiveTeams, loadRuntimeState, transitionRuntimeState } from "../team-state-store/store"
 import type { RuntimeState, TeamSpec } from "../types"
+import type { PreparedTeamMember } from "./prepare-team-members"
 import { hasUnresolvedTeamMembers } from "./unresolved-team-members"
 
 const SESSION_ID_POLL_MS = 25
@@ -88,5 +89,28 @@ export async function updateMemberInRuntimeState(input: {
     members: currentState.members.map((member) =>
       member.name === input.memberName ? input.patch(member) : member,
     ),
+  }), input.config)
+}
+
+export async function persistPreparedMemberResources(input: {
+  readonly teamRunId: string
+  readonly preparedMembers: readonly PreparedTeamMember[]
+  readonly config: TeamModeConfig
+}): Promise<RuntimeState> {
+  const resourcesByMemberName = new Map(input.preparedMembers.map((preparedMember) => [
+    preparedMember.member.name,
+    preparedMember.resource,
+  ]))
+  return transitionRuntimeState(input.teamRunId, (currentState) => ({
+    ...currentState,
+    members: currentState.members.map((member) => {
+      const resource = resourcesByMemberName.get(member.name)
+      if (!resource) return member
+      return {
+        ...member,
+        ...(resource.worktreePath ? { worktreePath: resource.worktreePath } : {}),
+        ...(resource.ownedWorktreeRoot ? { ownedWorktreeRoot: resource.ownedWorktreeRoot } : {}),
+      }
+    }),
   }), input.config)
 }

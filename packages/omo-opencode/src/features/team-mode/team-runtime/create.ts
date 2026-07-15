@@ -16,6 +16,7 @@ import { cleanupPreparedTeamRunResources, cleanupTeamRunResources } from "./clea
 import {
   buildMemberPrompt,
   findExistingRuntime,
+  persistPreparedMemberResources,
   resolveSpecSource,
   updateMemberInRuntimeState,
   waitForTaskSessionId,
@@ -113,6 +114,11 @@ export async function createTeamRun(
   let createdLayout = false
 
   try {
+    runtimeState = await persistPreparedMemberResources({
+      teamRunId: runtimeState.teamRunId,
+      preparedMembers,
+      config,
+    })
     registerTeamRunForSessionCleanup(runtimeState.teamRunId)
     if (reusesCallerLeadSession && spec.leadAgentId) {
       const callerLeadSubagentType = options?.callerAgentTypeId
