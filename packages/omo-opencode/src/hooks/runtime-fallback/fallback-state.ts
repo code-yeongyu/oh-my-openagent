@@ -71,7 +71,7 @@ export function findNextAvailableFallback(
   state: FallbackState,
   fallbackModels: string[],
   cooldownSeconds: number
-): string | undefined {
+): { model: string; index: number } | undefined {
   for (let i = state.fallbackIndex + 1; i < fallbackModels.length; i++) {
     const candidate = fallbackModels[i]
     if (areRuntimeFallbackModelsEquivalent(candidate, state.currentModel)) {
@@ -94,7 +94,7 @@ export function findNextAvailableFallback(
     }
 
     if (!isModelInCooldown(candidate, state, cooldownSeconds)) {
-      return candidate
+      return { model: candidate, index: i }
     }
     log(`[${HOOK_NAME}] Skipping fallback model in cooldown`, { model: candidate, index: i })
   }
@@ -113,9 +113,9 @@ export function prepareFallback(
     return { success: false, error: "Max fallback attempts reached", maxAttemptsReached: true }
   }
 
-  const nextModel = findNextAvailableFallback(state, fallbackModels, config.cooldown_seconds)
+  const nextResult = findNextAvailableFallback(state, fallbackModels, config.cooldown_seconds)
 
-  if (!nextModel) {
+  if (!nextResult) {
     log(`[${HOOK_NAME}] No available fallback models`, { sessionID })
     return { success: false, error: "No available fallback models (all in cooldown or exhausted)" }
   }
@@ -123,7 +123,7 @@ export function prepareFallback(
   log(`[${HOOK_NAME}] Preparing fallback`, {
     sessionID,
     from: state.currentModel,
-    to: nextModel,
+    to: nextResult.model,
     attempt: state.attemptCount + 1,
     isProviderFailure: options?.isProviderFailure ?? false,
   })
@@ -131,7 +131,7 @@ export function prepareFallback(
   const failedModel = state.currentModel
   const now = Date.now()
 
-  state.fallbackIndex = fallbackModels.indexOf(nextModel)
+  state.fallbackIndex = nextResult.index
   state.failedModels.set(failedModel, now)
   
   // Mark provider as failed for provider-wide errors (quota exhaustion, rate limits)
@@ -140,8 +140,8 @@ export function prepareFallback(
   }
   
   state.attemptCount++
-  state.currentModel = nextModel
-  state.pendingFallbackModel = nextModel
+  state.currentModel = nextResult.model
+  state.pendingFallbackModel = nextResult.model
 
-  return { success: true, newModel: nextModel }
+  return { success: true, newModel: nextResult.model }
 }

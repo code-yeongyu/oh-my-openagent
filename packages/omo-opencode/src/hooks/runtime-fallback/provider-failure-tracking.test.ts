@@ -81,7 +81,7 @@ describe("provider-level failure tracking", () => {
       ]
       
       const next = findNextAvailableFallback(state, fallbackModels, 60)
-      expect(next).toBe("anthropic/claude-3.5-sonnet")
+      expect(next?.model).toBe("anthropic/claude-3.5-sonnet")
     })
 
     test("returns undefined when all providers in cooldown", () => {
