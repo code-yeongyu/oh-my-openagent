@@ -187,3 +187,61 @@ describe("fallback-state-snapshot round-trip", () => {
     expect(snapshot.failedProviders.size).toBe(1)
   })
 })
+
+describe("error type classification from retry messages", () => {
+  // These patterns mirror those used in session-status-handler.ts
+  const RATE_LIMIT_PATTERNS = [
+    "rate limit exceeded",
+    "Rate-Limit: too many requests",
+    "429 Too Many Requests",
+    "quota will reset after 2024-01-01",
+    "quota exceeded for this month",
+    "You have exhausted your capacity",
+    "limit exhausted",
+    "cooling down, please try again later",
+    "频率限制",
+    "使用上限",
+    "请求过于频繁",
+  ]
+
+  const OVERLOAD_PATTERNS = [
+    "overloaded, please try again later",
+    "529 model overloaded",
+  ]
+
+  const TRANSIENT_PATTERNS = [
+    "500 Internal Server Error",
+    "503 Service Unavailable",
+    "connection reset",
+    "timeout",
+  ]
+
+  function classifyErrorType(retryMessage: string): string | undefined {
+    const messageLower = retryMessage.toLowerCase()
+    if (/rate.?limit|too.?many.?requests|(?:^|\s)429(?:\s|$)|quota|exhausted.*capacity|limit\s+exhausted|cool.*down|频率限制|使用上限|请求过于频繁/.test(messageLower)) {
+      return "rate_limit"
+    }
+    if (/overloaded|(?:^|\s)529(?:\s|$)/.test(messageLower)) {
+      return "quota_exceeded"
+    }
+    return undefined
+  }
+
+  test("classifies rate limit patterns as rate_limit", () => {
+    for (const msg of RATE_LIMIT_PATTERNS) {
+      expect(classifyErrorType(msg)).toBe("rate_limit")
+    }
+  })
+
+  test("classifies overload patterns as quota_exceeded", () => {
+    for (const msg of OVERLOAD_PATTERNS) {
+      expect(classifyErrorType(msg)).toBe("quota_exceeded")
+    }
+  })
+
+  test("returns undefined for transient errors (no provider-level marking)", () => {
+    for (const msg of TRANSIENT_PATTERNS) {
+      expect(classifyErrorType(msg)).toBeUndefined()
+    }
+  })
+})
