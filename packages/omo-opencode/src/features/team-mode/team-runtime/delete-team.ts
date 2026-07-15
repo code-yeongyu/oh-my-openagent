@@ -175,7 +175,7 @@ async function deleteTeamResources(
     }
   }
 
-  const removedWorktrees = await removeWorktrees(runtimeState.members.map((member) => member.worktreePath))
+  const removedWorktrees = await removeWorktrees(runtimeState.members.map((member) => member.ownedWorktreeRoot))
 
   if (runtimeState.status !== "deleted") {
     await transitionRuntimeState(teamRunId, (currentRuntimeState) => (

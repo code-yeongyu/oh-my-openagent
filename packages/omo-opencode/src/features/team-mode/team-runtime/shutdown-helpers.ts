@@ -65,13 +65,13 @@ export function findLatestShutdownRequestIndex(
   return -1
 }
 
-export async function removeWorktrees(memberPaths: Array<string | undefined>): Promise<string[]> {
+export async function removeWorktrees(ownedRoots: Array<string | undefined>): Promise<string[]> {
   const removedWorktrees: string[] = []
 
-  for (const memberPath of new Set(memberPaths)) {
-    if (!memberPath) continue
-    await rm(memberPath, { recursive: true, force: true })
-    removedWorktrees.push(memberPath)
+  for (const ownedRoot of new Set(ownedRoots)) {
+    if (!ownedRoot) continue
+    await rm(ownedRoot, { recursive: true, force: true })
+    removedWorktrees.push(ownedRoot)
   }
 
   return removedWorktrees

@@ -51,7 +51,10 @@ export function createSpec(worktreeRoot: string): TeamSpec {
   }
 }
 
-export async function createFixture(options?: { status?: RuntimeState["status"] }): Promise<{
+export async function createFixture(options?: {
+  status?: RuntimeState["status"]
+  ownedWorktrees?: boolean
+}): Promise<{
   baseDir: string
   config: TeamModeConfig
   teamRunId: string
@@ -78,6 +81,7 @@ export async function createFixture(options?: { status?: RuntimeState["status"] 
         status: "pending",
         pendingInjectedMessageIds: [],
         worktreePath: path.join(worktreeRoot, "member-a"),
+        ...((options?.ownedWorktrees ?? true) ? { ownedWorktreeRoot: path.join(worktreeRoot, "member-a") } : {}),
       },
       {
         name: "member-b",
@@ -85,6 +89,7 @@ export async function createFixture(options?: { status?: RuntimeState["status"] 
         status: "pending",
         pendingInjectedMessageIds: [],
         worktreePath: path.join(worktreeRoot, "member-b"),
+        ...((options?.ownedWorktrees ?? true) ? { ownedWorktreeRoot: path.join(worktreeRoot, "member-b") } : {}),
       },
     ],
     shutdownRequests: [],

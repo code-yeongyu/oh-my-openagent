@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
-import { access, mkdir, rm } from "node:fs/promises"
+import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
 
 import { sendMessage } from "../team-mailbox/send"
@@ -186,6 +186,28 @@ describe("team-runtime shutdown", () => {
     )
   })
 
+  test("preserves legacy member worktree paths without ownership during normal deletion", async () => {
+    // given
+    const fixture = await createFixture({ ownedWorktrees: false })
+    temporaryDirectories.push(fixture.baseDir)
+    await updateMemberStatuses(fixture.teamRunId, fixture.config, {
+      "member-a": "shutdown_approved",
+      "member-b": "shutdown_approved",
+    })
+    const preExistingWorktree = fixture.worktreePaths[0]
+    if (!preExistingWorktree) throw new Error("missing fixture worktree")
+    const sentinelPath = path.join(preExistingWorktree, "sentinel.txt")
+    await mkdir(preExistingWorktree, { recursive: true })
+    await writeFile(sentinelPath, "keep-normal")
+
+    // when
+    const result = await deleteTeam(fixture.teamRunId, fixture.config)
+
+    // then
+    expect(result.removedWorktrees).toEqual([])
+    expect(await readFile(sentinelPath, "utf8")).toBe("keep-normal")
+  })
+
   test("#given a team run is tracked for session cleanup #when deleteTeam succeeds #then it unregisters the run", async () => {
     // given
     const fixture = await createFixture()
@@ -232,6 +254,28 @@ describe("team-runtime shutdown", () => {
       () => { throw new Error(`expected ${runtimeStateDirectory} to be removed`) },
       () => undefined,
     )
+  })
+
+  test("preserves pre-existing member worktree paths without ownership during force deletion", async () => {
+    // given
+    const fixture = await createFixture({ ownedWorktrees: false })
+    temporaryDirectories.push(fixture.baseDir)
+    await updateMemberStatuses(fixture.teamRunId, fixture.config, {
+      "member-a": "running",
+      "member-b": "running",
+    })
+    const preExistingWorktree = fixture.worktreePaths[0]
+    if (!preExistingWorktree) throw new Error("missing fixture worktree")
+    const sentinelPath = path.join(preExistingWorktree, "sentinel.txt")
+    await mkdir(preExistingWorktree, { recursive: true })
+    await writeFile(sentinelPath, "keep-force")
+
+    // when
+    const result = await deleteTeam(fixture.teamRunId, fixture.config, undefined, undefined, { force: true })
+
+    // then
+    expect(result.removedWorktrees).toEqual([])
+    expect(await readFile(sentinelPath, "utf8")).toBe("keep-force")
   })
 
   test("force deletes a team stuck in 'creating' status", async () => {
@@ -298,7 +342,7 @@ describe("team-runtime shutdown", () => {
     await transitionRuntimeState(fixture.teamRunId, (runtimeState) => ({
       ...runtimeState,
       members: runtimeState.members.map((member) => member.name === "lead"
-        ? { ...member, worktreePath: leadWorktreePath }
+        ? { ...member, worktreePath: leadWorktreePath, ownedWorktreeRoot: leadWorktreePath }
         : member),
     }), fixture.config)
     await mkdir(leadWorktreePath, { recursive: true })
