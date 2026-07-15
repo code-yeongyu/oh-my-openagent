@@ -74,13 +74,13 @@ function matchesOpenCodeWildcard(value: string, pattern: string): boolean {
   return new RegExp(`^${expression}$`, flags).test(normalizedValue)
 }
 
-function isToolDisabled(agent: OpenCodeAgent, tool: string): boolean {
+function isToolAllowed(agent: OpenCodeAgent, tool: string): boolean {
   const effectiveRule = agent.permission.findLast((rule) => matchesOpenCodeWildcard(tool, rule.permission))
-  return effectiveRule?.pattern === "*" && effectiveRule.action === "deny"
+  return effectiveRule?.pattern === "*" && effectiveRule.action === "allow"
 }
 
 function getMissingTeamTools(agent: OpenCodeAgent): readonly string[] {
-  return REQUIRED_TEAM_MEMBER_TOOLS.filter((tool) => isToolDisabled(agent, tool))
+  return REQUIRED_TEAM_MEMBER_TOOLS.filter((tool) => !isToolAllowed(agent, tool))
 }
 
 function parseAgentRegistry(response: unknown): readonly OpenCodeAgent[] {
@@ -143,7 +143,7 @@ export async function resolveProjectAgentMember(
   const missingTools = getMissingTeamTools(agent)
   if (missingTools.length > 0) {
     throw new ProjectAgentMemberError(
-      `Project agent '${member.subagent_type}' denies required Team Mode tools: ${missingTools.join(", ")}.`,
+      `Project agent '${member.subagent_type}' does not allow required Team Mode tools: ${missingTools.join(", ")}.`,
     )
   }
 

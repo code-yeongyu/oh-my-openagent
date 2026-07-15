@@ -164,6 +164,49 @@ describe("project agent Team Mode member resolution", () => {
     await expect(result).rejects.toThrow("team_status")
   })
 
+  test("rejects a member when an explicit required-tool ask follows wildcard allow", async () => {
+    // given
+    const appAgents = mock(async () => ({
+      data: [createProjectAgent({
+        permission: [
+          { permission: "*", pattern: "*", action: "allow" },
+          { permission: "team_status", pattern: "*", action: "ask" },
+        ],
+      })],
+    }))
+
+    // when
+    const result = resolveProjectAgentMember(createMember(), createContext(appAgents), {
+      directory: "/repository-member-worktree",
+      isLead: false,
+    })
+
+    // then
+    await expect(result).rejects.toBeInstanceOf(ProjectAgentMemberError)
+    await expect(result).rejects.toThrow("team_status")
+  })
+
+  test("accepts a member when explicit all-five allows follow wildcard ask", async () => {
+    // given
+    const appAgents = mock(async () => ({
+      data: [createProjectAgent({
+        permission: [
+          { permission: "*", pattern: "*", action: "ask" },
+          ...REQUIRED_TEAM_TOOLS.map((permission) => ({ permission, pattern: "*", action: "allow" as const })),
+        ],
+      })],
+    }))
+
+    // when
+    const result = await resolveProjectAgentMember(createMember(), createContext(appAgents), {
+      directory: "/repository-member-worktree",
+      isLead: false,
+    })
+
+    // then
+    expect(result?.agentToUse).toBe("repository-reviewer")
+  })
+
   test("rejects hidden, primary, disabled, and incomplete project agents", async () => {
     for (const [label, agents] of [
       ["hidden", [createProjectAgent({ hidden: true })]],
