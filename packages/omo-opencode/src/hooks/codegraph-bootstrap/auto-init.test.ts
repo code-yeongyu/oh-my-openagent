@@ -1,9 +1,8 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, rmSync } from "node:fs"
 import { join } from "node:path"
-import { tmpdir } from "node:os"
 
 import {
   clearCodegraphBootstrapProjectsForTesting,
@@ -11,6 +10,12 @@ import {
   type CodegraphBootstrapDeps,
   type CodegraphBootstrapEventInput,
 } from "./index"
+
+function createAllowedWorkspace(name: string): string {
+  const workspace = join(process.cwd(), `.tmp-omo-codegraph-auto-init-${name}-${crypto.randomUUID()}`)
+  mkdirSync(workspace, { recursive: true })
+  return workspace
+}
 
 function createDeps(
   events: string[],
@@ -74,7 +79,7 @@ describe("codegraph-bootstrap auto_init", () => {
   // #then it should skip bootstrap without creating .codegraph
   test("#given auto_init is false and .codegraph does not exist #when bootstrap runs #then it skips without creating .codegraph", async () => {
     // given
-    workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-auto-init-skip-"))
+    workspace = createAllowedWorkspace("skip")
     expect(existsSync(join(workspace, ".codegraph"))).toBe(false)
     const events: string[] = []
     const scheduledTasks: Promise<void>[] = []
@@ -99,7 +104,7 @@ describe("codegraph-bootstrap auto_init", () => {
   // #then it should continue with sync (prepareWorkspace is called)
   test("#given auto_init is false and .codegraph already exists #when bootstrap runs #then it continues with sync", async () => {
     // given
-    workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-auto-init-existing-"))
+    workspace = createAllowedWorkspace("existing")
     mkdirSync(join(workspace, ".codegraph"), { recursive: true })
     expect(existsSync(join(workspace, ".codegraph"))).toBe(true)
     const events: string[] = []
@@ -123,7 +128,7 @@ describe("codegraph-bootstrap auto_init", () => {
   // #then it should proceed with bootstrap (current behavior preserved)
   test("#given auto_init is true and .codegraph does not exist #when bootstrap runs #then it proceeds with bootstrap", async () => {
     // given
-    workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-auto-init-true-"))
+    workspace = createAllowedWorkspace("true")
     expect(existsSync(join(workspace, ".codegraph"))).toBe(false)
     const events: string[] = []
     const scheduledTasks: Promise<void>[] = []
@@ -146,7 +151,7 @@ describe("codegraph-bootstrap auto_init", () => {
   // #then ensureProvisioned should NOT be called (minimal side effects)
   test("#given auto_init false with default auto_provision and no .codegraph #when bootstrap runs #then ensureProvisioned is not called", async () => {
     // given
-    workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-auto-init-no-provision-"))
+    workspace = createAllowedWorkspace("no-provision")
     expect(existsSync(join(workspace, ".codegraph"))).toBe(false)
     const events: string[] = []
     const scheduledTasks: Promise<void>[] = []
