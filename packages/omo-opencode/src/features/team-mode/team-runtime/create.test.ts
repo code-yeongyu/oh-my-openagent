@@ -484,7 +484,7 @@ describe("createTeamRun", () => {
     expect(await Promise.all(attemptedInboxes.map(pathExists))).toEqual([false, false])
   })
 
-  test("removes an overlapping owned worktree root once and reports only that root", async () => {
+  test("removes an owned member leaf while preserving a pre-existing sibling and shared parent", async () => {
     // given
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-overlapping-roots-"))
     temporaryDirectories.push(baseDir)
@@ -496,7 +496,12 @@ describe("createTeamRun", () => {
     const spec = createSpec(2)
     setMemberWorktree(spec, 0, "./shared/member-1")
     setMemberWorktree(spec, 1, "./shared/member-2")
-    const ownedWorktreeRoot = path.resolve(baseDir, "./shared")
+    const sharedRoot = path.resolve(baseDir, "./shared")
+    const ownedWorktreeRoot = path.join(sharedRoot, "member-1")
+    const existingSibling = path.join(sharedRoot, "member-2")
+    const siblingSentinel = path.join(existingSibling, "sentinel.txt")
+    await mkdir(existingSibling, { recursive: true })
+    await writeFile(siblingSentinel, "keep-sibling")
 
     // when
     const result = createTeamRun(
@@ -519,6 +524,8 @@ describe("createTeamRun", () => {
       expect(error.cleanupReport.removedWorktrees).toEqual([ownedWorktreeRoot])
     }
     expect(await pathExists(ownedWorktreeRoot)).toBe(false)
+    expect(await readFile(siblingSentinel, "utf8")).toBe("keep-sibling")
+    expect(await pathExists(sharedRoot)).toBe(true)
   })
 
   test("launches each member with its exact resolved identity, model, worktree directory, and question denial", async () => {

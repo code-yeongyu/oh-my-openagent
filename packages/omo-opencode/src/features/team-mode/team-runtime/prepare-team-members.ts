@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises"
+import { mkdir, stat } from "node:fs/promises"
 import path from "node:path"
 
 import { getAgentConfigKey } from "../../../shared/agent-display-names"
@@ -30,23 +30,6 @@ export class TeamMemberPreflightError extends Error {
   }
 }
 
-export function normalizeMkdirOwnershipPath(
-  createdPath: string | undefined,
-  platform: NodeJS.Platform,
-): string | undefined {
-  if (platform !== "win32" || !createdPath) return createdPath
-
-  const namespacePrefix = "\\\\?\\"
-  const uncNamespacePrefix = `${namespacePrefix}UNC\\`
-  if (createdPath.startsWith(uncNamespacePrefix)) {
-    return `\\\\${createdPath.slice(uncNamespacePrefix.length)}`
-  }
-  if (!createdPath.startsWith(namespacePrefix)) return createdPath
-
-  const ordinaryPath = createdPath.slice(namespacePrefix.length)
-  return /^[A-Za-z]:\\/.test(ordinaryPath) ? ordinaryPath : createdPath
-}
-
 export async function resolveMemberDirectory(
   worktreePath: string | undefined,
   projectRoot: string,
@@ -56,11 +39,24 @@ export async function resolveMemberDirectory(
   }
 
   const directory = path.isAbsolute(worktreePath) ? worktreePath : path.resolve(projectRoot, worktreePath)
-  const cleanupRoot = normalizeMkdirOwnershipPath(
-    await mkdir(directory, { recursive: true }),
-    process.platform,
-  )
-  return { directory, cleanupRoot }
+  const parentDirectory = path.dirname(directory)
+  if (parentDirectory !== path.parse(directory).root) {
+    await mkdir(parentDirectory, { recursive: true })
+  }
+
+  try {
+    await mkdir(directory)
+    return { directory, cleanupRoot: directory }
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "EEXIST") {
+      throw error
+    }
+    const metadata = await stat(directory)
+    if (!metadata.isDirectory()) {
+      throw error
+    }
+    return { directory, cleanupRoot: undefined }
+  }
 }
 
 function canReuseCallerAsLead(member: TeamSpec["members"][number]): boolean {
