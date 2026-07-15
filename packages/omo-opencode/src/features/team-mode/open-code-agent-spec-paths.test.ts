@@ -64,11 +64,12 @@ describe("OpenCode agent eligibility across Team spec paths", () => {
     const options = { eligibilityPolicy: DEFERRED_OPEN_CODE_AGENT_ELIGIBILITY }
 
     // when
-    const namedSpec = loadTeamSpec(teamName, config, projectRoot, options)
+    const namedSpec = expect(loadTeamSpec(teamName, config, projectRoot, options))
+      .rejects.toMatchObject({ code: "INELIGIBLE_AGENT" })
     const listedSpecs = await loadAllTeamSpecs(config, projectRoot, options)
 
     // then
-    await expect(namedSpec).rejects.toMatchObject({ code: "INELIGIBLE_AGENT" })
+    await namedSpec
     expect(listedSpecs).toEqual([
       expect.objectContaining({
         name: teamName,
