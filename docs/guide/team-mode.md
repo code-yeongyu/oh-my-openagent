@@ -69,16 +69,16 @@ When both scopes define the same team name, project scope wins.
 
 ## Member kinds
 
-- **`kind: "subagent_type"`** — direct agent (atlas, sisyphus, sisyphus-junior, hephaestus). `prompt` optional.
-- **`kind: "category"`** — routed through `sisyphus-junior` with the chosen category model. `prompt` REQUIRED.
+- **`kind: "subagent_type"`**: direct OMO built-in or an exact project-defined agent. For a project agent, Team Mode resolves `subagent_type` from OpenCode's final directory-scoped registry for that member's worktree. Its registry name, model, variant, prompt, and permissions stay intact. Team Mode does not substitute a category or generic agent. `prompt` is optional.
+- **`kind: "category"`**: routed through `sisyphus-junior` with the chosen category model. `prompt` REQUIRED.
 
 ## Eligible agents
 
-- **Eligible:** `sisyphus`, `atlas`, `sisyphus-junior`.
-- **Conditional:** `hephaestus` (needs teammate permission `teammate: "allow"`; otherwise use `subagent_type: "sisyphus"`).
-- **Hard-reject:** `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `prometheus`.
+- **OMO built-ins:** The static eligibility list still applies. `sisyphus`, `atlas`, and `sisyphus-junior` are eligible. `hephaestus` is conditional on its teammate permission. `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, and `prometheus` are hard-rejected. Use `task` for hard-rejected built-ins.
+- **Project agents:** A project-defined `.opencode/agents/*.md` agent is resolved separately by its exact final-registry identity, not by a generic static substitution. It must have mode `subagent` or `all`, `native: false`, not be hidden, and have effective `allow` for exactly `team_send_message`, `team_task_list`, `team_task_get`, `team_task_update`, and `team_status`. Missing, `ask`, or `deny` for any required tool rejects admission. `question` remains denied.
+- **Inherited restrictions:** OpenCode applies agent permissions and then parent-session permissions, with the last matching rule winning. Team Mode never grants or elevates permissions, so a parent restriction that makes a required tool `ask` or `deny` rejects the project agent.
 
-Hard-reject agents fail TeamSpec parsing because they cannot write mailbox state. Use `delegate-task` for those agents.
+Project agents are members only. The caller or lead of `team_create` must be a provenance-verified eligible OMO built-in. A project agent cannot lead, even if its name resembles a built-in, has a display alias, or includes a list-order prefix.
 
 ## Lifecycle
 
@@ -109,7 +109,11 @@ Hard-reject agents fail TeamSpec parsing because they cannot write mailbox state
 
 ## Worktrees (optional per member)
 
-Add `"worktreePath": "../wt-scout"` to a member entry. Path is filesystem-relative or absolute; bare branch names are rejected. Requires `git`.
+Add `"worktreePath": "../wt-scout"` to a member entry. The path may be explicitly relative to the project root or absolute. Bare branch names are rejected. Requires `git`.
+
+The member session and project-agent registry probes stay routed to that resolved directory. If Team Mode creates the exact leaf directory, it atomically assigns a private ownership token. Another active owner of that leaf conflicts. A pre-existing directory is usable but remains unowned and is preserved.
+
+Normal cleanup, force cleanup, and rollback remove only owned leaves whose adjacent and internal `.omo-team-owner.json` markers match the saved token. Shared ancestors, pre-existing directories, and legacy unowned paths remain in place. Explicit worktree paths can be anywhere, not only under `~/.omo`.
 
 ## tmux visualization (optional)
 
@@ -134,18 +138,20 @@ When enabled, each member gets a dedicated tmux pane attached to that member's s
 
 ```
 ~/.omo/
-├── teams/{name}/config.json                      # declared specs
-├── .highwatermark                                # parity marker for runtime state
-└── runtime/{teamRunId}/
+├── teams/{name}/config.json                      # user declaration scope
+├── .highwatermark                                # runtime parity marker
+└── runtime/{teamRunId}/                          # active runtime
     ├── state.json                                # durable runtime state
     ├── inboxes/{member}/{uuid}.json              # mailbox (atomic per-message files)
     ├── inboxes/{member}/.delivering-{uuid}.json  # transient live-delivery reservation
     ├── inboxes/{member}/processed/               # acked messages
     └── tasks/{id}.json                           # shared task list
+
+<project>/.omo/teams/{name}/config.json           # project declaration scope, wins on name collision
+<worktree-leaf>.omo-team-owner.json                # adjacent marker for an OMO-created leaf
+<worktree-leaf>/.omo-team-owner.json               # internal marker with the same ownership token
 ```
 
 `.delivering-{uuid}.json` files exist only while a message is being live-delivered via `promptAsync`. They are committed to `processed/` on delivery success, released back to `{uuid}.json` on failure, or reclaimed on team resume if stranded by a crash (10 minute TTL). `listUnreadMessages` ignores dotfile entries so the fallback poll never double-injects a reserved message.
 
-## Reference
-
-Full design: `.omo/plans/team-mode.md`.
+For Team Mode behavior and configuration, use this guide as the reference.

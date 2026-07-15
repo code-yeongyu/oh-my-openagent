@@ -783,13 +783,15 @@ To enable, edit your plugin config:
 
 Restart OpenCode after the change. Twelve new tools unlock: `team_create`, `team_delete`, `team_shutdown_request`, `team_approve_shutdown`, `team_reject_shutdown`, `team_send_message`, `team_task_create`, `team_task_list`, `team_task_update`, `team_task_get`, `team_status`, `team_list`.
 
-Team storage lives under `~/.omo/teams/{name}/` (user scope) or `<project>/.omo/teams/{name}/` (project scope — project beats user on collisions).
+Team declarations live under `~/.omo/teams/{name}/` (user scope) or `<project>/.omo/teams/{name}/` (project scope, which beats user on collisions). Active runtime state lives under the configured Team Mode base directory.
 
 Member eligibility:
 
 - **Eligible**: `sisyphus`, `atlas`, `sisyphus-junior`
 - **Conditional**: `hephaestus` (needs `teammate: "allow"` permission)
 - **Hard-rejected at parse**: `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `prometheus` (use `task`/`delegate-task` instead)
+
+Project-defined `.opencode/agents/*.md` agents can join as member-only `subagent_type` roles. They are resolved from the final registry for their member worktree with their exact configuration. They need a visible, non-native `subagent` or `all` definition and effective `allow` for the required member tools. Team Mode never raises permissions, and parent-session restrictions can reject a role. Worktree paths may be relative or absolute. OMO-created leaf directories are token-owned and cleaned only when their ownership markers match; pre-existing and shared paths remain untouched.
 
 Two skills already ride on top of Team Mode:
 

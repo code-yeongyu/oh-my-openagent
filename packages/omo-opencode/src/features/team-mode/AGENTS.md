@@ -51,7 +51,7 @@ Registered via [`src/plugin/tool-registry.ts`](../../plugin/tool-registry.ts) `t
 
 ## ELIGIBLE AGENTS
 
-[`AGENT_ELIGIBILITY_REGISTRY`](types.ts) in `types.ts` — three verdict tiers, each with its own rejection message:
+[`AGENT_ELIGIBILITY_REGISTRY`](types.ts) in `types.ts` governs OMO built-ins only. It has three verdict tiers, each with its own rejection message:
 
 | Verdict | Agents | Notes |
 |---------|--------|-------|
@@ -59,7 +59,9 @@ Registered via [`src/plugin/tool-registry.ts`](../../plugin/tool-registry.ts) `t
 | `conditional` | hephaestus | Lacks `teammate: "allow"` permission by default. Either apply D-36 patch (add `teammate: "allow"` in `tool-config-handler.ts`) or use `subagent_type: "sisyphus"` instead |
 | `hard-reject` | oracle, librarian, explore, multimodal-looker, metis, momus, prometheus | Read-only or plan-mode-only — cannot write to mailbox; use `task` (delegate-task) instead |
 
-Hard-reject agents throw at TeamSpec parse with a specific message ("Agent 'X' is read-only…"). The error message points members at delegate-task as the right escape hatch.
+Hard-reject built-ins throw at TeamSpec parse with a specific message ("Agent 'X' is read-only…"). The error message points members at delegate-task as the right escape hatch.
+
+Project-defined `.opencode/agents/*.md` roles are resolved separately by exact identity from OpenCode's final registry for the member worktree. They are member-only, never leads. Admission requires mode `subagent` or `all`, `native: false`, visibility, and effective `allow` for `team_send_message`, `team_task_list`, `team_task_get`, `team_task_update`, and `team_status`. Missing, `ask`, or `deny` rejects. `question` stays denied. Parent-session restrictions are applied after agent rules, so they can also reject admission. Team Mode does not grant or elevate permissions.
 
 ## MEMBER KINDS
 
@@ -72,8 +74,8 @@ Hard-reject agents throw at TeamSpec parse with a specific message ("Agent 'X' i
 }
 ```
 
-- `kind: "subagent_type"` — direct agent. `prompt` optional.
-- `kind: "category"` — routed through `sisyphus-junior` with the chosen category model. `prompt` REQUIRED.
+- `kind: "subagent_type"`: direct OMO built-in or exact project-defined agent. Project roles retain final-registry name, model, variant, prompt, and permissions. `prompt` optional.
+- `kind: "category"`: routed through `sisyphus-junior` with the chosen category model. `prompt` REQUIRED.
 
 ## MODULE LAYOUT
 
@@ -104,14 +106,17 @@ team-mode/
 ## STORAGE LAYOUT
 
 ```
-~/.omo/teams/{name}/                       # user scope
-<project>/.omo/teams/{name}/               # project scope (wins on collision)
-  ├── config.json                          # TeamSpec
-  ├── state.json                           # runtime: members, sessionIDs, lifecycle
-  ├── mailbox/                             # one .jsonl per recipient
-  ├── tasklist.jsonl                       # shared task list
-  └── worktrees/{member-name}/             # git worktree per member
+~/.omo/teams/{name}/config.json             # user declaration scope
+<project>/.omo/teams/{name}/config.json     # project declaration scope, wins on collision
+<base-dir>/runtime/{teamRunId}/              # active runtime
+  ├── state.json                            # members, session IDs, lifecycle, ownership metadata
+  ├── inboxes/{member}/                     # mailbox files and processed acknowledgements
+  └── tasks/{id}.json                       # shared task list
+<worktree-leaf>.omo-team-owner.json          # adjacent marker for an OMO-created leaf
+<worktree-leaf>/.omo-team-owner.json         # internal marker with the same ownership token
 ```
+
+An explicit member worktree path may be relative to the project root or absolute. A newly created exact leaf is atomically token-owned. Active ownership conflicts, while pre-existing directories stay usable and unowned. Cleanup, force cleanup, and rollback remove only leaves whose two markers match saved ownership metadata. Shared ancestors and unowned legacy paths remain.
 
 ## LIFECYCLE
 
@@ -131,7 +136,7 @@ team-mode/
 2. **Deferred ack:** messages are fire-and-forget; recipient acks via separate call.
 3. **Locked tasks:** task claiming uses atomic file locks; concurrent claims resolve safely.
 4. **Atomic writes:** state changes write to temp file then rename.
-5. **Eligible agents only:** rejection at parse, never at runtime.
+5. **Eligible members only:** static eligibility governs built-ins; project roles pass exact final-registry and effective-permission admission before launch.
 6. **No nested teams:** members CANNOT call `team_create`.
 
 ## INTEGRATION POINTS

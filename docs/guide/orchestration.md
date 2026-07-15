@@ -370,11 +370,13 @@ Background task concurrency defaults to **5** when no overrides are configured.
 
 Team mode is parallel multi-agent orchestration and is **OFF by default**.
 
-For `subagent_type` team members, current eligibility is:
+For `subagent_type` team members, the static OMO built-in eligibility list is:
 
 - Eligible: `sisyphus`, `atlas`, `sisyphus-junior`
 - Conditional: `hephaestus` (requires teammate permission enablement)
 - Hard-reject: `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `prometheus`
+
+Project-defined `.opencode/agents/*.md` agents may also join as members. Team Mode resolves their exact identity from the final registry for the member worktree and retains its model, variant, prompt, and permissions. They cannot lead. Admission requires a visible, non-native `subagent` or `all` agent with effective `allow` for the required Team Mode member tools. Parent-session restrictions can still reject it. See the [Team Mode guide](team-mode.md) for the complete admission and worktree rules.
 
 Why `oracle`/`prometheus` are rejected in team members:
 

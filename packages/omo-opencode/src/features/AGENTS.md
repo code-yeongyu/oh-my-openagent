@@ -56,7 +56,7 @@ Parallel multi-agent coordination, OFF by default. Harness-neutral domain primit
 - `team-layout-tmux/` — optional tmux pane visualization
 - `tools/` — 12 `team_*` tool implementations
 
-Eligible members: sisyphus, atlas, sisyphus-junior, hephaestus only. See [`team-mode/AGENTS.md`](team-mode/AGENTS.md).
+Static built-in eligibility covers sisyphus, atlas, sisyphus-junior, and conditional hephaestus. Project-defined `.opencode/agents/*.md` roles can also join as member-only exact final-registry identities when they pass mode, visibility, native, and effective-permission admission. See [`team-mode/AGENTS.md`](team-mode/AGENTS.md).
 
 ### opencode-skill-loader (~2.8k LOC)
 

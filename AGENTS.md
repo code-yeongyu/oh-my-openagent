@@ -173,14 +173,16 @@ Full schema in [`packages/omo-opencode/src/config/schema/team-mode.ts`](packages
 }
 ```
 
-Teams live as directories under `~/.omo/teams/{name}/config.json` (user) or `<project>/.omo/teams/{name}/config.json` (project; project beats user on collisions). Members declared as `kind: "subagent_type"` (direct agent) or `kind: "category"` (routed through `sisyphus-junior`).
+Team declarations live under `~/.omo/teams/{name}/config.json` (user) or `<project>/.omo/teams/{name}/config.json` (project, which beats user on collisions). Runtime state is separate under the configured Team Mode base directory. Members are declared as `kind: "subagent_type"` (direct OMO built-in or exact project role) or `kind: "category"` (routed through `sisyphus-junior`).
 
 **Member eligibility** (from [`AGENT_ELIGIBILITY_REGISTRY`](packages/omo-opencode/src/features/team-mode/types.ts)):
 - `eligible`: sisyphus, atlas, sisyphus-junior
 - `conditional`: hephaestus (lacks `teammate: "allow"` permission by default — apply D-36 in `tool-config-handler.ts` or use `subagent_type: "sisyphus"` instead)
 - `hard-reject`: oracle, librarian, explore, multimodal-looker, metis, momus, prometheus (rejected at parse — use `task`/delegate-task)
 
-**Storage layout** (`~/.omo/teams/{name}/`): `config.json` (spec), `state.json` (runtime), `mailbox/` (messages), `tasklist.jsonl` (tasks), `worktrees/` (per-member git worktrees).
+The static list governs OMO built-ins only. Project-defined `.opencode/agents/*.md` roles resolve separately by exact final-registry identity for the member worktree and are members only. They require mode `subagent` or `all`, `native: false`, visibility, and effective `allow` for the five member tools. Agent and then parent-session permissions apply with last-match-wins, so inherited `ask` or `deny` rejects admission. Team Mode never elevates permissions.
+
+**Storage layout:** declaration scopes hold `config.json`; `<base-dir>/runtime/{teamRunId}/` holds `state.json`, `inboxes/`, and `tasks/`. Explicit worktree paths can be relative or absolute. OMO-created leaf directories have adjacent and internal `.omo-team-owner.json` markers with a token. Cleanup removes only token-matching owned leaves, preserving pre-existing leaves and shared ancestors.
 
 **Implementation:** [`packages/omo-opencode/src/features/team-mode/`](packages/omo-opencode/src/features/team-mode/AGENTS.md). User docs: [`docs/guide/team-mode.md`](docs/guide/team-mode.md).
 
