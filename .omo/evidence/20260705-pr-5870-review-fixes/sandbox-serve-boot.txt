@@ -1,0 +1,23 @@
+real-db-session-count-before: 795
+health: {"healthy":true,"version":"1.17.13"}
+sse: FAILED to observe server.connected
+--- omo plugin log (last 60s, question-command-handoff / startup markers) ---
+[2026-07-03T09:59:46.172Z] [context-injector] Inserted synthetic part with hook content {"sessionID":"ses_0d8947ccdffe6rnJxrsJJ8VAlh","contentLength":81}
+[2026-07-03T09:59:54.415Z] [tool-execute-after] Failed to process hooks {"tool":"codegraph_codegraph_node","sessionID":"ses_0d8947ccdffe6rnJxrsJJ8VAlh","callID":"call_00_e6mxwVXE6UQVXVbOE3hD3028","error":{}}
+[2026-07-03T09:59:54.640Z] [tool-execute-after] Failed to process hooks {"tool":"codegraph_codegraph_node","sessionID":"ses_0d8947ccdffe6rnJxrsJJ8VAlh","callID":"call_01_8p3zhFkIC4I3NneT7q088424","error":{}}
+[2026-07-03T09:59:58.584Z] [tool-execute-after] Failed to process hooks {"tool":"codegraph_codegraph_search","sessionID":"ses_0d8947ccdffe6rnJxrsJJ8VAlh","callID":"call_01_E1Wn4KBCnfEkAJ5hbWB35889","error":{}}
+[2026-07-03T10:00:02.435Z] [tool-execute-after] Failed to process hooks {"tool":"codegraph_codegraph_node","sessionID":"ses_0d8947ccdffe6rnJxrsJJ8VAlh","callID":"call_00_B0QV8qE3iOas1A7Z33MI3749","error":{}}
+[2026-07-03T10:00:18.181Z] [tool-execute-after] Failed to process hooks {"tool":"codegraph_codegraph_node","sessionID":"ses_0d8947ccdffe6rnJxrsJJ8VAlh","callID":"call_00_mn6VDgAfiVvt6bD7r8CR0599","error":{}}
+[2026-07-03T10:00:39.376Z] [tool-execute-after] Failed to process hooks {"tool":"codegraph_codegraph_node","sessionID":"ses_0d8947ccdffe6rnJxrsJJ8VAlh","callID":"call_00_wGme4cg63YsKruY1v22I2241","error":{}}
+[2026-07-03T10:00:42.513Z] [tool-execute-after] Failed to process hooks {"tool":"codegraph_codegraph_node","sessionID":"ses_0d8947ccdffe6rnJxrsJJ8VAlh","callID":"call_00_QOBE7JivzJzLFzig9m020612","error":{}}
+[2026-07-05T12:47:54.415Z] [question-command-handoff] Dispatched /start-work from answered question option {"sessionID":"s1","status":"queued"}
+[2026-07-05T12:47:54.416Z] [question-command-handoff] Dispatched /start-work from answered question option {"sessionID":"s2","status":"queued"}
+[2026-07-05T12:47:54.416Z] [question-command-handoff] Dispatched /start-work from answered question option {"sessionID":"s2","status":"queued"}
+[2026-07-05T12:47:54.416Z] [question-command-handoff] Dispatched /start-work from answered question option {"sessionID":"s5","status":"queued"}
+--- serve.log tail ---
+Warning: OPENCODE_SERVER_PASSWORD is not set; server is unsecured.
+opencode server listening on http://127.0.0.1:44855
+serve-log: no plugin load errors
+real-db-session-count-after: 795
+isolation: real DB untouched
+sandbox removed

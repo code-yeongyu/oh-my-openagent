@@ -26,6 +26,7 @@ import {
   createNoHephaestusNonGptHook,
   createHephaestusAgentsMdInjectorHook,
   createQuestionLabelTruncatorHook,
+  createQuestionCommandHandoffHook,
   createPreemptiveCompactionHook,
   createRuntimeFallbackHook,
   createLegacyPluginToastHook,
@@ -62,6 +63,7 @@ export type SessionHooks = {
   noHephaestusNonGpt: ReturnType<typeof createNoHephaestusNonGptHook> | null
   hephaestusAgentsMdInjector: ReturnType<typeof createHephaestusAgentsMdInjectorHook> | null
   questionLabelTruncator: ReturnType<typeof createQuestionLabelTruncatorHook> | null
+  questionCommandHandoff: ReturnType<typeof createQuestionCommandHandoffHook> | null
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
   legacyPluginToast: ReturnType<typeof createLegacyPluginToastHook> | null
@@ -213,6 +215,9 @@ export function createSessionHooks(args: {
   const questionLabelTruncator = isHookEnabled("question-label-truncator")
     ? safeHook("question-label-truncator", () => createQuestionLabelTruncatorHook())
     : null
+  const questionCommandHandoff = isHookEnabled("question-command-handoff")
+    ? safeHook("question-command-handoff", () => createQuestionCommandHandoffHook(ctx))
+    : null
   const taskResumeInfo = isHookEnabled("task-resume-info")
     ? safeHook("task-resume-info", () => createTaskResumeInfoHook())
     : null
@@ -256,6 +261,7 @@ export function createSessionHooks(args: {
     noHephaestusNonGpt,
     hephaestusAgentsMdInjector,
     questionLabelTruncator,
+    questionCommandHandoff,
     taskResumeInfo,
     runtimeFallback,
     legacyPluginToast,

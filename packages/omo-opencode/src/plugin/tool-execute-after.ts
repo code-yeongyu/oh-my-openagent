@@ -199,6 +199,7 @@ export function createToolExecuteAfterHandler(args: {
       await hooks.fsyncSkipWarning?.["tool.execute.after"]?.(hookInput, output)
       await hooks.jsonErrorRecovery?.["tool.execute.after"]?.(hookInput, output)
       await hooks.planFormatValidator?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.questionCommandHandoff?.["tool.execute.after"]?.(hookInput, output)
     }
 
     if (input.tool === "extract" || input.tool === "discard") {

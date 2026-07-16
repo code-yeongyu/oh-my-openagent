@@ -883,6 +883,7 @@ Current composition counts:
 | **session-notification**     | Event               | OS notifications when agents go idle. Works on macOS, Linux, Windows.                              |
 | **agent-usage-reminder**     | PostToolUse + Event | Reminds you to leverage specialized agents for better results.                                     |
 | **question-label-truncator** | PreToolUse          | Truncates long question labels in the Question tool UI.                                            |
+| **question-command-handoff** | PostToolUse         | Dispatches the registered command a Prometheus handoff option points at (for example `/start-work`) as an internal prompt when that option is selected. The answer label is still returned to the planner as usual. |
 
 #### Task Management
 

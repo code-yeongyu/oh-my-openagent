@@ -6,6 +6,7 @@ export const HookNameSchema = z.enum([
   "comment-checker",
   "tool-output-truncator",
   "question-label-truncator",
+  "question-command-handoff",
   "directory-agents-injector",
   "directory-readme-injector",
   "empty-task-response-detector",
