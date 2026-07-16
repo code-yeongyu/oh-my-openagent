@@ -35,14 +35,31 @@ function createTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
   }
 }
 
+function activeTasksForTest(tasks: BackgroundTask[]): BackgroundTask[] {
+  return tasks.filter((task) => task.status === "pending" || task.status === "running")
+}
+
 function createManager(sequences: BackgroundTask[][]): BackgroundManager {
   let call = 0
+  let lastTasks = sequences[0] ?? []
   return unsafeTestValue<BackgroundManager>({
     getTasksByParentSession: (_sessionID: string) => {
       const index = Math.min(call, sequences.length - 1)
       call += 1
-      return sequences[index]
+      lastTasks = sequences[index] ?? []
+      return lastTasks
     },
+    hasBackgroundWorkInFlight: () => activeTasksForTest(lastTasks).length > 0,
+  })
+}
+
+function createManagerWithWorkState(
+  getTasks: () => BackgroundTask[],
+  hasBackgroundWorkInFlight: () => boolean,
+): BackgroundManager {
+  return unsafeTestValue<BackgroundManager>({
+    getTasksByParentSession: getTasks,
+    hasBackgroundWorkInFlight,
   })
 }
 
@@ -63,15 +80,17 @@ async function runTool(
 }
 
 describe("createWaitForBackgroundTasks", () => {
-  test("returns early when the session has no active tasks", async () => {
+  test("reports retained terminal tasks when work finished before the waiter started", async () => {
     // #given a manager with only terminal tasks
     const manager = createManager([[createTask({ status: "completed" })]])
 
     // #when the tool runs
     const output = await runTool(manager, {})
 
-    // #then it reports nothing to wait for
-    expect(output).toBe("No running or pending background tasks found for this session.")
+    // #then the fast completion remains visible instead of looking like no work existed
+    expect(output).toContain("## Terminal Tasks")
+    expect(output).toContain("`task-1`")
+    expect(output).toContain("**COMPLETED**")
   })
 
   test("waits for a task registered in a microtask after the initial empty snapshot", async () => {
@@ -88,6 +107,7 @@ describe("createWaitForBackgroundTasks", () => {
         }
         return tasks
       },
+      hasBackgroundWorkInFlight: () => activeTasksForTest(tasks).length > 0,
     })
 
     // #when the wait reaches its bounded timeout
@@ -112,6 +132,7 @@ describe("createWaitForBackgroundTasks", () => {
         }
         return tasks
       },
+      hasBackgroundWorkInFlight: () => activeTasksForTest(tasks).length > 0,
     })
 
     // #when the wait reaches its bounded timeout
@@ -133,9 +154,57 @@ describe("createWaitForBackgroundTasks", () => {
     const output = await runTool(manager, {})
 
     // #then it returns the completed-task summary
-    expect(output).toContain("## Completed Tasks")
+    expect(output).toContain("## Terminal Tasks")
     expect(output).toContain("`task-1`")
     expect(output).toContain("**COMPLETED**")
+  })
+
+  test("keeps waiting while terminal-task finalization is still in flight", async () => {
+    // #given a task that becomes terminal while the manager still owes teardown/notification work
+    let task = createTask({ status: "running" })
+    let finalizationPending = true
+    const manager = createManagerWithWorkState(
+      () => [task],
+      () => task.status === "running" || finalizationPending,
+    )
+
+    // #when completion status flips but finalization remains blocked
+    const run = runTool(manager, { timeout: 100 }, { pollIntervalMs: 1 })
+    task = createTask({ status: "completed" })
+    const beforeRelease = await Promise.race([
+      run.then(() => "RETURNED"),
+      new Promise<string>((resolve) => setTimeout(() => resolve("WAITING"), 20)),
+    ])
+
+    // #then the waiter does not return until the authoritative finalization state clears
+    expect(beforeRelease).toBe("WAITING")
+    finalizationPending = false
+    expect(await run).toContain("**COMPLETED**")
+  })
+
+  test("keeps waiting while a same-session launch is pending task registration", async () => {
+    // #given a launch reservation is visible before its task has been indexed
+    let tasks: BackgroundTask[] = []
+    let launchPending = true
+    const manager = createManagerWithWorkState(
+      () => tasks,
+      () => launchPending || activeTasksForTest(tasks).length > 0,
+    )
+
+    // #when the waiter starts during the pre-registration gap
+    const run = runTool(manager, { timeout: 100 }, { pollIntervalMs: 1 })
+    const beforeRegistration = await Promise.race([
+      run.then(() => "RETURNED"),
+      new Promise<string>((resolve) => setTimeout(() => resolve("WAITING"), 20)),
+    ])
+
+    // #then it remains blocked and observes the task once registration completes
+    expect(beforeRegistration).toBe("WAITING")
+    tasks = [createTask({ id: "task-delayed-registration", status: "running" })]
+    launchPending = false
+    const output = await run
+    expect(output).toContain("`task-delayed-registration`")
+    expect(output).toContain("Still Running")
   })
 
   test("surfaces still-running tasks when the wait times out", async () => {
@@ -162,7 +231,7 @@ describe("createWaitForBackgroundTasks", () => {
     const output = await runTool(manager, { timeout }, { pollIntervalMs: 1, minimumTimeoutMs: 100 })
 
     // #then it polls instead of returning an immediate timeout
-    expect(output).toContain("## Completed Tasks")
+    expect(output).toContain("## Terminal Tasks")
     expect(output).not.toContain("Still Running")
   })
 
@@ -182,6 +251,7 @@ describe("createWaitForBackgroundTasks", () => {
         }
         return tasks
       },
+      hasBackgroundWorkInFlight: () => activeTasksForTest(tasks).length > 0,
     })
 
     // #when the tool reaches its timeout with the new task still active
@@ -210,6 +280,7 @@ describe("createWaitForBackgroundTasks", () => {
         }
         return tasks
       },
+      hasBackgroundWorkInFlight: () => activeTasksForTest(tasks).length > 0,
     })
 
     // #when the wait reaches its bounded timeout
@@ -236,6 +307,26 @@ describe("createWaitForBackgroundTasks", () => {
     ])
     expect(output).not.toBe("TEST_TIMEOUT")
     expect(output).toContain("cancelled")
+  })
+
+  test("bounds retained task descriptions and errors independently of global truncation", async () => {
+    // #given a retained terminal task with provider-controlled oversized fields
+    const oversizedTask = createTask({
+      status: "completed",
+      description: "D".repeat(200_000),
+      error: "E".repeat(200_000),
+    })
+    const manager = createManager([
+      [createTask({ status: "running" })],
+      [oversizedTask],
+    ])
+
+    // #when the waiter formats the terminal snapshot
+    const output = await runTool(manager, {})
+
+    // #then the result has a hard local bound and marks truncation
+    expect(output.length).toBeLessThanOrEqual(24_000)
+    expect(output).toContain("truncated")
   })
 })
 

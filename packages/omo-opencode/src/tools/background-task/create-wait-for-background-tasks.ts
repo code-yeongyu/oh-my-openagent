@@ -7,6 +7,10 @@ const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000
 const MIN_TIMEOUT_MS = 1000
 const MAX_TIMEOUT_MS = 60 * 60 * 1000
 const POLL_INTERVAL_MS = 3000
+const MAX_RESULT_LENGTH = 24_000
+const MAX_TASKS_IN_RESULT = 100
+const MAX_DESCRIPTION_LENGTH = 300
+const MAX_ERROR_LENGTH = 1_000
 
 const TERMINAL_STATUSES: ReadonlySet<BackgroundTaskStatus> = new Set([
   "completed",
@@ -43,16 +47,21 @@ function waitForPoll(ms: number, signal?: AbortSignal): Promise<"elapsed" | "abo
   })
 }
 
+function truncateField(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value
+  return `${value.slice(0, maxLength)}... [truncated]`
+}
+
 function formatResult(tasks: BackgroundTask[], timedOut: boolean, timeoutMs: number): string {
   const completed: string[] = []
   const stillRunning: string[] = []
 
-  for (const task of tasks) {
+  for (const task of tasks.slice(0, MAX_TASKS_IN_RESULT)) {
     if (isTerminal(task.status)) {
-      const errorInfo = task.error ? `\n  Error: ${task.error}` : ""
-      completed.push(`- \`${task.id}\` (${task.description}): **${task.status.toUpperCase()}**${errorInfo}`)
+      const errorInfo = task.error ? `\n  Error: ${truncateField(task.error, MAX_ERROR_LENGTH)}` : ""
+      completed.push(`- \`${task.id}\` (${truncateField(task.description, MAX_DESCRIPTION_LENGTH)}): **${task.status.toUpperCase()}**${errorInfo}`)
     } else {
-      stillRunning.push(`- \`${task.id}\` (${task.description}): ${task.status}`)
+      stillRunning.push(`- \`${task.id}\` (${truncateField(task.description, MAX_DESCRIPTION_LENGTH)}): ${task.status}`)
     }
   }
 
@@ -60,7 +69,7 @@ function formatResult(tasks: BackgroundTask[], timedOut: boolean, timeoutMs: num
 
   if (completed.length > 0) {
     sections.push(
-      `## Completed Tasks\n${completed.join("\n")}\n\nUse \`background_output(task_id="<id>")\` to retrieve detailed results for each task.`,
+      `## Terminal Tasks\n${completed.join("\n")}\n\nUse \`background_output(task_id="<id>")\` to retrieve detailed results for each task.`,
     )
   }
 
@@ -70,7 +79,13 @@ function formatResult(tasks: BackgroundTask[], timedOut: boolean, timeoutMs: num
     )
   }
 
-  return sections.join("\n\n").trim()
+  if (tasks.length > MAX_TASKS_IN_RESULT) {
+    sections.push(`Result limited to ${MAX_TASKS_IN_RESULT} of ${tasks.length} retained tasks. Use \`background_output\` for omitted task details.`)
+  }
+
+  const result = sections.join("\n\n").trim()
+  if (result.length <= MAX_RESULT_LENGTH) return result
+  return `${result.slice(0, MAX_RESULT_LENGTH - 32)}\n\n... [result truncated]`
 }
 
 export function createWaitForBackgroundTasks(
@@ -97,7 +112,7 @@ export function createWaitForBackgroundTasks(
 
         let finalTasks = manager.getTasksByParentSession(sessionID)
         const initialActive = activeTasks(finalTasks)
-        let observedActiveTask = initialActive.length > 0
+        let observedBackgroundWork = manager.hasBackgroundWorkInFlight(sessionID)
 
         log("[wait-for-background-tasks] Waiting for tasks", {
           sessionID,
@@ -109,9 +124,9 @@ export function createWaitForBackgroundTasks(
         let timedOut = false
         while (true) {
           const remainingMs = timeoutMs - (Date.now() - startTime)
-          const currentActive = activeTasks(finalTasks)
+          const backgroundWorkInFlight = manager.hasBackgroundWorkInFlight(sessionID)
 
-          if (currentActive.length === 0) {
+          if (!backgroundWorkInFlight) {
             if (remainingMs <= 0) break
 
             if (await waitForPoll(Math.min(pollIntervalMs, remainingMs), toolContext.abort) === "aborted") {
@@ -121,13 +136,13 @@ export function createWaitForBackgroundTasks(
             finalTasks = manager.getTasksByParentSession(sessionID)
             await Promise.resolve()
             finalTasks = manager.getTasksByParentSession(sessionID)
-            if (activeTasks(finalTasks).length === 0) break
+            if (!manager.hasBackgroundWorkInFlight(sessionID)) break
 
-            observedActiveTask = true
+            observedBackgroundWork = true
             continue
           }
 
-          observedActiveTask = true
+          observedBackgroundWork = true
           if (remainingMs <= 0) {
             timedOut = true
             break
@@ -140,7 +155,7 @@ export function createWaitForBackgroundTasks(
           finalTasks = manager.getTasksByParentSession(sessionID)
         }
 
-        if (!observedActiveTask) {
+        if (!observedBackgroundWork && finalTasks.length === 0) {
           return "No running or pending background tasks found for this session."
         }
 

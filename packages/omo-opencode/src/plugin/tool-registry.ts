@@ -86,6 +86,10 @@ export function createToolRegistry(args: {
     trimToolsToCap(filteredTools, maxTools)
   }
 
+  if (filteredTools["wait-for-background-tasks"] && !filteredTools.background_output) {
+    delete filteredTools["wait-for-background-tasks"]
+  }
+
   backgroundWaitEnabled = filteredTools["wait-for-background-tasks"] !== undefined
 
   return {

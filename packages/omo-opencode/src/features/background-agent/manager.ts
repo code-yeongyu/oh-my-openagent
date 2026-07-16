@@ -275,6 +275,7 @@ export class BackgroundManager {
   private observedIncompleteTodosBySession: Map<string, boolean> = new Map()
   private rootDescendantCounts: Map<string, number>
   private preStartDescendantReservations: Set<string>
+  private pendingLaunchesByParentSession: Map<string, number>
   private enableParentSessionNotifications: boolean
   private modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   private logger: typeof log
@@ -301,6 +302,7 @@ export class BackgroundManager {
     this.onShutdown = options?.onShutdown
     this.rootDescendantCounts = new Map()
     this.preStartDescendantReservations = new Set()
+    this.pendingLaunchesByParentSession = new Map()
     this.enableParentSessionNotifications = options?.enableParentSessionNotifications ?? true
     this.modelFallbackControllerAccessor = options?.modelFallbackControllerAccessor
     this.logger = options?.log ?? log
@@ -396,6 +398,21 @@ export class BackgroundManager {
     }
 
     this.rootDescendantCounts.set(rootSessionID, currentCount - 1)
+  }
+
+  private reservePendingLaunch(parentSessionID: string): void {
+    const nextCount = (this.pendingLaunchesByParentSession.get(parentSessionID) ?? 0) + 1
+    this.pendingLaunchesByParentSession.set(parentSessionID, nextCount)
+  }
+
+  private releasePendingLaunch(parentSessionID: string): void {
+    const currentCount = this.pendingLaunchesByParentSession.get(parentSessionID) ?? 0
+    if (currentCount <= 1) {
+      this.pendingLaunchesByParentSession.delete(parentSessionID)
+      return
+    }
+
+    this.pendingLaunchesByParentSession.set(parentSessionID, currentCount - 1)
   }
 
   private markPreStartDescendantReservation(task: BackgroundTask): void {
@@ -574,9 +591,15 @@ export class BackgroundManager {
       throw new Error("Agent parameter is required after sanitization")
     }
 
-    const spawnReservation = await this.reserveSubagentSpawn(input.parentSessionId)
-
+    this.reservePendingLaunch(input.parentSessionId)
+    let spawnReservation: {
+      spawnContext: SubagentSpawnContext
+      descendantCount: number
+      commit: () => number
+      rollback: () => void
+    } | undefined
     try {
+      spawnReservation = await this.reserveSubagentSpawn(input.parentSessionId)
       log("[background-agent] spawn guard passed", {
         parentSessionID: input.parentSessionId,
         rootSessionID: spawnReservation.spawnContext.rootSessionID,
@@ -654,8 +677,10 @@ export class BackgroundManager {
 
       return { ...task }
     } catch (error) {
-      spawnReservation.rollback()
+      spawnReservation?.rollback()
       throw error
+    } finally {
+      this.releasePendingLaunch(input.parentSessionId)
     }
   }
 
@@ -1096,6 +1121,14 @@ The fallback retry session is now created and can be inspected directly.
    */
   hasActiveChildTasks(sessionID: string): boolean {
     return this.getTasksByParentSession(sessionID).some(t => t.status === "running" || t.status === "pending")
+  }
+
+  hasBackgroundWorkInFlight(sessionID: string): boolean {
+    return (
+      (this.pendingLaunchesByParentSession.get(sessionID) ?? 0) > 0 ||
+      this.hasActiveChildTasks(sessionID) ||
+      this.hasPendingParentWake(sessionID)
+    )
   }
 
   /**
@@ -3206,6 +3239,7 @@ The task was re-queued on a fallback model after a retryable failure.
     this.pendingByParent.clear()
     this.notificationQueueByParent.clear()
     this.rootDescendantCounts.clear()
+    this.pendingLaunchesByParentSession.clear()
     this.queuesByKey.clear()
     this.processingKeys.clear()
     this.taskHistory.clearAll()

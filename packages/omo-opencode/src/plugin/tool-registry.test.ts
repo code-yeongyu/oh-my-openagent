@@ -118,7 +118,9 @@ describe("#given tool trimming prioritization", () => {
 describe("#given block_on_background_tasks configuration", () => {
   const createBackgroundTools = mock(
     (_manager: unknown, _client: unknown, options?: { blockOnBackgroundTasks?: boolean }) =>
-      options?.blockOnBackgroundTasks ? { "wait-for-background-tasks": fakeTool } : {},
+      options?.blockOnBackgroundTasks
+        ? { background_output: fakeTool, "wait-for-background-tasks": fakeTool }
+        : { background_output: fakeTool },
   )
 
   test("#when disabled_tools removes the wait tool #then delegate guidance sees it as unavailable", () => {
@@ -176,6 +178,35 @@ describe("#given block_on_background_tasks configuration", () => {
     const delegateOptions = toolFactories.createDelegateTask.mock.calls[delegateCallsBefore]?.[0]
     const toolAvailable = result.filteredTools["wait-for-background-tasks"] !== undefined
     expect(delegateOptions?.isBackgroundWaitAvailable?.()).toBe(toolAvailable)
+  })
+
+  test("#when background_output is disabled #then the dependent wait tool is removed too", () => {
+    // #given the feature is enabled but its detailed-result tool is disabled
+    const result = createToolRegistry({
+      ctx: { directory: "/tmp" } as Parameters<typeof createToolRegistry>[0]["ctx"],
+      pluginConfig: createPluginConfig({
+        disabled_tools: ["background_output"],
+        experimental: { block_on_background_tasks: true },
+      }),
+      managers: {
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+      } as Parameters<typeof createToolRegistry>[0]["managers"],
+      skillContext: {
+        mergedSkills: [],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+      toolFactories: { ...toolFactories, createBackgroundTools },
+    })
+
+    // #when final registry dependencies are reconciled
+    // #then neither half of the required pair survives alone
+    expect(result.filteredTools).not.toHaveProperty("background_output")
+    expect(result.filteredTools).not.toHaveProperty("wait-for-background-tasks")
   })
 })
 

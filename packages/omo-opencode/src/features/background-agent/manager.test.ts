@@ -594,6 +594,76 @@ describe("BackgroundManager delegated child-session bootstrap", () => {
   })
 })
 
+describe("BackgroundManager pending launch visibility", () => {
+  test("reports work in flight before asynchronous lineage lookup registers the task", async () => {
+    // #given a launch blocked in its first asynchronous lineage lookup
+    let releaseLineage: (() => void) | undefined
+    const lineageGate = new Promise<void>((resolve) => { releaseLineage = resolve })
+    const client = {
+      session: {
+        get: async () => {
+          await lineageGate
+          return { data: { id: "parent-session" } }
+        },
+        create: async () => ({ data: { id: "child-session" } }),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+
+    try {
+      // #when launch starts but has not registered a BackgroundTask yet
+      const launch = manager.launch({
+        description: "delayed lineage launch",
+        prompt: "test",
+        agent: "explore",
+        parentSessionId: "parent-session",
+        parentMessageId: "parent-message",
+      })
+
+      // #then the parent still exposes authoritative work in flight
+      expect(manager.getTasksByParentSession("parent-session")).toEqual([])
+      expect(manager.hasBackgroundWorkInFlight("parent-session")).toBe(true)
+
+      releaseLineage?.()
+      const task = await launch
+      expect(task.parentSessionId).toBe("parent-session")
+      expect(manager.hasBackgroundWorkInFlight("parent-session")).toBe(true)
+    } finally {
+      releaseLineage?.()
+      manager.shutdown()
+    }
+  })
+
+  test("clears the pending launch reservation when lineage lookup fails", async () => {
+    // #given lineage lookup rejects before task registration
+    const client = {
+      session: {
+        get: async () => { throw new Error("lineage unavailable") },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+
+    try {
+      // #when launch fails
+      await expect(manager.launch({
+        description: "failed lineage launch",
+        prompt: "test",
+        agent: "explore",
+        parentSessionId: "parent-session",
+        parentMessageId: "parent-message",
+      })).rejects.toThrow("lineage unavailable")
+
+      // #then no phantom work remains visible
+      expect(manager.hasBackgroundWorkInFlight("parent-session")).toBe(false)
+    } finally {
+      manager.shutdown()
+    }
+  })
+})
+
 describe("BackgroundManager prompt rejection fallback routing", () => {
   test("routes launch-time prompt rejections into tryFallbackRetry before marking interrupt", async () => {
     //#given
