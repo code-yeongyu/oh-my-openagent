@@ -1,3 +1,1 @@
-HEAD=5e457493b936501446d2e2104f87f7346ef39da5
-DEV=81180f3759c55262a49be6883bb9db5c102e2b4d
 $ tsgo --noEmit -p tsconfig.json

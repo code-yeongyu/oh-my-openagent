@@ -1,6 +1,6 @@
 # PR #6043 QA Evidence
 
-Reviewed runtime source head: `5e457493b936501446d2e2104f87f7346ef39da5`
+Reviewed runtime source head: `d4cfbad8afb836ae6ffdc3f4e82126b883621b37`
 
 Integrated `dev`: `81180f3759c55262a49be6883bb9db5c102e2b4d`
 
@@ -61,9 +61,17 @@ artifacts and does not change the tested runtime behavior.
 
 ## What Was Observed
 
-- Focused suite: 48 pass, 0 fail.
-- Full runtime-fallback suite: 259 pass, 0 fail.
+- Focused suite: 52 pass, 0 fail.
+- Full runtime-fallback suite: 263 pass, 0 fail.
 - Scoped TypeScript and Biome linter checks: pass.
+- A failing-first lifecycle regression reproduced the live OpenCode race: the
+  watchdog's own abort emitted assistant completion plus `session.idle` before
+  the abort promise resolved, and the stale callback was incorrectly
+  invalidated. The repaired exact head preserves ownership for that internal
+  completion/idle pair while explicit terminal cancellation still suppresses
+  fallback dispatch.
+- A compaction-agent `role=user` update no longer arms the main-session
+  watchdog, while a later genuine user turn can re-arm after normal progress.
 - OpenCode accepted both asynchronous main-session prompts with HTTP 204.
 - At the production watchdog deadline, the plugin aborted the silent primary
   request and dispatched `openai/fallback`.
@@ -88,12 +96,14 @@ Artifacts:
 ## Why It Is Enough
 
 The tests cover main and subagent watchdog ownership, progress and terminal
-cancellation, removed-subagent suppression, abort failure, zero-timeout
-semantics, retry dedupe, fallback timeout, delayed abort provenance,
-compaction, disposal during asynchronous work, and cleanup boundaries. The
-live harness covers what unit tests cannot: local plugin loading, real OpenCode
-lifecycle events, production watchdog timing, active-request abort, fallback
-dispatch, visible assistant output, a later genuine user cancellation, and
+cancellation, cancellation while abort is in flight, expected internal-abort
+completion/idle events, removed-subagent suppression, abort failure,
+zero-timeout semantics, retry dedupe, fallback timeout, delayed abort
+provenance, compaction exclusion, re-arming after progress, disposal during
+asynchronous work, and cleanup boundaries. The live harness covers what unit
+tests cannot: local plugin loading, real OpenCode lifecycle events, production
+watchdog timing, active-request abort, fallback dispatch after the internal
+idle edge, visible assistant output, a later genuine user cancellation, and
 database isolation.
 
 ## What Was Omitted
