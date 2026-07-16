@@ -809,7 +809,7 @@ describe("boulder-state", () => {
       expect(progress.isComplete).toBe(false)
     })
 
-    test("#given a subsection inside TODOs #when progress is read #then subsection rows match continuation scope", () => {
+    test("#given a child heading inside TODOs #when progress is read #then parent-section rows remain counted", () => {
       // given
       const planPath = join(TEST_DIR, "todo-subsection-plan.md")
       writeFileSync(planPath, `# Plan
@@ -818,14 +818,14 @@ describe("boulder-state", () => {
 - [x] 1. Canonical task
 
 ### Notes
-- [ ] 2. Example outside task scope
+- [ ] 2. Canonical task after child heading
 `)
 
       // when
       const progress = getPlanProgress(planPath)
 
       // then
-      expect(progress).toEqual({ total: 1, completed: 1, isComplete: true })
+      expect(progress).toEqual({ total: 2, completed: 1, isComplete: false })
     })
 
     test("#given fenced task examples #when progress is read #then fenced rows match continuation scope", () => {

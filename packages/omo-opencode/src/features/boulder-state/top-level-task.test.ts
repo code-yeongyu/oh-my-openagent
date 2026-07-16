@@ -195,7 +195,7 @@ describe("readCurrentTopLevelTask", () => {
     expect(result?.title).toBe("Canonical task")
   })
 
-  test("ignores subsection rows and fenced examples when selecting the current task", () => {
+  test("keeps parent-section rows after child headings and ignores fenced examples", () => {
     // given
     const planPath = writePlanFile(
       `top-level-task-scope-${Date.now()}.md`,
@@ -205,7 +205,7 @@ describe("readCurrentTopLevelTask", () => {
 - [x] 1. Done task
 
 ### Acceptance Criteria
-- [ ] 2. Subsection example
+- [ ] 2. Canonical task after child heading
 
 ## TODOs
 \`\`\`\`md
@@ -222,10 +222,10 @@ describe("readCurrentTopLevelTask", () => {
 
     // then
     expect(result).toEqual({
-      key: "todo:4",
+      key: "todo:2",
       section: "todo",
-      label: "4",
-      title: "Canonical task",
+      label: "2",
+      title: "Canonical task after child heading",
     })
   })
 

@@ -9,7 +9,7 @@ export type PlanChecklist = {
 
 const TODO_HEADING_PATTERN = /^##[ \t]+TODOs(?:[ \t]+#+)?[ \t]*$/i;
 const FINAL_VERIFICATION_HEADING_PATTERN = /^##[ \t]+Final Verification Wave(?:[ \t]+#+)?[ \t]*$/i;
-const MARKDOWN_HEADING_PATTERN = /^#{1,6}(?:[ \t]+|$)/;
+const SECTION_BOUNDARY_HEADING_PATTERN = /^#{1,2}(?:[ \t]+|$)/;
 const FENCE_PATTERN = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/;
 const SIMPLE_CHECKBOX_PATTERN = /^[-*][ \t]*\[[ \t]*([xX]?)[ \t]*\][ \t]+(.+)$/;
 const TODO_CHECKBOX_PATTERN = /^- \[([ xX])\] ([1-9]\d*\. .+)$/;
@@ -59,7 +59,7 @@ export function parsePlanChecklist(markdown: string): PlanChecklist {
 			continue;
 		}
 
-		if (MARKDOWN_HEADING_PATTERN.test(line)) {
+		if (SECTION_BOUNDARY_HEADING_PATTERN.test(line)) {
 			section = parseStructuredSectionHeading(line);
 			continue;
 		}

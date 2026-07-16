@@ -156,6 +156,17 @@ describe("start-work plan checklist consumption", () => {
 		});
 	});
 
+	it("#given a child heading inside TODOs #when parsed #then canonical rows remain in the parent section", () => {
+		// given
+		const planPath = createPlan(["## TODOs", "- [x] 1. First task", "### Notes", "- [ ] 2. Second task"].join("\n"));
+
+		// when
+		const checklist = getPlanChecklist(planPath);
+
+		// then
+		expect(checklist).toEqual({ completed: 1, remaining: 1, total: 2, nextTaskLabel: "2. Second task" });
+	});
+
 	it("#given a four-backtick fence containing triple-backtick examples #when parsed #then shorter fences do not close it", () => {
 		// given
 		const planPath = createPlan(

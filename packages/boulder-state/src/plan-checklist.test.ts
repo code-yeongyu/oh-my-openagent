@@ -140,6 +140,17 @@ describe("parsePlanChecklist", () => {
     })
   })
 
+  test("#given a child heading inside TODOs #when parsed #then canonical rows remain in the parent section", () => {
+    // given
+    const markdown = ["## TODOs", "- [x] 1. First task", "### Notes", "- [ ] 2. Second task"].join("\n")
+
+    // when
+    const checklist = parsePlanChecklist(markdown)
+
+    // then
+    expect(checklist).toEqual({ completed: 1, remaining: 1, total: 2, nextTaskLabel: "2. Second task" })
+  })
+
   test("#given a four-backtick fence containing triple-backtick examples #when parsed #then shorter fences do not close it", () => {
     // given
     const markdown = [
