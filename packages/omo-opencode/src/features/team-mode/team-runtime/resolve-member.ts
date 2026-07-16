@@ -2,7 +2,8 @@ import type { FallbackEntry } from "../../../shared/model-requirements"
 import type { DelegatedModelConfig } from "../../../shared/model-resolution-types"
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import type { DelegateTaskArgs } from "../../../tools/delegate-task/types"
-import type { Member } from "../types"
+import { AGENT_ELIGIBILITY_REGISTRY, type Member } from "../types"
+import { resolveFinalProjectAgent } from "../final-open-code-agent-registry"
 import {
   buildSystemContent,
   resolveCategoryExecution,
@@ -21,7 +22,7 @@ export interface ResolvedMember {
   agentToUse: string
   model: DelegatedModelConfig | undefined
   fallbackChain: FallbackEntry[] | undefined
-  systemContent: string
+  systemContent: string | undefined
 }
 
 function createBaseDelegateTaskArgs(prompt: string): Pick<DelegateTaskArgs, "description" | "load_skills" | "prompt" | "run_in_background"> {
@@ -93,6 +94,24 @@ export async function resolveMember(
           maxPromptTokens: execution.maxPromptTokens,
           model: execution.categoryModel,
         }),
+      }
+    }
+
+    if (AGENT_ELIGIBILITY_REGISTRY[member.subagent_type] === undefined) {
+      if (member.name === parentAgent) {
+        throw new Error("Project-defined agents cannot be team leads.")
+      }
+      const projectAgent = await resolveFinalProjectAgent(
+        ctx.client,
+        ctx.directory,
+        member.subagent_type,
+      )
+      return {
+        memberName: member.name,
+        agentToUse: projectAgent.name,
+        model: projectAgent.model,
+        fallbackChain: undefined,
+        systemContent: undefined,
       }
     }
 
