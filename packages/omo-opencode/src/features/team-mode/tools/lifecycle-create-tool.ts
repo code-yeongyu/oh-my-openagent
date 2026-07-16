@@ -88,7 +88,10 @@ export function createTeamCreateTool(
       }
       const defaultCategoryName = resolveDefaultInlineCategory(executorConfig?.userCategories)
       const spec = args.teamName
-        ? await deps.loadTeamSpec(args.teamName, config, projectRoot, { callerTeamLead })
+        ? await deps.loadTeamSpec(args.teamName, config, projectRoot, {
+            callerTeamLead,
+            allowUnknownSubagentTypes: true,
+          })
         : parseInlineTeamSpec(args.inline_spec, { callerTeamLead, defaultCategoryName })
       const participantRuntime = await findParticipantRuntime(leadSessionId, config, deps)
       if (participantRuntime && (participantRuntime.teamName !== spec.name || participantRuntime.leadSessionId !== leadSessionId)) {
