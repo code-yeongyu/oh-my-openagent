@@ -2,8 +2,7 @@ import { existsSync, readFileSync } from "node:fs"
 
 import type { PlanChecklist } from "./types"
 
-const SIMPLE_CHECKBOX_PATTERN = /^- \[[ xX]\] /
-const SIMPLE_UNCHECKED_PATTERN = /^- \[ \] /
+const SIMPLE_CHECKBOX_PATTERN = /^[-*][ \t]*\[[ \t]*([xX]?)[ \t]*\][ \t]+(.+)$/
 const TODO_HEADING_PATTERN = /^##[ \t]+TODOs[ \t]*$/i
 const FINAL_VERIFICATION_HEADING_PATTERN = /^##[ \t]+Final Verification Wave[ \t]*$/i
 const MARKDOWN_HEADING_PATTERN = /^#{1,6}(?:[ \t]+|$)/
@@ -93,22 +92,33 @@ function parseSimpleChecklist(lines: readonly string[]): PlanChecklist {
   let nextTaskLabel: string | null = null
 
   for (const line of lines) {
-    if (!SIMPLE_CHECKBOX_PATTERN.test(line)) {
+    const checkbox = parseSimpleTopLevelCheckbox(line)
+    if (checkbox === null) {
       continue
     }
 
     total += 1
-    if (!SIMPLE_UNCHECKED_PATTERN.test(line)) {
+    if (checkbox.checked) {
       continue
     }
 
     remaining += 1
     if (nextTaskLabel === null) {
-      nextTaskLabel = line.slice("- [ ] ".length)
+      nextTaskLabel = checkbox.label
     }
   }
 
   return { completed: total - remaining, remaining, total, nextTaskLabel }
+}
+
+function parseSimpleTopLevelCheckbox(line: string): ParsedCheckbox | null {
+  const match = line.match(SIMPLE_CHECKBOX_PATTERN)
+  const marker = match?.[1]
+  const label = match?.[2]
+  if (marker === undefined || label === undefined) {
+    return null
+  }
+  return { checked: marker.toLowerCase() === "x", label }
 }
 
 function hasStructuredSection(lines: readonly string[]): boolean {

@@ -60,6 +60,17 @@ describe("parsePlanChecklist", () => {
     expect(checklist).toEqual({ completed: 1, remaining: 1, total: 2, nextTaskLabel: "First" })
   })
 
+  test("#given a heading-free legacy star checklist #when parsed #then fallback behavior is preserved", () => {
+    // given
+    const markdown = ["# Plan", "* [ ] First", "* [x] Done", "  * [ ] Nested"].join("\n")
+
+    // when
+    const checklist = parsePlanChecklist(markdown)
+
+    // then
+    expect(checklist).toEqual({ completed: 1, remaining: 1, total: 2, nextTaskLabel: "First" })
+  })
+
   test("#given completed implementation rows and pending final verifier #when parsed #then final verifier is next", () => {
     // given
     const markdown = [

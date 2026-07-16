@@ -11,6 +11,7 @@ const TODO_HEADING_PATTERN = /^##[ \t]+TODOs[ \t]*$/i;
 const FINAL_VERIFICATION_HEADING_PATTERN = /^##[ \t]+Final Verification Wave[ \t]*$/i;
 const MARKDOWN_HEADING_PATTERN = /^#{1,6}(?:[ \t]+|$)/;
 const FENCE_PATTERN = /^[ \t]{0,3}(`{3,}|~{3,})/;
+const SIMPLE_CHECKBOX_PATTERN = /^[-*][ \t]*\[[ \t]*([xX]?)[ \t]*\][ \t]+(.+)$/;
 const TODO_CHECKBOX_PATTERN = /^- \[([ xX])\] ([1-9]\d*\. .+)$/;
 const FINAL_WAVE_CHECKBOX_PATTERN = /^- \[([ xX])\] (F[1-9]\d*\. .+)$/i;
 
@@ -115,11 +116,11 @@ function parseStructuredCheckbox(line: string, section: "todo" | "final-wave"): 
 }
 
 function parseSimpleTopLevelCheckbox(line: string): ParsedCheckbox | null {
-	if (line.startsWith("- [ ] ")) return { checked: false, label: line.slice("- [ ] ".length) };
-	if (line.startsWith("- [x] ") || line.startsWith("- [X] ")) {
-		return { checked: true, label: line.slice("- [ ] ".length) };
-	}
-	return null;
+	const match = line.match(SIMPLE_CHECKBOX_PATTERN);
+	const marker = match?.[1];
+	const label = match?.[2];
+	if (marker === undefined || label === undefined) return null;
+	return { checked: marker.toLowerCase() === "x", label };
 }
 
 function parseFenceMarker(line: string): "`" | "~" | null {

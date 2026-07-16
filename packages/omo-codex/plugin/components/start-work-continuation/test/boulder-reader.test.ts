@@ -88,6 +88,17 @@ describe("start-work plan checklist consumption", () => {
 		expect(checklist).toEqual({ completed: 1, remaining: 1, total: 2, nextTaskLabel: "First" });
 	});
 
+	it("#given a heading-free legacy star checklist #when parsed #then fallback behavior is preserved", () => {
+		// given
+		const planPath = createPlan(["# Plan", "* [ ] First", "* [x] Done", "  * [ ] Nested"].join("\n"));
+
+		// when
+		const checklist = getPlanChecklist(planPath);
+
+		// then
+		expect(checklist).toEqual({ completed: 1, remaining: 1, total: 2, nextTaskLabel: "First" });
+	});
+
 	it("#given noncanonical structured rows #when parsed #then only exact positive-number grammar is counted", () => {
 		// given
 		const planPath = createPlan(
