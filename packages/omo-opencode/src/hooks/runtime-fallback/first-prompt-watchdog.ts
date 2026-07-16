@@ -38,7 +38,7 @@ export function createFirstPromptWatchdog(
   const abortProvenance = createWatchdogAbortProvenance()
   let lifecycleGeneration = 0
 
-  const cancel = (sessionID: string): void => {
+  const cancel = (sessionID: string, preserveAbortProvenance = false): void => {
     const timer = timers.get(sessionID)
     if (timer) {
       clearTimeout(timer)
@@ -48,7 +48,7 @@ export function createFirstPromptWatchdog(
     suspended.delete(sessionID)
     progressed.delete(sessionID)
     suspendedAfterProgress.delete(sessionID)
-    abortProvenance.clear(sessionID)
+    if (!preserveAbortProvenance) abortProvenance.clear(sessionID)
     currentUserMessageIDs.delete(sessionID)
     sessionGenerations.set(sessionID, (sessionGenerations.get(sessionID) ?? 0) + 1)
   }
@@ -148,14 +148,14 @@ export function createFirstPromptWatchdog(
         }
         suspended.delete(sessionID)
         deps.internallyAbortedSessions.delete(sessionID)
-        cancel(sessionID)
+        cancel(sessionID, true)
         log(`[${HOOK_NAME}] ${SOURCE}: resolved external cancellation`, { sessionID })
         return { kind: "resolve-terminal", sessionID }
       }
       if (suspendedContext) {
         abortProvenance.consumePrior(sessionID, suspendedContext.sessionGeneration)
         deps.internallyAbortedSessions.add(sessionID)
-        cancel(sessionID)
+        cancel(sessionID, true)
         return { kind: "resolve-terminal", sessionID }
       }
       if (!armed.has(sessionID)) return
@@ -222,7 +222,7 @@ export function createFirstPromptWatchdog(
         log(`[${HOOK_NAME}] ${SOURCE}: resolved delayed prior-generation abort`, { sessionID })
       } else {
         deps.internallyAbortedSessions.delete(sessionID)
-        cancel(sessionID)
+        cancel(sessionID, true)
         log(`[${HOOK_NAME}] ${SOURCE}: resolved external cancellation`, { sessionID })
       }
       return { kind: "resolve-terminal", sessionID }
