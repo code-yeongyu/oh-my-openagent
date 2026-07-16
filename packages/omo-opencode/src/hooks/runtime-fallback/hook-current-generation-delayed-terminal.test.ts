@@ -16,7 +16,12 @@ function createContext(): RuntimeFallbackPluginInput {
     client: {
       session: {
         abort: async () => ({}),
-        messages: async () => ({ data: [] }),
+        messages: async () => ({
+          data: [
+            { info: { role: "user" }, parts: [{ type: "text", text: "question" }] },
+            { info: { role: "assistant" }, parts: [{ type: "text", text: "fallback answer" }] },
+          ],
+        }),
         promptAsync: async () => ({}),
         status: async () => ({ data: { [SESSION_ID]: { type: "busy" } } }),
       },
@@ -48,6 +53,31 @@ function abortTerminal() {
     event: {
       type: "session.error",
       properties: { sessionID: SESSION_ID, error: { name: "MessageAbortedError" } },
+    },
+  }
+}
+
+function fallbackSuccess() {
+  return {
+    event: {
+      type: "message.updated",
+      properties: {
+        info: {
+          role: "assistant",
+          sessionID: SESSION_ID,
+          model: FALLBACK_MODEL,
+          completed: true,
+        },
+      },
+    },
+  }
+}
+
+function sessionIdle() {
+  return {
+    event: {
+      type: "session.idle",
+      properties: { sessionID: SESSION_ID },
     },
   }
 }
@@ -100,7 +130,7 @@ function createHarness() {
 }
 
 describe("runtime-fallback current-generation delayed watchdog terminal", () => {
-  it("#given fallback dispatch was accepted #when its delayed watchdog abort arrives #then fallback ownership remains intact", async () => {
+  it("#given fallback dispatch completed visibly #when its delayed watchdog abort arrives #then fallback ownership remains intact", async () => {
     const timers = installFakeTimers()
     const harness = createHarness()
 
@@ -113,19 +143,23 @@ describe("runtime-fallback current-generation delayed watchdog terminal", () => 
       expect(deps.internallyAbortedSessions.has(SESSION_ID)).toBe(false)
       expect(deps.sessionAwaitingFallbackResult.has(SESSION_ID)).toBe(true)
 
+      await harness.hook.event(fallbackSuccess())
+      await harness.hook.event(sessionIdle())
+      expect(deps.sessionAwaitingFallbackResult.has(SESSION_ID)).toBe(false)
+
       await harness.hook.event(abortTerminal())
 
       expect(harness.dispatchedModels).toEqual([FALLBACK_MODEL])
       expect(deps.sessionStates.get(SESSION_ID)?.currentModel).toBe(FALLBACK_MODEL)
       expect(deps.sessionStates.get(SESSION_ID)?.attemptCount).toBe(1)
-      expect(deps.sessionAwaitingFallbackResult.has(SESSION_ID)).toBe(true)
+      expect(deps.sessionAwaitingFallbackResult.has(SESSION_ID)).toBe(false)
     } finally {
       harness.hook.dispose?.()
       timers.restore()
     }
   })
 
-  it("#given the owned delayed watchdog abort was consumed #when another abort arrives #then it remains external cancellation", async () => {
+  it("#given the owned delayed watchdog abort was consumed #when a later generation is cancelled #then it remains external cancellation", async () => {
     const timers = installFakeTimers()
     const harness = createHarness()
 
@@ -133,8 +167,11 @@ describe("runtime-fallback current-generation delayed watchdog terminal", () => 
       await harness.hook.event(userMessage())
       await timers.advanceBy(WATCHDOG_MS)
       const deps = harness.getDeps()
+      await harness.hook.event(fallbackSuccess())
+      await harness.hook.event(sessionIdle())
       await harness.hook.event(abortTerminal())
 
+      await harness.hook.event(userMessage())
       await harness.hook.event(abortTerminal())
 
       expect(harness.dispatchedModels).toEqual([FALLBACK_MODEL])

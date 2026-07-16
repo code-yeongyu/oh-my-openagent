@@ -122,7 +122,17 @@ export function createRuntimeFallbackHook(
     if (event.type === "message.updated") {
       if (!config.enabled) return
       const props = event.properties as Record<string, unknown> | undefined
+      const info = props?.info as Record<string, unknown> | undefined
+      const sessionID = typeof info?.sessionID === "string" ? info.sessionID : undefined
+      const awaitingFallback = sessionID !== undefined && deps.sessionAwaitingFallbackResult.has(sessionID)
       await messageUpdateHandler(props)
+      if (
+        awaitingFallback
+        && sessionID !== undefined
+        && info?.role === "assistant"
+        && info.error === undefined
+        && !deps.sessionAwaitingFallbackResult.has(sessionID)
+      ) firstPromptWatchdog.onFallbackCompleted(sessionID)
       return
     }
     await baseEventHandler({ event })

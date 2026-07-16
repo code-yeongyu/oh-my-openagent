@@ -15,6 +15,7 @@ declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
 export interface FirstPromptWatchdog {
   onUserMessage(sessionID: string, model?: string, agent?: string, messageID?: string): void
   onAssistantProgress(sessionID: string, parentMessageID?: string, isAbortEvent?: boolean): WatchdogEventDecision | undefined
+  onFallbackCompleted(sessionID: string): void
   onSessionTerminal(sessionID: string, eventType?: string, isAbortEvent?: boolean): WatchdogEventDecision | undefined
   resolveDeferredTerminal(sessionID: string, currentRequestActive: boolean): WatchdogEventDecision | undefined
   dispose(): void
@@ -168,6 +169,7 @@ export function createFirstPromptWatchdog(
       if (context) progressed.set(sessionID, context)
       log(`[${HOOK_NAME}] ${SOURCE}: cancelled (assistant progress observed)`, { sessionID })
     },
+    onFallbackCompleted(sessionID) { abortProvenance.markCurrentCompleted(sessionID, sessionGenerations.get(sessionID)) },
     onSessionTerminal(sessionID, eventType, isAbortEvent) {
       if (!sessionID) return
       const suspendedContext = suspended.get(sessionID)
@@ -195,9 +197,9 @@ export function createFirstPromptWatchdog(
         && isAbortEvent === true
       ) {
         const currentGeneration = sessionGenerations.get(sessionID)
+        const fallbackPending = deps.sessionAwaitingFallbackResult.has(sessionID)
         const consumedCurrentAbort = !armed.has(sessionID)
-          && deps.sessionAwaitingFallbackResult.has(sessionID)
-          && abortProvenance.consumeCurrent(sessionID, currentGeneration)
+          && abortProvenance.consumeCurrent(sessionID, currentGeneration, fallbackPending)
         if (consumedCurrentAbort) return { kind: "consume-terminal", sessionID }
         if (
           abortProvenance.hasPrior(sessionID, currentGeneration)
