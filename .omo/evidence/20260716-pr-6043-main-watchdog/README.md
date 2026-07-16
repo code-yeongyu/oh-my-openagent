@@ -1,6 +1,6 @@
 # PR #6043 QA Evidence
 
-Reviewed runtime source head: `be630fc68e47b3c522556c3aec026c9b5c270247`
+Reviewed runtime source head: `5ae935e0c7754210faac62b36ccd0aeb170fd3e6`
 
 Integrated `dev`: `81180f3759c55262a49be6883bb9db5c102e2b4d`
 
@@ -15,8 +15,8 @@ artifacts and does not change the tested runtime behavior.
    bun test packages/omo-opencode/src/hooks/runtime-fallback/abort-provenance-race.test.ts packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-lifecycle.test.ts packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout.test.ts packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.test.ts packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.test.ts
    ```
 
-   The post-review repair run is captured in
-   `second-review-repair-focused-tests.txt`.
+   The final post-review repair run is captured in
+   `third-review-repair-focused-tests.txt`.
 
 2. Full runtime-fallback hook suite:
 
@@ -24,8 +24,8 @@ artifacts and does not change the tested runtime behavior.
    bun test packages/omo-opencode/src/hooks/runtime-fallback
    ```
 
-   The post-review repair run is captured in
-   `second-review-repair-runtime-fallback-suite.txt`.
+   The final post-review repair run is captured in
+   `third-review-repair-runtime-fallback-suite.txt`.
 
 3. OpenCode adapter typecheck and scoped Biome linter:
 
@@ -34,9 +34,9 @@ artifacts and does not change the tested runtime behavior.
    bunx --bun @biomejs/biome@2.4.16 check --javascript-formatter-enabled=false --assist-enabled=false --javascript-linter-enabled=true --error-on-warnings <changed files>
    ```
 
-   The post-review repair runs are captured in
-   `second-review-repair-omo-opencode-typecheck.txt` and
-   `second-review-repair-biome.txt`. Formatting is intentionally disabled because this
+   The final post-review repair runs are captured in
+   `third-review-repair-omo-opencode-typecheck.txt` and
+   `third-review-repair-biome.txt`. Formatting is intentionally disabled because this
    adapter has no Biome configuration and the repository style is enforced by
    its existing source and CI gates.
 
@@ -46,8 +46,8 @@ artifacts and does not change the tested runtime behavior.
    bash .agents/skills/opencode-qa/scripts/lib/common.sh --self-check
    ```
 
-   The post-review repair run is captured in
-   `second-review-repair-opencode-harness-self-check.txt` with local paths and
+   The final post-review repair run is captured in
+   `third-review-repair-opencode-harness-self-check.txt` with local paths and
    transient port values redacted.
 
 5. Real OpenCode live harness:
@@ -65,8 +65,8 @@ artifacts and does not change the tested runtime behavior.
 
 ## What Was Observed
 
-- Focused suite: 53 pass, 0 fail.
-- Full runtime-fallback suite: 264 pass, 0 fail.
+- Focused suite: 54 pass, 0 fail.
+- Full runtime-fallback suite: 265 pass, 0 fail.
 - Scoped TypeScript and Biome linter checks: pass.
 - A failing-first lifecycle regression reproduced the live OpenCode race: the
   watchdog's own abort emitted assistant completion plus `session.idle` before
@@ -82,7 +82,10 @@ artifacts and does not change the tested runtime behavior.
   `session.stop` still cancels and resets retry state during the same abort
   window.
 - A compaction-agent `role=user` update no longer arms the main-session
-  watchdog, while a later genuine user turn can re-arm after normal progress.
+  watchdog. The shared compaction-message predicate also excludes persisted
+  compaction marker turns that retain the original agent and carry
+  `parts: [{ type: "compaction" }]`, while a later genuine user turn can re-arm
+  after normal progress.
 - OpenCode accepted both asynchronous main-session prompts with HTTP 204.
 - At the production watchdog deadline, the plugin aborted the silent primary
   request and dispatched `openai/fallback`.
@@ -108,6 +111,9 @@ Artifacts:
 - `final-second-review-live-watchdog-run-attempt1.txt`: retained failed harness
   startup attempt; the server started, but the bounded SSE watcher did not
   observe `server.connected`. No product request was exercised in that attempt.
+- `final-third-review-live-watchdog-run.txt`: successful production-duration
+  live run pinned to final runtime head
+  `5ae935e0c7754210faac62b36ccd0aeb170fd3e6`.
 
 ## Why It Is Enough
 
