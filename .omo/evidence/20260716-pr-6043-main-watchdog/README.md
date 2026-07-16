@@ -1,6 +1,6 @@
 # PR #6043 QA Evidence
 
-Reviewed runtime source head: `5ae935e0c7754210faac62b36ccd0aeb170fd3e6`
+Reviewed runtime source head: `bdc5f644ba0185d594bd3b412d2189ef14a3c008`
 
 Integrated `dev`: `81180f3759c55262a49be6883bb9db5c102e2b4d`
 
@@ -16,7 +16,7 @@ artifacts and does not change the tested runtime behavior.
    ```
 
    The final post-review repair run is captured in
-   `third-review-repair-focused-tests.txt`.
+   `fourth-review-repair-focused-tests.txt`.
 
 2. Full runtime-fallback hook suite:
 
@@ -25,7 +25,7 @@ artifacts and does not change the tested runtime behavior.
    ```
 
    The final post-review repair run is captured in
-   `third-review-repair-runtime-fallback-suite.txt`.
+   `fourth-review-repair-runtime-fallback-suite.txt`.
 
 3. OpenCode adapter typecheck and scoped Biome linter:
 
@@ -35,8 +35,8 @@ artifacts and does not change the tested runtime behavior.
    ```
 
    The final post-review repair runs are captured in
-   `third-review-repair-omo-opencode-typecheck.txt` and
-   `third-review-repair-biome.txt`. Formatting is intentionally disabled because this
+   `fourth-review-repair-omo-opencode-typecheck.txt` and
+   `fourth-review-repair-biome.txt`. Formatting is intentionally disabled because this
    adapter has no Biome configuration and the repository style is enforced by
    its existing source and CI gates.
 
@@ -65,8 +65,8 @@ artifacts and does not change the tested runtime behavior.
 
 ## What Was Observed
 
-- Focused suite: 54 pass, 0 fail.
-- Full runtime-fallback suite: 265 pass, 0 fail.
+- Focused suite: 56 pass, 0 fail.
+- Full runtime-fallback suite: 267 pass, 0 fail.
 - Scoped TypeScript and Biome linter checks: pass.
 - A failing-first lifecycle regression reproduced the live OpenCode race: the
   watchdog's own abort emitted assistant completion plus `session.idle` before
@@ -114,6 +114,9 @@ Artifacts:
 - `final-third-review-live-watchdog-run.txt`: successful production-duration
   live run pinned to final runtime head
   `5ae935e0c7754210faac62b36ccd0aeb170fd3e6`.
+- `final-fourth-review-live-watchdog-run.txt`: successful production-duration
+  live run pinned to final runtime head
+  `bdc5f644ba0185d594bd3b412d2189ef14a3c008`.
 
 ## Why It Is Enough
 
