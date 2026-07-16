@@ -2,7 +2,6 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { BackgroundManager, BackgroundTask, BackgroundTaskStatus } from "../../features/background-agent"
 import { log } from "../../shared"
 import { WAIT_FOR_BACKGROUND_TASKS_DESCRIPTION } from "./constants"
-import { delay } from "./delay"
 
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000
 const MAX_TIMEOUT_MS = 60 * 60 * 1000
@@ -25,6 +24,22 @@ function isTerminal(status: BackgroundTaskStatus): boolean {
 
 function activeTasks(tasks: BackgroundTask[]): BackgroundTask[] {
   return tasks.filter((task) => !isTerminal(task.status))
+}
+
+function waitForPoll(ms: number, signal?: AbortSignal): Promise<"elapsed" | "aborted"> {
+  if (signal?.aborted) return Promise.resolve("aborted")
+
+  return new Promise((resolve) => {
+    const onAbort = (): void => {
+      clearTimeout(timer)
+      resolve("aborted")
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort)
+      resolve("elapsed")
+    }, ms)
+    signal?.addEventListener("abort", onAbort, { once: true })
+  })
 }
 
 function formatResult(tasks: BackgroundTask[], timedOut: boolean, timeoutMs: number): string {
@@ -90,7 +105,9 @@ export function createWaitForBackgroundTasks(
 
         let timedOut = true
         while (Date.now() - startTime < timeoutMs) {
-          await delay(pollIntervalMs)
+          if (await waitForPoll(pollIntervalMs, toolContext.abort) === "aborted") {
+            return "Background task wait cancelled because the tool call was aborted."
+          }
           if (activeTasks(manager.getTasksByParentSession(sessionID)).length === 0) {
             timedOut = false
             break

@@ -46,9 +46,16 @@ function createManager(sequences: BackgroundTask[][]): BackgroundManager {
   })
 }
 
-async function runTool(manager: BackgroundManager, args: { timeout?: number }): Promise<string> {
-  const tool = createWaitForBackgroundTasks(manager, { pollIntervalMs: 5 })
-  const result = await tool.execute?.(args, mockContext)
+async function runTool(
+  manager: BackgroundManager,
+  args: { timeout?: number },
+  options?: { abort?: AbortSignal; pollIntervalMs?: number },
+): Promise<string> {
+  const tool = createWaitForBackgroundTasks(manager, { pollIntervalMs: options?.pollIntervalMs ?? 5 })
+  const result = await tool.execute?.(args, {
+    ...mockContext,
+    abort: options?.abort ?? mockContext.abort,
+  })
   return typeof result === "string" ? result : String(result)
 }
 
@@ -90,6 +97,24 @@ describe("createWaitForBackgroundTasks", () => {
     // #then it reports the task as still running after timing out
     expect(output).toContain("## Still Running (timed out")
     expect(output).toContain("`task-1`")
+  })
+
+  test("stops promptly when the tool call is aborted", async () => {
+    // #given a task that remains active and a long poll interval
+    const manager = createManager([[createTask({ status: "running" })]])
+    const controller = new AbortController()
+    const run = runTool(manager, {}, { abort: controller.signal, pollIntervalMs: 10_000 })
+
+    // #when the parent tool call is aborted
+    controller.abort()
+
+    // #then the wait resolves without staying blocked on the polling interval
+    const output = await Promise.race([
+      run,
+      new Promise<string>((resolve) => setTimeout(() => resolve("TEST_TIMEOUT"), 100)),
+    ])
+    expect(output).not.toBe("TEST_TIMEOUT")
+    expect(output).toContain("cancelled")
   })
 })
 

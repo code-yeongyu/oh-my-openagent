@@ -651,4 +651,46 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     expectFn(result).toContain("Do NOT call background_output now")
     expectFn(result).toContain("<system-reminder>")
   })
+
+  testFn("directs block-on-background callers to retrieve results after waiting", async () => {
+    //#given - a turn-end-kill harness enables the blocking wait path
+    const manager = {
+      launch: async () => ({
+        id: "bg_blocking_wait",
+        sessionId: "ses_blocking_wait",
+        description: "Blocking wait",
+        agent: "explore",
+        status: "running",
+      }),
+      getTask: () => ({ sessionId: "ses_blocking_wait" }),
+    }
+
+    //#when
+    const result = await executeBackgroundTask(
+      {
+        description: "Blocking wait",
+        prompt: "check",
+        run_in_background: true,
+        load_skills: [],
+      },
+      {
+        sessionID: "ses_parent",
+        callID: "call_blocking_wait",
+        metadata: async () => {},
+        abort: new AbortController().signal,
+      },
+      { manager, blockOnBackgroundTasks: true },
+      { sessionID: "ses_parent", messageID: "msg_blocking_wait" },
+      "explore",
+      undefined,
+      undefined,
+      undefined,
+    )
+
+    //#then - the wait result is described accurately and result collection remains explicit
+    expectFn(result).toContain("call `wait-for-background-tasks`")
+    expectFn(result).toContain("returns their final statuses")
+    expectFn(result).toContain('background_output(task_id="<id>")')
+    expectFn(result).not.toContain("returns their results")
+  })
 })

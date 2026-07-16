@@ -214,7 +214,7 @@ export async function executeBackgroundTask(
       : ""
 
     const completionGuidance = executorCtx.blockOnBackgroundTasks
-      ? "Before ending your turn, you MUST call `wait-for-background-tasks` so the session is not terminated while tasks are still running. It blocks until all tasks finish and returns their results."
+      ? "Before ending your turn, you MUST call `wait-for-background-tasks` so the session is not terminated while tasks are still running. It blocks until all tasks finish and returns their final statuses. Then call `background_output(task_id=\"<id>\")` for each completed task to retrieve its result."
       : "Do NOT call background_output now. Wait for <system-reminder> notification first. The system will deliver the result when the task completes; you do not need to poll for it."
 
     return `Background task launched.
