@@ -4,7 +4,7 @@ packages/omo-opencode/src/hooks/runtime-fallback/watchdog-abort-provenance.test.
 10 |     provenance.markCurrentCompleted(sessionID, 1)
 11 |     provenance.record(sessionID, 2)
 12 |     provenance.markCurrentCompleted(sessionID, 2)
-13 | 
+13 |
 14 |     expect(provenance.consumeCurrent(sessionID, 2, false)).toBe(true)
 15 |     expect(provenance.consumeCurrent(sessionID, 2, false)).toBe(true)
                                                                 ^

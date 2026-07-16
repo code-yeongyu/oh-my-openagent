@@ -2,10 +2,10 @@ bun test v1.3.14 (0d9b296a)
 
 packages/omo-opencode/src/hooks/runtime-fallback/hook-two-completed-generations.test.ts:
 133 |       expect(deps.sessionStates.get(SESSION_ID)?.attemptCount).toBe(2)
-134 | 
+134 |
 135 |       await harness.hook.event(abortTerminal)
 136 |       await harness.hook.event(abortTerminal)
-137 | 
+137 |
 138 |       expect(deps.sessionStates.get(SESSION_ID)?.currentModel).toBe(FALLBACK_TWO)
                                                                      ^
 error: expect(received).toBe(expected)

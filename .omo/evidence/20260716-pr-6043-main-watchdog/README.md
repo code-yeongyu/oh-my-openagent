@@ -1,11 +1,11 @@
 # PR #6043 QA Evidence
 
-Reviewed integrated source head: `7020af726e1f21cea5eb1a57febd8bfa38832c1c`
+Reviewed integrated source head: `8dfd8d59440c52551f8fe682a86df94f980c8d52`
 
 Integrated `dev`: `6457ca1da78fcfd2a39ea391ee559b8d945b240a`
 
 Exact integrated QA head before this evidence-only refresh:
-`7020af726e1f21cea5eb1a57febd8bfa38832c1c`
+`8dfd8d59440c52551f8fe682a86df94f980c8d52`
 
 The following evidence commit is content-only. It refreshes reviewer-readable
 artifacts and does not change the tested runtime behavior.
@@ -442,6 +442,30 @@ Eighteenth-cycle artifacts:
 - `eighteenth-exact-integrity.txt`: exact source/base identity, clean tracked status, diff check, and pure-LOC limits.
 - `eighteenth-exact-opencode-harness-self-check.txt`: isolated OpenCode harness preflight and sandbox cleanup proof.
 - `eighteenth-exact-live-watchdog-run.txt`: production-duration live OpenCode run pinned to `7020af726e1f21cea5eb1a57febd8bfa38832c1c`; fallback observed, no fallback watchdog re-arm, later user abort external, and real database unchanged.
+
+The nineteenth fresh reviewer combined the completed-generation and
+multi-generation boundaries. Two visible fallback completions could leave
+abort provenance for both generations while retaining completion ownership
+for only the newest one. If the newer delayed terminal arrived first, it
+consumed the single completion marker; the older delayed terminal then fell
+through as an external cancellation and rewound the newest successful
+fallback to the primary model. The repair retains independently consumable
+completion ownership for every retained generation. It also clears the
+private generation counter on session deletion after invalidating any armed
+or suspended callback, closing the adjacent lifecycle leak without changing
+timer or retry behavior.
+
+Nineteenth-cycle artifacts:
+
+- `nineteenth-review-finding.md`: exact-head reviewer report for the two-completed-generation rewind and deletion cleanup gap.
+- `nineteenth-review-red-two-completed-generations.txt` and `nineteenth-review-red-two-completed-generations-hook.txt`: failing-first provenance and composed-hook proofs.
+- `nineteenth-review-red-deletion-cleanup.txt`: failing-first armed and suspended deletion cleanup proof.
+- `nineteenth-review-green.txt`: repaired provenance, composed-hook, later-generation cancellation, and deletion boundaries.
+- `nineteenth-exact-runtime-fallback-suite.txt`: 296 tests passing across 43 files on runtime head `8dfd8d59440c52551f8fe682a86df94f980c8d52`.
+- `nineteenth-exact-omo-opencode-typecheck.txt`, `nineteenth-exact-biome.txt`, and `nineteenth-exact-no-excuse.txt`: exact-source static gates.
+- `nineteenth-exact-integrity.txt`: exact source/base identity and pure-LOC limits.
+- `nineteenth-exact-opencode-harness-self-check.txt`: isolated OpenCode harness preflight and sandbox cleanup proof.
+- `nineteenth-exact-live-watchdog-run.txt`: production-duration live OpenCode run pinned to `8dfd8d59440c52551f8fe682a86df94f980c8d52`; fallback observed, no fallback watchdog re-arm, later user abort external, and real database unchanged.
 
 The live harness intentionally records only sanitized fake-provider, plugin,
 and SSE evidence. Authentication values, raw environment dumps, private

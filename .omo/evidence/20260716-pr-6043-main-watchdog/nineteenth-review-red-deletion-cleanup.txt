@@ -3,9 +3,9 @@ bun test v1.3.14 (0d9b296a)
 packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-deletion.test.ts:
 28 |     watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
 29 |     expect(generations.has(sessionID)).toBe(true)
-30 | 
+30 |
 31 |     watchdog.onSessionTerminal(sessionID, "session.deleted")
-32 | 
+32 |
 33 |     expect(generations.has(sessionID)).toBe(false)
                                             ^
 error: expect(received).toBe(expected)
@@ -17,9 +17,9 @@ Received: true
 (fail) first-prompt watchdog deletion cleanup > #given a session has an armed watchdog #when the session is deleted #then its generation bookkeeping is removed [0.77ms]
 54 |         sessionID,
 55 |       })
-56 | 
+56 |
 57 |       watchdog.onSessionTerminal(sessionID, "session.deleted")
-58 | 
+58 |
 59 |       expect(generations.has(sessionID)).toBe(false)
                                               ^
 error: expect(received).toBe(expected)
