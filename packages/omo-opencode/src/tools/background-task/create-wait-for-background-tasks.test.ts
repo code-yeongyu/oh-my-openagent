@@ -1,6 +1,9 @@
 /// <reference types="bun-types" />
 
 import { describe, test, expect } from "bun:test"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { createOpencodeClient } from "@opencode-ai/sdk"
@@ -186,6 +189,7 @@ describe("createWaitForBackgroundTasks", () => {
 
   test("returns after real manager finalization queues a deferred active-turn wake", async () => {
     // #given a real manager whose parent session stays active while the waiter runs
+    const tempProjectDir = mkdtempSync(join(tmpdir(), "omo-waiter-wake-"))
     const client = createOpencodeClient({ baseUrl: "http://127.0.0.1:1" })
     Object.assign(client.session, {
       messages: async () => [],
@@ -197,8 +201,8 @@ describe("createWaitForBackgroundTasks", () => {
     const pluginContext = unsafeTestValue<PluginInput>({
       client,
       project: {},
-      directory: projectDir,
-      worktree: projectDir,
+      directory: tempProjectDir,
+      worktree: tempProjectDir,
       experimental_workspace: { register: () => {} },
       serverUrl: new URL("http://localhost"),
       $: {},
@@ -231,6 +235,7 @@ describe("createWaitForBackgroundTasks", () => {
       expect(manager.hasBackgroundWorkInFlight(task.parentSessionId)).toBe(false)
     } finally {
       manager.shutdown()
+      rmSync(tempProjectDir, { recursive: true, force: true })
     }
   })
 
