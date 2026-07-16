@@ -77,7 +77,7 @@ export function createPluginInterface(args: {
       getUltraworkMessage,
       {
         backgroundManager: managers.backgroundManager,
-        blockOnBackgroundTasks: pluginConfig.experimental?.block_on_background_tasks,
+        blockOnBackgroundTasks: tools["wait-for-background-tasks"] !== undefined,
       },
     ),
 

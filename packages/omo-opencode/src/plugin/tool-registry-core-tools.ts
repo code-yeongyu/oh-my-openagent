@@ -21,8 +21,9 @@ export function createCoreTools(args: {
   readonly skillContext: SkillContext
   readonly availableCategories: AvailableCategory[]
   readonly factories: ToolRegistryFactories
+  readonly isBackgroundWaitAvailable: () => boolean
 }): Record<string, ToolDefinition> {
-  const { ctx, pluginConfig, managers, skillContext, availableCategories, factories } = args
+  const { ctx, pluginConfig, managers, skillContext, availableCategories, factories, isBackgroundWaitAvailable } = args
   const backgroundTools = factories.createBackgroundTools(managers.backgroundManager, ctx.client, {
     blockOnBackgroundTasks: pluginConfig.experimental?.block_on_background_tasks,
   })
@@ -66,6 +67,7 @@ export function createCoreTools(args: {
     sisyphusAgentConfig: pluginConfig.sisyphus_agent,
     syncPollTimeoutMs: pluginConfig.background_task?.syncPollTimeoutMs,
     blockOnBackgroundTasks: pluginConfig.experimental?.block_on_background_tasks,
+    isBackgroundWaitAvailable,
     modelFallbackControllerAccessor: managers.modelFallbackControllerAccessor,
     onSyncSessionCreated: async (event) => {
       log("[index] onSyncSessionCreated callback", {

@@ -17,6 +17,7 @@ export interface ExecutorContext {
   onSyncSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
   syncPollTimeoutMs?: number
   blockOnBackgroundTasks?: boolean
+  isBackgroundWaitAvailable?: () => boolean
 }
 
 export interface ParentContext {

@@ -49,6 +49,7 @@ export function createToolRegistry(args: {
     ...toolFactories,
   }
   const taskSystemEnabled = getTaskSystemEnabled(pluginConfig)
+  let backgroundWaitEnabled = false
   const allTools = {
     ...createCoreTools({
       ctx,
@@ -57,6 +58,7 @@ export function createToolRegistry(args: {
       skillContext,
       availableCategories,
       factories,
+      isBackgroundWaitAvailable: () => backgroundWaitEnabled,
     }),
     ...(interactiveBashEnabled ? { interactive_bash: factories.interactive_bash } : {}),
     ...createTeamModeToolsRecord({ pluginConfig, ctx, managers, factories }),
@@ -83,6 +85,8 @@ export function createToolRegistry(args: {
   if (maxTools) {
     trimToolsToCap(filteredTools, maxTools)
   }
+
+  backgroundWaitEnabled = filteredTools["wait-for-background-tasks"] !== undefined
 
   return {
     filteredTools,

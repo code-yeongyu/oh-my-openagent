@@ -115,6 +115,70 @@ describe("#given tool trimming prioritization", () => {
   })
 })
 
+describe("#given block_on_background_tasks configuration", () => {
+  const createBackgroundTools = mock(
+    (_manager: unknown, _client: unknown, options?: { blockOnBackgroundTasks?: boolean }) =>
+      options?.blockOnBackgroundTasks ? { "wait-for-background-tasks": fakeTool } : {},
+  )
+
+  test("#when disabled_tools removes the wait tool #then delegate guidance sees it as unavailable", () => {
+    const delegateCallsBefore = toolFactories.createDelegateTask.mock.calls.length
+
+    const result = createToolRegistry({
+      ctx: { directory: "/tmp" } as Parameters<typeof createToolRegistry>[0]["ctx"],
+      pluginConfig: createPluginConfig({
+        disabled_tools: ["wait-for-background-tasks"],
+        experimental: { block_on_background_tasks: true },
+      }),
+      managers: {
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+      } as Parameters<typeof createToolRegistry>[0]["managers"],
+      skillContext: {
+        mergedSkills: [],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+      toolFactories: { ...toolFactories, createBackgroundTools },
+    })
+
+    const delegateOptions = toolFactories.createDelegateTask.mock.calls[delegateCallsBefore]?.[0]
+    expect(result.filteredTools).not.toHaveProperty("wait-for-background-tasks")
+    expect(delegateOptions?.isBackgroundWaitAvailable?.()).toBe(false)
+  })
+
+  test("#when max_tools is applied #then delegate guidance matches the final capped registry", () => {
+    const delegateCallsBefore = toolFactories.createDelegateTask.mock.calls.length
+
+    const result = createToolRegistry({
+      ctx: { directory: "/tmp" } as Parameters<typeof createToolRegistry>[0]["ctx"],
+      pluginConfig: createPluginConfig({
+        experimental: { block_on_background_tasks: true, max_tools: 1 },
+      }),
+      managers: {
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+      } as Parameters<typeof createToolRegistry>[0]["managers"],
+      skillContext: {
+        mergedSkills: [],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+      toolFactories: { ...toolFactories, createBackgroundTools },
+    })
+
+    const delegateOptions = toolFactories.createDelegateTask.mock.calls[delegateCallsBefore]?.[0]
+    const toolAvailable = result.filteredTools["wait-for-background-tasks"] !== undefined
+    expect(delegateOptions?.isBackgroundWaitAvailable?.()).toBe(toolAvailable)
+  })
+})
+
 describe("#given task_system configuration", () => {
   test("#when task_system is omitted #then task tools are not registered by default", () => {
     syncSessionCreatedCallbacks.length = 0
