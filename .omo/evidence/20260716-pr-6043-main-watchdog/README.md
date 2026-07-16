@@ -467,6 +467,27 @@ Nineteenth-cycle artifacts:
 - `nineteenth-exact-opencode-harness-self-check.txt`: isolated OpenCode harness preflight and sandbox cleanup proof.
 - `nineteenth-exact-live-watchdog-run.txt`: production-duration live OpenCode run pinned to `8dfd8d59440c52551f8fe682a86df94f980c8d52`; fallback observed, no fallback watchdog re-arm, later user abort external, and real database unchanged.
 
+The twentieth fresh reviewer found that root-session identity was still stored
+as one latest ID. Creating root B after root A therefore made the watchdog
+reject a still-active silent root A. The repair retains an insertion-ordered
+set of active roots while preserving the latest root for existing consumers.
+Deletion removes only the deleted root and restores the prior active root when
+the latest root closes. A malformed root `session.created` event without an ID
+is ignored instead of clearing the registry. Unknown parent-linked sessions
+remain excluded from main-session watchdog ownership.
+
+Twentieth-cycle artifacts:
+
+- `twentieth-review-finding.md`: exact-head reviewer blocker, causal mechanism, repair, and verdict.
+- `twentieth-review-red-two-roots.txt` and `twentieth-review-green-two-roots.txt`: failing-first and repaired watchdog proof for roots A then B with silent A.
+- `twentieth-review-red-missing-created-id.txt` and `twentieth-review-green-missing-created-id.txt`: failing-first and repaired lifecycle proof that a missing created-session ID cannot clear active roots.
+- `twentieth-final-runtime-fallback-suite.txt`: 291 tests passing across 45 files on runtime head `1e0b44d5a8a08ec168a14d542456c11212a7c610`.
+- `twentieth-final-session-lifecycle-suite.txt`: 53 event, monitor, and state tests passing, including deletion restoration and missing-ID preservation.
+- `twentieth-final-omo-opencode-typecheck.txt`, `twentieth-biome-scoped.txt`, and `twentieth-no-excuse-scoped.txt`: exact-source static gates. The whole-file Biome run in `twentieth-biome-all-changed.txt` retained three unrelated legacy diagnostics; the passing scoped run adjusts only those lines in temporary copies. The standalone no-excuse helper could not load TypeScript in this environment, so the introduced diff was audited directly against the documented forbidden patterns.
+- `twentieth-exact-integrity.txt`: exact source/base identity, diff check, and pure-LOC receipt.
+- `twentieth-exact-opencode-harness-self-check.txt`: isolated OpenCode harness preflight and sandbox cleanup proof.
+- `twentieth-exact-live-watchdog-run.txt`: production-duration live OpenCode run pinned to `1e0b44d5a8a08ec168a14d542456c11212a7c610`; fallback observed, no fallback watchdog re-arm, later user abort external, and real database unchanged.
+
 The live harness intentionally records only sanitized fake-provider, plugin,
 and SSE evidence. Authentication values, raw environment dumps, private
 credentials, and unrelated service logs are omitted.

@@ -1,0 +1,34 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/features/claude-code-session-state/state.test.ts:
+(pass) claude-code-session-state > setSessionAgent > should store agent for session [0.36ms]
+(pass) claude-code-session-state > setSessionAgent > should strip zero-width ordering prefixes before storing agent for session [0.08ms]
+(pass) claude-code-session-state > setSessionAgent > should NOT overwrite existing agent (first-write wins) [0.07ms]
+(pass) claude-code-session-state > setSessionAgent > should return undefined for unknown session [0.08ms]
+(pass) claude-code-session-state > updateSessionAgent > should overwrite existing agent [0.07ms]
+(pass) claude-code-session-state > updateSessionAgent > should strip zero-width ordering prefixes when overwriting existing agent [0.06ms]
+(pass) claude-code-session-state > clearSessionAgent > should remove agent from session [0.07ms]
+(pass) claude-code-session-state > mainSessionID > should store and retrieve main session ID [0.06ms]
+(pass) claude-code-session-state > mainSessionID > should return undefined when not set [0.05ms]
+(pass) claude-code-session-state > mainSessionID > should retain all active root sessions while exposing the latest one [0.06ms]
+(pass) claude-code-session-state > mainSessionID > should restore the previous active root when the latest root is removed [0.08ms]
+(pass) claude-code-session-state > agent registration > should register config-key lookup when given a display name [0.13ms]
+(pass) claude-code-session-state > agent registration > should resolve config keys back to the registered raw agent name [0.08ms]
+(pass) claude-code-session-state > agent registration > should resolve legacy parenthesized names to registered agent [0.06ms]
+(pass) claude-code-session-state > agent registration > should resolve bare lowercase name from historical session [0.05ms]
+(pass) claude-code-session-state > agent registration > should clear registered agent names without clearing session ownership [0.07ms]
+(pass) claude-code-session-state > agent registration > #given atlas display name with zero-width prefix > #when checking registration without the zero-width prefix > #then it treats the display name as registered [0.06ms]
+(pass) claude-code-session-state > prometheus-md-only integration scenario > should correctly identify Prometheus agent for permission checks [0.09ms]
+(pass) claude-code-session-state > prometheus-md-only integration scenario > should return undefined when agent not set (bug scenario) [0.07ms]
+(pass) claude-code-session-state > issue #893: custom agent switch reset > should preserve custom agent when default agent is sent on subsequent messages [0.05ms]
+(pass) claude-code-session-state > issue #893: custom agent switch reset > should allow explicit agent update via updateSessionAgent [0.06ms]
+(pass) claude-code-session-state > backward compatibility > strips legacy ZWSP-prefixed agent names from persisted session state (GH-3259) [0.05ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-main-session.test.ts:
+(pass) first-prompt watchdog main-session identity > #given two active root sessions #when the older root stays silent #then it still receives watchdog fallback [1.14ms]
+(pass) first-prompt watchdog main-session identity > #given an authoritative main session exists #when an unregistered parent-linked child stays silent #then the main-session watchdog does not claim it [0.13ms]
+
+ 24 pass
+ 0 fail
+ 37 expect() calls
+Ran 24 tests across 2 files. [67.00ms]

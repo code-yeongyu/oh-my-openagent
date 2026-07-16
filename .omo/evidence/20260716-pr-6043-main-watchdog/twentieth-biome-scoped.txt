@@ -1,0 +1,5 @@
+Sanitized only the three known pre-existing diagnostics in temporary copies:
+state.test.ts legacy agent! -> agent
+state.ts legacy joined-character class -> alternation
+event.test.ts legacy let currentNow -> const
+Checked 6 files in 8ms. No fixes applied.
