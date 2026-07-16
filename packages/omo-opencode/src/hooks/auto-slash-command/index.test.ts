@@ -457,6 +457,41 @@ describe("createAutoSlashCommandHook", () => {
       expect(output.parts[0].text).toContain("This is the skill template content")
     })
 
+    it("removes empty user-request tags from already-rendered auto slash command prompts", async () => {
+      // given
+      const hook = createAutoSlashCommandHook()
+      const sessionID = `test-session-empty-user-request-${Date.now()}`
+      const input = createMockInput(sessionID)
+      const output = createMockOutput(
+        "<auto-slash-command>\n# /humanizer Command\n\n<user-request>\n\n</user-request>\n</auto-slash-command>"
+      )
+
+      // when
+      await hook["chat.message"](input, output)
+
+      // then
+      expect(output.parts[0].text).toContain("<auto-slash-command>")
+      expect(output.parts[0].text).not.toContain("<user-request>")
+      expect(output.parts[0].text).not.toContain("</user-request>")
+    })
+
+    it("keeps populated user-request tags in already-rendered auto slash command prompts", async () => {
+      // given
+      const hook = createAutoSlashCommandHook()
+      const sessionID = `test-session-populated-user-request-${Date.now()}`
+      const input = createMockInput(sessionID)
+      const output = createMockOutput(
+        "<auto-slash-command>\n# /humanizer Command\n\n<user-request>\nmake this human\n</user-request>\n</auto-slash-command>"
+      )
+
+      // when
+      await hook["chat.message"](input, output)
+
+      // then
+      expect(output.parts[0].text).toContain("<user-request>")
+      expect(output.parts[0].text).toContain("make this human")
+    })
+
     it("does not replace synthetic slash text with a skill template", async () => {
       // given
       const skill = createTestSkill("my-test-skill", "This is the skill template content")
@@ -497,6 +532,32 @@ describe("createAutoSlashCommandHook", () => {
       expect(output.parts[0].text).toContain("/my-test-skill Command")
       expect(output.parts[0].text).toContain("Skill template for command execute")
       expect(output.parts[0].text).toContain("extra args")
+    })
+
+    it("removes empty user-request tags from command.execute.before output that is already tagged", async () => {
+      // given
+      const hook = createAutoSlashCommandHook()
+      const input: CommandExecuteBeforeInput = {
+        command: "humanizer",
+        sessionID: `test-session-empty-user-request-cmd-${Date.now()}`,
+        arguments: "",
+      }
+      const output: CommandExecuteBeforeOutput = {
+        parts: [
+          {
+            type: "text",
+            text: "<auto-slash-command>\n# /humanizer Command\n\n<user-request>\n\n</user-request>\n</auto-slash-command>",
+          },
+        ],
+      }
+
+      // when
+      await hook["command.execute.before"](input, output)
+
+      // then
+      expect(output.parts[0].text).toContain("<auto-slash-command>")
+      expect(output.parts[0].text).not.toContain("<user-request>")
+      expect(output.parts[0].text).not.toContain("</user-request>")
     })
 
     it("should handle skill with lazy content loader", async () => {
