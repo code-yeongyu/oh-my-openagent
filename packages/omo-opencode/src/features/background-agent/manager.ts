@@ -415,6 +415,20 @@ export class BackgroundManager {
     this.pendingLaunchesByParentSession.set(parentSessionID, currentCount - 1)
   }
 
+  private reserveTaskFinalization(task: BackgroundTask): () => void {
+    const parentSessionID = task.parentSessionId
+    if (!parentSessionID) return () => {}
+
+    this.parentWakeNotifier.reserveNotificationPreparation(parentSessionID)
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      this.parentWakeNotifier.releaseNotificationPreparation(parentSessionID)
+      this.updateBackgroundTaskMarker(parentSessionID)
+    }
+  }
+
   private markPreStartDescendantReservation(task: BackgroundTask): void {
     this.preStartDescendantReservations.add(task.id)
   }
@@ -720,39 +734,46 @@ export class BackgroundManager {
         } catch (error) {
           log("[background-agent] Error starting task:", error)
           this.rollbackPreStartDescendantReservation(item.task)
+          const releaseTaskFinalization = this.reserveTaskFinalization(item.task)
+          let notificationQueued = false
 
-          // Mark task as error so the parent polling loop detects the failure
-          // instead of leaving it in a zombie "running" state with no prompt sent
-          if (item.task.currentAttemptID) {
-            finalizeAttempt(item.task, item.task.currentAttemptID, "error", error instanceof Error ? error.message : String(error))
-          } else {
-            item.task.status = "error"
-            item.task.error = error instanceof Error ? error.message : String(error)
-            item.task.completedAt = new Date()
+          try {
+            // Mark task as error so the parent polling loop detects the failure
+            // instead of leaving it in a zombie "running" state with no prompt sent
+            if (item.task.currentAttemptID) {
+              finalizeAttempt(item.task, item.task.currentAttemptID, "error", error instanceof Error ? error.message : String(error))
+            } else {
+              item.task.status = "error"
+              item.task.error = error instanceof Error ? error.message : String(error)
+              item.task.completedAt = new Date()
+            }
+
+            if (item.task.concurrencyKey) {
+              this.concurrencyManager.release(item.task.concurrencyKey)
+              item.task.concurrencyKey = undefined
+            } else {
+              this.concurrencyManager.release(key)
+            }
+
+            removeTaskToastTracking(item.task.id)
+
+            // Abort the orphaned session if one was created before the error
+            if (item.task.sessionId) {
+              clearDelegatedChildSessionBootstrap(item.task.sessionId)
+              await this.abortSessionWithLogging(item.task.sessionId, "startTask error cleanup")
+            }
+
+            // Update continuation marker for CLI run mode
+            this.updateBackgroundTaskMarker(item.task.parentSessionId)
+
+            this.markForNotification(item.task)
+            this.enqueueNotificationForParent(item.task.parentSessionId, () => this.notifyParentSession(item.task)).catch(err => {
+              log("[background-agent] Failed to notify on startTask error:", err)
+            }).finally(releaseTaskFinalization)
+            notificationQueued = true
+          } finally {
+            if (!notificationQueued) releaseTaskFinalization()
           }
-
-          if (item.task.concurrencyKey) {
-            this.concurrencyManager.release(item.task.concurrencyKey)
-            item.task.concurrencyKey = undefined
-          } else {
-            this.concurrencyManager.release(key)
-          }
-
-          removeTaskToastTracking(item.task.id)
-
-          // Abort the orphaned session if one was created before the error
-          if (item.task.sessionId) {
-            clearDelegatedChildSessionBootstrap(item.task.sessionId)
-            await this.abortSessionWithLogging(item.task.sessionId, "startTask error cleanup")
-          }
-
-          // Update continuation marker for CLI run mode
-          this.updateBackgroundTaskMarker(item.task.parentSessionId)
-
-          this.markForNotification(item.task)
-          this.enqueueNotificationForParent(item.task.parentSessionId, () => this.notifyParentSession(item.task)).catch(err => {
-            log("[background-agent] Failed to notify on startTask error:", err)
-          })
         }
       }
     } finally {
@@ -1021,36 +1042,43 @@ The fallback retry session is now created and can be inspected directly.
           return
         }
 
-        const errorMessage = errorInfo.message ?? (error instanceof Error ? error.message : String(error))
-        const terminalError = errorMessage.includes("agent.name") || errorMessage.includes("undefined") || isAgentNotFoundError(error)
-          ? `Agent "${input.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
-          : errorMessage
-        if (existingTask.currentAttemptID) {
-          finalizeAttempt(existingTask, existingTask.currentAttemptID, "interrupt", terminalError)
-        } else {
-          existingTask.status = "interrupt"
-          existingTask.error = terminalError
-          existingTask.completedAt = new Date()
-        }
-        if (existingTask.rootSessionId) {
-          this.unregisterRootDescendant(existingTask.rootSessionId)
-        }
-        if (existingTask.concurrencyKey) {
-          this.concurrencyManager.release(existingTask.concurrencyKey)
-          existingTask.concurrencyKey = undefined
-        }
+        const releaseTaskFinalization = this.reserveTaskFinalization(existingTask)
+        let notificationQueued = false
+        try {
+          const errorMessage = errorInfo.message ?? (error instanceof Error ? error.message : String(error))
+          const terminalError = errorMessage.includes("agent.name") || errorMessage.includes("undefined") || isAgentNotFoundError(error)
+            ? `Agent "${input.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
+            : errorMessage
+          if (existingTask.currentAttemptID) {
+            finalizeAttempt(existingTask, existingTask.currentAttemptID, "interrupt", terminalError)
+          } else {
+            existingTask.status = "interrupt"
+            existingTask.error = terminalError
+            existingTask.completedAt = new Date()
+          }
+          if (existingTask.rootSessionId) {
+            this.unregisterRootDescendant(existingTask.rootSessionId)
+          }
+          if (existingTask.concurrencyKey) {
+            this.concurrencyManager.release(existingTask.concurrencyKey)
+            existingTask.concurrencyKey = undefined
+          }
 
-        removeTaskToastTracking(existingTask.id)
+          removeTaskToastTracking(existingTask.id)
 
-        // Abort the session to prevent infinite polling hang
-        // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
-        clearDelegatedChildSessionBootstrap(sessionID)
-        await this.abortSessionWithLogging(sessionID, "launch error cleanup")
+          // Abort the session to prevent infinite polling hang
+          // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
+          clearDelegatedChildSessionBootstrap(sessionID)
+          await this.abortSessionWithLogging(sessionID, "launch error cleanup")
 
-        this.markForNotification(existingTask)
-        this.enqueueNotificationForParent(existingTask.parentSessionId, () => this.notifyParentSession(existingTask)).catch(err => {
-          log("[background-agent] Failed to notify on error:", err)
-        })
+          this.markForNotification(existingTask)
+          this.enqueueNotificationForParent(existingTask.parentSessionId, () => this.notifyParentSession(existingTask)).catch(err => {
+            log("[background-agent] Failed to notify on error:", err)
+          }).finally(releaseTaskFinalization)
+          notificationQueued = true
+        } finally {
+          if (!notificationQueued) releaseTaskFinalization()
+        }
       }
     })
 

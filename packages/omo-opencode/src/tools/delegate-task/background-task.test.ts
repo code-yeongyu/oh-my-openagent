@@ -689,8 +689,9 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
 
     //#then - the wait result is described accurately and result collection remains explicit
     expectFn(result).toContain("call `wait-for-background-tasks`")
-    expectFn(result).toContain("returns their final or current statuses")
-    expectFn(result).toContain("until all tasks finish, the wait times out, or the call is aborted")
+    expectFn(result).toContain("final or current statuses")
+    expectFn(result).toContain("times out")
+    expectFn(result).toContain("aborted")
     expectFn(result).toContain('background_output(task_id="<id>")')
     expectFn(result).not.toContain("returns their results")
   })

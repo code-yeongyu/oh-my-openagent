@@ -52,6 +52,12 @@ function truncateField(value: string, maxLength: number): string {
   return `${value.slice(0, maxLength)}... [truncated]`
 }
 
+function truncateResult(value: string): string {
+  if (value.length <= MAX_RESULT_LENGTH) return value
+  const suffix = "\n\n... [result truncated]"
+  return `${value.slice(0, MAX_RESULT_LENGTH - suffix.length)}${suffix}`
+}
+
 function formatResult(tasks: BackgroundTask[], timedOut: boolean, timeoutMs: number): string {
   const completed: string[] = []
   const stillRunning: string[] = []
@@ -89,9 +95,7 @@ function formatResult(tasks: BackgroundTask[], timedOut: boolean, timeoutMs: num
     sections.push(`Result limited to ${MAX_TASKS_IN_RESULT} of ${tasks.length} retained tasks. Use \`background_output\` for omitted task details.`)
   }
 
-  const result = sections.join("\n\n").trim()
-  if (result.length <= MAX_RESULT_LENGTH) return result
-  return `${result.slice(0, MAX_RESULT_LENGTH - 32)}\n\n... [result truncated]`
+  return truncateResult(sections.join("\n\n").trim())
 }
 
 export function createWaitForBackgroundTasks(
@@ -180,7 +184,7 @@ export function createWaitForBackgroundTasks(
 
         return formatResult(finalTasks, timedOut, timeoutMs)
       } catch (error) {
-        return `[ERROR] Error waiting for background tasks: ${error instanceof Error ? error.message : String(error)}`
+        return truncateResult(`[ERROR] Error waiting for background tasks: ${error instanceof Error ? error.message : String(error)}`)
       }
     },
   })
