@@ -74,7 +74,7 @@ describe("start-work Stop hook", () => {
 		// given
 		const workspace = createWorkspace({
 			boulderJson: createBoulderJson({ sessionIds: ["codex:sess_abc"], status: "active" }),
-			planMarkdown: ["# Plan", "", "## TODOs", "- [x] Done"].join("\n"),
+			planMarkdown: ["# Plan", "", "## TODOs", "- [x] 1. Done"].join("\n"),
 		});
 		const fs = createMemoryFs();
 
