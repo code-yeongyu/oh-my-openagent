@@ -13,6 +13,14 @@ export function createWatchdogAbortProvenance() {
       generations.add(generation)
       generationsBySession.set(sessionID, generations)
     },
+    hasPrior(sessionID: string, currentGeneration: number | undefined): boolean {
+      const generations = generationsBySession.get(sessionID)
+      if (currentGeneration === undefined || generations === undefined) return false
+      for (const generation of generations) {
+        if (generation < currentGeneration) return true
+      }
+      return false
+    },
     consumePrior(sessionID: string, currentGeneration: number | undefined): boolean {
       const generations = generationsBySession.get(sessionID)
       if (currentGeneration === undefined || generations === undefined) return false

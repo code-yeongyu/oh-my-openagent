@@ -156,19 +156,71 @@ describe("first-prompt watchdog generation races", () => {
     const watchdog = createFirstPromptWatchdog(deps, helpers, 1)
     const eventHandler = createEventHandler(deps, helpers)
 
-    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT, "user-generation-1")
     await new Promise((resolve) => setTimeout(resolve, 5))
     expect(calls.dispatch).toBe(1)
 
     deps.internallyAbortedSessions.delete(sessionID)
-    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
-    watchdog.onSessionTerminal(sessionID, "session.error", true)
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT, "user-generation-2")
+    expect(watchdog.onSessionTerminal(sessionID, "session.error", true)).toEqual({
+      kind: "defer-terminal",
+      sessionID,
+    })
+    expect(watchdog.onAssistantProgress(sessionID, "user-generation-1", true)).toEqual({
+      kind: "resolve-terminal",
+      sessionID,
+    })
     await eventHandler(createAbortEvent(sessionID))
     await new Promise((resolve) => setTimeout(resolve, 5))
 
     expect(calls.dispatch).toBe(2)
     expect(deps.sessionStates.get(sessionID)?.currentModel).not.toBe(PRIMARY_MODEL)
     expect(deps.sessionStates.get(sessionID)?.attemptCount).toBeGreaterThan(0)
+    watchdog.dispose()
+  })
+
+  it("#given generation one retains abort provenance #when generation two is cancelled before the delayed abort arrives #then cancellation prevents a second fallback", async () => {
+    const sessionID = "session-current-cancellation-before-delayed-abort"
+    const deps = createDeps()
+    deps.sessionStates.set(sessionID, createFallbackState(PRIMARY_MODEL))
+    const calls = { dispatch: 0 }
+    const helpers: AutoRetryHelpers = {
+      abortSessionRequest: async () => {
+        deps.internallyAbortedSessions.add(sessionID)
+        return true
+      },
+      clearSessionFallbackTimeout: () => {},
+      scheduleSessionFallbackTimeout: () => {},
+      autoRetryWithFallback: async () => {
+        calls.dispatch += 1
+        return { accepted: true, status: "dispatched" }
+      },
+      resolveAgentForSessionFromContext: async () => AGENT,
+      cleanupStaleSessions: () => {},
+    }
+    const watchdog = createFirstPromptWatchdog(deps, helpers, 1)
+    const eventHandler = createEventHandler(deps, helpers)
+
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT, "user-generation-1")
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    expect(calls.dispatch).toBe(1)
+
+    deps.internallyAbortedSessions.delete(sessionID)
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT, "user-generation-2")
+    expect(watchdog.onSessionTerminal(sessionID, "session.error", true)).toEqual({
+      kind: "defer-terminal",
+      sessionID,
+    })
+    expect(watchdog.onAssistantProgress(sessionID, "user-generation-2", true)).toEqual({
+      kind: "resolve-terminal",
+      sessionID,
+    })
+    await eventHandler(createAbortEvent(sessionID))
+    await new Promise((resolve) => setTimeout(resolve, 5))
+
+    expect(calls.dispatch).toBe(1)
+    expect(deps.sessionStates.get(sessionID)?.currentModel).toBe(PRIMARY_MODEL)
+    expect(deps.sessionStates.get(sessionID)?.attemptCount).toBe(0)
     watchdog.dispose()
   })
 })

@@ -64,6 +64,7 @@ export function createRuntimeFallbackHook(
   const messageUpdateHandler = factories.createMessageUpdateHandler(deps, helpers)
   const chatMessageHandler = factories.createChatMessageHandler(deps)
   const firstPromptWatchdog = factories.createFirstPromptWatchdog(deps, helpers)
+  const deferredTerminalEvents = new Map<string, { type: string; properties?: unknown }>()
 
   let cleanupInterval: RuntimeFallbackInterval | null = null
   let intervalStarted = false
@@ -82,8 +83,21 @@ export function createRuntimeFallbackHook(
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
     ensureInterval()
 
+    let watchdogDecision: ReturnType<typeof observeEventForWatchdog>
     if (config.enabled) {
-      observeEventForWatchdog(event, firstPromptWatchdog)
+      watchdogDecision = observeEventForWatchdog(event, firstPromptWatchdog)
+    }
+
+    if (watchdogDecision?.kind === "defer-terminal") {
+      deferredTerminalEvents.set(watchdogDecision.sessionID, event)
+      return
+    }
+    if (watchdogDecision?.kind === "resolve-terminal") {
+      const deferredEvent = deferredTerminalEvents.get(watchdogDecision.sessionID)
+      deferredTerminalEvents.delete(watchdogDecision.sessionID)
+      if (deferredEvent) {
+        await baseEventHandler({ event: deferredEvent })
+      }
     }
 
     if (event.type === "message.updated") {
@@ -105,6 +119,7 @@ export function createRuntimeFallbackHook(
     }
 
     firstPromptWatchdog.dispose()
+    deferredTerminalEvents.clear()
 
     deps.sessionStates.clear()
     deps.sessionLastAccess.clear()
