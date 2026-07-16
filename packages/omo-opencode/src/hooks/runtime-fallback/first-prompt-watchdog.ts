@@ -166,6 +166,7 @@ export function createFirstPromptWatchdog(
     onSessionTerminal(sessionID, eventType, isAbortEvent) {
       if (!sessionID) return
       if (suspended.has(sessionID)) {
+        if (eventType === "session.idle") return
         deps.internallyAbortedSessions.delete(sessionID)
         cancel(sessionID)
         return { kind: "resolve-terminal", sessionID }

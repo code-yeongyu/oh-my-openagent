@@ -110,6 +110,9 @@ describe("runtime-fallback progress before delayed terminal", () => {
       },
     })
     await hook.event({
+      event: { type: "session.idle", properties: { sessionID: SESSION_ID } },
+    })
+    await hook.event({
       event: {
         type: "message.updated",
         properties: {
