@@ -257,13 +257,22 @@ export function parseNpmPackJson(output) {
     try {
       const parsed = JSON.parse(output.slice(index))
       const entries = Array.isArray(parsed) ? parsed : parsed && typeof parsed === "object" ? Object.values(parsed) : []
-      if (entries[0]?.files !== undefined) return entries
+      if (entries.length > 0 && entries.every(isNpmPackEntry)) return entries
     } catch (error) {
       if (error instanceof SyntaxError) continue
       throw error
     }
   }
   throw new Error("npm pack --dry-run --json did not produce a parseable file list")
+}
+
+function isNpmPackEntry(value) {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    Array.isArray(value.files) &&
+    value.files.every((file) => file !== null && typeof file === "object" && typeof file.path === "string")
+  )
 }
 
 function isMainModule() {

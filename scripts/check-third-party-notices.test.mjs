@@ -15,6 +15,15 @@ test("#given npm 12 pack JSON #when parsing the manifest #then normalizes keyed 
   assert.deepEqual(parseNpmPackJson(JSON.stringify({ "@scope/package": entry })), [entry])
 })
 
+test("#given mixed npm 12 pack entries #when parsing the manifest #then rejects the malformed payload", () => {
+  const output = JSON.stringify({
+    "@scope/valid": { files: [{ path: "valid.txt" }] },
+    "@scope/invalid": { unexpected: true },
+  })
+
+  assert.throws(() => parseNpmPackJson(output), /did not produce a parseable file list/)
+})
+
 test("#given Windows npm command #when resolving notice checker spawn invocation #then uses cmd shim", () => {
   assert.deepEqual(resolveSpawnSyncInvocation("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], "win32"), {
     command: "cmd.exe",
