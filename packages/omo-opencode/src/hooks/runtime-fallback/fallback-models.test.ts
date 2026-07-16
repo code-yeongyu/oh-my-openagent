@@ -45,6 +45,87 @@ describe("runtime-fallback fallback-models", () => {
     expect(result).toEqual(["openai/gpt-5.5", "anthropic/claude-opus-4-7"])
   })
 
+  test("inherits prometheus fallback_models for a replaced plan agent by default", () => {
+    //#given
+    const pluginConfig = unsafeTestValue({
+      agents: {
+        plan: {},
+        prometheus: {
+          fallback_models: ["openai/gpt-5.5", "anthropic/claude-opus-4-7"],
+        },
+      },
+    })
+
+    //#when
+    const result = getFallbackModelsForSession("ses_runtime_fallback_plan", "plan", pluginConfig)
+
+    //#then
+    expect(result).toEqual(["openai/gpt-5.5", "anthropic/claude-opus-4-7"])
+  })
+
+  test("uses explicit plan fallback_models before prometheus inheritance", () => {
+    //#given
+    const pluginConfig = unsafeTestValue({
+      agents: {
+        plan: {
+          fallback_models: ["openai/gpt-5.4"],
+        },
+        prometheus: {
+          fallback_models: ["openai/gpt-5.5"],
+        },
+      },
+    })
+
+    //#when
+    const result = getFallbackModelsForSession("ses_runtime_fallback_plan", "plan", pluginConfig)
+
+    //#then
+    expect(result).toEqual(["openai/gpt-5.4"])
+  })
+
+  test("explicit empty plan fallback_models suppresses prometheus inheritance", () => {
+    //#given
+    const pluginConfig = unsafeTestValue({
+      agents: {
+        plan: {
+          fallback_models: [],
+        },
+        prometheus: {
+          fallback_models: ["openai/gpt-5.5"],
+        },
+      },
+    })
+
+    //#when
+    const result = getFallbackModelsForSession("ses_runtime_fallback_plan", "plan", pluginConfig)
+
+    //#then
+    expect(result).toEqual([])
+  })
+
+  test.each([
+    { planner_enabled: false },
+    { replace_plan: false },
+    { disabled: true },
+  ])("does not inherit prometheus fallback_models when plan replacement is disabled: %#", (sisyphusAgent) => {
+    //#given
+    const pluginConfig = unsafeTestValue({
+      sisyphus_agent: sisyphusAgent,
+      agents: {
+        plan: {},
+        prometheus: {
+          fallback_models: ["openai/gpt-5.5"],
+        },
+      },
+    })
+
+    //#when
+    const result = getFallbackModelsForSession("ses_runtime_fallback_plan", "plan", pluginConfig)
+
+    //#then
+    expect(result).toEqual([])
+  })
+
   test("does not fall back to another agent chain when agent cannot be resolved", () => {
     //#given
     const pluginConfig = unsafeTestValue({

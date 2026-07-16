@@ -32,6 +32,7 @@ describe("buildPlanDemoteConfig", () => {
       reasoningEffort: "high",
       textVerbosity: "medium",
       providerOptions: { key: "value" },
+      fallback_models: [{ model: "openai/gpt-5.5", variant: "high" }, "opencode-go/glm-5.2"],
     }
 
     //#when
@@ -48,6 +49,10 @@ describe("buildPlanDemoteConfig", () => {
     expect(result.reasoningEffort).toBe("high")
     expect(result.textVerbosity).toBe("medium")
     expect(result.providerOptions).toEqual({ key: "value" })
+    expect(result.fallback_models).toEqual([
+      { model: "openai/gpt-5.5", variant: "high" },
+      "opencode-go/glm-5.2",
+    ])
     expect(result.prompt).toBeUndefined()
     expect(result.permission).toBeUndefined()
     expect(result.description).toBeUndefined()
@@ -62,12 +67,14 @@ describe("buildPlanDemoteConfig", () => {
       variant: "max",
       temperature: 0.1,
       reasoningEffort: "high",
+      fallback_models: ["openai/gpt-5.5"],
     }
     const planOverride = {
       model: "openai/gpt-5.4",
       variant: "high",
       temperature: 0.5,
       reasoningEffort: "low",
+      fallback_models: [{ model: "opencode-go/glm-5.2" }],
     }
 
     //#when
@@ -78,6 +85,7 @@ describe("buildPlanDemoteConfig", () => {
     expect(result.variant).toBe("high")
     expect(result.temperature).toBe(0.5)
     expect(result.reasoningEffort).toBe("low")
+    expect(result.fallback_models).toEqual([{ model: "opencode-go/glm-5.2" }])
   })
 
   test("falls back to prometheus when plan override has partial settings", () => {
