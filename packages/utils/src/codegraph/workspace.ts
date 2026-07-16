@@ -108,7 +108,8 @@ export function prepareCodegraphWorkspace(
 }
 
 export function ensureCodegraphGitignored(workspace: string): boolean {
-  if (!existsSync(join(workspace, ".git"))) return false
+  const gitMarkerPath = join(workspace, ".git")
+  if (!existsSync(gitMarkerPath)) return false
 
   try {
     const isWorktree = execFileSync("git", ["rev-parse", "--is-inside-work-tree"], {
@@ -130,6 +131,16 @@ export function ensureCodegraphGitignored(workspace: string): boolean {
     }).trim()
     if (gitTopLevel.length === 0 || realpathSync.native(gitTopLevel) !== realpathSync.native(workspace)) return false
 
+    const gitDir = execFileSync("git", ["rev-parse", "--absolute-git-dir"], {
+      cwd: workspace,
+      encoding: "utf8",
+      shell: false,
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5_000,
+      windowsHide: true,
+    }).trim()
+    if (gitDir.length === 0 || !gitMarkerOwnsGitDir(gitMarkerPath, workspace, gitDir)) return false
+
     const gitExcludePath = execFileSync("git", ["rev-parse", "--git-path", "info/exclude"], {
       cwd: workspace,
       encoding: "utf8",
@@ -149,4 +160,38 @@ export function ensureCodegraphGitignored(workspace: string): boolean {
   } catch {
     return false
   }
+}
+
+function gitMarkerOwnsGitDir(gitMarkerPath: string, workspace: string, gitDir: string): boolean {
+  const markerStat = lstatSync(gitMarkerPath)
+  if (markerStat.isSymbolicLink()) return false
+
+  const resolvedGitDir = realpathSync.native(gitDir)
+  if (markerStat.isDirectory()) return realpathSync.native(gitMarkerPath) === resolvedGitDir
+  if (!markerStat.isFile()) return false
+
+  const markerMatch = /^gitdir:\s*(.+)\s*$/i.exec(readFileSync(gitMarkerPath, "utf8").trim())
+  if (markerMatch?.[1] === undefined) return false
+  if (realpathSync.native(resolve(workspace, markerMatch[1])) !== resolvedGitDir) return false
+
+  const backlinkPath = join(resolvedGitDir, "gitdir")
+  if (existsSync(backlinkPath)) {
+    const backlink = readFileSync(backlinkPath, "utf8").trim()
+    return backlink.length > 0
+      && realpathSync.native(resolve(resolvedGitDir, backlink)) === realpathSync.native(gitMarkerPath)
+  }
+
+  const coreWorktree = execFileSync(
+    "git",
+    ["config", "--file", join(resolvedGitDir, "config"), "--get", "core.worktree"],
+    {
+      encoding: "utf8",
+      shell: false,
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5_000,
+      windowsHide: true,
+    },
+  ).trim()
+  return coreWorktree.length > 0
+    && realpathSync.native(resolve(resolvedGitDir, coreWorktree)) === realpathSync.native(workspace)
 }
