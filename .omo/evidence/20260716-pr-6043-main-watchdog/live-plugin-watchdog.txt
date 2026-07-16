@@ -1,53 +1,53 @@
-[2026-07-16T20:53:48.610Z] [runtime-fallback] first-prompt-watchdog: armed {"sessionID":"<qa-session>","model":"openai/primary","agent":"sisyphus","watchdogMs":90000}
-[2026-07-16T20:54:01.033Z] [runtime-fallback] session.status retry with non-matching message {"sessionID":"<qa-session>","attempt":1,"retryMessage":"Provider response headers timed out after 10000ms"}
-[2026-07-16T20:54:13.071Z] [runtime-fallback] session.status retry with non-matching message {"sessionID":"<qa-session>","attempt":2,"retryMessage":"Provider response headers timed out after 10000ms"}
-[2026-07-16T20:54:27.102Z] [runtime-fallback] session.status retry with non-matching message {"sessionID":"<qa-session>","attempt":3,"retryMessage":"Provider response headers timed out after 10000ms"}
-[2026-07-16T20:54:45.151Z] [runtime-fallback] session.status retry with non-matching message {"sessionID":"<qa-session>","attempt":4,"retryMessage":"Provider response headers timed out after 10000ms"}
-[2026-07-16T20:55:11.217Z] [runtime-fallback] session.status retry with non-matching message {"sessionID":"<qa-session>","attempt":5,"retryMessage":"Provider response headers timed out after 10000ms"}
-[2026-07-16T20:55:18.610Z] [runtime-fallback] first-prompt-watchdog: session silent past 90000ms, dispatching fallback {"sessionID":"<qa-session>","model":"openai/primary","fallbackCount":1}
-[2026-07-16T20:55:18.631Z] [runtime-fallback] Aborted in-flight session request (first-prompt-watchdog) {"sessionID":"<qa-session>"}
-[2026-07-16T20:55:18.632Z] [runtime-fallback] Preparing fallback {"sessionID":"<qa-session>","from":"openai/primary","to":"openai/fallback","attempt":1}
-[2026-07-16T20:55:18.642Z] [todo-continuation-enforcer] session.idle {"sessionID":"<qa-session>"}
-[2026-07-16T20:55:18.643Z] [runtime-fallback] Auto-retrying with fallback model (first-prompt-watchdog) {"sessionID":"<qa-session>","model":"openai/fallback"}
-[2026-07-16T20:55:18.647Z] [todo-continuation-enforcer] Skipped: pending internal continuation response {"sessionID":"<qa-session>"}
-[2026-07-16T20:55:18.647Z] [runtime-fallback] session.idle while awaiting fallback result; keeping timeout armed {"sessionID":"<qa-session>"}
-[2026-07-16T20:55:18.648Z] [atlas] session.idle {"sessionID":"<qa-session>"}
-[2026-07-16T20:55:18.648Z] [atlas] Skipped: session not registered in active boulder {"sessionID":"<qa-session>"}
-[2026-07-16T20:55:18.812Z] [prompt-async-gate] promptAsync dispatching {"sessionID":"<qa-session>","source":"runtime-fallback:first-prompt-watchdog"}
-[2026-07-16T20:55:18.812Z] [live-server-route] dispatch via live listener {"sessionID":"<qa-session>","source":"runtime-fallback:first-prompt-watchdog"}
-[2026-07-16T20:55:18.817Z] [runtime-fallback] Applying fallback model override {"sessionID":"<qa-session>","from":{"providerID":"openai","modelID":"fallback"},"to":"openai/fallback"}
-[2026-07-16T20:55:18.818Z] [prompt-async-gate] remembered semantic prompt dispatch {"sessionID":"<qa-session>","source":"runtime-fallback:first-prompt-watchdog","holdMs":15000}
-[2026-07-16T20:55:18.818Z] [prompt-async-gate] promptAsync dispatched {"sessionID":"<qa-session>","source":"runtime-fallback:first-prompt-watchdog"}
-[2026-07-16T20:55:18.823Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
-[2026-07-16T20:55:18.833Z] [runtime-fallback] Assistant update observed without visible final response; keeping fallback timeout {"sessionID":"<qa-session>"}
-[2026-07-16T20:55:18.833Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
-[2026-07-16T20:55:18.851Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
-[2026-07-16T20:55:18.851Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
-[2026-07-16T20:55:18.852Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
-[2026-07-16T20:55:18.854Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
-[2026-07-16T20:55:18.855Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
-[2026-07-16T20:55:18.863Z] [runtime-fallback] Assistant response observed; cleared fallback timeout {"sessionID":"<qa-session>"}
-[2026-07-16T20:55:18.863Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
-[2026-07-16T20:55:18.863Z] [runtime-fallback] Assistant response observed; cleared fallback timeout {"sessionID":"<qa-session>"}
-[2026-07-16T20:55:18.863Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
-[2026-07-16T20:55:20.306Z] [runtime-fallback] Applying fallback model override {"sessionID":"<qa-session>","from":{"providerID":"openai","modelID":"fallback"},"to":"openai/fallback"}
-[2026-07-16T20:55:20.314Z] [runtime-fallback] first-prompt-watchdog: armed {"sessionID":"<qa-session>","model":"openai/fallback","agent":"sisyphus","watchdogMs":90000}
-[2026-07-16T20:55:20.314Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
-[2026-07-16T20:55:20.318Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
-[2026-07-16T20:55:20.752Z] [todo-continuation-enforcer] Abort detected via session.error {"sessionID":"<qa-session>","errorName":"MessageAbortedError"}
-[2026-07-16T20:55:20.752Z] [todo-continuation-enforcer] session.error {"sessionID":"<qa-session>"}
-[2026-07-16T20:55:20.753Z] [unstable-agent-babysitter] Marked session cancelled {"sessionID":"<qa-session>"}
-[2026-07-16T20:55:20.753Z] [todo-continuation-enforcer] session.idle {"sessionID":"<qa-session>"}
-[2026-07-16T20:55:20.753Z] [auto-compact] session.error received {"sessionID":"<qa-session>","error":{"name":"MessageAbortedError","data":{"message":"Aborted"}}}
-[2026-07-16T20:55:20.754Z] [auto-compact] message.updated with error {"sessionID":"<qa-session>","error":{"name":"MessageAbortedError","data":{"message":"Aborted"}}}
-[2026-07-16T20:55:20.754Z] [runtime-fallback] first-prompt-watchdog: deferred ambiguous abort for message correlation {"sessionID":"<qa-session>"}
-[2026-07-16T20:55:20.754Z] [runtime-fallback] first-prompt-watchdog: resolved external cancellation {"sessionID":"<qa-session>"}
-[2026-07-16T20:55:20.754Z] [runtime-fallback] session.error matched cancellation; cleared retry state {"sessionID":"<qa-session>","resolvedAgent":"sisyphus"}
-[2026-07-16T20:55:20.755Z] [runtime-fallback] message.updated with assistant error {"sessionID":"<qa-session>","errorName":"MessageAbortedError","errorType":"abort"}
-[2026-07-16T20:55:20.755Z] [runtime-fallback] message.updated error not retryable, skipping fallback {"sessionID":"<qa-session>","errorName":"MessageAbortedError","errorType":"abort"}
-[2026-07-16T20:55:20.755Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
-[2026-07-16T20:55:20.755Z] [atlas] session.error {"sessionID":"<qa-session>","isAbort":true}
-[2026-07-16T20:55:20.758Z] [todo-continuation-enforcer] Skipped: last assistant message was aborted (API fallback) {"sessionID":"<qa-session>"}
-[2026-07-16T20:55:20.758Z] [runtime-fallback] Cleared fallback retry state for cancelled session on idle {"sessionID":"<qa-session>"}
-[2026-07-16T20:55:20.758Z] [atlas] session.idle {"sessionID":"<qa-session>"}
-[2026-07-16T20:55:20.758Z] [atlas] Skipped: session not registered in active boulder {"sessionID":"<qa-session>"}
+[2026-07-16T21:45:23.528Z] [runtime-fallback] first-prompt-watchdog: armed {"sessionID":"<qa-session>","model":"openai/primary","agent":"sisyphus","watchdogMs":90000}
+[2026-07-16T21:45:35.992Z] [runtime-fallback] session.status retry with non-matching message {"sessionID":"<qa-session>","attempt":1,"retryMessage":"Provider response headers timed out after 10000ms"}
+[2026-07-16T21:45:48.018Z] [runtime-fallback] session.status retry with non-matching message {"sessionID":"<qa-session>","attempt":2,"retryMessage":"Provider response headers timed out after 10000ms"}
+[2026-07-16T21:46:02.052Z] [runtime-fallback] session.status retry with non-matching message {"sessionID":"<qa-session>","attempt":3,"retryMessage":"Provider response headers timed out after 10000ms"}
+[2026-07-16T21:46:20.082Z] [runtime-fallback] session.status retry with non-matching message {"sessionID":"<qa-session>","attempt":4,"retryMessage":"Provider response headers timed out after 10000ms"}
+[2026-07-16T21:46:46.092Z] [runtime-fallback] session.status retry with non-matching message {"sessionID":"<qa-session>","attempt":5,"retryMessage":"Provider response headers timed out after 10000ms"}
+[2026-07-16T21:46:53.530Z] [runtime-fallback] first-prompt-watchdog: session silent past 90000ms, dispatching fallback {"sessionID":"<qa-session>","model":"openai/primary","fallbackCount":1}
+[2026-07-16T21:46:53.554Z] [runtime-fallback] Aborted in-flight session request (first-prompt-watchdog) {"sessionID":"<qa-session>"}
+[2026-07-16T21:46:53.555Z] [runtime-fallback] Preparing fallback {"sessionID":"<qa-session>","from":"openai/primary","to":"openai/fallback","attempt":1}
+[2026-07-16T21:46:53.569Z] [todo-continuation-enforcer] session.idle {"sessionID":"<qa-session>"}
+[2026-07-16T21:46:53.569Z] [runtime-fallback] Auto-retrying with fallback model (first-prompt-watchdog) {"sessionID":"<qa-session>","model":"openai/fallback"}
+[2026-07-16T21:46:53.573Z] [todo-continuation-enforcer] Skipped: pending internal continuation response {"sessionID":"<qa-session>"}
+[2026-07-16T21:46:53.574Z] [runtime-fallback] session.idle while awaiting fallback result; keeping timeout armed {"sessionID":"<qa-session>"}
+[2026-07-16T21:46:53.575Z] [atlas] session.idle {"sessionID":"<qa-session>"}
+[2026-07-16T21:46:53.575Z] [atlas] Skipped: session not registered in active boulder {"sessionID":"<qa-session>"}
+[2026-07-16T21:46:53.751Z] [prompt-async-gate] promptAsync dispatching {"sessionID":"<qa-session>","source":"runtime-fallback:first-prompt-watchdog"}
+[2026-07-16T21:46:53.751Z] [live-server-route] dispatch via live listener {"sessionID":"<qa-session>","source":"runtime-fallback:first-prompt-watchdog"}
+[2026-07-16T21:46:53.756Z] [runtime-fallback] Applying fallback model override {"sessionID":"<qa-session>","from":{"providerID":"openai","modelID":"fallback"},"to":"openai/fallback"}
+[2026-07-16T21:46:53.758Z] [prompt-async-gate] remembered semantic prompt dispatch {"sessionID":"<qa-session>","source":"runtime-fallback:first-prompt-watchdog","holdMs":15000}
+[2026-07-16T21:46:53.758Z] [prompt-async-gate] promptAsync dispatched {"sessionID":"<qa-session>","source":"runtime-fallback:first-prompt-watchdog"}
+[2026-07-16T21:46:53.763Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
+[2026-07-16T21:46:53.775Z] [runtime-fallback] Assistant update observed without visible final response; keeping fallback timeout {"sessionID":"<qa-session>"}
+[2026-07-16T21:46:53.775Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
+[2026-07-16T21:46:53.801Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
+[2026-07-16T21:46:53.802Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
+[2026-07-16T21:46:53.802Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
+[2026-07-16T21:46:53.804Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
+[2026-07-16T21:46:53.805Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
+[2026-07-16T21:46:53.814Z] [runtime-fallback] Assistant response observed; cleared fallback timeout {"sessionID":"<qa-session>"}
+[2026-07-16T21:46:53.814Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
+[2026-07-16T21:46:53.821Z] [runtime-fallback] Assistant response observed; cleared fallback timeout {"sessionID":"<qa-session>"}
+[2026-07-16T21:46:53.821Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
+[2026-07-16T21:46:55.176Z] [runtime-fallback] Applying fallback model override {"sessionID":"<qa-session>","from":{"providerID":"openai","modelID":"fallback"},"to":"openai/fallback"}
+[2026-07-16T21:46:55.185Z] [runtime-fallback] first-prompt-watchdog: armed {"sessionID":"<qa-session>","model":"openai/fallback","agent":"sisyphus","watchdogMs":90000}
+[2026-07-16T21:46:55.185Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
+[2026-07-16T21:46:55.190Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
+[2026-07-16T21:46:55.630Z] [todo-continuation-enforcer] Abort detected via session.error {"sessionID":"<qa-session>","errorName":"MessageAbortedError"}
+[2026-07-16T21:46:55.630Z] [todo-continuation-enforcer] session.error {"sessionID":"<qa-session>"}
+[2026-07-16T21:46:55.630Z] [unstable-agent-babysitter] Marked session cancelled {"sessionID":"<qa-session>"}
+[2026-07-16T21:46:55.630Z] [todo-continuation-enforcer] session.idle {"sessionID":"<qa-session>"}
+[2026-07-16T21:46:55.631Z] [auto-compact] session.error received {"sessionID":"<qa-session>","error":{"name":"MessageAbortedError","data":{"message":"Aborted"}}}
+[2026-07-16T21:46:55.631Z] [auto-compact] message.updated with error {"sessionID":"<qa-session>","error":{"name":"MessageAbortedError","data":{"message":"Aborted"}}}
+[2026-07-16T21:46:55.631Z] [runtime-fallback] first-prompt-watchdog: deferred ambiguous abort for message correlation {"sessionID":"<qa-session>"}
+[2026-07-16T21:46:55.631Z] [runtime-fallback] first-prompt-watchdog: resolved external cancellation {"sessionID":"<qa-session>"}
+[2026-07-16T21:46:55.632Z] [runtime-fallback] session.error matched cancellation; cleared retry state {"sessionID":"<qa-session>","resolvedAgent":"sisyphus"}
+[2026-07-16T21:46:55.632Z] [runtime-fallback] message.updated with assistant error {"sessionID":"<qa-session>","errorName":"MessageAbortedError","errorType":"abort"}
+[2026-07-16T21:46:55.632Z] [runtime-fallback] message.updated error not retryable, skipping fallback {"sessionID":"<qa-session>","errorName":"MessageAbortedError","errorType":"abort"}
+[2026-07-16T21:46:55.632Z] [prompt-async-gate] promptAsync reservation release skipped for different source {"sessionID":"<qa-session>","source":"ralph-loop","reservedBy":"runtime-fallback:first-prompt-watchdog"}
+[2026-07-16T21:46:55.632Z] [atlas] session.error {"sessionID":"<qa-session>","isAbort":true}
+[2026-07-16T21:46:55.642Z] [todo-continuation-enforcer] Skipped: last assistant message was aborted (API fallback) {"sessionID":"<qa-session>"}
+[2026-07-16T21:46:55.642Z] [runtime-fallback] Cleared fallback retry state for cancelled session on idle {"sessionID":"<qa-session>"}
+[2026-07-16T21:46:55.642Z] [atlas] session.idle {"sessionID":"<qa-session>"}
+[2026-07-16T21:46:55.642Z] [atlas] Skipped: session not registered in active boulder {"sessionID":"<qa-session>"}

@@ -145,9 +145,7 @@ export function createFirstPromptWatchdog(
           && currentUserMessageID !== undefined
           && parentMessageID !== currentUserMessageID
           && abortProvenance.consumePrior(sessionID, suspendedContext.sessionGeneration)
-        if (isPriorGeneration) {
-          return { kind: "inspect-terminal", sessionID }
-        }
+        if (isPriorGeneration) return { kind: "inspect-terminal", sessionID }
         suspended.delete(sessionID)
         deps.internallyAbortedSessions.delete(sessionID)
         cancel(sessionID, true)
@@ -197,6 +195,10 @@ export function createFirstPromptWatchdog(
         && isAbortEvent === true
       ) {
         const currentGeneration = sessionGenerations.get(sessionID)
+        const consumedCurrentAbort = !armed.has(sessionID)
+          && deps.sessionAwaitingFallbackResult.has(sessionID)
+          && abortProvenance.consumeCurrent(sessionID, currentGeneration)
+        if (consumedCurrentAbort) return { kind: "consume-terminal", sessionID }
         if (
           abortProvenance.hasPrior(sessionID, currentGeneration)
           && (suspend(sessionID) || suspendAfterProgress(sessionID))
@@ -245,9 +247,7 @@ export function createFirstPromptWatchdog(
     },
     dispose() {
       lifecycleGeneration += 1
-      for (const timer of timers.values()) {
-        clearTimeout(timer)
-      }
+      for (const timer of timers.values()) clearTimeout(timer)
       timers.clear()
       armed.clear()
       suspended.clear()

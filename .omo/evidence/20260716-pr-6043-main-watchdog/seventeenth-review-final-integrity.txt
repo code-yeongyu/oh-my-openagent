@@ -1,0 +1,17 @@
+SOURCE_HEAD=af1ce820bfc9ef7cb90ce9f6d22290151ad36399
+ORIGIN_DEV=6457ca1da78fcfd2a39ea391ee559b8d945b240a
+
+DIFF_CHECK
+
+CHANGED_PATHS
+ M .omo/evidence/20260716-pr-6043-main-watchdog/README.md
+ M .omo/evidence/20260716-pr-6043-main-watchdog/live-fake-provider.txt
+ M .omo/evidence/20260716-pr-6043-main-watchdog/live-plugin-watchdog.txt
+ M packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/watchdog-abort-provenance.ts
+?? packages/omo-opencode/src/hooks/runtime-fallback/hook-current-generation-delayed-terminal.test.ts
+
+PURE_LOC
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts 248
+packages/omo-opencode/src/hooks/runtime-fallback/watchdog-abort-provenance.ts 42
+packages/omo-opencode/src/hooks/runtime-fallback/hook-current-generation-delayed-terminal.test.ts 134

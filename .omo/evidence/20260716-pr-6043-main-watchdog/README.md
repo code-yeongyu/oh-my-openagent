@@ -396,6 +396,30 @@ Sixteenth-cycle artifacts:
 - `sixteenth-integrated-opencode-harness-self-check.txt`: isolated OpenCode harness preflight and sandbox cleanup proof.
 - `sixteenth-integrated-live-watchdog-run.txt`: production-duration live OpenCode run pinned to `c385befaae1ea080ca28e19249f74b9f8a649e96`; fallback observed, no fallback watchdog re-arm, later user abort external, and real database unchanged.
 
+The seventeenth fresh reviewer found the same-generation sibling of the
+delayed-terminal race. After the watchdog dispatched an accepted fallback,
+the transient internal-abort marker was retired while the exact-generation
+provenance remained. A delayed abort for that same generation was not
+recognized as owned, so the base handler reset the accepted fallback model,
+attempt count, and awaiting-result state. The failing composed proof observed
+the model rewind from `anthropic/fallback` to `openai/gpt-5.4-mini`. The repair
+adds one-shot exact-generation provenance consumption only when no watchdog is
+armed and an accepted fallback result is pending. A second abort remains a
+genuine external cancellation.
+
+Seventeenth-cycle artifacts:
+
+- `seventeenth-review-finding.md`: exact-head reviewer report and same-generation delayed-terminal finding.
+- `seventeenth-review-red-current-generation-terminal.txt`: failing-first composed proof of the fallback-state rewind.
+- `seventeenth-review-green-current-generation-terminal.txt`: initial repaired proof for both one-shot ownership and the second-abort boundary.
+- `seventeenth-review-final-focused.txt`: 8 adjacent delayed-terminal and generation-race tests passing after the file-size cleanup.
+- `seventeenth-review-final-runtime-fallback-suite.txt`: 286 tests passing across 42 files.
+- `seventeenth-review-final-omo-opencode-typecheck.txt`, `seventeenth-review-final-biome.txt`, and `seventeenth-review-final-no-excuse.txt`: final repaired-candidate static gates.
+- `seventeenth-review-integrity.txt`: source identity, changed paths, diff check, and initial pure-LOC measurement that caught the temporary 256-line overage.
+- `seventeenth-review-final-integrity.txt`: final diff check and pure-LOC receipt, including `first-prompt-watchdog.ts` restored to 248 pure lines.
+- `seventeenth-review-opencode-harness-self-check.txt`: isolated OpenCode harness preflight and sandbox cleanup proof.
+- `seventeenth-review-live-watchdog-run.txt`: production-duration live OpenCode proof pinned to `af1ce820bfc9ef7cb90ce9f6d22290151ad36399`; fallback observed, no fallback watchdog re-arm, later user abort external, and real database unchanged.
+
 The live harness intentionally records only sanitized fake-provider, plugin,
 and SSE evidence. Authentication values, raw environment dumps, private
 credentials, and unrelated service logs are omitted.

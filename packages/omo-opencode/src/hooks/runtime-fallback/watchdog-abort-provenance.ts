@@ -21,6 +21,13 @@ export function createWatchdogAbortProvenance() {
       }
       return false
     },
+    consumeCurrent(sessionID: string, currentGeneration: number | undefined): boolean {
+      const generations = generationsBySession.get(sessionID)
+      if (currentGeneration === undefined || generations === undefined) return false
+      if (!generations.delete(currentGeneration)) return false
+      if (generations.size === 0) generationsBySession.delete(sessionID)
+      return true
+    },
     consumePrior(sessionID: string, currentGeneration: number | undefined): boolean {
       const generations = generationsBySession.get(sessionID)
       if (currentGeneration === undefined || generations === undefined) return false
