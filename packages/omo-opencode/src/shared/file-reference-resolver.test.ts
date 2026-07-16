@@ -139,4 +139,29 @@ describe("resolveFileReferencesInText", () => {
     expect(resolved).toContain("[path rejected:")
     expect(resolved).not.toContain("secret-content")
   })
+
+  test("preserves literal @tokens that do not resolve to an existing file", async () => {
+    //#given: skill wrapper prose containing a literal (@path) documentation token
+    const input = "File references (@path) in this skill are relative to this directory."
+
+    //#when
+    const resolved = await resolveFileReferencesInText(input, workspaceDir)
+
+    //#then: the literal token survives and no [file not found: ...] fragment is injected
+    expect(resolved).toBe(input)
+    expect(resolved).not.toContain("[file not found:")
+  })
+
+  test("inlines existing references while leaving unresolved @tokens untouched", async () => {
+    //#given: text mixing a real reference with a documentation token whose file does not exist
+    const input = "Load @notes/allowed.txt but keep @ts-ignore literal"
+
+    //#when
+    const resolved = await resolveFileReferencesInText(input, workspaceDir)
+
+    //#then: the real reference inlines while the prose token is preserved verbatim
+    expect(resolved).toContain("allowed-content")
+    expect(resolved).toContain("@ts-ignore")
+    expect(resolved).not.toContain("[file not found:")
+  })
 })

@@ -1,0 +1,79 @@
+bun test v1.3.11 (af24e281)
+bun.exe : 
+At C:\Users\pss\AppData\Roaming\npm\bun.ps1:14 char:3
++   & "$basedir/node_modules/bun/bin/bun.exe"   $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+packages\omo-opencode\src\shared\file-reference-resolver.test.ts:
+(pass) resolveFilePath > expands bare environment variables before resolving absolute paths
+(pass) resolveFilePath > expands braced environment variables before resolving absolute paths
+(pass) resolveFilePath > keeps POSIX absolute paths absolute when cwd is POSIX-shaped
+(pass) resolveFilePath > keeps Windows absolute paths absolute when cwd is POSIX-shaped
+(pass) resolveFilePath > resolves relative paths from POSIX-shaped cwd
+(pass) resolveFileReferencesInText > resolves file references within cwd [15.00ms]
+(pass) resolveFileReferencesInText > rejects traversal references that escape cwd
+(pass) resolveFileReferencesInText > rejects absolute references outside cwd
+(pass) resolveFileReferencesInText > rejects symlink references that escape cwd
+146 | 
+147 |     //#when
+148 |     const resolved = await resolveFileReferencesInText(input, workspaceDir)
+149 | 
+150 |     //#then: the literal token survives and no [file not found: ...] fragment is injected
+151 |     expect(resolved).toBe(input)
+                           ^
+error: expect(received).toBe(expected)
+
+Expected: "File references (@path) in this skill are relative to this directory."
+Received: "File references ([file not found: 
+C:\Users\pss\AppData\Local\Temp\file-reference-resolver-1783566949016\workspace\path)] in this skill are relative to 
+this directory."
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\oh-my-openagent-5978\packages\omo-opencode\src\shared\file-referen
+ce-resolver.test.ts:151:22)
+(fail) resolveFileReferencesInText > preserves literal @tokens that do not resolve to an existing file
+159 |     //#when
+160 |     const resolved = await resolveFileReferencesInText(input, workspaceDir)
+161 | 
+162 |     //#then: the real reference inlines while the prose token is preserved verbatim
+163 |     expect(resolved).toContain("allowed-content")
+164 |     expect(resolved).toContain("@ts-ignore")
+                           ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "@ts-ignore"
+Received: "Load allowed-content but keep [file not found: 
+C:\\Users\\pss\\AppData\\Local\\Temp\\file-reference-resolver-1783566949016\\workspace\\ts-ignore] literal"
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\oh-my-openagent-5978\packages\omo-opencode\src\shared\file-referen
+ce-resolver.test.ts:164:22)
+(fail) resolveFileReferencesInText > inlines existing references while leaving unresolved @tokens untouched
+
+packages\omo-opencode\src\tools\slashcommand\command-output-formatter.test.ts:
+(pass) command output formatter > #given command template includes argument placeholders > #then replaces both 
+placeholder forms
+47 |         // when
+48 |         const output = await formatLoadedCommand(command)
+49 | 
+50 |         // then
+51 |         expect(output).toContain("REAL_FILE_CONTENT")
+52 |         expect(output).toContain("(@path)")
+                            ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "(@path)"
+Received: "# /daplug:wrapper Command\n\n**Description**: Wrapper command\n\n**Scope**: plugin\n\n---\n\n## Command 
+Instructions\n\nFile references ([file not found: 
+C:\\Users\\pss\\AppData\\Local\\Temp\\command-output-formatter-1783566949062\\path)] are relative here. Load 
+REAL_FILE_CONTENT now."
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\oh-my-openagent-5978\packages\omo-opencode\src\tools\slashcommand\
+command-output-formatter.test.ts:52:24)
+(fail) command output formatter > #given command content mixes a real @file reference with literal @token prose > 
+#then inlines the real file but leaves the documentation token uncorrupted
+
+ 10 pass
+ 3 fail
+ 20 expect() calls
+Ran 13 tests across 2 files. [277.00ms]
