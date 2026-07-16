@@ -2,6 +2,7 @@ import type { AgentConfig } from "@opencode-ai/sdk";
 
 import {
   isClaudeFable5Model,
+  isClaudeModel,
   isClaudeFableOrMythosModel,
   isClaudeOpus46Model,
   isClaudeOpus47Model,
@@ -17,6 +18,7 @@ import {
 
 export {
   isClaudeFable5Model,
+  isClaudeModel,
   isClaudeFableOrMythosModel,
   isClaudeOpus46Model,
   isClaudeOpus47Model,
