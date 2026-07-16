@@ -258,4 +258,21 @@ describe("LspClient diagnostics freshness", () => {
 		expect(result.transientError?.kind).toBe("freshness_timeout");
 		expect(cancel?.params).toEqual({ id: request?.id });
 	});
+
+	it("#given a server without pull support that never publishes diagnostics #when diagnostics run on a clean file #then the request resolves clean after the freshness window instead of reporting a timeout", async () => {
+		const context = await harness.makeClient(
+			{},
+			{ diagnosticsFreshnessTimeoutMs: 60, versionlessPublishQuiescenceMs: 5 },
+		);
+
+		const startedAt = Date.now();
+		const result = await context.client.diagnostics(context.source);
+		const elapsedMs = Date.now() - startedAt;
+
+		expect(result.transientError).toBeUndefined();
+		expect(result.items).toEqual([]);
+		// The full freshness window is still honored so a slow publisher can win.
+		expect(elapsedMs).toBeGreaterThanOrEqual(45);
+	});
+
 });
