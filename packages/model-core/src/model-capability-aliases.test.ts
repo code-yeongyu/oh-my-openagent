@@ -164,4 +164,14 @@ describe("model-capability-aliases", () => {
       source: "canonical",
     })
   })
+
+  test("does not normalize OpenAI subprovider aliases for unrelated top-level providers", () => {
+    const result = resolveModelIDAlias("openai/gpt-5.6-sol-fast", "anthropic")
+
+    expect(result).toEqual({
+      requestedModelID: "openai/gpt-5.6-sol-fast",
+      canonicalModelID: "gpt-5.6-sol-fast",
+      source: "canonical",
+    })
+  })
 })

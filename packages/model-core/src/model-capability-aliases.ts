@@ -9,6 +9,7 @@ export type PatternAliasRule = {
   ruleID: string
   description: string
   providerIDs?: readonly string[]
+  allowedSubproviderHosts?: readonly string[]
   match: (normalizedModelID: string) => boolean
   canonicalize: (normalizedModelID: string) => string
 }
@@ -50,6 +51,7 @@ const PATTERN_ALIAS_RULES: ReadonlyArray<PatternAliasRule> = [
     ruleID: "openai-gpt-5.6-fast-service-tier-alias",
     description: "Normalizes OpenCode's OpenAI GPT-5.6 fast service-tier IDs to canonical snapshot IDs.",
     providerIDs: ["openai"],
+    allowedSubproviderHosts: ["vercel"],
     match: (normalizedModelID) => /^gpt-5\.6-(?:sol|terra|luna)-fast$/.test(normalizedModelID),
     canonicalize: (normalizedModelID) => normalizedModelID.slice(0, -"-fast".length),
   },
@@ -99,7 +101,11 @@ export function resolveModelIDAlias(modelID: string, providerID?: string): Model
   for (const rule of PATTERN_ALIAS_RULES) {
     if (rule.providerIDs) {
       const matchesProviderID = normalizedProviderID !== undefined && rule.providerIDs.includes(normalizedProviderID)
-      const matchesEmbeddedProviderID = embeddedProviderID !== undefined && rule.providerIDs.includes(embeddedProviderID)
+      const matchesEmbeddedProviderID =
+        normalizedProviderID !== undefined &&
+        rule.allowedSubproviderHosts?.includes(normalizedProviderID) === true &&
+        embeddedProviderID !== undefined &&
+        rule.providerIDs.includes(embeddedProviderID)
       if (!matchesProviderID && !matchesEmbeddedProviderID) {
         continue
       }
