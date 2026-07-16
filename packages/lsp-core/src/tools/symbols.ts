@@ -36,21 +36,21 @@ export async function executeLspSymbols(
 				});
 			}
 
-			const symbols = await withLspClient(
-				filePath,
-				async (client) => client.workspaceSymbols(query),
-				"workspaceSymbols",
-				clientOptions(signal),
-			);
+				const symbols = await withLspClient(
+					filePath,
+					async (client) => client.workspaceSymbols(query, signal),
+					"workspaceSymbols",
+					clientOptions(signal),
+				);
 			return formatSymbolsResult(filePath, scope, symbols, limit, query);
 		}
 
-		const symbols = await withLspClient(
-			filePath,
-			async (client) => client.documentSymbols(filePath),
-			"documentSymbols",
-			clientOptions(signal),
-		);
+			const symbols = await withLspClient(
+				filePath,
+				async (client) => client.documentSymbols(filePath, signal),
+				"documentSymbols",
+				clientOptions(signal),
+			);
 		return formatSymbolsResult(filePath, scope, symbols, limit);
 	} catch (error) {
 		const query = optionalString(params, "query");

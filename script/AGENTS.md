@@ -10,7 +10,7 @@ Build, publish, QA, and repo-invariant automation. Run via `bun run <script>` fr
 
 | File | Purpose |
 |------|---------|
-| `build-binaries.ts` | Platform launcher packages via `bun compile` (darwin/linux/windows, AVX2 + baseline) |
+| `build-binaries.ts` | Writes 12 generated Node launcher packages for darwin/linux/windows (AVX2 + baseline) |
 | `build-cli-node.ts` | Node-runtime CLI bundle (`dist/cli-node`) for environments without Bun |
 | `build-codex-install.ts` | Bundle the Codex installer entrypoints into `packages/omo-codex/scripts/install-dist/` |
 | `build-help-schemas.ts` | Generate CLI help schemas |
@@ -24,6 +24,7 @@ Build, publish, QA, and repo-invariant automation. Run via `bun run <script>` fr
 | `lazycodex-marketplace-validation.ts` | Validate the synced marketplace payload (runtime path args incl. Windows/absolute/`components/*/dist/*.js`) |
 | `lazycodex-runtime-dists.ts` | Enumerate component runtime dists bundled into the published payload |
 | `update-frontend-upstreams.mjs` | Bump shared-skills submodules + rewrite ATTRIBUTION pins (`--check` verifies) |
+| `install-codex-dev.ts` | Dev dogfood installer: uninstall current Codex Light, then install this repo's local build into the REAL `~/.codex` stamped as version `dev` (`.../omo/dev/`, `(OmO dev)` hook prefix). Sets `LAZYCODEX_DEV_VERSION`. Run via `bun run install:codex-dev`. Flags: `--version=<x>`, `--no-uninstall`. NOT for QA — use the isolated `CODEX_HOME` flow for that. |
 
 ## SUBDIRS
 

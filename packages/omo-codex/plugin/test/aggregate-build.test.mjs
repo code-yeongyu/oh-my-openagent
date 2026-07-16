@@ -36,3 +36,11 @@ test("#given omo-codex package build script #when inspected #then delegates to t
 	// then
 	assert.equal(buildPluginScript, "bun run --cwd plugin build");
 });
+
+test("#given a component-owned runtime manifest #when aggregate component build script is inspected #then it preserves bundled bytes", async () => {
+	const buildScript = await readFile(join(root, "scripts", "build-components.mjs"), "utf8");
+
+	assert.match(buildScript, /hasComponentOwnedBundle/u);
+	assert.match(buildScript, /"dist", "\.omo-runtime-manifest\.json"/u);
+	assert.match(buildScript, /if \(await hasComponentOwnedBundle\(task\.componentPath\)\) return/u);
+});

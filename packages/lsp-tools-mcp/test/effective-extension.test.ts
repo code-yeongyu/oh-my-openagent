@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { effectiveExtension } from "../src/lsp/effective-extension.js";
 import { findServerForExtension } from "../src/lsp/server-resolution.js";
+import { createStandaloneMcpRequestContext, runWithRequestContext } from "../src/request-context.js";
 
 describe("effectiveExtension", () => {
 	it("#given a file literally named Dockerfile #when resolving its extension #then maps to .dockerfile", () => {
@@ -39,7 +40,9 @@ describe("effectiveExtension", () => {
 
 	it("#given a Dockerfile basename #when resolving the server #then the dockerfile server is selected", () => {
 		// given / when
-		const result = findServerForExtension(effectiveExtension("/project/Dockerfile"));
+		const result = runWithRequestContext(createStandaloneMcpRequestContext(), () =>
+			findServerForExtension(effectiveExtension("/project/Dockerfile")),
+		);
 
 		// then
 		expect(result.status).not.toBe("not_configured");
