@@ -139,11 +139,11 @@ export async function createTeamRun(
 
   const baseDir = resolveBaseDir(config)
   await ensureBaseDirs(baseDir)
+  const callerLeadSubagentType = options?.callerAgentTypeId
   const reusesCallerLeadSession = shouldReuseCallerLeadSession(spec, options?.callerAgentTypeId)
   let runtimeState = await createRuntimeState(spec, leadSessionId, await resolveSpecSource(spec, ctx, config), config)
   registerTeamRunForSessionCleanup(runtimeState.teamRunId)
   if (reusesCallerLeadSession && spec.leadAgentId) {
-    const callerLeadSubagentType = options?.callerAgentTypeId
     registerTeamSession(leadSessionId, {
       teamRunId: runtimeState.teamRunId,
       memberName: spec.leadAgentId,
@@ -191,7 +191,7 @@ export async function createTeamRun(
             }
             continue
           }
-          const resolvedMember = await resolveMember(member, ctx, categoryExamples, spec.leadAgentId)
+          const resolvedMember = await resolveMember(member, ctx, categoryExamples, callerLeadSubagentType)
           const task = await bgMgr.launch({
             description: `Create team member ${spec.name}/${member.name}`,
             prompt: buildMemberPrompt(spec, member, runtimeState.teamRunId, config, resource.worktreePath),
