@@ -219,6 +219,14 @@ export async function handleSessionIdle(args: {
     incompleteCount,
     todos,
   )
+  if (state.continuationBlockReason) {
+    log(`[${HOOK_NAME}] Skipped: continuation paused at turn boundary`, {
+      sessionID,
+      reason: state.continuationBlockReason,
+      hasProgressed: progressUpdate.hasProgressed,
+    })
+    return
+  }
   if (shouldStopForStagnation({ sessionID, incompleteCount, progressUpdate })) {
     return
   }
