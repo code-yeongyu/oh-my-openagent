@@ -142,7 +142,7 @@ function boulderContinuationWillFire(cwd: string, sessionId: string): boolean {
 			const entry = work as Record<string, unknown>;
 			const sessionIds = Array.isArray(entry["session_ids"]) ? entry["session_ids"] : [];
 			const continuable = entry["status"] === "active" || entry["status"] === "paused";
-			return continuable && sessionIds.includes(`codex:${sessionId}`) && boulderPlanHasRemainingTask(cwd, entry);
+			return continuable && sessionIds.includes(`codex:${sessionId}`) && boulderPlanHasChecklist(cwd, entry);
 		});
 	} catch (error) {
 		if (error instanceof Error) return false;
@@ -160,10 +160,9 @@ function transcriptShowsContextPressure(transcriptPath: string): boolean {
 	}
 }
 
-// start-work-continuation only fires while its plan checklist has remaining
-// items; a boulder work whose plan is exhausted (or unreadable) leaves the
-// Stop event to this hook.
-function boulderPlanHasRemainingTask(cwd: string, entry: Record<string, unknown>): boolean {
+// start-work-continuation owns an active Boulder plan until its final gate marks
+// the work complete, including the zero-remaining checklist state.
+function boulderPlanHasChecklist(cwd: string, entry: Record<string, unknown>): boolean {
 	const activePlan = entry["active_plan"];
 	if (typeof activePlan !== "string" || activePlan.trim().length === 0) return false;
 	const planPath = isAbsolute(activePlan) ? activePlan : join(cwd, activePlan);
@@ -176,7 +175,7 @@ function boulderPlanHasRemainingTask(cwd: string, entry: Record<string, unknown>
 		try {
 			return readFileSync(candidate, "utf8")
 				.split(/\r?\n/)
-				.some((line) => line.startsWith("- [ ] "));
+				.some((line) => line.startsWith("- [ ] ") || line.startsWith("- [x] ") || line.startsWith("- [X] "));
 		} catch (error) {
 			if (!(error instanceof Error)) throw error;
 		}
