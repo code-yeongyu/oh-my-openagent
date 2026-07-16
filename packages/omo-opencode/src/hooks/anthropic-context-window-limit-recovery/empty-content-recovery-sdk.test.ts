@@ -1,15 +1,20 @@
 import { afterAll, describe, it, expect, mock, beforeEach } from "bun:test"
-import { fixEmptyMessagesWithSDK } from "./empty-content-recovery-sdk"
 
 const mockReplaceEmptyTextParts = mock(() => Promise.resolve(false))
 const mockInjectTextPart = mock(() => Promise.resolve(false))
 
-mock.module("./storage/empty-text", () => ({
-  replaceEmptyTextPartsAsync: mockReplaceEmptyTextParts,
-}))
-mock.module("./storage/text-part-injector", () => ({
-  injectTextPartAsync: mockInjectTextPart,
-}))
+function installStorageMocks() {
+  mock.module("./storage/empty-text", () => ({
+    replaceEmptyTextPartsAsync: mockReplaceEmptyTextParts,
+  }))
+  mock.module("./storage/text-part-injector", () => ({
+    injectTextPartAsync: mockInjectTextPart,
+  }))
+}
+
+installStorageMocks()
+
+const { fixEmptyMessagesWithSDK } = await import("./empty-content-recovery-sdk")
 
 afterAll(() => {
   mock.restore()
@@ -25,6 +30,7 @@ function createMockClient(messages: Array<{ info?: { id?: string }; parts?: Arra
 
 describe("fixEmptyMessagesWithSDK", () => {
   beforeEach(() => {
+    installStorageMocks()
     mockReplaceEmptyTextParts.mockReset()
     mockInjectTextPart.mockReset()
     mockReplaceEmptyTextParts.mockReturnValue(Promise.resolve(false))
