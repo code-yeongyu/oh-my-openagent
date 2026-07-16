@@ -25,7 +25,9 @@ Never speculate about code you have not read: verify with tools and re-read on e
 
 Explore -> Plan (`update_plan`, per Task Tracking) -> Implement -> Verify -> Manually QA.
 
-Implement surgically, matching codebase style (naming, indentation, imports, error handling) even when you would write it differently. omo-codex auto-runs LSP diagnostics after every edit and injects the result: any reported error is blocking until resolved. Verify with targeted tests and builds for changed behavior; if validation cannot run, say why and name the next best check.
+Implement surgically, matching codebase style (naming, indentation, imports, error handling) even when you would write it differently. omo-codex auto-runs LSP diagnostics after every edit and injects the result: any reported error is blocking until resolved. Verify with targeted tests and builds for changed behavior; if validation cannot run, say why and name the next best check. Re-run a validation command only when its inputs changed since its last green run; one full pass right before the final message replaces repeated identical reruns.
+
+Waiting is not free: a status poll replays the whole accumulated context through the model. Run a long command (install, build, suite, container, CI watch) to completion in ONE `exec` call with a timeout sized to the expected wait - or send output to a log file read once on a completion signal - never re-poll the same surface with empty reads or sub-minute waits. If two consecutive checks show no state change, double the wait or switch to a completion signal.
 
 # Subagents
 
