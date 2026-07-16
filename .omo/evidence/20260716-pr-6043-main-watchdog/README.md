@@ -483,10 +483,57 @@ Twentieth-cycle artifacts:
 - `twentieth-review-red-missing-created-id.txt` and `twentieth-review-green-missing-created-id.txt`: failing-first and repaired lifecycle proof that a missing created-session ID cannot clear active roots.
 - `twentieth-final-runtime-fallback-suite.txt`: 291 tests passing across 45 files on runtime head `1e0b44d5a8a08ec168a14d542456c11212a7c610`.
 - `twentieth-final-session-lifecycle-suite.txt`: 53 event, monitor, and state tests passing, including deletion restoration and missing-ID preservation.
-- `twentieth-final-omo-opencode-typecheck.txt`, `twentieth-biome-scoped.txt`, and `twentieth-no-excuse-scoped.txt`: exact-source static gates. The whole-file Biome run in `twentieth-biome-all-changed.txt` retained three unrelated legacy diagnostics; the passing scoped run adjusts only those lines in temporary copies. The standalone no-excuse helper could not load TypeScript in this environment, so the introduced diff was audited directly against the documented forbidden patterns.
+- `twentieth-final-omo-opencode-typecheck.txt`: exact-source typecheck pass. `twentieth-biome-all-changed.txt` records three pre-existing diagnostics from the exact files; `twentieth-biome-scoped.txt` is explicitly a temporary-copy diagnostic and is not an exact-source gate. The external no-excuse helper crashed before analysis, so `twentieth-no-excuse-scoped.txt` records only a qualified introduced-line audit, not a helper pass.
 - `twentieth-exact-integrity.txt`: exact source/base identity, diff check, and pure-LOC receipt.
 - `twentieth-exact-opencode-harness-self-check.txt`: isolated OpenCode harness preflight and sandbox cleanup proof.
 - `twentieth-exact-live-watchdog-run.txt`: production-duration live OpenCode run pinned to `1e0b44d5a8a08ec168a14d542456c11212a7c610`; fallback observed, no fallback watchdog re-arm, later user abort external, and real database unchanged.
+
+The first independent review of exact evidence head
+`38fbb576823955386e9a78a8362305d4af9aa110` blocked on five evidence and
+maintainability gaps. The live QA had only one root, the twentieth static-gate
+language overstated qualified substitutes, missing-ID coverage checked only the
+latest getter, deletion tests exposed private generation bookkeeping, and the
+new lifecycle tests extended the oversized `plugin/event.test.ts` module.
+
+Twenty-first-cycle repair commit
+`243a25ca97c46cfbf5fdb472aeef3da37c301906` closes each gap:
+
+- `event-main-session-lifecycle.test.ts` drives the real lifecycle handlers in a
+  focused module and asserts both latest-root identity and `isMainSession()`
+  membership for deletion restoration and missing-ID preservation.
+- `first-prompt-watchdog-deletion.test.ts` now asserts observable stale-timer
+  and deferred-state behavior. The test-only `sessionGenerations` production
+  parameter was removed.
+- The three exact files named by the prior Biome qualification were corrected
+  without behavioral refactoring. Exact-source Biome and the repository's
+  bundled TypeScript no-excuse helper now both pass.
+- `root-state-probe.ts` observes plugin state after real `session.created` and
+  `session.deleted` events in the same OpenCode process. The live harness now
+  creates roots A and B, proves both active, prompts silent A through the
+  production 90-second watchdog, deletes B, and proves A is active/current.
+
+Twenty-first-cycle artifacts:
+
+- `pr-6043-code-review.md`: independent exact-head BLOCK report that triggered
+  this restart.
+- `twenty-first-review-repair.md`: finding-to-repair trace and exact-head verdict.
+- `twenty-first-exact-runtime-fallback-suite.txt`: 291 tests passing across 45 files.
+- `twenty-first-exact-session-lifecycle-suite.txt`: 53 event, monitor, lifecycle,
+  and state tests passing.
+- `twenty-first-exact-omo-opencode-typecheck.txt`,
+  `twenty-first-exact-biome.txt`, and `twenty-first-exact-no-excuse.txt`:
+  exact-source static passes.
+- `twenty-first-exact-integrity.txt`: exact source/base identity, diff check, and
+  pure-LOC receipt.
+- `twenty-first-exact-opencode-harness-self-check.txt`: isolated harness preflight.
+- `root-state-probe.ts`, `live-root-state.jsonl`,
+  `live-isolation-receipt.txt`, `live-fake-provider.txt`, and
+  `live-plugin-watchdog.txt`: sanitized two-root lifecycle, watchdog, provider,
+  and database-isolation evidence.
+- `twenty-first-exact-live-watchdog-run.txt`: production-duration live OpenCode
+  run pinned to `243a25ca97c46cfbf5fdb472aeef3da37c301906`;
+  older-root fallback, two active roots, deletion restoration, no fallback
+  watchdog re-arm, later external abort, and unchanged real database all pass.
 
 The live harness intentionally records only sanitized fake-provider, plugin,
 and SSE evidence. Authentication values, raw environment dumps, private
@@ -504,18 +551,20 @@ prior abort, post-acknowledgement external cancellation, compaction exclusion,
 re-arming after progress, disposal during asynchronous work, and cleanup
 boundaries. The live harness covers what unit
 tests cannot: local plugin loading, real OpenCode lifecycle events, production
-watchdog timing, active-request abort, fallback dispatch after the internal
-idle edge, visible assistant output, no fallback-owned watchdog re-arm, a
-later genuine user cancellation, and database isolation.
+watchdog timing, two concurrent active roots, fallback of the older non-latest
+root, deletion restoration of that root, active-request abort, fallback
+dispatch after the internal idle edge, visible assistant output, no
+fallback-owned watchdog re-arm, a later genuine user cancellation, and
+database isolation.
 
 ## What Was Omitted
 
 Raw environment dumps, credentials, tokens, auth headers, session IDs, local
 paths, transient diagnostic runs, and unrelated shared logs are omitted or
 redacted. The provider API key and server password in the harness are fixed
-local-only dummy values. The TypeScript no-excuse helper, strict package
-typecheck, and scoped Biome check all completed successfully over the changed
-runtime-fallback TypeScript files.
+local-only dummy values. On the twenty-first exact source commit, the bundled
+TypeScript no-excuse helper, strict package typecheck, and exact-source Biome
+check all completed successfully over the reviewed TypeScript files.
 
 ## Cleanup
 

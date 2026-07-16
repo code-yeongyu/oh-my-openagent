@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 EVIDENCE="$ROOT/.omo/evidence/20260716-pr-6043-main-watchdog"
 FAKE_SCRIPT="$EVIDENCE/fake-silent-provider.mjs"
+ROOT_PROBE="$EVIDENCE/root-state-probe.ts"
 REAL_DB="$(opencode db path 2>/dev/null | head -1)"
 REAL_COUNT_BEFORE="$(sqlite3 "$REAL_DB" 'SELECT count(*) FROM session;')"
 TMP_ROOT="$(mktemp -d -t pr6043-live-qa.XXXXXX)"
@@ -15,6 +16,7 @@ FAKE_LOG=""
 SERVER_STDOUT=""
 SERVER_STDERR=""
 SSE_LOG=""
+ROOT_PROBE_LOG=""
 OMO_LOG="${TMPDIR:-/tmp}/oh-my-opencode.log"
 OMO_OFFSET=0
 
@@ -23,6 +25,7 @@ cleanup() {
   [ -n "$SERVER_STDOUT" ] && [ -f "$SERVER_STDOUT" ] && cp "$SERVER_STDOUT" "$EVIDENCE/live-last-server.stdout" || true
   [ -n "$SERVER_STDERR" ] && [ -f "$SERVER_STDERR" ] && cp "$SERVER_STDERR" "$EVIDENCE/live-last-server.stderr" || true
   [ -n "$SSE_LOG" ] && [ -f "$SSE_LOG" ] && cp "$SSE_LOG" "$EVIDENCE/live-last-events.sse" || true
+  [ -n "$ROOT_PROBE_LOG" ] && [ -f "$ROOT_PROBE_LOG" ] && cp "$ROOT_PROBE_LOG" "$EVIDENCE/live-last-root-state.jsonl" || true
   if [ -f "$OMO_LOG" ]; then
     tail -c "+$((OMO_OFFSET + 1))" "$OMO_LOG" | rg 'first-prompt-watchdog|runtime-fallback|ENTRY - plugin loading|Config loaded' > "$EVIDENCE/live-last-plugin.log" || true
   fi
@@ -79,11 +82,15 @@ FAKE_LOG="$TMP_ROOT/fake-provider.log"
 SERVER_STDOUT="$TMP_ROOT/opencode-serve.stdout"
 SERVER_STDERR="$TMP_ROOT/opencode-serve.stderr"
 SSE_LOG="$TMP_ROOT/events.sse"
+ROOT_PROBE_LOG="$TMP_ROOT/root-state.jsonl"
 [ -f "$OMO_LOG" ] && OMO_OFFSET="$(wc -c < "$OMO_LOG" | tr -d ' ')"
 
 cat > "$XDG_CONFIG_HOME/opencode/opencode.jsonc" <<JSONC
 {
-  "plugin": ["file://${ROOT}/packages/omo-opencode/src/index.ts"],
+  "plugin": [
+    "file://${ROOT}/packages/omo-opencode/src/index.ts",
+    "file://${ROOT_PROBE}"
+  ],
   "model": "openai/primary",
   "provider": {
     "openai": {
@@ -124,7 +131,7 @@ FAKE_PROVIDER_PORT="$FAKE_PORT" FAKE_PROVIDER_LOG="$FAKE_LOG" node "$FAKE_SCRIPT
 FAKE_PID=$!
 wait_for 10 "fake provider readiness" "curl --max-time 2 -fsS http://127.0.0.1:${FAKE_PORT}/health >/dev/null"
 
-OPENCODE_SERVER_PASSWORD="$SERVER_PASS" opencode serve --port "$SERVER_PORT" --hostname 127.0.0.1 >"$SERVER_STDOUT" 2>"$SERVER_STDERR" &
+PR6043_ROOT_PROBE_LOG="$ROOT_PROBE_LOG" OPENCODE_SERVER_PASSWORD="$SERVER_PASS" opencode serve --port "$SERVER_PORT" --hostname 127.0.0.1 >"$SERVER_STDOUT" 2>"$SERVER_STDERR" &
 SERVER_PID=$!
 wait_for 45 "OpenCode server readiness" "curl --max-time 2 -fsS -u opencode:${SERVER_PASS} http://127.0.0.1:${SERVER_PORT}/global/health >/dev/null"
 
@@ -133,8 +140,12 @@ curl -sN -u "opencode:$SERVER_PASS" "http://127.0.0.1:${SERVER_PORT}/event?direc
 SSE_PID=$!
 wait_for 10 "server.connected SSE event" "grep -q '\"type\":\"server.connected\"' '$SSE_LOG'"
 
-SESSION_JSON="$(curl -fsS -u "opencode:$SERVER_PASS" -X POST "http://127.0.0.1:${SERVER_PORT}/session?directory=${ENC_DIR}" -H 'content-type: application/json' -d '{"title":"PR 6043 main watchdog QA"}')"
-SESSION_ID="$(printf '%s' "$SESSION_JSON" | jq -er '.id')"
+OLDER_SESSION_JSON="$(curl -fsS -u "opencode:$SERVER_PASS" -X POST "http://127.0.0.1:${SERVER_PORT}/session?directory=${ENC_DIR}" -H 'content-type: application/json' -d '{"title":"PR 6043 older root watchdog QA"}')"
+OLDER_SESSION_ID="$(printf '%s' "$OLDER_SESSION_JSON" | jq -er '.id')"
+NEWER_SESSION_JSON="$(curl -fsS -u "opencode:$SERVER_PASS" -X POST "http://127.0.0.1:${SERVER_PORT}/session?directory=${ENC_DIR}" -H 'content-type: application/json' -d '{"title":"PR 6043 newer root lifecycle QA"}')"
+NEWER_SESSION_ID="$(printf '%s' "$NEWER_SESSION_JSON" | jq -er '.id')"
+wait_for 10 "two active roots in plugin state" "jq -e --arg older '$OLDER_SESSION_ID' --arg newer '$NEWER_SESSION_ID' 'select(.type == \"session.created\" and .eventSessionID == \$newer and .currentSessionID == \$newer and ([.roots[] | select(.id == \$older and .active == true)] | length) == 1 and ([.roots[] | select(.id == \$newer and .active == true)] | length) == 1)' '$ROOT_PROBE_LOG' >/dev/null"
+SESSION_ID="$OLDER_SESSION_ID"
 
 HTTP_CODE="$(curl -sS -o /dev/null -w '%{http_code}' -u "opencode:$SERVER_PASS" -X POST "http://127.0.0.1:${SERVER_PORT}/session/${SESSION_ID}/prompt_async?directory=${ENC_DIR}" -H 'content-type: application/json' -d '{"agent":"sisyphus","model":{"providerID":"openai","modelID":"primary"},"parts":[{"type":"text","text":"Reply exactly QA_FALLBACK_OK"}]}')"
 [ "$HTTP_CODE" = "204" ]
@@ -158,6 +169,10 @@ else
   ARM_COUNT_AFTER_SETTLE=0
 fi
 [ "$(grep -c 'REQUEST model=fallback' "$FAKE_LOG")" = "1" ]
+
+DELETE_HTTP_CODE="$(curl -sS -o /dev/null -w '%{http_code}' -u "opencode:$SERVER_PASS" -X DELETE "http://127.0.0.1:${SERVER_PORT}/session/${NEWER_SESSION_ID}?directory=${ENC_DIR}")"
+[ "$DELETE_HTTP_CODE" = "200" ]
+wait_for 10 "older root restored after newer root deletion" "jq -e --arg older '$OLDER_SESSION_ID' --arg newer '$NEWER_SESSION_ID' 'select(.type == \"session.deleted\" and .eventSessionID == \$newer and .currentSessionID == \$older and ([.roots[] | select(.id == \$older and .active == true)] | length) == 1 and ([.roots[] | select(.id == \$newer and .active == false)] | length) == 1)' '$ROOT_PROBE_LOG' >/dev/null"
 
 SECOND_HTTP_CODE="$(curl -sS -o /dev/null -w '%{http_code}' -u "opencode:$SERVER_PASS" -X POST "http://127.0.0.1:${SERVER_PORT}/session/${SESSION_ID}/prompt_async?directory=${ENC_DIR}" -H 'content-type: application/json' -d '{"agent":"sisyphus","model":{"providerID":"openai","modelID":"fallback"},"parts":[{"type":"text","text":"Second turn for user cancellation QA"}]}')"
 [ "$SECOND_HTTP_CODE" = "204" ]
@@ -187,11 +202,12 @@ cp "$FAKE_LOG" "$EVIDENCE/live-fake-provider.txt"
 sed -e "s/${SESSION_ID}/<qa-session>/g" -e "s#${TMP_ROOT}#<isolated-sandbox>#g" -e "s#${ROOT}#<worktree>#g" \
   "$TMP_ROOT/plugin-watchdog.log" > "$EVIDENCE/live-plugin-watchdog.txt"
 sed -n 's/^data: //p' "$SSE_LOG" | jq -c 'select(.type == "server.connected" or .type == "message.updated" or .type == "message.part.updated" or .type == "message.part.delta" or .type == "session.error" or .type == "session.idle") | {type, session:(if (.properties.sessionID // .properties.info.sessionID // .properties.part.sessionID // null) then "<qa-session>" else null end), role:(.properties.info.role // null), text:(.properties.part.text // .properties.delta // null)}' > "$EVIDENCE/live-sse-events.jsonl"
-printf 'real_db_unchanged=yes\nsandbox_isolated=yes\nsandbox_session_count=%s\nprompt_http_code=%s\nsecond_prompt_http_code=%s\nuser_abort_http_code=%s\nprimary_requests=%s\nfallback_requests=%s\nprimary_connection_closed=%s\nfallback_response_seen=%s\nfallback_watchdog_rearmed=no\nwatchdog_arm_count_after_success=%s\nwatchdog_arm_count_after_settle=%s\nuser_abort_classified_external=yes\n' \
-  "$SANDBOX_COUNT" "$HTTP_CODE" "$SECOND_HTTP_CODE" "$ABORT_HTTP_CODE" \
+sed -e "s/${OLDER_SESSION_ID}/<older-root>/g" -e "s/${NEWER_SESSION_ID}/<newer-root>/g" "$ROOT_PROBE_LOG" > "$EVIDENCE/live-root-state.jsonl"
+printf 'real_db_unchanged=yes\nsandbox_isolated=yes\nsandbox_session_count=%s\nprompt_http_code=%s\nsecond_prompt_http_code=%s\nuser_abort_http_code=%s\nnewer_root_delete_http_code=%s\nolder_root_watchdog_fallback=yes\ntwo_active_roots_observed=yes\nolder_root_restored_after_delete=yes\nprimary_requests=%s\nfallback_requests=%s\nprimary_connection_closed=%s\nfallback_response_seen=%s\nfallback_watchdog_rearmed=no\nwatchdog_arm_count_after_success=%s\nwatchdog_arm_count_after_settle=%s\nuser_abort_classified_external=yes\n' \
+  "$SANDBOX_COUNT" "$HTTP_CODE" "$SECOND_HTTP_CODE" "$ABORT_HTTP_CODE" "$DELETE_HTTP_CODE" \
   "$(grep -c 'REQUEST model=primary' "$FAKE_LOG")" "$(grep -c 'REQUEST model=fallback' "$FAKE_LOG")" \
   "$(grep -c 'PRIMARY_CONNECTION_CLOSED' "$FAKE_LOG")" "$(grep -c 'QA_FALLBACK_OK' "$SSE_LOG")" \
   "$ARM_COUNT_AFTER_SUCCESS" "$ARM_COUNT_AFTER_SETTLE" \
   > "$EVIDENCE/live-isolation-receipt.txt"
 
-printf 'PASS source_head=%s real_db_unchanged=yes fallback_seen=yes fallback_watchdog_rearmed=no later_user_abort=external\n' "$(git rev-parse HEAD)"
+printf 'PASS source_head=%s real_db_unchanged=yes older_root_fallback=yes two_active_roots=yes deletion_restored_older=yes fallback_watchdog_rearmed=no later_user_abort=external\n' "$(git rev-parse HEAD)"
