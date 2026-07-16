@@ -35,7 +35,7 @@ export function removeMainSession(id: string): void {
 const registeredAgentNames = new Set<string>()
 const registeredAgentAliases = new Map<string, string>()
 
-const ZERO_WIDTH_CHARACTERS_REGEX = /[\u200B\u200C\u200D\uFEFF]/g
+const ZERO_WIDTH_CHARACTERS_REGEX = /\u200B|\u200C|\u200D|\uFEFF/g
 
 function normalizeRegisteredAgentName(name: string): string {
   return name.replace(ZERO_WIDTH_CHARACTERS_REGEX, "").toLowerCase()

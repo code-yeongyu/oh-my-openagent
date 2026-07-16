@@ -238,7 +238,7 @@ describe("claude-code-session-state", () => {
       // then - getSessionAgent returns correct agent for prometheus-md-only hook
       const agent = getSessionAgent(sessionID)
       expect(agent).toBe("Prometheus - Plan Builder")
-      expect(["Prometheus - Plan Builder"].includes(agent!)).toBe(true)
+      expect(["Prometheus - Plan Builder"].includes(agent ?? "")).toBe(true)
     })
 
     test("should return undefined when agent not set (bug scenario)", () => {

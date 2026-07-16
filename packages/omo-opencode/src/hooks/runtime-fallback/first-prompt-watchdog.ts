@@ -28,8 +28,8 @@ export function createFirstPromptWatchdog(
   deps: HookDeps,
   helpers: AutoRetryHelpers,
   watchdogMs: number = DEFAULT_FIRST_PROMPT_WATCHDOG_MS,
-  sessionGenerations: Map<string, number> = new Map<string, number>(),
 ): FirstPromptWatchdog {
+  const sessionGenerations = new Map<string, number>()
   const timers = new Map<string, RuntimeFallbackTimeout>()
   const armed = new Map<string, ArmedWatchdog>()
   const suspended = new Map<string, ArmedWatchdog>()

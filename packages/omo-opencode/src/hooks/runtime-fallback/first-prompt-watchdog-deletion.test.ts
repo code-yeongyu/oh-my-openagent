@@ -15,34 +15,38 @@ function createCalls(): RecordedCalls {
 }
 
 describe("first-prompt watchdog deletion cleanup", () => {
-  it("#given a session has an armed watchdog #when the session is deleted #then its generation bookkeeping is removed", () => {
+  it("#given a session has an armed watchdog #when the session is deleted #then its stale timer cannot dispatch", async () => {
+    const timers = installFakeTimers()
     const sessionID = "session-deleted-while-armed"
-    const generations = new Map<string, number>()
+    const calls = createCalls()
     const watchdog = createFirstPromptWatchdog(
       createDeps(PLUGIN_CONFIG_WITH_FALLBACK),
-      createHelpers(createCalls(), AGENT),
+      createHelpers(calls, AGENT),
       100,
-      generations,
     )
 
-    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
-    expect(generations.has(sessionID)).toBe(true)
+    try {
+      watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
 
-    watchdog.onSessionTerminal(sessionID, "session.deleted")
+      watchdog.onSessionTerminal(sessionID, "session.deleted")
+      await timers.advanceBy(200)
 
-    expect(generations.has(sessionID)).toBe(false)
-    watchdog.dispose()
+      expect(calls.abort).toEqual([])
+      expect(calls.autoRetry).toEqual([])
+    } finally {
+      watchdog.dispose()
+      timers.restore()
+    }
   })
 
-  it("#given a session is suspended for delayed-abort correlation #when the session is deleted #then its generation bookkeeping is removed", async () => {
+  it("#given a session is suspended for delayed-abort correlation #when the session is deleted #then deferred state cannot resume", async () => {
     const timers = installFakeTimers()
     const sessionID = "session-deleted-while-suspended"
-    const generations = new Map<string, number>()
+    const calls = createCalls()
     const watchdog = createFirstPromptWatchdog(
       createDeps(PLUGIN_CONFIG_WITH_FALLBACK),
-      createHelpers(createCalls(), AGENT),
+      createHelpers(calls, AGENT),
       10,
-      generations,
     )
 
     try {
@@ -55,8 +59,14 @@ describe("first-prompt watchdog deletion cleanup", () => {
       })
 
       watchdog.onSessionTerminal(sessionID, "session.deleted")
+      const callsAfterDeletion = {
+        abort: [...calls.abort],
+        autoRetry: [...calls.autoRetry],
+      }
+      await timers.advanceBy(100)
 
-      expect(generations.has(sessionID)).toBe(false)
+      expect(watchdog.resolveDeferredTerminal(sessionID, true)).toBeUndefined()
+      expect(calls).toEqual(callsAfterDeletion)
     } finally {
       watchdog.dispose()
       timers.restore()

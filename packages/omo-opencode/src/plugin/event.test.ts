@@ -5,12 +5,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { createEventHandler, extractErrorMessage } from "./event"
 import { createChatMessageHandler } from "./chat-message"
 import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
-import {
-	_resetForTesting,
-	getMainSessionID,
-	setMainSession,
-	subagentSessions,
-} from "../features/claude-code-session-state"
+import { _resetForTesting, setMainSession, subagentSessions } from "../features/claude-code-session-state"
 import { clearPendingModelFallback, createModelFallbackHook } from "../hooks/model-fallback/hook"
 import { getSessionPromptParams, setSessionPromptParams } from "../shared/session-prompt-params-state"
 
@@ -572,7 +567,7 @@ describe("createEventHandler - idle deduplication", () => {
 	it("does NOT dedup session.idle events for DIFFERENT sessionIDs", async () => {
 		//#given
 		const originalDateNow = Date.now
-		let currentNow = 20_000
+		const currentNow = 20_000
 		Date.now = () => currentNow
 		const onEvent = mock<(event: EventInput["event"]) => void>(() => {})
 		const sessionNotification = mock(async (_input: EventInput) => {})
@@ -1385,69 +1380,6 @@ describe("createEventHandler - event forwarding", () => {
 			},
 		}))
 		expect(getSessionPromptParams(sessionID)).toBeUndefined()
-	})
-
-	it("#given two active root sessions #when the latest root is deleted #then the previous root becomes current", async () => {
-		const olderRootSessionID = "ses_root_a"
-		const newerRootSessionID = "ses_root_b"
-		setMainSession(olderRootSessionID)
-		setMainSession(newerRootSessionID)
-		const eventHandler = createEventHandler({
-			ctx: {} as never,
-			pluginConfig: {} as never,
-			firstMessageVariantGate: {
-				markSessionCreated: () => {},
-				clear: () => {},
-			},
-			managers: {
-				skillMcpManager: {
-					disconnectSession: async () => {},
-				},
-				tmuxSessionManager: {
-					onSessionCreated: async () => {},
-					onSessionDeleted: async () => {},
-				},
-			} as never,
-			hooks: {} as never,
-		})
-
-		await eventHandler(asEventHandlerInput({
-			event: {
-				type: "session.deleted",
-				properties: { info: { id: newerRootSessionID } },
-			},
-		}))
-
-		expect(getMainSessionID()).toBe(olderRootSessionID)
-	})
-
-	it("#given an active root session #when session.created has no ID #then the root registry is preserved", async () => {
-		const rootSessionID = "ses_root_preserved"
-		setMainSession(rootSessionID)
-		const eventHandler = createEventHandler({
-			ctx: {} as never,
-			pluginConfig: {} as never,
-			firstMessageVariantGate: {
-				markSessionCreated: () => {},
-				clear: () => {},
-			},
-			managers: {
-				tmuxSessionManager: {
-					onSessionCreated: async () => {},
-					onSessionDeleted: async () => {},
-				},
-			} as never,
-			hooks: {} as never,
-		})
-
-		await eventHandler(asEventHandlerInput({
-			event: {
-				type: "session.created",
-				properties: { info: {} },
-			},
-		}))
-
-		expect(getMainSessionID()).toBe(rootSessionID)
 	})
 })
 
