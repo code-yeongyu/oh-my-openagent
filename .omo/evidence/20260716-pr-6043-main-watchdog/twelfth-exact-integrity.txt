@@ -1,0 +1,14 @@
+head=03762c06deaee52f60b07d9c227c634a9e7e955e
+integrated_dev=16658f79c1155cb6f1b3bfaffa1f54ebd1469615
+merge_base_dev=16658f79c1155cb6f1b3bfaffa1f54ebd1469615
+diff_check=pass
+tracked_worktree=clean
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts total_lines=245 pure_loc=232
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-generation-race.test.ts total_lines=246 pure_loc=230
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-three-generation.test.ts total_lines=121 pure_loc=109
+151:        cancel(sessionID, true)
+158:        cancel(sessionID, true)
+176:        cancel(sessionID)
+196:          cancel(sessionID)
+211:      cancel(sessionID)
+225:        cancel(sessionID, true)

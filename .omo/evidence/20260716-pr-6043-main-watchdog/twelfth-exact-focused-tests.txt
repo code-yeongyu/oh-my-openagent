@@ -1,0 +1,46 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-terminal-races.test.ts:
+(pass) first-prompt watchdog terminal races > #given the watchdog abort request succeeded #when an abort error arrives while fallback dispatch settles #then it remains external cancellation [3.69ms]
+(pass) first-prompt watchdog terminal races > #given the watchdog abort marker is set #when a non-abort session error arrives #then the watchdog callback is cancelled [1.49ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-deferred-terminal.test.ts:
+(pass) runtime-fallback deferred watchdog terminal events > #given an ambiguous watchdog abort #when assistant parent correlation resolves it #then the deferred terminal event is handled before the message update [0.56ms]
+(pass) runtime-fallback deferred watchdog terminal events > #given an old-parent terminal candidate #when the newer request is busy #then the deferred event resolves as internal before the message update [0.36ms]
+(pass) runtime-fallback deferred watchdog terminal events > #given a current cancellation is deferred #when an old assistant abort arrives while the session is idle #then cancellation resets retry state [2.15ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-generation-race.test.ts:
+(pass) first-prompt watchdog generation races > #given the watchdog abort is acknowledged #when a user abort arrives while fallback dispatch is settling #then cancellation wins and the fallback request is stopped [2.08ms]
+(pass) first-prompt watchdog generation races > #given generation one dispatched a fallback #when its delayed abort arrives after generation two arms #then generation two remains owned [2.93ms]
+(pass) first-prompt watchdog generation races > #given generation one retains abort provenance #when generation two is cancelled before the delayed abort arrives #then cancellation prevents a second fallback [1.58ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.test.ts:
+(pass) first-prompt-watchdog > #given a main session stays silent past the threshold and has a fallback configured #when the watchdog fires #then it aborts the in-flight request and dispatches the fallback model [0.52ms]
+(pass) first-prompt-watchdog > #given the watchdog cannot abort a silent main session #when the abort fails #then it does not dispatch a competing fallback request [0.18ms]
+(pass) first-prompt-watchdog > #given timeout escalation is disabled for a main session #when the first prompt stays silent #then the main-session watchdog does not arm [0.11ms]
+(pass) first-prompt-watchdog > #given an active subagent stays silent past the threshold and has a fallback configured #when the watchdog fires #then it still aborts and dispatches the fallback model [0.18ms]
+(pass) first-prompt-watchdog > #given timeout escalation is disabled and an active subagent stays silent #when the watchdog fires #then the historical subagent safety net remains active [0.27ms]
+(pass) first-prompt-watchdog > #given a main session produces assistant text before the threshold #when progress is observed #then the watchdog is cancelled and no fallback is dispatched [0.14ms]
+(pass) first-prompt-watchdog > #given a fallback dispatch is already awaiting its result #when its internal user update is observed #then the first-prompt watchdog does not arm for that retry [0.12ms]
+(pass) first-prompt-watchdog > #given assistant progress cancels an armed watchdog #when a later user turn stays silent #then the watchdog re-arms for the new turn [0.19ms]
+(pass) first-prompt-watchdog > #given session emits message.part.updated with sessionID under properties.part #when watchdog tracks #then the watchdog recognizes progress and resets the silence timer [0.14ms]
+(pass) first-prompt-watchdog > #given the user prompt part arrives after the watchdog arms #when the provider stays silent #then the user part does not cancel fallback recovery [0.17ms]
+(pass) first-prompt-watchdog > #given session emits message.part.delta with field/delta but no part.type #when watchdog tracks #then the watchdog recognizes progress [0.14ms]
+(pass) first-prompt-watchdog > #given a subagent leaves subagentSessions before the threshold #when the watchdog fires #then it is suppressed [0.13ms]
+(pass) first-prompt-watchdog > #given a subagent reaches a terminal session state before the threshold #when onSessionTerminal is called #then the watchdog is cancelled and no fallback is dispatched [0.11ms]
+(pass) first-prompt-watchdog > #given a main session is silent past the threshold with no fallback configured #when the watchdog fires #then it does not abort or dispatch (lets the existing error-event paths handle it if one arrives later) [0.13ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/abort-provenance-race.test.ts:
+(pass) runtime-fallback abort provenance > #given an internal fallback user update precedes its delayed abort event #when both events are handled #then retry state remains owned by the internal abort [0.87ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-three-generation.test.ts:
+(pass) first-prompt watchdog three-generation races > #given generation one retains abort provenance #when progress cancels generation two before generation three arms #then generation three still recovers [3.21ms]
+(pass) first-prompt watchdog three-generation races > #given generation one retains abort provenance #when status resolution cancels generation two before generation three arms #then generation three still recovers [2.84ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-progress-delayed-terminal.test.ts:
+(pass) runtime-fallback progress before delayed terminal > #given generation two has assistant progress #when generation one's delayed abort arrives #then the accepted fallback state is preserved [2.57ms]
+
+ 26 pass
+ 0 fail
+ 83 expect() calls
+Ran 26 tests across 7 files. [172.00ms]

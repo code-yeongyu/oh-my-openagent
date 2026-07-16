@@ -1,11 +1,11 @@
 # PR #6043 QA Evidence
 
-Reviewed runtime source head: `e2048c0f6464a2cb3a0cc6679ab09b38b6b4ff07`
+Reviewed runtime source head: `03762c06deaee52f60b07d9c227c634a9e7e955e`
 
 Integrated `dev`: `16658f79c1155cb6f1b3bfaffa1f54ebd1469615`
 
 Exact integrated QA head before this evidence-only refresh:
-`73242309a3e8b8e594e4527fdace2d23fcd6eddd`
+`03762c06deaee52f60b07d9c227c634a9e7e955e`
 
 The following evidence commit is content-only. It refreshes reviewer-readable
 artifacts and does not change the tested runtime behavior.
@@ -268,6 +268,31 @@ harness self-check, and production-duration live QA. The captured SSE stream
 shows the real user-part ordering, followed by the watchdog dispatching the
 fallback after silence rather than cancelling immediately.
 
+The twelfth fresh reviewer found a three-generation abort race. Resolving
+generation two's external cancellation cleared generation one's retained abort
+provenance; if generation three armed before that old abort arrived, the old
+event cancelled generation three. Two failing-first toggles cover direct
+assistant-parent correlation and status resolution. Runtime commit
+`03762c06deaee52f60b07d9c227c634a9e7e955e` preserves older tombstones only
+while clearing current cancellation state. Explicit terminal cleanup still
+clears provenance. The exact twelfth cycle passes 26 focused tests, all 279
+runtime-fallback tests, typecheck, Biome, no-excuse, file-size integrity, the
+isolated harness self-check, and production-duration live OpenCode QA.
+
+Twelfth-cycle artifacts:
+
+- `twelfth-review-finding.md`: reviewer finding, root cause, repair, and scope.
+- `twelfth-review-red-three-generation-abort.txt`: direct-correlation red proof.
+- `twelfth-review-red-status-resolution-provenance.txt`: status-resolution red proof.
+- `twelfth-review-green-split-generation-races.txt`: split regression green proof.
+- `twelfth-exact-focused-tests.txt`: 26 focused tests passing.
+- `twelfth-exact-runtime-fallback-suite.txt`: 279 tests passing across 36 files.
+- `twelfth-exact-omo-opencode-typecheck.txt`, `twelfth-exact-biome.txt`, and
+  `twelfth-exact-no-excuse.txt`: exact runtime-head static gates.
+- `twelfth-exact-integrity.txt`: clean runtime head, call-site audit, and pure-LOC limits.
+- `twelfth-exact-opencode-harness-self-check.txt`: isolated harness preflight.
+- `twelfth-exact-live-watchdog-run.txt`: exact-head production-duration live proof.
+
 ## Why It Is Enough
 
 The tests cover main and subagent watchdog ownership, progress and terminal
@@ -290,8 +315,8 @@ Raw environment dumps, credentials, tokens, auth headers, session IDs, local
 paths, transient diagnostic runs, and unrelated shared logs are omitted or
 redacted. The provider API key and server password in the harness are fixed
 local-only dummy values. The TypeScript no-excuse helper, strict package
-typecheck, and scoped Biome check all completed successfully over the seven
-changed TypeScript files.
+typecheck, and scoped Biome check all completed successfully over the changed
+runtime-fallback TypeScript files.
 
 ## Cleanup
 
