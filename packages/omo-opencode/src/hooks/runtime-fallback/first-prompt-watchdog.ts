@@ -12,6 +12,7 @@ import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
+import { createWatchdogAbortProvenance } from "./watchdog-abort-provenance"
 
 const SOURCE = "first-prompt-watchdog"
 const SESSION_NEXT_EVENT_PREFIX = "session.next."
@@ -130,7 +131,7 @@ export function createFirstPromptWatchdog(
   const timers = new Map<string, RuntimeFallbackTimeout>()
   const armed = new Set<string>()
   const sessionGenerations = new Map<string, number>()
-  const acknowledgedAbortGenerations = new Map<string, number>()
+  const abortProvenance = createWatchdogAbortProvenance()
   let lifecycleGeneration = 0
 
   const cancel = (sessionID: string): void => {
@@ -140,7 +141,7 @@ export function createFirstPromptWatchdog(
       timers.delete(sessionID)
     }
     armed.delete(sessionID)
-    acknowledgedAbortGenerations.delete(sessionID)
+    abortProvenance.clear(sessionID)
     sessionGenerations.set(sessionID, (sessionGenerations.get(sessionID) ?? 0) + 1)
   }
 
@@ -206,15 +207,28 @@ export function createFirstPromptWatchdog(
       log(`[${HOOK_NAME}] ${SOURCE}: abort failed, skipping fallback dispatch`, { sessionID })
       return
     }
-    acknowledgedAbortGenerations.set(sessionID, sessionGeneration)
+    abortProvenance.record(sessionID, sessionGeneration)
+    await Promise.resolve()
+    if (generation !== lifecycleGeneration || sessionGeneration !== sessionGenerations.get(sessionID)) return
 
-    await dispatchFallbackRetry(deps, helpers, {
-      sessionID,
-      state,
-      fallbackModels,
-      resolvedAgent,
-      source: SOURCE,
-    })
+    try {
+      await dispatchFallbackRetry(deps, helpers, {
+        sessionID,
+        state,
+        fallbackModels,
+        resolvedAgent,
+        source: SOURCE,
+      })
+    } finally {
+      deps.internallyAbortedSessions.delete(sessionID)
+    }
+
+    if (
+      generation === lifecycleGeneration
+      && sessionGeneration !== sessionGenerations.get(sessionID)
+    ) {
+      await helpers.abortSessionRequest(sessionID, "session.stop")
+    }
   }
 
   return {
@@ -235,8 +249,6 @@ export function createFirstPromptWatchdog(
         } finally {
           if (sessionGeneration === sessionGenerations.get(sessionID)) {
             armed.delete(sessionID)
-            acknowledgedAbortGenerations.delete(sessionID)
-            sessionGenerations.delete(sessionID)
           }
         }
       }, watchdogMs)
@@ -251,17 +263,25 @@ export function createFirstPromptWatchdog(
       log(`[${HOOK_NAME}] ${SOURCE}: cancelled (assistant progress observed)`, { sessionID })
     },
     onSessionTerminal(sessionID, eventType, isAbortEvent) {
-      if (!sessionID || !armed.has(sessionID)) return
+      if (!sessionID) return
       if (
         eventType === "session.error"
         && isAbortEvent === true
-        && deps.internallyAbortedSessions.has(sessionID)
       ) {
-        // The watchdog owns only abort events delivered after this exact
-        // generation's abort request has returned successfully.
-        if (acknowledgedAbortGenerations.get(sessionID) === sessionGenerations.get(sessionID)) return
-
+        if (abortProvenance.consumePrior(sessionID, sessionGenerations.get(sessionID))) {
+          deps.internallyAbortedSessions.add(sessionID)
+          log(`[${HOOK_NAME}] ${SOURCE}: ignored delayed prior-generation abort`, { sessionID })
+          return
+        }
         deps.internallyAbortedSessions.delete(sessionID)
+        abortProvenance.clear(sessionID)
+      }
+      if (!armed.has(sessionID)) {
+        if (eventType === "session.deleted" || eventType === "session.stop") {
+          abortProvenance.clear(sessionID)
+          sessionGenerations.delete(sessionID)
+        }
+        return
       }
       if (
         eventType === "session.idle"
@@ -278,7 +298,7 @@ export function createFirstPromptWatchdog(
       timers.clear()
       armed.clear()
       sessionGenerations.clear()
-      acknowledgedAbortGenerations.clear()
+      abortProvenance.clearAll()
     },
   }
 }

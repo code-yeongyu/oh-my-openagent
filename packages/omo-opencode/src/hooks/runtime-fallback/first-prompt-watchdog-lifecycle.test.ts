@@ -277,10 +277,10 @@ describe("first-prompt watchdog lifecycle", () => {
     watchdog.dispose()
   })
 
-  it("#given the watchdog abort request succeeded #when OpenCode reports its acknowledged internal abort error #then the fallback dispatch remains owned", async () => {
+  it("#given the watchdog abort request succeeded #when an abort error arrives while fallback dispatch settles #then it remains external cancellation", async () => {
     const sessionID = "session-internal-abort-error"
     const deps = createDeps()
-    const calls = { dispatch: 0 }
+    const calls = { abortSources: [] as string[], dispatch: 0 }
     let resolveAbort: ((value: boolean) => void) | undefined
     let notifyAbortStarted: (() => void) | undefined
     const abortStarted = new Promise<void>((resolve) => {
@@ -298,10 +298,14 @@ describe("first-prompt watchdog lifecycle", () => {
       releaseDispatch = resolve
     })
     const helpers: AutoRetryHelpers = {
-      abortSessionRequest: async () => {
-        deps.internallyAbortedSessions.add(sessionID)
-        notifyAbortStarted?.()
-        return abortResult
+      abortSessionRequest: async (_abortedSessionID, source) => {
+        calls.abortSources.push(source)
+        if (source === "first-prompt-watchdog") {
+          deps.internallyAbortedSessions.add(sessionID)
+          notifyAbortStarted?.()
+          return abortResult
+        }
+        return true
       },
       clearSessionFallbackTimeout: () => {},
       scheduleSessionFallbackTimeout: () => {},
@@ -333,6 +337,7 @@ describe("first-prompt watchdog lifecycle", () => {
     }
 
     expect(calls.dispatch).toBe(1)
+    expect(calls.abortSources).toEqual(["first-prompt-watchdog", "session.stop"])
     expect(deps.internallyAbortedSessions.has(sessionID)).toBe(false)
     watchdog.dispose()
   })
