@@ -350,6 +350,29 @@ describe("getModelCapabilities", () => {
     expect(result.diagnostics.supportsThinking.source).toBe("bundled-snapshot")
   })
 
+  test("detects OpenCode Go Mimo aliases as non-thinking MiniMax models", () => {
+    const result = getModelCapabilities({
+      providerID: "opencode-go",
+      modelID: "opencode-go/mimo-v2.5-pro",
+      bundledSnapshot,
+    })
+
+    expect(result).toMatchObject({
+      requestedModelID: "opencode-go/mimo-v2.5-pro",
+      canonicalModelID: "mimo-v2.5-pro",
+      family: "minimax",
+      supportsThinking: false,
+      variants: ["low", "medium", "high"],
+    })
+    expect(result.diagnostics).toMatchObject({
+      resolutionMode: "heuristic-backed",
+      snapshot: { source: "none" },
+      family: { source: "heuristic" },
+      supportsThinking: { source: "heuristic" },
+      variants: { source: "heuristic" },
+    })
+  })
+
   test("marks non-thinking Kimi K2.6 as not supporting thinking", () => {
     // given
     const modelID = "kimi-k2.6"
