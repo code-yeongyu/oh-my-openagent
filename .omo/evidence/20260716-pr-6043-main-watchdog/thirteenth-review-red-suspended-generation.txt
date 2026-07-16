@@ -1,0 +1,22 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-suspended-generation.test.ts:
+70 |         sessionID,
+71 |       })
+72 |       await eventHandler(createAbortEvent(sessionID))
+73 |
+74 |       await timers.advanceBy(8)
+75 |       expect(abortCount).toBe(1)
+                              ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 2
+
+      at <anonymous> (<worktree>/packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-suspended-generation.test.ts:75:26)
+(fail) first-prompt watchdog suspended generation ownership > #given generation two is suspended by generation one's delayed abort #when generation three arrives before correlation resolves #then generation three receives a fresh deadline [2.42ms]
+
+ 0 pass
+ 1 fail
+ 6 expect() calls
+Ran 1 test across 1 file. [76.00ms]

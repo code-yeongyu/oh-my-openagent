@@ -1,11 +1,11 @@
 # PR #6043 QA Evidence
 
-Reviewed runtime source head: `03762c06deaee52f60b07d9c227c634a9e7e955e`
+Reviewed runtime source head: `0e7223d60b6cbbb04ddc92801f62fd6c09749e92`
 
 Integrated `dev`: `16658f79c1155cb6f1b3bfaffa1f54ebd1469615`
 
 Exact integrated QA head before this evidence-only refresh:
-`03762c06deaee52f60b07d9c227c634a9e7e955e`
+`0e7223d60b6cbbb04ddc92801f62fd6c09749e92`
 
 The following evidence commit is content-only. It refreshes reviewer-readable
 artifacts and does not change the tested runtime behavior.
@@ -292,6 +292,36 @@ Twelfth-cycle artifacts:
 - `twelfth-exact-integrity.txt`: clean runtime head, call-site audit, and pure-LOC limits.
 - `twelfth-exact-opencode-harness-self-check.txt`: isolated harness preflight.
 - `twelfth-exact-live-watchdog-run.txt`: exact-head production-duration live proof.
+
+The thirteenth fresh reviewer found a suspended-generation ownership defect.
+When generation three arrived while generation two was suspended for delayed
+abort correlation, the new user message was ignored. Busy status resolution
+then re-armed generation two's original deadline and aborted generation three
+after only the 8 ms remaining on the stale timer. The same review identified
+that an authoritative main-session ID was available but unused, allowing
+unregistered parent-linked internal sessions to inherit main-session watchdog
+eligibility. Failing-first tests reproduce both boundaries. The repair lets a
+new user message replace suspended ownership, prevents deferred resolution
+from overwriting a newer armed generation, and skips unregistered non-main
+sessions when the authoritative main ID is known. Four boundary tests were
+also split from the oversized original test module.
+
+Thirteenth-cycle artifacts:
+
+- `thirteenth-review-finding.md`: exact-head reviewer report and requested repairs.
+- `thirteenth-review-red-suspended-generation.txt`: failing-first stale-deadline proof.
+- `thirteenth-review-red-parent-linked-child.txt`: failing-first main-session scope proof.
+- `thirteenth-review-green-blockers.txt`, `thirteenth-review-green-suspended-generation.txt`, and `thirteenth-review-green-split-and-boundaries.txt`: repaired focused tests.
+- `thirteenth-review-runtime-fallback-suite.txt`: 281 tests passing across 39 files.
+- `thirteenth-review-omo-opencode-typecheck.txt`, `thirteenth-review-biome.txt`, and `thirteenth-review-no-excuse.txt`: repaired-candidate static gates.
+- `thirteenth-review-integrity.txt`: diff and pure-LOC integrity checks.
+- `thirteenth-review-opencode-harness-self-check.txt`: isolated harness preflight and cleanup proof.
+- `thirteenth-review-live-watchdog-run.txt`: production-duration isolated OpenCode proof for the repaired candidate.
+- `thirteenth-exact-runtime-fallback-suite.txt`: 281 tests passing across 39 files on runtime head `0e7223d60b6cbbb04ddc92801f62fd6c09749e92`.
+- `thirteenth-exact-omo-opencode-typecheck.txt`, `thirteenth-exact-biome.txt`, and `thirteenth-exact-no-excuse.txt`: exact-head static gates.
+- `thirteenth-exact-integrity.txt`: exact head/base identity, changed paths, diff check, and pure-LOC limits.
+- `thirteenth-exact-opencode-harness-self-check.txt`: exact-head isolated harness preflight and cleanup proof.
+- `thirteenth-exact-live-watchdog-run.txt`: production-duration live OpenCode run pinned to `0e7223d60b6cbbb04ddc92801f62fd6c09749e92`; fallback observed, no fallback watchdog re-arm, later user abort external, and real database unchanged.
 
 ## Why It Is Enough
 
