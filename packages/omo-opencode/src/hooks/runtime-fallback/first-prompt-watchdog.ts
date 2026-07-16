@@ -2,7 +2,7 @@ import type { HookDeps, RuntimeFallbackTimeout } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME, DEFAULT_FIRST_PROMPT_WATCHDOG_MS } from "./constants"
 import { log } from "../../shared/logger"
-import { subagentSessions } from "../../features/claude-code-session-state"
+import { getMainSessionID, subagentSessions } from "../../features/claude-code-session-state"
 import { createWatchdogAbortProvenance } from "./watchdog-abort-provenance"
 import type { ArmedWatchdog, WatchdogEventDecision } from "./first-prompt-watchdog-types"
 import { fireFirstPromptWatchdog } from "./first-prompt-watchdog-fire"
@@ -106,10 +106,12 @@ export function createFirstPromptWatchdog(
   return {
     onUserMessage(sessionID, model, agent, messageID) {
       if (!sessionID || deps.sessionAwaitingFallbackResult.has(sessionID)) return
-      if (armed.has(sessionID) || suspended.has(sessionID)) return
+      if (armed.has(sessionID)) return
       progressed.delete(sessionID)
 
       const wasSubagent = subagentSessions.has(sessionID)
+      const mainSessionID = getMainSessionID()
+      if (!wasSubagent && mainSessionID !== undefined && mainSessionID !== sessionID) return
       if (!wasSubagent && deps.config.timeout_seconds <= 0) return
 
       const generation = lifecycleGeneration
@@ -218,7 +220,7 @@ export function createFirstPromptWatchdog(
       const shouldResumeWatchdog = !suspendedAfterProgress.delete(sessionID)
       if (currentRequestActive) {
         deps.internallyAbortedSessions.add(sessionID)
-        if (shouldResumeWatchdog) arm(suspendedContext)
+        if (shouldResumeWatchdog && !armed.has(sessionID)) arm(suspendedContext)
         log(`[${HOOK_NAME}] ${SOURCE}: resolved delayed prior-generation abort`, { sessionID })
       } else {
         deps.internallyAbortedSessions.delete(sessionID)
