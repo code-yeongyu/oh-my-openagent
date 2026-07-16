@@ -8,8 +8,6 @@ import { log } from "../../shared/logger"
 
 const WRITE_TOOLS = new Set(["Write", "Edit", "write", "edit"])
 
-const CHECKBOX_PATTERN = /^[-*]\s*\[[ xX]\]/m
-
 const HEADING_SECOND_LEVEL = /^##\s+/
 const HEADING_TODOS = /^##\s+TODOs\b/i
 const HEADING_FINAL_WAVE = /^##\s+Final Verification Wave\b/i
@@ -39,14 +37,23 @@ function countRawTopLevelCheckboxes(content: string): number {
   return count
 }
 
+function hasRecognizedStructuredHeading(content: string): boolean {
+  return content.split(/\r?\n/).some((line) => HEADING_TODOS.test(line) || HEADING_FINAL_WAVE.test(line))
+}
+
 function buildWarning(rawCount: number, parsedCount: number): string {
   const skipped = rawCount - parsedCount
 
   if (parsedCount === 0) {
+    const summary =
+      rawCount === 0
+        ? "Plan has a recognized task section but no valid task rows."
+        : `Plan has **${rawCount} task checkbox(es)** but \`getPlanProgress()\` parsed **0**.`
+
     return [
       "",
       "<plan-format-warning>",
-      `Plan has **${rawCount} task checkbox(es)** but \`getPlanProgress()\` parsed **0**.`,
+      summary,
       "This means `/start-work` will show **\"Progress: 0/0\"** for this plan.",
       "",
       "**Fix**: Every task checkbox under `## TODOs` MUST start with a bare number",
@@ -111,15 +118,13 @@ export function createPlanFormatValidatorHook(_ctx: PluginInput) {
       if (!existsSync(resolvedPath)) return
 
       const content = readFileSync(resolvedPath, "utf-8")
-      if (!CHECKBOX_PATTERN.test(content)) return
-
       const rawCount = countRawTopLevelCheckboxes(content)
-      if (rawCount === 0) return
+      if (rawCount === 0 && !hasRecognizedStructuredHeading(content)) return
 
       const progress = getPlanProgress(resolvedPath)
       const parsedCount = progress.total
 
-      if (rawCount === parsedCount) return
+      if (rawCount === parsedCount && parsedCount > 0) return
 
       log(`[plan-format-validator] Plan ${filePath}: ${parsedCount}/${rawCount} tasks parsed`, {
         sessionID: input.sessionID,
