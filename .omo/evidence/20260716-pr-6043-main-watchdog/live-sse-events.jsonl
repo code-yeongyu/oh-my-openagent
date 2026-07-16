@@ -1,0 +1,20 @@
+{"type":"server.connected","sessionID":null,"role":null,"text":null}
+{"type":"message.updated","sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","role":"user","text":null}
+{"type":"message.part.updated","sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","role":null,"text":"Reply exactly QA_FALLBACK_OK"}
+{"type":"message.updated","sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","role":"assistant","text":null}
+{"type":"message.updated","sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","role":"user","text":null}
+{"type":"message.updated","sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","role":"assistant","text":null}
+{"type":"session.idle","sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","role":null,"text":null}
+{"type":"message.updated","sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","role":"user","text":null}
+{"type":"message.part.updated","sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","role":null,"text":"Reply exactly QA_FALLBACK_OK"}
+{"type":"message.updated","sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","role":"assistant","text":null}
+{"type":"message.updated","sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","role":"user","text":null}
+{"type":"message.part.updated","sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","role":null,"text":null}
+{"type":"message.part.updated","sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","role":null,"text":""}
+{"type":"message.part.delta","sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","role":null,"text":"QA_FALLBACK_OK"}
+{"type":"message.part.updated","sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","role":null,"text":"QA_FALLBACK_OK"}
+{"type":"message.part.updated","sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","role":null,"text":null}
+{"type":"message.updated","sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","role":"assistant","text":null}
+{"type":"message.updated","sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","role":"assistant","text":null}
+{"type":"session.idle","sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","role":null,"text":null}
+{"type":"message.updated","sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","role":"user","text":null}

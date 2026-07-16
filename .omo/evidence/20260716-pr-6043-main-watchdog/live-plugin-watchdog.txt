@@ -1,0 +1,17 @@
+[2026-07-16T10:27:45.550Z] [runtime-fallback] first-prompt-watchdog: armed {"sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","model":"openai/primary","agent":"sisyphus","watchdogMs":90000}
+[2026-07-16T10:27:45.623Z] [runtime-fallback] first-prompt-watchdog: cancelled (assistant progress observed) {"sessionID":"ses_095882d41ffec6NB65nvC5Eq3i"}
+[2026-07-16T10:27:47.410Z] [runtime-fallback] first-prompt-watchdog: armed {"sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","model":"openai/primary","agent":"sisyphus","watchdogMs":90000}
+[2026-07-16T10:27:57.955Z] [runtime-fallback] session.status retry with non-matching message {"sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","attempt":1,"retryMessage":"Provider response headers timed out after 10000ms"}
+[2026-07-16T10:28:09.982Z] [runtime-fallback] session.status retry with non-matching message {"sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","attempt":2,"retryMessage":"Provider response headers timed out after 10000ms"}
+[2026-07-16T10:28:24.016Z] [runtime-fallback] session.status retry with non-matching message {"sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","attempt":3,"retryMessage":"Provider response headers timed out after 10000ms"}
+[2026-07-16T10:28:42.067Z] [runtime-fallback] session.status retry with non-matching message {"sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","attempt":4,"retryMessage":"Provider response headers timed out after 10000ms"}
+[2026-07-16T10:29:08.106Z] [runtime-fallback] session.status retry with non-matching message {"sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","attempt":5,"retryMessage":"Provider response headers timed out after 10000ms"}
+[2026-07-16T10:29:17.419Z] [runtime-fallback] first-prompt-watchdog: session silent past 90000ms, dispatching fallback {"sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","model":"openai/primary","fallbackCount":1}
+[2026-07-16T10:29:17.595Z] [runtime-fallback] Aborted in-flight session request (first-prompt-watchdog) {"sessionID":"ses_095882d41ffec6NB65nvC5Eq3i"}
+[2026-07-16T10:29:17.596Z] [runtime-fallback] Preparing fallback {"sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","from":"openai/primary","to":"openai/fallback","attempt":1}
+[2026-07-16T10:29:17.748Z] [todo-continuation-enforcer] session.idle {"sessionID":"ses_095882d41ffec6NB65nvC5Eq3i"}
+[2026-07-16T10:29:17.749Z] [runtime-fallback] Auto-retrying with fallback model (first-prompt-watchdog) {"sessionID":"ses_095882d41ffec6NB65nvC5Eq3i","model":"openai/fallback"}
+[2026-07-16T10:29:17.769Z] [todo-continuation-enforcer] Skipped: pending internal continuation response {"sessionID":"ses_095882d41ffec6NB65nvC5Eq3i"}
+[2026-07-16T10:29:17.769Z] [runtime-fallback] session.idle while awaiting fallback result; keeping timeout armed {"sessionID":"ses_095882d41ffec6NB65nvC5Eq3i"}
+[2026-07-16T10:29:17.769Z] [atlas] session.idle {"sessionID":"ses_095882d41ffec6NB65nvC5Eq3i"}
+[2026-07-16T10:29:17.769Z] [atlas] Skipped: session not registered in active boulder {"sessionID":"ses_095882d41ffec6NB65nvC5Eq3i"}
