@@ -103,6 +103,28 @@ Describe the final checks here.
     }
   })
 
+  test("warns when a later valid Todos section masks an earlier prose-only Todos section", async () => {
+    // given
+    const fixture = createFixture(`# Plan
+
+## TODOs
+Describe the first implementation section here.
+
+## TODOs
+- [ ] 1. Implement the change
+`)
+
+    try {
+      // when
+      await fixture.run()
+
+      // then
+      expect(fixture.output.output).toContain("<plan-format-warning>")
+    } finally {
+      fixture.cleanup()
+    }
+  })
+
   test("preserves a valid structured plan", async () => {
     // given
     const fixture = createFixture(`# Plan
@@ -250,6 +272,29 @@ Describe final checks here.
 
       // then
       expect(fixture.output.output).not.toContain("<plan-format-warning>")
+    } finally {
+      fixture.cleanup()
+    }
+  })
+
+  test("preserves canonical tasks after a child heading inside Todos", async () => {
+    // given
+    const fixture = createFixture(`# Plan
+
+## TODOs
+- [x] 1. First task
+
+### Notes
+- [ ] 2. Second task
+`)
+    const originalOutput = fixture.output.output
+
+    try {
+      // when
+      await fixture.run()
+
+      // then
+      expect(fixture.output.output).toBe(originalOutput)
     } finally {
       fixture.cleanup()
     }

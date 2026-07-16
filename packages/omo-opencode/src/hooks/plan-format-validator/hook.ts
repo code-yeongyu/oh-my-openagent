@@ -8,7 +8,7 @@ import { log } from "../../shared/logger"
 
 const WRITE_TOOLS = new Set(["Write", "Edit", "write", "edit"])
 
-const HEADING_ANY_LEVEL = /^#{1,6}(?:[ \t]+|$)/
+const SECTION_BOUNDARY_HEADING = /^#{1,2}(?:[ \t]+|$)/
 const HEADING_TODOS = /^##[ \t]+TODOs(?:[ \t]+#+)?[ \t]*$/i
 const HEADING_FINAL_WAVE = /^##[ \t]+Final Verification Wave(?:[ \t]+#+)?[ \t]*$/i
 const TOPLEVEL_CHECKBOX = /^[-*]\s*\[[ xX]?\]/
@@ -19,9 +19,13 @@ const FENCE_PATTERN = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/
 type SectionName = "todo" | "final-wave"
 
 type SectionStats = {
-  readonly recognized: boolean
   readonly rawCount: number
   readonly validCount: number
+}
+
+type ActiveSection = {
+  readonly name: SectionName
+  readonly stats: { rawCount: number; validCount: number }
 }
 
 type PlanFormatStats = {
@@ -38,11 +42,8 @@ type MarkdownFence = {
 
 function analyzeStructuredSections(content: string): PlanFormatStats {
   const lines = content.split(/\r?\n/)
-  const stats: Record<SectionName, { recognized: boolean; rawCount: number; validCount: number }> = {
-    todo: { recognized: false, rawCount: 0, validCount: 0 },
-    "final-wave": { recognized: false, rawCount: 0, validCount: 0 },
-  }
-  let section: SectionName | null = null
+  const sections: SectionStats[] = []
+  let section: ActiveSection | null = null
   let fence: MarkdownFence | null = null
 
   for (const line of lines) {
@@ -56,24 +57,29 @@ function analyzeStructuredSections(content: string): PlanFormatStats {
       continue
     }
 
-    if (HEADING_ANY_LEVEL.test(line)) {
-      section = HEADING_TODOS.test(line) ? "todo" : HEADING_FINAL_WAVE.test(line) ? "final-wave" : null
-      if (section !== null) stats[section].recognized = true
+    if (SECTION_BOUNDARY_HEADING.test(line)) {
+      const name = HEADING_TODOS.test(line) ? "todo" : HEADING_FINAL_WAVE.test(line) ? "final-wave" : null
+      if (name === null) {
+        section = null
+      } else {
+        const stats = { rawCount: 0, validCount: 0 }
+        sections.push(stats)
+        section = { name, stats }
+      }
       continue
     }
     if (section === null || !TOPLEVEL_CHECKBOX.test(line)) continue
 
-    stats[section].rawCount += 1
-    const validPattern = section === "todo" ? TODO_TASK : FINAL_WAVE_TASK
-    if (validPattern.test(line)) stats[section].validCount += 1
+    section.stats.rawCount += 1
+    const validPattern = section.name === "todo" ? TODO_TASK : FINAL_WAVE_TASK
+    if (validPattern.test(line)) section.stats.validCount += 1
   }
 
-  const sections: readonly SectionStats[] = [stats.todo, stats["final-wave"]]
   return {
     rawCount: sections.reduce((total, item) => total + item.rawCount, 0),
-    hasEmptySection: sections.some((item) => item.recognized && item.validCount === 0),
+    hasEmptySection: sections.some((item) => item.validCount === 0),
     hasMalformedRows: sections.some((item) => item.rawCount !== item.validCount),
-    recognized: sections.some((item) => item.recognized),
+    recognized: sections.length > 0,
   }
 }
 
