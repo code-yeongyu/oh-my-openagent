@@ -185,9 +185,13 @@ export function createFirstPromptWatchdog(
 
     // Unlike the error-event path, the original request is still pending from
     // OpenCode's perspective when the watchdog fires. Forcefully end it so the
-    // fallback prompt can take over cleanly. Network errors from abort are
-    // logged inside abortSessionRequest and do not block fallback dispatch.
-    await helpers.abortSessionRequest(sessionID, SOURCE)
+    // fallback prompt can take over cleanly. If OpenCode rejects the abort,
+    // do not start a competing request while the original may still be live.
+    const abortSucceeded = await helpers.abortSessionRequest(sessionID, SOURCE)
+    if (abortSucceeded === false) {
+      log(`[${HOOK_NAME}] ${SOURCE}: abort failed, skipping fallback dispatch`, { sessionID })
+      return
+    }
 
     await dispatchFallbackRetry(deps, helpers, {
       sessionID,
@@ -204,6 +208,8 @@ export function createFirstPromptWatchdog(
       if (armed.has(sessionID)) return
 
       const wasSubagent = subagentSessions.has(sessionID)
+      if (!wasSubagent && deps.config.timeout_seconds <= 0) return
+
       armed.add(sessionID)
       const timer = setTimeout(async () => {
         await fire(sessionID, model, agent, wasSubagent)

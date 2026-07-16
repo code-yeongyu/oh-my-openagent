@@ -121,9 +121,24 @@ describe("createAbortSessionRequest reservation release", () => {
     const abortSessionRequest = createAbortSessionRequest(deps)
 
     // when
-    await abortSessionRequest(sessionID, "first-prompt-watchdog")
+    const aborted = await abortSessionRequest(sessionID, "first-prompt-watchdog")
 
     // then
+    expect(aborted).toBe(true)
     expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
+  })
+
+  test("#given a watchdog abort request fails #when the abort rejects #then no internal-abort marker remains", async () => {
+    const deps = createDeps()
+    const sessionID = "session-first-prompt-watchdog-abort-failed"
+    deps.ctx.client.session.abort = async () => {
+      throw new Error("abort failed")
+    }
+    const abortSessionRequest = createAbortSessionRequest(deps)
+
+    const aborted = await abortSessionRequest(sessionID, "first-prompt-watchdog")
+
+    expect(aborted).toBe(false)
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(false)
   })
 })

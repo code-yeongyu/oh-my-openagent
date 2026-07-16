@@ -11,7 +11,7 @@ declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
 
 export function createFallbackTimeoutHelpers(
   deps: HookDeps,
-  abortSessionRequest: (sessionID: string, source: string) => Promise<void>,
+  abortSessionRequest: (sessionID: string, source: string) => Promise<boolean | void>,
   autoRetryWithFallback: (
     sessionID: string,
     newModel: string,

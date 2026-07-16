@@ -32,4 +32,6 @@ export function createAutoRetryHelpers(deps: HookDeps) {
   }
 }
 
-export type AutoRetryHelpers = ReturnType<typeof createAutoRetryHelpers>
+export type AutoRetryHelpers = Omit<ReturnType<typeof createAutoRetryHelpers>, "abortSessionRequest"> & {
+  abortSessionRequest: (sessionID: string, source: string) => Promise<boolean | void>
+}

@@ -42,6 +42,11 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
     const role = info?.role as string | undefined
     const model = normalizeModelToCanonicalString(info?.model)
 
+    if (sessionID && role === "user") {
+      deps.internallyAbortedSessions.delete(sessionID)
+      return
+    }
+
     if (sessionID && role === "assistant" && !error) {
       if (!sessionAwaitingFallbackResult.has(sessionID)) {
         return

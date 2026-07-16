@@ -195,6 +195,83 @@ describe("first-prompt-watchdog", () => {
     watchdog.dispose()
   })
 
+  it("#given the watchdog cannot abort a silent main session #when the abort fails #then it does not dispatch a competing fallback request", async () => {
+    const sessionID = "session-main-abort-failed"
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const helpers: AutoRetryHelpers = {
+      ...createHelpers(calls, AGENT),
+      abortSessionRequest: async (abortedSessionID, source) => {
+        calls.abort.push({ sessionID: abortedSessionID, source })
+        return false
+      },
+    }
+    const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
+
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+
+    expect(calls.abort).toEqual([{ sessionID, source: "first-prompt-watchdog" }])
+    expect(calls.autoRetry).toEqual([])
+
+    watchdog.dispose()
+  })
+
+  it("#given timeout escalation is disabled for a main session #when the first prompt stays silent #then the main-session watchdog does not arm", async () => {
+    const sessionID = "session-main-timeout-disabled"
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    deps.config.timeout_seconds = 0
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const watchdog = createFirstPromptWatchdog(deps, createHelpers(calls, AGENT), WATCHDOG_MS)
+
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+
+    expect(calls.abort).toEqual([])
+    expect(calls.autoRetry).toEqual([])
+
+    watchdog.dispose()
+  })
+
+  it("#given an active subagent stays silent past the threshold and has a fallback configured #when the watchdog fires #then it still aborts and dispatches the fallback model", async () => {
+    const sessionID = "session-silent-active-subagent"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const helpers = createHelpers(calls, AGENT)
+    const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
+
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+
+    expect(calls.abort).toEqual([{ sessionID, source: "first-prompt-watchdog" }])
+    expect(calls.autoRetry).toHaveLength(1)
+    expect(calls.autoRetry[0]).toMatchObject({
+      sessionID,
+      newModel: FALLBACK_MODEL,
+      source: "first-prompt-watchdog",
+    })
+
+    watchdog.dispose()
+  })
+
+  it("#given timeout escalation is disabled and an active subagent stays silent #when the watchdog fires #then the historical subagent safety net remains active", async () => {
+    const sessionID = "session-subagent-timeout-disabled"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    deps.config.timeout_seconds = 0
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const watchdog = createFirstPromptWatchdog(deps, createHelpers(calls, AGENT), WATCHDOG_MS)
+
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+
+    expect(calls.abort).toEqual([{ sessionID, source: "first-prompt-watchdog" }])
+    expect(calls.autoRetry).toHaveLength(1)
+
+    watchdog.dispose()
+  })
+
   it("#given a main session produces assistant text before the threshold #when progress is observed #then the watchdog is cancelled and no fallback is dispatched", async () => {
     // given
     const sessionID = "session-main-makes-progress"
