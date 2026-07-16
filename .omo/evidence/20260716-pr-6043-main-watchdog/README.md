@@ -2,7 +2,10 @@
 
 Reviewed runtime source head: `e2048c0f6464a2cb3a0cc6679ab09b38b6b4ff07`
 
-Integrated `dev`: `238c65280ec341e174f1aa6b6ed582fbba952c4b`
+Integrated `dev`: `16658f79c1155cb6f1b3bfaffa1f54ebd1469615`
+
+Exact integrated QA head before this evidence-only refresh:
+`73242309a3e8b8e594e4527fdace2d23fcd6eddd`
 
 The following evidence commit is content-only. It refreshes reviewer-readable
 artifacts and does not change the tested runtime behavior.
