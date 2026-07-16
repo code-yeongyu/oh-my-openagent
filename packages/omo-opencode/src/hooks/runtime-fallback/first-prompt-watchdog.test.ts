@@ -294,6 +294,23 @@ describe("first-prompt-watchdog", () => {
     watchdog.dispose()
   })
 
+  it("#given assistant progress cancels an armed watchdog #when a later user turn stays silent #then the watchdog re-arms for the new turn", async () => {
+    const sessionID = "session-main-rearms-after-progress"
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const watchdog = createFirstPromptWatchdog(deps, createHelpers(calls, AGENT), WATCHDOG_MS)
+
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await getFakeTimers().advanceBy(SAFE_WAIT_BEFORE_FIRE_MS)
+    watchdog.onAssistantProgress(sessionID)
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+
+    expect(calls.abort).toEqual([{ sessionID, source: "first-prompt-watchdog" }])
+    expect(calls.autoRetry).toHaveLength(1)
+    watchdog.dispose()
+  })
+
   it("#given session emits message.part.updated with sessionID under properties.part #when watchdog tracks #then the watchdog recognizes progress and resets the silence timer", async () => {
     // given
     const sessionID = "session-nested-part-progress"
@@ -460,6 +477,20 @@ describe("observeEventForWatchdog", () => {
       createRecordingWatchdog(calls),
     )
     expect(calls.user).toEqual([{ sessionID, model: "openai/gpt-5.4-mini", agent: "sisyphus-junior" }])
+    expect(calls.progress).toEqual([])
+    expect(calls.terminal).toEqual([])
+  })
+
+  it("#given a compaction-agent message.updated event with role=user #when observed #then the watchdog does not arm", () => {
+    const calls = freshCalls()
+    observeEventForWatchdog(
+      {
+        type: "message.updated",
+        properties: { info: { sessionID, role: "user", model: "openai/gpt-5.4-mini", agent: "compaction" } },
+      },
+      createRecordingWatchdog(calls),
+    )
+    expect(calls.user).toEqual([])
     expect(calls.progress).toEqual([])
     expect(calls.terminal).toEqual([])
   })

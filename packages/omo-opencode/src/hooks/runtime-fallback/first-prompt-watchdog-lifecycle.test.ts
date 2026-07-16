@@ -141,4 +141,86 @@ describe("first-prompt watchdog lifecycle", () => {
     expect(deps.sessionStates.has(sessionID)).toBe(false)
     expect(deps.sessionLastAccess.has(sessionID)).toBe(false)
   })
+
+  it("#given the watchdog abort is in flight #when the session is cancelled before abort resolves #then no fallback is dispatched", async () => {
+    const sessionID = "session-cancelled-during-watchdog-abort"
+    const deps = createDeps()
+    const calls = { dispatch: 0 }
+    let resolveAbort: ((value: boolean) => void) | undefined
+    let notifyAbortStarted: (() => void) | undefined
+    const abortStarted = new Promise<void>((resolve) => {
+      notifyAbortStarted = resolve
+    })
+    const abortResult = new Promise<boolean>((resolve) => {
+      resolveAbort = resolve
+    })
+    const helpers: AutoRetryHelpers = {
+      abortSessionRequest: async () => {
+        notifyAbortStarted?.()
+        return abortResult
+      },
+      clearSessionFallbackTimeout: () => {},
+      scheduleSessionFallbackTimeout: () => {},
+      autoRetryWithFallback: async () => {
+        calls.dispatch += 1
+        return { accepted: true, status: "dispatched" }
+      },
+      resolveAgentForSessionFromContext: async () => AGENT,
+      cleanupStaleSessions: () => {},
+    }
+    const watchdog = createFirstPromptWatchdog(deps, helpers, 1)
+
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await abortStarted
+    watchdog.onSessionTerminal(sessionID)
+    resolveAbort?.(true)
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      await Promise.resolve()
+    }
+
+    expect(calls.dispatch).toBe(0)
+    watchdog.dispose()
+  })
+
+  it("#given the watchdog abort is in flight #when OpenCode reports its internal completion and idle events #then the fallback is still dispatched", async () => {
+    const sessionID = "session-internal-abort-completes"
+    const deps = createDeps()
+    const calls = { dispatch: 0 }
+    let resolveAbort: ((value: boolean) => void) | undefined
+    let notifyAbortStarted: (() => void) | undefined
+    const abortStarted = new Promise<void>((resolve) => {
+      notifyAbortStarted = resolve
+    })
+    const abortResult = new Promise<boolean>((resolve) => {
+      resolveAbort = resolve
+    })
+    const helpers: AutoRetryHelpers = {
+      abortSessionRequest: async () => {
+        deps.internallyAbortedSessions.add(sessionID)
+        notifyAbortStarted?.()
+        return abortResult
+      },
+      clearSessionFallbackTimeout: () => {},
+      scheduleSessionFallbackTimeout: () => {},
+      autoRetryWithFallback: async () => {
+        calls.dispatch += 1
+        return { accepted: true, status: "dispatched" }
+      },
+      resolveAgentForSessionFromContext: async () => AGENT,
+      cleanupStaleSessions: () => {},
+    }
+    const watchdog = createFirstPromptWatchdog(deps, helpers, 1)
+
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await abortStarted
+    watchdog.onAssistantProgress(sessionID)
+    watchdog.onSessionTerminal(sessionID, "session.idle")
+    resolveAbort?.(true)
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      await Promise.resolve()
+    }
+
+    expect(calls.dispatch).toBe(1)
+    watchdog.dispose()
+  })
 })

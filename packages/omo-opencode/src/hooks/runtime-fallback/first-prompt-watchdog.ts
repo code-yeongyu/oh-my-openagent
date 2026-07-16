@@ -5,6 +5,7 @@ import { log } from "../../shared/logger"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { isRecord } from "../../shared/record-type-guard"
+import { isCompactionAgent } from "../../shared/compaction-marker"
 import { normalizeModelToCanonicalString } from "./normalize-model"
 import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
@@ -20,7 +21,7 @@ declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
 export interface FirstPromptWatchdog {
   onUserMessage(sessionID: string, model?: string, agent?: string): void
   onAssistantProgress(sessionID: string): void
-  onSessionTerminal(sessionID: string): void
+  onSessionTerminal(sessionID: string, eventType?: string): void
   dispose(): void
 }
 
@@ -92,6 +93,7 @@ export function observeEventForWatchdog(
     if (role === "user") {
       const model = normalizeModelToCanonicalString(info?.model)
       const agent = typeof info?.agent === "string" ? info.agent : undefined
+      if (isCompactionAgent(agent)) return
       watchdog.onUserMessage(sessionID, model, agent)
       return
     }
@@ -112,7 +114,7 @@ export function observeEventForWatchdog(
 
   if (TERMINAL_EVENT_TYPES.has(event.type)) {
     const sessionID = resolveSessionEventID(props)
-    if (sessionID) watchdog.onSessionTerminal(sessionID)
+    if (sessionID) watchdog.onSessionTerminal(sessionID, event.type)
   }
 }
 
@@ -123,6 +125,7 @@ export function createFirstPromptWatchdog(
 ): FirstPromptWatchdog {
   const timers = new Map<string, RuntimeFallbackTimeout>()
   const armed = new Set<string>()
+  const sessionGenerations = new Map<string, number>()
   let lifecycleGeneration = 0
 
   const cancel = (sessionID: string): void => {
@@ -132,6 +135,7 @@ export function createFirstPromptWatchdog(
       timers.delete(sessionID)
     }
     armed.delete(sessionID)
+    sessionGenerations.set(sessionID, (sessionGenerations.get(sessionID) ?? 0) + 1)
   }
 
   const fire = async (
@@ -140,9 +144,9 @@ export function createFirstPromptWatchdog(
     agent: string | undefined,
     wasSubagent: boolean,
     generation: number,
+    sessionGeneration: number,
   ): Promise<void> => {
     timers.delete(sessionID)
-    armed.delete(sessionID)
 
     if (wasSubagent && !subagentSessions.has(sessionID)) {
       log(`[${HOOK_NAME}] ${SOURCE}: session no longer a subagent at fire time, skipping`, { sessionID })
@@ -150,7 +154,7 @@ export function createFirstPromptWatchdog(
     }
 
     const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
-    if (generation !== lifecycleGeneration) return
+    if (generation !== lifecycleGeneration || sessionGeneration !== sessionGenerations.get(sessionID)) return
     const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, deps.pluginConfig)
 
     if (fallbackModels.length === 0) {
@@ -191,7 +195,7 @@ export function createFirstPromptWatchdog(
     // fallback prompt can take over cleanly. If OpenCode rejects the abort,
     // do not start a competing request while the original may still be live.
     const abortSucceeded = await helpers.abortSessionRequest(sessionID, SOURCE)
-    if (generation !== lifecycleGeneration) return
+    if (generation !== lifecycleGeneration || sessionGeneration !== sessionGenerations.get(sessionID)) return
     if (abortSucceeded === false) {
       log(`[${HOOK_NAME}] ${SOURCE}: abort failed, skipping fallback dispatch`, { sessionID })
       return
@@ -214,10 +218,19 @@ export function createFirstPromptWatchdog(
       const wasSubagent = subagentSessions.has(sessionID)
       if (!wasSubagent && deps.config.timeout_seconds <= 0) return
 
-      armed.add(sessionID)
       const generation = lifecycleGeneration
+      const sessionGeneration = (sessionGenerations.get(sessionID) ?? 0) + 1
+      sessionGenerations.set(sessionID, sessionGeneration)
+      armed.add(sessionID)
       const timer = setTimeout(async () => {
-        await fire(sessionID, model, agent, wasSubagent, generation)
+        try {
+          await fire(sessionID, model, agent, wasSubagent, generation, sessionGeneration)
+        } finally {
+          if (sessionGeneration === sessionGenerations.get(sessionID)) {
+            armed.delete(sessionID)
+            sessionGenerations.delete(sessionID)
+          }
+        }
       }, watchdogMs)
       timers.set(sessionID, timer)
 
@@ -225,11 +238,13 @@ export function createFirstPromptWatchdog(
     },
     onAssistantProgress(sessionID) {
       if (!sessionID || !armed.has(sessionID)) return
+      if (deps.internallyAbortedSessions.has(sessionID)) return
       cancel(sessionID)
       log(`[${HOOK_NAME}] ${SOURCE}: cancelled (assistant progress observed)`, { sessionID })
     },
-    onSessionTerminal(sessionID) {
+    onSessionTerminal(sessionID, eventType) {
       if (!sessionID || !armed.has(sessionID)) return
+      if (eventType === "session.idle" && deps.internallyAbortedSessions.has(sessionID)) return
       cancel(sessionID)
       log(`[${HOOK_NAME}] ${SOURCE}: cancelled (session terminal)`, { sessionID })
     },
@@ -240,6 +255,7 @@ export function createFirstPromptWatchdog(
       }
       timers.clear()
       armed.clear()
+      sessionGenerations.clear()
     },
   }
 }
