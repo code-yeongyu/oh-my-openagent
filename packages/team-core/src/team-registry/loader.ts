@@ -10,10 +10,11 @@ import { TeamSpecSchema } from "../types"
 import type { TeamSpec } from "../types"
 import { normalizeTeamSpecInput } from "./team-spec-input-normalizer"
 import { discoverTeamSpecs, getTeamSpecPath, resolveBaseDir } from "./paths"
-import { TeamSpecValidationError, validateSpec } from "./validator"
+import { TeamSpecValidationError, validateSpec, type ValidateSpecOptions } from "./validator"
 
 type DiscoveredTeamSpec = Awaited<ReturnType<typeof discoverTeamSpecs>>[number]
 type JsonRecord = Record<string, unknown>
+export type LoadTeamSpecOptions = NormalizeTeamSpecInputOptions & ValidateSpecOptions
 
 function isJsonRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -101,7 +102,7 @@ function createZodValidationError(rawSpec: unknown, error: ZodError): TeamSpecVa
 
 async function loadTeamSpecFromEntry(
   entry: DiscoveredTeamSpec,
-  options?: NormalizeTeamSpecInputOptions,
+  options?: LoadTeamSpecOptions,
 ): Promise<TeamSpec> {
   let rawText: string
   try {
@@ -131,7 +132,7 @@ async function loadTeamSpecFromEntry(
     throw createZodValidationError(normalizedRawSpec, parsedSpec.error)
   }
 
-  validateSpec(parsedSpec.data)
+  validateSpec(parsedSpec.data, options)
   return parsedSpec.data
 }
 
@@ -142,7 +143,7 @@ export async function loadTeamSpec(
   teamName: string,
   config: TeamModeConfig,
   projectRoot: string,
-  options?: NormalizeTeamSpecInputOptions,
+  options?: LoadTeamSpecOptions,
 ): Promise<TeamSpec> {
   const discoveredTeamSpecs = await discoverTeamSpecs(config, projectRoot)
   const matchedTeamSpec = discoveredTeamSpecs.find((entry) => entry.name === teamName)

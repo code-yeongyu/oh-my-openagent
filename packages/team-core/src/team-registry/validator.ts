@@ -12,6 +12,10 @@ const HYPERPLAN_REQUIRED_CATEGORIES = [
 const UNKNOWN_SUBAGENT_MESSAGE =
   "Unknown subagent_type '<name>'. Available ELIGIBLE agents: sisyphus, atlas, sisyphus-junior, hephaestus (if D-36 applied). Use delegate-task for read-only agents like oracle, librarian, explore, metis, momus, multimodal-looker."
 
+export type ValidateSpecOptions = {
+  allowUnknownSubagentTypes?: boolean
+}
+
 export class TeamSpecValidationError extends Error {
   constructor(
     message: string,
@@ -24,7 +28,7 @@ export class TeamSpecValidationError extends Error {
   }
 }
 
-export function validateSpec(spec: TeamSpec): void {
+export function validateSpec(spec: TeamSpec, options: ValidateSpecOptions = {}): void {
   if (spec.members.length > MAX_TEAM_MEMBERS) {
     throw new TeamSpecValidationError(
       `Team '${spec.name}' exceeds max 8 members.`,
@@ -47,7 +51,7 @@ export function validateSpec(spec: TeamSpec): void {
     }
 
     seenMemberNames.add(member.name)
-    validateMemberEligibility(member)
+    validateMemberEligibility(member, options)
     validateDualSupport(member)
 
     if (member.name === spec.leadAgentId) {
@@ -88,13 +92,16 @@ function validateHyperplanComposition(spec: TeamSpec): void {
   }
 }
 
-export function validateMemberEligibility(member: Member): void {
+export function validateMemberEligibility(member: Member, options: ValidateSpecOptions = {}): void {
   if (member.kind !== "subagent_type") {
     return
   }
 
   const eligibility = AGENT_ELIGIBILITY_REGISTRY[member.subagent_type]
   if (!eligibility) {
+    if (options.allowUnknownSubagentTypes === true) {
+      return
+    }
     throw new TeamSpecValidationError(
       UNKNOWN_SUBAGENT_MESSAGE.replace("<name>", member.subagent_type),
       "UNKNOWN_SUBAGENT_TYPE",
