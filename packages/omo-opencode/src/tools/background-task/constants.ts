@@ -10,4 +10,4 @@ IMPORTANT: ONLY call this tool AFTER receiving a <system-reminder> notification 
 
 export const BACKGROUND_CANCEL_DESCRIPTION = `Cancel running background task(s). Use all=true to cancel ALL before final answer.`
 
-export const WAIT_FOR_BACKGROUND_TASKS_DESCRIPTION = `Block until ALL background tasks for your session complete, then return their final statuses. Call this BEFORE ending your turn while background tasks are running so the session is not terminated with work still in flight.`
+export const WAIT_FOR_BACKGROUND_TASKS_DESCRIPTION = `Block until all background tasks for your session finish, the wait times out, or the call is aborted, then return their final or current statuses. Call this BEFORE ending your turn while background tasks are running so the session is not terminated with work still in flight.`

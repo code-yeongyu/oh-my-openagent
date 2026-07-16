@@ -11,7 +11,7 @@ ${BACKGROUND_WAIT_TAG}
 You have background tasks that are still running or pending. You MUST call the \`wait-for-background-tasks\` tool BEFORE ending your turn. If you end your turn without calling it, the session may be terminated and all background work lost.
 
 Do NOT end your turn with a text response while background tasks are active. Instead:
-1. Call \`wait-for-background-tasks\` to block until all tasks complete
+1. Call \`wait-for-background-tasks\` to block until all tasks finish, the wait times out, or the call is aborted
 2. Process the results
 3. Then provide your final response
 </system-reminder>`

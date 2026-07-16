@@ -49,11 +49,11 @@ function createManager(sequences: BackgroundTask[][]): BackgroundManager {
 async function runTool(
   manager: BackgroundManager,
   args: { timeout?: number },
-  options?: { abort?: AbortSignal; pollIntervalMs?: number },
+  options?: { abort?: AbortSignal; pollIntervalMs?: number; minimumTimeoutMs?: number },
 ): Promise<string> {
   const tool = createWaitForBackgroundTasks(manager, {
     pollIntervalMs: options?.pollIntervalMs ?? 5,
-    minimumTimeoutMs: 10,
+    minimumTimeoutMs: options?.minimumTimeoutMs ?? 10,
   })
   const result = await tool.execute?.(args, {
     ...mockContext,
@@ -111,24 +111,33 @@ describe("createWaitForBackgroundTasks", () => {
     ])
 
     // #when the tool receives a non-positive timeout
-    const output = await runTool(manager, { timeout })
+    const output = await runTool(manager, { timeout }, { pollIntervalMs: 1, minimumTimeoutMs: 100 })
 
     // #then it polls instead of returning an immediate timeout
     expect(output).toContain("## Completed Tasks")
     expect(output).not.toContain("Still Running")
   })
 
-  test("keeps waiting when a task appears during completion settling", async () => {
-    // #given the original task completes while a new same-session task appears in the settle snapshot
+  test("keeps waiting when a task appears asynchronously during completion settling", async () => {
+    // #given the original task completes while a new same-session task is queued asynchronously
     const newTask = createTask({ id: "task-2", description: "new background task", status: "running" })
-    const manager = createManager([
-      [createTask({ status: "running" })],
-      [createTask({ status: "completed" })],
-      [createTask({ status: "completed" }), newTask],
-    ])
+    let tasks = [createTask({ status: "running" })]
+    let reads = 0
+    const manager = unsafeTestValue<BackgroundManager>({
+      getTasksByParentSession: () => {
+        reads += 1
+        if (reads === 2) {
+          tasks = [createTask({ status: "completed" })]
+          queueMicrotask(() => {
+            tasks = [createTask({ status: "completed" }), newTask]
+          })
+        }
+        return tasks
+      },
+    })
 
     // #when the tool reaches its timeout with the new task still active
-    const output = await runTool(manager, { timeout: 10 }, { pollIntervalMs: 1 })
+    const output = await runTool(manager, { timeout: 100 }, { pollIntervalMs: 1 })
 
     // #then it reports the newly observed active task instead of a completion-only result
     expect(output).toContain("## Still Running (timed out")

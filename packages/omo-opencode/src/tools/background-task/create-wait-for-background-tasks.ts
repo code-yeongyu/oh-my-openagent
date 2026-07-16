@@ -122,6 +122,10 @@ export function createWaitForBackgroundTasks(
 
           finalTasks = manager.getTasksByParentSession(sessionID)
           if (activeTasks(finalTasks).length === 0) {
+            const settleMs = Math.min(pollIntervalMs, Math.max(0, timeoutMs - (Date.now() - startTime)))
+            if (await waitForPoll(settleMs, toolContext.abort) === "aborted") {
+              return "Background task wait cancelled because the tool call was aborted."
+            }
             finalTasks = manager.getTasksByParentSession(sessionID)
           }
         }

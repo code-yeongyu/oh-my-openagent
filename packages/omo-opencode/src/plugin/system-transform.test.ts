@@ -44,6 +44,9 @@ describe("createSystemTransformHandler background-wait injection", () => {
     // #then the wait reminder is injected
     expect(system.some((part) => part.includes(WAIT_TAG))).toBe(true)
     expect(system.some((part) => part.includes("wait-for-background-tasks"))).toBe(true)
+    expect(system.some((part) => part.includes("until all tasks finish, the wait times out, or the call is aborted"))).toBe(
+      true,
+    )
   })
 
   test("does not inject when the flag is on but the session has no active tasks", async () => {
