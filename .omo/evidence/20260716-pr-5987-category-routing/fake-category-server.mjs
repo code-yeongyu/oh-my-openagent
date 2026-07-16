@@ -18,7 +18,15 @@ const server = http.createServer(async (req, res) => {
   const input = Array.isArray(body.input) ? body.input : []
   const hasToolResult = input.some((item) => item?.type === "function_call_output" || item?.type === "tool_result" || item?.role === "tool")
   calls += 1
-  console.log(JSON.stringify({ call: calls, hasCategoryProbe: raw.includes("CATEGORY_ROUTE_PROBE"), hasTeamProbe: raw.includes("TEAM_CATEGORY_ROUTE_PROBE"), hasChild: raw.includes("CATEGORY_CHILD_PROBE"), hasToolResult }))
+  console.log(JSON.stringify({
+    call: calls,
+    hasCategoryProbe: raw.includes("CATEGORY_ROUTE_PROBE"),
+    hasTeamProbe: raw.includes("TEAM_CATEGORY_ROUTE_PROBE"),
+    hasChild: raw.includes("CATEGORY_CHILD_PROBE"),
+    hasTargetSkill: raw.includes("PROBE_WORKER_ONLY_SKILL_CONTENT"),
+    hasJuniorSkill: raw.includes("JUNIOR_ONLY_SKILL_CONTENT"),
+    hasToolResult,
+  }))
   if (hasToolResult) console.log(JSON.stringify(input.filter((item) => item?.type === "function_call_output" || item?.type === "tool_result" || item?.role === "tool")))
   if (raw.includes("Generate a title")) {
     sendSse(res, textEvents(calls, "category route probe"))
@@ -49,7 +57,7 @@ const server = http.createServer(async (req, res) => {
       prompt: "CATEGORY_CHILD_PROBE: reply CHILD_DONE",
       category: "quick",
       run_in_background: false,
-      load_skills: [],
+      load_skills: ["probe-worker-only", "junior-only"],
     }))
   } else {
     sendSse(res, textEvents(calls, "PARENT_DONE"))

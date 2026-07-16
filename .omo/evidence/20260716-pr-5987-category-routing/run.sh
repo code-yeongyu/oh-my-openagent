@@ -10,7 +10,24 @@ REAL_DB="$(opencode db path)"
 BEFORE="$(sqlite3 "$REAL_DB" 'select count(*) from session')"
 export XDG_DATA_HOME="$SANDBOX/data" XDG_CONFIG_HOME="$SANDBOX/config" XDG_STATE_HOME="$SANDBOX/state" XDG_CACHE_HOME="$SANDBOX/cache"
 export OPENCODE_DISABLE_AUTOUPDATE=1 OPENCODE_DISABLE_MODELS_FETCH=1
-mkdir -p "$XDG_CONFIG_HOME/opencode" "$SANDBOX/project"
+mkdir -p "$XDG_CONFIG_HOME/opencode/skills/probe-worker-only" "$XDG_CONFIG_HOME/opencode/skills/junior-only" "$SANDBOX/project"
+
+cat >"$XDG_CONFIG_HOME/opencode/skills/probe-worker-only/SKILL.md" <<'SKILL'
+---
+name: probe-worker-only
+description: Restricted to the resolved category target
+agent: probe-worker
+---
+PROBE_WORKER_ONLY_SKILL_CONTENT
+SKILL
+cat >"$XDG_CONFIG_HOME/opencode/skills/junior-only/SKILL.md" <<'SKILL'
+---
+name: junior-only
+description: Restricted to the category placeholder
+agent: Sisyphus-Junior
+---
+JUNIOR_ONLY_SKILL_CONTENT
+SKILL
 
 node "$EVIDENCE/fake-category-server.mjs" >"$EVIDENCE/fake-server.txt" 2>&1 & FAKE_PID=$!
 for _ in $(seq 1 50); do grep -q '^PORT=' "$EVIDENCE/fake-server.txt" && break; sleep 0.1; done
@@ -42,6 +59,7 @@ JSON
 opencode run --agent probe-parent --auto --format json --dir "$SANDBOX/project" "CATEGORY_ROUTE_PROBE" >"$EVIDENCE/allowed-run.jsonl" 2>"$EVIDENCE/allowed-run.stderr"
 grep -q 'CHILD_DONE' "$EVIDENCE/allowed-run.jsonl"
 sqlite3 "$XDG_DATA_HOME/opencode/opencode.db" "select data from message" | grep -q '"agent":"probe-worker"'
+grep -q '"hasChild":true,"hasTargetSkill":true,"hasJuniorSkill":false' "$EVIDENCE/fake-server.txt"
 
 opencode run --auto --format json --dir "$SANDBOX/project" "TEAM_CATEGORY_ROUTE_PROBE" >"$EVIDENCE/team-run.jsonl" 2>"$EVIDENCE/team-run.stderr"
 jq -e '
@@ -54,5 +72,5 @@ jq -e '
 ' "$EVIDENCE/team-run.jsonl" >/dev/null
 
 AFTER="$(sqlite3 "$REAL_DB" 'select count(*) from session')"
-printf 'real_db=%s\nbefore=%s\nafter=%s\nsandbox=%s\nresolved_target=probe-worker\nteam_resolved_target=probe-worker\nresult=PASS\n' "$REAL_DB" "$BEFORE" "$AFTER" "$SANDBOX" >"$EVIDENCE/isolation-and-result.txt"
+printf 'real_db=%s\nbefore=%s\nafter=%s\nsandbox=%s\nresolved_target=probe-worker\ntarget_skill_injected=true\nplaceholder_skill_injected=false\nteam_resolved_target=probe-worker\nresult=PASS\n' "$REAL_DB" "$BEFORE" "$AFTER" "$SANDBOX" >"$EVIDENCE/isolation-and-result.txt"
 test "$BEFORE" = "$AFTER"

@@ -1,7 +1,9 @@
 real_db=/Users/yeongyu/.local/share/opencode/opencode.db
 before=5751
 after=5751
-sandbox=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.Kf2Zga9DUC
+sandbox=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.eKc3LgyamE
 resolved_target=probe-worker
+target_skill_injected=true
+placeholder_skill_injected=false
 team_resolved_target=probe-worker
 result=PASS
