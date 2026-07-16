@@ -42,12 +42,16 @@ function getLoopCommandArguments(args: Record<string, unknown>, command: "ralph-
 export function createToolExecuteBeforeHandler(args: {
   ctx: PluginContext
   hooks: CreatedHooks
-  backgroundManager?: Pick<BackgroundManager, "hasActiveDescendantTasks" | "hasPendingParentWake">
+  backgroundManager?: Pick<
+    BackgroundManager,
+    "hasActiveChildTasks" | "hasActiveDescendantTasks" | "hasPendingParentWake"
+  >
+  blockOnBackgroundTasks?: boolean
 }): (
   input: { tool: string; sessionID: string; callID: string },
   output: { args: Record<string, unknown> },
 ) => Promise<void> {
-  const { ctx, hooks, backgroundManager } = args
+  const { ctx, hooks, backgroundManager, blockOnBackgroundTasks } = args
 
   function buildUltraworkOracleVerificationPrompt(prompt: string, originalTask: string, verificationAttemptId: string): string {
     const verificationPrompt = [
@@ -95,7 +99,9 @@ export function createToolExecuteBeforeHandler(args: {
       if (
         isPureSleepCommand(output.args.command)
         && (
-          backgroundManager?.hasActiveDescendantTasks(input.sessionID) === true
+          (blockOnBackgroundTasks
+            ? backgroundManager?.hasActiveDescendantTasks(input.sessionID)
+            : backgroundManager?.hasActiveChildTasks(input.sessionID)) === true
           || backgroundManager?.hasPendingParentWake(input.sessionID) === true
         )
       ) {

@@ -16,6 +16,7 @@ describe("createToolExecuteBeforeHandler background wait guard", () => {
   test("blocks placeholder sleep waits while background children are still active", async () => {
     //#given
     const backgroundManager = {
+      hasActiveChildTasks: (sessionID: string) => sessionID === "ses_parent",
       hasActiveDescendantTasks: (sessionID: string) => sessionID === "ses_parent",
     }
     const handler = createToolExecuteBeforeHandler({
@@ -39,6 +40,7 @@ describe("createToolExecuteBeforeHandler background wait guard", () => {
   test("allows sleep commands when the session has no active background children", async () => {
     //#given
     const backgroundManager = {
+      hasActiveChildTasks: () => false,
       hasActiveDescendantTasks: () => false,
       hasPendingParentWake: () => false,
     }
@@ -63,6 +65,7 @@ describe("createToolExecuteBeforeHandler background wait guard", () => {
   test("blocks placeholder sleep waits while a parent wake is pending", async () => {
     //#given
     const backgroundManager = {
+      hasActiveChildTasks: () => false,
       hasActiveDescendantTasks: () => false,
       hasPendingParentWake: (sessionID: string) => sessionID === "ses_parent",
     }
@@ -87,6 +90,7 @@ describe("createToolExecuteBeforeHandler background wait guard", () => {
   test("allows non-wait bash commands while background children are active", async () => {
     //#given
     const backgroundManager = {
+      hasActiveChildTasks: () => true,
       hasActiveDescendantTasks: () => true,
       hasPendingParentWake: () => false,
     }

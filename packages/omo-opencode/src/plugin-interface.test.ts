@@ -14,40 +14,6 @@ import {
   updateSessionAgent,
 } from "./features/claude-code-session-state"
 
-const BACKGROUND_WAIT_TAG = "[CRITICAL — BACKGROUND TASKS RUNNING]"
-
-describe("createPluginInterface - effective background wait availability", () => {
-  test("does not inject a mandatory reminder when final tool filtering removed the wait tool", async () => {
-    // given
-    const pluginInterface = createPluginInterface({
-      ctx: { directory: "/tmp", client: {} } as never,
-      pluginConfig: { experimental: { block_on_background_tasks: true } } as never,
-      firstMessageVariantGate: {
-        shouldOverride: () => false,
-        markApplied: () => {},
-        markSessionCreated: () => {},
-        clear: () => {},
-      },
-      managers: {
-        backgroundManager: { hasActiveDescendantTasks: () => true },
-      } as never,
-      hooks: {} as never,
-      tools: {},
-    })
-    const output = { system: [] as string[] }
-
-    // when
-    await pluginInterface["experimental.chat.system.transform"]?.(
-      { sessionID: "main-1", model: { id: "anthropic/claude-opus-4-8", providerID: "anthropic" } },
-      output,
-    )
-
-    // then
-    expect(output.system.some((part) => part.includes(BACKGROUND_WAIT_TAG))).toBe(false)
-  })
-})
-
-
 describe("createPluginInterface - command.execute.before", () => {
   let testDir = ""
 

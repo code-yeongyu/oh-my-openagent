@@ -99,6 +99,7 @@ export function createPluginInterface(args: {
       ctx,
       hooks,
       backgroundManager: managers.backgroundManager,
+      blockOnBackgroundTasks: tools["wait-for-background-tasks"] !== undefined,
     }),
 
     "tool.execute.after": createToolExecuteAfterHandler({
