@@ -1,7 +1,9 @@
-import { describe, it, expect } from "bun:test"
+import { afterEach, describe, it, expect } from "bun:test"
 
 import { createMessagesTransformHandler } from "./messages-transform"
+import { createCategorySkillReminderHook } from "../hooks/category-skill-reminder"
 import { createToolPairValidatorHook } from "../hooks/tool-pair-validator/hook"
+import { _resetForTesting, updateSessionAgent } from "../features/claude-code-session-state"
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../shared/internal-initiator-marker"
 import type { CreatedHooks } from "../create-hooks"
 
@@ -50,6 +52,7 @@ function makeHooks(overrides: {
   teamMailbox?: TransformHook
   thinkingBlock?: TransformHook
   toolPair?: TransformHook
+  categorySkill?: TransformHook
 }): CreatedHooks {
   return {
     contextInjectorMessagesTransform: overrides.contextInjector ? makeHook(overrides.contextInjector) : undefined,
@@ -57,6 +60,7 @@ function makeHooks(overrides: {
     teamMailboxInjector: overrides.teamMailbox ? makeHook(overrides.teamMailbox) : undefined,
     thinkingBlockValidator: overrides.thinkingBlock ? makeHook(overrides.thinkingBlock) : undefined,
     toolPairValidator: overrides.toolPair ? makeHook(overrides.toolPair) : undefined,
+    categorySkillReminder: overrides.categorySkill ? makeHook(overrides.categorySkill) : undefined,
   } as CreatedHooks
 }
 
@@ -67,6 +71,10 @@ async function runHandler(
   const handler = createMessagesTransformHandler({ hooks })
   await handler({} as never, { messages: messages as never })
 }
+
+afterEach(() => {
+  _resetForTesting()
+})
 
 describe("createMessagesTransformHandler", () => {
   it("runs all hooks in order when none throw", async () => {
@@ -88,6 +96,9 @@ describe("createMessagesTransformHandler", () => {
       toolPair: async () => {
         callOrder.push("tool-pair-validator")
       },
+      categorySkill: async () => {
+        callOrder.push("category-skill-reminder")
+      },
     })
 
     //#when
@@ -99,6 +110,26 @@ describe("createMessagesTransformHandler", () => {
       "team-mode-status-injector",
       "team-mailbox-injector",
       "tool-pair-validator",
+      "category-skill-reminder",
+    ])
+  })
+
+  it("#given category-skill-reminder is disabled #when messages transform runs #then the user message is unchanged", async () => {
+    //#given
+    const messages: TestMessage[] = [
+      { info: { role: "user" }, parts: [{ type: "text", text: "unchanged" }] },
+    ]
+    const hooks = {
+      ...makeHooks({}),
+      categorySkillReminder: null,
+    } as CreatedHooks
+
+    //#when
+    await runHandler(hooks, messages)
+
+    //#then
+    expect(messages).toEqual([
+      { info: { role: "user" }, parts: [{ type: "text", text: "unchanged" }] },
     ])
   })
 
@@ -203,6 +234,48 @@ describe("createMessagesTransformHandler", () => {
       content: [{ type: "text", text: "Tool output unavailable (context compacted)" }],
     })
     expect(messages[4]?.parts[1]).toEqual({ type: "text", text: "next" })
+  })
+
+  it("keeps an ID-less tool-pair repair separate from reminder request identity", async () => {
+    //#given
+    const sessionID = "ses_tool_pair_reminder"
+    const categorySkillReminder = createCategorySkillReminderHook({} as never)
+    updateSessionAgent(sessionID, "Sisyphus")
+    for (const [index, tool] of ["read", "grep", "glob"].entries()) {
+      await categorySkillReminder["tool.execute.after"](
+        { tool, sessionID, callID: `call_${index}` },
+        { title: tool, output: "unchanged", metadata: {} },
+      )
+    }
+    const hooks = {
+      ...makeHooks({}),
+      toolPairValidator: createToolPairValidatorHook(),
+      categorySkillReminder,
+    } as CreatedHooks
+    const messages: TestMessage[] = [
+      {
+        info: { id: "msg_real_request", role: "user", sessionID },
+        parts: [{ type: "text", text: "continue the real request" }],
+      },
+      {
+        info: { id: "msg_orphaned_tool", role: "assistant", sessionID },
+        parts: [{ type: "tool_use", id: "toolu_missing_result" }],
+      },
+    ]
+
+    //#when
+    await runHandler(hooks, messages)
+
+    //#then
+    expect(messages.at(-1)?.info).toEqual({ role: "user", sessionID })
+    expect(messages[0]?.parts[0]).toMatchObject({
+      id: "prt_category_skill_reminder_msg_real_request",
+      messageID: "msg_real_request",
+      sessionID,
+      synthetic: true,
+      type: "text",
+    })
+    expect(messages[0]?.parts[1]).toEqual({ type: "text", text: "continue the real request" })
   })
 
   it("does not throw when tool-pair-validator itself fails", async () => {
