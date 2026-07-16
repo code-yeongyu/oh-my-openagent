@@ -621,6 +621,47 @@ describe("BackgroundManager delegated child-session bootstrap", () => {
 })
 
 describe("BackgroundManager pending launch visibility", () => {
+  test("reports a running nested descendant after its direct parent completes", () => {
+    // #given a completed direct child with a grandchild still running
+    const manager = createBackgroundManager()
+    const directChild: BackgroundTask = {
+      id: "task-direct-completed",
+      rootSessionId: "root-session",
+      sessionId: "session-direct-completed",
+      parentSessionId: "root-session",
+      parentMessageId: "msg-root",
+      description: "completed direct child",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+    }
+    const grandchild: BackgroundTask = {
+      id: "task-grandchild-running",
+      rootSessionId: "root-session",
+      sessionId: "session-grandchild-running",
+      parentSessionId: directChild.sessionId ?? "",
+      parentMessageId: "msg-direct",
+      description: "running grandchild",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+    }
+    const addTask = cast<{ addTask: (task: BackgroundTask) => void }>(manager).addTask.bind(manager)
+    addTask(directChild)
+    addTask(grandchild)
+    getRootDescendantCounts(manager).set("root-session", 1)
+
+    try {
+      // #when the root checks whether background work remains
+      const workInFlight = manager.hasBackgroundWorkInFlight("root-session")
+
+      // #then the running grandchild keeps the root blocked
+      expect(workInFlight).toBe(true)
+    } finally {
+      manager.shutdown()
+    }
+  })
+
   test("reports work in flight before asynchronous lineage lookup registers the task", async () => {
     // #given a launch blocked in its first asynchronous lineage lookup
     let releaseLineage: (() => void) | undefined

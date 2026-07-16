@@ -1222,10 +1222,21 @@ The fallback retry session is now created and can be inspected directly.
     return this.getTasksByParentSession(sessionID).some(t => t.status === "running" || t.status === "pending")
   }
 
+  hasActiveDescendantTasks(sessionID: string): boolean {
+    if ((this.rootDescendantCounts.get(sessionID) ?? 0) > 0) return true
+    return this.getAllDescendantTasks(sessionID).some(t => t.status === "running" || t.status === "pending")
+  }
+
+  getTasksForBackgroundWait(sessionID: string): BackgroundTask[] {
+    const rootTasks = Array.from(this.tasks.values()).filter(task => task.rootSessionId === sessionID)
+    if (rootTasks.length > 0 || this.rootDescendantCounts.has(sessionID)) return rootTasks
+    return this.getAllDescendantTasks(sessionID)
+  }
+
   hasBackgroundWorkInFlight(sessionID: string): boolean {
     return (
       (this.pendingLaunchesByParentSession.get(sessionID) ?? 0) > 0 ||
-      this.hasActiveChildTasks(sessionID) ||
+      this.hasActiveDescendantTasks(sessionID) ||
       this.parentWakeNotifier.hasNotificationPreparation(sessionID)
     )
   }
