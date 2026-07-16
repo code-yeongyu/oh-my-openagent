@@ -2,13 +2,13 @@
 
 Codex Stop-hook continuation injector for the omo-codex `start-work` skill.
 
-It reads `.omo/boulder.json` in the hook payload `cwd`, resolves the active work, inspects the active plan for incomplete top-level checkboxes, and emits Codex Stop-hook JSON when the plan still has work:
+It reads `.omo/boulder.json` in the hook payload `cwd`, resolves the active work, inspects the active plan's top-level checklist, and emits Codex Stop-hook JSON while the plan still has unchecked tasks or its final review/debugging gate remains pending:
 
 ```json
 {"decision":"block","reason":"<directive>"}
 ```
 
-The `reason` is loaded from `directive.md` on every invocation and filled with current plan state. The hook returns no output when `stop_hook_active` is `true`, when no active Boulder work exists, when the work is completed, when the active work is not tied to `codex:<session_id>`, or when all top-level plan checkboxes are complete.
+The `reason` is loaded from `directive.md` on every invocation and filled with current plan state. The hook returns no output when `stop_hook_active` is `true`, when no active Boulder work exists, when the work is completed, when the active work is not tied to `codex:<session_id>`, or when the plan has no readable top-level checklist. An active plan whose checklist is fully checked still blocks Stop until the final gate runs and Boulder is marked completed.
 
 This pairs with the `start-work` skill at `plugin/skills/start-work/SKILL.md`. That skill writes `.omo/boulder.json` with Codex session ids prefixed as `codex:` so the hook can continue only its own active Codex session.
 
