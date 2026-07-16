@@ -4,6 +4,7 @@ import { DEFAULT_CONFIG } from "./constants"
 import { createEventHandler } from "./event-handler"
 import { createFirstPromptWatchdog, observeEventForWatchdog } from "./first-prompt-watchdog"
 import { createMessageUpdateHandler } from "./message-update-handler"
+import { isSessionActive } from "../../shared/session-idle-settle"
 import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
 
 declare function setInterval(callback: () => void, delay?: number): RuntimeFallbackInterval
@@ -24,6 +25,16 @@ const defaultRuntimeFallbackHookFactories: RuntimeFallbackHookFactories = {
   createMessageUpdateHandler,
   createChatMessageHandler,
   createFirstPromptWatchdog,
+}
+
+async function isCurrentRequestActive(ctx: RuntimeFallbackPluginInput, sessionID: string): Promise<boolean> {
+  const status = ctx.client.session.status
+  if (!status) return false
+  return isSessionActive({
+    session: {
+      status: () => status({ query: { directory: ctx.directory } }),
+    },
+  }, sessionID)
 }
 
 export function createRuntimeFallbackHook(
@@ -91,6 +102,13 @@ export function createRuntimeFallbackHook(
     if (watchdogDecision?.kind === "defer-terminal") {
       deferredTerminalEvents.set(watchdogDecision.sessionID, event)
       return
+    }
+    if (watchdogDecision?.kind === "inspect-terminal") {
+      const currentRequestActive = await isCurrentRequestActive(ctx, watchdogDecision.sessionID)
+      watchdogDecision = firstPromptWatchdog.resolveDeferredTerminal(
+        watchdogDecision.sessionID,
+        currentRequestActive,
+      )
     }
     if (watchdogDecision?.kind === "resolve-terminal") {
       const deferredEvent = deferredTerminalEvents.get(watchdogDecision.sessionID)

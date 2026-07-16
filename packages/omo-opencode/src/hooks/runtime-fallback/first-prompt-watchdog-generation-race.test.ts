@@ -139,6 +139,14 @@ describe("first-prompt watchdog generation races", () => {
     const deps = createDeps()
     deps.sessionStates.set(sessionID, createFallbackState(PRIMARY_MODEL))
     const calls = { dispatch: 0 }
+    let notifyFirstDispatch: (() => void) | undefined
+    let notifySecondDispatch: (() => void) | undefined
+    const firstDispatch = new Promise<void>((resolve) => {
+      notifyFirstDispatch = resolve
+    })
+    const secondDispatch = new Promise<void>((resolve) => {
+      notifySecondDispatch = resolve
+    })
     const helpers: AutoRetryHelpers = {
       abortSessionRequest: async () => {
         deps.internallyAbortedSessions.add(sessionID)
@@ -148,6 +156,8 @@ describe("first-prompt watchdog generation races", () => {
       scheduleSessionFallbackTimeout: () => {},
       autoRetryWithFallback: async () => {
         calls.dispatch += 1
+        if (calls.dispatch === 1) notifyFirstDispatch?.()
+        if (calls.dispatch === 2) notifySecondDispatch?.()
         return { accepted: true, status: "dispatched" }
       },
       resolveAgentForSessionFromContext: async () => AGENT,
@@ -157,7 +167,8 @@ describe("first-prompt watchdog generation races", () => {
     const eventHandler = createEventHandler(deps, helpers)
 
     watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT, "user-generation-1")
-    await new Promise((resolve) => setTimeout(resolve, 5))
+    await firstDispatch
+    await flushTasks()
     expect(calls.dispatch).toBe(1)
 
     deps.internallyAbortedSessions.delete(sessionID)
@@ -167,11 +178,15 @@ describe("first-prompt watchdog generation races", () => {
       sessionID,
     })
     expect(watchdog.onAssistantProgress(sessionID, "user-generation-1", true)).toEqual({
+      kind: "inspect-terminal",
+      sessionID,
+    })
+    expect(watchdog.resolveDeferredTerminal(sessionID, true)).toEqual({
       kind: "resolve-terminal",
       sessionID,
     })
     await eventHandler(createAbortEvent(sessionID))
-    await new Promise((resolve) => setTimeout(resolve, 5))
+    await secondDispatch
 
     expect(calls.dispatch).toBe(2)
     expect(deps.sessionStates.get(sessionID)?.currentModel).not.toBe(PRIMARY_MODEL)
@@ -184,6 +199,10 @@ describe("first-prompt watchdog generation races", () => {
     const deps = createDeps()
     deps.sessionStates.set(sessionID, createFallbackState(PRIMARY_MODEL))
     const calls = { dispatch: 0 }
+    let notifyFirstDispatch: (() => void) | undefined
+    const firstDispatch = new Promise<void>((resolve) => {
+      notifyFirstDispatch = resolve
+    })
     const helpers: AutoRetryHelpers = {
       abortSessionRequest: async () => {
         deps.internallyAbortedSessions.add(sessionID)
@@ -193,6 +212,7 @@ describe("first-prompt watchdog generation races", () => {
       scheduleSessionFallbackTimeout: () => {},
       autoRetryWithFallback: async () => {
         calls.dispatch += 1
+        notifyFirstDispatch?.()
         return { accepted: true, status: "dispatched" }
       },
       resolveAgentForSessionFromContext: async () => AGENT,
@@ -202,7 +222,8 @@ describe("first-prompt watchdog generation races", () => {
     const eventHandler = createEventHandler(deps, helpers)
 
     watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT, "user-generation-1")
-    await new Promise((resolve) => setTimeout(resolve, 5))
+    await firstDispatch
+    await flushTasks()
     expect(calls.dispatch).toBe(1)
 
     deps.internallyAbortedSessions.delete(sessionID)
@@ -216,7 +237,6 @@ describe("first-prompt watchdog generation races", () => {
       sessionID,
     })
     await eventHandler(createAbortEvent(sessionID))
-    await new Promise((resolve) => setTimeout(resolve, 5))
 
     expect(calls.dispatch).toBe(1)
     expect(deps.sessionStates.get(sessionID)?.currentModel).toBe(PRIMARY_MODEL)

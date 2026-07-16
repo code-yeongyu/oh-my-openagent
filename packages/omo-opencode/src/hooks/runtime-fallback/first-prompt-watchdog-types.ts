@@ -1,5 +1,6 @@
 export type WatchdogEventDecision =
   | { readonly kind: "defer-terminal"; readonly sessionID: string }
+  | { readonly kind: "inspect-terminal"; readonly sessionID: string }
   | { readonly kind: "resolve-terminal"; readonly sessionID: string }
 
 export type ArmedWatchdog = {
@@ -9,4 +10,5 @@ export type ArmedWatchdog = {
   readonly wasSubagent: boolean
   readonly generation: number
   readonly sessionGeneration: number
+  readonly deadlineAt: number
 }

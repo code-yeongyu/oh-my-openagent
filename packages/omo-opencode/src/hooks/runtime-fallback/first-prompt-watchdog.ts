@@ -3,12 +3,9 @@ import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME, DEFAULT_FIRST_PROMPT_WATCHDOG_MS } from "./constants"
 import { log } from "../../shared/logger"
 import { subagentSessions } from "../../features/claude-code-session-state"
-import { createFallbackState } from "./fallback-state"
-import { getFallbackModelsForSession } from "./fallback-models"
-import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
-import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { createWatchdogAbortProvenance } from "./watchdog-abort-provenance"
 import type { ArmedWatchdog, WatchdogEventDecision } from "./first-prompt-watchdog-types"
+import { fireFirstPromptWatchdog } from "./first-prompt-watchdog-fire"
 
 const SOURCE = "first-prompt-watchdog"
 
@@ -19,6 +16,7 @@ export interface FirstPromptWatchdog {
   onUserMessage(sessionID: string, model?: string, agent?: string, messageID?: string): void
   onAssistantProgress(sessionID: string, parentMessageID?: string, isAbortEvent?: boolean): WatchdogEventDecision | undefined
   onSessionTerminal(sessionID: string, eventType?: string, isAbortEvent?: boolean): WatchdogEventDecision | undefined
+  resolveDeferredTerminal(sessionID: string, currentRequestActive: boolean): WatchdogEventDecision | undefined
   dispose(): void
 }
 
@@ -51,104 +49,24 @@ export function createFirstPromptWatchdog(
     sessionGenerations.set(sessionID, (sessionGenerations.get(sessionID) ?? 0) + 1)
   }
 
-  const fire = async (
-    sessionID: string,
-    model: string | undefined,
-    agent: string | undefined,
-    wasSubagent: boolean,
-    generation: number,
-    sessionGeneration: number,
-  ): Promise<void> => {
-    timers.delete(sessionID)
-
-    if (wasSubagent && !subagentSessions.has(sessionID)) {
-      log(`[${HOOK_NAME}] ${SOURCE}: session no longer a subagent at fire time, skipping`, { sessionID })
-      return
-    }
-
-    const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
-    if (generation !== lifecycleGeneration || sessionGeneration !== sessionGenerations.get(sessionID)) return
-    const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, deps.pluginConfig)
-
-    if (fallbackModels.length === 0) {
-      log(`[${HOOK_NAME}] ${SOURCE}: session silent past ${watchdogMs}ms with no fallback configured`, {
-        sessionID,
-        model,
-        agent: resolvedAgent,
-      })
-      return
-    }
-
-    let state = deps.sessionStates.get(sessionID)
-    if (!state) {
-      const initialModel = resolveFallbackBootstrapModel({
-        sessionID,
-        source: SOURCE,
-        eventModel: model,
-        resolvedAgent,
-        pluginConfig: deps.pluginConfig,
-      })
-      if (!initialModel) {
-        log(`[${HOOK_NAME}] ${SOURCE}: no model info available, cannot dispatch fallback`, { sessionID })
-        return
-      }
-      state = createFallbackState(initialModel)
-      deps.sessionStates.set(sessionID, state)
-      deps.sessionLastAccess.set(sessionID, Date.now())
-    }
-
-    log(`[${HOOK_NAME}] ${SOURCE}: session silent past ${watchdogMs}ms, dispatching fallback`, {
-      sessionID,
-      model: state.currentModel,
-      fallbackCount: fallbackModels.length,
-    })
-
-    // Unlike the error-event path, the original request is still pending from
-    // OpenCode's perspective when the watchdog fires. Forcefully end it so the
-    // fallback prompt can take over cleanly. If OpenCode rejects the abort,
-    // do not start a competing request while the original may still be live.
-    const abortSucceeded = await helpers.abortSessionRequest(sessionID, SOURCE)
-    if (generation !== lifecycleGeneration || sessionGeneration !== sessionGenerations.get(sessionID)) return
-    if (abortSucceeded === false) {
-      log(`[${HOOK_NAME}] ${SOURCE}: abort failed, skipping fallback dispatch`, { sessionID })
-      return
-    }
-    abortProvenance.record(sessionID, sessionGeneration)
-    await Promise.resolve()
-    if (generation !== lifecycleGeneration || sessionGeneration !== sessionGenerations.get(sessionID)) return
-
-    try {
-      await dispatchFallbackRetry(deps, helpers, {
-        sessionID,
-        state,
-        fallbackModels,
-        resolvedAgent,
-        source: SOURCE,
-      })
-    } finally {
-      deps.internallyAbortedSessions.delete(sessionID)
-    }
-
-    if (
-      generation === lifecycleGeneration
-      && sessionGeneration !== sessionGenerations.get(sessionID)
-    ) {
-      await helpers.abortSessionRequest(sessionID, "session.stop")
-    }
-  }
-
   const arm = (context: ArmedWatchdog): void => {
     armed.set(context.sessionID, context)
+    const remainingMs = Math.max(0, context.deadlineAt - Date.now())
     const timer = setTimeout(async () => {
       try {
-        await fire(
-          context.sessionID,
-          context.model,
-          context.agent,
-          context.wasSubagent,
-          context.generation,
-          context.sessionGeneration,
-        )
+        timers.delete(context.sessionID)
+        await fireFirstPromptWatchdog({
+          deps,
+          helpers,
+          watchdogMs,
+          sessionID: context.sessionID,
+          model: context.model,
+          agent: context.agent,
+          wasSubagent: context.wasSubagent,
+          isLifecycleCurrent: () => context.generation === lifecycleGeneration,
+          isSessionCurrent: () => context.sessionGeneration === sessionGenerations.get(context.sessionID),
+          recordAbortProvenance: () => abortProvenance.record(context.sessionID, context.sessionGeneration),
+        })
       } finally {
         if (
           context.sessionGeneration === sessionGenerations.get(context.sessionID)
@@ -157,7 +75,7 @@ export function createFirstPromptWatchdog(
           armed.delete(context.sessionID)
         }
       }
-    }, watchdogMs)
+    }, remainingMs)
     timers.set(context.sessionID, timer)
   }
 
@@ -185,7 +103,15 @@ export function createFirstPromptWatchdog(
       sessionGenerations.set(sessionID, sessionGeneration)
       if (messageID) currentUserMessageIDs.set(sessionID, messageID)
       else currentUserMessageIDs.delete(sessionID)
-      arm({ sessionID, model, agent, wasSubagent, generation, sessionGeneration })
+      arm({
+        sessionID,
+        model,
+        agent,
+        wasSubagent,
+        generation,
+        sessionGeneration,
+        deadlineAt: Date.now() + watchdogMs,
+      })
 
       log(`[${HOOK_NAME}] ${SOURCE}: armed`, { sessionID, model, agent, watchdogMs })
     },
@@ -193,21 +119,18 @@ export function createFirstPromptWatchdog(
       if (!sessionID) return
       const suspendedContext = suspended.get(sessionID)
       if (suspendedContext && isAbortEvent === true) {
-        suspended.delete(sessionID)
         const currentUserMessageID = currentUserMessageIDs.get(sessionID)
         const isPriorGeneration = parentMessageID !== undefined
           && currentUserMessageID !== undefined
           && parentMessageID !== currentUserMessageID
           && abortProvenance.consumePrior(sessionID, suspendedContext.sessionGeneration)
         if (isPriorGeneration) {
-          deps.internallyAbortedSessions.add(sessionID)
-          arm(suspendedContext)
-          log(`[${HOOK_NAME}] ${SOURCE}: resolved delayed prior-generation abort`, { sessionID })
-        } else {
-          deps.internallyAbortedSessions.delete(sessionID)
-          cancel(sessionID)
-          log(`[${HOOK_NAME}] ${SOURCE}: resolved external cancellation`, { sessionID })
+          return { kind: "inspect-terminal", sessionID }
         }
+        suspended.delete(sessionID)
+        deps.internallyAbortedSessions.delete(sessionID)
+        cancel(sessionID)
+        log(`[${HOOK_NAME}] ${SOURCE}: resolved external cancellation`, { sessionID })
         return { kind: "resolve-terminal", sessionID }
       }
       if (suspendedContext) {
@@ -253,6 +176,21 @@ export function createFirstPromptWatchdog(
       ) return
       cancel(sessionID)
       log(`[${HOOK_NAME}] ${SOURCE}: cancelled (session terminal)`, { sessionID })
+    },
+    resolveDeferredTerminal(sessionID, currentRequestActive) {
+      const suspendedContext = suspended.get(sessionID)
+      if (!suspendedContext) return
+      suspended.delete(sessionID)
+      if (currentRequestActive) {
+        deps.internallyAbortedSessions.add(sessionID)
+        arm(suspendedContext)
+        log(`[${HOOK_NAME}] ${SOURCE}: resolved delayed prior-generation abort`, { sessionID })
+      } else {
+        deps.internallyAbortedSessions.delete(sessionID)
+        cancel(sessionID)
+        log(`[${HOOK_NAME}] ${SOURCE}: resolved external cancellation`, { sessionID })
+      }
+      return { kind: "resolve-terminal", sessionID }
     },
     dispose() {
       lifecycleGeneration += 1

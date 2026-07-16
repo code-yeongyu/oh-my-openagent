@@ -11,6 +11,7 @@ export interface RuntimeFallbackPluginInput {
     session: {
       abort: (input: { path: { id: string } }) => Promise<unknown>
       messages: (input: { path: { id: string }; query: { directory: string } }) => Promise<unknown>
+      status?: (input?: { query: { directory: string } }) => Promise<unknown>
       promptAsync: (input: {
         path: { id: string }
         body: {
