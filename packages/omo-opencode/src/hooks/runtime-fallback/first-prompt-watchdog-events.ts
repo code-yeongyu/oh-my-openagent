@@ -79,7 +79,7 @@ export function observeEventForWatchdog(
       const hasAnyPart = parts.some((part) => isRecord(part) && typeof part.type === "string")
       if (hasError) {
         const parentMessageID = typeof info.parentID === "string" ? info.parentID : undefined
-        return watchdog.onAssistantProgress(sessionID, parentMessageID, true)
+        return watchdog.onAssistantProgress(sessionID, parentMessageID, isAbortError(info.error))
       }
       if (hasAssistantCompletionMarker(info) || hasAnyPart) {
         return watchdog.onAssistantProgress(sessionID)
