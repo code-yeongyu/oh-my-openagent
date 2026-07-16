@@ -1,6 +1,6 @@
 # PR #6043 QA Evidence
 
-Reviewed runtime source head: `dcdbaae5926e66a2165dfde00776c34052fabf61`
+Reviewed runtime source head: `c4896f52a32bb429f4394d8041e8f8c159da02b7`
 
 Integrated `dev`: `81180f3759c55262a49be6883bb9db5c102e2b4d`
 
@@ -16,7 +16,7 @@ artifacts and does not change the tested runtime behavior.
    ```
 
    The final post-review repair run is captured in
-   `fifth-review-repair-focused-tests.txt`.
+   `final-sixth-review-focused-tests.txt`.
 
 2. Full runtime-fallback hook suite:
 
@@ -25,7 +25,7 @@ artifacts and does not change the tested runtime behavior.
    ```
 
    The final post-review repair run is captured in
-   `fifth-review-repair-runtime-fallback-suite.txt`.
+   `final-sixth-review-runtime-fallback-suite.txt`.
 
 3. OpenCode adapter typecheck and scoped Biome linter:
 
@@ -35,8 +35,8 @@ artifacts and does not change the tested runtime behavior.
    ```
 
    The final post-review repair runs are captured in
-   `fifth-review-repair-omo-opencode-typecheck.txt` and
-   `fifth-review-repair-biome.txt`.
+   `final-sixth-review-omo-opencode-typecheck.txt` and
+   `final-sixth-review-biome.txt`.
 
 4. OpenCode QA harness self-check:
 
@@ -45,7 +45,7 @@ artifacts and does not change the tested runtime behavior.
    ```
 
    The final post-review repair run is captured in
-   `fifth-review-repair-opencode-harness-self-check.txt` with local paths and
+   `final-sixth-review-opencode-harness-self-check.txt` with local paths and
    transient port values redacted.
 
 5. Real OpenCode live harness:
@@ -63,8 +63,8 @@ artifacts and does not change the tested runtime behavior.
 
 ## What Was Observed
 
-- Focused suite: 55 pass, 0 fail.
-- Full runtime-fallback suite: 269 pass, 0 fail.
+- Focused suite: 57 pass, 0 fail.
+- Full runtime-fallback suite: 271 pass, 0 fail.
 - Scoped TypeScript and Biome linter checks: pass.
 - The final gate review found that a fallback-owned user update could arm a
   second watchdog and that a pre-acknowledgement abort-shaped `session.error`
@@ -87,6 +87,13 @@ artifacts and does not change the tested runtime behavior.
   watchdog generation for marked internal `session.error` while a real
   `session.stop` still cancels and resets retry state during the same abort
   window.
+- The sixth exact-head review found two remaining abort-provenance races. A
+  post-acknowledgement external abort could be swallowed as watchdog-owned,
+  while a delayed generation-one abort could cancel a newly armed generation
+  two. The repair retains acknowledged generations until their delayed event
+  is consumed, consumes only a generation older than the active watchdog, and
+  aborts a fallback request accepted while external cancellation was settling.
+  Integrated regressions cover both event orders.
 - A compaction-agent `role=user` update no longer arms the main-session
   watchdog. The shared compaction-message predicate also excludes persisted
   compaction marker turns that retain the original agent and carry
@@ -129,6 +136,14 @@ Artifacts:
 - `final-fifth-review-live-watchdog-run.txt`: successful production-duration
   live run pinned to final runtime head
   `dcdbaae5926e66a2165dfde00776c34052fabf61`.
+- `sixth-review-finding.md`: exact-head gate report that reproduced the two
+  final abort-provenance blockers against `83ae672478b4fdc0a76e8343bffd1040d360189a`.
+- `final-sixth-review-live-watchdog-run-attempt1.txt`: retained harness-only
+  startup attempt. Its OpenCode health probe hung before session creation; no
+  product request was exercised. The harness now bounds both readiness curls.
+- `final-sixth-review-live-watchdog-run.txt`: successful production-duration
+  live run pinned to repaired runtime head
+  `c4896f52a32bb429f4394d8041e8f8c159da02b7`.
 
 ## Why It Is Enough
 
@@ -137,7 +152,8 @@ cancellation, cancellation while abort is in flight, pre-acknowledgement
 external abort errors, acknowledged internal abort errors, expected
 internal-abort completion/idle events, removed-subagent suppression, abort failure,
 zero-timeout semantics, retry dedupe, fallback timeout, delayed abort
-provenance, compaction exclusion, re-arming after progress, disposal during
+provenance across watchdog generations, post-acknowledgement external
+cancellation, compaction exclusion, re-arming after progress, disposal during
 asynchronous work, and cleanup boundaries. The live harness covers what unit
 tests cannot: local plugin loading, real OpenCode lifecycle events, production
 watchdog timing, active-request abort, fallback dispatch after the internal

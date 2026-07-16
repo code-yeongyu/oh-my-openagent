@@ -122,11 +122,11 @@ JSONC
 
 FAKE_PROVIDER_PORT="$FAKE_PORT" FAKE_PROVIDER_LOG="$FAKE_LOG" node "$FAKE_SCRIPT" > "$TMP_ROOT/fake.stdout" 2>&1 &
 FAKE_PID=$!
-wait_for 10 "fake provider readiness" "curl -fsS http://127.0.0.1:${FAKE_PORT}/health >/dev/null"
+wait_for 10 "fake provider readiness" "curl --max-time 2 -fsS http://127.0.0.1:${FAKE_PORT}/health >/dev/null"
 
 OPENCODE_SERVER_PASSWORD="$SERVER_PASS" opencode serve --port "$SERVER_PORT" --hostname 127.0.0.1 >"$SERVER_STDOUT" 2>"$SERVER_STDERR" &
 SERVER_PID=$!
-wait_for 45 "OpenCode server readiness" "curl -fsS -u opencode:${SERVER_PASS} http://127.0.0.1:${SERVER_PORT}/global/health >/dev/null"
+wait_for 45 "OpenCode server readiness" "curl --max-time 2 -fsS -u opencode:${SERVER_PASS} http://127.0.0.1:${SERVER_PORT}/global/health >/dev/null"
 
 ENC_DIR="$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$TMP_ROOT/project")"
 curl -sN -u "opencode:$SERVER_PASS" "http://127.0.0.1:${SERVER_PORT}/event?directory=${ENC_DIR}" > "$SSE_LOG" &
