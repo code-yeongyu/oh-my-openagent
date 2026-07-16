@@ -5903,7 +5903,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "4.18.0",
+    version: "4.18.2",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -7837,9 +7837,16 @@ function findTomlSection(config, header) {
   const lines = config.match(/[^\n]*\n?|$/g) ?? [];
   let offset = 0;
   let start = -1;
+  let multilineQuote = null;
   for (const line of lines) {
     if (line.length === 0)
       break;
+    const multilineScan = scanTomlMultilineLine(line, multilineQuote);
+    multilineQuote = multilineScan.nextQuote;
+    if (multilineScan.wasInside) {
+      offset += line.length;
+      continue;
+    }
     const trimmed = line.trim();
     if (start === -1) {
       if (tomlTableHeaderMatches(trimmed, headerLine, targetHeaderPath))
@@ -7854,8 +7861,37 @@ function findTomlSection(config, header) {
   return { start, end: config.length, text: config.slice(start) };
 }
 function replaceOrInsertSetting(config, section, key, value) {
-  const linePattern = new RegExp(`^[ \\t]*${escapeRegExp(key)}[ \\t]*=.*$`, "m");
-  const replacement = linePattern.test(section.text) ? section.text.replace(linePattern, `${key} = ${value}`) : insertSetting(section.text, key, value);
+  const targetPath = parseTomlDottedKey(key);
+  if (!targetPath)
+    return config;
+  const lines = section.text.match(/[^\n]*\n?|$/g) ?? [];
+  let offset = 0;
+  let multilineQuote = null;
+  for (const line of lines) {
+    if (line.length === 0)
+      break;
+    const multilineScan = scanTomlMultilineLine(line, multilineQuote);
+    multilineQuote = multilineScan.nextQuote;
+    if (multilineScan.wasInside) {
+      offset += line.length;
+      continue;
+    }
+    const assignmentIndex = findUnquotedAssignment(line);
+    if (assignmentIndex < 0) {
+      offset += line.length;
+      continue;
+    }
+    const settingPath = parseTomlDottedKey(line.slice(0, assignmentIndex).trim());
+    if (!settingPath || !tomlPathMatches(settingPath, targetPath)) {
+      offset += line.length;
+      continue;
+    }
+    const replacement2 = replaceTomlAssignmentValue(line, assignmentIndex, value);
+    const assignmentEnd = multilineScan.nextQuote ? findTomlMultilineValueEnd(section.text, offset + line.length, multilineScan.nextQuote) : offset + line.length;
+    const sectionReplacement = section.text.slice(0, offset) + replacement2 + section.text.slice(assignmentEnd);
+    return config.slice(0, section.start) + sectionReplacement + config.slice(section.end);
+  }
+  const replacement = insertSetting(section.text, key, value);
   return config.slice(0, section.start) + replacement + config.slice(section.end);
 }
 function removeSetting(config, section, key) {
@@ -7877,6 +7913,50 @@ function replaceOrInsertRootSetting(config, key, value) {
 
 ${suffix.trimStart()}`;
 }
+function replaceOrInsertRootDottedSetting(config, keyPath, value) {
+  const targetPath = parseTomlDottedKey(keyPath);
+  if (!targetPath)
+    return config;
+  const lines = config.match(/[^\n]*\n?|$/g) ?? [];
+  let offset = 0;
+  let multilineQuote = null;
+  for (const line of lines) {
+    if (line.length === 0)
+      break;
+    const multilineScan = scanTomlMultilineLine(line, multilineQuote);
+    multilineQuote = multilineScan.nextQuote;
+    if (multilineScan.wasInside) {
+      offset += line.length;
+      continue;
+    }
+    if (isTomlTableHeaderLine(line))
+      break;
+    const assignmentIndex = findUnquotedAssignment(line);
+    if (assignmentIndex < 0) {
+      offset += line.length;
+      continue;
+    }
+    const settingPath = parseTomlDottedKey(line.slice(0, assignmentIndex).trim());
+    if (!settingPath || !tomlPathMatches(settingPath, targetPath)) {
+      offset += line.length;
+      continue;
+    }
+    const replacement2 = replaceTomlAssignmentValue(line, assignmentIndex, value);
+    const assignmentEnd = multilineScan.nextQuote ? findTomlMultilineValueEnd(config, offset + line.length, multilineScan.nextQuote) : offset + line.length;
+    return config.slice(0, offset) + replacement2 + config.slice(assignmentEnd);
+  }
+  const sectionStart = findFirstTableStart(config);
+  const root = config.slice(0, sectionStart).trimEnd();
+  const suffix = config.slice(sectionStart);
+  const replacement = `${root}${root.length > 0 ? `
+` : ""}${keyPath} = ${value}
+`;
+  if (suffix.length === 0)
+    return replacement;
+  return `${replacement.trimEnd()}
+
+${suffix.trimStart()}`;
+}
 function appendBlock(config, block) {
   const prefix = config.trimEnd();
   return `${prefix}${prefix.length > 0 ? `
@@ -7887,9 +7967,16 @@ function appendBlock(config, block) {
 function findFirstTableStart(config) {
   const lines = config.match(/[^\n]*\n?|$/g) ?? [];
   let offset = 0;
+  let multilineQuote = null;
   for (const line of lines) {
     if (line.length === 0)
       break;
+    const multilineScan = scanTomlMultilineLine(line, multilineQuote);
+    multilineQuote = multilineScan.nextQuote;
+    if (multilineScan.wasInside) {
+      offset += line.length;
+      continue;
+    }
     if (isTomlTableHeaderLine(line))
       return offset;
     offset += line.length;
@@ -7926,6 +8013,131 @@ function parseTomlTableHeader(line) {
 function isTomlTableHeaderLine(line) {
   const normalizedLine = stripUnquotedInlineComment(line).trim();
   return normalizedLine.startsWith("[") && normalizedLine.endsWith("]");
+}
+function scanTomlMultilineLine(line, currentQuote) {
+  if (currentQuote) {
+    return {
+      wasInside: true,
+      nextQuote: findTomlMultilineDelimiter(line, currentQuote, 0) === -1 ? currentQuote : null
+    };
+  }
+  let quote = null;
+  let index = 0;
+  while (index < line.length) {
+    const char = line[index];
+    if (quote === '"') {
+      if (char === "\\") {
+        index += 2;
+        continue;
+      }
+      if (char === '"')
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (quote === "'") {
+      if (char === "'")
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (char === "#")
+      break;
+    const delimiter2 = line.startsWith('"""', index) ? '"""' : line.startsWith("'''", index) ? "'''" : null;
+    if (delimiter2) {
+      const closingIndex = findTomlMultilineDelimiter(line, delimiter2, index + delimiter2.length);
+      return { wasInside: false, nextQuote: closingIndex === -1 ? delimiter2 : null };
+    }
+    if (char === '"' || char === "'")
+      quote = char;
+    index += 1;
+  }
+  return { wasInside: false, nextQuote: null };
+}
+function findTomlMultilineDelimiter(line, delimiter2, startIndex) {
+  let index = line.indexOf(delimiter2, startIndex);
+  while (index !== -1) {
+    if (delimiter2 === "'''" || countPrecedingBackslashes(line, index) % 2 === 0)
+      return index;
+    index = line.indexOf(delimiter2, index + 1);
+  }
+  return -1;
+}
+function countPrecedingBackslashes(line, index) {
+  let count = 0;
+  let cursor = index - 1;
+  while (cursor >= 0 && line[cursor] === "\\") {
+    count += 1;
+    cursor -= 1;
+  }
+  return count;
+}
+function findUnquotedAssignment(line) {
+  return findUnquotedCharacter(line, "=", 0);
+}
+function findUnquotedComment(line, startIndex) {
+  return findUnquotedCharacter(line, "#", startIndex);
+}
+function findUnquotedCharacter(line, target, startIndex) {
+  let quote = null;
+  let index = startIndex;
+  while (index < line.length) {
+    const char = line[index];
+    if (quote === '"') {
+      if (char === "\\") {
+        index += 2;
+        continue;
+      }
+      if (char === '"')
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (quote === "'") {
+      if (char === "'")
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      index += 1;
+      continue;
+    }
+    if (char === target)
+      return index;
+    if (char === "#")
+      return -1;
+    index += 1;
+  }
+  return -1;
+}
+function tomlPathMatches(candidate, target) {
+  return candidate.length === target.length && candidate.every((part, index) => part === target[index]);
+}
+function replaceTomlAssignmentValue(line, assignmentIndex, value) {
+  const newline = line.endsWith(`
+`) ? `
+` : "";
+  const lineBody = newline ? line.slice(0, -1) : line;
+  const commentIndex = findUnquotedComment(lineBody, assignmentIndex + 1);
+  const comment = commentIndex === -1 ? "" : ` ${lineBody.slice(commentIndex).trimStart()}`;
+  return `${lineBody.slice(0, assignmentIndex + 1)} ${value}${comment}${newline}`;
+}
+function findTomlMultilineValueEnd(text, startOffset, quote) {
+  const lines = text.slice(startOffset).match(/[^\n]*\n?|$/g) ?? [];
+  let offset = startOffset;
+  let currentQuote = quote;
+  for (const line of lines) {
+    if (line.length === 0)
+      break;
+    const scan = scanTomlMultilineLine(line, currentQuote);
+    currentQuote = scan.nextQuote;
+    offset += line.length;
+    if (currentQuote === null)
+      return offset;
+  }
+  return text.length;
 }
 function stripUnquotedInlineComment(line) {
   let quote = null;
@@ -8257,13 +8469,137 @@ function delay(milliseconds) {
   return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
 }
 
+// packages/omo-codex/src/install/toml-setting-reader.ts
+function hasTomlSetting(config, keyPath) {
+  const targetPath = parseTomlDottedKey(keyPath);
+  if (!targetPath)
+    return false;
+  return hasTomlAssignment(config, (tablePath, settingPath) => {
+    const fullPath = [...tablePath, ...settingPath];
+    return fullPath.length === targetPath.length && fullPath.every((part, index) => part === targetPath[index]);
+  });
+}
+function hasTomlRootDottedKeyPrefix(config, rootKey) {
+  return hasTomlAssignment(config, (tablePath, settingPath) => tablePath.length === 0 && settingPath.length > 1 && settingPath[0] === rootKey);
+}
+function hasTomlAssignment(config, predicate) {
+  let tablePath = [];
+  let multilineQuote = null;
+  for (const line of config.split(`
+`)) {
+    const multilineScan = scanTomlMultilineLine(line, multilineQuote);
+    multilineQuote = multilineScan.nextQuote;
+    if (multilineScan.wasInside)
+      continue;
+    const normalizedLine = stripUnquotedInlineComment2(line).trim();
+    if (normalizedLine.length === 0)
+      continue;
+    const headerPath = parseTomlTableHeader2(normalizedLine);
+    if (headerPath) {
+      tablePath = headerPath;
+      continue;
+    }
+    if (isTomlTableHeaderLine2(normalizedLine)) {
+      tablePath = null;
+      continue;
+    }
+    if (!tablePath)
+      continue;
+    const assignmentIndex = findUnquotedAssignment2(normalizedLine);
+    if (assignmentIndex < 0)
+      continue;
+    const settingPath = parseTomlDottedKey(normalizedLine.slice(0, assignmentIndex).trim());
+    if (!settingPath)
+      continue;
+    if (predicate(tablePath, settingPath))
+      return true;
+  }
+  return false;
+}
+function parseTomlTableHeader2(line) {
+  if (!line.startsWith("[") || !line.endsWith("]") || line.startsWith("[["))
+    return null;
+  return parseTomlDottedKey(line.slice(1, -1).trim());
+}
+function isTomlTableHeaderLine2(line) {
+  return line.startsWith("[") && line.endsWith("]");
+}
+function stripUnquotedInlineComment2(line) {
+  let quote = null;
+  let index = 0;
+  while (index < line.length) {
+    const char = line[index];
+    if (quote === '"') {
+      if (char === "\\") {
+        index += 2;
+        continue;
+      }
+      if (char === '"')
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (quote === "'") {
+      if (char === "'")
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      index += 1;
+      continue;
+    }
+    if (char === "#")
+      return line.slice(0, index);
+    index += 1;
+  }
+  return line;
+}
+function findUnquotedAssignment2(line) {
+  let quote = null;
+  let index = 0;
+  while (index < line.length) {
+    const char = line[index];
+    if (quote === '"') {
+      if (char === "\\") {
+        index += 2;
+        continue;
+      }
+      if (char === '"')
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (quote === "'") {
+      if (char === "'")
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      index += 1;
+      continue;
+    }
+    if (char === "=")
+      return index;
+    index += 1;
+  }
+  return -1;
+}
+
 // packages/omo-codex/src/install/codex-config-features.ts
 function ensureFeatureEnabled(config, featureName) {
   const section = findTomlSection(config, "features");
-  if (!section)
+  if (!section) {
+    if (hasTomlRootDottedKeyPrefix(config, "features")) {
+      return replaceOrInsertRootDottedSetting(config, `features.${featureName}`, "true");
+    }
     return appendBlock(config, `[features]
 ${featureName} = true
 `);
+  }
   return replaceOrInsertSetting(config, section, featureName, "true");
 }
 
@@ -8331,7 +8667,7 @@ function ensureAutonomousPermissions(config) {
   next = replaceOrInsertRootSetting(next, "sandbox_mode", JSON.stringify("danger-full-access"));
   next = replaceOrInsertRootSetting(next, "network_access", JSON.stringify("enabled"));
   for (const featureName of AUTONOMOUS_FEATURES) {
-    next = ensureFeatureEnabled2(next, featureName);
+    next = ensureFeatureEnabled(next, featureName);
   }
   next = removeWindowsSandboxSetting(next);
   next = ensureNoticeEnabled(next, "hide_full_access_warning");
@@ -8347,14 +8683,6 @@ function ensureNoticeEnabled(config, key) {
   const section = findTomlSection(config, "notice");
   if (section === null)
     return appendNoticeBlock(config, key);
-  return replaceOrInsertSetting(config, section, key, "true");
-}
-function ensureFeatureEnabled2(config, key) {
-  const section = findTomlSection(config, "features");
-  if (section === null)
-    return appendBlock(config, `[features]
-${key} = true
-`);
   return replaceOrInsertSetting(config, section, key, "true");
 }
 function appendNoticeBlock(config, key) {
@@ -8428,7 +8756,7 @@ function readStringArraySetting(sectionText, key) {
     const assignmentIndex = line.indexOf("=");
     if (assignmentIndex === -1)
       return null;
-    return parseTomlStringArray(stripUnquotedInlineComment2(line.slice(assignmentIndex + 1)).trim());
+    return parseTomlStringArray(stripUnquotedInlineComment3(line.slice(assignmentIndex + 1)).trim());
   }
   return null;
 }
@@ -8472,7 +8800,7 @@ function parseTomlString(input, startIndex) {
   }
   return null;
 }
-function stripUnquotedInlineComment2(line) {
+function stripUnquotedInlineComment3(line) {
   let quote = null;
   let index = 0;
   while (index < line.length) {
@@ -8686,24 +9014,27 @@ import { readFileSync } from "node:fs";
 import { dirname as dirname7, isAbsolute as isAbsolute6, join as join18 } from "node:path";
 var CODEX_AGENTS_HEADER = "agents";
 var CODEX_MULTI_AGENT_V2_HEADER = "features.multi_agent_v2";
+var CODEX_MULTI_AGENT_V2_THREAD_LIMIT_KEY = `${CODEX_MULTI_AGENT_V2_HEADER}.max_concurrent_threads_per_session`;
 var CODEX_SUBAGENT_THREAD_LIMIT = 1000;
+var CODEX_MULTI_AGENT_V2_THREAD_LIMIT = 16;
 function ensureCodexMultiAgentV2Config(config, options = {}) {
   const featureFlag = removeFeatureFlagSetting(config, "multi_agent_v2");
   const v2Preferred = options.multiAgentVersion === "v2";
   const modelKnown = options.multiAgentVersion != null || readRootModel(featureFlag.config) !== null;
   const agentsConfig = v2Preferred ? removeAgentsMaxThreads(featureFlag.config) : modelKnown ? ensureAgentsMaxThreads(featureFlag.config) : raiseExistingAgentsMaxThreads(featureFlag.config);
-  const maxThreadsValue = CODEX_SUBAGENT_THREAD_LIMIT.toString();
   const preserveDisable = featureFlag.value === false && !v2Preferred;
   const featureConfig = preserveDisable ? setMultiAgentV2Disable(agentsConfig) : v2Preferred ? removeMultiAgentV2Disable(agentsConfig) : agentsConfig;
+  if (hasTomlSetting(featureConfig, CODEX_MULTI_AGENT_V2_THREAD_LIMIT_KEY))
+    return featureConfig;
   const section = findTomlSection(featureConfig, CODEX_MULTI_AGENT_V2_HEADER);
   if (!section) {
     const enabledSetting = preserveDisable ? `enabled = false
 ` : "";
     return appendBlock(featureConfig, `[${CODEX_MULTI_AGENT_V2_HEADER}]
-${enabledSetting}max_concurrent_threads_per_session = ${maxThreadsValue}
+${enabledSetting}max_concurrent_threads_per_session = ${CODEX_MULTI_AGENT_V2_THREAD_LIMIT}
 `);
   }
-  return replaceOrInsertSetting(featureConfig, section, "max_concurrent_threads_per_session", maxThreadsValue);
+  return replaceOrInsertSetting(featureConfig, section, "max_concurrent_threads_per_session", CODEX_MULTI_AGENT_V2_THREAD_LIMIT.toString());
 }
 function resolveCodexMultiAgentVersion(config, configPath) {
   const model = readRootModel(config);

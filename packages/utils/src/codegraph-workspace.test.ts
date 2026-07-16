@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test"
+import { execFileSync } from "node:child_process"
 import {
   chmodSync,
   existsSync,
@@ -12,7 +13,7 @@ import {
   writeFileSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 
 import {
   ensureCodegraphGitignored,
@@ -118,19 +119,117 @@ describe("CodeGraph workspace helpers", () => {
     expect(result).toBe("my-repo-..-with-spaces")
   })
 
-  it("adds .codegraph to git info exclude without touching .gitignore", () => {
+  it("adds a single .codegraph exclusion for a valid Git worktree", () => {
     // given
     const workspace = tempDir("codegraph-gitignore")
-    mkdirSync(join(workspace, ".git", "info"), { recursive: true })
+    mkdirSync(workspace, { recursive: true })
+    execFileSync("git", ["init", workspace], { stdio: "ignore" })
+
+    // when
+    const firstResult = ensureCodegraphGitignored(workspace)
+    const secondResult = ensureCodegraphGitignored(workspace)
+
+    // then
+    const exclusions = readFileSync(join(workspace, ".git", "info", "exclude"), "utf8").split(/\r?\n/)
+    expect(firstResult).toBe(true)
+    expect(secondResult).toBe(true)
+    expect(exclusions.filter((exclusion) => exclusion === ".codegraph")).toHaveLength(1)
+    expect(existsSync(join(workspace, ".gitignore"))).toBe(false)
+
+    rmSync(workspace, { force: true, recursive: true })
+  })
+
+  it("does not mutate a workspace with an empty .git marker", () => {
+    // given
+    const workspace = tempDir("codegraph-empty-git")
+    mkdirSync(join(workspace, ".git"), { recursive: true })
 
     // when
     const result = ensureCodegraphGitignored(workspace)
 
     // then
-    expect(result).toBe(true)
-    expect(readFileSync(join(workspace, ".git", "info", "exclude"), "utf8")).toContain(".codegraph")
+    expect(result).toBe(false)
+    expect(existsSync(join(workspace, ".git", "info", "exclude"))).toBe(false)
 
     rmSync(workspace, { force: true, recursive: true })
+  })
+  it("does not mutate an invalid nested .git marker or its parent repository", () => {
+    // given
+    const parent = tempDir("codegraph-parent-git")
+    const workspace = join(parent, "nested")
+    mkdirSync(workspace, { recursive: true })
+    execFileSync("git", ["init", parent], { stdio: "ignore" })
+    mkdirSync(join(workspace, ".git"), { recursive: true })
+    const parentExcludePath = join(parent, ".git", "info", "exclude")
+    const parentExclusionsBefore = readFileSync(parentExcludePath, "utf8")
+
+    // when
+    const result = ensureCodegraphGitignored(workspace)
+
+    // then
+    expect(result).toBe(false)
+    expect(existsSync(join(workspace, ".git", "info", "exclude"))).toBe(false)
+    expect(readFileSync(parentExcludePath, "utf8")).toBe(parentExclusionsBefore)
+
+    rmSync(parent, { force: true, recursive: true })
+  })
+
+  it("does not follow a nested gitdir marker into its parent repository", () => {
+    // given
+    const parent = tempDir("codegraph-parent-gitdir")
+    const workspace = join(parent, "nested")
+    mkdirSync(workspace, { recursive: true })
+    execFileSync("git", ["init", parent], { stdio: "ignore" })
+    writeFileSync(join(workspace, ".git"), "gitdir: ../.git\n")
+    const parentExcludePath = join(parent, ".git", "info", "exclude")
+    const parentExclusionsBefore = readFileSync(parentExcludePath, "utf8")
+
+    // when
+    const result = ensureCodegraphGitignored(workspace)
+
+    // then
+    expect(result).toBe(false)
+    expect(readFileSync(parentExcludePath, "utf8")).toBe(parentExclusionsBefore)
+    expect(readFileSync(join(workspace, ".git"), "utf8")).toBe("gitdir: ../.git\n")
+
+    rmSync(parent, { force: true, recursive: true })
+  })
+
+  it("adds a single exclusion through a valid linked-worktree marker", () => {
+    // given
+    const root = tempDir("codegraph-linked-worktree")
+    const main = join(root, "main")
+    const linked = join(root, "linked")
+    execFileSync("git", ["init", main], { stdio: "ignore" })
+    execFileSync(
+      "git",
+      [
+        "-C", main,
+        "-c", "user.name=OMO Test",
+        "-c", "user.email=omo@example.invalid",
+        "commit", "--allow-empty", "-m", "init",
+      ],
+      { stdio: "ignore" },
+    )
+    execFileSync("git", ["-C", main, "worktree", "add", "--detach", linked], { stdio: "ignore" })
+    const markerBefore = readFileSync(join(linked, ".git"), "utf8")
+    const excludePath = resolve(
+      linked,
+      execFileSync("git", ["-C", linked, "rev-parse", "--git-path", "info/exclude"], { encoding: "utf8" }).trim(),
+    )
+
+    // when
+    const firstResult = ensureCodegraphGitignored(linked)
+    const secondResult = ensureCodegraphGitignored(linked)
+
+    // then
+    const exclusions = readFileSync(excludePath, "utf8").split(/\r?\n/)
+    expect(firstResult).toBe(true)
+    expect(secondResult).toBe(true)
+    expect(readFileSync(join(linked, ".git"), "utf8")).toBe(markerBefore)
+    expect(exclusions.filter((exclusion) => exclusion === ".codegraph")).toHaveLength(1)
+
+    rmSync(root, { force: true, recursive: true })
   })
 
   it("does not synthesize git info exclude for non-git workspaces", () => {
