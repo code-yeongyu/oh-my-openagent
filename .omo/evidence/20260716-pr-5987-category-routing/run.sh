@@ -29,14 +29,30 @@ cat >"$XDG_CONFIG_HOME/opencode/opencode.jsonc" <<JSON
   "permission": {"task":"allow"}
 }
 JSON
-cat >"$XDG_CONFIG_HOME/opencode/oh-my-openagent.json" <<'JSON'
-{"agents":{"probe-parent":{"category_target_agent":"probe-worker"}}}
+cat >"$XDG_CONFIG_HOME/opencode/oh-my-openagent.json" <<JSON
+{
+  "agents": {
+    "probe-parent": {"category_target_agent":"probe-worker"},
+    "sisyphus": {"category_target_agent":"probe-worker", "model":"openai/gpt-fake"}
+  },
+  "team_mode": {"enabled":true, "base_dir":"$SANDBOX/team-state"}
+}
 JSON
 
 opencode run --agent probe-parent --auto --format json --dir "$SANDBOX/project" "CATEGORY_ROUTE_PROBE" >"$EVIDENCE/allowed-run.jsonl" 2>"$EVIDENCE/allowed-run.stderr"
 grep -q 'CHILD_DONE' "$EVIDENCE/allowed-run.jsonl"
 sqlite3 "$XDG_DATA_HOME/opencode/opencode.db" "select data from message" | grep -q '"agent":"probe-worker"'
 
+opencode run --auto --format json --dir "$SANDBOX/project" "TEAM_CATEGORY_ROUTE_PROBE" >"$EVIDENCE/team-run.jsonl" 2>"$EVIDENCE/team-run.stderr"
+jq -e '
+  select(.type == "tool_use" and .part.tool == "team_create")
+  | .part.state.output
+  | fromjson
+  | .runtimeState.members as $members
+  | any($members[]; .name == "lead" and .subagent_type == "sisyphus")
+    and any($members[]; .name == "worker" and .subagent_type == "probe-worker")
+' "$EVIDENCE/team-run.jsonl" >/dev/null
+
 AFTER="$(sqlite3 "$REAL_DB" 'select count(*) from session')"
-printf 'real_db=%s\nbefore=%s\nafter=%s\nsandbox=%s\nresolved_target=probe-worker\nresult=PASS\n' "$REAL_DB" "$BEFORE" "$AFTER" "$SANDBOX" >"$EVIDENCE/isolation-and-result.txt"
+printf 'real_db=%s\nbefore=%s\nafter=%s\nsandbox=%s\nresolved_target=probe-worker\nteam_resolved_target=probe-worker\nresult=PASS\n' "$REAL_DB" "$BEFORE" "$AFTER" "$SANDBOX" >"$EVIDENCE/isolation-and-result.txt"
 test "$BEFORE" = "$AFTER"
