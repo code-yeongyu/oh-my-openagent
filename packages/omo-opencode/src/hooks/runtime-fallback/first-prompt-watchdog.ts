@@ -244,7 +244,10 @@ export function createFirstPromptWatchdog(
     },
     onSessionTerminal(sessionID, eventType) {
       if (!sessionID || !armed.has(sessionID)) return
-      if (eventType === "session.idle" && deps.internallyAbortedSessions.has(sessionID)) return
+      if (
+        (eventType === "session.idle" || eventType === "session.error")
+        && deps.internallyAbortedSessions.has(sessionID)
+      ) return
       cancel(sessionID)
       log(`[${HOOK_NAME}] ${SOURCE}: cancelled (session terminal)`, { sessionID })
     },
