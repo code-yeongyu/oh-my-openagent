@@ -95,6 +95,20 @@ describe("readBoulderState", () => {
     // then
     expect(state).toBeNull()
   })
+
+  test("#given empty object state json #when reading state #then null is returned", () => {
+    // given
+    const directory = createTempDirectory()
+    const boulderDirectory = join(directory, ".omo")
+    mkdirSync(boulderDirectory, { recursive: true })
+    writeFileSync(join(boulderDirectory, "boulder.json"), "{}", "utf-8")
+
+    // when
+    const state = readBoulderState(directory)
+
+    // then
+    expect(state).toBeNull()
+  })
 })
 
 describe("getWorkForSession", () => {
