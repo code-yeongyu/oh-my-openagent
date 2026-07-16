@@ -284,6 +284,32 @@ function getDispatchedParentWakes(manager: BackgroundManager): Map<string, Pendi
   }>(manager)).parentWakeNotifier.getDispatchedParentWakes()
 }
 
+function getParentWakeNotifierForWorkState(manager: BackgroundManager): {
+  reserveNotificationPreparation: (sessionID: string) => void
+  releaseNotificationPreparation: (sessionID: string) => void
+  queuePendingParentWake: (
+    sessionID: string,
+    notification: string,
+    promptContext: Record<string, unknown>,
+    shouldReply: boolean,
+    delayMs?: number,
+  ) => void
+} {
+  return (cast<{
+    parentWakeNotifier: {
+      reserveNotificationPreparation: (sessionID: string) => void
+      releaseNotificationPreparation: (sessionID: string) => void
+      queuePendingParentWake: (
+        sessionID: string,
+        notification: string,
+        promptContext: Record<string, unknown>,
+        shouldReply: boolean,
+        delayMs?: number,
+      ) => void
+    }
+  }>(manager)).parentWakeNotifier
+}
+
 function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
   return (cast<{ completionTimers: Map<string, ReturnType<typeof setTimeout>> }>(manager)).completionTimers
 }
@@ -2643,6 +2669,22 @@ describe("BackgroundManager.tryCompleteTask", () => {
     } finally {
       releaseAbort?.()
     }
+  })
+
+  test("background work clears once finalization queues a wake for the active parent turn", () => {
+    // #given completion preparation is in flight for a parent session
+    const parentSessionID = "session-parent-active-wait"
+    const notifier = getParentWakeNotifierForWorkState(manager)
+    notifier.reserveNotificationPreparation(parentSessionID)
+    expect(manager.hasBackgroundWorkInFlight(parentSessionID)).toBe(true)
+
+    // #when finalization queues the reply-required wake and releases preparation
+    notifier.queuePendingParentWake(parentSessionID, "task complete", {}, true, 60_000)
+    notifier.releaseNotificationPreparation(parentSessionID)
+
+    // #then the active wait tool can finish; wake delivery belongs to the later parent turn
+    expect(manager.hasPendingParentWake(parentSessionID)).toBe(true)
+    expect(manager.hasBackgroundWorkInFlight(parentSessionID)).toBe(false)
   })
 
   test("should immediately clear completed subagent runtime-fallback eligibility", async () => {

@@ -1,8 +1,10 @@
 /// <reference types="bun-types" />
 
 import { describe, test, expect } from "bun:test"
+import type { PluginInput } from "@opencode-ai/plugin"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
-import type { BackgroundManager, BackgroundTask } from "../../features/background-agent"
+import { createOpencodeClient } from "@opencode-ai/sdk"
+import { BackgroundManager, type BackgroundTask } from "../../features/background-agent"
 import type { OpencodeClient } from "../delegate-task/types"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { createWaitForBackgroundTasks } from "./create-wait-for-background-tasks"
@@ -182,6 +184,56 @@ describe("createWaitForBackgroundTasks", () => {
     expect(await run).toContain("**COMPLETED**")
   })
 
+  test("returns after real manager finalization queues a deferred active-turn wake", async () => {
+    // #given a real manager whose parent session stays active while the waiter runs
+    const client = createOpencodeClient({ baseUrl: "http://127.0.0.1:1" })
+    Object.assign(client.session, {
+      messages: async () => [],
+      status: async () => ({ data: { "main-1": { type: "busy" } } }),
+      prompt: async () => ({}),
+      promptAsync: async () => ({}),
+      abort: async () => ({}),
+    })
+    const pluginContext = unsafeTestValue<PluginInput>({
+      client,
+      project: {},
+      directory: projectDir,
+      worktree: projectDir,
+      experimental_workspace: { register: () => {} },
+      serverUrl: new URL("http://localhost"),
+      $: {},
+    })
+    const manager = new BackgroundManager({
+      pluginContext,
+      enableParentSessionNotifications: true,
+    })
+    const task = createTask({ sessionId: undefined })
+    const tasks = Reflect.get(manager, "tasks") as Map<string, BackgroundTask>
+    const pendingByParent = Reflect.get(manager, "pendingByParent") as Map<string, Set<string>>
+    tasks.set(task.id, task)
+    pendingByParent.set(task.parentSessionId, new Set([task.id]))
+
+    try {
+      // #when the child completes during the active wait tool call
+      const run = runTool(manager, { timeout: 200 }, { pollIntervalMs: 1 })
+      const tryCompleteTask = Reflect.get(manager, "tryCompleteTask") as (
+        task: BackgroundTask,
+        source: string,
+      ) => Promise<boolean>
+      const completion = tryCompleteTask.call(manager, task, "waiter integration test")
+      const output = await run
+      await completion
+
+      // #then finalization is observed, but deferred wake delivery does not self-block the waiter
+      expect(output).toContain("**COMPLETED**")
+      expect(output).not.toContain("timed out")
+      expect(manager.hasPendingParentWake(task.parentSessionId)).toBe(true)
+      expect(manager.hasBackgroundWorkInFlight(task.parentSessionId)).toBe(false)
+    } finally {
+      manager.shutdown()
+    }
+  })
+
   test("keeps waiting while a same-session launch is pending task registration", async () => {
     // #given a launch reservation is visible before its task has been indexed
     let tasks: BackgroundTask[] = []
@@ -217,6 +269,21 @@ describe("createWaitForBackgroundTasks", () => {
     // #then it reports the task as still running after timing out
     expect(output).toContain("## Still Running (timed out")
     expect(output).toContain("`task-1`")
+  })
+
+  test("reports timeout while task registration or finalization remains in flight", async () => {
+    // #given manager work remains in flight without a non-terminal task row
+    const manager = createManagerWithWorkState(
+      () => [createTask({ status: "completed" })],
+      () => true,
+    )
+
+    // #when the bounded wait expires
+    const output = await runTool(manager, { timeout: 10 }, { pollIntervalMs: 1 })
+
+    // #then the terminal task remains visible and the timeout is not disguised as success
+    expect(output).toContain("## Terminal Tasks")
+    expect(output).toContain("## Wait Timed Out")
   })
 
   test.each([0, -1])("does not let timeout %i bypass an active task", async (timeout) => {

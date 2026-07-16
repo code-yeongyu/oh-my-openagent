@@ -73,10 +73,16 @@ function formatResult(tasks: BackgroundTask[], timedOut: boolean, timeoutMs: num
     )
   }
 
-  if (timedOut && stillRunning.length > 0) {
-    sections.push(
-      `## Still Running (timed out after ${Math.round(timeoutMs / 1000)}s)\n${stillRunning.join("\n")}\n\nSome tasks did not finish within the timeout. Use \`background_output(task_id="<id>", block=true)\` to wait for individual tasks.`,
-    )
+  if (timedOut) {
+    if (stillRunning.length > 0) {
+      sections.push(
+        `## Still Running (timed out after ${Math.round(timeoutMs / 1000)}s)\n${stillRunning.join("\n")}\n\nSome tasks did not finish within the timeout. Use \`background_output(task_id="<id>", block=true)\` to wait for individual tasks.`,
+      )
+    } else {
+      sections.push(
+        `## Wait Timed Out\nBackground work was still being registered or finalized after ${Math.round(timeoutMs / 1000)}s. Re-run this tool or use \`background_output\` to inspect retained task details.`,
+      )
+    }
   }
 
   if (tasks.length > MAX_TASKS_IN_RESULT) {
@@ -160,6 +166,9 @@ export function createWaitForBackgroundTasks(
         }
 
         if (finalTasks.length === 0) {
+          if (timedOut) {
+            return `Background task wait timed out after ${Math.round(timeoutMs / 1000)}s while work was still being registered or finalized; no task details remain in memory.`
+          }
           return "All background tasks completed (no tasks remaining in memory)."
         }
 

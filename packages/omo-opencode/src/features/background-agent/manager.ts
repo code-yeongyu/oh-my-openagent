@@ -1127,7 +1127,7 @@ The fallback retry session is now created and can be inspected directly.
     return (
       (this.pendingLaunchesByParentSession.get(sessionID) ?? 0) > 0 ||
       this.hasActiveChildTasks(sessionID) ||
-      this.hasPendingParentWake(sessionID)
+      this.parentWakeNotifier.hasNotificationPreparation(sessionID)
     )
   }
 
