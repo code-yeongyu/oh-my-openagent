@@ -35,10 +35,21 @@ export type ContinuationState = {
 	readonly checklist: PlanChecklist;
 };
 
-const TODO_HEADING = "TODOs";
-const FINAL_VERIFICATION_HEADING = "Final Verification Wave";
-const CHECKBOX_PREFIX_LENGTH = "- [ ] ".length;
+const TODO_HEADING_PATTERN = /^##\s+TODOs\b/i;
+const FINAL_VERIFICATION_HEADING_PATTERN = /^##\s+Final Verification Wave\b/i;
+const SECOND_LEVEL_HEADING_PATTERN = /^##\s+/;
+const UNCHECKED_CHECKBOX_PATTERN = /^(\s*)[-*]\s*\[\s*\]\s*(.+)$/;
+const CHECKED_CHECKBOX_PATTERN = /^(\s*)[-*]\s*\[[xX]\]\s*(.+)$/;
+const TODO_TASK_PATTERN = /^\d+\.\s+/;
+const FINAL_WAVE_TASK_PATTERN = /^F\d+\.\s+/i;
 const SESSION_ID_PREFIX_PATTERN = /^(codex|opencode):/;
+
+type ChecklistSection = "todo" | "final-wave" | "other";
+
+type ParsedCheckbox = {
+	readonly checked: boolean;
+	readonly label: string;
+};
 
 export function readContinuationState(cwd: string, sessionId: string): ContinuationState | null {
 	const boulderPath = getBoulderFilePath(cwd);
@@ -75,21 +86,42 @@ export function getPlanChecklist(planPath: string): PlanChecklist {
 
 function parsePlanChecklist(markdown: string): PlanChecklist {
 	const lines = markdown.split(/\r?\n/);
-	const hasCountedSections = lines.some((line) => isCountedHeading(parseLevelTwoHeading(line)));
+	if (!lines.some(hasStructuredSectionHeading)) return parseSimpleChecklist(lines);
+
 	let completed = 0;
 	let remaining = 0;
 	let nextTaskLabel: string | null = null;
-	let isCountedSection = !hasCountedSections;
+	let section: ChecklistSection = "other";
 
 	for (const line of lines) {
-		const heading = parseLevelTwoHeading(line);
-		if (heading !== null) {
-			isCountedSection = isCountedHeading(heading);
+		const headingSection = parseStructuredSectionHeading(line);
+		if (headingSection !== null) {
+			section = headingSection;
 			continue;
 		}
-		if (!isCountedSection) continue;
+		if (section === "other") continue;
 
-		const checkbox = parseTopLevelCheckbox(line);
+		const checkbox = parseStructuredTopLevelCheckbox(line, section);
+		if (checkbox === null) continue;
+
+		if (checkbox.checked) {
+			completed += 1;
+		} else {
+			remaining += 1;
+			nextTaskLabel = nextTaskLabel ?? checkbox.label;
+		}
+	}
+
+	return { completed, remaining, total: completed + remaining, nextTaskLabel };
+}
+
+function parseSimpleChecklist(lines: readonly string[]): PlanChecklist {
+	let completed = 0;
+	let remaining = 0;
+	let nextTaskLabel: string | null = null;
+
+	for (const line of lines) {
+		const checkbox = parseSimpleTopLevelCheckbox(line);
 		if (checkbox === null) continue;
 
 		if (checkbox.checked) {
@@ -193,21 +225,39 @@ function resolveTrackedPath(baseDirectory: string, trackedPath: string): string 
 	return isAbsolute(trackedPath) ? resolve(trackedPath) : resolve(baseDirectory, trackedPath);
 }
 
-function parseTopLevelCheckbox(line: string): { readonly checked: boolean; readonly label: string } | null {
-	if (line.startsWith("- [ ] ")) return { checked: false, label: line.slice(CHECKBOX_PREFIX_LENGTH) };
+function parseSimpleTopLevelCheckbox(line: string): ParsedCheckbox | null {
+	if (line.startsWith("- [ ] ")) return { checked: false, label: line.slice("- [ ] ".length) };
 	if (line.startsWith("- [x] ") || line.startsWith("- [X] ")) {
-		return { checked: true, label: line.slice(CHECKBOX_PREFIX_LENGTH) };
+		return { checked: true, label: line.slice("- [ ] ".length) };
 	}
 	return null;
 }
 
-function parseLevelTwoHeading(line: string): string | null {
-	if (!line.startsWith("## ")) return null;
-	return line.slice("## ".length).trim();
+function hasStructuredSectionHeading(line: string): boolean {
+	const section = parseStructuredSectionHeading(line);
+	return section === "todo" || section === "final-wave";
 }
 
-function isCountedHeading(heading: string | null): boolean {
-	return heading === TODO_HEADING || heading === FINAL_VERIFICATION_HEADING;
+function parseStructuredSectionHeading(line: string): ChecklistSection | null {
+	if (!SECOND_LEVEL_HEADING_PATTERN.test(line)) return null;
+	if (TODO_HEADING_PATTERN.test(line)) return "todo";
+	if (FINAL_VERIFICATION_HEADING_PATTERN.test(line)) return "final-wave";
+	return "other";
+}
+
+function parseStructuredTopLevelCheckbox(line: string, section: "todo" | "final-wave"): ParsedCheckbox | null {
+	const checkedMatch = line.match(CHECKED_CHECKBOX_PATTERN);
+	const match = checkedMatch ?? line.match(UNCHECKED_CHECKBOX_PATTERN);
+	if (match === null) return null;
+
+	const indentation = match[1];
+	const taskBody = match[2]?.trim();
+	if (indentation !== "" || taskBody === undefined) return null;
+
+	const labelPattern = section === "todo" ? TODO_TASK_PATTERN : FINAL_WAVE_TASK_PATTERN;
+	if (!labelPattern.test(taskBody)) return null;
+
+	return { checked: checkedMatch !== null, label: taskBody };
 }
 
 function parseBoulderWorkStatus(value: unknown): BoulderWorkStatus | undefined {
