@@ -4,13 +4,12 @@ import type { PlanChecklist } from "./types"
 
 const SIMPLE_CHECKBOX_PATTERN = /^- \[[ xX]\] /
 const SIMPLE_UNCHECKED_PATTERN = /^- \[ \] /
-const TODO_HEADING_PATTERN = /^##\s+TODOs\b/i
-const FINAL_VERIFICATION_HEADING_PATTERN = /^##\s+Final Verification Wave\b/i
-const SECOND_LEVEL_HEADING_PATTERN = /^##\s+/
-const UNCHECKED_CHECKBOX_PATTERN = /^(\s*)[-*]\s*\[\s*\]\s*(.+)$/
-const CHECKED_CHECKBOX_PATTERN = /^(\s*)[-*]\s*\[[xX]\]\s*(.+)$/
-const TODO_TASK_PATTERN = /^\d+\.\s+/
-const FINAL_WAVE_TASK_PATTERN = /^F\d+\.\s+/i
+const TODO_HEADING_PATTERN = /^##[ \t]+TODOs[ \t]*$/i
+const FINAL_VERIFICATION_HEADING_PATTERN = /^##[ \t]+Final Verification Wave[ \t]*$/i
+const MARKDOWN_HEADING_PATTERN = /^#{1,6}(?:[ \t]+|$)/
+const FENCE_PATTERN = /^[ \t]{0,3}(`{3,}|~{3,})/
+const TODO_CHECKBOX_PATTERN = /^- \[([ xX])\] ([1-9]\d*\. .+)$/
+const FINAL_WAVE_CHECKBOX_PATTERN = /^- \[([ xX])\] (F[1-9]\d*\. .+)$/i
 
 type ChecklistSection = "todo" | "final-wave" | "other"
 
@@ -36,7 +35,7 @@ export function getPlanChecklist(planPath: string): PlanChecklist {
 
 export function parsePlanChecklist(markdown: string): PlanChecklist {
   const lines = markdown.split(/\r?\n/)
-  if (!lines.some(hasStructuredSectionHeading)) {
+  if (!hasStructuredSection(lines)) {
     return parseSimpleChecklist(lines)
   }
 
@@ -44,11 +43,20 @@ export function parsePlanChecklist(markdown: string): PlanChecklist {
   let total = 0
   let nextTaskLabel: string | null = null
   let section: ChecklistSection = "other"
+  let fence: "`" | "~" | null = null
 
   for (const line of lines) {
-    const headingSection = parseStructuredSectionHeading(line)
-    if (headingSection !== null) {
-      section = headingSection
+    const fenceMarker = parseFenceMarker(line)
+    if (fenceMarker !== null) {
+      fence = fence === null ? fenceMarker : fence === fenceMarker ? null : fence
+      continue
+    }
+    if (fence !== null) {
+      continue
+    }
+
+    if (MARKDOWN_HEADING_PATTERN.test(line)) {
+      section = parseStructuredSectionHeading(line)
       continue
     }
     if (section === "other") {
@@ -103,16 +111,22 @@ function parseSimpleChecklist(lines: readonly string[]): PlanChecklist {
   return { completed: total - remaining, remaining, total, nextTaskLabel }
 }
 
-function hasStructuredSectionHeading(line: string): boolean {
-  const section = parseStructuredSectionHeading(line)
-  return section === "todo" || section === "final-wave"
+function hasStructuredSection(lines: readonly string[]): boolean {
+  let fence: "`" | "~" | null = null
+  for (const line of lines) {
+    const fenceMarker = parseFenceMarker(line)
+    if (fenceMarker !== null) {
+      fence = fence === null ? fenceMarker : fence === fenceMarker ? null : fence
+      continue
+    }
+    if (fence === null && parseStructuredSectionHeading(line) !== "other") {
+      return true
+    }
+  }
+  return false
 }
 
-function parseStructuredSectionHeading(line: string): ChecklistSection | null {
-  if (!SECOND_LEVEL_HEADING_PATTERN.test(line)) {
-    return null
-  }
-
+function parseStructuredSectionHeading(line: string): ChecklistSection {
   if (TODO_HEADING_PATTERN.test(line)) {
     return "todo"
   }
@@ -126,24 +140,19 @@ function parseStructuredTopLevelCheckbox(
   line: string,
   section: "todo" | "final-wave",
 ): ParsedCheckbox | null {
-  const checkedMatch = line.match(CHECKED_CHECKBOX_PATTERN)
-  const match = checkedMatch ?? line.match(UNCHECKED_CHECKBOX_PATTERN)
-  if (match === null) {
+  const pattern = section === "todo" ? TODO_CHECKBOX_PATTERN : FINAL_WAVE_CHECKBOX_PATTERN
+  const match = line.match(pattern)
+  const marker = match?.[1]
+  const label = match?.[2]
+  if (marker === undefined || label === undefined) {
     return null
   }
+  return { checked: marker.toLowerCase() === "x", label }
+}
 
-  const indentation = match[1]
-  const taskBody = match[2]?.trim()
-  if (indentation !== "" || taskBody === undefined) {
-    return null
-  }
-
-  const labelPattern = section === "todo" ? TODO_TASK_PATTERN : FINAL_WAVE_TASK_PATTERN
-  if (!labelPattern.test(taskBody)) {
-    return null
-  }
-
-  return { checked: checkedMatch !== null, label: taskBody }
+function parseFenceMarker(line: string): "`" | "~" | null {
+  const marker = line.match(FENCE_PATTERN)?.[1]?.[0]
+  return marker === "`" || marker === "~" ? marker : null
 }
 
 function emptyChecklist(): PlanChecklist {

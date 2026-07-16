@@ -75,6 +75,59 @@ describe("parsePlanChecklist", () => {
     // then
     expect(checklist).toEqual({ completed: 1, remaining: 1, total: 2, nextTaskLabel: "F1. Verify the result" })
   })
+
+  test("#given noncanonical structured rows #when parsed #then only exact positive-number grammar is counted", () => {
+    // given
+    const markdown = [
+      "## Todos",
+      "- [ ] 0. Zero is invalid",
+      "- [ ] 01. Leading zero is invalid",
+      "* [ ] 2. Star marker is invalid",
+      "-[ ] 3. Missing spaces are invalid",
+      "- [ ] 4. Canonical implementation",
+      "## Final verification wave",
+      "- [ ] F0. Zero final verifier is invalid",
+      "- [ ] F01. Leading zero final verifier is invalid",
+      "- [x] F2. Canonical final verifier",
+    ].join("\n")
+
+    // when
+    const checklist = parsePlanChecklist(markdown)
+
+    // then
+    expect(checklist).toEqual({
+      completed: 1,
+      remaining: 1,
+      total: 2,
+      nextTaskLabel: "4. Canonical implementation",
+    })
+  })
+
+  test("#given fenced examples and a higher-level heading #when parsed #then section scope excludes them", () => {
+    // given
+    const markdown = [
+      "## Todos",
+      "- [ ] 1. Counted implementation",
+      "```md",
+      "- [ ] 2. Fenced example",
+      "```",
+      "# Appendix",
+      "- [ ] 3. Appendix checkbox",
+      "## Final verification wave",
+      "- [x] F1. Counted verifier",
+    ].join("\n")
+
+    // when
+    const checklist = parsePlanChecklist(markdown)
+
+    // then
+    expect(checklist).toEqual({
+      completed: 1,
+      remaining: 1,
+      total: 2,
+      nextTaskLabel: "1. Counted implementation",
+    })
+  })
 })
 
 describe("getPlanChecklist", () => {
