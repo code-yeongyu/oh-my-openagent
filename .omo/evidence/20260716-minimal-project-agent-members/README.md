@@ -16,9 +16,10 @@ This directory contains a narrow passing real-OpenCode QA run for project-define
 - Exactly one child provider request and one child session were created. The request contained the project prompt marker and child task marker, exposed every required Team Mode tool, and exposed neither `write` nor `question`.
 - The accepted project agent source remained present before the parent returned `team_create` and after the run, so the authoritative final OpenCode registry lookup retained its required input.
 - The rejected `team_create` failed with the exact config-time provenance error after a same-name definition was introduced later through project config. It created no child provider request and no child session.
-- Host OpenCode session count was 3986 before and 3986 after. Both providers stopped and both external sandboxes were removed.
+- Host OpenCode session count was 3996 before and 3996 after. Both providers stopped and both external sandboxes were removed.
 - Three exploratory harness issues were corrected before the passing run: deleting the source invalidated the authoritative registry input; the root plugin SDK requires nested `query.directory`; and the project fixture needed explicit `hidden: false` plus required tool allows without a wildcard deny that would override them in final permission rules.
-- `qa-result.json` records git HEAD `dec381ed201a1326883db9f42bdb3c2add91b299`, exact `git status --short`, and SHA-256 values for all 15 intended source, test, and doc files.
+- The final rerun followed a test-only mock-ownership fix; the accepted and rejected runtime behavior remained unchanged.
+- `qa-result.json` records git HEAD `8d80b19271feb17ff0c8a85be5eb61dfeb53a0cb`, exact `git status --short`, and SHA-256 values for all 15 intended source, test, and doc files.
 
 ## Why it is enough
 

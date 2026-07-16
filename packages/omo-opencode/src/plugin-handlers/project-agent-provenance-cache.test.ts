@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 
 import type { OhMyOpenCodeConfig } from "../config"
 import * as agents from "../agents"
@@ -23,6 +23,20 @@ import * as modelResolver from "../shared/model-resolver"
 import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 
 let createConfigHandler: (typeof import("./config-handler"))["createConfigHandler"]
+type OwnedRestorer = { mockRestore(): void }
+
+const ownedRestorers: OwnedRestorer[] = []
+const unrelatedSpyOwner = { invoke: () => true }
+const unrelatedSpy = spyOn(unrelatedSpyOwner, "invoke")
+
+function trackOwnedSpy<T extends OwnedRestorer>(spy: T): T {
+  ownedRestorers.push(spy)
+  return spy
+}
+
+afterAll(() => {
+  unrelatedSpy.mockRestore()
+})
 
 function createPluginConfig(): OhMyOpenCodeConfig {
   return {
@@ -39,49 +53,57 @@ async function importFreshConfigHandlerModule(): Promise<typeof import("./config
 }
 
 beforeEach(async () => {
-  mock.restore()
   configErrors.clearConfigLoadErrors()
-  spyOn(agents, unsafeTestValue("createBuiltinAgents")).mockResolvedValue({
+  trackOwnedSpy(spyOn(agents, unsafeTestValue("createBuiltinAgents"))).mockResolvedValue({
     sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
   })
-  spyOn(commandLoader, unsafeTestValue("loadUserCommands")).mockResolvedValue({})
-  spyOn(commandLoader, unsafeTestValue("loadProjectCommands")).mockResolvedValue({})
-  spyOn(commandLoader, unsafeTestValue("loadOpencodeGlobalCommands")).mockResolvedValue({})
-  spyOn(commandLoader, unsafeTestValue("loadOpencodeProjectCommands")).mockResolvedValue({})
-  spyOn(builtinCommands, unsafeTestValue("loadBuiltinCommands")).mockReturnValue({})
-  spyOn(skillLoader, unsafeTestValue("loadUserSkills")).mockResolvedValue({})
-  spyOn(skillLoader, unsafeTestValue("loadProjectSkills")).mockResolvedValue({})
-  spyOn(skillLoader, unsafeTestValue("loadOpencodeGlobalSkills")).mockResolvedValue({})
-  spyOn(skillLoader, unsafeTestValue("loadOpencodeProjectSkills")).mockResolvedValue({})
-  spyOn(skillLoader, unsafeTestValue("discoverUserClaudeSkills")).mockResolvedValue([])
-  spyOn(skillLoader, unsafeTestValue("discoverProjectClaudeSkills")).mockResolvedValue([])
-  spyOn(skillLoader, unsafeTestValue("discoverOpencodeGlobalSkills")).mockResolvedValue([])
-  spyOn(skillLoader, unsafeTestValue("discoverOpencodeProjectSkills")).mockResolvedValue([])
-  spyOn(agentLoader, unsafeTestValue("loadUserAgents")).mockReturnValue({})
-  spyOn(agentLoader, unsafeTestValue("loadProjectAgents")).mockReturnValue({})
-  spyOn(agentLoader, unsafeTestValue("loadOpencodeGlobalAgents")).mockReturnValue({})
-  spyOn(agentLoader, unsafeTestValue("loadOpencodeProjectAgents")).mockReturnValue({})
-  spyOn(agentLoader, unsafeTestValue("readOpencodeConfigAgents")).mockReturnValue({})
-  spyOn(mcpLoader, unsafeTestValue("loadMcpConfigs")).mockResolvedValue({ servers: {}, loadedServers: [] })
-  spyOn(mcpLoader, "setAdditionalAllowedMcpEnvVars").mockImplementation(() => {})
-  spyOn(pluginLoader, unsafeTestValue("loadAllPluginComponents")).mockResolvedValue({
+  trackOwnedSpy(spyOn(commandLoader, unsafeTestValue("loadUserCommands"))).mockResolvedValue({})
+  trackOwnedSpy(spyOn(commandLoader, unsafeTestValue("loadProjectCommands"))).mockResolvedValue({})
+  trackOwnedSpy(
+    spyOn(commandLoader, unsafeTestValue("loadOpencodeGlobalCommands")),
+  ).mockResolvedValue({})
+  trackOwnedSpy(
+    spyOn(commandLoader, unsafeTestValue("loadOpencodeProjectCommands")),
+  ).mockResolvedValue({})
+  trackOwnedSpy(spyOn(builtinCommands, unsafeTestValue("loadBuiltinCommands"))).mockReturnValue({})
+  trackOwnedSpy(spyOn(skillLoader, unsafeTestValue("loadUserSkills"))).mockResolvedValue({})
+  trackOwnedSpy(spyOn(skillLoader, unsafeTestValue("loadProjectSkills"))).mockResolvedValue({})
+  trackOwnedSpy(spyOn(skillLoader, unsafeTestValue("loadOpencodeGlobalSkills"))).mockResolvedValue({})
+  trackOwnedSpy(spyOn(skillLoader, unsafeTestValue("loadOpencodeProjectSkills"))).mockResolvedValue({})
+  trackOwnedSpy(spyOn(skillLoader, unsafeTestValue("discoverUserClaudeSkills"))).mockResolvedValue([])
+  trackOwnedSpy(spyOn(skillLoader, unsafeTestValue("discoverProjectClaudeSkills"))).mockResolvedValue([])
+  trackOwnedSpy(spyOn(skillLoader, unsafeTestValue("discoverOpencodeGlobalSkills"))).mockResolvedValue([])
+  trackOwnedSpy(spyOn(skillLoader, unsafeTestValue("discoverOpencodeProjectSkills"))).mockResolvedValue([])
+  trackOwnedSpy(spyOn(agentLoader, unsafeTestValue("loadUserAgents"))).mockReturnValue({})
+  trackOwnedSpy(spyOn(agentLoader, unsafeTestValue("loadProjectAgents"))).mockReturnValue({})
+  trackOwnedSpy(spyOn(agentLoader, unsafeTestValue("loadOpencodeGlobalAgents"))).mockReturnValue({})
+  trackOwnedSpy(spyOn(agentLoader, unsafeTestValue("loadOpencodeProjectAgents"))).mockReturnValue({})
+  trackOwnedSpy(spyOn(agentLoader, unsafeTestValue("readOpencodeConfigAgents"))).mockReturnValue({})
+  trackOwnedSpy(spyOn(mcpLoader, unsafeTestValue("loadMcpConfigs"))).mockResolvedValue({
+    servers: {},
+    loadedServers: [],
+  })
+  trackOwnedSpy(spyOn(mcpLoader, "setAdditionalAllowedMcpEnvVars")).mockImplementation(() => {})
+  trackOwnedSpy(
+    spyOn(pluginLoader, unsafeTestValue("loadAllPluginComponents")),
+  ).mockResolvedValue({
     commands: {}, skills: {}, agents: {}, mcpServers: {}, hooksConfigs: [], plugins: [], errors: [],
   })
-  spyOn(mcpModule, unsafeTestValue("createBuiltinMcps")).mockReturnValue({})
-  spyOn(shared, unsafeTestValue("log")).mockImplementation(() => {})
-  spyOn(shared, unsafeTestValue("fetchAvailableModels")).mockResolvedValue(new Set())
-  spyOn(shared, unsafeTestValue("readConnectedProvidersCache")).mockReturnValue(null)
-  spyOn(configDir, unsafeTestValue("getOpenCodeConfigPaths")).mockReturnValue({
+  trackOwnedSpy(spyOn(mcpModule, unsafeTestValue("createBuiltinMcps"))).mockReturnValue({})
+  trackOwnedSpy(spyOn(shared, unsafeTestValue("log"))).mockImplementation(() => {})
+  trackOwnedSpy(spyOn(shared, unsafeTestValue("fetchAvailableModels"))).mockResolvedValue(new Set())
+  trackOwnedSpy(spyOn(shared, unsafeTestValue("readConnectedProvidersCache"))).mockReturnValue(null)
+  trackOwnedSpy(spyOn(configDir, unsafeTestValue("getOpenCodeConfigPaths"))).mockReturnValue({
     configDir: "/tmp/.config/opencode",
     configJson: "/tmp/.config/opencode/opencode.json",
     configJsonc: "/tmp/.config/opencode/opencode.jsonc",
     packageJson: "/tmp/.config/opencode/package.json",
     omoConfig: "/tmp/.config/opencode/oh-my-opencode.jsonc",
   })
-  spyOn(permissionCompat, unsafeTestValue("migrateAgentConfig")).mockImplementation(
-    (config: Record<string, unknown>) => config,
-  )
-  spyOn(modelResolver, unsafeTestValue("resolveModelWithFallback")).mockReturnValue({
+  trackOwnedSpy(
+    spyOn(permissionCompat, unsafeTestValue("migrateAgentConfig")),
+  ).mockImplementation((config: Record<string, unknown>) => config)
+  trackOwnedSpy(spyOn(modelResolver, unsafeTestValue("resolveModelWithFallback"))).mockReturnValue({
     model: "openai/gpt-5.4-mini",
     source: "provider-fallback",
   })
@@ -90,7 +112,10 @@ beforeEach(async () => {
 
 afterEach(() => {
   configErrors.clearConfigLoadErrors()
-  mock.restore()
+  for (const restorer of ownedRestorers) {
+    restorer.mockRestore()
+  }
+  ownedRestorers.length = 0
 })
 
 function createHandler(directory: string) {
@@ -103,6 +128,16 @@ function createHandler(directory: string) {
     },
   })
 }
+
+test("preserves an unrelated spy established outside the per-test setup", () => {
+  // given: unrelatedSpy was established at module scope
+
+  // when
+  unrelatedSpyOwner.invoke()
+
+  // then
+  expect(unrelatedSpy).toHaveBeenCalledTimes(1)
+})
 
 describe("project agent provenance snapshots", () => {
   test("captures the exact directory project source without leaking to another directory", async () => {

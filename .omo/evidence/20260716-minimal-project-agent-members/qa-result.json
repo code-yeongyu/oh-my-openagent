@@ -18,23 +18,12 @@
     "rejectedCreatedNoChildRequestOrSession": true,
     "providersStoppedAndSandboxesRemoved": true
   },
-  "gitHead": "dec381ed201a1326883db9f42bdb3c2add91b299",
+  "gitHead": "8d80b19271feb17ff0c8a85be5eb61dfeb53a0cb",
   "gitStatusShort": [
-    "M docs/guide/team-mode.md",
-    " M packages/omo-opencode/src/features/team-mode/team-runtime/resolve-member.test.ts",
-    " M packages/omo-opencode/src/features/team-mode/team-runtime/resolve-member.ts",
-    " M packages/omo-opencode/src/features/team-mode/tools/lifecycle-create-tool.ts",
-    " M packages/omo-opencode/src/features/team-mode/tools/lifecycle-inline-spec.ts",
-    " M packages/omo-opencode/src/features/team-mode/tools/query.ts",
-    " M packages/omo-opencode/src/plugin-handlers/agent-config-handler.ts",
-    " M packages/omo-opencode/src/plugin-handlers/config-handler.ts",
-    " M packages/team-core/src/team-registry/loader.ts",
-    " M packages/team-core/src/team-registry/validator.ts",
-    "?? packages/omo-opencode/src/features/team-mode/final-open-code-agent-registry.ts",
-    "?? packages/omo-opencode/src/features/team-mode/team-registry/project-agent-loader.test.ts",
-    "?? packages/omo-opencode/src/features/team-mode/tools/lifecycle-inline-project-agent.test.ts",
-    "?? packages/omo-opencode/src/plugin-handlers/project-agent-provenance-cache.test.ts",
-    "?? packages/team-core/src/team-registry/validator-options.test.ts"
+    "M .omo/evidence/20260716-minimal-project-agent-members/opencode-run-accepted.jsonl",
+    " M .omo/evidence/20260716-minimal-project-agent-members/opencode-run-rejected.jsonl",
+    " M .omo/evidence/20260716-minimal-project-agent-members/qa-result.json",
+    " M packages/omo-opencode/src/plugin-handlers/project-agent-provenance-cache.test.ts"
   ],
   "sourceManifest": [
     {
@@ -83,7 +72,7 @@
     },
     {
       "file": "packages/omo-opencode/src/plugin-handlers/project-agent-provenance-cache.test.ts",
-      "sha256": "7bdbecfe740db80c5985729df550d3bdeb728ca96042066c93e3bcd91609912f"
+      "sha256": "6f41c6a80cf52f347a4ceb2376b44b298ab3faff967c756d1b5bf7199a221850"
     },
     {
       "file": "packages/team-core/src/team-registry/loader.ts",
@@ -99,8 +88,8 @@
     }
   ],
   "hostIsolation": {
-    "sessionCountBefore": 3986,
-    "sessionCountAfter": 3986,
+    "sessionCountBefore": 3996,
+    "sessionCountAfter": 3996,
     "unchanged": true
   },
   "scenarios": {
