@@ -114,7 +114,11 @@ async function formatCommandTemplate(cmd: CommandInfo, args: string): Promise<st
     .replace(/\$ARGUMENTS/g, resolvedArguments)
   sections.push(substitutedContent.trim())
 
-  if (args) {
+  if (
+    args &&
+    !resolvedContent.includes("${user_message}") &&
+    !resolvedContent.includes("$ARGUMENTS")
+  ) {
     sections.push("\n\n---\n")
     sections.push("## User Request\n")
     sections.push(args)
