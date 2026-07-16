@@ -172,8 +172,15 @@ export function createFirstPromptWatchdog(
     },
     onSessionTerminal(sessionID, eventType, isAbortEvent) {
       if (!sessionID) return
-      if (suspended.has(sessionID)) {
+      const suspendedContext = suspended.get(sessionID)
+      if (suspendedContext) {
         if (eventType === "session.idle") return
+        if (eventType === "session.error" && isAbortEvent === false) {
+          abortProvenance.consumePrior(sessionID, suspendedContext.sessionGeneration)
+          deps.internallyAbortedSessions.add(sessionID)
+          cancel(sessionID, true)
+          return { kind: "resolve-terminal", sessionID }
+        }
         deps.internallyAbortedSessions.delete(sessionID)
         cancel(sessionID)
         return { kind: "resolve-terminal", sessionID }
