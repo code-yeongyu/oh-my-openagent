@@ -157,8 +157,10 @@ describe("todo-continuation-enforcer", () => {
     info: {
       id: string
       role: "user" | "assistant"
+      finish?: string
       error?: { name: string; data?: { message: string } }
     }
+    parts?: Array<{ type: string; text?: string; synthetic?: boolean }>
   }
 
   interface PromptRequestOptions {
@@ -1022,6 +1024,100 @@ describe("todo-continuation-enforcer", () => {
     // then
     expect(promptCalls).toHaveLength(MAX_STAGNATION_COUNT)
   }, { timeout: 60000 })
+
+  test("given a continuation response without todo progress, does not re-arm the directive", async () => {
+    // given
+    const sessionID = "main-directive-response-loop-breaker"
+    setMainSession(sessionID)
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    expect(promptCalls).toHaveLength(1)
+
+    // when
+    await hook.handler({
+      event: {
+        type: "message.updated",
+        properties: { info: { sessionID, role: "assistant" } },
+      },
+    })
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    // then
+    expect(promptCalls).toHaveLength(1)
+  }, { timeout: 30000 })
+
+  test("given a real user interruption after continuation, does not re-arm after the user turn", async () => {
+    // given
+    const sessionID = "main-user-interruption-loop-breaker"
+    setMainSession(sessionID)
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    expect(promptCalls).toHaveLength(1)
+
+    // when
+    await hook.handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: { sessionID, role: "user" },
+          parts: [{ type: "text", text: "Stop. Inspect the broken context first.", synthetic: false }],
+        },
+      },
+    })
+    await hook.handler({
+      event: {
+        type: "message.updated",
+        properties: { info: { sessionID, role: "assistant" } },
+      },
+    })
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    // then
+    expect(promptCalls).toHaveLength(1)
+  }, { timeout: 30000 })
+
+  test("given todo progress after a continuation response, permits the next continuation", async () => {
+    // given
+    const sessionID = "main-directive-response-progress"
+    setMainSession(sessionID)
+    let todos = [
+      { id: "1", content: "Task 1", status: "pending", priority: "high" },
+      { id: "2", content: "Task 2", status: "pending", priority: "medium" },
+    ]
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.todo = async () => ({ data: todos })
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    expect(promptCalls).toHaveLength(1)
+
+    // when
+    await hook.handler({
+      event: {
+        type: "message.updated",
+        properties: { info: { sessionID, role: "assistant" } },
+      },
+    })
+    todos = [
+      { id: "1", content: "Task 1", status: "completed", priority: "high" },
+      { id: "2", content: "Task 2", status: "pending", priority: "medium" },
+    ]
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    // then
+    expect(promptCalls).toHaveLength(2)
+  }, { timeout: 30000 })
 
   test("should skip idle handling while injection is in flight", async () => {
     //#given
