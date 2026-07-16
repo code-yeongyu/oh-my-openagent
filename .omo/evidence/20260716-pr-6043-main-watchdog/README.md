@@ -166,6 +166,27 @@ Artifacts:
 - `seventh-exact-opencode-harness-self-check.txt`: isolated harness preflight.
 - `seventh-exact-live-watchdog-run.txt`: successful production-duration live
   run pinned to runtime head `50ca8e1cc705862b5534b293f83c20ef63da922c`.
+- `eighth-exact-focused-tests.txt`: 55 focused watchdog/deferred-terminal tests
+  plus 3 shared `session.status` timeout tests, all passing.
+- `eighth-exact-runtime-fallback-suite.txt`: 275 passing runtime-fallback
+  tests on integrated head `d4ab26633643e084931dd223c4c9f7c561fa050f`.
+- `eighth-exact-omo-opencode-typecheck.txt`, `eighth-exact-biome.txt`, and
+  `eighth-exact-no-excuse.txt`: exact integrated static gates over the 12
+  touched TypeScript files.
+- `eighth-exact-opencode-harness-self-check.txt`: isolated OpenCode harness
+  preflight with sandbox cleanup.
+- `eighth-exact-live-watchdog-run.txt`: production-duration live OpenCode run
+  pinned to `d4ab26633643e084931dd223c4c9f7c561fa050f`; fallback observed, no
+  fallback watchdog re-arm, later user abort external, real database unchanged.
+
+The eighth repair closes the final cancellation-ownership ambiguity. When a
+current identity-free terminal event is followed by a delayed old-parent
+assistant abort, the hook now uses the bounded shared `session.status` helper:
+an active replacement request preserves the old internal abort, while idle,
+unavailable, error, or timeout resolves the terminal as current cancellation.
+Suspended watchdogs also retain their original deadline instead of restarting
+the full timeout. Tests use deterministic completion signals rather than real
+sleeps, and the watchdog firing logic is split into a focused module.
 
 ## Why It Is Enough
 
