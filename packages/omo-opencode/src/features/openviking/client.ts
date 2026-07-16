@@ -16,6 +16,11 @@ import {
 import type { MemoryType } from "../../config/schema/openviking"
 
 /**
+ * Fetch function type for dependency injection
+ */
+export type FetchFn = typeof fetch
+
+/**
  * Default timeout values (ms)
  */
 const TIMEOUTS = {
@@ -42,15 +47,17 @@ const DEFAULT_CONFIG: Required<OpenVikingClientConfig> = {
  * - Memory recall
  * - Session commit
  * 
- * Uses Node.js built-in fetch API (no external dependencies)
+ * Uses dependency injection for fetch to enable testing
  */
 export class OpenVikingClient {
   private readonly config: Required<OpenVikingClientConfig>
   private readonly baseUrl: string
+  private readonly fetchFn: FetchFn
 
-  constructor(config: OpenVikingClientConfig) {
+  constructor(config: OpenVikingClientConfig, fetchFn: FetchFn = fetch) {
     this.config = { ...DEFAULT_CONFIG, ...config }
     this.baseUrl = this.config.url.replace(/\/$/, "") // Remove trailing slash
+    this.fetchFn = fetchFn
   }
 
   /**
@@ -156,7 +163,7 @@ export class OpenVikingClient {
     const timeoutId = setTimeout(() => controller.abort(), options.timeout_ms)
 
     try {
-      const response = await fetch(url, {
+      const response = await this.fetchFn(url, {
         method: options.method,
         headers,
         body: options.body ? JSON.stringify(options.body) : undefined,

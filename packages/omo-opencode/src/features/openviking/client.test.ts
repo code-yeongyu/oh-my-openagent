@@ -1,4 +1,4 @@
-import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
+import { describe, it, expect, mock, beforeEach } from "bun:test"
 import { OpenVikingClient, createOpenVikingClient } from "./client"
 import {
   OpenVikingError,
@@ -10,49 +10,54 @@ import {
   type Session,
 } from "./types"
 
-// Mock fetch
-const mockFetch = mock(() => Promise.resolve(new Response()))
-global.fetch = mockFetch as typeof fetch
-
 describe("OpenVikingClient", () => {
+  let mockFetch: ReturnType<typeof mock>
   let client: OpenVikingClient
 
   beforeEach(() => {
-    client = new OpenVikingClient({
-      url: "http://localhost:1933",
-      api_key: "test-api-key",
-    })
-    mockFetch.mockReset()
-  })
-
-  afterEach(() => {
-    mockFetch.mockReset()
+    mockFetch = mock(() => Promise.resolve(new Response()))
+    client = new OpenVikingClient(
+      {
+        url: "http://localhost:1933",
+        api_key: "test-api-key",
+      },
+      mockFetch
+    )
   })
 
   describe("constructor", () => {
     it("should create client with default config", () => {
-      const client = new OpenVikingClient({
-        url: "http://localhost:1933",
-      })
+      const client = new OpenVikingClient(
+        {
+          url: "http://localhost:1933",
+        },
+        mockFetch
+      )
 
       expect(client.getUrl()).toBe("http://localhost:1933")
       expect(client.hasApiKey()).toBe(false)
     })
 
     it("should create client with custom config", () => {
-      const client = new OpenVikingClient({
-        url: "https://openviking.example.com",
-        api_key: "test-key",
-      })
+      const client = new OpenVikingClient(
+        {
+          url: "https://openviking.example.com",
+          api_key: "test-key",
+        },
+        mockFetch
+      )
 
       expect(client.getUrl()).toBe("https://openviking.example.com")
       expect(client.hasApiKey()).toBe(true)
     })
 
     it("should remove trailing slash from URL", () => {
-      const client = new OpenVikingClient({
-        url: "http://localhost:1933/",
-      })
+      const client = new OpenVikingClient(
+        {
+          url: "http://localhost:1933/",
+        },
+        mockFetch
+      )
 
       expect(client.getUrl()).toBe("http://localhost:1933")
     })
@@ -60,6 +65,7 @@ describe("OpenVikingClient", () => {
 
   describe("health", () => {
     it("should return health status on success", async () => {
+      // given
       const mockResponse: HealthResponse = {
         status: "healthy",
         version: "1.0.0",
@@ -75,8 +81,10 @@ describe("OpenVikingClient", () => {
         })
       )
 
+      // when
       const result = await client.health()
 
+      // then
       expect(result).toEqual(mockResponse)
       expect(mockFetch).toHaveBeenCalledWith(
         "http://localhost:1933/health",
@@ -87,14 +95,17 @@ describe("OpenVikingClient", () => {
     })
 
     it("should include Authorization header when API key is set", async () => {
+      // given
       mockFetch.mockResolvedValueOnce(
         new Response(JSON.stringify({ status: "healthy" }), {
           status: 200,
         })
       )
 
+      // when
       await client.health()
 
+      // then
       expect(mockFetch).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
@@ -106,6 +117,7 @@ describe("OpenVikingClient", () => {
     })
 
     it("should throw OpenVikingError on HTTP error", async () => {
+      // given
       mockFetch.mockResolvedValueOnce(
         new Response(
           JSON.stringify({ error: "Internal server error" }),
@@ -113,30 +125,22 @@ describe("OpenVikingClient", () => {
         )
       )
 
+      // when/then
       await expect(client.health()).rejects.toThrow(OpenVikingError)
     })
 
-    it("should throw OpenVikingTimeoutError on timeout", async () => {
-      mockFetch.mockImplementationOnce(
-        () =>
-          new Promise((_, reject) => {
-            setTimeout(() => reject(new Error("AbortError")), 10000)
-          })
-      )
-
-      // This test would actually wait for timeout, so we'll skip it in unit tests
-      // In real tests, we'd use a mock timer
-    })
-
     it("should throw OpenVikingNetworkError on network error", async () => {
+      // given
       mockFetch.mockRejectedValueOnce(new TypeError("Network error"))
 
+      // when/then
       await expect(client.health()).rejects.toThrow(OpenVikingNetworkError)
     })
   })
 
   describe("recall", () => {
     it("should recall memories with query", async () => {
+      // given
       const mockResponse: RecallResponse = {
         memories: [
           {
@@ -159,8 +163,10 @@ describe("OpenVikingClient", () => {
         })
       )
 
+      // when
       const result = await client.recall("TypeScript")
 
+      // then
       expect(result).toEqual(mockResponse)
       expect(mockFetch).toHaveBeenCalledWith(
         "http://localhost:1933/api/v1/memories/recall",
@@ -175,14 +181,17 @@ describe("OpenVikingClient", () => {
     })
 
     it("should filter by memory types", async () => {
+      // given
       mockFetch.mockResolvedValueOnce(
         new Response(JSON.stringify({ memories: [], total: 0 }), {
           status: 200,
         })
       )
 
+      // when
       await client.recall("test", ["preferences", "patterns"])
 
+      // then
       expect(mockFetch).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
@@ -196,14 +205,17 @@ describe("OpenVikingClient", () => {
     })
 
     it("should respect limit parameter", async () => {
+      // given
       mockFetch.mockResolvedValueOnce(
         new Response(JSON.stringify({ memories: [], total: 0 }), {
           status: 200,
         })
       )
 
+      // when
       await client.recall("test", undefined, 10)
 
+      // then
       expect(mockFetch).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
@@ -218,6 +230,7 @@ describe("OpenVikingClient", () => {
 
   describe("commit", () => {
     it("should commit session", async () => {
+      // given
       const session: Session = {
         id: "session-123",
         messages: [
@@ -247,8 +260,10 @@ describe("OpenVikingClient", () => {
         })
       )
 
+      // when
       const result = await client.commit(session)
 
+      // then
       expect(result).toEqual(mockResponse)
       expect(mockFetch).toHaveBeenCalledWith(
         "http://localhost:1933/api/v1/sessions/commit",
@@ -264,6 +279,7 @@ describe("OpenVikingClient", () => {
     })
 
     it("should disable memory extraction when requested", async () => {
+      // given
       const session: Session = {
         id: "session-123",
         messages: [],
@@ -276,8 +292,10 @@ describe("OpenVikingClient", () => {
         })
       )
 
+      // when
       await client.commit(session, false, false)
 
+      // then
       expect(mockFetch).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
@@ -294,18 +312,28 @@ describe("OpenVikingClient", () => {
 
 describe("createOpenVikingClient", () => {
   it("should create client instance", () => {
-    const client = createOpenVikingClient({
-      url: "http://localhost:1933",
-    })
+    // given
+    const mockFetch = mock(() => Promise.resolve(new Response()))
 
+    // when
+    const client = createOpenVikingClient(
+      {
+        url: "http://localhost:1933",
+      },
+      mockFetch
+    )
+
+    // then
     expect(client).toBeInstanceOf(OpenVikingClient)
   })
 })
 
 describe("Error classes", () => {
   it("should create OpenVikingError", () => {
+    // given/when
     const error = new OpenVikingError("Test error", 400, "BAD_REQUEST")
 
+    // then
     expect(error.message).toBe("Test error")
     expect(error.statusCode).toBe(400)
     expect(error.code).toBe("BAD_REQUEST")
@@ -313,9 +341,13 @@ describe("Error classes", () => {
   })
 
   it("should create OpenVikingNetworkError", () => {
+    // given
     const cause = new Error("Network failure")
+
+    // when
     const error = new OpenVikingNetworkError("Network error", cause)
 
+    // then
     expect(error.message).toBe("Network error")
     expect(error.code).toBe("NETWORK_ERROR")
     expect(error.cause).toBe(cause)
@@ -323,8 +355,10 @@ describe("Error classes", () => {
   })
 
   it("should create OpenVikingTimeoutError", () => {
+    // given/when
     const error = new OpenVikingTimeoutError("Timeout", 2000)
 
+    // then
     expect(error.message).toBe("Timeout")
     expect(error.code).toBe("TIMEOUT_ERROR")
     expect(error.timeout_ms).toBe(2000)
