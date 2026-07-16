@@ -50,7 +50,7 @@ function createDeps(messagesResponse: unknown): HookDeps {
 
 function createHelpers(clearCalls: string[]): AutoRetryHelpers {
   return {
-    abortSessionRequest: async () => {},
+    abortSessionRequest: async () => true,
     clearSessionFallbackTimeout: (sessionID: string) => {
       clearCalls.push(sessionID)
     },

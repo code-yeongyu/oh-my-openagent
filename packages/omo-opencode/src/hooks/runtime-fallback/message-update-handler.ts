@@ -43,7 +43,9 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
     const model = normalizeModelToCanonicalString(info?.model)
 
     if (sessionID && role === "user") {
-      deps.internallyAbortedSessions.delete(sessionID)
+      if (!sessionAwaitingFallbackResult.has(sessionID)) {
+        deps.internallyAbortedSessions.delete(sessionID)
+      }
       return
     }
 
@@ -64,7 +66,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       sessionAwaitingFallbackResult.delete(sessionID)
       sessionStatusRetryKeys.delete(sessionID)
       helpers.clearSessionFallbackTimeout(sessionID)
-      let state = sessionStates.get(sessionID)
+      const state = sessionStates.get(sessionID)
       if (state?.pendingFallbackModel) {
         state.pendingFallbackModel = undefined
         state.pendingFallbackPromptMayHaveBeenAccepted = false

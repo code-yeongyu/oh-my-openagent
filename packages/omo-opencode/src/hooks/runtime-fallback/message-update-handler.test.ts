@@ -142,6 +142,7 @@ function createRuntimeFallbackHelpers(deps: HookDeps, operations: string[]): Aut
       if (source === "message.updated.quota-fallback") {
         deps.internallyAbortedSessions.add(_sessionID)
       }
+      return true
     },
     clearSessionFallbackTimeout: () => {},
     scheduleSessionFallbackTimeout: () => {},

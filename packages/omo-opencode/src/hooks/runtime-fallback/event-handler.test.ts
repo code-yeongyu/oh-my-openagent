@@ -48,6 +48,7 @@ function createHelpers(deps: HookDeps, abortCalls: string[], clearCalls: string[
   return {
     abortSessionRequest: async (sessionID: string) => {
       abortCalls.push(sessionID)
+      return true
     },
     clearSessionFallbackTimeout: (sessionID: string) => {
       clearCalls.push(sessionID)

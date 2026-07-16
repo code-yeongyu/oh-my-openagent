@@ -123,6 +123,7 @@ export function createFirstPromptWatchdog(
 ): FirstPromptWatchdog {
   const timers = new Map<string, RuntimeFallbackTimeout>()
   const armed = new Set<string>()
+  let lifecycleGeneration = 0
 
   const cancel = (sessionID: string): void => {
     const timer = timers.get(sessionID)
@@ -138,6 +139,7 @@ export function createFirstPromptWatchdog(
     model: string | undefined,
     agent: string | undefined,
     wasSubagent: boolean,
+    generation: number,
   ): Promise<void> => {
     timers.delete(sessionID)
     armed.delete(sessionID)
@@ -148,6 +150,7 @@ export function createFirstPromptWatchdog(
     }
 
     const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
+    if (generation !== lifecycleGeneration) return
     const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, deps.pluginConfig)
 
     if (fallbackModels.length === 0) {
@@ -188,6 +191,7 @@ export function createFirstPromptWatchdog(
     // fallback prompt can take over cleanly. If OpenCode rejects the abort,
     // do not start a competing request while the original may still be live.
     const abortSucceeded = await helpers.abortSessionRequest(sessionID, SOURCE)
+    if (generation !== lifecycleGeneration) return
     if (abortSucceeded === false) {
       log(`[${HOOK_NAME}] ${SOURCE}: abort failed, skipping fallback dispatch`, { sessionID })
       return
@@ -211,8 +215,9 @@ export function createFirstPromptWatchdog(
       if (!wasSubagent && deps.config.timeout_seconds <= 0) return
 
       armed.add(sessionID)
+      const generation = lifecycleGeneration
       const timer = setTimeout(async () => {
-        await fire(sessionID, model, agent, wasSubagent)
+        await fire(sessionID, model, agent, wasSubagent, generation)
       }, watchdogMs)
       timers.set(sessionID, timer)
 
@@ -229,6 +234,7 @@ export function createFirstPromptWatchdog(
       log(`[${HOOK_NAME}] ${SOURCE}: cancelled (session terminal)`, { sessionID })
     },
     dispose() {
+      lifecycleGeneration += 1
       for (const timer of timers.values()) {
         clearTimeout(timer)
       }

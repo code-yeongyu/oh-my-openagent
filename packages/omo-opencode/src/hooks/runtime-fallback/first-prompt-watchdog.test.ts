@@ -124,6 +124,7 @@ function createHelpers(calls: RecordedCalls, resolvedAgentName?: string): AutoRe
   return {
     abortSessionRequest: async (sessionID: string, source: string) => {
       calls.abort.push({ sessionID, source })
+      return true
     },
     clearSessionFallbackTimeout: () => {},
     scheduleSessionFallbackTimeout: () => {},

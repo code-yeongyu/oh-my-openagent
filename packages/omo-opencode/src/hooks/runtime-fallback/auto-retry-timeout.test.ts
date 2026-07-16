@@ -73,7 +73,7 @@ describe("createFallbackTimeoutHelpers", () => {
     })
     const helpers = createFallbackTimeoutHelpers(
       deps,
-      async () => {},
+      async () => true,
       async (_sessionID, model) => {
         retryModel = model
         resolveRetry?.()
@@ -120,7 +120,7 @@ describe("createFallbackTimeoutHelpers", () => {
     })
     const helpers = createFallbackTimeoutHelpers(
       deps,
-      async () => {},
+      async () => true,
       async () => {
         resolveRetry?.()
         return { accepted: false, status: "blocked", reason: "test gate blocked dispatch" }
@@ -141,5 +141,49 @@ describe("createFallbackTimeoutHelpers", () => {
     expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
     expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(true)
     helpers.clearSessionFallbackTimeout(sessionID)
+  })
+
+  test("#given timeout escalation cannot abort the active request #when the timeout fires #then it preserves retry ownership and does not dispatch a fallback", async () => {
+    const sessionID = "session-timeout-abort-failed"
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createDeps()
+    const state = createFallbackState("openai/gpt-5.4")
+    state.pendingFallbackModel = "litellm/openai.eu.gpt-5.5"
+    state.pendingFallbackPromptMayHaveBeenAccepted = true
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionRetryInFlight.add(sessionID)
+
+    let resolveAbort: (() => void) | undefined
+    const abortCalled = new Promise<void>((resolve) => {
+      resolveAbort = resolve
+    })
+    let dispatchCount = 0
+    const helpers = createFallbackTimeoutHelpers(
+      deps,
+      async () => {
+        resolveAbort?.()
+        return false
+      },
+      async () => {
+        dispatchCount += 1
+        return { accepted: true, status: "dispatched" }
+      },
+    )
+
+    helpers.scheduleSessionFallbackTimeout(sessionID)
+    await Promise.race([
+      abortCalled,
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("timer did not fire")), 1000)
+      }),
+    ])
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(dispatchCount).toBe(0)
+    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(true)
+    expect(state.pendingFallbackModel).toBe("litellm/openai.eu.gpt-5.5")
+    expect(state.pendingFallbackPromptMayHaveBeenAccepted).toBe(true)
+    expect(state.currentModel).toBe("openai/gpt-5.4")
+    expect(state.attemptCount).toBe(0)
   })
 })

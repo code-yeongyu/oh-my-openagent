@@ -54,6 +54,7 @@ function createHelpers(abortCalls: string[], retryCalls: Array<{ sessionID: stri
   return {
     abortSessionRequest: async (sessionID: string) => {
       abortCalls.push(sessionID)
+      return true
     },
     clearSessionFallbackTimeout: () => {},
     scheduleSessionFallbackTimeout: () => {},

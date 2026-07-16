@@ -11,7 +11,7 @@ declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
 
 export function createFallbackTimeoutHelpers(
   deps: HookDeps,
-  abortSessionRequest: (sessionID: string, source: string) => Promise<boolean | void>,
+  abortSessionRequest: (sessionID: string, source: string) => Promise<boolean>,
   autoRetryWithFallback: (
     sessionID: string,
     newModel: string,
@@ -58,7 +58,11 @@ export function createFallbackTimeoutHelpers(
         log(`[${HOOK_NAME}] Overriding in-flight retry due to session timeout`, { sessionID })
       }
 
-      await abortSessionRequest(sessionID, "session.timeout")
+      const abortSucceeded = await abortSessionRequest(sessionID, "session.timeout")
+      if (!abortSucceeded) {
+        log(`[${HOOK_NAME}] Session fallback timeout abort failed; preserving retry ownership`, { sessionID })
+        return
+      }
       sessionRetryInFlight.delete(sessionID)
 
       if (state.pendingFallbackModel) {
