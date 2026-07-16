@@ -512,6 +512,29 @@ describe("observeEventForWatchdog", () => {
     expect(calls.terminal).toEqual([])
   })
 
+  it("#given empty event parts mask an info compaction marker #when observed #then the watchdog does not arm", () => {
+    const calls = freshCalls()
+    observeEventForWatchdog(
+      {
+        type: "message.updated",
+        properties: {
+          info: {
+            sessionID,
+            role: "user",
+            model: "openai/gpt-5.4-mini",
+            agent: "sisyphus",
+            parts: [{ type: "compaction" }],
+          },
+          parts: [],
+        },
+      },
+      createRecordingWatchdog(calls),
+    )
+    expect(calls.user).toEqual([])
+    expect(calls.progress).toEqual([])
+    expect(calls.terminal).toEqual([])
+  })
+
   const assistantProgressParts: ReadonlyArray<readonly [string, { readonly type: string; readonly text?: string; readonly id?: string; readonly name?: string; readonly tool_use_id?: string }]> = [
     ["text", { type: "text", text: "hello" }],
     ["reasoning", { type: "reasoning", text: "thinking..." }],

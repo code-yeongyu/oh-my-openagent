@@ -6,6 +6,7 @@ import { subagentSessions } from "../../features/claude-code-session-state"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { isRecord } from "../../shared/record-type-guard"
 import { isCompactionMessage } from "../../shared/compaction-marker"
+import { isAbortError } from "../../shared/is-abort-error"
 import { normalizeModelToCanonicalString } from "./normalize-model"
 import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
@@ -21,7 +22,7 @@ declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
 export interface FirstPromptWatchdog {
   onUserMessage(sessionID: string, model?: string, agent?: string): void
   onAssistantProgress(sessionID: string): void
-  onSessionTerminal(sessionID: string, eventType?: string): void
+  onSessionTerminal(sessionID: string, eventType?: string, isAbortEvent?: boolean): void
   dispose(): void
 }
 
@@ -95,7 +96,7 @@ export function observeEventForWatchdog(
     if (role === "user") {
       const model = normalizeModelToCanonicalString(info?.model)
       const agent = typeof info?.agent === "string" ? info.agent : undefined
-      if (isCompactionMessage({ agent, parts: eventParts ?? infoParts })) return
+      if (isCompactionMessage({ agent, parts: [...(eventParts ?? []), ...(infoParts ?? [])] })) return
       watchdog.onUserMessage(sessionID, model, agent)
       return
     }
@@ -103,7 +104,7 @@ export function observeEventForWatchdog(
     if (role === "assistant") {
       const hasError = info?.error !== undefined
       const hasFinish = hasAssistantCompletionMarker(info)
-      const parts = eventParts ?? infoParts ?? []
+      const parts = [...(eventParts ?? []), ...(infoParts ?? [])]
       const hasAnyPart = parts.some((part) => isRecord(part) && typeof part.type === "string")
       if (hasError || hasFinish || hasAnyPart) {
         watchdog.onAssistantProgress(sessionID)
@@ -114,7 +115,10 @@ export function observeEventForWatchdog(
 
   if (TERMINAL_EVENT_TYPES.has(event.type)) {
     const sessionID = resolveSessionEventID(props)
-    if (sessionID) watchdog.onSessionTerminal(sessionID, event.type)
+    if (sessionID) {
+      const abortEvent = event.type === "session.error" ? isAbortError(props.error) : undefined
+      watchdog.onSessionTerminal(sessionID, event.type, abortEvent)
+    }
   }
 }
 
@@ -242,10 +246,10 @@ export function createFirstPromptWatchdog(
       cancel(sessionID)
       log(`[${HOOK_NAME}] ${SOURCE}: cancelled (assistant progress observed)`, { sessionID })
     },
-    onSessionTerminal(sessionID, eventType) {
+    onSessionTerminal(sessionID, eventType, isAbortEvent) {
       if (!sessionID || !armed.has(sessionID)) return
       if (
-        (eventType === "session.idle" || eventType === "session.error")
+        (eventType === "session.idle" || (eventType === "session.error" && isAbortEvent === true))
         && deps.internallyAbortedSessions.has(sessionID)
       ) return
       cancel(sessionID)
