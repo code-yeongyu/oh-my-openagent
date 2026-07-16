@@ -212,4 +212,46 @@ Describe the final checks here.
       fixture.cleanup()
     }
   })
+
+  test("warns for prose-only sections under headings with ATX closing markers", async () => {
+    // given
+    const fixture = createFixture(`# Plan
+
+## TODOs ##
+Describe implementation tasks here.
+
+## Final Verification Wave ###
+Describe final checks here.
+`)
+
+    try {
+      // when
+      await fixture.run()
+
+      // then
+      expect(fixture.output.output).toContain("<plan-format-warning>")
+    } finally {
+      fixture.cleanup()
+    }
+  })
+
+  test("preserves a canonical task after inline backtick code", async () => {
+    // given
+    const fixture = createFixture(`# Plan
+
+## Todos
+\`\`\`example\`\`\`
+- [ ] 1. Implement
+`)
+
+    try {
+      // when
+      await fixture.run()
+
+      // then
+      expect(fixture.output.output).not.toContain("<plan-format-warning>")
+    } finally {
+      fixture.cleanup()
+    }
+  })
 })

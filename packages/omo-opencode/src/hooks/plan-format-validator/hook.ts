@@ -9,12 +9,12 @@ import { log } from "../../shared/logger"
 const WRITE_TOOLS = new Set(["Write", "Edit", "write", "edit"])
 
 const HEADING_ANY_LEVEL = /^#{1,6}(?:[ \t]+|$)/
-const HEADING_TODOS = /^##[ \t]+TODOs[ \t]*$/i
-const HEADING_FINAL_WAVE = /^##[ \t]+Final Verification Wave[ \t]*$/i
+const HEADING_TODOS = /^##[ \t]+TODOs(?:[ \t]+#+)?[ \t]*$/i
+const HEADING_FINAL_WAVE = /^##[ \t]+Final Verification Wave(?:[ \t]+#+)?[ \t]*$/i
 const TOPLEVEL_CHECKBOX = /^[-*]\s*\[[ xX]?\]/
 const TODO_TASK = /^- \[[ xX]\] [1-9]\d*\. .+$/
 const FINAL_WAVE_TASK = /^- \[[ xX]\] F[1-9]\d*\. .+$/i
-const FENCE_PATTERN = /^[ \t]{0,3}(`{3,}|~{3,})/
+const FENCE_PATTERN = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/
 
 type SectionName = "todo" | "final-wave"
 
@@ -26,7 +26,6 @@ type SectionStats = {
 
 type PlanFormatStats = {
   readonly rawCount: number
-  readonly validCount: number
   readonly hasEmptySection: boolean
   readonly hasMalformedRows: boolean
   readonly recognized: boolean
@@ -72,7 +71,6 @@ function analyzeStructuredSections(content: string): PlanFormatStats {
   const sections: readonly SectionStats[] = [stats.todo, stats["final-wave"]]
   return {
     rawCount: sections.reduce((total, item) => total + item.rawCount, 0),
-    validCount: sections.reduce((total, item) => total + item.validCount, 0),
     hasEmptySection: sections.some((item) => item.recognized && item.validCount === 0),
     hasMalformedRows: sections.some((item) => item.rawCount !== item.validCount),
     recognized: sections.some((item) => item.recognized),
@@ -80,9 +78,18 @@ function analyzeStructuredSections(content: string): PlanFormatStats {
 }
 
 function parseOpeningFence(line: string): MarkdownFence | null {
-  const run = line.match(FENCE_PATTERN)?.[1]
+  const match = line.match(FENCE_PATTERN)
+  const run = match?.[1]
+  const info = match?.[2]
   const marker = run?.charAt(0)
-  if (run === undefined || (marker !== "`" && marker !== "~")) return null
+  if (
+    run === undefined ||
+    info === undefined ||
+    (marker !== "`" && marker !== "~") ||
+    (marker === "`" && info.includes("`"))
+  ) {
+    return null
+  }
   return { marker, length: run.length }
 }
 

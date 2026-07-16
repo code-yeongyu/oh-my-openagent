@@ -7,10 +7,10 @@ export type PlanChecklist = {
 	readonly nextTaskLabel: string | null;
 };
 
-const TODO_HEADING_PATTERN = /^##[ \t]+TODOs[ \t]*$/i;
-const FINAL_VERIFICATION_HEADING_PATTERN = /^##[ \t]+Final Verification Wave[ \t]*$/i;
+const TODO_HEADING_PATTERN = /^##[ \t]+TODOs(?:[ \t]+#+)?[ \t]*$/i;
+const FINAL_VERIFICATION_HEADING_PATTERN = /^##[ \t]+Final Verification Wave(?:[ \t]+#+)?[ \t]*$/i;
 const MARKDOWN_HEADING_PATTERN = /^#{1,6}(?:[ \t]+|$)/;
-const FENCE_PATTERN = /^[ \t]{0,3}(`{3,}|~{3,})/;
+const FENCE_PATTERN = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/;
 const SIMPLE_CHECKBOX_PATTERN = /^[-*][ \t]*\[[ \t]*([xX]?)[ \t]*\][ \t]+(.+)$/;
 const TODO_CHECKBOX_PATTERN = /^- \[([ xX])\] ([1-9]\d*\. .+)$/;
 const FINAL_WAVE_CHECKBOX_PATTERN = /^- \[([ xX])\] (F[1-9]\d*\. .+)$/i;
@@ -98,8 +98,19 @@ function parseSimpleChecklist(lines: readonly string[]): PlanChecklist {
 	let completed = 0;
 	let remaining = 0;
 	let nextTaskLabel: string | null = null;
+	let fence: MarkdownFence | null = null;
 
 	for (const line of lines) {
+		if (fence !== null) {
+			if (isClosingFence(line, fence)) fence = null;
+			continue;
+		}
+		const openingFence = parseOpeningFence(line);
+		if (openingFence !== null) {
+			fence = openingFence;
+			continue;
+		}
+
 		const checkbox = parseSimpleTopLevelCheckbox(line);
 		if (checkbox === null) continue;
 		if (checkbox.checked) completed += 1;
@@ -136,9 +147,17 @@ function parseSimpleTopLevelCheckbox(line: string): ParsedCheckbox | null {
 }
 
 function parseOpeningFence(line: string): MarkdownFence | null {
-	const run = line.match(FENCE_PATTERN)?.[1];
+	const match = line.match(FENCE_PATTERN);
+	const run = match?.[1];
+	const info = match?.[2];
 	const marker = run?.charAt(0);
-	if (run === undefined || (marker !== "`" && marker !== "~")) return null;
+	if (
+		run === undefined ||
+		info === undefined ||
+		(marker !== "`" && marker !== "~") ||
+		(marker === "`" && info.includes("`"))
+	)
+		return null;
 	return { marker, length: run.length };
 }
 

@@ -229,6 +229,27 @@ describe("readCurrentTopLevelTask", () => {
     })
   })
 
+  test("supports structured headings with ATX closing markers", () => {
+    // given
+    const planPath = writePlanFile(
+      `top-level-task-closing-marker-${Date.now()}.md`,
+      `## TODOs ##
+- [ ] 1. Implement
+`,
+    )
+
+    // when
+    const result = readCurrentTopLevelTask(planPath)
+
+    // then
+    expect(result).toEqual({
+      key: "todo:1",
+      section: "todo",
+      label: "1",
+      title: "Implement",
+    })
+  })
+
   test("returns final-wave task when plan has only Final Verification Wave section", () => {
     // given
     const planPath = writePlanFile(

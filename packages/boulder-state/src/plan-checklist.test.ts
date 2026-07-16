@@ -165,6 +165,50 @@ describe("parsePlanChecklist", () => {
       nextTaskLabel: "F1. Counted verifier",
     })
   })
+
+  test("#given structured headings with ATX closing markers #when parsed #then canonical tasks remain structured", () => {
+    // given
+    const markdown = [
+      "## TODOs ##",
+      "- [ ] 1. Implement",
+      "## Final Verification Wave ###",
+      "- [ ] F1. Verify",
+    ].join("\n")
+
+    // when
+    const checklist = parsePlanChecklist(markdown)
+
+    // then
+    expect(checklist).toEqual({
+      completed: 0,
+      remaining: 2,
+      total: 2,
+      nextTaskLabel: "1. Implement",
+    })
+  })
+
+  test("#given inline backtick code before a canonical task #when parsed #then it does not open a fence", () => {
+    // given
+    const markdown = ["## TODOs", "```example```", "- [ ] 1. Implement"].join("\n")
+
+    // when
+    const checklist = parsePlanChecklist(markdown)
+
+    // then
+    expect(checklist.total).toBe(1)
+    expect(checklist.nextTaskLabel).toBe("1. Implement")
+  })
+
+  test("#given a heading-free fenced checkbox example #when parsed #then legacy fallback ignores it", () => {
+    // given
+    const markdown = ["````md", "- [ ] 1. Example only", "````"].join("\n")
+
+    // when
+    const checklist = parsePlanChecklist(markdown)
+
+    // then
+    expect(checklist).toEqual({ completed: 0, remaining: 0, total: 0, nextTaskLabel: null })
+  })
 })
 
 describe("getPlanChecklist", () => {

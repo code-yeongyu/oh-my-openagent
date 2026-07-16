@@ -183,6 +183,52 @@ describe("start-work plan checklist consumption", () => {
 			nextTaskLabel: "F1. Counted verifier",
 		});
 	});
+
+	it("#given structured headings with ATX closing markers #when parsed #then canonical tasks remain structured", () => {
+		// given
+		const planPath = createPlan(
+			["## TODOs ##", "- [ ] 1. Implement", "## Final Verification Wave ###", "- [ ] F1. Verify"].join("\n"),
+		);
+
+		// when
+		const checklist = getPlanChecklist(planPath);
+
+		// then
+		expect(checklist).toEqual({
+			completed: 0,
+			remaining: 2,
+			total: 2,
+			nextTaskLabel: "1. Implement",
+		});
+	});
+
+	it("#given inline backtick code before a canonical task #when parsed #then it does not open a fence", () => {
+		// given
+		const planPath = createPlan(["## TODOs", "```example```", "- [ ] 1. Implement"].join("\n"));
+
+		// when
+		const checklist = getPlanChecklist(planPath);
+
+		// then
+		expect(checklist.total).toBe(1);
+		expect(checklist.nextTaskLabel).toBe("1. Implement");
+	});
+
+	it("#given a heading-free fenced checkbox example #when parsed #then legacy fallback ignores it", () => {
+		// given
+		const planPath = createPlan(["````md", "- [ ] 1. Example only", "````"].join("\n"));
+
+		// when
+		const checklist = getPlanChecklist(planPath);
+
+		// then
+		expect(checklist).toEqual({
+			completed: 0,
+			remaining: 0,
+			total: 0,
+			nextTaskLabel: null,
+		});
+	});
 });
 
 describe("start-work boulder state reader", () => {
