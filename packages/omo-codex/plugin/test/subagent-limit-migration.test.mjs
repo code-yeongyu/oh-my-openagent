@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { migrateConfigFile } from "../scripts/migrate-codex-config.mjs";
 
-test("#given SessionStart config migration sees an explicit V2 cap #when migrating #then preserves it while raising the legacy cap", async () => {
+test("#given SessionStart migration sees an inline-commented V2 cap #when migrating twice #then preserves the line and ordering byte-for-byte", async () => {
 	const root = await mkdtemp(join(tmpdir(), "lazycodex-subagent-limit-migration-"));
 	const configPath = join(root, "config.toml");
 	await writeFile(
@@ -26,21 +26,30 @@ test("#given SessionStart config migration sees an explicit V2 cap #when migrati
 			"",
 			"[features.multi_agent_v2]",
 			"enabled = false",
-			"max_concurrent_threads_per_session = 6",
+			"usage_hint_enabled = false",
+			"max_concurrent_threads_per_session = 7 # user cap",
+			"show_tool_use = false",
 			"",
 		].join("\n"),
 	);
 
-	const result = await migrateConfigFile(configPath);
+	const firstResult = await migrateConfigFile(configPath);
+	const firstPass = await readFile(configPath, "utf8");
+	const secondResult = await migrateConfigFile(configPath);
 
-	const content = await readFile(configPath, "utf8");
-	assert.equal(result.changed, true);
-	assert.match(content, /\[agents\][\s\S]*?max_threads = 1000/);
-	assert.match(content, /max_depth = 4/);
-	assert.match(content, /\[agents\.explorer\]\nconfig_file = "\.\/agents\/explorer\.toml"/);
-	assert.match(content, /\[features\.multi_agent_v2\][\s\S]*?enabled = false/);
-	assert.match(content, /max_concurrent_threads_per_session = 6/);
-	assert.doesNotMatch(content, /^max_threads\s*=\s*6$/m);
+	const secondPass = await readFile(configPath, "utf8");
+	assert.equal(firstResult.changed, true);
+	assert.equal(secondResult.changed, false);
+	assert.equal(secondPass, firstPass);
+	assert.match(
+		secondPass,
+		/usage_hint_enabled = false\nmax_concurrent_threads_per_session = 7 # user cap\nshow_tool_use = false/,
+	);
+	assert.match(secondPass, /\[agents\][\s\S]*?max_threads = 1000/);
+	assert.match(secondPass, /max_depth = 4/);
+	assert.match(secondPass, /\[agents\.explorer\]\nconfig_file = "\.\/agents\/explorer\.toml"/);
+	assert.match(secondPass, /\[features\.multi_agent_v2\][\s\S]*?enabled = false/);
+	assert.doesNotMatch(secondPass, /^max_threads\s*=\s*6$/m);
 });
 
 test("#given gpt-5.6 session model with no models_cache and an explicit V2 cap #when migrating #then removes agents.max_threads but preserves the cap", async () => {

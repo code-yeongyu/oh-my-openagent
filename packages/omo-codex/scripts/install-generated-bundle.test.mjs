@@ -78,7 +78,7 @@ test("#given no root model #when generated bundle updates config #then it does n
 	assert.match(config, /max_concurrent_threads_per_session = 16/);
 });
 
-test("#given an explicit V2 thread cap #when generated bundle updates config #then preserves the configured cap", async () => {
+test("#given an inline-commented V2 thread cap #when generated bundle updates config twice #then preserves the line and ordering byte-for-byte", async () => {
 	// given
 	const root = await mkdtemp(join(tmpdir(), "omo-codex-generated-explicit-v2-cap-"));
 	const configPath = join(root, "config.toml");
@@ -86,26 +86,33 @@ test("#given an explicit V2 thread cap #when generated bundle updates config #th
 		configPath,
 		[
 			"[features.multi_agent_v2]",
-			"max_concurrent_threads_per_session = 6",
 			"usage_hint_enabled = false",
+			"max_concurrent_threads_per_session = 7 # user cap",
+			"show_tool_use = false",
 			"",
 		].join("\n"),
 	);
 
 	// when
-	await updateCodexConfig({
+	const updateInput = {
 		configPath,
 		repoRoot: "/repo/packages/omo-codex",
 		marketplaceName: "debug",
 		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
 		pluginNames: ["omo"],
-	});
+	};
+	await updateCodexConfig(updateInput);
+	const firstPass = await readFile(configPath, "utf8");
+	const firstV2Section = sectionText(firstPass, "[features.multi_agent_v2]");
+	await updateCodexConfig(updateInput);
 
 	// then
-	const config = await readFile(configPath, "utf8");
-	const v2Section = sectionText(config, "[features.multi_agent_v2]");
-	assert.match(v2Section, /^max_concurrent_threads_per_session = 6$/m);
-	assert.doesNotMatch(v2Section, /^max_concurrent_threads_per_session = 1000$/m);
+	const secondPass = await readFile(configPath, "utf8");
+	assert.equal(sectionText(secondPass, "[features.multi_agent_v2]"), firstV2Section);
+	assert.match(
+		sectionText(secondPass, "[features.multi_agent_v2]"),
+		/usage_hint_enabled = false\nmax_concurrent_threads_per_session = 7 # user cap\nshow_tool_use = false/,
+	);
 });
 
 test("#given explicit v1 model_catalog_json and stale models_cache v2 #when generated bundle updates config #then explicit catalog preserves disable and cap", async () => {
