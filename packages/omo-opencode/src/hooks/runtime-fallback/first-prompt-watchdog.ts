@@ -5,7 +5,7 @@ import { log } from "../../shared/logger"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { isRecord } from "../../shared/record-type-guard"
-import { isCompactionAgent } from "../../shared/compaction-marker"
+import { isCompactionMessage } from "../../shared/compaction-marker"
 import { normalizeModelToCanonicalString } from "./normalize-model"
 import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
@@ -89,11 +89,13 @@ export function observeEventForWatchdog(
     const sessionID = typeof info?.sessionID === "string" ? info.sessionID : undefined
     const role = typeof info?.role === "string" ? info.role : undefined
     if (!sessionID || !role) return
+    const eventParts = Array.isArray(props.parts) ? props.parts : undefined
+    const infoParts = Array.isArray(info?.parts) ? info.parts : undefined
 
     if (role === "user") {
       const model = normalizeModelToCanonicalString(info?.model)
       const agent = typeof info?.agent === "string" ? info.agent : undefined
-      if (isCompactionAgent(agent)) return
+      if (isCompactionMessage({ agent, parts: eventParts ?? infoParts })) return
       watchdog.onUserMessage(sessionID, model, agent)
       return
     }
@@ -101,8 +103,6 @@ export function observeEventForWatchdog(
     if (role === "assistant") {
       const hasError = info?.error !== undefined
       const hasFinish = hasAssistantCompletionMarker(info)
-      const eventParts = Array.isArray(props.parts) ? props.parts : undefined
-      const infoParts = Array.isArray(info?.parts) ? info.parts : undefined
       const parts = eventParts ?? infoParts ?? []
       const hasAnyPart = parts.some((part) => isRecord(part) && typeof part.type === "string")
       if (hasError || hasFinish || hasAnyPart) {
