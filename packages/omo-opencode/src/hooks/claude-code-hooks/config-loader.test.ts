@@ -12,20 +12,25 @@ describe("loadPluginExtendedConfig", () => {
   let tempDirectory = ""
   let userConfigPath = ""
   let projectConfigPath = ""
-  let originalUserConfig: string | null = null
+  let originalXdgConfigHome: string | undefined = undefined
+  let originalOpencodeConfigDir: string | undefined = undefined
   let mockedNow = 0
 
   beforeEach(() => {
     //#given
     originalWorkingDirectory = process.cwd()
     tempDirectory = mkdtempSync(join(tmpdir(), "omo-cc-plugin-project-config-"))
+
+    // Isolate default user config dir inside temp so tests never touch the real system
+    originalXdgConfigHome = process.env.XDG_CONFIG_HOME
+    originalOpencodeConfigDir = process.env.OPENCODE_CONFIG_DIR
+    process.env.XDG_CONFIG_HOME = join(tempDirectory, ".config")
+    delete process.env.OPENCODE_CONFIG_DIR
+
     userConfigPath = join(getOpenCodeConfigDir({ binary: "opencode" }), "opencode-cc-plugin.json")
     projectConfigPath = join(tempDirectory, ".opencode", "opencode-cc-plugin.json")
     mkdirSync(getOpenCodeConfigDir({ binary: "opencode" }), { recursive: true })
     mkdirSync(join(tempDirectory, ".opencode"), { recursive: true })
-    originalUserConfig = existsSync(userConfigPath)
-      ? readFileSync(userConfigPath, "utf8")
-      : null
     process.chdir(tempDirectory)
     mockedNow = 1_000
     Date.now = () => mockedNow
@@ -37,10 +42,17 @@ describe("loadPluginExtendedConfig", () => {
     Date.now = originalDateNow
     process.chdir(originalWorkingDirectory)
     rmSync(tempDirectory, { recursive: true, force: true })
-    if (originalUserConfig === null) {
-      rmSync(userConfigPath, { force: true })
+
+    // Restore env vars so subsequent tests are not affected
+    if (originalXdgConfigHome !== undefined) {
+      process.env.XDG_CONFIG_HOME = originalXdgConfigHome
     } else {
-      writeFileSync(userConfigPath, originalUserConfig)
+      delete process.env.XDG_CONFIG_HOME
+    }
+    if (originalOpencodeConfigDir !== undefined) {
+      process.env.OPENCODE_CONFIG_DIR = originalOpencodeConfigDir
+    } else {
+      delete process.env.OPENCODE_CONFIG_DIR
     }
   })
 
@@ -150,6 +162,54 @@ describe("loadPluginExtendedConfig", () => {
     //#then
     expect(matchingResult).toBe(true)
     expect(nonMatchingResult).toBe(false)
+  })
+
+  test("#given custom and default user configs both exist #when no project config #then custom overrides default", async () => {
+    //#given
+    const customConfigDir = join(tempDirectory, "custom-opencode-config")
+    const customConfigPath = join(customConfigDir, "opencode-cc-plugin.json")
+    mkdirSync(customConfigDir, { recursive: true })
+    process.env.OPENCODE_CONFIG_DIR = customConfigDir
+
+    // default user config (inside tempDirectory/.config/opencode via XDG_CONFIG_HOME isolation)
+    writeConfigFile(customConfigPath, ["custom-stop"])
+    writeConfigFile(userConfigPath, ["default-stop"])
+
+    clearPluginExtendedConfigCache()
+
+    //#when
+    const result = await loadPluginExtendedConfig()
+
+    //#then custom wins over default
+    expect(result).toEqual({
+      disabledHooks: {
+        Stop: ["custom-stop"],
+      },
+    })
+  })
+
+  test("#given custom, default, and project configs all exist #when loading extended config #then project overrides all user configs", async () => {
+    //#given
+    const customConfigDir = join(tempDirectory, "custom-opencode-config")
+    const customConfigPath = join(customConfigDir, "opencode-cc-plugin.json")
+    mkdirSync(customConfigDir, { recursive: true })
+    process.env.OPENCODE_CONFIG_DIR = customConfigDir
+
+    writeConfigFile(customConfigPath, ["custom-stop"])
+    writeConfigFile(userConfigPath, ["default-stop"])
+    writeConfigFile(projectConfigPath, ["project-stop"])
+
+    clearPluginExtendedConfigCache()
+
+    //#when
+    const result = await loadPluginExtendedConfig()
+
+    //#then project wins over merged user configs
+    expect(result).toEqual({
+      disabledHooks: {
+        Stop: ["project-stop"],
+      },
+    })
   })
 })
 
