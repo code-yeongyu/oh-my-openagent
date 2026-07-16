@@ -72,7 +72,12 @@ export function findNextAvailableFallback(
   fallbackModels: string[],
   cooldownSeconds: number
 ): { model: string; index: number } | undefined {
-  for (let i = state.fallbackIndex + 1; i < fallbackModels.length; i++) {
+  const len = fallbackModels.length
+  // Search from current position forward, then wrap around to cover earlier entries.
+  // This handles the case where the session's preferred model appears at a higher
+  // index than the current fallback, so wrapping back to index 0 is necessary.
+  for (let step = 1; step < len; step++) {
+    const i = (state.fallbackIndex + step) % len
     const candidate = fallbackModels[i]
     if (areRuntimeFallbackModelsEquivalent(candidate, state.currentModel)) {
       log(`[${HOOK_NAME}] Skipping equivalent fallback model`, {
