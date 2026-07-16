@@ -1,9 +1,6 @@
-real_db=/Users/yeongyu/.local/share/opencode/opencode.db
-real_count_before=5751
-real_count_after=5751
-sandbox_db=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/pr6043-live-qa.XXXXXX.wY9Wkv51Ui/data/opencode/opencode.db
+real_db_unchanged=yes
+sandbox_isolated=yes
 sandbox_session_count=1
-session_id=ses_0956a1d86ffebyt8L6DMlDiOTl
 prompt_http_code=204
 second_prompt_http_code=204
 user_abort_http_code=200

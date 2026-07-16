@@ -173,12 +173,13 @@ REAL_COUNT_AFTER="$(sqlite3 "$REAL_DB" 'SELECT count(*) FROM session;')"
 [ "$REAL_COUNT_BEFORE" = "$REAL_COUNT_AFTER" ]
 
 cp "$FAKE_LOG" "$EVIDENCE/live-fake-provider.txt"
-cp "$TMP_ROOT/plugin-watchdog.log" "$EVIDENCE/live-plugin-watchdog.txt"
-sed -n 's/^data: //p' "$SSE_LOG" | jq -c 'select(.type == "server.connected" or .type == "message.updated" or .type == "message.part.updated" or .type == "message.part.delta" or .type == "session.error" or .type == "session.idle") | {type, sessionID:(.properties.sessionID // .properties.info.sessionID // .properties.part.sessionID // null), role:(.properties.info.role // null), text:(.properties.part.text // .properties.delta // null)}' > "$EVIDENCE/live-sse-events.jsonl"
-printf 'real_db=%s\nreal_count_before=%s\nreal_count_after=%s\nsandbox_db=%s\nsandbox_session_count=%s\nsession_id=%s\nprompt_http_code=%s\nsecond_prompt_http_code=%s\nuser_abort_http_code=%s\nprimary_requests=%s\nfallback_requests=%s\nprimary_connection_closed=%s\nfallback_response_seen=%s\nuser_abort_classified_external=yes\n' \
-  "$REAL_DB" "$REAL_COUNT_BEFORE" "$REAL_COUNT_AFTER" "$SANDBOX_DB" "$SANDBOX_COUNT" "$SESSION_ID" "$HTTP_CODE" "$SECOND_HTTP_CODE" "$ABORT_HTTP_CODE" \
+sed -e "s/${SESSION_ID}/<qa-session>/g" -e "s#${TMP_ROOT}#<isolated-sandbox>#g" -e "s#${ROOT}#<worktree>#g" \
+  "$TMP_ROOT/plugin-watchdog.log" > "$EVIDENCE/live-plugin-watchdog.txt"
+sed -n 's/^data: //p' "$SSE_LOG" | jq -c 'select(.type == "server.connected" or .type == "message.updated" or .type == "message.part.updated" or .type == "message.part.delta" or .type == "session.error" or .type == "session.idle") | {type, session:(if (.properties.sessionID // .properties.info.sessionID // .properties.part.sessionID // null) then "<qa-session>" else null end), role:(.properties.info.role // null), text:(.properties.part.text // .properties.delta // null)}' > "$EVIDENCE/live-sse-events.jsonl"
+printf 'real_db_unchanged=yes\nsandbox_isolated=yes\nsandbox_session_count=%s\nprompt_http_code=%s\nsecond_prompt_http_code=%s\nuser_abort_http_code=%s\nprimary_requests=%s\nfallback_requests=%s\nprimary_connection_closed=%s\nfallback_response_seen=%s\nuser_abort_classified_external=yes\n' \
+  "$SANDBOX_COUNT" "$HTTP_CODE" "$SECOND_HTTP_CODE" "$ABORT_HTTP_CODE" \
   "$(grep -c 'REQUEST model=primary' "$FAKE_LOG")" "$(grep -c 'REQUEST model=fallback' "$FAKE_LOG")" \
   "$(grep -c 'PRIMARY_CONNECTION_CLOSED' "$FAKE_LOG")" "$(grep -c 'QA_FALLBACK_OK' "$SSE_LOG")" \
   > "$EVIDENCE/live-isolation-receipt.txt"
 
-printf 'PASS source_base=%s session=%s real_db_unchanged=%s fallback_seen=yes later_user_abort=external\n' "$(git rev-parse HEAD)" "$SESSION_ID" "$REAL_COUNT_AFTER"
+printf 'PASS source_head=%s real_db_unchanged=yes fallback_seen=yes later_user_abort=external\n' "$(git rev-parse HEAD)"

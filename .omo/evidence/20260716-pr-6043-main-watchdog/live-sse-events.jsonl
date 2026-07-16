@@ -1,28 +1,28 @@
-{"type":"server.connected","sessionID":null,"role":null,"text":null}
-{"type":"message.updated","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":"user","text":null}
-{"type":"message.part.updated","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":null,"text":"Reply exactly QA_FALLBACK_OK"}
-{"type":"message.updated","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":"assistant","text":null}
-{"type":"message.updated","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":"user","text":null}
-{"type":"message.updated","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":"assistant","text":null}
-{"type":"session.idle","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":null,"text":null}
-{"type":"message.updated","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":"user","text":null}
-{"type":"message.part.updated","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":null,"text":"Reply exactly QA_FALLBACK_OK"}
-{"type":"message.updated","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":"assistant","text":null}
-{"type":"message.updated","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":"user","text":null}
-{"type":"message.part.updated","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":null,"text":null}
-{"type":"message.part.updated","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":null,"text":""}
-{"type":"message.part.delta","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":null,"text":"QA_FALLBACK_OK"}
-{"type":"message.part.updated","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":null,"text":"QA_FALLBACK_OK"}
-{"type":"message.part.updated","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":null,"text":null}
-{"type":"message.updated","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":"assistant","text":null}
-{"type":"message.updated","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":"assistant","text":null}
-{"type":"session.idle","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":null,"text":null}
-{"type":"message.updated","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":"user","text":null}
-{"type":"message.updated","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":"user","text":null}
-{"type":"message.part.updated","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":null,"text":"Second turn for user cancellation QA"}
-{"type":"message.updated","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":"assistant","text":null}
-{"type":"message.updated","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":"user","text":null}
-{"type":"session.error","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":null,"text":null}
-{"type":"session.idle","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":null,"text":null}
-{"type":"message.updated","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":"assistant","text":null}
-{"type":"session.idle","sessionID":"ses_0956a1d86ffebyt8L6DMlDiOTl","role":null,"text":null}
+{"type":"server.connected","session":null,"role":null,"text":null}
+{"type":"message.updated","session":"<qa-session>","role":"user","text":null}
+{"type":"message.part.updated","session":"<qa-session>","role":null,"text":"Reply exactly QA_FALLBACK_OK"}
+{"type":"message.updated","session":"<qa-session>","role":"assistant","text":null}
+{"type":"message.updated","session":"<qa-session>","role":"user","text":null}
+{"type":"message.updated","session":"<qa-session>","role":"assistant","text":null}
+{"type":"session.idle","session":"<qa-session>","role":null,"text":null}
+{"type":"message.updated","session":"<qa-session>","role":"user","text":null}
+{"type":"message.part.updated","session":"<qa-session>","role":null,"text":"Reply exactly QA_FALLBACK_OK"}
+{"type":"message.updated","session":"<qa-session>","role":"assistant","text":null}
+{"type":"message.updated","session":"<qa-session>","role":"user","text":null}
+{"type":"message.part.updated","session":"<qa-session>","role":null,"text":null}
+{"type":"message.part.updated","session":"<qa-session>","role":null,"text":""}
+{"type":"message.part.delta","session":"<qa-session>","role":null,"text":"QA_FALLBACK_OK"}
+{"type":"message.part.updated","session":"<qa-session>","role":null,"text":"QA_FALLBACK_OK"}
+{"type":"message.part.updated","session":"<qa-session>","role":null,"text":null}
+{"type":"message.updated","session":"<qa-session>","role":"assistant","text":null}
+{"type":"message.updated","session":"<qa-session>","role":"assistant","text":null}
+{"type":"session.idle","session":"<qa-session>","role":null,"text":null}
+{"type":"message.updated","session":"<qa-session>","role":"user","text":null}
+{"type":"message.updated","session":"<qa-session>","role":"user","text":null}
+{"type":"message.part.updated","session":"<qa-session>","role":null,"text":"Second turn for user cancellation QA"}
+{"type":"message.updated","session":"<qa-session>","role":"assistant","text":null}
+{"type":"message.updated","session":"<qa-session>","role":"user","text":null}
+{"type":"session.error","session":"<qa-session>","role":null,"text":null}
+{"type":"session.idle","session":"<qa-session>","role":null,"text":null}
+{"type":"message.updated","session":"<qa-session>","role":"assistant","text":null}
+{"type":"session.idle","session":"<qa-session>","role":null,"text":null}
