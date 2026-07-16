@@ -133,11 +133,24 @@ function mergeLoadedConfig(
   }
 
   const userMcpEnvAllowlist = config.mcp_env_allowlist ?? []
+  const userPlaywrightMcpArgs = config.browser_automation_engine?.playwright_mcp_args
   for (const layer of [...projectLayersNearestFirst].reverse()) {
     if (layer.config) config = mergeConfigs(config, layer.config)
   }
 
   config = { ...config, mcp_env_allowlist: userMcpEnvAllowlist }
+  if (config.browser_automation_engine) {
+    const {
+      playwright_mcp_args: _projectPlaywrightMcpArgs,
+      ...browserAutomationEngine
+    } = config.browser_automation_engine
+    config = {
+      ...config,
+      browser_automation_engine: userPlaywrightMcpArgs !== undefined
+        ? { ...browserAutomationEngine, playwright_mcp_args: userPlaywrightMcpArgs }
+        : browserAutomationEngine,
+    }
+  }
   return applyDisabledProviders(config)
 }
 
