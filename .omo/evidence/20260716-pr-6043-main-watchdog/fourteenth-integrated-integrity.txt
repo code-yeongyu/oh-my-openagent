@@ -1,0 +1,7 @@
+integrated_head=1a427eb83fc722249e6e7562d0097fe5a113db9d
+merged_dev=fb7d4b66f541e22e9718a4f51314702c6ac68e53
+origin_dev=fb7d4b66f541e22e9718a4f51314702c6ac68e53
+runtime_fix=2417ac2081c1e9614185a3340d560dc0d35a1ea5
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-events.ts=      86
+packages/omo-opencode/src/hooks/runtime-fallback/hook-provider-error-correlation.test.ts=     116
+fix_present=82:        return watchdog.onAssistantProgress(sessionID, parentMessageID, isAbortError(info.error))

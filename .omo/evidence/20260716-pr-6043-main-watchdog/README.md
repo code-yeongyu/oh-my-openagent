@@ -1,8 +1,8 @@
 # PR #6043 QA Evidence
 
-Reviewed runtime source head: `2417ac2081c1e9614185a3340d560dc0d35a1ea5`
+Reviewed integrated source head: `1a427eb83fc722249e6e7562d0097fe5a113db9d`
 
-Integrated `dev`: `16658f79c1155cb6f1b3bfaffa1f54ebd1469615`
+Integrated `dev`: `fb7d4b66f541e22e9718a4f51314702c6ac68e53`
 
 Exact integrated QA head before this evidence-only refresh:
 `0e7223d60b6cbbb04ddc92801f62fd6c09749e92`
@@ -348,6 +348,11 @@ Fourteenth-cycle artifacts:
 - `fourteenth-exact-integrity.txt`: exact runtime head, observed live `dev` tip, changed paths, diff check, and pure-LOC limits.
 - `fourteenth-exact-opencode-harness-self-check.txt`: exact-head isolated harness preflight and cleanup proof.
 - `fourteenth-exact-live-watchdog-run.txt`: production-duration live OpenCode run pinned to `2417ac2081c1e9614185a3340d560dc0d35a1ea5`; fallback observed, no fallback watchdog re-arm, later user abort external, and real database unchanged.
+- `fourteenth-integrated-runtime-fallback-suite.txt`: 282 tests passing across 40 files after merging `dev`.
+- `fourteenth-integrated-omo-opencode-typecheck.txt`, `fourteenth-integrated-biome.txt`, and `fourteenth-integrated-no-excuse.txt`: integrated-head static gates.
+- `fourteenth-integrated-integrity.txt`: integrated head `1a427eb83fc722249e6e7562d0097fe5a113db9d`, merged `dev` parent, retained runtime fix, diff check, and pure-LOC limits.
+- `fourteenth-integrated-opencode-harness-self-check.txt`: integrated-head isolated harness preflight and cleanup proof.
+- `fourteenth-integrated-live-watchdog-run.txt`: production-duration live OpenCode run pinned to integrated head `1a427eb83fc722249e6e7562d0097fe5a113db9d`; fallback observed, no fallback watchdog re-arm, later user abort external, and real database unchanged.
 
 ## Why It Is Enough
 
