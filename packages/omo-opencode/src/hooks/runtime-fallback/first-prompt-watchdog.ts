@@ -2,7 +2,7 @@ import type { HookDeps, RuntimeFallbackTimeout } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME, DEFAULT_FIRST_PROMPT_WATCHDOG_MS } from "./constants"
 import { log } from "../../shared/logger"
-import { getMainSessionID, subagentSessions } from "../../features/claude-code-session-state"
+import { getMainSessionID, isMainSession, subagentSessions } from "../../features/claude-code-session-state"
 import { createWatchdogAbortProvenance } from "./watchdog-abort-provenance"
 import type { ArmedWatchdog, WatchdogEventDecision } from "./first-prompt-watchdog-types"
 import { fireFirstPromptWatchdog } from "./first-prompt-watchdog-fire"
@@ -113,7 +113,7 @@ export function createFirstPromptWatchdog(
 
       const wasSubagent = subagentSessions.has(sessionID)
       const mainSessionID = getMainSessionID()
-      if (!wasSubagent && mainSessionID !== undefined && mainSessionID !== sessionID) return
+      if (!wasSubagent && mainSessionID !== undefined && !isMainSession(sessionID)) return
       if (!wasSubagent && deps.config.timeout_seconds <= 0) return
 
       const generation = lifecycleGeneration

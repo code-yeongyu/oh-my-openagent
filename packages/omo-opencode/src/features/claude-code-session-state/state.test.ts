@@ -8,6 +8,8 @@ import {
   updateSessionAgent,
   setMainSession,
   getMainSessionID,
+  isMainSession,
+  removeMainSession,
   registerAgentName,
   clearRegisteredAgentNames,
   isAgentRegistered,
@@ -129,6 +131,26 @@ describe("claude-code-session-state", () => {
       _resetForTesting()
       // then
       expect(getMainSessionID()).toBe(undefined)
+    })
+
+    test("should retain all active root sessions while exposing the latest one", () => {
+      setMainSession("root-a")
+      setMainSession("root-b")
+
+      expect(getMainSessionID()).toBe("root-b")
+      expect(isMainSession("root-a")).toBe(true)
+      expect(isMainSession("root-b")).toBe(true)
+    })
+
+    test("should restore the previous active root when the latest root is removed", () => {
+      setMainSession("root-a")
+      setMainSession("root-b")
+
+      removeMainSession("root-b")
+
+      expect(getMainSessionID()).toBe("root-a")
+      expect(isMainSession("root-a")).toBe(true)
+      expect(isMainSession("root-b")).toBe(false)
     })
   })
 

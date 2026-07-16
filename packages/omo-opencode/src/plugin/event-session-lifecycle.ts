@@ -1,6 +1,6 @@
 import {
   clearSessionAgent,
-  getMainSessionID,
+  removeMainSession,
   setMainSession,
   subagentSessions,
   syncSubagentSessions,
@@ -66,7 +66,7 @@ export async function handleSessionCreatedEvent(args: {
   const sessionID = resolveSessionEventID(args.props);
   const isSubagentSession = !!sessionInfo?.parentID || !!sessionID && subagentSessions.has(sessionID);
 
-  if (!isSubagentSession) setMainSession(sessionID);
+  if (sessionID && !isSubagentSession) setMainSession(sessionID);
   args.firstMessageVariantGate.markSessionCreated(sessionInfo);
 
   if (args.tmuxIntegrationEnabled && !isSubagentSession) {
@@ -93,8 +93,8 @@ export async function handleSessionDeletedEvent(args: {
   clearModelFallbackSession: (sessionID: string) => void;
 }): Promise<void> {
   const sessionID = resolveSessionEventID(args.props);
-  if (sessionID === getMainSessionID()) setMainSession(undefined);
   if (!sessionID) return;
+  removeMainSession(sessionID);
 
   await args.managers.monitorManager?.stopSessionMonitors(sessionID);
   const wasSyncSubagentSession = syncSubagentSessions.has(sessionID);
