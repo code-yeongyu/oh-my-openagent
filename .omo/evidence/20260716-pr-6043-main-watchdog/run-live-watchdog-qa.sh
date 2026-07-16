@@ -148,6 +148,17 @@ wait_for "${WATCHDOG_WAIT_SECONDS:-125}" "watchdog fallback request" "grep -q 'R
 wait_for 20 "fallback response SSE" "grep -q 'QA_FALLBACK_OK' '$SSE_LOG'"
 wait_for 20 "primary request abort" "grep -q 'PRIMARY_CONNECTION_CLOSED' '$FAKE_LOG'"
 
+if [ -f "$OMO_LOG" ]; then
+  ARM_COUNT_AFTER_SUCCESS="$(tail -c "+$((OMO_OFFSET + 1))" "$OMO_LOG" | grep -c 'first-prompt-watchdog: armed' || true)"
+  sleep 1
+  ARM_COUNT_AFTER_SETTLE="$(tail -c "+$((OMO_OFFSET + 1))" "$OMO_LOG" | grep -c 'first-prompt-watchdog: armed' || true)"
+  [ "$ARM_COUNT_AFTER_SUCCESS" = "$ARM_COUNT_AFTER_SETTLE" ]
+else
+  ARM_COUNT_AFTER_SUCCESS=0
+  ARM_COUNT_AFTER_SETTLE=0
+fi
+[ "$(grep -c 'REQUEST model=fallback' "$FAKE_LOG")" = "1" ]
+
 SECOND_HTTP_CODE="$(curl -sS -o /dev/null -w '%{http_code}' -u "opencode:$SERVER_PASS" -X POST "http://127.0.0.1:${SERVER_PORT}/session/${SESSION_ID}/prompt_async?directory=${ENC_DIR}" -H 'content-type: application/json' -d '{"agent":"sisyphus","model":{"providerID":"openai","modelID":"fallback"},"parts":[{"type":"text","text":"Second turn for user cancellation QA"}]}')"
 [ "$SECOND_HTTP_CODE" = "204" ]
 wait_for 20 "second user turn reaches fallback provider" "grep -q 'FALLBACK_HANGING_FOR_USER_ABORT' '$FAKE_LOG'"
@@ -176,10 +187,11 @@ cp "$FAKE_LOG" "$EVIDENCE/live-fake-provider.txt"
 sed -e "s/${SESSION_ID}/<qa-session>/g" -e "s#${TMP_ROOT}#<isolated-sandbox>#g" -e "s#${ROOT}#<worktree>#g" \
   "$TMP_ROOT/plugin-watchdog.log" > "$EVIDENCE/live-plugin-watchdog.txt"
 sed -n 's/^data: //p' "$SSE_LOG" | jq -c 'select(.type == "server.connected" or .type == "message.updated" or .type == "message.part.updated" or .type == "message.part.delta" or .type == "session.error" or .type == "session.idle") | {type, session:(if (.properties.sessionID // .properties.info.sessionID // .properties.part.sessionID // null) then "<qa-session>" else null end), role:(.properties.info.role // null), text:(.properties.part.text // .properties.delta // null)}' > "$EVIDENCE/live-sse-events.jsonl"
-printf 'real_db_unchanged=yes\nsandbox_isolated=yes\nsandbox_session_count=%s\nprompt_http_code=%s\nsecond_prompt_http_code=%s\nuser_abort_http_code=%s\nprimary_requests=%s\nfallback_requests=%s\nprimary_connection_closed=%s\nfallback_response_seen=%s\nuser_abort_classified_external=yes\n' \
+printf 'real_db_unchanged=yes\nsandbox_isolated=yes\nsandbox_session_count=%s\nprompt_http_code=%s\nsecond_prompt_http_code=%s\nuser_abort_http_code=%s\nprimary_requests=%s\nfallback_requests=%s\nprimary_connection_closed=%s\nfallback_response_seen=%s\nfallback_watchdog_rearmed=no\nwatchdog_arm_count_after_success=%s\nwatchdog_arm_count_after_settle=%s\nuser_abort_classified_external=yes\n' \
   "$SANDBOX_COUNT" "$HTTP_CODE" "$SECOND_HTTP_CODE" "$ABORT_HTTP_CODE" \
   "$(grep -c 'REQUEST model=primary' "$FAKE_LOG")" "$(grep -c 'REQUEST model=fallback' "$FAKE_LOG")" \
   "$(grep -c 'PRIMARY_CONNECTION_CLOSED' "$FAKE_LOG")" "$(grep -c 'QA_FALLBACK_OK' "$SSE_LOG")" \
+  "$ARM_COUNT_AFTER_SUCCESS" "$ARM_COUNT_AFTER_SETTLE" \
   > "$EVIDENCE/live-isolation-receipt.txt"
 
-printf 'PASS source_head=%s real_db_unchanged=yes fallback_seen=yes later_user_abort=external\n' "$(git rev-parse HEAD)"
+printf 'PASS source_head=%s real_db_unchanged=yes fallback_seen=yes fallback_watchdog_rearmed=no later_user_abort=external\n' "$(git rev-parse HEAD)"

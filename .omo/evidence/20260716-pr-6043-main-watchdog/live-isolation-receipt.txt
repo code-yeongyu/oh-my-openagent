@@ -8,4 +8,7 @@ primary_requests=5
 fallback_requests=2
 primary_connection_closed=5
 fallback_response_seen=4
+fallback_watchdog_rearmed=no
+watchdog_arm_count_after_success=2
+watchdog_arm_count_after_settle=2
 user_abort_classified_external=yes

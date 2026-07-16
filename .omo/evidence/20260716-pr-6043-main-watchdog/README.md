@@ -1,6 +1,6 @@
 # PR #6043 QA Evidence
 
-Reviewed runtime source head: `bdc5f644ba0185d594bd3b412d2189ef14a3c008`
+Reviewed runtime source head: `dcdbaae5926e66a2165dfde00776c34052fabf61`
 
 Integrated `dev`: `81180f3759c55262a49be6883bb9db5c102e2b4d`
 
@@ -12,11 +12,11 @@ artifacts and does not change the tested runtime behavior.
 1. Focused watchdog, abort-provenance, timeout-abort, and lifecycle tests:
 
    ```text
-   bun test packages/omo-opencode/src/hooks/runtime-fallback/abort-provenance-race.test.ts packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-lifecycle.test.ts packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout.test.ts packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.test.ts packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.test.ts
+   bun test packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.test.ts packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-lifecycle.test.ts packages/omo-opencode/src/hooks/runtime-fallback/abort-provenance-race.test.ts packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.test.ts
    ```
 
    The final post-review repair run is captured in
-   `fourth-review-repair-focused-tests.txt`.
+   `fifth-review-repair-focused-tests.txt`.
 
 2. Full runtime-fallback hook suite:
 
@@ -25,20 +25,18 @@ artifacts and does not change the tested runtime behavior.
    ```
 
    The final post-review repair run is captured in
-   `fourth-review-repair-runtime-fallback-suite.txt`.
+   `fifth-review-repair-runtime-fallback-suite.txt`.
 
 3. OpenCode adapter typecheck and scoped Biome linter:
 
    ```text
-   bun run --cwd packages/omo-opencode typecheck
+   bunx tsgo --noEmit -p packages/omo-opencode/tsconfig.json
    bunx --bun @biomejs/biome@2.4.16 check --javascript-formatter-enabled=false --assist-enabled=false --javascript-linter-enabled=true --error-on-warnings <changed files>
    ```
 
    The final post-review repair runs are captured in
-   `fourth-review-repair-omo-opencode-typecheck.txt` and
-   `fourth-review-repair-biome.txt`. Formatting is intentionally disabled because this
-   adapter has no Biome configuration and the repository style is enforced by
-   its existing source and CI gates.
+   `fifth-review-repair-omo-opencode-typecheck.txt` and
+   `fifth-review-repair-biome.txt`.
 
 4. OpenCode QA harness self-check:
 
@@ -47,7 +45,7 @@ artifacts and does not change the tested runtime behavior.
    ```
 
    The final post-review repair run is captured in
-   `third-review-repair-opencode-harness-self-check.txt` with local paths and
+   `fifth-review-repair-opencode-harness-self-check.txt` with local paths and
    transient port values redacted.
 
 5. Real OpenCode live harness:
@@ -65,9 +63,17 @@ artifacts and does not change the tested runtime behavior.
 
 ## What Was Observed
 
-- Focused suite: 56 pass, 0 fail.
-- Full runtime-fallback suite: 267 pass, 0 fail.
+- Focused suite: 55 pass, 0 fail.
+- Full runtime-fallback suite: 269 pass, 0 fail.
 - Scoped TypeScript and Biome linter checks: pass.
+- The final gate review found that a fallback-owned user update could arm a
+  second watchdog and that a pre-acknowledgement abort-shaped `session.error`
+  could be mistaken for the watchdog's own abort. Failing-first tests
+  reproduced both behaviors. The repaired watchdog skips fallback-owned user
+  events and binds abort ownership to the exact acknowledged session
+  generation; pre-acknowledgement abort errors now remain external
+  cancellation, while acknowledged internal abort errors retain dispatch
+  ownership.
 - A failing-first lifecycle regression reproduced the live OpenCode race: the
   watchdog's own abort emitted assistant completion plus `session.idle` before
   the abort promise resolved, and the stale callback was incorrectly
@@ -90,6 +96,9 @@ artifacts and does not change the tested runtime behavior.
 - At the production watchdog deadline, the plugin aborted the silent primary
   request and dispatched `openai/fallback`.
 - The fallback provider returned `QA_FALLBACK_OK` through the real SSE stream.
+- The watchdog arm count stayed unchanged after the successful fallback
+  settled (`2` before and after the settle window), proving the internally
+  dispatched fallback turn did not re-arm the first-prompt watchdog.
 - The later user abort returned HTTP 200 and the plugin logged that the
   cancellation cleared retry state, proving stale internal-abort provenance
   did not survive the completed fallback cycle.
@@ -117,29 +126,33 @@ Artifacts:
 - `final-fourth-review-live-watchdog-run.txt`: successful production-duration
   live run pinned to final runtime head
   `bdc5f644ba0185d594bd3b412d2189ef14a3c008`.
+- `final-fifth-review-live-watchdog-run.txt`: successful production-duration
+  live run pinned to final runtime head
+  `dcdbaae5926e66a2165dfde00776c34052fabf61`.
 
 ## Why It Is Enough
 
 The tests cover main and subagent watchdog ownership, progress and terminal
-cancellation, cancellation while abort is in flight, expected internal-abort
-completion/idle events, removed-subagent suppression, abort failure,
+cancellation, cancellation while abort is in flight, pre-acknowledgement
+external abort errors, acknowledged internal abort errors, expected
+internal-abort completion/idle events, removed-subagent suppression, abort failure,
 zero-timeout semantics, retry dedupe, fallback timeout, delayed abort
 provenance, compaction exclusion, re-arming after progress, disposal during
 asynchronous work, and cleanup boundaries. The live harness covers what unit
 tests cannot: local plugin loading, real OpenCode lifecycle events, production
 watchdog timing, active-request abort, fallback dispatch after the internal
-idle edge, visible assistant output, a later genuine user cancellation, and
-database isolation.
+idle edge, visible assistant output, no fallback-owned watchdog re-arm, a
+later genuine user cancellation, and database isolation.
 
 ## What Was Omitted
 
 Raw environment dumps, credentials, tokens, auth headers, session IDs, local
 paths, transient diagnostic runs, and unrelated shared logs are omitted or
 redacted. The provider API key and server password in the harness are fixed
-local-only dummy values. The optional TypeScript no-excuse helper was omitted
-as a gate because its own compiler-API import fails before inspecting files
-(`ts.ScriptTarget` is undefined); strict package typecheck and the scoped Biome
-linter completed successfully.
+local-only dummy values. The optional TypeScript no-excuse helper could not
+load its compiler dependency in this worktree, so the same forbidden patterns
+were checked directly over the three changed TypeScript files; strict package
+typecheck and scoped Biome also completed successfully.
 
 ## Cleanup
 
