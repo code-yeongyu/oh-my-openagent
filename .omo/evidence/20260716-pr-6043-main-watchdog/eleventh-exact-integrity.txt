@@ -1,0 +1,9 @@
+head=e2048c0f6464a2cb3a0cc6679ab09b38b6b4ff07
+diff_check=pass
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts total_lines=245 pure_loc=232
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-events.ts total_lines=96 pure_loc=85
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.test.ts total_lines=364 pure_loc=286
+runtime_commit_paths:
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-events.ts
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.test.ts
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts

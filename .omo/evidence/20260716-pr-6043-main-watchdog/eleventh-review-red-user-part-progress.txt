@@ -1,0 +1,44 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.test.ts:
+(pass) first-prompt-watchdog > #given a main session stays silent past the threshold and has a fallback configured #when the watchdog fires #then it aborts the in-flight request and dispatches the fallback model [1.31ms]
+(pass) first-prompt-watchdog > #given the watchdog cannot abort a silent main session #when the abort fails #then it does not dispatch a competing fallback request [0.14ms]
+(pass) first-prompt-watchdog > #given timeout escalation is disabled for a main session #when the first prompt stays silent #then the main-session watchdog does not arm [0.08ms]
+(pass) first-prompt-watchdog > #given an active subagent stays silent past the threshold and has a fallback configured #when the watchdog fires #then it still aborts and dispatches the fallback model [0.16ms]
+(pass) first-prompt-watchdog > #given timeout escalation is disabled and an active subagent stays silent #when the watchdog fires #then the historical subagent safety net remains active [0.12ms]
+(pass) first-prompt-watchdog > #given a main session produces assistant text before the threshold #when progress is observed #then the watchdog is cancelled and no fallback is dispatched [0.12ms]
+(pass) first-prompt-watchdog > #given a fallback dispatch is already awaiting its result #when its internal user update is observed #then the first-prompt watchdog does not arm for that retry [0.07ms]
+(pass) first-prompt-watchdog > #given assistant progress cancels an armed watchdog #when a later user turn stays silent #then the watchdog re-arms for the new turn [0.09ms]
+(pass) first-prompt-watchdog > #given session emits message.part.updated with sessionID under properties.part #when watchdog tracks #then the watchdog recognizes progress and resets the silence timer [0.17ms]
+264 |       },
+265 |       watchdog,
+266 |     )
+267 |     await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+268 |
+269 |     expect(calls.abort).toEqual([{ sessionID, source: "first-prompt-watchdog" }])
+                              ^
+error: expect(received).toEqual(expected)
+
+- [
+-   {
+-     "sessionID": "session-user-part-before-silence",
+-     "source": "first-prompt-watchdog",
+-   },
+- ]
++ []
+
+- Expected  - 6
++ Received  + 1
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.test.ts:269:25)
+(fail) first-prompt-watchdog > #given the user prompt part arrives after the watchdog arms #when the provider stays silent #then the user part does not cancel fallback recovery [0.24ms]
+(pass) first-prompt-watchdog > #given session emits message.part.delta with field/delta but no part.type #when watchdog tracks #then the watchdog recognizes progress [0.10ms]
+(pass) first-prompt-watchdog > #given a subagent leaves subagentSessions before the threshold #when the watchdog fires #then it is suppressed [0.09ms]
+(pass) first-prompt-watchdog > #given a subagent reaches a terminal session state before the threshold #when onSessionTerminal is called #then the watchdog is cancelled and no fallback is dispatched [0.12ms]
+(pass) first-prompt-watchdog > #given a main session is silent past the threshold with no fallback configured #when the watchdog fires #then it does not abort or dispatch (lets the existing error-event paths handle it if one arrives later) [0.08ms]
+
+ 13 pass
+ 1 fail
+ 31 expect() calls
+Ran 14 tests across 1 file. [55.00ms]
+exit=1

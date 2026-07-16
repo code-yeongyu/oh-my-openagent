@@ -1,6 +1,6 @@
 # PR #6043 QA Evidence
 
-Reviewed runtime source head: `423022fb1f3a8df2a34c07193e22e0a9677d7432`
+Reviewed runtime source head: `e2048c0f6464a2cb3a0cc6679ab09b38b6b4ff07`
 
 Integrated `dev`: `238c65280ec341e174f1aa6b6ed582fbba952c4b`
 
@@ -202,6 +202,24 @@ Artifacts:
 - `tenth-exact-integrity.txt`: exact runtime head and pure-LOC limits.
 - `tenth-exact-live-watchdog-run.txt`: successful production-duration live run
   pinned to `423022fb1f3a8df2a34c07193e22e0a9677d7432`.
+- `eleventh-review-finding.md`: fresh exact-head reviewer report that the real
+  user prompt part was incorrectly treated as assistant progress.
+- `eleventh-review-red-user-part-progress.txt`: failing-first proof that the
+  user part cancelled the armed watchdog before silent-provider recovery.
+- `eleventh-exact-focused-tests.txt`: 93 passing focused watchdog, lifecycle,
+  provenance, message-handler, and shared status tests.
+- `eleventh-exact-runtime-fallback-suite.txt`: 277 passing runtime-fallback
+  tests across 35 files.
+- `eleventh-exact-omo-opencode-typecheck.txt`, `eleventh-exact-biome.txt`, and
+  `eleventh-exact-no-excuse.txt`: exact candidate static gates.
+- `eleventh-exact-integrity.txt`: candidate head, diff check, changed paths,
+  and pure-LOC measurements.
+- `eleventh-exact-opencode-harness-self-check.txt`: isolated OpenCode harness
+  preflight and sandbox cleanup proof.
+- `eleventh-exact-live-watchdog-run.txt`: successful production-duration live
+  run on the eleventh repaired candidate; the initial real user part did not
+  cancel recovery, fallback was observed, no fallback watchdog re-armed, the
+  later user abort remained external, and the real database was unchanged.
 
 The eighth repair closes the final cancellation-ownership ambiguity. When a
 current identity-free terminal event is followed by a delayed old-parent
@@ -233,6 +251,19 @@ across idle while leaving genuine stop/delete/error terminal handling intact.
 The exact tenth cycle passes the same 56 focused plus 3 shared status tests,
 all 276 runtime-fallback tests, static gates, integrity limits, and isolated
 production-duration OpenCode QA.
+
+The eleventh fresh reviewer found a distinct first-turn event-classification
+defect. OpenCode emits the user's `message.part.updated` after the user
+`message.updated` arms the watchdog, but the adapter treated that user part as
+assistant progress and cancelled the timer. The red regression in
+`eleventh-review-red-user-part-progress.txt` failed with no watchdog abort.
+The repair forwards the part's message ID and ignores only ordinary progress
+belonging to the current user message. Assistant and identity-free progress
+retain their prior behavior. The exact candidate passes 93 focused tests, all
+277 runtime-fallback tests, typecheck, Biome, the no-excuse audit, the OpenCode
+harness self-check, and production-duration live QA. The captured SSE stream
+shows the real user-part ordering, followed by the watchdog dispatching the
+fallback after silence rather than cancelling immediately.
 
 ## Why It Is Enough
 
