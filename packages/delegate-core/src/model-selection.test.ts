@@ -1,11 +1,32 @@
 import { describe, expect, test } from "bun:test"
-import { resolveModelForDelegateTask, type DelegateModelResolutionDeps } from "./model-selection"
+import {
+  resolveModelForDelegateTask,
+  type DelegateFallbackEntry,
+  type DelegateModelResolutionDeps,
+} from "./model-selection"
 
 const noCacheDeps: DelegateModelResolutionDeps = {
   connectedProviders: null,
   hasProviderModelsCache: false,
   hasConnectedProvidersCache: false,
 }
+
+const nativeSolEntry: DelegateFallbackEntry = {
+  providers: ["openai", "vercel"],
+  model: "gpt-5.6-sol",
+  variant: "xhigh",
+}
+const copilotSolEntry: DelegateFallbackEntry = {
+  providers: ["github-copilot"],
+  model: "gpt-5.6-sol",
+  variant: "high",
+}
+const legacyGptEntry: DelegateFallbackEntry = {
+  providers: ["openai", "github-copilot", "opencode", "vercel"],
+  model: "gpt-5.5",
+  variant: "xhigh",
+}
+const gpt56SolFallbackChain = [nativeSolEntry, copilotSolEntry, legacyGptEntry]
 
 describe("resolveModelForDelegateTask", () => {
   test("#given no provider cache exists #when no user override is configured #then returns skipped sentinel", () => {
@@ -48,6 +69,98 @@ describe("resolveModelForDelegateTask", () => {
       model: "openai/gpt-5.4",
       variant: "medium",
       fallbackEntry: { providers: ["openai"], model: "gpt-5.4", variant: "medium" },
+      matchedFallback: true,
+    })
+  })
+
+  test("#given only transformed Vercel GPT-5.6 Sol #when fallback resolves #then Vercel keeps the native xhigh rung", () => {
+    const result = resolveModelForDelegateTask({
+      availableModels: new Set(["vercel/openai/gpt-5.6-sol"]),
+      fallbackChain: gpt56SolFallbackChain,
+      systemDefaultModel: "system/default",
+    }, noCacheDeps)
+
+    expect(result).toEqual({
+      model: "vercel/openai/gpt-5.6-sol",
+      variant: "xhigh",
+      fallbackEntry: nativeSolEntry,
+      matchedFallback: true,
+    })
+  })
+
+  test("#given transformed Vercel and Copilot GPT-5.6 Sol #when fallback resolves #then Vercel xhigh wins", () => {
+    const result = resolveModelForDelegateTask({
+      availableModels: new Set([
+        "github-copilot/gpt-5.6-sol",
+        "vercel/openai/gpt-5.6-sol",
+      ]),
+      fallbackChain: gpt56SolFallbackChain,
+    }, noCacheDeps)
+
+    expect(result).toEqual({
+      model: "vercel/openai/gpt-5.6-sol",
+      variant: "xhigh",
+      fallbackEntry: nativeSolEntry,
+      matchedFallback: true,
+    })
+  })
+
+  test("#given only Copilot GPT-5.6 Sol #when fallback resolves #then the dedicated high rung wins", () => {
+    const result = resolveModelForDelegateTask({
+      availableModels: new Set(["github-copilot/gpt-5.6-sol"]),
+      fallbackChain: gpt56SolFallbackChain,
+    }, noCacheDeps)
+
+    expect(result).toEqual({
+      model: "github-copilot/gpt-5.6-sol",
+      variant: "high",
+      fallbackEntry: copilotSolEntry,
+      matchedFallback: true,
+    })
+  })
+
+  test("#given GPT-5.6 is unavailable #when Copilot GPT-5.5 exists #then the legacy fallback remains", () => {
+    const result = resolveModelForDelegateTask({
+      availableModels: new Set(["github-copilot/gpt-5.5"]),
+      fallbackChain: gpt56SolFallbackChain,
+    }, noCacheDeps)
+
+    expect(result).toEqual({
+      model: "github-copilot/gpt-5.5",
+      variant: "xhigh",
+      fallbackEntry: legacyGptEntry,
+      matchedFallback: true,
+    })
+  })
+
+  test("#given a fallback model exists through an unlisted provider #when fallback resolves #then cross-provider matching remains", () => {
+    const fallbackEntry = { providers: ["openai"], model: "gpt-5.5", variant: "high" }
+    const result = resolveModelForDelegateTask({
+      availableModels: new Set(["custom-provider/gpt-5.5"]),
+      fallbackChain: [fallbackEntry],
+    }, noCacheDeps)
+
+    expect(result).toEqual({
+      model: "custom-provider/gpt-5.5",
+      variant: "high",
+      fallbackEntry,
+      matchedFallback: true,
+    })
+  })
+
+  test("#given custom and later-rung providers expose the same model #when fallback resolves #then the custom provider keeps the earlier variant", () => {
+    const result = resolveModelForDelegateTask({
+      availableModels: new Set([
+        "long-custom-provider/gpt-5.6-sol",
+        "github-copilot/gpt-5.6-sol",
+      ]),
+      fallbackChain: gpt56SolFallbackChain,
+    }, noCacheDeps)
+
+    expect(result).toEqual({
+      model: "long-custom-provider/gpt-5.6-sol",
+      variant: "xhigh",
+      fallbackEntry: nativeSolEntry,
       matchedFallback: true,
     })
   })

@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-The Senpi-coupled engine behind the `omo-senpi` task component: a durable task state machine, a persistent record store, two child runners (in-process and RPC process), a residency/TTL/reconcile lifecycle, an exactly-once completion notifier, a steering engine, a named-team runtime, and the 4 task + 6 lead-team `ToolDefinition`s. Package: `@oh-my-opencode/senpi-task` (private, `sideEffects: false`). `@code-yeongyu/senpi` and `typebox` are optional peers (`package.json:25`) so pure state/store/schema code stays runnable without a live Senpi import; runner and tool code that needs the Senpi surface is isolated. Do not import `packages/omo-opencode` from here.
+The Senpi-coupled engine behind the `omo-senpi` task component: a durable task state machine, a persistent record store, two child runners (in-process and RPC process), a residency/TTL/reconcile lifecycle, an exactly-once completion notifier, a steering engine, a named-team runtime, and the 4 task + 7 lead-team `ToolDefinition`s. Package: `@oh-my-opencode/senpi-task` (private, `sideEffects: false`). `@code-yeongyu/senpi` and `typebox` are optional peers (`package.json:25`) so pure state/store/schema code stays runnable without a live Senpi import; runner and tool code that needs the Senpi surface is isolated. Do not import `packages/omo-opencode` from here.
 
 ## ANATOMY
 
@@ -17,8 +17,8 @@ The Senpi-coupled engine behind the `omo-senpi` task component: a durable task s
 | Lifecycle | `src/lifecycle/` | `createTaskLifecycle` - residency admission (`residency.ts`), TTL sweep (`ttl.ts`), crash reconcile (`reconcile.ts`), and shutdown teardown (`shutdown.ts`). |
 | Completion | `src/completion/` | `createCompletionNotifier` + `routeCompletion` - the exactly-once wake/deliver/buffer/queue routing table (`completion/routing.ts`). |
 | Steering | `src/steering/` | `createSteeringEngine` - send / interrupt / cancel against a live or resident child. |
-| Team | `src/team/` | Named-team registry, normalize/validate, mailbox messaging, tasklist, shutdown handshake, and runtime (`team/runtime.ts`). |
-| Tools | `src/tools/` | `task/` (spawn), `control/` (`task_send`/`task_cancel`), `output/` (`task_output`), `team/` (the 6 lead-only tools). |
+| Team | `src/team/` | Named-team registry, normalize/validate, durable pull mailboxes, lead poller, member self-polling extension, tasklist, shutdown handshake, and runtime (`team/runtime.ts`). |
+| Tools | `src/tools/` | `task/` (single or `tasks:[...]` batch spawn), `control/` (`task_send`/`task_cancel`), `output/` (`task_output`), `team/` (the 7 lead-only tools, including `team_wait`). |
 | Agents | `src/agents/` | `loadAgents` + `mapOmoConfigAgents` - omo.json agent definitions to task-tool targets. |
 | Category | `src/category/` | `resolveCategory` + per-provider builtin category tables (anthropic/openai/google/kimi). |
 | Adversarial | `src/__adversarial__/` | Seeded 200-iteration chaos bench asserting the four W1 invariants (`chaos-bench.test.ts`). |
@@ -34,17 +34,25 @@ The Senpi-coupled engine behind the `omo-senpi` task component: a durable task s
 | `task_cancel` | `createTaskCancelTool` | `tools/control/cancel.ts:61` |
 | `task_output` | `createTaskOutputTool` | `tools/output/output.ts` |
 
-`task` is spawn-only. Continue, steer, park, team messaging, and shutdown approval traffic goes through `task_send`; child output and single-child blocking reads go through `task_output`.
+`task` is spawn-only. It accepts either one `prompt` or a non-empty `tasks:[...]` batch; synchronous batches aggregate every child result, while background batches return item ids and queue positions. Continue, steer, park, team messaging, and shutdown approval traffic goes through `task_send`; child output and single-child blocking reads go through `task_output`.
 
-### Team tools (6, lead-only)
+### Team tools (7, lead-only)
 
-`buildLeadTeamTools(deps)` returns them in canonical order (`tools/team/index.ts`): `team_create`, `team_delete`, `task_create`, `task_get`, `task_list`, `task_update`. Child/member sessions never receive the lead family; member sessions receive only a pre-scoped `task_send`.
+`buildLeadTeamTools(deps)` returns them in canonical order (`tools/team/index.ts`): `team_create`, `team_delete`, `task_create`, `task_get`, `task_list`, `task_update`, `team_wait`. Child/member sessions never receive the lead family. Each process member loads the bundled member extension in-child and receives only team-scoped `task_send` and `team_wait`; it never receives lead lifecycle or tasklist tools.
 
 `packages/omo-opencode` is a separate build that still uses its prior task/team names; cross-edition parity is a deliberate follow-up outside this package.
 
 ### Engine primitives
 
-`createTaskManager`, `createTaskLifecycle`, `createCompletionNotifier` / `routeCompletion` / `shouldNotifyStatus`, `createSteeringEngine`, `InProcessRunner`, `RpcProcessRunner`, `createTaskRecordStore` / `resolveStateDir`, `transitionTaskRecord` / `createTaskRecord`, `resolveCategory`, `loadAgents` / `mapOmoConfigAgents`, plus the team runtime (`createTeam`, `deleteTeam`, `sendTeamMessage`, `createTeamTask`, `requestShutdown`/`approveShutdown`/`rejectShutdown`, ...) and their typed errors (`SenpiTeamSpecError`, `SenpiTeamRuntimeError`, `SenpiShutdownError`, `RunnerError`, `TaskRecordCollisionError`).
+`createTaskManager`, `createTaskLifecycle`, `createCompletionNotifier` / `routeCompletion` / `shouldNotifyStatus`, `createSteeringEngine`, `InProcessRunner`, `RpcProcessRunner`, `createTaskRecordStore` / `resolveStateDir`, `transitionTaskRecord` / `createTaskRecord`, `resolveCategory`, `loadAgents` / `mapOmoConfigAgents`, plus the team runtime (`createTeam`, `deleteTeam`, `sendTeamMessage`, `createLeadPoller`, `WaitRegistry`, `resolveMemberExtensionEntryPath`, `createTeamTask`, `requestShutdown`/`approveShutdown`/`rejectShutdown`, ...) and their typed errors (`SenpiTeamSpecError`, `SenpiTeamRuntimeError`, `SenpiShutdownError`, `RunnerError`, `TaskRecordCollisionError`).
+
+## TEAM DELIVERY MODEL
+
+Team messaging is pull-only. A send writes a durable unread JSON file and returns; it never injects, steers, revives, or notifies the recipient directly. The current lead owns one `createLeadPoller` per team whose durable `leadSessionId` matches the current session. The adapter ticks owned lead pollers on `session_start` and every second, but suspends ticks during compaction, session switching, and shutdown. Member inboxes are never polled by the adapter: each process member loads `member-extension/`, which owns that member's poller and scoped tools inside the child process.
+
+Delivery is reservation-based: unread `<messageId>.json` becomes `.delivering-<messageId>.json`, then commits to `processed/<messageId>.json` only after the message is observed in the recipient session or a registered `team_wait` claims it. The processed file is the durable exactly-once ledger. A committed wait also appends `team_message_waited`; `task_output` renders it as `[team message from <from>] <body>`, so a caller that lost the immediate tool result can recover the body from the task log.
+
+Every `session_start` runs recovery in order: reattach durable process members, reclaim stale member and owned-lead reservations, retry failed completion notifications, then poll owned leads. Dead process members with a persisted session are respawned without replaying their original prompt and rebound with `switch_session`; set `task.reattach_on_reconcile: false` only to retain the old lost-task behavior.
 
 ### Completion routing table (`completion/routing.ts`)
 
@@ -53,7 +61,7 @@ The Senpi-coupled engine behind the `omo-senpi` task component: a durable task s
 ## EXECUTION MODES
 
 - **in-process (default)**: `InProcessRunner` runs the child through the SAME parent tool closures (`filterSharedParentTools` + `mergeChildCustomTools`), so a child sees the parent's live custom tools minus the `task_*`/`team_*` family. Proven by the marker-tool test (`src/runners/in-process/marker-suppression.test.ts`).
-- **process**: `RpcProcessRunner` spawns a child Senpi process; steering (`steer`/`abort`/`prompt`) crosses a JSON-RPC boundary (`src/runners/rpc/protocol-client.ts`), child transcripts land under `<stateDir>/sessions/`, and pid kill / lost-child reconciliation is handled by the lifecycle reconcile path (`src/lifecycle/reconcile.ts`).
+- **process**: `RpcProcessRunner` spawns a child Senpi process; steering (`steer`/`abort`/`prompt`) crosses a JSON-RPC boundary (`src/runners/rpc/protocol-client.ts`), child transcripts land under `<stateDir>/children/<taskId>/sessions/<taskId>/`, and session-start reconciliation can respawn and `switch_session` to the newest persisted JSONL. Team members always use this mode so the member extension and durable inbox poller live inside the child.
 
 Mode is chosen by `resolveExecutionMode` from the omo.json `task.default_execution_mode` and per-agent `execution_mode` (`src/manager/execution-mode.ts`).
 
@@ -66,6 +74,6 @@ bun test packages/senpi-task
 
 - Co-located `*.test.ts` throughout use given/when/then. The seeded chaos bench (`src/__adversarial__/chaos-bench.test.ts`, 200 iterations, `SEED=<label>` to rerun a seed) asserts: (1) exactly-once notification per `(task_id, run_epoch)`, (2) terminal idempotence, (3) no concurrency slot leak, (4) no unhandled rejection.
 - Standalone manual QA scripts write a disposable fixture tree and never touch repo state: `bun packages/senpi-task/scripts/manual-qa.ts <evidence-dir>` (store + transitions), plus `manual-category-qa.ts`, `manual-agents-qa.ts`, `manual-output-qa.ts`.
-- Live end-to-end proof runs through the `omo-senpi` task component drivers, not this package alone. See [`packages/omo-senpi/AGENTS.md`](../omo-senpi/AGENTS.md).
+- Live end-to-end proof runs through the `omo-senpi` task component drivers, not this package alone. `task-e2e.mjs` proves single and `tasks:[...]` batch delegation; `team-e2e.mjs` proves the pull handshake, `team_wait`, reservation reclaim, and kill-between-inject-and-commit restart deduplication. See [`packages/omo-senpi/AGENTS.md`](../omo-senpi/AGENTS.md).
 
 Parent: [`packages/AGENTS.md`](../AGENTS.md).

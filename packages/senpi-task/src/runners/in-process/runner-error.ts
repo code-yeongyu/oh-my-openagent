@@ -18,7 +18,3 @@ export class RunnerError extends Error {
     }
   }
 }
-
-export function isRunnerError(value: unknown): value is RunnerError {
-  return RunnerError.is(value)
-}

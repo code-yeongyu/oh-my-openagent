@@ -2,7 +2,8 @@ import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 import { log } from "@oh-my-opencode/utils"
 
 import type { TaskRecordStore } from "../store"
-import type { LifecycleDeps, ProcessSignaller, ResidencyRegistry } from "./port"
+import { injectedLifecycleReattachPorts } from "./port"
+import type { LifecycleDeps, LifecycleReattachPorts, ProcessSignaller, ResidencyRegistry } from "./port"
 
 const DEFAULT_ORPHAN_KILL_DELAY_MS = 5_000
 
@@ -13,6 +14,7 @@ export type LifecycleContext = {
   readonly now: () => number
   readonly signaller: ProcessSignaller
   readonly orphanKillDelayMs: number
+  readonly reattachPorts: LifecycleReattachPorts | undefined
 }
 
 // The sole default OS-process signaller: process.kill lives here (audited-in via src/lifecycle) so
@@ -44,6 +46,7 @@ export function resolveContext(deps: LifecycleDeps): LifecycleContext {
     now: deps.now ?? Date.now,
     signaller: deps.signaller ?? defaultSignaller,
     orphanKillDelayMs: deps.orphanKillDelayMs ?? DEFAULT_ORPHAN_KILL_DELAY_MS,
+    reattachPorts: injectedLifecycleReattachPorts(deps),
   }
 }
 

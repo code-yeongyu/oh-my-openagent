@@ -30,6 +30,8 @@ export type ManagedStartSpec = {
   readonly instructions?: string
   readonly toolAllowlist?: readonly string[]
   readonly memberScopedTools?: readonly ToolDefinition[]
+  readonly extensions?: readonly string[]
+  readonly memberEnv?: Readonly<Record<string, string>>
 }
 
 export type ManagedRunner = {
@@ -51,6 +53,8 @@ export type ManagerStartSpec = {
   readonly allowed_subagents?: readonly string[]
   readonly run_in_background?: boolean
   readonly memberScopedTools?: readonly ToolDefinition[]
+  readonly extensions?: readonly string[]
+  readonly memberEnv?: Readonly<Record<string, string>>
 }
 
 export type ResolvedChildPlan = {
@@ -139,6 +143,13 @@ export type SpawnAdmission =
 
 export type AdmitResident = (parentSessionId: string) => Promise<SpawnAdmission>
 
+export type TrustedRespawnLaunch = {
+  readonly extensions?: readonly string[]
+  readonly memberEnv?: Readonly<Record<string, string>>
+}
+
+export type TrustedRespawnLaunchResolver = (record: TaskRecord) => Promise<TrustedRespawnLaunch | undefined>
+
 export type TaskManagerOptions = {
   readonly store: TaskRecordStore
   readonly runners: Readonly<Record<ExecutionMode, ManagedRunner>>
@@ -152,6 +163,9 @@ export type TaskManagerOptions = {
   // Injected by the todo-17 wiring. Consulted at spawn so the residency cap (LRU eviction) gates a
   // new child; absent -> admission is skipped (pre-wiring/unit behaviour, no cap enforcement).
   readonly admit?: AdmitResident
+  // Resolves launch inputs from the current runtime. Persisted task records never supply executable
+  // extensions or environment during a respawn.
+  readonly trustedRespawnLaunch?: TrustedRespawnLaunchResolver
 }
 
 export type TaskManager = {
@@ -162,7 +176,7 @@ export type TaskManager = {
   cancelTask(idOrName: string, reason?: string): Promise<CancelOutcome>
   get(taskId: string): TaskRecord | undefined
   list(scope: ListScope): readonly ListedTask[]
-  waitFor(taskId: string): Promise<TaskRecord>
+  waitFor(taskId: string, options?: { readonly signal?: AbortSignal }): Promise<TaskRecord>
   // W1-V F3: prune a live handle (and its per-epoch release/background bookkeeping) so the lifecycle
   // destruction port and eviction path never leave a stale handle behind or grow #live unbounded.
   forget(taskId: string): void

@@ -134,7 +134,8 @@ const startWorkCodexCompletion = `When all top-level checkboxes in \`## TODOs\` 
 1. Run the plan's final verification commands.
 2. Complete the **Global Review and Debugging Gate** before any completion claim, PR creation, PR handoff, branch handoff, or merge:
    - Invoke the \`review-work\` skill with the final diff, changed files, user goal, constraints, run command, and verification evidence. All five review lanes must return PASS. A timeout, missing deliverable, ack-only child, \`BLOCKED:\`, or inconclusive lane is a gate failure, not approval.
-   - Run a debugging-oriented runtime audit even when the review passes: name at least three plausible failure hypotheses for the changed surface, run the distinguishing checks against the actual artifact, and append the ruled-out or confirmed result to \`.omo/start-work/ledger.jsonl\`.
+   - Each passing review lane binds to the exact full commit SHA it reviewed. Immediately append a durable record to \`.omo/start-work/ledger.jsonl\` with the lane name, full SHA, PASS verdict, and report artifact/source. Before same-SHA reuse after any continuation or compaction, re-read the ledger record and require the exact lane/SHA pair; memory, chat history, or an unstamped report is not coverage. New commits require fresh applicable lane coverage.
+   - Run a debugging-oriented runtime audit even when the review passes: name at least three plausible failure hypotheses for the changed surface, run the distinguishing checks against the actual artifact, and append a separate durable record with the audit name, exact full SHA, verdict, and evidence artifact/source to \`.omo/start-work/ledger.jsonl\`. Reuse it only after re-reading an exact audit/SHA match.
    - If any review lane or debugging hypothesis fails, invoke the \`debugging\` skill, confirm root cause with runtime evidence, add the minimal failing test or reproduction, fix it, rerun the affected verification, then rerun the Global Review and Debugging Gate.
    - Evidence hygiene is mandatory: redact or mask secrets and sensitive user data before writing \`.omo/start-work/ledger.jsonl\`, a PR body, or a handoff. Never include raw tokens, credentials, auth headers, cookies, API keys, env dumps, private logs, or PII; use concise summaries, lengths, hashes, or short non-sensitive prefixes instead.
    - If the work includes creating, updating, or handing off a PR, refresh \`git status\` and the PR/branch state from the task-owned worktree after the gate, and include only redacted review/debugging evidence in the PR body or handoff.
@@ -155,6 +156,13 @@ explicit \`BLOCKED:\`, or inconclusive lane is not a pass. Treat that lane as
 failed, investigate the underlying uncertainty with the \`debugging\` skill when
 runtime behavior may be wrong, fix with evidence, and rerun the affected lane
 before claiming completion, creating or handing off a PR, or merging.
+
+After each lane reaches PASS, immediately append a durable task-evidence record
+to the active ledger with the lane name, exact full commit SHA, PASS verdict,
+and report artifact/source. Before reusing coverage after continuation or
+compaction, re-read that record and require the exact lane/SHA pair. Memory,
+chat history, or an unstamped report is not coverage; a new commit requires
+fresh applicable lane records.
 
 A rejecting lane must name its blockers inline in its final message — each
 blocker cites the violated goal criterion or requirement plus an evidence

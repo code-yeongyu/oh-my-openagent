@@ -40,6 +40,12 @@ export type TaskNotification = {
   readonly notification_failed_epoch?: number
 }
 
+export type TaskSpawnSpec = {
+  readonly cwd: string
+  readonly extensions?: readonly string[]
+  readonly member_env?: Readonly<Record<string, string>>
+}
+
 export type TaskRecordInput = {
   readonly name?: string
   readonly parent_session_id: string
@@ -62,6 +68,7 @@ export type TaskRecord = TaskRecordInput & {
   readonly updated_at: string
   readonly pid?: number
   readonly child_session_id?: string
+  readonly spawn_spec?: TaskSpawnSpec
   readonly final_response?: string
   readonly error_message?: string
   // Set true when the terminal error was an external kill / exit-by-signal (todo-8 kill contract); a

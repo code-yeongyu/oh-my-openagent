@@ -116,7 +116,7 @@ All spacing derives from a base of **4px**.
 - Breakpoints: sm 640px, md 768px, lg 1024px, xl 1280px, 2xl 1536px
 
 ### Rules
-- No magic numbers. Every spacing value maps to a token.
+- Tokenize design *intent* — spacing steps, content width, gutters, section gaps, density steps. Keep browser *mechanics* raw: `auto`, `%`, `min-content`, `max-content`, `fit-content`, `clamp()`, viewport/container units, intrinsic sizing. A `clamp(1rem, 4vw, 2rem)` gap or a `minmax(min(16rem, 100%), 1fr)` track is mechanics, not a magic number — do not force it into a token.
 - Asymmetric spacing is intentional, not accidental — document why.
 
 ## 5. Components
@@ -130,6 +130,7 @@ Document reusable patterns before implementation for greenfield work, and as the
 - **States**: default, hover, active, focus, disabled, loading, empty, error
 - **Accessibility**: keyboard, ARIA, contrast
 - **Motion**: entry/exit animations
+- **Layout**: spatial primitive (stack / cluster / sidebar / grid / shell…) and, if the component scrolls or pins anything, its scroll owner
 
 Greenfield starts with the primitives you are about to build, assembled from
 the selected references' component anatomy and adapted to the user's product.
@@ -214,13 +215,14 @@ After every component implementation, check:
 
 - [ ] All colors reference tokens from Section 2. No raw hex outside `DESIGN.md`.
 - [ ] All font sizes match Section 3 scale. No arbitrary sizes.
-- [ ] All spacing values are multiples of `--space-1` (4px). No magic numbers.
+- [ ] Spacing intent maps to a token (Section 4); browser mechanics (`clamp()`, intrinsic sizing, container units) stay raw. No arbitrary px.
 - [ ] Interactive elements have all required states from Section 5 and Section 6.
 - [ ] Depth treatment matches the chosen strategy from Section 7.
 - [ ] Component reused 2+ times? Documented in Section 5.
 - [ ] Motion follows the timing table. No arbitrary durations.
 - [ ] Component visual QA passed for each primitive and required state before product screens were composed.
 - [ ] Section 8 accessibility constraints hold for the new component; any new debt is recorded in Section 8, not silently accepted.
+- [ ] Survives content stress: empty, long label, unbroken string. Reflows to one readable column at 375px with no horizontal scroll of primary content.
 
 ## Memory Management
 

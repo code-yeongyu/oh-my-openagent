@@ -45,8 +45,7 @@ export function parseJsonString(value: string): string | null {
   try {
     const parsed: unknown = JSON.parse(value)
     return typeof parsed === "string" ? parsed : null
-  } catch (error) {
-    if (error instanceof Error) return null
+  } catch {
     return null
   }
 }

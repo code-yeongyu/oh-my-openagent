@@ -110,7 +110,7 @@ describe("TaskManager start failure security", () => {
     // given
     const runner = new FakeRunner()
     runner.startError = ADVERSARIAL_ERROR
-    const { manager } = makeManager({ inProcess: runner })
+    const { manager } = makeManager({ process: runner })
     const spec = normalizeSenpiTeamSpec(
       { members: [{ name: "alpha", kind: "category", category: "quick", prompt: "work" }] },
       "secure-team",

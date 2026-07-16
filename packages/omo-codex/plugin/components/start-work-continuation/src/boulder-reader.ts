@@ -50,7 +50,7 @@ export function readContinuationState(cwd: string, sessionId: string): Continuat
 
 	const planPath = resolveBoulderPlanPathForWork(cwd, work);
 	const checklist = getPlanChecklist(planPath);
-	if (checklist.remaining === 0) return null;
+	if (checklist.total === 0) return null;
 
 	return {
 		planName: work.planName,

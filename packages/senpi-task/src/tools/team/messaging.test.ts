@@ -12,38 +12,28 @@ class NamedError extends Error {
 }
 
 describe("team messaging route", () => {
-  test("#given a message to the lead #when it wakes the parent #then it reports to_lead wake", async () => {
+  test("#given a message to the lead #when it is enqueued #then it reports the lead inbox result", async () => {
     const service = createFakeTeamService({
-      sendMessage: async () => ({ kind: "to_lead", messageId: "m1", lead: { kind: "delivered", decision: "wake" } }),
+      sendMessage: async () => ({ kind: "to_lead", messageId: "m1" }),
     })
 
     const result = await runTeamSend(service, "run-1", TEAM_LEAD_SENTINEL, { to: "lead", body: "hi" })
 
-    expect(result.details).toMatchObject({ kind: "to_lead", message_id: "m1", delivery: "wake" })
+    expect(result.content).toEqual([{ type: "text", text: "Message enqueued to lead." }])
+    expect(result.details).toEqual({ kind: "to_lead", message_id: "m1" })
   })
 
-  test("#given a lead-message enqueue that double-throws #when send runs #then the caller SEES a failed delivery", async () => {
-    const service = createFakeTeamService({
-      sendMessage: async () => ({ kind: "to_lead", messageId: "m1", lead: { kind: "failed" } }),
-    })
-
-    const result = await runTeamSend(service, "run-1", "alpha", { to: "lead", body: "done" })
-
-    expect(result.details).toMatchObject({ kind: "to_lead", delivery: "failed" })
-  })
-
-  test("#given a member-direction message #when delivered #then it reports each member outcome", async () => {
+  test("#given a member-direction message #when enqueued #then it reports the recipient list", async () => {
     const service = createFakeTeamService({
       sendMessage: async () => ({
         kind: "to_members",
         messageId: "m2",
-        deliveries: [{ kind: "steered", member: "beta", messageId: "m2" }],
+        recipients: ["beta"],
       }),
     })
     const result = await runTeamSend(service, "run-1", TEAM_LEAD_SENTINEL, { to: "beta", body: "go" })
-    expect(result.details).toMatchObject({ kind: "to_members", message_id: "m2" })
-    if (result.details.kind !== "to_members") throw new Error("expected to_members")
-    expect(result.details.deliveries[0]).toMatchObject({ member: "beta", outcome: "steered" })
+    expect(result.content).toEqual([{ type: "text", text: "Message enqueued to 1 recipient(s)." }])
+    expect(result.details).toEqual({ kind: "to_members", message_id: "m2", recipients: ["beta"] })
   })
 
   test("#given a recipient backpressure error #when send runs #then it surfaces recipient_backpressure", async () => {
@@ -65,7 +55,6 @@ describe("team messaging route", () => {
     const result = await runTeamSend(service, "run-1", "alpha", { to: "*", body: "x" })
     expect(result.details.kind).toBe("broadcast_denied")
   })
-
 })
 
 describe("member-routed team messaging", () => {

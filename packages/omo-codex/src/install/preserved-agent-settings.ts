@@ -1,5 +1,6 @@
 import { lstat, readFile, readdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
+import { parseJsonString } from "./codex-config-toml-sections"
 import { resolveManagedAgentReasoning, type PreservedAgentReasoning } from "./managed-agent-reasoning-defaults"
 
 export async function capturePreservedAgentReasoning(input: {
@@ -158,16 +159,6 @@ function isSectionHeader(line: string): boolean {
 
 function agentNameFromToml(fileName: string): string {
   return fileName.endsWith(".toml") ? fileName.slice(0, -".toml".length) : fileName
-}
-
-function parseJsonString(value: string): string | null {
-  try {
-    const parsed: unknown = JSON.parse(value)
-    return typeof parsed === "string" ? parsed : null
-  } catch (error) {
-    if (error instanceof Error) return null
-    return null
-  }
 }
 
 async function exists(path: string): Promise<boolean> {

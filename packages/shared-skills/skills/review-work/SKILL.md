@@ -1,6 +1,6 @@
 ---
 name: review-work
-description: "Post-implementation review orchestrator. Launches 5 parallel background sub-agents: Oracle (goal/constraint verification), Oracle (code quality), Oracle (security), unspecified-high (hands-on QA execution), unspecified-high (context mining from GitHub/git/Slack/Notion). All must pass for review to pass. MUST USE after completing any significant implementation work. Triggers: 'review work', 'review my work', 'review changes', 'QA my work', 'verify implementation', 'check my work', 'validate changes', 'post-implementation review'."
+description: "Post-implementation review orchestrator. Launches 5 parallel background sub-agents: Oracle (goal/constraint verification), Oracle (code quality), Oracle (security), unspecified-high (hands-on QA execution), unspecified-high (context mining from GitHub/git/Slack/Notion). All must pass for review to pass. MUST USE before a PR handoff or when the user explicitly asks to review completed work. Triggers: 'review work', 'review my work', 'review changes', 'QA my work', 'verify implementation', 'check my work', 'validate changes', 'post-implementation review'."
 ---
 ## Codex Harness Tool Compatibility
 
@@ -31,7 +31,13 @@ handoff. Role or specialty instructions belong inside `message`.
 Use `fork_context: false` unless full history is truly
 required; paste only the review context that worker needs.
 
-Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short `multi_agent_v1.wait_agent` cycles sized to the work. Never use a single long blocking wait for them, and never spin on tiny timeouts as a failure budget.
+Review lanes are leaf agents: a lane does its own reading, running, and
+judging inline and never spawns sub-reviewers of its own. Reviewers are
+one-shot: a lane ends at its verdict; a re-review after fixes is a fresh
+spawn scoped to the delta plus current evidence, never a `followup_task`
+to a long-lived reviewer carrying stale context.
+
+Plan and reviewer agents may run for a long time; spawn them in the background and keep doing independent root work. Between `multi_agent_v1.wait_agent` calls, back off — double the timeout up to ~5 minutes — instead of spinning short cycles.
 
 Treat child status as a progress signal, not a timeout counter. For
 work likely to exceed one wait cycle, require the child to send
@@ -224,6 +230,8 @@ task(
 </run_command>
 
 You are a QA engineer. Your job is to RUN the application and verify it works through hands-on testing. You do not review code - you test behavior.
+
+If the orchestrator already ran the `visual-qa` dual-oracle gate on this same build, consume that verdict instead of re-running it - your lane covers hands-on behavior the visual gate does not.
 
 MANDATORY PROCESS (follow in order):
 

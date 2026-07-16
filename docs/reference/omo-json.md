@@ -219,6 +219,5 @@ This is deliberate: `omo.json` landed **senpi-first**. Adopting it in the OpenCo
 
 ## Follow-ups
 
-- No generated `assets/omo.schema.json` artifact or published `$schema` URL exists yet; the `$schema` key is accepted but points at nothing shipped in this repo.
 - `member.backendType: "tmux"` and non-project (user-global) team storage are schema-level only and are not exercised by the current Senpi runtime; use `in-process` members in project `.omo/` teams.
 - OpenCode-edition adoption of `omo.json` and a `oh-my-openagent.json` migration path are not implemented.

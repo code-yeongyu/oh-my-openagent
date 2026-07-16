@@ -16,7 +16,7 @@ You are mid-flight on a Prometheus work plan; this turn is an automatic continua
 # What to do this turn
 
 1. Read `{{PLAN_PATH}}` AND `{{LEDGER_PATH}}` first — they are the only sources of truth for what remains and what evidence exists; do not trust your memory of prior turns.
-2. Pick the FIRST unchecked top-level checkbox in `## TODOs` or `## Final Verification Wave`. Ignore nested checkboxes under Acceptance Criteria / Evidence / Definition of Done.
+2. When the remaining count is `0`, skip checkbox execution and perform the Final gate now. Otherwise, pick the FIRST unchecked top-level checkbox in `## TODOs` or `## Final Verification Wave`. Ignore nested checkboxes under Acceptance Criteria / Evidence / Definition of Done.
 3. Follow the `start-work` skill in full. The skill is already loaded from your earlier turn — re-read its file at `packages/omo-codex/plugin/skills/start-work/SKILL.md` if you have lost context.
 4. Apply the checkbox's tier from its ledger entry, or classify it now per the start-work skill: LIGHT (default — a narrow change inside existing layers) needs one real-surface proof of the deliverable, with auxiliary surfaces first-class for CLI- or data-shaped work, and only trigger-mapped adversarial classes; HEAVY (new module/abstraction, auth/security, external integration, schema/migration, concurrency, cross-domain refactor, care signals) takes the full per-criterion regime. When unsure, take HEAVY; never downgrade.
 5. Decompose the checkbox into atomic sub-tasks. Dispatch them in PARALLEL via `multi_agent_v1.spawn_agent` calls in this same response unless a sub-task has a NAMED blocking dependency (input from another sub-task or shared file). Use `fork_context: false` unless full history is truly required. Put role and specialty instructions inside `message`. Flat `spawn_agent` requiring `task_name` instead (`multi_agent_v2`)? Add `"task_name"`, use `fork_turns: "none"`, `wait_agent` takes only `timeout_ms`, finished agents end on their own.
@@ -40,7 +40,7 @@ You are mid-flight on a Prometheus work plan; this turn is an automatic continua
 
 # Final gate
 
-Before completion, run `review-work` and a `debugging` runtime audit; inconclusive lanes fail. Do not create a PR, PR handoff, branch handoff, merge, or final completion answer until this gate passes. For PR/branch work, stay in the task-owned worktree: create/update the PR, wait for CI/review/Cubic gates, merge by default unless explicitly opted out, then clean up. Redact secrets, tokens, credentials, auth headers, cookies, env dumps, logs, and PII.
+Before completion, satisfy all five `review-work` lanes and a `debugging` runtime audit; inconclusive lanes or an inconclusive audit fail. Each pass binds to the exact full commit SHA it reviewed. Immediately append a durable task-evidence record to `{{LEDGER_PATH}}` for every passing lane and the debugging audit with its name, full SHA, verdict, and report artifact/source. Before same-SHA reuse after any continuation or compaction, re-read the ledger record and verify the exact lane/SHA pair; memory, chat history, or an unstamped report is not coverage. New commits require fresh applicable coverage. Do not create a PR, PR handoff, branch handoff, merge, or final completion answer until this gate passes. For PR/branch work, stay in the task-owned worktree: create/update the PR, wait for CI/review/Cubic gates, merge by default unless explicitly opted out, then clean up. After the gate and lifecycle pass, mark the Boulder work completed before the final answer. Redact secrets, tokens, credentials, auth headers, cookies, env dumps, logs, and PII.
 
 # Stop conditions for THIS turn
 
@@ -54,6 +54,6 @@ Before completion, run `review-work` and a `debugging` runtime audit; inconclusi
 - Surface only state changes: sub-agent dispatched, scenario PASS/FAIL with artifact path, checkbox marked, evidence appended.
 - Do NOT print "Should I continue?", restate the plan, or recap prior turns — the Stop hook continues you; the ledger and plan are the durable record.
 
-Begin now. Pick the next checkbox, dispatch the parallel sub-agents, verify, mark, continue.
+Begin now. If no checkbox remains, run the Final gate; otherwise pick the next checkbox, dispatch the parallel sub-agents, verify, mark, continue.
 
 </start-work-continuation>

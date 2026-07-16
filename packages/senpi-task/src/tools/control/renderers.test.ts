@@ -38,7 +38,7 @@ const SEND_RESULT_RENDER_CASES = [
   ["invalid_arguments", { kind: "invalid_arguments", reason: "message is required" }, "[error]task_send invalid: message is required[/error]"],
   ["interrupted", { kind: "interrupted", task_id: "st_1", previous_status: "running" }, "[warning]task_send interrupted st_1 (was running)[/warning]"],
   ["noop", { kind: "noop", task_id: "st_1", previous_status: "interrupted", reason: "Already interrupted." }, "[warning]task_send no change st_1 (interrupted): Already interrupted.[/warning]"],
-  ["team_message", { kind: "team_message", team: { kind: "to_lead", message_id: "msg-1", delivery: "wake" } }, "[success]task_send team message msg-1 to lead:wake[/success]"],
+  ["team_message", { kind: "team_message", team: { kind: "to_lead", message_id: "msg-1" } }, "[success]task_send team message msg-1 enqueued to lead[/success]"],
   ["shutdown_requested", { kind: "shutdown_requested", team_run_id: "team-1", member: "atlas" }, "[warning]task_send shutdown requested team-1 member:atlas[/warning]"],
   ["shutdown_responded", { kind: "shutdown_responded", team_run_id: "team-1", member: "atlas", approved: false }, "[warning]task_send shutdown rejected team-1 member:atlas[/warning]"],
   ["shutdown_failed", { kind: "shutdown_failed", operation: "reject", team_run_id: "team-1", member: "atlas", code: "team_state_missing", reason: "Team state is unavailable." }, "[error]task_send shutdown reject failed team-1 member:atlas: Team state is unavailable.[/error]"],

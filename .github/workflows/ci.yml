@@ -229,7 +229,16 @@ jobs:
         run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Run Senpi compatibility tests
-        run: bun run test:senpi
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun run build:senpi-plugin
+          PACK_DIR="$RUNNER_TEMP/omo-senpi-pack"
+          mkdir -p "$PACK_DIR"
+          npm pack --pack-destination "$PACK_DIR" packages/omo-senpi/plugin
+          npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts
+          bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+          bun test packages/omo-senpi
 
       - name: Write job summary
         if: always()
@@ -239,8 +248,9 @@ jobs:
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - Builds the local-path Senpi adapter package artifacts.
-            - Runs the hermetic `bun run test:senpi` gate.
-            - Covers Linux, macOS, and Windows compatibility.
+            - Builds the shared LSP daemon once before staging Senpi artifacts.
+            - Packs the generated Pi package and runs hermetic Senpi type/tests.
+            - Covers Linux/macOS socket and Windows named-pipe daemon smoke.
           JOB_SUMMARY_NEXT: Inspect the first omo-senpi build, sync, directive, or package test failure for this OS.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 

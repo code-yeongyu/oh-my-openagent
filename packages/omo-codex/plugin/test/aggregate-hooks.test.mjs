@@ -80,7 +80,7 @@ test("#given aggregate SubagentStop hooks #when inspected #then start-work and L
 	// then
 	assert.equal(subagentStopGroups.length, 2);
 	assert.equal(subagentStopGroups[0]?.matcher, undefined);
-	assert.equal(subagentStopGroups[1]?.matcher, "^lazycodex-(executor|worker-(low|medium|high))$");
+	assert.equal(subagentStopGroups[1]?.matcher, "^lazycodex-worker-(low|medium|high)$");
 	assert.equal(verifierGroups.length, 1);
 	assert.equal(verifierGroups[0]?.groupIndex, 0);
 	assert.equal(verifierGroups[0]?.handler.timeout, 10);

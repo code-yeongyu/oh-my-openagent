@@ -96,6 +96,32 @@ describe("taskCallLines", () => {
 })
 
 describe("taskResultLines", () => {
+  test(" w2batch #given aggregate item details #when rendered #then each item receives its own ordered result line", () => {
+    // given
+    const details = {
+      task_id: "st_batch_1",
+      status: "error",
+      mode: "spawn" as const,
+      items: [
+        { task_id: "st_batch_1", name: "alpha", status: "completed" },
+        { task_id: "", name: "beta", status: "error", error_message: "depth limit" },
+        { task_id: "st_batch_3", name: "gamma", status: "pending", queue_position: 2 },
+      ],
+    }
+
+    // when
+    const lines = taskResultLines(details)
+
+    // then
+    expect(lines).toHaveLength(4)
+    expect(lines[1]).toContain("alpha")
+    expect(lines[1]).toContain("completed")
+    expect(lines[2]).toContain("beta")
+    expect(lines[2]).toContain("depth limit")
+    expect(lines[3]).toContain("gamma")
+    expect(lines[3]).toContain("queue:2")
+  })
+
   test("#given a result detail #when rendered #then task_id and status appear", () => {
     // when
     const lines = taskResultLines({ task_id: "st_0000000b", status: "completed", mode: "spawn" })

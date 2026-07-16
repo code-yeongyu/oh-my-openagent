@@ -6,6 +6,8 @@ import { afterAll, describe, expect, test } from "bun:test"
 
 import { createTaskRecordStore } from "../../store"
 import { TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_TOOL_EVENT } from "../../manager/transcript-log"
+import { makeRecord } from "./__fixtures__/records"
+import { runTaskOutput } from "./output"
 import { readEventLogTranscript } from "./transcript/event-log"
 import { childSessionDir, readSessionDirTranscript } from "./transcript/session-dir"
 import { defaultTranscriptReader } from "./transcript/reader"
@@ -24,6 +26,37 @@ afterAll(() => {
 })
 
 describe("readEventLogTranscript", () => {
+  test("#given a committed team_message_waited event #when task_output reads the event log #then the recovered body is visible", async () => {
+    // given
+    const stateDir = tempStateDir()
+    const store = createTaskRecordStore({ project_dir: stateDir, task: { state_dir: stateDir } })
+    const record = makeRecord({ task_id: "st_000000ef", status: "completed" })
+    store.save(record)
+    store.appendEvent(record.task_id, {
+      type: "team_message_waited",
+      payload: { message_id: "message-1", from: "alpha", body: "recovered after lead restart" },
+    })
+    const manager = {
+      get: (taskId: string) => store.load(taskId) ?? undefined,
+      list: () => [{ record }],
+      waitFor: () => Promise.reject(new Error("waitFor should not be called")),
+    }
+
+    // when
+    const result = await runTaskOutput(
+      { manager, stateDir, waitConfig: { min_ms: 1, default_ms: 5, max_ms: 10 } },
+      { task_id: record.task_id, mode: "full", block: false },
+      record.parent_session_id,
+    )
+
+    // then
+    expect(result.details.kind).toBe("transcript")
+    if (result.details.kind === "transcript") {
+      expect(result.details.transcript).toContain("[team message from alpha] recovered after lead restart")
+      expect(result.details.source).toBe("event-log")
+    }
+  })
+
   test("#given a store event log with transcript events #when read #then assistant and tool entries are reconstructed in order", () => {
     // given
     const stateDir = tempStateDir()

@@ -12,6 +12,7 @@ references/design/*.md
 !references/design/aside.md
 !references/design/clone-from-url.md
 !references/design/design-system-architecture.md
+!references/design/layout-skill.md
 !references/design/lazyweb.md
 !references/design/react-dev-tooling-skill.md
 
