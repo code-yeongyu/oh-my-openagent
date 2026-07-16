@@ -1,11 +1,11 @@
 # PR #6043 QA Evidence
 
-Reviewed integrated source head: `43a3704e92d66fdd7b7133568fe4c9e5e99b4b3a`
+Reviewed integrated source head: `7020af726e1f21cea5eb1a57febd8bfa38832c1c`
 
-Integrated `dev`: `fb7d4b66f541e22e9718a4f51314702c6ac68e53`
+Integrated `dev`: `6457ca1da78fcfd2a39ea391ee559b8d945b240a`
 
 Exact integrated QA head before this evidence-only refresh:
-`43a3704e92d66fdd7b7133568fe4c9e5e99b4b3a`
+`7020af726e1f21cea5eb1a57febd8bfa38832c1c`
 
 The following evidence commit is content-only. It refreshes reviewer-readable
 artifacts and does not change the tested runtime behavior.
@@ -419,6 +419,29 @@ Seventeenth-cycle artifacts:
 - `seventeenth-review-final-integrity.txt`: final diff check and pure-LOC receipt, including `first-prompt-watchdog.ts` restored to 248 pure lines.
 - `seventeenth-review-opencode-harness-self-check.txt`: isolated OpenCode harness preflight and sandbox cleanup proof.
 - `seventeenth-review-live-watchdog-run.txt`: production-duration live OpenCode proof pinned to `af1ce820bfc9ef7cb90ce9f6d22290151ad36399`; fallback observed, no fallback watchdog re-arm, later user abort external, and real database unchanged.
+
+The eighteenth fresh reviewer found that the same-generation ownership fix
+still depended on the transient `sessionAwaitingFallbackResult` flag. A
+visible successful fallback response clears that flag before the original
+watchdog abort terminal is guaranteed to arrive, so the delayed terminal
+rewound the session from `anthropic/fallback` to the failed primary model.
+The completed-fallback composed regression reproduces the rewind after
+accepted dispatch, persisted assistant output, and `session.idle`. Runtime
+commit `7020af726e1f21cea5eb1a57febd8bfa38832c1c` records completion for the
+exact watchdog generation and permits one final owned-terminal consumption.
+The marker is consumed or cleared with the generation, and a later-generation
+user cancellation still follows the ordinary external-cancellation path.
+
+Eighteenth-cycle artifacts:
+
+- `eighteenth-review-finding.md`: exact-head reviewer report and the completed-fallback delayed-terminal blocker.
+- `eighteenth-review-red-completed-fallback-terminal.txt`: failing-first composed proof of the fallback-state rewind.
+- `eighteenth-review-green-completed-fallback-terminal.txt`: repaired completed-fallback and later-generation cancellation boundaries.
+- `eighteenth-exact-runtime-fallback-suite.txt`: 286 tests passing across 42 files on runtime head `7020af726e1f21cea5eb1a57febd8bfa38832c1c`.
+- `eighteenth-exact-omo-opencode-typecheck.txt`, `eighteenth-exact-biome.txt`, and `eighteenth-exact-no-excuse.txt`: exact-source static gates.
+- `eighteenth-exact-integrity.txt`: exact source/base identity, clean tracked status, diff check, and pure-LOC limits.
+- `eighteenth-exact-opencode-harness-self-check.txt`: isolated OpenCode harness preflight and sandbox cleanup proof.
+- `eighteenth-exact-live-watchdog-run.txt`: production-duration live OpenCode run pinned to `7020af726e1f21cea5eb1a57febd8bfa38832c1c`; fallback observed, no fallback watchdog re-arm, later user abort external, and real database unchanged.
 
 The live harness intentionally records only sanitized fake-provider, plugin,
 and SSE evidence. Authentication values, raw environment dumps, private
