@@ -33,6 +33,7 @@ describe("CodeGraph SessionStart exclusion policy", () => {
 				stdin: Readable.from(["{}"]),
 				stdout: { write: (chunk) => stdout.push(chunk) },
 				spawnWorker: (invocation) => spawned.push(invocation),
+				sweepZombies: () => [],
 				statusProbe: () => {
 					throw new Error("excluded projects must not probe CodeGraph status");
 				},
@@ -64,6 +65,7 @@ describe("CodeGraph SessionStart exclusion policy", () => {
 				stdin: Readable.from(["{}"]),
 				stdout: { write: (chunk) => stdout.push(chunk) },
 				spawnWorker: (invocation) => spawned.push(invocation),
+				sweepZombies: () => [],
 				statusProbe: () => Promise.resolve(false),
 			});
 
@@ -93,6 +95,7 @@ describe("CodeGraph SessionStart exclusion policy", () => {
 				stdin: Readable.from(["{}"]),
 				stdout: { write: (chunk) => stdout.push(chunk) },
 				spawnWorker: (invocation) => spawned.push(invocation),
+				sweepZombies: () => [],
 				statusProbe: () => Promise.resolve(false),
 			});
 
