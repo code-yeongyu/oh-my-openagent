@@ -3,6 +3,7 @@ import { prefersMultiAgentV2, readRootModel, resolveMultiAgentVersionFromConfig 
 const CODEX_AGENTS_HEADER = "[agents]";
 const CODEX_MULTI_AGENT_V2_HEADER = "[features.multi_agent_v2]";
 const CODEX_SUBAGENT_THREAD_LIMIT = "1000";
+const CODEX_MULTI_AGENT_V2_DEFAULT_THREAD_LIMIT = "16";
 
 /**
  * Ensure subagent concurrency limits without writing settings that conflict
@@ -83,10 +84,16 @@ function ensureMultiAgentV2ThreadLimit(config) {
 	if (!section) {
 		return appendBlock(
 			config,
-			`${CODEX_MULTI_AGENT_V2_HEADER}\nmax_concurrent_threads_per_session = ${CODEX_SUBAGENT_THREAD_LIMIT}\n`,
+			`${CODEX_MULTI_AGENT_V2_HEADER}\nmax_concurrent_threads_per_session = ${CODEX_MULTI_AGENT_V2_DEFAULT_THREAD_LIMIT}\n`,
 		);
 	}
-	return replaceOrInsertSetting(config, section, "max_concurrent_threads_per_session", CODEX_SUBAGENT_THREAD_LIMIT);
+	if (/^\s*max_concurrent_threads_per_session\s*=/m.test(section.text)) return config;
+	return replaceOrInsertSetting(
+		config,
+		section,
+		"max_concurrent_threads_per_session",
+		CODEX_MULTI_AGENT_V2_DEFAULT_THREAD_LIMIT,
+	);
 }
 
 function replaceOrInsertSetting(config, section, key, value) {
