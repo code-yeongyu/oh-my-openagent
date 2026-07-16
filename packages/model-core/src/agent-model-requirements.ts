@@ -32,9 +32,9 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   hephaestus: {
     fallbackChain: [
       {
-        providers: ["openai", "vercel"],
+        providers: ["openai", "github-copilot", "vercel"],
         model: "gpt-5.6-sol",
-        variant: "medium",
+        variant: "high",
       },
       {
         providers: ["openai", "github-copilot", "opencode", "vercel"],
@@ -142,6 +142,11 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         providers: ["openai", "vercel"],
         model: "gpt-5.6-sol",
         variant: "xhigh",
+      },
+      {
+        providers: ["github-copilot"],
+        model: "gpt-5.6-sol",
+        variant: "high",
       },
       {
         providers: ["openai", "github-copilot", "opencode", "vercel"],

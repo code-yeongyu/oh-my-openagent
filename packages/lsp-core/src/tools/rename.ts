@@ -1,6 +1,5 @@
 import { formatApplyResult, formatPrepareRenameResult } from "../lsp/formatters.js";
 import { withLspClient } from "../lsp/client-wrapper.js";
-import { applyWorkspaceEdit } from "../lsp/workspace-edit.js";
 import { missingDependencyResult } from "../missing-dependency-result.js";
 import { clientOptions, requireNumber, requireString } from "./parameters.js";
 import { text } from "./result.js";
@@ -15,12 +14,12 @@ export async function executeLspPrepareRename(
 	const character = requireNumber(params, "character");
 
 	try {
-		const result = await withLspClient(
-			filePath,
-			async (client) => client.prepareRename(filePath, line, character),
-			"prepareRename",
-			clientOptions(signal),
-		);
+			const result = await withLspClient(
+				filePath,
+				async (client) => client.prepareRename(filePath, line, character, signal),
+				"prepareRename",
+				clientOptions(signal),
+			);
 		const details: LspPrepareRenameDetails = { filePath, line, character, result };
 		return text(formatPrepareRenameResult(result), details);
 	} catch (error) {
@@ -45,18 +44,14 @@ export async function executeLspRename(
 	const newName = requireString(params, "newName");
 
 	try {
-		const edit = await withLspClient(
+		const result = await withLspClient(
 			filePath,
-			async (client, workspaceRoot) => ({
-				edit: await client.rename(filePath, line, character, newName),
-				workspaceRoot,
-			}),
+			async (client) => client.rename(filePath, line, character, newName, signal),
 			"rename",
 			clientOptions(signal),
 		);
-		const apply = applyWorkspaceEdit(edit.edit, { workspaceRoot: edit.workspaceRoot });
-		const details: LspRenameDetails = { filePath, line, character, newName, apply, edit: edit.edit };
-		return text(formatApplyResult(apply), details, !apply.success);
+		const details: LspRenameDetails = { filePath, line, character, newName, apply: result.apply, edit: result.edit };
+		return text(formatApplyResult(result.apply), details, !result.apply.success);
 	} catch (error) {
 		const missingDependency = missingDependencyResult(error, {
 			filePath,

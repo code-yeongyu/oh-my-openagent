@@ -1,5 +1,7 @@
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
+import type { ManagedChildHandle } from "../manager/child-handle"
+import type { TaskRecord } from "../state"
 import type { TaskRecordStore } from "../store"
 
 // Why a task is being torn down. Cancel (todo 10), LRU eviction, TTL cleanup, session shutdown, and
@@ -38,12 +40,48 @@ export type ProcessSignaller = {
   signal(pid: number, signal: "SIGTERM" | "SIGKILL"): void
 }
 
+export type RespawnResult =
+  | { readonly ok: true; readonly handle: ManagedChildHandle }
+  | { readonly ok: false; readonly reason: string }
+
+export type ReattachResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly kind: "already_attached" | "failed"; readonly reason: string }
+
+export type RespawnPort = (record: TaskRecord, resumeSessionPath: string) => Promise<RespawnResult>
+export type ReattachPort = (record: TaskRecord, handle: ManagedChildHandle) => Promise<ReattachResult>
+
+export type LifecycleReattachPorts = {
+  readonly respawn: RespawnPort
+  readonly reattach: ReattachPort
+}
+
+const registeredReattachPorts = new WeakMap<TaskRecordStore, LifecycleReattachPorts>()
+
+export function registerLifecycleReattachPorts(
+  store: TaskRecordStore,
+  ports: LifecycleReattachPorts,
+): void {
+  registeredReattachPorts.set(store, ports)
+}
+
+export function getLifecycleReattachPorts(store: TaskRecordStore): LifecycleReattachPorts | undefined {
+  return registeredReattachPorts.get(store)
+}
+
 export type LifecycleDeps = {
   readonly store: TaskRecordStore
   readonly registry: ResidencyRegistry
   readonly config: OmoTaskSettings
   readonly now?: () => number
   readonly signaller?: ProcessSignaller
+  readonly respawn?: RespawnPort
+  readonly reattach?: ReattachPort
   // Delay before escalating an orphan SIGTERM to SIGKILL during reconciliation. Defaults to 5s.
   readonly orphanKillDelayMs?: number
+}
+
+export function injectedLifecycleReattachPorts(deps: LifecycleDeps): LifecycleReattachPorts | undefined {
+  if (deps.respawn === undefined || deps.reattach === undefined) return undefined
+  return { respawn: deps.respawn, reattach: deps.reattach }
 }

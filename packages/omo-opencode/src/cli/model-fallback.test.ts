@@ -53,9 +53,13 @@ describe("generateModelConfig", () => {
       )
       expect(unsupportedEntries).toEqual([])
       expect(result.agents?.momus).toEqual({
-        model: "github-copilot/gpt-5.5",
+        model: "github-copilot/gpt-5.6-sol",
         variant: "high",
         fallback_models: [
+          {
+            model: "github-copilot/gpt-5.5",
+            variant: "high",
+          },
           {
             model: "github-copilot/claude-opus-4.7",
             variant: "max",
@@ -66,6 +70,12 @@ describe("generateModelConfig", () => {
           },
         ],
       })
+      expect(result.categories?.ultrabrain?.model).toBe("github-copilot/gpt-5.6-sol")
+      expect(result.categories?.ultrabrain?.variant).toBe("high")
+      expect(result.categories?.deep?.model).toBe("github-copilot/gpt-5.6-terra")
+      expect(result.categories?.deep?.variant).toBe("high")
+      expect(result.categories?.["unspecified-low"]?.model).toBe("github-copilot/gpt-5.6-luna")
+      expect(result.categories?.["unspecified-low"]?.variant).toBe("high")
     })
     test("omits librarian when only ZAI is available", () => {
       // #given only ZAI is available
@@ -292,10 +302,10 @@ describe("generateModelConfig", () => {
 
       // #then
       expect(result.agents?.hephaestus?.model).toBe("openai/gpt-5.6-sol")
-      expect(result.agents?.hephaestus?.variant).toBe("medium")
+      expect(result.agents?.hephaestus?.variant).toBe("high")
     })
 
-    test("Hephaestus falls back to Copilot GPT-5.5 when only Copilot is available", () => {
+    test("Hephaestus uses Copilot GPT-5.6 Sol high when only Copilot is available", () => {
       // #given
       const config = createConfig({ hasCopilot: true })
 
@@ -304,8 +314,14 @@ describe("generateModelConfig", () => {
 
       // #then
       expect(result.agents?.hephaestus).toEqual({
-        model: "github-copilot/gpt-5.5",
-        variant: "medium",
+        model: "github-copilot/gpt-5.6-sol",
+        variant: "high",
+        fallback_models: [
+          {
+            model: "github-copilot/gpt-5.5",
+            variant: "medium",
+          },
+        ],
       })
     })
 

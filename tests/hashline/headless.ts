@@ -10,6 +10,7 @@ import { normalizeHashlineEdits } from "../../packages/omo-opencode/src/tools/ha
 import { applyHashlineEditsWithReport } from "../../packages/omo-opencode/src/tools/hashline-edit/edit-operations"
 import { canonicalizeFileText, restoreFileText } from "../../packages/omo-opencode/src/tools/hashline-edit/file-text-canonicalization"
 import { HASHLINE_EDIT_DESCRIPTION } from "../../packages/omo-opencode/src/tools/hashline-edit/tool-description"
+import { parseHashlineTestEnvironment } from "./test-environment"
 
 const DEFAULT_MODEL = "minimax-m2.5-free"
 const MAX_STEPS = 50
@@ -116,11 +117,12 @@ const editFileTool = tool({
 // ── Agent Loop ───────────────────────────────────────────────
 async function run() {
   const { prompt, modelId } = parseArgs()
+  const environment = parseHashlineTestEnvironment(process.env)
 
   const provider = createOpenAICompatible({
     name: "hashline-test",
-    baseURL: process.env.HASHLINE_TEST_BASE_URL ?? "https://quotio.mengmota.com/v1",
-    apiKey: process.env.HASHLINE_TEST_API_KEY ?? "quotio-local-60A613FE-DB74-40FF-923E-A14151951E5D",
+    baseURL: environment.baseURL,
+    apiKey: environment.apiKey,
   })
   const model = provider.chatModel(modelId)
   const tools = { read_file: readFileTool, edit_file: editFileTool }
@@ -185,17 +187,18 @@ async function run() {
 }
 
 // ── Signal + Startup ─────────────────────────────────────────
-process.once("SIGINT", () => process.exit(0))
-process.once("SIGTERM", () => process.exit(143))
+if (import.meta.main) {
+  process.once("SIGINT", () => process.exit(0))
+  process.once("SIGTERM", () => process.exit(143))
 
-const startTime = Date.now()
-run()
-  .catch((error) => {
-    emit({ type: "error", error: error instanceof Error ? error.message : String(error) })
-    process.exit(1)
-  })
-  .then(() => {
-    const elapsed = ((Date.now() - startTime) / 1000).toFixed(2)
-    console.error(`[headless] Completed in ${elapsed}s`)
-  })
-
+  const startTime = Date.now()
+  run()
+    .catch((error) => {
+      emit({ type: "error", error: error instanceof Error ? error.message : String(error) })
+      process.exit(1)
+    })
+    .then(() => {
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(2)
+      console.error(`[headless] Completed in ${elapsed}s`)
+    })
+}

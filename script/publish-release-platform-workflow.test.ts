@@ -124,14 +124,11 @@ describe("release and platform publish workflows", () => {
     expect(darwinVerifyStep).not.toContain("codesign")
   })
 
-  test("regenerates and commits release lockfiles in the release version bump", () => {
+  test("regenerates and commits release lockfiles only in the prepared source state", () => {
     // #given
     const workflow = readFileSync(publishWorkflowPath, "utf8")
-
-    // #when
     const prepareStep = sliceWorkflowSection(workflow, "      - name: Prepare and merge release state before publishing", "      - name: Write job summary")
-    const applyStep = sliceWorkflowSection(workflow, "      - name: Apply release version to source tree", "      - name: Commit version bump")
-    const commitStep = sliceWorkflowSection(workflow, "      - name: Commit version bump", "      - name: Create release tag")
+    const releaseJob = workflow.slice(workflow.indexOf("  release:"))
     const codexLockfileCommand = "npm --prefix packages/omo-codex/plugin install --package-lock-only --ignore-scripts --no-audit --fund=false"
     const codexLockfilePath = "packages/omo-codex/plugin/package-lock.json"
 
@@ -140,33 +137,29 @@ describe("release and platform publish workflows", () => {
     expect(prepareStep.indexOf(codexLockfileCommand)).toBeGreaterThan(prepareStep.indexOf("node packages/omo-codex/plugin/scripts/sync-version.mjs"))
     expect(prepareStep.indexOf("bun install --lockfile-only")).toBeGreaterThan(prepareStep.indexOf(codexLockfileCommand))
     expect(prepareStep).toContain(codexLockfilePath)
-    expect(applyStep).toContain("bun install --lockfile-only")
-    expect(applyStep).toContain(codexLockfileCommand)
-    expect(applyStep.indexOf(codexLockfileCommand)).toBeGreaterThan(applyStep.indexOf("node packages/omo-codex/plugin/scripts/sync-version.mjs"))
-    expect(applyStep.indexOf("bun install --lockfile-only")).toBeGreaterThan(applyStep.indexOf(codexLockfileCommand))
-    expect(applyStep.indexOf("bun install --lockfile-only")).toBeGreaterThan(applyStep.indexOf("node packages/omo-codex/plugin/scripts/sync-version.mjs"))
-    expect(commitStep).toContain(" bun.lock")
-    expect(commitStep).toContain(codexLockfilePath)
+    expect(prepareStep).toContain("git commit -m \"release: v${VERSION}\"")
+    expect(releaseJob).not.toContain("name: Apply release version to source tree")
+    expect(releaseJob).not.toContain("name: Commit version bump")
   })
 
-  test("keeps the release tail safe to rerun after a tag exists", () => {
+  test("validates an existing release tag before redispatching its prepared source", () => {
     // #given
     const workflow = readFileSync(publishWorkflowPath, "utf8")
+    const dispatchJob = sliceWorkflowSection(workflow, "  dispatch-provenance-safe-publish:", "  publish-main:")
 
     // #when
-    const hasExistingTagResolver = workflow.includes("id: release-state") &&
-      workflow.includes("tag_exists=true") &&
-      workflow.includes('git checkout --detach "v${VERSION}"')
-    const tagStepSkipsExistingTag = workflow.includes("if: steps.release-state.outputs.tag_exists != 'true'")
-    const noHardExistingTagFailure = !workflow.includes("Tag v${VERSION} already exists")
-    const pushSkipsExistingRemoteTag = workflow.includes("Release tag v${VERSION} already exists on origin")
+    const checksExistingTagTarget =
+      dispatchJob.includes('if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then') &&
+      dispatchJob.includes('TAG_SHA="$(git rev-list --max-count=1 "v${VERSION}")"') &&
+      dispatchJob.includes('"$TAG_SHA" != "$RELEASE_SHA"')
+    const createsMissingTagAtPreparedSource = dispatchJob.includes('git tag "v${VERSION}" "$RELEASE_SHA"')
+    const redispatchesTag = dispatchJob.includes('gh workflow run publish.yml --ref "v${VERSION}"')
     const marketplacePushSkipsWhenClean = workflow.includes("LazyCodex marketplace already up to date")
 
     // #then
-    expect(hasExistingTagResolver, "release must detect and reuse an existing tag on rerun").toBe(true)
-    expect(tagStepSkipsExistingTag, "tag creation must skip when the release tag already exists").toBe(true)
-    expect(noHardExistingTagFailure, "existing tags must not make reruns fail").toBe(true)
-    expect(pushSkipsExistingRemoteTag, "tag push must be skip-if-exists").toBe(true)
+    expect(checksExistingTagTarget, "reruns must reject a release tag that points away from the prepared source").toBe(true)
+    expect(createsMissingTagAtPreparedSource, "the first publish run must create its tag at the prepared source").toBe(true)
+    expect(redispatchesTag, "the provenance-bearing publish run must be dispatched from the verified release tag").toBe(true)
     expect(marketplacePushSkipsWhenClean, "marketplace sync must skip push when rerun has no changes").toBe(true)
   })
 
@@ -209,7 +202,7 @@ describe("release and platform publish workflows", () => {
     expect(publishIds, "PLATFORM_PACKAGE_IDS must match build-binaries PLATFORMS exactly").toEqual(
       buildBinariesPlatforms,
     )
-    expect(publishYmlLists.length, "publish.yml must enumerate platforms in 2 PLATFORMS arrays + 3 version-bump loops").toBe(5)
+    expect(publishYmlLists.length, "publish.yml must enumerate platforms in 2 PLATFORMS arrays + 2 prepared-source version-bump loops").toBe(4)
     for (const publishYmlList of publishYmlLists) {
       expect(publishYmlList, "every publish.yml platform list must match build-binaries PLATFORMS exactly").toEqual(
         buildBinariesPlatforms,

@@ -5,6 +5,11 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { handleLspMcpRequest } from "../src/mcp.js";
+import {
+	createStandaloneMcpRequestContext,
+	runWithRequestContext,
+	type LspRequestContext,
+} from "../src/request-context.js";
 
 describe("lsp MCP server", () => {
 	it("responds to initialize with tool capabilities", async () => {
@@ -50,12 +55,14 @@ describe("lsp MCP server", () => {
 	});
 
 	it("calls status without starting a language server", async () => {
-		const response = await handleLspMcpRequest({
-			jsonrpc: "2.0",
-			id: 3,
-			method: "tools/call",
-			params: { name: "status", arguments: {} },
-		});
+		const response = await runWithRequestContext(createStandaloneMcpRequestContext(), () =>
+			handleLspMcpRequest({
+				jsonrpc: "2.0",
+				id: 3,
+				method: "tools/call",
+				params: { name: "status", arguments: {} },
+			}),
+		);
 
 		expect(response).toMatchObject({
 			jsonrpc: "2.0",
@@ -68,12 +75,14 @@ describe("lsp MCP server", () => {
 	});
 
 	it("accepts legacy lsp-prefixed tool names without listing them", async () => {
-		const response = await handleLspMcpRequest({
-			jsonrpc: "2.0",
-			id: 4,
-			method: "tools/call",
-			params: { name: "lsp_status", arguments: {} },
-		});
+		const response = await runWithRequestContext(createStandaloneMcpRequestContext(), () =>
+			handleLspMcpRequest({
+				jsonrpc: "2.0",
+				id: 4,
+				method: "tools/call",
+				params: { name: "lsp_status", arguments: {} },
+			}),
+		);
 
 		expect(response).toMatchObject({
 			jsonrpc: "2.0",
@@ -89,6 +98,7 @@ describe("lsp MCP server", () => {
 describe("lsp MCP install_decision routing", () => {
 	const tempDirectories: string[] = [];
 	const saved = new Map<string, string | undefined>();
+	let requestContext: LspRequestContext;
 
 	function setEnv(name: string, value: string): void {
 		if (!saved.has(name)) saved.set(name, process.env[name]);
@@ -100,7 +110,8 @@ describe("lsp MCP install_decision routing", () => {
 		tempDirectories.push(dir);
 		setEnv("LSP_TOOLS_MCP_INSTALL_DECISIONS", join(dir, "lsp-install-decisions.json"));
 		setEnv("LSP_TOOLS_MCP_USER_CONFIG", join(dir, "absent-user.json"));
-		setEnv("LSP_TOOLS_MCP_PROJECT_CONFIG", join(dir, "absent-project.json"));
+		setEnv("LSP_TOOLS_MCP_PROJECT_CONFIG", "absent-project.json");
+		requestContext = createStandaloneMcpRequestContext({ cwd: dir });
 	});
 
 	afterEach(() => {
@@ -118,24 +129,28 @@ describe("lsp MCP install_decision routing", () => {
 	});
 
 	it("routes install_decision tool calls", async () => {
-		const response = await handleLspMcpRequest({
-			jsonrpc: "2.0",
-			id: 5,
-			method: "tools/call",
-			params: { name: "install_decision", arguments: { server_id: "typescript", decision: "declined" } },
-		});
+		const response = await runWithRequestContext(requestContext, () =>
+			handleLspMcpRequest({
+				jsonrpc: "2.0",
+				id: 5,
+				method: "tools/call",
+				params: { name: "install_decision", arguments: { server_id: "typescript", decision: "declined" } },
+			}),
+		);
 
 		expect(response).toMatchObject({ jsonrpc: "2.0", id: 5, result: { isError: false } });
 		expect(response?.result?.content?.[0]?.text).toContain("typescript");
 	});
 
 	it("routes the legacy lsp_install_decision alias", async () => {
-		const response = await handleLspMcpRequest({
-			jsonrpc: "2.0",
-			id: 6,
-			method: "tools/call",
-			params: { name: "lsp_install_decision", arguments: { server_id: "typescript", decision: "allowed" } },
-		});
+		const response = await runWithRequestContext(requestContext, () =>
+			handleLspMcpRequest({
+				jsonrpc: "2.0",
+				id: 6,
+				method: "tools/call",
+				params: { name: "lsp_install_decision", arguments: { server_id: "typescript", decision: "allowed" } },
+			}),
+		);
 
 		expect(response).toMatchObject({ jsonrpc: "2.0", id: 6, result: { isError: false } });
 	});

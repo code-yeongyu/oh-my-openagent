@@ -143,6 +143,30 @@ describe("linkCachedPluginAgents", () => {
     expect((await lstat(join(agentsDir, "planner.toml"))).isSymbolicLink()).toBe(false)
   })
 
+  test("ignores malformed installed agent reasoning effort when reinstalling file copies", async () => {
+    // given
+    const { codexHome, pluginRoot } = await makeFixture()
+    const agentsDir = join(codexHome, "agents")
+    await mkdir(agentsDir, { recursive: true })
+    await writeFile(
+      join(pluginRoot, "components", "ulw-loop", "agents", "planner.toml"),
+      'name = "planner"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\n',
+    )
+    await writeFile(
+      join(agentsDir, "planner.toml"),
+      'name = "planner"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "high\\q"\n',
+    )
+    const preservedReasoning = await capturePreservedAgentReasoning({ codexHome })
+
+    // when
+    await linkCachedPluginAgents({ codexHome, pluginRoot, platform: "linux", preservedReasoning })
+
+    // then
+    const content = await readFile(join(agentsDir, "planner.toml"), "utf8")
+    expect(content).toContain('model_reasoning_effort = "xhigh"')
+    expect(content).not.toContain("high\\q")
+  })
+
   test("preserves removed installed agent service tier when reinstalling file copies", async () => {
     // given
     const { codexHome, pluginRoot } = await makeFixture()
@@ -165,6 +189,29 @@ describe("linkCachedPluginAgents", () => {
     const content = await readFile(join(agentsDir, "planner.toml"), "utf8")
     expect(content).not.toContain("service_tier")
     expect((await lstat(join(agentsDir, "planner.toml"))).isSymbolicLink()).toBe(false)
+  })
+
+  test("ignores malformed installed agent service tier when reinstalling file copies", async () => {
+    // given
+    const { codexHome, pluginRoot } = await makeFixture()
+    const agentsDir = join(codexHome, "agents")
+    await mkdir(agentsDir, { recursive: true })
+    await writeFile(
+      join(pluginRoot, "components", "ulw-loop", "agents", "planner.toml"),
+      'name = "planner"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\nservice_tier = "fast"\n',
+    )
+    await writeFile(
+      join(agentsDir, "planner.toml"),
+      'name = "planner"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\nservice_tier = "flex\\q"\n',
+    )
+    const preservedServiceTier = await capturePreservedAgentServiceTier({ codexHome })
+
+    // when
+    await linkCachedPluginAgents({ codexHome, pluginRoot, platform: "linux", preservedServiceTier })
+
+    // then
+    const content = await readFile(join(agentsDir, "planner.toml"), "utf8")
+    expect(content).not.toContain("service_tier")
   })
 
   test("preserves reviewer reasoning like any other compatibility fixture", async () => {

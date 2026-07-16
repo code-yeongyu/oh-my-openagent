@@ -150,6 +150,34 @@ describe("opencode-config-dir", () => {
         resolve("/xdg/config/opencode"),
       ])
     })
+
+    test("deduplicates when OPENCODE_CONFIG_DIR equals the default XDG path", () => {
+      // given OPENCODE_CONFIG_DIR points to the same path as the XDG default
+      const defaultDir = join(homedir(), ".config", "opencode")
+      process.env.OPENCODE_CONFIG_DIR = defaultDir
+      delete process.env.XDG_CONFIG_HOME
+      Object.defineProperty(process, "platform", { value: "linux" })
+
+      // when getOpenCodeConfigDirs is called
+      const result = getOpenCodeConfigDirs({ binary: "opencode", version: "1.0.200" })
+
+      // then the array contains a single deduplicated entry
+      expect(result).toEqual([resolve(defaultDir)])
+    })
+
+    test("returns single-element array for non-opencode binary", () => {
+      // given a Tauri desktop binary and OPENCODE_CONFIG_DIR is set
+      process.env.OPENCODE_CONFIG_DIR = "/custom/opencode/path"
+      Object.defineProperty(process, "platform", { value: "linux" })
+
+      // when getOpenCodeConfigDirs is called with binary="opencode-desktop"
+      const result = getOpenCodeConfigDirs({ binary: "opencode-desktop", version: "1.0.200" })
+
+      // then it returns a single-element array (no additive semantics for non-opencode binaries)
+      expect(result).toEqual([getOpenCodeConfigDir({ binary: "opencode-desktop", version: "1.0.200" })])
+      expect(result).toHaveLength(1)
+    })
+
   })
 
   describe("isDevBuild", () => {

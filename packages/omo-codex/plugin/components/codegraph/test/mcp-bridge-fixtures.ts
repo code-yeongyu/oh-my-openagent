@@ -49,6 +49,41 @@ export function writeFakeContractCodegraph(filePath: string): void {
 	chmodSync(filePath, 0o755);
 }
 
+export function writeFakeHeldOpenCodegraph(filePath: string): void {
+	writeFileSync(
+		filePath,
+		[
+			"#!/usr/bin/env node",
+			"const fs = require('node:fs');",
+			"const readline = require('node:readline');",
+			"fs.writeFileSync(process.env.CODEGRAPH_FAKE_LOG, String(process.pid));",
+			"const rl = readline.createInterface({ input: process.stdin });",
+			"rl.once('line', (line) => {",
+			"  const request = JSON.parse(line);",
+			"  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { ok: true } }) + '\\n');",
+			"});",
+			"setInterval(() => {}, 1000);",
+		].join("\n"),
+	);
+	chmodSync(filePath, 0o755);
+}
+
+export function writeFakeExitingCodegraph(filePath: string): void {
+	writeFileSync(
+		filePath,
+		[
+			"#!/usr/bin/env node",
+			"const readline = require('node:readline');",
+			"const rl = readline.createInterface({ input: process.stdin });",
+			"rl.once('line', (line) => {",
+			"  const request = JSON.parse(line);",
+			"  process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { ok: true } }) + '\\n', () => process.exit(0));",
+			"});",
+		].join("\n"),
+	);
+	chmodSync(filePath, 0o755);
+}
+
 export function frameMcpRequest(request: {
 	readonly id: number;
 	readonly method: string;

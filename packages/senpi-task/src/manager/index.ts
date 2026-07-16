@@ -38,6 +38,8 @@ export type {
   PlanResolution,
   PlanResolutionError,
   ResolvedChildPlan,
+  TrustedRespawnLaunch,
+  TrustedRespawnLaunchResolver,
   SpawnAdmission,
   StartResult,
   TaskManager,

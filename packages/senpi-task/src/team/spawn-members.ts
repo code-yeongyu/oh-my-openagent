@@ -1,11 +1,14 @@
 import { mkdir } from "node:fs/promises"
 
-import type { ToolDefinition } from "@code-yeongyu/senpi"
 import type { TeamSpec } from "@oh-my-opencode/team-core/types"
 
 import type { ManagerStartSpec, StartResult } from "../manager"
 import { projectMemberStatus, type RuntimeMemberStatus } from "./member-projection"
-import { SenpiTeamRuntimeError, type TeamRuntimeManagerPort } from "./runtime-types"
+import {
+  SenpiTeamRuntimeError,
+  type SpawnMemberExtensionConfig,
+  type TeamRuntimeManagerPort,
+} from "./runtime-types"
 
 type TeamMember = TeamSpec["members"][number]
 
@@ -24,7 +27,7 @@ export type SpawnMembersInput = {
   readonly maxParallel: number
   readonly deadlineAt: number
   readonly now: () => number
-  readonly memberScopedTools?: (memberName: string, teamRunId: string) => readonly ToolDefinition[]
+  readonly memberExtension?: SpawnMemberExtensionConfig
 }
 
 export type SpawnMembersResult = {
@@ -38,10 +41,10 @@ export function memberTaskName(teamRunId: string, memberName: string): string {
 
 /**
  * Spawns team members as senpi-task children through the manager, capped at `maxParallel` cooperating
- * workers over a shared index, enforcing the create deadline before each pull. Members are ALWAYS
- * in-process (v1) and run in the background. The FIRST failure (a rejected start, a thrown start, or
- * a deadline breach) flips the shared flag so the remaining workers drain out and the caller rolls
- * back the members already spawned.
+ * workers over a shared index, enforcing the create deadline before each pull. Members run as durable
+ * background processes so their sessions remain recoverable across parent or child crashes. The FIRST
+ * failure (a rejected start, a thrown start, or a deadline breach) flips the shared flag so the remaining
+ * workers drain out and the caller rolls back the members already spawned.
  */
 export async function spawnTeamMembers(input: SpawnMembersInput): Promise<SpawnMembersResult> {
   const spawned = new Map<string, SpawnedMember>()
@@ -107,18 +110,27 @@ async function spawnOneMember(input: SpawnMembersInput, member: TeamMember): Pro
 }
 
 function buildMemberStartSpec(input: SpawnMembersInput, member: TeamMember): ManagerStartSpec {
-  const scopedTools = input.memberScopedTools?.(member.name, input.teamRunId)
+  const launch = input.memberExtension
+  const extensions = launch === undefined
+    ? undefined
+    : [...new Set([...(launch.inheritedExtensions ?? []), launch.entryPath])]
   return {
     prompt: member.prompt ?? `You are team member '${member.name}' in team '${input.spec.name}'.`,
     parent_session_id: input.leadSessionId,
     root_session_id: input.leadSessionId,
     depth: input.spawnDepth,
     name: memberTaskName(input.teamRunId, member.name),
-    execution_mode: "in-process",
+    execution_mode: "process",
     run_in_background: true,
     ...(member.kind === "category" ? { category: member.category } : { subagent_type: member.subagent_type }),
     ...(member.worktreePath !== undefined ? { cwd: member.worktreePath } : {}),
-    ...(scopedTools !== undefined ? { memberScopedTools: scopedTools } : {}),
+    ...(extensions !== undefined ? { extensions } : {}),
+    ...(launch !== undefined ? {
+      memberEnv: {
+        SENPI_TASK_MEMBER: `${input.teamRunId}::${member.name}`,
+        SENPI_TASK_TEAM_CONFIG: launch.teamConfig,
+      },
+    } : {}),
   }
 }
 

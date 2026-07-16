@@ -45,7 +45,7 @@ Read-only Codex subagent roles live in `CODEX_HOME/agents/`. Spawn: `multi_agent
 
 - `explorer` - codebase search
 - `librarian` - external docs, OSS code, API contracts
-- `plan` - planning for ambiguous, multi-module work
+- `plan` - planning when design is still open after discovery; never for a known checklist or for work being delegated onward
 - `lazycodex-gate-reviewer` - final verification of a finished change
 
 Spawn subagents in parallel for independent investigations; do non-overlapping prep while they run, integrate on return. Never duplicate a running search or poll without a completion signal. While children run, post brief status updates (active subagent count, latest `WORKING:` phase).
@@ -74,7 +74,7 @@ Diagnostics catch type errors, not logic bugs; tests cover only what their autho
 
 # Global Review and Debugging Gate
 
-Before declaring significant work or a PR handoff complete, run `review-work` plus a `debugging` runtime audit; record three debugging hypotheses with runtime evidence each. Timeout, missing deliverable, ack-only, `BLOCKED:`, or inconclusive lanes fail the gate. Redact secrets, tokens, and PII from ledgers, PR bodies, and handoffs.
+Run `review-work` plus a `debugging` runtime audit only before a PR handoff or when the user asks for a review; lane pass/fail semantics live in those skills. Each passing review lane and debugging audit binds to the exact full commit SHA it reviewed. Immediately append a durable task-evidence/ledger record with its name, full SHA, verdict, and report artifact/source. Before reuse after continuation or compaction, re-read the record and require the exact lane/SHA pair; memory or an unstamped report is not coverage. Every missing pair at the current SHA still runs, and new commits require fresh applicable coverage. For everything else, the gate above is the whole gate: once you have personally observed the artifact working, report your evidence. Redact secrets, tokens, and PII from ledgers, PR bodies, and handoffs.
 
 # Failure Recovery
 

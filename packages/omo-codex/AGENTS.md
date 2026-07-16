@@ -23,9 +23,14 @@
 
 **ALWAYS. EVERY TIME. NO EXCEPTIONS.**
 
+### Dev dogfood (real `~/.codex`, distinct from the isolated QA flow above)
+
+`bun run install:codex-dev` swaps your real install for this repo's local build stamped as version `dev` (env `LAZYCODEX_DEV_VERSION`, default `dev`). Everywhere the plugin version shows — cache dir `.../omo/dev/`, `plugin.json`, and the per-turn `(OmO dev)` hook prefix — reads `dev`, so you can SEE which build is loaded. This is dogfooding on your REAL home; it is NOT a substitute for the mandatory isolated-`CODEX_HOME` QA above. Impl: `resolveLazyCodexPluginVersion` `versionOverride` (`src/install/lazycodex-version-stamp.ts`) fed from `env.LAZYCODEX_DEV_VERSION` in `runCodexInstaller`; display in `get-local-version` (`dev` status on a non-semver stamp).
+
+
 ## OVERVIEW
 
-`@oh-my-opencode/omo-codex` (private, v0.1.0): the Codex harness adapter = the **Light Edition** (omo for the OpenAI Codex CLI). Vendors a Codex plugin namespace `omo` + a TypeScript installer + telemetry. Public distribution = the `lazycodex` bin/npm alias and the [`code-yeongyu/lazycodex`](https://github.com/code-yeongyu/lazycodex) marketplace repo. Codex marketplace identity = `sisyphuslabs` / plugin `omo` (`omo@sisyphuslabs`); `lazycodex` is the alias only. Full identity + the publish/deploy pipeline live in the root [`AGENTS.md`](../../AGENTS.md) "CODEX LIGHT EDITION" section.
+`@oh-my-opencode/omo-codex` (private, v4.18.1): the Codex harness adapter = the **Light Edition** (omo for the OpenAI Codex CLI). Vendors a Codex plugin namespace `omo` + a TypeScript installer + telemetry. Public distribution = the live `lazycodex-ai` npm package/bin alias. `lazycodex` remains a root bin alias and the [`code-yeongyu/lazycodex`](https://github.com/code-yeongyu/lazycodex) repository identity, but is not an npm package. Codex marketplace identity = `sisyphuslabs` / plugin `omo` (`omo@sisyphuslabs`). Full identity + the publish/deploy pipeline live in the root [`AGENTS.md`](../../AGENTS.md) "CODEX LIGHT EDITION" section.
 
 ## LAYOUT
 

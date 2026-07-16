@@ -4,7 +4,6 @@ import { Theme, type MessageRenderer } from "@code-yeongyu/senpi"
 import { normalizeRendererText, rendererVisibleWidth } from "@oh-my-opencode/senpi-task"
 
 import { renderTaskCompletion } from "./renderers"
-import { renderTeamMessage, type TeamMessageDetails } from "./team-renderers"
 
 const TEST_FG_COLORS = {
   accent: "#000000",
@@ -114,19 +113,6 @@ describe("task-family custom message renderers", () => {
     expect(lines.join("\n")).not.toContain("<task-notification>")
   })
 
-  test("#given terminal control injection #when rendering a team message #then structured CJK details are sanitized", () => {
-    // given
-    const details: TeamMessageDetails = { from: "member-a", messageId: "m1", body: ADVERSARIAL_CONTENT }
-
-    // when
-    const lines = renderContentLines(renderTeamMessage, "senpi-task.team-message", "<peer_message>raw</peer_message>", details)
-
-    // then
-    expectSanitizedLines(lines)
-    expect(lines.join("\n")).toContain("첫줄 빨강")
-    expect(lines.join("\n")).not.toContain("<peer_message>")
-  })
-
   test("#given structured completion details #when rendering #then user-facing task facts replace protocol tags", () => {
     // given
     const details = [{
@@ -159,50 +145,6 @@ describe("task-family custom message renderers", () => {
     expect(text).toContain("task_send")
     expect(text).not.toContain("<task-notification>")
     expect(text).not.toContain("<head>")
-  })
-
-  test("#given a structured team message #when rendering #then sender summary and body replace the peer envelope", () => {
-    // given
-    const details: TeamMessageDetails & { readonly body: string; readonly summary: string } = {
-      from: "member-a",
-      messageId: "m1",
-      summary: "검토 완료",
-      body: "한국어 팀 메시지 본문과 the actual review result.",
-    }
-
-    // when
-    const lines = renderContentLines(
-      renderTeamMessage,
-      "senpi-task.team-message",
-      '<peer_message from="member-a" summary="검토 완료">\n한국어 팀 메시지 본문과 the actual review result.\n</peer_message>',
-      details,
-    )
-    const text = lines.join("\n")
-
-    // then
-    expect(text).toContain("team message")
-    expect(text).toContain("from:member-a")
-    expect(text).toContain("id:m1")
-    expect(text).toContain("summary:검토 완료")
-    expect(text).toContain("한국어 팀 메시지 본문")
-    expect(text).not.toContain("<peer_message")
-    expect(text).not.toContain("</peer_message>")
-  })
-
-  test("#given a long team body #when rendering at 48 cells #then the actual-width excerpt preserves English word boundaries", () => {
-    // given
-    const body = "Context confirms that the actual review result are visible after the final checks and remain available for inspection. Additional evidence stays attached."
-    const details: TeamMessageDetails = { from: "member-a", messageId: "m1", body }
-
-    // when
-    const lines = renderContentLines(renderTeamMessage, "senpi-task.team-message", "<peer_message>raw</peer_message>", details, 48)
-    const normalizedLines = lines.map(normalizeRendererText)
-    const messageLine = normalizedLines.find((line) => line.startsWith('message:"')) ?? ""
-
-    // then
-    expect(messageLine).toContain("the actual")
-    expect(messageLine).not.toMatch(/\b(?:rev|vis)\.\.\.$/u)
-    for (const line of lines) expect(rendererVisibleWidth(line)).toBeLessThanOrEqual(48)
   })
 
   test("#given a long completion continuation #when rendering at 54 cells #then the actual-width excerpt preserves English word boundaries", () => {

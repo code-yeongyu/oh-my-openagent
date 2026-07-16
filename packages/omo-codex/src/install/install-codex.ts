@@ -34,6 +34,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
   const runCommand = options.runCommand ?? defaultRunCommand
   const log = options.log ?? (() => undefined)
   const buildSource = await shouldBuildSourcePackages(repoRoot)
+  const versionOverride = env.LAZYCODEX_DEV_VERSION?.trim() || undefined
 
   const gitBashResolution = await prepareGitBashForInstall({
     platform,
@@ -69,6 +70,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
       marketplaceName: marketplace.name,
       pluginName: entry.name,
       distributionManifest,
+      versionOverride,
     })
     validatePathSegment(version, "plugin version")
     log(`Building ${entry.name}@${version}`)
@@ -76,6 +78,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     const plugin = await installCachedPlugin({
       buildSource,
       codexHome,
+      env,
       marketplaceName: marketplace.name,
       name: entry.name,
       runCommand,
@@ -162,7 +165,15 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     })
   }
 
-  await reapLspDaemons(codexHome).catch(() => [])
+  const legacyDaemonCleanup = await reapLspDaemons(codexHome).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error)
+    log(`Warning: skipped legacy Codex LSP daemon cleanup: ${message}`)
+    return []
+  })
+  for (const cleanup of legacyDaemonCleanup) {
+    if (cleanup.status !== "deferred") continue
+    log(`Warning: deferred legacy Codex LSP daemon cleanup for v${cleanup.version}: ${cleanup.reason}`)
+  }
 
   const marketplaceRoot = join(codexHome, "plugins", "cache", marketplace.name)
   await writeCachedMarketplaceManifest({

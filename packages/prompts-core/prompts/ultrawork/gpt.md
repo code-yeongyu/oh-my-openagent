@@ -62,7 +62,7 @@ Before acting, survey the skills available in this system: scan their descriptio
 | explore agent | Need codebase patterns you don't have | `task(subagent_type="explore", load_skills=[], run_in_background=true, ...)` |
 | librarian agent | External library docs, OSS examples | `task(subagent_type="librarian", load_skills=[], run_in_background=true, ...)` |
 | oracle agent | Stuck on architecture/debugging after 2+ attempts | `task(subagent_type="oracle", load_skills=[], run_in_background=false, ...)` |
-| plan agent | Complex multi-step with dependencies (5+ steps) | `task(subagent_type="plan", load_skills=[], run_in_background=false, ...)` |
+| plan agent | Discovery leaves unresolved design uncertainty: unclear boundaries, competing decompositions, or uncertain dependency order | `task(subagent_type="plan", load_skills=[], run_in_background=false, ...)` |
 | task category | Specialized work matching a category | `task(category="...", load_skills=[...], run_in_background=true)` |
 
 <tool_usage_rules>
@@ -84,8 +84,8 @@ Before acting, survey the skills available in this system: scan their descriptio
 **ALWAYS run both tracks in parallel:**
 ```
 // Fire background agents for deep exploration
-task(subagent_type="explore", load_skills=[], prompt="I'm implementing [TASK] and need to understand [KNOWLEDGE GAP]. Find [X] patterns in the codebase - file paths, implementation approach, conventions used, and how modules connect. I'll use this to [DOWNSTREAM DECISION]. Focus on production code in src/. Return file paths with brief descriptions.", run_in_background=true)
-task(subagent_type="librarian", load_skills=[], prompt="I'm working with [TECHNOLOGY] and need [SPECIFIC INFO]. Find official docs and production examples for [Y] - API reference, configuration, recommended patterns, and pitfalls. Skip tutorials. I'll use this to [DECISION THIS INFORMS].", run_in_background=true)
+task(subagent_type="explore", load_skills=[], prompt="CONTEXT: implementing [TASK]; gap: [KNOWLEDGE GAP]. GOAL: find [X] patterns in the codebase - file paths, implementation approach, conventions, module connections - to unblock [DOWNSTREAM DECISION]. Focus on production code in src/. STOP WHEN: the findings answer the gap or two search rounds add nothing new. EVIDENCE: file:line refs with one-line descriptions.", run_in_background=true)
+task(subagent_type="librarian", load_skills=[], prompt="CONTEXT: working with [TECHNOLOGY]; need [SPECIFIC INFO]. GOAL: official docs and production examples for [Y] - API reference, configuration, recommended patterns, pitfalls - to unblock [DECISION THIS INFORMS]. Skip tutorials. STOP WHEN: the cited sources answer [SPECIFIC INFO] or sources repeat. EVIDENCE: source links with the claim each supports.", run_in_background=true)
 
 // WHILE THEY RUN - use direct tools for immediate context
 grep(pattern="relevant_pattern", path="src/")
@@ -97,14 +97,14 @@ deep_context = background_output(task_id=...)
 // Merge ALL findings for comprehensive understanding
 ```
 
-**Plan agent (size the scope first):**
-- Count distinct surfaces, files, steps. Invoke for 5+ interdependent steps / multi-file / unclear scope; skip only for genuinely trivial single-step work.
+**Plan agent (size by what is UNDECIDED, not by step count):**
+- Invoke only when open design decisions remain after context gathering — unclear boundaries, several viable decompositions, or a multi-file build whose dependency order is not obvious. A known procedure, however many steps, and work you are delegating to another session never justify it.
 - Invoke AFTER gathering context from both tracks.
 - Then execute in the plan's exact wave order + parallel grouping and run the verification it specifies.
 
 **Execute:**
 - Surgical, minimal changes matching existing patterns
-- If delegating: provide exhaustive context and success criteria
+- If delegating: every child prompt carries GOAL, STOP WHEN (the exact observable condition that ends its run — the child stops the moment it holds), and EVIDENCE (what it returns so you can verify, not trust) — plus exhaustive context. Judge the child by its returned EVIDENCE against its STOP WHEN, never by its self-report.
 
 **Verify (per-scenario, not just "at the end"):**
 - RED→GREEN proof captured (test id + assertion msg in both states)
@@ -123,7 +123,7 @@ Define 3+ scenarios covering: **happy path**, **edge** (boundary / empty / malfo
 - The real surface that proves it.
 - The test file + test id (written test-first; see TDD).
 
-Scenarios are the contract. Done = every scenario PASSES with RED→GREEN proof AND real-surface artifact captured.
+Scenarios are the contract. Done = every scenario PASSES with RED→GREEN proof AND real-surface artifact captured. Then declare WHEN TO STOP for the whole run, in one line: "I'll stop right away when <the exact observable state that ends this run>" — its end state MUST be the full STOP GOAL from the Stop rules, never scenario completion alone. The Stop rules bind to this line — the moment it holds, you stop.
 
 ## TDD (MANDATORY on every production change)
 
@@ -167,13 +167,12 @@ Name the exact tool + exact invocation per scenario (literal `curl` / `send-keys
 
 Trigger if user said "엄밀"/"strictly"/"rigorously"/"properly review", or task touches 3+ files OR ran 20+ turns OR 30+ min, or it's a refactor/migration/perf/security change. Spawn a high-rigor reviewer via `task` with goal + scenarios + evidence + diff. A concern blocks only when it cites a success criterion the evidence fails — others are notes. Fix cited blockers, re-run only the affected QA, and re-submit the delta at most twice; an approval with only notes left counts as approval. If cited blockers remain after two re-reviews, surface them to the user before declaring done.
 
-## COMPLETION CRITERIA
+## STOP RULES
 
-Done when ALL of:
-1. Every scenario PASSES with RED→GREEN proof AND real-surface artifact captured.
-2. Full test suite green; lsp_diagnostics clean on changed files.
-3. Code matches existing patterns; no scope creep.
-4. Reviewer gate (if triggered) returned unconditional approval.
+- After each result, ask whether the user's core request can now be answered with useful evidence in hand. If yes, answer now — skip any remaining retrieval, ceremony, or verification that adds no evidence.
+- The STOP GOAL: every scenario PASSES with RED→GREEN proof AND real-surface artifact captured; full suite green and `lsp_diagnostics` clean on changed files; QA teardown receipts recorded; no scope creep; and (if triggered) the reviewer gate approved unconditionally. Above ALL of that, the decisive test — outranking every other consideration — is: is the user's problem ACTUALLY SOLVED in observable behavior? If no, you are NOT done, whatever the checklist says. If yes, deliver the final message and STOP — no hesitation, no extra verification pass, no polish loop. Work past the stop goal is scope creep, not diligence.
+- After 2 identical failed attempts at one step, surface what was tried and ask the user before another retry.
+- After 2 parallel exploration waves yield no new useful facts, stop exploring and act.
 
 **Deliver exactly what was asked. No more, no less.**
 

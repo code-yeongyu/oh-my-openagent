@@ -171,6 +171,8 @@ export type {
   TaskConcurrencyConfig,
   TaskManager,
   TaskManagerOptions,
+  TrustedRespawnLaunch,
+  TrustedRespawnLaunchResolver,
 } from "./manager"
 export { defineAgent, loadAgents, mapOmoConfigAgents, registerAgent, resolveToolRule } from "./agents"
 export type {
@@ -207,19 +209,29 @@ export type {
   SkipReason,
   TransitionReason,
 } from "./completion"
-export { AgentLimitReached, createTaskLifecycle } from "./lifecycle"
+export {
+  AgentLimitReached,
+  createTaskLifecycle,
+  getLifecycleReattachPorts,
+  registerLifecycleReattachPorts,
+} from "./lifecycle"
 export type {
   AdmissionResult,
   CleanupResult,
   DestroyCause,
   LifecycleDeps,
+  LifecycleReattachPorts,
   ProcessSignaller,
+  ReattachPort,
+  ReattachResult,
   ReconcileOutcome,
   ReconcileOutcomeKind,
   ReconcileResult,
   ResidentHandle,
   ResidentSummary,
   ResidencyRegistry,
+  RespawnPort,
+  RespawnResult,
   TaskLifecycle,
   TeardownSummary,
 } from "./lifecycle"
@@ -334,36 +346,38 @@ export type {
   TranscriptSource,
 } from "./tools/output"
 export {
-  ackMemberInjection,
-  buildMemberUnreadInjection,
   buildPeerMessageEnvelope,
   buildTeamMessage,
+  createLeadPoller,
   DEFAULT_STALE_RESERVATION_TTL_MS,
-  deliverToLead,
-  deliverToMember,
+  MEMBER_EXTENSION_BUNDLE_NAME,
+  parseMemberExtensionEnv,
   reclaimStaleTeamReservations,
   reconcileTeamMailboxOnSessionStart,
-  releaseMemberInjection,
+  resolveMemberExtensionEntryPath,
+  createTeamMemberRespawnLaunchResolver,
+  TeamMemberRespawnLaunchError,
   sendTeamMessage,
+  WaitRegistry,
 } from "./team"
 export type {
-  AckMemberInjectionInput,
-  BuildMemberUnreadInjectionInput,
   BuildTeamMessageOptions,
-  DeliverToLeadInput,
-  DeliverToMemberInput,
-  LeadDeliveryResult,
-  LeadMessageNotifier,
-  LeadTeamMessage,
-  MemberDeliveryResult,
-  MemberLiveHandle,
-  MessagingDeliveryPort,
+  LeadInjection,
+  LeadInjectionSink,
+  LeadPollFilter,
+  LeadPoller,
+  LeadPollerDeps,
+  MemberExtensionConfigErrorCode,
   MessagingEngineDeps,
+  ParsedMemberExtensionEnv,
   ReclaimResult,
   ReconcileTeamMailboxDeps,
-  ReleaseMemberInjectionInput,
   SendTeamMessageInput,
   SendTeamMessageResult,
+  WaitClaim,
+  WaitFilter,
+  WaitMessage,
+  WaitRegistration,
 } from "./team"
 export {
   approveShutdown,
@@ -412,8 +426,12 @@ export type {
   MemberTaskMap,
   RefreshTeamMemberStatusesDeps,
   SenpiTeamRuntimeErrorCode,
+  SpawnMemberExtensionConfig,
   TeamCoreConfig,
+  TeamMemberExtensionConfig,
   TeamRuntimeManagerPort,
+  TeamMemberRespawnLaunchResolverOptions,
+  TeamMemberRespawnLaunchErrorCode,
 } from "./team"
 
 export * from "./tools/team"

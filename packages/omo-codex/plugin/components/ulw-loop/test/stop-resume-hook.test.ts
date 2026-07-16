@@ -110,7 +110,7 @@ describe("runStopResumeHook", () => {
 		expect(runStopResumeHook(stopPayload())).toBe("");
 	});
 
-	it("#given an active boulder work whose plan is exhausted #when the hook runs #then resumes instead of deferring", () => {
+	it("#given an active boulder work whose plan is exhausted #when the hook runs #then defers to the final gate continuation", () => {
 		writeGoals([pendingGoal()]);
 		const plan = writeBoulderPlan(false);
 		writeFileSync(
@@ -118,7 +118,7 @@ describe("runStopResumeHook", () => {
 			JSON.stringify({ works: { w1: { session_ids: ["codex:s1"], status: "active", active_plan: plan } } }),
 		);
 
-		expect(JSON.parse(runStopResumeHook(stopPayload())).decision).toBe("block");
+		expect(runStopResumeHook(stopPayload())).toBe("");
 	});
 
 	it("#given a flat legacy boulder work with remaining plan tasks #when the hook runs #then still defers", () => {

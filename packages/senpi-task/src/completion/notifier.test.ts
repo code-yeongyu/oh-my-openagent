@@ -34,6 +34,7 @@ function fakeStore(seed: readonly TaskRecord[]) {
   const replaced: TaskRecord[] = []
   const store = {
     load: (taskId: string): TaskRecord | null => records.get(taskId) ?? null,
+    list: () => ({ records: [...records.values()], diagnostics: [] }),
     replace: (record: TaskRecord): void => {
       records.set(record.task_id, record)
       replaced.push(record)

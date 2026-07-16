@@ -21,14 +21,14 @@ Harness-neutral LSP engine (`@oh-my-opencode/lsp-core`). Manages language server
 | `src/lsp/server-installation.ts` | `isServerInstalled()` — PATH lookup with Windows extension handling |
 | `src/lsp/directory-diagnostics.ts` | `aggregateDiagnosticsForDirectory()` — walk directory, cap files + diagnostics |
 | `src/lsp/formatters.ts` | Format locations, symbols, diagnostics, rename results, workspace edits |
-| `src/tools/definitions.ts` | `LSP_MCP_TOOLS` — 7 tool schemas exported to MCP |
+| `src/tools/definitions.ts` | `LSP_MCP_TOOLS` — 8 tool schemas exported to MCP |
 | `src/tools/runtime.ts` | `executeLspTool()` + `coerceToolArguments()` dispatch |
 | `src/request-context.ts` | `runWithRequestContext()` / `contextCwd()` / `contextEnv()` via `AsyncLocalStorage` |
 | `src/mcp.ts` | `handleLspMcpRequest()` + `runMcpStdioServer()` — MCP entry over `mcp-stdio-core` |
 
 ## NOTES
 
-- **Tool surface:** 7 tools: `lsp_diagnostics`, `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_prepare_rename`, `lsp_rename`, `lsp_status`, plus `lsp_install_decision`.
+- **Tool surface:** 8 tools: `lsp_diagnostics`, `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_prepare_rename`, `lsp_rename`, `lsp_status`, and `lsp_install_decision`.
 - **RequestContext seam:** `request-context.ts` uses `AsyncLocalStorage` so the MCP proxy can thread `cwd` and `env` through shared daemon sessions.
 - **Config priority:** project `.codex/lsp-client.json` beats user `~/.codex/lsp-client.json` beats `BUILTIN_SERVERS`.
 - **Reaper:** `LspManager` reaps clients idle longer than `IDLE_TIMEOUT_MS` (default 5 min) or stuck initializing past `INIT_TIMEOUT_MS` (default 30 s).

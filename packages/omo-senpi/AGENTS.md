@@ -23,8 +23,8 @@ The v1 install surface is local-path only. Install the built Pi package from `pa
 - `ulw-loop`: detects active `omo ulw-loop` state and injects continuation guidance when the cwd has an incomplete run.
 - `comment-checker`: runs the shared comment-checker flow after write-like tool results when a resolver finds the binary.
 - `telemetry`: sends the anonymous once-per-UTC-day `omo_senpi_daily_active` event, with product-specific opt-outs.
-- `lsp`: registers direct LSP tools and optional post-edit diagnostics using the vendored Senpi LSP client adaptation.
-- `task`: loads `omo.json` at register (`loadOmoConfig`, `src/components/task/index.ts:57`), composes the task engine over `@oh-my-opencode/senpi-task`, and registers the 4 task tools (`task`, `task_send`, `task_cancel`, `task_output`, `index.ts:106`) plus the 6 lead-only team tools (`team_create`, `team_delete`, `task_create`, `task_get`, `task_list`, `task_update`, via `buildLeadTeamTools`, `index.ts:122`). Member children receive a pre-scoped `task_send` for team messages. It wires the session lifecycle (`session_start` reconcile + buffer flush, `session_before_switch`/`before_compact` transition marking, `session_shutdown` teardown, `model_select` registry refresh, `index.ts:151`), a completion-message renderer, the `/tasks` and `/task-kill` slash commands (`src/components/task/commands.ts:30`), and the status-UI footer. Gated by the `--no-omo-task` flag and skipped when required ExtensionAPI capabilities are missing (`index.ts:45`).
+- `lsp`: registers direct LSP tools and optional post-edit diagnostics through the packaged shared LSP daemon runtime. The Senpi adapter owns only descriptors, schemas, renderers, path extraction, and project-config migration warnings.
+- `task`: loads `omo.json` at register (`loadOmoConfig`, `src/components/task/index.ts`), composes the task engine over `@oh-my-opencode/senpi-task`, and registers the 4 task tools (`task`, `task_send`, `task_cancel`, `task_output`) plus the 7 lead-only team tools (`team_create`, `team_delete`, `task_create`, `task_get`, `task_list`, `task_update`, `team_wait`). Team sends are durable file-only writes. The adapter owns one 1-second lead poller per team led by the current session; process members load the scoped member extension and poll themselves with only `task_send` and `team_wait`. It wires the ordered session-start recovery chain (process reattach, member/lead reservation reclaim, failed-notification retry, owned-lead poll), transition suspension, shutdown teardown, a completion-message renderer, the `/tasks` and `/task-kill` slash commands, and the status-UI footer. Gated by the `--no-omo-task` flag and skipped when required ExtensionAPI capabilities are missing.
 
 `packages/omo-opencode` is a separate build that still uses its prior task/team names; cross-edition parity is a deliberate follow-up outside this adapter.
 
@@ -32,7 +32,7 @@ Rules are intentionally not a Senpi component. Senpi has builtin rules, so this 
 
 ### Dependencies
 
-The adapter depends on `@oh-my-opencode/senpi-task` (task engine + tool factories), `@oh-my-opencode/omo-config-core` (`loadOmoConfig` + `OmoConfigSource`), `@oh-my-opencode/delegate-core`, `@oh-my-opencode/team-core`, `@oh-my-opencode/comment-checker-core`, `@oh-my-opencode/telemetry-core`, `@oh-my-opencode/prompts-core`, `@oh-my-opencode/utils`, and `vscode-jsonrpc`, with `@code-yeongyu/senpi` as an optional peer (`package.json`).
+The adapter depends on `@oh-my-opencode/senpi-task` (task engine + tool factories), `@oh-my-opencode/omo-config-core` (`loadOmoConfig` + `OmoConfigSource`), `@oh-my-opencode/delegate-core`, `@oh-my-opencode/team-core`, `@oh-my-opencode/comment-checker-core`, `@oh-my-opencode/telemetry-core`, `@oh-my-opencode/prompts-core`, `@oh-my-opencode/lsp-core`, `@code-yeongyu/lsp-daemon`, and `@oh-my-opencode/utils`, with `@code-yeongyu/senpi` as an optional peer (`package.json`).
 
 ### omo.json coexistence
 
@@ -46,7 +46,7 @@ Build outputs under `plugin/extensions/` and `plugin/skills/` are generated. Do 
 - `node packages/omo-senpi/plugin/scripts/build-extension.mjs --check` verifies the generated extension is current.
 - `node packages/omo-senpi/plugin/scripts/sync-skills.mjs` syncs Senpi-ready skills into `plugin/skills/`.
 - `node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check` verifies the generated ultrawork directive is current.
-- `bun run test:senpi` runs the package gate: build extension, sync skills, directive check, then `bun test packages/omo-senpi`.
+- `bun run test:senpi` runs the package gate: build the shared daemon, stage the plugin artifacts, typecheck, then `bun test packages/omo-senpi`.
 
 Peer-external build rule: the extension build must externalize the Senpi peer/import family so shared core packages stay harness-neutral and Senpi resolves those peers from the installed Senpi runtime. Keep `SENPI_LOADER_ALIASES` in `plugin/scripts/build-extension.mjs` aligned with `src/bundle-purity.test.ts`, including `@code-yeongyu/senpi`, `@earendil-works/pi-*`, and `@mariozechner/pi-*` imports. The current build also externalizes the TypeBox aliases required by Senpi's loader and Node builtins.
 
@@ -72,7 +72,7 @@ node packages/omo-senpi/scripts/qa/task-rpc-e2e.mjs --self-test
 
 `drive.mjs` and the task/team live drivers create isolated Senpi agent directories and ignore caller `SENPI_CODING_AGENT_DIR`. If the Senpi binary is unavailable, the live drivers report `SKIP` or `FAIL` in final JSON instead of touching the real `~/.senpi/agent`.
 
-Task-component QA in this package: `packages/omo-senpi/scripts/qa/task-13.test.ts` exercises the task engine wiring, `task-e2e.mjs` covers the task-family live lifecycle, `team-e2e.mjs` covers the team lifecycle and shutdown-via-`task_send`, and `task-rpc-e2e.mjs --self-test` pins the RPC driver scripts. The `@oh-my-opencode/senpi-task` unit + chaos suites (`bun test packages/senpi-task`) cover the state machine, runners, and completion invariants. The task engine's own standalone manual drivers live under `packages/senpi-task/scripts/` (see [`packages/senpi-task/AGENTS.md`](../senpi-task/AGENTS.md)).
+Task-component QA in this package: `packages/omo-senpi/scripts/qa/task-13.test.ts` exercises the task engine wiring, `task-e2e.mjs` covers single and batch task lifecycles, `team-e2e.mjs` covers pull delivery, `team_wait`, shutdown-via-`task_send`, stale-reservation reclaim, and kill/restart exactly-once recovery, and `task-rpc-e2e.mjs --self-test` pins the RPC driver scripts. The `@oh-my-opencode/senpi-task` unit + chaos suites (`bun test packages/senpi-task`) cover the state machine, runners, and completion invariants. The task engine's own standalone manual drivers live under `packages/senpi-task/scripts/` (see [`packages/senpi-task/AGENTS.md`](../senpi-task/AGENTS.md)).
 
 ## Evidence Rules
 

@@ -1,8 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { delimiter, isAbsolute, join } from "node:path";
 
-import { contextCwd, contextEnv } from "../request-context.js";
+import { lspRequestContext } from "../request-context.js";
 import { BUILTIN_SERVERS } from "./server-definitions.js";
 import type { ResolvedServer } from "./types.js";
 
@@ -27,27 +25,17 @@ export interface ServerWithSource extends ResolvedServer {
 
 export function getConfigPaths(): { project: string; user: string } {
 	return {
-		project: getProjectConfigPaths()[0] ?? join(process.cwd(), ".codex", "lsp-client.json"),
+		project: getProjectConfigPaths()[0] ?? lspRequestContext().projectConfigPaths[0] ?? "",
 		user: getUserConfigPath(),
 	};
 }
 
-function resolveProjectConfigPath(path: string): string {
-	return isAbsolute(path) ? path : join(contextCwd(), path);
-}
-
-function getProjectConfigPaths(): string[] {
-	const projectOverride = contextEnv("LSP_TOOLS_MCP_PROJECT_CONFIG");
-	if (projectOverride) {
-		return projectOverride.split(delimiter).filter(Boolean).map(resolveProjectConfigPath);
-	}
-	return [join(contextCwd(), ".codex", "lsp-client.json")];
+function getProjectConfigPaths(): readonly string[] {
+	return lspRequestContext().projectConfigPaths;
 }
 
 function getUserConfigPath(): string {
-	const userOverride = contextEnv("LSP_TOOLS_MCP_USER_CONFIG");
-	if (!userOverride) return join(homedir(), ".codex", "lsp-client.json");
-	return isAbsolute(userOverride) ? userOverride : join(homedir(), userOverride);
+	return lspRequestContext().userConfigPath;
 }
 
 function loadJsonFile(path: string): ConfigJson | null {

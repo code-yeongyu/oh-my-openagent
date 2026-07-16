@@ -1,0 +1,180 @@
+bun test v1.3.11 (af24e281)
+bun.exe : 
+At C:\Users\pss\AppData\Roaming\npm\bun.ps1:14 char:3
++   & "$basedir/node_modules/bun/bin/bun.exe"   $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+packages\omo-opencode\src\shared\file-reference-resolver.test.ts:
+(pass) resolveFilePath > expands bare environment variables before resolving absolute paths
+(pass) resolveFilePath > expands braced environment variables before resolving absolute paths
+(pass) resolveFilePath > keeps POSIX absolute paths absolute when cwd is POSIX-shaped
+(pass) resolveFilePath > keeps Windows absolute paths absolute when cwd is POSIX-shaped
+(pass) resolveFilePath > resolves relative paths from POSIX-shaped cwd
+(pass) resolveFileReferencesInText > resolves file references within cwd
+(pass) resolveFileReferencesInText > rejects traversal references that escape cwd [15.00ms]
+(pass) resolveFileReferencesInText > rejects absolute references outside cwd
+(pass) resolveFileReferencesInText > rejects symlink references that escape cwd
+(pass) resolveFileReferencesInText > preserves literal @tokens that do not resolve to an existing file
+(pass) resolveFileReferencesInText > inlines existing references while leaving unresolved @tokens untouched
+
+packages\omo-opencode\src\hooks\auto-slash-command\constants.test.ts:
+(pass) slash command parsing pattern > #given plugin namespace includes dot > #then parses command name with dot and 
+colon
+
+packages\omo-opencode\src\hooks\auto-slash-command\detector.test.ts:
+(pass) auto-slash-command detector > removeCodeBlocks > should remove markdown code blocks
+(pass) auto-slash-command detector > removeCodeBlocks > should remove multiline code blocks
+(pass) auto-slash-command detector > removeCodeBlocks > should handle text without code blocks
+(pass) auto-slash-command detector > parseSlashCommand > should parse simple command without args
+(pass) auto-slash-command detector > parseSlashCommand > should parse command with arguments
+(pass) auto-slash-command detector > parseSlashCommand > should parse command with quoted arguments
+(pass) auto-slash-command detector > parseSlashCommand > should parse command with hyphen in name
+(pass) auto-slash-command detector > parseSlashCommand > should parse namespaced marketplace commands
+(pass) auto-slash-command detector > parseSlashCommand > should return null for non-slash text
+(pass) auto-slash-command detector > parseSlashCommand > should return null for slash not at start [16.00ms]
+(pass) auto-slash-command detector > parseSlashCommand > should return null for just a slash
+(pass) auto-slash-command detector > parseSlashCommand > should return null for slash followed by number
+(pass) auto-slash-command detector > parseSlashCommand > should handle whitespace before slash
+(pass) auto-slash-command detector > isExcludedCommand > should exclude ralph-loop
+(pass) auto-slash-command detector > isExcludedCommand > should exclude cancel-ralph
+(pass) auto-slash-command detector > isExcludedCommand > should be case-insensitive for exclusion
+(pass) auto-slash-command detector > isExcludedCommand > should not exclude regular commands
+(pass) auto-slash-command detector > detectSlashCommand > should detect slash command in plain text
+(pass) auto-slash-command detector > detectSlashCommand > should NOT detect slash command inside code block
+(pass) auto-slash-command detector > detectSlashCommand > should detect command when text has code blocks elsewhere
+(pass) auto-slash-command detector > detectSlashCommand > should NOT detect excluded commands
+(pass) auto-slash-command detector > detectSlashCommand > should return null for non-command text
+(pass) auto-slash-command detector > extractPromptText > should extract text from parts
+(pass) auto-slash-command detector > extractPromptText > should handle empty parts
+(pass) auto-slash-command detector > extractPromptText > should handle parts without text
+(pass) auto-slash-command detector > extractPromptText > ignores synthetic and internal slash text when extracting 
+prompt text [15.00ms]
+(pass) auto-slash-command detector > findSlashCommandPartIndex > does not select synthetic or internal slash command 
+parts
+(pass) auto-slash-command detector > findSlashCommandPartIndex > returns minus one when every slash command part is 
+synthetic or internal
+
+packages\omo-opencode\src\hooks\auto-slash-command\executor-resolution.test.ts:
+(pass) executeSlashCommand resolution semantics > returns project command when project and builtin names collide 
+[47.00ms]
+(pass) executeSlashCommand resolution semantics > blocks slash skill invocation when invoking agent is missing
+(pass) executeSlashCommand resolution semantics > allows slash skill invocation when invoking agent matches restriction
+
+packages\omo-opencode\src\hooks\auto-slash-command\executor.test.ts:
+(pass) auto-slash command executor plugin dispatch > resolves marketplace plugin commands when plugin loading is 
+enabled [15.00ms]
+(pass) auto-slash command executor plugin dispatch > excludes marketplace commands when plugins are disabled via 
+config toggle [16.00ms]
+(pass) auto-slash command executor plugin dispatch > returns standard not-found for unknown namespaced commands 
+[15.00ms]
+(pass) auto-slash command executor plugin dispatch > replaces $ARGUMENTS placeholders in plugin command templates
+(pass) auto-slash command executor plugin dispatch > renders Atlas as the builtin start-work agent during 
+slash-command execution [16.00ms]
+
+packages\omo-opencode\src\hooks\auto-slash-command\index.test.ts:
+(pass) createAutoSlashCommandHook > slash command replacement > should resolve project commands from provided 
+directory even when cwd differs [250.00ms]
+(pass) createAutoSlashCommandHook > slash command replacement > should not modify message when command not found 
+[141.00ms]
+(pass) createAutoSlashCommandHook > slash command replacement > should not modify message for unknown command (feature 
+inactive) [47.00ms]
+(pass) createAutoSlashCommandHook > slash command replacement > should not modify for unknown command (no prepending) 
+[31.00ms]
+(pass) createAutoSlashCommandHook > no slash command > should do nothing for regular text
+(pass) createAutoSlashCommandHook > no slash command > should do nothing for slash in middle of text
+(pass) createAutoSlashCommandHook > excluded commands > should NOT trigger for ralph-loop command
+(pass) createAutoSlashCommandHook > excluded commands > should NOT trigger for cancel-ralph command [15.00ms]
+(pass) createAutoSlashCommandHook > already processed > should skip if auto-slash-command tags already present
+(pass) createAutoSlashCommandHook > code blocks > should NOT detect command inside code block
+(pass) createAutoSlashCommandHook > edge cases > should handle empty text
+(pass) createAutoSlashCommandHook > edge cases > should handle just slash
+(pass) createAutoSlashCommandHook > edge cases > should handle command with special characters in args (not found = no 
+modification) [47.00ms]
+(pass) createAutoSlashCommandHook > edge cases > should handle multiple text parts (unknown command = no modification) 
+[32.00ms]
+(pass) createAutoSlashCommandHook > command.execute.before hook > should not modify output for unknown command 
+[31.00ms]
+(pass) createAutoSlashCommandHook > command.execute.before hook > should add text part when parts array is empty and 
+command is unknown [31.00ms]
+(pass) createAutoSlashCommandHook > command.execute.before hook > should inject template for known builtin commands 
+like ralph-loop [31.00ms]
+(pass) createAutoSlashCommandHook > command.execute.before hook > should not duplicate injection when command output 
+is already tagged [16.00ms]
+(pass) createAutoSlashCommandHook > command.execute.before hook > should inject template for known builtin commands 
+like ulw-loop [31.00ms]
+(pass) createAutoSlashCommandHook > command.execute.before hook > should pass command arguments correctly [31.00ms]
+(pass) createAutoSlashCommandHook > command.execute.before hook > should not duplicate injection when parts already 
+contain auto-slash-command tags (#3724)
+(pass) createAutoSlashCommandHook > skills as slash commands > should replace message with skill template when skill 
+is used as slash command via chat.message
+(pass) createAutoSlashCommandHook > skills as slash commands > does not replace synthetic slash text with a skill 
+template [16.00ms]
+(pass) createAutoSlashCommandHook > skills as slash commands > should inject skill template via command.execute.before
+(pass) createAutoSlashCommandHook > skills as slash commands > should handle skill with lazy content loader
+
+packages\omo-opencode\src\hooks\auto-slash-command\init-deep-skill.test.ts:
+(pass) init-deep slash surface > #given init-deep builtin skill #when slash command executes #then it renders skill 
+instructions with arguments [16.00ms]
+
+packages\omo-opencode\src\tools\slashcommand\command-discovery.test.ts:
+(pass) slashcommand command discovery plugin integration > discovers marketplace plugin commands and skills as command 
+items [109.00ms]
+(pass) slashcommand command discovery plugin integration > omits marketplace plugin commands when plugins are disabled 
+[109.00ms]
+(pass) slashcommand command discovery plugin integration > honors plugins_override by disabling overridden plugin keys 
+[110.00ms]
+(pass) slashcommand command discovery plugin integration > discovers parent opencode commands when profile config dir 
+is active [109.00ms]
+(pass) slashcommand command discovery plugin integration > discovers commands from both OPENCODE_CONFIG_DIR and the 
+default global config directory [94.00ms]
+(pass) slashcommand command discovery plugin integration > discovers ancestor project opencode commands from plural 
+commands directory [109.00ms]
+(pass) slashcommand command discovery plugin integration > deduplicates same-named opencode commands while keeping the 
+higher-priority alias [125.00ms]
+(pass) slashcommand command discovery plugin integration > discovers nested opencode project commands [110.00ms]
+(pass) slashcommand command discovery plugin integration > keeps builtin start-work routed to Atlas during static 
+discovery [93.00ms]
+(pass) non-directory commands path > #given .claude/commands is a file #when discoverCommandsSync runs #then returns 
+without crashing [110.00ms]
+(pass) non-directory commands path > #given .claude/commands is a directory #when discoverCommandsSync runs #then 
+discovers commands normally [94.00ms]
+(pass) non-directory commands path > #given excluded subdirectories under .claude/commands #when discoverCommandsSync 
+runs #then prunes commands beneath them [109.00ms]
+
+packages\omo-opencode\src\tools\slashcommand\command-output-formatter.test.ts:
+(pass) command output formatter > #given command template includes argument placeholders > #then replaces both 
+placeholder forms
+(pass) command output formatter > #given command content mixes a real @file reference with literal @token prose > 
+#then inlines the real file but leaves the documentation token uncorrupted [16.00ms]
+
+packages\omo-opencode\src\tools\slashcommand\execution-compatibility.test.ts:
+(pass) slashcommand discovery and execution compatibility > executes commands discovered from a parent opencode config 
+dir [141.00ms]
+(pass) slashcommand discovery and execution compatibility > executes project commands using the provided directory 
+even when cwd differs [93.00ms]
+
+packages\omo-opencode\src\tools\slashcommand\index.test.ts:
+(pass) slashcommand module exports > exports discovery API only [16.00ms]
+
+packages\omo-opencode\src\tools\slashcommand\opencode-project-command-discovery.test.ts:
+(pass) opencode project command discovery > discovers ancestor opencode commands with slash-separated nested names and 
+worktree boundaries [125.00ms]
+
+packages\omo-opencode\src\hooks\auto-slash-command\leak\auto-slash-command-leak.test.ts:
+(pass) createAutoSlashCommandHook leak prevention > #given hook with sessionProcessedCommandExecutions > #when same 
+command executed twice after fallback dedup window > #then second execution is treated as intentional rerun
+(pass) createAutoSlashCommandHook leak prevention > #given hook with sessionProcessedCommandExecutions > #when same 
+command is repeated within fallback dedup window > #then duplicate dispatch is suppressed
+(pass) createAutoSlashCommandHook leak prevention > #given hook with sessionProcessedCommandExecutions > #when same 
+event identifier is dispatched twice > #then second dispatch is deduplicated regardless of elapsed seconds
+(pass) createAutoSlashCommandHook leak prevention > #given hook with entries from multiple sessions > #when dispose() 
+is called > #then both Sets are empty
+(pass) createAutoSlashCommandHook leak prevention > #given Set with more than 10000 entries > #when new entry added > 
+#then Set size is reduced [469.00ms]
+
+ 97 pass
+ 0 fail
+ 195 expect() calls
+Ran 97 tests across 13 files. [3.52s]

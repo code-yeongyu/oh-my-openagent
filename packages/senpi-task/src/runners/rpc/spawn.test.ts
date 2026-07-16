@@ -182,4 +182,33 @@ describe("buildRpcSpawn spawn strategy", () => {
     expect(descriptor.env).not.toBe(parentEnv)
     expect(parentEnv).not.toHaveProperty(SESSION_DIR_ENV)
   })
+
+  test("#given member extension env w2mem #when building #then identity config and task id reach the child without overriding isolation", () => {
+    // given
+    const memberEnv = {
+      SENPI_TASK_MEMBER: "11111111-1111-4111-8111-111111111111::alice",
+      SENPI_TASK_MEMBER_TASK_ID: "st_00000001",
+      SENPI_TASK_TEAM_CONFIG: '{"members":["alice"]}',
+      SENPI_CODING_AGENT_SESSION_DIR: "/untrusted/override",
+    }
+
+    // when
+    const descriptor = buildRpcSpawn(
+      { ...baseSpec, memberEnv },
+      {
+        isBunBinary: false,
+        execPath: "/usr/bin/node",
+        platform: "linux",
+        parentEnv: { PATH: "/usr/bin" },
+        resolveRpcEntry: () => "/rpc-entry.js",
+        ...noExecutable,
+      },
+    )
+
+    // then
+    expect(descriptor.env.SENPI_TASK_MEMBER).toBe(memberEnv.SENPI_TASK_MEMBER)
+    expect(descriptor.env.SENPI_TASK_MEMBER_TASK_ID).toBe(memberEnv.SENPI_TASK_MEMBER_TASK_ID)
+    expect(descriptor.env.SENPI_TASK_TEAM_CONFIG).toBe(memberEnv.SENPI_TASK_TEAM_CONFIG)
+    expect(descriptor.env.SENPI_CODING_AGENT_SESSION_DIR).toBe(resolveChildSessionDir(baseSpec.state_dir, baseSpec.task_id))
+  })
 })

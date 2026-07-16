@@ -1,6 +1,6 @@
 import { applyRandomAction, flushMicrotasks, isTerminalStatus } from "./chaos-actions"
 import type { ChaosState } from "./chaos-actions"
-import { buildHarness } from "./chaos-harness"
+import { buildHarness, CHAOS_SESSION } from "./chaos-harness"
 import { collectInvariantViolations } from "./chaos-invariants"
 import type { Violation } from "./chaos-invariants"
 import { RandomSource } from "./prng"
@@ -9,20 +9,28 @@ import { RandomSource } from "./prng"
 // checked against a fully quiesced system. Settling every handle each round releases occupied slots
 // (including revived and late-launched children) and lets the queue drain deterministically.
 async function drain(state: ChaosState): Promise<void> {
-  const cap = state.taskIds.length * 4 + 40
+  const cap = state.taskIds.length * 8 + 80
   for (let round = 0; round < cap; round += 1) {
     const before = state.harness.runner.handles.size
     for (const handle of state.harness.runner.handles.values()) {
       handle.settle({ status: "completed", finalResponse: "drain" })
     }
+    state.harness.waiters.advance()
+    state.harness.notifier.flushBuffered({ sessionId: CHAOS_SESSION, replaced: false })
+    state.harness.notifier.reconcileFailedNotifications({ sessionId: CHAOS_SESSION, parentState: { kind: "idle" } })
+    const pendingRetries = state.harness.retryScheduler.pendingCount
+    if (pendingRetries > 0) state.harness.retryScheduler.run(state.rng.int(0, pendingRetries - 1))
     await flushMicrotasks()
     await flushMicrotasks()
     const records = state.harness.store.list().records
     const allTerminal = records.every((record) => isTerminalStatus(record.status))
     const anyPending = records.some((record) => record.status === "pending")
     const grew = state.harness.runner.handles.size > before
-    if (allTerminal && !anyPending && !grew) break
+    const notificationsSettled = state.harness.retryScheduler.pendingCount === 0
+      && state.harness.notifier.bufferedCount(CHAOS_SESSION) === 0
+    if (allTerminal && !anyPending && !grew && notificationsSettled) break
   }
+  state.harness.waiters.abortAll()
   await flushMicrotasks()
   await flushMicrotasks()
 }

@@ -1,7 +1,19 @@
 export { createTaskLifecycle } from "./create"
 export { AgentLimitReached } from "./errors"
 export type { ResidentSummary } from "./errors"
-export type { DestroyCause, LifecycleDeps, ProcessSignaller, ResidentHandle, ResidencyRegistry } from "./port"
+export { getLifecycleReattachPorts, registerLifecycleReattachPorts } from "./port"
+export type {
+  DestroyCause,
+  LifecycleDeps,
+  LifecycleReattachPorts,
+  ProcessSignaller,
+  ReattachPort,
+  ReattachResult,
+  ResidentHandle,
+  ResidencyRegistry,
+  RespawnPort,
+  RespawnResult,
+} from "./port"
 export type {
   AdmissionResult,
   CleanupResult,

@@ -1,13 +1,10 @@
-import { resolve } from "node:path";
-
-import { isDirectoryPath, withLspClient } from "../lsp/client-wrapper.js";
+import { isDirectoryPath, resolvePathInsideContext, withLspClient } from "../lsp/client-wrapper.js";
 import { DEFAULT_MAX_DIAGNOSTICS } from "../lsp/constants.js";
 import { aggregateDiagnosticsForDirectory } from "../lsp/directory-diagnostics.js";
 import { filterDiagnosticsBySeverity, formatDiagnostic } from "../lsp/formatters.js";
 import { inferExtensionFromDirectory } from "../lsp/infer-extension.js";
 import type { Diagnostic } from "../lsp/types.js";
 import { missingDependencyResult } from "../missing-dependency-result.js";
-import { contextCwd } from "../request-context.js";
 import { clientOptions, requireString, severityFilter } from "./parameters.js";
 import { text } from "./result.js";
 import type { LspDiagnosticsDetails, ToolExecutionResult } from "./types.js";
@@ -26,7 +23,7 @@ export async function executeLspDiagnostics(
 	const severity = severityFilter(params);
 
 	try {
-		const absPath = resolve(contextCwd(), filePath);
+		const absPath = resolvePathInsideContext(filePath);
 		if (isDirectoryPath(absPath)) {
 			const extension = inferExtensionFromDirectory(absPath);
 			if (!extension) {
@@ -44,24 +41,46 @@ export async function executeLspDiagnostics(
 				return text(message, details);
 			}
 
-			const output = await aggregateDiagnosticsForDirectory(absPath, extension, severity);
+				const output = await aggregateDiagnosticsForDirectory(
+					absPath,
+					extension,
+					severity,
+					undefined,
+					signal === undefined ? {} : { signal },
+				);
 			const details: LspDiagnosticsDetails = {
 				filePath,
 				severity,
 				mode: "directory",
 				diagnostics: [],
-				totalDiagnostics: 0,
+				totalDiagnostics: output.totalDiagnostics,
 				truncated: false,
+				fileFailures: [...output.fileFailures],
 			};
-			return text(output, details);
+			return text(output.output, details);
 		}
 
 		const result = await withLspClient(
-			filePath,
-			async (client) => client.diagnostics(filePath),
-			"diagnostics",
-			clientOptions(signal),
-		);
+				filePath,
+				async (client) => client.diagnostics(filePath, signal),
+				"diagnostics",
+				clientOptions(signal),
+			);
+		if (result.transientError) {
+			const message = result.transientError.message;
+			const details: LspDiagnosticsDetails = {
+				filePath,
+				severity,
+				mode: "file",
+				diagnostics: [],
+				totalDiagnostics: 0,
+				truncated: false,
+				error: message,
+				errorKind: result.transientError.kind,
+			};
+			return text(message, details, true);
+		}
+
 		const diagnostics = filterDiagnosticsBySeverity(asDiagnosticArray(result), severity);
 		const total = diagnostics.length;
 		const truncated = total > DEFAULT_MAX_DIAGNOSTICS;
