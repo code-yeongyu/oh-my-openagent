@@ -51,7 +51,10 @@ async function runTool(
   args: { timeout?: number },
   options?: { abort?: AbortSignal; pollIntervalMs?: number },
 ): Promise<string> {
-  const tool = createWaitForBackgroundTasks(manager, { pollIntervalMs: options?.pollIntervalMs ?? 5 })
+  const tool = createWaitForBackgroundTasks(manager, {
+    pollIntervalMs: options?.pollIntervalMs ?? 5,
+    minimumTimeoutMs: 10,
+  })
   const result = await tool.execute?.(args, {
     ...mockContext,
     abort: options?.abort ?? mockContext.abort,
@@ -97,6 +100,39 @@ describe("createWaitForBackgroundTasks", () => {
     // #then it reports the task as still running after timing out
     expect(output).toContain("## Still Running (timed out")
     expect(output).toContain("`task-1`")
+  })
+
+  test.each([0, -1])("does not let timeout %i bypass an active task", async (timeout) => {
+    // #given an active task that completes after the first poll
+    const manager = createManager([
+      [createTask({ status: "running" })],
+      [createTask({ status: "running" })],
+      [createTask({ status: "completed" })],
+    ])
+
+    // #when the tool receives a non-positive timeout
+    const output = await runTool(manager, { timeout })
+
+    // #then it polls instead of returning an immediate timeout
+    expect(output).toContain("## Completed Tasks")
+    expect(output).not.toContain("Still Running")
+  })
+
+  test("keeps waiting when a task appears during completion settling", async () => {
+    // #given the original task completes while a new same-session task appears in the settle snapshot
+    const newTask = createTask({ id: "task-2", description: "new background task", status: "running" })
+    const manager = createManager([
+      [createTask({ status: "running" })],
+      [createTask({ status: "completed" })],
+      [createTask({ status: "completed" }), newTask],
+    ])
+
+    // #when the tool reaches its timeout with the new task still active
+    const output = await runTool(manager, { timeout: 10 }, { pollIntervalMs: 1 })
+
+    // #then it reports the newly observed active task instead of a completion-only result
+    expect(output).toContain("## Still Running (timed out")
+    expect(output).toContain("`task-2`")
   })
 
   test("stops promptly when the tool call is aborted", async () => {

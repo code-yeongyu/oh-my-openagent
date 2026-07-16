@@ -4,6 +4,7 @@ import { log } from "../../shared"
 import { WAIT_FOR_BACKGROUND_TASKS_DESCRIPTION } from "./constants"
 
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000
+const MIN_TIMEOUT_MS = 1000
 const MAX_TIMEOUT_MS = 60 * 60 * 1000
 const POLL_INTERVAL_MS = 3000
 
@@ -15,7 +16,7 @@ const TERMINAL_STATUSES: ReadonlySet<BackgroundTaskStatus> = new Set([
 ])
 
 interface WaitForBackgroundTasksArgs {
-  timeout?: number
+  readonly timeout?: number
 }
 
 function isTerminal(status: BackgroundTaskStatus): boolean {
@@ -74,24 +75,28 @@ function formatResult(tasks: BackgroundTask[], timedOut: boolean, timeoutMs: num
 
 export function createWaitForBackgroundTasks(
   manager: BackgroundManager,
-  options?: { pollIntervalMs?: number },
+  options?: { readonly pollIntervalMs?: number; readonly minimumTimeoutMs?: number },
 ): ToolDefinition {
   const pollIntervalMs = options?.pollIntervalMs ?? POLL_INTERVAL_MS
+  const minimumTimeoutMs = options?.minimumTimeoutMs ?? MIN_TIMEOUT_MS
   return tool({
     description: WAIT_FOR_BACKGROUND_TASKS_DESCRIPTION,
     args: {
       timeout: tool.schema
         .number()
+        .min(MIN_TIMEOUT_MS)
+        .max(MAX_TIMEOUT_MS)
         .optional()
-        .describe("Max wait time in ms (default: 1800000 = 30min, max: 3600000 = 60min)"),
+        .describe("Max wait time in ms (default: 1800000 = 30min, range: 1000-3600000)"),
     },
     async execute(args: WaitForBackgroundTasksArgs, toolContext) {
       try {
         const sessionID = toolContext.sessionID
-        const timeoutMs = Math.min(args.timeout ?? DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS)
+        const timeoutMs = Math.min(Math.max(args.timeout ?? DEFAULT_TIMEOUT_MS, minimumTimeoutMs), MAX_TIMEOUT_MS)
         const startTime = Date.now()
 
-        const initialActive = activeTasks(manager.getTasksByParentSession(sessionID))
+        let finalTasks = manager.getTasksByParentSession(sessionID)
+        const initialActive = activeTasks(finalTasks)
         if (initialActive.length === 0) {
           return "No running or pending background tasks found for this session."
         }
@@ -103,18 +108,24 @@ export function createWaitForBackgroundTasks(
           taskIds: initialActive.map((task) => task.id),
         })
 
-        let timedOut = true
-        while (Date.now() - startTime < timeoutMs) {
-          if (await waitForPoll(pollIntervalMs, toolContext.abort) === "aborted") {
+        let timedOut = false
+        while (activeTasks(finalTasks).length > 0) {
+          const remainingMs = timeoutMs - (Date.now() - startTime)
+          if (remainingMs <= 0) {
+            timedOut = true
+            break
+          }
+
+          if (await waitForPoll(Math.min(pollIntervalMs, remainingMs), toolContext.abort) === "aborted") {
             return "Background task wait cancelled because the tool call was aborted."
           }
-          if (activeTasks(manager.getTasksByParentSession(sessionID)).length === 0) {
-            timedOut = false
-            break
+
+          finalTasks = manager.getTasksByParentSession(sessionID)
+          if (activeTasks(finalTasks).length === 0) {
+            finalTasks = manager.getTasksByParentSession(sessionID)
           }
         }
 
-        const finalTasks = manager.getTasksByParentSession(sessionID)
         if (finalTasks.length === 0) {
           return "All background tasks completed (no tasks remaining in memory)."
         }
