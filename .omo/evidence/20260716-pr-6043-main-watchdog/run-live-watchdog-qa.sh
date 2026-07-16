@@ -106,7 +106,7 @@ cat > "$XDG_CONFIG_HOME/opencode/oh-my-openagent.jsonc" <<'JSONC'
 {
   "runtime_fallback": {
     "enabled": true,
-    "timeout_seconds": 0,
+    "timeout_seconds": 30,
     "notify_on_fallback": false,
     "max_fallback_attempts": 2
   },
@@ -148,9 +148,16 @@ wait_for "${WATCHDOG_WAIT_SECONDS:-125}" "watchdog fallback request" "grep -q 'R
 wait_for 20 "fallback response SSE" "grep -q 'QA_FALLBACK_OK' '$SSE_LOG'"
 wait_for 20 "primary request abort" "grep -q 'PRIMARY_CONNECTION_CLOSED' '$FAKE_LOG'"
 
+SECOND_HTTP_CODE="$(curl -sS -o /dev/null -w '%{http_code}' -u "opencode:$SERVER_PASS" -X POST "http://127.0.0.1:${SERVER_PORT}/session/${SESSION_ID}/prompt_async?directory=${ENC_DIR}" -H 'content-type: application/json' -d '{"agent":"sisyphus","model":{"providerID":"openai","modelID":"fallback"},"parts":[{"type":"text","text":"Second turn for user cancellation QA"}]}')"
+[ "$SECOND_HTTP_CODE" = "204" ]
+wait_for 20 "second user turn reaches fallback provider" "grep -q 'FALLBACK_HANGING_FOR_USER_ABORT' '$FAKE_LOG'"
+ABORT_HTTP_CODE="$(curl -sS -o /dev/null -w '%{http_code}' -u "opencode:$SERVER_PASS" -X POST "http://127.0.0.1:${SERVER_PORT}/session/${SESSION_ID}/abort?directory=${ENC_DIR}")"
+[ "$ABORT_HTTP_CODE" = "200" ]
+
 if [ -f "$OMO_LOG" ]; then
   wait_for 15 "watchdog dispatch log" "grep -q 'first-prompt-watchdog.*dispatching fallback' '$OMO_LOG'"
   wait_for 15 "watchdog abort log" "grep -q 'Aborted in-flight session request (first-prompt-watchdog)' '$OMO_LOG'"
+  wait_for 15 "later user abort classified as cancellation" "grep -q 'session.error matched cancellation; cleared retry state' '$OMO_LOG'"
   tail -c "+$((OMO_OFFSET + 1))" "$OMO_LOG" | rg "${SESSION_ID}|first-prompt-watchdog" > "$TMP_ROOT/plugin-watchdog.log" || true
 else
   : > "$TMP_ROOT/plugin-watchdog.log"
@@ -158,6 +165,7 @@ fi
 
 grep -q 'first-prompt-watchdog.*dispatching fallback' "$TMP_ROOT/plugin-watchdog.log"
 grep -q 'Aborted in-flight session request (first-prompt-watchdog)' "$TMP_ROOT/plugin-watchdog.log"
+grep -q 'session.error matched cancellation; cleared retry state' "$TMP_ROOT/plugin-watchdog.log"
 
 SANDBOX_DB="$XDG_DATA_HOME/opencode/opencode.db"
 SANDBOX_COUNT="$(sqlite3 "$SANDBOX_DB" 'SELECT count(*) FROM session;')"
@@ -167,10 +175,10 @@ REAL_COUNT_AFTER="$(sqlite3 "$REAL_DB" 'SELECT count(*) FROM session;')"
 cp "$FAKE_LOG" "$EVIDENCE/live-fake-provider.txt"
 cp "$TMP_ROOT/plugin-watchdog.log" "$EVIDENCE/live-plugin-watchdog.txt"
 sed -n 's/^data: //p' "$SSE_LOG" | jq -c 'select(.type == "server.connected" or .type == "message.updated" or .type == "message.part.updated" or .type == "message.part.delta" or .type == "session.error" or .type == "session.idle") | {type, sessionID:(.properties.sessionID // .properties.info.sessionID // .properties.part.sessionID // null), role:(.properties.info.role // null), text:(.properties.part.text // .properties.delta // null)}' > "$EVIDENCE/live-sse-events.jsonl"
-printf 'real_db=%s\nreal_count_before=%s\nreal_count_after=%s\nsandbox_db=%s\nsandbox_session_count=%s\nsession_id=%s\nprompt_http_code=%s\nprimary_requests=%s\nfallback_requests=%s\nprimary_connection_closed=%s\nfallback_response_seen=%s\n' \
-  "$REAL_DB" "$REAL_COUNT_BEFORE" "$REAL_COUNT_AFTER" "$SANDBOX_DB" "$SANDBOX_COUNT" "$SESSION_ID" "$HTTP_CODE" \
+printf 'real_db=%s\nreal_count_before=%s\nreal_count_after=%s\nsandbox_db=%s\nsandbox_session_count=%s\nsession_id=%s\nprompt_http_code=%s\nsecond_prompt_http_code=%s\nuser_abort_http_code=%s\nprimary_requests=%s\nfallback_requests=%s\nprimary_connection_closed=%s\nfallback_response_seen=%s\nuser_abort_classified_external=yes\n' \
+  "$REAL_DB" "$REAL_COUNT_BEFORE" "$REAL_COUNT_AFTER" "$SANDBOX_DB" "$SANDBOX_COUNT" "$SESSION_ID" "$HTTP_CODE" "$SECOND_HTTP_CODE" "$ABORT_HTTP_CODE" \
   "$(grep -c 'REQUEST model=primary' "$FAKE_LOG")" "$(grep -c 'REQUEST model=fallback' "$FAKE_LOG")" \
   "$(grep -c 'PRIMARY_CONNECTION_CLOSED' "$FAKE_LOG")" "$(grep -c 'QA_FALLBACK_OK' "$SSE_LOG")" \
   > "$EVIDENCE/live-isolation-receipt.txt"
 
-printf 'PASS exact_head=%s session=%s real_db_unchanged=%s fallback_seen=yes\n' "$(git rev-parse HEAD)" "$SESSION_ID" "$REAL_COUNT_AFTER"
+printf 'PASS source_base=%s session=%s real_db_unchanged=%s fallback_seen=yes later_user_abort=external\n' "$(git rev-parse HEAD)" "$SESSION_ID" "$REAL_COUNT_AFTER"

@@ -56,6 +56,8 @@ function sendChatText(response, id, text) {
   response.end()
 }
 
+let fallbackRequestCount = 0
+
 const server = http.createServer(async (request, response) => {
   log(`HTTP method=${request.method} path=${request.url}`)
   if (request.method === "GET" && request.url === "/health") {
@@ -93,6 +95,11 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (model === "fallback") {
+    fallbackRequestCount += 1
+    if (fallbackRequestCount > 1) {
+      log("FALLBACK_HANGING_FOR_USER_ABORT")
+      return
+    }
     const id = `resp-${Date.now()}`
     if (isChatCompletions) sendChatText(response, id, "QA_FALLBACK_OK")
     else sendText(response, id, "QA_FALLBACK_OK")
