@@ -1,7 +1,7 @@
 name = "lazycodex-worker-low"
 description = "LazyCodex low-difficulty implementation worker, sized for SMALL changes: single-spot fixes, boilerplate, config/copy changes, and pattern-following edits confined to one file. Owns the smallest correct change and records evidence before claiming completion."
 nickname_candidates = ["Low Worker"]
-model = "gpt-5.6-luna"
+model = "gpt-5.6-terra"
 model_reasoning_effort = "high"
 
 developer_instructions = """

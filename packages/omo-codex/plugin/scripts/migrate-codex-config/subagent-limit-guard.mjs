@@ -1,141 +1,75 @@
-import { prefersMultiAgentV2, readRootModel, resolveMultiAgentVersionFromConfig } from "./multi-agent-v2-guard.mjs";
+import {
+	findTomlAssignment,
+	findTomlSection,
+	isTomlLexicallyValid,
+} from "./toml-lexical-lines.mjs";
 
-const CODEX_AGENTS_HEADER = "[agents]";
 const CODEX_MULTI_AGENT_V2_HEADER = "[features.multi_agent_v2]";
 const CODEX_SUBAGENT_THREAD_LIMIT = "1000";
+const MANAGED_MULTI_AGENT_V2_COMMENT =
+	"# Managed by LazyCodex: multi_agent_v2 is re-disabled on every Codex session start";
 
 /**
- * Ensure subagent concurrency limits without writing settings that conflict
- * with MultiAgentV2. When the selected model prefers V2 (catalog `v2`, or a
- * GPT-5.6 family session model with the catalog unavailable) or V2 is already
- * enabled in config, skip `agents.max_threads` because Codex rejects that key
- * while features.multi_agent_v2 is enabled.
- *
- * When no model is resolvable at all (no session model and no root `model`
- * in config.toml — Codex Desktop selects the model in the UI), never
- * introduce `agents.max_threads`: it hard-fails thread/start on
- * MultiAgentV2 sessions. An existing cap is still raised in place so the
- * legacy low-cap repair keeps working and a hand-removed key stays removed.
- *
- * @param {string} config
- * @param {{ multiAgentVersion?: string | null, sessionModel?: string | null, env?: NodeJS.ProcessEnv, modelsCachePath?: string }} [options]
+ * Preserve user concurrency choices. The only mutation here is removal of the
+ * exact historical V2 `1000` when the immediately adjacent LazyCodex comment
+ * proves ownership; absent settings and legacy `[agents].max_threads` stay as-is.
  */
 export function ensureSubagentConcurrencyLimit(config, options = {}) {
-	const multiAgentVersion =
-		options.multiAgentVersion !== undefined
-			? options.multiAgentVersion
-			: resolveMultiAgentVersionFromConfig(config, options);
-	const v2Preferred = prefersMultiAgentV2(multiAgentVersion, options.sessionModel) || isMultiAgentV2Enabled(config);
-
-	let result = config;
-	if (v2Preferred) {
-		result = removeAgentsMaxThreads(result);
-	} else if (multiAgentVersion == null && !hasModelEvidence(config, options)) {
-		result = raiseExistingAgentsMaxThreads(result);
-	} else {
-		result = ensureAgentsMaxThreads(result);
-	}
-	return ensureMultiAgentV2ThreadLimit(result);
+	if (!isTomlLexicallyValid(config)) return config;
+	const result = ensureMultiAgentV2Section(config);
+	return options.removeManagedMultiAgentV2ThreadLimit === true
+		? removeMultiAgentV2ThreadLimit(result)
+		: result;
 }
 
-function hasModelEvidence(config, options) {
-	const sessionModel = typeof options.sessionModel === "string" ? options.sessionModel.trim() : "";
-	return sessionModel.length > 0 || readRootModel(config) !== null;
-}
-
-function isMultiAgentV2Enabled(config) {
-	const section = findSection(config, CODEX_MULTI_AGENT_V2_HEADER);
+export function hasManagedMultiAgentV2ThreadLimit(config) {
+	if (!isTomlLexicallyValid(config)) return false;
+	const section = findTomlSection(config, CODEX_MULTI_AGENT_V2_HEADER);
 	if (!section) return false;
-	return /^\s*enabled\s*=\s*true[ \t]*(?:#[^\n]*)?$/m.test(section.text);
-}
-
-function raiseExistingAgentsMaxThreads(config) {
-	const section = findSection(config, CODEX_AGENTS_HEADER);
-	if (!section) return config;
-	if (!/^\s*max_threads\s*=/m.test(section.text)) return config;
-	return replaceOrInsertSetting(config, section, "max_threads", CODEX_SUBAGENT_THREAD_LIMIT);
-}
-
-function ensureAgentsMaxThreads(config) {
-	const section = findSection(config, CODEX_AGENTS_HEADER);
-	if (!section) return appendBlock(config, `${CODEX_AGENTS_HEADER}\nmax_threads = ${CODEX_SUBAGENT_THREAD_LIMIT}\n`);
-	return replaceOrInsertSetting(config, section, "max_threads", CODEX_SUBAGENT_THREAD_LIMIT);
-}
-
-function removeAgentsMaxThreads(config) {
-	const section = findSection(config, CODEX_AGENTS_HEADER);
-	if (!section) return config;
-	if (!/^\s*max_threads\s*=/m.test(section.text)) return config;
-
-	const patched = section.text.replace(/^\s*max_threads\s*=\s*[^\n]*\n?/m, "");
-	const bodyLines = patched
-		.split("\n")
-		.slice(1)
-		.filter((line) => line.trim() !== "");
-	if (bodyLines.length === 0) {
-		return config.slice(0, section.start) + config.slice(section.end).replace(/^\n+/, "");
+	if (
+		findTomlAssignment(section.text, "max_concurrent_threads_per_session")
+			?.value !== CODEX_SUBAGENT_THREAD_LIMIT
+	) {
+		return false;
 	}
+	return hasAdjacentManagedComment(config, section.start);
+}
+
+function removeMultiAgentV2ThreadLimit(config) {
+	const section = findTomlSection(config, CODEX_MULTI_AGENT_V2_HEADER);
+	if (!section) return config;
+	const assignment = findTomlAssignment(
+		section.text,
+		"max_concurrent_threads_per_session",
+	);
+	if (assignment?.value !== CODEX_SUBAGENT_THREAD_LIMIT) return config;
+	const patched =
+		section.text.slice(0, assignment.start) +
+		section.text.slice(assignment.end + assignment.newline.length);
 	return config.slice(0, section.start) + patched + config.slice(section.end);
 }
 
-function ensureMultiAgentV2ThreadLimit(config) {
-	const section = findSection(config, CODEX_MULTI_AGENT_V2_HEADER);
-	if (!section) {
-		return appendBlock(
-			config,
-			`${CODEX_MULTI_AGENT_V2_HEADER}\nmax_concurrent_threads_per_session = ${CODEX_SUBAGENT_THREAD_LIMIT}\n`,
-		);
-	}
-	return replaceOrInsertSetting(config, section, "max_concurrent_threads_per_session", CODEX_SUBAGENT_THREAD_LIMIT);
-}
-
-function replaceOrInsertSetting(config, section, key, value) {
-	const pattern = new RegExp(`^(\\s*)${escapeRegExp(key)}\\s*=\\s*[^\\n#]*(#[^\\n]*)?$`, "m");
-	if (pattern.test(section.text)) {
-		const patched = section.text.replace(pattern, (_match, indent, comment) =>
-			comment ? `${indent}${key} = ${value} ${comment}` : `${indent}${key} = ${value}`,
-		);
-		return config.slice(0, section.start) + patched + config.slice(section.end);
-	}
-
-	const headerEnd = section.text.indexOf("\n");
-	const insertAt = headerEnd === -1 ? section.text.length : headerEnd + 1;
-	const patched = `${section.text.slice(0, insertAt)}${headerEnd === -1 ? "\n" : ""}${key} = ${value}\n${section.text.slice(insertAt)}`;
-	return config.slice(0, section.start) + patched + config.slice(section.end);
-}
-
-function appendBlock(config, block) {
+function ensureMultiAgentV2Section(config) {
+	if (findTomlSection(config, CODEX_MULTI_AGENT_V2_HEADER)) return config;
 	const trimmed = config.trimEnd();
-	const prefix = trimmed.length === 0 ? "" : `${trimmed}\n\n`;
-	return `${prefix}${block}`;
+	return `${trimmed}${trimmed.length > 0 ? "\n\n" : ""}${CODEX_MULTI_AGENT_V2_HEADER}\n`;
 }
 
-function escapeRegExp(value) {
-	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function stripTrailingComment(line) {
-	const idx = line.indexOf("#");
-	return idx === -1 ? line : line.slice(0, idx).trim();
-}
-
-function findSection(config, headerLine) {
-	const lines = config.match(/[^\n]*\n?|$/g) ?? [];
-	let offset = 0;
-	let start = -1;
-	for (const line of lines) {
-		if (line.length === 0) break;
-		const trimmed = line.trim();
-		if (start === -1) {
-			if (stripTrailingComment(trimmed) === headerLine) start = offset;
-		} else {
-			const bare = stripTrailingComment(trimmed);
-			if (bare.startsWith("[") && bare.endsWith("]")) {
-				return { start, end: offset, text: config.slice(start, offset) };
-			}
+function hasAdjacentManagedComment(config, sectionStart) {
+	let cursor = sectionStart;
+	let blankLines = 0;
+	while (cursor > 0) {
+		const lineEnd = config[cursor - 1] === "\n" ? cursor - 1 : cursor;
+		const lineStart = config.lastIndexOf("\n", lineEnd - 1) + 1;
+		const line = config.slice(lineStart, lineEnd).trim();
+		if (line === "" && blankLines === 0) {
+			blankLines += 1;
+			cursor = lineStart;
+			continue;
 		}
-		offset += line.length;
+		if (line === MANAGED_MULTI_AGENT_V2_COMMENT) return true;
+		if (!line.startsWith("#")) return false;
+		cursor = lineStart;
 	}
-	if (start === -1) return null;
-	return { start, end: config.length, text: config.slice(start) };
+	return false;
 }

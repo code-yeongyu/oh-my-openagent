@@ -1,12 +1,28 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { root } from "./aggregate-plugin-fixture.mjs";
 
-const teamScript = join(root, "components", "teammode", "skills", "teammode", "scripts", "team.mjs");
+const teamScript = join(
+	root,
+	"components",
+	"teammode",
+	"skills",
+	"teammode",
+	"scripts",
+	"team.mjs",
+);
 
 export function createTeamRoot(prefix) {
 	return mkdtempSync(join(tmpdir(), prefix));
@@ -30,7 +46,11 @@ export function readTeamJson(tempRoot, sessionId) {
 
 export function runTeam(cwd, ...args) {
 	const result = runTeamRaw(cwd, ...args);
-	assert.equal(result.status, 0, `team.mjs ${args.join(" ")} failed: ${result.stderr}`);
+	assert.equal(
+		result.status,
+		0,
+		`team.mjs ${args.join(" ")} failed: ${result.stderr}`,
+	);
 	return result;
 }
 
@@ -40,6 +60,45 @@ export function runTeamRaw(cwd, ...args) {
 		encoding: "utf8",
 		timeout: 10_000,
 	});
+}
+
+export function addV2Members(tempRoot, sessionId) {
+	runTeam(
+		tempRoot,
+		"add-member",
+		"--team",
+		sessionId,
+		"--id",
+		"A",
+		"--name",
+		"runtime-core",
+		"--task-name",
+		"runtime_core",
+		"--focus",
+		"runtime state and binding",
+		"--lens",
+		"ownership",
+		"--deliverable",
+		"runtime contract",
+	);
+	runTeam(
+		tempRoot,
+		"add-member",
+		"--team",
+		sessionId,
+		"--id",
+		"B",
+		"--name",
+		"mailbox-delivery",
+		"--task-name",
+		"mailbox_delivery",
+		"--focus",
+		"cross-agent message delivery",
+		"--lens",
+		"area",
+		"--deliverable",
+		"delivery evidence",
+	);
 }
 
 export function runTeamRawWithEnv(cwd, env, ...args) {
@@ -96,7 +155,11 @@ export function symlinkOrSkip(t, target, path, type) {
 }
 
 function isUnavailableSymlinkError(error) {
-	return error?.code === "EPERM" || error?.code === "EACCES" || error?.code === "EINVAL";
+	return (
+		error?.code === "EPERM" ||
+		error?.code === "EACCES" ||
+		error?.code === "EINVAL"
+	);
 }
 
 export function createArchivedOutsideTeam(tempRoot, sessionId) {
@@ -124,5 +187,8 @@ export function createArchivedOutsideTeam(tempRoot, sessionId) {
 
 export function assertOutsideTeamIntact(outsideTeamDir) {
 	assert.equal(existsSync(outsideTeamDir), true);
-	assert.equal(JSON.parse(readFileSync(join(outsideTeamDir, "team.json"), "utf8")).teamId, "outside-team");
+	assert.equal(
+		JSON.parse(readFileSync(join(outsideTeamDir, "team.json"), "utf8")).teamId,
+		"outside-team",
+	);
 }

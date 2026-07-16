@@ -5903,7 +5903,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "4.18.0",
+    version: "4.18.2",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -7830,45 +7830,198 @@ async function shouldBuildSourcePackages(repoRoot) {
 import { mkdir as mkdir5, readFile as readFile11 } from "node:fs/promises";
 import { dirname as dirname8 } from "node:path";
 
+// packages/omo-codex/src/install/toml-lexical-lines.ts
+function scanTomlLines(config) {
+  return scanTomlDocument(config).lines;
+}
+function isTomlLexicallyValid(config) {
+  return scanTomlDocument(config).valid;
+}
+function findTomlAssignment(config, key) {
+  for (const line of scanTomlLines(config)) {
+    if (line.assignment?.key === key)
+      return line.assignment;
+  }
+  return null;
+}
+function scanTomlDocument(config) {
+  const lines = config.match(/[^\n]*\n?|$/g) ?? [];
+  const scanned = [];
+  let multiline = null;
+  let valid = true;
+  let offset = 0;
+  for (const text of lines) {
+    if (text.length === 0)
+      break;
+    const startedInsideMultiline = multiline !== null;
+    const result = scanLine(text, multiline);
+    multiline = result.multiline;
+    valid = valid && result.valid;
+    const code = startedInsideMultiline ? "" : result.code;
+    const normalized = code.trim();
+    scanned.push({
+      text,
+      offset,
+      code,
+      tableHeader: isNormalizedTableHeader(normalized) ? normalized : null,
+      assignment: readAssignment(text, code, offset)
+    });
+    offset += text.length;
+  }
+  return { lines: scanned, valid: valid && multiline === null };
+}
+function isTomlTableHeaderLine(line) {
+  return isNormalizedTableHeader(stripTomlInlineComment(line).trim());
+}
+function stripTomlInlineComment(line) {
+  return scanLine(line, null).code;
+}
+function scanLine(line, initialMultiline) {
+  let multiline = initialMultiline;
+  let index = 0;
+  const structural = multiline === null;
+  while (index < line.length) {
+    if (multiline !== null) {
+      const delimiter2 = multiline === "basic" ? '"""' : "'''";
+      const close = findMultilineClose(line, index, delimiter2);
+      if (close === -1)
+        return { code: structural ? line : "", multiline, valid: true };
+      multiline = null;
+      index = close + delimiter2.length;
+      continue;
+    }
+    if (line[index] === "#")
+      return {
+        code: structural ? line.slice(0, index) : "",
+        multiline: null,
+        valid: true
+      };
+    if (line.startsWith('"""', index)) {
+      multiline = "basic";
+      index += 3;
+      continue;
+    }
+    if (line.startsWith("'''", index)) {
+      multiline = "literal";
+      index += 3;
+      continue;
+    }
+    if (line[index] === '"') {
+      const close = skipBasicString(line, index + 1);
+      if (close === -1)
+        return { code: line, multiline, valid: false };
+      index = close;
+      continue;
+    }
+    if (line[index] === "'") {
+      const close = skipLiteralString(line, index + 1);
+      if (close === -1)
+        return { code: line, multiline, valid: false };
+      index = close;
+      continue;
+    }
+    index += 1;
+  }
+  return { code: structural ? line : "", multiline, valid: true };
+}
+function findMultilineClose(line, start, delimiter2) {
+  let index = line.indexOf(delimiter2, start);
+  while (index !== -1) {
+    if (delimiter2 === "'''" || !isEscaped(line, index))
+      return index;
+    index = line.indexOf(delimiter2, index + 1);
+  }
+  return -1;
+}
+function isEscaped(line, index) {
+  let backslashes = 0;
+  for (let cursor = index - 1;cursor >= 0 && line[cursor] === "\\"; cursor -= 1)
+    backslashes += 1;
+  return backslashes % 2 === 1;
+}
+function skipBasicString(line, start) {
+  let index = start;
+  while (index < line.length) {
+    if (line[index] === "\\") {
+      index += 2;
+      continue;
+    }
+    if (line[index] === '"')
+      return index + 1;
+    index += 1;
+  }
+  return -1;
+}
+function skipLiteralString(line, start) {
+  const close = line.indexOf("'", start);
+  return close === -1 ? -1 : close + 1;
+}
+function readAssignment(text, code, offset) {
+  if (code.length === 0)
+    return null;
+  const match = /^([ \t]*)([A-Za-z0-9_-]+)[ \t]*=[ \t]*(.*?)[ \t]*(?:\r?\n)?$/.exec(code);
+  if (!match)
+    return null;
+  const newline = text.endsWith(`\r
+`) ? `\r
+` : text.endsWith(`
+`) ? `
+` : "";
+  const contentEnd = text.length - newline.length;
+  return {
+    key: match[2],
+    value: match[3],
+    start: offset,
+    end: offset + contentEnd,
+    indent: match[1],
+    comment: text.slice(code.replace(/\r?\n$/, "").length, contentEnd).trimStart(),
+    newline
+  };
+}
+function isNormalizedTableHeader(line) {
+  return line.startsWith("[") && line.endsWith("]");
+}
+
 // packages/omo-codex/src/install/toml-section-editor.ts
 function findTomlSection(config, header) {
   const headerLine = `[${header}]`;
   const targetHeaderPath = parseTomlDottedKey(header);
-  const lines = config.match(/[^\n]*\n?|$/g) ?? [];
-  let offset = 0;
   let start = -1;
-  for (const line of lines) {
-    if (line.length === 0)
-      break;
-    const trimmed = line.trim();
+  for (const line of scanTomlLines(config)) {
     if (start === -1) {
-      if (tomlTableHeaderMatches(trimmed, headerLine, targetHeaderPath))
-        start = offset;
-    } else if (isTomlTableHeaderLine(line)) {
-      return { start, end: offset, text: config.slice(start, offset) };
+      if (line.tableHeader !== null && tomlTableHeaderMatches(line.tableHeader, headerLine, targetHeaderPath)) {
+        start = line.offset;
+      }
+    } else if (line.tableHeader !== null) {
+      return {
+        start,
+        end: line.offset,
+        text: config.slice(start, line.offset)
+      };
     }
-    offset += line.length;
   }
   if (start === -1)
     return null;
   return { start, end: config.length, text: config.slice(start) };
 }
 function replaceOrInsertSetting(config, section, key, value) {
-  const linePattern = new RegExp(`^[ \\t]*${escapeRegExp(key)}[ \\t]*=.*$`, "m");
-  const replacement = linePattern.test(section.text) ? section.text.replace(linePattern, `${key} = ${value}`) : insertSetting(section.text, key, value);
+  const assignment = findTomlAssignment(section.text, key);
+  const replacement = assignment ? replaceAssignment(section.text, assignment, key, value) : insertSetting(section.text, key, value);
   return config.slice(0, section.start) + replacement + config.slice(section.end);
 }
 function removeSetting(config, section, key) {
-  const linePattern = new RegExp(`^[ \\t]*${escapeRegExp(key)}[ \\t]*=.*(?:\\n|$)`, "m");
-  const replacement = section.text.replace(linePattern, "");
+  const assignment = findTomlAssignment(section.text, key);
+  if (!assignment)
+    return config;
+  const replacement = section.text.slice(0, assignment.start) + section.text.slice(assignment.end + assignment.newline.length);
   return config.slice(0, section.start) + replacement + config.slice(section.end);
 }
 function replaceOrInsertRootSetting(config, key, value) {
   const sectionStart = findFirstTableStart(config);
   const root = config.slice(0, sectionStart);
   const suffix = config.slice(sectionStart);
-  const linePattern = new RegExp(`^[ \\t]*${escapeRegExp(key)}[ \\t]*=.*$`, "m");
-  const replacement = linePattern.test(root) ? root.replace(linePattern, `${key} = ${value}`) : `${root.trimEnd()}${root.trimEnd().length > 0 ? `
+  const assignment = findTomlAssignment(root, key);
+  const replacement = assignment ? replaceAssignment(root, assignment, key, value) : `${root.trimEnd()}${root.trimEnd().length > 0 ? `
 ` : ""}${key} = ${value}
 `;
   if (suffix.length === 0)
@@ -7885,14 +8038,9 @@ function appendBlock(config, block) {
 `;
 }
 function findFirstTableStart(config) {
-  const lines = config.match(/[^\n]*\n?|$/g) ?? [];
-  let offset = 0;
-  for (const line of lines) {
-    if (line.length === 0)
-      break;
-    if (isTomlTableHeaderLine(line))
-      return offset;
-    offset += line.length;
+  for (const line of scanTomlLines(config)) {
+    if (line.tableHeader !== null)
+      return line.offset;
   }
   return config.length;
 }
@@ -7903,11 +8051,15 @@ function insertSetting(sectionText, key, value) {
   return lines.join(`
 `);
 }
+function replaceAssignment(text, assignment, key, value) {
+  const comment = assignment.comment.length > 0 ? ` ${assignment.comment}` : "";
+  return `${text.slice(0, assignment.start)}${assignment.indent}${key} = ${value}${comment}${text.slice(assignment.end)}`;
+}
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 function tomlTableHeaderMatches(line, headerLine, targetHeaderPath) {
-  const normalizedLine = stripUnquotedInlineComment(line).trim();
+  const normalizedLine = stripTomlInlineComment(line).trim();
   if (normalizedLine === headerLine)
     return true;
   if (!targetHeaderPath)
@@ -7918,46 +8070,10 @@ function tomlTableHeaderMatches(line, headerLine, targetHeaderPath) {
   return candidateHeaderPath.every((part, index) => part === targetHeaderPath[index]);
 }
 function parseTomlTableHeader(line) {
-  const normalizedLine = stripUnquotedInlineComment(line).trim();
+  const normalizedLine = stripTomlInlineComment(line).trim();
   if (!normalizedLine.startsWith("[") || !normalizedLine.endsWith("]") || normalizedLine.startsWith("[["))
     return null;
   return parseTomlDottedKey(normalizedLine.slice(1, -1).trim());
-}
-function isTomlTableHeaderLine(line) {
-  const normalizedLine = stripUnquotedInlineComment(line).trim();
-  return normalizedLine.startsWith("[") && normalizedLine.endsWith("]");
-}
-function stripUnquotedInlineComment(line) {
-  let quote = null;
-  let index = 0;
-  while (index < line.length) {
-    const char = line[index];
-    if (quote === '"') {
-      if (char === "\\") {
-        index += 2;
-        continue;
-      }
-      if (char === '"')
-        quote = null;
-      index += 1;
-      continue;
-    }
-    if (quote === "'") {
-      if (char === "'")
-        quote = null;
-      index += 1;
-      continue;
-    }
-    if (char === '"' || char === "'") {
-      quote = char;
-      index += 1;
-      continue;
-    }
-    if (char === "#")
-      return line.slice(0, index);
-    index += 1;
-  }
-  return line;
 }
 function parseTomlDottedKey(input) {
   const parts = [];
@@ -8018,27 +8134,27 @@ function parseBasicTomlString(input, startIndex) {
   return null;
 }
 function parseBasicTomlEscape(input, backslashIndex) {
-  const escape = input[backslashIndex + 1];
-  if (escape === undefined)
+  const escapeCode = input[backslashIndex + 1];
+  if (escapeCode === undefined)
     return null;
-  if (escape === "b")
+  if (escapeCode === "b")
     return { value: "\b", nextIndex: backslashIndex + 2 };
-  if (escape === "t")
+  if (escapeCode === "t")
     return { value: "\t", nextIndex: backslashIndex + 2 };
-  if (escape === "n")
+  if (escapeCode === "n")
     return { value: `
 `, nextIndex: backslashIndex + 2 };
-  if (escape === "f")
+  if (escapeCode === "f")
     return { value: "\f", nextIndex: backslashIndex + 2 };
-  if (escape === "r")
+  if (escapeCode === "r")
     return { value: "\r", nextIndex: backslashIndex + 2 };
-  if (escape === '"')
+  if (escapeCode === '"')
     return { value: '"', nextIndex: backslashIndex + 2 };
-  if (escape === "\\")
+  if (escapeCode === "\\")
     return { value: "\\", nextIndex: backslashIndex + 2 };
-  if (escape === "u")
+  if (escapeCode === "u")
     return parseUnicodeEscape(input, backslashIndex + 2, 4);
-  if (escape === "U")
+  if (escapeCode === "U")
     return parseUnicodeEscape(input, backslashIndex + 2, 8);
   return null;
 }
@@ -8049,7 +8165,10 @@ function parseUnicodeEscape(input, digitsStart, digitCount) {
   const codePoint = Number.parseInt(digits, 16);
   if (codePoint > 1114111)
     return null;
-  return { value: String.fromCodePoint(codePoint), nextIndex: digitsStart + digitCount };
+  return {
+    value: String.fromCodePoint(codePoint),
+    nextIndex: digitsStart + digitCount
+  };
 }
 function parseBareTomlKey(input, startIndex) {
   let index = startIndex;
@@ -8073,19 +8192,16 @@ function removeTomlSections(config, shouldRemove) {
 `);
 }
 function splitTomlSections(config) {
-  const lines = config.match(/[^\n]*\n?|$/g) ?? [];
   const sections = [];
   let current = { header: null, text: "" };
-  for (const line of lines) {
-    if (line.length === 0)
-      break;
-    const header = parseTomlHeader(line);
+  for (const line of scanTomlLines(config)) {
+    const header = parseTomlHeader(line.tableHeader);
     if (header !== null) {
       if (current.text.length > 0)
         sections.push(current);
-      current = { header, text: line };
+      current = { header, text: line.text };
     } else {
-      current = { ...current, text: current.text + line };
+      current = { ...current, text: current.text + line.text };
     }
   }
   if (current.text.length > 0)
@@ -8115,42 +8231,12 @@ function parseHookStateHeaderKey(header) {
   return path[2] ?? null;
 }
 function parseTomlHeader(line) {
-  const trimmed = stripTomlLineComment(line).trim();
+  if (line === null)
+    return null;
+  const trimmed = line.trim();
   if (!trimmed.startsWith("[") || !trimmed.endsWith("]") || trimmed.startsWith("[["))
     return null;
   return trimmed.slice(1, -1);
-}
-function stripTomlLineComment(line) {
-  let quote = null;
-  let index = 0;
-  while (index < line.length) {
-    const char = line[index];
-    if (quote === '"') {
-      if (char === "\\") {
-        index += 2;
-        continue;
-      }
-      if (char === '"')
-        quote = null;
-      index += 1;
-      continue;
-    }
-    if (quote === "'") {
-      if (char === "'")
-        quote = null;
-      index += 1;
-      continue;
-    }
-    if (char === '"' || char === "'") {
-      quote = char;
-      index += 1;
-      continue;
-    }
-    if (char === "#")
-      return line.slice(0, index);
-    index += 1;
-  }
-  return line;
 }
 
 // packages/omo-codex/src/install/codex-config-agents.ts
@@ -8268,7 +8354,10 @@ ${featureName} = true
 }
 
 // packages/omo-codex/src/install/codex-config-marketplaces.ts
-var SISYPHUS_LEGACY_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"];
+var SISYPHUS_LEGACY_MARKETPLACES = [
+  "lazycodex",
+  "code-yeongyu-codex-plugins"
+];
 function legacyMarketplaceNames(marketplaceName) {
   return marketplaceName === "sisyphuslabs" ? SISYPHUS_LEGACY_MARKETPLACES : [];
 }
@@ -8306,6 +8395,9 @@ function removeStaleMarketplaceHookStateBlocks(config, marketplaceName, keepPlug
 }
 function ensureMarketplaceBlock(config, marketplaceName, source) {
   const header = `marketplaces.${marketplaceName}`;
+  const section = findTomlSection(config, header);
+  if (section && marketplaceSourceMatches(section.text, source))
+    return config;
   const lines = [
     `[${header}]`,
     `last_updated = "${new Date().toISOString().replace(/\.\d{3}Z$/, "Z")}"`,
@@ -8318,10 +8410,20 @@ function ensureMarketplaceBlock(config, marketplaceName, source) {
   lines.push("");
   const block = lines.join(`
 `);
-  const section = findTomlSection(config, header);
-  if (section)
-    return config.slice(0, section.start) + block + config.slice(section.end);
+  if (section) {
+    const trailingNewlines = section.text.match(/\n+$/)?.[0] ?? `
+`;
+    return config.slice(0, section.start) + block.trimEnd() + trailingNewlines + config.slice(section.end);
+  }
   return appendBlock(config, block);
+}
+function marketplaceSourceMatches(sectionText, source) {
+  if (findTomlAssignment(sectionText, "source_type")?.value !== JSON.stringify(source.sourceType))
+    return false;
+  if (findTomlAssignment(sectionText, "source")?.value !== JSON.stringify(source.source))
+    return false;
+  const ref = findTomlAssignment(sectionText, "ref")?.value ?? null;
+  return source.sourceType === "local" ? ref === null : ref === JSON.stringify(source.ref);
 }
 
 // packages/omo-codex/src/install/codex-config-permissions.ts
@@ -8428,7 +8530,7 @@ function readStringArraySetting(sectionText, key) {
     const assignmentIndex = line.indexOf("=");
     if (assignmentIndex === -1)
       return null;
-    return parseTomlStringArray(stripUnquotedInlineComment2(line.slice(assignmentIndex + 1)).trim());
+    return parseTomlStringArray(stripUnquotedInlineComment(line.slice(assignmentIndex + 1)).trim());
   }
   return null;
 }
@@ -8472,7 +8574,7 @@ function parseTomlString(input, startIndex) {
   }
   return null;
 }
-function stripUnquotedInlineComment2(line) {
+function stripUnquotedInlineComment(line) {
   let quote = null;
   let index = 0;
   while (index < line.length) {
@@ -8506,9 +8608,16 @@ function stripUnquotedInlineComment2(line) {
 }
 
 // packages/omo-codex/src/install/codex-config-reasoning.ts
-var MANAGED_KEYS = ["model", "model_context_window", "model_reasoning_effort", "plan_mode_reasoning_effort"];
+var MANAGED_KEYS = [
+  "model",
+  "model_context_window",
+  "model_reasoning_effort",
+  "plan_mode_reasoning_effort"
+];
 function ensureCodexReasoningConfig(config, catalog) {
   const current = readRootReasoningSettings(config);
+  if (Object.keys(current).length === 0)
+    return config;
   if (Object.keys(current).length > 0 && !matchesProfile(current, catalog.current) && !catalog.managedProfiles.some((profile) => matchesProfile(current, profile))) {
     return config;
   }
@@ -8681,30 +8790,9 @@ function isRootSetting2(line, key) {
   return match?.[1] === key;
 }
 
-// packages/omo-codex/src/install/codex-multi-agent-v2-config.ts
+// packages/omo-codex/src/install/codex-multi-agent-v2-model-resolution.ts
 import { readFileSync } from "node:fs";
 import { dirname as dirname7, isAbsolute as isAbsolute6, join as join18 } from "node:path";
-var CODEX_AGENTS_HEADER = "agents";
-var CODEX_MULTI_AGENT_V2_HEADER = "features.multi_agent_v2";
-var CODEX_SUBAGENT_THREAD_LIMIT = 1000;
-function ensureCodexMultiAgentV2Config(config, options = {}) {
-  const featureFlag = removeFeatureFlagSetting(config, "multi_agent_v2");
-  const v2Preferred = options.multiAgentVersion === "v2";
-  const modelKnown = options.multiAgentVersion != null || readRootModel(featureFlag.config) !== null;
-  const agentsConfig = v2Preferred ? removeAgentsMaxThreads(featureFlag.config) : modelKnown ? ensureAgentsMaxThreads(featureFlag.config) : raiseExistingAgentsMaxThreads(featureFlag.config);
-  const maxThreadsValue = CODEX_SUBAGENT_THREAD_LIMIT.toString();
-  const preserveDisable = featureFlag.value === false && !v2Preferred;
-  const featureConfig = preserveDisable ? setMultiAgentV2Disable(agentsConfig) : v2Preferred ? removeMultiAgentV2Disable(agentsConfig) : agentsConfig;
-  const section = findTomlSection(featureConfig, CODEX_MULTI_AGENT_V2_HEADER);
-  if (!section) {
-    const enabledSetting = preserveDisable ? `enabled = false
-` : "";
-    return appendBlock(featureConfig, `[${CODEX_MULTI_AGENT_V2_HEADER}]
-${enabledSetting}max_concurrent_threads_per_session = ${maxThreadsValue}
-`);
-  }
-  return replaceOrInsertSetting(featureConfig, section, "max_concurrent_threads_per_session", maxThreadsValue);
-}
 function resolveCodexMultiAgentVersion(config, configPath) {
   const model = readRootModel(config);
   if (model === null)
@@ -8714,6 +8802,9 @@ function resolveCodexMultiAgentVersion(config, configPath) {
   if (catalogVersion !== null)
     return catalogVersion;
   return /^gpt-5\.6\b/i.test(model) ? "v2" : null;
+}
+function readRootModel(config) {
+  return readRootStringSetting(config, "model");
 }
 function resolveCatalogPath(configuredPath, configPath) {
   if (configuredPath === null)
@@ -8747,22 +8838,51 @@ function readCatalogMultiAgentVersion(model, cachePath) {
   }
   return null;
 }
-function readRootModel(config) {
-  const double = config.match(/^\s*model\s*=\s*"([^"]+)"/m);
-  if (double !== null)
-    return double[1] ?? null;
-  const single = config.match(/^\s*model\s*=\s*'([^']+)'/m);
-  return single?.[1] ?? null;
-}
 function readRootModelCatalogPath(config) {
-  const double = config.match(/^\s*model_catalog_json\s*=\s*"([^"]+)"/m);
-  if (double !== null)
-    return double[1] ?? null;
-  const single = config.match(/^\s*model_catalog_json\s*=\s*'([^']+)'/m);
-  return single?.[1] ?? null;
+  return readRootStringSetting(config, "model_catalog_json");
+}
+function readRootStringSetting(config, key) {
+  for (const line of scanTomlLines(config)) {
+    if (line.tableHeader !== null)
+      break;
+    if (line.assignment?.key !== key)
+      continue;
+    return parseTomlString2(line.assignment.value);
+  }
+  return null;
+}
+function parseTomlString2(value) {
+  if (value.startsWith("'") && value.endsWith("'"))
+    return value.slice(1, -1);
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === "string" ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+// packages/omo-codex/src/install/codex-multi-agent-v2-config.ts
+var CODEX_MULTI_AGENT_V2_HEADER = "features.multi_agent_v2";
+var CODEX_SUBAGENT_THREAD_LIMIT = 1000;
+var CODEX_MULTI_AGENT_V2_TOOL_NAMESPACE = "agents";
+var MANAGED_MULTI_AGENT_V2_COMMENT = "# Managed by LazyCodex: multi_agent_v2 is re-disabled on every Codex session start";
+var CODEX_MULTI_AGENT_MODE_HINT = "Work directly on trivial or bounded tasks. Delegate only when specialization, meaningful parallelism, unresolved complexity, or an explicit plan materially improves the result. Do not delegate merely because agents are available. Preserve focused delegation for genuinely heavy work.";
+function ensureCodexMultiAgentV2Config(config, options = {}) {
+  if (!isTomlLexicallyValid(config))
+    return config;
+  const removeManagedMultiAgentV2ThreadLimit = hasManagedMultiAgentV2ThreadLimit(config);
+  const featureFlag = removeFeatureFlagSetting(config, "multi_agent_v2");
+  const v2Preferred = options.multiAgentVersion === "v2";
+  const modelKnown = options.multiAgentVersion != null || readRootModel(featureFlag.config) !== null;
+  const agentsConfig = featureFlag.config;
+  const preserveDisable = featureFlag.value === false && !v2Preferred;
+  const featureConfig = preserveDisable ? ensureMultiAgentV2Disable(agentsConfig) : v2Preferred ? removeMultiAgentV2Disable(agentsConfig) : agentsConfig;
+  const routedConfig = v2Preferred || !modelKnown ? ensureMultiAgentV2PreferredSettings(featureConfig) : ensureMultiAgentV2Section(featureConfig);
+  return removeManagedMultiAgentV2ThreadLimit ? removeMultiAgentV2ThreadLimit(routedConfig) : routedConfig;
 }
 function removeFeatureFlagSetting(config, featureName) {
   const section = findTomlSection(config, "features");
@@ -8773,51 +8893,100 @@ function removeFeatureFlagSetting(config, featureName) {
     value: readBooleanSetting(section.text, featureName)
   };
 }
-function ensureAgentsMaxThreads(config) {
-  const maxThreadsValue = CODEX_SUBAGENT_THREAD_LIMIT.toString();
-  const section = findTomlSection(config, CODEX_AGENTS_HEADER);
-  if (!section) {
-    return appendBlock(config, `[${CODEX_AGENTS_HEADER}]
-max_threads = ${maxThreadsValue}
-`);
-  }
-  return replaceOrInsertSetting(config, section, "max_threads", maxThreadsValue);
-}
-function removeAgentsMaxThreads(config) {
-  const section = findTomlSection(config, CODEX_AGENTS_HEADER);
-  if (!section)
-    return config;
-  if (!/^\s*max_threads\s*=/m.test(section.text))
-    return config;
-  return removeSetting(config, section, "max_threads");
-}
 function removeMultiAgentV2Disable(config) {
   const section = findTomlSection(config, CODEX_MULTI_AGENT_V2_HEADER);
   if (!section)
     return config;
-  if (!/^\s*enabled\s*=\s*false(?:\s*#.*)?$/m.test(section.text))
+  if (findTomlAssignment(section.text, "enabled")?.value !== "false")
     return config;
   return removeSetting(config, section, "enabled");
 }
-function setMultiAgentV2Disable(config) {
+function ensureMultiAgentV2PreferredSettings(config) {
+  const section = findTomlSection(config, CODEX_MULTI_AGENT_V2_HEADER);
+  if (!section) {
+    return appendBlock(config, [
+      `[${CODEX_MULTI_AGENT_V2_HEADER}]`,
+      `tool_namespace = ${JSON.stringify(CODEX_MULTI_AGENT_V2_TOOL_NAMESPACE)}`,
+      "hide_spawn_agent_metadata = false",
+      `multi_agent_mode_hint_text = ${JSON.stringify(CODEX_MULTI_AGENT_MODE_HINT)}`,
+      ""
+    ].join(`
+`));
+  }
+  let result = config;
+  result = ensureMultiAgentV2Hint(result);
+  result = replaceOrInsertMultiAgentV2Setting(result, "hide_spawn_agent_metadata", "false");
+  return replaceOrInsertMultiAgentV2Setting(result, "tool_namespace", JSON.stringify(CODEX_MULTI_AGENT_V2_TOOL_NAMESPACE));
+}
+function ensureMultiAgentV2Hint(config) {
   const section = findTomlSection(config, CODEX_MULTI_AGENT_V2_HEADER);
   if (!section)
     return config;
-  return replaceOrInsertSetting(config, section, "enabled", "false");
+  if (hasSetting(section.text, "multi_agent_mode_hint_text"))
+    return config;
+  return replaceOrInsertSetting(config, section, "multi_agent_mode_hint_text", JSON.stringify(CODEX_MULTI_AGENT_MODE_HINT));
 }
-function raiseExistingAgentsMaxThreads(config) {
-  const section = findTomlSection(config, CODEX_AGENTS_HEADER);
+function replaceOrInsertMultiAgentV2Setting(config, key, value) {
+  const section = findTomlSection(config, CODEX_MULTI_AGENT_V2_HEADER);
   if (!section)
     return config;
-  if (!/^\s*max_threads\s*=/m.test(section.text))
+  return replaceOrInsertSetting(config, section, key, value);
+}
+function ensureMultiAgentV2Disable(config) {
+  const section = findTomlSection(config, CODEX_MULTI_AGENT_V2_HEADER);
+  if (!section) {
+    return appendBlock(config, `[${CODEX_MULTI_AGENT_V2_HEADER}]
+enabled = false
+`);
+  }
+  return replaceOrInsertSetting(config, section, "enabled", "false");
+}
+function hasManagedMultiAgentV2ThreadLimit(config) {
+  const section = findTomlSection(config, CODEX_MULTI_AGENT_V2_HEADER);
+  if (!section)
+    return false;
+  if (!settingEquals(section.text, "max_concurrent_threads_per_session", CODEX_SUBAGENT_THREAD_LIMIT.toString())) {
+    return false;
+  }
+  return hasAdjacentManagedComment(config, section.start);
+}
+function removeMultiAgentV2ThreadLimit(config) {
+  const section = findTomlSection(config, CODEX_MULTI_AGENT_V2_HEADER);
+  if (!section)
     return config;
-  return replaceOrInsertSetting(config, section, "max_threads", CODEX_SUBAGENT_THREAD_LIMIT.toString());
+  return removeSetting(config, section, "max_concurrent_threads_per_session");
+}
+function ensureMultiAgentV2Section(config) {
+  return findTomlSection(config, CODEX_MULTI_AGENT_V2_HEADER) ? config : appendBlock(config, `[${CODEX_MULTI_AGENT_V2_HEADER}]
+`);
+}
+function settingEquals(sectionText, key, value) {
+  return findTomlAssignment(sectionText, key)?.value === value;
 }
 function readBooleanSetting(sectionText, key) {
-  const match = new RegExp(`^\\s*${escapeRegExp(key)}\\s*=\\s*(true|false)\\s*(?:#.*)?$`, "m").exec(sectionText);
-  if (!match)
-    return null;
-  return match[1] === "true";
+  const value = findTomlAssignment(sectionText, key)?.value;
+  return value === "true" ? true : value === "false" ? false : null;
+}
+function hasSetting(sectionText, key) {
+  return findTomlAssignment(sectionText, key) !== null;
+}
+function hasAdjacentManagedComment(config, sectionStart) {
+  const lines = config.slice(0, sectionStart).split(/\r?\n/);
+  if (lines.at(-1) === "")
+    lines.pop();
+  let blankLines = 0;
+  while (lines.length > 0) {
+    const line = lines.pop()?.trim();
+    if (line === "" && blankLines === 0) {
+      blankLines += 1;
+      continue;
+    }
+    if (line === MANAGED_MULTI_AGENT_V2_COMMENT)
+      return true;
+    if (!line?.startsWith("#"))
+      return false;
+  }
+  return false;
 }
 
 // packages/omo-codex/src/install/codex-config-toml.ts
@@ -8831,6 +9000,8 @@ async function updateCodexConfig(input) {
       throw error;
     config = "";
   }
+  if (!isTomlLexicallyValid(config))
+    return;
   const pluginSet = new Set(input.pluginNames);
   for (const legacyMarketplaceName of legacyMarketplaceNames(input.marketplaceName)) {
     config = removeMarketplaceBlock(config, legacyMarketplaceName);
@@ -9024,7 +9195,7 @@ import { copyFile, lstat as lstat9, mkdir as mkdir6, readdir as readdir7, rm as 
 import { basename as basename5, join as join22 } from "node:path";
 
 // packages/omo-codex/src/install/preserved-agent-settings.ts
-import { lstat as lstat7, readFile as readFile13, readdir as readdir6, writeFile as writeFile6 } from "node:fs/promises";
+import { lstat as lstat7, readdir as readdir6, readFile as readFile13, writeFile as writeFile6 } from "node:fs/promises";
 import { join as join20 } from "node:path";
 
 // packages/omo-codex/src/install/managed-agent-reasoning-defaults.ts
@@ -9039,6 +9210,10 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       {
         previous: { model: "gpt-5.6-terra", effort: "medium" },
         current: { model: "gpt-5.6-luna", effort: "low" }
+      },
+      {
+        previous: { model: "gpt-5.6-luna", effort: "low" },
+        current: { model: "gpt-5.6-terra", effort: "medium" }
       }
     ]
   ],
@@ -9052,6 +9227,10 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       {
         previous: { model: "gpt-5.6-terra", effort: "medium" },
         current: { model: "gpt-5.6-luna", effort: "low" }
+      },
+      {
+        previous: { model: "gpt-5.6-luna", effort: "low" },
+        current: { model: "gpt-5.6-terra", effort: "medium" }
       }
     ]
   ],
@@ -9074,11 +9253,24 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
     ]
   ],
   [
+    "lazycodex-worker-low",
+    [
+      {
+        previous: { model: "gpt-5.6-luna", effort: "high" },
+        current: { model: "gpt-5.6-terra", effort: "high" }
+      }
+    ]
+  ],
+  [
     "lazycodex-worker-medium",
     [
       {
         previous: { model: "gpt-5.6-sol", effort: "high" },
         current: { model: "gpt-5.6-luna", effort: "max" }
+      },
+      {
+        previous: { model: "gpt-5.6-luna", effort: "max" },
+        current: { model: "gpt-5.6-terra", effort: "high" }
       }
     ]
   ],
@@ -9088,6 +9280,10 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       {
         previous: { model: "gpt-5.6-terra", effort: "medium" },
         current: { model: "gpt-5.6-luna", effort: "high" }
+      },
+      {
+        previous: { model: "gpt-5.6-luna", effort: "high" },
+        current: { model: "gpt-5.6-terra", effort: "medium" }
       }
     ]
   ],
@@ -9104,15 +9300,15 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
 function resolveManagedAgentReasoning(input) {
   const steps = MANAGED_REASONING_DEFAULT_UPGRADES.get(input.agentName);
   if (steps === undefined)
-    return input.preserved.effort;
+    return input.preserved;
   const latest = steps[steps.length - 1];
   if (latest === undefined)
-    return input.preserved.effort;
+    return input.preserved;
   if (input.bundledModel !== latest.current.model || input.bundledEffort !== latest.current.effort) {
-    return input.preserved.effort;
+    return input.preserved;
   }
   const preservedMatchesAnyStep = steps.some((step) => input.preserved.model === step.previous.model && input.preserved.effort === step.previous.effort);
-  return preservedMatchesAnyStep ? latest.current.effort : input.preserved.effort;
+  return preservedMatchesAnyStep ? latest.current : input.preserved;
 }
 
 // packages/omo-codex/src/install/preserved-agent-settings.ts
@@ -9158,19 +9354,33 @@ async function restorePreservedReasoning(input) {
   if (input.value === undefined)
     return;
   const content = await readFile13(input.target, "utf8");
+  const bundledModel = extractModel(content);
   const bundledEffort = extractReasoningEffort(content);
-  const effort = resolveManagedAgentReasoning({
+  const reasoning = resolveManagedAgentReasoning({
     agentName: input.agentName,
-    bundledModel: extractModel(content),
+    bundledModel,
     bundledEffort,
     preserved: input.value
   });
-  if (bundledEffort === effort)
+  if (bundledModel === reasoning.model && bundledEffort === reasoning.effort)
     return;
-  const replacement = replaceTopLevelStringSetting(content, "model_reasoning_effort", effort, { insertIfMissing: false });
-  if (!replacement.replaced)
+  let restored = content;
+  let changed = false;
+  if (bundledModel !== reasoning.model) {
+    const replacement = replaceTopLevelStringSetting(restored, "model", reasoning.model, { insertIfMissing: false });
+    restored = replacement.content;
+    changed = replacement.replaced;
+  }
+  if (bundledEffort !== reasoning.effort) {
+    const replacement = replaceTopLevelStringSetting(restored, "model_reasoning_effort", reasoning.effort, {
+      insertIfMissing: false
+    });
+    restored = replacement.content;
+    changed = changed || replacement.replaced;
+  }
+  if (!changed)
     return;
-  await writeFile6(input.linkPath, replacement.content);
+  await writeFile6(input.linkPath, restored);
 }
 async function restorePreservedServiceTier(input) {
   if (!input.preserved)
@@ -9808,7 +10018,7 @@ function repairProjectLocalCodexConfigText(config) {
   const removedKeys = [];
   for (const key of LEGACY_AGENT_CONFLICT_KEYS) {
     const section = findTomlSection(nextConfig, "agents");
-    if (section === null || !hasSetting(section.text, key))
+    if (section === null || !hasSetting2(section.text, key))
       continue;
     nextConfig = removeSetting(nextConfig, section, key);
     removedKeys.push(key);
@@ -9902,7 +10112,7 @@ function isMultiAgentV2Enabled(config) {
 function settingIsBooleanTrue(sectionText, key) {
   return new RegExp(`^\\s*${escapeRegExp(key)}\\s*=\\s*true\\s*(?:#.*)?$`, "m").test(sectionText);
 }
-function hasSetting(sectionText, key) {
+function hasSetting2(sectionText, key) {
   return new RegExp(`^\\s*${escapeRegExp(key)}\\s*=`, "m").test(sectionText);
 }
 function formatBackupTimestamp(date) {

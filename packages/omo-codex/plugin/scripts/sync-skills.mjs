@@ -2,16 +2,26 @@
 import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-
-import { isCliEntry } from "./entry-guard.mjs";
 import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills";
+import { isCliEntry } from "./entry-guard.mjs";
+import { writeCodexSkillDisplayMetadata } from "./sync-skills-display-metadata.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const sharedSkillsRoot = sharedSkillsRootPath();
 const skillsRoot = join(root, "skills");
 const sourceTestFilePattern = /\.test\.ts$/;
-const ignoredSkillSourceDirNames = new Set([".mypy_cache", ".omo", ".pytest_cache", ".ruff_cache", "__pycache__"]);
-const ignoredSkillSourceFileNames = new Set([".gitignore", ".npmignore", "pyrightconfig.json"]);
+const ignoredSkillSourceDirNames = new Set([
+	".mypy_cache",
+	".omo",
+	".pytest_cache",
+	".ruff_cache",
+	"__pycache__",
+]);
+const ignoredSkillSourceFileNames = new Set([
+	".gitignore",
+	".npmignore",
+	"pyrightconfig.json",
+]);
 const skillSources = [
 	["comment-checker", "components/comment-checker/skills/comment-checker"],
 	["lsp", "components/lsp/skills/lsp"],
@@ -23,20 +33,21 @@ const skillSources = [
 ];
 const componentSkillNames = new Set(skillSources.map(([name]) => name));
 const codexHiddenSharedSkillNames = new Set(["ultraresearch"]);
-const skillDisplayPrefix = "(OmO) ";
 
 function shouldCopySkillSource(source) {
 	const normalized = source.replaceAll("\\", "/");
 	const segments = normalized.split("/");
 	const name = segments.at(-1) ?? "";
-	if (segments.some((segment) => ignoredSkillSourceDirNames.has(segment))) return false;
+	if (segments.some((segment) => ignoredSkillSourceDirNames.has(segment)))
+		return false;
 	if (ignoredSkillSourceFileNames.has(name)) return false;
 	if (sourceTestFilePattern.test(name) || name.endsWith(".pyc")) return false;
 	const scriptsIndex = segments.lastIndexOf("scripts");
 	return scriptsIndex === -1 || segments[scriptsIndex + 1] !== "tests";
 }
 
-const opencodeOnlyOrchestrationPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/;
+const opencodeOnlyOrchestrationPattern =
+	/\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/;
 
 export const codexHarnessToolCompatibility = `## Codex Harness Tool Compatibility
 
@@ -54,11 +65,11 @@ This skill may include examples copied from the OpenCode harness. In Codex, do n
 
 Role-specific behavior must be described in a self-contained \`message\`. Use \`fork_context: false\` to start the child with only the initial prompt (no parent history); use \`fork_context: true\` only when full parent history is truly required. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's \`message\`. OMO installs these selectable agent roles into \`~/.codex/agents/\`: \`explorer\`, \`librarian\`, \`plan\`, \`momus\`, \`metis\`, \`lazycodex-code-reviewer\`, \`lazycodex-qa-executor\`, and \`lazycodex-gate-reviewer\` - pass the matching name as \`agent_type\` so the child gets that role's model and instructions. If the spawn tool exposes no \`agent_type\` parameter, omit it and describe the role inside \`message\`. If a code block below conflicts with this section, this section wins.
 
-Codex exposes ONE of two subagent tool surfaces per session; check your own tool list and route accordingly. If \`multi_agent_v1.*\` tools exist, use the table above as written. If instead a flat \`spawn_agent\` with a required \`task_name\` exists (\`multi_agent_v2\`), rewrite every \`multi_agent_v1.*\` example: \`multi_agent_v1.spawn_agent({...,"fork_context":false})\` becomes \`spawn_agent({"task_name":"<lowercase_digits_underscores>","message":...,"agent_type":...,"fork_turns":"none"})\` (\`"all"\` only when full parent history is truly required); \`send_input\` becomes \`send_message\`; do not call \`close_agent\`/\`resume_agent\` (finished agents end on their own; \`followup_task\` re-tasks one, \`interrupt_agent\` stops one); \`wait_agent\` takes only \`timeout_ms\` and returns on any child mailbox activity. On the v2 surface \`agent_type\` may be ABSENT from the spawn schema (verified 2026-07-11: only \`fork_turns\`/\`message\`/\`task_name\`) — when absent, omit it and describe the role inside \`message\`; installed role TOMLs cannot be selected on that surface. If a code block below conflicts with this section, this section wins.
+Codex exposes ONE of two subagent tool surfaces per session; check your own tool list and route accordingly. If \`multi_agent_v1.*\` tools exist, use the table above as written. If the GPT-5.6-compatible MultiAgentV2 \`agents.*\` tools exist (\`multi_agent_v2\`), rewrite every \`multi_agent_v1.*\` example: \`multi_agent_v1.spawn_agent({...,"fork_context":false})\` becomes \`agents.spawn_agent({"task_name":"<lowercase_digits_underscores>","message":"TASK: act as <role>. ...","agent_type":"lazycodex-worker-medium","fork_turns":"none"})\`; omit \`model\`, \`reasoning_effort\`, and \`service_tier\` by default so the installed role TOML controls the child routing. Use those optional fields only for an intentional override, e.g. \`agents.spawn_agent({"task_name":"hard_refactor","message":"TASK: act as a high-power worker. ...","agent_type":"lazycodex-worker-high","model":"gpt-5.6-sol","reasoning_effort":"max","service_tier":"fast","fork_turns":"none"})\`; use \`"all"\` only for full parent history. Map lifecycle tools to the same namespace: \`send_input\` becomes \`agents.send_message\`, finished agents end on their own, \`agents.followup_task\` re-tasks one, \`agents.interrupt_agent\` stops one, and \`agents.wait_agent\` takes only \`timeout_ms\` and returns on any child mailbox activity. Current upstream evidence indicates \`followup_task\` may reset a pinned child to the parent model; when model fidelity matters, spawn a fresh typed child instead of using \`followup_task\`. If a code block below conflicts with this section, this section wins.
 
 When translating \`load_skills=[...]\`, include the requested skill names in the spawned agent's \`message\`. If a code block below conflicts with this section, this section wins.
 
-For work likely to exceed one wait cycle, require the child to send \`WORKING: <task> - <current phase>\` before long passes and \`BLOCKED: <reason>\` only when progress stops. A \`multi_agent_v1.wait_agent\` timeout only means no new mailbox update arrived; back off between waits (double the timeout up to ~5 minutes) instead of spinning short cycles. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly \`BLOCKED:\`, or no longer running.
+For work likely to exceed one wait cycle, require the child to send \`WORKING: <task> - <current phase>\` before long passes and \`BLOCKED: <reason>\` only when progress stops. Use the active surface's wait tool for mailbox signals; a timeout only means no new mailbox update arrived. Back off between waits (double the timeout up to ~5 minutes) instead of spinning short cycles. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly \`BLOCKED:\`, or no longer running.
 
 `;
 
@@ -76,7 +87,9 @@ function findCodexCompatibilitySectionEnd(content, searchStart) {
 	const structuralEnd = structuralEndPattern.exec(content);
 	if (structuralEnd) return structuralEnd.index + 1;
 
-	const knownEndMarker = codexCompatibilityEndMarkers.find((marker) => content.indexOf(marker, searchStart) !== -1);
+	const knownEndMarker = codexCompatibilityEndMarkers.find(
+		(marker) => content.indexOf(marker, searchStart) !== -1,
+	);
 	if (knownEndMarker === undefined) return content.length;
 
 	return content.indexOf(knownEndMarker, searchStart) + knownEndMarker.length;
@@ -90,20 +103,30 @@ function removeCodexCompatibilityGuidance(content) {
 		const start = withoutGuidance.indexOf(heading);
 		if (start === -1) return withoutGuidance;
 
-		const end = findCodexCompatibilitySectionEnd(withoutGuidance, start + heading.length);
+		const end = findCodexCompatibilitySectionEnd(
+			withoutGuidance,
+			start + heading.length,
+		);
 
 		withoutGuidance = `${withoutGuidance.slice(0, start)}${withoutGuidance.slice(end)}`;
 	}
 }
 
-function hasKnownGeneratedCodexCompatibilityGuidance(content, compatibilityIndex) {
-	return codexCompatibilityEndMarkers.some((marker) => content.indexOf(marker, compatibilityIndex) !== -1);
+function hasKnownGeneratedCodexCompatibilityGuidance(
+	content,
+	compatibilityIndex,
+) {
+	return codexCompatibilityEndMarkers.some(
+		(marker) => content.indexOf(marker, compatibilityIndex) !== -1,
+	);
 }
 
 export function insertCodexCompatibilityGuidance(content) {
 	if (!opencodeOnlyOrchestrationPattern.test(content)) return content;
 	const firstExampleIndex = content.search(opencodeOnlyOrchestrationPattern);
-	const compatibilityIndex = content.indexOf("## Codex Harness Tool Compatibility");
+	const compatibilityIndex = content.indexOf(
+		"## Codex Harness Tool Compatibility",
+	);
 	if (
 		compatibilityIndex !== -1 &&
 		compatibilityIndex < firstExampleIndex &&
@@ -114,7 +137,9 @@ export function insertCodexCompatibilityGuidance(content) {
 
 	const contentWithoutGuidance = removeCodexCompatibilityGuidance(content);
 
-	const frontmatterMatch = contentWithoutGuidance.match(/^---\n[\s\S]*?\n---\n+/);
+	const frontmatterMatch = contentWithoutGuidance.match(
+		/^---\n[\s\S]*?\n---\n+/,
+	);
 	if (!frontmatterMatch) {
 		return `${codexHarnessToolCompatibility}${contentWithoutGuidance}`;
 	}
@@ -143,11 +168,14 @@ const startWorkCodexCompletion = `When all top-level checkboxes in \`## TODOs\` 
 4. Remove or mark the Boulder work as completed.
 5. Print an \`ORCHESTRATION COMPLETE\` block with the plan path, verification commands, Global Review and Debugging Gate verdict, artifacts, and cleanup receipts.`;
 
-const startWorkOriginalHardRule = "- No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.\n- No PR/branch implementation, review, or merge in the main worktree; use the task-owned git worktree.\n- No unprefixed session ids in Boulder state. Codex sessions are always `codex:<session_id>`.";
+const startWorkOriginalHardRule =
+	"- No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.\n- No PR/branch implementation, review, or merge in the main worktree; use the task-owned git worktree.\n- No unprefixed session ids in Boulder state. Codex sessions are always `codex:<session_id>`.";
 
-const startWorkCodexHardRule = "- No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.\n- No `ORCHESTRATION COMPLETE`, final response, PR creation, PR handoff, or merge before the Global Review and Debugging Gate passes with recorded evidence.\n- No PR/branch implementation or review in the main worktree; create or use a task-owned git worktree first.\n- No unprefixed session ids in Boulder state. Codex sessions are always `codex:<session_id>`.";
+const startWorkCodexHardRule =
+	"- No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.\n- No `ORCHESTRATION COMPLETE`, final response, PR creation, PR handoff, or merge before the Global Review and Debugging Gate passes with recorded evidence.\n- No PR/branch implementation or review in the main worktree; create or use a task-owned git worktree first.\n- No unprefixed session ids in Boulder state. Codex sessions are always `codex:<session_id>`.";
 
-const reviewWorkAnchor = "Launch 5 specialized sub-agents in parallel to review completed implementation work from every angle. All 5 must pass for the review to pass. If even ONE fails, the review fails.\n";
+const reviewWorkAnchor =
+	"Launch 5 specialized sub-agents in parallel to review completed implementation work from every angle. All 5 must pass for the review to pass. If even ONE fails, the review fails.\n";
 
 const reviewWorkCodexGate = `
 When \`review-work\` is used as a final implementation, PR, or \`$start-work\`
@@ -196,65 +224,48 @@ function applyCodexSkillOverlays(skillName, content) {
 				"answer those normally, and mention that `ulw-research` is available (legacy alias: `ultraresearch`) when a question would clearly benefit from it.",
 				"answer those normally, and mention that `ulw-research` is available when a question would clearly benefit from it.",
 			)
-			.replace("# Ultraresearch Synthesis: <query>", "# ULW-Research Synthesis: <query>");
+			.replace(
+				"# Ultraresearch Synthesis: <query>",
+				"# ULW-Research Synthesis: <query>",
+			);
 	}
 	if (skillName === "start-work") {
 		return content
 			.replace(startWorkOriginalCompletion, startWorkCodexCompletion)
 			.replace(startWorkOriginalHardRule, startWorkCodexHardRule);
 	}
-	if (skillName === "review-work" && !content.includes("When `review-work` is used as a final implementation")) {
-		return content.replace(reviewWorkAnchor, `${reviewWorkAnchor}${reviewWorkCodexGate}`);
+	if (
+		skillName === "review-work" &&
+		!content.includes("When `review-work` is used as a final implementation")
+	) {
+		return content.replace(
+			reviewWorkAnchor,
+			`${reviewWorkAnchor}${reviewWorkCodexGate}`,
+		);
 	}
 	return content;
-}
-
-function readSkillFrontmatterName(content, fallbackName) {
-	const frontmatter = content.match(/^---\n(?<body>[\s\S]*?)\n---\n+/);
-	const rawName = frontmatter?.groups?.body.match(/^name:\s*"?([^"\n]+)"?\s*$/m)?.[1]?.trim();
-	return rawName && rawName.length > 0 ? rawName : fallbackName;
-}
-
-function upsertDisplayName(metadata, displayName) {
-	const content = metadata.endsWith("\n") ? metadata : `${metadata}\n`;
-	if (/^\s*display_name:/m.test(metadata)) {
-		return content.replace(/^(\s*display_name:\s*).+$/m, `$1"${displayName}"`);
-	}
-	if (/^interface:\s*$/m.test(metadata)) {
-		return content.replace(/^interface:\s*$/m, `interface:\n  display_name: "${displayName}"`);
-	}
-	return `interface:\n  display_name: "${displayName}"\n${content}`;
-}
-
-async function writeCodexSkillDisplayMetadata(skillName) {
-	const skillRoot = join(skillsRoot, skillName);
-	const skillPath = join(skillRoot, "SKILL.md");
-	const content = await readFile(skillPath, "utf8");
-	const frontmatterName = readSkillFrontmatterName(content, skillName);
-	const metadataDir = join(skillRoot, "agents");
-	const metadataPath = join(metadataDir, "openai.yaml");
-	await mkdir(metadataDir, { recursive: true });
-	let metadata = "interface:\n";
-	try {
-		metadata = await readFile(metadataPath, "utf8");
-	} catch (error) {
-		if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
-	}
-	await writeFile(metadataPath, upsertDisplayName(metadata, `${skillDisplayPrefix}${frontmatterName}`), "utf8");
 }
 
 async function adaptSkillForCodex(skillName) {
 	const skillPath = join(skillsRoot, skillName, "SKILL.md");
 	const content = await readFile(skillPath, "utf8");
-	const adapted = applyCodexSkillOverlays(skillName, insertCodexCompatibilityGuidance(content));
+	const adapted = applyCodexSkillOverlays(
+		skillName,
+		insertCodexCompatibilityGuidance(content),
+	);
 	if (adapted !== content) {
 		await writeFile(skillPath, adapted, "utf8");
 	}
-	await writeCodexSkillDisplayMetadata(skillName);
+	await writeCodexSkillDisplayMetadata(skillsRoot, skillName);
 }
 
 async function syncSkills() {
-	await rm(skillsRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+	await rm(skillsRoot, {
+		recursive: true,
+		force: true,
+		maxRetries: 5,
+		retryDelay: 100,
+	});
 	await mkdir(skillsRoot, { recursive: true });
 
 	for (const [name, source] of skillSources) {
@@ -262,7 +273,9 @@ async function syncSkills() {
 		await adaptSkillForCodex(name);
 	}
 
-	const sharedSkillEntries = await readdir(sharedSkillsRoot, { withFileTypes: true });
+	const sharedSkillEntries = await readdir(sharedSkillsRoot, {
+		withFileTypes: true,
+	});
 	const sharedSkillNames = sharedSkillEntries
 		.filter((entry) => entry.isDirectory())
 		.map((entry) => entry.name)

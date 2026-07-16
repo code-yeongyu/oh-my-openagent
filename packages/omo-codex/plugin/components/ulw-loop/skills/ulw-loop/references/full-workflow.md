@@ -42,13 +42,13 @@ Size each worker to the task. Put the intended role, rigor level, and specialty 
 | Deep debugging / race / perf / subtle cross-module reasoning | `TASK: act as a deep debugging worker. ...` |
 | QA execution (drive a channel, capture evidence) | `TASK: act as a QA execution worker. ...` |
 | Read-only codebase search | `TASK: act as an explorer. ...` |
-| Implementation — pick the tier by change SIZE: LOW small (one-file fix, boilerplate) / MEDIUM mid-sized (standard feature, a few files) / HIGH large (new module, cross-module, concurrency/security/migration, or a big complex problem with one clear goal) | `TASK: act as a <low|medium|high>-difficulty implementation worker. ...` + `agent_type: "lazycodex-worker-<low|medium|high>"` when exposed |
+| Implementation — pick the tier by change SIZE: LOW small (one-file fix, boilerplate) / MEDIUM mid-sized (standard feature, a few files) / HIGH large (new module, cross-module, concurrency/security/migration, or a big complex problem with one clear goal) | `TASK: act as a <low|medium|high>-difficulty implementation worker. ...`; bind the matching `lazycodex-worker-<low|medium|high>` role through the active surface's typed field |
 | External library / docs research | `TASK: act as a librarian. ...` |
 | Final verification audit | `TASK: act as a rigorous final verification reviewer. ...` |
 
 For reviewer work, use a self-contained reviewer assignment, tight scope, and explicit verification in `message`. Never spawn a context-only child for review.
 
-Difficulty is orthogonal to LIGHT/HEAVY rigor. Tier roles bind via `agent_type` (v1); the deployed v2 spawn schema omits it — state the tier inside `message` there.
+Difficulty is orthogonal to LIGHT/HEAVY rigor. V2: `agents.spawn_agent({"task_name":"medium_implementation","message":"TASK: implement. DELIVERABLE: ... SCOPE: ... VERIFY: ...","agent_type":"lazycodex-worker-medium","fork_turns":"none"})`. V1: `multi_agent_v1.spawn_agent({"message":"TASK: implement. DELIVERABLE: ... SCOPE: ... VERIFY: ...","agent_type":"lazycodex-worker-medium","fork_context":false})`; only a V1 schema without `agent_type` uses `multi_agent_v1.spawn_agent({"message":"TASK: implement. DELIVERABLE: ... SCOPE: ... VERIFY: ...","fork_context":false})`.
 
 Every worker message MUST carry: goal + exact files in scope; the PIN + failing-first proof before production code; constraints + project rules; verification commands; the ONE Manual-QA channel and exact artifact; for git-tracked edits, require `git-master` plus repo and touched-path commit history before commit. Workers have NO interview context — be exhaustive, and forward learnings.
 

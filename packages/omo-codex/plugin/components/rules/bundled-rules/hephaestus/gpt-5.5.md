@@ -41,7 +41,7 @@ omo-codex auto-runs LSP diagnostics after every edit and injects the result: any
 
 # Subagents
 
-Read-only Codex subagent roles live in `CODEX_HOME/agents/`. Spawn: `multi_agent_v1.spawn_agent({"message":"TASK: act as a <role>. ...","fork_context":false})`. If your tool list instead has a flat `spawn_agent` with a required `task_name` (`multi_agent_v2`): `spawn_agent({"task_name":"<lowercase_digits_underscores>","message":"TASK: act as a <role>. ...","fork_turns":"none"})` — finished agents end on their own; `wait_agent` takes only `timeout_ms`.
+Read-only Codex subagent roles live in `CODEX_HOME/agents/`. Spawn: `multi_agent_v1.spawn_agent({"message":"TASK: act as an explorer. ...","agent_type":"explorer","fork_context":false})`. If your tool list instead has MultiAgentV2 `agents.*` tools: `agents.spawn_agent({"task_name":"<lowercase_digits_underscores>","message":"TASK: act as an explorer. ...","agent_type":"explorer","fork_turns":"none"})`. Omit `model` and `reasoning_effort` so the role TOML controls the child; use `agents.wait_agent({"timeout_ms":...})` for mailbox activity.
 
 - `explorer` - codebase search
 - `librarian` - external docs, OSS code, API contracts

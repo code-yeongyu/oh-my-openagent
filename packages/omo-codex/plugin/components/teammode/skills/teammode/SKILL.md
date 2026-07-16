@@ -1,6 +1,6 @@
 ---
 name: teammode
-description: "Codex-only team orchestration: run a named team of cooperating Codex workers with durable, script-managed state. MUST USE when the user asks Codex to create, run, coordinate, inspect, archive, or delete a team of agents/threads/sessions, or to work on something as a team in parallel. FIRST inspects the active tool surface (checking tool_search for deferred tools) and tells the user the route: native MultiAgentV2 agents (flat spawn_agent with task_name) when available, Codex App threads as the fallback, or a plain-subagent split when neither set exists. The main session is always the leader; members are defined by a concrete part, ownership area, or perspective - never a vague job role; a bundled cross-platform script writes the .omo/teams state plus an auto-generated member field manual. Use a team when the work is not perfectly isolated but parallelizing helps; use plain subagents when scope is perfectly isolated or the goal is ambiguous. Triggers: team mode, teammode, make a team, run as a team, team of agents, coordinate threads, parallel Codex threads, archive the team."
+description: "Codex-only team orchestration: run a named team of cooperating Codex workers with durable, script-managed state. MUST USE when the user asks Codex to create, run, coordinate, inspect, archive, or delete a team of agents/threads/sessions, or to work on something as a team in parallel. FIRST inspects the active tool surface (checking tool_search for deferred tools) and tells the user the route: native MultiAgentV2 agents (namespaced agents.spawn_agent with task_name) when available, Codex App threads as the fallback, or a plain-subagent split when neither set exists. The main session is always the leader; members are defined by a concrete part, ownership area, or perspective - never a vague job role; a bundled cross-platform script writes the .omo/teams state plus an auto-generated member field manual. Use a team when the work is not perfectly isolated but parallelizing helps; use plain subagents when scope is perfectly isolated or the goal is ambiguous. Triggers: team mode, teammode, make a team, run as a team, team of agents, coordinate threads, parallel Codex threads, archive the team."
 ---
 
 # Teammode
@@ -19,7 +19,7 @@ Use a TEAM when EITHER holds:
 - one task still needs exploration, yet its GOAL is already clear - parallel investigation under
   a fixed objective.
 
-Use plain fire-and-forget subagents (`$ulw` / one-off `spawn_agent` workers) - NOT a team - when
+Use plain fire-and-forget subagents (`$ulw` / one-off `agents.spawn_agent` workers on V2) - NOT a team - when
 EITHER holds:
 - the work IS perfectly isolated, so there is no coordination cost worth paying; or
 - the GOAL is still ambiguous, where one mind should resolve direction before any fan-out.
@@ -32,16 +32,17 @@ is the thing you actually need.
 Before creating any team state, decide which transport this session can run.
 Inspect your active tool list and select:
 
-1. **MultiAgentV2 (preferred)** - select when the flat V2 collaboration tools are ALL active:
-   flat `spawn_agent` whose schema requires `task_name`, plus `send_message`, `followup_task`,
-   `wait_agent`, `list_agents`, and `interrupt_agent`. Members are durable native agents
+1. **MultiAgentV2 (preferred)** - select when the namespaced V2 tools are ALL active:
+   `agents.spawn_agent` whose schema requires `task_name`, plus `agents.send_message`,
+   `agents.followup_task`, `agents.wait_agent`, `agents.list_agents`, and
+   `agents.interrupt_agent`. Members are durable native agents
    addressed by task name / agent path (`/root/<task_name>`). The namespaced
    `multi_agent_v1.*` surface never qualifies as a team transport.
-2. **Codex App threads (fallback)** - select when flat V2 is not available but the
+2. **Codex App threads (fallback)** - select when namespaced V2 is not available but the
    `codex_app.*` thread tools are (`create_thread`, `read_thread`, `send_message_to_thread`,
    `set_thread_title`, `set_thread_archived`).
 3. **Neither set visible** - if a `tool_search` tool is active, search for the missing sets
-   (e.g. `spawn_agent`, `codex_app`) before concluding: some environments defer tools behind
+   (e.g. `agents.spawn_agent`, `codex_app`) before concluding: some environments defer tools behind
    tool search. A hit is only a lead: revalidate that the visible result is the COMPLETE,
    mutually compatible transport set from case 1 or 2 before selecting it. Do not combine
    partial hits from different transports.
@@ -53,8 +54,8 @@ Inspect your active tool list and select:
 
 Then, BEFORE running `init` (or instead of it in case 4), tell the user in one line what this
 environment provides and which route you picked:
-- `Teammode transport: MultiAgentV2 (flat spawn_agent with task_name).`
-- `Teammode transport: Codex App threads (flat V2 tools not present in this session).`
+- `Teammode transport: MultiAgentV2 (agents.spawn_agent with task_name).`
+- `Teammode transport: Codex App threads (MultiAgentV2 agents.* tools not present in this session).`
 - `Teammode unavailable: neither MultiAgentV2 nor codex_app tools exist in this session -
   using <visible plain-subagent mechanism> for independent scopes.`
 - `Teammode unavailable: neither MultiAgentV2 nor codex_app tools exist in this session, and
@@ -138,20 +139,28 @@ teams, and a refused command never changes `team.json`.
 `init` the team, then `add-member` once per member. What happens next depends on the transport.
 
 **MultiAgentV2 teams:**
-1. If a member needs an isolated worktree, run `worktree-add` BEFORE spawning it - flat
-   `spawn_agent` has no cwd argument, so the path must ride in the bootstrap message.
-2. Spawn each member with flat `spawn_agent` using only the V2 schema fields:
-   `task_name` is that member's `--task-name`, `message` is the bootstrap printed by
-   `add-member` / `member-prompt`, and `fork_turns` is `"none"` (members read
-   `guide.md` for context; full parent history is not their context model). Put any
-   role, priority, or task-specific routing instruction in `message`; V2 does not accept
-   `agent_type`, `model`, `reasoning_effort`, or `service_tier`, so members inherit the
-   session model.
+LazyCodex intentionally supersedes the reduced default V2 schema by configuring
+`tool_namespace = "agents"` and `hide_spawn_agent_metadata = false`. On that
+configured surface, `agent_type`, `model`, `reasoning_effort`, and `service_tier`
+are typed spawn fields.
+
+1. If a member needs an isolated worktree, run `worktree-add` BEFORE spawning it -
+   `agents.spawn_agent` has no cwd argument, so the path must ride in the bootstrap message.
+2. Spawn each member with `agents.spawn_agent`: `task_name` is that member's `--task-name`,
+   `message` is the bootstrap printed by `add-member` / `member-prompt`, `agent_type` selects
+   the installed role (default to `lazycodex-worker-medium` when no narrower role fits), and
+   `fork_turns: "none"` keeps the member context isolated. The `agent_type` selects the
+   installed role TOML. Omit `model`, `reasoning_effort`, and `service_tier` so that TOML owns
+   the defaults. Set only fields needed for an intentional per-member override and verify the
+   applied values from the spawn result, for example:
+   `agents.spawn_agent({"task_name":"hard_refactor","message":"TASK: act as a high-power worker. ...","agent_type":"lazycodex-worker-high","model":"gpt-5.6-sol","reasoning_effort":"max","service_tier":"fast","fork_turns":"none"})`.
 3. `bind-agent --agent-path` with the canonical task name the spawn returned (normally
    `/root/<task_name>`); binding confirms the runtime identity matches the roster and records
    the member's cwd. Members are durable: they persist as subagent threads, survive idling,
-   and are re-tasked with `followup_task` - never respawned under a second name.
-4. Members appear in `list_agents` with their task paths; inspect status there instead of
+   and are re-tasked with `agents.followup_task` - never respawned under a second name when
+   model fidelity is not at risk. Because follow-up may reset a pinned child model, spawn a
+   fresh typed member when preserving an explicit override matters.
+4. Members appear in `agents.list_agents` with their task paths; inspect status there instead of
    deep links (V2 exposes no thread title or `codex://` link surface to you).
 
 **Codex App teams:**
@@ -185,11 +194,11 @@ channel open: expect frequent small inbound updates from each member - findings,
 `WORKING:`/`BLOCKED:` markers, peer digests - rather than one final dump, and act on them as
 they arrive.
 
-- **MultiAgentV2:** members reach you with `send_message` to `/root` and reach peers by their
-  `members[].agentPath`. You reach members the same way; use `followup_task` when you hand an
-  idle member NEW work (it wakes the member), `send_message` for context that should not
-  interrupt, and `wait_agent` only when you are genuinely blocked on their next update - a
-  `wait_agent` timeout only means no new mailbox update arrived, never that a member failed.
+- **MultiAgentV2:** members reach you with `agents.send_message` to `/root` and reach peers by their
+  `members[].agentPath`. You reach members the same way; use `agents.followup_task` when you hand an
+  idle member NEW work (it wakes the member), `agents.send_message` for context that should not
+  interrupt, and `agents.wait_agent` only when you are genuinely blocked on their next update - an
+  `agents.wait_agent` timeout only means no new mailbox update arrived, never that a member failed.
   Your own session IS `/root` - members can always reach you; leave `--session` unset.
 - **Codex App:** members push with `codex_app.send_message_to_thread`; you inspect state with
   `codex_app.read_thread`. So members can actually reach you, run `init` with
@@ -234,7 +243,7 @@ current branch with a merge commit (never a squash or rebase); resolve any confl
 `worktree-remove` each worktree at cleanup.
 
 Delivering the path differs by transport: on MultiAgentV2, create the worktree BEFORE spawning
-so the bootstrap carries it, or send it to an already-running member as a `followup_task`; on
+so the bootstrap carries it, or send it to an already-running member as an `agents.followup_task`; on
 Codex App, send a follow-up message that includes both the worktree path and the member's
 `codex://threads/<thread_id>` link. Either way, run `bind-agent`/`bind-thread` with
 `--cwd <worktree>` (or `--worktree-path`) so `team.json`, `guide.md`, `status`, and
@@ -267,7 +276,7 @@ then delete the team state only after archival evidence is clean or preserved. A
 is never disbanded is a leak.
 
 - `archive` closes the team: notify each active member, copy anything useful into `artifacts/`,
-  then close each member on its transport. On MultiAgentV2, `interrupt_agent` any member still
+  then close each member on its transport. On MultiAgentV2, `agents.interrupt_agent` any member still
   mid-turn and record in the note that V2 exposes no runtime archive operation - the durable
   `team.json` state IS the archive; never claim a V2 agent itself was archived. On Codex App,
   try `codex_app.set_thread_archived` per member thread; treat failures such as

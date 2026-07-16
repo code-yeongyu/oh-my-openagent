@@ -68,16 +68,16 @@ Fan out read-only research before deciding. Every spawn names DELIVERABLE / SCOP
 multi_agent_v1.spawn_agent({"message":"TASK: act as an explorer. DELIVERABLE: ... SCOPE: ... VERIFY: ...","agent_type":"explorer","fork_context":false})
 ```
 
-If your tool list has a flat `spawn_agent` with a required `task_name` instead of `multi_agent_v1.*` (`multi_agent_v2`), rewrite: add `"task_name":"<lowercase_digits_underscores>"`, replace `"fork_context":false` with `"fork_turns":"none"`, and `wait_agent` takes only `timeout_ms`, returning on any child mailbox activity (finished agents end on their own).
+If your tool list has MultiAgentV2 `agents.*` tools instead of `multi_agent_v1.*`, rewrite the spawn as `agents.spawn_agent({"task_name":"<lowercase_digits_underscores>","message":"TASK: act as an explorer. DELIVERABLE: ... SCOPE: ... VERIFY: ...","agent_type":"explorer","fork_turns":"none"})`. The typed `agent_type` selects the installed role TOML; omit `model`, `reasoning_effort`, and `service_tier` unless intentionally overriding that role. An explicit high-power override may use `agents.spawn_agent({"task_name":"hard_refactor","message":"TASK: act as a high-power worker. DELIVERABLE: ... SCOPE: ... VERIFY: ...","agent_type":"lazycodex-worker-high","model":"gpt-5.6-sol","reasoning_effort":"max","service_tier":"fast","fork_turns":"none"})`. Use `agents.wait_agent({"timeout_ms":...})` for mailbox activity; finished agents end on their own.
 
 Spawn every independent child for the current wave first. After the wave
-is launched, use `multi_agent_v1.wait_agent` for each child until each
+is launched, use the active surface's wait tool for each child until each
 reaches terminal status. A timeout is not terminal status. Do not start dependent planning, drafting, approval-gate work, or final handoff until each child result is integrated or recorded as inconclusive.
 
 For work likely to exceed one wait cycle, require the child to send
 `WORKING: <task> - <current phase>` before long passes and
-`BLOCKED: <reason>` only when progress stops. A `multi_agent_v1.wait_agent`
-timeout only means no new mailbox update arrived. Treat a running child as
+`BLOCKED: <reason>` only when progress stops. A wait timeout only means no
+new mailbox update arrived. Treat a running child as
 alive. Fallback only when the child is completed without the deliverable,
 ack-only after followup, explicitly `BLOCKED:`, or no longer running.
 

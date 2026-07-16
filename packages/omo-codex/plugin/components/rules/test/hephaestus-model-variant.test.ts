@@ -1,10 +1,9 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
-
-import { type CodexSessionStartInput, runSessionStartHook } from "../src/codex-hook.js";
 import { findPluginBundledCandidates } from "@oh-my-opencode/rules-engine/engine";
+import { afterEach, describe, expect, it } from "vitest";
+import { type CodexSessionStartInput, runSessionStartHook } from "../src/codex-hook.js";
 
 const GPT_55_VARIANT_PATH = "bundled-rules/hephaestus/gpt-5.5.md";
 const GPT_56_VARIANT_PATH = "bundled-rules/hephaestus/gpt-5.6.md";
@@ -41,6 +40,20 @@ function sessionStartInput(root: string, model: string): CodexSessionStartInput 
 		permission_mode: "default",
 		source: "startup",
 	};
+}
+
+function readAdditionalContext(output: string): string {
+	const parsed: unknown = JSON.parse(output);
+	if (!isRecord(parsed)) throw new TypeError("Expected hook output object");
+	const hookSpecificOutput = parsed["hookSpecificOutput"];
+	if (!isRecord(hookSpecificOutput)) throw new TypeError("Expected hookSpecificOutput object");
+	const additionalContext = hookSpecificOutput["additionalContext"];
+	if (typeof additionalContext !== "string") throw new TypeError("Expected additionalContext string");
+	return additionalContext;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function restoreEnv(name: string, value: string | undefined): void {
@@ -83,11 +96,15 @@ describe("Hephaestus bundled rule model variants", () => {
 			pluginDataRoot: pluginData,
 			env: BUNDLED_ONLY_ENV,
 		});
+		const context = readAdditionalContext(output);
 
-		expect(output).toContain(`Instructions from: ${join(process.cwd(), GPT_55_VARIANT_PATH)}`);
-		expect(output).toContain("based on GPT-5.5");
-		expect(output).not.toContain("based on GPT-5.6");
-		expect(output).not.toContain("[Truncated. Full:");
+		expect(context).toContain(`Instructions from: ${join(process.cwd(), GPT_55_VARIANT_PATH)}`);
+		expect(context).toContain("based on GPT-5.5");
+		expect(context).toContain("agents.spawn_agent");
+		expect(context).toContain('"agent_type":"explorer"');
+		expect(context).not.toContain("flat `spawn_agent`");
+		expect(context).not.toContain("based on GPT-5.6");
+		expect(context).not.toContain("[Truncated. Full:");
 	});
 
 	it("#given a gpt-5.6 session #when SessionStart runs #then the gpt-5.6 identity is injected in full", async () => {
@@ -97,10 +114,14 @@ describe("Hephaestus bundled rule model variants", () => {
 			pluginDataRoot: pluginData,
 			env: BUNDLED_ONLY_ENV,
 		});
+		const context = readAdditionalContext(output);
 
-		expect(output).toContain(`Instructions from: ${join(process.cwd(), GPT_56_VARIANT_PATH)}`);
-		expect(output).toContain("based on GPT-5.6");
-		expect(output).not.toContain("based on GPT-5.5");
-		expect(output).not.toContain("[Truncated. Full:");
+		expect(context).toContain(`Instructions from: ${join(process.cwd(), GPT_56_VARIANT_PATH)}`);
+		expect(context).toContain("based on GPT-5.6");
+		expect(context).toContain("agents.spawn_agent");
+		expect(context).toContain('"agent_type":"explorer"');
+		expect(context).not.toContain("flat `spawn_agent`");
+		expect(context).not.toContain("based on GPT-5.5");
+		expect(context).not.toContain("[Truncated. Full:");
 	});
 });
