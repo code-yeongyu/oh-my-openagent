@@ -1,0 +1,22 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/watchdog-abort-provenance.test.ts:
+10 |     provenance.markCurrentCompleted(sessionID, 1)
+11 |     provenance.record(sessionID, 2)
+12 |     provenance.markCurrentCompleted(sessionID, 2)
+13 | 
+14 |     expect(provenance.consumeCurrent(sessionID, 2, false)).toBe(true)
+15 |     expect(provenance.consumeCurrent(sessionID, 2, false)).toBe(true)
+                                                                ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/watchdog-abort-provenance.test.ts:15:60)
+(fail) watchdog abort provenance > #given two watchdog generations completed visibly #when newest then oldest delayed terminals arrive #then each generation is consumed once [1.06ms]
+
+ 0 pass
+ 1 fail
+ 2 expect() calls
+Ran 1 test across 1 file. [64.00ms]

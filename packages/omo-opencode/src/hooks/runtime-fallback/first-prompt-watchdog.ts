@@ -28,18 +28,18 @@ export function createFirstPromptWatchdog(
   deps: HookDeps,
   helpers: AutoRetryHelpers,
   watchdogMs: number = DEFAULT_FIRST_PROMPT_WATCHDOG_MS,
+  sessionGenerations: Map<string, number> = new Map<string, number>(),
 ): FirstPromptWatchdog {
   const timers = new Map<string, RuntimeFallbackTimeout>()
   const armed = new Map<string, ArmedWatchdog>()
   const suspended = new Map<string, ArmedWatchdog>()
   const progressed = new Map<string, ArmedWatchdog>()
   const suspendedAfterProgress = new Set<string>()
-  const sessionGenerations = new Map<string, number>()
   const currentUserMessageIDs = new Map<string, string>()
   const abortProvenance = createWatchdogAbortProvenance()
   let lifecycleGeneration = 0
 
-  const cancel = (sessionID: string, preserveAbortProvenance = false): void => {
+  const cancel = (sessionID: string, preserveAbortProvenance = false, deleteGeneration = false): void => {
     const timer = timers.get(sessionID)
     if (timer) {
       clearTimeout(timer)
@@ -52,6 +52,7 @@ export function createFirstPromptWatchdog(
     if (!preserveAbortProvenance) abortProvenance.clear(sessionID)
     currentUserMessageIDs.delete(sessionID)
     sessionGenerations.set(sessionID, (sessionGenerations.get(sessionID) ?? 0) + 1)
+    if (deleteGeneration) sessionGenerations.delete(sessionID)
   }
 
   const arm = (context: ArmedWatchdog): void => {
@@ -172,6 +173,11 @@ export function createFirstPromptWatchdog(
     onFallbackCompleted(sessionID) { abortProvenance.markCurrentCompleted(sessionID, sessionGenerations.get(sessionID)) },
     onSessionTerminal(sessionID, eventType, isAbortEvent) {
       if (!sessionID) return
+      if (eventType === "session.deleted" || eventType === "session.stop") {
+        const hadSuspendedTerminal = suspended.has(sessionID)
+        cancel(sessionID, false, true)
+        return hadSuspendedTerminal ? { kind: "resolve-terminal", sessionID } : undefined
+      }
       const suspendedContext = suspended.get(sessionID)
       if (suspendedContext) {
         if (eventType === "session.idle") return
@@ -212,10 +218,7 @@ export function createFirstPromptWatchdog(
         abortProvenance.clear(sessionID)
       }
       if (!armed.has(sessionID)) {
-        if (eventType === "session.deleted" || eventType === "session.stop") {
-          cancel(sessionID)
-          sessionGenerations.delete(sessionID)
-        } else if (
+        if (
           eventType === "session.idle"
           && !abortProvenance.hasPrior(sessionID, sessionGenerations.get(sessionID))
         ) {
@@ -250,10 +253,7 @@ export function createFirstPromptWatchdog(
     dispose() {
       lifecycleGeneration += 1
       for (const timer of timers.values()) clearTimeout(timer)
-      timers.clear()
-      armed.clear()
-      suspended.clear()
-      progressed.clear()
+      for (const state of [timers, armed, suspended, progressed]) state.clear()
       suspendedAfterProgress.clear()
       sessionGenerations.clear()
       currentUserMessageIDs.clear()

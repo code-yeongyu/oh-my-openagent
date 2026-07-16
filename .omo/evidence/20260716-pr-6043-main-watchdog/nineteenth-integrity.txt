@@ -1,0 +1,8 @@
+
+HEAD=61f9736aa037ddf016f66452d92c8f082ad8c704
+pure_loc:
+packages/omo-opencode/src/hooks/runtime-fallback/watchdog-abort-provenance.ts 85
+packages/omo-opencode/src/hooks/runtime-fallback/watchdog-abort-provenance.test.ts 15
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts 250
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-deletion.test.ts 56
+packages/omo-opencode/src/hooks/runtime-fallback/hook-two-completed-generations.test.ts 135
