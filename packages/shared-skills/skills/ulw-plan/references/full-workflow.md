@@ -76,6 +76,10 @@ No Metis, no plan file, no execution until the user approves. The UNCLEAR path a
 ```
 > Target 5-8 todos per wave; fewer than 3 (except the final) means under-splitting. Implementation + Test = ONE todo. Each todo carries: exhaustive References (the executor has no interview context), agent-executable Acceptance criteria, happy + failure QA scenarios each with an evidence path, and a Commit line.
 
+## Plan artifact producer contract
+
+When producing the plan, encode every executable item as a column-zero Markdown task row: implementation rows MUST match `- [ ] N. <title>` (where `N` is a positive decimal integer), and final-verifier rows MUST match `- [ ] F<number>. <title>`. Prose headings, numbered paragraphs, and ordinary bullets are not task substitutes and MUST NOT be counted as implementation or final-verifier tasks. Before handoff, run a structural self-check over the plan: verify that every implementation row and final-verifier row is column-zero, matches its required grammar, and appears in the intended `## Todos` or `## Final verification wave` section; verify that no prose heading or bullet is being used as a task; and repair the plan before handoff if any check fails.
+
 ### Final verification wave (after ALL todos)
 Runs in parallel; ALL must APPROVE; surface results and wait for the user's explicit okay before declaring complete: F1 plan compliance audit, F2 code quality review, F3 real manual QA, F4 scope fidelity.
 
