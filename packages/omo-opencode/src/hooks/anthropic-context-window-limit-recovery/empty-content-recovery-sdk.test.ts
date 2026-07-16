@@ -1,32 +1,15 @@
-import { afterAll, describe, it, expect, mock, beforeEach } from "bun:test"
+import { describe, it, expect, mock, beforeEach } from "bun:test"
+import { fixEmptyMessagesWithSDK as fixEmptyMessagesWithSDKImpl } from "./empty-content-recovery-sdk"
 
 const mockReplaceEmptyTextParts = mock(() => Promise.resolve(false))
 const mockInjectTextPart = mock(() => Promise.resolve(false))
-
-function installStorageMocks() {
-  mock.module("./storage/empty-text", () => ({
-    get replaceEmptyTextPartsAsync() {
-      return mockReplaceEmptyTextParts
-    },
-    findMessagesWithEmptyTextPartsFromSDK: () => Promise.resolve([]),
-  }))
-  mock.module("./storage/text-part-injector", () => ({
-    get injectTextPartAsync() {
-      return mockInjectTextPart
-    },
-  }))
+const storage = {
+  replaceEmptyTextPartsAsync: mockReplaceEmptyTextParts,
+  findMessagesWithEmptyTextPartsFromSDK: () => Promise.resolve([]),
+  injectTextPartAsync: mockInjectTextPart,
 }
-
-installStorageMocks()
-
-const sdkModulePath = "./empty-content-recovery-sdk?sdk-test"
-const sdkModule: typeof import("./empty-content-recovery-sdk") = await import(sdkModulePath)
-const { fixEmptyMessagesWithSDK } = sdkModule
-mock.restore()
-
-afterAll(() => {
-  mock.restore()
-})
+const fixEmptyMessagesWithSDK = (params: Parameters<typeof fixEmptyMessagesWithSDKImpl>[0]) =>
+  fixEmptyMessagesWithSDKImpl(params, storage)
 
 function createMockClient(messages: Array<{ info?: { id?: string }; parts?: Array<{ type?: string; text?: string }> }>) {
   return {
@@ -38,7 +21,6 @@ function createMockClient(messages: Array<{ info?: { id?: string }; parts?: Arra
 
 describe("fixEmptyMessagesWithSDK", () => {
   beforeEach(() => {
-    installStorageMocks()
     mockReplaceEmptyTextParts.mockReset()
     mockInjectTextPart.mockReset()
     mockReplaceEmptyTextParts.mockReturnValue(Promise.resolve(false))

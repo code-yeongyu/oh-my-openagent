@@ -115,12 +115,21 @@ async function findEmptyMessageByIndexFromSDK(
   }
 }
 
-export async function fixEmptyMessagesWithSDK(params: {
-  sessionID: string
-  client: Client
-  placeholderText: string
-  messageIndex?: number
-}): Promise<{ fixed: boolean; fixedMessageIds: string[]; scannedEmptyCount: number }> {
+const defaultStorage = {
+  replaceEmptyTextPartsAsync,
+  findMessagesWithEmptyTextPartsFromSDK,
+  injectTextPartAsync,
+}
+
+export async function fixEmptyMessagesWithSDK(
+  params: {
+    sessionID: string
+    client: Client
+    placeholderText: string
+    messageIndex?: number
+  },
+  storage = defaultStorage,
+): Promise<{ fixed: boolean; fixedMessageIds: string[]; scannedEmptyCount: number }> {
   let fixed = false
   const fixedMessageIds: string[] = []
 
@@ -132,7 +141,7 @@ export async function fixEmptyMessagesWithSDK(params: {
     )
 
     if (targetMessageId) {
-      const replaced = await replaceEmptyTextPartsAsync(
+      const replaced = await storage.replaceEmptyTextPartsAsync(
         params.client,
         params.sessionID,
         targetMessageId,
@@ -143,7 +152,7 @@ export async function fixEmptyMessagesWithSDK(params: {
         fixed = true
         fixedMessageIds.push(targetMessageId)
       } else {
-        const injected = await injectTextPartAsync(
+        const injected = await storage.injectTextPartAsync(
           params.client,
           params.sessionID,
           targetMessageId,
@@ -167,7 +176,7 @@ export async function fixEmptyMessagesWithSDK(params: {
   // Also find messages with empty text parts alongside non-empty content (e.g., tool calls).
   // messageHasContentFromSDK returns true for these since they have tool parts,
   // but the API still rejects the empty text block.
-  const emptyTextPartIds = await findMessagesWithEmptyTextPartsFromSDK(params.client, params.sessionID)
+  const emptyTextPartIds = await storage.findMessagesWithEmptyTextPartsFromSDK(params.client, params.sessionID)
   const additionalIds = emptyTextPartIds.filter((id) => !emptyMessageIds.includes(id))
   const allTargetIds = [...emptyMessageIds, ...additionalIds]
 
@@ -176,7 +185,7 @@ export async function fixEmptyMessagesWithSDK(params: {
   }
 
   for (const messageID of allTargetIds) {
-    const replaced = await replaceEmptyTextPartsAsync(
+    const replaced = await storage.replaceEmptyTextPartsAsync(
       params.client,
       params.sessionID,
       messageID,
@@ -187,7 +196,7 @@ export async function fixEmptyMessagesWithSDK(params: {
       fixed = true
       fixedMessageIds.push(messageID)
     } else {
-      const injected = await injectTextPartAsync(
+      const injected = await storage.injectTextPartAsync(
         params.client,
         params.sessionID,
         messageID,

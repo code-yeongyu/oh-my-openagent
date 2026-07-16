@@ -1,35 +1,22 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
-
-const processWithCli = mock(async () => {})
-
-function installCliRunnerMock() {
-  mock.module("./cli-runner", () => ({
-    initializeCommentCheckerCli: () => {},
-    getCommentCheckerCliPathPromise: () => Promise.resolve("/tmp/fake-comment-checker"),
-    isCliPathUsable: () => true,
-    get processWithCli() {
-      return processWithCli
-    },
-    processApplyPatchEditsWithCli: async () => {},
-  }))
-}
-
-installCliRunnerMock()
-
-afterAll(() => {
-  mock.restore()
-})
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 
 const hookModulePath = "./hook?before-after"
 const hookModule: typeof import("./hook") = await import(hookModulePath)
 const { createCommentCheckerHooks } = hookModule
-mock.restore()
+
+const processWithCli = mock(async () => {})
+const cliRunner = {
+  initializeCommentCheckerCli: () => {},
+  getCommentCheckerCliPathPromise: () => Promise.resolve("/tmp/fake-comment-checker"),
+  isCliPathUsable: () => true,
+  processWithCli,
+  processApplyPatchEditsWithCli: async () => {},
+}
 const { stopPendingCallCleanup } = await import("./pending-calls")
 const { _resetCommentCheckerInitializationForTesting } = await import("./initialization-gate")
 
 describe("comment-checker mutation tool routing", () => {
   beforeEach(() => {
-    installCliRunnerMock()
     processWithCli.mockClear()
     stopPendingCallCleanup()
     _resetCommentCheckerInitializationForTesting()
@@ -42,7 +29,7 @@ describe("comment-checker mutation tool routing", () => {
 
   it("#given write tool with filePath #when before and after hooks run #then it checks the pending write", async () => {
     // given
-    const hooks = createCommentCheckerHooks()
+    const hooks = createCommentCheckerHooks(undefined, cliRunner)
     const input = { tool: "write", sessionID: "ses_test", callID: "call_write" }
 
     // when
@@ -70,7 +57,7 @@ describe("comment-checker mutation tool routing", () => {
 
   it("#given edit tool with file_path #when before and after hooks run #then it checks the pending edit", async () => {
     // given
-    const hooks = createCommentCheckerHooks()
+    const hooks = createCommentCheckerHooks(undefined, cliRunner)
     const input = { tool: "edit", sessionID: "ses_test", callID: "call_edit" }
 
     // when
@@ -102,7 +89,7 @@ describe("comment-checker mutation tool routing", () => {
 
   it("#given multiedit tool with path #when before and after hooks run #then it checks the pending multiedit", async () => {
     // given
-    const hooks = createCommentCheckerHooks()
+    const hooks = createCommentCheckerHooks(undefined, cliRunner)
     const input = { tool: "multiedit", sessionID: "ses_test", callID: "call_multiedit" }
     const edits = [{ old_string: "const c = 1\n", new_string: "// multiedit comment\nconst c = 1\n" }]
 
@@ -130,7 +117,7 @@ describe("comment-checker mutation tool routing", () => {
 
   it("#given non-mutation tool #when before and after hooks run #then it does not run the checker", async () => {
     // given
-    const hooks = createCommentCheckerHooks()
+    const hooks = createCommentCheckerHooks(undefined, cliRunner)
     const input = { tool: "read", sessionID: "ses_test", callID: "call_read" }
 
     // when
