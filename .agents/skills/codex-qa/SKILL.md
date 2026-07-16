@@ -69,6 +69,8 @@ Windows.
 | `scripts/hook-unit-probe.sh` | the `ultrawork` component injects `<ultrawork-mode>` on an `ulw` UserPromptSubmit (also a manual `--component/--event` mode) |
 | `scripts/tui-smoke.sh` | the real codex TUI boots in the isolated home, renders, and survives (no early exit); captures the pane |
 
+To tell a dev dogfood build apart from a published one on a REAL `~/.codex` (NOT the isolated QA home), the repo ships `bun run install:codex-dev`, which stamps the plugin version as `dev` — visible as the `(OmO dev)` hook-status prefix every turn and as a `[DEV]` badge in `omo get-local-version`. Use it to confirm which build is loaded during manual dogfooding; it writes to the real home, so it is NEVER part of the isolated QA flow above.
+
 When TUI visual QA evidence is needed, follow
 `docs/reference/web-terminal-visual-qa.md`: render the TUI through the real
 xterm.js web terminal - NEVER the `tmux capture-pane` frame, which degrades

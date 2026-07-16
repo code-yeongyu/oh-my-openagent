@@ -44,6 +44,88 @@ describe("codex-cache install", () => {
     15000,
   )
 
+  test(
+    "#given outer npx env has allow-scripts case variants #when caching plugin #then npm install commands preserve only unrelated env",
+    async () => {
+      // given
+      const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-npm-env-"))
+      const codexHome = join(root, "codex-home")
+      const sourceRoot = join(root, "plugin")
+      const env: NodeJS.ProcessEnv = {
+        npm_config_allow_scripts: "@code-yeongyu/comment-checker",
+        NPM_CONFIG_ALLOW_SCRIPTS: "@code-yeongyu/codex-ulw-loop",
+        NpM_CoNfIg_AlLoW_ScRiPtS: "@code-yeongyu/codex-rules",
+        npm_config_registry: "https://registry.example.test",
+        "npm_config_//registry.example.test/:_authToken": "test-token",
+        npm_config_https_proxy: "http://proxy.example.test:8080",
+        PATH: "/test/bin",
+        HOME: "/test/home",
+      }
+      const preservedEnv: NodeJS.ProcessEnv = {
+        npm_config_registry: "https://registry.example.test",
+        "npm_config_//registry.example.test/:_authToken": "test-token",
+        npm_config_https_proxy: "http://proxy.example.test:8080",
+        PATH: "/test/bin",
+        HOME: "/test/home",
+      }
+      const npmInstallEnvs: Array<NodeJS.ProcessEnv | undefined> = []
+      await mkdir(sourceRoot, { recursive: true })
+      await writeFile(join(sourceRoot, "package.json"), JSON.stringify({ name: "@scope/omo", version: "0.1.0" }))
+
+      // when
+      await installCachedPlugin({
+        codexHome,
+        env,
+        marketplaceName: "debug",
+        name: "omo",
+        sourcePath: sourceRoot,
+        version: "0.1.0",
+        runCommand: async (command, args, options) => {
+          if (command !== "npm") return
+          expect(args).toEqual(npmInstallEnvs.length === 0 ? ["install"] : ["ci", "--omit=dev"])
+          npmInstallEnvs.push(options.env)
+        },
+      })
+
+      // then
+      expect(npmInstallEnvs).toEqual([preservedEnv, preservedEnv])
+    },
+    15000,
+  )
+
+  test(
+    "#given a component ships its own nested .mcp.json #when caching plugin #then only the plugin-root .mcp.json is cached",
+    async () => {
+      // given
+      const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-mcp-"))
+      const codexHome = join(root, "codex-home")
+      const sourceRoot = join(root, "plugin")
+      await mkdir(join(sourceRoot, "components", "lsp"), { recursive: true })
+      await writeFile(join(sourceRoot, "package.json"), JSON.stringify({ name: "@scope/omo", version: "0.1.0" }))
+      await writeFile(join(sourceRoot, ".mcp.json"), JSON.stringify({ mcpServers: { grep_app: { url: "https://mcp.grep.app" } } }))
+      // A standalone-plugin dev manifest whose relative daemon path dangles once flattened into the cache.
+      await writeFile(
+        join(sourceRoot, "components", "lsp", ".mcp.json"),
+        JSON.stringify({ mcpServers: { lsp: { command: "node", args: ["../../../../lsp-daemon/dist/cli.js", "mcp"] } } }),
+      )
+
+      // when
+      const installed = await installCachedPlugin({
+        codexHome,
+        marketplaceName: "debug",
+        name: "omo",
+        sourcePath: sourceRoot,
+        version: "0.1.0",
+        runCommand: async () => undefined,
+      })
+
+      // then
+      expect(await readFile(join(installed.path, ".mcp.json"), "utf8")).toContain("grep_app")
+      await expect(stat(join(installed.path, "components", "lsp", ".mcp.json"))).rejects.toThrow()
+    },
+    15000,
+  )
+
   test("#given source plugin references missing hook command target #when caching plugin #then previous active cache is preserved", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-hook-target-"))

@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Vendored, Node-targeted MCP-layer package (`@code-yeongyu/lsp-daemon`). Runs ONE long-lived LSP process per user and fans many short-lived agent sessions into it over a unix socket (Windows named pipe). Built for the **Codex** edition where every tool call spawns a fresh process: instead of cold-starting a language server each time, sessions launch a thin stdio MCP **proxy** that forwards to the warm **daemon**. Reuses [`@code-yeongyu/lsp-tools-mcp`](../lsp-tools-mcp) for the actual LSP manager + MCP request handler — this package only adds the daemon/proxy/transport layer. Built with `npm` + vitest + biome (NOT Bun); `engines.node >= 20`.
+Vendored, Node-targeted MCP-layer package (`@code-yeongyu/lsp-daemon`). Runs ONE long-lived LSP process per user and fans many short-lived agent sessions into it over a unix socket (Windows named pipe). The runtime contract is harness-neutral so Codex, OpenCode, and Senpi can converge on the same authenticated daemon. Sessions launch a thin stdio MCP **proxy** that forwards to the warm **daemon**. Reuses [`@code-yeongyu/lsp-tools-mcp`](../lsp-tools-mcp) for the actual LSP manager + MCP request handler - this package only adds the daemon/proxy/transport layer. Built with `npm` + vitest + biome (NOT Bun); `engines.node >= 20`.
 
 ## KEY FILES
 
@@ -16,7 +16,8 @@ Vendored, Node-targeted MCP-layer package (`@code-yeongyu/lsp-daemon`). Runs ONE
 | `daemon-client.ts` | `callToolViaDaemon()` / `callDiagnosticsViaDaemon()` — connect to socket, send tool call, await response |
 | `ensure-daemon.ts` | `ensureDaemonRunning()` — probe → lock → spawn detached daemon → poll until reachable (DI'd deps for tests) |
 | `request-routing.ts` | `handleDaemonMessage()` — strips `_context` (cwd/env) from args, runs request inside that `RequestContext` |
-| `paths.ts` | Versioned socket/lock/pid/log path resolution |
+| `runtime-contract.ts` | Exact three-variable runtime override contract + typed validation errors |
+| `paths.ts` | OMO-owned versioned socket/lock/pid/log path resolution |
 | `lock.ts` | Single-flight file lock + `unlinkQuietly` |
 | `socket-jsonrpc.ts` | Newline-delimited JSON-RPC framing over the socket |
 | `run-daemon.ts` | `daemon` subcommand entry (boots the server) |
@@ -38,6 +39,11 @@ session → omo-lsp-daemon (mcp proxy, stdio)
 
 - **Per-request context threading:** the proxy injects `_context` (cwd + env allowlist) into each `tools/call`; the daemon runs that request inside `runWithRequestContext` so one shared process correctly serves many working directories.
 - **Idle shutdown:** daemon self-exits after 30 min (`DEFAULT_IDLE_SHUTDOWN_MS`) once there are no live connections AND `getLspManager().clientCount() === 0`. Live LSP clients keep it warm.
-- **Socket path:** `$CODEX_LSP_DAEMON_DIR` → else `$PLUGIN_DATA/daemon` → else `~/.codex/codex-lsp/daemon/`, all under a `v<version>` dir. Unix socket `daemon.sock`; falls back to a hashed `tmpdir()` path when the natural path exceeds 100 chars; Windows uses a `\\.\pipe\omo-lsp-*` named pipe.
+- **State root:** `$OMO_LSP_DAEMON_DIR` when it is already absolute, otherwise `~/.omo/lsp-daemon`; every runtime is isolated under `v<version>`.
+- **Runtime overrides are paired:** `$OMO_LSP_DAEMON_CLI` and `$OMO_LSP_DAEMON_VERSION` must be both absent or both present. A singleton pair fails before path creation or spawn. Explicit CLI paths must be absolute existing regular files; versions must match `[A-Za-z0-9][A-Za-z0-9._+-]{0,127}`.
+- **Socket path:** Unix uses `<version-dir>/daemon.sock` and keeps the short hashed `tmpdir()` fallback when the natural path reaches 100 characters. Windows binds the pipe digest to the canonical version directory plus the current user discriminator; request authentication remains the security boundary.
+- **OpenCode bootstrap:** dist/bootstrap resolves the package `./cli` export instead of deep-running generated files. Source mode runs the actual `src/cli.ts` with Bun and sets the paired `OMO_LSP_DAEMON_CLI`/`OMO_LSP_DAEMON_VERSION` override to that source CLI plus the package version. The OpenCode adapter supplies only the three `LSP_TOOLS_MCP_*` translator inputs for request context: `.opencode/lsp.json`, `.omo/lsp.json`, `.omo/lsp-client.json`, then the OpenCode user config and install-decision paths.
+- **Legacy cleanup input:** `test/fixtures/legacy-path-vectors.json` freezes the pre-migration natural Unix, hashed Unix, and Windows named-pipe paths for the installer cleanup work. Do not regenerate those paths from the new resolver.
+- **Clean builds:** `scripts/clean-dist.mjs` removes the complete old `dist` tree before TypeScript and Bun emit new artifacts, so deleted generated files cannot survive a build.
 - **Spawn is detached + log-redirected:** child runs `node cli.js daemon` with `stdio: ["ignore", logFd, logFd]` (→ `daemon.log`) and `unref()`, so the parent session never blocks on it.
 - **Build before use:** `bun run build:lsp-daemon` (`npm ci` + `npm run build`) before anything needing `dist/`. Shipped via the root `package.json` `files` array (`packages/lsp-daemon/{package.json,dist}`).

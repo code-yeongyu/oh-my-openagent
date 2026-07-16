@@ -87,12 +87,12 @@ describe("createTaskTool", () => {
     expect(tool.description).toContain("oracle")
   })
 
-  test("#given the assembled tool #when parameters are read #then the shared TypeBox schema requires only prompt", () => {
+  test("#given the assembled tool #when parameters are read #then the shared TypeBox schema leaves prompt/tasks optional (XOR enforced in validateBatchShape)", () => {
     // given
     const tool = createTaskTool(deps(fakeManager({})))
 
     // then
-    expect(tool.parameters.required).toEqual(["prompt"])
+    expect(tool.parameters.required).toBeUndefined()
   })
 
   test("#given the real task call renderer #when rendered at 72 columns #then actual prompt and italic background mode are visible", () => {

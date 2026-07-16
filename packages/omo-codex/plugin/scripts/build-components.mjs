@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { availableParallelism } from "node:os";
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { builtinModules } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -55,6 +55,7 @@ async function runTasksWithConcurrency(items, limit) {
 
 async function buildComponent(task) {
 	await runCaptured(task.buildCommand, task.buildArgs, task.buildCwd, `Building ${task.componentPath}`);
+	if (await hasComponentOwnedBundle(task.componentPath)) return;
 	await bundleCli(task.componentPath);
 }
 
@@ -82,6 +83,17 @@ async function bundleCli(workspace) {
 	const output = join(root, workspace, "dist", "cli.js");
 	await runCaptured("bun", ["build", entry, "--target", "node", "--format", "esm", "--outfile", output], root, `Bundling ${workspace}/dist/cli.js`);
 	await normalizeBuiltinImports(output);
+}
+
+async function hasComponentOwnedBundle(workspace) {
+	try {
+		const manifest = JSON.parse(await readFile(join(root, workspace, "dist", ".omo-runtime-manifest.json"), "utf8"));
+		const cli = await stat(join(root, workspace, "dist", "cli.js"));
+		return manifest?.schemaVersion === 1 && cli.isFile() && cli.size > 0;
+	} catch (error) {
+		if (error instanceof Error && "code" in error && error.code === "ENOENT") return false;
+		throw error;
+	}
 }
 
 // Buffers each child's stdout/stderr and flushes it as one contiguous block so

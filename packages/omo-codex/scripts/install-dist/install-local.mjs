@@ -96,14 +96,14 @@ var init_atomic_write = __esm(() => {
 
 // packages/telemetry-core/src/activity-state.ts
 import { existsSync as existsSync5, mkdirSync as mkdirSync2, readFileSync as readFileSync2 } from "node:fs";
-import { basename as basename6, join as join33 } from "node:path";
+import { basename as basename7, join as join33 } from "node:path";
 function resolveTelemetryStateDir(product, options = {}) {
   const dataDir = resolveXdgDataDir(product.cacheDirName, {
     env: options.env,
     osProvider: options.osProvider
   });
   const xdgStateDir = options.env?.XDG_DATA_HOME === undefined ? undefined : join33(options.env.XDG_DATA_HOME, product.cacheDirName);
-  if (dataDir === xdgStateDir || xdgStateDir === undefined && basename6(dataDir) === product.cacheDirName) {
+  if (dataDir === xdgStateDir || xdgStateDir === undefined && basename7(dataDir) === product.cacheDirName) {
     return dataDir;
   }
   return join33(dataDir, product.cacheDirName);
@@ -337,18 +337,18 @@ var init_env = __esm(() => {
 });
 
 // packages/telemetry-core/src/machine-id.ts
-import { createHash as createHash2 } from "node:crypto";
+import { createHash as createHash3 } from "node:crypto";
 import os2 from "node:os";
 function getDefaultTelemetryOsProvider() {
   return os2;
 }
 function getTelemetryDistinctId(machineIdPrefix, osProvider = getDefaultTelemetryOsProvider()) {
-  return createHash2("sha256").update(`${machineIdPrefix}${osProvider.hostname()}`).digest("hex");
+  return createHash3("sha256").update(`${machineIdPrefix}${osProvider.hostname()}`).digest("hex");
 }
 var init_machine_id = () => {};
 
 // node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/module.node.mjs
-import { dirname as dirname10, posix, sep as sep7 } from "node:path";
+import { dirname as dirname10, posix as posix2, sep as sep7 } from "node:path";
 function createModulerModifier() {
   const getModuleFromFileName = createGetModuleFromFilename();
   return async (frames) => {
@@ -363,7 +363,7 @@ function createGetModuleFromFilename(basePath = process.argv[1] ? dirname10(proc
     if (!filename)
       return;
     const normalizedFilename = isWindows ? normalizeWindowsPath(filename) : filename;
-    let { dir, base: file, ext } = posix.parse(normalizedFilename);
+    let { dir, base: file, ext } = posix2.parse(normalizedFilename);
     if (ext === ".js" || ext === ".mjs" || ext === ".cjs")
       file = file.slice(0, -1 * ext.length);
     const decodedFile = decodeURIComponent(file);
@@ -5903,7 +5903,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "4.16.3",
+    version: "4.18.2",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -6122,7 +6122,7 @@ var init_telemetry = __esm(() => {
 });
 
 // packages/omo-codex/src/install/install-local-cli.ts
-import { readFile as readFile21 } from "node:fs/promises";
+import { readFile as readFile22 } from "node:fs/promises";
 import { dirname as dirname12, join as join39, resolve as resolve10 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
@@ -7519,9 +7519,11 @@ function collectCommands(value, commands) {
 
 // packages/omo-codex/src/install/codex-cache-install.ts
 async function installCachedPlugin(input) {
+  const env = input.env ?? process.env;
+  const npmInstallEnv = sanitizeNpmInstallEnv(env);
   if (input.buildSource !== false) {
-    await maybeRunNpmInstall(input.sourcePath, input.runCommand);
-    await maybeRunNpmBuild(input.sourcePath, input.runCommand);
+    await maybeRunNpmInstall(input.sourcePath, input.runCommand, npmInstallEnv);
+    await maybeRunNpmBuild(input.sourcePath, input.runCommand, env);
   }
   const targetPath = join12(input.codexHome, "plugins", "cache", input.marketplaceName, input.name, input.version);
   const tempPath = createTempSiblingPath(targetPath);
@@ -7531,10 +7533,10 @@ async function installCachedPlugin(input) {
     await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath);
     await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath });
     await copyRootRuntimeDists({ pluginRoot: tempPath, sourcePath: input.sourcePath });
-    await maybeRunNpmInstall(tempPath, input.runCommand, ["ci", "--omit=dev"]);
+    await maybeRunNpmInstall(tempPath, input.runCommand, npmInstallEnv, ["ci", "--omit=dev"]);
     await removeCachedManagedNpmBinShims(tempPath);
     if (input.buildSource === false)
-      await maybeRunNpmSyncSkills(tempPath, input.runCommand);
+      await maybeRunNpmSyncSkills(tempPath, input.runCommand, env);
     await assertNoRemovedSparkshellPromptReferences(tempPath);
     await rewriteCachedMcpManifest(tempPath, input.sourcePath);
     await rewriteCachedManifestRoot(tempPath, tempPath, targetPath);
@@ -7546,12 +7548,12 @@ async function installCachedPlugin(input) {
   }
   return { name: input.name, version: input.version, path: targetPath };
 }
-async function maybeRunNpmInstall(cwd, runCommand, args = ["install"]) {
+async function maybeRunNpmInstall(cwd, runCommand, env, args = ["install"]) {
   if (!await fileExistsStrict(join12(cwd, "package.json")))
     return;
-  await runCommand("npm", args, { cwd });
+  await runCommand("npm", args, { cwd, env });
 }
-async function maybeRunNpmBuild(cwd, runCommand) {
+async function maybeRunNpmBuild(cwd, runCommand, env) {
   if (!await fileExistsStrict(join12(cwd, "package.json")))
     return;
   const packageJson = JSON.parse(await readFile8(join12(cwd, "package.json"), "utf8"));
@@ -7560,9 +7562,9 @@ async function maybeRunNpmBuild(cwd, runCommand) {
   const scripts = packageJson.scripts;
   if (!isPlainRecord(scripts) || typeof scripts.build !== "string")
     return;
-  await runCommand("npm", ["run", "build"], { cwd });
+  await runCommand("npm", ["run", "build"], { cwd, env });
 }
-async function maybeRunNpmSyncSkills(cwd, runCommand) {
+async function maybeRunNpmSyncSkills(cwd, runCommand, env) {
   if (!await fileExistsStrict(join12(cwd, "package.json")))
     return;
   const packageJson = JSON.parse(await readFile8(join12(cwd, "package.json"), "utf8"));
@@ -7571,7 +7573,10 @@ async function maybeRunNpmSyncSkills(cwd, runCommand) {
   const scripts = packageJson.scripts;
   if (!isPlainRecord(scripts) || typeof scripts["sync:skills"] !== "string")
     return;
-  await runCommand("npm", ["run", "sync:skills"], { cwd });
+  await runCommand("npm", ["run", "sync:skills"], { cwd, env });
+}
+function sanitizeNpmInstallEnv(env) {
+  return Object.fromEntries(Object.entries(env).filter(([key]) => key.toLowerCase() !== "npm_config_allow_scripts"));
 }
 function createTempSiblingPath(targetPath) {
   return join12(dirname5(targetPath), `.tmp-${basename3(targetPath)}-${process.pid}-${Date.now()}`);
@@ -7612,7 +7617,12 @@ function shouldCopyPluginPath(path, root) {
   if (relative4 === "")
     return true;
   const parts = relative4.split(sep5);
-  return !parts.some((part) => part === ".git" || part === "node_modules");
+  if (parts.some((part) => part === ".git" || part === "node_modules"))
+    return false;
+  return !isNestedComponentMcpManifest(parts);
+}
+function isNestedComponentMcpManifest(parts) {
+  return parts.length > 1 && parts.at(-1) === ".mcp.json";
 }
 var removedSparkshellReferencePattern = /\b(?:sparkshell|spark[-_\s]+shell)\b/i;
 var removedSparkshellPromptSurfaceDirs = new Set([".codex-plugin", "agents", "bundled-rules", "hooks", "skills"]);
@@ -7827,9 +7837,16 @@ function findTomlSection(config, header) {
   const lines = config.match(/[^\n]*\n?|$/g) ?? [];
   let offset = 0;
   let start = -1;
+  let multilineQuote = null;
   for (const line of lines) {
     if (line.length === 0)
       break;
+    const multilineScan = scanTomlMultilineLine(line, multilineQuote);
+    multilineQuote = multilineScan.nextQuote;
+    if (multilineScan.wasInside) {
+      offset += line.length;
+      continue;
+    }
     const trimmed = line.trim();
     if (start === -1) {
       if (tomlTableHeaderMatches(trimmed, headerLine, targetHeaderPath))
@@ -7844,8 +7861,37 @@ function findTomlSection(config, header) {
   return { start, end: config.length, text: config.slice(start) };
 }
 function replaceOrInsertSetting(config, section, key, value) {
-  const linePattern = new RegExp(`^[ \\t]*${escapeRegExp(key)}[ \\t]*=.*$`, "m");
-  const replacement = linePattern.test(section.text) ? section.text.replace(linePattern, `${key} = ${value}`) : insertSetting(section.text, key, value);
+  const targetPath = parseTomlDottedKey(key);
+  if (!targetPath)
+    return config;
+  const lines = section.text.match(/[^\n]*\n?|$/g) ?? [];
+  let offset = 0;
+  let multilineQuote = null;
+  for (const line of lines) {
+    if (line.length === 0)
+      break;
+    const multilineScan = scanTomlMultilineLine(line, multilineQuote);
+    multilineQuote = multilineScan.nextQuote;
+    if (multilineScan.wasInside) {
+      offset += line.length;
+      continue;
+    }
+    const assignmentIndex = findUnquotedAssignment(line);
+    if (assignmentIndex < 0) {
+      offset += line.length;
+      continue;
+    }
+    const settingPath = parseTomlDottedKey(line.slice(0, assignmentIndex).trim());
+    if (!settingPath || !tomlPathMatches(settingPath, targetPath)) {
+      offset += line.length;
+      continue;
+    }
+    const replacement2 = replaceTomlAssignmentValue(line, assignmentIndex, value);
+    const assignmentEnd = multilineScan.nextQuote ? findTomlMultilineValueEnd(section.text, offset + line.length, multilineScan.nextQuote) : offset + line.length;
+    const sectionReplacement = section.text.slice(0, offset) + replacement2 + section.text.slice(assignmentEnd);
+    return config.slice(0, section.start) + sectionReplacement + config.slice(section.end);
+  }
+  const replacement = insertSetting(section.text, key, value);
   return config.slice(0, section.start) + replacement + config.slice(section.end);
 }
 function removeSetting(config, section, key) {
@@ -7867,6 +7913,50 @@ function replaceOrInsertRootSetting(config, key, value) {
 
 ${suffix.trimStart()}`;
 }
+function replaceOrInsertRootDottedSetting(config, keyPath, value) {
+  const targetPath = parseTomlDottedKey(keyPath);
+  if (!targetPath)
+    return config;
+  const lines = config.match(/[^\n]*\n?|$/g) ?? [];
+  let offset = 0;
+  let multilineQuote = null;
+  for (const line of lines) {
+    if (line.length === 0)
+      break;
+    const multilineScan = scanTomlMultilineLine(line, multilineQuote);
+    multilineQuote = multilineScan.nextQuote;
+    if (multilineScan.wasInside) {
+      offset += line.length;
+      continue;
+    }
+    if (isTomlTableHeaderLine(line))
+      break;
+    const assignmentIndex = findUnquotedAssignment(line);
+    if (assignmentIndex < 0) {
+      offset += line.length;
+      continue;
+    }
+    const settingPath = parseTomlDottedKey(line.slice(0, assignmentIndex).trim());
+    if (!settingPath || !tomlPathMatches(settingPath, targetPath)) {
+      offset += line.length;
+      continue;
+    }
+    const replacement2 = replaceTomlAssignmentValue(line, assignmentIndex, value);
+    const assignmentEnd = multilineScan.nextQuote ? findTomlMultilineValueEnd(config, offset + line.length, multilineScan.nextQuote) : offset + line.length;
+    return config.slice(0, offset) + replacement2 + config.slice(assignmentEnd);
+  }
+  const sectionStart = findFirstTableStart(config);
+  const root = config.slice(0, sectionStart).trimEnd();
+  const suffix = config.slice(sectionStart);
+  const replacement = `${root}${root.length > 0 ? `
+` : ""}${keyPath} = ${value}
+`;
+  if (suffix.length === 0)
+    return replacement;
+  return `${replacement.trimEnd()}
+
+${suffix.trimStart()}`;
+}
 function appendBlock(config, block) {
   const prefix = config.trimEnd();
   return `${prefix}${prefix.length > 0 ? `
@@ -7877,9 +7967,16 @@ function appendBlock(config, block) {
 function findFirstTableStart(config) {
   const lines = config.match(/[^\n]*\n?|$/g) ?? [];
   let offset = 0;
+  let multilineQuote = null;
   for (const line of lines) {
     if (line.length === 0)
       break;
+    const multilineScan = scanTomlMultilineLine(line, multilineQuote);
+    multilineQuote = multilineScan.nextQuote;
+    if (multilineScan.wasInside) {
+      offset += line.length;
+      continue;
+    }
     if (isTomlTableHeaderLine(line))
       return offset;
     offset += line.length;
@@ -7916,6 +8013,131 @@ function parseTomlTableHeader(line) {
 function isTomlTableHeaderLine(line) {
   const normalizedLine = stripUnquotedInlineComment(line).trim();
   return normalizedLine.startsWith("[") && normalizedLine.endsWith("]");
+}
+function scanTomlMultilineLine(line, currentQuote) {
+  if (currentQuote) {
+    return {
+      wasInside: true,
+      nextQuote: findTomlMultilineDelimiter(line, currentQuote, 0) === -1 ? currentQuote : null
+    };
+  }
+  let quote = null;
+  let index = 0;
+  while (index < line.length) {
+    const char = line[index];
+    if (quote === '"') {
+      if (char === "\\") {
+        index += 2;
+        continue;
+      }
+      if (char === '"')
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (quote === "'") {
+      if (char === "'")
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (char === "#")
+      break;
+    const delimiter2 = line.startsWith('"""', index) ? '"""' : line.startsWith("'''", index) ? "'''" : null;
+    if (delimiter2) {
+      const closingIndex = findTomlMultilineDelimiter(line, delimiter2, index + delimiter2.length);
+      return { wasInside: false, nextQuote: closingIndex === -1 ? delimiter2 : null };
+    }
+    if (char === '"' || char === "'")
+      quote = char;
+    index += 1;
+  }
+  return { wasInside: false, nextQuote: null };
+}
+function findTomlMultilineDelimiter(line, delimiter2, startIndex) {
+  let index = line.indexOf(delimiter2, startIndex);
+  while (index !== -1) {
+    if (delimiter2 === "'''" || countPrecedingBackslashes(line, index) % 2 === 0)
+      return index;
+    index = line.indexOf(delimiter2, index + 1);
+  }
+  return -1;
+}
+function countPrecedingBackslashes(line, index) {
+  let count = 0;
+  let cursor = index - 1;
+  while (cursor >= 0 && line[cursor] === "\\") {
+    count += 1;
+    cursor -= 1;
+  }
+  return count;
+}
+function findUnquotedAssignment(line) {
+  return findUnquotedCharacter(line, "=", 0);
+}
+function findUnquotedComment(line, startIndex) {
+  return findUnquotedCharacter(line, "#", startIndex);
+}
+function findUnquotedCharacter(line, target, startIndex) {
+  let quote = null;
+  let index = startIndex;
+  while (index < line.length) {
+    const char = line[index];
+    if (quote === '"') {
+      if (char === "\\") {
+        index += 2;
+        continue;
+      }
+      if (char === '"')
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (quote === "'") {
+      if (char === "'")
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      index += 1;
+      continue;
+    }
+    if (char === target)
+      return index;
+    if (char === "#")
+      return -1;
+    index += 1;
+  }
+  return -1;
+}
+function tomlPathMatches(candidate, target) {
+  return candidate.length === target.length && candidate.every((part, index) => part === target[index]);
+}
+function replaceTomlAssignmentValue(line, assignmentIndex, value) {
+  const newline = line.endsWith(`
+`) ? `
+` : "";
+  const lineBody = newline ? line.slice(0, -1) : line;
+  const commentIndex = findUnquotedComment(lineBody, assignmentIndex + 1);
+  const comment = commentIndex === -1 ? "" : ` ${lineBody.slice(commentIndex).trimStart()}`;
+  return `${lineBody.slice(0, assignmentIndex + 1)} ${value}${comment}${newline}`;
+}
+function findTomlMultilineValueEnd(text, startOffset, quote) {
+  const lines = text.slice(startOffset).match(/[^\n]*\n?|$/g) ?? [];
+  let offset = startOffset;
+  let currentQuote = quote;
+  for (const line of lines) {
+    if (line.length === 0)
+      break;
+    const scan = scanTomlMultilineLine(line, currentQuote);
+    currentQuote = scan.nextQuote;
+    offset += line.length;
+    if (currentQuote === null)
+      return offset;
+  }
+  return text.length;
 }
 function stripUnquotedInlineComment(line) {
   let quote = null;
@@ -8090,6 +8312,14 @@ function parseAgentHeaderName(header) {
   const path = parseTomlDottedKey(header);
   return path?.[0] === "agents" ? path[1] ?? null : null;
 }
+function parseJsonString(value) {
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === "string" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 function parseHookStateHeaderKey(header) {
   const path = parseTomlDottedKey(header);
   if (path?.[0] !== "hooks" || path[1] !== "state")
@@ -8239,13 +8469,137 @@ function delay(milliseconds) {
   return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
 }
 
+// packages/omo-codex/src/install/toml-setting-reader.ts
+function hasTomlSetting(config, keyPath) {
+  const targetPath = parseTomlDottedKey(keyPath);
+  if (!targetPath)
+    return false;
+  return hasTomlAssignment(config, (tablePath, settingPath) => {
+    const fullPath = [...tablePath, ...settingPath];
+    return fullPath.length === targetPath.length && fullPath.every((part, index) => part === targetPath[index]);
+  });
+}
+function hasTomlRootDottedKeyPrefix(config, rootKey) {
+  return hasTomlAssignment(config, (tablePath, settingPath) => tablePath.length === 0 && settingPath.length > 1 && settingPath[0] === rootKey);
+}
+function hasTomlAssignment(config, predicate) {
+  let tablePath = [];
+  let multilineQuote = null;
+  for (const line of config.split(`
+`)) {
+    const multilineScan = scanTomlMultilineLine(line, multilineQuote);
+    multilineQuote = multilineScan.nextQuote;
+    if (multilineScan.wasInside)
+      continue;
+    const normalizedLine = stripUnquotedInlineComment2(line).trim();
+    if (normalizedLine.length === 0)
+      continue;
+    const headerPath = parseTomlTableHeader2(normalizedLine);
+    if (headerPath) {
+      tablePath = headerPath;
+      continue;
+    }
+    if (isTomlTableHeaderLine2(normalizedLine)) {
+      tablePath = null;
+      continue;
+    }
+    if (!tablePath)
+      continue;
+    const assignmentIndex = findUnquotedAssignment2(normalizedLine);
+    if (assignmentIndex < 0)
+      continue;
+    const settingPath = parseTomlDottedKey(normalizedLine.slice(0, assignmentIndex).trim());
+    if (!settingPath)
+      continue;
+    if (predicate(tablePath, settingPath))
+      return true;
+  }
+  return false;
+}
+function parseTomlTableHeader2(line) {
+  if (!line.startsWith("[") || !line.endsWith("]") || line.startsWith("[["))
+    return null;
+  return parseTomlDottedKey(line.slice(1, -1).trim());
+}
+function isTomlTableHeaderLine2(line) {
+  return line.startsWith("[") && line.endsWith("]");
+}
+function stripUnquotedInlineComment2(line) {
+  let quote = null;
+  let index = 0;
+  while (index < line.length) {
+    const char = line[index];
+    if (quote === '"') {
+      if (char === "\\") {
+        index += 2;
+        continue;
+      }
+      if (char === '"')
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (quote === "'") {
+      if (char === "'")
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      index += 1;
+      continue;
+    }
+    if (char === "#")
+      return line.slice(0, index);
+    index += 1;
+  }
+  return line;
+}
+function findUnquotedAssignment2(line) {
+  let quote = null;
+  let index = 0;
+  while (index < line.length) {
+    const char = line[index];
+    if (quote === '"') {
+      if (char === "\\") {
+        index += 2;
+        continue;
+      }
+      if (char === '"')
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (quote === "'") {
+      if (char === "'")
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      index += 1;
+      continue;
+    }
+    if (char === "=")
+      return index;
+    index += 1;
+  }
+  return -1;
+}
+
 // packages/omo-codex/src/install/codex-config-features.ts
 function ensureFeatureEnabled(config, featureName) {
   const section = findTomlSection(config, "features");
-  if (!section)
+  if (!section) {
+    if (hasTomlRootDottedKeyPrefix(config, "features")) {
+      return replaceOrInsertRootDottedSetting(config, `features.${featureName}`, "true");
+    }
     return appendBlock(config, `[features]
 ${featureName} = true
 `);
+  }
   return replaceOrInsertSetting(config, section, featureName, "true");
 }
 
@@ -8313,7 +8667,7 @@ function ensureAutonomousPermissions(config) {
   next = replaceOrInsertRootSetting(next, "sandbox_mode", JSON.stringify("danger-full-access"));
   next = replaceOrInsertRootSetting(next, "network_access", JSON.stringify("enabled"));
   for (const featureName of AUTONOMOUS_FEATURES) {
-    next = ensureFeatureEnabled2(next, featureName);
+    next = ensureFeatureEnabled(next, featureName);
   }
   next = removeWindowsSandboxSetting(next);
   next = ensureNoticeEnabled(next, "hide_full_access_warning");
@@ -8329,14 +8683,6 @@ function ensureNoticeEnabled(config, key) {
   const section = findTomlSection(config, "notice");
   if (section === null)
     return appendNoticeBlock(config, key);
-  return replaceOrInsertSetting(config, section, key, "true");
-}
-function ensureFeatureEnabled2(config, key) {
-  const section = findTomlSection(config, "features");
-  if (section === null)
-    return appendBlock(config, `[features]
-${key} = true
-`);
   return replaceOrInsertSetting(config, section, key, "true");
 }
 function appendNoticeBlock(config, key) {
@@ -8410,7 +8756,7 @@ function readStringArraySetting(sectionText, key) {
     const assignmentIndex = line.indexOf("=");
     if (assignmentIndex === -1)
       return null;
-    return parseTomlStringArray(stripUnquotedInlineComment2(line.slice(assignmentIndex + 1)).trim());
+    return parseTomlStringArray(stripUnquotedInlineComment3(line.slice(assignmentIndex + 1)).trim());
   }
   return null;
 }
@@ -8454,7 +8800,7 @@ function parseTomlString(input, startIndex) {
   }
   return null;
 }
-function stripUnquotedInlineComment2(line) {
+function stripUnquotedInlineComment3(line) {
   let quote = null;
   let index = 0;
   while (index < line.length) {
@@ -8559,12 +8905,18 @@ import { readFile as readFile10 } from "node:fs/promises";
 import { join as join17 } from "node:path";
 var FALLBACK_CODEX_MODEL_CATALOG = {
   current: {
-    model: "gpt-5.5",
-    modelContextWindow: 400000,
+    model: "gpt-5.6-sol",
+    modelContextWindow: 372000,
     modelReasoningEffort: "high",
     planModeReasoningEffort: "xhigh"
   },
   managedProfiles: [
+    {
+      model: "gpt-5.5",
+      modelContextWindow: 400000,
+      modelReasoningEffort: "high",
+      planModeReasoningEffort: "xhigh"
+    },
     {
       model: "gpt-5.5",
       modelContextWindow: 1e6,
@@ -8662,24 +9014,27 @@ import { readFileSync } from "node:fs";
 import { dirname as dirname7, isAbsolute as isAbsolute6, join as join18 } from "node:path";
 var CODEX_AGENTS_HEADER = "agents";
 var CODEX_MULTI_AGENT_V2_HEADER = "features.multi_agent_v2";
+var CODEX_MULTI_AGENT_V2_THREAD_LIMIT_KEY = `${CODEX_MULTI_AGENT_V2_HEADER}.max_concurrent_threads_per_session`;
 var CODEX_SUBAGENT_THREAD_LIMIT = 1000;
+var CODEX_MULTI_AGENT_V2_THREAD_LIMIT = 16;
 function ensureCodexMultiAgentV2Config(config, options = {}) {
   const featureFlag = removeFeatureFlagSetting(config, "multi_agent_v2");
   const v2Preferred = options.multiAgentVersion === "v2";
   const modelKnown = options.multiAgentVersion != null || readRootModel(featureFlag.config) !== null;
   const agentsConfig = v2Preferred ? removeAgentsMaxThreads(featureFlag.config) : modelKnown ? ensureAgentsMaxThreads(featureFlag.config) : raiseExistingAgentsMaxThreads(featureFlag.config);
-  const maxThreadsValue = CODEX_SUBAGENT_THREAD_LIMIT.toString();
   const preserveDisable = featureFlag.value === false && !v2Preferred;
   const featureConfig = preserveDisable ? setMultiAgentV2Disable(agentsConfig) : v2Preferred ? removeMultiAgentV2Disable(agentsConfig) : agentsConfig;
+  if (hasTomlSetting(featureConfig, CODEX_MULTI_AGENT_V2_THREAD_LIMIT_KEY))
+    return featureConfig;
   const section = findTomlSection(featureConfig, CODEX_MULTI_AGENT_V2_HEADER);
   if (!section) {
     const enabledSetting = preserveDisable ? `enabled = false
 ` : "";
     return appendBlock(featureConfig, `[${CODEX_MULTI_AGENT_V2_HEADER}]
-${enabledSetting}max_concurrent_threads_per_session = ${maxThreadsValue}
+${enabledSetting}max_concurrent_threads_per_session = ${CODEX_MULTI_AGENT_V2_THREAD_LIMIT}
 `);
   }
-  return replaceOrInsertSetting(featureConfig, section, "max_concurrent_threads_per_session", maxThreadsValue);
+  return replaceOrInsertSetting(featureConfig, section, "max_concurrent_threads_per_session", CODEX_MULTI_AGENT_V2_THREAD_LIMIT.toString());
 }
 function resolveCodexMultiAgentVersion(config, configPath) {
   const model = readRootModel(config);
@@ -9039,6 +9394,42 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
         current: { model: "gpt-5.6-sol", effort: "ultra" }
       }
     ]
+  ],
+  [
+    "plan",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "xhigh" },
+        current: { model: "gpt-5.6-sol", effort: "max" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-worker-medium",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "high" },
+        current: { model: "gpt-5.6-luna", effort: "max" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-qa-executor",
+    [
+      {
+        previous: { model: "gpt-5.6-terra", effort: "medium" },
+        current: { model: "gpt-5.6-luna", effort: "high" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-gate-reviewer",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "xhigh" },
+        current: { model: "gpt-5.6-sol", effort: "high" }
+      }
+    ]
   ]
 ]);
 function resolveManagedAgentReasoning(input) {
@@ -9202,16 +9593,6 @@ function isSectionHeader3(line) {
 }
 function agentNameFromToml(fileName) {
   return fileName.endsWith(".toml") ? fileName.slice(0, -".toml".length) : fileName;
-}
-function parseJsonString(value) {
-  try {
-    const parsed = JSON.parse(value);
-    return typeof parsed === "string" ? parsed : null;
-  } catch (error) {
-    if (error instanceof Error)
-      return null;
-    return null;
-  }
 }
 async function exists2(path) {
   try {
@@ -9555,6 +9936,10 @@ async function readDistributionManifest(repoRoot) {
   }
 }
 function resolveLazyCodexPluginVersion(input) {
+  const override = input.versionOverride?.trim();
+  if (override !== undefined && override.length > 0) {
+    return override;
+  }
   if (input.marketplaceName === "sisyphuslabs" && input.pluginName === "omo" && input.distributionManifest !== undefined) {
     return input.distributionManifest.version;
   }
@@ -9897,69 +10282,319 @@ function formatUnknownError(error) {
 }
 
 // packages/omo-codex/src/install/lsp-daemon-reaper.ts
-import { readFile as readFile18, readdir as readdir9, rm as rm10 } from "node:fs/promises";
+import { createHash as createHash2 } from "node:crypto";
+import { lstat as lstat11, readFile as readFile19, readdir as readdir10, rm as rm10 } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join as join27, posix } from "node:path";
+
+// packages/omo-codex/src/install/lsp-daemon-reaper-attestation.ts
+import { execFile } from "node:child_process";
+import { readFile as readFile18, readdir as readdir9, readlink as readlink5 } from "node:fs/promises";
 import { connect } from "node:net";
-import { join as join27 } from "node:path";
-async function reapLspDaemons(codexHome, deps = {}) {
-  const killProcess = deps.killProcess ?? sendSigterm;
-  const isDaemonLive = deps.isDaemonLive ?? probeSocketLive;
-  const daemonRoot = join27(codexHome, "codex-lsp", "daemon");
-  const reaped = [];
-  let entries;
-  try {
-    entries = await readdir9(daemonRoot);
-  } catch {
-    return reaped;
-  }
-  for (const entry of entries) {
-    const versionDir = join27(daemonRoot, entry);
-    const pid = await readPidFile(join27(versionDir, "daemon.pid"));
-    const socketPath = await readEndpointFile(join27(versionDir, "daemon.endpoint"));
-    if (pid !== null && socketPath !== null && await isDaemonLive(socketPath) && killProcess(pid)) {
-      reaped.push(pid);
-    }
-    await rm10(versionDir, { recursive: true, force: true });
-  }
-  return reaped;
-}
-async function readEndpointFile(path) {
-  try {
-    const content = (await readFile18(path, "utf8")).trim();
-    return content.length > 0 ? content : null;
-  } catch {
-    return null;
-  }
-}
-async function readPidFile(path) {
-  try {
-    const pid = Number.parseInt((await readFile18(path, "utf8")).trim(), 10);
-    return Number.isInteger(pid) && pid > 0 ? pid : null;
-  } catch {
-    return null;
-  }
-}
-function probeSocketLive(socketPath, timeoutMs = 500) {
-  return new Promise((resolve8) => {
-    const socket = connect(socketPath);
-    const done = (ok) => {
+import { basename as basename6 } from "node:path";
+var PROBE_TIMEOUT_MS = 500;
+async function probeLegacyJsonRpcEndpoint(endpoint, timeoutMs = PROBE_TIMEOUT_MS) {
+  return await new Promise((resolve8) => {
+    const socket = connect(endpoint);
+    let settled = false;
+    let buffer = "";
+    const finish = (value) => {
+      if (settled)
+        return;
+      settled = true;
+      clearTimeout(timer);
       socket.destroy();
-      resolve8(ok);
+      resolve8(value);
     };
-    const timer = setTimeout(() => done(false), timeoutMs);
-    timer.unref();
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    timer.unref?.();
     socket.once("connect", () => {
-      clearTimeout(timer);
-      done(true);
+      socket.write(`${JSON.stringify(legacyStatusRequest())}
+`);
     });
-    socket.once("error", () => {
-      clearTimeout(timer);
-      done(false);
+    socket.on("data", (chunk) => {
+      buffer += chunk.toString("utf8");
+      const newlineIndex = buffer.indexOf(`
+`);
+      if (newlineIndex < 0)
+        return;
+      finish(isJsonRpcResponse(buffer.slice(0, newlineIndex).trim()));
+    });
+    socket.once("error", () => finish(false));
+  });
+}
+async function attestLegacyDaemonOwnership(input, deps = {}) {
+  if (input.platform === "linux")
+    return await attestLinuxOwnership(input, deps);
+  if (input.platform === "darwin")
+    return await attestMacOwnership(input, deps);
+  return false;
+}
+async function attestLinuxOwnership(input, deps) {
+  const readFileImpl = deps.readFile ?? readFile18;
+  const readDirImpl = deps.readDir ?? readdir9;
+  const readLinkImpl = deps.readLink ?? readlink5;
+  const procNetUnix = await readText(readFileImpl, "/proc/net/unix");
+  if (procNetUnix === null)
+    return false;
+  const inode = inodeForEndpoint(procNetUnix, input.endpoint);
+  if (inode === null)
+    return false;
+  const fdEntries = await readDirImpl(`/proc/${input.pid}/fd`).catch(() => null);
+  if (fdEntries === null)
+    return false;
+  let ownsEndpoint = false;
+  for (const fdEntry of fdEntries) {
+    const target = await readLinkImpl(`/proc/${input.pid}/fd/${fdEntry}`).catch(() => null);
+    if (target !== `socket:[${inode}]`)
+      continue;
+    ownsEndpoint = true;
+    break;
+  }
+  if (!ownsEndpoint)
+    return false;
+  const cmdline = await readBinary(readFileImpl, `/proc/${input.pid}/cmdline`);
+  if (cmdline === null)
+    return false;
+  return isNodeCliDaemonArgv(splitCmdline(cmdline));
+}
+async function attestMacOwnership(input, deps) {
+  const executeFileImpl = deps.executeFile ?? execFile;
+  const filteredLsofOutput = await executeForStdout(executeFileImpl, "/usr/sbin/lsof", [
+    "-a",
+    "-n",
+    "-P",
+    "-p",
+    String(input.pid),
+    "-U",
+    "-Fn",
+    "--",
+    input.endpoint
+  ]);
+  const lsofOutput = filteredLsofOutput ?? await executeForStdout(executeFileImpl, "/usr/sbin/lsof", [
+    "-a",
+    "-n",
+    "-P",
+    "-p",
+    String(input.pid),
+    "-U",
+    "-Fn"
+  ]);
+  if (lsofOutput === null || !lsofShowsUnixEndpoint(lsofOutput, input.pid, input.endpoint))
+    return false;
+  const commandOutput = await executeForStdout(executeFileImpl, "/bin/ps", ["-p", String(input.pid), "-o", "command="]);
+  if (commandOutput === null)
+    return false;
+  return isNodeCliDaemonCommand(commandOutput.trim());
+}
+function legacyStatusRequest() {
+  return {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/call",
+    params: { name: "status", arguments: {} }
+  };
+}
+function isJsonRpcResponse(line) {
+  if (line.length === 0)
+    return false;
+  try {
+    const parsed = JSON.parse(line);
+    return parsed.jsonrpc === "2.0" && parsed.id === 1 && (Object.hasOwn(parsed, "result") || Object.hasOwn(parsed, "error"));
+  } catch {
+    return false;
+  }
+}
+function inodeForEndpoint(procNetUnix, endpoint) {
+  for (const line of procNetUnix.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0 || trimmed.startsWith("Num"))
+      continue;
+    const fields = trimmed.split(/\s+/);
+    if (fields.length < 8 || fields[7] !== endpoint)
+      continue;
+    return fields[6] ?? null;
+  }
+  return null;
+}
+function splitCmdline(buffer) {
+  return buffer.toString("utf8").split("\x00").filter((value) => value.length > 0);
+}
+function isNodeCliDaemonArgv(argv) {
+  if (argv.length < 2 || !argv.includes("daemon"))
+    return false;
+  const executable = basename6(argv[0] ?? "");
+  if (!/^node(?:\.exe)?$/i.test(executable))
+    return false;
+  return argv.some((value) => value === "cli.js" || value.endsWith("/cli.js") || value.endsWith("\\cli.js"));
+}
+function lsofShowsUnixEndpoint(output, pid, endpoint) {
+  const lines = output.split(/\r?\n/).filter((line) => line.length > 0);
+  const endpointName = basename6(endpoint);
+  return lines.includes(`p${pid}`) && lines.some((line) => line === `n${endpoint}` || line === `n${endpointName}`);
+}
+function isNodeCliDaemonCommand(command) {
+  return /\bnode(?:\.exe)?\b/i.test(command) && /\bcli\.js\b/.test(command) && /\bdaemon\b/.test(command);
+}
+async function executeForStdout(executeFileImpl, file, args) {
+  return await new Promise((resolve8) => {
+    executeFileImpl(file, [...args], { encoding: "utf8", maxBuffer: 1024 * 1024, timeout: 1000 }, (error, stdout) => {
+      if (error !== null) {
+        resolve8(null);
+        return;
+      }
+      resolve8(stdout);
     });
   });
+}
+async function readText(readFileImpl, path) {
+  return await readFileImpl(path, "utf8").catch(() => null);
+}
+async function readBinary(readFileImpl, path) {
+  return await readFileImpl(path).catch(() => null);
+}
+
+// packages/omo-codex/src/install/lsp-daemon-reaper.ts
+var LEGACY_EXIT_WAIT_TIMEOUT_MS = 5000;
+var LEGACY_VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/;
+async function reapLspDaemons(codexHome, deps = {}) {
+  const daemonRoot = join27(codexHome, "codex-lsp", "daemon");
+  const platform = deps.platform ?? process.platform;
+  const tmpDir = deps.tmpDir ?? tmpdir();
+  const probe = deps.probeLegacyJsonRpc ?? probeLegacyJsonRpcEndpoint;
+  const attest = deps.attestLegacyDaemonOwnership ?? ((input) => attestLegacyDaemonOwnership(input));
+  const killProcess = deps.killProcess ?? sendSigterm;
+  const waitForProcessExit = deps.waitForProcessExit ?? defaultWaitForProcessExit;
+  const entries = await readdir10(daemonRoot, { withFileTypes: true }).catch(() => []);
+  const results = [];
+  for (const entry of [...entries].sort((left, right) => left.name.localeCompare(right.name))) {
+    const versionPath = join27(daemonRoot, entry.name);
+    const parsedVersion = parseVersionEntry(entry.name);
+    if (parsedVersion === null || !entry.isDirectory()) {
+      await removeVersionDir(versionPath);
+      results.push(removed(entry.name, "removed invalid legacy version entry"));
+      continue;
+    }
+    const metadata = await readLegacyMetadata({ versionPath, version: parsedVersion, codexHome, platform, tmpDir });
+    if (metadata.kind === "remove") {
+      await removeVersionDir(versionPath);
+      results.push(removed(parsedVersion, metadata.reason));
+      continue;
+    }
+    if (!await probe(metadata.endpoint)) {
+      await removeVersionDir(versionPath);
+      results.push(removed(parsedVersion, "removed stale legacy daemon state"));
+      continue;
+    }
+    if (platform === "win32") {
+      results.push(deferred(parsedVersion, "legacy named pipe responded but Windows cannot prove pid ownership safely"));
+      continue;
+    }
+    const owned = await attest({ pid: metadata.pid, endpoint: metadata.endpoint, platform });
+    if (!owned) {
+      results.push(deferred(parsedVersion, "legacy endpoint responded but pid ownership was not proven"));
+      continue;
+    }
+    if (!killProcess(metadata.pid)) {
+      await removeVersionDir(versionPath);
+      results.push(removed(parsedVersion, "removed stale legacy daemon state"));
+      continue;
+    }
+    if (!await waitForProcessExit(metadata.pid, LEGACY_EXIT_WAIT_TIMEOUT_MS)) {
+      results.push(deferred(parsedVersion, `timed out waiting ${LEGACY_EXIT_WAIT_TIMEOUT_MS}ms for the proven legacy daemon to exit`));
+      continue;
+    }
+    await removeVersionDir(versionPath);
+    results.push(terminated(parsedVersion, "terminated proven owned legacy daemon"));
+  }
+  return results;
+}
+function parseVersionEntry(entryName) {
+  if (!entryName.startsWith("v"))
+    return null;
+  const version = entryName.slice(1);
+  return LEGACY_VERSION_PATTERN.test(version) ? version : null;
+}
+async function readLegacyMetadata(input) {
+  const pidText = await readRegularTrimmedFile(join27(input.versionPath, "daemon.pid"));
+  if (pidText === "non_regular")
+    return { kind: "remove", reason: "removed non-regular legacy daemon metadata" };
+  if (pidText === null)
+    return { kind: "remove", reason: "removed malformed legacy daemon metadata" };
+  const pid = Number.parseInt(pidText, 10);
+  if (!Number.isInteger(pid) || pid <= 0)
+    return { kind: "remove", reason: "removed malformed legacy daemon metadata" };
+  const endpointText = await readRegularTrimmedFile(join27(input.versionPath, "daemon.endpoint"));
+  if (endpointText === "non_regular")
+    return { kind: "remove", reason: "removed non-regular legacy daemon metadata" };
+  if (endpointText === null)
+    return { kind: "remove", reason: "removed malformed legacy daemon metadata" };
+  const allowedEndpoints = legacyEndpointCandidates({
+    version: input.version,
+    versionPath: input.versionPath,
+    platform: input.platform,
+    tmpDir: input.tmpDir
+  });
+  if (!allowedEndpoints.includes(endpointText)) {
+    return { kind: "remove", reason: "removed legacy daemon state with an endpoint outside the frozen vectors" };
+  }
+  return { kind: "valid", pid, endpoint: endpointText };
+}
+function legacyEndpointCandidates(input) {
+  if (input.platform === "win32") {
+    const normalizedVersionPath = input.versionPath.replaceAll("/", "\\");
+    const digest = shortDigest(normalizedVersionPath);
+    return [`\\\\.\\pipe\\omo-lsp-${input.version}-${digest}`];
+  }
+  const natural = posix.join(input.versionPath, "daemon.sock");
+  const hashed = posix.join(input.tmpDir, `omo-lsp-${input.version}-${shortDigest(input.versionPath)}.sock`);
+  return [natural, hashed];
+}
+async function readRegularTrimmedFile(path) {
+  const stats = await lstat11(path).catch(() => null);
+  if (stats === null)
+    return null;
+  if (!stats.isFile())
+    return "non_regular";
+  const content = (await readFile19(path, "utf8")).trim();
+  return content.length > 0 ? content : null;
+}
+function shortDigest(value) {
+  return createHash2("sha256").update(value).digest("hex").slice(0, 16);
+}
+async function removeVersionDir(path) {
+  await rm10(path, { recursive: true, force: true });
+}
+function removed(version, reason) {
+  return { version, status: "removed", reason };
+}
+function terminated(version, reason) {
+  return { version, status: "terminated", reason };
+}
+function deferred(version, reason) {
+  return { version, status: "deferred", reason };
 }
 function sendSigterm(pid) {
   try {
     process.kill(pid, "SIGTERM");
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function defaultWaitForProcessExit(pid, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  for (;; ) {
+    if (!processIsRunning(pid))
+      return true;
+    if (Date.now() >= deadline)
+      return false;
+    await new Promise((resolve8) => setTimeout(resolve8, 100));
+  }
+}
+function processIsRunning(pid) {
+  try {
+    process.kill(pid, 0);
     return true;
   } catch {
     return false;
@@ -9982,7 +10617,7 @@ function resolveCodexInstallerBinDir(input) {
 }
 
 // packages/omo-codex/src/install/codex-git-bash-hooks.ts
-import { readFile as readFile19, writeFile as writeFile11 } from "node:fs/promises";
+import { readFile as readFile20, writeFile as writeFile11 } from "node:fs/promises";
 import { join as join29 } from "node:path";
 var WINDOWS_ONLY_GIT_BASH_HOOKS = new Set([
   "./hooks/pre-tool-use-recommending-git-bash-mcp.json",
@@ -9992,7 +10627,7 @@ async function removeGitBashHooksOffWindows(input) {
   if (input.platform === "win32")
     return;
   const manifestPath = join29(input.pluginRoot, ".codex-plugin", "plugin.json");
-  const parsed = JSON.parse(await readFile19(manifestPath, "utf8"));
+  const parsed = JSON.parse(await readFile20(manifestPath, "utf8"));
   if (!isPlainRecord(parsed) || !Array.isArray(parsed.hooks))
     return;
   const hooks = parsed.hooks.filter((hook) => typeof hook !== "string" || !WINDOWS_ONLY_GIT_BASH_HOOKS.has(hook));
@@ -10195,6 +10830,7 @@ async function runCodexInstaller(options = {}) {
     return;
   });
   const buildSource = await shouldBuildSourcePackages(repoRoot);
+  const versionOverride = env2.LAZYCODEX_DEV_VERSION?.trim() || undefined;
   const gitBashResolution = await prepareGitBashForInstall({
     platform,
     env: env2,
@@ -10221,13 +10857,15 @@ async function runCodexInstaller(options = {}) {
       manifestVersion: manifest.version,
       marketplaceName: marketplace.name,
       pluginName: entry.name,
-      distributionManifest
+      distributionManifest,
+      versionOverride
     });
     validatePathSegment(version2, "plugin version");
     log(`Building ${entry.name}@${version2}`);
     const plugin = await installCachedPlugin({
       buildSource,
       codexHome,
+      env: env2,
       marketplaceName: marketplace.name,
       name: entry.name,
       runCommand,
@@ -10301,7 +10939,16 @@ async function runCodexInstaller(options = {}) {
       pluginNames: marketplace.plugins.map((plugin) => plugin.name)
     });
   }
-  await reapLspDaemons(codexHome).catch(() => []);
+  const legacyDaemonCleanup = await reapLspDaemons(codexHome).catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    log(`Warning: skipped legacy Codex LSP daemon cleanup: ${message}`);
+    return [];
+  });
+  for (const cleanup of legacyDaemonCleanup) {
+    if (cleanup.status !== "deferred")
+      continue;
+    log(`Warning: deferred legacy Codex LSP daemon cleanup for v${cleanup.version}: ${cleanup.reason}`);
+  }
   const marketplaceRoot = join35(codexHome, "plugins", "cache", marketplace.name);
   await writeCachedMarketplaceManifest({
     marketplaceName: marketplace.name,
@@ -10941,7 +11588,7 @@ function readVersionManifest(path2) {
   }
 }
 // packages/omo-codex/src/install/codex-git-bash-mcp-env.ts
-import { readFile as readFile20, writeFile as writeFile12 } from "node:fs/promises";
+import { readFile as readFile21, writeFile as writeFile12 } from "node:fs/promises";
 import { join as join38 } from "node:path";
 var GIT_BASH_ENV_KEY2 = "OMO_CODEX_GIT_BASH_PATH";
 var CODEGRAPH_RELATIVE_ARGS2 = new Set(["components/codegraph/dist/serve.js", "./components/codegraph/dist/serve.js"]);
@@ -10949,7 +11596,7 @@ async function stampGitBashMcpEnv(input) {
   const manifestPath = join38(input.pluginRoot, ".mcp.json");
   if (!await fileExistsStrict(manifestPath))
     return false;
-  const parsed = JSON.parse(await readFile20(manifestPath, "utf8"));
+  const parsed = JSON.parse(await readFile21(manifestPath, "utf8"));
   if (!isPlainRecord(parsed) || !isPlainRecord(parsed["mcpServers"]))
     return false;
   let changed = stampCodegraphMcpPath(parsed["mcpServers"], input.pluginRoot);
@@ -10994,13 +11641,17 @@ function resolveDefaultRepoRoot() {
   return resolveDefaultRepoRootForEntrypoint(fileURLToPath2(import.meta.url));
 }
 async function runLazyCodexInstallLocalCli(input) {
+  const logWarning = (message) => {
+    if (message.startsWith("Warning:"))
+      input.log(message);
+  };
   const parsed = parseLazyCodexInstallCliArgs(input.argv);
   if (parsed.kind === "help") {
     input.log(formatLazyCodexInstallHelp());
     return 0;
   }
   if (parsed.kind === "version") {
-    const packageJson = JSON.parse(await readFile21(join39(input.defaultRepoRoot, "package.json"), "utf8"));
+    const packageJson = JSON.parse(await readFile22(join39(input.defaultRepoRoot, "package.json"), "utf8"));
     const version2 = typeof packageJson.version === "string" ? packageJson.version : "unknown";
     input.log(`lazycodex-ai ${version2}`);
     return 0;
@@ -11018,7 +11669,8 @@ async function runLazyCodexInstallLocalCli(input) {
       const result2 = await installMarketplaceLocally({
         repoRoot: resolve10(parsed.repoRoot),
         autonomousPermissions: true,
-        env: input.env
+        env: input.env,
+        log: logWarning
       });
       input.log(`Installed ${result2.installed.length} plugin(s) from ${result2.marketplaceName}.`);
       return 0;
@@ -11029,7 +11681,8 @@ async function runLazyCodexInstallLocalCli(input) {
   const result = await installMarketplaceLocally({
     repoRoot,
     autonomousPermissions: parsed.autonomousPermissions,
-    env: input.env
+    env: input.env,
+    log: logWarning
   });
   input.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`);
   return 0;

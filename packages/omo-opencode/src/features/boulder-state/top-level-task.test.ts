@@ -175,7 +175,7 @@ describe("readCurrentTopLevelTask", () => {
     })
   })
 
-  test("supports unchecked tasks with asterisk bullets", () => {
+  test("rejects structured asterisk rows and selects the next canonical task", () => {
     // given
     const planPath = writePlanFile(
       `top-level-task-asterisk-${Date.now()}.md`,
@@ -183,6 +183,7 @@ describe("readCurrentTopLevelTask", () => {
 
 ## TODOs
 * [ ] 1. Task using asterisk bullet
+- [ ] 2. Canonical task
 `,
     )
 
@@ -190,8 +191,63 @@ describe("readCurrentTopLevelTask", () => {
     const result = readCurrentTopLevelTask(planPath)
 
     // then
-    expect(result?.key).toBe("todo:1")
-    expect(result?.title).toBe("Task using asterisk bullet")
+    expect(result?.key).toBe("todo:2")
+    expect(result?.title).toBe("Canonical task")
+  })
+
+  test("keeps parent-section rows after child headings and ignores fenced examples", () => {
+    // given
+    const planPath = writePlanFile(
+      `top-level-task-scope-${Date.now()}.md`,
+      `# Plan
+
+## TODOs
+- [x] 1. Done task
+
+### Acceptance Criteria
+- [ ] 2. Canonical task after child heading
+
+## TODOs
+\`\`\`\`md
+\`\`\`ts
+- [ ] 3. Fenced example
+\`\`\`
+\`\`\`\`
+- [ ] 4. Canonical task
+`,
+    )
+
+    // when
+    const result = readCurrentTopLevelTask(planPath)
+
+    // then
+    expect(result).toEqual({
+      key: "todo:2",
+      section: "todo",
+      label: "2",
+      title: "Canonical task after child heading",
+    })
+  })
+
+  test("supports structured headings with ATX closing markers", () => {
+    // given
+    const planPath = writePlanFile(
+      `top-level-task-closing-marker-${Date.now()}.md`,
+      `## TODOs ##
+- [ ] 1. Implement
+`,
+    )
+
+    // when
+    const result = readCurrentTopLevelTask(planPath)
+
+    // then
+    expect(result).toEqual({
+      key: "todo:1",
+      section: "todo",
+      label: "1",
+      title: "Implement",
+    })
   })
 
   test("returns final-wave task when plan has only Final Verification Wave section", () => {

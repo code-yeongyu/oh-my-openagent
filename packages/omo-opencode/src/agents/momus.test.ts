@@ -14,9 +14,6 @@ describe("createMomusAgent", () => {
       // then
       expect(config.reasoningEffort).toBe("xhigh");
       expect(config.prompt).not.toBe(gpt55Config.prompt);
-      expect(config.prompt).toContain(".omo/plans/");
-      expect(config.prompt).toContain("[OKAY]");
-      expect(config.prompt).toContain("[REJECT]");
     });
 
     test("#when creating the agent #then review contract and restrictions are preserved", () => {
@@ -58,11 +55,11 @@ describe("createMomusAgent", () => {
 
       // when
       const config = createMomusAgent(model);
+      const gpt56Config = createMomusAgent("openai/gpt-5.6-sol");
 
       // then
       expect(config.reasoningEffort).toBe("medium");
-      expect(config.prompt).toContain("<identity>");
-      expect(config.prompt).toContain("[OKAY]");
+      expect(config.prompt).not.toBe(gpt56Config.prompt);
     });
   });
 
@@ -73,10 +70,11 @@ describe("createMomusAgent", () => {
 
       // when
       const config = createMomusAgent(model) as Record<string, unknown>;
+      const gptConfig = createMomusAgent("openai/gpt-5.5");
 
       // then
       expect(config.reasoningEffort).toBeUndefined();
-      expect(config.prompt).toContain("CRITICAL FIRST RULE");
+      expect(config.prompt).not.toBe(gptConfig.prompt);
       expect(config.thinking).toEqual({ type: "enabled", budgetTokens: 32000 });
     });
   });

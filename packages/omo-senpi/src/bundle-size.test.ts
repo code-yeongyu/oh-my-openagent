@@ -9,7 +9,7 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // PLAN TARGET (todo 17e): the built omo.js must stay at or under 700,000 bytes.
 //
 // The extension inlines every component's third-party dependency tree into ONE non-split file
-// (zod v4 ~477 KB, jsonc-parser ~263 KB, vscode-jsonrpc ~229 KB, posthog-node ~175 KB, js-yaml ~100 KB),
+// (zod v4 ~477 KB, jsonc-parser ~263 KB, posthog-node ~175 KB, js-yaml ~100 KB),
 // so an unminified build is ~1.28 MB. The budget is met by minifying that single-file output
 // (measured ~695 KB): a within-file, semantics-preserving transform that leaves the one-file loader
 // topology unchanged - unlike code-splitting, which emits sibling chunks and would require live Senpi

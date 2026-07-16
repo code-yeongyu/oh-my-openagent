@@ -42,13 +42,61 @@ describe("resolveManagedAgentReasoning", () => {
 	test("#given an unlisted agent #when resolving #then the preserved effort is untouched", () => {
 		// when
 		const effort = resolveManagedAgentReasoning({
-			agentName: "plan",
+			agentName: "custom-unlisted-agent",
 			bundledModel: "gpt-5.6-sol",
-			bundledEffort: "xhigh",
+			bundledEffort: "high",
 			preserved: { model: "gpt-5.6-sol", effort: "medium" },
 		})
 		// then
 		expect(effort).toBe("medium")
+	})
+
+	test("#given a preserved plan sol/xhigh default #when resolving against sol/max #then the new bundled effort wins", () => {
+		// when
+		const effort = resolveManagedAgentReasoning({
+			agentName: "plan",
+			bundledModel: "gpt-5.6-sol",
+			bundledEffort: "max",
+			preserved: { model: "gpt-5.6-sol", effort: "xhigh" },
+		})
+		// then
+		expect(effort).toBe("max")
+	})
+
+	test("#given a preserved worker-medium sol/high default #when resolving against luna/max #then the new bundled effort wins", () => {
+		// when
+		const effort = resolveManagedAgentReasoning({
+			agentName: "lazycodex-worker-medium",
+			bundledModel: "gpt-5.6-luna",
+			bundledEffort: "max",
+			preserved: { model: "gpt-5.6-sol", effort: "high" },
+		})
+		// then
+		expect(effort).toBe("max")
+	})
+
+	test("#given a preserved qa-executor terra/medium default #when resolving against luna/high #then the new bundled effort wins", () => {
+		// when
+		const effort = resolveManagedAgentReasoning({
+			agentName: "lazycodex-qa-executor",
+			bundledModel: "gpt-5.6-luna",
+			bundledEffort: "high",
+			preserved: { model: "gpt-5.6-terra", effort: "medium" },
+		})
+		// then
+		expect(effort).toBe("high")
+	})
+
+	test("#given a preserved gate-reviewer sol/xhigh default #when resolving against sol/high #then the new bundled effort wins", () => {
+		// when
+		const effort = resolveManagedAgentReasoning({
+			agentName: "lazycodex-gate-reviewer",
+			bundledModel: "gpt-5.6-sol",
+			bundledEffort: "high",
+			preserved: { model: "gpt-5.6-sol", effort: "xhigh" },
+		})
+		// then
+		expect(effort).toBe("high")
 	})
 
 	test("#given a second resolve over already-migrated values #when resolving #then the result is stable", () => {

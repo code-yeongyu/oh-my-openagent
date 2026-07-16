@@ -299,7 +299,7 @@ function existingReceiptTargetOutsideEvidenceRoot(): string {
 function createInput(cwd: string, overrides: Partial<SubagentStopInput> = {}): SubagentStopInput {
 	return {
 		hook_event_name: "SubagentStop",
-		agent_type: "lazycodex-executor",
+		agent_type: "lazycodex-worker-medium",
 		agent_id: "agent_1",
 		session_id: "sess.1",
 		cwd,
@@ -315,7 +315,7 @@ function createInput(cwd: string, overrides: Partial<SubagentStopInput> = {}): S
 function createUnknownEventInput(cwd: string): Record<string, string | boolean> {
 	return {
 		hook_event_name: "Stop",
-		agent_type: "lazycodex-executor",
+		agent_type: "lazycodex-worker-medium",
 		agent_id: "agent_1",
 		session_id: "sess.1",
 		cwd,
@@ -388,7 +388,8 @@ describe("tier worker receipt enforcement", () => {
 			const matcher = new RegExp(manifest.hooks.SubagentStop[0].matcher);
 
 			// then
-			for (const name of ["lazycodex-executor", ...workerTypes]) expect(matcher.test(name)).toBe(true);
+			for (const name of workerTypes) expect(matcher.test(name)).toBe(true);
+			expect(matcher.test("lazycodex-executor")).toBe(false);
 			expect(matcher.test("explorer")).toBe(false);
 			expect(matcher.test("lazycodex-gate-reviewer")).toBe(false);
 		}

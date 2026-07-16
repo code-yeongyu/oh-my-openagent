@@ -76,6 +76,10 @@ No Metis, no plan file, no execution until the user approves. The UNCLEAR path a
 ```
 > Target 5-8 todos per wave; fewer than 3 (except the final) means under-splitting. Implementation + Test = ONE todo. Each todo carries: exhaustive References (the executor has no interview context), agent-executable Acceptance criteria, happy + failure QA scenarios each with an evidence path, and a Commit line.
 
+## Plan artifact producer contract
+
+When producing the plan, encode every executable item as a column-zero Markdown task row: implementation rows MUST match `- [ ] N. <title>` (where `N` is a positive decimal integer), and final-verifier rows MUST match `- [ ] F<number>. <title>`. Prose headings, numbered paragraphs, and ordinary bullets are not task substitutes and MUST NOT be counted as implementation or final-verifier tasks. Before handoff, run a structural self-check over the plan: verify that every implementation row and final-verifier row is column-zero, matches its required grammar, and appears in the intended `## Todos` or `## Final verification wave` section; verify that no prose heading or bullet is being used as a task; and repair the plan before handoff if any check fails.
+
 ### Final verification wave (after ALL todos)
 Runs in parallel; ALL must APPROVE; surface results and wait for the user's explicit okay before declaring complete: F1 plan compliance audit, F2 code quality review, F3 real manual QA, F4 scope fidelity.
 
@@ -98,7 +102,7 @@ multi_agent_v1.spawn_agent({"message":"TASK: act as an explorer. DELIVERABLE: ..
 
 If your tool list has a flat `spawn_agent` with a required `task_name` instead of `multi_agent_v1.*` (`multi_agent_v2`), rewrite: add `"task_name":"<lowercase_digits_underscores>"`, replace `"fork_context":false` with `"fork_turns":"none"`, and `wait_agent` takes only `timeout_ms`, returning on any child mailbox activity (finished agents end on their own — skip the close step).
 
-Roles: `explorer`, `librarian`, `metis`, `momus`. Spawn long plan/reviewer agents in the background and poll with short waits; require the child to send `WORKING: <task> - <phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A wait timeout only means no new mailbox update arrived; treat a running child as alive. Fall back only when the child completed without the deliverable, is ack-only after followup, explicitly `BLOCKED:`, or no longer running; then respawn a smaller `fork_context: false` job. Close each agent after integrating its result.
+Roles: `explorer`, `librarian`, `metis`, `momus`. Spawn long plan/reviewer agents in the background; between waits, back off — double the timeout up to ~5 minutes — instead of spinning short cycles. Require the child to send `WORKING: <task> - <phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A wait timeout only means no new mailbox update arrived; treat a running child as alive. Fall back only when the child completed without the deliverable, is ack-only after followup, explicitly `BLOCKED:`, or no longer running; then respawn a smaller `fork_context: false` job. Close each agent after integrating its result.
 
 ## Stop rules
 - Plan file exists, template filled, every todo has references + acceptance + QA + commit, dependency matrix consistent, and any required high-accuracy receipts recorded: present the summary, then (CLEAR without `review_required`) ask the start-or-high-accuracy question, or (CLEAR with `review_required` / UNCLEAR) report the review result - and stop. Execution belongs to the worker, never to you.

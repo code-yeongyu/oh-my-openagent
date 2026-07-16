@@ -12,7 +12,10 @@ export interface LiveTaskContext {
   readonly ui?: CapturedUi
   readonly mode?: string
   readonly hasUI?: boolean
-  readonly sessionManager?: { getSessionId(): string }
+  readonly sessionManager?: {
+    getSessionId(): string
+    getSessionFile?(): string | undefined
+  }
   isIdle?(): boolean
 }
 
@@ -41,6 +44,7 @@ export class TaskRuntimeContext {
   #transition: ParentTransition
   #ui: CapturedUi | undefined
   #sessionId: string | undefined
+  #sessionFile: string | undefined
   #mode: string | undefined
 
   constructor(cwd: string) {
@@ -52,7 +56,10 @@ export class TaskRuntimeContext {
     if (ctx.modelRegistry !== undefined) this.#modelRegistry = ctx.modelRegistry
     if (ctx.ui !== undefined) this.#ui = ctx.ui
     if (typeof ctx.mode === "string") this.#mode = ctx.mode
-    if (ctx.sessionManager !== undefined) this.#sessionId = ctx.sessionManager.getSessionId()
+    if (ctx.sessionManager !== undefined) {
+      this.#sessionId = ctx.sessionManager.getSessionId()
+      this.#sessionFile = ctx.sessionManager.getSessionFile?.()
+    }
     if (typeof ctx.isIdle === "function") this.#idle = ctx.isIdle()
   }
 
@@ -78,6 +85,10 @@ export class TaskRuntimeContext {
 
   sessionId(): string | undefined {
     return this.#sessionId
+  }
+
+  sessionFile(): string | undefined {
+    return this.#sessionFile
   }
 
   mode(): string | undefined {

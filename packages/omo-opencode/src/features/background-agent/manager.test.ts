@@ -162,7 +162,10 @@ class MockBackgroundManager {
     }
 
     if (existingTask.status === "running") {
-      return existingTask
+      throw new Error(
+        `Task ${existingTask.id} is currently running and cannot accept a continuation prompt. ` +
+        "Wait for it to complete before resuming it with task_id.",
+      )
     }
 
     this.resumeCalls.push({ sessionId: input.sessionId, prompt: input.prompt })
@@ -1795,7 +1798,7 @@ describe("BackgroundManager.resume", () => {
     expect(result.progress?.toolCalls).toBe(42)
   })
 
-  test("should ignore resume when task is already running", () => {
+  test("should reject resume when task is already running", () => {
     // given
     const runningTask = createMockTask({
       id: "task-a",
@@ -1806,15 +1809,18 @@ describe("BackgroundManager.resume", () => {
     manager.addTask(runningTask)
 
     // when
-    const result = manager.resume({
+    expect(() => manager.resume({
       sessionId: "session-a",
-      prompt: "resume should be ignored",
+      prompt: "resume should be rejected",
       parentSessionId: "new-parent",
       parentMessageId: "new-msg",
-    })
+    })).toThrow(
+      "Task task-a is currently running and cannot accept a continuation prompt",
+    )
 
     // then
-    expect(result.parentSessionId).toBe("session-parent")
+    expect(runningTask.parentSessionId).toBe("session-parent")
+    expect(runningTask.parentMessageId).toBe("mock-message-id")
     expect(manager.resumeCalls).toHaveLength(0)
   })
 })
@@ -2973,6 +2979,70 @@ describe("BackgroundManager.resume concurrency key", () => {
     const concurrencyManager = getConcurrencyManager(manager)
     expect(concurrencyManager.getCount("anthropic")).toBe(1)
     expect(task.concurrencyKey).toBe("anthropic")
+  })
+})
+
+describe("BackgroundManager.resume running-task guard", () => {
+  test("rejects a running task without changing parent context or dispatching a prompt", async () => {
+    //#given
+    const promptCalls: string[] = []
+    const client = {
+      session: {
+        prompt: async () => {
+          promptCalls.push("prompt")
+          return {}
+        },
+        promptAsync: async () => {
+          promptCalls.push("promptAsync")
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const sessionId = "session-running-resume"
+    const task: BackgroundTask = {
+      id: "task-running-resume",
+      sessionId,
+      parentSessionId: "parent-session-original",
+      parentMessageId: "parent-message-original",
+      parentModel: { providerID: "openai", modelID: "gpt-5.4" },
+      parentAgent: "sisyphus",
+      parentTools: { task: false },
+      description: "running task",
+      prompt: "original prompt",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    try {
+      //#when
+      await expectRejectsWithMessage(
+        manager.resume({
+          sessionId,
+          prompt: "continuation prompt",
+          parentSessionId: "parent-session-new",
+          parentMessageId: "parent-message-new",
+          parentModel: { providerID: "anthropic", modelID: "claude-opus" },
+          parentAgent: "atlas",
+          parentTools: { task: true },
+        }),
+        "Task task-running-resume is currently running and cannot accept a continuation prompt",
+      )
+
+      //#then
+      expect(task.status).toBe("running")
+      expect(task.parentSessionId).toBe("parent-session-original")
+      expect(task.parentMessageId).toBe("parent-message-original")
+      expect(task.parentModel).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+      expect(task.parentAgent).toBe("sisyphus")
+      expect(task.parentTools).toEqual({ task: false })
+      expect(promptCalls).toEqual([])
+    } finally {
+      manager.shutdown()
+    }
   })
 })
 

@@ -6,15 +6,36 @@ import { DEFAULT_MAX_DIAGNOSTICS, DEFAULT_MAX_DIRECTORY_FILES } from "./constant
 import { effectiveExtension } from "./effective-extension.js";
 import { LspInvalidPathError, LspServerLookupError } from "./errors.js";
 import { filterDiagnosticsBySeverity, formatDiagnostic } from "./formatters.js";
-import { getLspManager } from "./manager.js";
+import { getLspManager, type LspManager } from "./manager.js";
 import { findServerForExtension } from "./server-resolution.js";
-import type { Diagnostic, SeverityFilter } from "./types.js";
+import type { Diagnostic, ResolvedServer, SeverityFilter } from "./types.js";
 
 const SKIP_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build", ".next", "out"]);
+const DIRECTORY_DIAGNOSTICS_MAX_CONCURRENCY = 4;
 
 interface FileDiagnostic {
 	filePath: string;
 	diagnostic: Diagnostic;
+}
+
+export interface DirectoryDiagnosticsFileFailure {
+	readonly file: string;
+	readonly error: string;
+}
+
+export interface DirectoryDiagnosticsResult {
+	readonly output: string;
+	readonly totalDiagnostics: number;
+	readonly fileFailures: readonly DirectoryDiagnosticsFileFailure[];
+}
+
+export interface DirectoryDiagnosticsOptions {
+	readonly listFiles?: (directory: string, extension: string, maxFiles: number) => string[];
+	readonly manager?: LspManager;
+	readonly maxConcurrency?: number;
+	readonly workspaceRoot?: string;
+	readonly server?: ResolvedServer;
+	readonly signal?: AbortSignal;
 }
 
 export function collectFilesWithExtension(dir: string, extension: string, maxFiles: number): string[] {
@@ -63,61 +84,73 @@ export async function aggregateDiagnosticsForDirectory(
 	extension: string,
 	severity?: SeverityFilter,
 	maxFiles: number = DEFAULT_MAX_DIRECTORY_FILES,
-): Promise<string> {
+	options: DirectoryDiagnosticsOptions = {},
+): Promise<DirectoryDiagnosticsResult> {
 	if (!extension.startsWith(".")) {
 		throw new LspInvalidPathError(
 			`Extension must start with a dot (e.g., ".ts", not "${extension}"). Use ".${extension}" instead.`,
 		);
 	}
 
-	const absDir = resolve(contextCwd(), directory);
+	const absDir = resolve(options.workspaceRoot ?? contextCwd(), directory);
 	if (!existsSync(absDir)) {
 		throw new LspInvalidPathError(`Directory does not exist: ${absDir}`);
 	}
 
-	const serverResult = findServerForExtension(extension);
+	const serverResult = options.server === undefined ? findServerForExtension(extension) : { status: "found" as const, server: options.server };
 	if (serverResult.status !== "found") {
 		throw new LspServerLookupError(formatServerLookupError(serverResult));
 	}
 
 	const server = serverResult.server;
-	const allFiles = collectFilesWithExtension(absDir, extension, maxFiles + 1);
+	const allFiles = (options.listFiles ?? collectFilesWithExtension)(absDir, extension, maxFiles + 1);
 	const wasCapped = allFiles.length > maxFiles;
 	const filesToProcess = allFiles.slice(0, maxFiles);
 
 	if (filesToProcess.length === 0) {
-		return [
+		const output = [
 			`Directory: ${absDir}`,
 			`Extension: ${extension}`,
 			"Files scanned: 0",
 			`No files found with extension "${extension}".`,
 		].join("\n");
+		return { output, totalDiagnostics: 0, fileFailures: [] };
 	}
 
-	const root = findWorkspaceRoot(absDir);
-	const manager = getLspManager();
+	const root = options.workspaceRoot ?? findWorkspaceRoot(absDir);
+	const manager = options.manager ?? getLspManager();
 	const allDiagnostics: FileDiagnostic[] = [];
-	const fileErrors: { file: string; error: string }[] = [];
+	const fileErrors: DirectoryDiagnosticsFileFailure[] = [];
+	const maxConcurrency = Math.max(1, options.maxConcurrency ?? DIRECTORY_DIAGNOSTICS_MAX_CONCURRENCY);
 
-	const client = await manager.getClient(root, server);
+	options.signal?.throwIfAborted();
+	const client = await manager.getClient(root, server, options.signal);
 	try {
-		for (const file of filesToProcess) {
-			try {
-				const result = await client.diagnostics(file);
-				const filtered = filterDiagnosticsBySeverity(result.items, severity);
-				allDiagnostics.push(
-					...filtered.map((diagnostic) => ({
-						filePath: file,
-						diagnostic,
-					})),
-				);
-			} catch (e) {
-				fileErrors.push({
-					file,
-					error: e instanceof Error ? e.message : String(e),
-				});
+		let nextIndex = 0;
+		const workers = Array.from({ length: Math.min(maxConcurrency, filesToProcess.length) }, async () => {
+			for (;;) {
+				if (options.signal?.aborted) return;
+				const file = filesToProcess[nextIndex];
+				nextIndex += 1;
+				if (file === undefined) return;
+				try {
+					const result = await client.diagnostics(file, options.signal);
+					const filtered = filterDiagnosticsBySeverity(result.items, severity);
+					allDiagnostics.push(
+						...filtered.map((diagnostic) => ({
+							filePath: file,
+							diagnostic,
+						})),
+					);
+				} catch (e) {
+					fileErrors.push({
+						file,
+						error: e instanceof Error ? e.message : String(e),
+					});
+				}
 			}
-		}
+		});
+		await Promise.all(workers);
 	} finally {
 		manager.releaseClient(root, server.id);
 	}
@@ -150,5 +183,5 @@ export async function aggregateDiagnosticsForDirectory(
 		}
 	}
 
-	return lines.join("\n");
+	return { output: lines.join("\n"), totalDiagnostics: allDiagnostics.length, fileFailures: fileErrors };
 }

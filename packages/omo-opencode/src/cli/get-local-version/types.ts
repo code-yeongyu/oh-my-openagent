@@ -5,7 +5,7 @@ export interface VersionInfo {
   isLocalDev: boolean
   isPinned: boolean
   pinnedVersion: string | null
-  status: "up-to-date" | "outdated" | "local-dev" | "pinned" | "pinned-mismatch" | "error" | "unknown"
+  status: "up-to-date" | "outdated" | "local-dev" | "dev" | "pinned" | "pinned-mismatch" | "error" | "unknown"
 }
 
 export interface GetLocalVersionOptions {

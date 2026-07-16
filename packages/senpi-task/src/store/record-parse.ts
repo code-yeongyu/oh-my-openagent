@@ -21,6 +21,7 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
   const errorMessage = readOptionalString(value, "error_message")
   const killed = readOptionalBoolean(value, "killed")
   const resolvedModel = readOptionalResolvedModel(value)
+  const spawnSpec = readOptionalSpawnSpec(value)
 
   return {
     task_id: parseTaskId(readString(value, "task_id")),
@@ -40,12 +41,20 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
     ...(toolAllow === undefined ? {} : { tool_allow: toolAllow }),
     ...(toolDeny === undefined ? {} : { tool_deny: toolDeny }),
     ...(resolvedModel === undefined ? {} : { resolved_model: resolvedModel }),
+    ...(spawnSpec === undefined ? {} : { spawn_spec: spawnSpec }),
     ...(pid === undefined ? {} : { pid }),
     ...(childSessionId === undefined ? {} : { child_session_id: childSessionId }),
     ...(finalResponse === undefined ? {} : { final_response: finalResponse }),
     ...(errorMessage === undefined ? {} : { error_message: errorMessage }),
     ...(killed === undefined ? {} : { killed }),
   }
+}
+
+function readOptionalSpawnSpec(record: Record<string, unknown>): TaskRecord["spawn_spec"] {
+  const value = record["spawn_spec"]
+  if (value === undefined) return undefined
+  if (!isRecord(value)) throw new Error("spawn_spec is not an object")
+  return { cwd: readString(value, "cwd") }
 }
 
 function readOptionalResolvedModel(record: Record<string, unknown>): ResolvedModelRecord | undefined {
@@ -157,6 +166,7 @@ function readOptionalStringArray(record: Record<string, unknown>, key: string): 
   }
   return value
 }
+
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)

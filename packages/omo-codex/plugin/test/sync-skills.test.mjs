@@ -252,14 +252,16 @@ test("#given synced ulw-loop skill #when worker guidance is inspected #then cont
 	);
 	const syncedSkill = await readFile(join(root, "skills", "ulw-loop", "SKILL.md"), "utf8");
 	const syncedWorkflow = await readFile(join(root, "skills", "ulw-loop", "references", "full-workflow.md"), "utf8");
+	// ulw-loop is V2-primary (gpt-5.6 sol/terra use the flat `wait_agent`); the `multi_agent_v1.*`
+	// namespace is documented only as the v1 fallback, so the wait_agent refs accept the bare token.
 	const requiredPatterns = [
-		["multi_agent_v1.wait_agent ref", /multi_agent_v1\.wait_agent/],
+		["wait_agent ref", /\bwait_agent\b/],
 		["local spawned-name tracking", /Track spawned agent names locally/],
 		["wait_agent mailbox path", /wait_agent.*mailbox signals/],
 		["progress status contract", /WORKING:/],
 		["long-running plan/reviewer background guidance", /Plan and reviewer agents may run for a long time/],
-		["bounded plan/reviewer polling", /multi_agent_v1\.wait_agent.*cycles/],
-		["single long wait guard", /single long blocking wait/],
+		["bounded plan/reviewer polling", /wait_agent.*cycles/],
+		["exponential backoff wait guard", /double the timeout up to ~5 minutes/],
 		["git-master checkpointing", /git-master/],
 		["touched-path commit-style probe", /touched-path commit history/],
 		["verified work-unit commit", /verified work unit/],

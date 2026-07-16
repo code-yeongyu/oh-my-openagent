@@ -241,6 +241,9 @@ test("#given start-work skill #when synced for Codex #then the difficulty-tier d
 	assert.match(content, /lazycodex-worker-medium/);
 	assert.match(content, /Delegation by difficulty/);
 	assert.match(content, /Global Review and Debugging Gate/);
+	assert.match(content, /full commit SHA/);
+	assert.match(content, /re-read the ledger record/);
+	assert.match(content, /exact lane\/SHA pair/);
 	assert.doesNotMatch(content, /works the same on both surfaces/);
 });
 
@@ -256,6 +259,10 @@ test("#given review-work skill #when some lanes do not finish #then aggregate re
 	assert.match(content, /Do not spin in repeated/);
 	assert.match(content, /bare REJECT\/FAIL token without findings is not a verdict/);
 	assert.match(content, /cites the violated goal criterion/);
+	assert.match(content, /append a durable task-evidence record/);
+	assert.match(content, /full commit SHA/);
+	assert.match(content, /re-read that record/);
+	assert.match(content, /exact lane\/SHA pair/);
 	assert.match(content, /Do not use `multi_agent_v1\.send_input` as an interrupt/);
 });
 

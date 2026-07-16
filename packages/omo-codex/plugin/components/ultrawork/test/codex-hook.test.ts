@@ -284,4 +284,29 @@ describe("codex ultrawork hook", () => {
 		expect(directive).toMatch(/ratchet up only/i);
 		expect(directive).toMatch(/`plan` agent/);
 	});
+
+	it("#given directive #when discovery leaves known execution steps #then planning stays direct unless design uncertainty remains", () => {
+		// given
+		const payload = {
+			hook_event_name: "UserPromptSubmit",
+			prompt: "ulw",
+		};
+
+		// when
+		const output = runUserPromptSubmitHook(payload, { skillFilePath: null });
+		const parsed = parseHookOutput(output);
+
+		// then
+		const directive = parsed.hookSpecificOutput.additionalContext;
+		const discoveryIndex = directive.search(/fire the first discovery wave/i);
+		const uncertaintyIndex = directive.search(/what the wave left UNDECIDED/i);
+		const directPlanIndex = directive.search(/known procedure[\s\S]*plan directly/i);
+		expect(discoveryIndex).toBeGreaterThanOrEqual(0);
+		expect(uncertaintyIndex).toBeGreaterThan(discoveryIndex);
+		expect(directPlanIndex).toBeGreaterThan(uncertaintyIndex);
+		expect(directive).toMatch(/unclear module boundaries[\s\S]*viable decompositions[\s\S]*dependency order/i);
+		expect(directive).toMatch(/A known procedure.*however many steps.*never justify a planner/is);
+		expect(directive).toMatch(/[Nn]ever spawn `plan` before the discovery wave/);
+		expect(directive).toMatch(/tier sizes\s+evidence and review, never who plans/i);
+	});
 });

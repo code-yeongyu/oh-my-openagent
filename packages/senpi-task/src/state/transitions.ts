@@ -177,9 +177,10 @@ function isStatusTransitionAllowed(current: TaskStatus, transition: TaskTransiti
   switch (transition.type) {
     case "start":
       return current === "pending"
+    case "cancel":
+      return current === "running" || current === "pending"
     case "complete":
     case "fail":
-    case "cancel":
     case "interrupt":
       return current === "running"
     case "lose":

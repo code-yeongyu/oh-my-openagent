@@ -26,7 +26,17 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 
+import {
+	findTomlSection as findSection,
+	hasTomlSetting,
+	removeTomlSectionSetting,
+	removeRootTomlSetting,
+	replaceOrInsertTomlSectionSetting,
+	replaceOrInsertRootTomlSetting,
+} from "./toml-section-editor.mjs";
+
 const MANAGED_COMMENT_MARKER = "openai/codex#26753";
+const MULTI_AGENT_V2_THREAD_LIMIT_KEY = "features.multi_agent_v2.max_concurrent_threads_per_session";
 const MANAGED_DISABLE_COMMENT = [
 	"# Managed by LazyCodex: multi_agent_v2 is re-disabled on every Codex session start",
 	`# because enabling it fails every turn with HTTP 400 (${MANAGED_COMMENT_MARKER}).`,
@@ -177,7 +187,11 @@ function isGpt56Family(model) {
 
 function clearMultiAgentV2DisableForReservedSchema(config) {
 	// `config` arrives shorthand-normalized from forceDisableMultiAgentV2.
-	const result = removeManagedDisableComments(config);
+	let result = removeManagedDisableComments(config);
+	result = removeRootTomlSetting(result, "features.multi_agent_v2.enabled", "false");
+	result = removeRootTomlSetting(result, "features.multi_agent_v2.hide_spawn_agent_metadata", "false");
+	result = removeDottedMultiAgentV2Setting(result, "enabled", "false");
+	result = removeDottedMultiAgentV2Setting(result, "hide_spawn_agent_metadata", "false");
 
 	const section = findSection(result, "[features.multi_agent_v2]");
 	if (!section) return result;
@@ -203,6 +217,9 @@ function forceDisableLegacyEncryptedV2(config) {
 	const section = findSection(config, "[features.multi_agent_v2]");
 
 	if (!section) {
+		if (hasTomlSetting(config, MULTI_AGENT_V2_THREAD_LIMIT_KEY)) {
+			return setDottedMultiAgentV2Disable(config);
+		}
 		return ensureManagedComment(appendDisabledSection(config));
 	}
 
@@ -220,6 +237,20 @@ function forceDisableLegacyEncryptedV2(config) {
 	const insertAt = headerEnd === -1 ? section.text.length : headerEnd + 1;
 	const patched = `${section.text.slice(0, insertAt)}${headerEnd === -1 ? "\n" : ""}enabled = false\n${section.text.slice(insertAt)}`;
 	return ensureManagedComment(config.slice(0, section.start) + patched + config.slice(section.end));
+}
+
+function setDottedMultiAgentV2Disable(config) {
+	const featuresSection = findSection(config, "[features]");
+	if (!featuresSection) {
+		return replaceOrInsertRootTomlSetting(config, "features.multi_agent_v2.enabled", "false");
+	}
+	return replaceOrInsertTomlSectionSetting(config, featuresSection, "multi_agent_v2.enabled", "false");
+}
+
+function removeDottedMultiAgentV2Setting(config, key, expectedValue) {
+	const featuresSection = findSection(config, "[features]");
+	if (!featuresSection) return config;
+	return removeTomlSectionSetting(config, featuresSection, `multi_agent_v2.${key}`, expectedValue);
 }
 
 function ensureManagedComment(config) {
@@ -268,31 +299,4 @@ function appendDisabledSection(config) {
 	const trimmed = config.trimEnd();
 	const prefix = trimmed.length === 0 ? "" : `${trimmed}\n\n`;
 	return `${prefix}[features.multi_agent_v2]\nenabled = false\n`;
-}
-
-// Strips a trailing # comment from a TOML line fragment (best-effort; quoted keys containing # are out of scope).
-function stripTrailingComment(line) {
-	const idx = line.indexOf("#");
-	return idx === -1 ? line : line.slice(0, idx).trim();
-}
-
-function findSection(config, headerLine) {
-	const lines = config.match(/[^\n]*\n?|$/g) ?? [];
-	let offset = 0;
-	let start = -1;
-	for (const line of lines) {
-		if (line.length === 0) break;
-		const trimmed = line.trim();
-		if (start === -1) {
-			if (stripTrailingComment(trimmed) === headerLine) start = offset;
-		} else {
-			const bare = stripTrailingComment(trimmed);
-			if (bare.startsWith("[") && bare.endsWith("]")) {
-				return { start, end: offset, text: config.slice(start, offset) };
-			}
-		}
-		offset += line.length;
-	}
-	if (start === -1) return null;
-	return { start, end: config.length, text: config.slice(start) };
 }

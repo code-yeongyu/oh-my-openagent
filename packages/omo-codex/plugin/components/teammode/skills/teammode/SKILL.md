@@ -1,6 +1,6 @@
 ---
 name: teammode
-description: "Codex-only team orchestration: run a named team of cooperating Codex workers with durable, script-managed state. MUST USE when the user asks Codex to create, run, coordinate, inspect, archive, or delete a team of agents/threads/sessions, or to work on something as a team in parallel. FIRST inspects the active tool surface and tells the user which transport it selected: native MultiAgentV2 agents (flat spawn_agent with task_name) when available, Codex App threads as the fallback. The main session is always the leader; members are defined by a concrete part, ownership area, or perspective - never a vague job role; a bundled cross-platform script writes the .omo/teams state plus an auto-generated member field manual. Use a team when the work is not perfectly isolated but parallelizing helps; use plain subagents when scope is perfectly isolated or the goal is ambiguous. Triggers: team mode, teammode, make a team, run as a team, team of agents, coordinate threads, parallel Codex threads, archive the team."
+description: "Codex-only team orchestration: run a named team of cooperating Codex workers with durable, script-managed state. MUST USE when the user asks Codex to create, run, coordinate, inspect, archive, or delete a team of agents/threads/sessions, or to work on something as a team in parallel. FIRST inspects the active tool surface (checking tool_search for deferred tools) and tells the user the route: native MultiAgentV2 agents (flat spawn_agent with task_name) when available, Codex App threads as the fallback, or a plain-subagent split when neither set exists. The main session is always the leader; members are defined by a concrete part, ownership area, or perspective - never a vague job role; a bundled cross-platform script writes the .omo/teams state plus an auto-generated member field manual. Use a team when the work is not perfectly isolated but parallelizing helps; use plain subagents when scope is perfectly isolated or the goal is ambiguous. Triggers: team mode, teammode, make a team, run as a team, team of agents, coordinate threads, parallel Codex threads, archive the team."
 ---
 
 # Teammode
@@ -40,17 +40,31 @@ Inspect your active tool list and select:
 2. **Codex App threads (fallback)** - select when flat V2 is not available but the
    `codex_app.*` thread tools are (`create_thread`, `read_thread`, `send_message_to_thread`,
    `set_thread_title`, `set_thread_archived`).
-3. **Neither complete set available** - STOP before `init`. Tell the user which tools are
-   missing; do not fake a team with partial tooling.
+3. **Neither set visible** - if a `tool_search` tool is active, search for the missing sets
+   (e.g. `spawn_agent`, `codex_app`) before concluding: some environments defer tools behind
+   tool search. A hit is only a lead: revalidate that the visible result is the COMPLETE,
+   mutually compatible transport set from case 1 or 2 before selecting it. Do not combine
+   partial hits from different transports.
+4. **Neither set exists** - teammode cannot run here. Do NOT run `init` or fake a team with
+   partial tooling. If another visible plain-subagent mechanism can independently spawn,
+   communicate with, and observe plain workers, announce that exact mechanism and use it for
+   non-overlapping scopes. Otherwise continue serially and report the capability limitation;
+   never promise or imply plain subagents that this session cannot create.
 
-Then, BEFORE running `init`, tell the user in one line which transport you selected and why,
-e.g. `Teammode transport: MultiAgentV2 (flat spawn_agent with task_name).` or
-`Teammode transport: Codex App threads (flat V2 tools not present in this session).`
+Then, BEFORE running `init` (or instead of it in case 4), tell the user in one line what this
+environment provides and which route you picked:
+- `Teammode transport: MultiAgentV2 (flat spawn_agent with task_name).`
+- `Teammode transport: Codex App threads (flat V2 tools not present in this session).`
+- `Teammode unavailable: neither MultiAgentV2 nor codex_app tools exist in this session -
+  using <visible plain-subagent mechanism> for independent scopes.`
+- `Teammode unavailable: neither MultiAgentV2 nor codex_app tools exist in this session, and
+  no compatible plain-subagent mechanism is available - continuing serially.`
 
-Pass that choice to `init` as `--transport multi_agent_v2` or `--transport codex_app`. The
+Pass the choice to `init` as `--transport multi_agent_v2` or `--transport codex_app`. The
 transport is recorded in `team.json` and is IMMUTABLE for the team's lifetime: a V2 spawn
 failure is a V2 blocker to report, never permission to mix Codex App threads into the same
-team. Never probe by trial-calling tools; read your tool list.
+team. Never probe by trial-calling tools; read your tool list, and search it with
+`tool_search` only when a needed set is not visible.
 
 ## You are the leader - orchestrate, do not implement
 
@@ -126,10 +140,13 @@ teams, and a refused command never changes `team.json`.
 **MultiAgentV2 teams:**
 1. If a member needs an isolated worktree, run `worktree-add` BEFORE spawning it - flat
    `spawn_agent` has no cwd argument, so the path must ride in the bootstrap message.
-2. Spawn each member with flat `spawn_agent`: `task_name` is that member's `--task-name`,
-   `message` is the bootstrap printed by `add-member` / `member-prompt`, and
-   `fork_turns: "none"` (members read `guide.md` for context; full parent history is not
-   their context model). Do not set `agent_type`, `model`, or `reasoning_effort`.
+2. Spawn each member with flat `spawn_agent` using only the V2 schema fields:
+   `task_name` is that member's `--task-name`, `message` is the bootstrap printed by
+   `add-member` / `member-prompt`, and `fork_turns` is `"none"` (members read
+   `guide.md` for context; full parent history is not their context model). Put any
+   role, priority, or task-specific routing instruction in `message`; V2 does not accept
+   `agent_type`, `model`, `reasoning_effort`, or `service_tier`, so members inherit the
+   session model.
 3. `bind-agent --agent-path` with the canonical task name the spawn returned (normally
    `/root/<task_name>`); binding confirms the runtime identity matches the roster and records
    the member's cwd. Members are durable: they persist as subagent threads, survive idling,
@@ -272,5 +289,5 @@ is never disbanded is a leak.
 - Member communication stays English unless the user explicitly requests otherwise; user-facing
   replies follow the user's language.
 - Stop if the selected transport's tools (V2 spawn/message/wait/list/interrupt, or Codex App
-  create/read/send/title/archive) are unavailable or stop working; say so instead of faking it
-  or silently switching transports.
+  create/read/send/title/archive) stop working mid-run; say so instead of faking it or silently
+  switching transports. Pre-init absence is not a stop - it routes to the plain-subagent split.

@@ -44,6 +44,7 @@ import {
 import { isMultiAgentV2, parseTeamTransport } from "./team-transport.mjs";
 import { addMemberWorktree, integrateMemberBranch, removeMemberWorktree } from "./team-worktree.mjs";
 
+
 function parseFlags(args) {
 	const flags = { _: [] };
 	for (let i = 0; i < args.length; i++) {
@@ -149,7 +150,7 @@ const handlers = {
 			return { team, member: team.members.find((m) => m.id === memberId) };
 		});
 		const delivery = isMultiAgentV2(team)
-			? `Send this as spawn_agent message (task_name "${member.taskName}", fork_turns "none"), then bind-agent --agent-path "${member.agentPath}"`
+			? `Send this with spawn_agent using only task_name "${member.taskName}", message <bootstrap>, and fork_turns "none"; then bind-agent --agent-path "${member.agentPath}"`
 			: `Send this as the new thread's first message (title the thread "${member.threadTitle}")`;
 		process.stdout.write(`added member ${memberId} to team ${sessionId}.\n\n${delivery}:\n---\n${buildMemberPrompt(team, memberId)}\n---\n`);
 	},

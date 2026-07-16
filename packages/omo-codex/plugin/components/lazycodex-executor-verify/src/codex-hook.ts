@@ -7,7 +7,6 @@ import type { HookFileSystem, StopHookOutput, SubagentStopInput } from "./types.
 import { SUBAGENT_STOP_EVENT } from "./types.js";
 
 const RECEIPT_ENFORCED_AGENTS = new Set([
-	"lazycodex-executor",
 	"lazycodex-worker-low",
 	"lazycodex-worker-medium",
 	"lazycodex-worker-high",
