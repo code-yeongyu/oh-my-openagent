@@ -107,9 +107,50 @@ test("#given parseArgs #when the slug is missing or unsafe #then it throws, and 
 	assert.equal(ok.intent, "unclear");
 	assert.equal(ok.reset, true);
 	assert.equal(ok.force, true);
+	assert.equal(ok.draftOnly, false);
+	assert.equal(ok.reviewRequired, false);
+	const draftOnly = parseArgs(["node", "s", "my-plan", "--draft-only"]);
+	assert.equal(draftOnly.draftOnly, true);
+	const reviewRequired = parseArgs(["node", "s", "my-plan", "--draft-only", "--review-required"]);
+	assert.equal(reviewRequired.reviewRequired, true);
 	const plain = parseArgs(["node", "s", "my-plan"]);
 	assert.equal(plain.reset, false);
 	assert.equal(plain.force, false);
+});
+
+test("#given an explicit review modifier at startup #when draft-only scaffold runs #then the first durable write contains the complete pending review request", async () => {
+	const { scaffold } = await import(scriptUrl);
+	const dir = await mkdtemp(join(tmpdir(), "ulwp-"));
+	try {
+		await scaffold(dir, { slug: "demo", intent: "clear", draftOnly: true, reviewRequired: true });
+		const draft = await readFile(join(dir, ".omo", "drafts", "demo.md"), "utf8");
+		assert.match(draft, /review_required: true/);
+		assert.match(draft, /plan_path: \.omo\/plans\/demo\.md/);
+		assert.match(draft, /pending-action: write and review \.omo\/plans\/demo\.md/);
+		assert.match(draft, /momus:\n\s+status: pending/);
+		assert.match(draft, /independent:\n\s+status: pending/);
+		await assert.rejects(() => readFile(join(dir, ".omo", "plans", "demo.md"), "utf8"), /ENOENT/);
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
+});
+
+test("#given pre-approval planning #when draft-only scaffold runs #then it creates the durable draft without creating a plan", async () => {
+	const { scaffold } = await import(scriptUrl);
+	const dir = await mkdtemp(join(tmpdir(), "ulwp-"));
+	try {
+		const first = await scaffold(dir, { slug: "demo", intent: "unclear", draftOnly: true });
+		assert.equal(first.length, 1);
+		assert.equal(first[0].status, "created");
+		assert.match(await readFile(join(dir, ".omo", "drafts", "demo.md"), "utf8"), /intent: unclear/);
+		await assert.rejects(() => readFile(join(dir, ".omo", "plans", "demo.md"), "utf8"), /ENOENT/);
+
+		const afterApproval = await scaffold(dir, { slug: "demo", intent: "unclear" });
+		assert.equal(afterApproval[0].status, "exists");
+		assert.equal(afterApproval[1].status, "created");
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
 });
 
 test("#given an already-scaffolded plan #when the script is re-run plain #then it is a no-op that preserves appended todos (resume-safe, no crash, no clobber)", async () => {

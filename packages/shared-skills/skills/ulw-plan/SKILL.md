@@ -24,24 +24,24 @@ After grounding, make ONE judgment, record `intent: clear|unclear` plus `review_
 
 - **OVERRIDE - explicit ask wins:** if the user explicitly asks to be questioned or interviewed ("ask me", "interview me", "why aren't you asking me" - in any language), route **CLEAR**, run the interview, and turn the adopt-default filter OFF: the user has claimed the forks, so every surviving one is ASKED, not defaulted. This beats the OUTCOME test below, even on a fuzzy brief.
 - **CLEAR** - the user knows the outcome; the only open items are preferences/tradeoffs the repo cannot answer (genuine owner-decisions). Read **`references/intent-clear.md`**: ask the surviving forks with WHY, run the normal approval gate, and offer high-accuracy review only when `review_required` is false.
-- **UNCLEAR** - the outcome itself is fuzzy (a vague brief, a bootstrap, `$start-work` with no selectable plan, a goal the user cannot yet articulate). Asking would offload your own job onto the user. Read **`references/intent-unclear.md`**: research maximally, adopt and ANNOUNCE best-practice defaults, do NOT ask the user extra questions, and run high-accuracy review AUTOMATICALLY (unless Classify sized the work Trivial).
+- **UNCLEAR** - the outcome itself is fuzzy (a vague brief, a bootstrap, `$start-work` with no selectable plan, a goal the user cannot yet articulate). Asking would offload your own job onto the user. Read **`references/intent-unclear.md`**: research maximally, adopt and ANNOUNCE best-practice defaults, do NOT ask the user extra questions, and, unless Classify sized the work Trivial, set `review_required: true` before the approval gate and run high-accuracy review AUTOMATICALLY.
 - **ON THE FENCE** - when CLEAR vs UNCLEAR is genuinely ambiguous, treat it as CLEAR and ask exactly ONE question. A user wrongly silenced is worse than one extra question. The dominant failure to guard against is mis-routing a CLEAR request to UNCLEAR, which silently applies defaults and overrides forks the user wanted to own.
 
 WORKED: "add a 5/min-per-IP rate-limit to `/login`" = CLEAR. "make auth better" = UNCLEAR.
 
 Both intent paths ALSO read **`references/full-workflow.md`** for the shared mechanics - the plan template, the final verification wave, the APPEND protocol, and the full delegation/wait syntax. Read the phase you are in.
 
-## RUN THE SCRIPT - do not hand-build the plan files
+## RUN THE SCRIPT - do not hand-build artifacts
 
-Before writing any plan or draft by hand, RUN:
+As soon as `<slug>` and intent are known, before recording draft state, RUN:
 
 ```
-node "<skill-root>/scripts/scaffold-plan.mjs" <slug> [--clear|--unclear]
+node "<skill-root>/scripts/scaffold-plan.mjs" <slug> [--clear|--unclear] --draft-only [--review-required]
 ```
 
-(Replace `<skill-root>` with this skill's own directory; `bun` is an accepted substitute for `node`.) It creates `.omo/drafts/<slug>.md` (your durable, compaction-safe resume point) and `.omo/plans/<slug>.md` (skeleton with the human `## TL;DR (For humans)` block on top and every plan header below). Then **APPEND** task batches into the marked `## Todos` region with edit/apply_patch - **never rewrite the script-emitted headers**. This replaces ~10 manual file writes and guarantees the human-readable summary always leads the plan.
+(Replace `<skill-root>` with this skill's own directory; `bun` is accepted.) This creates only `.omo/drafts/<slug>.md`, the compaction-safe resume point; it does not create a plan before approval. When an explicit review modifier is already known, include `--review-required` so the first durable write contains the complete pending review request. After approval, rerun without `--draft-only` to create `.omo/plans/<slug>.md`, then **APPEND** task batches into `## Todos` - never rewrite script-emitted headers.
 
-Run it ONCE at plan generation. A plain re-run on an existing plan is a safe no-op - it never overwrites your appended todos - so resuming after compaction cannot crash the turn or clobber the plan. Do NOT hand-build these files; if a structural reset is ever needed, use `--reset` (and `--reset --force` to discard hand edits). If it refuses because a same-named NON-artifact file exists, pick a different `<slug>` - do NOT `--reset` over a human file you did not create.
+Both invocations are resume-safe no-ops for artifacts already present. Do NOT hand-build them; use `--reset` only for a structural reset (`--reset --force` discards edits). If a same-named non-artifact file exists, choose another slug.
 
 ## Plan artifact producer contract
 
@@ -62,7 +62,7 @@ When producing the plan, encode every executable item as a column-zero Markdown 
 
 ## Approval gate
 
-When exploration is exhausted and the unknowns are answered, record the gate in the draft (`status: awaiting-approval`, the pending action `write .omo/plans/<slug>.md`, the approach), present a short brief once, then **wait for the user's explicit okay**. Read their next reply as a decision (approve / scope-change / still-unclear). Full gate mechanics: `references/full-workflow.md`.
+When exploration is exhausted and the unknowns are answered, record the gate in the draft (`status: awaiting-approval`, approach, and the next workflow action), present a short brief once, then **wait for the user's explicit okay**. Approval authorizes plan creation only; any already-required review runs afterward under its existing authorization. Full mechanics: `references/full-workflow.md`.
 
 ## Delegation (OpenCode-native)
 
