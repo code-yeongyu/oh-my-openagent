@@ -1,0 +1,21 @@
+===== RENDERED /start-work WRAPPER =====
+# /start-work Command
+
+**Description**: Execute a Prometheus work plan
+
+**Scope**: plugin
+
+---
+
+## Command Instructions
+
+Base directory for this skill: /Users/dev/.cache/opencode/packages/oh-my-openagent@latest/skills/start-work/
+File references (@path) in this skill are relative to this directory.
+Never use @ts-ignore or @ts-expect-error in code.
+Load REAL-STEP-ONE / REAL-STEP-TWO for the checklist.
+===== ASSERTIONS =====
+[file not found: fragments  = 0  (expect 0 after fix)
+contains literal "(@path)"   = true  (expect true)
+contains literal "@ts-ignore"= true  (expect true)
+contains "@latest"            = true  (expect true, install path intact)
+real @steps.md inlined        = true  (expect true, feature preserved)

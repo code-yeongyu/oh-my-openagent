@@ -1,0 +1,21 @@
+===== RENDERED /start-work WRAPPER =====
+# /start-work Command
+
+**Description**: Execute a Prometheus work plan
+
+**Scope**: plugin
+
+---
+
+## Command Instructions
+
+Base directory for this skill: /Users/dev/.cache/opencode/packages/oh-my-openagent[file not found: C:\Users\pss\AppData\Local\Temp\omo-5978-driver-1783567086097\latest\skills\start-work]
+File references ([file not found: C:\Users\pss\AppData\Local\Temp\omo-5978-driver-1783567086097\path)] in this skill are relative to this directory.
+Never use [file not found: C:\Users\pss\AppData\Local\Temp\omo-5978-driver-1783567086097\ts-ignore] or [file not found: C:\Users\pss\AppData\Local\Temp\omo-5978-driver-1783567086097\ts-expect-error] in code.
+Load REAL-STEP-ONE / REAL-STEP-TWO for the checklist.
+===== ASSERTIONS =====
+[file not found: fragments  = 4  (expect 0 after fix)
+contains literal "(@path)"   = false  (expect true)
+contains literal "@ts-ignore"= false  (expect true)
+contains "@latest"            = false  (expect true, install path intact)
+real @steps.md inlined        = true  (expect true, feature preserved)
