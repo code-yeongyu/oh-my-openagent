@@ -24,6 +24,7 @@ export function buildRecordInput(input: {
     depth: spec.depth,
     execution_mode: executionMode,
     model: plan.model,
+    ...(plan.resolved_model !== undefined ? { resolved_model: plan.resolved_model } : {}),
     ...(agentType !== undefined ? { agent_type: agentType } : {}),
     ...(category !== undefined ? { category } : {}),
     ...(plan.toolAllowlist !== undefined ? { tool_allow: plan.toolAllowlist } : {}),
@@ -40,6 +41,9 @@ export function buildManagedSpec(input: {
   const { record, spec, plan, cwd, stateDir } = input
   const prompt = plan.promptAppend ? `${spec.prompt}\n\n${plan.promptAppend}` : spec.prompt
   const instructions = spec.instructions ?? plan.instructions
+  const memberEnv = spec.memberEnv === undefined
+    ? undefined
+    : { ...spec.memberEnv, SENPI_TASK_MEMBER_TASK_ID: record.task_id }
   return {
     taskId: record.task_id,
     cwd: spec.cwd ?? cwd,
@@ -53,6 +57,8 @@ export function buildManagedSpec(input: {
     ...(instructions !== undefined ? { instructions } : {}),
     ...(plan.toolAllowlist !== undefined ? { toolAllowlist: plan.toolAllowlist } : {}),
     ...(spec.memberScopedTools !== undefined ? { memberScopedTools: spec.memberScopedTools } : {}),
+    ...(spec.extensions !== undefined ? { extensions: spec.extensions } : {}),
+    ...(memberEnv !== undefined ? { memberEnv } : {}),
   }
 }
 

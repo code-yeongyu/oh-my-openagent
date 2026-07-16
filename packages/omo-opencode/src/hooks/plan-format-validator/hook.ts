@@ -8,46 +8,116 @@ import { log } from "../../shared/logger"
 
 const WRITE_TOOLS = new Set(["Write", "Edit", "write", "edit"])
 
-const CHECKBOX_PATTERN = /^[-*]\s*\[[ xX]\]/m
-
-const HEADING_SECOND_LEVEL = /^##\s+/
-const HEADING_TODOS = /^##\s+TODOs\b/i
-const HEADING_FINAL_WAVE = /^##\s+Final Verification Wave\b/i
+const SECTION_BOUNDARY_HEADING = /^#{1,2}(?:[ \t]+|$)/
+const HEADING_TODOS = /^##[ \t]+TODOs(?:[ \t]+#+)?[ \t]*$/i
+const HEADING_FINAL_WAVE = /^##[ \t]+Final Verification Wave(?:[ \t]+#+)?[ \t]*$/i
 const TOPLEVEL_CHECKBOX = /^[-*]\s*\[[ xX]?\]/
+const TODO_TASK = /^- \[[ xX]\] [1-9]\d*\. .+$/
+const FINAL_WAVE_TASK = /^- \[[ xX]\] F[1-9]\d*\. .+$/i
+const FENCE_PATTERN = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/
 
-function countRawTopLevelCheckboxes(content: string): number {
+type SectionName = "todo" | "final-wave"
+
+type SectionStats = {
+  readonly rawCount: number
+  readonly validCount: number
+}
+
+type ActiveSection = {
+  readonly name: SectionName
+  readonly stats: { rawCount: number; validCount: number }
+}
+
+type PlanFormatStats = {
+  readonly rawCount: number
+  readonly hasEmptySection: boolean
+  readonly hasMalformedRows: boolean
+  readonly recognized: boolean
+}
+
+type MarkdownFence = {
+  readonly marker: "`" | "~"
+  readonly length: number
+}
+
+function analyzeStructuredSections(content: string): PlanFormatStats {
   const lines = content.split(/\r?\n/)
-  let section: "todo" | "final-wave" | "other" = "other"
-  let count = 0
+  const sections: SectionStats[] = []
+  let section: ActiveSection | null = null
+  let fence: MarkdownFence | null = null
 
   for (const line of lines) {
-    if (HEADING_SECOND_LEVEL.test(line)) {
-      section = HEADING_TODOS.test(line)
-        ? "todo"
-        : HEADING_FINAL_WAVE.test(line)
-          ? "final-wave"
-          : "other"
+    if (fence !== null) {
+      if (isClosingFence(line, fence)) fence = null
+      continue
+    }
+    const openingFence = parseOpeningFence(line)
+    if (openingFence !== null) {
+      fence = openingFence
       continue
     }
 
-    if (section === "other") continue
-    if (!TOPLEVEL_CHECKBOX.test(line)) continue
+    if (SECTION_BOUNDARY_HEADING.test(line)) {
+      const name = HEADING_TODOS.test(line) ? "todo" : HEADING_FINAL_WAVE.test(line) ? "final-wave" : null
+      if (name === null) {
+        section = null
+      } else {
+        const stats = { rawCount: 0, validCount: 0 }
+        sections.push(stats)
+        section = { name, stats }
+      }
+      continue
+    }
+    if (section === null || !TOPLEVEL_CHECKBOX.test(line)) continue
 
-    count++
+    section.stats.rawCount += 1
+    const validPattern = section.name === "todo" ? TODO_TASK : FINAL_WAVE_TASK
+    if (validPattern.test(line)) section.stats.validCount += 1
   }
 
-  return count
+  return {
+    rawCount: sections.reduce((total, item) => total + item.rawCount, 0),
+    hasEmptySection: sections.some((item) => item.validCount === 0),
+    hasMalformedRows: sections.some((item) => item.rawCount !== item.validCount),
+    recognized: sections.length > 0,
+  }
 }
 
-function buildWarning(rawCount: number, parsedCount: number): string {
+function parseOpeningFence(line: string): MarkdownFence | null {
+  const match = line.match(FENCE_PATTERN)
+  const run = match?.[1]
+  const info = match?.[2]
+  const marker = run?.charAt(0)
+  if (
+    run === undefined ||
+    info === undefined ||
+    (marker !== "`" && marker !== "~") ||
+    (marker === "`" && info.includes("`"))
+  ) {
+    return null
+  }
+  return { marker, length: run.length }
+}
+
+function isClosingFence(line: string, fence: MarkdownFence): boolean {
+  const run = line.match(/^[ \t]{0,3}(`{3,}|~{3,})[ \t]*$/)?.[1]
+  return run?.charAt(0) === fence.marker && run.length >= fence.length
+}
+
+function buildWarning(rawCount: number, parsedCount: number, hasEmptySection: boolean): string {
   const skipped = rawCount - parsedCount
 
-  if (parsedCount === 0) {
+  if (hasEmptySection) {
+    const summary =
+      parsedCount === 0
+        ? "Plan has recognized task sections but no valid task rows."
+        : "One or more recognized task sections contain no valid task rows."
+
     return [
       "",
       "<plan-format-warning>",
-      `Plan has **${rawCount} task checkbox(es)** but \`getPlanProgress()\` parsed **0**.`,
-      "This means `/start-work` will show **\"Progress: 0/0\"** for this plan.",
+      summary,
+      "Those sections will contribute no tasks to `/start-work` progress.",
       "",
       "**Fix**: Every task checkbox under `## TODOs` MUST start with a bare number",
       "followed by dot + space: `1.`, `2.`, `3.` — NOT `T1.`, `Phase 1:`, `Task-1.` etc.",
@@ -111,24 +181,22 @@ export function createPlanFormatValidatorHook(_ctx: PluginInput) {
       if (!existsSync(resolvedPath)) return
 
       const content = readFileSync(resolvedPath, "utf-8")
-      if (!CHECKBOX_PATTERN.test(content)) return
-
-      const rawCount = countRawTopLevelCheckboxes(content)
-      if (rawCount === 0) return
+      const formatStats = analyzeStructuredSections(content)
+      if (!formatStats.recognized) return
 
       const progress = getPlanProgress(resolvedPath)
       const parsedCount = progress.total
 
-      if (rawCount === parsedCount) return
+      if (!formatStats.hasEmptySection && !formatStats.hasMalformedRows) return
 
-      log(`[plan-format-validator] Plan ${filePath}: ${parsedCount}/${rawCount} tasks parsed`, {
+      log(`[plan-format-validator] Plan ${filePath}: ${parsedCount}/${formatStats.rawCount} tasks parsed`, {
         sessionID: input.sessionID,
         filePath,
-        rawCount,
+        rawCount: formatStats.rawCount,
         parsedCount,
       })
 
-      output.output = `${output.output}${buildWarning(rawCount, parsedCount)}`
+      output.output = `${output.output}${buildWarning(formatStats.rawCount, parsedCount, formatStats.hasEmptySection)}`
     },
   }
 }

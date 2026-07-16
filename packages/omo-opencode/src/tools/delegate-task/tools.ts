@@ -54,6 +54,22 @@ function buildPromptNativeSkillInfos(
   }))
 }
 
+async function askTaskPermission(
+  ctx: ToolContextWithMetadata,
+  description: string,
+  agentToUse: string,
+): Promise<void> {
+  await ctx.ask?.({
+    permission: "task",
+    patterns: [agentToUse],
+    always: ["*"],
+    metadata: {
+      description,
+      subagent_type: agentToUse,
+    },
+  })
+}
+
 export { resolveCategoryConfig } from "./categories"
 export type { SyncSessionCreatedEvent, DelegateTaskToolOptions, BuildSystemContentInput } from "./types"
 export { buildSystemContent, buildTaskPrompt } from "./prompt-builder"
@@ -167,6 +183,8 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         fallbackChain = resolution.fallbackChain
         maxPromptTokens = resolution.maxPromptTokens
 
+        await askTaskPermission(ctx, delegateTaskArgs.description, agentToUse)
+
         const isRunInBackgroundExplicitlyFalse = isExplicitSyncRun(delegateTaskArgs.run_in_background)
 
         log("[task] unstable agent detection", {
@@ -201,6 +219,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         agentToUse = resolution.agentToUse
         categoryModel = resolution.categoryModel
         fallbackChain = resolution.fallbackChain
+        await askTaskPermission(ctx, delegateTaskArgs.description, agentToUse)
       }
 
       const systemContent = buildSystemContent({

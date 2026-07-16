@@ -52,6 +52,29 @@ describe("recordSpawnedPid", () => {
 })
 
 describe("TaskManager spawn-fact persistence", () => {
+  test("#given member launch env #when a process task starts #then the generated task id is threaded into the child env", async () => {
+    // given
+    const processRunner = new FakeRunner()
+    const { manager } = makeManager({ process: processRunner })
+
+    // when
+    const result = await manager.start(baseSpec({
+      execution_mode: "process",
+      memberEnv: {
+        SENPI_TASK_MEMBER: "11111111-1111-4111-8111-111111111111::alpha",
+        SENPI_TASK_TEAM_CONFIG: "{}",
+      },
+    }))
+
+    // then
+    if (result.kind !== "started") throw new Error("expected started")
+    expect(processRunner.startedSpecs[0]?.memberEnv).toEqual({
+      SENPI_TASK_MEMBER: "11111111-1111-4111-8111-111111111111::alpha",
+      SENPI_TASK_TEAM_CONFIG: "{}",
+      SENPI_TASK_MEMBER_TASK_ID: result.task_id,
+    })
+  })
+
   test("#given a process runner whose child has a pid #when a process task starts #then the persisted record carries that pid", async () => {
     // given a process runner that spawns a child reporting a real OS pid
     const processRunner = new FakeRunner()

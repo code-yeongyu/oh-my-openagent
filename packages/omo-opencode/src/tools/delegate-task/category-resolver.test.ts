@@ -82,6 +82,9 @@ describe("resolveCategoryExecution", () => {
 				model: "anthropic/claude-sonnet-4-6",
 			},
 		}
+		executorCtx.client = unsafeTestValue({
+			app: { agents: async () => ({ data: [{ name: "Custom Builder", mode: "subagent" }] }) },
+		})
 		executorCtx.agentOverrides = {
 			"custom-planner": {
 				category_target_agent: "Custom Builder",
@@ -95,6 +98,53 @@ describe("resolveCategoryExecution", () => {
 		expect(result.error).toBeUndefined()
 		expect(result.agentToUse).toBe("Custom Builder")
 		expect(result.categoryModel?.modelID).toBe("claude-sonnet-4-6")
+	})
+
+	test("rejects an unknown configured category target before launch", async () => {
+		//#given
+		const args = {
+			category: "quick",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.client = unsafeTestValue({
+			app: { agents: async () => ({ data: [{ name: "Known Worker", mode: "subagent" }] }) },
+		})
+		executorCtx.userCategories = { quick: { model: "anthropic/claude-sonnet-4-6" } }
+		executorCtx.agentOverrides = {
+			"custom-planner": { category_target_agent: "Missing Worker" },
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, undefined, "custom-planner")
+
+		//#then
+		expect(result.error).toContain('Unknown agent: "Missing Worker"')
+	})
+
+	test("rejects a coordinator configured as a category target", async () => {
+		//#given
+		const args = {
+			category: "quick",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = { quick: { model: "anthropic/claude-sonnet-4-6" } }
+		executorCtx.agentOverrides = {
+			"custom-planner": { category_target_agent: "prometheus" },
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, undefined, "custom-planner")
+
+		//#then
+		expect(result.error).toContain('Cannot delegate to coordinator agent "prometheus"')
 	})
 
 	test("returns 'unknown category' error for truly unknown categories", async () => {

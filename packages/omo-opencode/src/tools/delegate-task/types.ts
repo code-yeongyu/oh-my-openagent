@@ -69,6 +69,12 @@ export interface ToolContextWithMetadata {
   messageID: string
   agent: string
   abort: AbortSignal
+  ask?: (input: {
+    permission: string
+    patterns: string[]
+    always: string[]
+    metadata: Record<string, unknown>
+  }) => Promise<void>
   metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void | Promise<void>
   /**
    * Tool call ID injected by OpenCode's internal context (not in plugin ToolContext type,
@@ -136,6 +142,5 @@ export interface BuildSystemContentInput {
   agentName?: string
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]
-  /** OpenCode native skill list to merge into the <available_skills> block. */
   nativeSkillInfos?: { name: string; description: string; location: string }[]
 }

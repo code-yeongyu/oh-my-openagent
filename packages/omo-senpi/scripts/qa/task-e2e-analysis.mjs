@@ -42,11 +42,20 @@ export function parseJsonEvents(stdout) {
     if (line.trim().length === 0) continue
     try {
       events.push(JSON.parse(line))
-    } catch {
-      // non-JSON startup banner line
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error
     }
   }
   return events
+}
+
+export function findBatchFanout(events, minimumChildren) {
+  for (const event of events) {
+    if (event?.type !== "tool_execution_end" || event.toolName !== "task") continue
+    const items = event.result?.details?.items
+    if (Array.isArray(items) && items.length >= minimumChildren) return items
+  }
+  return []
 }
 
 // All distinct st_ task ids that appear anywhere in the event stream.
@@ -55,15 +64,20 @@ export function findTaskIds(events) {
   return [...new Set(matches)]
 }
 
-// The idle-wake completion is injected as a NEW turn carrying a <task-notification> block. Proof for the
-// unconditional-wake contract: the block names the finished task_id AND carries the task_send continuation
-// hint (messageability = continuable). Returns both facts so the driver can attribute a precise failure.
+// The idle-wake completion is injected as a NEW turn carrying friendly task-completion rows. Proof for
+// the unconditional-wake contract: the notification names the finished task_id, terminal status, and
+// task_send continuation hint (messageability = continuable). Returns each fact for precise failure attribution.
 export function findWakeNotification(events, taskId) {
   const hay = JSON.stringify(events)
-  const hasBlock = hay.includes("<task-notification>")
+  const hasNotification = hay.includes("task completion") && hay.includes("status:completed")
   const namesTask = typeof taskId === "string" && taskId.length > 0 && hay.includes(taskId)
   const hasContinuationHint = hay.includes("task_send(")
-  return { hasBlock, namesTask, hasContinuationHint, ok: hasBlock && namesTask && hasContinuationHint }
+  return {
+    hasNotification,
+    namesTask,
+    hasContinuationHint,
+    ok: hasNotification && namesTask && hasContinuationHint,
+  }
 }
 
 // task_send(deliver_as:"followUp") on a completed-resident child REVIVES it. Proof is the send tool

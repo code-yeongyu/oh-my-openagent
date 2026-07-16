@@ -136,10 +136,18 @@ describe("createToolExecuteBeforeHandler", () => {
       }
     }
 
-    test("sets subagent_type to sisyphus-junior when category is provided without subagent_type", async () => {
+    test("sets subagent_type to the parent agent's configured category target", async () => {
       //#given
-      const ctx = createCtxWithSessionMessages()
-      const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
+      const ctx = createCtxWithSessionMessages([
+        { info: { role: "assistant", agent: "workflow-planner" } },
+      ])
+      const handler = createToolExecuteBeforeHandler({
+        ctx,
+        hooks: emptyHooks,
+        agentOverrides: {
+          "workflow-planner": { category_target_agent: "Workflow Builder" },
+        },
+      })
       const input = { tool: "task", sessionID: "ses_123", callID: "call_1" }
       const output = { args: { category: "quick", description: "Test" } as Record<string, unknown> }
 
@@ -147,7 +155,7 @@ describe("createToolExecuteBeforeHandler", () => {
       await handler(input, output)
 
       //#then
-      expect(output.args.subagent_type).toBe("sisyphus-junior")
+      expect(output.args.subagent_type).toBe("Workflow Builder")
     })
 
     test("preserves existing subagent_type when explicitly provided", async () => {

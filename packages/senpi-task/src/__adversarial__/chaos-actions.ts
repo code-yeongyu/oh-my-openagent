@@ -6,7 +6,7 @@ import { isTerminalStatus } from "./observing-store"
 import type { RandomSource } from "./prng"
 
 export function flushMicrotasks(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0))
+  return new Promise((resolve) => queueMicrotask(resolve))
 }
 
 export type ChaosState = {
@@ -43,6 +43,10 @@ function byStatus(state: ChaosState, predicate: (record: TaskRecord) => boolean)
     const record = load(state, id)
     return record !== null && predicate(record)
   })
+}
+
+function nonTerminal(state: ChaosState): string[] {
+  return byStatus(state, (record) => !isTerminalStatus(record.status))
 }
 
 function pick(state: ChaosState, ids: readonly string[]): string | undefined {
@@ -95,6 +99,18 @@ async function actCancel(state: ChaosState): Promise<void> {
   await state.harness.manager.cancelTask(id, state.rng.bool() ? "user aborted" : undefined)
 }
 
+async function actCancelPending(state: ChaosState): Promise<void> {
+  const id = pick(state, byStatus(state, (record) => record.status === "pending"))
+  if (id === undefined) return
+  await state.harness.manager.cancelTask(id, state.rng.bool() ? "cancelled while queued" : undefined)
+}
+
+async function actAbortParentWait(state: ChaosState): Promise<void> {
+  const id = pick(state, nonTerminal(state))
+  if (id === undefined) return
+  state.harness.waiters.register(id, state.rng.int(1, 6))
+}
+
 async function actRevive(state: ChaosState): Promise<void> {
   const id = pick(state, byStatus(state, (record) => REVIVABLE.has(record.status) && record.residency_state === "resident"))
   if (id === undefined) return
@@ -129,16 +145,20 @@ function alreadyNotified(state: ChaosState): string[] {
 // One notification per terminal transition: the store commits each (task, epoch) terminal exactly
 // once, and that single commit is the notifier's trigger (plan todo 11). Concurrent duplicate
 // idle-edge injections are the todo-17 IdleInjectionCoordinator's job, out of the W1 notifier scope.
-async function actNotify(state: ChaosState): Promise<void> {
-  const id = pick(state, unobservedNotifying(state))
-  if (id === undefined) return
+function notifyEdge(state: ChaosState, id: string, parentState: ParentState): void {
   const record = load(state, id)
   if (record === null) return
   state.observedEdges.add(`${id}:${record.notification.run_epoch}`)
-  const parentState = state.rng.bool(0.6) ? state.rng.pick(DELIVER_STATES) : state.rng.pick(BUFFER_STATES)
   const before = state.harness.parentNotifier.calls.length
   const result = state.harness.notifier.notifyTerminal({ record, parentState, runInBackground: true })
   checkDelta(state, before, result)
+}
+
+async function actNotify(state: ChaosState): Promise<void> {
+  const id = pick(state, unobservedNotifying(state))
+  if (id === undefined) return
+  const parentState = state.rng.bool(0.6) ? state.rng.pick(DELIVER_STATES) : state.rng.pick(BUFFER_STATES)
+  notifyEdge(state, id, parentState)
 }
 
 // Resume / replay re-observes an ALREADY-notified terminal (persisted notified_epoch >= run_epoch).
@@ -170,14 +190,26 @@ async function actEvict(state: ChaosState): Promise<void> {
 
 async function actReconcile(state: ChaosState): Promise<void> {
   await state.harness.lifecycle.reconcileOnSessionStart()
+  state.harness.notifier.reconcileFailedNotifications({ sessionId: CHAOS_SESSION, parentState: { kind: "idle" } })
 }
 
 async function actShutdown(state: ChaosState): Promise<void> {
   await state.harness.lifecycle.teardownOnSessionShutdown()
 }
 
-async function actNotifierThrow(state: ChaosState): Promise<void> {
-  state.harness.parentNotifier.failNext(state.rng.int(1, 2))
+async function actNotifierFailThenRetry(state: ChaosState): Promise<void> {
+  const pendingRetries = state.harness.retryScheduler.pendingCount
+  if (pendingRetries > 0 && state.rng.bool(0.7)) {
+    state.harness.retryScheduler.run(state.rng.int(0, pendingRetries - 1))
+    return
+  }
+  const id = pick(state, unobservedNotifying(state))
+  if (id === undefined) {
+    if (pendingRetries > 0) state.harness.retryScheduler.run(state.rng.int(0, pendingRetries - 1))
+    return
+  }
+  state.harness.parentNotifier.failNext(state.rng.int(2, 5))
+  notifyEdge(state, id, { kind: "idle" })
 }
 
 type Action = { readonly run: (state: ChaosState) => Promise<void>; readonly weight: number }
@@ -189,6 +221,8 @@ const ACTIONS: readonly Action[] = [
   { run: actSteer, weight: 3 },
   { run: actInterrupt, weight: 3 },
   { run: actCancel, weight: 3 },
+  { run: actCancelPending, weight: 4 },
+  { run: actAbortParentWait, weight: 4 },
   { run: actRevive, weight: 3 },
   { run: actNotify, weight: 6 },
   { run: actReplayNotify, weight: 3 },
@@ -196,10 +230,11 @@ const ACTIONS: readonly Action[] = [
   { run: actEvict, weight: 3 },
   { run: actReconcile, weight: 2 },
   { run: actShutdown, weight: 1 },
-  { run: actNotifierThrow, weight: 2 },
+  { run: actNotifierFailThenRetry, weight: 4 },
 ]
 
 export async function applyRandomAction(state: ChaosState): Promise<void> {
+  state.harness.waiters.advance()
   const action = state.rng.weighted(ACTIONS.map((entry) => ({ value: entry.run, weight: entry.weight })))
   await action(state)
   if (state.rng.bool(0.5)) await flushMicrotasks()

@@ -257,6 +257,9 @@
             "category": {
               "type": "string"
             },
+            "category_target_agent": {
+              "type": "string"
+            },
             "skills": {
               "type": "array",
               "items": {
@@ -618,6 +621,9 @@
               "type": "string"
             },
             "category": {
+              "type": "string"
+            },
+            "category_target_agent": {
               "type": "string"
             },
             "skills": {
@@ -983,6 +989,9 @@
             "category": {
               "type": "string"
             },
+            "category_target_agent": {
+              "type": "string"
+            },
             "skills": {
               "type": "array",
               "items": {
@@ -1344,6 +1353,9 @@
               "type": "string"
             },
             "category": {
+              "type": "string"
+            },
+            "category_target_agent": {
               "type": "string"
             },
             "skills": {
@@ -1712,6 +1724,9 @@
             "category": {
               "type": "string"
             },
+            "category_target_agent": {
+              "type": "string"
+            },
             "skills": {
               "type": "array",
               "items": {
@@ -2073,6 +2088,9 @@
               "type": "string"
             },
             "category": {
+              "type": "string"
+            },
+            "category_target_agent": {
               "type": "string"
             },
             "skills": {
@@ -2438,6 +2456,9 @@
             "category": {
               "type": "string"
             },
+            "category_target_agent": {
+              "type": "string"
+            },
             "skills": {
               "type": "array",
               "items": {
@@ -2799,6 +2820,9 @@
               "type": "string"
             },
             "category": {
+              "type": "string"
+            },
+            "category_target_agent": {
               "type": "string"
             },
             "skills": {
@@ -3164,6 +3188,9 @@
             "category": {
               "type": "string"
             },
+            "category_target_agent": {
+              "type": "string"
+            },
             "skills": {
               "type": "array",
               "items": {
@@ -3525,6 +3552,9 @@
               "type": "string"
             },
             "category": {
+              "type": "string"
+            },
+            "category_target_agent": {
               "type": "string"
             },
             "skills": {
@@ -3890,6 +3920,9 @@
             "category": {
               "type": "string"
             },
+            "category_target_agent": {
+              "type": "string"
+            },
             "skills": {
               "type": "array",
               "items": {
@@ -4251,6 +4284,9 @@
               "type": "string"
             },
             "category": {
+              "type": "string"
+            },
+            "category_target_agent": {
               "type": "string"
             },
             "skills": {
@@ -4616,6 +4652,9 @@
             "category": {
               "type": "string"
             },
+            "category_target_agent": {
+              "type": "string"
+            },
             "skills": {
               "type": "array",
               "items": {
@@ -4977,6 +5016,9 @@
               "type": "string"
             },
             "category": {
+              "type": "string"
+            },
+            "category_target_agent": {
               "type": "string"
             },
             "skills": {
@@ -5341,6 +5383,9 @@
             "type": "string"
           },
           "category": {
+            "type": "string"
+          },
+          "category_target_agent": {
             "type": "string"
           },
           "skills": {
@@ -6747,6 +6792,12 @@
             "dev-browser",
             "playwright-cli"
           ]
+        },
+        "playwright_mcp_args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [

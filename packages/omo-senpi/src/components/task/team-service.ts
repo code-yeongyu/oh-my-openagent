@@ -1,14 +1,18 @@
 import type { OmoConfig, OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
+import { listActiveTeams, loadRuntimeState } from "@oh-my-opencode/team-core/team-state-store"
+import { log } from "@oh-my-opencode/utils"
 import {
   TEAM_LEAD_SENTINEL,
   claimTeamTask,
-  createMemberScopedSendMessageTool,
   createTeam,
   createTeamTask,
+  createTaskRecordStore,
   deleteTeam,
   getTeamTask,
   listTeamTasks,
   reconcileTeamMailboxOnSessionStart,
+  parseExtensionEntries,
+  resolveMemberExtensionEntryPath,
   refreshTeamMemberStatuses,
   requestShutdown,
   approveShutdown,
@@ -19,18 +23,16 @@ import {
   toTeamCoreConfig,
   updateTeamTaskStatus,
   type ActiveTeamSummary,
-  type LeadMessageNotifier,
+  type PersistedTaskEvent,
   type StateDirConfig,
   type TaskManager,
   type TeamCoreConfig,
   type TeamToolsService,
 } from "@oh-my-opencode/senpi-task"
-import { listActiveTeams } from "@oh-my-opencode/team-core/team-state-store"
 
 import type { TaskRuntimeContext } from "./runtime-context"
 import {
   buildMemberPorts,
-  buildMessagingDelivery,
   makeCancelMemberTask,
   makeShutdownMessenger,
   resolveTeamSpec,
@@ -47,7 +49,7 @@ export interface TeamServiceDeps {
   readonly omoConfig: OmoConfig
   readonly cwd: string
   readonly agentNames: ReadonlySet<string>
-  readonly leadNotifier: LeadMessageNotifier
+  readonly appendTaskEvent?: (taskId: string, event: PersistedTaskEvent) => void
   readonly now?: () => number
   readonly newMessageId?: () => string
 }
@@ -56,6 +58,21 @@ function stateDirConfig(deps: TeamServiceDeps): StateDirConfig {
   return {
     project_dir: deps.cwd,
     ...(deps.settings.state_dir !== undefined ? { task: { state_dir: deps.settings.state_dir } } : {}),
+  }
+}
+
+function createTaskEventAppender(stateDir: StateDirConfig): (taskId: string, event: PersistedTaskEvent) => void {
+  const store = createTaskRecordStore(stateDir)
+  return (taskId, event) => {
+    try {
+      store.appendEvent(taskId, event)
+    } catch (error) {
+      log("omo-senpi task event append failed", {
+        taskId,
+        eventType: event.type,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
   }
 }
 
@@ -76,23 +93,18 @@ function toTeams(rows: Awaited<ReturnType<typeof listActiveTeams>>): readonly Ac
     status: row.status,
     memberCount: row.memberCount,
     scope: row.scope,
+    ...(row.leadSessionId !== undefined ? { leadSessionId: row.leadSessionId } : {}),
   }))
 }
 
-/**
- * The live TeamToolsService the omo-senpi component binds to the task engine: it threads the task
- * manager, the omo.json-derived team-core config + state dir, the current lead session, and the
- * idle-coordinator-backed lead notifier into the senpi-task team layer. Member children receive
- * exactly one pre-scoped `team_send_message` (from-bound to the member, run-bound to this run) via the
- * createTeam memberScopedTools seam; the manager's shared-tool filter strips every other team tool.
- */
 export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
   const stateDir = stateDirConfig(deps)
   const config: TeamCoreConfig = toTeamCoreConfig(deps.settings, teamStorageBaseDir(stateDir))
+  const appendTaskEvent = deps.appendTaskEvent ?? createTaskEventAppender(stateDir)
   const ports = buildMemberPorts(deps.omoConfig, deps.agentNames)
-  const delivery = buildMessagingDelivery(deps.manager)
   const omoTeams = deps.omoConfig.teams as Record<string, unknown> | undefined
   const runtimeDir = (teamRunId: string) => resolveTeamRuntimeDirs(stateDir, teamRunId).runtimeDir
+  const memberExtensionEntryPath = resolveMemberExtensionEntryPath()
 
   const service: TeamToolsService = {
     async createTeam(input) {
@@ -105,23 +117,25 @@ export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
         leadSessionId,
         spawnDepth: TEAM_MEMBER_SPAWN_DEPTH,
         ...(deps.now !== undefined ? { now: deps.now } : {}),
-        memberScopedTools: (memberName, teamRunId) => [
-          createMemberScopedSendMessageTool({ service, teamRunId, from: memberName }),
-        ],
+        memberExtension: {
+          entryPath: memberExtensionEntryPath,
+          inheritedExtensions: [memberExtensionEntryPath, ...parseExtensionEntries(process.argv)],
+        },
       })
     },
     deleteTeam: (input) => deleteTeam(input.teamRunId, { manager: deps.manager, stateDir, taskSettings: deps.settings }),
-    sendMessage: (teamRunId, input) =>
-      sendTeamMessage(input, {
+    sendMessage: async (teamRunId, input) => {
+      const runtimeState = await loadRuntimeState(teamRunId, config)
+      return sendTeamMessage(input, {
         teamRunId,
         stateDir,
         config,
-        delivery,
-        leadNotifier: deps.leadNotifier,
-        parentState: () => deps.runtime.parentState(),
+        activeMembers: runtimeState.members.map((member) => member.name),
+        appendEvent: appendTaskEvent,
         ...(deps.now !== undefined ? { now: deps.now } : {}),
         ...(deps.newMessageId !== undefined ? { newMessageId: deps.newMessageId } : {}),
-      }),
+      })
+    },
     status: (teamRunId) => refreshTeamMemberStatuses(teamRunId, { manager: deps.manager, config, runtimeDir: runtimeDir(teamRunId) }),
     listTeams: async () => toTeams(await listActiveTeams(config)),
     createTask: (teamRunId, input) =>
@@ -172,5 +186,9 @@ export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
 export function createTeamMailboxReconciler(deps: TeamServiceDeps): () => Promise<void> {
   const stateDir = stateDirConfig(deps)
   const config: TeamCoreConfig = toTeamCoreConfig(deps.settings, teamStorageBaseDir(stateDir))
-  return () => reconcileTeamMailboxOnSessionStart({ stateDir, config })
+  return () => reconcileTeamMailboxOnSessionStart({
+    stateDir,
+    config,
+    currentLeadSessionId: deps.runtime.sessionId(),
+  })
 }

@@ -2,6 +2,8 @@ import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { isCliEntry } from "./entry-guard.mjs";
+
 const pluginScriptsDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(pluginScriptsDir, "..", "..", "..", "..");
 const sharedSkillsScripts = join(repoRoot, "packages", "shared-skills", "scripts");
@@ -35,7 +37,7 @@ export async function materializeSharedUpstreams({ strict }) {
 	return materializeFrontendRefs({ strict });
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isCliEntry(import.meta.url)) {
 	// The root build materializes once up front and sets this so downstream codex-plugin
 	// builds in the same run do not re-run it; concurrent runs would contend on git's
 	// submodule index.lock and race writes into packages/shared-skills/skills.

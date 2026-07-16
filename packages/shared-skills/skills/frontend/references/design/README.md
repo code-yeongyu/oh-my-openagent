@@ -169,6 +169,12 @@ Triggers (mid-conversation, not initial): "you keep leaving placeholders", "stop
 
 **Action:** Add `output-skill.md` on top of whatever is currently loaded. This stacks cleanly — it is purely about output completeness, not visual style.
 
+### Step 8 — Is the screen an app shell, not a scroll-the-page site?
+
+Triggers: dashboard, settings, mail/inbox, list-detail, command surface, split panes, fixed sidebar + scrolling body, admin console — or the user reports a layout that breaks when content gets long, empty, or unbroken (panel won't scroll, footer pushed off-screen, horizontal overflow on mobile).
+
+**Action:** Add `layout-skill.md` on top of whatever style skill you selected in Steps 1-2. It carries scroll-ownership doctrine, the two silently-failing CSS contracts (`min-block-size: 0` scroll shells, `minmax(min(…),100%)` grids), the named-primitive vocabulary, container-vs-viewport routing, and the content-stress matrix. It adds no visual direction — the style skill still owns taste. Skip it for pure scroll-the-document marketing pages, where `taste-skill` layout guidance already fits.
+
 ## Stacking rules (read this once, internalize it)
 
 1. **At most one Layer A *style* skill at a time.** A layout cannot be both `minimalist-skill` and `brutalist-skill` simultaneously — they encode opposite spacing and typography philosophies. Pick one.
@@ -177,6 +183,7 @@ Triggers (mid-conversation, not initial): "you keep leaving placeholders", "stop
 4. **`redesign-skill.md` replaces a style-skill** when the task is auditing, not building. Stack a Layer B brand if the user wants a specific direction.
 5. **`image-to-code-skill.md` pairs with one imagegen skill** for the full flow.
 6. **Layer B (brand DESIGN.md) is orthogonal to Layer A.** You can pair any Layer A skill with any Layer B brand. Use Layer B as the source of color/type/component tokens; let Layer A drive the execution discipline.
+7. **`layout-skill.md` stacks on top of any style skill** for app-shell / dashboard / split-pane work. It owns spatial structure and scroll ownership only — no visual direction — so it never conflicts with the style skill you picked.
 
 ## Anti-patterns — do not do these
 
@@ -218,6 +225,8 @@ Once references are loaded, before writing any UI code:
 | "Generate a brand identity board for {company}" | `imagegen-brandkit.md` |
 | "Stop using placeholders" | Add `output-skill.md` to current stack |
 | "Also output a DESIGN.md doc" | Add `stitch-skill.md` to current stack |
+| "Build a dashboard / settings / inbox / app shell" | one style skill (usually `taste-skill.md`) + `layout-skill.md` |
+| "Panel won't scroll / footer pushed off-screen / mobile overflow" | Add `layout-skill.md` to current stack |
 
 ## Phase Final — Design QA (MANDATORY, runs after implementation)
 

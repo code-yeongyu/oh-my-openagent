@@ -57,6 +57,7 @@ export function createPluginInterface(args: {
     "chat.headers": createChatHeadersHandler({ ctx }),
 
     "command.execute.before": createCommandExecuteBeforeHandler({
+      directory: ctx.directory,
       hooks,
     }),
 
@@ -93,6 +94,7 @@ export function createPluginInterface(args: {
     "tool.execute.before": createToolExecuteBeforeHandler({
       ctx,
       hooks,
+      agentOverrides: pluginConfig.agents,
       backgroundManager: managers.backgroundManager,
     }),
 

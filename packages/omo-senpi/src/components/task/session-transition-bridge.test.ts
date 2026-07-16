@@ -48,6 +48,7 @@ function fakeStore(initial: TaskRecord): FakeStore {
       events.push({ taskId, type: event.type })
       return "evt"
     },
+    list: () => ({ records: [current], diagnostics: [] }),
   }
 }
 

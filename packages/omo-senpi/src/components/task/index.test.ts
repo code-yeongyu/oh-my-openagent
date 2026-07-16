@@ -7,25 +7,20 @@ import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext, ComponentLogger } from "../../extension/types"
-import { composeTaskEngine } from "./engine"
+import { composeTaskEngine, type TaskEngine } from "./engine"
 import { createTaskComponent, wireEventBridge } from "./index"
 import type { CapturedUi } from "./runtime-context"
 import { createSessionTransitionBridge } from "./session-transition-bridge"
 
-const TASK_TOOL_NAMES = ["task", "task_send", "task_wait", "task_interrupt", "task_cancel", "task_list", "task_output"]
+const TASK_TOOL_NAMES = ["task", "task_send", "task_cancel", "task_output"]
 const TEAM_TOOL_NAMES = [
   "team_create",
   "team_delete",
-  "team_send_message",
-  "team_status",
-  "team_list",
-  "team_task_create",
-  "team_task_list",
-  "team_task_update",
-  "team_task_get",
-  "team_shutdown_request",
-  "team_approve_shutdown",
-  "team_reject_shutdown",
+  "task_create",
+  "task_get",
+  "task_list",
+  "task_update",
+  "team_wait",
 ]
 const ALL_TOOL_NAMES = [...TASK_TOOL_NAMES, ...TEAM_TOOL_NAMES]
 const TASK_EVENTS = [
@@ -93,6 +88,7 @@ function wiredBridge(): {
   pi: FakeExtensionAPI
   engine: ReturnType<typeof composeTaskEngine>
   reconcileCalls: { count: number }
+  leadCalls: { ticks: number; shutdowns: number }
 } {
   const cwd = tempProject()
   const pi = new FakeExtensionAPI()
@@ -100,14 +96,22 @@ function wiredBridge(): {
   const engine = composeTaskEngine({ pi, omoConfig: loadOmoConfig({ cwd }).config, cwd, sharedParentTools: () => [] })
   const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })
   const reconcileCalls = { count: 0 }
+  const leadCalls = { ticks: 0, shutdowns: 0 }
   wireEventBridge(pi, ctxFor(pi, logger), engine, noopStatusUi, transitions, {
     warnDualConfig: false,
     reconcileTeamMailbox: () => {
       reconcileCalls.count += 1
       return Promise.resolve()
     },
+    leadPollers: {
+      tick: () => {
+        leadCalls.ticks += 1
+        return Promise.resolve()
+      },
+      shutdown: () => { leadCalls.shutdowns += 1 },
+    },
   })
-  return { pi, engine, reconcileCalls }
+  return { pi, engine, reconcileCalls, leadCalls }
 }
 
 function toolNames(pi: FakeExtensionAPI): string[] {
@@ -118,7 +122,7 @@ function toolNames(pi: FakeExtensionAPI): string[] {
 }
 
 describe("omo-senpi task component wiring", () => {
-  it("#given a fake ExtensionAPI boot #when the task component registers #then tools, commands, a renderer, and the event handlers are wired", () => {
+  it("#given a fake ExtensionAPI boot #when the task component registers #then tools, commands, the completion renderer, and event handlers are wired", () => {
     // given
     const pi = new FakeExtensionAPI()
     const logger = createLogger()
@@ -126,17 +130,16 @@ describe("omo-senpi task component wiring", () => {
     // when
     createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
 
-    // then the 7 task tools + 12 lead team tools registered
     expect(toolNames(pi)).toEqual([...ALL_TOOL_NAMES].sort())
     // the /tasks and /task-kill commands registered
     expect(pi.commands.map((entry) => entry.name).sort()).toEqual([...TASK_COMMANDS].sort())
-    // the completion + team-message renderers registered
-    expect(pi.messageRenderers.map((entry) => entry.customType).sort()).toEqual(["senpi-task.completion", "senpi-task.team-message"])
+    // pull-delivered peer messages are plain user turns; only completion keeps a custom renderer
+    expect(pi.messageRenderers.map((entry) => entry.customType)).toEqual(["senpi-task.completion"])
     // exactly the task event handlers (session lifecycle + transition-buffer edges)
     expect(pi.handlers.map((handler) => handler.event).sort()).toEqual([...TASK_EVENTS].sort())
   })
 
-  it("#given a fake ExtensionAPI boot #when the task component registers #then the 12 lead team tools are wired", () => {
+  it("#given a fake ExtensionAPI boot #when the task component registers #then the 7 lead team tools are wired", () => {
     // given
     const pi = new FakeExtensionAPI()
     const logger = createLogger()
@@ -144,8 +147,6 @@ describe("omo-senpi task component wiring", () => {
     // when
     createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
 
-    // then every lead team tool is present (child/member sessions never see these; the manager's
-    // shared-tool filter strips the team_* family and only the pre-scoped member send is re-added)
     const registered = toolNames(pi)
     for (const teamTool of TEAM_TOOL_NAMES) expect(registered).toContain(teamTool)
   })
@@ -186,17 +187,66 @@ describe("omo-senpi task component wiring", () => {
     expect(configWarnings).toHaveLength(1)
   })
 
-  it("#given a wired bridge #when session_start fires #then the team mailbox is reconciled exactly once across repeated starts", async () => {
+  it("#given a wired bridge #when session_start fires repeatedly #then the team mailbox is reconciled on every start", async () => {
     // given
-    const { pi, reconcileCalls } = wiredBridge()
+    const { pi, reconcileCalls, leadCalls } = wiredBridge()
     const liveCtx = { ui: fakeUi(), mode: "tui", sessionManager: { getSessionId: () => "session-a" } }
 
-    // when the session starts twice (only the first start reconciles, matching lifecycle.reconcileOnSessionStart)
+    // when the session starts twice
     await pi.dispatch("session_start", {}, liveCtx)
     await pi.dispatch("session_start", {}, liveCtx)
 
     // then
-    expect(reconcileCalls.count).toBe(1)
+    expect(reconcileCalls.count).toBe(2)
+    expect(leadCalls.ticks).toBe(2)
+  })
+
+  it("#given a session start #when reconciliation runs #then reattach, mailbox reclaim, notification retry, and lead polling stay ordered", async () => {
+    // given
+    const cwd = tempProject()
+    const pi = new FakeExtensionAPI()
+    const logger = createLogger()
+    const base = composeTaskEngine({ pi, omoConfig: loadOmoConfig({ cwd }).config, cwd, sharedParentTools: () => [] })
+    const order: string[] = []
+    const engine: TaskEngine = {
+      ...base,
+      lifecycle: {
+        ...base.lifecycle,
+        reconcileOnSessionStart: async () => {
+          order.push("reattach")
+          return { outcomes: [] }
+        },
+      },
+      notifier: {
+        ...base.notifier,
+        reconcileFailedNotifications: () => { order.push("notify") },
+      },
+    }
+    const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })
+    wireEventBridge(pi, ctxFor(pi, logger), engine, noopStatusUi, transitions, {
+      warnDualConfig: false,
+      reconcileTeamMailbox: () => {
+        order.push("reclaim")
+        return Promise.resolve()
+      },
+      leadPollers: {
+        tick: () => {
+          order.push("poll")
+          return Promise.resolve()
+        },
+        shutdown: () => undefined,
+      },
+    })
+
+    // when
+    await pi.dispatch("session_start", {}, {
+      ui: fakeUi(),
+      mode: "tui",
+      sessionManager: { getSessionId: () => "session-a" },
+    })
+
+    // then
+    expect(order).toEqual(["reattach", "reclaim", "notify", "poll"])
   })
 
   it("#given a captured ui #when session_before_switch fires #then the ui bridge is cleared", async () => {
@@ -216,7 +266,7 @@ describe("omo-senpi task component wiring", () => {
 
   it("#given a captured ui #when session_shutdown fires #then the ui bridge is cleared", async () => {
     // given a wired event bridge with a ui captured on session_start
-    const { pi, engine } = wiredBridge()
+    const { pi, engine, leadCalls } = wiredBridge()
     const liveCtx = { ui: fakeUi(), mode: "tui", sessionManager: { getSessionId: () => "session-a" } }
     await pi.dispatch("session_start", {}, liveCtx)
     expect(engine.runtime.ui()).toBeDefined()
@@ -226,6 +276,7 @@ describe("omo-senpi task component wiring", () => {
 
     // then the bridge is cleared
     expect(engine.runtime.ui()).toBeUndefined()
+    expect(leadCalls.shutdowns).toBe(1)
   })
 
   it("#given an ExtensionAPI missing registerMessageRenderer #when the component registers #then it skips with one warning and never crashes", () => {

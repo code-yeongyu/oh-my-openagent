@@ -77,6 +77,7 @@ export async function resolveMember(
         undefined,
         undefined,
         parentAgent,
+        { allowPrimaryAgentDelegation: true },
       )
 
       if (execution.error) {

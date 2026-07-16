@@ -3,7 +3,7 @@ import { defineTool, type ToolDefinition } from "@code-yeongyu/senpi"
 import { buildTaskToolDescription, TASK_PROMPT_GUIDELINES, TASK_PROMPT_SNIPPET } from "./description"
 import { buildTaskExecute } from "./execute"
 import { TaskToolParams } from "./params"
-import { linesComponent, statusThemeColor, taskCallLines, taskResultLines } from "./renderers"
+import { linesComponent, renderTaskCallLines, renderTaskResultComponent } from "./renderers"
 import type { TaskToolDeps, TaskToolDetails } from "./types"
 
 export const TASK_TOOL_NAME = "task"
@@ -22,12 +22,9 @@ export function createTaskTool(deps: TaskToolDeps): ToolDefinition<typeof TaskTo
     parameters: TaskToolParams,
     execute: (toolCallId, params, signal, onUpdate, ctx) => execute(toolCallId, params, signal, onUpdate, ctx),
     renderCall: (args, theme) => {
-      const [line] = taskCallLines(args)
-      return linesComponent([theme.fg("toolTitle", `task ${line ?? ""}`)])
+      const lines = renderTaskCallLines(args, theme)
+      return linesComponent(lines.map((line) => theme.fg("toolTitle", line)))
     },
-    renderResult: (result, _options, theme) => {
-      const [line] = taskResultLines(result.details)
-      return linesComponent([theme.fg(statusThemeColor(result.details.status), line ?? "")])
-    },
+    renderResult: (result, _options, theme) => renderTaskResultComponent(result.details, theme),
   })
 }

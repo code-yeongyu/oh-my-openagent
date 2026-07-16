@@ -9,7 +9,7 @@ import { readOpencodeConfigSkills } from "./opencode-config-skills-reader"
 describe("readOpencodeConfigSkills", () => {
   let tmpDir: string
   let globalConfigDir: string
-  let getOpenCodeConfigDirSpy: ReturnType<typeof spyOn>
+  let getOpenCodeConfigDirsSpy: ReturnType<typeof spyOn>
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ohmo-host-skills-"))
@@ -17,13 +17,13 @@ describe("readOpencodeConfigSkills", () => {
     // empty tmp dir so the developer's real ~/.config/opencode does not
     // leak into these tests (or vice versa: CI passes while local fails).
     globalConfigDir = fs.mkdtempSync(path.join(os.tmpdir(), "ohmo-global-opencode-"))
-    getOpenCodeConfigDirSpy = spyOn(opencodeConfigDir, "getOpenCodeConfigDir").mockReturnValue(
+    getOpenCodeConfigDirsSpy = spyOn(opencodeConfigDir, "getOpenCodeConfigDirs").mockReturnValue([
       globalConfigDir,
-    )
+    ])
   })
 
   afterEach(() => {
-    getOpenCodeConfigDirSpy.mockRestore()
+    getOpenCodeConfigDirsSpy.mockRestore()
     fs.rmSync(tmpDir, { recursive: true, force: true })
     fs.rmSync(globalConfigDir, { recursive: true, force: true })
   })
@@ -104,6 +104,39 @@ describe("readOpencodeConfigSkills", () => {
       expect(result).toBeUndefined()
     } finally {
       readFileSyncSpy.mockRestore()
+    }
+  })
+
+  it("merges skills from multiple user config dirs", () => {
+    // given the plural function returns two config dirs, each with its own skills config
+    const customDir = fs.mkdtempSync(path.join(os.tmpdir(), "ohmo-custom-opencode-"))
+    const defaultDir = fs.mkdtempSync(path.join(os.tmpdir(), "ohmo-default-opencode-"))
+
+    fs.writeFileSync(
+      path.join(customDir, "opencode.json"),
+      JSON.stringify({
+        skills: { paths: ["/custom/skill"], urls: ["https://custom.example.com/s.md"] },
+      }),
+    )
+    fs.writeFileSync(
+      path.join(defaultDir, "opencode.json"),
+      JSON.stringify({
+        skills: { paths: ["/default/skill"], urls: ["https://default.example.com/s.md"] },
+      }),
+    )
+
+    getOpenCodeConfigDirsSpy.mockReturnValue([customDir, defaultDir])
+
+    try {
+      // when
+      const result = readOpencodeConfigSkills(tmpDir)
+
+      // then both dirs contribute skills, deduplicated by the existing !paths.includes check
+      expect(result?.paths).toEqual(["/custom/skill", "/default/skill"])
+      expect(result?.urls).toEqual(["https://custom.example.com/s.md", "https://default.example.com/s.md"])
+    } finally {
+      fs.rmSync(customDir, { recursive: true, force: true })
+      fs.rmSync(defaultDir, { recursive: true, force: true })
     }
   })
 })
