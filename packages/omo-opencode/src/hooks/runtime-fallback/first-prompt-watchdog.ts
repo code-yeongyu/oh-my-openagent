@@ -131,6 +131,11 @@ export function createFirstPromptWatchdog(
     },
     onAssistantProgress(sessionID, parentMessageID, isAbortEvent) {
       if (!sessionID) return
+      if (
+        isAbortEvent !== true
+        && parentMessageID !== undefined
+        && parentMessageID === currentUserMessageIDs.get(sessionID)
+      ) return
       const suspendedContext = suspended.get(sessionID)
       if (suspendedContext && isAbortEvent === true) {
         const currentUserMessageID = currentUserMessageIDs.get(sessionID)

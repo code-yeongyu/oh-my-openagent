@@ -227,6 +227,50 @@ describe("first-prompt-watchdog", () => {
     watchdog.dispose()
   })
 
+  it("#given the user prompt part arrives after the watchdog arms #when the provider stays silent #then the user part does not cancel fallback recovery", async () => {
+    const sessionID = "session-user-part-before-silence"
+    const userMessageID = "msg-user-silent"
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const watchdog = createFirstPromptWatchdog(deps, createHelpers(calls, AGENT), WATCHDOG_MS)
+
+    observeEventForWatchdog(
+      {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: userMessageID,
+            sessionID,
+            role: "user",
+            model: PRIMARY_MODEL,
+            agent: AGENT,
+          },
+        },
+      },
+      watchdog,
+    )
+    observeEventForWatchdog(
+      {
+        type: "message.part.updated",
+        properties: {
+          part: {
+            id: "part-user-silent",
+            messageID: userMessageID,
+            sessionID,
+            type: "text",
+            text: "Reply exactly QA_FALLBACK_OK",
+          },
+        },
+      },
+      watchdog,
+    )
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+
+    expect(calls.abort).toEqual([{ sessionID, source: "first-prompt-watchdog" }])
+    expect(calls.autoRetry).toHaveLength(1)
+    watchdog.dispose()
+  })
+
   it("#given session emits message.part.delta with field/delta but no part.type #when watchdog tracks #then the watchdog recognizes progress", async () => {
     // given
     const sessionID = "session-delta-progress"
