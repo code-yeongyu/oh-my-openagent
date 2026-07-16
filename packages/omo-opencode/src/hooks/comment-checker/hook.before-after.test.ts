@@ -7,7 +7,9 @@ function installCliRunnerMock() {
     initializeCommentCheckerCli: () => {},
     getCommentCheckerCliPathPromise: () => Promise.resolve("/tmp/fake-comment-checker"),
     isCliPathUsable: () => true,
-    processWithCli,
+    get processWithCli() {
+      return processWithCli
+    },
     processApplyPatchEditsWithCli: async () => {},
   }))
 }
@@ -18,7 +20,10 @@ afterAll(() => {
   mock.restore()
 })
 
-const { createCommentCheckerHooks } = await import("./hook")
+const hookModulePath = "./hook?before-after"
+const hookModule: typeof import("./hook") = await import(hookModulePath)
+const { createCommentCheckerHooks } = hookModule
+mock.restore()
 const { stopPendingCallCleanup } = await import("./pending-calls")
 const { _resetCommentCheckerInitializationForTesting } = await import("./initialization-gate")
 

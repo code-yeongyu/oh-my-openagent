@@ -5,16 +5,24 @@ const mockInjectTextPart = mock(() => Promise.resolve(false))
 
 function installStorageMocks() {
   mock.module("./storage/empty-text", () => ({
-    replaceEmptyTextPartsAsync: mockReplaceEmptyTextParts,
+    get replaceEmptyTextPartsAsync() {
+      return mockReplaceEmptyTextParts
+    },
+    findMessagesWithEmptyTextPartsFromSDK: () => Promise.resolve([]),
   }))
   mock.module("./storage/text-part-injector", () => ({
-    injectTextPartAsync: mockInjectTextPart,
+    get injectTextPartAsync() {
+      return mockInjectTextPart
+    },
   }))
 }
 
 installStorageMocks()
 
-const { fixEmptyMessagesWithSDK } = await import("./empty-content-recovery-sdk")
+const sdkModulePath = "./empty-content-recovery-sdk?sdk-test"
+const sdkModule: typeof import("./empty-content-recovery-sdk") = await import(sdkModulePath)
+const { fixEmptyMessagesWithSDK } = sdkModule
+mock.restore()
 
 afterAll(() => {
   mock.restore()
