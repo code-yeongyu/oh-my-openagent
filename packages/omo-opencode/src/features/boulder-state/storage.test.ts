@@ -144,7 +144,7 @@ describe("boulder-state", () => {
       expect(result!.session_ids).toEqual([])
     })
 
-    test("should default session_ids to [] for empty object", () => {
+    test("should return null for empty object", () => {
       //#given - boulder.json with empty object
       const boulderFile = join(OMO_DIR, "boulder.json")
       writeFileSync(boulderFile, JSON.stringify({}))
@@ -153,8 +153,7 @@ describe("boulder-state", () => {
       const result = readBoulderState(TEST_DIR)
 
       //#then
-      expect(result).not.toBeNull()
-      expect(result!.session_ids).toEqual([])
+      expect(result).toBeNull()
     })
 
     test("should backfill missing origin as direct only for a single tracked session", () => {
