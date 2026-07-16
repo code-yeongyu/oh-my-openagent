@@ -178,6 +178,18 @@ Artifacts:
 - `eighth-exact-live-watchdog-run.txt`: production-duration live OpenCode run
   pinned to `d4ab26633643e084931dd223c4c9f7c561fa050f`; fallback observed, no
   fallback watchdog re-arm, later user abort external, real database unchanged.
+- `ninth-review-finding.md`: fresh exact-head reviewer report for the
+  delayed-abort-after-progress blocker.
+- `ninth-review-red-progress-delayed-abort.txt`: failing composed-hook proof
+  that the old abort reset the accepted fallback before the ninth repair.
+- `ninth-exact-focused-tests.txt`: 56 focused watchdog/deferred-terminal tests
+  plus 3 shared `session.status` tests, all passing.
+- `ninth-exact-runtime-fallback-suite.txt`: 276 passing runtime-fallback tests.
+- `ninth-exact-omo-opencode-typecheck.txt`, `ninth-exact-biome.txt`, and
+  `ninth-exact-no-excuse.txt`: exact static gates for the ninth repair.
+- `ninth-exact-opencode-harness-self-check.txt`: isolated harness preflight.
+- `ninth-exact-live-watchdog-run.txt`: successful production-duration live run
+  pinned to `7ef3442500100b9f8ee32401773fd7c80cfab6fc`.
 
 The eighth repair closes the final cancellation-ownership ambiguity. When a
 current identity-free terminal event is followed by a delayed old-parent
@@ -187,6 +199,17 @@ unavailable, error, or timeout resolves the terminal as current cancellation.
 Suspended watchdogs also retain their original deadline instead of restarting
 the full timeout. Tests use deterministic completion signals rather than real
 sleeps, and the watchdog firing logic is split into a focused module.
+
+The first fresh post-push reviewer then found a distinct post-progress race:
+normal assistant progress for generation two cleared generation-one abort
+provenance, so a still-delayed old abort could reset the accepted fallback.
+`ninth-review-red-progress-delayed-abort.txt` reproduces the reset before the
+repair. Runtime commit `7ef3442500100b9f8ee32401773fd7c80cfab6fc`
+stops the timer on progress while retaining generation context for later abort
+correlation; a consumed old abort does not rearm a watchdog that already saw
+assistant output. The exact ninth cycle passes 56 focused tests plus 3 shared
+status tests, all 276 runtime-fallback tests, static gates, and isolated live
+OpenCode QA.
 
 ## Why It Is Enough
 
