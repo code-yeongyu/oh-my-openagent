@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { clearCommandLoaderCache } from "../../features/claude-code-command-loader"
@@ -44,6 +44,24 @@ Execute daplug prompt flow.
 description: Templated prompt from daplug
 ---
 Echo $ARGUMENTS and \${user_message}.
+`,
+  )
+  writeFileSync(
+    join(pluginInstallPath, "commands", "special-args.md"),
+    `---
+description: Special argument prompt from daplug
+---
+Echo $ARGUMENTS.
+`,
+  )
+  const userCommandsDir = join(claudeConfigDir, "commands")
+  mkdirSync(userCommandsDir, { recursive: true })
+  writeFileSync(
+    join(userCommandsDir, "plain.md"),
+    `---
+description: Plain user prompt
+---
+Execute the plain prompt.
 `,
   )
 
@@ -194,6 +212,47 @@ describe("auto-slash command executor plugin dispatch", () => {
     expect(result.replacementText).toContain("Echo ship it and ship it.")
     expect(result.replacementText).not.toContain("$ARGUMENTS")
     expect(result.replacementText).not.toContain("${user_message}")
+    expect(result.replacementText).not.toContain("## User Request")
+  })
+
+  it("retains the user request section for command templates without argument placeholders", async () => {
+    const result = await executeSlashCommand(
+      {
+        command: "plain",
+        args: "ship it",
+        raw: "/plain ship it",
+      },
+      {
+        skills: [],
+        pluginsEnabled: true,
+        directory: tempDir,
+      },
+    )
+
+    expect(result.success).toBe(true)
+    expect(result.replacementText).toContain("## User Request\n\nship it")
+  })
+
+  it("preserves special arguments as data when a command template consumes them", async () => {
+    const injectionMarker = join(tempDir, "should-not-exist")
+    const args = `ship @secret.txt $(touch ${injectionMarker}) $HOME`
+
+    const result = await executeSlashCommand(
+      {
+        command: "daplug:special-args",
+        args,
+        raw: `/daplug:special-args ${args}`,
+      },
+      {
+        skills: [],
+        pluginsEnabled: true,
+      },
+    )
+
+    expect(result.success).toBe(true)
+    expect(result.replacementText).toContain(`Echo ${args}.`)
+    expect(result.replacementText).not.toContain("## User Request")
+    expect(existsSync(injectionMarker)).toBe(false)
   })
 
   it("renders Atlas as the builtin start-work agent during slash-command execution", async () => {
