@@ -147,4 +147,21 @@ describe("resolveModelForDelegateTask", () => {
       matchedFallback: true,
     })
   })
+
+  test("#given custom and later-rung providers expose the same model #when fallback resolves #then the custom provider keeps the earlier variant", () => {
+    const result = resolveModelForDelegateTask({
+      availableModels: new Set([
+        "long-custom-provider/gpt-5.6-sol",
+        "github-copilot/gpt-5.6-sol",
+      ]),
+      fallbackChain: gpt56SolFallbackChain,
+    }, noCacheDeps)
+
+    expect(result).toEqual({
+      model: "long-custom-provider/gpt-5.6-sol",
+      variant: "xhigh",
+      fallbackEntry: nativeSolEntry,
+      matchedFallback: true,
+    })
+  })
 })

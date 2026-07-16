@@ -239,14 +239,20 @@ export function resolveModelForDelegateTask(
           }
         }
 
-        const crossProviderMatch = fuzzyMatchModel(entry.model, new Set(input.availableModels))
+        const laterRungProviders = new Set(
+          fallbackChain
+            .slice(entryIndex + 1)
+            .filter((candidate) => candidate.model === entry.model)
+            .flatMap((candidate) => candidate.providers),
+        )
+        const crossProviderCandidates = new Set(
+          [...input.availableModels].filter((model) => {
+            const [provider] = model.split("/")
+            return provider !== undefined && !laterRungProviders.has(provider)
+          }),
+        )
+        const crossProviderMatch = fuzzyMatchModel(entry.model, crossProviderCandidates)
         if (crossProviderMatch) {
-          const matchedProvider = crossProviderMatch.split("/")[0]
-          const hasLaterProviderRung = fallbackChain.slice(entryIndex + 1).some((candidate) =>
-            candidate.model === entry.model && candidate.providers.includes(matchedProvider)
-          )
-          if (hasLaterProviderRung) continue
-
           if (explicitHighModel && entry.variant === "high" && crossProviderMatch === explicitHighBaseModel) {
             return { model: explicitHighModel, fallbackEntry: entry, matchedFallback: true }
           }
