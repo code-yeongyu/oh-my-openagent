@@ -289,21 +289,39 @@ Until every success criterion PASSES with its evidence captured:
    vars. Append a one-line cleanup receipt to the notepad next to the
    artifact, e.g. `cleanup: killed 12345; tmux kill-session ulw-qa-foo;
    rm -rf /tmp/ulw.aB12cD`. No receipt → criterion stays in_progress.
-6. Verify: LSP diagnostics clean on changed files + full test suite
-   green (no skipped, no xfail added this turn).
+6. Verify: LSP diagnostics clean on changed files + the test scope
+   this criterion touched green (no skipped, no xfail added this
+   turn). Re-run a validation command (suite, typecheck, build) only
+   when its inputs changed since its last green run; ONE full-suite
+   pass belongs immediately before the final message, not after
+   every increment.
 7. Mark completed. Append non-obvious findings / learnings.
-8. After each increment, re-run every criterion's scenario. Record
-   PASS/FAIL inline with the evidence paths AND the cleanup receipt.
-   Loop until all PASS.
+8. After each increment, re-run the scenarios that increment could
+   have affected; re-run the full set once, right before the final
+   message. Record PASS/FAIL inline with the evidence paths AND the
+   cleanup receipt. Loop until all PASS.
 
 Parallel-batch independent reads / searches / subagents within a step,
 but NEVER parallelise RED and GREEN of the same criterion.
 
+# Waiting discipline (a poll costs a full model round)
+Every status check you issue as a tool call replays the entire
+accumulated context through the model. When a command will run long
+(installs, builds, test suites, containers, CI), run it to completion
+in ONE call with a timeout sized to the expected duration, or send
+output to a log file and read it once when a completion signal is
+expected. Never re-poll the same surface with empty reads or
+sub-minute waits — batch waiting into the fewest, longest blocking
+calls the harness allows, and do independent root work while the
+command runs. If two consecutive checks show no state change, double
+the wait before the next check or switch to a completion signal.
+
 # Codex subagent reliability
 Every `multi_agent_v1.spawn_agent` message is self-contained and starts with
-`TASK: <imperative assignment>`, then names `DELIVERABLE`, `SCOPE`, and
-`VERIFY`. State that it is an executable assignment, not a context
-handoff. Use `fork_context: false` unless full history is truly
+`TASK: <imperative assignment>`, then names `DELIVERABLE`, `SCOPE`,
+`VERIFY`, and `STOP WHEN` — the observable condition that ends the
+child's run; a child without a stop condition wanders past its goal.
+State that it is an executable assignment, not a context handoff. Use `fork_context: false` unless full history is truly
 required; paste only the context the child needs. Full-history forks can
 make the child continue old parent context instead of the delegated task.
 If your tool list has a flat `spawn_agent` with a required `task_name` instead of `multi_agent_v1.*` (`multi_agent_v2`), rewrite: `fork_context: false` becomes `fork_turns: "none"`, `send_input` becomes `send_message`, finished agents end on their own (no `close_agent`; `followup_task` re-tasks, `interrupt_agent` stops), and `wait_agent` takes only `timeout_ms`, returning on any child mailbox activity.
