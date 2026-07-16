@@ -123,11 +123,25 @@ describe("start-work boulder state reader", () => {
 		expect(state?.checklist).toEqual({ completed: 0, remaining: 1, total: 1, nextTaskLabel: "First" });
 	});
 
-	it("#given no remaining top-level checklist items #when state is read #then continuation is absent", () => {
+	it("#given active codex work with no remaining checklist items #when state is read #then final gate continuation remains present", () => {
 		// given
 		const workspace = createWorkspace({
 			boulderJson: createBoulderJson({ status: "active", sessionIds: ["codex:sess_abc"] }),
 			planMarkdown: "# Plan\n\n## TODOs\n- [x] First\n",
+		});
+
+		// when
+		const state = readContinuationState(workspace, "sess_abc");
+
+		// then
+		expect(state?.checklist).toEqual({ completed: 1, remaining: 0, total: 1, nextTaskLabel: null });
+	});
+
+	it("#given active codex work with no readable checklist #when state is read #then continuation remains absent", () => {
+		// given
+		const workspace = createWorkspace({
+			boulderJson: createBoulderJson({ status: "active", sessionIds: ["codex:sess_abc"] }),
+			planMarkdown: "# Plan\n\nNo checklist yet.\n",
 		});
 
 		// when
