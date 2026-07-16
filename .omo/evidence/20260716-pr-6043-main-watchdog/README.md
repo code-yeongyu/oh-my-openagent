@@ -1,11 +1,11 @@
 # PR #6043 QA Evidence
 
-Reviewed integrated source head: `1a427eb83fc722249e6e7562d0097fe5a113db9d`
+Reviewed integrated source head: `43a3704e92d66fdd7b7133568fe4c9e5e99b4b3a`
 
 Integrated `dev`: `fb7d4b66f541e22e9718a4f51314702c6ac68e53`
 
 Exact integrated QA head before this evidence-only refresh:
-`0e7223d60b6cbbb04ddc92801f62fd6c09749e92`
+`43a3704e92d66fdd7b7133568fe4c9e5e99b4b3a`
 
 The following evidence commit is content-only. It refreshes reviewer-readable
 artifacts and does not change the tested runtime behavior.
@@ -353,6 +353,27 @@ Fourteenth-cycle artifacts:
 - `fourteenth-integrated-integrity.txt`: integrated head `1a427eb83fc722249e6e7562d0097fe5a113db9d`, merged `dev` parent, retained runtime fix, diff check, and pure-LOC limits.
 - `fourteenth-integrated-opencode-harness-self-check.txt`: integrated-head isolated harness preflight and cleanup proof.
 - `fourteenth-integrated-live-watchdog-run.txt`: production-duration live OpenCode run pinned to integrated head `1a427eb83fc722249e6e7562d0097fe5a113db9d`; fallback observed, no fallback watchdog re-arm, later user abort external, and real database unchanged.
+
+The fifteenth fresh reviewer found the sibling provider-error transport. When
+the current retryable failure arrived as `session.error` while an older abort
+was suspended for correlation, the watchdog removed the internal ownership
+marker before replaying the deferred abort. The replay therefore reset retry
+state, and normal provider handling repeated fallback one. The failing
+composed proof observed `anthropic/fallback-1` twice. The repair consumes the
+older tombstone, preserves one internal marker for the deferred replay, and
+then lets the unchanged current provider error advance to
+`google/fallback-2` with attempt count two.
+
+Fifteenth-cycle artifacts:
+
+- `fifteenth-review-finding.md`: exact-head reviewer report and sibling `session.error` transport finding.
+- `fifteenth-review-red-session-error-correlation.txt`: failing-first proof that fallback one repeated.
+- `fifteenth-review-green-session-error-correlation.txt`: repaired composed coverage for assistant and `session.error` provider transports.
+- `fifteenth-exact-runtime-fallback-suite.txt`: 283 tests passing across 40 files on runtime head `43a3704e92d66fdd7b7133568fe4c9e5e99b4b3a`.
+- `fifteenth-exact-omo-opencode-typecheck.txt`, `fifteenth-exact-biome.txt`, and `fifteenth-exact-no-excuse.txt`: exact-head static gates.
+- `fifteenth-exact-integrity.txt`: exact runtime head/base/merge-base identity, diff check, and pure-LOC limits.
+- `fifteenth-exact-opencode-harness-self-check.txt`: exact-head isolated OpenCode harness preflight and sandbox cleanup proof.
+- `fifteenth-exact-live-watchdog-run.txt`: production-duration live OpenCode run pinned to `43a3704e92d66fdd7b7133568fe4c9e5e99b4b3a`; fallback observed, no fallback watchdog re-arm, later user abort external, and real database unchanged.
 
 ## Why It Is Enough
 
