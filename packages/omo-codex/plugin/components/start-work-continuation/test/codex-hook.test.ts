@@ -69,6 +69,26 @@ describe("start-work Stop hook", () => {
 		expect(parsed.reason).toContain("- Your session id in boulder.json: `codex:sess_abc`");
 	});
 
+	it("#given active codex work with zero remaining tasks #when hook runs #then blocks for the final gate", () => {
+		// given
+		const workspace = createWorkspace({
+			boulderJson: createBoulderJson({ sessionIds: ["codex:sess_abc"], status: "active" }),
+			planMarkdown: ["# Plan", "", "## TODOs", "- [x] Done"].join("\n"),
+		});
+		const fs = createMemoryFs();
+
+		// when
+		const output = runStopHook(createStopInput(workspace), fs);
+
+		// then
+		const parsed = parseBlockOutput(output);
+		expect(parsed.decision).toBe("block");
+		expect(parsed.reason).toContain("- Remaining top-level checkboxes: `0` of `1`");
+		expect(parsed.reason).toContain("- Next incomplete task: `none (final gate pending)`");
+		expect(parsed.reason).toContain("When the remaining count is `0`, skip checkbox execution");
+		expect(parsed.reason).toContain("re-read the ledger record and verify the exact lane/SHA pair");
+	});
+
 	it("#given context-window pressure in transcript #when hook runs #then it does not inject continuation text", () => {
 		// given
 		const transcriptPath = "/repo/transcript.jsonl";

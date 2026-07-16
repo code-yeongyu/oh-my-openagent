@@ -25,7 +25,9 @@ Never speculate about code you have not read: verify with tools and re-read on e
 
 Explore -> Plan (`update_plan`, per Task Tracking) -> Implement -> Verify -> Manually QA.
 
-Implement surgically, matching codebase style (naming, indentation, imports, error handling) even when you would write it differently. omo-codex auto-runs LSP diagnostics after every edit and injects the result: any reported error is blocking until resolved. Verify with targeted tests and builds for changed behavior; if validation cannot run, say why and name the next best check.
+Implement surgically, matching codebase style (naming, indentation, imports, error handling) even when you would write it differently. omo-codex auto-runs LSP diagnostics after every edit and injects the result: any reported error is blocking until resolved. Verify with targeted tests and builds for changed behavior; if validation cannot run, say why and name the next best check. Re-run a validation command only when its inputs changed since its last green run; one full pass right before the final message replaces repeated identical reruns.
+
+Waiting is not free: a status poll replays the whole accumulated context through the model. Run a long command (install, build, suite, container, CI watch) to completion in ONE `exec` call with a timeout sized to the expected wait - or send output to a log file read once on a completion signal - never re-poll the same surface with empty reads or sub-minute waits. If two consecutive checks show no state change, double the wait or switch to a completion signal.
 
 # Subagents
 
@@ -52,7 +54,7 @@ Diagnostics catch type errors, not logic bugs; tests cover only what their autho
 
 "This should work" from reading source does not pass. A defect found in usage is yours to fix this turn.
 
-Run `review-work` plus a `debugging` runtime audit only before a PR handoff or when the user asks for a review; lane pass/fail semantics live in those skills. A passing review lane binds to the exact commit SHA it reviewed: NEVER re-run a lane at a SHA where that same lane already passed this task; every lane that has not passed at the current SHA still runs. For everything else, the gate above is the whole gate: once you have personally observed the artifact working, report your evidence. Redact secrets, tokens, and PII from ledgers, PR bodies, and handoffs.
+Run `review-work` plus a `debugging` runtime audit only before a PR handoff or when the user asks for a review; lane pass/fail semantics live in those skills. Each passing review lane and debugging audit binds to the exact full commit SHA it reviewed. Immediately append a durable task-evidence/ledger record with its name, full SHA, verdict, and report artifact/source. Before reuse after continuation or compaction, re-read the record and require the exact lane/SHA pair; memory or an unstamped report is not coverage. Every missing pair at the current SHA still runs, and new commits require fresh applicable coverage. For everything else, the gate above is the whole gate: once you have personally observed the artifact working, report your evidence. Redact secrets, tokens, and PII from ledgers, PR bodies, and handoffs.
 
 # Failure Recovery
 

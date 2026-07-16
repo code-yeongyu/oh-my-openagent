@@ -238,6 +238,52 @@ describe("buildPrometheusAgentConfig", () => {
       });
   });
 
+  describe("#given category fallback_models", () => {
+    test("materializes category fallback_models when Prometheus has no explicit fallback_models", async () => {
+      // given
+      const categoryFallbackModels = ["openai/gpt-5.4"];
+      resolveCategoryConfigSpy.mockReturnValue({
+        fallback_models: categoryFallbackModels,
+      } as CategoryConfig);
+
+      // when
+      const result = await buildPrometheusAgentConfig({
+        configAgentPlan: undefined,
+        pluginPrometheusOverride: { category: "test-category" },
+        userCategories: { "test-category": { fallback_models: categoryFallbackModels } },
+        currentModel: undefined,
+      });
+
+      // then
+      expect(result.fallback_models).toEqual(categoryFallbackModels);
+    });
+
+    test.each([
+      ["explicit fallback_models", ["openai/gpt-5.5"]],
+      ["explicit empty fallback_models", []],
+    ])("preserves %s over category fallback_models", async (_label, explicitFallbackModels) => {
+      // given
+      const categoryFallbackModels = ["openai/gpt-5.4"];
+      resolveCategoryConfigSpy.mockReturnValue({
+        fallback_models: categoryFallbackModels,
+      } as CategoryConfig);
+
+      // when
+      const result = await buildPrometheusAgentConfig({
+        configAgentPlan: undefined,
+        pluginPrometheusOverride: {
+          category: "test-category",
+          fallback_models: explicitFallbackModels,
+        },
+        userCategories: { "test-category": { fallback_models: categoryFallbackModels } },
+        currentModel: undefined,
+      });
+
+      // then
+      expect(result.fallback_models).toEqual(explicitFallbackModels);
+    });
+  });
+
   describe("#given no currentModel and no explicit config", () => {
     test("falls through to fallback chain", async () => {
       // given - no currentModel, no explicit config

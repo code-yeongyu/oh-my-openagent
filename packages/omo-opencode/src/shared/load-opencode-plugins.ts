@@ -1,8 +1,8 @@
 import * as fs from "node:fs"
-import * as os from "node:os"
 import * as path from "node:path"
 
 import { parseJsoncSafe } from "./jsonc-parser"
+import { getOpenCodeConfigDirs } from "./opencode-config-dir"
 
 interface OpencodeConfig {
   plugin?: (string | [string, ...unknown[]])[]
@@ -10,35 +10,16 @@ interface OpencodeConfig {
 
 const opencodePluginsCache = new Map<string, string[]>()
 
-function getWindowsAppdataDir(): string | null {
-  return process.env.APPDATA || null
-}
-
 function getConfigPaths(directory: string): string[] {
-  const crossPlatformDir = path.join(os.homedir(), ".config")
-  const paths = [
+  const configDirs = getOpenCodeConfigDirs({ binary: "opencode" })
+  return [
     path.join(directory, ".opencode", "opencode.json"),
     path.join(directory, ".opencode", "opencode.jsonc"),
-    path.join(crossPlatformDir, "opencode", "opencode.json"),
-    path.join(crossPlatformDir, "opencode", "opencode.jsonc"),
+    ...configDirs.flatMap((dir) => [
+      path.join(dir, "opencode.json"),
+      path.join(dir, "opencode.jsonc"),
+    ]),
   ]
-
-  const customConfigDir = process.env.OPENCODE_CONFIG_DIR?.trim()
-  if (customConfigDir) {
-    const resolvedCustomConfigDir = path.resolve(customConfigDir)
-    paths.push(path.join(resolvedCustomConfigDir, "opencode.json"))
-    paths.push(path.join(resolvedCustomConfigDir, "opencode.jsonc"))
-  }
-
-  if (process.platform === "win32") {
-    const appdataDir = getWindowsAppdataDir()
-    if (appdataDir) {
-      paths.push(path.join(appdataDir, "opencode", "opencode.json"))
-      paths.push(path.join(appdataDir, "opencode", "opencode.jsonc"))
-    }
-  }
-
-  return Array.from(new Set(paths))
 }
 
 export function loadOpencodePlugins(directory: string): string[] {
