@@ -294,6 +294,22 @@ describe("first-prompt-watchdog", () => {
     watchdog.dispose()
   })
 
+  it("#given a fallback dispatch is already awaiting its result #when its internal user update is observed #then the first-prompt watchdog does not arm for that retry", async () => {
+    const sessionID = "session-internal-fallback-user-update"
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+    deps.internallyAbortedSessions.add(sessionID)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const watchdog = createFirstPromptWatchdog(deps, createHelpers(calls, AGENT), WATCHDOG_MS)
+
+    watchdog.onUserMessage(sessionID, FALLBACK_MODEL, AGENT)
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+
+    expect(calls.abort).toEqual([])
+    expect(calls.autoRetry).toEqual([])
+    watchdog.dispose()
+  })
+
   it("#given assistant progress cancels an armed watchdog #when a later user turn stays silent #then the watchdog re-arms for the new turn", async () => {
     const sessionID = "session-main-rearms-after-progress"
     const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)

@@ -187,6 +187,54 @@ describe("first-prompt watchdog lifecycle", () => {
     watchdog.dispose()
   })
 
+  it("#given the watchdog abort request is not yet acknowledged #when an abort-shaped session error arrives #then it is external cancellation and no fallback is dispatched", async () => {
+    const sessionID = "session-external-abort-during-watchdog-abort"
+    const deps = createDeps()
+    const calls = { dispatch: 0 }
+    let resolveAbort: ((value: boolean) => void) | undefined
+    let notifyAbortStarted: (() => void) | undefined
+    const abortStarted = new Promise<void>((resolve) => {
+      notifyAbortStarted = resolve
+    })
+    const abortResult = new Promise<boolean>((resolve) => {
+      resolveAbort = resolve
+    })
+    const helpers: AutoRetryHelpers = {
+      abortSessionRequest: async () => {
+        deps.internallyAbortedSessions.add(sessionID)
+        notifyAbortStarted?.()
+        return abortResult
+      },
+      clearSessionFallbackTimeout: () => {},
+      scheduleSessionFallbackTimeout: () => {},
+      autoRetryWithFallback: async () => {
+        calls.dispatch += 1
+        return { accepted: true, status: "dispatched" }
+      },
+      resolveAgentForSessionFromContext: async () => AGENT,
+      cleanupStaleSessions: () => {},
+    }
+    const watchdog = createFirstPromptWatchdog(deps, helpers, 1)
+
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await abortStarted
+    watchdog.onSessionTerminal(sessionID, "session.error", true)
+    await createEventHandler(deps, helpers)({
+      event: {
+        type: "session.error",
+        properties: { sessionID, error: { name: "MessageAbortedError" } },
+      },
+    })
+    resolveAbort?.(true)
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      await Promise.resolve()
+    }
+
+    expect(calls.dispatch).toBe(0)
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(false)
+    watchdog.dispose()
+  })
+
   it("#given the watchdog abort is in flight #when OpenCode reports its internal completion and idle events #then the fallback is still dispatched", async () => {
     const sessionID = "session-internal-abort-completes"
     const deps = createDeps()
@@ -229,7 +277,7 @@ describe("first-prompt watchdog lifecycle", () => {
     watchdog.dispose()
   })
 
-  it("#given the watchdog abort is in flight #when OpenCode reports its internal abort error #then the fallback is still dispatched", async () => {
+  it("#given the watchdog abort request succeeded #when OpenCode reports its acknowledged internal abort error #then the fallback dispatch remains owned", async () => {
     const sessionID = "session-internal-abort-error"
     const deps = createDeps()
     const calls = { dispatch: 0 }
@@ -241,6 +289,14 @@ describe("first-prompt watchdog lifecycle", () => {
     const abortResult = new Promise<boolean>((resolve) => {
       resolveAbort = resolve
     })
+    let releaseDispatch: (() => void) | undefined
+    let notifyDispatchStarted: (() => void) | undefined
+    const dispatchStarted = new Promise<void>((resolve) => {
+      notifyDispatchStarted = resolve
+    })
+    const dispatchReleased = new Promise<void>((resolve) => {
+      releaseDispatch = resolve
+    })
     const helpers: AutoRetryHelpers = {
       abortSessionRequest: async () => {
         deps.internallyAbortedSessions.add(sessionID)
@@ -251,6 +307,8 @@ describe("first-prompt watchdog lifecycle", () => {
       scheduleSessionFallbackTimeout: () => {},
       autoRetryWithFallback: async () => {
         calls.dispatch += 1
+        notifyDispatchStarted?.()
+        await dispatchReleased
         return { accepted: true, status: "dispatched" }
       },
       resolveAgentForSessionFromContext: async () => AGENT,
@@ -260,6 +318,8 @@ describe("first-prompt watchdog lifecycle", () => {
 
     watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
     await abortStarted
+    resolveAbort?.(true)
+    await dispatchStarted
     watchdog.onSessionTerminal(sessionID, "session.error", true)
     await createEventHandler(deps, helpers)({
       event: {
@@ -267,12 +327,13 @@ describe("first-prompt watchdog lifecycle", () => {
         properties: { sessionID, error: { name: "MessageAbortedError" } },
       },
     })
-    resolveAbort?.(true)
+    releaseDispatch?.()
     for (let attempt = 0; attempt < 10; attempt += 1) {
       await Promise.resolve()
     }
 
     expect(calls.dispatch).toBe(1)
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(false)
     watchdog.dispose()
   })
 

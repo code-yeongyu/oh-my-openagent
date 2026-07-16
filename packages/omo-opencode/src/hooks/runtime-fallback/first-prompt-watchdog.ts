@@ -130,6 +130,7 @@ export function createFirstPromptWatchdog(
   const timers = new Map<string, RuntimeFallbackTimeout>()
   const armed = new Set<string>()
   const sessionGenerations = new Map<string, number>()
+  const acknowledgedAbortGenerations = new Map<string, number>()
   let lifecycleGeneration = 0
 
   const cancel = (sessionID: string): void => {
@@ -139,6 +140,7 @@ export function createFirstPromptWatchdog(
       timers.delete(sessionID)
     }
     armed.delete(sessionID)
+    acknowledgedAbortGenerations.delete(sessionID)
     sessionGenerations.set(sessionID, (sessionGenerations.get(sessionID) ?? 0) + 1)
   }
 
@@ -204,6 +206,7 @@ export function createFirstPromptWatchdog(
       log(`[${HOOK_NAME}] ${SOURCE}: abort failed, skipping fallback dispatch`, { sessionID })
       return
     }
+    acknowledgedAbortGenerations.set(sessionID, sessionGeneration)
 
     await dispatchFallbackRetry(deps, helpers, {
       sessionID,
@@ -216,7 +219,7 @@ export function createFirstPromptWatchdog(
 
   return {
     onUserMessage(sessionID, model, agent) {
-      if (!sessionID) return
+      if (!sessionID || deps.sessionAwaitingFallbackResult.has(sessionID)) return
       if (armed.has(sessionID)) return
 
       const wasSubagent = subagentSessions.has(sessionID)
@@ -232,6 +235,7 @@ export function createFirstPromptWatchdog(
         } finally {
           if (sessionGeneration === sessionGenerations.get(sessionID)) {
             armed.delete(sessionID)
+            acknowledgedAbortGenerations.delete(sessionID)
             sessionGenerations.delete(sessionID)
           }
         }
@@ -249,7 +253,18 @@ export function createFirstPromptWatchdog(
     onSessionTerminal(sessionID, eventType, isAbortEvent) {
       if (!sessionID || !armed.has(sessionID)) return
       if (
-        (eventType === "session.idle" || (eventType === "session.error" && isAbortEvent === true))
+        eventType === "session.error"
+        && isAbortEvent === true
+        && deps.internallyAbortedSessions.has(sessionID)
+      ) {
+        // The watchdog owns only abort events delivered after this exact
+        // generation's abort request has returned successfully.
+        if (acknowledgedAbortGenerations.get(sessionID) === sessionGenerations.get(sessionID)) return
+
+        deps.internallyAbortedSessions.delete(sessionID)
+      }
+      if (
+        eventType === "session.idle"
         && deps.internallyAbortedSessions.has(sessionID)
       ) return
       cancel(sessionID)
@@ -263,6 +278,7 @@ export function createFirstPromptWatchdog(
       timers.clear()
       armed.clear()
       sessionGenerations.clear()
+      acknowledgedAbortGenerations.clear()
     },
   }
 }
