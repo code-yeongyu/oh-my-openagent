@@ -26,4 +26,5 @@ export {
 export { buildGpt54SisyphusPrompt } from "./gpt-5-4";
 export { buildGpt55SisyphusPrompt } from "./gpt-5-5";
 export { buildGlm52SisyphusPrompt } from "./glm-5-2";
+export { buildMimoV25ProSisyphusPrompt } from "./mimo-v2-5-pro";
 export { buildKimiK26SisyphusPrompt } from "./kimi-k2-6";

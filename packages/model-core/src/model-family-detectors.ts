@@ -81,6 +81,11 @@ export function isGlmModel(model: string): boolean {
   return modelName.includes("glm")
 }
 
+export function isMimoModel(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase()
+  return modelName.includes("mimo")
+}
+
 const GEMINI_PROVIDERS = ["google/", "google-vertex/"] as const
 
 export function isGeminiModel(model: string): boolean {

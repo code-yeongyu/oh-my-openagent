@@ -19,6 +19,7 @@ import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
 import { buildGpt55SisyphusPrompt } from "./sisyphus/gpt-5-5";
 import { buildKimiK26SisyphusPrompt } from "./sisyphus/kimi-k2-6";
 import { buildKimiK27SisyphusPrompt } from "./sisyphus/kimi-k2-7";
+import { buildMimoV25ProSisyphusPrompt } from "./sisyphus/mimo-v2-5-pro";
 import type { AgentMode } from "./types";
 import {
   isClaudeFable5Model,
@@ -31,6 +32,7 @@ import {
   isGptNativeSisyphusModel,
   isKimiK2Model,
   isKimiK27Model,
+  isMimoModel,
 } from "./types";
 
 const MODE: AgentMode = "primary";
@@ -51,6 +53,7 @@ export type SisyphusPromptFamily =
   | "claude-opus-4-8"
   | "claude-opus-4-7"
   | "glm-5-2"
+  | "mimo-v2.5-pro"
   | "fallback";
 
 export function resolveSisyphusPromptFamily(model: string): SisyphusPromptFamily {
@@ -62,6 +65,7 @@ export function resolveSisyphusPromptFamily(model: string): SisyphusPromptFamily
   if (isClaudeOpus48Model(model)) return "claude-opus-4-8";
   if (isClaudeOpus47Model(model)) return "claude-opus-4-7";
   if (isGlmModel(model)) return "glm-5-2";
+  if (isMimoModel(model)) return "mimo-v2.5-pro";
   return "fallback";
 }
 
@@ -126,6 +130,12 @@ export function createSisyphusAgent(
         MODE,
         model,
         buildGlm52SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
+      );
+    case "mimo-v2.5-pro":
+      return buildGlmSisyphusAgentConfig(
+        MODE,
+        model,
+        buildMimoV25ProSisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
       );
     case "fallback": {
       const prompt = buildFallbackSisyphusPrompt(
