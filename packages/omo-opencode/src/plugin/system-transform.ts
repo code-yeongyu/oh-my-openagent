@@ -20,7 +20,7 @@ export function createSystemTransformHandler(
   defaultMode?: DefaultModeConfig,
   getUltraworkMessage?: (agentName?: string, modelID?: string) => string,
   options?: {
-    backgroundManager?: Pick<BackgroundManager, "hasActiveChildTasks">
+    backgroundManager?: Pick<BackgroundManager, "hasActiveDescendantTasks">
     blockOnBackgroundTasks?: boolean
   },
 ): (
@@ -54,11 +54,11 @@ function injectBackgroundWaitInstruction(
   sessionID: string | undefined,
   system: string[],
   options:
-    | { backgroundManager?: Pick<BackgroundManager, "hasActiveChildTasks">; blockOnBackgroundTasks?: boolean }
+    | { backgroundManager?: Pick<BackgroundManager, "hasActiveDescendantTasks">; blockOnBackgroundTasks?: boolean }
     | undefined,
 ): void {
   if (!options?.blockOnBackgroundTasks || !options.backgroundManager || !sessionID) return
-  if (!options.backgroundManager.hasActiveChildTasks(sessionID)) return
+  if (!options.backgroundManager.hasActiveDescendantTasks(sessionID)) return
   if (system.some((part) => part.includes(BACKGROUND_WAIT_TAG))) return
   system.push(BACKGROUND_WAIT_INSTRUCTION)
 }

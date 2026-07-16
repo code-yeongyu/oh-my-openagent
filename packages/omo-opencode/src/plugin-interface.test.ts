@@ -29,7 +29,7 @@ describe("createPluginInterface - effective background wait availability", () =>
         clear: () => {},
       },
       managers: {
-        backgroundManager: { hasActiveChildTasks: () => true },
+        backgroundManager: { hasActiveDescendantTasks: () => true },
       } as never,
       hooks: {} as never,
       tools: {},

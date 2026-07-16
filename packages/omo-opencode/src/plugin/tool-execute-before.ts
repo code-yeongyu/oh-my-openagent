@@ -42,7 +42,7 @@ function getLoopCommandArguments(args: Record<string, unknown>, command: "ralph-
 export function createToolExecuteBeforeHandler(args: {
   ctx: PluginContext
   hooks: CreatedHooks
-  backgroundManager?: Pick<BackgroundManager, "hasActiveChildTasks" | "hasPendingParentWake">
+  backgroundManager?: Pick<BackgroundManager, "hasActiveDescendantTasks" | "hasPendingParentWake">
 }): (
   input: { tool: string; sessionID: string; callID: string },
   output: { args: Record<string, unknown> },
@@ -95,7 +95,7 @@ export function createToolExecuteBeforeHandler(args: {
       if (
         isPureSleepCommand(output.args.command)
         && (
-          backgroundManager?.hasActiveChildTasks(input.sessionID) === true
+          backgroundManager?.hasActiveDescendantTasks(input.sessionID) === true
           || backgroundManager?.hasPendingParentWake(input.sessionID) === true
         )
       ) {

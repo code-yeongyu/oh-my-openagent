@@ -6,8 +6,8 @@ import { createSystemTransformHandler } from "./system-transform"
 
 const WAIT_TAG = "[CRITICAL — BACKGROUND TASKS RUNNING]"
 
-function backgroundManager(hasActive: boolean): Pick<BackgroundManager, "hasActiveChildTasks"> {
-  return { hasActiveChildTasks: () => hasActive }
+function backgroundManager(hasActive: boolean): Pick<BackgroundManager, "hasActiveDescendantTasks"> {
+  return { hasActiveDescendantTasks: () => hasActive }
 }
 
 function runHandler(
