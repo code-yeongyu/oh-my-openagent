@@ -1,0 +1,5 @@
+curl: (7) Failed to connect to 127.0.0.1 port 49292 after 0 ms: Couldn't connect to server
+curl: (7) Failed to connect to 127.0.0.1 port 49293 after 0 ms: Couldn't connect to server
+curl: (7) Failed to connect to 127.0.0.1 port 49293 after 0 ms: Couldn't connect to server
+PASS source_head=be630fc68e47b3c522556c3aec026c9b5c270247 real_db_unchanged=yes fallback_seen=yes later_user_abort=external
+.omo/evidence/20260716-pr-6043-main-watchdog/run-live-watchdog-qa.sh: line 32:   215 Terminated: 15          curl -sN -u "opencode:$SERVER_PASS" "http://127.0.0.1:${SERVER_PORT}/event?directory=${ENC_DIR}" > "$SSE_LOG"
