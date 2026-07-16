@@ -6747,6 +6747,12 @@
             "dev-browser",
             "playwright-cli"
           ]
+        },
+        "playwright_mcp_args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
