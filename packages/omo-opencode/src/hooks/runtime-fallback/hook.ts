@@ -103,6 +103,7 @@ export function createRuntimeFallbackHook(
       deferredTerminalEvents.set(watchdogDecision.sessionID, event)
       return
     }
+    if (watchdogDecision?.kind === "consume-terminal") return
     if (watchdogDecision?.kind === "inspect-terminal") {
       const currentRequestActive = await isCurrentRequestActive(ctx, watchdogDecision.sessionID)
       watchdogDecision = firstPromptWatchdog.resolveDeferredTerminal(

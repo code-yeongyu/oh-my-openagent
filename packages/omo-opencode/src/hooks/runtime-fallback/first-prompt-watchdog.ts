@@ -181,6 +181,13 @@ export function createFirstPromptWatchdog(
           cancel(sessionID, true)
           return { kind: "resolve-terminal", sessionID }
         }
+        if (
+          eventType === "session.error"
+          && isAbortEvent === true
+          && abortProvenance.consumePrior(sessionID, suspendedContext.sessionGeneration)
+        ) {
+          return { kind: "consume-terminal", sessionID }
+        }
         deps.internallyAbortedSessions.delete(sessionID)
         cancel(sessionID)
         return { kind: "resolve-terminal", sessionID }
