@@ -2,6 +2,8 @@
 
 ## [0.1.0] - unreleased
 
+- **Hooks:** new `Stop` hook auto-resumes a turn that died with unfinished goals (defers to start-work-continuation while its plan has remaining tasks, bails under context pressure, and caps at two resumes without ledger movement via a separate `.stuck` marker). New `PreToolUse` spawn guard adds a per-session fan-out cap (`OMO_SPAWN_FANOUT_LIMIT`, default 60) and denies final gate-reviewer spawns while the reviewer artifacts the gate audits are missing.
+
 - **Memory:** steering ledger entries no longer embed the full plan four times (`before`/`after` at both the audit and entry level). Accepted steers now record a compact `UlwLoopSteeringPlanSnapshot` (plan counters + only the goals the mutation touched), shrinking a measured real-world entry from 189KB to 7.8KB (~24x) and ending quadratic `ledger.jsonl` growth over long runs.
 - **Memory:** steering dedup (`--idempotency-key` / `promptSignature`) streams the ledger line-by-line with a substring pre-filter instead of `JSON.parse`-ing every entry into memory; dedup returns strip legacy full-plan `before`/`after` payloads from re-surfaced audits. `readSteeringLedgerEntries` streams too.
 - **Memory:** `withUlwLoopMutationLock` no longer retains the mutation result (full plan/audit) per `(repo, scope)` in its module-level lock map; settled gates self-evict, so long-lived embedders stop accumulating entries.

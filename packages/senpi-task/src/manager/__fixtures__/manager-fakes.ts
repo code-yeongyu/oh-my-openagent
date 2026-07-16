@@ -71,6 +71,7 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
 export class FakeRunner implements ManagedRunner {
   readonly handles = new Map<string, FakeHandle>()
   throwOnStart = false
+  startError: unknown = undefined
   readonly startedSpecs: ManagedStartSpec[] = []
   // When set, every handle this runner produces reports this pid (an rpc-style child with a real OS
   // process). Left undefined it mimics an in-process child with no pid.
@@ -78,6 +79,7 @@ export class FakeRunner implements ManagedRunner {
 
   start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
     this.startedSpecs.push(spec)
+    if (this.startError !== undefined) throw this.startError
     if (this.throwOnStart) throw new Error("runner boom")
     const fake = makeHandle(spec.taskId, this.childPid)
     this.handles.set(spec.taskId, fake)

@@ -48,6 +48,22 @@ test("#given isolated components #when hooks are inspected #then commands stay i
 	assert.equal(await exists("scripts/migrate-codex-config.mjs"), true);
 });
 
+test("#given aggregate Stop hooks #when inspected #then start-work continuation and ulw-loop resume are separate groups", async () => {
+	// given
+	const manifests = await readAggregateHookManifests();
+
+	// when
+	const stopCommands = manifests
+		.filter(({ hooks }) => hooks.hooks.Stop)
+		.flatMap(({ hooks }) => hooks.hooks.Stop)
+		.flatMap((group) => group.hooks.map((handler) => handler.command));
+
+	// then
+	assert.equal(stopCommands.length, 2);
+	assert.ok(stopCommands.some((command) => command.includes("start-work-continuation/dist/cli.js")));
+	assert.ok(stopCommands.some((command) => command.includes("ulw-loop/dist/cli.js\" hook stop")));
+});
+
 test("#given aggregate SubagentStop hooks #when inspected #then start-work and LazyCodex executor verifier are separate groups", async () => {
 	// given
 	const manifests = await readAggregateHookManifests();
@@ -64,7 +80,7 @@ test("#given aggregate SubagentStop hooks #when inspected #then start-work and L
 	// then
 	assert.equal(subagentStopGroups.length, 2);
 	assert.equal(subagentStopGroups[0]?.matcher, undefined);
-	assert.equal(subagentStopGroups[1]?.matcher, "^lazycodex-executor$");
+	assert.equal(subagentStopGroups[1]?.matcher, "^lazycodex-worker-(low|medium|high)$");
 	assert.equal(verifierGroups.length, 1);
 	assert.equal(verifierGroups[0]?.groupIndex, 0);
 	assert.equal(verifierGroups[0]?.handler.timeout, 10);
@@ -158,7 +174,12 @@ test("#given aggregate OMO plugin is enabled #when hooks are inspected #then she
 	assert.match(text, /Resetting Git Bash MCP Reminder/);
 	assert.match(text, /components\/ulw-loop\/dist\/cli\.js/);
 	assert.match(text, /hook pre-tool-use/);
-	assert.deepEqual(preToolUseGroups.map((group) => group.matcher), ["^Bash$", "^create_goal$"]);
+	assert.deepEqual(preToolUseGroups.map((group) => group.matcher), [
+		"^Bash$",
+		"^create_goal$",
+		"^(spawn_agent|collaborationspawn_agent|collaboration\\.spawn_agent)$",
+	]);
+	assert.match(text, /hook pre-tool-use-spawn/);
 });
 
 test("#given aggregate OMO plugin has a dedicated ultrawork trigger #when hooks are inspected #then ulw-loop does not duplicate ultrawork injection", async () => {

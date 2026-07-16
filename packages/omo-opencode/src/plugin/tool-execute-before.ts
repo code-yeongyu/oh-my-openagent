@@ -2,13 +2,13 @@ import type { PluginContext } from "./types"
 import { randomUUID } from "node:crypto"
 
 import { getMainSessionID } from "../features/claude-code-session-state"
-import { clearBoulderState } from "../features/boulder-state"
 import { log, replaceToolArgs } from "../shared"
 import { stripInvisibleAgentCharacters } from "../shared/agent-display-names"
 import { resolveSessionAgent } from "./session-agent-resolver"
 import { isRalphLoopResumeArgument, parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
 import { ULTRAWORK_VERIFICATION_PROMISE } from "../hooks/ralph-loop/constants"
 import { readState, writeState } from "../hooks/ralph-loop/storage"
+import { stopContinuation } from "./stop-continuation"
 
 import type { CreatedHooks } from "../create-hooks"
 import type { BackgroundManager } from "../features/background-agent"
@@ -229,13 +229,7 @@ export function createToolExecuteBeforeHandler(args: {
       const sessionID = input.sessionID || getMainSessionID()
 
       if (command === "stop-continuation" && sessionID) {
-        hooks.stopContinuationGuard?.stop(sessionID)
-        hooks.todoContinuationEnforcer?.cancelAllCountdowns()
-        hooks.ralphLoop?.cancelLoop(sessionID)
-        clearBoulderState(ctx.directory)
-        log("[stop-continuation] All continuation mechanisms stopped", {
-          sessionID,
-        })
+        stopContinuation({ directory: ctx.directory, hooks, sessionID })
       }
 
       // Clear stop state when user explicitly resumes work via work-starting commands.

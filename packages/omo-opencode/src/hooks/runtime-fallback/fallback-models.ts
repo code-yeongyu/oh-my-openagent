@@ -68,9 +68,20 @@ function getRawFallbackModelsForSession(
     return undefined
   }
 
+  const shouldInheritPlanFallback =
+    pluginConfig.sisyphus_agent?.disabled !== true &&
+    pluginConfig.sisyphus_agent?.planner_enabled !== false &&
+    pluginConfig.sisyphus_agent?.replace_plan !== false
+  const tryGetPrometheusFallbackForPlan = (agentName: string) => {
+    if (agentName.toLowerCase() !== "plan" || !shouldInheritPlanFallback) return undefined
+    return tryGetFallbackFromAgent("prometheus")
+  }
+
   if (agent) {
     const result = tryGetFallbackFromAgent(agent)
     if (result) return result
+    const planFallback = tryGetPrometheusFallbackForPlan(agent)
+    if (planFallback) return planFallback
   }
 
   const sessionAgentMatch = sessionID.match(agentPattern)
@@ -78,6 +89,8 @@ function getRawFallbackModelsForSession(
     const detectedAgent = sessionAgentMatch[1].toLowerCase()
     const result = tryGetFallbackFromAgent(detectedAgent)
     if (result) return result
+    const planFallback = tryGetPrometheusFallbackForPlan(detectedAgent)
+    if (planFallback) return planFallback
   }
 
   log(`[${HOOK_NAME}] No category/agent fallback models resolved for session`, { sessionID, agent })

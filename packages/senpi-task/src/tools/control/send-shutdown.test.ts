@@ -1,10 +1,34 @@
 import { describe, expect, test } from "bun:test"
 
-import { TEAM_LEAD_SENTINEL } from "../../team"
+import { SenpiShutdownError, TEAM_LEAD_SENTINEL } from "../../team"
 import type { SendOutcome } from "../../steering"
 import { createFakeTeamService, fakeRuntimeState } from "../team/__fixtures__/team-tool-fakes"
 import { runTaskSend } from "./send"
-import type { SendManager } from "./types"
+import type { SendManager, SendToolResult } from "./types"
+
+const RAW_MISSING_STATE_MESSAGE = "ENOENT: no such file or directory, open '/private/secret/team/run-1/state.json'"
+
+function missingStateError() {
+  return Object.assign(new Error(RAW_MISSING_STATE_MESSAGE), { code: "ENOENT" })
+}
+
+function expectMissingStateFailure(
+  result: SendToolResult,
+  operation: "request" | "approve" | "reject",
+): void {
+  expect(result.details).toEqual({
+    kind: "shutdown_failed",
+    operation,
+    team_run_id: "run-1",
+    member: "alpha",
+    code: "team_state_missing",
+    reason: "Team state is unavailable.",
+  })
+  const serialized = JSON.stringify(result)
+  expect(serialized).not.toContain("ENOENT")
+  expect(serialized).not.toContain("/private/secret")
+  expect(serialized).not.toContain("state.json")
+}
 
 function spyManager(outcome: SendOutcome): SendManager {
   return {
@@ -86,6 +110,105 @@ describe("runTaskSend shutdown routing", () => {
 
     expect(result.details).toEqual({ kind: "shutdown_responded", team_run_id: "run-1", member: "alpha", approved: false })
     expect(service.calls[0]).toMatchObject({ method: "rejectShutdown", args: ["run-1", "alpha", "still needed"] })
+  })
+
+  test("#given shutdown_request hits missing team state #when routed through task_send #then it returns a sanitized structured failure", async () => {
+    const manager = spyManager({ kind: "not_found", reason: "unused", suggestion: "unused" })
+    const service = createFakeTeamService({
+      requestShutdown: () => Promise.reject(missingStateError()),
+    })
+
+    const result = await runTaskSend(
+      manager,
+      { to: "alpha", team_run_id: "run-1", message: { type: "shutdown_request" } },
+      "lead-session",
+      { service, from: TEAM_LEAD_SENTINEL },
+    )
+
+    expectMissingStateFailure(result, "request")
+  })
+
+  test("#given shutdown_response approve hits missing team state #when routed through task_send #then it returns a sanitized structured failure", async () => {
+    const manager = spyManager({ kind: "not_found", reason: "unused", suggestion: "unused" })
+    const service = createFakeTeamService({
+      approveShutdown: () => Promise.reject(missingStateError()),
+    })
+
+    const result = await runTaskSend(
+      manager,
+      { to: "alpha", team_run_id: "run-1", message: { type: "shutdown_response", approve: true } },
+      "lead-session",
+      { service, from: TEAM_LEAD_SENTINEL },
+    )
+
+    expectMissingStateFailure(result, "approve")
+  })
+
+  test("#given shutdown_response reject hits missing team state #when routed through task_send #then it returns a sanitized structured failure", async () => {
+    const manager = spyManager({ kind: "not_found", reason: "unused", suggestion: "unused" })
+    const service = createFakeTeamService({
+      rejectShutdown: () => Promise.reject(missingStateError()),
+    })
+
+    const result = await runTaskSend(
+      manager,
+      {
+        to: "alpha",
+        team_run_id: "run-1",
+        message: { type: "shutdown_response", approve: false, reason: "still needed" },
+      },
+      "lead-session",
+      { service, from: TEAM_LEAD_SENTINEL },
+    )
+
+    expectMissingStateFailure(result, "reject")
+  })
+
+  test("#given a shutdown domain failure #when routed through task_send #then it returns stable safe failure details", async () => {
+    const manager = spyManager({ kind: "not_found", reason: "unused", suggestion: "unused" })
+    const service = createFakeTeamService({
+      requestShutdown: () =>
+        Promise.reject(new SenpiShutdownError("raw unknown member detail", "unknown_member", "run-1", "alpha")),
+    })
+
+    const result = await runTaskSend(
+      manager,
+      { to: "alpha", team_run_id: "run-1", message: { type: "shutdown_request" } },
+      "lead-session",
+      { service, from: TEAM_LEAD_SENTINEL },
+    )
+
+    expect(result.details).toEqual({
+      kind: "shutdown_failed",
+      operation: "request",
+      team_run_id: "run-1",
+      member: "alpha",
+      code: "unknown_member",
+      reason: "Team member is unavailable.",
+    })
+    expect(JSON.stringify(result)).not.toContain("raw unknown member detail")
+  })
+
+  test("#given an unexpected shutdown service error #when routed through task_send #then the original exception propagates", async () => {
+    const manager = spyManager({ kind: "not_found", reason: "unused", suggestion: "unused" })
+    const unexpected = new TypeError("unexpected service failure")
+    const service = createFakeTeamService({ requestShutdown: () => Promise.reject(unexpected) })
+
+    const pending = runTaskSend(
+      manager,
+      { to: "alpha", team_run_id: "run-1", message: { type: "shutdown_request" } },
+      "lead-session",
+      { service, from: TEAM_LEAD_SENTINEL },
+    )
+
+    let rejected: unknown = new Error("expected task_send to reject")
+    try {
+      await pending
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error
+      rejected = error
+    }
+    expect(rejected).toBe(unexpected)
   })
 
   test("#given structured message with no team routing #when sent #then it reports not in a team", async () => {

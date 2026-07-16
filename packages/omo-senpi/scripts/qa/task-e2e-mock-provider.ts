@@ -36,6 +36,11 @@ type MockStep =
 interface MockScript {
   parentSteps: MockStep[]
   childSteps: MockStep[]
+  customMessages?: ReadonlyArray<{
+    readonly customType: string
+    readonly content: string
+    readonly details: Readonly<Record<string, unknown>>
+  }>
 }
 
 type Api = "openai-completions"
@@ -100,6 +105,8 @@ interface MockProvider {
 
 interface ExtensionAPI {
   registerProvider(id: string, provider: MockProvider): void
+  on?(event: string, handler: () => void): void
+  sendMessage?(message: Record<string, unknown>, options?: Record<string, unknown>): void
 }
 
 interface LocalAssistantMessageEventStream extends AsyncIterable<unknown> {
@@ -128,6 +135,16 @@ export default function registerMockProvider(pi: ExtensionAPI): void {
     streamSimple(streamModel: Model<Api>, context: Context, options?: SimpleStreamOptions) {
       return streamMockResponse(streamModel, context, options)
     },
+  })
+  if (pi.on === undefined || pi.sendMessage === undefined) return
+  pi.on("session_start", () => {
+    const script = loadMockScript(process.cwd())
+    for (const message of script.customMessages ?? []) {
+      pi.sendMessage?.(
+        { customType: message.customType, content: message.content, display: true, details: message.details },
+        {},
+      )
+    }
   })
 }
 

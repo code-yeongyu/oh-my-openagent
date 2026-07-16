@@ -3,6 +3,7 @@ import { Type } from "typebox"
 import type { Static } from "typebox"
 
 import type { TaskStatus } from "../../state"
+import { renderTaskCancelCall, renderTaskCancelResult } from "./renderers"
 import { toolResult } from "./tool-result"
 import type { CancelManager, CancelResultDetails, CancelToolResult } from "./types"
 
@@ -63,5 +64,7 @@ export function createTaskCancelTool(deps: TaskCancelDeps): ToolDefinition<typeo
     description: DESCRIPTION,
     parameters: TaskCancelParams,
     execute: (_toolCallId, params) => runTaskCancel(deps.manager, params),
+    renderCall: (args, theme) => renderTaskCancelCall(args, theme),
+    renderResult: (result, options, theme) => renderTaskCancelResult(result, options, theme),
   }
 }

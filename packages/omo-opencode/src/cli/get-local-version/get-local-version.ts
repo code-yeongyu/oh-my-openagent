@@ -65,6 +65,21 @@ export async function getLocalVersion(
       return 1
     }
 
+    if (!/^\d+\.\d+\.\d+/.test(currentVersion)) {
+      const info: VersionInfo = {
+        currentVersion,
+        latestVersion: null,
+        isUpToDate: false,
+        isLocalDev: true,
+        isPinned: false,
+        pinnedVersion: null,
+        status: "dev",
+      }
+
+      console.log(options.json ? formatJsonOutput(info) : formatVersionOutput(info))
+      return 0
+    }
+
     const { extractChannel } = await import("../../hooks/auto-update-checker/index")
     const channel = extractChannel(pluginInfo?.pinnedVersion ?? currentVersion)
     const latestVersion = await getLatestVersion(channel)

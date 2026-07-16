@@ -95,21 +95,21 @@ var init_atomic_write = __esm(() => {
 });
 
 // packages/telemetry-core/src/activity-state.ts
-import { existsSync as existsSync5, mkdirSync as mkdirSync2, readFileSync } from "node:fs";
-import { basename as basename6, join as join31 } from "node:path";
+import { existsSync as existsSync5, mkdirSync as mkdirSync2, readFileSync as readFileSync2 } from "node:fs";
+import { basename as basename7, join as join33 } from "node:path";
 function resolveTelemetryStateDir(product, options = {}) {
   const dataDir = resolveXdgDataDir(product.cacheDirName, {
     env: options.env,
     osProvider: options.osProvider
   });
-  const xdgStateDir = options.env?.XDG_DATA_HOME === undefined ? undefined : join31(options.env.XDG_DATA_HOME, product.cacheDirName);
-  if (dataDir === xdgStateDir || xdgStateDir === undefined && basename6(dataDir) === product.cacheDirName) {
+  const xdgStateDir = options.env?.XDG_DATA_HOME === undefined ? undefined : join33(options.env.XDG_DATA_HOME, product.cacheDirName);
+  if (dataDir === xdgStateDir || xdgStateDir === undefined && basename7(dataDir) === product.cacheDirName) {
     return dataDir;
   }
-  return join31(dataDir, product.cacheDirName);
+  return join33(dataDir, product.cacheDirName);
 }
 function getTelemetryActivityStateFilePath(stateDir) {
-  return join31(stateDir, POSTHOG_ACTIVITY_STATE_FILE);
+  return join33(stateDir, POSTHOG_ACTIVITY_STATE_FILE);
 }
 function getDailyActiveCaptureState(input) {
   const state = readPostHogActivityState(input.stateDir, input.diagnostics);
@@ -138,7 +138,7 @@ function readPostHogActivityState(stateDir, diagnostics) {
     return {};
   }
   try {
-    const stateContent = readFileSync(stateFilePath, "utf-8");
+    const stateContent = readFileSync2(stateFilePath, "utf-8");
     const stateJson = JSON.parse(stateContent);
     if (!isPostHogActivityState(stateJson)) {
       return {};
@@ -179,10 +179,10 @@ var init_activity_state = __esm(() => {
 var DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com", DEFAULT_POSTHOG_API_KEY = "phc_CFJhj5HyvA62QPhvyaUCtaq23aUfznnijg5VaaGkNk74";
 
 // packages/telemetry-core/src/diagnostics.ts
-import { appendFileSync, existsSync as existsSync6, mkdirSync as mkdirSync3, readFileSync as readFileSync2 } from "node:fs";
-import { join as join32 } from "node:path";
+import { appendFileSync, existsSync as existsSync6, mkdirSync as mkdirSync3, readFileSync as readFileSync3 } from "node:fs";
+import { join as join34 } from "node:path";
 function getTelemetryDiagnosticsFilePath(diagnosticsDir) {
-  return join32(diagnosticsDir, DIAGNOSTICS_FILE_NAME);
+  return join34(diagnosticsDir, DIAGNOSTICS_FILE_NAME);
 }
 function writeTelemetryDiagnostic(input, options) {
   const now = options.now ?? new Date;
@@ -205,7 +205,7 @@ function cleanupTelemetryDiagnostics(options) {
   }
   try {
     const cutoffMs = (options.now ?? new Date).getTime() - DIAGNOSTICS_RETENTION_MS;
-    const retainedLines = trimToMaxBytes(readFileSync2(diagnosticsFilePath, "utf-8").split(`
+    const retainedLines = trimToMaxBytes(readFileSync3(diagnosticsFilePath, "utf-8").split(`
 `).filter((line) => shouldRetainLine(line, cutoffMs)));
     writeFileAtomically(diagnosticsFilePath, retainedLines.length === 0 ? "" : `${retainedLines.join(`
 `)}
@@ -257,7 +257,7 @@ function shouldRetainLine(line, cutoffMs) {
 function parseDiagnosticLine(line) {
   try {
     const parsed = JSON.parse(line);
-    if (!isRecord(parsed)) {
+    if (!isRecord2(parsed)) {
       return null;
     }
     return parsed;
@@ -268,7 +268,7 @@ function parseDiagnosticLine(line) {
     throw error;
   }
 }
-function isRecord(value) {
+function isRecord2(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 function trimToMaxBytes(lines) {
@@ -337,18 +337,18 @@ var init_env = __esm(() => {
 });
 
 // packages/telemetry-core/src/machine-id.ts
-import { createHash as createHash2 } from "node:crypto";
+import { createHash as createHash3 } from "node:crypto";
 import os2 from "node:os";
 function getDefaultTelemetryOsProvider() {
   return os2;
 }
 function getTelemetryDistinctId(machineIdPrefix, osProvider = getDefaultTelemetryOsProvider()) {
-  return createHash2("sha256").update(`${machineIdPrefix}${osProvider.hostname()}`).digest("hex");
+  return createHash3("sha256").update(`${machineIdPrefix}${osProvider.hostname()}`).digest("hex");
 }
 var init_machine_id = () => {};
 
 // node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/module.node.mjs
-import { dirname as dirname9, posix, sep as sep7 } from "node:path";
+import { dirname as dirname10, posix as posix2, sep as sep7 } from "node:path";
 function createModulerModifier() {
   const getModuleFromFileName = createGetModuleFromFilename();
   return async (frames) => {
@@ -357,13 +357,13 @@ function createModulerModifier() {
     return frames;
   };
 }
-function createGetModuleFromFilename(basePath = process.argv[1] ? dirname9(process.argv[1]) : process.cwd(), isWindows = sep7 === "\\") {
+function createGetModuleFromFilename(basePath = process.argv[1] ? dirname10(process.argv[1]) : process.cwd(), isWindows = sep7 === "\\") {
   const normalizedBase = isWindows ? normalizeWindowsPath(basePath) : basePath;
   return (filename) => {
     if (!filename)
       return;
     const normalizedFilename = isWindows ? normalizeWindowsPath(filename) : filename;
-    let { dir, base: file, ext } = posix.parse(normalizedFilename);
+    let { dir, base: file, ext } = posix2.parse(normalizedFilename);
     if (ext === ".js" || ext === ".mjs" || ext === ".cjs")
       file = file.slice(0, -1 * ext.length);
     const decodedFile = decodeURIComponent(file);
@@ -3378,7 +3378,7 @@ var init_context_lines_node = __esm(() => {
 });
 
 // node_modules/.bun/posthog-node@5.35.12/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/relative-path.node.mjs
-import { isAbsolute as isAbsolute6, relative as relative4, sep as sep8 } from "node:path";
+import { isAbsolute as isAbsolute7, relative as relative4, sep as sep8 } from "node:path";
 function createRelativePathModifier(basePath = process.cwd()) {
   const isWindows = sep8 === "\\";
   const toUnix = (p) => isWindows ? p.replace(/\\/g, "/") : p;
@@ -3386,7 +3386,7 @@ function createRelativePathModifier(basePath = process.cwd()) {
   return async (frames) => {
     for (const frame of frames)
       if (!(!frame.filename || frame.filename.startsWith("node:") || frame.filename.startsWith("data:"))) {
-        if (isAbsolute6(frame.filename))
+        if (isAbsolute7(frame.filename))
           frame.filename = toUnix(relative4(normalizedBase, toUnix(frame.filename)));
       }
     return frames;
@@ -5903,7 +5903,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "4.16.1",
+    version: "4.18.2",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -6122,8 +6122,8 @@ var init_telemetry = __esm(() => {
 });
 
 // packages/omo-codex/src/install/install-local-cli.ts
-import { readFile as readFile21 } from "node:fs/promises";
-import { dirname as dirname11, join as join37, resolve as resolve10 } from "node:path";
+import { readFile as readFile22 } from "node:fs/promises";
+import { dirname as dirname12, join as join39, resolve as resolve10 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // packages/utils/src/runtime/spawn.ts
@@ -6456,7 +6456,7 @@ var defaultRunCommand = async (command, args, options) => {
 };
 
 // packages/omo-codex/src/install/install-codex.ts
-import { join as join33, resolve as resolve9 } from "node:path";
+import { join as join35, resolve as resolve9 } from "node:path";
 import { existsSync as existsSync7 } from "node:fs";
 import { homedir as homedir2 } from "node:os";
 
@@ -7519,9 +7519,11 @@ function collectCommands(value, commands) {
 
 // packages/omo-codex/src/install/codex-cache-install.ts
 async function installCachedPlugin(input) {
+  const env = input.env ?? process.env;
+  const npmInstallEnv = sanitizeNpmInstallEnv(env);
   if (input.buildSource !== false) {
-    await maybeRunNpmInstall(input.sourcePath, input.runCommand);
-    await maybeRunNpmBuild(input.sourcePath, input.runCommand);
+    await maybeRunNpmInstall(input.sourcePath, input.runCommand, npmInstallEnv);
+    await maybeRunNpmBuild(input.sourcePath, input.runCommand, env);
   }
   const targetPath = join12(input.codexHome, "plugins", "cache", input.marketplaceName, input.name, input.version);
   const tempPath = createTempSiblingPath(targetPath);
@@ -7531,10 +7533,10 @@ async function installCachedPlugin(input) {
     await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath);
     await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath });
     await copyRootRuntimeDists({ pluginRoot: tempPath, sourcePath: input.sourcePath });
-    await maybeRunNpmInstall(tempPath, input.runCommand, ["ci", "--omit=dev"]);
+    await maybeRunNpmInstall(tempPath, input.runCommand, npmInstallEnv, ["ci", "--omit=dev"]);
     await removeCachedManagedNpmBinShims(tempPath);
     if (input.buildSource === false)
-      await maybeRunNpmSyncSkills(tempPath, input.runCommand);
+      await maybeRunNpmSyncSkills(tempPath, input.runCommand, env);
     await assertNoRemovedSparkshellPromptReferences(tempPath);
     await rewriteCachedMcpManifest(tempPath, input.sourcePath);
     await rewriteCachedManifestRoot(tempPath, tempPath, targetPath);
@@ -7546,12 +7548,12 @@ async function installCachedPlugin(input) {
   }
   return { name: input.name, version: input.version, path: targetPath };
 }
-async function maybeRunNpmInstall(cwd, runCommand, args = ["install"]) {
+async function maybeRunNpmInstall(cwd, runCommand, env, args = ["install"]) {
   if (!await fileExistsStrict(join12(cwd, "package.json")))
     return;
-  await runCommand("npm", args, { cwd });
+  await runCommand("npm", args, { cwd, env });
 }
-async function maybeRunNpmBuild(cwd, runCommand) {
+async function maybeRunNpmBuild(cwd, runCommand, env) {
   if (!await fileExistsStrict(join12(cwd, "package.json")))
     return;
   const packageJson = JSON.parse(await readFile8(join12(cwd, "package.json"), "utf8"));
@@ -7560,9 +7562,9 @@ async function maybeRunNpmBuild(cwd, runCommand) {
   const scripts = packageJson.scripts;
   if (!isPlainRecord(scripts) || typeof scripts.build !== "string")
     return;
-  await runCommand("npm", ["run", "build"], { cwd });
+  await runCommand("npm", ["run", "build"], { cwd, env });
 }
-async function maybeRunNpmSyncSkills(cwd, runCommand) {
+async function maybeRunNpmSyncSkills(cwd, runCommand, env) {
   if (!await fileExistsStrict(join12(cwd, "package.json")))
     return;
   const packageJson = JSON.parse(await readFile8(join12(cwd, "package.json"), "utf8"));
@@ -7571,7 +7573,10 @@ async function maybeRunNpmSyncSkills(cwd, runCommand) {
   const scripts = packageJson.scripts;
   if (!isPlainRecord(scripts) || typeof scripts["sync:skills"] !== "string")
     return;
-  await runCommand("npm", ["run", "sync:skills"], { cwd });
+  await runCommand("npm", ["run", "sync:skills"], { cwd, env });
+}
+function sanitizeNpmInstallEnv(env) {
+  return Object.fromEntries(Object.entries(env).filter(([key]) => key.toLowerCase() !== "npm_config_allow_scripts"));
 }
 function createTempSiblingPath(targetPath) {
   return join12(dirname5(targetPath), `.tmp-${basename3(targetPath)}-${process.pid}-${Date.now()}`);
@@ -7612,7 +7617,12 @@ function shouldCopyPluginPath(path, root) {
   if (relative4 === "")
     return true;
   const parts = relative4.split(sep5);
-  return !parts.some((part) => part === ".git" || part === "node_modules");
+  if (parts.some((part) => part === ".git" || part === "node_modules"))
+    return false;
+  return !isNestedComponentMcpManifest(parts);
+}
+function isNestedComponentMcpManifest(parts) {
+  return parts.length > 1 && parts.at(-1) === ".mcp.json";
 }
 var removedSparkshellReferencePattern = /\b(?:sparkshell|spark[-_\s]+shell)\b/i;
 var removedSparkshellPromptSurfaceDirs = new Set([".codex-plugin", "agents", "bundled-rules", "hooks", "skills"]);
@@ -7818,7 +7828,7 @@ async function shouldBuildSourcePackages(repoRoot) {
 
 // packages/omo-codex/src/install/codex-config-toml.ts
 import { mkdir as mkdir5, readFile as readFile11 } from "node:fs/promises";
-import { dirname as dirname7 } from "node:path";
+import { dirname as dirname8 } from "node:path";
 
 // packages/omo-codex/src/install/toml-section-editor.ts
 function findTomlSection(config, header) {
@@ -7827,9 +7837,16 @@ function findTomlSection(config, header) {
   const lines = config.match(/[^\n]*\n?|$/g) ?? [];
   let offset = 0;
   let start = -1;
+  let multilineQuote = null;
   for (const line of lines) {
     if (line.length === 0)
       break;
+    const multilineScan = scanTomlMultilineLine(line, multilineQuote);
+    multilineQuote = multilineScan.nextQuote;
+    if (multilineScan.wasInside) {
+      offset += line.length;
+      continue;
+    }
     const trimmed = line.trim();
     if (start === -1) {
       if (tomlTableHeaderMatches(trimmed, headerLine, targetHeaderPath))
@@ -7844,8 +7861,37 @@ function findTomlSection(config, header) {
   return { start, end: config.length, text: config.slice(start) };
 }
 function replaceOrInsertSetting(config, section, key, value) {
-  const linePattern = new RegExp(`^[ \\t]*${escapeRegExp(key)}[ \\t]*=.*$`, "m");
-  const replacement = linePattern.test(section.text) ? section.text.replace(linePattern, `${key} = ${value}`) : insertSetting(section.text, key, value);
+  const targetPath = parseTomlDottedKey(key);
+  if (!targetPath)
+    return config;
+  const lines = section.text.match(/[^\n]*\n?|$/g) ?? [];
+  let offset = 0;
+  let multilineQuote = null;
+  for (const line of lines) {
+    if (line.length === 0)
+      break;
+    const multilineScan = scanTomlMultilineLine(line, multilineQuote);
+    multilineQuote = multilineScan.nextQuote;
+    if (multilineScan.wasInside) {
+      offset += line.length;
+      continue;
+    }
+    const assignmentIndex = findUnquotedAssignment(line);
+    if (assignmentIndex < 0) {
+      offset += line.length;
+      continue;
+    }
+    const settingPath = parseTomlDottedKey(line.slice(0, assignmentIndex).trim());
+    if (!settingPath || !tomlPathMatches(settingPath, targetPath)) {
+      offset += line.length;
+      continue;
+    }
+    const replacement2 = replaceTomlAssignmentValue(line, assignmentIndex, value);
+    const assignmentEnd = multilineScan.nextQuote ? findTomlMultilineValueEnd(section.text, offset + line.length, multilineScan.nextQuote) : offset + line.length;
+    const sectionReplacement = section.text.slice(0, offset) + replacement2 + section.text.slice(assignmentEnd);
+    return config.slice(0, section.start) + sectionReplacement + config.slice(section.end);
+  }
+  const replacement = insertSetting(section.text, key, value);
   return config.slice(0, section.start) + replacement + config.slice(section.end);
 }
 function removeSetting(config, section, key) {
@@ -7867,6 +7913,50 @@ function replaceOrInsertRootSetting(config, key, value) {
 
 ${suffix.trimStart()}`;
 }
+function replaceOrInsertRootDottedSetting(config, keyPath, value) {
+  const targetPath = parseTomlDottedKey(keyPath);
+  if (!targetPath)
+    return config;
+  const lines = config.match(/[^\n]*\n?|$/g) ?? [];
+  let offset = 0;
+  let multilineQuote = null;
+  for (const line of lines) {
+    if (line.length === 0)
+      break;
+    const multilineScan = scanTomlMultilineLine(line, multilineQuote);
+    multilineQuote = multilineScan.nextQuote;
+    if (multilineScan.wasInside) {
+      offset += line.length;
+      continue;
+    }
+    if (isTomlTableHeaderLine(line))
+      break;
+    const assignmentIndex = findUnquotedAssignment(line);
+    if (assignmentIndex < 0) {
+      offset += line.length;
+      continue;
+    }
+    const settingPath = parseTomlDottedKey(line.slice(0, assignmentIndex).trim());
+    if (!settingPath || !tomlPathMatches(settingPath, targetPath)) {
+      offset += line.length;
+      continue;
+    }
+    const replacement2 = replaceTomlAssignmentValue(line, assignmentIndex, value);
+    const assignmentEnd = multilineScan.nextQuote ? findTomlMultilineValueEnd(config, offset + line.length, multilineScan.nextQuote) : offset + line.length;
+    return config.slice(0, offset) + replacement2 + config.slice(assignmentEnd);
+  }
+  const sectionStart = findFirstTableStart(config);
+  const root = config.slice(0, sectionStart).trimEnd();
+  const suffix = config.slice(sectionStart);
+  const replacement = `${root}${root.length > 0 ? `
+` : ""}${keyPath} = ${value}
+`;
+  if (suffix.length === 0)
+    return replacement;
+  return `${replacement.trimEnd()}
+
+${suffix.trimStart()}`;
+}
 function appendBlock(config, block) {
   const prefix = config.trimEnd();
   return `${prefix}${prefix.length > 0 ? `
@@ -7877,9 +7967,16 @@ function appendBlock(config, block) {
 function findFirstTableStart(config) {
   const lines = config.match(/[^\n]*\n?|$/g) ?? [];
   let offset = 0;
+  let multilineQuote = null;
   for (const line of lines) {
     if (line.length === 0)
       break;
+    const multilineScan = scanTomlMultilineLine(line, multilineQuote);
+    multilineQuote = multilineScan.nextQuote;
+    if (multilineScan.wasInside) {
+      offset += line.length;
+      continue;
+    }
     if (isTomlTableHeaderLine(line))
       return offset;
     offset += line.length;
@@ -7916,6 +8013,131 @@ function parseTomlTableHeader(line) {
 function isTomlTableHeaderLine(line) {
   const normalizedLine = stripUnquotedInlineComment(line).trim();
   return normalizedLine.startsWith("[") && normalizedLine.endsWith("]");
+}
+function scanTomlMultilineLine(line, currentQuote) {
+  if (currentQuote) {
+    return {
+      wasInside: true,
+      nextQuote: findTomlMultilineDelimiter(line, currentQuote, 0) === -1 ? currentQuote : null
+    };
+  }
+  let quote = null;
+  let index = 0;
+  while (index < line.length) {
+    const char = line[index];
+    if (quote === '"') {
+      if (char === "\\") {
+        index += 2;
+        continue;
+      }
+      if (char === '"')
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (quote === "'") {
+      if (char === "'")
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (char === "#")
+      break;
+    const delimiter2 = line.startsWith('"""', index) ? '"""' : line.startsWith("'''", index) ? "'''" : null;
+    if (delimiter2) {
+      const closingIndex = findTomlMultilineDelimiter(line, delimiter2, index + delimiter2.length);
+      return { wasInside: false, nextQuote: closingIndex === -1 ? delimiter2 : null };
+    }
+    if (char === '"' || char === "'")
+      quote = char;
+    index += 1;
+  }
+  return { wasInside: false, nextQuote: null };
+}
+function findTomlMultilineDelimiter(line, delimiter2, startIndex) {
+  let index = line.indexOf(delimiter2, startIndex);
+  while (index !== -1) {
+    if (delimiter2 === "'''" || countPrecedingBackslashes(line, index) % 2 === 0)
+      return index;
+    index = line.indexOf(delimiter2, index + 1);
+  }
+  return -1;
+}
+function countPrecedingBackslashes(line, index) {
+  let count = 0;
+  let cursor = index - 1;
+  while (cursor >= 0 && line[cursor] === "\\") {
+    count += 1;
+    cursor -= 1;
+  }
+  return count;
+}
+function findUnquotedAssignment(line) {
+  return findUnquotedCharacter(line, "=", 0);
+}
+function findUnquotedComment(line, startIndex) {
+  return findUnquotedCharacter(line, "#", startIndex);
+}
+function findUnquotedCharacter(line, target, startIndex) {
+  let quote = null;
+  let index = startIndex;
+  while (index < line.length) {
+    const char = line[index];
+    if (quote === '"') {
+      if (char === "\\") {
+        index += 2;
+        continue;
+      }
+      if (char === '"')
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (quote === "'") {
+      if (char === "'")
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      index += 1;
+      continue;
+    }
+    if (char === target)
+      return index;
+    if (char === "#")
+      return -1;
+    index += 1;
+  }
+  return -1;
+}
+function tomlPathMatches(candidate, target) {
+  return candidate.length === target.length && candidate.every((part, index) => part === target[index]);
+}
+function replaceTomlAssignmentValue(line, assignmentIndex, value) {
+  const newline = line.endsWith(`
+`) ? `
+` : "";
+  const lineBody = newline ? line.slice(0, -1) : line;
+  const commentIndex = findUnquotedComment(lineBody, assignmentIndex + 1);
+  const comment = commentIndex === -1 ? "" : ` ${lineBody.slice(commentIndex).trimStart()}`;
+  return `${lineBody.slice(0, assignmentIndex + 1)} ${value}${comment}${newline}`;
+}
+function findTomlMultilineValueEnd(text, startOffset, quote) {
+  const lines = text.slice(startOffset).match(/[^\n]*\n?|$/g) ?? [];
+  let offset = startOffset;
+  let currentQuote = quote;
+  for (const line of lines) {
+    if (line.length === 0)
+      break;
+    const scan = scanTomlMultilineLine(line, currentQuote);
+    currentQuote = scan.nextQuote;
+    offset += line.length;
+    if (currentQuote === null)
+      return offset;
+  }
+  return text.length;
 }
 function stripUnquotedInlineComment(line) {
   let quote = null;
@@ -8090,6 +8312,14 @@ function parseAgentHeaderName(header) {
   const path = parseTomlDottedKey(header);
   return path?.[0] === "agents" ? path[1] ?? null : null;
 }
+function parseJsonString(value) {
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === "string" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 function parseHookStateHeaderKey(header) {
   const path = parseTomlDottedKey(header);
   if (path?.[0] !== "hooks" || path[1] !== "state")
@@ -8139,6 +8369,9 @@ function stripTomlLineComment(line) {
 var LEGACY_MANAGED_CODEX_AGENT_NAMES_TO_PURGE = ["codex-ultrawork-reviewer"];
 var CURRENT_MANAGED_CODEX_AGENT_NAMES = [
   "explorer",
+  "lazycodex-worker-high",
+  "lazycodex-worker-low",
+  "lazycodex-worker-medium",
   "librarian",
   "metis",
   "momus",
@@ -8236,13 +8469,137 @@ function delay(milliseconds) {
   return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
 }
 
+// packages/omo-codex/src/install/toml-setting-reader.ts
+function hasTomlSetting(config, keyPath) {
+  const targetPath = parseTomlDottedKey(keyPath);
+  if (!targetPath)
+    return false;
+  return hasTomlAssignment(config, (tablePath, settingPath) => {
+    const fullPath = [...tablePath, ...settingPath];
+    return fullPath.length === targetPath.length && fullPath.every((part, index) => part === targetPath[index]);
+  });
+}
+function hasTomlRootDottedKeyPrefix(config, rootKey) {
+  return hasTomlAssignment(config, (tablePath, settingPath) => tablePath.length === 0 && settingPath.length > 1 && settingPath[0] === rootKey);
+}
+function hasTomlAssignment(config, predicate) {
+  let tablePath = [];
+  let multilineQuote = null;
+  for (const line of config.split(`
+`)) {
+    const multilineScan = scanTomlMultilineLine(line, multilineQuote);
+    multilineQuote = multilineScan.nextQuote;
+    if (multilineScan.wasInside)
+      continue;
+    const normalizedLine = stripUnquotedInlineComment2(line).trim();
+    if (normalizedLine.length === 0)
+      continue;
+    const headerPath = parseTomlTableHeader2(normalizedLine);
+    if (headerPath) {
+      tablePath = headerPath;
+      continue;
+    }
+    if (isTomlTableHeaderLine2(normalizedLine)) {
+      tablePath = null;
+      continue;
+    }
+    if (!tablePath)
+      continue;
+    const assignmentIndex = findUnquotedAssignment2(normalizedLine);
+    if (assignmentIndex < 0)
+      continue;
+    const settingPath = parseTomlDottedKey(normalizedLine.slice(0, assignmentIndex).trim());
+    if (!settingPath)
+      continue;
+    if (predicate(tablePath, settingPath))
+      return true;
+  }
+  return false;
+}
+function parseTomlTableHeader2(line) {
+  if (!line.startsWith("[") || !line.endsWith("]") || line.startsWith("[["))
+    return null;
+  return parseTomlDottedKey(line.slice(1, -1).trim());
+}
+function isTomlTableHeaderLine2(line) {
+  return line.startsWith("[") && line.endsWith("]");
+}
+function stripUnquotedInlineComment2(line) {
+  let quote = null;
+  let index = 0;
+  while (index < line.length) {
+    const char = line[index];
+    if (quote === '"') {
+      if (char === "\\") {
+        index += 2;
+        continue;
+      }
+      if (char === '"')
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (quote === "'") {
+      if (char === "'")
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      index += 1;
+      continue;
+    }
+    if (char === "#")
+      return line.slice(0, index);
+    index += 1;
+  }
+  return line;
+}
+function findUnquotedAssignment2(line) {
+  let quote = null;
+  let index = 0;
+  while (index < line.length) {
+    const char = line[index];
+    if (quote === '"') {
+      if (char === "\\") {
+        index += 2;
+        continue;
+      }
+      if (char === '"')
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (quote === "'") {
+      if (char === "'")
+        quote = null;
+      index += 1;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      index += 1;
+      continue;
+    }
+    if (char === "=")
+      return index;
+    index += 1;
+  }
+  return -1;
+}
+
 // packages/omo-codex/src/install/codex-config-features.ts
 function ensureFeatureEnabled(config, featureName) {
   const section = findTomlSection(config, "features");
-  if (!section)
+  if (!section) {
+    if (hasTomlRootDottedKeyPrefix(config, "features")) {
+      return replaceOrInsertRootDottedSetting(config, `features.${featureName}`, "true");
+    }
     return appendBlock(config, `[features]
 ${featureName} = true
 `);
+  }
   return replaceOrInsertSetting(config, section, featureName, "true");
 }
 
@@ -8310,7 +8667,7 @@ function ensureAutonomousPermissions(config) {
   next = replaceOrInsertRootSetting(next, "sandbox_mode", JSON.stringify("danger-full-access"));
   next = replaceOrInsertRootSetting(next, "network_access", JSON.stringify("enabled"));
   for (const featureName of AUTONOMOUS_FEATURES) {
-    next = ensureFeatureEnabled2(next, featureName);
+    next = ensureFeatureEnabled(next, featureName);
   }
   next = removeWindowsSandboxSetting(next);
   next = ensureNoticeEnabled(next, "hide_full_access_warning");
@@ -8326,14 +8683,6 @@ function ensureNoticeEnabled(config, key) {
   const section = findTomlSection(config, "notice");
   if (section === null)
     return appendNoticeBlock(config, key);
-  return replaceOrInsertSetting(config, section, key, "true");
-}
-function ensureFeatureEnabled2(config, key) {
-  const section = findTomlSection(config, "features");
-  if (section === null)
-    return appendBlock(config, `[features]
-${key} = true
-`);
   return replaceOrInsertSetting(config, section, key, "true");
 }
 function appendNoticeBlock(config, key) {
@@ -8407,7 +8756,7 @@ function readStringArraySetting(sectionText, key) {
     const assignmentIndex = line.indexOf("=");
     if (assignmentIndex === -1)
       return null;
-    return parseTomlStringArray(stripUnquotedInlineComment2(line.slice(assignmentIndex + 1)).trim());
+    return parseTomlStringArray(stripUnquotedInlineComment3(line.slice(assignmentIndex + 1)).trim());
   }
   return null;
 }
@@ -8451,7 +8800,7 @@ function parseTomlString(input, startIndex) {
   }
   return null;
 }
-function stripUnquotedInlineComment2(line) {
+function stripUnquotedInlineComment3(line) {
   let quote = null;
   let index = 0;
   while (index < line.length) {
@@ -8556,12 +8905,18 @@ import { readFile as readFile10 } from "node:fs/promises";
 import { join as join17 } from "node:path";
 var FALLBACK_CODEX_MODEL_CATALOG = {
   current: {
-    model: "gpt-5.5",
-    modelContextWindow: 400000,
+    model: "gpt-5.6-sol",
+    modelContextWindow: 372000,
     modelReasoningEffort: "high",
     planModeReasoningEffort: "xhigh"
   },
   managedProfiles: [
+    {
+      model: "gpt-5.5",
+      modelContextWindow: 400000,
+      modelReasoningEffort: "high",
+      planModeReasoningEffort: "xhigh"
+    },
     {
       model: "gpt-5.5",
       modelContextWindow: 1e6,
@@ -8655,30 +9010,90 @@ function isRootSetting2(line, key) {
 }
 
 // packages/omo-codex/src/install/codex-multi-agent-v2-config.ts
+import { readFileSync } from "node:fs";
+import { dirname as dirname7, isAbsolute as isAbsolute6, join as join18 } from "node:path";
 var CODEX_AGENTS_HEADER = "agents";
 var CODEX_MULTI_AGENT_V2_HEADER = "features.multi_agent_v2";
+var CODEX_MULTI_AGENT_V2_THREAD_LIMIT_KEY = `${CODEX_MULTI_AGENT_V2_HEADER}.max_concurrent_threads_per_session`;
 var CODEX_SUBAGENT_THREAD_LIMIT = 1000;
-function ensureCodexMultiAgentV2Config(config) {
+var CODEX_MULTI_AGENT_V2_THREAD_LIMIT = 16;
+function ensureCodexMultiAgentV2Config(config, options = {}) {
   const featureFlag = removeFeatureFlagSetting(config, "multi_agent_v2");
-  const agentsConfig = ensureAgentsMaxThreads(featureFlag.config);
-  const section = findTomlSection(agentsConfig, CODEX_MULTI_AGENT_V2_HEADER);
-  const maxThreadsValue = CODEX_SUBAGENT_THREAD_LIMIT.toString();
+  const v2Preferred = options.multiAgentVersion === "v2";
+  const modelKnown = options.multiAgentVersion != null || readRootModel(featureFlag.config) !== null;
+  const agentsConfig = v2Preferred ? removeAgentsMaxThreads(featureFlag.config) : modelKnown ? ensureAgentsMaxThreads(featureFlag.config) : raiseExistingAgentsMaxThreads(featureFlag.config);
+  const preserveDisable = featureFlag.value === false && !v2Preferred;
+  const featureConfig = preserveDisable ? setMultiAgentV2Disable(agentsConfig) : v2Preferred ? removeMultiAgentV2Disable(agentsConfig) : agentsConfig;
+  if (hasTomlSetting(featureConfig, CODEX_MULTI_AGENT_V2_THREAD_LIMIT_KEY))
+    return featureConfig;
+  const section = findTomlSection(featureConfig, CODEX_MULTI_AGENT_V2_HEADER);
   if (!section) {
-    const enabledSetting = featureFlag.value === false ? `enabled = false
+    const enabledSetting = preserveDisable ? `enabled = false
 ` : "";
-    return appendBlock(agentsConfig, `[${CODEX_MULTI_AGENT_V2_HEADER}]
-${enabledSetting}max_concurrent_threads_per_session = ${maxThreadsValue}
+    return appendBlock(featureConfig, `[${CODEX_MULTI_AGENT_V2_HEADER}]
+${enabledSetting}max_concurrent_threads_per_session = ${CODEX_MULTI_AGENT_V2_THREAD_LIMIT}
 `);
   }
-  const withPreservedDisable = featureFlag.value === false ? replaceOrInsertSetting(agentsConfig, section, "enabled", "false") : agentsConfig;
-  const updatedSection = featureFlag.value === false ? findTomlSection(withPreservedDisable, CODEX_MULTI_AGENT_V2_HEADER) : section;
-  if (!updatedSection) {
-    return appendBlock(withPreservedDisable, `[${CODEX_MULTI_AGENT_V2_HEADER}]
-enabled = false
-max_concurrent_threads_per_session = ${maxThreadsValue}
-`);
+  return replaceOrInsertSetting(featureConfig, section, "max_concurrent_threads_per_session", CODEX_MULTI_AGENT_V2_THREAD_LIMIT.toString());
+}
+function resolveCodexMultiAgentVersion(config, configPath) {
+  const model = readRootModel(config);
+  if (model === null)
+    return null;
+  const catalogPath = resolveCatalogPath(readRootModelCatalogPath(config), configPath);
+  const catalogVersion = readCatalogMultiAgentVersion(model, catalogPath);
+  if (catalogVersion !== null)
+    return catalogVersion;
+  return /^gpt-5\.6\b/i.test(model) ? "v2" : null;
+}
+function resolveCatalogPath(configuredPath, configPath) {
+  if (configuredPath === null)
+    return join18(dirname7(configPath), "models_cache.json");
+  return isAbsolute6(configuredPath) ? configuredPath : join18(dirname7(configPath), configuredPath);
+}
+function readCatalogMultiAgentVersion(model, cachePath) {
+  let raw;
+  try {
+    raw = readFileSync(cachePath, "utf8");
+  } catch {
+    return null;
   }
-  return replaceOrInsertSetting(withPreservedDisable, updatedSection, "max_concurrent_threads_per_session", maxThreadsValue);
+  let cache;
+  try {
+    cache = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!isRecord(cache) || !Array.isArray(cache.models))
+    return null;
+  for (const entry of cache.models) {
+    if (!isRecord(entry))
+      continue;
+    if (entry.slug !== model && entry.id !== model)
+      continue;
+    const version = entry.multi_agent_version;
+    if (version === "v1" || version === "v2")
+      return version;
+    return null;
+  }
+  return null;
+}
+function readRootModel(config) {
+  const double = config.match(/^\s*model\s*=\s*"([^"]+)"/m);
+  if (double !== null)
+    return double[1] ?? null;
+  const single = config.match(/^\s*model\s*=\s*'([^']+)'/m);
+  return single?.[1] ?? null;
+}
+function readRootModelCatalogPath(config) {
+  const double = config.match(/^\s*model_catalog_json\s*=\s*"([^"]+)"/m);
+  if (double !== null)
+    return double[1] ?? null;
+  const single = config.match(/^\s*model_catalog_json\s*=\s*'([^']+)'/m);
+  return single?.[1] ?? null;
+}
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function removeFeatureFlagSetting(config, featureName) {
   const section = findTomlSection(config, "features");
@@ -8699,6 +9114,36 @@ max_threads = ${maxThreadsValue}
   }
   return replaceOrInsertSetting(config, section, "max_threads", maxThreadsValue);
 }
+function removeAgentsMaxThreads(config) {
+  const section = findTomlSection(config, CODEX_AGENTS_HEADER);
+  if (!section)
+    return config;
+  if (!/^\s*max_threads\s*=/m.test(section.text))
+    return config;
+  return removeSetting(config, section, "max_threads");
+}
+function removeMultiAgentV2Disable(config) {
+  const section = findTomlSection(config, CODEX_MULTI_AGENT_V2_HEADER);
+  if (!section)
+    return config;
+  if (!/^\s*enabled\s*=\s*false(?:\s*#.*)?$/m.test(section.text))
+    return config;
+  return removeSetting(config, section, "enabled");
+}
+function setMultiAgentV2Disable(config) {
+  const section = findTomlSection(config, CODEX_MULTI_AGENT_V2_HEADER);
+  if (!section)
+    return config;
+  return replaceOrInsertSetting(config, section, "enabled", "false");
+}
+function raiseExistingAgentsMaxThreads(config) {
+  const section = findTomlSection(config, CODEX_AGENTS_HEADER);
+  if (!section)
+    return config;
+  if (!/^\s*max_threads\s*=/m.test(section.text))
+    return config;
+  return replaceOrInsertSetting(config, section, "max_threads", CODEX_SUBAGENT_THREAD_LIMIT.toString());
+}
 function readBooleanSetting(sectionText, key) {
   const match = new RegExp(`^\\s*${escapeRegExp(key)}\\s*=\\s*(true|false)\\s*(?:#.*)?$`, "m").exec(sectionText);
   if (!match)
@@ -8708,7 +9153,7 @@ function readBooleanSetting(sectionText, key) {
 
 // packages/omo-codex/src/install/codex-config-toml.ts
 async function updateCodexConfig(input) {
-  await mkdir5(dirname7(input.configPath), { recursive: true });
+  await mkdir5(dirname8(input.configPath), { recursive: true });
   let config;
   try {
     config = await readFile11(input.configPath, "utf8");
@@ -8731,7 +9176,9 @@ async function updateCodexConfig(input) {
   config = ensureFeatureEnabled(config, "multi_agent");
   config = removeUnsupportedCodexMultiAgentModeConfig(config);
   config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(input.repoRoot));
-  config = ensureCodexMultiAgentV2Config(config);
+  config = ensureCodexMultiAgentV2Config(config, {
+    multiAgentVersion: resolveCodexMultiAgentVersion(config, input.configPath)
+  });
   if (input.autonomousPermissions === true)
     config = ensureAutonomousPermissions(config);
   if (!(input.preserveMarketplaceSource === true && hasMarketplaceBlock(config, input.marketplaceName))) {
@@ -8757,7 +9204,7 @@ function isMissingFileError(error) {
 // packages/omo-codex/src/install/codex-hook-trust.ts
 import { createHash } from "node:crypto";
 import { readFile as readFile12 } from "node:fs/promises";
-import { join as join18 } from "node:path";
+import { join as join19 } from "node:path";
 var EVENT_LABELS = new Map([
   ["PreToolUse", "pre_tool_use"],
   ["PermissionRequest", "permission_request"],
@@ -8771,7 +9218,7 @@ var EVENT_LABELS = new Map([
   ["Stop", "stop"]
 ]);
 async function trustedHookStatesForPlugin(input) {
-  const manifestPath = join18(input.pluginRoot, ".codex-plugin", "plugin.json");
+  const manifestPath = join19(input.pluginRoot, ".codex-plugin", "plugin.json");
   if (!await exists(manifestPath))
     return [];
   const manifest = JSON.parse(await readFile12(manifestPath, "utf8"));
@@ -8779,7 +9226,7 @@ async function trustedHookStatesForPlugin(input) {
     return [];
   const states = [];
   for (const hookPath of hookManifestPaths2(manifest.hooks)) {
-    const hooksPath = join18(input.pluginRoot, hookPath);
+    const hooksPath = join19(input.pluginRoot, hookPath);
     if (!await exists(hooksPath))
       continue;
     const parsed = JSON.parse(await readFile12(hooksPath, "utf8"));
@@ -8904,41 +9351,168 @@ function toCodexResolution(resolution) {
 }
 
 // packages/omo-codex/src/install/link-cached-plugin-agents.ts
-import { copyFile, lstat as lstat8, mkdir as mkdir6, readFile as readFile14, readdir as readdir6, rm as rm8, writeFile as writeFile6 } from "node:fs/promises";
-import { basename as basename5, join as join20 } from "node:path";
+import { copyFile, lstat as lstat9, mkdir as mkdir6, readdir as readdir7, rm as rm8, writeFile as writeFile7 } from "node:fs/promises";
+import { basename as basename5, join as join22 } from "node:path";
 
-// packages/omo-codex/src/install/retired-managed-agent-purge.ts
-import { lstat as lstat7, readFile as readFile13, rm as rm7 } from "node:fs/promises";
-import { join as join19 } from "node:path";
-var RETIRED_MANAGED_AGENT_FILES = [
-  {
-    fileName: "codex-ultrawork-reviewer.toml",
-    requiredMarkers: [
-      'name = "codex-ultrawork-reviewer"',
-      'description = "Strict ultrawork verification reviewer.',
-      'developer_instructions = """You are the ultrawork verification reviewer.'
+// packages/omo-codex/src/install/preserved-agent-settings.ts
+import { lstat as lstat7, readFile as readFile13, readdir as readdir6, writeFile as writeFile6 } from "node:fs/promises";
+import { join as join20 } from "node:path";
+
+// packages/omo-codex/src/install/managed-agent-reasoning-defaults.ts
+var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
+  [
+    "explorer",
+    [
+      {
+        previous: { model: "gpt-5.4-mini", effort: "low" },
+        current: { model: "gpt-5.6-terra", effort: "medium" }
+      },
+      {
+        previous: { model: "gpt-5.6-terra", effort: "medium" },
+        current: { model: "gpt-5.6-luna", effort: "low" }
+      }
     ]
+  ],
+  [
+    "librarian",
+    [
+      {
+        previous: { model: "gpt-5.4-mini", effort: "low" },
+        current: { model: "gpt-5.6-terra", effort: "medium" }
+      },
+      {
+        previous: { model: "gpt-5.6-terra", effort: "medium" },
+        current: { model: "gpt-5.6-luna", effort: "low" }
+      }
+    ]
+  ],
+  [
+    "momus",
+    [
+      {
+        previous: { model: "gpt-5.5", effort: "xhigh" },
+        current: { model: "gpt-5.6-sol", effort: "ultra" }
+      }
+    ]
+  ],
+  [
+    "plan",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "xhigh" },
+        current: { model: "gpt-5.6-sol", effort: "max" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-worker-medium",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "high" },
+        current: { model: "gpt-5.6-luna", effort: "max" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-qa-executor",
+    [
+      {
+        previous: { model: "gpt-5.6-terra", effort: "medium" },
+        current: { model: "gpt-5.6-luna", effort: "high" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-gate-reviewer",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "xhigh" },
+        current: { model: "gpt-5.6-sol", effort: "high" }
+      }
+    ]
+  ]
+]);
+function resolveManagedAgentReasoning(input) {
+  const steps = MANAGED_REASONING_DEFAULT_UPGRADES.get(input.agentName);
+  if (steps === undefined)
+    return input.preserved.effort;
+  const latest = steps[steps.length - 1];
+  if (latest === undefined)
+    return input.preserved.effort;
+  if (input.bundledModel !== latest.current.model || input.bundledEffort !== latest.current.effort) {
+    return input.preserved.effort;
   }
-];
-async function purgeRetiredManagedAgentFiles(input) {
-  const agentsDir = join19(input.codexHome, "agents");
-  if (!await exists2(agentsDir))
-    return;
-  for (const retiredAgent of RETIRED_MANAGED_AGENT_FILES) {
-    const agentPath = join19(agentsDir, retiredAgent.fileName);
-    if (!await exists2(agentPath))
-      continue;
-    const agentStat = await lstat7(agentPath);
-    if (agentStat.isDirectory() && !agentStat.isSymbolicLink())
-      continue;
-    const content = await readTextIfExists(agentPath);
-    if (content === null || !hasRequiredMarkers(content, retiredAgent.requiredMarkers))
-      continue;
-    await rm7(agentPath, { force: true });
-  }
+  const preservedMatchesAnyStep = steps.some((step) => input.preserved.model === step.previous.model && input.preserved.effort === step.previous.effort);
+  return preservedMatchesAnyStep ? latest.current.effort : input.preserved.effort;
 }
-function hasRequiredMarkers(content, markers) {
-  return markers.every((marker) => content.includes(marker));
+
+// packages/omo-codex/src/install/preserved-agent-settings.ts
+async function capturePreservedAgentReasoning(input) {
+  const agentsDir = join20(input.codexHome, "agents");
+  if (!await exists2(agentsDir))
+    return new Map;
+  const preserved = new Map;
+  const agentEntries = await readdir6(agentsDir, { withFileTypes: true });
+  for (const entry of agentEntries) {
+    if (!entry.name.endsWith(".toml"))
+      continue;
+    const content = await readTextIfExists(join20(agentsDir, entry.name));
+    if (content === null)
+      continue;
+    const effort = extractReasoningEffort(content);
+    if (effort !== null) {
+      preserved.set(agentNameFromToml(entry.name), {
+        model: extractModel(content),
+        effort
+      });
+    }
+  }
+  return preserved;
+}
+async function capturePreservedAgentServiceTier(input) {
+  const agentsDir = join20(input.codexHome, "agents");
+  if (!await exists2(agentsDir))
+    return new Map;
+  const preserved = new Map;
+  const agentEntries = await readdir6(agentsDir, { withFileTypes: true });
+  for (const entry of agentEntries) {
+    if (!entry.name.endsWith(".toml"))
+      continue;
+    const content = await readTextIfExists(join20(agentsDir, entry.name));
+    if (content === null)
+      continue;
+    preserved.set(agentNameFromToml(entry.name), extractServiceTier(content));
+  }
+  return preserved;
+}
+async function restorePreservedReasoning(input) {
+  if (input.value === undefined)
+    return;
+  const content = await readFile13(input.target, "utf8");
+  const bundledEffort = extractReasoningEffort(content);
+  const effort = resolveManagedAgentReasoning({
+    agentName: input.agentName,
+    bundledModel: extractModel(content),
+    bundledEffort,
+    preserved: input.value
+  });
+  if (bundledEffort === effort)
+    return;
+  const replacement = replaceTopLevelStringSetting(content, "model_reasoning_effort", effort, { insertIfMissing: false });
+  if (!replacement.replaced)
+    return;
+  await writeFile6(input.linkPath, replacement.content);
+}
+async function restorePreservedServiceTier(input) {
+  if (!input.preserved)
+    return;
+  const content = await readFile13(input.linkPath, "utf8");
+  if (extractServiceTier(content) === input.value)
+    return;
+  const replacement = replaceTopLevelStringSetting(content, "service_tier", input.value, { insertIfMissing: true });
+  if (!replacement.replaced)
+    return;
+  await writeFile6(input.linkPath, replacement.content);
 }
 async function readTextIfExists(path) {
   try {
@@ -8949,161 +9523,8 @@ async function readTextIfExists(path) {
     throw error;
   }
 }
-async function exists2(path) {
-  try {
-    await lstat7(path);
-    return true;
-  } catch (error) {
-    if (nodeErrorCode(error) !== "ENOENT")
-      throw error;
-    return false;
-  }
-}
-function nodeErrorCode(error) {
-  if (!(error instanceof Error) || !("code" in error))
-    return null;
-  return typeof error.code === "string" ? error.code : null;
-}
-
-// packages/omo-codex/src/install/link-cached-plugin-agents.ts
-var MANIFEST_FILE = ".installed-agents.json";
-async function capturePreservedAgentReasoning(input) {
-  const agentsDir = join20(input.codexHome, "agents");
-  if (!await exists3(agentsDir))
-    return new Map;
-  const preserved = new Map;
-  const agentEntries = await readdir6(agentsDir, { withFileTypes: true });
-  for (const entry of agentEntries) {
-    if (!entry.name.endsWith(".toml"))
-      continue;
-    const content = await readTextIfExists2(join20(agentsDir, entry.name));
-    if (content === null)
-      continue;
-    const effort = extractReasoningEffort(content);
-    if (effort !== null)
-      preserved.set(agentNameFromToml(entry.name), effort);
-  }
-  return preserved;
-}
-async function capturePreservedAgentServiceTier(input) {
-  const agentsDir = join20(input.codexHome, "agents");
-  if (!await exists3(agentsDir))
-    return new Map;
-  const preserved = new Map;
-  const agentEntries = await readdir6(agentsDir, { withFileTypes: true });
-  for (const entry of agentEntries) {
-    if (!entry.name.endsWith(".toml"))
-      continue;
-    const content = await readTextIfExists2(join20(agentsDir, entry.name));
-    if (content === null)
-      continue;
-    preserved.set(agentNameFromToml(entry.name), extractServiceTier(content));
-  }
-  return preserved;
-}
-async function linkCachedPluginAgents(input) {
-  const bundledAgents = await discoverBundledAgents(input.pluginRoot);
-  await purgeRetiredManagedAgentFiles({ codexHome: input.codexHome });
-  if (bundledAgents.length === 0) {
-    await writeManifest(input.pluginRoot, []);
-    return [];
-  }
-  const agentsDir = join20(input.codexHome, "agents");
-  await mkdir6(agentsDir, { recursive: true });
-  const linked = [];
-  for (const agentPath of bundledAgents) {
-    const agentFileName = basename5(agentPath);
-    const agentName = agentNameFromToml(agentFileName);
-    const linkPath = join20(agentsDir, agentFileName);
-    await replaceWithCopy(linkPath, agentPath);
-    await restorePreservedReasoning({
-      agentName,
-      linkPath,
-      target: agentPath,
-      value: input.preservedReasoning?.get(agentName)
-    });
-    await restorePreservedServiceTier({
-      linkPath,
-      preserved: input.preservedServiceTier?.has(agentName) ?? false,
-      value: input.preservedServiceTier?.get(agentName) ?? null
-    });
-    linked.push({ name: agentFileName, path: linkPath, target: agentPath });
-  }
-  await writeManifest(input.pluginRoot, linked.map((entry) => entry.path));
-  return linked;
-}
-async function restorePreservedServiceTier(input) {
-  if (!input.preserved)
-    return;
-  const content = await readFile14(input.linkPath, "utf8");
-  if (extractServiceTier(content) === input.value)
-    return;
-  const replacement = replaceServiceTier(content, input.value);
-  if (!replacement.replaced)
-    return;
-  await writeFile6(input.linkPath, replacement.content);
-}
-async function discoverBundledAgents(pluginRoot) {
-  const componentsRoot = join20(pluginRoot, "components");
-  if (!await exists3(componentsRoot))
-    return [];
-  const componentEntries = await readdir6(componentsRoot, { withFileTypes: true });
-  const agents = [];
-  for (const entry of componentEntries) {
-    if (!entry.isDirectory())
-      continue;
-    const agentsRoot = join20(componentsRoot, entry.name, "agents");
-    if (!await exists3(agentsRoot))
-      continue;
-    const agentEntries = await readdir6(agentsRoot, { withFileTypes: true });
-    for (const file of agentEntries) {
-      if (!file.isFile() || !file.name.endsWith(".toml"))
-        continue;
-      agents.push(join20(agentsRoot, file.name));
-    }
-  }
-  agents.sort();
-  return agents;
-}
-async function replaceWithCopy(linkPath, target) {
-  await prepareReplacement(linkPath);
-  await copyFile(target, linkPath);
-}
-async function prepareReplacement(linkPath) {
-  if (!await exists3(linkPath))
-    return;
-  const entryStat = await lstat8(linkPath);
-  if (entryStat.isDirectory() && !entryStat.isSymbolicLink()) {
-    throw new Error(`${linkPath} already exists and is a directory; refusing to replace`);
-  }
-  await rm8(linkPath, { force: true });
-}
-async function writeManifest(pluginRoot, agentPaths) {
-  const manifestPath = join20(pluginRoot, MANIFEST_FILE);
-  const payload = { agents: [...agentPaths].sort() };
-  await writeFile6(manifestPath, `${JSON.stringify(payload, null, "\t")}
-`);
-}
-async function restorePreservedReasoning(input) {
-  if (input.value === undefined)
-    return;
-  const content = await readFile14(input.target, "utf8");
-  const bundledEffort = extractReasoningEffort(content);
-  if (bundledEffort === input.value)
-    return;
-  const replacement = replaceReasoningEffort(content, input.value);
-  if (!replacement.replaced)
-    return;
-  await writeFile6(input.linkPath, replacement.content);
-}
-async function readTextIfExists2(path) {
-  try {
-    return await readFile14(path, "utf8");
-  } catch (error) {
-    if (nodeErrorCode2(error) === "ENOENT")
-      return null;
-    throw error;
-  }
+function extractModel(content) {
+  return extractTopLevelStringSetting(content, "model");
 }
 function extractReasoningEffort(content) {
   return extractTopLevelStringSetting(content, "model_reasoning_effort");
@@ -9123,12 +9544,6 @@ function extractTopLevelStringSetting(content, key) {
       return parsed;
   }
   return null;
-}
-function replaceReasoningEffort(content, value) {
-  return replaceTopLevelStringSetting(content, "model_reasoning_effort", value, { insertIfMissing: false });
-}
-function replaceServiceTier(content, value) {
-  return replaceTopLevelStringSetting(content, "service_tier", value, { insertIfMissing: true });
 }
 function replaceTopLevelStringSetting(content, key, value, options) {
   const lines = content.split(/\n/);
@@ -9179,14 +9594,62 @@ function isSectionHeader3(line) {
 function agentNameFromToml(fileName) {
   return fileName.endsWith(".toml") ? fileName.slice(0, -".toml".length) : fileName;
 }
-function parseJsonString(value) {
+async function exists2(path) {
   try {
-    const parsed = JSON.parse(value);
-    return typeof parsed === "string" ? parsed : null;
+    await lstat7(path);
+    return true;
   } catch (error) {
-    if (error instanceof Error)
-      return null;
+    if (nodeErrorCode(error) !== "ENOENT")
+      throw error;
+    return false;
+  }
+}
+function nodeErrorCode(error) {
+  if (!(error instanceof Error) || !("code" in error))
     return null;
+  return typeof error.code === "string" ? error.code : null;
+}
+
+// packages/omo-codex/src/install/retired-managed-agent-purge.ts
+import { lstat as lstat8, readFile as readFile14, rm as rm7 } from "node:fs/promises";
+import { join as join21 } from "node:path";
+var RETIRED_MANAGED_AGENT_FILES = [
+  {
+    fileName: "codex-ultrawork-reviewer.toml",
+    requiredMarkers: [
+      'name = "codex-ultrawork-reviewer"',
+      'description = "Strict ultrawork verification reviewer.',
+      'developer_instructions = """You are the ultrawork verification reviewer.'
+    ]
+  }
+];
+async function purgeRetiredManagedAgentFiles(input) {
+  const agentsDir = join21(input.codexHome, "agents");
+  if (!await exists3(agentsDir))
+    return;
+  for (const retiredAgent of RETIRED_MANAGED_AGENT_FILES) {
+    const agentPath = join21(agentsDir, retiredAgent.fileName);
+    if (!await exists3(agentPath))
+      continue;
+    const agentStat = await lstat8(agentPath);
+    if (agentStat.isDirectory() && !agentStat.isSymbolicLink())
+      continue;
+    const content = await readTextIfExists2(agentPath);
+    if (content === null || !hasRequiredMarkers(content, retiredAgent.requiredMarkers))
+      continue;
+    await rm7(agentPath, { force: true });
+  }
+}
+function hasRequiredMarkers(content, markers) {
+  return markers.every((marker) => content.includes(marker));
+}
+async function readTextIfExists2(path) {
+  try {
+    return await readFile14(path, "utf8");
+  } catch (error) {
+    if (nodeErrorCode2(error) === "ENOENT")
+      return null;
+    throw error;
   }
 }
 async function exists3(path) {
@@ -9205,12 +9668,105 @@ function nodeErrorCode2(error) {
   return typeof error.code === "string" ? error.code : null;
 }
 
+// packages/omo-codex/src/install/link-cached-plugin-agents.ts
+var MANIFEST_FILE = ".installed-agents.json";
+async function linkCachedPluginAgents(input) {
+  const bundledAgents = await discoverBundledAgents(input.pluginRoot);
+  await purgeRetiredManagedAgentFiles({ codexHome: input.codexHome });
+  if (bundledAgents.length === 0) {
+    await writeManifest(input.pluginRoot, []);
+    return [];
+  }
+  const agentsDir = join22(input.codexHome, "agents");
+  await mkdir6(agentsDir, { recursive: true });
+  const linked = [];
+  for (const agentPath of bundledAgents) {
+    const agentFileName = basename5(agentPath);
+    const agentName = agentNameFromToml2(agentFileName);
+    const linkPath = join22(agentsDir, agentFileName);
+    await replaceWithCopy(linkPath, agentPath);
+    await restorePreservedReasoning({
+      agentName,
+      linkPath,
+      target: agentPath,
+      value: input.preservedReasoning?.get(agentName)
+    });
+    await restorePreservedServiceTier({
+      linkPath,
+      preserved: input.preservedServiceTier?.has(agentName) ?? false,
+      value: input.preservedServiceTier?.get(agentName) ?? null
+    });
+    linked.push({ name: agentFileName, path: linkPath, target: agentPath });
+  }
+  await writeManifest(input.pluginRoot, linked.map((entry) => entry.path));
+  return linked;
+}
+async function discoverBundledAgents(pluginRoot) {
+  const componentsRoot = join22(pluginRoot, "components");
+  if (!await exists4(componentsRoot))
+    return [];
+  const componentEntries = await readdir7(componentsRoot, { withFileTypes: true });
+  const agents = [];
+  for (const entry of componentEntries) {
+    if (!entry.isDirectory())
+      continue;
+    const agentsRoot = join22(componentsRoot, entry.name, "agents");
+    if (!await exists4(agentsRoot))
+      continue;
+    const agentEntries = await readdir7(agentsRoot, { withFileTypes: true });
+    for (const file of agentEntries) {
+      if (!file.isFile() || !file.name.endsWith(".toml"))
+        continue;
+      agents.push(join22(agentsRoot, file.name));
+    }
+  }
+  agents.sort();
+  return agents;
+}
+async function replaceWithCopy(linkPath, target) {
+  await prepareReplacement(linkPath);
+  await copyFile(target, linkPath);
+}
+async function prepareReplacement(linkPath) {
+  if (!await exists4(linkPath))
+    return;
+  const entryStat = await lstat9(linkPath);
+  if (entryStat.isDirectory() && !entryStat.isSymbolicLink()) {
+    throw new Error(`${linkPath} already exists and is a directory; refusing to replace`);
+  }
+  await rm8(linkPath, { force: true });
+}
+async function writeManifest(pluginRoot, agentPaths) {
+  const manifestPath = join22(pluginRoot, MANIFEST_FILE);
+  const payload = { agents: [...agentPaths].sort() };
+  await writeFile7(manifestPath, `${JSON.stringify(payload, null, "\t")}
+`);
+}
+function agentNameFromToml2(fileName) {
+  return fileName.endsWith(".toml") ? fileName.slice(0, -".toml".length) : fileName;
+}
+async function exists4(path) {
+  try {
+    await lstat9(path);
+    return true;
+  } catch (error) {
+    if (nodeErrorCode3(error) !== "ENOENT")
+      throw error;
+    return false;
+  }
+}
+function nodeErrorCode3(error) {
+  if (!(error instanceof Error) || !("code" in error))
+    return null;
+  return typeof error.code === "string" ? error.code : null;
+}
+
 // packages/omo-codex/src/install/codex-marketplace.ts
 import { readFile as readFile15 } from "node:fs/promises";
-import { join as join21 } from "node:path";
+import { join as join23 } from "node:path";
 var DEFAULT_MARKETPLACE_PATH = "packages/omo-codex/marketplace.json";
 async function readMarketplace(repoRoot, options) {
-  const marketplacePath = options?.marketplacePath ?? join21(repoRoot, DEFAULT_MARKETPLACE_PATH);
+  const marketplacePath = options?.marketplacePath ?? join23(repoRoot, DEFAULT_MARKETPLACE_PATH);
   const raw = await readFile15(marketplacePath, "utf8");
   const parsed = JSON.parse(raw);
   if (!isPlainRecord(parsed))
@@ -9229,10 +9785,10 @@ async function readMarketplace(repoRoot, options) {
 function resolvePluginSource(repoRoot, plugin, options) {
   const sourcePath = localSourcePath(options?.pathOverride ?? plugin.source);
   const relativePath = sourcePath.slice(2);
-  return join21(repoRoot, ...relativePath.split(/[\\/]/));
+  return join23(repoRoot, ...relativePath.split(/[\\/]/));
 }
 async function readPluginManifest(pluginRoot) {
-  const raw = await readFile15(join21(pluginRoot, ".codex-plugin", "plugin.json"), "utf8");
+  const raw = await readFile15(join23(pluginRoot, ".codex-plugin", "plugin.json"), "utf8");
   const parsed = JSON.parse(raw);
   if (!isPlainRecord(parsed))
     throw new Error(`${pluginRoot} plugin.json must be an object`);
@@ -9313,8 +9869,8 @@ function validateLocalSourcePath(path) {
 }
 
 // packages/omo-codex/src/install/codex-marketplace-snapshot.ts
-import { cp as cp3, mkdir as mkdir7, rename as rename4, rm as rm9, writeFile as writeFile7 } from "node:fs/promises";
-import { join as join22, sep as sep6 } from "node:path";
+import { cp as cp3, mkdir as mkdir7, rename as rename4, rm as rm9, writeFile as writeFile8 } from "node:fs/promises";
+import { join as join24, sep as sep6 } from "node:path";
 var INSTALLED_MARKETPLACES_DIR = ".tmp/marketplaces";
 async function writeInstalledMarketplaceSnapshot(input) {
   const marketplaceRoot = installedMarketplaceRoot(input.codexHome, input.marketplace.name);
@@ -9327,21 +9883,21 @@ async function writeInstalledMarketplaceSnapshot(input) {
   return snapshotPlugins;
 }
 function installedMarketplaceRoot(codexHome, marketplaceName) {
-  return join22(codexHome, INSTALLED_MARKETPLACES_DIR, marketplaceName);
+  return join24(codexHome, INSTALLED_MARKETPLACES_DIR, marketplaceName);
 }
 async function writeMarketplaceManifest(marketplaceRoot, marketplace) {
-  const manifestDir = join22(marketplaceRoot, ".agents", "plugins");
+  const manifestDir = join24(marketplaceRoot, ".agents", "plugins");
   await mkdir7(manifestDir, { recursive: true });
-  const tempPath = join22(manifestDir, `.marketplace-${process.pid}-${Date.now()}.json.tmp`);
-  await writeFile7(tempPath, `${JSON.stringify(marketplace, null, "\t")}
+  const tempPath = join24(manifestDir, `.marketplace-${process.pid}-${Date.now()}.json.tmp`);
+  await writeFile8(tempPath, `${JSON.stringify(marketplace, null, "\t")}
 `);
-  await rename4(tempPath, join22(manifestDir, "marketplace.json"));
+  await rename4(tempPath, join24(manifestDir, "marketplace.json"));
 }
 async function writeSnapshotPlugin(marketplaceRoot, plugin) {
-  const pluginsDir = join22(marketplaceRoot, "plugins");
+  const pluginsDir = join24(marketplaceRoot, "plugins");
   await mkdir7(pluginsDir, { recursive: true });
-  const targetPath = join22(pluginsDir, plugin.name);
-  const tempPath = join22(pluginsDir, `.tmp-${plugin.name}-${process.pid}-${Date.now()}`);
+  const targetPath = join24(pluginsDir, plugin.name);
+  const tempPath = join24(pluginsDir, `.tmp-${plugin.name}-${process.pid}-${Date.now()}`);
   await rm9(tempPath, { recursive: true, force: true });
   await cp3(plugin.sourcePath, tempPath, {
     recursive: true,
@@ -9362,11 +9918,11 @@ function shouldCopyMarketplaceSourcePath(path, root) {
 }
 
 // packages/omo-codex/src/install/lazycodex-version-stamp.ts
-import { readdir as readdir7, readFile as readFile16, writeFile as writeFile8 } from "node:fs/promises";
-import { join as join23 } from "node:path";
+import { readdir as readdir8, readFile as readFile16, writeFile as writeFile9 } from "node:fs/promises";
+import { join as join25 } from "node:path";
 async function readDistributionManifest(repoRoot) {
   try {
-    const parsed = JSON.parse(await readFile16(join23(repoRoot, "package.json"), "utf8"));
+    const parsed = JSON.parse(await readFile16(join25(repoRoot, "package.json"), "utf8"));
     if (!isPlainRecord(parsed) || typeof parsed.version !== "string" || parsed.version.trim().length === 0)
       return;
     return {
@@ -9380,25 +9936,29 @@ async function readDistributionManifest(repoRoot) {
   }
 }
 function resolveLazyCodexPluginVersion(input) {
+  const override = input.versionOverride?.trim();
+  if (override !== undefined && override.length > 0) {
+    return override;
+  }
   if (input.marketplaceName === "sisyphuslabs" && input.pluginName === "omo" && input.distributionManifest !== undefined) {
     return input.distributionManifest.version;
   }
   return input.manifestVersion ?? "local";
 }
 async function stampLazyCodexPluginVersion(input) {
-  const manifestPath = join23(input.pluginRoot, ".codex-plugin", "plugin.json");
+  const manifestPath = join25(input.pluginRoot, ".codex-plugin", "plugin.json");
   const hookPaths = await readPluginHookPaths(manifestPath);
   await stampJsonVersion(manifestPath, input.version);
-  await stampJsonVersion(join23(input.pluginRoot, "package.json"), input.version);
+  await stampJsonVersion(join25(input.pluginRoot, "package.json"), input.version);
   for (const hookPath of hookPaths) {
-    await stampHookStatusMessages(join23(input.pluginRoot, hookPath), input.version);
+    await stampHookStatusMessages(join25(input.pluginRoot, hookPath), input.version);
   }
   await stampComponentVersions(input);
 }
 async function writeLazyCodexInstallSnapshot(input) {
   if (input.distributionManifest === undefined)
     return;
-  await writeFile8(join23(input.pluginRoot, "lazycodex-install.json"), `${JSON.stringify({
+  await writeFile9(join25(input.pluginRoot, "lazycodex-install.json"), `${JSON.stringify({
     packageName: input.distributionManifest.name,
     version: input.distributionManifest.version
   }, null, "\t")}
@@ -9410,7 +9970,7 @@ async function stampJsonVersion(path, version) {
     if (!isPlainRecord(parsed))
       return;
     parsed.version = version;
-    await writeFile8(path, `${JSON.stringify(parsed, null, "\t")}
+    await writeFile9(path, `${JSON.stringify(parsed, null, "\t")}
 `);
   } catch (error) {
     if (error instanceof Error)
@@ -9444,7 +10004,7 @@ async function stampHookStatusMessages(path, version) {
     if (!isPlainRecord(parsed))
       return;
     stampHookGroups(parsed.hooks, version);
-    await writeFile8(path, `${JSON.stringify(parsed, null, "\t")}
+    await writeFile9(path, `${JSON.stringify(parsed, null, "\t")}
 `);
   } catch (error) {
     if (error instanceof Error)
@@ -9455,16 +10015,16 @@ async function stampHookStatusMessages(path, version) {
 async function stampComponentVersions(input) {
   let entries;
   try {
-    entries = await readdir7(join23(input.pluginRoot, "components"));
+    entries = await readdir8(join25(input.pluginRoot, "components"));
   } catch (error) {
     if (error instanceof Error)
       return;
     throw error;
   }
   for (const entry of entries) {
-    const componentRoot = join23(input.pluginRoot, "components", entry);
-    await stampJsonVersion(join23(componentRoot, "package.json"), input.version);
-    await stampHookStatusMessages(join23(componentRoot, "hooks", "hooks.json"), input.version);
+    const componentRoot = join25(input.pluginRoot, "components", entry);
+    await stampJsonVersion(join25(componentRoot, "package.json"), input.version);
+    await stampHookStatusMessages(join25(componentRoot, "hooks", "hooks.json"), input.version);
   }
 }
 function stampHookGroups(hooks, version) {
@@ -9493,8 +10053,8 @@ function normalizeHookStatusVersion(version) {
 }
 
 // packages/omo-codex/src/install/codex-project-local-cleanup.ts
-import { copyFile as copyFile2, lstat as lstat9, readFile as readFile17, writeFile as writeFile9 } from "node:fs/promises";
-import { dirname as dirname8, join as join24, resolve as resolve7 } from "node:path";
+import { copyFile as copyFile2, lstat as lstat10, readFile as readFile17, writeFile as writeFile10 } from "node:fs/promises";
+import { dirname as dirname9, join as join26, resolve as resolve7 } from "node:path";
 var LEGACY_AGENT_CONFLICT_KEYS = ["max_threads"];
 var PROJECT_LOCAL_ARTIFACT_PATHS = [
   ".codex/hooks.json",
@@ -9526,7 +10086,7 @@ async function repairNearestProjectLocalCodexArtifacts(input) {
     }
     const backupPath = `${configPath}.backup-${formatBackupTimestamp(input.now?.() ?? new Date)}`;
     await copyFile2(configPath, backupPath);
-    await writeFile9(configPath, `${repair.config.trimEnd()}
+    await writeFile10(configPath, `${repair.config.trimEnd()}
 `);
     configs.push({
       projectRoot: project.projectRoot,
@@ -9597,37 +10157,37 @@ async function findProjectLocalCodexConfigs(startDirectory, codexHome) {
   if (startDirectoryStat !== null && !startDirectoryStat.isDirectory()) {
     throw new ProjectLocalCleanupStartDirectoryError(startDirectory);
   }
-  const codexHomeConfigPath = codexHome === undefined ? null : join24(resolve7(codexHome), "config.toml");
+  const codexHomeConfigPath = codexHome === undefined ? null : join26(resolve7(codexHome), "config.toml");
   let current = resolve7(startDirectory);
   const configPathsFromCwd = [];
   while (true) {
-    const configPath = join24(current, ".codex", "config.toml");
+    const configPath = join26(current, ".codex", "config.toml");
     if (await isRegularProjectLocalConfig(current, configPath)) {
       if (codexHomeConfigPath === null || resolve7(configPath) !== codexHomeConfigPath) {
         configPathsFromCwd.push(configPath);
       }
     }
-    if (await exists4(join24(current, ".git"))) {
+    if (await exists5(join26(current, ".git"))) {
       return configPathsFromCwd.length === 0 ? null : {
         projectRoot: current,
         configPaths: [...configPathsFromCwd].reverse(),
         artifactRoots: artifactRootsForConfigPaths(configPathsFromCwd)
       };
     }
-    const parent = dirname8(current);
+    const parent = dirname9(current);
     if (parent === current) {
       const nearestConfigPath = configPathsFromCwd[0];
       return nearestConfigPath === undefined ? null : {
-        projectRoot: dirname8(dirname8(nearestConfigPath)),
+        projectRoot: dirname9(dirname9(nearestConfigPath)),
         configPaths: [nearestConfigPath],
-        artifactRoots: [dirname8(dirname8(nearestConfigPath))]
+        artifactRoots: [dirname9(dirname9(nearestConfigPath))]
       };
     }
     current = parent;
   }
 }
 async function isRegularProjectLocalConfig(directory, configPath) {
-  const codexDirStat = await maybeLstat(join24(directory, ".codex"));
+  const codexDirStat = await maybeLstat(join26(directory, ".codex"));
   if (codexDirStat === null || !codexDirStat.isDirectory() || codexDirStat.isSymbolicLink())
     return false;
   const configStat = await maybeLstat(configPath);
@@ -9636,7 +10196,7 @@ async function isRegularProjectLocalConfig(directory, configPath) {
 function artifactRootsForConfigPaths(configPaths) {
   const roots = [];
   for (const configPath of configPaths) {
-    const root = dirname8(dirname8(configPath));
+    const root = dirname9(dirname9(configPath));
     if (!roots.includes(root))
       roots.push(root);
   }
@@ -9647,7 +10207,7 @@ async function collectProjectLocalArtifacts(projectRoots) {
   const seenPaths = new Set;
   for (const projectRoot of projectRoots) {
     for (const relativePath of PROJECT_LOCAL_ARTIFACT_PATHS) {
-      const artifactPath = join24(projectRoot, relativePath);
+      const artifactPath = join26(projectRoot, relativePath);
       if (seenPaths.has(artifactPath))
         continue;
       const entryStat = await maybeLstat(artifactPath);
@@ -9681,17 +10241,17 @@ function formatBackupTimestamp(date) {
 }
 async function maybeLstat(path) {
   try {
-    return await lstat9(path);
+    return await lstat10(path);
   } catch (error) {
-    if (nodeErrorCode3(error) === "ENOENT")
+    if (nodeErrorCode4(error) === "ENOENT")
       return null;
     throw error;
   }
 }
-async function exists4(path) {
+async function exists5(path) {
   return await maybeLstat(path) !== null;
 }
-function nodeErrorCode3(error) {
+function nodeErrorCode4(error) {
   if (!(error instanceof Error) || !("code" in error))
     return null;
   return typeof error.code === "string" ? error.code : null;
@@ -9722,65 +10282,297 @@ function formatUnknownError(error) {
 }
 
 // packages/omo-codex/src/install/lsp-daemon-reaper.ts
-import { readFile as readFile18, readdir as readdir8, rm as rm10 } from "node:fs/promises";
+import { createHash as createHash2 } from "node:crypto";
+import { lstat as lstat11, readFile as readFile19, readdir as readdir10, rm as rm10 } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join as join27, posix } from "node:path";
+
+// packages/omo-codex/src/install/lsp-daemon-reaper-attestation.ts
+import { execFile } from "node:child_process";
+import { readFile as readFile18, readdir as readdir9, readlink as readlink5 } from "node:fs/promises";
 import { connect } from "node:net";
-import { join as join25 } from "node:path";
-async function reapLspDaemons(codexHome, deps = {}) {
-  const killProcess = deps.killProcess ?? sendSigterm;
-  const isDaemonLive = deps.isDaemonLive ?? probeSocketLive;
-  const daemonRoot = join25(codexHome, "codex-lsp", "daemon");
-  const reaped = [];
-  let entries;
-  try {
-    entries = await readdir8(daemonRoot);
-  } catch {
-    return reaped;
-  }
-  for (const entry of entries) {
-    const versionDir = join25(daemonRoot, entry);
-    const pid = await readPidFile(join25(versionDir, "daemon.pid"));
-    const socketPath = await readEndpointFile(join25(versionDir, "daemon.endpoint"));
-    if (pid !== null && socketPath !== null && await isDaemonLive(socketPath) && killProcess(pid)) {
-      reaped.push(pid);
-    }
-    await rm10(versionDir, { recursive: true, force: true });
-  }
-  return reaped;
-}
-async function readEndpointFile(path) {
-  try {
-    const content = (await readFile18(path, "utf8")).trim();
-    return content.length > 0 ? content : null;
-  } catch {
-    return null;
-  }
-}
-async function readPidFile(path) {
-  try {
-    const pid = Number.parseInt((await readFile18(path, "utf8")).trim(), 10);
-    return Number.isInteger(pid) && pid > 0 ? pid : null;
-  } catch {
-    return null;
-  }
-}
-function probeSocketLive(socketPath, timeoutMs = 500) {
-  return new Promise((resolve8) => {
-    const socket = connect(socketPath);
-    const done = (ok) => {
+import { basename as basename6 } from "node:path";
+var PROBE_TIMEOUT_MS = 500;
+async function probeLegacyJsonRpcEndpoint(endpoint, timeoutMs = PROBE_TIMEOUT_MS) {
+  return await new Promise((resolve8) => {
+    const socket = connect(endpoint);
+    let settled = false;
+    let buffer = "";
+    const finish = (value) => {
+      if (settled)
+        return;
+      settled = true;
+      clearTimeout(timer);
       socket.destroy();
-      resolve8(ok);
+      resolve8(value);
     };
-    const timer = setTimeout(() => done(false), timeoutMs);
-    timer.unref();
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    timer.unref?.();
     socket.once("connect", () => {
-      clearTimeout(timer);
-      done(true);
+      socket.write(`${JSON.stringify(legacyStatusRequest())}
+`);
     });
-    socket.once("error", () => {
-      clearTimeout(timer);
-      done(false);
+    socket.on("data", (chunk) => {
+      buffer += chunk.toString("utf8");
+      const newlineIndex = buffer.indexOf(`
+`);
+      if (newlineIndex < 0)
+        return;
+      finish(isJsonRpcResponse(buffer.slice(0, newlineIndex).trim()));
+    });
+    socket.once("error", () => finish(false));
+  });
+}
+async function attestLegacyDaemonOwnership(input, deps = {}) {
+  if (input.platform === "linux")
+    return await attestLinuxOwnership(input, deps);
+  if (input.platform === "darwin")
+    return await attestMacOwnership(input, deps);
+  return false;
+}
+async function attestLinuxOwnership(input, deps) {
+  const readFileImpl = deps.readFile ?? readFile18;
+  const readDirImpl = deps.readDir ?? readdir9;
+  const readLinkImpl = deps.readLink ?? readlink5;
+  const procNetUnix = await readText(readFileImpl, "/proc/net/unix");
+  if (procNetUnix === null)
+    return false;
+  const inode = inodeForEndpoint(procNetUnix, input.endpoint);
+  if (inode === null)
+    return false;
+  const fdEntries = await readDirImpl(`/proc/${input.pid}/fd`).catch(() => null);
+  if (fdEntries === null)
+    return false;
+  let ownsEndpoint = false;
+  for (const fdEntry of fdEntries) {
+    const target = await readLinkImpl(`/proc/${input.pid}/fd/${fdEntry}`).catch(() => null);
+    if (target !== `socket:[${inode}]`)
+      continue;
+    ownsEndpoint = true;
+    break;
+  }
+  if (!ownsEndpoint)
+    return false;
+  const cmdline = await readBinary(readFileImpl, `/proc/${input.pid}/cmdline`);
+  if (cmdline === null)
+    return false;
+  return isNodeCliDaemonArgv(splitCmdline(cmdline));
+}
+async function attestMacOwnership(input, deps) {
+  const executeFileImpl = deps.executeFile ?? execFile;
+  const filteredLsofOutput = await executeForStdout(executeFileImpl, "/usr/sbin/lsof", [
+    "-a",
+    "-n",
+    "-P",
+    "-p",
+    String(input.pid),
+    "-U",
+    "-Fn",
+    "--",
+    input.endpoint
+  ]);
+  const lsofOutput = filteredLsofOutput ?? await executeForStdout(executeFileImpl, "/usr/sbin/lsof", [
+    "-a",
+    "-n",
+    "-P",
+    "-p",
+    String(input.pid),
+    "-U",
+    "-Fn"
+  ]);
+  if (lsofOutput === null || !lsofShowsUnixEndpoint(lsofOutput, input.pid, input.endpoint))
+    return false;
+  const commandOutput = await executeForStdout(executeFileImpl, "/bin/ps", ["-p", String(input.pid), "-o", "command="]);
+  if (commandOutput === null)
+    return false;
+  return isNodeCliDaemonCommand(commandOutput.trim());
+}
+function legacyStatusRequest() {
+  return {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/call",
+    params: { name: "status", arguments: {} }
+  };
+}
+function isJsonRpcResponse(line) {
+  if (line.length === 0)
+    return false;
+  try {
+    const parsed = JSON.parse(line);
+    return parsed.jsonrpc === "2.0" && parsed.id === 1 && (Object.hasOwn(parsed, "result") || Object.hasOwn(parsed, "error"));
+  } catch {
+    return false;
+  }
+}
+function inodeForEndpoint(procNetUnix, endpoint) {
+  for (const line of procNetUnix.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0 || trimmed.startsWith("Num"))
+      continue;
+    const fields = trimmed.split(/\s+/);
+    if (fields.length < 8 || fields[7] !== endpoint)
+      continue;
+    return fields[6] ?? null;
+  }
+  return null;
+}
+function splitCmdline(buffer) {
+  return buffer.toString("utf8").split("\x00").filter((value) => value.length > 0);
+}
+function isNodeCliDaemonArgv(argv) {
+  if (argv.length < 2 || !argv.includes("daemon"))
+    return false;
+  const executable = basename6(argv[0] ?? "");
+  if (!/^node(?:\.exe)?$/i.test(executable))
+    return false;
+  return argv.some((value) => value === "cli.js" || value.endsWith("/cli.js") || value.endsWith("\\cli.js"));
+}
+function lsofShowsUnixEndpoint(output, pid, endpoint) {
+  const lines = output.split(/\r?\n/).filter((line) => line.length > 0);
+  const endpointName = basename6(endpoint);
+  return lines.includes(`p${pid}`) && lines.some((line) => line === `n${endpoint}` || line === `n${endpointName}`);
+}
+function isNodeCliDaemonCommand(command) {
+  return /\bnode(?:\.exe)?\b/i.test(command) && /\bcli\.js\b/.test(command) && /\bdaemon\b/.test(command);
+}
+async function executeForStdout(executeFileImpl, file, args) {
+  return await new Promise((resolve8) => {
+    executeFileImpl(file, [...args], { encoding: "utf8", maxBuffer: 1024 * 1024, timeout: 1000 }, (error, stdout) => {
+      if (error !== null) {
+        resolve8(null);
+        return;
+      }
+      resolve8(stdout);
     });
   });
+}
+async function readText(readFileImpl, path) {
+  return await readFileImpl(path, "utf8").catch(() => null);
+}
+async function readBinary(readFileImpl, path) {
+  return await readFileImpl(path).catch(() => null);
+}
+
+// packages/omo-codex/src/install/lsp-daemon-reaper.ts
+var LEGACY_EXIT_WAIT_TIMEOUT_MS = 5000;
+var LEGACY_VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/;
+async function reapLspDaemons(codexHome, deps = {}) {
+  const daemonRoot = join27(codexHome, "codex-lsp", "daemon");
+  const platform = deps.platform ?? process.platform;
+  const tmpDir = deps.tmpDir ?? tmpdir();
+  const probe = deps.probeLegacyJsonRpc ?? probeLegacyJsonRpcEndpoint;
+  const attest = deps.attestLegacyDaemonOwnership ?? ((input) => attestLegacyDaemonOwnership(input));
+  const killProcess = deps.killProcess ?? sendSigterm;
+  const waitForProcessExit = deps.waitForProcessExit ?? defaultWaitForProcessExit;
+  const entries = await readdir10(daemonRoot, { withFileTypes: true }).catch(() => []);
+  const results = [];
+  for (const entry of [...entries].sort((left, right) => left.name.localeCompare(right.name))) {
+    const versionPath = join27(daemonRoot, entry.name);
+    const parsedVersion = parseVersionEntry(entry.name);
+    if (parsedVersion === null || !entry.isDirectory()) {
+      await removeVersionDir(versionPath);
+      results.push(removed(entry.name, "removed invalid legacy version entry"));
+      continue;
+    }
+    const metadata = await readLegacyMetadata({ versionPath, version: parsedVersion, codexHome, platform, tmpDir });
+    if (metadata.kind === "remove") {
+      await removeVersionDir(versionPath);
+      results.push(removed(parsedVersion, metadata.reason));
+      continue;
+    }
+    if (!await probe(metadata.endpoint)) {
+      await removeVersionDir(versionPath);
+      results.push(removed(parsedVersion, "removed stale legacy daemon state"));
+      continue;
+    }
+    if (platform === "win32") {
+      results.push(deferred(parsedVersion, "legacy named pipe responded but Windows cannot prove pid ownership safely"));
+      continue;
+    }
+    const owned = await attest({ pid: metadata.pid, endpoint: metadata.endpoint, platform });
+    if (!owned) {
+      results.push(deferred(parsedVersion, "legacy endpoint responded but pid ownership was not proven"));
+      continue;
+    }
+    if (!killProcess(metadata.pid)) {
+      await removeVersionDir(versionPath);
+      results.push(removed(parsedVersion, "removed stale legacy daemon state"));
+      continue;
+    }
+    if (!await waitForProcessExit(metadata.pid, LEGACY_EXIT_WAIT_TIMEOUT_MS)) {
+      results.push(deferred(parsedVersion, `timed out waiting ${LEGACY_EXIT_WAIT_TIMEOUT_MS}ms for the proven legacy daemon to exit`));
+      continue;
+    }
+    await removeVersionDir(versionPath);
+    results.push(terminated(parsedVersion, "terminated proven owned legacy daemon"));
+  }
+  return results;
+}
+function parseVersionEntry(entryName) {
+  if (!entryName.startsWith("v"))
+    return null;
+  const version = entryName.slice(1);
+  return LEGACY_VERSION_PATTERN.test(version) ? version : null;
+}
+async function readLegacyMetadata(input) {
+  const pidText = await readRegularTrimmedFile(join27(input.versionPath, "daemon.pid"));
+  if (pidText === "non_regular")
+    return { kind: "remove", reason: "removed non-regular legacy daemon metadata" };
+  if (pidText === null)
+    return { kind: "remove", reason: "removed malformed legacy daemon metadata" };
+  const pid = Number.parseInt(pidText, 10);
+  if (!Number.isInteger(pid) || pid <= 0)
+    return { kind: "remove", reason: "removed malformed legacy daemon metadata" };
+  const endpointText = await readRegularTrimmedFile(join27(input.versionPath, "daemon.endpoint"));
+  if (endpointText === "non_regular")
+    return { kind: "remove", reason: "removed non-regular legacy daemon metadata" };
+  if (endpointText === null)
+    return { kind: "remove", reason: "removed malformed legacy daemon metadata" };
+  const allowedEndpoints = legacyEndpointCandidates({
+    version: input.version,
+    versionPath: input.versionPath,
+    platform: input.platform,
+    tmpDir: input.tmpDir
+  });
+  if (!allowedEndpoints.includes(endpointText)) {
+    return { kind: "remove", reason: "removed legacy daemon state with an endpoint outside the frozen vectors" };
+  }
+  return { kind: "valid", pid, endpoint: endpointText };
+}
+function legacyEndpointCandidates(input) {
+  if (input.platform === "win32") {
+    const normalizedVersionPath = input.versionPath.replaceAll("/", "\\");
+    const digest = shortDigest(normalizedVersionPath);
+    return [`\\\\.\\pipe\\omo-lsp-${input.version}-${digest}`];
+  }
+  const natural = posix.join(input.versionPath, "daemon.sock");
+  const hashed = posix.join(input.tmpDir, `omo-lsp-${input.version}-${shortDigest(input.versionPath)}.sock`);
+  return [natural, hashed];
+}
+async function readRegularTrimmedFile(path) {
+  const stats = await lstat11(path).catch(() => null);
+  if (stats === null)
+    return null;
+  if (!stats.isFile())
+    return "non_regular";
+  const content = (await readFile19(path, "utf8")).trim();
+  return content.length > 0 ? content : null;
+}
+function shortDigest(value) {
+  return createHash2("sha256").update(value).digest("hex").slice(0, 16);
+}
+async function removeVersionDir(path) {
+  await rm10(path, { recursive: true, force: true });
+}
+function removed(version, reason) {
+  return { version, status: "removed", reason };
+}
+function terminated(version, reason) {
+  return { version, status: "terminated", reason };
+}
+function deferred(version, reason) {
+  return { version, status: "deferred", reason };
 }
 function sendSigterm(pid) {
   try {
@@ -9790,10 +10582,28 @@ function sendSigterm(pid) {
     return false;
   }
 }
+async function defaultWaitForProcessExit(pid, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  for (;; ) {
+    if (!processIsRunning(pid))
+      return true;
+    if (Date.now() >= deadline)
+      return false;
+    await new Promise((resolve8) => setTimeout(resolve8, 100));
+  }
+}
+function processIsRunning(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // packages/omo-codex/src/install/codex-installer-bin-dir.ts
 import { homedir } from "node:os";
-import { join as join26, resolve as resolve8 } from "node:path";
+import { join as join28, resolve as resolve8 } from "node:path";
 function resolveCodexInstallerBinDir(input) {
   const explicitBinDir = input.binDir ?? input.env?.CODEX_LOCAL_BIN_DIR;
   if (explicitBinDir !== undefined && explicitBinDir.trim().length > 0)
@@ -9802,13 +10612,13 @@ function resolveCodexInstallerBinDir(input) {
   const defaultCodexHome = resolve8(homeDir, ".codex");
   const resolvedCodexHome = resolve8(input.codexHome);
   if (resolvedCodexHome !== defaultCodexHome)
-    return join26(resolvedCodexHome, "bin");
+    return join28(resolvedCodexHome, "bin");
   return resolve8(homeDir, ".local", "bin");
 }
 
 // packages/omo-codex/src/install/codex-git-bash-hooks.ts
-import { readFile as readFile19, writeFile as writeFile10 } from "node:fs/promises";
-import { join as join27 } from "node:path";
+import { readFile as readFile20, writeFile as writeFile11 } from "node:fs/promises";
+import { join as join29 } from "node:path";
 var WINDOWS_ONLY_GIT_BASH_HOOKS = new Set([
   "./hooks/pre-tool-use-recommending-git-bash-mcp.json",
   "./hooks/post-compact-resetting-git-bash-mcp-reminder.json"
@@ -9816,22 +10626,22 @@ var WINDOWS_ONLY_GIT_BASH_HOOKS = new Set([
 async function removeGitBashHooksOffWindows(input) {
   if (input.platform === "win32")
     return;
-  const manifestPath = join27(input.pluginRoot, ".codex-plugin", "plugin.json");
-  const parsed = JSON.parse(await readFile19(manifestPath, "utf8"));
+  const manifestPath = join29(input.pluginRoot, ".codex-plugin", "plugin.json");
+  const parsed = JSON.parse(await readFile20(manifestPath, "utf8"));
   if (!isPlainRecord(parsed) || !Array.isArray(parsed.hooks))
     return;
   const hooks = parsed.hooks.filter((hook) => typeof hook !== "string" || !WINDOWS_ONLY_GIT_BASH_HOOKS.has(hook));
   if (hooks.length === parsed.hooks.length)
     return;
-  await writeFile10(manifestPath, `${JSON.stringify({ ...parsed, hooks }, null, "\t")}
+  await writeFile11(manifestPath, `${JSON.stringify({ ...parsed, hooks }, null, "\t")}
 `);
 }
 
 // packages/omo-codex/src/install/omo-sot-migration.ts
-import { join as join28 } from "node:path";
+import { join as join30 } from "node:path";
 async function seedAndMigrateOmoSot(input) {
   const commandEnv = { ...input.env };
-  const scriptPath = join28(input.repoRoot, "packages", "omo-codex", "plugin", "scripts", "migrate-omo-sot.mjs");
+  const scriptPath = join30(input.repoRoot, "packages", "omo-codex", "plugin", "scripts", "migrate-omo-sot.mjs");
   try {
     await input.runCommand(process.execPath, [scriptPath, "--seed"], {
       cwd: input.repoRoot,
@@ -9845,7 +10655,7 @@ async function seedAndMigrateOmoSot(input) {
 }
 
 // packages/omo-codex/src/install/install-ast-grep-sg.ts
-import { join as join30 } from "node:path";
+import { join as join32 } from "node:path";
 
 // packages/utils/src/ast-grep/sg-manifest.ts
 function normalizeRuntimePlatform(platform = process.platform) {
@@ -9865,11 +10675,11 @@ function runtimeSlug(platform = process.platform, arch = process.arch) {
 // packages/utils/src/ast-grep/install-script.ts
 import { spawn as spawn2 } from "node:child_process";
 import { existsSync as existsSync4 } from "node:fs";
-import { join as join29 } from "node:path";
+import { join as join31 } from "node:path";
 var AST_GREP_BIN_DIR_ENV_KEY = "OMO_AST_GREP_BIN_DIR";
 var AST_GREP_INSTALL_TIMEOUT_MS = 30000;
 function astGrepRuntimeDir(baseDir, platform = process.platform, arch = process.arch) {
-  return join29(baseDir, "runtime", "ast-grep", runtimeSlug(platform, arch));
+  return join31(baseDir, "runtime", "ast-grep", runtimeSlug(platform, arch));
 }
 function isMissingExecutable(error) {
   if (!("code" in error))
@@ -9907,7 +10717,7 @@ function defaultSpawnProcess(command, args, options) {
   };
 }
 function scriptPathForPlatform(skillDir, platform) {
-  return join29(skillDir, platform === "win32" ? "install.ps1" : "install.sh");
+  return join31(skillDir, platform === "win32" ? "install.ps1" : "install.sh");
 }
 function invocationsForPlatform(scriptPath, platform) {
   if (platform !== "win32")
@@ -9979,7 +10789,7 @@ async function installAstGrepForCodex(options) {
     return;
   const platform = options.platform ?? process.platform;
   const targetDir = astGrepRuntimeDir(options.codexHome, platform, options.arch ?? process.arch);
-  const skillDir = join30(plugin.path, "skills", "ast-grep");
+  const skillDir = join32(plugin.path, "skills", "ast-grep");
   const installer = options.installer ?? runAstGrepSkillInstall;
   try {
     const result = await installer({ platform, skillDir, targetDir });
@@ -10012,7 +10822,7 @@ async function runCodexInstaller(options = {}) {
   const env2 = options.env ?? process.env;
   const platform = options.platform ?? process.platform;
   const repoRoot = resolve9(options.repoRoot ?? findRepoRoot({ importerDir: import.meta.dir, env: env2 }));
-  const codexHome = resolve9(options.codexHome ?? env2.CODEX_HOME ?? join33(homedir2(), ".codex"));
+  const codexHome = resolve9(options.codexHome ?? env2.CODEX_HOME ?? join35(homedir2(), ".codex"));
   const projectDirectory = resolve9(options.projectDirectory ?? env2.OMO_CODEX_PROJECT ?? process.cwd());
   const binDir = resolveCodexInstallerBinDir({ binDir: options.binDir, codexHome, env: env2 });
   const runCommand = options.runCommand ?? defaultRunCommand;
@@ -10020,6 +10830,7 @@ async function runCodexInstaller(options = {}) {
     return;
   });
   const buildSource = await shouldBuildSourcePackages(repoRoot);
+  const versionOverride = env2.LAZYCODEX_DEV_VERSION?.trim() || undefined;
   const gitBashResolution = await prepareGitBashForInstall({
     platform,
     env: env2,
@@ -10028,9 +10839,9 @@ async function runCodexInstaller(options = {}) {
   if (!gitBashResolution.found) {
     throw new Error(gitBashResolution.installHint);
   }
-  const codexPackageRoot = join33(repoRoot, "packages", "omo-codex");
+  const codexPackageRoot = join35(repoRoot, "packages", "omo-codex");
   const marketplace = await readMarketplace(repoRoot, {
-    marketplacePath: join33(codexPackageRoot, "marketplace.json")
+    marketplacePath: join35(codexPackageRoot, "marketplace.json")
   });
   const distributionManifest = await readDistributionManifest(repoRoot);
   const installed = [];
@@ -10046,13 +10857,15 @@ async function runCodexInstaller(options = {}) {
       manifestVersion: manifest.version,
       marketplaceName: marketplace.name,
       pluginName: entry.name,
-      distributionManifest
+      distributionManifest,
+      versionOverride
     });
     validatePathSegment(version2, "plugin version");
     log(`Building ${entry.name}@${version2}`);
     const plugin = await installCachedPlugin({
       buildSource,
       codexHome,
+      env: env2,
       marketplaceName: marketplace.name,
       name: entry.name,
       runCommand,
@@ -10073,7 +10886,7 @@ async function runCodexInstaller(options = {}) {
       if (runtimeLink !== null)
         log(`Linked ${runtimeLink.name} -> ${runtimeLink.target}`);
       else
-        log(`Warning: skipped the omo runtime wrapper because ${join33(repoRoot, "dist", "cli", "index.js")} is missing; omo ulw-loop commands will be unavailable until a package shipping dist/cli is installed`);
+        log(`Warning: skipped the omo runtime wrapper because ${join35(repoRoot, "dist", "cli", "index.js")} is missing; omo ulw-loop commands will be unavailable until a package shipping dist/cli is installed`);
     }
     pluginSources.push({ name: entry.name, sourcePath });
     installed.push(plugin);
@@ -10104,7 +10917,7 @@ async function runCodexInstaller(options = {}) {
     });
     for (const link of agentLinks) {
       log(`Linked agent ${link.name} -> ${link.target}`);
-      const agentName = agentNameFromToml2(link.name);
+      const agentName = agentNameFromToml3(link.name);
       agentConfigs.set(agentName, { name: agentName, configFile: `./agents/${link.name}` });
     }
   }
@@ -10126,14 +10939,23 @@ async function runCodexInstaller(options = {}) {
       pluginNames: marketplace.plugins.map((plugin) => plugin.name)
     });
   }
-  await reapLspDaemons(codexHome).catch(() => []);
-  const marketplaceRoot = join33(codexHome, "plugins", "cache", marketplace.name);
+  const legacyDaemonCleanup = await reapLspDaemons(codexHome).catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    log(`Warning: skipped legacy Codex LSP daemon cleanup: ${message}`);
+    return [];
+  });
+  for (const cleanup of legacyDaemonCleanup) {
+    if (cleanup.status !== "deferred")
+      continue;
+    log(`Warning: deferred legacy Codex LSP daemon cleanup for v${cleanup.version}: ${cleanup.reason}`);
+  }
+  const marketplaceRoot = join35(codexHome, "plugins", "cache", marketplace.name);
   await writeCachedMarketplaceManifest({
     marketplaceName: marketplace.name,
     marketplaceRoot,
     plugins: installed
   });
-  const configPath = join33(codexHome, "config.toml");
+  const configPath = join35(codexHome, "config.toml");
   await updateCodexConfig({
     configPath,
     repoRoot: codexPackageRoot,
@@ -10171,7 +10993,7 @@ async function runCodexInstaller(options = {}) {
     projectCleanup
   };
 }
-function agentNameFromToml2(fileName) {
+function agentNameFromToml3(fileName) {
   return fileName.endsWith(".toml") ? fileName.slice(0, -".toml".length) : fileName;
 }
 async function agentSourceRootsForInstall(input) {
@@ -10193,7 +11015,7 @@ function findRepoRootFromImporter(importerDir) {
   for (let depth = 0;depth <= 7; depth += 1) {
     if (isRepoRootWithCodexPlugin(current))
       return current;
-    for (const wrapperPackageRoot of [join33(current, "node_modules", "oh-my-openagent"), join33(current, "oh-my-openagent")]) {
+    for (const wrapperPackageRoot of [join35(current, "node_modules", "oh-my-openagent"), join35(current, "oh-my-openagent")]) {
       if (isRepoRootWithCodexPlugin(wrapperPackageRoot))
         return wrapperPackageRoot;
     }
@@ -10211,7 +11033,7 @@ function findRepoRoot(input) {
   return findRepoRootFromImporter(input.importerDir);
 }
 function isRepoRootWithCodexPlugin(repoRoot) {
-  return existsSync7(join33(repoRoot, "packages", "omo-codex", "plugin", ".codex-plugin", "plugin.json"));
+  return existsSync7(join35(repoRoot, "packages", "omo-codex", "plugin", ".codex-plugin", "plugin.json"));
 }
 function codexMarketplaceSource(marketplaceRoot) {
   return { sourceType: "local", source: marketplaceRoot };
@@ -10523,13 +11345,13 @@ function shellQuote(value) {
 
 // packages/omo-codex/src/install/lazycodex-manual-update.ts
 import { spawn as spawn3, spawnSync as spawnSync3 } from "node:child_process";
-import { readFileSync as readFileSync3 } from "node:fs";
-import { dirname as dirname10, join as join35 } from "node:path";
+import { readFileSync as readFileSync4 } from "node:fs";
+import { dirname as dirname11, join as join37 } from "node:path";
 import { createInterface as createInterface2 } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 
 // packages/omo-codex/src/install/lazycodex-bun-global-paths.ts
-import { join as join34 } from "node:path";
+import { join as join36 } from "node:path";
 function isBunGlobalEntrypointPath(invokedPath, env2) {
   if (typeof invokedPath !== "string" || invokedPath.trim().length === 0)
     return false;
@@ -10540,8 +11362,8 @@ function resolveBunGlobalRoots(env2) {
   const bunInstallRoot = env2.BUN_INSTALL?.trim();
   const homeRoot = env2.HOME?.trim();
   return [
-    ...bunInstallRoot ? [join34(bunInstallRoot, "bin"), join34(bunInstallRoot, "install", "global", "node_modules")] : [],
-    ...homeRoot ? [join34(homeRoot, ".bun", "bin"), join34(homeRoot, ".bun", "install", "global", "node_modules")] : []
+    ...bunInstallRoot ? [join36(bunInstallRoot, "bin"), join36(bunInstallRoot, "install", "global", "node_modules")] : [],
+    ...homeRoot ? [join36(homeRoot, ".bun", "bin"), join36(homeRoot, ".bun", "install", "global", "node_modules")] : []
   ].map(normalizePathForPrefix);
 }
 function normalizePathForPrefix(path2) {
@@ -10633,8 +11455,8 @@ function resolveArgs(env2) {
 function resolveCurrentVersion(env2) {
   if (env2.LAZYCODEX_CURRENT_VERSION?.trim())
     return env2.LAZYCODEX_CURRENT_VERSION.trim();
-  const pluginRoot = dirname10(dirname10(fileURLToPath(import.meta.url)));
-  return readVersionManifest(resolveInstalledVersionPath(env2, pluginRoot)) ?? readVersionManifest(join35(pluginRoot, "..", "..", "..", "package.json")) ?? readVersionManifest(join35(pluginRoot, ".codex-plugin", "plugin.json"));
+  const pluginRoot = dirname11(dirname11(fileURLToPath(import.meta.url)));
+  return readVersionManifest(resolveInstalledVersionPath(env2, pluginRoot)) ?? readVersionManifest(join37(pluginRoot, "..", "..", "..", "package.json")) ?? readVersionManifest(join37(pluginRoot, ".codex-plugin", "plugin.json"));
 }
 function resolveLatestVersion(env2) {
   if (env2.LAZYCODEX_LATEST_VERSION?.trim())
@@ -10750,11 +11572,11 @@ function compareVersions(left, right) {
 function resolveInstalledVersionPath(env2, pluginRoot) {
   if (env2.LAZYCODEX_INSTALLED_VERSION_FILE?.trim())
     return env2.LAZYCODEX_INSTALLED_VERSION_FILE.trim();
-  return join35(pluginRoot, INSTALLED_VERSION_FILE);
+  return join37(pluginRoot, INSTALLED_VERSION_FILE);
 }
 function readVersionManifest(path2) {
   try {
-    const parsed = JSON.parse(readFileSync3(path2, "utf8"));
+    const parsed = JSON.parse(readFileSync4(path2, "utf8"));
     if (typeof parsed === "object" && parsed !== null && "version" in parsed && typeof parsed.version === "string") {
       return parsed.version;
     }
@@ -10766,15 +11588,15 @@ function readVersionManifest(path2) {
   }
 }
 // packages/omo-codex/src/install/codex-git-bash-mcp-env.ts
-import { readFile as readFile20, writeFile as writeFile11 } from "node:fs/promises";
-import { join as join36 } from "node:path";
+import { readFile as readFile21, writeFile as writeFile12 } from "node:fs/promises";
+import { join as join38 } from "node:path";
 var GIT_BASH_ENV_KEY2 = "OMO_CODEX_GIT_BASH_PATH";
 var CODEGRAPH_RELATIVE_ARGS2 = new Set(["components/codegraph/dist/serve.js", "./components/codegraph/dist/serve.js"]);
 async function stampGitBashMcpEnv(input) {
-  const manifestPath = join36(input.pluginRoot, ".mcp.json");
+  const manifestPath = join38(input.pluginRoot, ".mcp.json");
   if (!await fileExistsStrict(manifestPath))
     return false;
-  const parsed = JSON.parse(await readFile20(manifestPath, "utf8"));
+  const parsed = JSON.parse(await readFile21(manifestPath, "utf8"));
   if (!isPlainRecord(parsed) || !isPlainRecord(parsed["mcpServers"]))
     return false;
   let changed = stampCodegraphMcpPath(parsed["mcpServers"], input.pluginRoot);
@@ -10792,7 +11614,7 @@ async function stampGitBashMcpEnv(input) {
   }
   if (!changed)
     return false;
-  await writeFile11(manifestPath, `${JSON.stringify(parsed, null, "\t")}
+  await writeFile12(manifestPath, `${JSON.stringify(parsed, null, "\t")}
 `);
   return true;
 }
@@ -10804,7 +11626,7 @@ function stampCodegraphMcpPath(mcpServers, pluginRoot) {
   const entrypoint = args[0];
   if (typeof entrypoint !== "string" || !CODEGRAPH_RELATIVE_ARGS2.has(entrypoint))
     return false;
-  codegraphServer["args"] = [join36(pluginRoot, "components", "codegraph", "dist", "serve.js"), ...args.slice(1)];
+  codegraphServer["args"] = [join38(pluginRoot, "components", "codegraph", "dist", "serve.js"), ...args.slice(1)];
   return true;
 }
 
@@ -10813,19 +11635,23 @@ async function installMarketplaceLocally(options = {}) {
   return runCodexInstaller(options);
 }
 function resolveDefaultRepoRootForEntrypoint(entrypointPath) {
-  return resolve10(dirname11(entrypointPath), "..", "..", "..");
+  return resolve10(dirname12(entrypointPath), "..", "..", "..");
 }
 function resolveDefaultRepoRoot() {
   return resolveDefaultRepoRootForEntrypoint(fileURLToPath2(import.meta.url));
 }
 async function runLazyCodexInstallLocalCli(input) {
+  const logWarning = (message) => {
+    if (message.startsWith("Warning:"))
+      input.log(message);
+  };
   const parsed = parseLazyCodexInstallCliArgs(input.argv);
   if (parsed.kind === "help") {
     input.log(formatLazyCodexInstallHelp());
     return 0;
   }
   if (parsed.kind === "version") {
-    const packageJson = JSON.parse(await readFile21(join37(input.defaultRepoRoot, "package.json"), "utf8"));
+    const packageJson = JSON.parse(await readFile22(join39(input.defaultRepoRoot, "package.json"), "utf8"));
     const version2 = typeof packageJson.version === "string" ? packageJson.version : "unknown";
     input.log(`lazycodex-ai ${version2}`);
     return 0;
@@ -10843,7 +11669,8 @@ async function runLazyCodexInstallLocalCli(input) {
       const result2 = await installMarketplaceLocally({
         repoRoot: resolve10(parsed.repoRoot),
         autonomousPermissions: true,
-        env: input.env
+        env: input.env,
+        log: logWarning
       });
       input.log(`Installed ${result2.installed.length} plugin(s) from ${result2.marketplaceName}.`);
       return 0;
@@ -10854,7 +11681,8 @@ async function runLazyCodexInstallLocalCli(input) {
   const result = await installMarketplaceLocally({
     repoRoot,
     autonomousPermissions: parsed.autonomousPermissions,
-    env: input.env
+    env: input.env,
+    log: logWarning
   });
   input.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`);
   return 0;

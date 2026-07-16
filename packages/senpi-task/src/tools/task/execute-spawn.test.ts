@@ -55,6 +55,41 @@ describe("buildTaskExecute spawn", () => {
     expect(captured?.category).toBe("quick")
   })
 
+  test("#given a resolved background start #when executed #then resolved metadata and background mode reach result details without prompt persistence", async () => {
+    // given
+    const resolvedModel = {
+      provider: "openai",
+      model_id: "gpt-5.6-sol",
+      display: "GPT-5.6 Sol",
+      reasoning_effort: "xhigh",
+      source: "category" as const,
+    }
+    const manager = createFakeManager({
+      start: async (): Promise<StartResult> => ({
+        kind: "started",
+        task_id: "st_00000013",
+        status: "running",
+        name: "resolved-bg",
+        resolved_model: resolvedModel,
+      }),
+    })
+    const execute = buildTaskExecute(makeDeps(manager))
+
+    // when
+    const result = await execute(
+      "call-resolved-bg",
+      { prompt: "sensitive prompt", category: "ultrabrain", run_in_background: true },
+      undefined,
+      undefined,
+      CTX,
+    )
+
+    // then
+    expect(result.details.resolved_model).toEqual(resolvedModel)
+    expect(result.details.run_in_background).toBe(true)
+    expect(Object.hasOwn(result.details, "prompt")).toBe(false)
+  })
+
   test("#given config default execution mode #when spawning without an agent overlay #then config mode reaches the start spec", async () => {
     let captured: ManagerStartSpec | undefined
     const manager = createFakeManager({
@@ -138,6 +173,45 @@ describe("buildTaskExecute spawn", () => {
     expect(text).toContain("THE FINAL ANSWER")
     expect(text).toContain("st_00000004")
     expect(result.details.status).toBe("completed")
+  })
+
+  test("#given a resolved foreground record #when execution completes #then resolved metadata, raw model fallback, and foreground mode reach details", async () => {
+    // given
+    const resolvedModel = {
+      provider: "openai",
+      model_id: "gpt-5.6-sol",
+      display: "GPT-5.6 Sol",
+      variant: "reasoning",
+      reasoning_effort: "xhigh",
+      source: "category" as const,
+    }
+    const manager = createFakeManager({
+      start: async (): Promise<StartResult> => ({
+        kind: "started",
+        task_id: "st_00000014",
+        status: "running",
+        name: "resolved-fg",
+        resolved_model: resolvedModel,
+      }),
+      waitFor: async (): Promise<TaskRecord> =>
+        makeRecord({
+          task_id: "st_00000014",
+          status: "completed",
+          category: "ultrabrain",
+          model: "openai/gpt-5.6-sol",
+          resolved_model: resolvedModel,
+          final_response: "done",
+        }),
+    })
+    const execute = buildTaskExecute(makeDeps(manager))
+
+    // when
+    const result = await execute("call-resolved-fg", { prompt: "finish", category: "ultrabrain" }, undefined, undefined, CTX)
+
+    // then
+    expect(result.details.resolved_model).toEqual(resolvedModel)
+    expect(result.details.model).toBe("openai/gpt-5.6-sol")
+    expect(result.details.run_in_background).toBe(false)
   })
 
   test("#given both category and subagent_type #when executed #then it returns the XOR error result without spawning", async () => {

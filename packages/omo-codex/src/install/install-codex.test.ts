@@ -7,6 +7,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { findRepoRoot, findRepoRootFromImporter, resolveCodexInstallerBinDir, runCodexInstaller } from "./install-codex"
 import { createRepoWithBuiltComponentBins } from "./install-codex-test-fixtures"
+import { createLegacyCodexHome, liveLegacyEndpointFor, startIdleNodeProcess, startLegacyDaemonProcess, stopChild, waitForChildReady, writeLegacyVersionState } from "./lsp-daemon-reaper.test-support"
 
 const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
 
@@ -252,6 +253,47 @@ describe("install-codex", () => {
     const linkedNames = await readdir(binDir)
     const rootCliBinName = process.platform === "win32" ? "omo.cmd" : "omo"
     expect(linkedNames).not.toContain(rootCliBinName)
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
+
+  test("#given a live unverifiable legacy daemon dir #when installing omo #then it warns and does not copy legacy IPC state into the OMO home", async () => {
+    // given
+    const codexHome = createLegacyCodexHome("omo-codex-home-legacy-daemon-")
+    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-legacy-daemon-"))
+    const home = await mkdtemp(join(tmpdir(), "omo-codex-user-home-legacy-daemon-"))
+    const endpoint = liveLegacyEndpointFor({ codexHome, version: "0.1.0" })
+    const daemon = startLegacyDaemonProcess({ endpoint })
+    const unrelated = startIdleNodeProcess()
+    await waitForChildReady(daemon)
+    const version = await writeLegacyVersionState({
+      codexHome,
+      version: "0.1.0",
+      pid: String(unrelated.pid ?? 0),
+      endpoint,
+    })
+    const logs: string[] = []
+
+    try {
+      // when
+      await runCodexInstaller({
+        codexHome,
+        binDir,
+        repoRoot: process.cwd(),
+        astGrepInstaller: skipAstGrepInstall,
+        runCommand: async () => undefined,
+        env: { HOME: home },
+        log: (line) => logs.push(line),
+      })
+
+      // then
+      expect(logs.some((line) => line.includes("Warning: deferred legacy Codex LSP daemon cleanup for v0.1.0"))).toBe(true)
+      const expectedReason = process.platform === "win32" ? "Windows cannot prove pid ownership safely" : "pid ownership was not proven"
+      expect(logs.some((line) => line.includes(expectedReason))).toBe(true)
+      expect((await stat(version.versionDir)).isDirectory()).toBe(true)
+      await expect(stat(join(home, ".omo", "lsp-daemon"))).rejects.toThrow()
+    } finally {
+      await stopChild(daemon)
+      await stopChild(unrelated)
+    }
   }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
   test("#given autonomous permissions requested #when installing omo #then writes Codex autonomy settings", async () => {

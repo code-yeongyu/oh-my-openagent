@@ -7,6 +7,15 @@ import { runTaskSend } from "./send"
 afterEach(cleanupProjects)
 
 describe("runTaskCancel", () => {
+  test("#given the task_cancel tool #when created #then it exposes custom call and result renderers", () => {
+    const { manager } = makeManager({})
+
+    const tool = createTaskCancelTool({ manager })
+
+    expect(typeof tool.renderCall).toBe("function")
+    expect(typeof tool.renderResult).toBe("function")
+  })
+
   test("#given a running child #when cancelled with a reason #then the exact post-state is reported", async () => {
     const { manager } = makeManager({})
     const started = await manager.start(baseSpec({ parent_session_id: "p1" }))

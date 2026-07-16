@@ -1,16 +1,19 @@
 import { describe, expect, it } from "bun:test"
 
-import type { ListedTask, TaskRecord, TaskStatus } from "@oh-my-opencode/senpi-task"
+import { rendererVisibleWidth, type ListedTask, type TaskRecord, type TaskStatus } from "@oh-my-opencode/senpi-task"
 
 import type { CapturedUi } from "./runtime-context"
 import {
   buildWidgetRows,
   createTaskStatusUi,
   formatFooterStatus,
+  formatTaskRow,
   type StatusUiManager,
   type StatusUiRuntime,
   type StatusUiTimers,
 } from "./status-ui"
+
+// allow: SIZE_OK - status formatting and captured-UI behavior share one focused fixture surface.
 
 function record(overrides: Partial<TaskRecord> & { task_id: string; status: TaskStatus }): TaskRecord {
   return {
@@ -29,6 +32,23 @@ function record(overrides: Partial<TaskRecord> & { task_id: string; status: Task
 
 function listed(records: readonly TaskRecord[]): readonly ListedTask[] {
   return records.map((rec) => ({ record: rec }))
+}
+
+function longActiveRecord(): TaskRecord {
+  return record({
+    task_id: "st_01active0123456789",
+    name: "active-child",
+    status: "running",
+    category: "ultrabrain",
+    resolved_model: {
+      provider: "omo-mock",
+      model_id: "mock-1",
+      display: "omo-mock/mock-1",
+      reasoning_effort: "xhigh",
+      variant: "xhigh",
+      source: "category",
+    },
+  })
 }
 
 interface FakeUi extends CapturedUi {
@@ -67,7 +87,7 @@ function runtimeOf(ui: CapturedUi | undefined, sessionId: string | undefined, mo
 }
 
 describe("formatFooterStatus", () => {
-  it("#given two running tasks #when formatting the footer #then all four counts and an active tail render", () => {
+  it("#given two running tasks #when formatting the footer #then compact active counts and a task tail render", () => {
     // given
     const records = [record({ task_id: "st_aaaa", status: "running" }), record({ task_id: "st_bbbb", status: "running" })]
 
@@ -75,8 +95,8 @@ describe("formatFooterStatus", () => {
     const footer = formatFooterStatus(records)
 
     // then
-    expect(footer).toContain("tasks:2 run:2 done:0 err:0")
-    expect(footer).toContain("| st_aaaa")
+    expect(footer).toContain("t2/r2")
+    expect(footer).toContain("st_aaaa")
   })
 
   it("#given no tasks #when formatting the footer #then it is undefined so the status clears", () => {
@@ -99,6 +119,16 @@ describe("formatFooterStatus", () => {
     expect(footer).toContain("run:0")
     expect(footer).toContain("done:3")
     expect(footer).toContain("err:2")
+  })
+
+  it("#given a 137-column active task #when formatting the footer #then it remains one physical line at 72 and 120 columns", () => {
+    // given / when
+    const footer = formatFooterStatus([longActiveRecord()]) ?? ""
+
+    // then
+    expect(footer).not.toContain("\n")
+    for (const columns of [72, 120]) expect(rendererVisibleWidth(footer)).toBeLessThanOrEqual(columns)
+    expect(footer).toBe("t1/r1 st_01acti...|c:ultrabrain omo-mock/mock-1 xhigh in-process running")
   })
 })
 
@@ -123,7 +153,7 @@ describe("buildWidgetRows", () => {
     expect(buildWidgetRows(records)).toHaveLength(0)
   })
 
-  it("#given an active task #when building a row #then it carries id, agent, state, mode, model", () => {
+  it("#given an active task #when building a row #then it retains useful id, target, model, mode, and status context", () => {
     // given
     const records = [
       record({ task_id: "st_row", name: "finder", status: "running", agent_type: "explore", pid: 4242 }),
@@ -134,11 +164,125 @@ describe("buildWidgetRows", () => {
 
     // then
     expect(row).toContain("st_row")
-    expect(row).toContain("finder")
-    expect(row).toContain("agent:explore")
+    expect(row).toContain("a:explore")
+    expect(row).toContain("anthropic/")
+    expect(row).toContain("in-process")
     expect(row).toContain("running")
-    expect(row).toContain("mode:in-process")
-    expect(row).toContain("pid:4242")
+    expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(72)
+  })
+
+  it("#given a 137-column active task #when building its widget row #then it remains one physical line at 72 and 120 columns", () => {
+    // given / when
+    const row = buildWidgetRows([longActiveRecord()])[0] ?? ""
+
+    // then
+    expect(row).not.toContain("\n")
+    for (const columns of [70, 72, 120]) expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(columns)
+    expect(row).toContain("c:ultrabrain")
+    expect(row).toContain("omo-mock/mock-1")
+    expect(row).toContain("xhigh")
+    expect(row).toContain("in-process")
+    expect(row).toContain("running")
+  })
+})
+
+describe("formatTaskRow", () => {
+  it("#given a category task with resolved model metadata #when formatting #then category, display model, reasoning, variant, mode, and status render in one order", () => {
+    // given
+    const task = record({
+      task_id: "st_resolved",
+      name: "planner",
+      status: "running",
+      category: "ultrabrain",
+      execution_mode: "rpc",
+      model: "category/raw-fallback",
+      resolved_model: {
+        provider: "openai",
+        model_id: "gpt-5.6-sol",
+        display: "openai/gpt-5.6-sol",
+        reasoning_effort: "xhigh",
+        variant: "sol",
+        source: "category",
+      },
+    })
+
+    // when
+    const row = formatTaskRow(task)
+
+    // then
+    expect(row).toBe(
+      "st_resolved planner category:ultrabrain model:openai/gpt-5.6-sol reasoning:xhigh variant:sol mode:rpc status:running",
+    )
+  })
+
+  it("#given a legacy task without resolved model metadata #when formatting #then raw model is preserved as the model label", () => {
+    // given
+    const task = record({
+      task_id: "st_legacy",
+      status: "running",
+      agent_type: "explore",
+      model: "anthropic/claude-sonnet-4-6",
+    })
+
+    // when
+    const row = formatTaskRow(task)
+
+    // then
+    expect(row).toBe("st_legacy agent:explore model:anthropic/claude-sonnet-4-6 mode:in-process status:running")
+  })
+
+  it("#given empty resolved model detail labels #when formatting #then empty reasoning and variant labels are omitted", () => {
+    // given
+    const task = record({
+      task_id: "st_empty",
+      status: "running",
+      category: "ultrabrain",
+      model: "category/raw-fallback",
+      resolved_model: {
+        provider: "google",
+        model_id: "gemini-3.1-pro",
+        display: "google/gemini-3.1-pro",
+        reasoning_effort: "",
+        variant: "",
+        source: "category",
+      },
+    })
+
+    // when
+    const row = formatTaskRow(task)
+
+    // then
+    expect(row).toBe("st_empty category:ultrabrain model:google/gemini-3.1-pro mode:in-process status:running")
+  })
+
+  it("#given matching reasoning and variant values #when formatting #then the duplicate variant label is omitted", () => {
+    // given / when
+    const row = formatTaskRow(longActiveRecord())
+
+    // then
+    expect(row).toContain("reasoning:xhigh")
+    expect(row).not.toContain("variant:xhigh")
+  })
+
+  it("#given a stale malformed running record with final_response #when formatting defensively #then the progress excerpt is terminal-width safe and concise", () => {
+    // given a stale persisted record; normal lifecycle progress does not set final_response while running
+    const task = record({
+      task_id: "st_cjk",
+      status: "running",
+      agent_type: "explore",
+      final_response: `${"界".repeat(40)}tail`,
+    })
+
+    // when
+    const row = formatTaskRow(task)
+    const progressPrefix = " progress:"
+    const progressIndex = row.indexOf(progressPrefix)
+    const progress = progressIndex >= 0 ? row.slice(progressIndex + progressPrefix.length) : ""
+
+    // then
+    expect(progress).toContain("...")
+    expect(progress).not.toContain("tail")
+    expect(rendererVisibleWidth(progress)).toBeLessThanOrEqual(60)
   })
 })
 
@@ -155,11 +299,40 @@ describe("createTaskStatusUi.syncNow", () => {
     statusUi.syncNow()
 
     // then footer counts scoped to session-a only (2 tasks, not 3)
-    expect(ui.statusCalls.at(-1)).toContain("tasks:2 run:2")
+    expect(ui.statusCalls.at(-1)).toContain("t2/r2")
     // widget shows the two session-a rows below the editor
     const widget = ui.widgetCalls.at(-1)
     expect(widget?.content).toHaveLength(2)
     expect(widget?.placement).toBe("belowEditor")
+  })
+
+  it("#given controls across a stale malformed running record with final_response #when syncing defensively #then the row widget and footer are sanitized without damaging CJK text", () => {
+    // given a stale persisted record; normal lifecycle progress does not set final_response while running
+    const task = record({
+      task_id: "st_\u001b[31mred\u001b[0m", name: "한국어\u0007 작업",
+      status: "running", category: "ultra\u001b[2Jbrain",
+      resolved_model: { provider: "openai", model_id: "gpt-5.6-sol", source: "category", display: "GPT\u001b]0;hidden\u001b\\-5.6 Sol", reasoning_effort: "xhigh\u0085", variant: "sol\u001bc" },
+      final_response: "첫째\t둘째\n界 \u001b]8;;https://example.com/unterminated",
+    })
+    const ui = fakeUi()
+    const statusUi = createTaskStatusUi({ manager: fakeManager([task]), runtime: runtimeOf(ui, "session-a", "tui") })
+
+    // when
+    statusUi.syncNow()
+
+    // then
+    const footer = ui.statusCalls.at(-1) ?? ""
+    const widgetRow = ui.widgetCalls.at(-1)?.content?.[0] ?? ""
+    expect(rendererVisibleWidth(widgetRow)).toBeLessThanOrEqual(70)
+    expect(rendererVisibleWidth(footer)).toBeLessThanOrEqual(72)
+    expect(widgetRow).toContain("한")
+    expect(widgetRow).toContain("c:ultrabrain")
+    expect(widgetRow).toContain("GPT-5.6 Sol")
+    expect(widgetRow).toContain("xhigh")
+    expect(widgetRow).toContain("in-process")
+    expect(widgetRow).toContain("running")
+    expect(footer).toContain("t1/r1")
+    expect(`${footer} ${widgetRow}`).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/u)
   })
 
   it("#given no captured ui context #when syncing #then it is a no-op", () => {
@@ -212,7 +385,7 @@ describe("createTaskStatusUi.scheduleSync", () => {
         return handle
       },
       clear: (handle) => {
-        active.delete(handle as number)
+        if (typeof handle === "number") active.delete(handle)
       },
     }
     const ui = fakeUi()

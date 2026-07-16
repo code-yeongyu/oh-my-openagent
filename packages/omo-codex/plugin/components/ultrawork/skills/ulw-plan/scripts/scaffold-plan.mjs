@@ -221,7 +221,7 @@ Your next move: <fill - e.g. approve, or run a high-accuracy review>. Full execu
 ## Verification strategy
 > Zero human intervention - all verification is agent-executed.
 - Test decision: <TDD | tests-after | none> + framework
-- Evidence: .omo/evidence/task-<N>-${slug}.<ext>
+- Evidence: <attemptDir>/task-<N>-${slug}.<ext> (attemptDir = currentAttemptDir from 'omo ulw-loop status --json', .omo/evidence/ulw/<session>/<goalId>/a<attempt>; outside ulw-loop use .omo/evidence/)
 
 ## Execution strategy
 ### Parallel execution waves
@@ -239,7 +239,7 @@ Your next move: <fill - e.g. approve, or run a high-accuracy review>. Full execu
   Parallelization: Wave <N> | Blocked by: <...> | Blocks: <...>
   References (executor has NO interview context - be exhaustive): <src/path:lines>
   Acceptance criteria (agent-executable): <exact command or assertion>
-  QA scenarios (name the exact tool + invocation): happy + failure, Evidence .omo/evidence/task-1-${slug}.<ext>
+  QA scenarios (name the exact tool + invocation): happy + failure, Evidence <attemptDir>/task-1-${slug}.<ext>
   Commit: <Y/N> | <type>(<scope>): <summary>
 
 ## Final verification wave

@@ -57,6 +57,23 @@ describe("getHephaestusPromptSource", () => {
     expect(source2).toBe("gpt-5-5");
   });
 
+  test("returns 'gpt-5-6' for gpt-5.6 family models", () => {
+    // given
+    const model1 = "openai/gpt-5.6";
+    const model2 = "openai/gpt-5.6-sol";
+    const model3 = "vercel/openai/gpt-5.6-terra";
+
+    // when
+    const source1 = getHephaestusPromptSource(model1);
+    const source2 = getHephaestusPromptSource(model2);
+    const source3 = getHephaestusPromptSource(model3);
+
+    // then
+    expect(source1).toBe("gpt-5-6");
+    expect(source2).toBe("gpt-5-6");
+    expect(source3).toBe("gpt-5-6");
+  });
+
   test("returns 'gpt' for GPT 5.3 Codex models", () => {
     // given
     const model1 = "openai/gpt-5.3-codex";
@@ -138,6 +155,21 @@ describe("getHephaestusPrompt", () => {
     expect(prompt).toContain("Three-attempt failure protocol");
     expect(prompt).toContain("based on GPT-5.5");
     expect(prompt).toContain("Autonomy and Persistence");
+  });
+
+  test("GPT 5.6 model returns GPT-5.6 optimized prompt", () => {
+    // given
+    const model = "openai/gpt-5.6-sol";
+
+    // when
+    const prompt = getHephaestusPrompt(model);
+
+    // then
+    expect(prompt).toContain("based on GPT-5.6");
+    expect(prompt).toContain("Manual QA Gate");
+    expect(prompt).toContain("Hard invariants");
+    expect(prompt).not.toContain("# Tone");
+    expect(prompt).not.toContain("based on GPT-5.5");
   });
 
   test("GPT 5.3 Codex model returns generic GPT prompt", () => {

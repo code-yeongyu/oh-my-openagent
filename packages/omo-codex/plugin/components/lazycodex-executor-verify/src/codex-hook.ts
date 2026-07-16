@@ -6,11 +6,15 @@ import { clearAttemptState, MAX_ATTEMPTS, readAttemptState, writeAttemptState } 
 import type { HookFileSystem, StopHookOutput, SubagentStopInput } from "./types.js";
 import { SUBAGENT_STOP_EVENT } from "./types.js";
 
-const LAZYCODEX_EXECUTOR_AGENT = "lazycodex-executor";
+const RECEIPT_ENFORCED_AGENTS = new Set([
+	"lazycodex-worker-low",
+	"lazycodex-worker-medium",
+	"lazycodex-worker-high",
+]);
 
 export function runSubagentStopHook(input: unknown, fs: HookFileSystem): string {
 	if (!isSubagentStopInput(input)) return "";
-	if (input.agent_type !== LAZYCODEX_EXECUTOR_AGENT) return "";
+	if (!RECEIPT_ENFORCED_AGENTS.has(input.agent_type)) return "";
 	if (transcriptHasContextPressureMarker(input.transcript_path, fs)) return "";
 	if (hasValidEvidenceReceipt(input, fs)) {
 		clearAttemptState(input.cwd, input.session_id, input.agent_id, fs);

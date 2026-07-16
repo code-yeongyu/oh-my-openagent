@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { createSandbox, digestDirectory, seedSandbox } from "./drive.mjs"
 import {
   changedRealPaths,
+  findBatchFanout,
   findCategoryListingError,
   findInlineFinal,
   findRevived,
@@ -19,41 +20,22 @@ import {
   SHARED_SENPI_LOG,
   snapshotDir,
 } from "./task-e2e-analysis.mjs"
+import {
+  BATCH_FINAL,
+  BATCH_SCRIPT,
+  CHILD_FIRST,
+  CHILD_SECOND,
+  MAIN_SCRIPT,
+  NEGATIVE_SCRIPT,
+  SYNC_FINAL,
+  SYNC_SCRIPT,
+} from "./task-e2e-scenarios.mjs"
+import { isAlive, killTree } from "./task-e2e-process.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "task-e2e-mock-provider.ts")
 const realSenpiAgentDir = join(homedir(), ".senpi", "agent")
-const CHILD_FIRST = "omo e2e child first unit complete"
-const CHILD_SECOND = "omo e2e child second unit complete"
-const SYNC_FINAL = "omo e2e sync child final text"
 const OMO_CONFIG = { categories: { mockcat: { description: "Local mock category pinned to the mock provider.", model: "omo-mock/mock-1" } } }
-
-const MAIN_SCRIPT = {
-  childSteps: [{ type: "text", text: CHILD_FIRST }, { type: "text", text: CHILD_SECOND }],
-  parentSteps: [
-    { type: "tool_call", name: "task", arguments: { category: "mockcat", prompt: "do the first unit", run_in_background: true, name: "e2echild" } },
-    { type: "text", text: "parent turn one done, going idle" },
-    { type: "tool_call", name: "task_send", arguments: { to: "e2echild", deliver_as: "interrupt" } },
-    { type: "tool_call", name: "task_send", arguments: { to: "e2echild", message: "do the second unit" } },
-    { type: "text", text: "parent turn two done, going idle" },
-    { type: "tool_call", name: "task_output", arguments: { name: "e2echild", mode: "full", block: true } },
-    { type: "text", text: "parent read the transcript, all done" },
-  ],
-}
-const SYNC_SCRIPT = {
-  childSteps: [{ type: "text", text: SYNC_FINAL }],
-  parentSteps: [
-    { type: "tool_call", name: "task", arguments: { category: "mockcat", prompt: "do sync work", run_in_background: false, name: "syncchild" } },
-    { type: "text", text: "sync task returned inline, done" },
-  ],
-}
-const NEGATIVE_SCRIPT = {
-  childSteps: [{ type: "text", text: "unused" }],
-  parentSteps: [
-    { type: "tool_call", name: "task", arguments: { category: "nonexistent-xyz", prompt: "route nowhere", run_in_background: true, name: "badchild" } },
-    { type: "text", text: "saw the category error" },
-  ],
-}
 
 function findOnPath(bin) {
   if (bin.includes("/")) return existsSync(bin) ? bin : null
@@ -99,11 +81,12 @@ function driveSenpi(senpiBin, scenario, prompt, pids) {
   return { run, events: parseJsonEvents(run.stdout ?? "") }
 }
 
-function readStoreTaskId(stateDir) {
+function readStoreTaskIds(stateDir) {
   const tasksDir = join(stateDir, "tasks")
-  if (!existsSync(tasksDir)) return undefined
-  const file = readdirSync(tasksDir).find((entry) => entry.endsWith(".json"))
-  return file === undefined ? undefined : file.replace(/\.json$/, "")
+  if (!existsSync(tasksDir)) return []
+  return readdirSync(tasksDir)
+    .filter((entry) => entry.endsWith(".json"))
+    .map((entry) => entry.replace(/\.json$/, ""))
 }
 
 function readStoreJsonl(stateDir, taskId) {
@@ -120,7 +103,7 @@ function runMainFlow(senpiBin, checks, capture, pids) {
   const scenario = seedScenario(MAIN_SCRIPT, { withMarker: true })
   const { run, events } = driveSenpi(senpiBin, scenario, "spawn a background child, keep working, then follow up and read its output", pids)
   capture.main = { exit: run.status, signal: run.signal ?? null, stateDir: scenario.stateDir }
-  const taskId = readStoreTaskId(scenario.stateDir)
+  const taskId = readStoreTaskIds(scenario.stateDir)[0]
   const jsonl = taskId === undefined ? "" : readStoreJsonl(scenario.stateDir, taskId)
   capture.mainStdout = run.stdout ?? ""
   capture.mainStderr = run.stderr ?? ""
@@ -140,12 +123,22 @@ function runMainFlow(senpiBin, checks, capture, pids) {
   return scenario.sandbox
 }
 
+function runBatchFlow(senpiBin, checks, capture, pids) {
+  const scenario = seedScenario(BATCH_SCRIPT)
+  const { run, events } = driveSenpi(senpiBin, scenario, "fan out two synchronous child tasks", pids)
+  const taskIds = readStoreTaskIds(scenario.stateDir)
+  const items = findBatchFanout(events, 2)
+  capture.batchStdout = run.stdout ?? ""
+  checks.batch_fanout_two_children = run.status === 0 && taskIds.length >= 2 && batchChildrenCompleted(events, items) ? "PASS" : "FAIL"
+  return scenario.sandbox
+}
+
 function runSyncFlow(senpiBin, checks, capture, pids) {
   const scenario = seedScenario(SYNC_SCRIPT)
   const { run, events } = driveSenpi(senpiBin, scenario, "run a synchronous task and return its answer", pids)
   capture.syncStdout = run.stdout ?? ""
   const inline = findInlineFinal(events, SYNC_FINAL)
-  const noNotification = !JSON.stringify(events).includes("<task-notification>")
+  const noNotification = !JSON.stringify(events).includes("task completion")
   checks.sync_inline_no_notification = run.status === 0 && inline && noNotification ? "PASS" : "FAIL"
   return scenario.sandbox
 }
@@ -158,25 +151,9 @@ function runNegativeFlow(senpiBin, checks, capture, pids) {
   return scenario.sandbox
 }
 
-function isAlive(pid) {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch {
-    return false
-  }
-}
-
-function killTree(pid) {
-  spawnSync("pkill", ["-9", "-P", String(pid)])
-  try {
-    process.kill(pid, 9)
-  } catch {
-    // already dead
-  }
-}
-
 function main() {
+  const configuredOutDir = process.env.TASK_E2E_OUT_DIR?.trim()
+  const outDir = configuredOutDir ? resolve(configuredOutDir) : undefined
   const beforeDigest = digestDirectory(realSenpiAgentDir)
   const beforeSnapshot = snapshotDir(realSenpiAgentDir)
   const providedAgentDir = process.env.SENPI_CODING_AGENT_DIR ? "IGNORED" : "unset"
@@ -190,7 +167,7 @@ function main() {
   const capture = {}
   const pids = []
   try {
-    for (const runner of [runMainFlow, runSyncFlow, runNegativeFlow]) runner(senpiBin, checks, capture, pids)
+    for (const runner of [runMainFlow, runBatchFlow, runSyncFlow, runNegativeFlow]) runner(senpiBin, checks, capture, pids)
   } finally {
     for (const pid of pids) if (isAlive(pid)) killTree(pid)
   }
@@ -217,19 +194,20 @@ function main() {
     mainTaskId: capture.mainTaskId,
     mainSignatures: capture.mainSignatures,
     mainExit: capture.main?.exit,
+    batchTaskIds: capture.batchTaskIds,
   }
-  writeEvidenceMaybe(capture, payload)
+  writeEvidenceMaybe(outDir, capture, payload)
   console.log(JSON.stringify(payload))
 }
 
-function writeEvidenceMaybe(capture, payload) {
-  const outDir = process.env.TASK_E2E_OUT_DIR
+function writeEvidenceMaybe(outDir, capture, payload) {
   if (outDir === undefined) return
   mkdirSync(outDir, { recursive: true })
   writeFileSync(join(outDir, "verdict.json"), `${JSON.stringify(payload, null, 2)}\n`)
   writeFileSync(join(outDir, "main.stdout.json.log"), capture.mainStdout ?? "")
   writeFileSync(join(outDir, "main.stderr.log"), capture.mainStderr ?? "")
   writeFileSync(join(outDir, "main.jsonl.log"), capture.mainJsonl ?? "")
+  writeFileSync(join(outDir, "batch.stdout.json.log"), capture.batchStdout ?? "")
   writeFileSync(join(outDir, "sync.stdout.json.log"), capture.syncStdout ?? "")
   writeFileSync(join(outDir, "negative.stdout.json.log"), capture.negativeStdout ?? "")
 }
@@ -238,8 +216,17 @@ function findBlockingTaskOutput(events) {
   return JSON.stringify(events).includes('"name":"task_output"') && JSON.stringify(events).includes('"block":true')
 }
 
+function batchChildrenCompleted(events, items) {
+  if (items.length !== 2 || !items.every((item) => item?.status === "completed")) return false
+  const output = JSON.stringify(events)
+  return output.includes(`${BATCH_FINAL} one`) && output.includes(`${BATCH_FINAL} two`)
+}
+
 function runSelfTest() {
-  const wakeEvents = parseJsonEvents(`banner\n${JSON.stringify({ type: "custom", content: "<task-notification>\n- task \"e2echild\" (st_abc) completed in 3ms\n  Use task_send({ to: \"st_abc\" }) to continue, or task_output({ task_id: \"st_abc\" }) to read the full result." })}`)
+  const wakeEvents = parseJsonEvents(`banner\n${JSON.stringify({
+    type: "custom",
+    content: "task completion name:e2echild id:st_abc status:completed duration:3ms\nresult:\"done\"\nnext:Use task_send({ to: \"st_abc\" }) to continue, or task_output({ task_id: \"st_abc\" }) to read the full result.",
+  })}`)
   if (!findWakeNotification(wakeEvents, "st_abc").ok) throw new Error("self-test: wake notification must be detected")
   if (findWakeNotification(wakeEvents, "st_missing").ok) throw new Error("self-test: wake must not match a foreign task id")
   if (!findRevived(parseJsonEvents(JSON.stringify({ type: "toolResult", details: { kind: "revived", task_id: "st_abc", run_epoch: 1 } })))) throw new Error("self-test: revived must be detected")
@@ -247,6 +234,64 @@ function runSelfTest() {
   if (!findBlockingTaskOutput(parseJsonEvents(JSON.stringify({ name: "task_output", arguments: { block: true } })))) throw new Error("self-test: blocking output call must be detected")
   if (!findInlineFinal(parseJsonEvents(JSON.stringify({ type: "text", text: SYNC_FINAL })), SYNC_FINAL)) throw new Error("self-test: inline final must be detected")
   if (!findCategoryListingError(parseJsonEvents(JSON.stringify({ type: "toolResult", content: "Unknown category. Available categories: quick, deep." })))) throw new Error("self-test: category listing error must be detected")
+  const batchItems = findBatchFanout(parseJsonEvents(JSON.stringify({
+    type: "tool_execution_end",
+    toolName: "task",
+    result: { details: { items: [{ task_id: "st_1" }, { task_id: "st_2" }] } },
+  })), 2)
+  if (batchItems.length !== 2) throw new Error("self-test: two-child batch fanout must be detected")
+  const completedBatchEvents = parseJsonEvents(JSON.stringify({
+    type: "tool_execution_end",
+    toolName: "task",
+    result: {
+      content: [{ type: "text", text: `${BATCH_FINAL} one\n${BATCH_FINAL} two` }],
+      details: {
+        status: "completed",
+        items: [
+          { task_id: "st_1", status: "completed" },
+          { task_id: "st_2", status: "completed" },
+        ],
+      },
+    },
+  }))
+  const completedItems = findBatchFanout(completedBatchEvents, 2)
+  if (!batchChildrenCompleted(completedBatchEvents, completedItems)) {
+    throw new Error("self-test: completed batch children with both outputs must pass")
+  }
+  const pendingBatchEvents = parseJsonEvents(JSON.stringify({
+    type: "tool_execution_end",
+    toolName: "task",
+    result: {
+      content: [{ type: "text", text: `${BATCH_FINAL} one\n${BATCH_FINAL} two` }],
+      details: {
+        status: "completed",
+        items: [
+          { task_id: "st_1", status: "completed" },
+          { task_id: "st_2", status: "running" },
+        ],
+      },
+    },
+  }))
+  if (batchChildrenCompleted(pendingBatchEvents, findBatchFanout(pendingBatchEvents, 2))) {
+    throw new Error("self-test: a pending batch child must fail")
+  }
+  const incompleteOutputBatchEvents = parseJsonEvents(JSON.stringify({
+    type: "tool_execution_end",
+    toolName: "task",
+    result: {
+      content: [{ type: "text", text: `${BATCH_FINAL} one` }],
+      details: {
+        status: "completed",
+        items: [
+          { task_id: "st_1", status: "completed" },
+          { task_id: "st_2", status: "completed" },
+        ],
+      },
+    },
+  }))
+  if (batchChildrenCompleted(incompleteOutputBatchEvents, findBatchFanout(incompleteOutputBatchEvents, 2))) {
+    throw new Error("self-test: a missing batch output must fail")
+  }
   const signatures = jsonlSignatures([
     JSON.stringify({ type: "transition_applied", payload: { type: "transition_applied", status: "running", residency_state: "resident" } }),
     JSON.stringify({ type: "assistant_message", payload: { text: CHILD_FIRST } }),

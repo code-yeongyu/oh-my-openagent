@@ -16,6 +16,54 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 			output: 262144,
 		},
 	},
+	"gpt-5.6-sol": {
+		id: "gpt-5.6-sol",
+		family: "gpt",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image", "pdf"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1050000,
+			input: 922000,
+			output: 128000,
+		},
+	},
+	"gpt-5.6-terra": {
+		id: "gpt-5.6-terra",
+		family: "gpt-mini",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image", "pdf"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1050000,
+			input: 922000,
+			output: 128000,
+		},
+	},
+	"gpt-5.6-luna": {
+		id: "gpt-5.6-luna",
+		family: "gpt-nano",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image", "pdf"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1050000,
+			input: 922000,
+			output: 128000,
+		},
+	},
 	"gpt-5.5": {
 		id: "gpt-5.5",
 		family: "gpt",

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { TaskToolParams } from "./params"
+import { MAX_TASK_BATCH_ITEMS, TaskToolParams } from "./params"
 
 describe("TaskToolParams", () => {
   test("#given the schema #when inspected #then it is a TypeBox object with the task tool fields", () => {
@@ -28,7 +28,11 @@ describe("TaskToolParams", () => {
     expect(propertyKeys).not.toContain("task_id")
   })
 
-  test("#given the schema #when required fields are read #then only prompt is required", () => {
-    expect(TaskToolParams.required).toEqual(["prompt"])
+  test("#given the schema #when required fields are read #then neither prompt nor tasks is schema-required (the prompt-XOR-tasks rule is enforced by validateBatchShape)", () => {
+    expect(TaskToolParams.required).toBeUndefined()
+  })
+
+  test("#given batch task parameters #when schema is inspected #then a finite maximum is enforced", () => {
+    expect(TaskToolParams.properties.tasks).toMatchObject({ maxItems: MAX_TASK_BATCH_ITEMS })
   })
 })
