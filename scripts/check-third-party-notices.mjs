@@ -257,7 +257,7 @@ export function parseNpmPackJson(output) {
     try {
       const parsed = JSON.parse(output.slice(index))
       const entries = Array.isArray(parsed) ? parsed : parsed && typeof parsed === "object" ? Object.values(parsed) : []
-      if (entries.length > 0 && entries.every(isNpmPackEntry)) return entries
+      if (entries.length === 1 && entries.every(isNpmPackEntry)) return entries
     } catch (error) {
       if (error instanceof SyntaxError) continue
       throw error

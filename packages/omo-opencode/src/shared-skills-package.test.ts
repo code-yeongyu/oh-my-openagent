@@ -30,7 +30,7 @@ function isNpmPackEntry(value: unknown): value is NpmPackEntry {
 function parseNpmPackEntries(stdout: string): readonly NpmPackEntry[] {
   const parsed: unknown = JSON.parse(stdout)
   const entries = Array.isArray(parsed) ? parsed : isRecord(parsed) ? Object.values(parsed) : undefined
-  if (!entries?.every(isNpmPackEntry)) {
+  if (entries?.length !== 1 || !entries.every(isNpmPackEntry)) {
     throw new NpmPackJsonShapeError()
   }
   return entries

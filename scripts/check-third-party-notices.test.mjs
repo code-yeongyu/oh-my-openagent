@@ -24,6 +24,15 @@ test("#given mixed npm 12 pack entries #when parsing the manifest #then rejects 
   assert.throws(() => parseNpmPackJson(output), /did not produce a parseable file list/)
 })
 
+test("#given multiple valid npm 12 pack entries #when parsing the manifest #then rejects the ambiguous payload", () => {
+  const output = JSON.stringify({
+    decoy: { files: [{ path: "THIRD-PARTY-NOTICES.md" }] },
+    "oh-my-opencode": { files: [] },
+  })
+
+  assert.throws(() => parseNpmPackJson(output), /did not produce a parseable file list/)
+})
+
 test("#given Windows npm command #when resolving notice checker spawn invocation #then uses cmd shim", () => {
   assert.deepEqual(resolveSpawnSyncInvocation("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], "win32"), {
     command: "cmd.exe",
