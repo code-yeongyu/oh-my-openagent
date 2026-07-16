@@ -13,6 +13,7 @@ describe("loadPluginExtendedConfig", () => {
   let userConfigPath = ""
   let projectConfigPath = ""
   let originalXdgConfigHome: string | undefined = undefined
+  let originalOpencodeConfigDir: string | undefined = undefined
   let mockedNow = 0
 
   beforeEach(() => {
@@ -22,7 +23,9 @@ describe("loadPluginExtendedConfig", () => {
 
     // Isolate default user config dir inside temp so tests never touch the real system
     originalXdgConfigHome = process.env.XDG_CONFIG_HOME
+    originalOpencodeConfigDir = process.env.OPENCODE_CONFIG_DIR
     process.env.XDG_CONFIG_HOME = join(tempDirectory, ".config")
+    delete process.env.OPENCODE_CONFIG_DIR
 
     userConfigPath = join(getOpenCodeConfigDir({ binary: "opencode" }), "opencode-cc-plugin.json")
     projectConfigPath = join(tempDirectory, ".opencode", "opencode-cc-plugin.json")
@@ -46,7 +49,11 @@ describe("loadPluginExtendedConfig", () => {
     } else {
       delete process.env.XDG_CONFIG_HOME
     }
-    delete process.env.OPENCODE_CONFIG_DIR
+    if (originalOpencodeConfigDir !== undefined) {
+      process.env.OPENCODE_CONFIG_DIR = originalOpencodeConfigDir
+    } else {
+      delete process.env.OPENCODE_CONFIG_DIR
+    }
   })
 
   test("#given cached extended config #when files change within ttl #then cached config is reused", async () => {
