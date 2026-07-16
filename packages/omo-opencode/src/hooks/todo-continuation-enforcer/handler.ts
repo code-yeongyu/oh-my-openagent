@@ -85,6 +85,9 @@ export function createTodoContinuationHandler(args: {
         state.lastIncompleteCount = undefined
         state.lastInjectedAt = undefined
         state.awaitingPostInjectionProgressCheck = false
+        state.continuationResponseObserved = false
+        state.continuationBlockReason = undefined
+        state.pendingUserMessageID = undefined
         state.stagnationCount = 0
         state.consecutiveFailures = 0
         shouldCancelCountdown = true
