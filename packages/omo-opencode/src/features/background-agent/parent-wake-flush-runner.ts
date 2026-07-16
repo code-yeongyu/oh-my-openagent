@@ -50,10 +50,21 @@ export class ParentWakeFlushRunner {
     const emptyAssistantTurnRetry = latestWake.allowEmptyAssistantTurnRetry === true
     const forceDispatchAfterActiveDefer = sessionActive && this.shouldForceDispatchAfterActiveDefer(latestWake)
     if (sessionActive && !forceDispatchAfterActiveDefer) {
-      this.schedulePendingParentWakeFlush(sessionID)
-      log("[background-agent] Deferred parent wake because parent session is active:", {
+      if (this.deferReplyWakeWhileUnsafe(sessionID, latestWake)) {
+        return
+      }
+      await this.sendParentWakePrompt(sessionID, latestWake, {
+        emptyAssistantTurnRetry: false,
+        toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
+        forceNoReply: true,
+        retainPendingWake: latestWake.shouldReply,
+      })
+      log("[background-agent] Recorded admit-only parent wake during active parent turn:", {
         sessionID,
       })
+      if (latestWake.shouldReply) {
+        this.schedulePendingParentWakeFlush(sessionID)
+      }
       return
     }
 
