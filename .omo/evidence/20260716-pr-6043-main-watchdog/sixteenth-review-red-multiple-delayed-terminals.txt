@@ -1,0 +1,22 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-multiple-delayed-terminals.test.ts:
+131 |       await hook.event(abortTerminal())
+132 |       await hook.event(abortTerminal())
+133 |       await hook.event(priorAbortMessage())
+134 |       await timers.advanceBy(WATCHDOG_MS)
+135 |
+136 |       expect(abortCount).toBe(3)
+                               ^
+error: expect(received).toBe(expected)
+
+Expected: 3
+Received: 2
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/hook-multiple-delayed-terminals.test.ts:136:26)
+(fail) runtime-fallback multiple delayed watchdog terminals > #given two prior watchdog aborts #when both terminals arrive before correlation #then the current watchdog and retry state are preserved [2.80ms]
+
+ 0 pass
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [71.00ms]

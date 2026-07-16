@@ -375,6 +375,31 @@ Fifteenth-cycle artifacts:
 - `fifteenth-exact-opencode-harness-self-check.txt`: exact-head isolated OpenCode harness preflight and sandbox cleanup proof.
 - `fifteenth-exact-live-watchdog-run.txt`: production-duration live OpenCode run pinned to `43a3704e92d66fdd7b7133568fe4c9e5e99b4b3a`; fallback observed, no fallback watchdog re-arm, later user abort external, and real database unchanged.
 
+The sixteenth fresh reviewer found a multiple-terminal correlation gap. Two
+older watchdog aborts can both remain delayed while a third request is active.
+The first terminal suspends generation three, but the second previously fell
+through to broad cancellation, cleared the current watchdog, and replayed the
+first terminal without internal ownership. The failing composed proof stopped
+at two aborts and reset retry state. The repair adds an explicit
+`consume-terminal` decision for an additional prior-generation terminal, so it
+is absorbed without disturbing the suspended current request. Correlation then
+resumes the third watchdog and the fallback chain reaches attempt three.
+
+Sixteenth-cycle artifacts:
+
+- `sixteenth-review-finding.md`: exact-head reviewer report and multiple delayed-terminal finding.
+- `sixteenth-review-red-multiple-delayed-terminals.txt`: failing-first composed proof; generation three never fired (`abortCount = 2`).
+- `sixteenth-review-green-multiple-delayed-terminals.txt`: repaired composed proof; generation three fired and advanced to the third fallback.
+- `sixteenth-integrated-runtime-fallback-suite.txt`: 284 tests passing across 41 files after merging current `dev`.
+- `sixteenth-integrated-omo-opencode-typecheck.txt`, `sixteenth-integrated-biome.txt`, and `sixteenth-integrated-no-excuse.txt`: integrated-head static gates.
+- `sixteenth-integrated-integrity.txt`: integrated head `c385befaae1ea080ca28e19249f74b9f8a649e96`, merge parents, current `dev`, merge-base identity, diff check, and pure-LOC limits.
+- `sixteenth-integrated-opencode-harness-self-check.txt`: isolated OpenCode harness preflight and sandbox cleanup proof.
+- `sixteenth-integrated-live-watchdog-run.txt`: production-duration live OpenCode run pinned to `c385befaae1ea080ca28e19249f74b9f8a649e96`; fallback observed, no fallback watchdog re-arm, later user abort external, and real database unchanged.
+
+The live harness intentionally records only sanitized fake-provider, plugin,
+and SSE evidence. Authentication values, raw environment dumps, private
+credentials, and unrelated service logs are omitted.
+
 ## Why It Is Enough
 
 The tests cover main and subagent watchdog ownership, progress and terminal

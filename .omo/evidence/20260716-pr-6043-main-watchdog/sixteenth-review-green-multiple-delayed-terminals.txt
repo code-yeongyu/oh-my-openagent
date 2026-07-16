@@ -1,0 +1,9 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-multiple-delayed-terminals.test.ts:
+(pass) runtime-fallback multiple delayed watchdog terminals > #given two prior watchdog aborts #when both terminals arrive before correlation #then the current watchdog and retry state are preserved [2.96ms]
+
+ 1 pass
+ 0 fail
+ 4 expect() calls
+Ran 1 test across 1 file. [61.00ms]
