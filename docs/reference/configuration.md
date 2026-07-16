@@ -55,7 +55,7 @@ User config loads first. Project configs are discovered by walking from the work
 
 **Security note:** `mcp_env_allowlist` is user-only. Walked configs cannot extend it.
 
-**Rename compatibility:** The published package and CLI binary remain `oh-my-opencode`. OpenCode plugin registration prefers `oh-my-openagent`, while legacy `oh-my-opencode` entries and config basenames still load during the transition. Config detection checks `oh-my-opencode` before `oh-my-openagent`, so if both plugin config basenames exist in the same directory, the legacy `oh-my-opencode.*` file currently wins.
+**Rename compatibility:** The published package and CLI binary remain `oh-my-opencode`. OpenCode plugin registration prefers `oh-my-openagent`, while legacy `oh-my-opencode` entries and config basenames still load during the transition. Config detection checks `oh-my-openagent` before `oh-my-opencode`, so if both plugin config basenames exist in the same directory, the canonical `oh-my-openagent.*` file currently wins and edits to the legacy `oh-my-opencode.*` file can look ignored. Run `ls -la ~/.config/opencode/oh-my-openagent.json* ~/.config/opencode/oh-my-opencode.json*` and the same check in project `.opencode/` directories when model routing appears stale after restart.
 JSONC supports `// line comments`, `/* block comments */`, and trailing commas.
 
 Enable schema autocomplete:
