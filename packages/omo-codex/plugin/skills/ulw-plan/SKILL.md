@@ -43,6 +43,10 @@ node "<skill-root>/scripts/scaffold-plan.mjs" <slug> [--clear|--unclear]
 
 Run it ONCE at plan generation. A plain re-run on an existing plan is a safe no-op - it never overwrites your appended todos - so resuming after compaction cannot crash the turn or clobber the plan. Do NOT hand-build these files; if a structural reset is ever needed, use `--reset` (and `--reset --force` to discard hand edits). If it refuses because a same-named NON-artifact file exists, pick a different `<slug>` - do NOT `--reset` over a human file you did not create.
 
+## Plan artifact producer contract
+
+When producing the plan, encode every executable item as a column-zero Markdown task row: implementation rows MUST match `- [ ] N. <title>` (where `N` is a positive decimal integer), and final-verifier rows MUST match `- [ ] F<number>. <title>`. Prose headings, numbered paragraphs, and ordinary bullets are not task substitutes and MUST NOT be counted as implementation or final-verifier tasks. Before handoff, run a structural self-check over the plan: verify that every implementation row and final-verifier row is column-zero, matches its required grammar, and appears in the intended `## Todos` or `## Final verification wave` section; verify that no prose heading or bullet is being used as a task; and repair the plan before handoff if any check fails.
+
 ## Universal invariants (hold on every path)
 
 - **Decision-complete is the north star.** The executor has NO interview context - spell out exact paths, "every X in Y", and an explicit Must-NOT-Have. Leave the implementer ZERO judgment calls.
