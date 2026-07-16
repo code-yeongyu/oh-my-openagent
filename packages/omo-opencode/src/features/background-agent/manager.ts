@@ -1280,13 +1280,22 @@ The fallback retry session is now created and can be inspected directly.
 
   getAllDescendantTasks(sessionID: string): BackgroundTask[] {
     const result: BackgroundTask[] = []
-    const directChildren = this.getTasksByParentSession(sessionID)
+    const pendingSessionIDs = [sessionID]
+    const visitedSessionIDs = new Set<string>()
+    const visitedTaskIDs = new Set<string>()
 
-    for (const child of directChildren) {
-      result.push(child)
-      if (child.sessionId) {
-        const descendants = this.getAllDescendantTasks(child.sessionId)
-        result.push(...descendants)
+    while (pendingSessionIDs.length > 0) {
+      const currentSessionID = pendingSessionIDs.pop()
+      if (!currentSessionID || visitedSessionIDs.has(currentSessionID)) continue
+      visitedSessionIDs.add(currentSessionID)
+
+      for (const child of this.getTasksByParentSession(currentSessionID)) {
+        if (visitedTaskIDs.has(child.id)) continue
+        visitedTaskIDs.add(child.id)
+        result.push(child)
+        if (child.sessionId && !visitedSessionIDs.has(child.sessionId)) {
+          pendingSessionIDs.push(child.sessionId)
+        }
       }
     }
 
@@ -1456,6 +1465,13 @@ The fallback retry session is now created and can be inspected directly.
         `Task ${existingTask.id} is currently running and cannot accept a continuation prompt. ` +
         "Wait for it to complete before resuming it with task_id.",
       )
+    }
+
+    if (
+      input.parentSessionId === existingTask.sessionId ||
+      this.getAllDescendantTasks(existingTask.sessionId).some(task => task.sessionId === input.parentSessionId)
+    ) {
+      throw new Error(`Resuming task ${existingTask.id} from session ${input.parentSessionId} would create a background task cycle`)
     }
 
     const resumeSnapshot = this.captureResumeTaskSnapshot(existingTask)
@@ -3033,7 +3049,11 @@ The task was re-queued on a fallback model after a retryable failure.
         task.status = "error"
         task.error = errorMessage
         task.completedAt = new Date()
-        if (!wasPending) this.releaseTaskRootDescendant(task)
+        if (wasPending) {
+          this.rollbackPreStartDescendantReservation(task)
+        } else {
+          this.releaseTaskRootDescendant(task)
+        }
         this.taskHistory.record(task.parentSessionId, { id: task.id, sessionID: task.sessionId, agent: task.agent, description: task.description, status: "error", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
         if (task.concurrencyKey) {
           this.concurrencyManager.release(task.concurrencyKey)
@@ -3087,6 +3107,10 @@ The task was re-queued on a fallback model after a retryable failure.
       concurrencyManager: this.concurrencyManager,
       notifyParentSession: (task) => this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)),
       sessionStatuses: allStatuses,
+      onTaskInterrupted: (task) => {
+        this.releaseTaskRootDescendant(task)
+        removeTaskToastTracking(task.id)
+      },
     })
   }
 

@@ -1420,6 +1420,88 @@ describe("BackgroundManager terminal ownership and root reservations", () => {
 
     await manager.shutdown()
   })
+
+  test("rejects resuming an ancestor from its descendant session", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    const ancestor = createMockTask({
+      id: "task-resume-cycle-ancestor",
+      parentSessionId: "root-session",
+      sessionId: "session-resume-cycle-ancestor",
+      rootSessionId: "root-session",
+      status: "completed",
+      completedAt: new Date(),
+    })
+    const descendant = createMockTask({
+      id: "task-resume-cycle-descendant",
+      parentSessionId: ancestor.sessionId,
+      sessionId: "session-resume-cycle-descendant",
+      rootSessionId: "root-session",
+    })
+    getTaskMap(manager).set(ancestor.id, ancestor)
+    getTaskMap(manager).set(descendant.id, descendant)
+
+    //#when / #then
+    await expect(manager.resume({
+      sessionId: ancestor.sessionId,
+      prompt: "continue",
+      parentSessionId: descendant.sessionId,
+      parentMessageId: "resume-cycle-message",
+    })).rejects.toThrow("would create a background task cycle")
+    expect(ancestor.parentSessionId).toBe("root-session")
+
+    await manager.shutdown()
+  })
+
+  test("rejects resuming a task from its own session", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    const task = createMockTask({
+      id: "task-resume-self-cycle",
+      parentSessionId: "root-session",
+      sessionId: "session-resume-self-cycle",
+      rootSessionId: "root-session",
+      status: "completed",
+      completedAt: new Date(),
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when / #then
+    await expect(manager.resume({
+      sessionId: task.sessionId,
+      prompt: "continue",
+      parentSessionId: task.sessionId,
+      parentMessageId: "resume-self-cycle-message",
+    })).rejects.toThrow("would create a background task cycle")
+    expect(task.parentSessionId).toBe("root-session")
+
+    await manager.shutdown()
+  })
+
+  test("returns each task once when stored lineage contains a cycle", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    const taskB = createMockTask({
+      id: "task-cycle-b",
+      sessionId: "session-cycle-b",
+      parentSessionId: "session-cycle-a",
+    })
+    const taskA = createMockTask({
+      id: "task-cycle-a",
+      sessionId: "session-cycle-a",
+      parentSessionId: "session-cycle-b",
+    })
+    getTaskMap(manager).set(taskB.id, taskB)
+    getTaskMap(manager).set(taskA.id, taskA)
+
+    //#when
+    const result = manager.getAllDescendantTasks("session-cycle-a")
+
+    //#then
+    expect(result.map(task => task.id)).toEqual(["task-cycle-b", "task-cycle-a"])
+
+    await manager.shutdown()
+  })
 })
 
 describe("BackgroundManager retry observability", () => {
@@ -5720,9 +5802,11 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
         toolCalls: 2,
         lastUpdate: new Date(Date.now() - 200_000),
       },
+      rootSessionId: "root-session-stale-running",
     }
 
     getTaskMap(manager).set(task.id, task)
+    getRootDescendantCounts(manager).set(task.rootSessionId, 1)
 
     await manager["checkAndInterruptStaleTasks"](undefined)
 
@@ -5730,6 +5814,9 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     expect(task.error).toContain("Stale timeout")
     expect(task.error).toContain("3min")
     expect(task.completedAt).toBeDefined()
+    expect(getRootDescendantCounts(manager).has(task.rootSessionId)).toBe(false)
+    expect(manager.hasActiveDescendantTasks(task.rootSessionId)).toBe(false)
+    expect(manager.hasBackgroundWorkInFlight(task.rootSessionId)).toBe(false)
   })
 
    test("should respect custom staleTimeoutMs config", async () => {
@@ -7715,6 +7802,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
       agent: "test-agent",
       status: "pending",
       queuedAt,
+      rootSessionId: "root-session-stale-pending",
     }
     const key = task.agent
 
@@ -7728,12 +7816,19 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
 
     getTaskMap(manager).set(task.id, task)
     getQueuesByKey(manager).set(key, [{ task, input }])
+    getRootDescendantCounts(manager).set(task.rootSessionId, 1)
+    getPreStartDescendantReservations(manager).add(task.id)
 
     //#when
     pruneStaleTasksAndNotificationsForTest(manager)
 
     //#then
     expect(getQueuesByKey(manager).get(key)).toBeUndefined()
+    expect(task.status).toBe("error")
+    expect(getPreStartDescendantReservations(manager).has(task.id)).toBe(false)
+    expect(getRootDescendantCounts(manager).has(task.rootSessionId)).toBe(false)
+    expect(manager.hasActiveDescendantTasks(task.rootSessionId)).toBe(false)
+    expect(manager.hasBackgroundWorkInFlight(task.rootSessionId)).toBe(false)
 
     manager.shutdown()
   })
