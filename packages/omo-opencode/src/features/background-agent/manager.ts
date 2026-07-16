@@ -903,9 +903,9 @@ export class BackgroundManager {
 
     const sessionID = createResult.data.id
 
-    if (task.status === "cancelled") {
+    if (task.status !== "pending") {
       clearDelegatedChildSessionBootstrap(sessionID)
-      await this.abortSessionWithLogging(sessionID, "cancelled pre-start cleanup")
+      await this.abortSessionWithLogging(sessionID, "terminal pre-start cleanup")
       this.concurrencyManager.release(concurrencyKey)
       return
     }

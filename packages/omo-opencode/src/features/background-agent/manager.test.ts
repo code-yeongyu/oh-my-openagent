@@ -7789,6 +7789,69 @@ describe("BackgroundManager queue processing - error tasks are skipped", () => {
 })
 
 describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tasks from queuesByKey", () => {
+  test("does not resurrect a stale pending task after session creation resolves", async () => {
+    //#given
+    let resolveCreate: ((value: { data: { id: string } }) => void) | undefined
+    let markCreateStarted: (() => void) | undefined
+    const createStarted = new Promise<void>((resolve) => { markCreateStarted = resolve })
+    const createResult = new Promise<{ data: { id: string } }>((resolve) => { resolveCreate = resolve })
+    const abortedSessions: string[] = []
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: tmpdir() } }),
+        create: async () => {
+          markCreateStarted?.()
+          return createResult
+        },
+        promptAsync: async () => ({}),
+        abort: async ({ path }: { path: { id: string } }) => {
+          abortedSessions.push(path.id)
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const task: BackgroundTask = {
+      id: "task-stale-during-create",
+      parentSessionId: "parent-session",
+      parentMessageId: "msg-1",
+      description: "stale during create",
+      prompt: "test",
+      agent: "test-agent",
+      status: "pending",
+      queuedAt: new Date(Date.now() - 31 * 60 * 1000),
+      rootSessionId: "root-session-stale-during-create",
+    }
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionId: task.parentSessionId,
+      parentMessageId: task.parentMessageId,
+    }
+    const key = task.agent
+    getTaskMap(manager).set(task.id, task)
+    getQueuesByKey(manager).set(key, [{ task, input }])
+    getRootDescendantCounts(manager).set(task.rootSessionId, 1)
+    getPreStartDescendantReservations(manager).add(task.id)
+
+    //#when
+    const processing = processKeyForTest(manager, key)
+    await createStarted
+    pruneStaleTasksAndNotificationsForTest(manager)
+    resolveCreate?.({ data: { id: "session-stale-during-create" } })
+    await processing
+
+    //#then
+    expect(task.status).toBe("error")
+    expect(task.sessionId).toBeUndefined()
+    expect(abortedSessions).toEqual(["session-stale-during-create"])
+    expect(getRootDescendantCounts(manager).has(task.rootSessionId)).toBe(false)
+    expect(manager.hasBackgroundWorkInFlight(task.rootSessionId)).toBe(false)
+
+    await manager.shutdown()
+  })
+
   test("removes stale pending task from queue", () => {
     //#given
     const manager = createBackgroundManager()
