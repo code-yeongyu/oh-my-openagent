@@ -7,6 +7,12 @@ const noCacheDeps: DelegateModelResolutionDeps = {
   hasConnectedProvidersCache: false,
 }
 
+const warmEmptyCacheDeps: DelegateModelResolutionDeps = {
+  connectedProviders: null,
+  hasProviderModelsCache: true,
+  hasConnectedProvidersCache: true,
+}
+
 describe("resolveModelForDelegateTask", () => {
   test("#given no provider cache exists #when no user override is configured #then returns skipped sentinel", () => {
     const result = resolveModelForDelegateTask({
@@ -48,6 +54,40 @@ describe("resolveModelForDelegateTask", () => {
       model: "openai/gpt-5.4",
       variant: "medium",
       fallbackEntry: { providers: ["openai"], model: "gpt-5.4", variant: "medium" },
+      matchedFallback: true,
+    })
+  })
+
+  test("#given user-configured category model has variant #when resolving #then bypasses validation and preserves variant", () => {
+    const result = resolveModelForDelegateTask({
+      categoryDefaultModel: "openai/gpt-5.4 high",
+      isUserConfiguredCategoryModel: true,
+      availableModels: new Set(),
+    }, warmEmptyCacheDeps)
+
+    expect(result).toEqual({
+      model: "openai/gpt-5.4",
+      variant: "high",
+    })
+  })
+
+  test("#given cold provider cache and disconnected category default #when fallback chain has connected provider #then selects connected fallback", () => {
+    const result = resolveModelForDelegateTask({
+      availableModels: new Set(),
+      categoryDefaultModel: "anthropic/claude-sonnet-4-6",
+      fallbackChain: [
+        { providers: ["anthropic"], model: "claude-sonnet-4-6" },
+        { providers: ["openai"], model: "gpt-5.4" },
+      ],
+    }, {
+      connectedProviders: ["openai"],
+      hasProviderModelsCache: true,
+      hasConnectedProvidersCache: true,
+    })
+
+    expect(result).toEqual({
+      model: "openai/gpt-5.4",
+      fallbackEntry: { providers: ["openai"], model: "gpt-5.4" },
       matchedFallback: true,
     })
   })
