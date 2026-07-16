@@ -81,6 +81,28 @@ describe("plan-format-validator", () => {
     }
   })
 
+  test("warns when a valid Todos section masks a prose-only final wave", async () => {
+    // given
+    const fixture = createFixture(`# Plan
+
+## Todos
+- [ ] 1. Implement the change
+
+## Final Verification Wave
+Describe the final checks here.
+`)
+
+    try {
+      // when
+      await fixture.run()
+
+      // then
+      expect(fixture.output.output).toContain("<plan-format-warning>")
+    } finally {
+      fixture.cleanup()
+    }
+  })
+
   test("preserves a valid structured plan", async () => {
     // given
     const fixture = createFixture(`# Plan
@@ -115,7 +137,6 @@ describe("plan-format-validator", () => {
 
       // then
       expect(fixture.output.output).toContain("<plan-format-warning>")
-      expect(fixture.output.output).toContain("parsed **0**")
     } finally {
       fixture.cleanup()
     }
