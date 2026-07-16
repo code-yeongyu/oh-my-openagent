@@ -32,6 +32,11 @@ type PlanFormatStats = {
   readonly recognized: boolean
 }
 
+type MarkdownFence = {
+  readonly marker: "`" | "~"
+  readonly length: number
+}
+
 function analyzeStructuredSections(content: string): PlanFormatStats {
   const lines = content.split(/\r?\n/)
   const stats: Record<SectionName, { recognized: boolean; rawCount: number; validCount: number }> = {
@@ -39,15 +44,18 @@ function analyzeStructuredSections(content: string): PlanFormatStats {
     "final-wave": { recognized: false, rawCount: 0, validCount: 0 },
   }
   let section: SectionName | null = null
-  let fence: "`" | "~" | null = null
+  let fence: MarkdownFence | null = null
 
   for (const line of lines) {
-    const fenceMarker = parseFenceMarker(line)
-    if (fenceMarker !== null) {
-      fence = fence === null ? fenceMarker : fence === fenceMarker ? null : fence
+    if (fence !== null) {
+      if (isClosingFence(line, fence)) fence = null
       continue
     }
-    if (fence !== null) continue
+    const openingFence = parseOpeningFence(line)
+    if (openingFence !== null) {
+      fence = openingFence
+      continue
+    }
 
     if (HEADING_ANY_LEVEL.test(line)) {
       section = HEADING_TODOS.test(line) ? "todo" : HEADING_FINAL_WAVE.test(line) ? "final-wave" : null
@@ -71,9 +79,16 @@ function analyzeStructuredSections(content: string): PlanFormatStats {
   }
 }
 
-function parseFenceMarker(line: string): "`" | "~" | null {
-  const marker = line.match(FENCE_PATTERN)?.[1]?.[0]
-  return marker === "`" || marker === "~" ? marker : null
+function parseOpeningFence(line: string): MarkdownFence | null {
+  const run = line.match(FENCE_PATTERN)?.[1]
+  const marker = run?.charAt(0)
+  if (run === undefined || (marker !== "`" && marker !== "~")) return null
+  return { marker, length: run.length }
+}
+
+function isClosingFence(line: string, fence: MarkdownFence): boolean {
+  const run = line.match(/^[ \t]{0,3}(`{3,}|~{3,})[ \t]*$/)?.[1]
+  return run?.charAt(0) === fence.marker && run.length >= fence.length
 }
 
 function buildWarning(rawCount: number, parsedCount: number, hasEmptySection: boolean): string {

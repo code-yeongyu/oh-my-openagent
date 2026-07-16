@@ -155,6 +155,34 @@ describe("start-work plan checklist consumption", () => {
 			nextTaskLabel: "1. Counted implementation",
 		});
 	});
+
+	it("#given a four-backtick fence containing triple-backtick examples #when parsed #then shorter fences do not close it", () => {
+		// given
+		const planPath = createPlan(
+			[
+				"## Todos",
+				"- [x] 1. Counted implementation",
+				"````md",
+				"```ts",
+				"- [ ] 2. Fenced example",
+				"```",
+				"````",
+				"## Final verification wave",
+				"- [ ] F1. Counted verifier",
+			].join("\n"),
+		);
+
+		// when
+		const checklist = getPlanChecklist(planPath);
+
+		// then
+		expect(checklist).toEqual({
+			completed: 1,
+			remaining: 1,
+			total: 2,
+			nextTaskLabel: "F1. Counted verifier",
+		});
+	});
 });
 
 describe("start-work boulder state reader", () => {

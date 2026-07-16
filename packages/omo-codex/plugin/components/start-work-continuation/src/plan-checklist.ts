@@ -22,6 +22,11 @@ type ParsedCheckbox = {
 	readonly label: string;
 };
 
+type MarkdownFence = {
+	readonly marker: "`" | "~";
+	readonly length: number;
+};
+
 export function getPlanChecklist(planPath: string): PlanChecklist {
 	if (!existsSync(planPath)) return emptyChecklist();
 
@@ -41,15 +46,18 @@ export function parsePlanChecklist(markdown: string): PlanChecklist {
 	let remaining = 0;
 	let nextTaskLabel: string | null = null;
 	let section: ChecklistSection = "other";
-	let fence: "`" | "~" | null = null;
+	let fence: MarkdownFence | null = null;
 
 	for (const line of lines) {
-		const fenceMarker = parseFenceMarker(line);
-		if (fenceMarker !== null) {
-			fence = fence === null ? fenceMarker : fence === fenceMarker ? null : fence;
+		if (fence !== null) {
+			if (isClosingFence(line, fence)) fence = null;
 			continue;
 		}
-		if (fence !== null) continue;
+		const openingFence = parseOpeningFence(line);
+		if (openingFence !== null) {
+			fence = openingFence;
+			continue;
+		}
 
 		if (MARKDOWN_HEADING_PATTERN.test(line)) {
 			section = parseStructuredSectionHeading(line);
@@ -70,14 +78,18 @@ export function parsePlanChecklist(markdown: string): PlanChecklist {
 }
 
 function hasStructuredSection(lines: readonly string[]): boolean {
-	let fence: "`" | "~" | null = null;
+	let fence: MarkdownFence | null = null;
 	for (const line of lines) {
-		const fenceMarker = parseFenceMarker(line);
-		if (fenceMarker !== null) {
-			fence = fence === null ? fenceMarker : fence === fenceMarker ? null : fence;
+		if (fence !== null) {
+			if (isClosingFence(line, fence)) fence = null;
 			continue;
 		}
-		if (fence === null && parseStructuredSectionHeading(line) !== "other") return true;
+		const openingFence = parseOpeningFence(line);
+		if (openingFence !== null) {
+			fence = openingFence;
+			continue;
+		}
+		if (parseStructuredSectionHeading(line) !== "other") return true;
 	}
 	return false;
 }
@@ -123,9 +135,16 @@ function parseSimpleTopLevelCheckbox(line: string): ParsedCheckbox | null {
 	return { checked: marker.toLowerCase() === "x", label };
 }
 
-function parseFenceMarker(line: string): "`" | "~" | null {
-	const marker = line.match(FENCE_PATTERN)?.[1]?.[0];
-	return marker === "`" || marker === "~" ? marker : null;
+function parseOpeningFence(line: string): MarkdownFence | null {
+	const run = line.match(FENCE_PATTERN)?.[1];
+	const marker = run?.charAt(0);
+	if (run === undefined || (marker !== "`" && marker !== "~")) return null;
+	return { marker, length: run.length };
+}
+
+function isClosingFence(line: string, fence: MarkdownFence): boolean {
+	const run = line.match(/^[ \t]{0,3}(`{3,}|~{3,})[ \t]*$/)?.[1];
+	return run?.charAt(0) === fence.marker && run.length >= fence.length;
 }
 
 function emptyChecklist(): PlanChecklist {

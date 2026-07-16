@@ -189,4 +189,27 @@ Describe the final checks here.
       fixture.cleanup()
     }
   })
+
+  test("warns when a four-backtick fence contains the only apparent task row", async () => {
+    // given
+    const fixture = createFixture(`# Plan
+
+## Todos
+\`\`\`\`md
+\`\`\`ts
+- [ ] 1. Fenced example
+\`\`\`
+\`\`\`\`
+`)
+
+    try {
+      // when
+      await fixture.run()
+
+      // then
+      expect(fixture.output.output).toContain("<plan-format-warning>")
+    } finally {
+      fixture.cleanup()
+    }
+  })
 })

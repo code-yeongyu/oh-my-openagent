@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs"
 
-import type { PlanChecklist } from "./types"
+import type { PlanChecklist, TopLevelTaskRef } from "./types"
 
 const SIMPLE_CHECKBOX_PATTERN = /^[-*][ \t]*\[[ \t]*([xX]?)[ \t]*\][ \t]+(.+)$/
 const TODO_HEADING_PATTERN = /^##[ \t]+TODOs[ \t]*$/i
@@ -15,6 +15,20 @@ type ChecklistSection = "todo" | "final-wave" | "other"
 type ParsedCheckbox = {
   readonly checked: boolean
   readonly label: string
+}
+
+type ParsedStructuredCheckbox = ParsedCheckbox & {
+  readonly task: TopLevelTaskRef
+}
+
+type MarkdownFence = {
+  readonly marker: "`" | "~"
+  readonly length: number
+}
+
+type ParsedStructuredPlan = {
+  readonly checklist: PlanChecklist
+  readonly nextTask: TopLevelTaskRef | null
 }
 
 export function getPlanChecklist(planPath: string): PlanChecklist {
@@ -38,19 +52,37 @@ export function parsePlanChecklist(markdown: string): PlanChecklist {
     return parseSimpleChecklist(lines)
   }
 
+  return parseStructuredPlan(lines).checklist
+}
+
+export function parseCurrentTopLevelTask(markdown: string): TopLevelTaskRef | null {
+  const lines = markdown.split(/\r?\n/)
+  if (!hasStructuredSection(lines)) {
+    return null
+  }
+
+  return parseStructuredPlan(lines).nextTask
+}
+
+function parseStructuredPlan(lines: readonly string[]): ParsedStructuredPlan {
   let remaining = 0
   let total = 0
   let nextTaskLabel: string | null = null
+  let nextTask: TopLevelTaskRef | null = null
   let section: ChecklistSection = "other"
-  let fence: "`" | "~" | null = null
+  let fence: MarkdownFence | null = null
 
   for (const line of lines) {
-    const fenceMarker = parseFenceMarker(line)
-    if (fenceMarker !== null) {
-      fence = fence === null ? fenceMarker : fence === fenceMarker ? null : fence
+    if (fence !== null) {
+      if (isClosingFence(line, fence)) {
+        fence = null
+      }
       continue
     }
-    if (fence !== null) {
+
+    const openingFence = parseOpeningFence(line)
+    if (openingFence !== null) {
+      fence = openingFence
       continue
     }
 
@@ -75,14 +107,18 @@ export function parsePlanChecklist(markdown: string): PlanChecklist {
     remaining += 1
     if (nextTaskLabel === null) {
       nextTaskLabel = checkbox.label
+      nextTask = checkbox.task
     }
   }
 
   return {
-    completed: total - remaining,
-    remaining,
-    total,
-    nextTaskLabel,
+    checklist: {
+      completed: total - remaining,
+      remaining,
+      total,
+      nextTaskLabel,
+    },
+    nextTask,
   }
 }
 
@@ -122,14 +158,21 @@ function parseSimpleTopLevelCheckbox(line: string): ParsedCheckbox | null {
 }
 
 function hasStructuredSection(lines: readonly string[]): boolean {
-  let fence: "`" | "~" | null = null
+  let fence: MarkdownFence | null = null
   for (const line of lines) {
-    const fenceMarker = parseFenceMarker(line)
-    if (fenceMarker !== null) {
-      fence = fence === null ? fenceMarker : fence === fenceMarker ? null : fence
+    if (fence !== null) {
+      if (isClosingFence(line, fence)) {
+        fence = null
+      }
       continue
     }
-    if (fence === null && parseStructuredSectionHeading(line) !== "other") {
+
+    const openingFence = parseOpeningFence(line)
+    if (openingFence !== null) {
+      fence = openingFence
+      continue
+    }
+    if (parseStructuredSectionHeading(line) !== "other") {
       return true
     }
   }
@@ -149,7 +192,7 @@ function parseStructuredSectionHeading(line: string): ChecklistSection {
 function parseStructuredTopLevelCheckbox(
   line: string,
   section: "todo" | "final-wave",
-): ParsedCheckbox | null {
+): ParsedStructuredCheckbox | null {
   const pattern = section === "todo" ? TODO_CHECKBOX_PATTERN : FINAL_WAVE_CHECKBOX_PATTERN
   const match = line.match(pattern)
   const marker = match?.[1]
@@ -157,12 +200,41 @@ function parseStructuredTopLevelCheckbox(
   if (marker === undefined || label === undefined) {
     return null
   }
-  return { checked: marker.toLowerCase() === "x", label }
+  const task = buildTaskRef(section, label)
+  if (task === null) {
+    return null
+  }
+  return { checked: marker.toLowerCase() === "x", label, task }
 }
 
-function parseFenceMarker(line: string): "`" | "~" | null {
-  const marker = line.match(FENCE_PATTERN)?.[1]?.[0]
-  return marker === "`" || marker === "~" ? marker : null
+function buildTaskRef(section: "todo" | "final-wave", label: string): TopLevelTaskRef | null {
+  const pattern = section === "todo" ? /^([1-9]\d*)\. (.+)$/ : /^(F[1-9]\d*)\. (.+)$/i
+  const match = label.match(pattern)
+  const rawLabel = match?.[1]
+  const title = match?.[2]
+  if (rawLabel === undefined || title === undefined) {
+    return null
+  }
+  return {
+    key: `${section}:${rawLabel.toLowerCase()}`,
+    section,
+    label: rawLabel,
+    title,
+  }
+}
+
+function parseOpeningFence(line: string): MarkdownFence | null {
+  const run = line.match(FENCE_PATTERN)?.[1]
+  const marker = run?.charAt(0)
+  if (run === undefined || (marker !== "`" && marker !== "~")) {
+    return null
+  }
+  return { marker, length: run.length }
+}
+
+function isClosingFence(line: string, fence: MarkdownFence): boolean {
+  const run = line.match(/^[ \t]{0,3}(`{3,}|~{3,})[ \t]*$/)?.[1]
+  return run?.charAt(0) === fence.marker && run.length >= fence.length
 }
 
 function emptyChecklist(): PlanChecklist {
