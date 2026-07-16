@@ -46,7 +46,7 @@ function createManager(
   hasBackgroundWorkInFlight: () => boolean,
 ): BackgroundManager {
   return unsafeTestValue<BackgroundManager>({
-    getTasksByParentSession: getTasks,
+    getTasksForBackgroundWait: getTasks,
     hasBackgroundWorkInFlight,
   })
 }

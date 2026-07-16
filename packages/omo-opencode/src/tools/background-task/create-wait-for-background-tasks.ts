@@ -120,7 +120,7 @@ export function createWaitForBackgroundTasks(
         const timeoutMs = Math.min(Math.max(args.timeout ?? DEFAULT_TIMEOUT_MS, minimumTimeoutMs), MAX_TIMEOUT_MS)
         const startTime = Date.now()
 
-        let finalTasks = manager.getTasksByParentSession(sessionID)
+        let finalTasks = manager.getTasksForBackgroundWait(sessionID)
         const initialActive = activeTasks(finalTasks)
         let observedBackgroundWork = manager.hasBackgroundWorkInFlight(sessionID)
 
@@ -143,9 +143,9 @@ export function createWaitForBackgroundTasks(
               return "Background task wait cancelled because the tool call was aborted."
             }
 
-            finalTasks = manager.getTasksByParentSession(sessionID)
+            finalTasks = manager.getTasksForBackgroundWait(sessionID)
             await Promise.resolve()
-            finalTasks = manager.getTasksByParentSession(sessionID)
+            finalTasks = manager.getTasksForBackgroundWait(sessionID)
             if (!manager.hasBackgroundWorkInFlight(sessionID)) break
 
             observedBackgroundWork = true
@@ -162,7 +162,7 @@ export function createWaitForBackgroundTasks(
             return "Background task wait cancelled because the tool call was aborted."
           }
 
-          finalTasks = manager.getTasksByParentSession(sessionID)
+          finalTasks = manager.getTasksForBackgroundWait(sessionID)
         }
 
         if (!observedBackgroundWork && finalTasks.length === 0) {

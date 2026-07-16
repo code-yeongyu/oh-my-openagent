@@ -44,7 +44,7 @@ function createManager(sequences: BackgroundTask[][]): BackgroundManager {
   let call = 0
   let lastTasks = sequences[0] ?? []
   return unsafeTestValue<BackgroundManager>({
-    getTasksByParentSession: (_sessionID: string) => {
+    getTasksForBackgroundWait: (_sessionID: string) => {
       const index = Math.min(call, sequences.length - 1)
       call += 1
       lastTasks = sequences[index] ?? []
@@ -59,7 +59,7 @@ function createManagerWithWorkState(
   hasBackgroundWorkInFlight: () => boolean,
 ): BackgroundManager {
   return unsafeTestValue<BackgroundManager>({
-    getTasksByParentSession: getTasks,
+    getTasksForBackgroundWait: getTasks,
     hasBackgroundWorkInFlight,
   })
 }
@@ -99,7 +99,7 @@ describe("createWaitForBackgroundTasks", () => {
     let tasks: BackgroundTask[] = []
     let reads = 0
     const manager = unsafeTestValue<BackgroundManager>({
-      getTasksByParentSession: () => {
+      getTasksForBackgroundWait: () => {
         reads += 1
         if (reads === 1) {
           queueMicrotask(() => {
@@ -124,7 +124,7 @@ describe("createWaitForBackgroundTasks", () => {
     let tasks: BackgroundTask[] = []
     let reads = 0
     const manager = unsafeTestValue<BackgroundManager>({
-      getTasksByParentSession: () => {
+      getTasksForBackgroundWait: () => {
         reads += 1
         if (reads === 1) {
           setTimeout(() => {
@@ -172,6 +172,36 @@ describe("createWaitForBackgroundTasks", () => {
     expect(output).toContain("`task-1`")
   })
 
+  test("keeps the root wait open for an active grandchild after its direct child completes", async () => {
+    // #given a completed direct child whose nested descendant is still running
+    const directChild = createTask({
+      id: "task-direct",
+      sessionId: "ses-direct",
+      description: "completed direct child",
+      status: "completed",
+    })
+    const grandchild = createTask({
+      id: "task-grandchild",
+      sessionId: "ses-grandchild",
+      parentSessionId: "ses-direct",
+      description: "running grandchild",
+      status: "running",
+    })
+    const descendants = [directChild, grandchild]
+    const manager = createManagerWithWorkState(
+      () => descendants,
+      () => activeTasksForTest(descendants).length > 0,
+    )
+
+    // #when the bounded root wait expires while the grandchild remains active
+    const output = await runTool(manager, { timeout: 10 }, { pollIntervalMs: 1 })
+
+    // #then the grandchild keeps the waiter open and is named in the timeout result
+    expect(output).toContain("## Still Running (timed out")
+    expect(output).toContain("`task-grandchild`")
+    expect(output).toContain("running grandchild")
+  })
+
   test.each([0, -1])("does not let timeout %i bypass an active task", async (timeout) => {
     // #given an active task that completes after the first poll
     const manager = createManager([
@@ -194,7 +224,7 @@ describe("createWaitForBackgroundTasks", () => {
     let tasks = [createTask({ status: "running" })]
     let reads = 0
     const manager = unsafeTestValue<BackgroundManager>({
-      getTasksByParentSession: () => {
+      getTasksForBackgroundWait: () => {
         reads += 1
         if (reads === 2) {
           tasks = [createTask({ status: "completed" })]
@@ -221,7 +251,7 @@ describe("createWaitForBackgroundTasks", () => {
     let tasks = [createTask({ status: "running" })]
     let reads = 0
     const manager = unsafeTestValue<BackgroundManager>({
-      getTasksByParentSession: () => {
+      getTasksForBackgroundWait: () => {
         reads += 1
         if (reads === 2) {
           tasks = [createTask({ status: "completed" })]
@@ -285,7 +315,7 @@ describe("createWaitForBackgroundTasks", () => {
   test("bounds unexpected manager errors", async () => {
     // #given a manager failure with an oversized provider-controlled message
     const manager = unsafeTestValue<BackgroundManager>({
-      getTasksByParentSession: () => { throw new Error("E".repeat(100_000)) },
+      getTasksForBackgroundWait: () => { throw new Error("E".repeat(100_000)) },
     })
 
     // #when the waiter catches the failure
