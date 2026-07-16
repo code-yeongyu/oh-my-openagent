@@ -1,6 +1,6 @@
 # PR #6043 QA Evidence
 
-Reviewed runtime source head: `c4896f52a32bb429f4394d8041e8f8c159da02b7`
+Reviewed runtime source head: `50ca8e1cc705862b5534b293f83c20ef63da922c`
 
 Integrated `dev`: `81180f3759c55262a49be6883bb9db5c102e2b4d`
 
@@ -16,7 +16,7 @@ artifacts and does not change the tested runtime behavior.
    ```
 
    The final post-review repair run is captured in
-   `final-sixth-review-focused-tests.txt`.
+   `seventh-exact-focused-tests.txt`.
 
 2. Full runtime-fallback hook suite:
 
@@ -25,7 +25,7 @@ artifacts and does not change the tested runtime behavior.
    ```
 
    The final post-review repair run is captured in
-   `final-sixth-review-runtime-fallback-suite.txt`.
+   `seventh-exact-runtime-fallback-suite.txt`.
 
 3. OpenCode adapter typecheck and scoped Biome linter:
 
@@ -35,8 +35,8 @@ artifacts and does not change the tested runtime behavior.
    ```
 
    The final post-review repair runs are captured in
-   `final-sixth-review-omo-opencode-typecheck.txt` and
-   `final-sixth-review-biome.txt`.
+   `seventh-exact-omo-opencode-typecheck.txt`,
+   `seventh-exact-biome.txt`, and `seventh-exact-no-excuse.txt`.
 
 4. OpenCode QA harness self-check:
 
@@ -45,7 +45,7 @@ artifacts and does not change the tested runtime behavior.
    ```
 
    The final post-review repair run is captured in
-   `final-sixth-review-opencode-harness-self-check.txt` with local paths and
+   `seventh-exact-opencode-harness-self-check.txt` with local paths and
    transient port values redacted.
 
 5. Real OpenCode live harness:
@@ -63,8 +63,9 @@ artifacts and does not change the tested runtime behavior.
 
 ## What Was Observed
 
-- Focused suite: 57 pass, 0 fail.
-- Full runtime-fallback suite: 271 pass, 0 fail.
+- Focused suite: 55 pass, 0 fail across the event adapter, generation-race,
+  deferred-hook, and progress suites.
+- Full runtime-fallback suite: 273 pass, 0 fail.
 - Scoped TypeScript and Biome linter checks: pass.
 - The final gate review found that a fallback-owned user update could arm a
   second watchdog and that a pre-acknowledgement abort-shaped `session.error`
@@ -94,6 +95,17 @@ artifacts and does not change the tested runtime behavior.
   is consumed, consumes only a generation older than the active watchdog, and
   aborts a fallback request accepted while external cancellation was settling.
   Integrated regressions cover both event orders.
+- The seventh exact-head review found that a current-generation user
+  cancellation could arrive before a retained prior-generation abort. The
+  session-level provenance queue then consumed the current cancellation as
+  prior ownership and left generation two armed, producing a second fallback.
+  The failing proof is `seventh-review-red-current-cancellation-order.txt`.
+  The repaired watchdog suspends an ambiguous abort, correlates the following
+  assistant error through `parentID`, replays the deferred terminal event
+  through the normal handler, and resumes only when the parent belongs to the
+  older user-message generation. A composed-hook regression verifies deferred
+  replay order, while the two-turn race regression proves current cancellation
+  resets state and prevents a second fallback.
 - A compaction-agent `role=user` update no longer arms the main-session
   watchdog. The shared compaction-message predicate also excludes persisted
   compaction marker turns that retain the original agent and carry
@@ -144,6 +156,16 @@ Artifacts:
 - `final-sixth-review-live-watchdog-run.txt`: successful production-duration
   live run pinned to repaired runtime head
   `c4896f52a32bb429f4394d8041e8f8c159da02b7`.
+- `seventh-review-finding.md`: exact-head reviewer blocker, reproduced event
+  order, repair contract, and verification summary.
+- `seventh-exact-focused-tests.txt`: 55 passing focused watchdog/event tests.
+- `seventh-exact-runtime-fallback-suite.txt`: 273 passing runtime-fallback
+  tests.
+- `seventh-exact-omo-opencode-typecheck.txt`, `seventh-exact-biome.txt`, and
+  `seventh-exact-no-excuse.txt`: exact-runtime static gates.
+- `seventh-exact-opencode-harness-self-check.txt`: isolated harness preflight.
+- `seventh-exact-live-watchdog-run.txt`: successful production-duration live
+  run pinned to runtime head `50ca8e1cc705862b5534b293f83c20ef63da922c`.
 
 ## Why It Is Enough
 
@@ -152,9 +174,10 @@ cancellation, cancellation while abort is in flight, pre-acknowledgement
 external abort errors, acknowledged internal abort errors, expected
 internal-abort completion/idle events, removed-subagent suppression, abort failure,
 zero-timeout semantics, retry dedupe, fallback timeout, delayed abort
-provenance across watchdog generations, post-acknowledgement external
-cancellation, compaction exclusion, re-arming after progress, disposal during
-asynchronous work, and cleanup boundaries. The live harness covers what unit
+provenance across watchdog generations, current cancellation before a delayed
+prior abort, post-acknowledgement external cancellation, compaction exclusion,
+re-arming after progress, disposal during asynchronous work, and cleanup
+boundaries. The live harness covers what unit
 tests cannot: local plugin loading, real OpenCode lifecycle events, production
 watchdog timing, active-request abort, fallback dispatch after the internal
 idle edge, visible assistant output, no fallback-owned watchdog re-arm, a
@@ -165,10 +188,9 @@ later genuine user cancellation, and database isolation.
 Raw environment dumps, credentials, tokens, auth headers, session IDs, local
 paths, transient diagnostic runs, and unrelated shared logs are omitted or
 redacted. The provider API key and server password in the harness are fixed
-local-only dummy values. The optional TypeScript no-excuse helper could not
-load its compiler dependency in this worktree, so the same forbidden patterns
-were checked directly over the three changed TypeScript files; strict package
-typecheck and scoped Biome also completed successfully.
+local-only dummy values. The TypeScript no-excuse helper, strict package
+typecheck, and scoped Biome check all completed successfully over the seven
+changed TypeScript files.
 
 ## Cleanup
 
