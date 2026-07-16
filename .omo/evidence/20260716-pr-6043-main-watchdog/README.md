@@ -1,6 +1,6 @@
 # PR #6043 QA Evidence
 
-Reviewed runtime source head: `0e7223d60b6cbbb04ddc92801f62fd6c09749e92`
+Reviewed runtime source head: `2417ac2081c1e9614185a3340d560dc0d35a1ea5`
 
 Integrated `dev`: `16658f79c1155cb6f1b3bfaffa1f54ebd1469615`
 
@@ -322,6 +322,32 @@ Thirteenth-cycle artifacts:
 - `thirteenth-exact-integrity.txt`: exact head/base identity, changed paths, diff check, and pure-LOC limits.
 - `thirteenth-exact-opencode-harness-self-check.txt`: exact-head isolated harness preflight and cleanup proof.
 - `thirteenth-exact-live-watchdog-run.txt`: production-duration live OpenCode run pinned to `0e7223d60b6cbbb04ddc92801f62fd6c09749e92`; fallback observed, no fallback watchdog re-arm, later user abort external, and real database unchanged.
+
+The fourteenth fresh reviewer found that every assistant `info.error` was
+classified as abort correlation. During deferred correlation of an older
+watchdog abort, a current retryable provider error therefore reset retry state
+and repeated fallback one instead of advancing to fallback two. The failing
+composed proof observed `anthropic/fallback-1` twice. The repair classifies the
+assistant error with `isAbortError(info.error)` before forwarding it to the
+watchdog, preserving abort correlation only for actual abort-shaped errors.
+The repaired composed proof advances to `google/fallback-2` with attempt count
+two, while the adjacent event-observation suite remains green.
+
+Fourteenth-cycle artifacts:
+
+- `fourteenth-review-finding.md`: exact-head reviewer report and provider-error correlation finding.
+- `fourteenth-review-red-provider-error-correlation.txt`: failing-first proof that fallback one repeated.
+- `fourteenth-review-green-provider-error-correlation.txt`: repaired composed regression plus adjacent event-observation coverage, 30 tests passing.
+- `fourteenth-review-runtime-fallback-suite.txt`: 282 tests passing across 40 files.
+- `fourteenth-review-omo-opencode-typecheck.txt`, `fourteenth-review-biome.txt`, and `fourteenth-review-no-excuse.txt`: repaired-candidate static gates.
+- `fourteenth-review-integrity.txt`: changed-path, diff, and pure-LOC integrity checks.
+- `fourteenth-review-opencode-harness-self-check.txt`: isolated OpenCode harness preflight and cleanup proof.
+- `fourteenth-review-live-watchdog-run.txt`: production-duration isolated OpenCode proof; fallback observed, no fallback watchdog re-arm, later user abort external, and real database unchanged.
+- `fourteenth-exact-runtime-fallback-suite.txt`: 282 tests passing across 40 files on runtime head `2417ac2081c1e9614185a3340d560dc0d35a1ea5`.
+- `fourteenth-exact-omo-opencode-typecheck.txt`, `fourteenth-exact-biome.txt`, and `fourteenth-exact-no-excuse.txt`: exact-head static gates.
+- `fourteenth-exact-integrity.txt`: exact runtime head, observed live `dev` tip, changed paths, diff check, and pure-LOC limits.
+- `fourteenth-exact-opencode-harness-self-check.txt`: exact-head isolated harness preflight and cleanup proof.
+- `fourteenth-exact-live-watchdog-run.txt`: production-duration live OpenCode run pinned to `2417ac2081c1e9614185a3340d560dc0d35a1ea5`; fallback observed, no fallback watchdog re-arm, later user abort external, and real database unchanged.
 
 ## Why It Is Enough
 
