@@ -97,9 +97,7 @@ export function createWaitForBackgroundTasks(
 
         let finalTasks = manager.getTasksByParentSession(sessionID)
         const initialActive = activeTasks(finalTasks)
-        if (initialActive.length === 0) {
-          return "No running or pending background tasks found for this session."
-        }
+        let observedActiveTask = initialActive.length > 0
 
         log("[wait-for-background-tasks] Waiting for tasks", {
           sessionID,
@@ -109,8 +107,27 @@ export function createWaitForBackgroundTasks(
         })
 
         let timedOut = false
-        while (activeTasks(finalTasks).length > 0) {
+        while (true) {
           const remainingMs = timeoutMs - (Date.now() - startTime)
+          const currentActive = activeTasks(finalTasks)
+
+          if (currentActive.length === 0) {
+            if (remainingMs <= 0) break
+
+            if (await waitForPoll(Math.min(pollIntervalMs, remainingMs), toolContext.abort) === "aborted") {
+              return "Background task wait cancelled because the tool call was aborted."
+            }
+
+            finalTasks = manager.getTasksByParentSession(sessionID)
+            await Promise.resolve()
+            finalTasks = manager.getTasksByParentSession(sessionID)
+            if (activeTasks(finalTasks).length === 0) break
+
+            observedActiveTask = true
+            continue
+          }
+
+          observedActiveTask = true
           if (remainingMs <= 0) {
             timedOut = true
             break
@@ -121,13 +138,10 @@ export function createWaitForBackgroundTasks(
           }
 
           finalTasks = manager.getTasksByParentSession(sessionID)
-          if (activeTasks(finalTasks).length === 0) {
-            const settleMs = Math.min(pollIntervalMs, Math.max(0, timeoutMs - (Date.now() - startTime)))
-            if (await waitForPoll(settleMs, toolContext.abort) === "aborted") {
-              return "Background task wait cancelled because the tool call was aborted."
-            }
-            finalTasks = manager.getTasksByParentSession(sessionID)
-          }
+        }
+
+        if (!observedActiveTask) {
+          return "No running or pending background tasks found for this session."
         }
 
         if (finalTasks.length === 0) {

@@ -74,6 +74,54 @@ describe("createWaitForBackgroundTasks", () => {
     expect(output).toBe("No running or pending background tasks found for this session.")
   })
 
+  test("waits for a task registered in a microtask after the initial empty snapshot", async () => {
+    // #given the first read is empty while a same-session task is queued in a microtask
+    let tasks: BackgroundTask[] = []
+    let reads = 0
+    const manager = unsafeTestValue<BackgroundManager>({
+      getTasksByParentSession: () => {
+        reads += 1
+        if (reads === 1) {
+          queueMicrotask(() => {
+            tasks = [createTask({ id: "task-microtask" })]
+          })
+        }
+        return tasks
+      },
+    })
+
+    // #when the wait reaches its bounded timeout
+    const output = await runTool(manager, { timeout: 30 }, { pollIntervalMs: 1 })
+
+    // #then the asynchronously registered task is reported instead of being omitted
+    expect(output).toContain("## Still Running (timed out")
+    expect(output).toContain("`task-microtask`")
+  })
+
+  test("waits for a task registered by a timer after the initial empty snapshot", async () => {
+    // #given the first read is empty while a same-session task is queued by a timer
+    let tasks: BackgroundTask[] = []
+    let reads = 0
+    const manager = unsafeTestValue<BackgroundManager>({
+      getTasksByParentSession: () => {
+        reads += 1
+        if (reads === 1) {
+          setTimeout(() => {
+            tasks = [createTask({ id: "task-timer" })]
+          }, 0)
+        }
+        return tasks
+      },
+    })
+
+    // #when the wait reaches its bounded timeout
+    const output = await runTool(manager, { timeout: 30 }, { pollIntervalMs: 5 })
+
+    // #then the timer-registered task is reported instead of being omitted
+    expect(output).toContain("## Still Running (timed out")
+    expect(output).toContain("`task-timer`")
+  })
+
   test("blocks until the active task reaches a terminal state, then reports completion", async () => {
     // #given a task that is running on the first poll and completed afterwards
     const manager = createManager([
@@ -142,6 +190,34 @@ describe("createWaitForBackgroundTasks", () => {
     // #then it reports the newly observed active task instead of a completion-only result
     expect(output).toContain("## Still Running (timed out")
     expect(output).toContain("`task-2`")
+  })
+
+  test("rechecks after a task is queued in a microtask following the confirmation snapshot", async () => {
+    // #given the original task completes and the confirmation read queues a new task
+    const newTask = createTask({ id: "task-after-confirmation", status: "running" })
+    let tasks = [createTask({ status: "running" })]
+    let reads = 0
+    const manager = unsafeTestValue<BackgroundManager>({
+      getTasksByParentSession: () => {
+        reads += 1
+        if (reads === 2) {
+          tasks = [createTask({ status: "completed" })]
+        }
+        if (reads === 3) {
+          queueMicrotask(() => {
+            tasks = [createTask({ status: "completed" }), newTask]
+          })
+        }
+        return tasks
+      },
+    })
+
+    // #when the wait reaches its bounded timeout
+    const output = await runTool(manager, { timeout: 30 }, { pollIntervalMs: 1 })
+
+    // #then the task queued after the confirmation snapshot is still observed
+    expect(output).toContain("## Still Running (timed out")
+    expect(output).toContain("`task-after-confirmation`")
   })
 
   test("stops promptly when the tool call is aborted", async () => {
