@@ -1,8 +1,8 @@
 # PR #6043 QA Evidence
 
-Reviewed runtime source head: `50ca8e1cc705862b5534b293f83c20ef63da922c`
+Reviewed runtime source head: `423022fb1f3a8df2a34c07193e22e0a9677d7432`
 
-Integrated `dev`: `81180f3759c55262a49be6883bb9db5c102e2b4d`
+Integrated `dev`: `238c65280ec341e174f1aa6b6ed582fbba952c4b`
 
 The following evidence commit is content-only. It refreshes reviewer-readable
 artifacts and does not change the tested runtime behavior.
@@ -190,6 +190,18 @@ Artifacts:
 - `ninth-exact-opencode-harness-self-check.txt`: isolated harness preflight.
 - `ninth-exact-live-watchdog-run.txt`: successful production-duration live run
   pinned to `7ef3442500100b9f8ee32401773fd7c80cfab6fc`.
+- `tenth-review-finding.md`: fresh exact-head reviewer report for the
+  `session.error -> session.idle -> assistant correlation` ordering defect.
+- `tenth-review-red-idle-before-correlation.txt`: failing-first composed-hook
+  proof that idle resolved the suspended abort and reset the accepted fallback.
+- `tenth-exact-focused-tests.txt`: 56 focused watchdog/deferred-terminal tests
+  plus 3 shared `session.status` tests, all passing.
+- `tenth-exact-runtime-fallback-suite.txt`: 276 passing runtime-fallback tests.
+- `tenth-exact-omo-opencode-typecheck.txt`, `tenth-exact-biome.txt`, and
+  `tenth-exact-no-excuse.txt`: exact static gates for the tenth repair.
+- `tenth-exact-integrity.txt`: exact runtime head and pure-LOC limits.
+- `tenth-exact-live-watchdog-run.txt`: successful production-duration live run
+  pinned to `423022fb1f3a8df2a34c07193e22e0a9677d7432`.
 
 The eighth repair closes the final cancellation-ownership ambiguity. When a
 current identity-free terminal event is followed by a delayed old-parent
@@ -210,6 +222,17 @@ correlation; a consumed old abort does not rearm a watchdog that already saw
 assistant output. The exact ninth cycle passes 56 focused tests plus 3 shared
 status tests, all 276 runtime-fallback tests, static gates, and isolated live
 OpenCode QA.
+
+The next fresh reviewer found that the real OpenCode terminal sequence includes
+`session.idle` between the deferred abort and its assistant-parent correlation.
+That idle edge resolved the deferred error too early and reset the accepted
+fallback state. The failing proof is
+`tenth-review-red-idle-before-correlation.txt`. Runtime commit
+`423022fb1f3a8df2a34c07193e22e0a9677d7432` preserves suspended correlation
+across idle while leaving genuine stop/delete/error terminal handling intact.
+The exact tenth cycle passes the same 56 focused plus 3 shared status tests,
+all 276 runtime-fallback tests, static gates, integrity limits, and isolated
+production-duration OpenCode QA.
 
 ## Why It Is Enough
 
