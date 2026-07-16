@@ -31,6 +31,8 @@ export function createFirstPromptWatchdog(
   const timers = new Map<string, RuntimeFallbackTimeout>()
   const armed = new Map<string, ArmedWatchdog>()
   const suspended = new Map<string, ArmedWatchdog>()
+  const progressed = new Map<string, ArmedWatchdog>()
+  const suspendedAfterProgress = new Set<string>()
   const sessionGenerations = new Map<string, number>()
   const currentUserMessageIDs = new Map<string, string>()
   const abortProvenance = createWatchdogAbortProvenance()
@@ -44,6 +46,8 @@ export function createFirstPromptWatchdog(
     }
     armed.delete(sessionID)
     suspended.delete(sessionID)
+    progressed.delete(sessionID)
+    suspendedAfterProgress.delete(sessionID)
     abortProvenance.clear(sessionID)
     currentUserMessageIDs.delete(sessionID)
     sessionGenerations.set(sessionID, (sessionGenerations.get(sessionID) ?? 0) + 1)
@@ -90,10 +94,20 @@ export function createFirstPromptWatchdog(
     return true
   }
 
+  const suspendAfterProgress = (sessionID: string): boolean => {
+    const context = progressed.get(sessionID)
+    if (!context) return false
+    progressed.delete(sessionID)
+    suspended.set(sessionID, context)
+    suspendedAfterProgress.add(sessionID)
+    return true
+  }
+
   return {
     onUserMessage(sessionID, model, agent, messageID) {
       if (!sessionID || deps.sessionAwaitingFallbackResult.has(sessionID)) return
       if (armed.has(sessionID) || suspended.has(sessionID)) return
+      progressed.delete(sessionID)
 
       const wasSubagent = subagentSessions.has(sessionID)
       if (!wasSubagent && deps.config.timeout_seconds <= 0) return
@@ -141,7 +155,12 @@ export function createFirstPromptWatchdog(
       }
       if (!armed.has(sessionID)) return
       if (deps.internallyAbortedSessions.has(sessionID)) return
-      cancel(sessionID)
+      const context = armed.get(sessionID)
+      const timer = timers.get(sessionID)
+      if (timer) clearTimeout(timer)
+      timers.delete(sessionID)
+      armed.delete(sessionID)
+      if (context) progressed.set(sessionID, context)
       log(`[${HOOK_NAME}] ${SOURCE}: cancelled (assistant progress observed)`, { sessionID })
     },
     onSessionTerminal(sessionID, eventType, isAbortEvent) {
@@ -156,7 +175,10 @@ export function createFirstPromptWatchdog(
         && isAbortEvent === true
       ) {
         const currentGeneration = sessionGenerations.get(sessionID)
-        if (abortProvenance.hasPrior(sessionID, currentGeneration) && suspend(sessionID)) {
+        if (
+          abortProvenance.hasPrior(sessionID, currentGeneration)
+          && (suspend(sessionID) || suspendAfterProgress(sessionID))
+        ) {
           log(`[${HOOK_NAME}] ${SOURCE}: deferred ambiguous abort for message correlation`, { sessionID })
           return { kind: "defer-terminal", sessionID }
         }
@@ -165,8 +187,14 @@ export function createFirstPromptWatchdog(
       }
       if (!armed.has(sessionID)) {
         if (eventType === "session.deleted" || eventType === "session.stop") {
-          abortProvenance.clear(sessionID)
+          cancel(sessionID)
           sessionGenerations.delete(sessionID)
+        } else if (
+          eventType === "session.idle"
+          && !abortProvenance.hasPrior(sessionID, sessionGenerations.get(sessionID))
+        ) {
+          progressed.delete(sessionID)
+          currentUserMessageIDs.delete(sessionID)
         }
         return
       }
@@ -181,9 +209,10 @@ export function createFirstPromptWatchdog(
       const suspendedContext = suspended.get(sessionID)
       if (!suspendedContext) return
       suspended.delete(sessionID)
+      const shouldResumeWatchdog = !suspendedAfterProgress.delete(sessionID)
       if (currentRequestActive) {
         deps.internallyAbortedSessions.add(sessionID)
-        arm(suspendedContext)
+        if (shouldResumeWatchdog) arm(suspendedContext)
         log(`[${HOOK_NAME}] ${SOURCE}: resolved delayed prior-generation abort`, { sessionID })
       } else {
         deps.internallyAbortedSessions.delete(sessionID)
@@ -200,6 +229,8 @@ export function createFirstPromptWatchdog(
       timers.clear()
       armed.clear()
       suspended.clear()
+      progressed.clear()
+      suspendedAfterProgress.clear()
       sessionGenerations.clear()
       currentUserMessageIDs.clear()
       abortProvenance.clearAll()
