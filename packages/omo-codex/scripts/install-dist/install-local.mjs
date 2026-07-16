@@ -5903,7 +5903,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "4.18.0",
+    version: "4.18.1",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -8687,12 +8687,12 @@ import { dirname as dirname7, isAbsolute as isAbsolute6, join as join18 } from "
 var CODEX_AGENTS_HEADER = "agents";
 var CODEX_MULTI_AGENT_V2_HEADER = "features.multi_agent_v2";
 var CODEX_SUBAGENT_THREAD_LIMIT = 1000;
+var CODEX_MULTI_AGENT_V2_THREAD_LIMIT = 16;
 function ensureCodexMultiAgentV2Config(config, options = {}) {
   const featureFlag = removeFeatureFlagSetting(config, "multi_agent_v2");
   const v2Preferred = options.multiAgentVersion === "v2";
   const modelKnown = options.multiAgentVersion != null || readRootModel(featureFlag.config) !== null;
   const agentsConfig = v2Preferred ? removeAgentsMaxThreads(featureFlag.config) : modelKnown ? ensureAgentsMaxThreads(featureFlag.config) : raiseExistingAgentsMaxThreads(featureFlag.config);
-  const maxThreadsValue = CODEX_SUBAGENT_THREAD_LIMIT.toString();
   const preserveDisable = featureFlag.value === false && !v2Preferred;
   const featureConfig = preserveDisable ? setMultiAgentV2Disable(agentsConfig) : v2Preferred ? removeMultiAgentV2Disable(agentsConfig) : agentsConfig;
   const section = findTomlSection(featureConfig, CODEX_MULTI_AGENT_V2_HEADER);
@@ -8700,10 +8700,12 @@ function ensureCodexMultiAgentV2Config(config, options = {}) {
     const enabledSetting = preserveDisable ? `enabled = false
 ` : "";
     return appendBlock(featureConfig, `[${CODEX_MULTI_AGENT_V2_HEADER}]
-${enabledSetting}max_concurrent_threads_per_session = ${maxThreadsValue}
+${enabledSetting}max_concurrent_threads_per_session = ${CODEX_MULTI_AGENT_V2_THREAD_LIMIT}
 `);
   }
-  return replaceOrInsertSetting(featureConfig, section, "max_concurrent_threads_per_session", maxThreadsValue);
+  if (/^\s*max_concurrent_threads_per_session\s*=/m.test(section.text))
+    return featureConfig;
+  return replaceOrInsertSetting(featureConfig, section, "max_concurrent_threads_per_session", CODEX_MULTI_AGENT_V2_THREAD_LIMIT.toString());
 }
 function resolveCodexMultiAgentVersion(config, configPath) {
   const model = readRootModel(config);

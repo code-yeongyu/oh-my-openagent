@@ -6,6 +6,7 @@ import { appendBlock, escapeRegExp, findTomlSection, removeSetting, replaceOrIns
 const CODEX_AGENTS_HEADER = "agents"
 const CODEX_MULTI_AGENT_V2_HEADER = "features.multi_agent_v2"
 const CODEX_SUBAGENT_THREAD_LIMIT = 1000
+const CODEX_MULTI_AGENT_V2_THREAD_LIMIT = 16
 
 export type CodexMultiAgentVersion = "v1" | "v2" | null
 
@@ -45,7 +46,6 @@ export function ensureCodexMultiAgentV2Config(
     : modelKnown
       ? ensureAgentsMaxThreads(featureFlag.config)
       : raiseExistingAgentsMaxThreads(featureFlag.config)
-  const maxThreadsValue = CODEX_SUBAGENT_THREAD_LIMIT.toString()
   const preserveDisable = featureFlag.value === false && !v2Preferred
   const featureConfig = preserveDisable
     ? setMultiAgentV2Disable(agentsConfig)
@@ -57,10 +57,16 @@ export function ensureCodexMultiAgentV2Config(
     const enabledSetting = preserveDisable ? "enabled = false\n" : ""
     return appendBlock(
       featureConfig,
-      `[${CODEX_MULTI_AGENT_V2_HEADER}]\n${enabledSetting}max_concurrent_threads_per_session = ${maxThreadsValue}\n`,
+      `[${CODEX_MULTI_AGENT_V2_HEADER}]\n${enabledSetting}max_concurrent_threads_per_session = ${CODEX_MULTI_AGENT_V2_THREAD_LIMIT}\n`,
     )
   }
-  return replaceOrInsertSetting(featureConfig, section, "max_concurrent_threads_per_session", maxThreadsValue)
+  if (/^\s*max_concurrent_threads_per_session\s*=/m.test(section.text)) return featureConfig
+  return replaceOrInsertSetting(
+    featureConfig,
+    section,
+    "max_concurrent_threads_per_session",
+    CODEX_MULTI_AGENT_V2_THREAD_LIMIT.toString(),
+  )
 }
 
 /**

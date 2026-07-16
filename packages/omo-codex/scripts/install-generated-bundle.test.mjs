@@ -75,7 +75,37 @@ test("#given no root model #when generated bundle updates config #then it does n
 	// then
 	const config = await readFile(configPath, "utf8");
 	assert.doesNotMatch(config, /^\s*max_threads\s*=/m);
-	assert.match(config, /max_concurrent_threads_per_session = 1000/);
+	assert.match(config, /max_concurrent_threads_per_session = 16/);
+});
+
+test("#given an explicit V2 thread cap #when generated bundle updates config #then preserves the configured cap", async () => {
+	// given
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-generated-explicit-v2-cap-"));
+	const configPath = join(root, "config.toml");
+	await writeFile(
+		configPath,
+		[
+			"[features.multi_agent_v2]",
+			"max_concurrent_threads_per_session = 6",
+			"usage_hint_enabled = false",
+			"",
+		].join("\n"),
+	);
+
+	// when
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "debug",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+		pluginNames: ["omo"],
+	});
+
+	// then
+	const config = await readFile(configPath, "utf8");
+	const v2Section = sectionText(config, "[features.multi_agent_v2]");
+	assert.match(v2Section, /^max_concurrent_threads_per_session = 6$/m);
+	assert.doesNotMatch(v2Section, /^max_concurrent_threads_per_session = 1000$/m);
 });
 
 test("#given explicit v1 model_catalog_json and stale models_cache v2 #when generated bundle updates config #then explicit catalog preserves disable and cap", async () => {
@@ -153,7 +183,7 @@ test("#given explicit v2 model_catalog_json and stale models_cache v1 #when gene
 	const v2Section = sectionText(config, "[features.multi_agent_v2]");
 	assert.doesNotMatch(v2Section, /^enabled\s*=/m);
 	assert.doesNotMatch(config, /^\s*max_threads\s*=/m);
-	assert.match(v2Section, /max_concurrent_threads_per_session = 1000/);
+	assert.match(v2Section, /max_concurrent_threads_per_session = 16/);
 });
 
 function sectionText(config, header) {

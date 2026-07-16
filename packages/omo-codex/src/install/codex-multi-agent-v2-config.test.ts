@@ -40,8 +40,37 @@ describe("codex MultiAgentV2 config", () => {
     expect(content).not.toMatch(/^\s*multi_agent_v2\s*=/m)
     expect(parsed.features.multi_agent_v2).toEqual({
       usage_hint_enabled: false,
-      max_concurrent_threads_per_session: 1000,
+      max_concurrent_threads_per_session: 16,
     })
+  })
+
+  test("#given an explicit V2 thread cap #when updating config #then preserves the configured cap", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-mav2-explicit-cap-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(
+      configPath,
+      [
+        "[features.multi_agent_v2]",
+        "usage_hint_enabled = false",
+        "max_concurrent_threads_per_session = 6",
+        "",
+      ].join("\n"),
+    )
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    const parsed = parseToml(content)
+    expect(parsed.features.multi_agent_v2.max_concurrent_threads_per_session).toBe(6)
   })
 
   test("#given disabled boolean shorthand #when updating config #then explicit disable is preserved in table form", async () => {
@@ -77,7 +106,7 @@ describe("codex MultiAgentV2 config", () => {
     expect(content).not.toMatch(/^\s*multi_agent_v2\s*=/m)
     expect(parsed.features.multi_agent_v2).toEqual({
       enabled: false,
-      max_concurrent_threads_per_session: 1000,
+      max_concurrent_threads_per_session: 16,
     })
   })
 })
