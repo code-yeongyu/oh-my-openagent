@@ -6,6 +6,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { BackgroundManager } from "../../features/background-agent"
 import type { LaunchInput } from "../../features/background-agent/types"
+import { getSessionAgent, subagentSessions } from "../../features/claude-code-session-state"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { createWaitForBackgroundTasks } from "./create-wait-for-background-tasks"
 
@@ -28,14 +29,12 @@ function createManager(client: unknown): BackgroundManager {
   const manager = new BackgroundManager({
     pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }),
   })
-  Reflect.set(manager, "reserveSubagentSpawn", async () => ({
-    spawnContext: { rootSessionID: PARENT_SESSION_ID, parentDepth: 0, childDepth: 1 },
-    descendantCount: 1,
-    commit: () => 1,
-    rollback: () => {},
-  }))
   Reflect.set(manager, "notifyParentSession", async () => {})
   return manager
+}
+
+function getRootDescendantCount(manager: BackgroundManager): number {
+  return Reflect.get(manager, "rootDescendantCounts").get(PARENT_SESSION_ID) ?? 0
 }
 
 async function runWaiter(manager: BackgroundManager): Promise<string> {
@@ -137,6 +136,9 @@ describe("wait-for-background-tasks launch failure finalization", () => {
 
       // #then the waiter remains blocked until the orphan abort settles
       await expectWaitsForRelease(waiter, () => releaseAbort?.(), "ERROR")
+      expect(subagentSessions.has("child-start-failure")).toBe(false)
+      expect(getSessionAgent("child-start-failure")).toBeUndefined()
+      expect(getRootDescendantCount(manager)).toBe(0)
     } finally {
       releaseAbort?.()
       await manager.shutdown()
