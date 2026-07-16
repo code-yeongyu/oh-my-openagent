@@ -327,7 +327,7 @@ describe("resolveCompatibleModelSettings", () => {
   })
 
   test("GitHub Copilot GPT-5 high-tier variants downgrade to high", () => {
-    for (const modelID of ["gpt-5.4", "gpt-5.5"]) {
+    for (const modelID of ["gpt-5.4", "gpt-5.5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]) {
       for (const requested of ["xhigh", "max"]) {
         const capabilities = getModelCapabilities({
           providerID: "github-copilot",

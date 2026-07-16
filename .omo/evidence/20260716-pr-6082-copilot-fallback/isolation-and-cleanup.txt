@@ -1,0 +1,6 @@
+host_db=/Users/yeongyu/.local/share/opencode/opencode.db
+host_sessions_before=5751
+host_sessions_after=5751
+host_db_unchanged=yes
+opencode_processes_stopped=yes
+sandbox_roots_removed=yes
