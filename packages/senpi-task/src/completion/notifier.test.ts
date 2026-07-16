@@ -1,11 +1,10 @@
 import { describe, expect, test } from "bun:test"
 
 import { createCompletionNotifier } from "./notifier"
-import type { NotificationConfig, ParentNotifier, ParentNotifierMessage, ParentState } from "./types"
+import type { ParentNotifier, ParentNotifierMessage, ParentState } from "./types"
 import type { TaskRecord } from "../state"
 import type { PersistedTaskEvent } from "../store"
 
-const wakeConfig: NotificationConfig = { deliver_as: "followUp" }
 
 function baseRecord(overrides: Partial<TaskRecord> = {}): TaskRecord {
   return {
@@ -35,6 +34,7 @@ function fakeStore(seed: readonly TaskRecord[]) {
   const replaced: TaskRecord[] = []
   const store = {
     load: (taskId: string): TaskRecord | null => records.get(taskId) ?? null,
+    list: () => ({ records: [...records.values()], diagnostics: [] }),
     replace: (record: TaskRecord): void => {
       records.set(record.task_id, record)
       replaced.push(record)
@@ -70,7 +70,7 @@ describe("createCompletionNotifier - exactly-once epoch contract", () => {
     const record = baseRecord()
     const { store, replaced } = fakeStore([record])
     const { notifier, calls } = fakeNotifier()
-    const completion = createCompletionNotifier({ notifier, store, config: wakeConfig })
+    const completion = createCompletionNotifier({ notifier, store })
 
     // when
     const first = completion.notifyTerminal({ record, parentState: { kind: "idle" }, runInBackground: true })
@@ -88,7 +88,7 @@ describe("createCompletionNotifier - exactly-once epoch contract", () => {
     const record = baseRecord({ notification: { run_epoch: 1, notified_epoch: 0 } })
     const { store, replaced } = fakeStore([record])
     const { notifier, calls } = fakeNotifier()
-    const completion = createCompletionNotifier({ notifier, store, config: wakeConfig })
+    const completion = createCompletionNotifier({ notifier, store })
 
     // when
     const result = completion.notifyTerminal({ record, parentState: { kind: "idle" }, runInBackground: true })
@@ -104,7 +104,7 @@ describe("createCompletionNotifier - exactly-once epoch contract", () => {
     const record = baseRecord({ notification: { run_epoch: 0, notified_epoch: 0 } })
     const { store } = fakeStore([record])
     const { notifier, calls } = fakeNotifier()
-    const completion = createCompletionNotifier({ notifier, store, config: wakeConfig })
+    const completion = createCompletionNotifier({ notifier, store })
 
     // when
     const result = completion.notifyTerminal({ record, parentState: { kind: "idle" }, runInBackground: true })
@@ -121,7 +121,7 @@ describe("createCompletionNotifier - gating", () => {
     const record = baseRecord()
     const { store } = fakeStore([record])
     const { notifier, calls } = fakeNotifier()
-    const completion = createCompletionNotifier({ notifier, store, config: wakeConfig })
+    const completion = createCompletionNotifier({ notifier, store })
 
     // when
     const result = completion.notifyTerminal({ record, parentState: { kind: "idle" }, runInBackground: false })
@@ -137,7 +137,7 @@ describe("createCompletionNotifier - gating", () => {
     const interrupted = baseRecord({ status: "interrupted", final_response: undefined })
     const { store } = fakeStore([cancelled])
     const { notifier, calls } = fakeNotifier()
-    const completion = createCompletionNotifier({ notifier, store, config: wakeConfig })
+    const completion = createCompletionNotifier({ notifier, store })
 
     // when
     const cancelResult = completion.notifyTerminal({ record: cancelled, parentState: { kind: "idle" }, runInBackground: true })
@@ -154,7 +154,7 @@ describe("createCompletionNotifier - gating", () => {
     const record = baseRecord({ status: "running", final_response: undefined })
     const { store } = fakeStore([record])
     const { notifier } = fakeNotifier()
-    const completion = createCompletionNotifier({ notifier, store, config: wakeConfig })
+    const completion = createCompletionNotifier({ notifier, store })
 
     // when
     const result = completion.notifyTerminal({ record, parentState: { kind: "idle" }, runInBackground: true })
@@ -165,37 +165,36 @@ describe("createCompletionNotifier - gating", () => {
 })
 
 describe("createCompletionNotifier - routing table", () => {
-  function route(parentState: ParentState, config: NotificationConfig) {
+  function route(parentState: ParentState) {
     const record = baseRecord()
     const { store } = fakeStore([record])
     const { notifier, calls } = fakeNotifier()
-    const completion = createCompletionNotifier({ notifier, store, config })
+    const completion = createCompletionNotifier({ notifier, store })
     const result = completion.notifyTerminal({ record, parentState, runInBackground: true })
     return { result, calls, completion }
   }
 
   test("#given idle parent #when delivered #then triggerTurn payload recorded unconditionally", () => {
     // when
-    const { result, calls } = route({ kind: "idle" }, { deliver_as: "followUp" })
+    const { result, calls } = route({ kind: "idle" })
 
     // then an idle parent always wakes with a triggerTurn payload
     expect(result).toEqual({ kind: "delivered", decision: "wake" })
     expect(calls[0]?.triggerTurn).toBe(true)
   })
 
-  test("#given streaming parent #when delivered #then followUp deliverAs and triggerTurn are set", () => {
+  test("#given streaming parent #when delivered #then triggerTurn payload recorded for the batched steer", () => {
     // when
-    const { result, calls } = route({ kind: "streaming" }, { deliver_as: "followUp" })
+    const { result, calls } = route({ kind: "streaming" })
 
-    // then a streaming completion queues as followUp AND guarantees a turn
+    // then a streaming completion also guarantees a turn; the adapter steers the batched injection
     expect(result).toEqual({ kind: "delivered", decision: "deliver_streaming" })
-    expect(calls[0]?.deliverAs).toBe("followUp")
     expect(calls[0]?.triggerTurn).toBe(true)
   })
 
   test("#given compacting parent #when notified #then buffered without delivery", () => {
     // when
-    const { result, calls } = route({ kind: "compacting" }, wakeConfig)
+    const { result, calls } = route({ kind: "compacting" })
 
     // then
     expect(result).toEqual({ kind: "buffered", reason: "compacting" })
@@ -204,7 +203,7 @@ describe("createCompletionNotifier - routing table", () => {
 
   test("#given session_switching parent #when notified #then buffered without delivery", () => {
     // when
-    const { result, calls } = route({ kind: "session_switching" }, wakeConfig)
+    const { result, calls } = route({ kind: "session_switching" })
 
     // then
     expect(result).toEqual({ kind: "buffered", reason: "session_switching" })
@@ -219,7 +218,7 @@ describe("createCompletionNotifier - buffering, flush, batching", () => {
     const second = baseRecord({ task_id: "st_bbbb", name: "two" })
     const { store, replaced } = fakeStore([first, second])
     const { notifier, calls } = fakeNotifier()
-    const completion = createCompletionNotifier({ notifier, store, config: wakeConfig })
+    const completion = createCompletionNotifier({ notifier, store })
     completion.notifyTerminal({ record: first, parentState: { kind: "compacting" }, runInBackground: true })
     completion.notifyTerminal({ record: second, parentState: { kind: "compacting" }, runInBackground: true })
 
@@ -239,7 +238,7 @@ describe("createCompletionNotifier - buffering, flush, batching", () => {
     const record = baseRecord()
     const { store, events, replaced } = fakeStore([record])
     const { notifier, calls } = fakeNotifier()
-    const completion = createCompletionNotifier({ notifier, store, config: wakeConfig })
+    const completion = createCompletionNotifier({ notifier, store })
     completion.notifyTerminal({ record, parentState: { kind: "session_shutdown" }, runInBackground: true })
 
     // when
@@ -257,7 +256,7 @@ describe("createCompletionNotifier - buffering, flush, batching", () => {
     const record = baseRecord()
     const { store } = fakeStore([record])
     const { notifier } = fakeNotifier()
-    const completion = createCompletionNotifier({ notifier, store, config: wakeConfig })
+    const completion = createCompletionNotifier({ notifier, store })
 
     // when
     const flush = completion.flushBuffered({ sessionId: "parent-session", replaced: false })
@@ -273,7 +272,7 @@ describe("createCompletionNotifier - notifier failure contract", () => {
     const record = baseRecord()
     const { store, replaced } = fakeStore([record])
     const { notifier, calls } = fakeNotifier(1)
-    const completion = createCompletionNotifier({ notifier, store, config: wakeConfig })
+    const completion = createCompletionNotifier({ notifier, store })
 
     // when
     const result = completion.notifyTerminal({ record, parentState: { kind: "idle" }, runInBackground: true })
@@ -289,7 +288,7 @@ describe("createCompletionNotifier - notifier failure contract", () => {
     const record = baseRecord()
     const { store, events, replaced } = fakeStore([record])
     const { notifier, calls } = fakeNotifier(2)
-    const completion = createCompletionNotifier({ notifier, store, config: wakeConfig })
+    const completion = createCompletionNotifier({ notifier, store })
 
     // when
     const result = completion.notifyTerminal({ record, parentState: { kind: "idle" }, runInBackground: true })

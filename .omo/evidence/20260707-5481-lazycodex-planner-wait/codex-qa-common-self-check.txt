@@ -1,9 +1,0 @@
-missing dependency: jq
-missing dependency: tmux
-FAIL: missing dependencies
-PASS: codex binary -> /c/Users/pss/AppData/Roaming/npm/codex
-PASS: isolated CODEX_HOME auto-removed on exit (/tmp/cqa-home.3eUTYW)
-PASS: CODEX_HOME points inside sandbox, not ~/.codex
-PASS: mock model serves Responses SSE on :51229
-PASS: real ~/.codex/config.toml unchanged (cb6d178eed71e5ff15b90fdc5c9d48d1512aa3ce)
-common.sh self-check had 1 failure(s)

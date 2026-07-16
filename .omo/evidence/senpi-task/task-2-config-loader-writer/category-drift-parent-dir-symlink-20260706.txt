@@ -1,9 +1,0 @@
-bun test v1.3.14 (0d9b296a)
-
-tests/omo-config-category-drift.test.ts:
-(pass) omo config category drift guard > #given omo category schemas #when comparing zod object shape keys #then omo-config-core matches omo-opencode [0.48ms]
-
- 1 pass
- 0 fail
- 2 expect() calls
-Ran 1 test across 1 file. [77.00ms]

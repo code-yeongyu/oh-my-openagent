@@ -1,3 +1,0 @@
-$ rg -n "components/codegraph/dist/cli.js" packages/omo-codex/plugin/hooks/hooks.json
-50:						"command": "node \"${PLUGIN_ROOT}/components/codegraph/dist/cli.js\" hook session-start",
-EXIT:0

@@ -94,6 +94,7 @@ export type SteeringHarness = {
   readonly store: TaskRecordStore
   readonly destruction: FakeDestruction
   readonly reviveCalls: string[]
+  readonly dequeueCalls: string[]
   setLive(taskId: string, handle: ManagedChildHandle): void
   clearLive(taskId: string): void
   seedRecord(overrides?: Partial<TaskRecordInput>): TaskRecord
@@ -105,12 +106,17 @@ export function makeHarness(): SteeringHarness {
   const live = new Map<string, ManagedChildHandle>()
   const destruction = makeFakeDestruction()
   const reviveCalls: string[] = []
+  const dequeueCalls: string[] = []
   let clock = Date.parse("2026-07-06T00:00:00.000Z")
   const port: SteeringPort = {
     store,
     liveHandle: (taskId) => live.get(taskId),
     reacquireForRevive: (taskId) => {
       reviveCalls.push(taskId)
+    },
+    dequeuePending: (taskId) => {
+      dequeueCalls.push(taskId)
+      return false
     },
     destruction,
     now: () => clock,
@@ -120,6 +126,7 @@ export function makeHarness(): SteeringHarness {
     store,
     destruction,
     reviveCalls,
+    dequeueCalls,
     setLive: (taskId, handle) => {
       live.set(taskId, handle)
     },

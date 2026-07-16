@@ -44,7 +44,7 @@ Lane B worker DoneClaims must include:
 
 - Exact changed files and the `frontend` references loaded.
 - The real-surface QA invocation required by `start-work` for the UI surface, with captured artifact path.
-- Screenshot, browser, HTTP, or tmux artifacts appropriate to the visible surface.
+- Screenshot, browser, HTTP, or xterm.js web-terminal artifacts appropriate to the visible surface.
 - Accessibility evidence from the existing OpenAgent frontend path, such as Lighthouse, react-doctor, keyboard checks, or other plan-required checks.
 - A short design trace: which persona, design principle, token, or state requirement each major UI decision satisfies.
 - Cleanup receipts for any browser session, server, tmux session, temporary artifact, or process used during QA.

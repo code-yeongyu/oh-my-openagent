@@ -21,8 +21,6 @@ export function classifyMailboxError(error: unknown): MailboxErrorKind | undefin
   return MAILBOX_ERROR_NAMES[error.name]
 }
 
-// True when a thrown error is a missing-runtime-state ENOENT (a team that was never created or already
-// deleted). Lets team_status / team_task_get report a clean not-found instead of surfacing a raw throw.
 export function isMissingStateError(error: unknown): boolean {
   return (error as NodeJS.ErrnoException | null)?.code === "ENOENT"
 }

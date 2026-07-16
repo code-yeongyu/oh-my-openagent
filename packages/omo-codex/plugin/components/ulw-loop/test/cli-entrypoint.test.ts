@@ -57,7 +57,10 @@ async function runCli(args: readonly string[], input = ""): Promise<CliResult> {
 }
 
 beforeAll(async () => {
-	const build = await runProcess("npm", ["run", "build"], componentRoot);
+	const build =
+		process.platform === "win32"
+			? await runProcess("cmd.exe", ["/c", "npm", "run", "build"], componentRoot)
+			: await runProcess("npm", ["run", "build"], componentRoot);
 	expect(build.code, `npm run build failed:\n${build.stderr}`).toBe(0);
 }, 120_000);
 

@@ -1,3 +1,0 @@
-
-> @code-yeongyu/codex-ultrawork@4.15.1 typecheck
-> tsc --noEmit

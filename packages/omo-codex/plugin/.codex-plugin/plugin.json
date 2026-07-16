@@ -1,6 +1,6 @@
 {
 	"name": "omo",
-	"version": "4.16.0",
+	"version": "4.18.2",
 	"description": "One Codex plugin namespace for Yeongyu's local Codex components.",
 	"author": {
 		"name": "Yeongyu Kim",
@@ -30,6 +30,7 @@
 		"./hooks/user-prompt-submit-checking-ulw-loop-steering.json",
 		"./hooks/pre-tool-use-recommending-git-bash-mcp.json",
 		"./hooks/pre-tool-use-enforcing-unlimited-goal-budget.json",
+		"./hooks/pre-tool-use-guarding-ulw-loop-spawns.json",
 		"./hooks/post-tool-use-checking-comments.json",
 		"./hooks/post-tool-use-checking-lsp-diagnostics.json",
 		"./hooks/post-tool-use-checking-codegraph-init-guidance.json",
@@ -39,6 +40,7 @@
 		"./hooks/post-compact-resetting-project-rule-cache.json",
 		"./hooks/post-compact-resetting-lsp-diagnostics-cache.json",
 		"./hooks/stop-checking-start-work-continuation.json",
+		"./hooks/stop-checking-ulw-loop-resume.json",
 		"./hooks/subagent-stop-checking-start-work-continuation.json",
 		"./hooks/subagent-stop-verifying-lazycodex-executor-evidence.json"
 	],

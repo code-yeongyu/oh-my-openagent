@@ -1,7 +1,8 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
-import { buildClaudeThinkingConfig, isGptModel } from "./types";
+import { buildClaudeThinkingConfig, isGpt5_6Model, isGptModel } from "./types";
 import { createAgentToolRestrictions } from "../shared/permission-compat";
+import { MOMUS_GPT_5_6_PROMPT } from "./momus-gpt-5-6";
 
 const MODE: AgentMode = "subagent";
 
@@ -294,6 +295,15 @@ export function createMomusAgent(model: string): AgentConfig {
     ...restrictions,
     prompt: MOMUS_DEFAULT_PROMPT,
   } as AgentConfig;
+
+  if (isGpt5_6Model(model)) {
+    return {
+      ...base,
+      prompt: MOMUS_GPT_5_6_PROMPT,
+      reasoningEffort: "xhigh",
+      textVerbosity: "high",
+    } as AgentConfig;
+  }
 
   if (isGptModel(model)) {
     return {

@@ -136,7 +136,6 @@ Task engine settings; every field has a default, so the whole object is optional
 | `model_concurrency` | record<string, positive int> | unset |
 | `max_depth` | int >= 0 | `1` |
 | `residency_max_children` | positive int | `8` |
-| `notification.deliver_as` | `followUp \| steer` | `followUp` |
 | `ttl_ms` | positive int | `86400000` (24h) |
 | `state_dir` | string | unset (defaults to `<project>/.omo/senpi-task`) |
 | `wait.min_ms` | positive int | `5000` |
@@ -146,7 +145,7 @@ Task engine settings; every field has a default, so the whole object is optional
 | `team.max_parallel_members` | int 1..8 | `4` |
 | `team.max_wall_clock_minutes` | positive int | `120` |
 
-`state_dir` defaults to `<project_dir>/.omo/senpi-task` when unset (`packages/senpi-task/src/store/state-dir.ts`). `notification` controls how a child completion reaches an idle or streaming parent; see the completion routing table in [`packages/senpi-task/AGENTS.md`](../../packages/senpi-task/AGENTS.md).
+`state_dir` defaults to `<project_dir>/.omo/senpi-task` when unset (`packages/senpi-task/src/store/state-dir.ts`). Completion delivery is not configurable: every child completion is batched with any other ready notifications and steered into the parent's running turn at the next tool-call boundary; see the completion routing table in [`packages/senpi-task/AGENTS.md`](../../packages/senpi-task/AGENTS.md).
 
 ### `teams`
 
@@ -180,7 +179,6 @@ Each member shares a base (`name` matching `^[a-z0-9-]+$`, optional `cwd`, `work
   "task": {
     "default_execution_mode": "in-process",
     "default_concurrency": 4,
-    "notification": { "deliver_as": "followUp" },
     "wait": { "default_ms": 90000 }
   },
   "categories": {
@@ -221,6 +219,5 @@ This is deliberate: `omo.json` landed **senpi-first**. Adopting it in the OpenCo
 
 ## Follow-ups
 
-- No generated `assets/omo.schema.json` artifact or published `$schema` URL exists yet; the `$schema` key is accepted but points at nothing shipped in this repo.
 - `member.backendType: "tmux"` and non-project (user-global) team storage are schema-level only and are not exercised by the current Senpi runtime; use `in-process` members in project `.omo/` teams.
 - OpenCode-edition adoption of `omo.json` and a `oh-my-openagent.json` migration path are not implemented.

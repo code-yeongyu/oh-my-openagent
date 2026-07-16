@@ -1,7 +1,0 @@
-
-> @sisyphuslabs/codex-codegraph@4.10.0 typecheck
-> tsc --noEmit
-
-../../../../utils/src/runtime/which.ts(31,56): error TS4111: Property 'Path' comes from an index signature, so it must be accessed with ['Path'].
-../../../../utils/src/runtime/which.ts(31,76): error TS4111: Property 'PATH' comes from an index signature, so it must be accessed with ['PATH'].
-../../../../utils/src/runtime/which.ts(33,22): error TS4111: Property 'PATH' comes from an index signature, so it must be accessed with ['PATH'].

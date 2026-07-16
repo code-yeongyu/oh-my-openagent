@@ -76,6 +76,14 @@ function composeWithSpies(): { inProcess: Spy; process: Spy; engine: ReturnType<
 }
 
 describe("task engine runner routing", () => {
+  it("#given an invalid event task id #when the adapter appends an audit event #then store rejection is contained", () => {
+    // given
+    const { engine } = composeWithSpies()
+
+    // when / then
+    expect(() => engine.appendTaskEvent("not-a-task-id", { type: "probe", payload: {} })).not.toThrow()
+  })
+
   it("#given a process-mode spawn #when the manager launches #then the process runner receives the spec and the in-process runner does not", async () => {
     // given the engine wired with distinct in-process and process runner spies
     const { inProcess, process, engine } = composeWithSpies()

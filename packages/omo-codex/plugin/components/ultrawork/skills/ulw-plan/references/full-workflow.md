@@ -76,6 +76,10 @@ No Metis, no plan file, no execution until the user approves. The UNCLEAR path a
 ```
 > Target 5-8 todos per wave; fewer than 3 (except the final) means under-splitting. Implementation + Test = ONE todo. Each todo carries: exhaustive References (the executor has no interview context), agent-executable Acceptance criteria, happy + failure QA scenarios each with an evidence path, and a Commit line.
 
+## Plan artifact producer contract
+
+When producing the plan, encode every executable item as a column-zero Markdown task row: implementation rows MUST match `- [ ] N. <title>` (where `N` is a positive decimal integer), and final-verifier rows MUST match `- [ ] F<number>. <title>`. Prose headings, numbered paragraphs, and ordinary bullets are not task substitutes and MUST NOT be counted as implementation or final-verifier tasks. Before handoff, run a structural self-check over the plan: verify that every implementation row and final-verifier row is column-zero, matches its required grammar, and appears in the intended `## Todos` or `## Final verification wave` section; verify that no prose heading or bullet is being used as a task; and repair the plan before handoff if any check fails.
+
 ### Final verification wave (after ALL todos)
 Runs in parallel; ALL must APPROVE; surface results and wait for the user's explicit okay before declaring complete: F1 plan compliance audit, F2 code quality review, F3 real manual QA, F4 scope fidelity.
 
@@ -85,7 +89,7 @@ Runs in parallel; ALL must APPROVE; surface results and wait for the user's expl
 - UNCLEAR: run the high-accuracy review AUTOMATICALLY before presenting (unless Classify=Trivial), then present a brief that LEADS with the derived approach and the adopted defaults; still wait for the user's explicit okay.
 
 ### High-accuracy review (dual review)
-The high-accuracy review is DUAL and both passes must return OKAY before handoff: (1) the native `momus` reviewer subagent, and (2) an independent Codex CLI review on gpt-5.5 at xhigh reasoning, run in a disposable isolated workspace and `CODEX_HOME` with the harness's normal approval and sandbox policy. Do not add flags that disable approvals or sandboxing. One round = exactly ONE `momus` + ONE independent review, dispatched together against the COMPLETE plan file (todos + TL;DR filled) - never a second `momus` while a round is in flight. After both verdicts return, fix every cited issue and resubmit both fresh until each approves. CLEAR: runs when the user opts in or `review_required: true`. UNCLEAR: runs automatically unless Classify=Trivial.
+The high-accuracy review is DUAL and both passes must return OKAY before handoff: (1) the native `momus` reviewer subagent, and (2) an independent Codex CLI review on gpt-5.6-sol at xhigh reasoning, run in a disposable isolated workspace and `CODEX_HOME` with the harness's normal approval and sandbox policy. Do not add flags that disable approvals or sandboxing. Momus runs at Ultra and may take substantially longer than other agents. One round = exactly ONE `momus` + ONE independent review, dispatched together against the COMPLETE plan file (todos + TL;DR filled). Keep Momus in flight and wait for its terminal result: elapsed time alone never justifies cancelling, duplicating, replacing, or treating it as failed. After both verdicts return, fix every cited issue and resubmit both fresh until each approves. CLEAR: runs when the user opts in or `review_required: true`. UNCLEAR: runs automatically unless Classify=Trivial.
 
 The draft must record the native Momus session/result, the independent Codex CLI review command/result, and the fix/retry summary. Do not say "high-accuracy review completed" unless both receipts exist and both final verdicts are unconditional approval.
 
@@ -96,7 +100,9 @@ Every spawn starts with `TASK:`, then DELIVERABLE / SCOPE / VERIFY inside `messa
 multi_agent_v1.spawn_agent({"message":"TASK: act as an explorer. DELIVERABLE: ... SCOPE: ... VERIFY: ...","agent_type":"explorer","fork_context":false})
 ```
 
-Roles: `explorer`, `librarian`, `metis`, `momus`. Spawn long plan/reviewer agents in the background and poll with short waits; require the child to send `WORKING: <task> - <phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A wait timeout only means no new mailbox update arrived; treat a running child as alive. Fall back only when the child completed without the deliverable, is ack-only after followup, explicitly `BLOCKED:`, or no longer running; then respawn a smaller `fork_context: false` job. Close each agent after integrating its result.
+If your tool list has a flat `spawn_agent` with a required `task_name` instead of `multi_agent_v1.*` (`multi_agent_v2`), rewrite: add `"task_name":"<lowercase_digits_underscores>"`, replace `"fork_context":false` with `"fork_turns":"none"`, and `wait_agent` takes only `timeout_ms`, returning on any child mailbox activity (finished agents end on their own — skip the close step).
+
+Roles: `explorer`, `librarian`, `metis`, `momus`. Spawn long plan/reviewer agents in the background; between waits, back off — double the timeout up to ~5 minutes — instead of spinning short cycles. Require the child to send `WORKING: <task> - <phase>` before long passes and `BLOCKED: <reason>` only when progress stops. A wait timeout only means no new mailbox update arrived; treat a running child as alive. Fall back only when the child completed without the deliverable, is ack-only after followup, explicitly `BLOCKED:`, or no longer running; then respawn a smaller `fork_context: false` job. Close each agent after integrating its result.
 
 ## Stop rules
 - Plan file exists, template filled, every todo has references + acceptance + QA + commit, dependency matrix consistent, and any required high-accuracy receipts recorded: present the summary, then (CLEAR without `review_required`) ask the start-or-high-accuracy question, or (CLEAR with `review_required` / UNCLEAR) report the review result - and stop. Execution belongs to the worker, never to you.

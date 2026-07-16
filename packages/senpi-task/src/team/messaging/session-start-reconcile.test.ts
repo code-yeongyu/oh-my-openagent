@@ -5,7 +5,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { reserveMessageForDelivery, sendMessage } from "@oh-my-opencode/team-core/team-mailbox"
 
-import { normalizeSenpiTeamSpec } from "../normalize"
+import { normalizeSenpiTeamSpec, TEAM_LEAD_SENTINEL } from "../normalize"
 import { createTeam } from "../runtime"
 import { toTeamCoreConfig } from "../runtime-config"
 import { resolveTeamMemberInboxDir, teamStorageBaseDir } from "../storage"
@@ -55,6 +55,26 @@ async function reserveAndAge(
   return { message, reserved }
 }
 
+async function reserveLeadAndAge(
+  stateDir: Awaited<ReturnType<typeof activeTeamWithMember>>["stateDir"],
+  config: Awaited<ReturnType<typeof activeTeamWithMember>>["config"],
+  teamRunId: string,
+  member: string,
+) {
+  const message = buildTeamMessage({ from: member, to: TEAM_LEAD_SENTINEL, body: "lead note" })
+  await sendMessage(message, teamRunId, config, {
+    isLead: false,
+    activeMembers: [member],
+    leadRecipient: TEAM_LEAD_SENTINEL,
+  })
+  await reserveMessageForDelivery(teamRunId, TEAM_LEAD_SENTINEL, message.messageId, config)
+  const inboxDir = resolveTeamMemberInboxDir(stateDir, teamRunId, TEAM_LEAD_SENTINEL)
+  const reserved = join(inboxDir, `.delivering-${message.messageId}.json`)
+  const past = new Date(Date.now() - STALE_TTL_MS * 4)
+  await utimes(reserved, past, past)
+  return { message, inboxDir, reserved }
+}
+
 describe("reconcileTeamMailboxOnSessionStart", () => {
   test("#given an active team with a stale reservation #when reconciled #then the reservation is restored to unread", async () => {
     // given
@@ -77,6 +97,41 @@ describe("reconcileTeamMailboxOnSessionStart", () => {
 
     // when
     await reconcileTeamMailboxOnSessionStart({ stateDir, config, staleTtlMs: STALE_TTL_MS })
+
+    // then
+    expect(existsSync(reserved)).toBe(true)
+  })
+
+  test("#given an owned team with a stale lead reservation #when reconciled #then the lead inbox is restored", async () => {
+    // given
+    const { stateDir, config, teamRunId, member } = await activeTeamWithMember()
+    const { message, inboxDir, reserved } = await reserveLeadAndAge(stateDir, config, teamRunId, member)
+
+    // when
+    await reconcileTeamMailboxOnSessionStart({
+      stateDir,
+      config,
+      staleTtlMs: STALE_TTL_MS,
+      currentLeadSessionId: "lead-session",
+    })
+
+    // then
+    expect(existsSync(join(inboxDir, `${message.messageId}.json`))).toBe(true)
+    expect(existsSync(reserved)).toBe(false)
+  })
+
+  test("#given a foreign team with a stale lead reservation #when reconciled #then its lead inbox is untouched", async () => {
+    // given
+    const { stateDir, config, teamRunId, member } = await activeTeamWithMember()
+    const { reserved } = await reserveLeadAndAge(stateDir, config, teamRunId, member)
+
+    // when
+    await reconcileTeamMailboxOnSessionStart({
+      stateDir,
+      config,
+      staleTtlMs: STALE_TTL_MS,
+      currentLeadSessionId: "another-session",
+    })
 
     // then
     expect(existsSync(reserved)).toBe(true)

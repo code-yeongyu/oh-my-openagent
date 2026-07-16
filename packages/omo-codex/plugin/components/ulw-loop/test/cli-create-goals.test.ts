@@ -103,6 +103,8 @@ describe("ulwLoopCommand create-goals", () => {
 
 	it("#given completed default aggregate #when creating another default plan #then guides to a fresh session", async () => {
 		await createPlan("- Finished");
+		expect(await ulwLoopCommand(["complete-goals"])).toBe(0);
+		resetOutput();
 		for (const criterionId of ["C001", "C002", "C003"]) await passCriterion("G001-finished", criterionId);
 		expect(
 			await ulwLoopCommand([
@@ -126,6 +128,16 @@ describe("ulwLoopCommand create-goals", () => {
 		expect(err.join("")).toContain("Existing ulw-loop aggregate is already complete");
 		expect(err.join("")).toContain("create-goals --session-id <new-id>");
 		expect(err.join("")).toContain("--force only");
+	});
+
+	it("#given an active goal on a v2 plan #when reading status --json #then exposes the current attempt dir", async () => {
+		await createPlan();
+		expect(await ulwLoopCommand(["complete-goals"])).toBe(0);
+		resetOutput();
+
+		expect(await ulwLoopCommand(["status", "--json"])).toBe(0);
+
+		expect(stdoutJson()).toMatchObject({ currentAttemptDir: ".omo/evidence/ulw/session/G001-goal-a/a1" });
 	});
 
 	it("#given two session ids #when creating goals #then writes isolated session-scoped plans", async () => {

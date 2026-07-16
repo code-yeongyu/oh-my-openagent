@@ -1,6 +1,6 @@
 ---
 name: ulw-plan
-description: "MUST USE for planning before coding: 5+ steps, ambiguous scope, multiple modules, architecture decisions, a vague 'just make it good / figure out what to build' brief, or any request to plan, interview, or break work down. Explore-first planning consultant (Prometheus) that grounds in the codebase, asks only the forks exploration cannot resolve - or researches them to best practice when the intent is fuzzy - waits for explicit approval, then writes ONE decision-complete work plan a worker executes with zero further interview. Triggers: ulw-plan, plan this, make a plan, plan before coding, interview me, break this down, start planning, plan mode, just make it good, figure out what to build."
+description: "MUST USE for planning before coding when design uncertainty remains after discovery: ambiguous scope, competing decompositions, unclear boundaries, uncertain dependency ordering, architecture decisions, a vague 'just make it good / figure out what to build' brief, or any request to plan, interview, or break work down. Explore-first planning consultant (Prometheus) that grounds in the codebase, asks only the forks exploration cannot resolve - or researches them to best practice when the intent is fuzzy - waits for explicit approval, then writes ONE decision-complete work plan a worker executes with zero further interview. Triggers: ulw-plan, plan this, make a plan, plan before coding, interview me, break this down, start planning, plan mode, just make it good, figure out what to build."
 metadata:
   short-description: Explore-first planning consultant that waits for your okay before planning
 ---
@@ -43,9 +43,14 @@ node "<skill-root>/scripts/scaffold-plan.mjs" <slug> [--clear|--unclear]
 
 Run it ONCE at plan generation. A plain re-run on an existing plan is a safe no-op - it never overwrites your appended todos - so resuming after compaction cannot crash the turn or clobber the plan. Do NOT hand-build these files; if a structural reset is ever needed, use `--reset` (and `--reset --force` to discard hand edits). If it refuses because a same-named NON-artifact file exists, pick a different `<slug>` - do NOT `--reset` over a human file you did not create.
 
+## Plan artifact producer contract
+
+When producing the plan, encode every executable item as a column-zero Markdown task row: implementation rows MUST match `- [ ] N. <title>` (where `N` is a positive decimal integer), and final-verifier rows MUST match `- [ ] F<number>. <title>`. Prose headings, numbered paragraphs, and ordinary bullets are not task substitutes and MUST NOT be counted as implementation or final-verifier tasks. Before handoff, run a structural self-check over the plan: verify that every implementation row and final-verifier row is column-zero, matches its required grammar, and appears in the intended `## Todos` or `## Final verification wave` section; verify that no prose heading or bullet is being used as a task; and repair the plan before handoff if any check fails.
+
 ## Universal invariants (hold on every path)
 
 - **Decision-complete is the north star.** The executor has NO interview context - spell out exact paths, "every X in Y", and an explicit Must-NOT-Have. Leave the implementer ZERO judgment calls.
+- **Full scope is the default.** Plan the ENTIRE request; "MVP", "v1", "phase 1", or any reduced subset is never an option you invent or ask about - it exists only if the user introduces it. Scope OUT / Must-NOT-Have entries are guardrails against unrequested additions, never reductions of the request.
 - **Explore before asking.** Discoverable facts (repo/system/docs truth) -> research and cite, never ask. Preferences/tradeoffs -> the only things you bring to the user. When unsure which, treat it as a user-decision.
 - **CodeGraph first when present.** Use `codegraph_explore` for repo how/where/what/flow questions before wider reads; if codegraph_* tools are absent, inactive/uninitialized, or cold-start unavailable, continue with Read/Grep/Glob/LSP and the ast-grep skill.
 - **Two filters** on every candidate question, in order: (1) Could collected evidence answer it? -> explore instead. (2) Could the user's stated intent plus a defensible default answer it? -> adopt the default, record it, do not ask - UNLESS it is an owner-decision, which always survives as a question even when a default exists: anything irreversible / destructive / safety-critical, or a cross-cutting product choice the user lives with (public config surface, distribution / packaging, external dependency or pinned SHA, data / schema shape). Default the reversible internals; surface the owner-decisions.
@@ -66,6 +71,8 @@ Fan out read-only research before deciding. Every spawn names DELIVERABLE / SCOP
 ```
 multi_agent_v1.spawn_agent({"message":"TASK: act as an explorer. DELIVERABLE: ... SCOPE: ... VERIFY: ...","agent_type":"explorer","fork_context":false})
 ```
+
+If your tool list has a flat `spawn_agent` with a required `task_name` instead of `multi_agent_v1.*` (`multi_agent_v2`), rewrite: add `"task_name":"<lowercase_digits_underscores>"`, replace `"fork_context":false` with `"fork_turns":"none"`, and `wait_agent` takes only `timeout_ms`, returning on any child mailbox activity (finished agents end on their own).
 
 Spawn every independent child for the current wave first. After the wave
 is launched, use `multi_agent_v1.wait_agent` for each child until each

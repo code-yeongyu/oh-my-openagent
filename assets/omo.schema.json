@@ -364,26 +364,6 @@
           "exclusiveMinimum": 0,
           "maximum": 9007199254740991
         },
-        "notification": {
-          "default": {
-            "deliver_as": "followUp"
-          },
-          "type": "object",
-          "properties": {
-            "deliver_as": {
-              "default": "followUp",
-              "type": "string",
-              "enum": [
-                "followUp",
-                "steer"
-              ]
-            }
-          },
-          "required": [
-            "deliver_as"
-          ],
-          "additionalProperties": false
-        },
         "ttl_ms": {
           "default": 86400000,
           "type": "integer",
@@ -392,6 +372,9 @@
         },
         "state_dir": {
           "type": "string"
+        },
+        "reattach_on_reconcile": {
+          "type": "boolean"
         },
         "wait": {
           "default": {
@@ -467,7 +450,6 @@
         "default_concurrency",
         "max_depth",
         "residency_max_children",
-        "notification",
         "ttl_ms",
         "wait",
         "team"

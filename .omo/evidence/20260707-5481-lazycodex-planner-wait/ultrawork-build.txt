@@ -1,7 +1,0 @@
-
-> @code-yeongyu/codex-ultrawork@4.15.1 build
-> node scripts/sync-directive.mjs && node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && bun build src/cli.ts --target node --format esm --outfile dist/cli.js
-
-Bundled 4 modules in 26ms
-
-  cli.js  7.28 KB  (entry point)

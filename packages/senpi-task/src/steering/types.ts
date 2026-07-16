@@ -15,6 +15,7 @@ export type DestructionPort = {
 export type SteeringPort = {
   readonly store: TaskRecordStore
   liveHandle(taskId: string): ManagedChildHandle | undefined
+  dequeuePending(taskId: string): boolean
   // Re-account a revived (now-running) child: re-acquire its concurrency slot and re-arm outcome
   // tracking under the NEW run_epoch so the later release is not swallowed by the release guard.
   reacquireForRevive(taskId: string): void

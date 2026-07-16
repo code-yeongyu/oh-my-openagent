@@ -1,3 +1,0 @@
-
-> @code-yeongyu/codex-ulw-loop@4.15.1 build
-> tsc -p tsconfig.build.json
