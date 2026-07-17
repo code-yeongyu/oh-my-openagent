@@ -123,14 +123,19 @@ export function createFirstPromptWatchdog(
 
   return {
     onUserMessage(sessionID, model, agent, messageID) {
-      if (messageID && currentUserMessageIDs.get(sessionID) === messageID) return
+      const currentUserMessageID = currentUserMessageIDs.get(sessionID)
+      if (messageID && currentUserMessageID === messageID) return
       let decision: WatchdogEventDecision | undefined
       if (suspended.has(sessionID)) {
         clearInternalAbortOwnership(deps, sessionID)
         cancel(sessionID, true)
         decision = { kind: "discard-terminal", sessionID }
       }
-      if (!sessionID || deps.sessionAwaitingFallbackResult.has(sessionID) || armed.has(sessionID)) return decision
+      if (armed.has(sessionID)) {
+        if (!messageID || !currentUserMessageID) return decision
+        cancel(sessionID, true)
+      }
+      if (!sessionID || deps.sessionAwaitingFallbackResult.has(sessionID)) return decision
       progressed.delete(sessionID)
 
       const wasSubagent = subagentSessions.has(sessionID)

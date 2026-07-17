@@ -192,6 +192,25 @@ describe("first-prompt-watchdog", () => {
     watchdog.dispose()
   })
 
+  it("#given a watchdog is armed for one user message #when a distinct user message arrives #then the deadline belongs to the newer turn", async () => {
+    const sessionID = "session-main-rearms-for-distinct-user-message"
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const watchdog = createFirstPromptWatchdog(deps, createHelpers(calls, AGENT), WATCHDOG_MS)
+
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT, "user-1")
+    await getFakeTimers().advanceBy(SAFE_WAIT_BEFORE_FIRE_MS)
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT, "user-2")
+    await getFakeTimers().advanceBy(WATCHDOG_MS - SAFE_WAIT_BEFORE_FIRE_MS + 1)
+
+    expect(calls.abort).toEqual([])
+    expect(calls.autoRetry).toEqual([])
+    await getFakeTimers().advanceBy(SAFE_WAIT_BEFORE_FIRE_MS)
+    expect(calls.abort).toEqual([{ sessionID, source: "first-prompt-watchdog" }])
+    expect(calls.autoRetry).toHaveLength(1)
+    watchdog.dispose()
+  })
+
   it("#given session emits message.part.updated with sessionID under properties.part #when watchdog tracks #then the watchdog recognizes progress and resets the silence timer", async () => {
     // given
     const sessionID = "session-nested-part-progress"
