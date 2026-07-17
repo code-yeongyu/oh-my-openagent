@@ -13,6 +13,8 @@ SOURCE_PATHS=(
   packages/omo-opencode/src/hooks/runtime-fallback/hook.ts
   packages/omo-opencode/src/hooks/runtime-fallback/watchdog-abort-provenance.ts
 )
+RUNTIME_SOURCE_PARENT="c71b41c1574a191a51c7497da43c11d5d2aa9d0e"
+RUNTIME_SOURCE_HEAD="0dd0ab901c8ddc1a49155efddad7aea982c9a458"
 FAKE_SCRIPT="$ASSET_EVIDENCE/fake-silent-provider.mjs"
 ROOT_PROBE="$ASSET_EVIDENCE/root-state-probe.ts"
 REAL_DB="$(opencode db path 2>/dev/null | head -1)"
@@ -29,20 +31,26 @@ SSE_LOG=""
 ROOT_PROBE_LOG=""
 OMO_LOG="${TMPDIR:-/tmp}/oh-my-opencode.log"
 OMO_OFFSET=0
+RUN_SUCCEEDED=0
 
 RUN_HEAD="$(git rev-parse HEAD)"
-SOURCE_DIFF_SHA256="$(git diff -- "${SOURCE_PATHS[@]}" | shasum -a 256 | awk '{print $1}')"
+test -z "$(git status --porcelain=v1)"
+git merge-base --is-ancestor "$RUNTIME_SOURCE_HEAD" "$RUN_HEAD"
+test "$(git rev-parse "${RUNTIME_SOURCE_HEAD}^")" = "$RUNTIME_SOURCE_PARENT"
+SOURCE_DIFF_SHA256="$(git diff "$RUNTIME_SOURCE_PARENT" "$RUNTIME_SOURCE_HEAD" -- "${SOURCE_PATHS[@]}" | shasum -a 256 | awk '{print $1}')"
 [ "$SOURCE_DIFF_SHA256" != "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" ]
-SOURCE_MATCHES=working-tree
+SOURCE_MATCHES=committed-runtime-source
 
 cleanup() {
-  [ -n "$FAKE_LOG" ] && [ -f "$FAKE_LOG" ] && cp "$FAKE_LOG" "$EVIDENCE/live-last-fake-provider.txt" || true
-  [ -n "$SERVER_STDOUT" ] && [ -f "$SERVER_STDOUT" ] && cp "$SERVER_STDOUT" "$EVIDENCE/live-last-server.stdout" || true
-  [ -n "$SERVER_STDERR" ] && [ -f "$SERVER_STDERR" ] && cp "$SERVER_STDERR" "$EVIDENCE/live-last-server.stderr" || true
-  [ -n "$SSE_LOG" ] && [ -f "$SSE_LOG" ] && cp "$SSE_LOG" "$EVIDENCE/live-last-events.sse" || true
-  [ -n "$ROOT_PROBE_LOG" ] && [ -f "$ROOT_PROBE_LOG" ] && cp "$ROOT_PROBE_LOG" "$EVIDENCE/live-last-root-state.jsonl" || true
-  if [ -f "$OMO_LOG" ]; then
-    tail -c "+$((OMO_OFFSET + 1))" "$OMO_LOG" | rg 'first-prompt-watchdog|runtime-fallback|ENTRY - plugin loading|Config loaded' > "$EVIDENCE/live-last-plugin.log" || true
+  if [ "$RUN_SUCCEEDED" = 0 ]; then
+    [ -n "$FAKE_LOG" ] && [ -f "$FAKE_LOG" ] && cp "$FAKE_LOG" "$EVIDENCE/live-last-fake-provider.txt" || true
+    [ -n "$SERVER_STDOUT" ] && [ -f "$SERVER_STDOUT" ] && cp "$SERVER_STDOUT" "$EVIDENCE/live-last-server.stdout" || true
+    [ -n "$SERVER_STDERR" ] && [ -f "$SERVER_STDERR" ] && cp "$SERVER_STDERR" "$EVIDENCE/live-last-server.stderr" || true
+    [ -n "$SSE_LOG" ] && [ -f "$SSE_LOG" ] && cp "$SSE_LOG" "$EVIDENCE/live-last-events.sse" || true
+    [ -n "$ROOT_PROBE_LOG" ] && [ -f "$ROOT_PROBE_LOG" ] && cp "$ROOT_PROBE_LOG" "$EVIDENCE/live-last-root-state.jsonl" || true
+    if [ -f "$OMO_LOG" ]; then
+      tail -c "+$((OMO_OFFSET + 1))" "$OMO_LOG" | rg 'first-prompt-watchdog|runtime-fallback|ENTRY - plugin loading|Config loaded' > "$EVIDENCE/live-last-plugin.log" || true
+    fi
   fi
   for pid in "$SSE_PID" "$SERVER_PID" "$FAKE_PID"; do
     if [ -n "$pid" ]; then
@@ -57,6 +65,8 @@ cleanup() {
   rm -rf "$TMP_ROOT"
 }
 trap cleanup EXIT
+
+rm -f "$EVIDENCE"/live-last-*
 
 free_port() {
   python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()'
@@ -219,13 +229,14 @@ sed -e "s/${SESSION_ID}/<qa-session>/g" -e "s#${TMP_ROOT}#<isolated-sandbox>#g" 
   "$TMP_ROOT/plugin-watchdog.log" > "$EVIDENCE/live-plugin-watchdog.txt"
 sed -n 's/^data: //p' "$SSE_LOG" | jq -c 'select(.type == "server.connected" or .type == "session.created" or .type == "session.deleted" or .type == "message.updated" or .type == "message.part.updated" or .type == "message.part.delta" or .type == "session.error" or .type == "session.idle") | {type, session:(if (.properties.sessionID // .properties.info.sessionID // .properties.info.id // .properties.part.sessionID // null) then "<qa-session>" else null end), role:(.properties.info.role // null), text:(.properties.part.text // .properties.delta // null)}' > "$EVIDENCE/live-sse-events.jsonl"
 sed -e "s/${OLDER_SESSION_ID}/<older-root>/g" -e "s/${NEWER_SESSION_ID}/<newer-root>/g" "$ROOT_PROBE_LOG" > "$EVIDENCE/live-root-state.jsonl"
-printf 'run_head=%s\nsource_diff_sha256=%s\nsource_matches=%s\nreal_db_unchanged=yes\nsandbox_isolated=yes\nsandbox_session_count=%s\nprompt_http_code=%s\nsecond_prompt_http_code=%s\nuser_abort_http_code=%s\nnewer_root_delete_http_code=%s\nolder_root_watchdog_fallback=yes\ntwo_active_roots_observed=yes\nolder_root_restored_after_delete=yes\nprimary_requests=%s\nfallback_requests=%s\nprimary_connection_closed=%s\nfallback_response_seen=%s\nfallback_watchdog_rearmed=no\nwatchdog_arm_count_after_success=%s\nwatchdog_arm_count_after_settle=%s\nuser_abort_classified_external=yes\n' \
-  "$RUN_HEAD" "$SOURCE_DIFF_SHA256" "$SOURCE_MATCHES" \
+printf 'run_head=%s\nruntime_source_head=%s\nruntime_source_parent=%s\nsource_diff_sha256=%s\nsource_matches=%s\nreal_db_unchanged=yes\nsandbox_isolated=yes\nsandbox_session_count=%s\nprompt_http_code=%s\nsecond_prompt_http_code=%s\nuser_abort_http_code=%s\nnewer_root_delete_http_code=%s\nolder_root_watchdog_fallback=yes\ntwo_active_roots_observed=yes\nolder_root_restored_after_delete=yes\nprimary_requests=%s\nfallback_requests=%s\nprimary_connection_closed=%s\nfallback_response_seen=%s\nfallback_watchdog_rearmed=no\nwatchdog_arm_count_after_success=%s\nwatchdog_arm_count_after_settle=%s\nuser_abort_classified_external=yes\n' \
+  "$RUN_HEAD" "$RUNTIME_SOURCE_HEAD" "$RUNTIME_SOURCE_PARENT" "$SOURCE_DIFF_SHA256" "$SOURCE_MATCHES" \
   "$SANDBOX_COUNT" "$HTTP_CODE" "$SECOND_HTTP_CODE" "$ABORT_HTTP_CODE" "$DELETE_HTTP_CODE" \
   "$(grep -c 'REQUEST model=primary' "$FAKE_LOG")" "$(grep -c 'REQUEST model=fallback' "$FAKE_LOG")" \
   "$(grep -c 'PRIMARY_CONNECTION_CLOSED' "$FAKE_LOG")" "$(grep -c 'QA_FALLBACK_OK' "$SSE_LOG")" \
   "$ARM_COUNT_AFTER_SUCCESS" "$ARM_COUNT_AFTER_SETTLE" \
   > "$EVIDENCE/live-isolation-receipt.txt"
 
-printf 'PASS run_head=%s source_diff_sha256=%s source_matches=%s real_db_unchanged=yes older_root_fallback=yes two_active_roots=yes deletion_restored_older=yes fallback_watchdog_rearmed=no later_user_abort=external\n' \
-  "$RUN_HEAD" "$SOURCE_DIFF_SHA256" "$SOURCE_MATCHES"
+RUN_SUCCEEDED=1
+printf 'PASS run_head=%s runtime_source_head=%s source_diff_sha256=%s source_matches=%s real_db_unchanged=yes older_root_fallback=yes two_active_roots=yes deletion_restored_older=yes fallback_watchdog_rearmed=no later_user_abort=external\n' \
+  "$RUN_HEAD" "$RUNTIME_SOURCE_HEAD" "$SOURCE_DIFF_SHA256" "$SOURCE_MATCHES"
