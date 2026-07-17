@@ -59,6 +59,6 @@ function injectBackgroundWaitInstruction(
 ): void {
   if (!options?.blockOnBackgroundTasks || !options.backgroundManager || !sessionID) return
   if (!options.backgroundManager.hasActiveDescendantTasks(sessionID)) return
-  if (system.some((part) => part.includes(BACKGROUND_WAIT_TAG))) return
+  if (system.includes(BACKGROUND_WAIT_INSTRUCTION)) return
   system.push(BACKGROUND_WAIT_INSTRUCTION)
 }

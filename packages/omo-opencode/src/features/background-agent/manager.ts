@@ -279,6 +279,7 @@ export class BackgroundManager {
   private releasedRootDescendantTasks = new Set<string>()
   private resumingTasks = new Set<string>()
   private terminalizingTasks = new Set<string>()
+  private finalizingTasks = new Set<string>()
   private terminalizationWaiters = new Map<string, Set<() => void>>()
   private preStartDescendantReservations: Set<string>
   private pendingLaunchesByParentSession: Map<string, number>
@@ -423,7 +424,8 @@ export class BackgroundManager {
       this.shutdownTriggered ||
       task.status === "running" ||
       this.resumingTasks.has(task.id) ||
-      this.terminalizingTasks.has(task.id)
+      this.terminalizingTasks.has(task.id) ||
+      this.finalizingTasks.has(task.id)
     ) {
       return undefined
     }
@@ -494,11 +496,13 @@ export class BackgroundManager {
     const parentSessionID = task.parentSessionId
     if (!parentSessionID) return () => {}
 
+    this.finalizingTasks.add(task.id)
     this.parentWakeNotifier.reserveNotificationPreparation(parentSessionID)
     let released = false
     return () => {
       if (released) return
       released = true
+      this.finalizingTasks.delete(task.id)
       this.parentWakeNotifier.releaseNotificationPreparation(parentSessionID)
       this.updateBackgroundTaskMarker(parentSessionID)
     }
@@ -544,6 +548,7 @@ export class BackgroundManager {
     this.tasks.delete(task.id)
     this.releasedRootDescendantTasks.delete(task.id)
     this.terminalizingTasks.delete(task.id)
+    this.finalizingTasks.delete(task.id)
     const terminalizationWaiters = this.terminalizationWaiters.get(task.id)
     this.terminalizationWaiters.delete(task.id)
     for (const resolve of terminalizationWaiters ?? []) resolve()
@@ -822,7 +827,11 @@ export class BackgroundManager {
         }
 
         if (item.task.status === "cancelled" || item.task.status === "error" || item.task.status === "interrupt") {
+          const hadPreStartReservation = this.preStartDescendantReservations.has(item.task.id)
           this.rollbackPreStartDescendantReservation(item.task)
+          if (!hadPreStartReservation) {
+            this.releaseTaskRootDescendant(item.task)
+          }
           this.concurrencyManager.release(key)
           continue
         }
@@ -1531,6 +1540,13 @@ The fallback retry session is now created and can be inspected directly.
       this.getAllDescendantTasks(existingTask.sessionId).some(task => task.sessionId === input.parentSessionId)
     ) {
       throw new Error(`Resuming task ${existingTask.id} from session ${input.parentSessionId} would create a background task cycle`)
+    }
+
+    const callerRootSessionID = this.findBySession(input.parentSessionId)?.rootSessionId ?? input.parentSessionId
+    if (existingTask.rootSessionId && callerRootSessionID !== existingTask.rootSessionId) {
+      throw new Error(
+        `Task ${existingTask.id} belongs to root ${existingTask.rootSessionId} and cannot be resumed from root ${callerRootSessionID}`,
+      )
     }
 
     const releaseResume = this.reserveTaskResume(existingTask)
@@ -3555,6 +3571,7 @@ The task was re-queued on a fallback model after a retryable failure.
     this.releasedRootDescendantTasks.clear()
     this.resumingTasks.clear()
     this.terminalizingTasks.clear()
+    this.finalizingTasks.clear()
     for (const waiters of this.terminalizationWaiters.values()) {
       for (const resolve of waiters) resolve()
     }

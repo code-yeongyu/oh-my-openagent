@@ -1726,6 +1726,48 @@ describe("BackgroundManager terminal ownership and root reservations", () => {
     await manager.shutdown()
   })
 
+  test("rejects resume while stale prune notification still owns finalization", async () => {
+    //#given
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput({ session: {} }),
+      config: { taskTtlMs: 1 },
+    })
+    const notification = blockNotifyParentSession(manager)
+    const staleTime = new Date(Date.now() - 60_000)
+    const task = createMockTask({
+      id: "task-stale-prune-resume-finalization",
+      parentSessionId: "root-session",
+      sessionId: "session-stale-prune-resume-finalization",
+      rootSessionId: "root-session",
+      startedAt: staleTime,
+      progress: { toolCalls: 0, lastUpdate: staleTime },
+    })
+    getTaskMap(manager).set(task.id, task)
+    getRootDescendantCounts(manager).set("root-session", 1)
+
+    //#when
+    pruneStaleTasksAndNotificationsForTest(manager)
+    await notification.started
+    const resumeOutcome = await manager.resume({
+      sessionId: task.sessionId,
+      prompt: "continue during stale notification",
+      parentSessionId: "root-session",
+      parentMessageId: "resume-message",
+    }).then(
+      () => "fulfilled" as const,
+      (error: unknown) => error,
+    )
+
+    //#then
+    expect(resumeOutcome).toBeInstanceOf(Error)
+    expect(resumeOutcome).toHaveProperty("message", expect.stringContaining("cannot accept a continuation prompt"))
+    expect(task.status).toBe("error")
+
+    notification.release()
+    await waitUntil(() => !manager.hasBackgroundWorkInFlight("root-session"), 600)
+    await manager.shutdown()
+  })
+
   test("keeps crash finalization visible until parent notification settles", async () => {
     //#given
     const manager = new BackgroundManager({ pluginContext: createPluginInput({ session: {} }) })
@@ -2221,6 +2263,32 @@ describe("BackgroundManager terminal ownership and root reservations", () => {
       parentMessageId: "resume-self-cycle-message",
     })).rejects.toThrow("would create a background task cycle")
     expect(task.parentSessionId).toBe("root-session")
+
+    await manager.shutdown()
+  })
+
+  test("rejects resuming a task from a different root session", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    const task = createMockTask({
+      id: "task-resume-cross-root",
+      parentSessionId: "root-session-a",
+      sessionId: "session-resume-cross-root",
+      rootSessionId: "root-session-a",
+      status: "completed",
+      completedAt: new Date(),
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when / #then
+    await expect(manager.resume({
+      sessionId: task.sessionId,
+      prompt: "continue from another root",
+      parentSessionId: "root-session-b",
+      parentMessageId: "resume-cross-root-message",
+    })).rejects.toThrow("belongs to root root-session-a")
+    expect(task.parentSessionId).toBe("root-session-a")
+    expect(task.rootSessionId).toBe("root-session-a")
 
     await manager.shutdown()
   })
@@ -4599,7 +4667,14 @@ describe("BackgroundManager.resume promptAsync gate state", () => {
       concurrencyGroup: "explore",
       rootSessionId: "root-session-cancelled-delayed-resume-skip",
     })
+    const newParentTask = createMockTask({
+      id: "task-parent-cancelled-delayed-resume-skip",
+      sessionId: "parent-session-new",
+      parentSessionId: "root-session-cancelled-delayed-resume-skip",
+      rootSessionId: "root-session-cancelled-delayed-resume-skip",
+    })
     getTaskMap(manager).set(task.id, task)
+    getTaskMap(manager).set(newParentTask.id, newParentTask)
 
     //#when
     await manager.resume({
@@ -8626,6 +8701,42 @@ describe("BackgroundManager queue processing - error tasks are skipped", () => {
 })
 
 describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tasks from queuesByKey", () => {
+  test("releases fallback root ownership when stale prune follows an immediately acquired shifted slot", async () => {
+    //#given
+    const manager = createBackgroundManagerWithOptions({ config: { defaultConcurrency: 1 } })
+    const task = createMockTask({
+      id: "task-stale-shifted-immediate-fallback",
+      parentSessionId: "parent-session",
+      sessionId: undefined,
+      rootSessionId: "root-session-stale-shifted-immediate-fallback",
+      status: "pending",
+      queuedAt: new Date(Date.now() - 31 * 60 * 1000),
+    })
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionId: task.parentSessionId,
+    }
+    const key = task.agent
+    getTaskMap(manager).set(task.id, task)
+    getQueuesByKey(manager).set(key, [{ task, input }])
+    getRootDescendantCounts(manager).set(task.rootSessionId, 1)
+
+    //#when
+    const processing = processKeyForTest(manager, key)
+    pruneStaleTasksAndNotificationsForTest(manager)
+    await processing
+
+    //#then
+    expect(task.status).toBe("error")
+    expect(getRootDescendantCounts(manager).has(task.rootSessionId)).toBe(false)
+    expect(manager.hasBackgroundWorkInFlight(task.rootSessionId)).toBe(false)
+    expect(getConcurrencyManager(manager).getCount(key)).toBe(0)
+
+    await manager.shutdown()
+  })
+
   test("cancels a stale pending task already shifted into concurrency acquisition", async () => {
     //#given
     const manager = createBackgroundManagerWithOptions({ config: { defaultConcurrency: 1 } })

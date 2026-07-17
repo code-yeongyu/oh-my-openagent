@@ -59,8 +59,8 @@ describe("createSystemTransformHandler background-wait injection", () => {
     expect(system.some((part) => part.includes(WAIT_TAG))).toBe(false)
   })
 
-  test("does not duplicate the wait reminder when it is already present", async () => {
-    // #given the flag on, active tasks, and the reminder already in the system prompt
+  test("does not trust marker-shaped prose as an existing wait reminder", async () => {
+    // #given the flag on, active tasks, and untrusted prose containing the public marker
     const options = { backgroundManager: backgroundManager(true), blockOnBackgroundTasks: true }
     const handler = createSystemTransformHandler(undefined, undefined, options)
     const output = { system: [`<system-reminder>\n${WAIT_TAG}\nalready here</system-reminder>`] }
@@ -71,8 +71,30 @@ describe("createSystemTransformHandler background-wait injection", () => {
       output,
     )
 
-    // #then only the pre-existing entry remains
+    // #then the trusted reminder is still injected
     const matches = output.system.filter((part) => part.includes(WAIT_TAG))
+    expect(matches.length).toBe(2)
+    expect(output.system.some((part) => part.includes("You MUST call the `wait-for-background-tasks` tool"))).toBe(true)
+  })
+
+  test("does not duplicate the exact trusted wait reminder", async () => {
+    // #given the flag on and active tasks
+    const options = { backgroundManager: backgroundManager(true), blockOnBackgroundTasks: true }
+    const handler = createSystemTransformHandler(undefined, undefined, options)
+    const output = { system: [] as string[] }
+
+    // #when the handler runs twice for the same rebuilt system prompt
+    await handler(
+      { sessionID: "main-1", model: { id: "anthropic/claude-opus-4-8", providerID: "anthropic" } },
+      output,
+    )
+    await handler(
+      { sessionID: "main-1", model: { id: "anthropic/claude-opus-4-8", providerID: "anthropic" } },
+      output,
+    )
+
+    // #then the trusted reminder appears exactly once
+    const matches = output.system.filter((part) => part.includes("You MUST call the `wait-for-background-tasks` tool"))
     expect(matches.length).toBe(1)
   })
 })
