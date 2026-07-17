@@ -53,7 +53,11 @@ function createContext(abort: () => Promise<unknown>, promptModels: string[]): R
   }
 }
 
-function createHook(abort: () => Promise<unknown>, promptModels: string[]) {
+function createHook(
+  abort: () => Promise<unknown>,
+  promptModels: string[],
+  sessionTimeoutMs?: number,
+) {
   return createRuntimeFallbackHook(createContext(abort, promptModels), {
     config: {
       enabled: true,
@@ -71,6 +75,7 @@ function createHook(abort: () => Promise<unknown>, promptModels: string[]) {
         },
       },
     },
+    ...(sessionTimeoutMs !== undefined ? { session_timeout_ms: sessionTimeoutMs } : {}),
   })
 }
 
@@ -211,6 +216,41 @@ describe("runtime-fallback composed abort lifecycle races", () => {
     await pendingRetry
 
     expect({ abortCalls, promptModels }).toEqual({ abortCalls: 0, promptModels: [] })
+    hook.dispose?.()
+  })
+
+  it("#given a fallback timeout abort is pending #when a newer user turn arrives #then stale timeout completion cannot dispatch", async () => {
+    const timeoutAbort = createDeferred<unknown>()
+    const timeoutAbortStarted = createDeferred<void>()
+    const promptModels: string[] = []
+    let abortCalls = 0
+    const hook = createHook(async () => {
+      abortCalls += 1
+      if (abortCalls === 2) {
+        timeoutAbortStarted.resolve()
+        return timeoutAbort.promise
+      }
+      return {}
+    }, promptModels, 1)
+    SessionCategoryRegistry.register(SESSION_ID, "test")
+
+    await hook.event(retryEvent(1))
+    await Promise.race([
+      timeoutAbortStarted.promise,
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("fallback timeout abort did not start")), 1000)
+      }),
+    ])
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: { info: { id: "newer-timeout-user-message", role: "user", sessionID: SESSION_ID } },
+      },
+    })
+    timeoutAbort.resolve({})
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(promptModels).toEqual(["openai/fallback-one"])
     hook.dispose?.()
   })
 })

@@ -7,6 +7,7 @@ import { restoreFallbackState, snapshotFallbackState } from "./fallback-state-sn
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { isRuntimeFallbackActive } from "./lifecycle"
 import { clearSessionRetryOwnership } from "./session-retry-ownership"
+import { getSessionGeneration, isSessionGenerationCurrent } from "./session-generation"
 
 declare function setTimeout(callback: () => void | Promise<void>, delay?: number): RuntimeFallbackTimeout
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
@@ -45,10 +46,14 @@ export function createFallbackTimeoutHelpers(
     const timeoutMs = options?.session_timeout_ms ?? config.timeout_seconds * 1000
     if (timeoutMs <= 0) return
     const wasSubagentSession = subagentSessions.has(sessionID)
+    const sessionGeneration = getSessionGeneration(deps, sessionID)
+    const isCurrent = () => isRuntimeFallbackActive(deps)
+      && isSessionGenerationCurrent(deps, sessionID, sessionGeneration)
 
     const timer = setTimeout(async () => {
+      if (sessionFallbackTimeouts.get(sessionID) !== timer) return
       sessionFallbackTimeouts.delete(sessionID)
-      if (!isRuntimeFallbackActive(deps)) return
+      if (!isCurrent()) return
 
       if (wasSubagentSession && !subagentSessions.has(sessionID)) {
         log(`[${HOOK_NAME}] Session fallback timeout skipped for completed subagent`, { sessionID })
@@ -63,7 +68,7 @@ export function createFallbackTimeoutHelpers(
       }
 
       const abortSucceeded = await abortSessionRequest(sessionID, "session.timeout")
-      if (!isRuntimeFallbackActive(deps)) return
+      if (!isCurrent() || sessionStates.get(sessionID) !== state) return
       if (!abortSucceeded) {
         log(`[${HOOK_NAME}] Session fallback timeout abort failed; preserving retry ownership`, { sessionID })
         return
@@ -88,6 +93,7 @@ export function createFallbackTimeoutHelpers(
       const result = prepareFallback(sessionID, state, fallbackModels, config)
       if (result.success && result.newModel) {
         const dispatchOutcome = await autoRetryWithFallback(sessionID, result.newModel, resolvedAgent, "session.timeout")
+        if (!isCurrent() || sessionStates.get(sessionID) !== state) return
         if (!dispatchOutcome.accepted) {
           restoreFallbackState(state, stateSnapshot)
           if (deps.sessionAwaitingFallbackResult.has(sessionID)) {
