@@ -8,6 +8,7 @@ import type { OpencodeClient } from "../delegate-task/types"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { createWaitForBackgroundTasks } from "./create-wait-for-background-tasks"
 import { createBackgroundTools } from "../index"
+import { BACKGROUND_OUTPUT_DESCRIPTION } from "./constants"
 
 const projectDir = tmpdir()
 
@@ -309,6 +310,8 @@ describe("createWaitForBackgroundTasks", () => {
     ])
     expect(output).not.toBe("TEST_TIMEOUT")
     expect(output).toContain("cancelled")
+    expect(output).toContain("`task-1`")
+    expect(output).toContain("running")
   })
 
   test("bounds retained task descriptions and errors independently of global truncation", async () => {
@@ -343,6 +346,13 @@ describe("createWaitForBackgroundTasks", () => {
     // #then the error return obeys the same aggregate output bound
     expect(output.length).toBeLessThanOrEqual(24_000)
     expect(output).toContain("truncated")
+  })
+})
+
+describe("background output guidance", () => {
+  test("permits retrieval after the waiter reports a terminal task", () => {
+    expect(BACKGROUND_OUTPUT_DESCRIPTION).toContain("wait-for-background-tasks")
+    expect(BACKGROUND_OUTPUT_DESCRIPTION).toContain("terminal")
   })
 })
 

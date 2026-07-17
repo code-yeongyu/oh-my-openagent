@@ -58,7 +58,7 @@ function truncateResult(value: string): string {
   return `${value.slice(0, MAX_RESULT_LENGTH - suffix.length)}${suffix}`
 }
 
-function formatResult(tasks: BackgroundTask[], timedOut: boolean, timeoutMs: number): string {
+function formatResult(tasks: BackgroundTask[], timedOut: boolean, timeoutMs: number, aborted = false): string {
   const completed: string[] = []
   const stillRunning: string[] = []
   const prioritizedTasks = [
@@ -93,6 +93,13 @@ function formatResult(tasks: BackgroundTask[], timedOut: boolean, timeoutMs: num
         `## Wait Timed Out\nBackground work was still being registered or finalized after ${Math.round(timeoutMs / 1000)}s. Do NOT end your turn; call \`wait-for-background-tasks\` again.`,
       )
     }
+  }
+
+  if (aborted) {
+    const current = stillRunning.length > 0
+      ? `\n\n## Current Tasks\n${stillRunning.join("\n")}`
+      : ""
+    sections.unshift(`## Wait Aborted\nBackground task wait cancelled because the tool call was aborted.${current}`)
   }
 
   if (tasks.length > MAX_TASKS_IN_RESULT) {
@@ -144,7 +151,8 @@ export function createWaitForBackgroundTasks(
             if (remainingMs <= 0) break
 
             if (await waitForPoll(Math.min(pollIntervalMs, remainingMs), toolContext.abort) === "aborted") {
-              return "Background task wait cancelled because the tool call was aborted."
+              finalTasks = manager.getTasksForBackgroundWait(sessionID)
+              return formatResult(finalTasks, false, timeoutMs, true)
             }
 
             finalTasks = manager.getTasksForBackgroundWait(sessionID)
@@ -163,7 +171,8 @@ export function createWaitForBackgroundTasks(
           }
 
           if (await waitForPoll(Math.min(pollIntervalMs, remainingMs), toolContext.abort) === "aborted") {
-            return "Background task wait cancelled because the tool call was aborted."
+            finalTasks = manager.getTasksForBackgroundWait(sessionID)
+            return formatResult(finalTasks, false, timeoutMs, true)
           }
 
           finalTasks = manager.getTasksForBackgroundWait(sessionID)
