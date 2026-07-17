@@ -79,6 +79,8 @@ export function updateGoal(ref: GoalStoreRef, update: GoalUpdate): Goal | null {
     ...existing,
     objective: update.objective ?? existing.objective,
     status: update.status ?? existing.status,
+    tokensUsed: update.tokensUsed ?? existing.tokensUsed,
+    timeUsedSeconds: update.timeUsedSeconds ?? existing.timeUsedSeconds,
     updatedAt: now,
   }
 

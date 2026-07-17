@@ -43,6 +43,8 @@ export type TokenUsageSnapshot = {
 export type GoalUpdate = {
   readonly objective?: string
   readonly status?: GoalStatus
+  readonly tokensUsed?: number
+  readonly timeUsedSeconds?: number
 }
 
 export const GoalToolSnapshotSchema = z.object({
