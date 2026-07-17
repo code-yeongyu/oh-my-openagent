@@ -10,12 +10,14 @@ import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
+import type { FallbackOwnershipTransfer } from "./first-prompt-watchdog-ownership"
 
 export function createSessionStatusHandler(
   deps: HookDeps,
   helpers: AutoRetryHelpers,
-  onFallbackOwnershipTransferred?: (sessionID: string) => (() => void) | undefined,
+  onFallbackOwnershipTransferred?: (sessionID: string) => FallbackOwnershipTransfer | undefined,
   isSessionCancelled: (sessionID: string) => boolean = () => false,
+  getSessionGeneration: (sessionID: string) => number = () => 0,
 ) {
   const {
     pluginConfig,
@@ -33,7 +35,10 @@ export function createSessionStatusHandler(
     const timeoutEnabled = deps.config.timeout_seconds > 0
 
     if (!sessionID || status?.type !== "retry") return
-    const isCurrent = () => deps.isLifecycleActive?.() !== false && !isSessionCancelled(sessionID)
+    const sessionGeneration = getSessionGeneration(sessionID)
+    const isCurrent = () => deps.isLifecycleActive?.() !== false
+      && !isSessionCancelled(sessionID)
+      && getSessionGeneration(sessionID) === sessionGeneration
 
     const retryMessage = typeof status.message === "string" ? status.message : ""
     const retrySignal = extractAutoRetrySignal({ status: retryMessage, message: retryMessage })
@@ -159,8 +164,8 @@ export function createSessionStatusHandler(
       retryAttempt: status.attempt,
     })
 
-    const restoreFallbackOwnership = onFallbackOwnershipTransferred?.(sessionID)
-    if (!isCurrent()) { releaseRetryKey(); restoreFallbackOwnership?.(); return }
+    const ownershipTransfer = onFallbackOwnershipTransferred?.(sessionID)
+    if (!isCurrent()) { releaseRetryKey(); ownershipTransfer?.rollback(); return }
     const dispatched = await dispatchFallbackRetry(deps, helpers, {
       sessionID,
       state,
@@ -170,7 +175,9 @@ export function createSessionStatusHandler(
     })
     if (!dispatched) {
       releaseRetryKey()
-      restoreFallbackOwnership?.()
+      ownershipTransfer?.rollback()
+    } else {
+      ownershipTransfer?.commit()
     }
   }
 }

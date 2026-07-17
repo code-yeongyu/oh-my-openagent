@@ -1,10 +1,12 @@
-import { afterEach, describe, expect, it } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { createEventHandler } from "./event-handler"
 import { createFirstPromptWatchdog } from "./first-prompt-watchdog"
 import {
   AGENT,
   createDeps,
+  type FakeTimers,
+  installFakeTimers,
   PLUGIN_CONFIG_WITH_FALLBACK,
   PRIMARY_MODEL,
 } from "./first-prompt-watchdog-test-helpers"
@@ -43,7 +45,12 @@ function helpers(overrides: Partial<AutoRetryHelpers> = {}): AutoRetryHelpers {
 }
 
 describe("runtime fallback terminal ownership races", () => {
+  let timers: FakeTimers | undefined
+
+  beforeEach(() => { timers = installFakeTimers() })
   afterEach(() => {
+    timers?.restore()
+    timers = undefined
     SessionCategoryRegistry.clear()
   })
 
@@ -68,6 +75,9 @@ describe("runtime fallback terminal ownership races", () => {
     const pending = handler(retryEvent(sessionID))
     await resolutionStarted.promise
     await handler({ event: { type: "session.stop", properties: { sessionID } } })
+    await handler({
+      event: { type: "message.updated", properties: { info: { role: "user", sessionID } } },
+    })
     resolution.resolve(AGENT)
     await pending
 
@@ -86,7 +96,7 @@ describe("runtime fallback terminal ownership races", () => {
     watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT, "user-1")
     watchdog.onAssistantProgress(sessionID, "assistant-parent")
     watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT, "user-1")
-    await Bun.sleep(10)
+    await timers?.advanceBy(10)
 
     expect(aborts).toBe(0)
     watchdog.dispose()
@@ -106,7 +116,7 @@ describe("runtime fallback terminal ownership races", () => {
     }), 1)
 
     watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT, "user-1")
-    await Bun.sleep(20)
+    await timers?.advanceBy(20)
 
     expect(aborts).toBe(2)
     expect(dispatches).toBe(1)
@@ -135,7 +145,7 @@ describe("runtime fallback terminal ownership races", () => {
 
     watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT, "user-1")
     await handler(retryEvent(sessionID))
-    await Bun.sleep(10)
+    await timers?.advanceBy(10)
 
     expect(dispatches).toBe(2)
     watchdog.dispose()

@@ -103,8 +103,7 @@ export function observeEventForWatchdog(
       const agent = typeof info.agent === "string" ? info.agent : undefined
       if (isCompactionMessage({ agent, parts: [...(eventParts ?? []), ...(infoParts ?? [])] })) return
       const messageID = typeof info.id === "string" ? info.id : undefined
-      watchdog.onUserMessage(sessionID, model, agent, messageID)
-      return
+      return watchdog.onUserMessage(sessionID, model, agent, messageID)
     }
 
     if (role === "assistant") {

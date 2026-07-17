@@ -22,6 +22,7 @@ type FireFirstPromptWatchdogInput = {
   readonly isLifecycleCurrent: () => boolean
   readonly isSessionCurrent: () => boolean
   readonly recordAbortProvenance: () => () => void
+  readonly markAbortCompleted: () => void
   readonly markAbortResponsePending: () => void
   readonly clearAbortResponsePending: () => void
 }
@@ -38,6 +39,7 @@ export async function fireFirstPromptWatchdog(input: FireFirstPromptWatchdogInpu
     isLifecycleCurrent,
     isSessionCurrent,
     recordAbortProvenance,
+    markAbortCompleted,
     markAbortResponsePending,
     clearAbortResponsePending,
   } = input
@@ -97,13 +99,17 @@ export async function fireFirstPromptWatchdog(input: FireFirstPromptWatchdogInpu
   if (!isLifecycleCurrent() || !isSessionCurrent()) return
 
   try {
-    await dispatchFallbackRetry(deps, helpers, {
+    const dispatched = await dispatchFallbackRetry(deps, helpers, {
       sessionID,
       state,
       fallbackModels,
       resolvedAgent,
       source: SOURCE,
     })
+    if (!dispatched) {
+      markAbortCompleted()
+      return "retry"
+    }
   } finally {
     releaseInternalAbortOwnership(deps, sessionID)
   }

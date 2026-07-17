@@ -113,6 +113,10 @@ export function createRuntimeFallbackHook(
       return
     }
     if (watchdogDecision?.kind === "consume-terminal") return
+    if (watchdogDecision?.kind === "discard-terminal") {
+      deferredTerminalEvents.delete(watchdogDecision.sessionID)
+      watchdogDecision = undefined
+    }
     if (watchdogDecision?.kind === "inspect-terminal") {
       const currentRequestActive = await isCurrentRequestActive(ctx, watchdogDecision.sessionID)
       if (disposed) return

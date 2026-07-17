@@ -52,21 +52,11 @@ export async function getSessionActivity(
   sessionID: string,
   statusTimeoutMs: number = DEFAULT_SESSION_STATUS_TIMEOUT_MS,
 ): Promise<SessionActivity> {
-  if (typeof client.session?.status !== "function") {
-    return "unknown"
-  }
-
+  if (typeof client.session?.status !== "function") return "unknown"
   try {
-    const statusResult = await withStatusTimeout(
-      client.session.status(),
-      statusTimeoutMs,
-    )
+    const statusResult = await withStatusTimeout(client.session.status(), statusTimeoutMs)
     const status = getSessionStatusPayload(statusResult)[sessionID]
-    if (!isRecord(status)) {
-      return "unknown"
-    }
-
-    const statusType = status.type
+    const statusType = isRecord(status) ? status.type : undefined
     if (typeof statusType !== "string") return "unknown"
     if (isActiveSessionStatusType(statusType)) return "active"
     return statusType === "idle" ? "inactive" : "unknown"
@@ -84,8 +74,7 @@ export async function isSessionActive(
   try {
     const statusResult = await withStatusTimeout(client.session.status(), statusTimeoutMs)
     const status = getSessionStatusPayload(statusResult)[sessionID]
-    if (!isRecord(status)) return false
-    const statusType = status.type
+    const statusType = isRecord(status) ? status.type : undefined
     return typeof statusType === "string" && isActiveSessionStatusType(statusType)
   } catch {
     return false

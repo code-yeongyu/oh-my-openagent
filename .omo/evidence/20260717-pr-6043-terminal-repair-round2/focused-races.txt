@@ -1,0 +1,32 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-terminal-races.test.ts:
+(pass) first-prompt watchdog terminal races > #given the watchdog abort request succeeded #when an abort error arrives while fallback dispatch settles #then it remains external cancellation [3.15ms]
+(pass) first-prompt watchdog terminal races > #given the watchdog abort marker is set #when a non-abort session error arrives #then the watchdog callback is cancelled [1.52ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-two-completed-generations.test.ts:
+(pass) runtime-fallback completed watchdog generations > #given two watchdog fallbacks completed visibly #when newest then oldest delayed aborts arrive #then latest fallback remains until a later real cancellation [1.84ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-suspended-generation.test.ts:
+(pass) first-prompt watchdog suspended generation ownership > #given generation two is suspended by generation one's delayed abort #when generation three arrives before correlation resolves #then generation three receives a fresh deadline [0.72ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-ownership-races.test.ts:
+(pass) first-prompt watchdog ownership races > re-arms after an accepted abort when fallback dispatch is rejected [0.36ms]
+(pass) first-prompt watchdog ownership races > restores suspended ownership without arming a new timer [0.30ms]
+(pass) first-prompt watchdog ownership races > discards inconclusive suspended ownership before a distinct user generation [0.37ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/abort-wire-ordering.test.ts:
+(pass) runtime-fallback abort wire ordering > #given OpenCode publishes the watchdog abort before its HTTP response #when the event is observed #then fallback ownership survives and dispatch continues [2.08ms]
+(pass) runtime-fallback abort wire ordering > #given overlapping internal abort callers for one session #when OpenCode emits one internal terminal #then the next abort event remains a genuine cancellation [0.19ms]
+(pass) runtime-fallback abort wire ordering > #given status fallback and watchdog share one abort #when the terminal arrives during status dispatch #then the status fallback remains authoritative [0.57ms]
+(pass) runtime-fallback abort wire ordering > #given a status fallback replaces the silent request #when the original watchdog deadline passes #then the accepted fallback is not aborted or advanced [0.25ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-generation-race.test.ts:
+(pass) first-prompt watchdog generation races > #given the watchdog abort is acknowledged #when a user abort arrives while fallback dispatch is settling #then cancellation wins and the fallback request is stopped [1.65ms]
+(pass) first-prompt watchdog generation races > #given generation one dispatched a fallback #when its delayed abort arrives after generation two arms #then generation two remains owned [2.62ms]
+(pass) first-prompt watchdog generation races > #given generation one retains abort provenance #when generation two is cancelled before the delayed abort arrives #then cancellation prevents a second fallback [1.34ms]
+
+ 14 pass
+ 0 fail
+ 56 expect() calls
+Ran 14 tests across 6 files. [83.00ms]

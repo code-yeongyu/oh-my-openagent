@@ -14,19 +14,25 @@ import { resolveMessageEventSessionID, resolveSessionEventID } from "../../share
 import { clearInternalAbortOwnership, consumeInternalAbortOwnership } from "./internal-abort-ownership"
 import { isRuntimeFallbackActive } from "./lifecycle"
 import { resolveCreatedSessionModel, resolveEventModel } from "./event-model"
+import type { FallbackOwnershipTransfer } from "./first-prompt-watchdog-ownership"
 
 export function createEventHandler(
   deps: HookDeps,
   helpers: AutoRetryHelpers,
-  onStatusFallbackOwnershipTransferred?: (sessionID: string) => (() => void) | undefined,
+  onStatusFallbackOwnershipTransferred?: (sessionID: string) => FallbackOwnershipTransfer | undefined,
 ) {
   const { config, pluginConfig, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionFallbackTimeouts, sessionStatusRetryKeys } = deps
   const cancelledSessions = new Set<string>()
+  const sessionGenerations = new Map<string, number>()
+  const bumpSessionGeneration = (sessionID: string) => {
+    sessionGenerations.set(sessionID, (sessionGenerations.get(sessionID) ?? 0) + 1)
+  }
   const sessionStatusHandler = createSessionStatusHandler(
     deps,
     helpers,
     onStatusFallbackOwnershipTransferred,
     (sessionID) => cancelledSessions.has(sessionID),
+    (sessionID) => sessionGenerations.get(sessionID) ?? 0,
   )
 
   const resetRetryState = (sessionID: string) => {
@@ -63,6 +69,7 @@ export function createEventHandler(
     const sessionID = resolveSessionEventID(props)
 
     if (sessionID) {
+      bumpSessionGeneration(sessionID)
       log(`[${HOOK_NAME}] Cleaning up session state`, { sessionID })
       cancelledSessions.delete(sessionID)
       sessionStates.delete(sessionID)
@@ -80,6 +87,7 @@ export function createEventHandler(
     const sessionID = resolveSessionEventID(props)
     if (!sessionID) return
 
+    bumpSessionGeneration(sessionID)
     cancelledSessions.add(sessionID)
     if (sessionRetryInFlight.has(sessionID) || sessionAwaitingFallbackResult.has(sessionID)) {
       await helpers.abortSessionRequest(sessionID, "session.stop")
@@ -96,6 +104,7 @@ export function createEventHandler(
     const role = info?.role as string | undefined
     if (!sessionID || role !== "user") return
 
+    bumpSessionGeneration(sessionID)
     cancelledSessions.delete(sessionID)
   }
 
@@ -105,6 +114,7 @@ export function createEventHandler(
 
     if (cancelledSessions.has(sessionID)) {
       resetRetryState(sessionID)
+      cancelledSessions.delete(sessionID)
       log(`[${HOOK_NAME}] Cleared fallback retry state for cancelled session on idle`, { sessionID })
       return
     }

@@ -1,6 +1,7 @@
 export type WatchdogEventDecision =
   | { readonly kind: "consume-terminal"; readonly sessionID: string }
   | { readonly kind: "defer-terminal"; readonly sessionID: string }
+  | { readonly kind: "discard-terminal"; readonly sessionID: string }
   | { readonly kind: "inspect-terminal"; readonly sessionID: string }
   | { readonly kind: "resolve-terminal"; readonly sessionID: string }
 

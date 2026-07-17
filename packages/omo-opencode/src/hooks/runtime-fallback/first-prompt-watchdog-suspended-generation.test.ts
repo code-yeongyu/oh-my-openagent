@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test"
 import type { AutoRetryHelpers } from "./auto-retry"
-import { createEventHandler } from "./event-handler"
 import { createFirstPromptWatchdog } from "./first-prompt-watchdog"
 import {
   AGENT,
@@ -10,15 +9,6 @@ import {
   PRIMARY_MODEL,
 } from "./first-prompt-watchdog-test-helpers"
 import { createFallbackState } from "./fallback-state"
-
-function createAbortEvent(sessionID: string) {
-  return {
-    event: {
-      type: "session.error",
-      properties: { sessionID, error: { name: "MessageAbortedError" } },
-    },
-  }
-}
 
 describe("first-prompt watchdog suspended generation ownership", () => {
   it("#given generation two is suspended by generation one's delayed abort #when generation three arrives before correlation resolves #then generation three receives a fresh deadline", async () => {
@@ -44,8 +34,6 @@ describe("first-prompt watchdog suspended generation ownership", () => {
       cleanupStaleSessions: () => {},
     }
     const watchdog = createFirstPromptWatchdog(deps, helpers, 30)
-    const eventHandler = createEventHandler(deps, helpers)
-
     try {
       watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT, "user-generation-1")
       await timers.advanceBy(30)
@@ -60,16 +48,14 @@ describe("first-prompt watchdog suspended generation ownership", () => {
         sessionID,
       })
 
-      watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT, "user-generation-3")
+      expect(watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT, "user-generation-3")).toEqual({
+        kind: "discard-terminal",
+        sessionID,
+      })
       expect(watchdog.onAssistantProgress(sessionID, "user-generation-1", true)).toEqual({
-        kind: "inspect-terminal",
+        kind: "consume-terminal",
         sessionID,
       })
-      expect(watchdog.resolveDeferredTerminal(sessionID, true)).toEqual({
-        kind: "resolve-terminal",
-        sessionID,
-      })
-      await eventHandler(createAbortEvent(sessionID))
 
       await timers.advanceBy(8)
       expect(abortCount).toBe(1)
