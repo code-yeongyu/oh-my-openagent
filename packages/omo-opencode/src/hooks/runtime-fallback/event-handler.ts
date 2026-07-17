@@ -18,15 +18,16 @@ import { resolveCreatedSessionModel, resolveEventModel } from "./event-model"
 export function createEventHandler(
   deps: HookDeps,
   helpers: AutoRetryHelpers,
-  onStatusFallbackOwnershipTransferred?: (sessionID: string) => void,
+  onStatusFallbackOwnershipTransferred?: (sessionID: string) => (() => void) | undefined,
 ) {
   const { config, pluginConfig, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionFallbackTimeouts, sessionStatusRetryKeys } = deps
+  const cancelledSessions = new Set<string>()
   const sessionStatusHandler = createSessionStatusHandler(
     deps,
     helpers,
     onStatusFallbackOwnershipTransferred,
+    (sessionID) => cancelledSessions.has(sessionID),
   )
-  const cancelledSessions = new Set<string>()
 
   const resetRetryState = (sessionID: string) => {
     const state = sessionStates.get(sessionID)
@@ -79,11 +80,11 @@ export function createEventHandler(
     const sessionID = resolveSessionEventID(props)
     if (!sessionID) return
 
+    cancelledSessions.add(sessionID)
     if (sessionRetryInFlight.has(sessionID) || sessionAwaitingFallbackResult.has(sessionID)) {
       await helpers.abortSessionRequest(sessionID, "session.stop")
     }
 
-    cancelledSessions.add(sessionID)
     resetRetryState(sessionID)
 
     log(`[${HOOK_NAME}] Cleared fallback retry state on session.stop`, { sessionID })

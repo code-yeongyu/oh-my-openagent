@@ -14,7 +14,8 @@ import { normalizeModelToCanonicalString } from "./normalize-model"
 export function createSessionStatusHandler(
   deps: HookDeps,
   helpers: AutoRetryHelpers,
-  onFallbackOwnershipTransferred?: (sessionID: string) => void,
+  onFallbackOwnershipTransferred?: (sessionID: string) => (() => void) | undefined,
+  isSessionCancelled: (sessionID: string) => boolean = () => false,
 ) {
   const {
     pluginConfig,
@@ -32,6 +33,7 @@ export function createSessionStatusHandler(
     const timeoutEnabled = deps.config.timeout_seconds > 0
 
     if (!sessionID || status?.type !== "retry") return
+    const isCurrent = () => deps.isLifecycleActive?.() !== false && !isSessionCancelled(sessionID)
 
     const retryMessage = typeof status.message === "string" ? status.message : ""
     const retrySignal = extractAutoRetrySignal({ status: retryMessage, message: retryMessage })
@@ -74,6 +76,7 @@ export function createSessionStatusHandler(
           model,
         })
         requestAborted = await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
+        if (!isCurrent()) { releaseRetryKey(); return }
         if (!requestAborted) {
           releaseRetryKey()
           return
@@ -86,6 +89,7 @@ export function createSessionStatusHandler(
     }
 
     const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
+    if (!isCurrent()) { releaseRetryKey(); return }
     const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
     if (fallbackModels.length === 0) {
       if (!sessionStates.has(sessionID)) {
@@ -105,6 +109,7 @@ export function createSessionStatusHandler(
 
     if (!requestAborted) {
       requestAborted = await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
+      if (!isCurrent()) { releaseRetryKey(); return }
       if (!requestAborted) {
         releaseRetryKey()
         return
@@ -154,13 +159,18 @@ export function createSessionStatusHandler(
       retryAttempt: status.attempt,
     })
 
-    onFallbackOwnershipTransferred?.(sessionID)
-    await dispatchFallbackRetry(deps, helpers, {
+    const restoreFallbackOwnership = onFallbackOwnershipTransferred?.(sessionID)
+    if (!isCurrent()) { releaseRetryKey(); restoreFallbackOwnership?.(); return }
+    const dispatched = await dispatchFallbackRetry(deps, helpers, {
       sessionID,
       state,
       fallbackModels,
       resolvedAgent,
       source: "session.status",
     })
+    if (!dispatched) {
+      releaseRetryKey()
+      restoreFallbackOwnership?.()
+    }
   }
 }

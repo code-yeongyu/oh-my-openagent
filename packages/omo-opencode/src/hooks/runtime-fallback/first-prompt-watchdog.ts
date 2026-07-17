@@ -15,11 +15,11 @@ declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
 
 export interface FirstPromptWatchdog {
   onUserMessage(sessionID: string, model?: string, agent?: string, messageID?: string): void
-  onFallbackOwnershipTransferred(sessionID: string): void
+  onFallbackOwnershipTransferred(sessionID: string): (() => void) | undefined
   onAssistantProgress(sessionID: string, parentMessageID?: string, isAbortEvent?: boolean): WatchdogEventDecision | undefined
   onFallbackCompleted(sessionID: string): void
   onSessionTerminal(sessionID: string, eventType?: string, isAbortEvent?: boolean): WatchdogEventDecision | undefined
-  resolveDeferredTerminal(sessionID: string, currentRequestActive: boolean): WatchdogEventDecision | undefined
+  resolveDeferredTerminal(sessionID: string, currentRequestActive: boolean | undefined): WatchdogEventDecision | undefined
   dispose(): void
 }
 
@@ -61,9 +61,10 @@ export function createFirstPromptWatchdog(
     armed.set(context.sessionID, context)
     const remainingMs = Math.max(0, context.deadlineAt - Date.now())
     const timer = setTimeout(async () => {
+      let retry = false
       try {
         timers.delete(context.sessionID)
-        await fireFirstPromptWatchdog({
+        retry = await fireFirstPromptWatchdog({
           deps,
           helpers,
           watchdogMs,
@@ -76,10 +77,13 @@ export function createFirstPromptWatchdog(
           recordAbortProvenance: () => abortProvenance.reserve(context.sessionID, context.sessionGeneration),
           markAbortResponsePending: () => abortProvenance.markResponsePending(context.sessionID),
           clearAbortResponsePending: () => abortProvenance.clearResponsePending(context.sessionID),
-        })
+        }) === "retry"
       } finally {
         if (context.sessionGeneration === sessionGenerations.get(context.sessionID) && armed.get(context.sessionID) === context) {
           armed.delete(context.sessionID)
+        }
+        if (retry && context.generation === lifecycleGeneration && context.sessionGeneration === sessionGenerations.get(context.sessionID)) {
+          arm({ ...context, deadlineAt: Date.now() + watchdogMs })
         }
       }
     }, remainingMs)
@@ -109,6 +113,7 @@ export function createFirstPromptWatchdog(
   return {
     onUserMessage(sessionID, model, agent, messageID) {
       if (!sessionID || deps.sessionAwaitingFallbackResult.has(sessionID) || armed.has(sessionID)) return
+      if (messageID && currentUserMessageIDs.get(sessionID) === messageID) return
       progressed.delete(sessionID)
 
       const wasSubagent = subagentSessions.has(sessionID)
@@ -134,9 +139,26 @@ export function createFirstPromptWatchdog(
       log(`[${HOOK_NAME}] ${SOURCE}: armed`, { sessionID, model, agent, watchdogMs })
     },
     onFallbackOwnershipTransferred(sessionID) {
-      if (!armed.has(sessionID) && !suspended.has(sessionID) && !progressed.has(sessionID)) return
+      const context = armed.get(sessionID) ?? suspended.get(sessionID) ?? progressed.get(sessionID)
+      if (!context) return
+      const wasProgressed = progressed.has(sessionID)
+      const messageID = currentUserMessageIDs.get(sessionID)
       cancel(sessionID)
+      const restorationGeneration = sessionGenerations.get(sessionID)
       log(`[${HOOK_NAME}] ${SOURCE}: cancelled (fallback ownership transferred)`, { sessionID })
+      if (restorationGeneration === undefined) return
+      return () => {
+        if (restorationGeneration !== sessionGenerations.get(sessionID) || context.generation !== lifecycleGeneration) return
+        const restored = {
+          ...context,
+          sessionGeneration: restorationGeneration,
+          deadlineAt: Date.now() + watchdogMs,
+        }
+        if (messageID) currentUserMessageIDs.set(sessionID, messageID)
+        if (wasProgressed) progressed.set(sessionID, restored)
+        else arm(restored)
+        log(`[${HOOK_NAME}] ${SOURCE}: restored after rejected fallback transfer`, { sessionID })
+      }
     },
     onAssistantProgress(sessionID, parentMessageID, isAbortEvent) {
       if (!sessionID) return
@@ -237,6 +259,10 @@ export function createFirstPromptWatchdog(
     resolveDeferredTerminal(sessionID, currentRequestActive) {
       const suspendedContext = suspended.get(sessionID)
       if (!suspendedContext) return
+      if (currentRequestActive === undefined) {
+        log(`[${HOOK_NAME}] ${SOURCE}: status probe inconclusive; retaining deferred terminal`, { sessionID })
+        return
+      }
       suspended.delete(sessionID)
       const shouldResumeWatchdog = !suspendedAfterProgress.delete(sessionID)
       if (currentRequestActive) {

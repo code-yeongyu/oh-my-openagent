@@ -1,4 +1,4 @@
-import { isSessionActive } from "../../shared/session-idle-settle"
+import { getSessionActivity } from "../../shared/session-idle-settle"
 import { createAutoRetryHelpers } from "./auto-retry"
 import { createChatMessageHandler } from "./chat-message-handler"
 import { DEFAULT_CONFIG } from "./constants"
@@ -28,14 +28,15 @@ const defaultRuntimeFallbackHookFactories: RuntimeFallbackHookFactories = {
   createFirstPromptWatchdog,
 }
 
-async function isCurrentRequestActive(ctx: RuntimeFallbackPluginInput, sessionID: string): Promise<boolean> {
+async function isCurrentRequestActive(ctx: RuntimeFallbackPluginInput, sessionID: string): Promise<boolean | undefined> {
   const status = ctx.client.session.status
-  if (!status) return false
-  return isSessionActive({
+  if (!status) return undefined
+  const activity = await getSessionActivity({
     session: {
       status: () => status({ query: { directory: ctx.directory } }),
     },
   }, sessionID)
+  return activity === "unknown" ? undefined : activity === "active"
 }
 
 export function createRuntimeFallbackHook(

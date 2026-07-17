@@ -76,7 +76,8 @@ describe("first-prompt-watchdog", () => {
     watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
     await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
 
-    expect(calls.abort).toEqual([{ sessionID, source: "first-prompt-watchdog" }])
+    expect(calls.abort.length).toBeGreaterThanOrEqual(2)
+    expect(calls.abort.every((call) => call.sessionID === sessionID && call.source === "first-prompt-watchdog")).toBe(true)
     expect(calls.autoRetry).toEqual([])
 
     watchdog.dispose()

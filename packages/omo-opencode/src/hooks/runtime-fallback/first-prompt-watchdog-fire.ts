@@ -26,7 +26,7 @@ type FireFirstPromptWatchdogInput = {
   readonly clearAbortResponsePending: () => void
 }
 
-export async function fireFirstPromptWatchdog(input: FireFirstPromptWatchdogInput): Promise<void> {
+export async function fireFirstPromptWatchdog(input: FireFirstPromptWatchdogInput): Promise<"retry" | undefined> {
   const {
     deps,
     helpers,
@@ -91,7 +91,7 @@ export async function fireFirstPromptWatchdog(input: FireFirstPromptWatchdogInpu
   if (abortSucceeded === false) {
     rollbackAbortProvenance()
     log(`[${HOOK_NAME}] ${SOURCE}: abort failed, skipping fallback dispatch`, { sessionID })
-    return
+    return "retry"
   }
   await Promise.resolve()
   if (!isLifecycleCurrent() || !isSessionCurrent()) return

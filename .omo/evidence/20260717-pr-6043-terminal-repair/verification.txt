@@ -1,0 +1,5 @@
+PASS regression_tests=5 focused_matrix=421 expectations=857 failures=0
+PASS omo_opencode_typecheck=yes utils_typecheck=yes diff_check=yes
+PASS opencode_harness_self_check=yes server_smoke=yes sse_server_connected=yes tui_smoke=yes
+PASS host_db_before=5751 host_db_after=5751 isolated=yes cleanup=yes
+PASS live_watchdog=yes fallback_watchdog_rearmed=no user_abort_external=yes
