@@ -20,6 +20,18 @@ const skillSources = [
 ]
 const componentSkillNames = new Set(skillSources.map(({ name }) => name))
 
+// Senpi-native skills authored directly against the omo-senpi tool surface (not ported from Codex or
+// the shared pool). They ship verbatim aside from blank-line normalization: no edition rewrite, no
+// section stripping, and no Senpi-compatibility banner (they already speak native Senpi tools).
+const nativeSkillsRoot = join(repoRoot, "omo-senpi", "skills")
+const nativeSkillSources = [
+  {
+    name: "hyperplan",
+    source: join(nativeSkillsRoot, "hyperplan"),
+  },
+]
+const nativeSkillNames = new Set(nativeSkillSources.map(({ name }) => name))
+
 const textExtensions = new Set([".md", ".yaml", ".yml", ".json", ".txt"])
 const sectionHeadingsToStrip = new Set([
   "Codex Harness Tool Compatibility",
@@ -253,6 +265,13 @@ export async function syncSkills() {
     await adaptSkillTree(destination, applyTier1Adaptation)
   }
 
+  for (const { name, source } of nativeSkillSources) {
+    await assertSourceExists(source)
+    const destination = join(skillsRoot, name)
+    await cp(source, destination, { filter: shouldCopySkillSource, recursive: true })
+    await adaptSkillTree(destination, normalizeBlankLines)
+  }
+
   const sharedSkillEntries = await readdir(sharedSkillsRoot, { withFileTypes: true })
   const sharedSkillNames = sharedSkillEntries
     .filter((entry) => entry.isDirectory())
@@ -260,7 +279,7 @@ export async function syncSkills() {
     .sort()
 
   for (const skillName of sharedSkillNames) {
-    if (componentSkillNames.has(skillName)) continue
+    if (componentSkillNames.has(skillName) || nativeSkillNames.has(skillName)) continue
     const source = join(sharedSkillsRoot, skillName)
     const destination = join(skillsRoot, skillName)
     await cp(source, destination, { filter: shouldCopySkillSource, recursive: true })

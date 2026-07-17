@@ -4,13 +4,14 @@
 
 ## Shipped skills
 
-The plugin ships 18 skills by default:
+The plugin ships 19 skills by default:
 
 - `ast-grep` — structural code search and rewrites
 - `coding-agent-sessions` — find, read, and reconstruct coding-agent session transcripts
 - `debugging` — hypothesis-driven runtime debugging across languages
 - `frontend` — UI/UX/visual design, styling, layout, and frontend implementation
 - `git-master` — advanced Git operations, history surgery, and workflow automation
+- `hyperplan` — adversarial 5-member cross-critique planning
 - `init-deep` — deep project initialization and scaffold setup
 - `lsp-setup` — Language Server configuration and troubleshooting
 - `programming` — type-strict, modern-stack programming guidance

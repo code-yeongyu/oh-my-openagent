@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5746 - tmux subagent panes attach only after focus by default
+
+- **Affects**: `tmux.enabled` sessions that expect every subagent pane to show a live attached session immediately.
+- **Symptom**: New panes can show only the placeholder text `Focus this pane to attach` until the user focuses each pane. With high background concurrency, the tmux layout can look blank or inactive even though subagents are running.
+- **Workaround**: Focus a pane to activate its `opencode attach` session, or inspect subagent status through normal task/background outputs when live pane rendering is not necessary. Treat the placeholder as current behavior unless an eager-attach option is added.
+- **Status**: Open enhancement. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5746.
+
 ## #5809 - cmux tmux panes can stay on the focus-to-attach placeholder
 
 - **Affects**: Users running OMO inside cmux's tmux-compat native split layer.
