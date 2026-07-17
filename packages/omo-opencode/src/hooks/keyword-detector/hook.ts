@@ -32,7 +32,7 @@ function filterAlreadyInjectedKeywords(
   detected: DetectedKeyword[],
   text: string,
 ): DetectedKeyword[] {
-  return detected.filter((keyword) => !text.includes(keyword.message))
+  return detected.filter((keyword) => !text.includes(keyword.message.trim()))
 }
 
 export function createKeywordDetectorHook(
@@ -237,7 +237,7 @@ export function createKeywordDetectorHook(
       const allMessages = detectedKeywords.map((k) => k.message).join("\n\n")
       const originalText = output.parts[textPartIndex].text ?? ""
 
-      output.parts[textPartIndex].text = `${allMessages}\n\n---\n\n${originalText}`
+      output.parts[textPartIndex].text = `${originalText}\n\n---\n\n${allMessages}`
 
       log(`[keyword-detector] Detected ${detectedKeywords.length} keywords`, {
         sessionID: input.sessionID,
