@@ -174,4 +174,17 @@ describe("wait-for-background-tasks lifecycle settling", () => {
     expect(output).toContain("## Terminal Tasks")
     expect(output).toContain("## Wait Timed Out")
   })
+
+  test("keeps retry guidance when timeout expires before a pending launch is registered", async () => {
+    // #given pending background work remains visible before any task row is indexed
+    const manager = createManager(() => [], () => true)
+
+    // #when the bounded wait expires during that registration gap
+    const output = await runTool(manager, 10)
+
+    // #then the turn-end-kill harness is still told to keep waiting
+    expect(output).toContain("## Wait Timed Out")
+    expect(output).toContain("Do NOT end your turn")
+    expect(output).toContain("call `wait-for-background-tasks` again")
+  })
 })

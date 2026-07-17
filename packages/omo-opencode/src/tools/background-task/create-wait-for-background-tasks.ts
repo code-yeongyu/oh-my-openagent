@@ -190,7 +190,7 @@ export function createWaitForBackgroundTasks(
 
         if (finalTasks.length === 0) {
           if (timedOut) {
-            return `Background task wait timed out after ${Math.round(timeoutMs / 1000)}s while work was still being registered or finalized; no task details remain in memory.`
+            return formatResult(finalTasks, true, timeoutMs)
           }
           return "All background tasks completed (no tasks remaining in memory)."
         }
