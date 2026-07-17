@@ -2,7 +2,7 @@
 
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { beforeEach, describe, expect, test } from "bun:test"
-import { _resetMemCacheForTesting, updateConnectedProvidersCache } from "../../shared/connected-providers-cache"
+import { _resetMemCacheForTesting, updateConnectedProvidersCache, writeProviderModelsCache } from "../../shared/connected-providers-cache"
 
 type ChatMessageOutput = {
   message: Record<string, unknown>
@@ -288,6 +288,70 @@ describe("model fallback hook", () => {
     expect(output.message["model"]).toEqual({
       providerID: "provider-x",
       modelID: "fallback-model",
+    })
+    clearPendingModelFallback(modelFallback, sessionID)
+  })
+
+  test("skips the kimi-for-coding-only k3 rung when the connected provider catalog lacks k3", async () => {
+    //#given - only opencode-go is connected, and its catalog serves kimi-k3/kimi-k2.6 but not k3
+    const sessionID = "ses_model_fallback_kfc_only_k3_rung"
+    clearPendingModelFallback(modelFallback, sessionID)
+    writeProviderModelsCache({
+      connected: ["opencode-go"],
+      models: {
+        "opencode-go": [{ id: "kimi-k3" }, { id: "kimi-k2.6" }, { id: "kimi-k2.5" }],
+      },
+    })
+
+    const hook = unsafeTestValue<{
+      "chat.message"?: (
+        input: { sessionID: string },
+        output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
+      ) => Promise<void>
+    }>(modelFallback)
+
+    //#when - first hop after the anthropic opus failure
+    expect(
+      setPendingModelFallback(
+        modelFallback,
+        sessionID,
+        "Sisyphus - Ultraworker",
+        "anthropic",
+        "claude-opus-4-7-thinking",
+      ),
+    ).toBe(true)
+    const first = {
+      message: { model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" } },
+      parts: [{ type: "text", text: "continue" }],
+    }
+    await hook["chat.message"]?.({ sessionID }, first)
+
+    //#then - the shared kimi-k3 rung is selected via opencode-go, not skipped
+    expect(first.message["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "kimi-k3",
+    })
+
+    //#when - second hop after opencode-go/kimi-k3 fails
+    expect(
+      setPendingModelFallback(
+        modelFallback,
+        sessionID,
+        "Sisyphus - Ultraworker",
+        "opencode-go",
+        "kimi-k3",
+      ),
+    ).toBe(true)
+    const second = {
+      message: { model: { providerID: "opencode-go", modelID: "kimi-k3" } },
+      parts: [{ type: "text", text: "continue" }],
+    }
+    await hook["chat.message"]?.({ sessionID }, second)
+
+    //#then - the kimi-for-coding-only k3 rung is skipped (opencode-go does not serve k3)
+    expect(second.message["model"]).toEqual({
+      providerID: "opencode-go",
+      modelID: "kimi-k2.6",
     })
     clearPendingModelFallback(modelFallback, sessionID)
   })

@@ -16,6 +16,21 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 			output: 262144,
 		},
 	},
+	"k3": {
+		id: "k3",
+		family: "kimi",
+		reasoning: true,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image", "video"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1048576,
+			output: 131072,
+		},
+	},
 	"kimi-k2.6": {
 		id: "kimi-k2.6",
 		family: "kimi",

@@ -17,6 +17,14 @@ function createReachabilityChecker(state: ModelFallbackState): (entry: FallbackE
   const connectedSet = connectedProviders
     ? new Set(connectedProviders.map((provider) => provider.toLowerCase()))
     : null
+  const currentProviderCatalogKey = providerModelsCache
+    ? Object.keys(providerModelsCache.models).find(
+        (provider) => provider.toLowerCase() === state.providerID.toLowerCase(),
+      )
+    : undefined
+  const currentProviderCatalog = currentProviderCatalogKey
+    ? providerModelsCache?.models[currentProviderCatalogKey]
+    : undefined
 
   return (entry: FallbackEntry): boolean => {
     if (!connectedSet) return true
@@ -25,7 +33,22 @@ function createReachabilityChecker(state: ModelFallbackState): (entry: FallbackE
       return true
     }
 
-    return connectedSet.has(state.providerID.toLowerCase())
+    if (!connectedSet.has(state.providerID.toLowerCase())) {
+      return false
+    }
+
+    // The rung's providers are disconnected but the current provider is
+    // connected, so selectFallbackProvider would substitute it for the
+    // retry. That only works when the current provider actually serves the
+    // rung's model — otherwise the retry targets a nonexistent catalog id
+    // (e.g. opencode-go/k3 for the kimi-for-coding-only k3 rung).
+    // Stay optimistic when no catalog data is available for the provider.
+    if (!currentProviderCatalog || currentProviderCatalog.length === 0) return true
+
+    const transformed = canonicalizeModelID(transformModelForProvider(state.providerID, entry.model))
+    return currentProviderCatalog.some(
+      (model) => canonicalizeModelID(typeof model === "string" ? model : model.id) === transformed,
+    )
   }
 }
 
