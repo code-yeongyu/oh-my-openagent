@@ -1,0 +1,9 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-message-fetch-ordering.test.ts:
+(pass) first-prompt watchdog message-fetch ordering > #given abort resolved while retry messages are pending #when its terminal arrives #then fallback ownership survives through dispatch [4.40ms]
+
+ 1 pass
+ 0 fail
+ 6 expect() calls
+Ran 1 test across 1 file. [57.00ms]

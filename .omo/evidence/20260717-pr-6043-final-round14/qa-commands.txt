@@ -1,0 +1,22 @@
+Runtime source and focused tests:
+  bun test packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-message-fetch-ordering.test.ts packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-terminal-races.test.ts packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-generation-race.test.ts
+
+Full affected suite:
+  bun test packages/omo-opencode/src/hooks/runtime-fallback
+
+Adapter typecheck:
+  bun run --cwd packages/omo-opencode typecheck
+
+Scoped lint:
+  bunx --bun --package @biomejs/biome@2.4.16 biome lint <seven changed TypeScript paths>
+
+OpenCode QA harness self-check:
+  bash .agents/skills/opencode-qa/scripts/lib/common.sh --self-check
+
+Production-duration isolated live QA:
+  gtimeout -k 10 240 bash .omo/evidence/20260717-pr-6043-final-round14/run-live-watchdog-qa.sh
+
+Source/static audit:
+  git diff --check
+  awk pure-LOC count over all seven changed TypeScript paths
+  rg forbidden-pattern audit over all seven changed TypeScript paths
