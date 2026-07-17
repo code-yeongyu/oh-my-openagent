@@ -252,6 +252,7 @@ describe("createManagers", () => {
       sessionID: "ses-bg-1",
       parentID: "ses-parent",
       title: "child task",
+      signal: new AbortController().signal,
     })
 
     expect(dispatchOpenClawEvent).toHaveBeenCalledTimes(1)

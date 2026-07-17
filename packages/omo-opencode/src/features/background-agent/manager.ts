@@ -218,6 +218,7 @@ export interface SubagentSessionCreatedEvent {
   sessionID: string
   parentID: string
   title: string
+  signal: AbortSignal
 }
 
 export type OnSubagentSessionCreated = (event: SubagentSessionCreatedEvent) => Promise<void>
@@ -262,6 +263,7 @@ export class BackgroundManager {
   private shutdownPromise?: Promise<void>
   private shutdownTimeoutMs = BACKGROUND_MANAGER_SHUTDOWN_TIMEOUT_MS
   private shutdownDeadlineAt?: number
+  private readonly shutdownAbortController = new AbortController()
   private readonly inFlightOperations = new Set<Promise<unknown>>()
   private readonly pendingTaskRegistrations = new Map<string, Promise<BackgroundTask>>()
   private config?: BackgroundTaskConfig
@@ -1268,6 +1270,14 @@ The fallback retry session is now created and can be inspected directly.
       path: { id: sessionID },
       body: promptBody,
     }, parentDirectory).catch(async (error) => {
+      if (this.shutdownTriggered) {
+        log("[background-agent] Ignoring launch prompt error after shutdown:", {
+          sessionID,
+          taskId: task.id,
+        })
+        return
+      }
+
       // Retry with fallback agent if the original agent was unregistered (e.g., after a model switch)
       if (isAgentNotFoundError(error) && input.agent !== FALLBACK_AGENT) {
         log("[background-agent] Agent not found, retrying with fallback agent", {
@@ -1383,6 +1393,7 @@ The fallback retry session is now created and can be inspected directly.
         sessionID,
         parentID: input.parentSessionId,
         title: input.description,
+        signal: this.shutdownAbortController.signal,
       }).catch((err) => {
         log("[background-agent] Failed to spawn tmux pane:", err)
       })
@@ -3732,6 +3743,7 @@ The task was re-queued on a fallback model after a retryable failure.
   shutdown(): Promise<void> {
     if (this.shutdownPromise) return this.shutdownPromise
     this.shutdownTriggered = true
+    this.shutdownAbortController.abort()
     this.shutdownPromise = this.performShutdown()
     return this.shutdownPromise
   }
@@ -3809,21 +3821,28 @@ The task was re-queued on a fallback model after a retryable failure.
     }
 
     if (this.onShutdown) {
-      try {
-        const shutdownCallbackPhase = await this.settleWithinShutdownDeadline(
-          "onShutdown callback",
-          Promise.resolve(this.onShutdown()).then(
-            () => undefined,
-            (error) => {
-              log("[background-agent] Error in onShutdown callback:", error)
-            },
-          ),
-        )
-        if (shutdownCallbackPhase.status === "timed_out") {
-          log("[background-agent] Timed out waiting for onShutdown callback")
+      const remainingMs = (this.shutdownDeadlineAt ?? performance.now()) - performance.now()
+      if (remainingMs <= 0) {
+        log("[background-agent] Shutdown deadline exhausted before phase:", {
+          label: "onShutdown callback",
+        })
+      } else {
+        try {
+          const shutdownCallbackPhase = await this.settleWithinShutdownDeadline(
+            "onShutdown callback",
+            Promise.resolve(this.onShutdown()).then(
+              () => undefined,
+              (error) => {
+                log("[background-agent] Error in onShutdown callback:", error)
+              },
+            ),
+          )
+          if (shutdownCallbackPhase.status === "timed_out") {
+            log("[background-agent] Timed out waiting for onShutdown callback")
+          }
+        } catch (error) {
+          log("[background-agent] Error in onShutdown callback:", error)
         }
-      } catch (error) {
-        log("[background-agent] Error in onShutdown callback:", error)
       }
     }
 

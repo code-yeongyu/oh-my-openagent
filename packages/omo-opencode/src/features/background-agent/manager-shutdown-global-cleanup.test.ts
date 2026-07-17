@@ -502,4 +502,160 @@ describe("BackgroundManager shutdown global cleanup", () => {
     expect(outcome).toBe("resolved")
     expect(getInternals(manager).tasks.size).toBe(0)
   })
+
+  test("does not dispatch launch fallback after shutdown deadline", async () => {
+    // given
+    let rejectPrompt = (_error: Error): void => {}
+    let promptCalls = 0
+    const firstPrompt = new Promise<never>((_resolve, reject) => {
+      rejectPrompt = reject
+    })
+    const manager = new BackgroundManager({ pluginContext: {
+      client: {
+        session: {
+          get: async () => ({ data: { directory: tmpdir() } }),
+          create: async () => ({ data: { id: "session-late-fallback-launch" } }),
+          promptAsync: async () => {
+            promptCalls += 1
+            if (promptCalls === 1) return firstPrompt
+            return {}
+          },
+          abort: async () => ({}),
+        },
+      } as never,
+      directory: tmpdir(),
+    } as never })
+    getInternals(manager).shutdownTimeoutMs = 15
+    const task = createTask({
+      id: "task-late-fallback-launch",
+      sessionId: "",
+      status: "pending",
+      startedAt: undefined,
+      queuedAt: new Date(),
+    })
+    await (manager as unknown as {
+      startTask: (item: { task: BackgroundTask; input: {
+        description: string
+        prompt: string
+        agent: string
+        parentSessionId: string
+        parentMessageId: string
+      } }) => Promise<void>
+    }).startTask({
+      task,
+      input: {
+        description: "late fallback launch",
+        prompt: "work",
+        agent: "explore",
+        parentSessionId: "parent-late-fallback-launch",
+        parentMessageId: "message-late-fallback-launch",
+      },
+    })
+    while (promptCalls === 0) await Promise.resolve()
+    await manager.shutdown()
+
+    // when
+    rejectPrompt(new Error("Agent not found: explore"))
+    for (let index = 0; index < 12; index += 1) await Promise.resolve()
+
+    // then
+    expect(promptCalls).toBe(1)
+  })
+
+  test("aborts a delayed tmux callback before its post-await side effect", async () => {
+    // given
+    const callback = createDeferredPromise()
+    let callbackStarted = false
+    let callbackSignal: AbortSignal | undefined
+    let sideEffects = 0
+    const originalTmux = process.env.TMUX
+    process.env.TMUX = "/tmp/pr6005-late-tmux"
+    const manager = new BackgroundManager({
+      pluginContext: {
+        client: {
+          session: {
+            get: async () => ({ data: { directory: tmpdir() } }),
+            create: async () => ({ data: { id: "session-late-tmux" } }),
+            promptAsync: async () => ({}),
+            abort: async () => ({}),
+          },
+        } as never,
+        directory: tmpdir(),
+      } as never,
+      tmuxConfig: { enabled: true } as never,
+      onSubagentSessionCreated: async (event) => {
+        callbackStarted = true
+        callbackSignal = (event as typeof event & { signal?: AbortSignal }).signal
+        await callback.promise
+        if (!callbackSignal?.aborted) sideEffects += 1
+      },
+    })
+    getInternals(manager).shutdownTimeoutMs = 15
+
+    try {
+      const task = createTask({
+        id: "task-late-tmux",
+        sessionId: "",
+        status: "pending",
+        startedAt: undefined,
+        queuedAt: new Date(),
+      })
+      await (manager as unknown as {
+        startTask: (item: { task: BackgroundTask; input: {
+          description: string
+          prompt: string
+          agent: string
+          parentSessionId: string
+          parentMessageId: string
+        } }) => Promise<void>
+      }).startTask({
+        task,
+        input: {
+          description: "late tmux callback",
+          prompt: "work",
+          agent: "general",
+          parentSessionId: "parent-late-tmux",
+          parentMessageId: "message-late-tmux",
+        },
+      })
+      while (!callbackStarted) await Promise.resolve()
+      await manager.shutdown()
+
+      // when
+      callback.resolve()
+      for (let index = 0; index < 12; index += 1) await Promise.resolve()
+
+      // then
+      expect(callbackSignal?.aborted).toBe(true)
+      expect(sideEffects).toBe(0)
+    } finally {
+      callback.resolve()
+      if (originalTmux === undefined) delete process.env.TMUX
+      else process.env.TMUX = originalTmux
+    }
+  })
+
+  test("does not start shutdown cleanup after the shared deadline is exhausted", async () => {
+    // given
+    let cleanupCalls = 0
+    const manager = new BackgroundManager({
+      pluginContext: {
+        client: {
+          session: {
+            promptAsync: async () => ({}),
+            abort: async () => ({}),
+          },
+        } as never,
+        directory: tmpdir(),
+      } as never,
+      onShutdown: () => { cleanupCalls += 1 },
+    })
+    getInternals(manager).shutdownTimeoutMs = 0
+
+    // when
+    await manager.shutdown()
+
+    // then
+    expect(cleanupCalls).toBe(0)
+  })
 })

@@ -136,6 +136,8 @@ export function createManagers(args: {
           title: event.title,
         })
 
+        if (event.signal.aborted) return
+
         await tmuxSessionManager.onSessionCreated({
           type: "session.created",
           properties: {
@@ -146,6 +148,11 @@ export function createManagers(args: {
             },
           },
         })
+
+        if (event.signal.aborted) {
+          await tmuxSessionManager.onSessionDeleted({ sessionID: event.sessionID })
+          return
+        }
 
         if (pluginConfig.openclaw) {
           await openclawRuntimeDispatch.dispatchOpenClawEvent({
