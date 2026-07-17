@@ -1,4 +1,0 @@
-$ git status --short --untracked-files=all
- M packages/senpi-task/scripts/manual-category-qa.ts
- M packages/senpi-task/src/category/resolve-category-boundary.test.ts
- M packages/senpi-task/src/category/resolver.ts

@@ -1,8 +1,0 @@
-$ tmux list-sessions | rg todo13-codex-qa
-todo13_tmux_rg_exit=1
-$ test temp dirs removed
-removed=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.ihAfCryKEM
-removed=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.E03Pho8OS5
-removed=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.MCJdb8abSg
-$ ps TODO 13 processes
-todo13_process_rg_exit=1

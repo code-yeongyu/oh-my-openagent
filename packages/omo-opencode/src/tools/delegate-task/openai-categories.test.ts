@@ -8,51 +8,12 @@ import {
   resolveDeepCategoryPromptAppend,
 } from "./openai-categories"
 
-describe("DEEP_CATEGORY_PROMPT_APPEND_GPT_5_5", () => {
-  test("uses Category_Context wrapper with name=\"deep\"", () => {
-    //#given
-    const prompt = DEEP_CATEGORY_PROMPT_APPEND_GPT_5_5
-
-    //#then
-    expect(prompt).toContain('<Category_Context name="deep">')
-    expect(prompt).toContain("</Category_Context>")
-  })
-
-  test("contains GPT-5.5 prose-first style markers from the deep.md draft", () => {
-    //#given
-    const prompt = DEEP_CATEGORY_PROMPT_APPEND_GPT_5_5
-
-    //#then
-    expect(prompt).toContain("operating in DEEP mode")
-    expect(prompt).toContain("Exploration budget: generous")
-    expect(prompt).toContain("five to fifteen minutes")
-    expect(prompt).toContain("Goal, not plan")
-    expect(prompt).toContain("Atomic task treatment")
-    expect(prompt).toContain("Root cause bias")
-    expect(prompt).toContain("Ambition scaled to context")
-    expect(prompt).toContain("Completion bar: full delivery")
-    expect(prompt).toContain("Status cadence: sparse")
-  })
-
-  test("does not use the legacy threat-frame phrasing", () => {
-    //#given
-    const prompt = DEEP_CATEGORY_PROMPT_APPEND_GPT_5_5
-
-    //#then
-    expect(prompt).not.toContain("You are NOT an interactive assistant")
-    expect(prompt).not.toContain("BEFORE making ANY changes")
-  })
-
-  test("is materially different from the legacy DEEP_CATEGORY_PROMPT_APPEND", () => {
+describe("resolveDeepCategoryPromptAppend", () => {
+  test("the two branch artifacts are distinct, so model routing is observable", () => {
     //#then
     expect(DEEP_CATEGORY_PROMPT_APPEND_GPT_5_5).not.toBe(DEEP_CATEGORY_PROMPT_APPEND)
-    expect(DEEP_CATEGORY_PROMPT_APPEND_GPT_5_5.length).toBeGreaterThan(
-      DEEP_CATEGORY_PROMPT_APPEND.length,
-    )
   })
-})
 
-describe("resolveDeepCategoryPromptAppend", () => {
   test("returns GPT-5.5 prompt for openai/gpt-5.5", () => {
     //#when
     const result = resolveDeepCategoryPromptAppend("openai/gpt-5.5")

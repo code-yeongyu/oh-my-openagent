@@ -1,5 +1,0 @@
-packages/senpi-task/src/category/openai-categories.ts:3:// Ported from packages/omo-opencode/src/tools/delegate-task/openai-categories.ts.
-packages/senpi-task/src/category/kimi-categories.ts:3:// Ported from packages/omo-opencode/src/tools/delegate-task/kimi-categories.ts.
-packages/senpi-task/src/category/anthropic-categories.ts:3:// Ported from packages/omo-opencode/src/tools/delegate-task/anthropic-categories.ts.
-packages/senpi-task/src/category/builtins.ts:9:// Ported from packages/omo-opencode/src/tools/delegate-task/builtin-categories.ts.
-packages/senpi-task/src/category/google-categories.ts:3:// Ported from packages/omo-opencode/src/tools/delegate-task/google-categories.ts.

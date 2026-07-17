@@ -1,6 +1,6 @@
 {
 	"name": "@code-yeongyu/codex-ulw-loop",
-	"version": "4.15.1",
+	"version": "4.18.2",
 	"description": "Codex plugin: durable repo-native multi-goal orchestration with embedded success criteria and observable evidence audit.",
 	"type": "module",
 	"packageManager": "npm@11.12.1",

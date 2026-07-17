@@ -210,4 +210,50 @@ describe("RpcProcessRunner", () => {
     await nextIdle
     expect(handle.lastAssistantText()).toBe("steered-complete")
   })
+
+  test("#given inheritedExtensions and a spec without its own extensions #when started #then the child spec carries the inherited entries", () => {
+    // given
+    let seen: RpcRunnerSpec | undefined
+    const runner = new RpcProcessRunner({
+      inheritedExtensions: ["/tmp/mock.ts"],
+      buildSpawn: (spec) => {
+        seen = spec
+        return { command: "/bin/true", args: [], cwd: spec.cwd, env: {} }
+      },
+      spawnChild: (descriptor) => {
+        const child = spawnFakeChild(descriptor.env)
+        children.push(child)
+        return child
+      },
+    })
+
+    // when
+    runner.start(makeSpec())
+
+    // then
+    expect(seen?.extensions).toEqual(["/tmp/mock.ts"])
+  })
+
+  test("#given a spec that already carries extensions #when started #then inheritedExtensions do NOT override them", () => {
+    // given
+    let seen: RpcRunnerSpec | undefined
+    const runner = new RpcProcessRunner({
+      inheritedExtensions: ["/tmp/inherited.ts"],
+      buildSpawn: (spec) => {
+        seen = spec
+        return { command: "/bin/true", args: [], cwd: spec.cwd, env: {} }
+      },
+      spawnChild: (descriptor) => {
+        const child = spawnFakeChild(descriptor.env)
+        children.push(child)
+        return child
+      },
+    })
+
+    // when
+    runner.start(makeSpec({ extensions: ["/tmp/explicit.ts"] }))
+
+    // then
+    expect(seen?.extensions).toEqual(["/tmp/explicit.ts"])
+  })
 })

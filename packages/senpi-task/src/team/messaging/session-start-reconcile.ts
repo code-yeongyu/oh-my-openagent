@@ -2,6 +2,7 @@ import { listActiveTeams } from "@oh-my-opencode/team-core/team-state-store"
 import { log } from "@oh-my-opencode/utils"
 
 import { readMemberTaskMap } from "../member-map"
+import { TEAM_LEAD_SENTINEL } from "../normalize"
 import type { TeamCoreConfig } from "../runtime-config"
 import type { StateDirConfig } from "../../store"
 import { resolveTeamRuntimeDirs } from "../storage"
@@ -15,6 +16,7 @@ export type ReconcileTeamMailboxDeps = {
   readonly stateDir: StateDirConfig
   readonly config: TeamCoreConfig
   readonly staleTtlMs?: number
+  readonly currentLeadSessionId?: string
 }
 
 function toErrorMessage(error: unknown): string {
@@ -43,8 +45,11 @@ export async function reconcileTeamMailboxOnSessionStart(deps: ReconcileTeamMail
     try {
       const runtimeDir = resolveTeamRuntimeDirs(deps.stateDir, team.teamRunId).runtimeDir
       const memberNames = Object.keys(await readMemberTaskMap(runtimeDir))
-      if (memberNames.length === 0) continue
-      await reclaimStaleTeamReservations(team.teamRunId, memberNames, deps.config, staleTtlMs)
+      const recipients = team.leadSessionId === deps.currentLeadSessionId
+        ? [...new Set([...memberNames, TEAM_LEAD_SENTINEL])]
+        : memberNames
+      if (recipients.length === 0) continue
+      await reclaimStaleTeamReservations(team.teamRunId, recipients, deps.config, staleTtlMs)
     } catch (error) {
       log("senpi-task team session-start reclaim skipped one team", { teamRunId: team.teamRunId, error: toErrorMessage(error) })
     }

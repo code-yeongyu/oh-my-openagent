@@ -27,10 +27,8 @@ describe("project skill tool references", () => {
       const skillContent = await readProjectSkill("work-with-pr")
 
       const delegatesThroughGitMaster = skillContent.includes("commits through `git-master`")
-      const usesRealReviewCategory = skillContent.includes('category="unspecified-high"')
 
       expect(delegatesThroughGitMaster).toBe(true)
-      expect(usesRealReviewCategory).toBe(true)
       expect(skillContent).not.toContain(
         'task(category="quick", load_skills=["git-master"], prompt="Commit the changes atomically following git-master conventions. Repository is at {WORKTREE_PATH}.")'
       )

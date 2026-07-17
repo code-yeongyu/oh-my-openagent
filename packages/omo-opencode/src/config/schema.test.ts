@@ -785,6 +785,31 @@ describe("BrowserAutomationConfigSchema", () => {
     // then
     expect(result.provider).toBe("playwright-cli")
   })
+
+  test("accepts Playwright MCP arguments and preserves argv boundaries", () => {
+    // given
+    const input = {
+      provider: "playwright",
+      playwright_mcp_args: ["--headless", "--executable-path", "/opt/chromium/chrome"],
+    }
+
+    // when
+    const result = BrowserAutomationConfigSchema.parse(input)
+
+    // then
+    expect(result.playwright_mcp_args).toEqual(input.playwright_mcp_args)
+  })
+
+  test("rejects non-string Playwright MCP arguments", () => {
+    // given
+    const input = { provider: "playwright", playwright_mcp_args: ["--headless", 42] }
+
+    // when
+    const result = BrowserAutomationConfigSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(false)
+  })
 })
 
 describe("OhMyOpenCodeConfigSchema - browser_automation_engine", () => {

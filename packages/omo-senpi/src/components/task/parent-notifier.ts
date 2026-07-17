@@ -7,24 +7,28 @@ import type { SenpiExtensionAPI } from "../../extension/types"
 export const TASK_COMPLETION_MESSAGE_TYPE = "senpi-task.completion"
 
 /**
- * Adapt the engine's synchronous ParentNotifier.enqueue seam onto senpi delivery. A wake (triggerTurn
- * = an idle parent) routes through the idle-injection coordinator so a completion wake and a pending
- * ulw-loop continuation on the same idle edge collapse to ONE injection (the Oracle arbitration
- * blocker). Streaming (deliverAs) and silent-queue completions keep the rich custom-message channel so
- * the senpi-task.completion renderer applies. senpi swallows async delivery errors, so a synchronous
- * throw here surfaces as the engine's delivery failure.
+ * Adapt the engine's synchronous ParentNotifier.enqueue seam onto senpi delivery. EVERY delivered
+ * completion routes through the shared idle-injection coordinator with a DEFERRED flush, so all
+ * notifications that become ready within the batch window (multiple children completing near-
+ * simultaneously, a pending ulw-loop continuation, team lead-messages) collapse into exactly ONE
+ * injection steered into the running turn at the next tool-call boundary. Without a coordinator
+ * (composition seam absent) it falls back to a direct steer through the rich custom-message channel.
+ * senpi swallows async delivery errors, so a synchronous throw here surfaces as the engine's failure.
  */
-export function createParentNotifier(pi: SenpiExtensionAPI, coordinator?: IdleInjectionCoordinator): ParentNotifier {
+export function createParentNotifier(
+  pi: SenpiExtensionAPI,
+  coordinator?: IdleInjectionCoordinator,
+  isStreaming?: () => boolean,
+): ParentNotifier {
   return {
     enqueue(message: ParentNotifierMessage): void {
-      if (message.triggerTurn === true && coordinator !== undefined) {
+      if (coordinator !== undefined) {
         coordinator.enqueue({ key: injectionKey(message), source: "task-completion", content: message.content })
-        coordinator.flushOnIdle()
+        // Mid-turn: collect in the batch window (the agent_end drain backstops a turn that ends first).
+        // Idle: flush on the next microtask so same-tick completions batch but delivery is immediate.
+        if (isStreaming?.() === true) coordinator.scheduleFlush()
+        else coordinator.flushSoon()
         return
-      }
-      const options: { triggerTurn?: boolean; deliverAs?: "steer" | "followUp" } = {
-        ...(message.triggerTurn !== undefined && { triggerTurn: message.triggerTurn }),
-        ...(message.deliverAs !== undefined && { deliverAs: message.deliverAs }),
       }
       pi.sendMessage(
         {
@@ -33,7 +37,7 @@ export function createParentNotifier(pi: SenpiExtensionAPI, coordinator?: IdleIn
           display: message.display,
           details: message.details,
         },
-        options,
+        { triggerTurn: true, deliverAs: "steer" },
       )
     },
   }

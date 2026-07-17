@@ -23,11 +23,15 @@ Model-specific prompt variants for the Sisyphus main orchestrator. Parent `sisyp
 | `gpt-5-4.ts` | GPT-5.4-native: 8-block architecture, entropy-reduced, 449 LOC |
 | `gpt-5-5.ts` | GPT-5.5-native: updated orchestration prompt tuned for GPT-5.5 |
 | `kimi-k2-6.ts` | Kimi K2.6-native variant |
+| `kimi-k2-7.ts` | Kimi K2.7-native variant |
+| `kimi-k3.ts` | Kimi K3-native variant with explicit anti-overthinking calibration |
 | `index.ts` | Barrel exports |
 
 ## VARIANT SELECTION
 
 `sisyphus-agent-factory.ts` selects variant by model name:
+- Kimi K3 -> `kimi-k3.ts`
+- Kimi K2.7 -> `kimi-k2-7.ts`
 - Kimi K2 family -> `kimi-k2-6.ts`
 - Contains "gpt-5.5" -> `gpt-5-5.ts`
 - GPT-5.4+ -> `gpt-5-4.ts`

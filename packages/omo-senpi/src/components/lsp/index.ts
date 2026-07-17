@@ -1,21 +1,26 @@
 import { reportToolHookStatus } from "../../extension/tool-hook-status";
+import type { PostEditDiagnosticsOutcome } from "@oh-my-opencode/lsp-core/post-edit";
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types";
-import { getConfigNotices } from "./lsp/config-loader.js";
-import { disposeDefaultLspManager, getLspManager } from "./lsp/manager-default.js";
+import {
+	lsp_diagnostics,
+	lsp_find_references,
+	lsp_goto_definition,
+	lsp_prepare_rename,
+	lsp_rename,
+	lsp_symbols,
+} from "./adapter/descriptors.js";
+import { getConfigNotices } from "./adapter/migration-notices.js";
+import { callPackagedDaemonTool, clearPackagedDaemonToolClientCache } from "./daemon-tool-client.js";
 import {
 	appendPostEditDiagnostics,
+	createLspPostEditSessionState,
 	POST_EDIT_DIAGNOSTICS_WIDGET_KEY,
 	shouldRunPostEditDiagnostics,
 	syncPostEditDiagnosticsWidget,
 	type DiagnosticsRunner,
+	type LspPostEditSessionState,
 	type ToolResultLike,
-} from "./lsp/post-edit-diagnostics.js";
-import { getAllServers } from "./lsp/server-resolution.js";
-import { lsp_diagnostics } from "./lsp/tools/diagnostics.js";
-import { lsp_find_references } from "./lsp/tools/find-references.js";
-import { lsp_goto_definition } from "./lsp/tools/goto-definition.js";
-import { lsp_prepare_rename, lsp_rename } from "./lsp/tools/rename.js";
-import { lsp_symbols } from "./lsp/tools/symbols.js";
+} from "./post-edit-diagnostics.js";
 
 const LSP_TOOLS_ENABLED_FLAG = "omo-senpi-lsp-tools-enabled";
 const LSP_POST_EDIT_DIAGNOSTICS_ENABLED_FLAG = "omo-senpi-lsp-post-edit-diagnostics-enabled";
@@ -32,7 +37,20 @@ interface ToolResultHandlerResult {
 	readonly content?: ToolResultLike["content"];
 }
 
-export function createLspComponent(): OmoSenpiComponent {
+interface LspComponentOptions {
+	readonly postEdit?: {
+		readonly runDiagnostics?: DiagnosticsRunner;
+		readonly state?: LspPostEditSessionState;
+	};
+}
+
+const DEFAULT_POST_EDIT_SESSION_STATE = createLspPostEditSessionState();
+
+export { createLspPostEditSessionState };
+
+export function createLspComponent(options: LspComponentOptions = {}): OmoSenpiComponent {
+	const postEditState = options.postEdit?.state ?? createLspPostEditSessionState();
+	const runPostEditDiagnostics = options.postEdit?.runDiagnostics ?? runLspDiagnosticsForPostEdit;
 	return {
 		name: "lsp",
 		register(pi, ctx) {
@@ -40,23 +58,29 @@ export function createLspComponent(): OmoSenpiComponent {
 			if (ctx.config.getFlag(LSP_TOOLS_ENABLED_FLAG) === false) return;
 
 			for (const notice of getConfigNotices()) {
-				ctx.logger.warn("omo-senpi ignored untrusted project-local LSP command", notice);
-			}
-
-			const installedServers = getAllServers().filter((server) => server.installed && !server.disabled);
-			if (installedServers.length === 0) {
-				ctx.logger.warn("omo-senpi lsp component inert: no installed language server is resolvable");
-				return;
+				ctx.logger.warn(
+					"omo-senpi ignored project-local LSP commands; move custom commands to the user .pi config",
+					notice,
+				);
 			}
 
 			registerLspTools(pi);
 
 			if (ctx.config.getFlag(LSP_POST_EDIT_DIAGNOSTICS_ENABLED_FLAG) !== false) {
-				pi.on("tool_result", (event, eventCtx) => handlePostEditDiagnosticsToolResult(event, eventCtx));
+				pi.on("tool_result", (event, eventCtx) =>
+					handlePostEditDiagnosticsToolResult(event, eventCtx, runPostEditDiagnostics, postEditState),
+				);
+				pi.on("session_start", (_event, eventCtx) => {
+					postEditState.onSessionStart(sessionIdFromContext(eventCtx));
+				});
+				pi.on("session_compact", (_event, eventCtx) => {
+					postEditState.reset(sessionIdFromContext(eventCtx));
+				});
 			}
 
-			pi.on("session_shutdown", async () => {
-				await disposeDefaultLspManager();
+			pi.on("session_shutdown", (_event, eventCtx) => {
+				postEditState.delete(sessionIdFromContext(eventCtx));
+				clearPackagedDaemonToolClientCache();
 			});
 		},
 	};
@@ -84,20 +108,48 @@ function registerLspTools(pi: SenpiExtensionAPI): void {
 		lsp_prepare_rename,
 		lsp_rename,
 	]) {
-		pi.registerTool(tool);
+		pi.registerTool(withPackagedDaemonRuntime(tool));
 	}
+}
+
+type LspTool = {
+	readonly name: string;
+	execute(
+		toolCallId: string,
+		rawParams: unknown,
+		signal?: AbortSignal,
+		onUpdate?: unknown,
+		ctx?: unknown,
+	): Promise<unknown>;
+};
+
+function withPackagedDaemonRuntime<TTool extends LspTool>(tool: TTool): TTool {
+	return {
+		...tool,
+		async execute(
+			toolCallId: string,
+			rawParams: unknown,
+			signal?: AbortSignal,
+			onUpdate?: unknown,
+			ctx?: unknown,
+		): Promise<unknown> {
+			const args = isRecord(rawParams) ? rawParams : {};
+			return callPackagedDaemonTool(tool.name, args, signal === undefined ? {} : { signal });
+		},
+	};
 }
 
 export async function handlePostEditDiagnosticsToolResult(
 	event: unknown,
 	ctx?: unknown,
 	runDiagnostics: DiagnosticsRunner = runLspDiagnosticsForPostEdit,
+	state: LspPostEditSessionState = DEFAULT_POST_EDIT_SESSION_STATE,
 ): Promise<ToolResultHandlerResult | undefined> {
 	if (!isToolResultLike(event)) return undefined;
 	if (shouldRunPostEditDiagnostics(event)) {
 		reportToolHookStatus(ctx, "(OmO) Checking LSP Diagnostics");
 	}
-	const result = await appendPostEditDiagnostics(event, runDiagnostics);
+	const result = await appendPostEditDiagnostics(event, runDiagnostics, state.getOrCreate(sessionIdFromContext(ctx)));
 	syncPostEditDiagnosticsWidget((key, content, options) => {
 		if (isWidgetContext(ctx)) {
 			ctx.ui?.setWidget?.(key, content, options);
@@ -106,26 +158,30 @@ export async function handlePostEditDiagnosticsToolResult(
 	return result?.content ? { content: result.content } : undefined;
 }
 
-async function runLspDiagnosticsForPostEdit(filePath: string): Promise<string> {
-	const result = await lsp_diagnostics.execute(
-		`omo-senpi-post-edit-diagnostics:${filePath}`,
-		{ filePath, severity: "error" },
-		undefined,
-		undefined,
-		undefined,
-	);
-	await disposeIdleFakeClients();
+async function runLspDiagnosticsForPostEdit(filePath: string): Promise<PostEditDiagnosticsOutcome> {
+	const result = await callPackagedDaemonTool("lsp_diagnostics", { filePath, severity: "error" });
+	return postEditOutcomeFromDaemonResult(result);
+}
+
+function postEditOutcomeFromDaemonResult(result: {
+	readonly content: readonly { readonly type: string; readonly text?: string }[];
+	readonly details?: unknown;
+}): PostEditDiagnosticsOutcome {
+	const availability = notConfiguredAvailability(result.details);
+	if (availability !== undefined) return { kind: "not_configured", extension: availability.extension };
 	return result.content
 		.filter((block) => block.type === "text")
 		.map((block) => block.text)
 		.join("\n");
 }
 
-async function disposeIdleFakeClients(): Promise<void> {
-	const manager = getLspManager();
-	if (manager.getSnapshot().some((snapshot) => snapshot.command[0] === "omo-senpi-fake-ls")) {
-		await disposeDefaultLspManager();
-	}
+function notConfiguredAvailability(details: unknown): { readonly extension: string } | undefined {
+	if (!isRecord(details)) return undefined;
+	const availability = details["availability"];
+	if (!isRecord(availability)) return undefined;
+	if (availability["kind"] !== "not_configured") return undefined;
+	const extension = availability["extension"];
+	return typeof extension === "string" && extension.length > 0 ? { extension } : undefined;
 }
 
 function isToolResultLike(value: unknown): value is ToolResultLike {
@@ -141,6 +197,16 @@ function isToolResultLike(value: unknown): value is ToolResultLike {
 
 function isWidgetContext(value: unknown): value is WidgetContext {
 	return isRecord(value) && (value["ui"] === undefined || isRecord(value["ui"]));
+}
+
+function sessionIdFromContext(value: unknown): string | undefined {
+	if (!isRecord(value)) return undefined;
+	const sessionManager = value["sessionManager"];
+	if (!isRecord(sessionManager)) return undefined;
+	const getSessionId = sessionManager["getSessionId"];
+	if (typeof getSessionId !== "function") return undefined;
+	const sessionId: unknown = Reflect.apply(getSessionId, sessionManager, []);
+	return typeof sessionId === "string" && sessionId.length > 0 ? sessionId : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

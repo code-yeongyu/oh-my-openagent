@@ -8,17 +8,17 @@ import { root } from "./aggregate-plugin-fixture.mjs";
 test("#given bundled model catalog #when inspected #then default verifier and worker roles are pinned", async () => {
 	const catalog = JSON.parse(await readFile(join(root, "model-catalog.json"), "utf8"));
 
-	assert.equal(catalog.current.model, "gpt-5.5");
-	assert.equal(catalog.current.model_context_window, 400000);
+	assert.equal(catalog.current.model, "gpt-5.6-sol");
+	assert.equal(catalog.current.model_context_window, 372000);
 	assert.equal(catalog.current.model_reasoning_effort, "high");
 	assert.equal(catalog.current.plan_mode_reasoning_effort, "xhigh");
 	assert.deepEqual(catalog.roles.default, catalog.current);
 	assert.deepEqual(catalog.roles.verifier, {
-		model: "gpt-5.5",
+		model: "gpt-5.6-sol",
 		model_reasoning_effort: "high",
 	});
 	assert.deepEqual(catalog.roles.worker, {
-		model: "gpt-5.5",
+		model: "gpt-5.6-sol",
 		model_reasoning_effort: "high",
 	});
 });
