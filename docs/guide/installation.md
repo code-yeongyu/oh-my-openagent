@@ -512,7 +512,7 @@ When OpenCode Zen is the best available provider, common examples:
 
 | Agent         | Model                                                |
 | ------------- | ---------------------------------------------------- |
-| **Sisyphus**  | `opencode/claude-opus-4-7`                           |
+|| **Sisyphus**  | `opencode/claude-opus-4-7` / `opencode-go/kimi-k3`   |
 | **Oracle**    | `opencode/gpt-5.5`                                   |
 | **Explore**   | `opencode/minimax-m2.7`                              |
 
@@ -528,11 +528,13 @@ Not all models behave the same way. Understanding "similar" families helps you m
 
 | Model                    | Provider(s)                         | Notes                                                                                       |
 | ------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------- |
-| **Claude Opus 4.7**      | anthropic, github-copilot, opencode | Best overall. Default for Sisyphus.                                                         |
-| **Claude Sonnet 4.6**    | anthropic, github-copilot, opencode | Faster, cheaper. Good balance.                                                              |
-| **Claude Haiku 4.5**     | anthropic, vercel                   | Fast and cheap. Good for quick tasks.                                                       |
-| **Kimi K2.6**            | opencode-go, vercel                 | Current default fallback after Claude Opus in primary Sisyphus chain. Claude-like behavior. |
-| **Kimi K2.5**            | kimi-for-coding, opencode, moonshotai, moonshotai-cn, firmware, ollama-cloud, aihubmix | Claude-like, available on multiple providers, still in active fallback chains. |
+|| **Claude Opus 4.8**      | anthropic, github-copilot, opencode | Current best Opus. Dedicated per-agent prompt variants.                                     |
+|| **Claude Opus 4.7**      | anthropic, github-copilot, opencode | Still excellent; hardcoded chain default for budget stability.                              |
+|| **Claude Sonnet 4.6**    | anthropic, github-copilot, opencode | Faster, cheaper. Good balance.                                                              |
+|| **Claude Haiku 4.5**     | anthropic, vercel                   | Fast and cheap. Good for quick tasks.                                                       |
+|| **Kimi K3**              | opencode-go, kimi-for-coding, moonshotai, opencode, vercel | Top recommended Kimi for Sisyphus when thinking-token cost is acceptable.                   |
+|| **Kimi K2.6**            | opencode-go, vercel                 | Current default fallback after Claude Opus and Kimi K3 in primary Sisyphus chain. Claude-like behavior. |
+|| **Kimi K2.5**            | kimi-for-coding, opencode, moonshotai, moonshotai-cn, firmware, ollama-cloud, aihubmix | Claude-like, available on multiple providers, still in active fallback chains. |
 | **Kimi K2.5 Free**       | opencode                            | Free-tier Kimi. Rate-limited but functional.                                                |
 | **GLM 5.2**              | opencode-go, vercel                 | Claude-like behavior. Current OpenCode Go/Vercel fallback entry.                             |
 | **GLM 5**                | zai-coding-plan, opencode           | Claude-like behavior. Good for broad tasks.                                                 |
@@ -576,7 +578,7 @@ Not all models behave the same way. Understanding "similar" families helps you m
 
 | Agent        | Role             | Default Chain                                              |
 | ------------ | ---------------- | ---------------------------------------------------------- |
-| **Sisyphus** | Main ultraworker | anthropic\|github-copilot\|opencode/claude-opus-4-7 (max) → opencode-go/kimi-k2.6 → kimi-for-coding/k2p5 → opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k2.5 → openai\|github-copilot\|opencode/gpt-5.5 (medium) → zai-coding-plan\|opencode/glm-5 → opencode/big-pickle |
+|| **Sisyphus** | Main ultraworker | anthropic\|github-copilot\|opencode/claude-opus-4-7 (max) → opencode-go\|kimi-for-coding\|moonshotai\|opencode\|vercel/kimi-k3 → opencode-go/kimi-k2.6 → kimi-for-coding/k2p5 → opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k2.5 → openai\|github-copilot\|opencode/gpt-5.5 (medium) → zai-coding-plan\|opencode/glm-5 → opencode/big-pickle |
 | **Metis**    | Plan review      | anthropic\|github-copilot\|opencode/claude-sonnet-4-6 → anthropic\|github-copilot\|opencode/claude-opus-4-7 (max) → openai\|github-copilot\|opencode/gpt-5.5 (high) → opencode-go/glm-5.2 → kimi-for-coding/k2p5 |
 
 **Model-Flexible Agents** (fallback across Claude, GPT, and Claude-like models):

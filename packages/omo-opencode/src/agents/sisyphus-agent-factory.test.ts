@@ -35,6 +35,10 @@ describe("createSisyphusAgent", () => {
       // given
       const cases = [
         {
+          model: "opencode-go/kimi-k3",
+          promptAnchors: ["running on Kimi K3", "<k3_calibration>"],
+        },
+        {
           model: "moonshotai/kimi-k2.6",
           promptAnchors: ["<re_entry_rule>", "<verification_loop>"],
         },
@@ -76,17 +80,25 @@ describe("createSisyphusAgent", () => {
     });
   });
 
-  describe("#given Kimi K2.7 vs K2.6 models", () => {
-    test("#when creating agents #then K2.7 routes to its own restrained variant, not the K2.6 prompt", () => {
+  describe("#given Kimi K3 vs K2.7 vs K2.6 models", () => {
+    test("#when creating agents #then each Kimi generation routes to its own variant", () => {
       // given
+      const k3Agent = createSisyphusAgent("opencode-go/kimi-k3");
       const k27Agent = createSisyphusAgent("opencode-go/kimi-k2.7");
       const k26Agent = createSisyphusAgent("opencode-go/kimi-k2.6");
 
       // then
+      expect(k3Agent.prompt).toContain("running on Kimi K3");
+      expect(k3Agent.prompt).toContain("<k3_calibration>");
+      expect(k3Agent.prompt).not.toContain("running on Kimi K2.7");
+
       expect(k27Agent.prompt).toContain("running on Kimi K2.7");
       expect(k27Agent.prompt).not.toContain("Toggle RL");
+      expect(k27Agent.prompt).not.toContain("running on Kimi K3");
+
       expect(k26Agent.prompt).toContain("Toggle RL");
       expect(k26Agent.prompt).not.toContain("Kimi K2.7");
+      expect(k26Agent.prompt).not.toContain("running on Kimi K3");
     });
   });
 

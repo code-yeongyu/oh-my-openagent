@@ -194,7 +194,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 <td align="center"><img src=".github/assets/hephaestus.png" height="300" /></td>
 </tr></table>
 
-**Sisyphus** (`claude-opus-4-7` / **`kimi-k2.6`** / **`glm-5`**)는 메인 오케스트레이터입니다. 계획을 세우고, 전문가에게 위임하고, 공격적인 병렬 실행으로 작업을 끝까지 밀어붙입니다. 중간에 멈추지 않습니다.
+**Sisyphus** (`claude-opus-4-8` / `claude-opus-4-7` / **`kimi-k3`** / **`kimi-k2.6`** / **`glm-5`**)는 메인 오케스트레이터입니다. 계획을 세우고, 전문가에게 위임하고, 공격적인 병렬 실행으로 작업을 끝까지 밀어붙입니다. 중간에 멈추지 않습니다. thinking token 비용을 감수할 수 있다면 **Kimi K3**를, 그렇지 않으면 **Claude Opus 4.8 / 4.7** 또는 **Kimi K2.6**을 권장합니다.
 
 **Hephaestus** (OpenAI 또는 Vercel에서 `gpt-5.6-sol`, 그다음 `gpt-5.5`)는 자율적으로 깊게 파는 작업자입니다. 레시피가 아니라 목표를 주세요. 코드베이스를 탐색하고, 패턴을 조사하고, 손을 잡아주지 않아도 엔드투엔드로 실행합니다. *The Legitimate Craftsman.*
 
@@ -204,7 +204,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 
 > Anthropic은 [우리 때문에 OpenCode를 차단했습니다.](https://x.com/thdxr/status/2010149530486911014) 그래서 Hephaestus에게 "The Legitimate Craftsman"이라는 별명이 붙었습니다. 의도된 아이러니입니다.
 >
-> Opus에서 가장 잘 돌지만, Kimi K2.6 + GPT-5.5 조합만으로도 이미 바닐라 Claude Code를 이깁니다. 별도 설정 없이요.
+> Opus나 Kimi K3에서 가장 잘 돌지만, Kimi K2.6 + GPT-5.5 조합만으로도 이미 바닐라 Claude Code를 이깁니다. 별도 설정 없이요.
 
 ### Team Mode (v4.0)
 
