@@ -640,6 +640,32 @@ The live harness intentionally records only sanitized fake-provider, plugin,
 and SSE evidence. Authentication values, raw environment dumps, private
 credentials, and unrelated service logs are omitted.
 
+The twenty-sixth fresh review found two remaining transport-ordering races: an
+abort event could arrive before its HTTP response and before watchdog provenance
+was recorded, while overlapping same-session callers could create more terminal
+ownership than OpenCode publishes. Source
+`69c41c05481cbf7eb1dae55e57cb711fede845c3` reserves provenance before I/O and
+coalesces same-session internal abort requests.
+
+Twenty-sixth-cycle artifacts:
+
+- `twenty-sixth-review-repair.md`: failing-first finding, bounded repair, exact
+  commands/counts, and residual-risk statement.
+- `twenty-sixth-exact-focused-regressions.txt`: 21 direct ordering, ownership,
+  lifecycle, and generation-race tests passing.
+- `twenty-sixth-exact-runtime-fallback-suite.txt`: 300 tests passing across 47
+  runtime-fallback files.
+- `twenty-sixth-exact-session-lifecycle-suite.txt`: 66 model-fallback,
+  lifecycle, event, and session-state tests passing.
+- `twenty-sixth-exact-omo-opencode-typecheck.txt`,
+  `twenty-sixth-exact-no-excuse.txt`, `twenty-sixth-exact-biome.txt`, and
+  `twenty-sixth-exact-integrity.txt`: exact-source static and pure-LOC gates.
+- `twenty-sixth-exact-sdk-abort-boundary.txt`: pinned SDK 1.15.13 loopback
+  cancellation-failure proof.
+- `twenty-sixth-exact-opencode-harness-self-check.txt` and the complete
+  `twenty-sixth-exact-live-*` set: isolated production-duration OpenCode server,
+  SSE, root-lifecycle, fallback, later-cancellation, and unchanged-DB proof.
+
 ## Why It Is Enough
 
 The tests cover main and subagent watchdog ownership, progress and terminal
