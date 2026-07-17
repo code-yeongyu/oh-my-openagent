@@ -1,18 +1,21 @@
-import type { ParentState } from "@oh-my-opencode/senpi-task"
-
-import type { TaskModelRegistry } from "./planner"
+import type { ChildModelRegistry, ParentState } from "@oh-my-opencode/senpi-task"
 
 // Structural slice of senpi's ExtensionContext the task runtime reads. ExtensionContext satisfies it;
 // tests pass a tiny fake. `ui` lives on ExtensionContext (event/command contexts), NOT ExtensionAPI,
 // so it is captured here on entry and cleared on switch/shutdown (the todo-18 bridge constraint).
+// modelRegistry is the CONCRETE senpi ModelRegistry: the planner reads it through its structural port,
+// and in-process children reuse this exact instance so they inherit the parent's live provider set.
 export interface LiveTaskContext {
   readonly cwd?: string
-  readonly modelRegistry?: TaskModelRegistry
+  readonly modelRegistry?: ChildModelRegistry
   readonly model?: unknown
   readonly ui?: CapturedUi
   readonly mode?: string
   readonly hasUI?: boolean
-  readonly sessionManager?: { getSessionId(): string }
+  readonly sessionManager?: {
+    getSessionId(): string
+    getSessionFile?(): string | undefined
+  }
   isIdle?(): boolean
 }
 
@@ -36,11 +39,12 @@ export type ParentTransition = "compacting" | "session_switching" | "session_shu
  */
 export class TaskRuntimeContext {
   #cwd: string
-  #modelRegistry: TaskModelRegistry | undefined
+  #modelRegistry: ChildModelRegistry | undefined
   #idle = true
   #transition: ParentTransition
   #ui: CapturedUi | undefined
   #sessionId: string | undefined
+  #sessionFile: string | undefined
   #mode: string | undefined
 
   constructor(cwd: string) {
@@ -52,7 +56,10 @@ export class TaskRuntimeContext {
     if (ctx.modelRegistry !== undefined) this.#modelRegistry = ctx.modelRegistry
     if (ctx.ui !== undefined) this.#ui = ctx.ui
     if (typeof ctx.mode === "string") this.#mode = ctx.mode
-    if (ctx.sessionManager !== undefined) this.#sessionId = ctx.sessionManager.getSessionId()
+    if (ctx.sessionManager !== undefined) {
+      this.#sessionId = ctx.sessionManager.getSessionId()
+      this.#sessionFile = ctx.sessionManager.getSessionFile?.()
+    }
     if (typeof ctx.isIdle === "function") this.#idle = ctx.isIdle()
   }
 
@@ -68,7 +75,7 @@ export class TaskRuntimeContext {
     return this.#cwd
   }
 
-  modelRegistry(): TaskModelRegistry | undefined {
+  modelRegistry(): ChildModelRegistry | undefined {
     return this.#modelRegistry
   }
 
@@ -78,6 +85,10 @@ export class TaskRuntimeContext {
 
   sessionId(): string | undefined {
     return this.#sessionId
+  }
+
+  sessionFile(): string | undefined {
+    return this.#sessionFile
   }
 
   mode(): string | undefined {

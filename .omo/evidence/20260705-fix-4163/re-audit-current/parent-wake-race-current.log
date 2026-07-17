@@ -1,6 +1,0 @@
-surface: bun parent wake race test
-invocation: bun test packages/omo-opencode/src/hooks/todo-continuation-enforcer/parent-wake-race.test.ts
----
-zsh:1: command not found: bun
-
-exit_code=127

@@ -1,5 +1,5 @@
 import type { TaskStatus } from "../state"
-import type { NotificationConfig, ParentState, RoutingDecision } from "./types"
+import type { ParentState, RoutingDecision } from "./types"
 
 const notifyingStatuses = new Set<TaskStatus>(["completed", "error", "lost"])
 
@@ -9,12 +9,15 @@ export function shouldNotifyStatus(status: TaskStatus): boolean {
   return notifyingStatuses.has(status)
 }
 
-export function routeCompletion(parentState: ParentState, config: NotificationConfig): RoutingDecision {
+// Delivery is unconditional: an idle parent ALWAYS wakes and a streaming parent ALWAYS receives the
+// notification steered into its running turn at the next tool-call boundary - no config can suppress,
+// delay, or split it. Transient transitions buffer and flush on the next session_start/idle edge.
+export function routeCompletion(parentState: ParentState): RoutingDecision {
   switch (parentState.kind) {
     case "idle":
-      return config.wake_idle_parent ? { kind: "wake" } : { kind: "queue_silently" }
+      return { kind: "wake" }
     case "streaming":
-      return { kind: "deliver_streaming", deliverAs: config.deliver_as }
+      return { kind: "deliver_streaming" }
     case "compacting":
       return { kind: "buffer", reason: "compacting" }
     case "session_switching":

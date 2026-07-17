@@ -1,6 +1,6 @@
 # delegate-core — Delegate Model Selection + Retry Guidance (Core)
 
-**Generated:** 2026-06-17
+**Generated:** 2026-07-17 / 7d664b96b
 
 ## OVERVIEW
 
@@ -32,4 +32,5 @@ Two harness-neutral primitives for the `task`/delegate tool: (1) resolve which m
 - **Cold-cache `skipped` sentinel:** when `availableModels` AND `connectedProviders` caches are both empty, resolution defers — caller waits for the model cache rather than picking wrong.
 - **`-high` models** are matched on their base model exactly, never fuzzy-downgraded to a non-high variant.
 - **Variant propagation:** a matched `DelegateFallbackEntry`'s variant flows through to the result.
+- **Fallback-chain provider shaping:** each entry's model passes through `transformModelForProvider` before exact matching, so provider-prefixed IDs (e.g. Vercel `openai/gpt-5.6-sol`) resolve on the owning entry. Cross-provider fuzzy matching skips providers that have a later dedicated rung for the same model, so an unlisted custom provider keeps the earlier variant instead of being preempted by a later rung.
 - Parent: [`packages/AGENTS.md`](../AGENTS.md).

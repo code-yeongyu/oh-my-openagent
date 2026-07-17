@@ -157,7 +157,7 @@
         "verify": "VERIFY — Prove it works"
       },
       "tagline": "For when good enough isn't.",
-      "model": "GPT 5.5 Medium"
+      "model": "GPT 5.6 Sol Medium"
     },
     "teamMode": {
       "badge": "v4.0+",
@@ -226,13 +226,13 @@
       "momus": {
         "name": "Momus",
         "role": "Plan Reviewer",
-        "model": "GPT 5.5 xHigh",
+        "model": "GPT 5.6 Sol xHigh",
         "description": "Ruthless validation. Only approves when the plan is bulletproof."
       },
       "atlas": {
         "name": "Atlas",
         "role": "Parallel Task Executor",
-        "model": "Claude Opus 4.7",
+        "model": "Claude Sonnet 4.6",
         "description": "Orchestrates multi-step plans with dependency tracking. Delegates to specialists and verifies independently."
       },
       "sisyphusJunior": {
@@ -244,7 +244,7 @@
       "multimodalLooker": {
         "name": "Multimodal-Looker",
         "role": "Media Analysis",
-        "model": "Claude Sonnet 4.6",
+        "model": "GPT 5.5 Medium",
         "description": "Extracts information from PDFs, images, and diagrams. Quick summary extraction without full reads."
       },
       "dynamicSystem": {

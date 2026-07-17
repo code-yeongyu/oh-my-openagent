@@ -14,7 +14,7 @@
 
     // Implementation: uses planning outputs
     "hephaestus": {
-      "model": "openai/gpt-5.5",
+      "model": "openai/gpt-5.6-sol",
       "prompt_append": "Follow established plans precisely. Ask for clarification when plans are ambiguous.",
     },
 
@@ -65,7 +65,7 @@
   "categories": {
     "quick": { "model": "opencode/gpt-5-nano" },
 
-    "unspecified-low": { "model": "anthropic/claude-sonnet-4-6" },
+    "unspecified-low": { "model": "openai/gpt-5.6-luna", "variant": "xhigh" },
 
     // High-effort planning fallback: communicative Claude-like behavior.
     // Use ultrabrain/deep or Hephaestus for GPT-native specialist reasoning.
@@ -81,10 +81,10 @@
     "visual-engineering": { "model": "google/gemini-3.1-pro", "variant": "high" },
 
     // Deep research and analysis
-    "deep": { "model": "openai/gpt-5.5" },
+    "deep": { "model": "openai/gpt-5.6-terra", "variant": "xhigh" },
 
     // Strategic reasoning
-    "ultrabrain": { "model": "openai/gpt-5.5", "variant": "xhigh" },
+    "ultrabrain": { "model": "openai/gpt-5.6-sol", "variant": "xhigh" },
 
     // Creative approaches to problems
     "artistry": { "model": "google/gemini-3.1-pro", "variant": "high" },

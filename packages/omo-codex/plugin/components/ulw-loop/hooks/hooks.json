@@ -7,7 +7,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook user-prompt-submit --with-ultrawork",
 						"timeout": 10,
-						"statusMessage": "(OmO) Checking Ulw-Loop Steering"
+						"statusMessage": "(OmO 4.19.0) Checking Ulw-Loop Steering"
 					}
 				]
 			}
@@ -20,7 +20,30 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook pre-tool-use",
 						"timeout": 5,
-						"statusMessage": "(OmO) Enforcing Unlimited Ulw-Loop Budget"
+						"statusMessage": "(OmO 4.19.0) Enforcing Unlimited Ulw-Loop Budget"
+					}
+				]
+			},
+			{
+				"matcher": "^(spawn_agent|collaborationspawn_agent|collaboration\\.spawn_agent)$",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook pre-tool-use-spawn",
+						"timeout": 5,
+						"statusMessage": "(OmO 4.19.0) Guarding Ulw-Loop Spawns"
+					}
+				]
+			}
+		],
+		"Stop": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook stop",
+						"timeout": 10,
+						"statusMessage": "(OmO 4.19.0) Checking Ulw-Loop Resume"
 					}
 				]
 			}

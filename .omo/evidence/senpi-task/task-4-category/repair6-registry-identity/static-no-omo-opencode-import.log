@@ -1,2 +1,0 @@
-$ if rg -n "^[[:space:]]*import.*(@oh-my-opencode/omo-opencode|packages/omo-opencode|\.\./.*omo-opencode)" packages/senpi-task/src/category packages/senpi-task/src/index.ts packages/senpi-task/scripts/manual-category-qa.ts; then exit 1; else echo "No runtime omo-opencode imports in scoped senpi-task category/source import statements."; fi
-No runtime omo-opencode imports in scoped senpi-task category/source import statements.

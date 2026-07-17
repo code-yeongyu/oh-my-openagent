@@ -1,6 +1,0 @@
-scenario: 15-final-git-status-after-report
-surface: final git worktree status after report and hygiene artifacts
-invocation: git status --short --untracked-files=all
-started_at: 2026-07-06T11:05:03Z
-finished_at: 2026-07-06T11:05:03Z
-exit: 0

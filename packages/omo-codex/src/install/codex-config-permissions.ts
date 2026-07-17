@@ -1,4 +1,5 @@
 import { appendBlock, findTomlSection, removeSetting, replaceOrInsertRootSetting, replaceOrInsertSetting } from "./toml-section-editor"
+import { ensureFeatureEnabled } from "./codex-config-features"
 
 const AUTONOMOUS_FEATURES = ["multi_agent", "unified_exec", "goals"] as const
 
@@ -23,12 +24,6 @@ function removeWindowsSandboxSetting(config: string): string {
 function ensureNoticeEnabled(config: string, key: string): string {
   const section = findTomlSection(config, "notice")
   if (section === null) return appendNoticeBlock(config, key)
-  return replaceOrInsertSetting(config, section, key, "true")
-}
-
-function ensureFeatureEnabled(config: string, key: string): string {
-  const section = findTomlSection(config, "features")
-  if (section === null) return appendBlock(config, `[features]\n${key} = true\n`)
   return replaceOrInsertSetting(config, section, key, "true")
 }
 

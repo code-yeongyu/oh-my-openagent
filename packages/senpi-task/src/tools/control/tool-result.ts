@@ -16,8 +16,6 @@ export function isTerminalStatus(status: TaskStatus): boolean {
 
 const FINAL_RESPONSE_HEAD_MAX = 400
 
-// task_wait returns a HEAD of each completed child's final response, never the full transcript
-// (task_output owns the full read). Keeps the wait result compact for the parent's context.
 export function finalResponseHead(text: string | undefined): string | undefined {
   if (text === undefined) return undefined
   const trimmed = text.trim()

@@ -1,6 +1,6 @@
 # src/features/builtin-commands/ -- Built-in Slash Commands
 
-**Generated:** 2026-05-18
+**Generated:** 2026-07-17 / 7d664b96b
 
 ## OVERVIEW
 
@@ -19,13 +19,10 @@ Registry of built-in commands shipped inside the plugin. Each command is a templ
 
 | Command | Source File | Notes |
 |---------|-------------|-------|
-| `init-deep` | `templates/init-deep.ts` | Hierarchical AGENTS.md generator |
-| `ralph-loop` | `templates/ralph-loop.ts` | Self-referential dev loop |
-| `ulw-loop` | `templates/ralph-loop.ts` | Ultrawork loop variant |
-| `cancel-ralph` | `templates/ralph-loop.ts` | Loop cancellation |
+| `goal` | `templates/goal.ts` | Persistent thread objective (set / pause / resume / clear); replaces removed `/ralph-loop`, `/ulw-loop`, `/cancel-ralph` |
 | `refactor` | `templates/refactor.ts` | LSP + AST-grep refactoring |
 | `start-work` | `templates/start-work.ts` | Prometheus plan executor |
-| `stop-continuation` | `templates/stop-continuation.ts` | Kill all continuations |
+| `stop-continuation` | `templates/stop-continuation.ts` | Stop all continuations (todo enforcer, ralph loop, goal, boulder) |
 | `handoff` | `templates/handoff.ts` | Session context summary |
 | `remove-ai-slops` | `templates/remove-ai-slops.ts` | AI code smell cleanup |
 | `hyperplan` | `templates/hyperplan.ts` | Adversarial team-mode planning |
@@ -40,4 +37,4 @@ Phase 6 of config loading (`command-config-handler.ts`) merges built-ins with us
 
 ## TESTS
 
-Co-located `.test.ts` files in `templates/` cover `ralph-loop` and `stop-continuation` logic.
+Co-located `.test.ts` files in `templates/` cover `goal` and `stop-continuation` logic.

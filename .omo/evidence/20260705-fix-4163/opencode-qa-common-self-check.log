@@ -1,9 +1,0 @@
-missing dependency: opencode
-FAIL: missing dependencies
-FAIL: oqa_db_path returned ''
-PASS: oqa_sql_escape quotes single quotes
-PASS: oqa_free_port -> 64591
-PASS: isolated XDG sandbox auto-removed on exit (/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/oqa-xdg.XXXXXX.r2ykKTOvyB)
-PASS: isolated HOME points inside sandbox
-PASS: isolated HOME preserves HOME-based opencode shim
-common.sh self-check had 2 failure(s)

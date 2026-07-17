@@ -16,6 +16,7 @@ describe("omo-senpi extension entry", () => {
         "omo-senpi-comment-checker-disabled",
         "omo-senpi-telemetry-disabled",
         "omo-senpi-lsp-disabled",
+        "omo-senpi-codegraph-disabled",
       ]),
     )
     expect(pi.handlers.map((handler) => handler.event)).toEqual(

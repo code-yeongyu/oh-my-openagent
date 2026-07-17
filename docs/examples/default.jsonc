@@ -13,7 +13,7 @@
 
     // Deep autonomous worker: end-to-end implementation
     "hephaestus": {
-      "model": "openai/gpt-5.5",
+      "model": "openai/gpt-5.6-sol",
       "prompt_append": "Explore thoroughly, then implement. Prefer small, testable changes.",
     },
 
@@ -49,14 +49,14 @@
 
   "categories": {
     "quick": { "model": "opencode/gpt-5-nano" },
-    "unspecified-low": { "model": "anthropic/claude-sonnet-4-6" },
-    // General high-effort fallback stays Claude-like for communicative orchestration.
-    // Use deep/ultrabrain or Hephaestus for GPT-native specialist work.
+    "unspecified-low": { "model": "openai/gpt-5.6-luna", "variant": "xhigh" },
+    // General high-effort fallback: keep this communicative and Claude-like.
+    // Route GPT-native specialist work to deep/ultrabrain or Hephaestus.
     "unspecified-high": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
     "writing": { "model": "kimi-for-coding/k2p5" },
     "visual-engineering": { "model": "google/gemini-3.1-pro", "variant": "high" },
-    "deep": { "model": "openai/gpt-5.5" },
-    "ultrabrain": { "model": "openai/gpt-5.5", "variant": "xhigh" },
+    "deep": { "model": "openai/gpt-5.6-terra", "variant": "xhigh" },
+    "ultrabrain": { "model": "openai/gpt-5.6-sol", "variant": "xhigh" },
   },
 
   // Conservative concurrency for cost control

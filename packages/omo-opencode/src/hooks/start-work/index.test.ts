@@ -40,7 +40,7 @@ describe("start-work hook", () => {
     const userRequest = options?.userRequest ?? ""
 
     return `<command-instruction>
-You are starting a Sisyphus work session.
+You are starting an Atlas work session.
 </command-instruction>
 
 <session-context>${sessionContext}</session-context>${userRequest ? `

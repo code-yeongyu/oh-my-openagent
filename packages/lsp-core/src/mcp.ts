@@ -3,7 +3,6 @@ import {
 	errorResponse,
 	isPlainRecord,
 	jsonRpcId,
-	messageFromError,
 	runJsonRpcStdioServer,
 	successResponse,
 	type JsonRpcError,
@@ -13,13 +12,21 @@ import {
 	type McpToolDescriptor,
 } from "@oh-my-opencode/mcp-stdio-core";
 import { coerceToolArguments, executeLspTool, LSP_MCP_TOOLS } from "./tools.js";
+import { createStandaloneMcpRequestContext, runWithRequestContext } from "./request-context.js";
 
 export type { JsonRpcError, JsonRpcId, JsonRpcResponse, JsonRpcResult, McpToolDescriptor };
 
 const SERVER_NAME = "lsp";
 const SERVER_VERSION = "0.1.0";
 
-export async function handleLspMcpRequest(input: unknown): Promise<JsonRpcResponse | undefined> {
+export interface HandleLspMcpRequestOptions {
+	readonly signal?: AbortSignal;
+}
+
+export async function handleLspMcpRequest(
+	input: unknown,
+	options: HandleLspMcpRequestOptions = {},
+): Promise<JsonRpcResponse | undefined> {
 	if (!isPlainRecord(input)) {
 		return errorResponse(null, -32600, "Invalid Request");
 	}
@@ -42,7 +49,7 @@ export async function handleLspMcpRequest(input: unknown): Promise<JsonRpcRespon
 	}
 
 	if (method === "tools/call") {
-		return handleToolCall(id, input["params"]);
+		return handleToolCall(id, input["params"], options.signal);
 	}
 
 	return errorResponse(id, -32601, `Method not found: ${String(method)}`);
@@ -52,30 +59,34 @@ export async function runMcpStdioServer(
 	input: Readable = process.stdin,
 	output: Writable = process.stdout,
 ): Promise<void> {
+	const requestContext = createStandaloneMcpRequestContext();
 	await runJsonRpcStdioServer({
 		input,
 		output,
 		idleTimeoutMs: 0,
-		handler: handleLspMcpRequest,
+		handler: (request) => runWithRequestContext(requestContext, () => handleLspMcpRequest(request)),
 		handlerOptions: undefined,
 	});
 }
 
-async function handleToolCall(id: JsonRpcId, params: unknown): Promise<JsonRpcResponse> {
+async function handleToolCall(id: JsonRpcId, params: unknown, signal?: AbortSignal): Promise<JsonRpcResponse> {
 	if (!isPlainRecord(params) || typeof params["name"] !== "string") {
 		return errorResponse(id, -32602, "tools/call requires params.name");
 	}
 
 	try {
-		const result = await executeLspTool(params["name"], coerceToolArguments(params["arguments"]));
+		const result = await executeLspTool(params["name"], coerceToolArguments(params["arguments"]), signal);
 		return successResponse(id, {
 			content: result.content,
 			isError: result.isError ?? false,
 			details: result.details,
 		});
 	} catch (error) {
+		if (!(error instanceof Error)) {
+			throw error;
+		}
 		return successResponse(id, {
-			content: [{ type: "text", text: messageFromError(error) }],
+			content: [{ type: "text", text: error.message }],
 			isError: true,
 		});
 	}

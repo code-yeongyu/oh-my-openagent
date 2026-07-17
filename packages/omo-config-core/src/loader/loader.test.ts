@@ -238,4 +238,31 @@ describe("loadOmoConfig", () => {
     expect(both.config.task?.default_concurrency).toBe(4)
     expect(both.sources[0]).toEqual({ exists: true, loaded: true, path: jsoncPath, scope: "user" })
   })
+
+  test("#given an omo config carrying a $schema key #when loading #then the key is tolerated with no diagnostics and does not disturb the real config sections", () => {
+    // given
+    const schemaUrl = "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json"
+    const fixture = makeFixture()
+    const userPath = join(fixture.xdgConfigHome, "omo", "omo.jsonc")
+    writeJsonc(
+      userPath,
+      `{
+        "$schema": "${schemaUrl}",
+        "task": { "default_concurrency": 3 }
+      }`,
+    )
+
+    // when
+    const result = loadOmoConfig({
+      cwd: fixture.cwd,
+      env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+      platform: "linux",
+    })
+
+    // then
+    expect(result.diagnostics).toEqual([])
+    expect(result.sources[0]).toEqual({ exists: true, loaded: true, path: userPath, scope: "user" })
+    expect(result.config.task?.default_concurrency).toBe(3)
+    expect(result.config.$schema).toBe(schemaUrl)
+  })
 })

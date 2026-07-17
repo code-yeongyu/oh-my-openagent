@@ -1,6 +1,6 @@
 # src/features/boulder-state/ — Active Work Plan Tracker
 
-**Generated:** 2026-05-15
+**Generated:** 2026-07-17 / 7d664b96b
 
 ## OVERVIEW
 
@@ -45,8 +45,7 @@ interface BoulderState {
 ```
 session.startWork(plan)
   → BoulderState created with active_plan, started_at, plan_name
-  → atlas-hook reads BoulderState on session.idle for boulder continuation
-  → ralph-loop reads task_sessions to resume subagent work
+  → atlas-hook reads BoulderState + `task_sessions` on session.idle (boulder continuation + subagent resume)
 session.idle (incomplete plan)
   → todoContinuationEnforcer + atlasHook inspect state
   → Inject CONTINUATION_PROMPT or BOULDER_COMPLETE_PROMPT
@@ -59,8 +58,7 @@ session.completed
 | Where | What |
 |-------|------|
 | [`src/cli/boulder/`](../../cli/boulder) | CLI inspector formats this state |
-| [`src/hooks/atlas/`](../../hooks/atlas) | Reads work state, drives boulder-complete and parallel-delegation prompts |
-| [`src/hooks/ralph-loop/`](../../hooks/ralph-loop) | Resumes subagent task sessions via `task_sessions` |
+| [`src/hooks/atlas/`](../../hooks/atlas) | Reads work state + `task_sessions` (subagent resume); drives boulder-complete and parallel-delegation prompts |
 | [`src/hooks/start-work/`](../../hooks/start-work) | Creates the BoulderState on `/start-work` invocation |
 | [`src/hooks/todo-continuation-enforcer/`](../../hooks/todo-continuation-enforcer) | Session-idle continuation when boulder incomplete |
 

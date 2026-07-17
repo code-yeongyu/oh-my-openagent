@@ -1,5 +1,0 @@
-packages/senpi-task/src/agents/paths.ts 100
-packages/senpi-task/src/agents/loader.ts 44
-packages/senpi-task/src/agents/omo-overlay.ts 71
-packages/senpi-task/src/agents/loader.test.ts 181
-packages/senpi-task/scripts/manual-agents-qa.ts 88

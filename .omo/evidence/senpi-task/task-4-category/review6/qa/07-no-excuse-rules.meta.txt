@@ -1,6 +1,0 @@
-scenario: 07-no-excuse-rules
-surface: Static TypeScript no-excuse rules
-invocation: bun run packages/shared-skills/skills/programming/scripts/typescript/check-no-excuse-rules.ts packages/senpi-task/src/category packages/senpi-task/scripts/manual-category-qa.ts packages/senpi-task/src/index.ts
-started_at: 2026-07-06T11:02:07Z
-finished_at: 2026-07-06T11:02:07Z
-exit: 0

@@ -1,10 +1,11 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
+import type { PostEditDiagnosticsOutcome } from "@oh-my-opencode/lsp-core/post-edit";
 
-import { extractMutatedFilePaths, runLspPostToolUseHook } from "../src/codex-hook.js";
+import { codexLspRequestContext, extractMutatedFilePaths, runLspPostToolUseHook } from "../src/codex-hook.js";
 
 const tempDirs: string[] = [];
 
@@ -15,6 +16,21 @@ afterEach(() => {
 });
 
 describe("codex PostToolUse hook", () => {
+	it("#given CODEX_HOME #when building the daemon request context #then Codex config paths are exact and capability is enabled", () => {
+		const cwd = tempDir("codex-lsp-cwd-");
+		const codexHome = tempDir("codex-lsp-home-");
+
+		const context = codexLspRequestContext({ CODEX_HOME: codexHome }, cwd);
+
+		expect(context).toEqual({
+			cwd: realpathSync(cwd),
+			projectConfigPaths: [path.join(realpathSync(cwd), ".codex", "lsp-client.json")],
+			userConfigPath: path.join(codexHome, "lsp-client.json"),
+			installDecisionsPath: path.join(codexHome, "lsp-install-decisions.json"),
+			capabilities: { installDecisionTool: true },
+		});
+	});
+
 	it("extracts files from Codex apply_patch command payloads", () => {
 		const paths = extractMutatedFilePaths({
 			tool_name: "apply_patch",
@@ -174,7 +190,7 @@ describe("codex PostToolUse hook", () => {
 					return "error[typescript] (2322) at 1:7: Type 'number' is not assignable to type 'string'.";
 				}
 				if (filePath === "README.md") {
-					return "No LSP server configured for extension: .md";
+					return markdownNotConfigured();
 				}
 				return "No diagnostics found";
 			},
@@ -286,7 +302,7 @@ describe("codex PostToolUse hook", () => {
 				},
 				tool_response: "Success. Updated files.",
 			},
-			async () => "No LSP server configured for extension: .md",
+			async () => markdownNotConfigured(),
 		);
 
 		expect(output).toBe("");
@@ -355,4 +371,14 @@ function isPostToolUseHookOutput(value: unknown): value is PostToolUseHookOutput
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function tempDir(prefix: string): string {
+	const dir = mkdtempSync(path.join(tmpdir(), prefix));
+	tempDirs.push(dir);
+	return dir;
+}
+
+function markdownNotConfigured(): PostEditDiagnosticsOutcome {
+	return { kind: "not_configured", extension: ".md" };
 }
