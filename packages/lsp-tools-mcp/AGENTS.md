@@ -1,6 +1,6 @@
-# lsp-tools-mcp — LSP Tools stdio MCP (MCP layer)
+# lsp-tools-mcp -- LSP Tools stdio MCP (MCP layer)
 
-**Generated:** 2026-06-16
+**Generated:** 2026-07-17 / 7d664b96b
 
 ## OVERVIEW
 
