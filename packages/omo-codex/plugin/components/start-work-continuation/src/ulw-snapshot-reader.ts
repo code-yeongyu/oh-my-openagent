@@ -166,9 +166,9 @@ function scopedSnapshotSessionIds(sessionId: string): readonly string[] {
 
 	const withoutCodexPrefix = trimmed.startsWith("codex:") ? trimmed.slice("codex:".length) : trimmed;
 	return uniqueNonNull([
-		normalizeSnapshotSessionId(trimmed),
 		normalizeSnapshotSessionId(`codex:${withoutCodexPrefix}`),
 		normalizeSnapshotSessionId(withoutCodexPrefix),
+		normalizeSnapshotSessionId(trimmed),
 	]);
 }
 

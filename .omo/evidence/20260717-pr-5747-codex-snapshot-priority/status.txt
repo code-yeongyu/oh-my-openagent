@@ -1,0 +1,3 @@
+common_self_check=1
+hook_unit_probe=1
+app_server_drive=1

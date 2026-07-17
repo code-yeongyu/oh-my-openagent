@@ -157,6 +157,36 @@ describe("ULW snapshot bridge", () => {
 		expect(parsed.reason).toContain("- Next action: `Continue from the writer-normalized Codex-scoped snapshot`");
 	});
 
+	it("#given raw and writer-normalized scoped snapshots #when hook runs with the raw Codex session id #then the Codex snapshot wins", () => {
+		// given
+		const workspace = createWorkspace({ worktreePath: null });
+		writeSnapshotAt(
+			workspace,
+			["sess_abc"],
+			createSnapshotMarkdown({
+				metadata: ["- Session ID: sess_abc", "- Plan Path: .omo/ulw-loop/sess_abc/goals.json"],
+				nextAction: "Continue from the stale raw snapshot",
+			}),
+		);
+		const codexSnapshotPath = writeSnapshotAt(
+			workspace,
+			["codex-sess_abc"],
+			createSnapshotMarkdown({
+				metadata: ["- Session ID: codex:sess_abc", "- Plan Path: .omo/ulw-loop/codex-sess_abc/goals.json"],
+				nextAction: "Continue from the current Codex snapshot",
+			}),
+		);
+
+		// when
+		const output = runStopHook(createStopInput(workspace, "sess_abc"), createDiskBackedFs());
+
+		// then
+		const parsed = parseBlockOutput(output);
+		expect(parsed.reason).toContain(`- Snapshot path: \`${codexSnapshotPath}\``);
+		expect(parsed.reason).toContain("- Next action: `Continue from the current Codex snapshot`");
+		expect(parsed.reason).not.toContain("Continue from the stale raw snapshot");
+	});
+
 	it.each(
 		UNSAFE_OR_MALFORMED_SNAPSHOT_CASES,
 	)("#given unsafe or malformed scoped ULW snapshot $name #when reader runs #then snapshot is omitted", ({
