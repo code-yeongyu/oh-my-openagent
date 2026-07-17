@@ -77,6 +77,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
 
     if (sessionID && role === "assistant" && error) {
       let state = sessionStates.get(sessionID)
+      let requestAborted = false
       const pendingFallbackModel = state?.pendingFallbackModel
       const wasAwaitingFallbackResult = sessionAwaitingFallbackResult.has(sessionID)
       if (
@@ -92,9 +93,6 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         })
         return
       }
-      if (wasAwaitingFallbackResult) {
-        sessionAwaitingFallbackResult.delete(sessionID)
-      }
       if (sessionRetryInFlight.has(sessionID) && !retrySignal) {
         log(`[${HOOK_NAME}] message.updated fallback skipped (retry in flight)`, { sessionID })
         return
@@ -105,8 +103,14 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
           sessionID,
           model,
         })
-        await helpers.abortSessionRequest(sessionID, "message.updated.retry-signal")
+        requestAborted = await helpers.abortSessionRequest(sessionID, "message.updated.retry-signal")
+        if (!requestAborted) {
+          return
+        }
         sessionRetryInFlight.delete(sessionID)
+      }
+      if (wasAwaitingFallbackResult) {
+        sessionAwaitingFallbackResult.delete(sessionID)
       }
 
       if (retrySignal && timeoutEnabled) {
@@ -153,6 +157,14 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         return
       }
 
+      if (classifyErrorType(error) === "quota_exceeded" && !requestAborted) {
+        requestAborted = await helpers.abortSessionRequest(sessionID, "message.updated.quota-fallback")
+        if (!requestAborted) {
+          return
+        }
+        sessionRetryInFlight.delete(sessionID)
+      }
+
       if (!state) {
         const initialModel = resolveFallbackBootstrapModel({
           sessionID,
@@ -193,11 +205,6 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
             return
           }
         }
-      }
-
-      if (classifyErrorType(error) === "quota_exceeded") {
-        await helpers.abortSessionRequest(sessionID, "message.updated.quota-fallback")
-        sessionRetryInFlight.delete(sessionID)
       }
 
       await dispatchFallbackRetry(deps, helpers, {

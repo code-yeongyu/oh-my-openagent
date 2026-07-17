@@ -59,6 +59,7 @@ export function createSessionStatusHandler(
       return
     }
     sessionStatusRetryKeys.set(sessionID, retryKey)
+    let requestAborted = false
 
     if (sessionRetryInFlight.has(sessionID)) {
       if (timeoutEnabled) {
@@ -66,7 +67,10 @@ export function createSessionStatusHandler(
           sessionID,
           model,
         })
-        await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
+        requestAborted = await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
+        if (!requestAborted) {
+          return
+        }
         sessionRetryInFlight.delete(sessionID)
       } else {
         log(`[${HOOK_NAME}] session.status retry skipped - retry already in flight`, { sessionID })
@@ -84,6 +88,21 @@ export function createSessionStatusHandler(
     }
 
     let state = sessionStates.get(sessionID)
+    if (state?.pendingFallbackModel && state.pendingFallbackPromptMayHaveBeenAccepted) {
+      log(`[${HOOK_NAME}] session.status retry skipped (pending fallback prompt may already be accepted)`, {
+        sessionID,
+        pendingFallbackModel: state.pendingFallbackModel,
+      })
+      return
+    }
+
+    if (!requestAborted) {
+      requestAborted = await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
+      if (!requestAborted) {
+        return
+      }
+    }
+
     if (!state) {
       const initialModel = resolveFallbackBootstrapModel({
         sessionID,
@@ -105,13 +124,6 @@ export function createSessionStatusHandler(
     sessionLastAccess.set(sessionID, Date.now())
 
     if (state.pendingFallbackModel) {
-      if (state.pendingFallbackPromptMayHaveBeenAccepted) {
-        log(`[${HOOK_NAME}] session.status retry skipped (pending fallback prompt may already be accepted)`, {
-          sessionID,
-          pendingFallbackModel: state.pendingFallbackModel,
-        })
-        return
-      }
       if (timeoutEnabled) {
         log(`[${HOOK_NAME}] Clearing pending fallback due to provider auto-retry signal`, {
           sessionID,
@@ -133,8 +145,6 @@ export function createSessionStatusHandler(
       model: state.currentModel,
       retryAttempt: status.attempt,
     })
-
-    await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
 
     await dispatchFallbackRetry(deps, helpers, {
       sessionID,
