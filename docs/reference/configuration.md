@@ -192,7 +192,7 @@ Agent tab cycling defaults to Sisyphus, Hephaestus, Prometheus, Atlas. Override 
 | `textVerbosity`   | string        | Text verbosity: `low`, `medium`, `high`                |
 | `providerOptions` | object        | Provider-specific options                              |
 
-Prometheus is the exception for prompt replacement: its mandatory planner prompt always remains active so it can load `shared/ulw-plan` first. For `agents.prometheus`, both `prompt` and `prompt_append` are appended to the mandatory base prompt instead of replacing it.
+Prometheus is the exception for prompt replacement: its mandatory planner prompt always remains active so it can load `ulw-plan` first. For `agents.prometheus`, both `prompt` and `prompt_append` are appended to the mandatory base prompt instead of replacing it.
 
 #### Anthropic Extended Thinking
 
