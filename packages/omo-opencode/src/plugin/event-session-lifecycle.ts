@@ -108,7 +108,10 @@ export function reserveSessionDeletedEvent(args: SessionDeletedEventArgs): Sessi
   let startCleanup: (() => void) | undefined;
   let started = false;
   const startGate = new Promise<void>((resolve) => { startCleanup = resolve; });
-  const cleanup = startGate.then(async (): Promise<void> => {
+  const previousTask = args.sessionDeletionTasks.get(sessionID);
+  const cleanup = (async (): Promise<void> => {
+    await previousTask?.catch(() => undefined);
+    await startGate;
     removeMainSession(sessionID);
     const wasSyncSubagentSession = syncSubagentSessions.has(sessionID);
     clearSessionAgent(sessionID);
@@ -127,7 +130,7 @@ export function reserveSessionDeletedEvent(args: SessionDeletedEventArgs): Sessi
     await dispatchOpenClawSessionEvent({ ...args, rawEvent: "session.deleted", sessionID });
     await args.managers.skillMcpManager.disconnectSession(sessionID);
     if (args.tmuxIntegrationEnabled) await args.managers.tmuxSessionManager.onSessionDeleted({ sessionID });
-  });
+  })();
   const task = cleanup.finally(() => {
     if (args.sessionDeletionTasks.get(sessionID) === task) args.sessionDeletionTasks.delete(sessionID);
   });

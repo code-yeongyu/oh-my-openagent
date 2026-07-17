@@ -70,4 +70,72 @@ describe("plugin session deletion ordering", () => {
     expect(getSessionAgent(sessionID)).toBe("hephaestus")
     expect(getSessionModel(sessionID)).toEqual({ providerID: "openai", modelID: "replacement" })
   })
+
+  it("#given overlapping deletions for one ID #when recreation starts #then all cleanup completes before replacement creation", async () => {
+    const firstCleanupRelease = deferred<void>()
+    const firstCleanupStarted = deferred<void>()
+    const sessionID = "session-recreated-after-overlapping-deletions"
+    let createCalls = 0
+    let stopCalls = 0
+    let replacementCreated = false
+    let staleTeardownAfterReplacement = false
+    const managers = {
+      skillMcpManager: {
+        disconnectSession: async () => {
+          if (replacementCreated) staleTeardownAfterReplacement = true
+        },
+      },
+      monitorManager: {
+        stopSessionMonitors: async () => {
+          stopCalls += 1
+          if (stopCalls !== 1) return
+          firstCleanupStarted.resolve()
+          await firstCleanupRelease.promise
+        },
+        handleEvent: () => {},
+      },
+      tmuxSessionManager: {
+        onEvent: () => {},
+        onSessionCreated: async () => {
+          createCalls += 1
+          if (createCalls !== 2) return
+          replacementCreated = true
+          updateSessionAgent(sessionID, "hephaestus")
+          setSessionModel(sessionID, { providerID: "openai", modelID: "replacement" })
+        },
+        onSessionDeleted: async () => {
+          if (replacementCreated) staleTeardownAfterReplacement = true
+        },
+      },
+    } as Managers
+    const handler = createEventHandler({
+      ctx: {} as EventHandlerArgs["ctx"],
+      pluginConfig: { tmux: { enabled: true } } as EventHandlerArgs["pluginConfig"],
+      firstMessageVariantGate: { markSessionCreated: () => {}, clear: () => {} },
+      managers,
+      hooks: {} as EventHandlerArgs["hooks"],
+    })
+    const createdEvent = {
+      event: { type: "session.created", properties: { info: { id: sessionID } } },
+    } as Parameters<typeof handler>[0]
+    const deletedEvent = {
+      event: { type: "session.deleted", properties: { info: { id: sessionID } } },
+    } as Parameters<typeof handler>[0]
+
+    await handler(createdEvent)
+    const firstDeletion = handler(deletedEvent)
+    await firstCleanupStarted.promise
+    const secondDeletion = handler(deletedEvent)
+    let recreationSettled = false
+    const recreation = handler(createdEvent).then(() => { recreationSettled = true })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(stopCalls).toBe(1)
+    expect(recreationSettled).toBe(false)
+    firstCleanupRelease.resolve()
+    await Promise.all([firstDeletion, secondDeletion, recreation])
+    expect(staleTeardownAfterReplacement).toBe(false)
+    expect(getSessionAgent(sessionID)).toBe("hephaestus")
+    expect(getSessionModel(sessionID)).toEqual({ providerID: "openai", modelID: "replacement" })
+  })
 })
