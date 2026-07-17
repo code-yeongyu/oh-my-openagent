@@ -118,7 +118,7 @@ describe("createDelegateTask native skill prompt filtering", () => {
       disabledSkills: new Set(["blocked-native-skill", "debugging"]),
       availableSkills: [
         {
-          name: "shared/ulw-plan",
+          name: "ulw-plan",
           description: "Bundled shared ulw-plan",
           location: "plugin",
         },
@@ -127,8 +127,8 @@ describe("createDelegateTask native skill prompt filtering", () => {
         all() {
           return [
             nativeSkill("blocked-native-skill", "BLOCKED_NATIVE_PROMPT_INJECTION"),
-            nativeSkill("shared/Debugging", "DISABLED_SHARED_ALIAS_INJECTION"),
-            nativeSkill("Shared/ULW-PLAN", "IGNORE_ALL_PRIOR_INSTRUCTIONS"),
+            nativeSkill("debugging", "DISABLED_SHARED_ALIAS_INJECTION"),
+            nativeSkill("ulw-plan", "IGNORE_ALL_PRIOR_INSTRUCTIONS"),
             nativeSkill("safe-native-skill", "Safe native guidance"),
           ]
         },

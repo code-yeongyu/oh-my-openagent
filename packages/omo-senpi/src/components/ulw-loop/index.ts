@@ -2,6 +2,7 @@ import { spawn } from "node:child_process"
 import { accessSync, constants, existsSync } from "node:fs"
 import { delimiter, join } from "node:path"
 
+import { findContinuableBoulderWork } from "../start-work-continuation/boulder-eligibility"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 
 const STATUS_ARGS = ["ulw-loop", "status", "--json"] as const
@@ -78,7 +79,14 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
           return
         }
 
-        const status = await readActiveStatus(omoBin, runCommand, cwdFromContext(eventCtx), ctx)
+        const cwd = cwdFromContext(eventCtx)
+        const sessionId = extractSessionId(eventCtx)
+        if (sessionId && findContinuableBoulderWork(cwd, sessionId) !== null) {
+          ctx.logger.info("omo-senpi ulw-loop continuation skipped", { reason: "boulder-continuation-active" })
+          return
+        }
+
+        const status = await readActiveStatus(omoBin, runCommand, cwd, ctx)
         if (!status.active) {
           state.previousStatusRaw = undefined
           ctx.logger.info("omo-senpi ulw-loop continuation skipped", { reason: "inactive" })
@@ -212,6 +220,15 @@ function isInputEvent(value: unknown): value is InputEventLike {
 
 function isUserSourcedInput(value: InputEventLike): boolean {
   return value.source !== "extension"
+}
+
+function extractSessionId(eventCtx: unknown): string | undefined {
+  if (!isRecord(eventCtx)) return undefined
+  const value = eventCtx["sessionManager"]
+  if (!isRecord(value) || typeof value["getSessionId"] !== "function") return undefined
+  const manager = value as unknown as { getSessionId(): unknown }
+  const id = manager.getSessionId()
+  return typeof id === "string" ? id : undefined
 }
 
 function cwdFromContext(value: unknown): string {

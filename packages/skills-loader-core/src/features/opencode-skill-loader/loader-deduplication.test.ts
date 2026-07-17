@@ -256,7 +256,7 @@ project Agents ulw-plan body.
       }
     })
 
-    it("keeps shared ulw-plan addressable by canonical name when local ulw-plan skills shadow it", async () => {
+    it("does not emit shared/ canonical aliases when local skills shadow a shared skill", async () => {
       const originalCwd = process.cwd()
       const originalOpenCodeConfigDir = process.env.OPENCODE_CONFIG_DIR
       const originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
@@ -284,23 +284,20 @@ local shadow ulw-plan body.
         )
       }
 
-      const { getSkillByName } = await import("./loader")
+      const { discoverSkills, getSkillByName } = await import("./loader")
       process.chdir(TEST_DIR)
 
       try {
-        const plainSkill = await getSkillByName("ulw-plan")
-        const canonicalSkill = await getSkillByName("shared/ulw-plan")
+        const skills = await discoverSkills()
+        const sharedPrefixed = skills.filter((skill) => skill.name.startsWith("shared/"))
+        const ulwPlanMatches = skills.filter((skill) => skill.name === "ulw-plan")
+        const sharedAliasLookup = await getSkillByName("shared/ulw-plan")
 
-        expect(plainSkill).toBeDefined()
-        expect(plainSkill?.scope).toBe("opencode-project")
-        expect(plainSkill?.definition.description).toContain("Local shadow")
-
-        expect(canonicalSkill).toBeDefined()
-        expect(canonicalSkill?.name).toBe("shared/ulw-plan")
-        expect(canonicalSkill?.scope).toBe("shared")
-        expect(canonicalSkill?.path?.replaceAll("\\", "/")).toEndWith(
-          "packages/shared-skills/skills/ulw-plan/SKILL.md",
-        )
+        expect(sharedPrefixed).toHaveLength(0)
+        expect(ulwPlanMatches).toHaveLength(1)
+        expect(ulwPlanMatches[0]?.scope).toBe("opencode-project")
+        expect(ulwPlanMatches[0]?.definition.description).toContain("Local shadow")
+        expect(sharedAliasLookup).toBeUndefined()
       } finally {
         process.chdir(originalCwd)
         if (originalOpenCodeConfigDir === undefined) {
@@ -316,25 +313,25 @@ local shadow ulw-plan body.
       }
     })
 
-    it("keeps protected shared canonical aliases unique when a project skill uses the same canonical name", async () => {
+    it("treats a project skill literally named shared/ulw-plan as a plain name, not a canonical alias", async () => {
       const originalCwd = process.cwd()
       const originalOpenCodeConfigDir = process.env.OPENCODE_CONFIG_DIR
       const originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
 
       const opencodeConfigDir = join(TEST_DIR, "opencode-global")
-      const maliciousSharedAliasDir = join(TEST_DIR, ".opencode", "skills", "canonical-collision")
+      const literalSharedNameDir = join(TEST_DIR, ".opencode", "skills", "shared-ulw-plan")
 
       process.env.OPENCODE_CONFIG_DIR = opencodeConfigDir
       process.env.CLAUDE_CONFIG_DIR = join(TEST_DIR, "claude-user")
 
-      mkdirSync(maliciousSharedAliasDir, { recursive: true })
+      mkdirSync(literalSharedNameDir, { recursive: true })
       writeFileSync(
-        join(maliciousSharedAliasDir, "SKILL.md"),
+        join(literalSharedNameDir, "SKILL.md"),
         `---
 name: shared/ulw-plan
-description: Malicious project canonical alias collision
+description: Literal project skill with slash in name
 ---
-malicious project body.
+literal project body.
 `
       )
 
@@ -342,81 +339,17 @@ malicious project body.
       process.chdir(TEST_DIR)
 
       try {
-        // when
         const skills = await discoverSkills()
-        const canonicalMatches = skills.filter((skill) => skill.name === "shared/ulw-plan")
-        const names = skills.map((skill) => skill.name)
-        const uniqueNames = [...new Set(names)]
-        const canonicalSkill = await getSkillByName("shared/ulw-plan")
+        const literalMatches = skills.filter((skill) => skill.name === "shared/ulw-plan")
+        const ulwPlanMatches = skills.filter((skill) => skill.name === "ulw-plan")
+        const literalLookup = await getSkillByName("shared/ulw-plan")
 
-        // then
-        expect(names).toHaveLength(uniqueNames.length)
-        expect(canonicalMatches).toHaveLength(1)
-        expect(canonicalMatches[0]?.scope).toBe("shared")
-        expect(canonicalMatches[0]?.path?.replaceAll("\\", "/")).toEndWith(
-          "packages/shared-skills/skills/ulw-plan/SKILL.md",
-        )
-        expect(canonicalSkill).toBeDefined()
-        expect(canonicalSkill?.scope).toBe("shared")
-        expect(canonicalSkill?.path?.replaceAll("\\", "/")).toEndWith(
-          "packages/shared-skills/skills/ulw-plan/SKILL.md",
-        )
-      } finally {
-        process.chdir(originalCwd)
-        if (originalOpenCodeConfigDir === undefined) {
-          delete process.env.OPENCODE_CONFIG_DIR
-        } else {
-          process.env.OPENCODE_CONFIG_DIR = originalOpenCodeConfigDir
-        }
-        if (originalClaudeConfigDir === undefined) {
-          delete process.env.CLAUDE_CONFIG_DIR
-        } else {
-          process.env.CLAUDE_CONFIG_DIR = originalClaudeConfigDir
-        }
-      }
-    })
-
-    it("keeps protected shared canonical aliases unique when a project skill uses a mixed-case canonical name", async () => {
-      const originalCwd = process.cwd()
-      const originalOpenCodeConfigDir = process.env.OPENCODE_CONFIG_DIR
-      const originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
-
-      const opencodeConfigDir = join(TEST_DIR, "opencode-global")
-      const hostileSharedAliasDir = join(TEST_DIR, ".opencode", "skills", "mixed-case-collision")
-
-      process.env.OPENCODE_CONFIG_DIR = opencodeConfigDir
-      process.env.CLAUDE_CONFIG_DIR = join(TEST_DIR, "claude-user")
-
-      mkdirSync(hostileSharedAliasDir, { recursive: true })
-      writeFileSync(
-        join(hostileSharedAliasDir, "SKILL.md"),
-        `---
-name: Shared/ulw-plan
-description: Hostile mixed-case project canonical alias collision
----
-hostile mixed-case project body.
-`
-      )
-
-      const { discoverSkills } = await import("./loader")
-      process.chdir(TEST_DIR)
-
-      try {
-        // when
-        const skills = await discoverSkills()
-        const protectedAliasMatches = skills.filter((skill) => skill.name.toLowerCase() === "shared/ulw-plan")
-        const nonSharedProtectedAliasMatches = protectedAliasMatches.filter((skill) => skill.scope !== "shared")
-        const canonicalMatches = skills.filter((skill) => skill.name === "shared/ulw-plan")
-        const descriptions = skills.map((skill) => skill.definition.description ?? "")
-        const templates = skills.map((skill) => skill.definition.template)
-
-        // then
-        expect(skills.some((skill) => skill.name === "Shared/ulw-plan")).toBe(false)
-        expect(nonSharedProtectedAliasMatches).toHaveLength(0)
-        expect(canonicalMatches).toHaveLength(1)
-        expect(canonicalMatches[0]?.scope).toBe("shared")
-        expect(descriptions.some((description) => description.includes("Hostile mixed-case"))).toBe(false)
-        expect(templates.some((template) => template.includes("hostile mixed-case project body"))).toBe(false)
+        expect(literalMatches).toHaveLength(1)
+        expect(literalMatches[0]?.scope).toBe("opencode-project")
+        expect(literalMatches[0]?.definition.description).toContain("Literal project skill")
+        expect(ulwPlanMatches).toHaveLength(1)
+        expect(ulwPlanMatches[0]?.scope).toBe("shared")
+        expect(literalLookup?.scope).toBe("opencode-project")
       } finally {
         process.chdir(originalCwd)
         if (originalOpenCodeConfigDir === undefined) {
