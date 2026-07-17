@@ -131,6 +131,10 @@ export function createEventHandler(args: {
 
     const { event } = input;
     const props = event.properties as Record<string, unknown> | undefined;
+    if (event.type === "session.created") {
+      const sessionID = resolveSessionEventID(props);
+      if (sessionID) await sessionDeletionTasks.get(sessionID)?.catch(() => undefined);
+    }
     const deletionReservation = event.type === "session.deleted"
       ? reserveSessionDeletedEvent({
           props,

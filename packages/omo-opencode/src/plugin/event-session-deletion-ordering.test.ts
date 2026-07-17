@@ -138,4 +138,54 @@ describe("plugin session deletion ordering", () => {
     expect(getSessionAgent(sessionID)).toBe("hephaestus")
     expect(getSessionModel(sessionID)).toEqual({ providerID: "openai", modelID: "replacement" })
   })
+
+  it("#given deletion pauses before later hooks #when the same ID is recreated #then replacement hooks wait for deletion fan-out", async () => {
+    const deletionHookRelease = deferred<void>()
+    const deletionHookStarted = deferred<void>()
+    const sessionID = "session-recreated-before-deletion-hook-fanout"
+    let replacementHookState: string | undefined
+    const handler = createEventHandler({
+      ctx: {} as EventHandlerArgs["ctx"],
+      pluginConfig: {} as EventHandlerArgs["pluginConfig"],
+      firstMessageVariantGate: { markSessionCreated: () => {}, clear: () => {} },
+      managers: {
+        skillMcpManager: { disconnectSession: async () => {} },
+        monitorManager: { stopSessionMonitors: async () => {}, handleEvent: () => {} },
+        tmuxSessionManager: { onEvent: () => {}, onSessionCreated: async () => {}, onSessionDeleted: async () => {} },
+      } as Managers,
+      hooks: {
+        autoUpdateChecker: {
+          event: async (input) => {
+            if (input.event.type !== "session.deleted") return
+            deletionHookStarted.resolve()
+            await deletionHookRelease.promise
+          },
+        },
+        runtimeFallback: {
+          event: async (input) => {
+            if (input.event.type === "session.created") replacementHookState = "replacement"
+            if (input.event.type === "session.deleted") replacementHookState = undefined
+          },
+        },
+      } as EventHandlerArgs["hooks"],
+    })
+    const createdEvent = {
+      event: { type: "session.created", properties: { info: { id: sessionID } } },
+    } as Parameters<typeof handler>[0]
+    const deletedEvent = {
+      event: { type: "session.deleted", properties: { info: { id: sessionID } } },
+    } as Parameters<typeof handler>[0]
+
+    await handler(createdEvent)
+    replacementHookState = undefined
+    const deletion = handler(deletedEvent)
+    await deletionHookStarted.promise
+    const recreation = handler(createdEvent)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(replacementHookState).toBeUndefined()
+    deletionHookRelease.resolve()
+    await Promise.all([deletion, recreation])
+    expect(replacementHookState).toBe("replacement")
+  })
 })
