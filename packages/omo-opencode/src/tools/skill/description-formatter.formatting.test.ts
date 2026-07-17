@@ -6,12 +6,21 @@ import {
   builtinSharedSkill,
   makeCommand,
   makeSkill,
-  opencodeNativeSkill,
   sharedSkill,
 } from "./description-formatter.test-support"
 
-describe("formatCombinedDescription with path-alias deduplication", () => {
-  it("omits the bare alias from the injected description", () => {
+describe("formatCombinedDescription with bare-name skills", () => {
+  it("lists all skills when no name collisions exist", () => {
+    const skills: SkillInfo[] = [
+      makeSkill("debugging"),
+      makeSkill("review-work"),
+    ]
+    const result = formatCombinedDescription(skills, [], { includeSkills: true })
+    expect(result).toContain("/debugging")
+    expect(result).toContain("/review-work")
+  })
+
+  it("keeps bare and qualified names distinct after the shared/ cutover", () => {
     const skills: SkillInfo[] = [
       sharedSkill("debugging"),
       builtinSharedSkill("debugging"),
@@ -19,15 +28,15 @@ describe("formatCombinedDescription with path-alias deduplication", () => {
     ]
     const result = formatCombinedDescription(skills, [], { includeSkills: true })
     expect(result).toContain("/shared/debugging")
-    expect(result).not.toContain("\n    <name>/debugging</name>")
+    expect(result).toContain("/debugging")
     expect(result).toContain("/review-work")
   })
 
-  it("omits shorter shared-derived builtin commands when the shared skill is listed", () => {
+  it("suppresses builtin commands that share an exact name with a skill", () => {
     const skills: SkillInfo[] = [
-      sharedSkill("refactor", "full refactor skill"),
-      sharedSkill("remove-ai-slops", "full cleanup skill"),
-      sharedSkill("start-work", "full start-work skill"),
+      makeSkill("refactor", "full refactor skill"),
+      makeSkill("remove-ai-slops", "full cleanup skill"),
+      makeSkill("start-work", "full start-work skill"),
     ]
     const commands: CommandInfo[] = [
       makeCommand("refactor", "short refactor command"),
@@ -37,65 +46,22 @@ describe("formatCombinedDescription with path-alias deduplication", () => {
     ]
 
     const result = formatCombinedDescription(skills, commands, { includeSkills: true })
-
-    expect(result).toContain("<name>/shared/refactor</name>")
-    expect(result).toContain("<name>/shared/remove-ai-slops</name>")
-    expect(result).toContain("<name>/shared/start-work</name>")
-    expect(result).not.toContain("\n    <name>/refactor</name>")
-    expect(result).not.toContain("\n    <name>/remove-ai-slops</name>")
-    expect(result).not.toContain("\n    <name>/start-work</name>")
+    expect(result).toContain("/refactor")
+    expect(result).toContain("/remove-ai-slops")
+    expect(result).toContain("/start-work")
     expect(result).not.toContain("short refactor command")
     expect(result).not.toContain("short cleanup command")
     expect(result).not.toContain("short start-work command")
-    expect(result).toContain("handoff command")
+    expect(result).toContain("/handoff")
   })
 
-  it("keeps distinct project commands even when a shared skill has the same short name", () => {
-    const skills: SkillInfo[] = [sharedSkill("refactor", "full refactor skill")]
-    const commands: CommandInfo[] = [
-      makeCommand("refactor", "project refactor command", { scope: "project" }),
-    ]
+  it("does not suppress builtin commands when no skill shares the exact name", () => {
+    const skills: SkillInfo[] = [makeSkill("debugging")]
+    const commands: CommandInfo[] = [makeCommand("refactor", "short refactor command")]
 
     const result = formatCombinedDescription(skills, commands, { includeSkills: true })
-
-    expect(result).toContain("<name>/shared/refactor</name>")
-    expect(result).toContain("\n    <name>/refactor</name>")
-    expect(result).toContain("full refactor skill")
-    expect(result).toContain("project refactor command")
-  })
-
-  it("keeps builtin commands when the matching qualified skill is not shared-derived", () => {
-    const skills: SkillInfo[] = [
-      makeSkill("project/refactor", "project refactor skill", {
-        scope: "project",
-        location: "/repo/.agents/skills/project/refactor/SKILL.md",
-      }),
-    ]
-    const commands: CommandInfo[] = [
-      makeCommand("refactor", "builtin refactor command"),
-    ]
-
-    const result = formatCombinedDescription(skills, commands, { includeSkills: true })
-
-    expect(result).toContain("<name>/project/refactor</name>")
-    expect(result).toContain("\n    <name>/refactor</name>")
-    expect(result).toContain("project refactor skill")
-    expect(result).toContain("builtin refactor command")
-  })
-
-  it("keeps OpenCode-injected native skills while suppressing shared path aliases", () => {
-    const skills: SkillInfo[] = [
-      sharedSkill("debugging", "full shared debugging"),
-      builtinSharedSkill("debugging", "short debugging wrapper"),
-      opencodeNativeSkill("opencode/customize-opencode", "Qualified OpenCode customize entry"),
-      opencodeNativeSkill("customize-opencode", "Customize OpenCode"),
-    ]
-
-    const result = formatCombinedDescription(skills, [], { includeSkills: true })
-
-    expect(result).toContain("<name>/shared/debugging</name>")
-    expect(result).not.toContain("\n    <name>/debugging</name>")
-    expect(result).toContain("<name>/customize-opencode</name>")
-    expect(result).toContain("Customize OpenCode")
+    expect(result).toContain("/debugging")
+    expect(result).toContain("/refactor")
+    expect(result).toContain("short refactor command")
   })
 })

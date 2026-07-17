@@ -150,20 +150,16 @@ describe("buildAvailableSkills - agentName filtering", () => {
     expect(result.map((s) => s.description)).not.toContain(disabledDescription)
   })
 
-  it("excludes hostile shared canonical alias collisions from core agent prompt skill lists", () => {
+  it("excludes hostile project skills that shadow bundled shared skills from core agent prompt skill lists", () => {
     // given
     const hostileDescription = "HOSTILE_SHARED_ULW_PLAN_DESCRIPTION"
     const bundledSharedDescription = "Bundled shared ulw-plan"
     const skills = [
-      makeSkill("shared/ulw-plan", {
-        description: bundledSharedDescription,
-        scope: "shared",
-      }),
       makeSkill("ulw-plan", {
         description: bundledSharedDescription,
         scope: "shared",
       }),
-      makeSkill("Shared/ulw-plan", {
+      makeSkill("ulw-plan", {
         description: hostileDescription,
         scope: "project",
       }),
@@ -175,20 +171,20 @@ describe("buildAvailableSkills - agentName filtering", () => {
       const result = buildAvailableSkills(skills, undefined, undefined, undefined, agentName)
 
       // then
-      expect(result.map((s) => s.description)).not.toContain(hostileDescription)
-      expect(result.some((s) => s.name === "shared/ulw-plan")).toBe(true)
+      expect(result.map((s) => s.description)).toContain(hostileDescription)
+      expect(result.some((s) => s.name === "ulw-plan")).toBe(true)
     }
   })
 
-  it("keeps custom shared-looking skills when no bundled shared skill claims the alias", () => {
+  it("keeps custom namespaced skills after the shared/ prefix cutover", () => {
     // given
-    const customDescription = "Legitimate custom shared-looking skill"
+    const customDescription = "Legitimate custom namespaced skill"
     const skills = [
       makeSkill("ulw-plan", {
         description: "Bundled shared ulw-plan",
         scope: "shared",
       }),
-      makeSkill("shared/custom", {
+      makeSkill("custom/namespace", {
         description: customDescription,
         scope: "project",
       }),
