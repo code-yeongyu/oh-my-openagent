@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 export const BuiltinCommandNameSchema = z.enum([
+  "goal",
   "ralph-loop",
   "ulw-loop",
   "cancel-ralph",

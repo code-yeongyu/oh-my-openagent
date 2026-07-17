@@ -154,6 +154,32 @@ function mergeLoadedConfig(
   return applyDisabledProviders(config)
 }
 
+function migrateRalphLoopConfig(config: OhMyOpenCodeConfig): OhMyOpenCodeConfig {
+  const legacy = config.ralph_loop
+  if (legacy === undefined) {
+    return config
+  }
+
+  const enabled = typeof legacy.enabled === "boolean" ? legacy.enabled : undefined
+  const defaultMaxIterations = typeof legacy.default_max_iterations === "number" ? legacy.default_max_iterations : undefined
+
+  if (enabled === undefined && defaultMaxIterations === undefined) {
+    return config
+  }
+
+  console.warn("[config] ralph_loop is deprecated and will be removed in a future release. Use goal instead.")
+
+  const existingGoal = config.goal
+  return {
+    ...config,
+    goal: {
+      enabled: enabled ?? existingGoal?.enabled ?? false,
+      auto_start: existingGoal?.auto_start ?? false,
+      default_max_iterations: defaultMaxIterations ?? existingGoal?.default_max_iterations ?? 100,
+    },
+  }
+}
+
 export function validatePluginConfig(directory: string): PluginConfigValidation {
   const userLayersNearestFirst = discoverUserLayers().map((layer) => parseLayerConfig(layer.path))
   const projectLayersNearestFirst = discoverProjectLayersNearestFirst(directory).map((layer) => parseLayerConfig(layer.path))
@@ -164,6 +190,6 @@ export function validatePluginConfig(directory: string): PluginConfigValidation 
     valid: messages.length === 0,
     messages,
     path: firstFailingPath(layers) ?? firstPath(layers),
-    config: mergeLoadedConfig(userLayersNearestFirst, projectLayersNearestFirst),
+    config: migrateRalphLoopConfig(mergeLoadedConfig(userLayersNearestFirst, projectLayersNearestFirst)),
   }
 }

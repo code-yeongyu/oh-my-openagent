@@ -8,9 +8,14 @@ export const DefaultModeConfigSchema = z.object({
    */
   ultrawork: z.boolean().default(false),
   /**
-   * Automatically start ralph loop on main session start
-   * without requiring /ralph-loop or /ulw-loop commands.
-   * When ultrawork is also enabled, the loop starts in ultrawork mode.
+   * Automatically create a goal from the first main-session message
+   * without requiring the /goal command.
+   * When ultrawork is also enabled, the goal continuation prompt uses ultrawork mode.
+   */
+  goal: z.boolean().default(false),
+  /**
+   * Deprecated: automatically start ralph loop on main session start.
+   * Migrated to goal in validate.ts.
    */
   ralph_loop: z.boolean().default(false),
 })

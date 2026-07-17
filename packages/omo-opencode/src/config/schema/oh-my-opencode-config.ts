@@ -18,6 +18,7 @@ import { KeywordDetectorConfigSchema } from "./keyword-detector"
 import { NotificationConfigSchema } from "./notification"
 import { OpenClawConfigSchema } from "./openclaw"
 import { ModelCapabilitiesConfigSchema } from "./model-capabilities"
+import { GoalConfigSchema } from "./goal"
 import { MonitorConfigSchema } from "./monitor"
 import { RalphLoopConfigSchema } from "./ralph-loop"
 import { RuntimeFallbackConfigSchema } from "./runtime-fallback"
@@ -70,6 +71,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   experimental: ExperimentalConfigSchema.optional(),
   auto_update: z.boolean().optional(),
   skills: SkillsConfigSchema.optional(),
+  goal: GoalConfigSchema.optional(),
+  /** Compatibility shim: old \`ralph_loop\` key is parsed and migrated to \`goal\` in validate.ts. */
   ralph_loop: RalphLoopConfigSchema.optional(),
   /**
    * Enable runtime fallback (default: false)
@@ -99,7 +102,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   tui: TuiConfigSchema.default({ sidebar: { enabled: true } }).optional(),
   sisyphus: SisyphusConfigSchema.optional(),
   start_work: StartWorkConfigSchema.optional(),
-  /** Default mode auto-activation settings (ultrawork, ralph loop) */
+  /** Default mode auto-activation settings (ultrawork, goal) */
   default_mode: DefaultModeConfigSchema.optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */
   _migrations: z.array(z.string()).optional(),
