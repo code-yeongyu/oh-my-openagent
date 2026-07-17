@@ -5,7 +5,7 @@ import { detectSlashCommand, extractPromptText } from "../hooks/auto-slash-comma
 import { isSyntheticOrInternalOnlyTextParts, log } from "../shared"
 import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
 import type { PluginContext } from "./types"
-import { handleGoalMessage, handleRalphLoopMessage } from "./chat-message/loop-commands"
+import { handleGoalMessage } from "./chat-message/loop-commands"
 import { notifyWhenModelCacheIsMissing } from "./chat-message/model-cache-warning"
 import { recordSessionModel, getStoredMainSessionModel } from "./chat-message/session-model"
 import { runStartWorkHookIfApplicable } from "./chat-message/start-work-message"
@@ -129,13 +129,6 @@ export function createChatMessageHandler(args: {
     })
     await runStartWorkHookIfApplicable(hooks, input, output)
     notifyWhenModelCacheIsMissing(pluginContext.client.tui)
-    handleRalphLoopMessage({
-      hooks,
-      input,
-      output,
-      isFirstMessage,
-      pluginConfig,
-    })
     handleGoalMessage({
       hooks,
       input,

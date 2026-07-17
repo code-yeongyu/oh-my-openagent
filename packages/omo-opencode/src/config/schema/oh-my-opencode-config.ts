@@ -20,7 +20,6 @@ import { OpenClawConfigSchema } from "./openclaw"
 import { ModelCapabilitiesConfigSchema } from "./model-capabilities"
 import { GoalConfigSchema } from "./goal"
 import { MonitorConfigSchema } from "./monitor"
-import { RalphLoopConfigSchema } from "./ralph-loop"
 import { RuntimeFallbackConfigSchema } from "./runtime-fallback"
 import { TeamModeConfigSchema } from "./team-mode"
 import { SkillsConfigSchema } from "./skills"
@@ -72,8 +71,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   auto_update: z.boolean().optional(),
   skills: SkillsConfigSchema.optional(),
   goal: GoalConfigSchema.optional(),
-  /** Compatibility shim: old \`ralph_loop\` key is parsed and migrated to \`goal\` in validate.ts. */
-  ralph_loop: RalphLoopConfigSchema.optional(),
+  /** Deprecated compatibility shim. Old \`ralph_loop\` key is parsed and migrated to \`goal\` in validate.ts. */
+  ralph_loop: z.record(z.string(), z.unknown()).optional(),
   /**
    * Enable runtime fallback (default: false)
    * Set to false to disable, or use object for advanced config:

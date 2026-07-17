@@ -42,21 +42,6 @@ type StopContinuationGuard = {
   clear: (sessionID: string) => void
 }
 
-type RalphLoopHook = {
-  startLoop: (
-    sessionID: string,
-    prompt: string,
-    options?: {
-      readonly ultrawork?: boolean
-      readonly maxIterations?: number
-      readonly completionPromise?: string
-      readonly strategy?: "continue" | "reset"
-    },
-  ) => boolean | void
-  resumeLoop?: (sessionID: string) => boolean
-  cancelLoop: (sessionID: string) => boolean | void
-}
-
 type GoalHook = {
   setGoal: (sessionID: string, objective: string) => { readonly objective: string; readonly status: string } | null
   getGoal: (sessionID: string) => { readonly objective: string; readonly status: string } | null
@@ -83,7 +68,6 @@ export type ChatMessageHooks = {
   noHephaestusNonGpt?: ChatMessageHook | null
   hephaestusAgentsMdInjector?: ChatMessageHook | null
   startWork?: ChatMessageHook | null
-  ralphLoop?: RalphLoopHook | null
   goal?: GoalHook | null
   todoContinuationEnforcer?: TodoContinuationEnforcerHook | null
 }

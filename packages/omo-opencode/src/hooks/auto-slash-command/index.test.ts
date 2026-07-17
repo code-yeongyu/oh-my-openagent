@@ -166,35 +166,41 @@ describe("createAutoSlashCommandHook", () => {
     })
   })
 
-  describe("excluded commands", () => {
-    it("should NOT trigger for ralph-loop command", async () => {
-      // given ralph-loop command
+  describe("goal command", () => {
+    it("should inject template for /goal via chat.message", async () => {
+      // given goal command
       const hook = createAutoSlashCommandHook()
-      const sessionID = `test-session-ralph-${Date.now()}`
+      const sessionID = `test-session-goal-${Date.now()}`
       const input = createMockInput(sessionID)
-      const output = createMockOutput("/ralph-loop do something")
+      const output = createMockOutput("/goal implement the feature")
       const originalText = output.parts[0].text
 
       // when hook is called
       await hook["chat.message"](input, output)
 
-      // then should not modify (excluded command)
-      expect(output.parts[0].text).toBe(originalText)
+      // then should replace message with goal template
+      expect(output.parts[0].text).not.toBe(originalText)
+      expect(output.parts[0].text).toContain("<auto-slash-command>")
+      expect(output.parts[0].text).toContain("/goal Command")
+      expect(output.parts[0].text).toContain("<user-task>")
+      expect(output.parts[0].text).toContain("implement the feature")
     })
 
-    it("should NOT trigger for cancel-ralph command", async () => {
-      // given cancel-ralph command
+    it("should inject template for /goal with no args via chat.message", async () => {
+      // given bare goal command
       const hook = createAutoSlashCommandHook()
-      const sessionID = `test-session-cancel-${Date.now()}`
+      const sessionID = `test-session-goal-empty-${Date.now()}`
       const input = createMockInput(sessionID)
-      const output = createMockOutput("/cancel-ralph")
+      const output = createMockOutput("/goal")
       const originalText = output.parts[0].text
 
       // when hook is called
       await hook["chat.message"](input, output)
 
-      // then should not modify
-      expect(output.parts[0].text).toBe(originalText)
+      // then should replace message with goal template
+      expect(output.parts[0].text).not.toBe(originalText)
+      expect(output.parts[0].text).toContain("<auto-slash-command>")
+      expect(output.parts[0].text).toContain("/goal Command")
     })
   })
 
@@ -341,10 +347,10 @@ describe("createAutoSlashCommandHook", () => {
       expect(output.parts.length).toBe(0)
     })
 
-    it("should inject template for known builtin commands like ralph-loop", async () => {
+    it("should inject template for builtin goal command", async () => {
       //#given
       const hook = createAutoSlashCommandHook()
-      const input = createCommandInput("ralph-loop")
+      const input = createCommandInput("goal")
       const output = createCommandOutput("original")
 
       //#when
@@ -352,14 +358,14 @@ describe("createAutoSlashCommandHook", () => {
 
       //#then
       expect(output.parts[0].text).toContain("<auto-slash-command>")
-      expect(output.parts[0].text).toContain("/ralph-loop Command")
+      expect(output.parts[0].text).toContain("/goal Command")
     })
 
     it("should not duplicate injection when command output is already tagged", async () => {
       //#given
       const hook = createAutoSlashCommandHook()
-      const input = createCommandInput("ralph-loop")
-      const taggedContent = "<auto-slash-command>\n/ralph-loop Command\n</auto-slash-command>"
+      const input = createCommandInput("goal")
+      const taggedContent = "<auto-slash-command>\n/goal Command\n</auto-slash-command>"
       const output = createCommandOutput(taggedContent)
 
       //#when
@@ -371,10 +377,10 @@ describe("createAutoSlashCommandHook", () => {
       expect(output.parts[0]?.text?.split("<auto-slash-command>").length).toBe(2)
     })
 
-    it("should inject template for known builtin commands like ulw-loop", async () => {
+    it("should inject template for builtin goal command with arguments", async () => {
       //#given
       const hook = createAutoSlashCommandHook()
-      const input = createCommandInput("ulw-loop", '"Ship feature" --strategy=continue')
+      const input = createCommandInput("goal", "implement auth flow")
       const output = createCommandOutput("original")
 
       //#when
@@ -382,9 +388,9 @@ describe("createAutoSlashCommandHook", () => {
 
       //#then
       expect(output.parts[0].text).toContain("<auto-slash-command>")
-      expect(output.parts[0].text).toContain("/ulw-loop Command")
+      expect(output.parts[0].text).toContain("/goal Command")
       expect(output.parts[0].text).toContain("<user-task>")
-      expect(output.parts[0].text).toContain('"Ship feature" --strategy=continue')
+      expect(output.parts[0].text).toContain("implement auth flow")
     })
 
     it("should pass command arguments correctly", async () => {
@@ -409,8 +415,8 @@ describe("createAutoSlashCommandHook", () => {
     it("should not duplicate injection when parts already contain auto-slash-command tags (#3724)", async () => {
       //#given - parts already have tags (as if chat.message hook already ran)
       const hook = createAutoSlashCommandHook()
-      const input = createCommandInput("ralph-loop")
-      const alreadyTagged = "<auto-slash-command>\n/ralph-loop Command\n## Command Instructions\ntemplate content\n</auto-slash-command>"
+      const input = createCommandInput("goal")
+      const alreadyTagged = "<auto-slash-command>\n/goal Command\n## Command Instructions\ntemplate content\n</auto-slash-command>"
       const output: CommandExecuteBeforeOutput = {
         parts: [{ type: "text", text: alreadyTagged }],
       }

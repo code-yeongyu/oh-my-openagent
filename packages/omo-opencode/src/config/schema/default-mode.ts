@@ -7,17 +7,12 @@ export const DefaultModeConfigSchema = z.object({
    * The ultrawork mode system prompt is injected once per session.
    */
   ultrawork: z.boolean().default(false),
-  /**
-   * Automatically create a goal from the first main-session message
-   * without requiring the /goal command.
-   * When ultrawork is also enabled, the goal continuation prompt uses ultrawork mode.
-   */
-  goal: z.boolean().default(false),
-  /**
-   * Deprecated: automatically start ralph loop on main session start.
-   * Migrated to goal in validate.ts.
-   */
-  ralph_loop: z.boolean().default(false),
+ /**
+ * Automatically create a goal from the first main-session message
+ * without requiring the /goal command.
+ * When ultrawork is also enabled, the goal continuation prompt uses ultrawork mode.
+ */
+ goal: z.boolean().default(false),
 })
 
 export type DefaultModeConfig = z.infer<typeof DefaultModeConfigSchema>

@@ -15,7 +15,6 @@ import {
   createAgentUsageReminderHook,
   createNonInteractiveEnvHook,
   createInteractiveBashSessionHook,
-  createRalphLoopHook,
   createEditErrorRecoveryHook,
   createDelegateTaskRetryHook,
   createTaskResumeInfoHook,
@@ -53,7 +52,6 @@ export type SessionHooks = {
   agentUsageReminder: ReturnType<typeof createAgentUsageReminderHook> | null
   nonInteractiveEnv: ReturnType<typeof createNonInteractiveEnvHook> | null
   interactiveBashSession: ReturnType<typeof createInteractiveBashSessionHook> | null
-  ralphLoop: ReturnType<typeof createRalphLoopHook> | null
   goal: ReturnType<typeof createGoalHook> | null
   editErrorRecovery: ReturnType<typeof createEditErrorRecoveryHook> | null
   delegateTaskRetry: ReturnType<typeof createDelegateTaskRetryHook> | null
@@ -167,15 +165,6 @@ export function createSessionHooks(args: {
     ? safeHook("interactive-bash-session", () => createInteractiveBashSessionHook(ctx))
     : null
 
-  const ralphLoop = isHookEnabled("ralph-loop")
-    ? safeHook("ralph-loop", () =>
-        createRalphLoopHook(ctx, {
-          config: pluginConfig.ralph_loop,
-          checkSessionExists: async (sessionId) => await sessionExists(sessionId),
-          backgroundManager,
-        }))
-    : null
-
   const goal = isHookEnabled("goal") && pluginConfig.goal?.enabled
     ? safeHook("goal", () =>
         createGoalHook(ctx, {
@@ -258,7 +247,6 @@ export function createSessionHooks(args: {
     agentUsageReminder,
     nonInteractiveEnv,
     interactiveBashSession,
-    ralphLoop,
     goal,
     editErrorRecovery,
     delegateTaskRetry,
