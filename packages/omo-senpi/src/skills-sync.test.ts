@@ -4,8 +4,37 @@ import { join, relative } from "node:path"
 
 const repoRoot = join(import.meta.dir, "..", "..", "..")
 const skillsRoot = join(repoRoot, "packages", "omo-senpi", "plugin", "skills")
-const expectedSkillNames = ["ultrawork", "ulw-loop"] as const
+
+const expectedSkillNames = [
+  "ast-grep",
+  "coding-agent-sessions",
+  "debugging",
+  "frontend",
+  "git-master",
+  "init-deep",
+  "lsp-setup",
+  "programming",
+  "refactor",
+  "remove-ai-slops",
+  "review-work",
+  "start-work",
+  "ultimate-browsing",
+  "ultrawork",
+  "ulw-loop",
+  "ulw-plan",
+  "ulw-research",
+  "visual-qa",
+] as const
+
+const CODEX_DERIVED_SKILL_NAMES: Record<string, true> = {
+  ultrawork: true,
+  "ulw-loop": true,
+}
+const sharedSkillNames = expectedSkillNames.filter((name) => !(name in CODEX_DERIVED_SKILL_NAMES))
+const namePattern = /^[a-z0-9-]{1,64}$/
 const forbiddenTokenPattern = /\b(?:codex|multi_agent|spawn_agent)\b/i
+const opencodeOrchestrationPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/
+const compatibilitySectionHeading = "## Senpi Harness Tool Compatibility"
 
 function listDirectoryNames(path: string): string[] {
   if (!existsSync(path)) {
@@ -47,44 +76,97 @@ function expectFrontmatterField(frontmatter: string, field: string, path: string
   expect(pattern.test(frontmatter), `${relative(repoRoot, path)} frontmatter must include ${field}`).toBe(true)
 }
 
+function extractFrontmatterField(frontmatter: string, field: string): string | undefined {
+  const match = frontmatter.match(new RegExp(`^${field}:\\s*(.*?)$`, "m"))
+  return match?.[1]?.trim()
+}
+
 describe("OMO Senpi scoped skill sync", () => {
-  test("#given synced skill output #when inspected #then only ultrawork and ulw-loop roots exist", () => {
-    expect(listDirectoryNames(skillsRoot)).toEqual([...expectedSkillNames].sort())
+  test("#given synced skill output #when inspected #then exactly 18 roots exist with valid names", () => {
+    const actualNames = listDirectoryNames(skillsRoot)
+    expect(actualNames).toEqual([...expectedSkillNames].sort())
 
     for (const skillName of expectedSkillNames) {
       const skillFile = join(skillsRoot, skillName, "SKILL.md")
       expect(existsSync(skillFile), `${relative(repoRoot, skillFile)} must exist`).toBe(true)
       expect(statSync(skillFile).isFile(), `${relative(repoRoot, skillFile)} must be a file`).toBe(true)
+      expect(namePattern.test(skillName), `${skillName} must match ${namePattern.source}`).toBe(true)
     }
-
-    expect(existsSync(join(skillsRoot, "ulw-plan"))).toBe(false)
   })
 
-  test("#given synced skill roots #when frontmatter is parsed #then every root skill has name and description", () => {
+  test("#given synced skill roots #when frontmatter is parsed #then every root skill has name, description, and valid values", () => {
     for (const skillName of expectedSkillNames) {
       const skillFile = join(skillsRoot, skillName, "SKILL.md")
-      const frontmatter = readFrontmatter(readFileSync(skillFile, "utf8"), skillFile)
+      const content = readFileSync(skillFile, "utf8")
+      const frontmatter = readFrontmatter(content, skillFile)
 
       expectFrontmatterField(frontmatter, "name", skillFile)
       expectFrontmatterField(frontmatter, "description", skillFile)
+
+      const name = extractFrontmatterField(frontmatter, "name")
+      expect(name, `${relative(repoRoot, skillFile)} frontmatter name must equal ${skillName}`).toBe(skillName)
+
+      const descriptionLine = frontmatter.match(/^description:\\s*(.*)$/m)?.[0] ?? ""
+      expect(
+        descriptionLine.length,
+        `${relative(repoRoot, skillFile)} description line must be <= 1024 chars`,
+      ).toBeLessThanOrEqual(1024)
     }
   })
 
-  test("#given synced skill files #when scanned #then no Codex or multi-agent harness guidance survives", () => {
-    const files = listFiles(skillsRoot)
-    expect(files.map((file) => toPortablePath(relative(skillsRoot, file))).sort()).toContain(
-      "ulw-loop/references/full-workflow.md",
-    )
+  test("#given codex-derived skill roots #when scanned #then no Codex or multi-agent harness guidance survives", () => {
+    const leaks: string[] = []
 
-    const leaks = files.flatMap((file) => {
-      const content = readFileSync(file, "utf8")
-      return forbiddenTokenPattern.test(content) ? [relative(repoRoot, file)] : []
-    })
+    for (const skillName of Object.keys(CODEX_DERIVED_SKILL_NAMES)) {
+      const skillRoot = join(skillsRoot, skillName)
+      if (!existsSync(skillRoot)) continue
+
+      for (const file of listFiles(skillRoot)) {
+        const content = readFileSync(file, "utf8")
+        if (forbiddenTokenPattern.test(content)) {
+          leaks.push(relative(repoRoot, file))
+        }
+      }
+    }
 
     expect(leaks).toEqual([])
   })
-})
 
-function toPortablePath(path: string): string {
-  return path.replaceAll("\\", "/")
-}
+  test("#given shared skill roots with opencode orchestration #when inspected #then a Senpi compatibility section precedes the first example", () => {
+    const missing: string[] = []
+
+    for (const skillName of sharedSkillNames) {
+      const skillFile = join(skillsRoot, skillName, "SKILL.md")
+      if (!existsSync(skillFile)) continue
+
+      const content = readFileSync(skillFile, "utf8")
+      const firstExampleMatch = opencodeOrchestrationPattern.exec(content)
+      if (firstExampleMatch === null) continue
+
+      const sectionIndex = content.indexOf(compatibilitySectionHeading)
+      if (sectionIndex === -1 || sectionIndex > firstExampleMatch.index) {
+        missing.push(relative(repoRoot, skillFile))
+      }
+    }
+
+    expect(missing).toEqual([])
+  })
+
+  test("#given start-work skill #when inspected #then session ids reference senpi, not codex", () => {
+    const skillFile = join(skillsRoot, "start-work", "SKILL.md")
+    const content = readFileSync(skillFile, "utf8")
+
+    expect(content.includes("senpi:<session_id>"), "start-work must reference senpi:<session_id>").toBe(true)
+    expect(content.includes("codex:<session_id>"), "start-work must not reference codex:<session_id>").toBe(false)
+  })
+
+  test("#given synced skill tree #when inspected #then no codex-only display metadata is packaged", () => {
+    const openaiFiles = listFiles(skillsRoot).filter((file) => file.endsWith("agents/openai.yaml"))
+    expect(openaiFiles.map((file) => relative(repoRoot, file))).toEqual([])
+  })
+
+  test("#given frontend skill #when inspected #then materialized design references exist", () => {
+    const refsDir = join(skillsRoot, "frontend", "references", "design")
+    expect(existsSync(refsDir), "frontend/references/design must exist after materialization").toBe(true)
+  })
+})
