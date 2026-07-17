@@ -32,7 +32,6 @@ export function createAbortSessionRequest(deps: HookDeps) {
           throwOnError: true,
         })
         if (isInternalAbort && !isCurrentAbortRequest()) {
-          releaseInternalAbortOwnership(deps, sessionID)
           return false
         }
         if (!isRuntimeFallbackActive(deps)) {
@@ -65,7 +64,6 @@ export function createAbortSessionRequest(deps: HookDeps) {
         return true
       } catch (error) {
         if (isInternalAbort && !isCurrentAbortRequest()) {
-          releaseInternalAbortOwnership(deps, sessionID)
           return false
         }
         if (isInternalAbort) {
