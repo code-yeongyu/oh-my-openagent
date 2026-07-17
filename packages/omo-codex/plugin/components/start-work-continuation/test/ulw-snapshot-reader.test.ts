@@ -135,6 +135,28 @@ describe("ULW snapshot bridge", () => {
 		expect(parsed.reason).toContain("- Next action: `Continue from the Codex-scoped ULW snapshot`");
 	});
 
+	it("#given a writer-normalized Codex-scoped ULW snapshot #when hook runs with the prefixed session id #then snapshot is surfaced", () => {
+		// given
+		const workspace = createWorkspace({ worktreePath: null });
+		const snapshotPath = writeSnapshotAt(
+			workspace,
+			["codex-sess_abc"],
+			createSnapshotMarkdown({
+				metadata: ["- Session ID: codex:sess_abc", "- Plan Path: .omo/ulw-loop/codex-sess_abc/goals.json"],
+				nextAction: "Continue from the writer-normalized Codex-scoped snapshot",
+			}),
+		);
+
+		// when
+		const output = runStopHook(createStopInput(workspace, "codex:sess_abc"), createDiskBackedFs());
+
+		// then
+		const parsed = parseBlockOutput(output);
+		expect(parsed.reason).toContain("# Repo-native ULW snapshot");
+		expect(parsed.reason).toContain(`- Snapshot path: \`${snapshotPath}\``);
+		expect(parsed.reason).toContain("- Next action: `Continue from the writer-normalized Codex-scoped snapshot`");
+	});
+
 	it.each(
 		UNSAFE_OR_MALFORMED_SNAPSHOT_CASES,
 	)("#given unsafe or malformed scoped ULW snapshot $name #when reader runs #then snapshot is omitted", ({
