@@ -16,20 +16,22 @@ Launching the real TUI would create sessions in the real ~/.local/share/opencode
 
 ## Browser-rendered TUI visual evidence
 
-For PR evidence or any TUI visual QA claim, keep the tmux transcript and add a
-browser-rendered screenshot using the repository helper:
+For PR evidence or any TUI visual QA claim, render the live TUI through the real
+xterm.js web terminal - NEVER the `tmux capture-pane` frame, which degrades
+color and CJK width:
 
 ```bash
 node script/qa/web-terminal-visual-qa.mjs --title "OpenCode TUI QA" \
-  --from-file .omo/evidence/<slug>/opencode-tui-pane.txt \
+  --command "opencode" --input "{Enter}" \
   --evidence-dir .omo/evidence/<slug>/opencode-web-terminal
 ```
 
-The helper replays the terminal frame into `terminal.html`, captures
-`terminal.png` with Chrome when available, writes `metadata.json`, and records
-the cleanup receipt. This is the required TUI visual evidence pattern when the
-review needs to see the screen, while `scripts/tui-smoke.sh` remains the
-isolation/smoke authority.
+The helper runs a real pty, renders it in xterm.js under Chrome, captures
+`terminal.png` (true color), writes `terminal.txt` + `metadata.json`, and
+records the cleanup receipt (`--from-file <capture.ansi>` replays a saved raw
+stream). This is the required TUI visual evidence pattern when the review needs
+to see the screen, while `scripts/tui-smoke.sh` remains the isolation/smoke
+authority.
 
 ## Manual tmux recipe (fenced) - for ad hoc smoke
 

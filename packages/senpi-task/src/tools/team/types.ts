@@ -1,14 +1,17 @@
-import type { RuntimeState, Task } from "@oh-my-opencode/team-core/types"
+import type { Message, RuntimeState, Task } from "@oh-my-opencode/team-core/types"
 
 import type { CreateTeamResult, DeleteTeamResult, SendTeamMessageInput, SendTeamMessageResult } from "../../team"
+import type { LeadPoller } from "../../team/messaging/lead-poller"
+import type { WaitRegistry } from "../../team/messaging/wait-registry"
+import type { WaitBounds } from "../control"
 
-// The active-team row team_list returns, mirroring team-core listActiveTeams.
 export type ActiveTeamSummary = {
   readonly teamRunId: string
   readonly teamName: string
   readonly status: string
   readonly memberCount: number
   readonly scope: "project" | "user"
+  readonly leadSessionId?: string
 }
 
 export type TeamTaskStatus = Task["status"]
@@ -33,10 +36,6 @@ export type UpdateTeamTaskServiceInput = {
   readonly owner?: string
 }
 
-// The team-runtime service the tool layer drives. The omo-senpi component (todo 24 wiring) binds it to
-// the live task manager, team-core config, the idle-coordinator-backed lead notifier, and the current
-// lead session. Every method throws the team layer's typed errors; the tools catch and map them to
-// structured `details`, never prose-only. The tools NEVER reach the store or team-core directly.
 export type TeamToolsService = {
   createTeam(input: CreateTeamToolInput): Promise<CreateTeamResult>
   deleteTeam(input: { readonly teamRunId: string; readonly force?: boolean }): Promise<DeleteTeamResult>
@@ -52,6 +51,18 @@ export type TeamToolsService = {
   rejectShutdown(teamRunId: string, member: string, reason: string): Promise<RuntimeState>
 }
 
+type TeamWaitDeps = {
+  readonly waitBounds: WaitBounds
+  readonly registry: WaitRegistry<Message>
+  readonly resolveLeadPoller: (teamRunId: string) => LeadPoller | undefined
+  readonly resolveTeamRunId: (explicit?: string) => Promise<
+    | { readonly ok: true; readonly teamRunId: string }
+    | { readonly ok: false; readonly reason: string }
+  >
+}
+
 export type TeamToolDeps = {
   readonly service: TeamToolsService
-}
+} & Partial<TeamWaitDeps>
+
+export type LeadTeamToolDeps = TeamToolDeps & TeamWaitDeps

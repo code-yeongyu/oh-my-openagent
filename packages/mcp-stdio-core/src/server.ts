@@ -1,5 +1,5 @@
 import type { Readable, Writable } from "node:stream"
-import { errorResponse, jsonRpcId } from "./responses.js"
+import { errorResponse, jsonRpcId, messageFromError } from "./responses.js"
 import { isPlainRecord } from "./record.js"
 import type { JsonRpcResponse, McpLifecycleLog } from "./types.js"
 import { readStdioJsonRpcMessages, writeStdioJsonRpcResponse } from "./transport.js"
@@ -39,10 +39,10 @@ export async function runJsonRpcStdioServer<HandlerOptions>(
       if (idleTimer.closed()) break
       idleTimer.arm()
       if (message.kind === "parse_error") {
-        handleParseError(message, config, log)
+        if (!(await handleParseError(message, config, log))) break
         continue
       }
-      await handleRequest(message, config, log)
+      if (!(await handleRequest(message, config, log))) break
     }
   } finally {
     idleTimer.clear()
@@ -50,36 +50,73 @@ export async function runJsonRpcStdioServer<HandlerOptions>(
   }
 }
 
-function handleParseError<HandlerOptions>(
+async function handleParseError<HandlerOptions>(
   message: Extract<StdioJsonRpcMessage, { readonly kind: "parse_error" }>,
   config: JsonRpcStdioServerConfig<HandlerOptions>,
   log: McpLifecycleLog,
-): void {
+): Promise<boolean> {
   log("parse_error", { message: message.message })
   const response = config.parseErrorResponse?.(message.message) ?? errorResponse(null, -32700, "Parse error", message.message)
-  if (response !== undefined) {
-    writeStdioJsonRpcResponse(config.output, response, message.responseMode)
-  }
+  if (response === undefined) return true
+  return writeResponse(response, {
+    output: config.output,
+    responseMode: message.responseMode,
+    log,
+  })
 }
 
 async function handleRequest<HandlerOptions>(
   message: Extract<StdioJsonRpcMessage, { readonly kind: "request" }>,
   config: JsonRpcStdioServerConfig<HandlerOptions>,
   log: McpLifecycleLog,
-): Promise<void> {
+): Promise<boolean> {
   const parsed = message.payload
   const id = isPlainRecord(parsed) ? jsonRpcId(parsed["id"]) : null
   const method = isPlainRecord(parsed) && typeof parsed["method"] === "string" ? parsed["method"] : null
   log("request", { id: id === null ? null : String(id), method })
+  let response: JsonRpcResponse | undefined
   try {
-    const response = await config.handler(parsed, config.handlerOptions)
-    if (response === undefined) return
-    writeStdioJsonRpcResponse(config.output, response, message.responseMode)
-    log("response", { id: String(response.id), method, is_error: response.error !== undefined })
+    response = await config.handler(parsed, config.handlerOptions)
   } catch (error) {
     if (config.onHandlerError === undefined) throw error
     config.onHandlerError(error)
+    return true
   }
+  if (response === undefined) return true
+  if (
+    !(await writeResponse(response, {
+      output: config.output,
+      responseMode: message.responseMode,
+      log,
+    }))
+  ) return false
+  log("response", { id: String(response.id), method, is_error: response.error !== undefined })
+  return true
+}
+
+async function writeResponse(
+  response: JsonRpcResponse,
+  context: ResponseWriteContext,
+): Promise<boolean> {
+  try {
+    await writeStdioJsonRpcResponse(context.output, response, context.responseMode)
+    return true
+  } catch (error) {
+    if (!isTerminalOutputError(error)) throw error
+    context.log("output_error", { message: messageFromError(error) })
+    return false
+  }
+}
+
+function isTerminalOutputError(error: unknown): boolean {
+  if (!(error instanceof Error) || !("code" in error)) return false
+  return error.code === "EPIPE" || error.code === "ERR_STREAM_DESTROYED" || error.code === "ERR_STREAM_WRITE_AFTER_END"
+}
+
+interface ResponseWriteContext {
+  readonly output: Writable
+  readonly responseMode: StdioJsonRpcMessage["responseMode"]
+  readonly log: McpLifecycleLog
 }
 
 function createIdleTimer(

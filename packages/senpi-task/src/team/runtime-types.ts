@@ -1,4 +1,3 @@
-import type { ToolDefinition } from "@code-yeongyu/senpi"
 import type { RuntimeState } from "@oh-my-opencode/team-core/types"
 
 import type { ManagerStartSpec, StartResult } from "../manager"
@@ -41,6 +40,15 @@ export type TeamRuntimeManagerPort = {
   getResidentHandle(taskId: string): { readonly sessionId: string | undefined } | undefined
 }
 
+export type TeamMemberExtensionConfig = {
+  readonly entryPath: string
+  readonly inheritedExtensions?: readonly string[]
+}
+
+export type SpawnMemberExtensionConfig = TeamMemberExtensionConfig & {
+  readonly teamConfig: string
+}
+
 export type CreateTeamDeps = {
   readonly manager: TeamRuntimeManagerPort
   readonly stateDir: StateDirConfig
@@ -48,11 +56,7 @@ export type CreateTeamDeps = {
   readonly leadSessionId: string
   readonly spawnDepth: number
   readonly now?: () => number
-  // Optional per-member tool injection (todo 24 binds the pre-scoped `team_send_message`). Absent in
-  // the runtime layer's own tests; the spawner forwards whatever it returns via memberScopedTools. The
-  // team run id is threaded so the binder can run-scope the member's send tool (it is not known until
-  // createRuntimeState mints it, so the caller cannot bind it up front).
-  readonly memberScopedTools?: (memberName: string, teamRunId: string) => readonly ToolDefinition[]
+  readonly memberExtension?: TeamMemberExtensionConfig
   // Injectable member-sidecar writer (defaults to the atomic writeMemberTaskMap). Present so tests can
   // force the pre-activation write to fail and exercise the create rollback.
   readonly writeMemberMap?: (runtimeDir: string, map: MemberTaskMap) => Promise<void>

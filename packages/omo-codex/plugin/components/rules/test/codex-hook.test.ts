@@ -28,6 +28,7 @@ type SessionCache = {
 };
 
 const CLI_PATH = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
+const COMPONENT_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 function runHookCli(input: string, subcommand = "post-tool-use", env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
 	return new Promise((resolve, reject) => {
@@ -68,6 +69,12 @@ const CLAUDE_AND_RULES_ENV = {
 
 const RULES_ONLY_ENV = {
 	CODEX_RULES_ENABLED_SOURCES: ".omo/rules",
+};
+
+const DYNAMIC_BUNDLED_ONLY_ENV = {
+	CODEX_RULES_MODE: "dynamic",
+	CODEX_RULES_ENABLED_SOURCES: "plugin-bundled",
+	PLUGIN_ROOT: COMPONENT_ROOT,
 };
 
 afterEach(() => {
@@ -409,6 +416,31 @@ describe("codex rules hooks", () => {
 		expect(output).toBe("");
 		expect(Object.keys(cachedState.dynamicTargetFingerprints ?? {})).toHaveLength(1);
 		expect(readSessionCache(pluginData).dynamicTargetFingerprints).toEqual(cachedState.dynamicTargetFingerprints);
+	});
+
+	it("#given bundled dynamic rules already injected for gpt-5.5 #when same target switches to gpt-5.6 #then emits the gpt-5.6 rule", async () => {
+		// given
+		const { root, pluginData } = makeTempProject();
+		const filePath = path.join(root, "src", "app.ts");
+		const input = postToolUseInput(root, filePath);
+		const firstOutput = await runPostToolUseHook(input, {
+			pluginDataRoot: pluginData,
+			env: DYNAMIC_BUNDLED_ONLY_ENV,
+		});
+
+		// when
+		const secondOutput = await runPostToolUseHook(
+			{ ...input, model: "gpt-5.6-codex" },
+			{ pluginDataRoot: pluginData, env: DYNAMIC_BUNDLED_ONLY_ENV },
+		);
+
+		// then
+		const firstContext = parseHookOutput(firstOutput).hookSpecificOutput?.additionalContext ?? "";
+		const secondContext = parseHookOutput(secondOutput).hookSpecificOutput?.additionalContext ?? "";
+		expect(firstContext).toContain("based on GPT-5.5");
+		expect(firstContext).not.toContain("based on GPT-5.6");
+		expect(secondContext).toContain("based on GPT-5.6");
+		expect(secondContext).not.toContain("based on GPT-5.5");
 	});
 
 	it("#given default auto sources #when excluded AGENTS.md changes #then PostToolUse fingerprint stays stable", async () => {

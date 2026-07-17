@@ -1,3 +1,0 @@
-$ find .omo/evidence/senpi-task/task-5-agents -type f -size 0 -print
-no zero-byte evidence files
-exit=0

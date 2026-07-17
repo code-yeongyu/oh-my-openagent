@@ -22,7 +22,7 @@ const expectedNormalTransitionTable: Record<
     start: { expectedApplied: true, expectedStatus: "running", expectedAudit: "transition_applied" },
     complete: { expectedApplied: false, expectedStatus: "pending", expectedAudit: "invalid_transition_ignored" },
     fail: { expectedApplied: false, expectedStatus: "pending", expectedAudit: "invalid_transition_ignored" },
-    cancel: { expectedApplied: false, expectedStatus: "pending", expectedAudit: "invalid_transition_ignored" },
+    cancel: { expectedApplied: true, expectedStatus: "cancelled", expectedAudit: "transition_applied" },
     interrupt: { expectedApplied: false, expectedStatus: "pending", expectedAudit: "invalid_transition_ignored" },
     lose: { expectedApplied: false, expectedStatus: "pending", expectedAudit: "invalid_transition_ignored" },
   },

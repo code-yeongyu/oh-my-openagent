@@ -7,7 +7,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/lsp/dist/cli.js\" hook post-tool-use",
 						"timeout": 60,
-						"statusMessage": "(OmO) Checking LSP Diagnostics",
+						"statusMessage": "(OmO 4.18.2) Checking LSP Diagnostics",
 						"commandWindows": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${PLUGIN_ROOT}\\components\\bootstrap\\scripts\\node-dispatch.ps1\" \"${PLUGIN_ROOT}\\components\\lsp\\dist\\cli.js\" hook post-tool-use"
 					}
 				],

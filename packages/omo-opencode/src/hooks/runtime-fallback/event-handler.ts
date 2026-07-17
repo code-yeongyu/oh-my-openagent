@@ -62,6 +62,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
 
     sessionRetryInFlight.delete(sessionID)
     sessionAwaitingFallbackResult.delete(sessionID)
+    deps.internallyAbortedSessions.delete(sessionID)
     sessionStatusRetryKeys.delete(sessionID)
     helpers.clearSessionFallbackTimeout(sessionID)
   }
@@ -105,6 +106,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       sessionLastAccess.delete(sessionID)
       sessionRetryInFlight.delete(sessionID)
       sessionAwaitingFallbackResult.delete(sessionID)
+      deps.internallyAbortedSessions.delete(sessionID)
       helpers.clearSessionFallbackTimeout(sessionID)
       sessionStatusRetryKeys.delete(sessionID)
       SessionCategoryRegistry.remove(sessionID)

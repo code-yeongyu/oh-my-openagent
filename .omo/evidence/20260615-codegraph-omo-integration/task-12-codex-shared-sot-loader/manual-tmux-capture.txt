@@ -1,7 +1,0 @@
-worktree=/Users/yeongyu/local-workspaces/omo-wt/codegraph-omo-integration
-tmp_root=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.wzhfiHrw1z
-$ codex block overrides base
-{"auto_provision":true,"enabled":false,"install_dir":"/base","telemetry":false}
-$ legacy env overrides SOT
-false
-cleanup=removed /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.wzhfiHrw1z

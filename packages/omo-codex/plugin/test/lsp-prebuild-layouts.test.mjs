@@ -64,6 +64,8 @@ test("#given the installed cache layout #when running build-lsp-daemon #then use
 
 		await mkdir(join(root, "components", "lsp-daemon", "dist"), { recursive: true });
 		await writeFile(join(root, "components", "lsp-daemon", "dist", "cli.js"), "");
+		await writeFile(join(root, "components", "lsp-daemon", "dist", "client.js"), "");
+		await writeFile(join(root, "components", "lsp-daemon", "dist", "client.d.ts"), "");
 		await writeFile(join(root, "components", "lsp-daemon", "dist", "index.js"), "");
 		await writeFile(join(root, "components", "lsp-daemon", "dist", "index.d.ts"), "");
 

@@ -25,7 +25,7 @@ export type RunnerFailure = {
 
 export type RunnerOutcome =
   | { readonly status: "completed"; readonly finalResponse: string }
-  | { readonly status: "error"; readonly failure: RunnerFailure }
+  | { readonly status: "error"; readonly failure: RunnerFailure; readonly killed?: boolean }
   | { readonly status: "cancelled" }
 
 export type ChildHandle = {
@@ -46,10 +46,6 @@ export type CreateChildHandleInput = {
   readonly promptText: string
 }
 
-function toFailureMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
-
 // A prompt turn is a TRACKED async op: the promise is created and its rejection handled at the
 // call site, so steering can happen WHILE it runs and no rejection ever escapes. The same routine
 // drives the initial prompt and every revive follow-up (a fresh turn on an idle resident session).
@@ -58,9 +54,16 @@ async function runTurn(session: ChildSession, text: string, isAborted: () => boo
     await session.prompt(text)
   } catch (error) {
     if (isAborted()) return { status: "cancelled" }
+    if (error instanceof Error) {
+      return {
+        status: "error",
+        failure: { kind: "child-prompt-failed", message: error.message, cause: error },
+      }
+    }
+    const message = String(error)
     return {
       status: "error",
-      failure: { kind: "child-prompt-failed", message: toFailureMessage(error), cause: error },
+      failure: { kind: "child-prompt-failed", message, cause: error },
     }
   }
   if (isAborted()) return { status: "cancelled" }
@@ -77,6 +80,7 @@ export function createChildHandle(input: CreateChildHandleInput): ChildHandle {
   // Start a fresh tracked turn and mark it active until it settles. waitForIdle() always returns the
   // CURRENT turn, so a revive follow-up re-arms it to the new turn instead of a stale resolved one.
   const beginTurn = (text: string): void => {
+    aborted = false
     turnActive = true
     running = runTurn(session, text, () => aborted)
     void running.then(

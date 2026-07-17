@@ -1,1 +1,0 @@
-packages/senpi-task/src/category/resolver.ts:136:  return { models: models.map((model) => parseRegistryModel(model)).filter((model) => model !== undefined).map(formatModel).sort(), validContainer: true }

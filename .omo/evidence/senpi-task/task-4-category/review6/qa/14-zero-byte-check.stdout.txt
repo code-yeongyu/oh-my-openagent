@@ -1,1 +1,0 @@
-zero_byte_artifacts=0

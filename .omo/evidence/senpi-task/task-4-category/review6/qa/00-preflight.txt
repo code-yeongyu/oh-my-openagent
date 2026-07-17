@@ -1,6 +1,0 @@
-surface: git repository preflight
-invocation: git rev-parse --show-toplevel; git branch --show-current; git rev-parse HEAD; git show -s --format=%s HEAD
-/Volumes/mengmotaStorage/local-workspaces/omo-wt/senpi-task-w0-category
-code-yeongyu/senpi-task-w0-category
-70c148a2fa84d1a531903a34904f9a60a4d23f0f
-fix(senpi-task): validate category registry identity

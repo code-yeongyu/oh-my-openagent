@@ -1,6 +1,0 @@
-scenario: 16-final-zero-byte-check
-surface: final zero-byte check for review6 artifacts
-invocation: zero=$(find /Users/yeongyu/local-workspaces/omo-wt/senpi-task-w0-category/.omo/evidence/senpi-task/task-4-category/review6 -type f -size 0 -print | sort); if [ -n "$zero" ]; then printf "%s\n" "$zero"; exit 1; fi; printf "zero_byte_artifacts=0\n"
-started_at: 2026-07-06T11:05:03Z
-finished_at: 2026-07-06T11:05:03Z
-exit: 0
