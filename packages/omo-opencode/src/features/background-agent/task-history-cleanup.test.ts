@@ -89,7 +89,7 @@ describe("task history cleanup", () => {
     expect(history.getByParentSession("parent-2")).toHaveLength(0)
   })
 
-  test("#given BackgroundManager with taskHistory entries #when shutdown() called #then taskHistory is cleared via clearAll()", () => {
+  test("#given BackgroundManager with taskHistory entries #when shutdown() completes #then taskHistory is cleared via clearAll()", async () => {
     // given
     const manager = createManager()
     managerUnderTest = manager
@@ -103,7 +103,7 @@ describe("task history cleanup", () => {
     }
 
     // when
-    manager.shutdown()
+    await manager.shutdown()
 
     // then
     expect(clearAllCalls).toBe(1)

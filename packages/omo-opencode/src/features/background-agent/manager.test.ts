@@ -912,8 +912,15 @@ describe("BackgroundManager pending launch visibility", () => {
       parentMessageId: "parent-message",
     })
     await flushBackgroundNotifications()
-    await manager.shutdown()
+    const shutdown = manager.shutdown()
+    let shutdownSettled = false
+    void shutdown.then(() => { shutdownSettled = true })
+    await flushBackgroundNotifications()
+
+    expect(shutdownSettled).toBe(false)
+
     releaseLineage?.()
+    await shutdown
 
     //#then
     await expect(launch).rejects.toThrow("Background manager is shutting down")
@@ -958,14 +965,71 @@ describe("BackgroundManager pending launch visibility", () => {
       parentMessageId: "parent-message",
     })
     await createStarted
-    await manager.shutdown()
+    const shutdown = manager.shutdown()
+    let shutdownSettled = false
+    void shutdown.then(() => { shutdownSettled = true })
+    await flushBackgroundNotifications()
+
+    expect(shutdownSettled).toBe(false)
+
     releaseCreate?.()
-    await waitUntil(() => abortedSessions.length > 0, 600)
+    await shutdown
 
     //#then
     expect(abortedSessions).toEqual(["late-created-session"])
     expect(promptCalls).toBe(0)
     expect(manager.hasBackgroundWorkInFlight("parent-session")).toBe(false)
+  })
+
+  test("keeps shutdown pending until an admitted stale interruption settles", async () => {
+    //#given
+    let releaseStaleAbort: (() => void) | undefined
+    let markStaleAbortStarted: (() => void) | undefined
+    const staleAbortStarted = new Promise<void>((resolve) => { markStaleAbortStarted = resolve })
+    const staleAbortGate = new Promise<void>((resolve) => { releaseStaleAbort = resolve })
+    let abortCalls = 0
+    const client = {
+      session: {
+        status: async () => ({ data: { "stale-session": { type: "idle" } } }),
+        abort: async () => {
+          abortCalls += 1
+          if (abortCalls === 1) {
+            markStaleAbortStarted?.()
+            await staleAbortGate
+          }
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput(client),
+      config: { messageStalenessTimeoutMs: 1 },
+    })
+    stubNotifyParentSession(manager)
+    const task = createMockTask({
+      id: "stale-task",
+      sessionId: "stale-session",
+      parentSessionId: "parent-session",
+      status: "running",
+      startedAt: new Date(Date.now() - 60_000),
+      progress: undefined,
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    const poll = cast<{ pollRunningTasks: () => Promise<void> }>(manager).pollRunningTasks()
+    await staleAbortStarted
+    const shutdown = manager.shutdown()
+    let shutdownSettled = false
+    void shutdown.then(() => { shutdownSettled = true })
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(shutdownSettled).toBe(false)
+    releaseStaleAbort?.()
+    await Promise.all([poll, shutdown])
+    expect(abortCalls).toBe(2)
+    expect(getTaskMap(manager).size).toBe(0)
   })
 
   test("aborts a created child when onSessionCreated rejects", async () => {
@@ -1206,9 +1270,15 @@ describe("BackgroundManager prompt rejection fallback routing", () => {
     const cancellation = manager.cancelTask(task.id, { source: "test", skipNotification: true })
     await blockedAbortStarted
     finishFallbackRouting?.(false)
-    await manager.shutdown()
+    const shutdown = manager.shutdown()
+    let shutdownSettled = false
+    void shutdown.then(() => { shutdownSettled = true })
+    await flushBackgroundNotifications()
+
+    expect(shutdownSettled).toBe(false)
+
     finishAbort?.()
-    const cancelled = await cancellation
+    const [cancelled] = await Promise.all([cancellation, shutdown])
     await flushBackgroundNotifications()
 
     //#then
@@ -4623,6 +4693,30 @@ describe("BackgroundManager.trackTask", () => {
     expect(concurrencyManager.getCount("external-key")).toBe(1)
     expect(getTaskMap(manager).size).toBe(1)
   })
+
+  test("shares one task and concurrency slot across concurrent duplicate registration", async () => {
+    //#given
+    const input = {
+      taskId: "task-concurrent",
+      sessionId: "session-concurrent",
+      parentSessionId: "parent-session",
+      description: "external concurrent task",
+      agent: "task",
+      concurrencyKey: "external-key",
+    }
+
+    //#when
+    const [first, second] = await Promise.all([
+      manager.trackTask(input),
+      manager.trackTask(input),
+    ])
+
+    //#then
+    const concurrencyManager = getConcurrencyManager(manager)
+    expect(first).toBe(second)
+    expect(concurrencyManager.getCount("external-key")).toBe(1)
+    expect(getTaskMap(manager).size).toBe(1)
+  })
 })
 
 describe("BackgroundManager.resume concurrency key", () => {
@@ -7292,6 +7386,44 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 })
 
 describe("BackgroundManager.shutdown session abort", () => {
+  test("shares one pending shutdown barrier across concurrent callers", async () => {
+    //#given
+    let releaseAbort: (() => void) | undefined
+    let markAbortStarted: (() => void) | undefined
+    const abortStarted = new Promise<void>((resolve) => { markAbortStarted = resolve })
+    const abortGate = new Promise<void>((resolve) => { releaseAbort = resolve })
+    const client = {
+      session: {
+        abort: async () => {
+          markAbortStarted?.()
+          await abortGate
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const task = createMockTask({
+      id: "task-shared-shutdown",
+      sessionId: "session-shared-shutdown",
+      status: "running",
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    const firstShutdown = manager.shutdown()
+    await abortStarted
+    const secondShutdown = manager.shutdown()
+    let secondSettled = false
+    void secondShutdown.then(() => { secondSettled = true })
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(secondSettled).toBe(false)
+    releaseAbort?.()
+    await Promise.all([firstShutdown, secondShutdown])
+    expect(getTaskMap(manager).size).toBe(0)
+  })
+
    test("should call session.abort for all running tasks during shutdown", () => {
      // given
      const abortedSessionIDs: string[] = []

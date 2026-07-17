@@ -258,6 +258,8 @@ export class BackgroundManager {
   private pollingInFlight = false
   private concurrencyManager: ConcurrencyManager
   private shutdownTriggered = false
+  private shutdownPromise?: Promise<void>
+  private readonly inFlightOperations = new Set<Promise<unknown>>()
   private config?: BackgroundTaskConfig
   private tmuxEnabled: boolean
   private onSubagentSessionCreated?: OnSubagentSessionCreated
@@ -353,8 +355,29 @@ export class BackgroundManager {
     }
   }
 
+  private trackInFlightOperation<T>(operation: Promise<T>): Promise<T> {
+    this.inFlightOperations.add(operation)
+    void operation.then(
+      () => this.inFlightOperations.delete(operation),
+      () => this.inFlightOperations.delete(operation),
+    )
+    return operation
+  }
+
+  private async drainInFlightOperations(): Promise<void> {
+    while (this.inFlightOperations.size > 0) {
+      await Promise.allSettled(Array.from(this.inFlightOperations))
+    }
+  }
+
   async assertCanSpawn(parentSessionID: string): Promise<SubagentSpawnContext> {
+    if (this.shutdownTriggered) {
+      throw new Error("Background manager is shutting down")
+    }
     const spawnContext = await resolveSubagentSpawnContext(this.client, parentSessionID, this.directory)
+    if (this.shutdownTriggered) {
+      throw new Error("Background manager is shutting down")
+    }
     const maxDepth = getMaxSubagentDepth(this.config)
     if (spawnContext.childDepth > maxDepth) {
       throw createSubagentDepthLimitError({
@@ -743,7 +766,14 @@ export class BackgroundManager {
     }
   }
 
-  async launch(input: LaunchInput): Promise<BackgroundTask> {
+  launch(input: LaunchInput): Promise<BackgroundTask> {
+    if (this.shutdownTriggered) {
+      return Promise.reject(new Error("Background manager is shutting down"))
+    }
+    return this.trackInFlightOperation(this.performLaunch(input))
+  }
+
+  private async performLaunch(input: LaunchInput): Promise<BackgroundTask> {
     log("[background-agent] launch() called with:", {
       agent: input.agent,
       model: input.model,
@@ -864,7 +894,12 @@ export class BackgroundManager {
     }
   }
 
-  private async processKey(key: string): Promise<void> {
+  private processKey(key: string): Promise<void> {
+    if (this.shutdownTriggered) return Promise.resolve()
+    return this.trackInFlightOperation(this.performProcessKey(key))
+  }
+
+  private async performProcessKey(key: string): Promise<void> {
     if (this.shutdownTriggered || this.processingKeys.has(key)) {
       return
     }
@@ -1510,7 +1545,22 @@ The fallback retry session is now created and can be inspected directly.
    * Track a task created elsewhere (e.g., from task) for notification tracking.
    * This allows tasks created by other tools to receive the same toast/prompt notifications.
    */
-  async trackTask(input: {
+  trackTask(input: {
+    taskId: string
+    sessionId: string
+    parentSessionId: string
+    description: string
+    agent?: string
+    parentAgent?: string
+    concurrencyKey?: string
+  }): Promise<BackgroundTask> {
+    if (this.shutdownTriggered) {
+      return Promise.reject(new Error("Background manager is shutting down"))
+    }
+    return this.trackInFlightOperation(this.performTrackTask(input))
+  }
+
+  private async performTrackTask(input: {
     taskId: string
     sessionId: string
     parentSessionId: string
@@ -1573,6 +1623,11 @@ The fallback retry session is now created and can be inspected directly.
         this.concurrencyManager.release(concurrencyKey)
         throw new Error("Background manager is shutting down")
       }
+
+      if (this.tasks.has(input.taskId)) {
+        this.concurrencyManager.release(concurrencyKey)
+        return this.performTrackTask(input)
+      }
     }
 
     const task: BackgroundTask = {
@@ -1610,7 +1665,14 @@ The fallback retry session is now created and can be inspected directly.
     return task
   }
 
-  async resume(input: ResumeInput): Promise<BackgroundTask> {
+  resume(input: ResumeInput): Promise<BackgroundTask> {
+    if (this.shutdownTriggered) {
+      return Promise.reject(new Error("Background manager is shutting down"))
+    }
+    return this.trackInFlightOperation(this.performResume(input))
+  }
+
+  private async performResume(input: ResumeInput): Promise<BackgroundTask> {
     const existingTask = this.findBySession(input.sessionId)
     if (!existingTask) {
       throw new Error(`Task not found for session: ${input.sessionId}`)
@@ -1963,6 +2025,7 @@ The fallback retry session is now created and can be inspected directly.
   }
 
   handleEvent(event: Event): void {
+    if (this.shutdownTriggered) return
     const props = event.properties
 
     if (event.type.startsWith(SESSION_NEXT_EVENT_PREFIX)) {
@@ -2394,7 +2457,17 @@ The fallback retry session is now created and can be inspected directly.
     }
   }
 
-  private async handleSessionErrorEvent(args: {
+  private handleSessionErrorEvent(args: {
+    task: BackgroundTask
+    errorInfo: { name?: string; message?: string; statusCode?: number }
+    errorName: string | undefined
+    errorMessage: string | undefined
+  }): Promise<void> {
+    if (this.shutdownTriggered) return Promise.resolve()
+    return this.trackInFlightOperation(this.performHandleSessionErrorEvent(args))
+  }
+
+  private async performHandleSessionErrorEvent(args: {
     task: BackgroundTask
     errorInfo: { name?: string; message?: string; statusCode?: number }
     errorName: string | undefined
@@ -2524,7 +2597,16 @@ The fallback retry session is now created and can be inspected directly.
     }
   }
 
-  private async tryFallbackRetry(
+  private tryFallbackRetry(
+    task: BackgroundTask,
+    errorInfo: { name?: string; message?: string; statusCode?: number },
+    source: string,
+  ): Promise<boolean> {
+    if (this.shutdownTriggered) return Promise.resolve(false)
+    return this.trackInFlightOperation(this.performFallbackRetry(task, errorInfo, source))
+  }
+
+  private async performFallbackRetry(
     task: BackgroundTask,
     errorInfo: { name?: string; message?: string; statusCode?: number },
     source: string,
@@ -2759,7 +2841,15 @@ The task was re-queued on a fallback model after a retryable failure.
     this.completionTimers.set(taskId, timer)
   }
 
-  async cancelTask(
+  cancelTask(
+    taskId: string,
+    options?: { source?: string; reason?: string; abortSession?: boolean; skipNotification?: boolean }
+  ): Promise<boolean> {
+    if (this.shutdownTriggered) return Promise.resolve(false)
+    return this.trackInFlightOperation(this.performCancelTask(taskId, options))
+  }
+
+  private async performCancelTask(
     taskId: string,
     options?: { source?: string; reason?: string; abortSession?: boolean; skipNotification?: boolean }
   ): Promise<boolean> {
@@ -2928,7 +3018,12 @@ The task was re-queued on a fallback model after a retryable failure.
    * Safely complete a task with race condition protection.
    * Returns true if task was successfully completed, false if already completed by another path.
    */
-  private async tryCompleteTask(task: BackgroundTask, source: string): Promise<boolean> {
+  private tryCompleteTask(task: BackgroundTask, source: string): Promise<boolean> {
+    if (this.shutdownTriggered) return Promise.resolve(false)
+    return this.trackInFlightOperation(this.performCompleteTask(task, source))
+  }
+
+  private async performCompleteTask(task: BackgroundTask, source: string): Promise<boolean> {
     const releaseTerminalization = this.reserveTaskTerminalization(task, RUNNING_BACKGROUND_TASK_STATUSES)
     if (!releaseTerminalization) {
       log("[background-agent] Task already completed, skipping:", { taskId: task.id, status: task.status, source })
@@ -3449,7 +3544,12 @@ The task was re-queued on a fallback model after a retryable failure.
     }
   }
 
-  private async pollRunningTasks(): Promise<void> {
+  private pollRunningTasks(): Promise<void> {
+    if (this.shutdownTriggered) return Promise.resolve()
+    return this.trackInFlightOperation(this.performPollRunningTasks())
+  }
+
+  private async performPollRunningTasks(): Promise<void> {
     if (this.pollingInFlight) return
     this.pollingInFlight = true
     try {
@@ -3577,11 +3677,40 @@ The task was re-queued on a fallback model after a retryable failure.
    * Cancels all pending concurrency waiters and clears timers.
    * Should be called when the plugin is unloaded.
    */
-  async shutdown(): Promise<void> {
-    if (this.shutdownTriggered) return
+  shutdown(): Promise<void> {
+    if (this.shutdownPromise) return this.shutdownPromise
     this.shutdownTriggered = true
+    this.shutdownPromise = this.performShutdown()
+    return this.shutdownPromise
+  }
+
+  private async performShutdown(): Promise<void> {
     log("[background-agent] Shutting down BackgroundManager")
     this.stopPolling()
+    this.concurrencyManager.clear()
+
+    for (const timer of this.completionTimers.values()) {
+      clearTimeout(timer)
+    }
+    this.completionTimers.clear()
+
+    for (const timer of this.idleDeferralTimers.values()) {
+      clearTimeout(timer)
+    }
+    this.idleDeferralTimers.clear()
+
+    this.parentWakeNotifier.shutdown()
+    this.unregisterProcessCleanup()
+
+    let onShutdownPromise: Promise<void> | undefined
+    if (this.onShutdown) {
+      try {
+        onShutdownPromise = Promise.resolve(this.onShutdown())
+      } catch (error) {
+        log("[background-agent] Error in onShutdown callback:", error)
+      }
+    }
+
     const trackedSessionIDs = new Set<string>()
     const abortRequests: Array<{ sessionID: string; promise: Promise<unknown> }> = []
 
@@ -3611,10 +3740,15 @@ The task was re-queued on a fallback model after a retryable failure.
       }
     }
 
-    // Notify shutdown listeners (e.g., tmux cleanup)
-    if (this.onShutdown) {
+    await this.drainInFlightOperations()
+
+    while (this.notificationQueueByParent.size > 0) {
+      await Promise.allSettled(Array.from(this.notificationQueueByParent.values()))
+    }
+
+    if (onShutdownPromise) {
       try {
-        await this.onShutdown()
+        await onShutdownPromise
       } catch (error) {
         log("[background-agent] Error in onShutdown callback:", error)
       }
@@ -3634,25 +3768,12 @@ The task was re-queued on a fallback model after a retryable failure.
       }
     }
 
-    for (const timer of this.completionTimers.values()) {
-      clearTimeout(timer)
-    }
-    this.completionTimers.clear()
-
-    for (const timer of this.idleDeferralTimers.values()) {
-      clearTimeout(timer)
-    }
-    this.idleDeferralTimers.clear()
-
-    this.parentWakeNotifier.shutdown()
-
     for (const sessionID of trackedSessionIDs) {
       subagentSessions.delete(sessionID)
       clearDelegatedChildSessionBootstrap(sessionID)
       SessionCategoryRegistry.remove(sessionID)
     }
 
-    this.concurrencyManager.clear()
     this.tasks.clear()
     this.tasksByParentSession.clear()
     this.notifications.clear()
@@ -3674,7 +3795,6 @@ The task was re-queued on a fallback model after a retryable failure.
     this.processingKeys.clear()
     this.taskHistory.clearAll()
     this.completedTaskSummaries.clear()
-    this.unregisterProcessCleanup()
     log("[background-agent] Shutdown complete")
 
   }

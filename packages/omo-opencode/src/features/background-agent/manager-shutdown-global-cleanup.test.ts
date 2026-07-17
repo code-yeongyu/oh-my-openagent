@@ -274,9 +274,15 @@ describe("BackgroundManager shutdown global cleanup", () => {
     // when
     const cancellation = manager.cancelTask(task.id, { source: "test" })
     while (abortCalls === 0) await Promise.resolve()
-    await manager.shutdown()
+    const shutdown = manager.shutdown()
+    let shutdownSettled = false
+    void shutdown.then(() => { shutdownSettled = true })
+    await Promise.resolve()
+
+    expect(shutdownSettled).toBe(false)
+
     firstAbort.resolve()
-    const cancelled = await cancellation
+    const [cancelled] = await Promise.all([cancellation, shutdown])
 
     // then
     expect(cancelled).toBe(false)
