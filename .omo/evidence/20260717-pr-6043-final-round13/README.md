@@ -55,6 +55,10 @@ implementation to 247 pure lines.
   `093efc8c713d66c78cef65c5210af622a029c22a`, whose tree is
   `402ef28ff67606eb98116910222fcefbe2ed4514`. The accepted receipt records the
   evidence run head, source commit, source tree, and `source_matches=yes`.
+- Exact evidence-head rerun: after the source-binding and lifecycle sanitizer
+  were committed at `11d66695322a5a861299bb2a61af6d8dd2765c54`, the complete
+  production-duration scenario was run again from that exact head. The current
+  live receipt records that run head and the repaired source identity together.
 - Lifecycle wire proof: the sanitized SSE artifact retains
   `session.created` and `session.deleted` alongside message, idle, and error
   events; session identifiers are replaced with reviewer-safe placeholders.
