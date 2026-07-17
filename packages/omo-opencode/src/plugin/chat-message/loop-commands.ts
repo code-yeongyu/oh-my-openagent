@@ -1,5 +1,6 @@
 import type { OhMyOpenCodeConfig } from "../../config"
 
+import { parseGoalCommand } from "../../hooks/goal/command-arguments"
 import { isRalphLoopResumeArgument, parseRalphLoopArguments } from "../../hooks/ralph-loop/command-arguments"
 import { log } from "../../shared"
 import { NATIVE_LOOP_TRIGGERED_FLAG } from "../command-execute-before"
@@ -115,5 +116,58 @@ export function handleRalphLoopMessage(args: {
       sessionID: input.sessionID,
       ultrawork,
     })
+  }
+}
+
+export function handleGoalMessage(args: {
+  readonly hooks: ChatMessageHooks
+  readonly input: ChatMessageInput
+  readonly output: ChatMessageHandlerOutput
+  readonly isFirstMessage: boolean
+  readonly pluginConfig: OhMyOpenCodeConfig
+}): void {
+  const { hooks, input, output, isFirstMessage, pluginConfig } = args
+  if (!hooks.goal || output.message[NATIVE_LOOP_TRIGGERED_FLAG] === true) {
+    return
+  }
+
+  const promptText = extractPromptText(output.parts)
+  const parsed = parseGoalCommand(promptText)
+
+  switch (parsed.kind) {
+    case "setObjective":
+      hooks.goal.setGoal(input.sessionID, parsed.objective)
+      log("[chat-message] Goal set", { sessionID: input.sessionID, objective: parsed.objective })
+      break
+    case "setStatus":
+      if (parsed.status === "paused") {
+        hooks.goal.pauseGoal(input.sessionID)
+        log("[chat-message] Goal paused", { sessionID: input.sessionID })
+      } else {
+        hooks.goal.resumeGoal(input.sessionID)
+        log("[chat-message] Goal resumed", { sessionID: input.sessionID })
+      }
+      break
+    case "clear":
+      hooks.goal.clearGoal(input.sessionID)
+      log("[chat-message] Goal cleared", { sessionID: input.sessionID })
+      break
+    case "show":
+      // No side effect; the goal is surfaced by TUI mirror and tools.
+      break
+    default:
+      break
+  }
+
+  if (
+    parsed.kind === "show"
+    && isFirstMessage
+    && pluginConfig.default_mode?.goal
+  ) {
+    const objective = promptText.trim()
+    if (objective.length > 0) {
+      hooks.goal.setGoal(input.sessionID, objective)
+      log("[chat-message] Default goal auto-started", { sessionID: input.sessionID, objective })
+    }
   }
 }

@@ -57,6 +57,15 @@ type RalphLoopHook = {
   cancelLoop: (sessionID: string) => boolean | void
 }
 
+type GoalHook = {
+  setGoal: (sessionID: string, objective: string) => { readonly objective: string; readonly status: string } | null
+  getGoal: (sessionID: string) => { readonly objective: string; readonly status: string } | null
+  pauseGoal: (sessionID: string) => { readonly objective: string; readonly status: string } | null
+  resumeGoal: (sessionID: string) => { readonly objective: string; readonly status: string } | null
+  clearGoal: (sessionID: string) => boolean
+  markComplete: (sessionID: string) => { readonly objective: string; readonly status: string } | null
+}
+
 type TodoContinuationEnforcerHook = {
   cancelAllCountdowns: () => void
 }
@@ -75,5 +84,6 @@ export type ChatMessageHooks = {
   hephaestusAgentsMdInjector?: ChatMessageHook | null
   startWork?: ChatMessageHook | null
   ralphLoop?: RalphLoopHook | null
+  goal?: GoalHook | null
   todoContinuationEnforcer?: TodoContinuationEnforcerHook | null
 }

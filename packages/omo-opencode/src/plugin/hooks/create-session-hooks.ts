@@ -30,6 +30,7 @@ import {
   createRuntimeFallbackHook,
   createLegacyPluginToastHook,
 } from "../../hooks"
+import { createGoalHook } from "../../hooks/goal"
 import {
   detectExternalNotificationPlugin,
   getNotificationConflictWarning,
@@ -53,6 +54,7 @@ export type SessionHooks = {
   nonInteractiveEnv: ReturnType<typeof createNonInteractiveEnvHook> | null
   interactiveBashSession: ReturnType<typeof createInteractiveBashSessionHook> | null
   ralphLoop: ReturnType<typeof createRalphLoopHook> | null
+  goal: ReturnType<typeof createGoalHook> | null
   editErrorRecovery: ReturnType<typeof createEditErrorRecoveryHook> | null
   delegateTaskRetry: ReturnType<typeof createDelegateTaskRetryHook> | null
   startWork: ReturnType<typeof createStartWorkHook> | null
@@ -174,6 +176,16 @@ export function createSessionHooks(args: {
         }))
     : null
 
+  const goal = isHookEnabled("goal") && pluginConfig.goal?.enabled
+    ? safeHook("goal", () =>
+        createGoalHook(ctx, {
+          projectDir: ctx.directory,
+          autoStart: pluginConfig.goal?.auto_start ?? false,
+          ultrawork: pluginConfig.default_mode?.ultrawork ?? false,
+          getSessionExists: async (sessionId) => await sessionExists(sessionId),
+        }))
+    : null
+
   const editErrorRecovery = isHookEnabled("edit-error-recovery")
     ? safeHook("edit-error-recovery", () => createEditErrorRecoveryHook(ctx))
     : null
@@ -247,6 +259,7 @@ export function createSessionHooks(args: {
     nonInteractiveEnv,
     interactiveBashSession,
     ralphLoop,
+    goal,
     editErrorRecovery,
     delegateTaskRetry,
     startWork,
