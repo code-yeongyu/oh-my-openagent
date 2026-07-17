@@ -1,3 +1,0 @@
-$ rg -n "\.claude|opencode.*agent|agent.*opencode|/opencode/agents|opencode/agent" <touched TS files>
-no matches
-exit=0

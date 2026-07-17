@@ -104,6 +104,57 @@ describe("test workflows", () => {
     expect(typecheckBuildsLspToolsMcp, "publish typecheck job must build lsp-tools-mcp before bun run typecheck").toBe(true)
   })
 
+  test("builds publish-main from the prepared release SHA", () => {
+    // #given
+    const workflow = readFileSync(publishWorkflowPath, "utf8")
+    const publishMainJob = sliceWorkflowSection(workflow, "  publish-main:", "  publish-platform:")
+
+    // #when
+    const checksOutPreparedRelease = publishMainJob.includes("ref: ${{ needs.prepare-release-state.outputs.release_sha }}")
+    const regeneratesInstallerBeforeMainBuild = publishMainJob.includes(
+      "bun run build:codex-install && bun run build:lsp-tools-mcp && bun run build:lsp-daemon && bun run build",
+    )
+
+    // #then
+    expect(checksOutPreparedRelease, "publish-main must build the release-state commit after version synchronization").toBe(true)
+    expect(regeneratesInstallerBeforeMainBuild, "publish-main must regenerate the embedded Codex installer from that release commit").toBe(true)
+  })
+
+  test("dispatches a source-pinned publish run before provenance-bearing release operations", () => {
+    // #given
+    const workflow = readFileSync(publishWorkflowPath, "utf8")
+    const prepareJob = sliceWorkflowSection(workflow, "  prepare-release-state:", "  dispatch-provenance-safe-publish:")
+    const dispatchJob = sliceWorkflowSection(workflow, "  dispatch-provenance-safe-publish:", "  publish-main:")
+    const publishMainJob = sliceWorkflowSection(workflow, "  publish-main:", "  publish-platform:")
+    const publishPlatformJob = sliceWorkflowSection(workflow, "  publish-platform:", "  release:")
+    const releaseJob = sliceWorkflowSectionToEnd(workflow, "  release:")
+
+    // #when
+    const exposesPreparedSourceInput = workflow.includes("prepared_release_sha:")
+    const validatesDispatchSource = prepareJob.includes("PREPARED_RELEASE_SHA: ${{ inputs.prepared_release_sha }}") &&
+      prepareJob.includes('"$PREPARED_RELEASE_SHA" != "$GITHUB_SHA"')
+    const dispatchesPinnedTagRun =
+      dispatchJob.includes('git tag "v${VERSION}" "$RELEASE_SHA"') &&
+      dispatchJob.includes('gh workflow run publish.yml --ref "v${VERSION}"') &&
+      dispatchJob.includes('prepared_release_sha=${RELEASE_SHA}')
+    const provenanceOperationsRequirePinnedRun =
+      publishMainJob.includes("inputs.prepared_release_sha != ''") &&
+      publishPlatformJob.includes("inputs.prepared_release_sha != ''") &&
+      releaseJob.includes("inputs.prepared_release_sha != ''")
+    const releaseChecksOutPreparedSource = releaseJob.includes("ref: ${{ needs.prepare-release-state.outputs.release_sha }}")
+    const releaseDoesNotRestampOrRetag =
+      !releaseJob.includes("name: Apply release version to source tree") &&
+      !releaseJob.includes("name: Create release tag")
+
+    // #then
+    expect(exposesPreparedSourceInput, "the follow-up publish run must receive the exact prepared source SHA").toBe(true)
+    expect(validatesDispatchSource, "the provenance-bearing run must reject a dispatch SHA different from the prepared source").toBe(true)
+    expect(dispatchesPinnedTagRun, "the preparation run must tag and dispatch the exact prepared source").toBe(true)
+    expect(provenanceOperationsRequirePinnedRun, "npm, platform, marketplace, and GitHub release operations must only run from the pinned follow-up dispatch").toBe(true)
+    expect(releaseChecksOutPreparedSource, "GitHub release and marketplace operations must check out the prepared source directly").toBe(true)
+    expect(releaseDoesNotRestampOrRetag, "the provenance-bearing release run must not mutate its release source").toBe(true)
+  })
+
   test("runs Codex compatibility checks before publish jobs", () => {
     // #given
     const workflow = readFileSync(publishWorkflowPath, "utf8")

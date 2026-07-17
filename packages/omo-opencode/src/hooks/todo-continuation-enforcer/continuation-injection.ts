@@ -189,6 +189,14 @@ ${todoList}`
     return
   }
 
+  if (injectionState?.continuationBlockReason) {
+    log(`[${HOOK_NAME}] Skipped injection: continuation paused at turn boundary`, {
+      sessionID,
+      reason: injectionState.continuationBlockReason,
+    })
+    return
+  }
+
   if (injectionState) {
     injectionState.inFlight = true
   }
@@ -234,6 +242,9 @@ ${todoList}`
           injectionState.inFlight = false
           injectionState.lastInjectedAt = Date.now()
           injectionState.awaitingPostInjectionProgressCheck = true
+          injectionState.continuationResponseObserved = false
+          injectionState.continuationBlockReason = undefined
+          injectionState.pendingUserMessageID = undefined
           injectionState.consecutiveFailures = 0
         }
         return
@@ -253,6 +264,9 @@ ${todoList}`
       injectionState.inFlight = false
       injectionState.lastInjectedAt = Date.now()
       injectionState.awaitingPostInjectionProgressCheck = true
+      injectionState.continuationResponseObserved = false
+      injectionState.continuationBlockReason = undefined
+      injectionState.pendingUserMessageID = undefined
       injectionState.consecutiveFailures = 0
     }
   } catch (error) {

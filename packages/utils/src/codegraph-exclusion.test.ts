@@ -52,7 +52,7 @@ describe("CodeGraph project exclusion policy", () => {
       expect(
         shouldExcludeCodegraphProject("/Users/alice/repo", { platform: "darwin", tmpdir: "/var/folders/ab/xyz/T" }),
       ).toEqual({ excluded: false })
-      expect(shouldExcludeCodegraphProject("/Users/alice/repo/.omo/ultraresearch/run/clones/repo")).toEqual({
+      expect(shouldExcludeCodegraphProject("/Users/alice/repo/.omo/ulw-research/run/clones/repo")).toEqual({
         excluded: true,
         matchedRoot: ".omo",
         reason: "omo-state",

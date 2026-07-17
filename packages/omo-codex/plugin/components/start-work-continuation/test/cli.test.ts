@@ -6,6 +6,7 @@ import { execPath } from "node:process";
 import { afterEach, describe, expect, it } from "vitest";
 
 const cleanupRoots: string[] = [];
+const SCAFFOLD_PLAN_MARKDOWN = readFileSync(new URL("./fixtures/plan-scaffold.md", import.meta.url), "utf8");
 
 afterEach(() => {
 	for (const root of cleanupRoots.splice(0)) rmSync(root, { recursive: true, force: true });
@@ -25,8 +26,8 @@ describe("start-work continuation CLI", () => {
 		expect(result.status).toBe(0);
 		const output = parseStopHookOutput(result.stdout);
 		expect(output.decision).toBe("block");
-		expect(output.reason).toContain("Remaining top-level checkboxes: `2` of `3`");
-		expect(output.reason).toContain("Next incomplete task: `Task one`");
+		expect(output.reason).toContain("Remaining top-level checkboxes: `2` of `4`");
+		expect(output.reason).toContain("Next incomplete task: `1. Implement checklist parser parity`");
 		expect(output.reason).toContain("Your session id in boulder.json: `codex:s1`");
 	});
 
@@ -106,7 +107,7 @@ function createWorkspace(sessionIds: readonly string[]): string {
 	const root = mkdtempSync(join(tmpdir(), "codex-continuation-cli-"));
 	cleanupRoots.push(root);
 	mkdirSync(join(root, ".omo", "plans"), { recursive: true });
-	writeFileSync(join(root, ".omo", "plans", "plan.md"), "## TODOs\n\n- [ ] Task one\n- [x] Done\n- [ ] Task two\n");
+	writeFileSync(join(root, ".omo", "plans", "plan.md"), SCAFFOLD_PLAN_MARKDOWN);
 	const work = {
 		work_id: "w1",
 		active_plan: ".omo/plans/plan.md",

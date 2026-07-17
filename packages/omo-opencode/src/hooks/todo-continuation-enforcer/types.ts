@@ -33,6 +33,9 @@ export interface SessionState {
   lastIncompleteCount?: number
   lastInjectedAt?: number
   awaitingPostInjectionProgressCheck?: boolean
+  continuationResponseObserved?: boolean
+  continuationBlockReason?: "directive-response" | "user-interruption"
+  pendingUserMessageID?: string
   inFlight?: boolean
   stagnationCount: number
   consecutiveFailures: number

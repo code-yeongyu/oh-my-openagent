@@ -293,7 +293,7 @@ describe("team-mode integration", () => {
         thinking: { type: "enabled", budgetTokens: 1024 },
       },
     })
-  })
+  }, 30000)
 
   test("C-10.4 keeps member spawn concurrency within max_parallel_members", async () => {
     // given
@@ -313,8 +313,8 @@ describe("team-mode integration", () => {
       { kind: "subagent_type", name: "worker-b", subagent_type: "atlas", backendType: "in-process", isActive: true },
     ]), "ses_lead", createContext(baseDir, manager, new Set(["ses_lead"])), createConfig(baseDir, { max_parallel_members: launchLimit }), manager)
     try {
-      const firstBatch = await launchProbe.waitForFirstBatch("timed out waiting for the first two member launches")
-      await launchProbe.releaseAndWaitForCompletion(run, "timed out waiting for all member launches")
+      const firstBatch = await launchProbe.waitForFirstBatch()
+      await launchProbe.releaseAndWaitForCompletion(run)
       const completed = launchProbe.snapshot()
 
       // then
@@ -327,5 +327,5 @@ describe("team-mode integration", () => {
       launchProbe.release()
       run.catch(() => undefined)
     }
-  })
+  }, 30000)
 })

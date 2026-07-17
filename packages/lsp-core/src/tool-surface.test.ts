@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { createStandaloneMcpRequestContext, runWithRequestContext } from "./request-context.js";
 import { coerceToolArguments, executeLspTool, LSP_MCP_TOOLS } from "./tools.js";
 
 const expectedToolSurface = [
@@ -142,7 +143,9 @@ describe("LSP core tool surface", () => {
 
 	test("#given legacy tool aliases #when executed #then aliases are callable but not listed", async () => {
 		// given / when
-		const result = await executeLspTool("lsp_diagnostics", { filePath: "module.wat" });
+		const result = await runWithRequestContext(createStandaloneMcpRequestContext(), () =>
+			executeLspTool("lsp_diagnostics", { filePath: "module.wat" }),
+		);
 
 		// then
 		expect(result.content[0]?.text).toContain("No LSP server configured for extension: .wat");

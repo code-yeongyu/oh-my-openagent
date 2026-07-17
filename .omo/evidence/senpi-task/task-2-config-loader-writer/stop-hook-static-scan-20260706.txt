@@ -1,8 +1,0 @@
-no as any / TS suppressions in writer sources:
-PASS: no matches
-empty catch scan in writer sources:
-PASS: no empty catch blocks
-pure LOC for changed files:
-packages/omo-config-core/src/writer/writer.ts 120
-packages/omo-config-core/src/writer/writer-security.test.ts 81
-.omo/evidence/senpi-task/task-2-config-loader-writer/manual-parent-dir-symlink-20260706.mjs 72

@@ -241,17 +241,17 @@ Even with only the following subscriptions, `ultrawork` works well (this project
 <td align="center"><img src=".github/assets/hephaestus.png" height="300" /></td>
 </tr></table>
 
-**Sisyphus** (`claude-opus-4-7` / **`kimi-k2.6`** / **`glm-5.1`** ) is your main orchestrator. He plans, delegates to specialists, and drives tasks to completion with aggressive parallel execution. He does not stop halfway.
+**Sisyphus** (`claude-opus-4-8` / `claude-opus-4-7` / **`kimi-k3`** / **`kimi-k2.6`** / **`glm-5`** ) is your main orchestrator. He plans, delegates to specialists, and drives tasks to completion with aggressive parallel execution. He does not stop halfway. Use **Kimi K3** when you can accept its thinking-token cost; otherwise **Claude Opus 4.8 / 4.7** or **Kimi K2.6** are the recommended defaults.
 
-**Hephaestus** (`gpt-5.5`) is your autonomous deep worker. Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding. *The Legitimate Craftsman.*
+**Hephaestus** (`gpt-5.6-sol` on OpenAI or Vercel, then `gpt-5.5`) is your autonomous deep worker. Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding. *The Legitimate Craftsman.*
 
-**Prometheus** (`claude-opus-4-7` / **`kimi-k2.6`** / **`glm-5.1`** ) is your strategic planner. Interview mode: he asks questions, identifies scope, and builds a detailed plan before a single line of code is touched.
+**Prometheus** (`claude-opus-4-7` / **`gpt-5.5`** / **`glm-5.2`** ) is your strategic planner. Interview mode: he asks questions, identifies scope, and builds a detailed plan before a single line of code is touched.
 
 Every agent is tuned to its model's specific strengths. No manual model juggling. [Learn more →](docs/guide/overview.md)
 
 > Anthropic [blocked OpenCode because of us.](https://x.com/thdxr/status/2010149530486911014) That's why Hephaestus is called "The Legitimate Craftsman." The irony is intentional.
 >
-> We run best on Opus, but Kimi K2.6 + GPT-5.5 already beats vanilla Claude Code. Zero config needed.
+> We run best on Opus or Kimi K3, but Kimi K2.6 + GPT-5.5 already beats vanilla Claude Code. Zero config needed.
 
 ### Team Mode (v4.0)
 
@@ -288,7 +288,7 @@ When Sisyphus delegates to a subagent, it doesn't pick a model. It picks a **cat
 | `quick`              | Single-file changes, typos         |
 | `ultrabrain`         | Hard logic, architecture decisions |
 
-The agent says what kind of work it needs; the harness picks the right model. `ultrabrain` now routes to GPT-5.5 xhigh by default. You touch nothing.
+The agent says what kind of work it needs; the harness picks the right model. `ultrabrain` now routes to GPT-5.6 Sol xhigh through OpenAI or Vercel when available, then GPT-5.5 xhigh. You touch nothing.
 
 ### Claude Code Compatibility
 

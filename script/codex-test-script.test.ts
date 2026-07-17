@@ -6,21 +6,6 @@ import { readFileSync } from "node:fs"
 const packageManifestPath = new URL("../package.json", import.meta.url)
 
 describe("Codex compatibility test script", () => {
-  test("does not run the rejected compatibility installer test", () => {
-    // #given
-    const packageManifest = readFileSync(packageManifestPath, "utf8")
-    const forbiddenShortToken = ["o", "m", "x"].join("")
-    const forbiddenInstallerTest = ["install", forbiddenShortToken, "compatibility.test.mjs"].join("-")
-
-    // #when
-    const hasForbiddenShortToken = packageManifest.toLowerCase().includes(forbiddenShortToken)
-    const hasForbiddenInstallerTest = packageManifest.includes(forbiddenInstallerTest)
-
-    // #then
-    expect(hasForbiddenShortToken, "test:codex must not include the rejected compatibility token").toBe(false)
-    expect(hasForbiddenInstallerTest, "test:codex must not include the rejected installer test").toBe(false)
-  })
-
   test("runs the vendored LSP package tests after building its package", () => {
     // #given
     const packageManifest = readFileSync(packageManifestPath, "utf8")

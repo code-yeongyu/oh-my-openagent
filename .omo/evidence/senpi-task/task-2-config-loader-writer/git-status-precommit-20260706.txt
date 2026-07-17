@@ -1,5 +1,0 @@
-$ git status --short --branch
-## code-yeongyu/senpi-task-w0-config-loader-writer...origin/code-yeongyu/senpi-task-w0-config-loader-writer
- M packages/omo-config-core/src/loader/loader.test.ts
- M packages/omo-config-core/src/loader/paths.ts
- M packages/omo-config-core/src/loader/types.ts
