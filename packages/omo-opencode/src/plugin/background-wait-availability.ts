@@ -22,7 +22,7 @@ export function createBackgroundWaitAvailability(
     const agentOverride = pluginConfig.agents?.[getAgentConfigKey(sessionAgent)]
     let effectivePermission: "allow" | "ask" | "deny" | undefined
     for (const [permission, action] of Object.entries(agentOverride?.permission ?? {})) {
-      if (matchesToolMatcher(BACKGROUND_WAIT_TOOL, permission)) {
+      if (typeof action === "string" && matchesToolMatcher(BACKGROUND_WAIT_TOOL, permission)) {
         effectivePermission = action
       }
     }
