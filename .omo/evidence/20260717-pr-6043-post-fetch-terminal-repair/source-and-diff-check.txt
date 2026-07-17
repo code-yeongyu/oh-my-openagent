@@ -1,11 +1,12 @@
-git_diff_check=PASS
- M packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-generation-race.test.ts
- M packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-message-fetch-ordering.test.ts
- M packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-ownership.ts
- M packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-terminal-races.test.ts
- M packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts
- M packages/omo-opencode/src/hooks/runtime-fallback/hook.ts
- M packages/omo-opencode/src/hooks/runtime-fallback/watchdog-abort-provenance.ts
-head=c71b41c1574a191a51c7497da43c11d5d2aa9d0e
+run_head=e41dd8583964c217e023c38129cccb15b6e2b842
+runtime_source_head=0dd0ab901c8ddc1a49155efddad7aea982c9a458
+runtime_source_parent=c71b41c1574a191a51c7497da43c11d5d2aa9d0e
 origin_dev=8af398565abfaece6d5fc3e6bc4ef0c7efa9bb7a
-working_diff_sha256=7a7c0e2dff2e09100c8fee327680218560fa9cee38a24b215efb7f95ffab0582
+runtime_source_is_ancestor=PASS
+runtime_source_parent_matches=PASS
+committed_diff_check=PASS
+committed_diff_sha256=7a7c0e2dff2e09100c8fee327680218560fa9cee38a24b215efb7f95ffab0582
+source_matches=committed-runtime-source
+source_path_count=7
+worktree_clean_at_harness_start=PASS
+verdict=PASS
