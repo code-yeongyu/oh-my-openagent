@@ -535,6 +535,44 @@ Twenty-first-cycle artifacts:
   older-root fallback, two active roots, deletion restoration, no fallback
   watchdog re-arm, later external abort, and unchanged real database all pass.
 
+The second fresh exact-head review then found an abort-ownership gap outside
+the watchdog callback itself. The `message.updated` and `session.status`
+provider-signal handlers ignored `abortSessionRequest() === false`, released
+retry ownership, and dispatched a replacement even though OpenCode had not
+cancelled the original request. Four failing-first handler regressions observed
+fallback dispatch after rejection on both transports, including duplicate
+abort attempts in the in-flight status path.
+
+Twenty-second-cycle source commit
+`ece0473ca317a819d4d5ba8bf8f86272ee31d1fa` treats cancellation ownership as a
+hard dispatch gate. Rejected aborts preserve active, awaiting, or pending
+fallback state and return without a replacement request; a successful
+provider-signal override is reused instead of issuing a second abort.
+
+Twenty-second-cycle artifacts:
+
+- `pr-6043-lane-2-code-review.md`: independent exact-head BLOCK report.
+- `twenty-second-review-repair.md`: finding, causal repair, evidence boundary,
+  and exact-source verdict.
+- `twenty-second-exact-runtime-fallback-suite.txt`: 295 tests passing across 46 files.
+- `twenty-second-exact-session-lifecycle-suite.txt`: 53 lifecycle/state tests passing.
+- `twenty-second-exact-omo-opencode-typecheck.txt`,
+  `twenty-second-exact-biome.txt`, and `twenty-second-exact-no-excuse.txt`:
+  exact-source static passes.
+- `twenty-second-exact-integrity.txt`: source/base identity, diff check, and
+  pure-LOC receipt.
+- `twenty-second-opencode-harness-self-check.txt`: isolated harness preflight.
+- `twenty-second-exact-live-watchdog-run.txt`: production-duration real
+  OpenCode run pinned to `ece0473ca317a819d4d5ba8bf8f86272ee31d1fa`;
+  older-root fallback, two active roots, deletion restoration, no watchdog
+  re-arm, later external cancellation, and unchanged real database all pass.
+
+The rejected-abort outcome is proven deterministically at the typed handler
+seam. The live server run exercises the successful-abort transport and complete
+user-visible watchdog lifecycle; it does not force a live abort rejection,
+which is not deterministic through OpenCode's public server API while an
+actual request remains active.
+
 The live harness intentionally records only sanitized fake-provider, plugin,
 and SSE evidence. Authentication values, raw environment dumps, private
 credentials, and unrelated service logs are omitted.
