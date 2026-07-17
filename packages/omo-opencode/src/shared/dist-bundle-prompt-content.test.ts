@@ -49,7 +49,7 @@ const PROMPT_SIGNATURES = [
   {
     path: "packages/prompts-core/prompts/prometheus/default.md",
     label: "Prometheus default",
-    signature: "Your FIRST action in every planning session is to LOAD the shared ulw-plan skill",
+    signature: "Your FIRST action in every planning session is to LOAD the ulw-plan skill",
   },
   {
     path: "packages/prompts-core/prompts/mode/team.md",

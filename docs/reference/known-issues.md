@@ -9,6 +9,13 @@ Tracks bugs that are present in the current release but have been intentionally 
 - **Workaround**: Use a provider-native route or adapter that supports GPT-5.5 reasoning with tools, or use a model/provider configuration that does not emit the unsupported reasoning setting for tool-heavy agents.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5529.
 
+## #5604 - Required-model delegation can fail before the child stream starts
+
+- **Affects**: OpenCode delegation when provider connectivity is known and none of the connected providers can serve a required-model subagent's fallback chain.
+- **Symptom**: Model resolution can return success without pinning a provider/model. The harness may then create a child session that fails before producing assistant or tool output, which can look like a hidden, stuck, or skipped subagent.
+- **Workaround**: Connect a provider supported by the target agent, or reroute through a category or subagent whose fallback chain has an available provider. If a child produces no assistant/tool output, treat the dispatch as failed and retry through a supported route.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5604.
+
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
 - **Affects**: OpenAI-compatible custom providers whose models are written to `opencode.json` without a `limit` block.

@@ -300,7 +300,7 @@ export function createMomusAgent(model: string): AgentConfig {
     return {
       ...base,
       prompt: MOMUS_GPT_5_6_PROMPT,
-      reasoningEffort: "xhigh",
+      reasoningEffort: "high",
       textVerbosity: "high",
     } as AgentConfig;
   }

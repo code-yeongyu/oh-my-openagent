@@ -7,6 +7,7 @@ import { describe, expect, test } from "bun:test"
 
 import type { BoulderState, BoulderWorkState } from "./types"
 import { getWorkForSession, readBoulderState } from "./storage/read-state"
+import { normalizeSessionId } from "./storage/shared"
 
 function createTempDirectory(): string {
   return mkdtempSync(join(tmpdir(), "boulder-read-state-"))
@@ -108,6 +109,20 @@ describe("readBoulderState", () => {
 
     // then
     expect(state).toBeNull()
+  })
+})
+
+describe("normalizeSessionId", () => {
+  test("#given bare id and senpi platform #when normalizing #then senpi prefix is applied", () => {
+    expect(normalizeSessionId("abc", "senpi")).toBe("senpi:abc")
+  })
+
+  test("#given already senpi-prefixed id #when normalizing #then id is unchanged", () => {
+    expect(normalizeSessionId("senpi:abc")).toBe("senpi:abc")
+  })
+
+  test("#given senpi-prefixed id with different platform #when normalizing #then prefix wins", () => {
+    expect(normalizeSessionId("senpi:abc", "codex")).toBe("senpi:abc")
   })
 })
 

@@ -330,7 +330,7 @@ describe("buildPrometheusAgentConfig", () => {
   });
 
   describe("#given a Prometheus prompt override tries to replace the base prompt", () => {
-    test("keeps the mandatory shared ulw-plan skill instruction when prompt is configured", async () => {
+    test("keeps the mandatory ulw-plan skill instruction when prompt is configured", async () => {
       // given
       const replacementOnlyPrompt = "OVERRIDE_PROMPT_NO_SHARED_SKILL";
 
@@ -345,7 +345,7 @@ describe("buildPrometheusAgentConfig", () => {
       // then
       expect(typeof result.prompt).toBe("string");
       if (typeof result.prompt === "string") {
-        expect(result.prompt).toContain('skill(name="shared/ulw-plan")');
+        expect(result.prompt).toContain('skill(name="ulw-plan")');
         expect(result.prompt).toContain(replacementOnlyPrompt);
         expect(result.prompt).not.toBe(replacementOnlyPrompt);
       }

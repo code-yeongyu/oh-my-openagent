@@ -42,6 +42,10 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
         previous: { model: "gpt-5.5", effort: "xhigh" },
         current: { model: "gpt-5.6-sol", effort: "ultra" },
       },
+      {
+        previous: { model: "gpt-5.6-sol", effort: "ultra" },
+        current: { model: "gpt-5.6-terra", effort: "high" },
+      },
     ],
   ],
   [

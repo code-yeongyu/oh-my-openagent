@@ -82,11 +82,12 @@ Sisyphus is your main orchestrator. He plans, delegates to specialists, and driv
 
 **Recommended models:**
 
-- **Claude Opus 4.7** — Best overall experience. Sisyphus was built with Claude-optimized prompts.
-- **Kimi K2.6** / **K2.5** — Great Claude-like alternatives. K2.6 is the current default fallback in the primary Sisyphus chain; many users run K2.6 or the K2.5/K2.6 combo exclusively.
+- **Claude Opus 4.8** / **Opus 4.7** — Best overall experience. Sisyphus was built with Claude-optimized prompts.
+- **Kimi K3** — Strongest Kimi for Sisyphus. Recommended when you can accept its thinking-token cost; the K3 prompt is calibrated to stop overthinking and keep work moving.
+- **Kimi K2.6** / **K2.5** — Great Claude-like alternatives. K2.6 is the current default fallback in the primary Sisyphus chain after K3; many users run K2.6 or the K2.5/K2.6 combo exclusively.
 - **GLM 5** — Solid option, especially via Z.ai.
 
-Sisyphus works best on Claude Opus 4.7, Kimi K2.6 (or K2.5), and GLM 5. GPT-5.4 and GPT-5.5 now have dedicated prompt paths, but older GPT models are still a poor fit and should route to Hephaestus instead.
+Sisyphus works best on Claude Opus 4.8 / 4.7, Kimi K3 / K2.6 (or K2.5), and GLM 5. GPT-5.4 and GPT-5.5 now have dedicated prompt paths, but older GPT models are still a poor fit and should route to Hephaestus instead.
 
 ### Hephaestus: The Legitimate Craftsman
 
@@ -225,8 +226,8 @@ You can override specific agents or categories in your config:
 
 **GPT models** (explicit reasoning, principle-driven):
 
-- GPT-5.6 Sol — preferred for Hephaestus, Momus, and `ultrabrain` when OpenAI or Vercel exposes it; first fallback for `deep`
-- GPT-5.6 Terra — mid-tier; default for the `deep` category (xhigh)
+- GPT-5.6 Sol — preferred for Hephaestus and `ultrabrain` when OpenAI or Vercel exposes it; first fallback for `deep`
+- GPT-5.6 Terra — mid-tier; default for the `deep` category (xhigh); preferred for Momus (high)
 - GPT-5.6 Luna — light tier; default for the `unspecified-low` category (xhigh)
 - GPT-5.5 — deep coding powerhouse, default for Oracle and the first GPT fallback for GPT-5.6-native roles
 - GPT-5.4 Mini — fast and cheap utility tasks

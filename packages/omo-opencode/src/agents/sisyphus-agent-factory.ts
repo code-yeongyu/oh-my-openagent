@@ -19,6 +19,7 @@ import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
 import { buildGpt55SisyphusPrompt } from "./sisyphus/gpt-5-5";
 import { buildKimiK26SisyphusPrompt } from "./sisyphus/kimi-k2-6";
 import { buildKimiK27SisyphusPrompt } from "./sisyphus/kimi-k2-7";
+import { buildKimiK3SisyphusPrompt } from "./sisyphus/kimi-k3";
 import type { AgentMode } from "./types";
 import {
   isClaudeFable5Model,
@@ -31,6 +32,7 @@ import {
   isGptNativeSisyphusModel,
   isKimiK2Model,
   isKimiK27Model,
+  isKimiK3Model,
 } from "./types";
 
 const MODE: AgentMode = "primary";
@@ -43,6 +45,7 @@ const MODE: AgentMode = "primary";
  * body is the wrong family and must be rebuilt (issue #5297/#5316).
  */
 export type SisyphusPromptFamily =
+  | "kimi-k3"
   | "kimi-k2-7"
   | "kimi-k2-6"
   | "gpt-5-5"
@@ -54,6 +57,7 @@ export type SisyphusPromptFamily =
   | "fallback";
 
 export function resolveSisyphusPromptFamily(model: string): SisyphusPromptFamily {
+  if (isKimiK3Model(model)) return "kimi-k3";
   if (isKimiK27Model(model)) return "kimi-k2-7";
   if (isKimiK2Model(model)) return "kimi-k2-6";
   if (isGpt5_5Model(model) || isGpt5_6Model(model)) return "gpt-5-5";
@@ -79,6 +83,12 @@ export function createSisyphusAgent(
   const agents = availableAgents ?? [];
 
   switch (resolveSisyphusPromptFamily(model)) {
+    case "kimi-k3":
+      return buildGptSisyphusAgentConfig(
+        MODE,
+        model,
+        buildKimiK3SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
+      );
     case "kimi-k2-7":
       return buildGptSisyphusAgentConfig(
         MODE,

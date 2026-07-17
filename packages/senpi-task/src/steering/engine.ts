@@ -95,6 +95,10 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     return { kind: "queued", task_id: taskId, queue_position: queue.length }
   }
 
+  function dropPending(taskId: string): void {
+    pending.delete(taskId)
+  }
+
   async function notifyStarted(taskId: string): Promise<void> {
     const queue = pending.get(taskId)
     if (queue === undefined || queue.length === 0) return
@@ -184,7 +188,7 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     return { kind: "cancelled", task_id: record.task_id, previous_status: "running" }
   }
 
-  return { sendToTask, interruptTask, cancelTask, notifyStarted }
+  return { sendToTask, interruptTask, cancelTask, notifyStarted, dropPending }
 }
 
 function scopeDenied(record: TaskRecord, input: SendInput): SendOutcome | undefined {

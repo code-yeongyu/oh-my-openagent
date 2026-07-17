@@ -15,7 +15,7 @@ describe("managed bundled agent effort migration", () => {
 
     await linkCachedPluginAgents({ codexHome, pluginRoot, preservedReasoning })
 
-    expect(await readAgentEffort(codexHome, "momus")).toBe("ultra")
+    expect(await readAgentEffort(codexHome, "momus")).toBe("high")
     // explorer/librarian chain lands on the newest bundled default (luna/low), 2026-07-11
     expect(await readAgentEffort(codexHome, "explorer")).toBe("low")
     expect(await readAgentEffort(codexHome, "librarian")).toBe("low")
@@ -54,7 +54,7 @@ async function makeAgentFixture(): Promise<{ readonly codexHome: string; readonl
   const pluginRoot = join(root, "plugin")
   const agentsDir = join(pluginRoot, "components", "ultrawork", "agents")
   await mkdir(agentsDir, { recursive: true })
-  await writeFile(join(agentsDir, "momus.toml"), agentToml("momus", "gpt-5.6-sol", "ultra"))
+  await writeFile(join(agentsDir, "momus.toml"), agentToml("momus", "gpt-5.6-terra", "high"))
   await writeFile(join(agentsDir, "explorer.toml"), agentToml("explorer", "gpt-5.6-terra", "medium"))
   await writeFile(join(agentsDir, "librarian.toml"), agentToml("librarian", "gpt-5.6-terra", "medium"))
   return { codexHome, pluginRoot }
