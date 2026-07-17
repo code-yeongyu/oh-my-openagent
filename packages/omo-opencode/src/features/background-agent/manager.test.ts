@@ -2059,6 +2059,115 @@ describe("BackgroundManager terminal ownership and root reservations", () => {
     await manager.shutdown()
   })
 
+  test("rejects a concurrent resume before it can acquire duplicate task ownership", async () => {
+    //#given
+    let promptCallCount = 0
+    const client = {
+      session: {
+        promptAsync: async () => {
+          promptCallCount += 1
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput(client),
+      config: { defaultConcurrency: 1 },
+    })
+    stubNotifyParentSession(manager)
+    const task = createMockTask({
+      id: "task-concurrent-resume",
+      parentSessionId: "root-session",
+      sessionId: "session-concurrent-resume",
+      rootSessionId: "root-session",
+    })
+    getTaskMap(manager).set(task.id, task)
+    getRootDescendantCounts(manager).set("root-session", 2)
+    await tryCompleteTaskForTest(manager, task)
+
+    //#when
+    const firstResume = manager.resume({
+      sessionId: task.sessionId,
+      prompt: "first continuation",
+      parentSessionId: "root-session",
+      parentMessageId: "first-message",
+    })
+    const secondResumeOutcome = manager.resume({
+      sessionId: task.sessionId,
+      prompt: "second continuation",
+      parentSessionId: "root-session",
+      parentMessageId: "second-message",
+    }).then(
+      () => "fulfilled" as const,
+      (error: unknown) => error,
+    )
+
+    await firstResume
+    await tryCompleteTaskForTest(manager, task)
+    const secondOutcome = await secondResumeOutcome
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(secondOutcome).toBeInstanceOf(Error)
+    expect(secondOutcome).toHaveProperty("message", expect.stringContaining("cannot accept a continuation prompt"))
+    expect(promptCallCount).toBe(1)
+    expect(task.status).toBe("completed")
+    expect(getConcurrencyManager(manager).getCount("explore")).toBe(0)
+    expect(getRootDescendantCounts(manager).get("root-session")).toBe(1)
+
+    await manager.shutdown()
+  })
+
+  test("rejects resume while completion still owns terminalization", async () => {
+    //#given
+    let promptCallCount = 0
+    const client = {
+      session: {
+        promptAsync: async () => {
+          promptCallCount += 1
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const notification = blockNotifyParentSession(manager)
+    const task = createMockTask({
+      id: "task-resume-during-terminalization",
+      parentSessionId: "root-session",
+      sessionId: "session-resume-during-terminalization",
+      rootSessionId: "root-session",
+    })
+    getTaskMap(manager).set(task.id, task)
+    getRootDescendantCounts(manager).set("root-session", 1)
+
+    //#when
+    const completion = tryCompleteTaskForTest(manager, task)
+    await notification.started
+    const resumeOutcome = await manager.resume({
+      sessionId: task.sessionId,
+      prompt: "continue during completion",
+      parentSessionId: "root-session",
+      parentMessageId: "resume-message",
+    }).then(
+      () => "fulfilled" as const,
+      (error: unknown) => error,
+    )
+    await flushBackgroundNotifications()
+    const statusDuringTerminalization = task.status
+    notification.release()
+    const completed = await completion
+
+    //#then
+    expect(resumeOutcome).toBeInstanceOf(Error)
+    expect(resumeOutcome).toHaveProperty("message", expect.stringContaining("cannot accept a continuation prompt"))
+    expect(promptCallCount).toBe(0)
+    expect(statusDuringTerminalization).toBe("completed")
+    expect(completed).toBe(true)
+    await manager.shutdown()
+  })
+
   test("rejects resuming an ancestor from its descendant session", async () => {
     //#given
     const manager = createBackgroundManager()
@@ -8517,6 +8626,57 @@ describe("BackgroundManager queue processing - error tasks are skipped", () => {
 })
 
 describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tasks from queuesByKey", () => {
+  test("cancels a stale pending task already shifted into concurrency acquisition", async () => {
+    //#given
+    const manager = createBackgroundManagerWithOptions({ config: { defaultConcurrency: 1 } })
+    const task = createMockTask({
+      id: "task-stale-shifted-concurrency-waiter",
+      parentSessionId: "parent-session",
+      sessionId: undefined,
+      rootSessionId: "root-session-stale-shifted-concurrency-waiter",
+      status: "pending",
+      queuedAt: new Date(Date.now() - 31 * 60 * 1000),
+    })
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionId: task.parentSessionId,
+    }
+    const key = task.agent
+    const concurrencyManager = getConcurrencyManager(manager)
+    await concurrencyManager.acquire(key, "slot-owner")
+    getTaskMap(manager).set(task.id, task)
+    getQueuesByKey(manager).set(key, [{ task, input }])
+    getRootDescendantCounts(manager).set(task.rootSessionId, 1)
+    getPreStartDescendantReservations(manager).add(task.id)
+
+    let processingSettled = false
+    const processing = processKeyForTest(manager, key).then(() => {
+      processingSettled = true
+    })
+    await flushBackgroundNotifications()
+    expect(getQueuesByKey(manager).get(key)?.length ?? 0).toBe(0)
+
+    //#when
+    pruneStaleTasksAndNotificationsForTest(manager)
+    await flushBackgroundNotifications()
+    const settledBeforeOwnerRelease = processingSettled
+    const rootReleasedBeforeOwnerRelease = !getRootDescendantCounts(manager).has(task.rootSessionId)
+
+    concurrencyManager.release(key)
+    await processing
+
+    //#then
+    expect(task.status).toBe("error")
+    expect(settledBeforeOwnerRelease).toBe(true)
+    expect(rootReleasedBeforeOwnerRelease).toBe(true)
+    expect(getPreStartDescendantReservations(manager).has(task.id)).toBe(false)
+    expect(manager.hasBackgroundWorkInFlight(task.rootSessionId)).toBe(false)
+
+    await manager.shutdown()
+  })
+
   test("does not resurrect a stale pending task after session creation resolves", async () => {
     //#given
     let resolveCreate: ((value: { data: { id: string } }) => void) | undefined

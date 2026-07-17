@@ -277,6 +277,7 @@ export class BackgroundManager {
   private observedIncompleteTodosBySession: Map<string, boolean> = new Map()
   private rootDescendantCounts: Map<string, number>
   private releasedRootDescendantTasks = new Set<string>()
+  private resumingTasks = new Set<string>()
   private terminalizingTasks = new Set<string>()
   private terminalizationWaiters = new Map<string, Set<() => void>>()
   private preStartDescendantReservations: Set<string>
@@ -415,6 +416,25 @@ export class BackgroundManager {
     if (!task.rootSessionId) return
     this.releasedRootDescendantTasks.delete(task.id)
     this.registerRootDescendant(task.rootSessionId)
+  }
+
+  private reserveTaskResume(task: BackgroundTask): (() => void) | undefined {
+    if (
+      this.shutdownTriggered ||
+      task.status === "running" ||
+      this.resumingTasks.has(task.id) ||
+      this.terminalizingTasks.has(task.id)
+    ) {
+      return undefined
+    }
+
+    this.resumingTasks.add(task.id)
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      this.resumingTasks.delete(task.id)
+    }
   }
 
   private reserveTaskTerminalization(
@@ -1506,18 +1526,19 @@ The fallback retry session is now created and can be inspected directly.
       throw new Error(`Task has no sessionID: ${existingTask.id}`)
     }
 
-    if (existingTask.status === "running") {
-      throw new Error(
-        `Task ${existingTask.id} is currently running and cannot accept a continuation prompt. ` +
-        "Wait for it to complete before resuming it with task_id.",
-      )
-    }
-
     if (
       input.parentSessionId === existingTask.sessionId ||
       this.getAllDescendantTasks(existingTask.sessionId).some(task => task.sessionId === input.parentSessionId)
     ) {
       throw new Error(`Resuming task ${existingTask.id} from session ${input.parentSessionId} would create a background task cycle`)
+    }
+
+    const releaseResume = this.reserveTaskResume(existingTask)
+    if (!releaseResume) {
+      throw new Error(
+        `Task ${existingTask.id} is currently running and cannot accept a continuation prompt. ` +
+        "Wait for it to complete before resuming it with task_id.",
+      )
     }
 
     const resumeSnapshot = this.captureResumeTaskSnapshot(existingTask)
@@ -1531,14 +1552,22 @@ The fallback retry session is now created and can be inspected directly.
     const concurrencyKey = this.concurrencyManager.getConcurrencyKey(
       existingTask.concurrencyGroup ?? existingTask.agent,
     )
-    await this.concurrencyManager.acquire(concurrencyKey)
-    existingTask.concurrencyKey = concurrencyKey
-    existingTask.concurrencyGroup = concurrencyKey
+    try {
+      await this.concurrencyManager.acquire(concurrencyKey)
+      if (this.shutdownTriggered) {
+        this.concurrencyManager.release(concurrencyKey)
+        throw new Error("Background manager is shutting down")
+      }
+      existingTask.concurrencyKey = concurrencyKey
+      existingTask.concurrencyGroup = concurrencyKey
 
-    if (TERMINAL_BACKGROUND_TASK_STATUSES.has(resumeSnapshot.status)) {
-      this.reacquireTaskRootDescendant(existingTask)
+      if (TERMINAL_BACKGROUND_TASK_STATUSES.has(resumeSnapshot.status)) {
+        this.reacquireTaskRootDescendant(existingTask)
+      }
+      existingTask.status = "running"
+    } finally {
+      releaseResume()
     }
-    existingTask.status = "running"
     existingTask.completedAt = undefined
     existingTask.error = undefined
     this.updateTaskParent(existingTask, input.parentSessionId)
@@ -3157,6 +3186,7 @@ The task was re-queued on a fallback model after a retryable failure.
         try {
           const wasPending = task.status === "pending"
           let removedFromQueue = false
+          let cancelledConcurrencyWaiter = false
           log("[background-agent] Pruning stale task:", { taskId, status: task.status, age: Math.round(((wasPending ? task.queuedAt?.getTime() : task.startedAt?.getTime()) ? (Date.now() - (wasPending ? task.queuedAt!.getTime() : task.startedAt!.getTime())) : 0) / 1000) + "s" })
           if (wasPending) {
             const key = this.concurrencyManager.getConcurrencyKey(this.getRawConcurrencyKeyFromTask(task))
@@ -3171,13 +3201,16 @@ The task was re-queued on a fallback model after a retryable failure.
                 }
               }
             }
+            if (!removedFromQueue) {
+              cancelledConcurrencyWaiter = this.concurrencyManager.cancelWaiter(key, task.id)
+            }
           }
 
           task.status = "error"
           task.error = errorMessage
           task.completedAt = new Date()
           if (wasPending) {
-            if (removedFromQueue) {
+            if (removedFromQueue || cancelledConcurrencyWaiter) {
               const hadPreStartReservation = this.preStartDescendantReservations.has(task.id)
               this.rollbackPreStartDescendantReservation(task)
               if (!hadPreStartReservation) {
@@ -3520,6 +3553,7 @@ The task was re-queued on a fallback model after a retryable failure.
     this.notificationQueueByParent.clear()
     this.rootDescendantCounts.clear()
     this.releasedRootDescendantTasks.clear()
+    this.resumingTasks.clear()
     this.terminalizingTasks.clear()
     for (const waiters of this.terminalizationWaiters.values()) {
       for (const resolve of waiters) resolve()
