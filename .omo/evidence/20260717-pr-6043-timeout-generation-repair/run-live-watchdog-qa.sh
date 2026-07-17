@@ -10,7 +10,7 @@ SOURCE_PATHS=(
   packages/omo-opencode/src/hooks/runtime-fallback/hook-abort-lifecycle-races.test.ts
 )
 RUNTIME_SOURCE_PARENT="23a3420573d4db152cde6fb547416f572685436c"
-RUNTIME_SOURCE_HEAD="e13ad8773de0d95134c8128bb1f1e45e2525d97c"
+RUNTIME_SOURCE_HEAD="e13ad87739ca2970e25da425f4fbbf68c830bd77"
 FAKE_SCRIPT="$ASSET_EVIDENCE/fake-silent-provider.mjs"
 ROOT_PROBE="$ASSET_EVIDENCE/root-state-probe.ts"
 REAL_DB="$(opencode db path 2>/dev/null | head -1)"
