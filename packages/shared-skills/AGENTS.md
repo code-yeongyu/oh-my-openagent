@@ -6,9 +6,11 @@
 
 Hand-authored, cross-harness skill bundle shared between the OpenCode and Codex editions. Mostly authored skill data, with skill-owned scripts/assets when required and no transform inside the package. `index.mjs` exports `sharedSkillsRootPath()` returning the absolute path to `skills/`. Package: `@oh-my-opencode/shared-skills` (`files`: `index.mjs`, `index.d.ts`, `skills`).
 
-## SKILLS (20 under `skills/<name>/`)
+## SKILLS (16 under `skills/<name>/`)
 
-`programming`, `debugging`, `frontend`, `visual-qa`, `ast-grep`, `coding-agent-sessions`, `git-master`, `refactor`, `review-work`, `start-work`, `ulw-plan`, `ulw-research`, `ultraresearch`, `init-deep`, `remove-ai-slops`, `lsp-setup`, `ultimate-browsing` (shared) + `lcx-report-bug`, `lcx-contribute-bug-fix`, `lcx-doctor` (Codex-only, `lcx-` prefix).
+`programming`, `debugging`, `frontend`, `visual-qa`, `ast-grep`, `coding-agent-sessions`, `git-master`, `refactor`, `review-work`, `start-work`, `ulw-plan`, `ulw-research`, `init-deep`, `remove-ai-slops`, `lsp-setup`, `ultimate-browsing`.
+
+The Codex-only `lcx-report-bug`, `lcx-contribute-bug-fix`, and `lcx-doctor` skills live under `packages/omo-codex/plugin/components/lcx/skills/`; they are no longer authored in this package.
 
 Per-skill layout: `SKILL.md` (YAML frontmatter `name:` + single-line `description:` with triggers) + optional `references/` (the real content; SKILL.md is a router/index) + optional `scripts/` + optional `agents/openai.yaml` (6 skills carry the Codex agent role declaration).
 
@@ -19,13 +21,13 @@ skills/ (source)
   ├─ build:shared-skills-assets (root) → cp -R skills dist/skills          # literal copy, no transform
   ├─ skills-loader-core → loadSkillsFromDir(sharedSkillsRootPath(), scope:"shared")   # OpenCode runtime
   └─ omo-codex/plugin/scripts/sync-skills.mjs → plugin/skills/             # the only transformer
-        1. copies 7 omo-codex COMPONENT skills FIRST (comment-checker, lsp, rules, teammode,
-           ulw-loop, ulw-plan, ultrawork from plugin/components/*/skills/*); same-named shared
-           skills are skipped → ulw-plan/ultrawork in Codex come from components, NOT from here
-        2. copies remaining shared skills EXCEPT ultraresearch (codexHiddenSharedSkillNames)
+        1. copies 10 omo-codex COMPONENT skills FIRST (comment-checker, lcx-*, lsp, rules,
+           teammode, ulw-loop, ulw-plan, ultrawork from plugin/components/*/skills/*); same-named
+           shared skills are skipped → ulw-plan/ultrawork in Codex come from components, NOT from here
+        2. copies remaining shared skills
         3. adaptSkillForCodex(): inserts Codex Harness Tool Compatibility sections; overlays
-           start-work/review-work/ulw-research; writes agents/openai.yaml display metadata
-           with the "(OmO) " prefix; filters out tests, caches, and source metadata
+           start-work/review-work; writes agents/openai.yaml display metadata with the "(OmO) "
+           prefix; filters out tests, caches, and source metadata
         → ships to ~/.codex/.../skills/
 ```
 

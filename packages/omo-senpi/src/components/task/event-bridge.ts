@@ -70,6 +70,7 @@ export function wireEventBridge(
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     transitions.onShutdown(engine.runtime.sessionId())
     engine.runtime.clearUi()
+    statusUi.dispose()
     state.leadPollers.shutdown()
     await engine.lifecycle.teardownOnSessionShutdown()
   })

@@ -3,7 +3,7 @@ import { createMomusAgent } from "./momus";
 
 describe("createMomusAgent", () => {
   describe("#given a GPT-5.6 family model", () => {
-    test("#when creating the agent #then it runs xhigh reasoning with a GPT-5.6 tuned prompt", () => {
+    test("#when creating the agent #then it runs high reasoning with a GPT-5.6 tuned prompt", () => {
       // given
       const model = "openai/gpt-5.6-sol";
 
@@ -12,7 +12,7 @@ describe("createMomusAgent", () => {
       const gpt55Config = createMomusAgent("openai/gpt-5.5");
 
       // then
-      expect(config.reasoningEffort).toBe("xhigh");
+      expect(config.reasoningEffort).toBe("high");
       expect(config.prompt).not.toBe(gpt55Config.prompt);
     });
 
@@ -42,9 +42,9 @@ describe("createMomusAgent", () => {
 
       // then
       expect(aliasConfig.prompt).toBe(solConfig.prompt);
-      expect(aliasConfig.reasoningEffort).toBe("xhigh");
+      expect(aliasConfig.reasoningEffort).toBe("high");
       expect(dashedConfig.prompt).toBe(solConfig.prompt);
-      expect(dashedConfig.reasoningEffort).toBe("xhigh");
+      expect(dashedConfig.reasoningEffort).toBe("high");
     });
   });
 

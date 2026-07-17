@@ -71,6 +71,13 @@ export function isKimiK27Model(model: string): boolean {
   return false
 }
 
+export function isKimiK3Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase()
+  if (/kimi-k3/.test(modelName)) return true
+  if (/k3[-.]?p?\d*$/.test(modelName)) return true
+  return false
+}
+
 export function isMiniMaxModel(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase()
   return modelName.includes("minimax")

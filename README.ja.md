@@ -193,7 +193,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 <td align="center"><img src=".github/assets/hephaestus.png" height="300" /></td>
 </tr></table>
 
-**Sisyphus** (`claude-opus-4-7` / **`kimi-k2.6`** / **`glm-5`**) はあなたのメインオーケストレーターです。計画を立て、専門家に委任し、攻撃的な並列実行でタスクを完了まで推進します。途中で投げ出すことはありません。
+**Sisyphus** (`claude-opus-4-8` / `claude-opus-4-7` / **`kimi-k3`** / **`kimi-k2.6`** / **`glm-5`**) はあなたのメインオーケストレーターです。計画を立て、専門家に委任し、攻撃的な並列実行でタスクを完了まで推進します。途中で投げ出すことはありません。thinking token のコストを許容できる場合は **Kimi K3** を、そうでなければ **Claude Opus 4.8 / 4.7** または **Kimi K2.6** を推奨します。
 
 **Hephaestus** (OpenAI または Vercel では `gpt-5.6-sol`、その次に `gpt-5.5`) はあなたの自律的なディープワーカーです。レシピではなく、目標を与えてください。手取り足取り教えなくても、コードベースを探索し、パターンを調査し、エンドツーエンドで実行します。*正当なる職人 (The Legitimate Craftsman).*
 
@@ -203,7 +203,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 
 > Anthropic が [私たちのせいで OpenCode をブロックしました。](https://x.com/thdxr/status/2010149530486911014) だからこそ Hephaestus は「正当なる職人 (The Legitimate Craftsman)」と呼ばれているのです。皮肉を込めています。
 >
-> Opus で最もよく動きますが、Kimi K2.6 + GPT-5.5 の組み合わせだけでも、バニラの Claude Code を軽く凌駕します。設定は一切不要です。
+> Opus または Kimi K3 で最もよく動きますが、Kimi K2.6 + GPT-5.5 の組み合わせだけでも、バニラの Claude Code を軽く凌駕します。設定は一切不要です。
 
 ### Team Mode (v4.0)
 

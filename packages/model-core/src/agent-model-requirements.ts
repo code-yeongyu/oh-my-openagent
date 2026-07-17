@@ -8,6 +8,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "claude-opus-4-7",
         variant: "max",
       },
+      { providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode", "vercel"], model: "kimi-k3" },
       { providers: ["opencode-go", "vercel"], model: "kimi-k2.6" },
       { providers: ["kimi-for-coding"], model: "k2p5" },
       {
@@ -140,12 +141,12 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["openai", "vercel"],
-        model: "gpt-5.6-sol",
-        variant: "xhigh",
+        model: "gpt-5.6-terra",
+        variant: "high",
       },
       {
         providers: ["github-copilot"],
-        model: "gpt-5.6-sol",
+        model: "gpt-5.6-terra",
         variant: "high",
       },
       {

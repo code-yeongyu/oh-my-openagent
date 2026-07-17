@@ -31,6 +31,8 @@ export type FakeHandle = {
   settle: (outcome: RunnerOutcome) => void
   readonly steerCalls: string[]
   readonly followUpCalls: string[]
+  subscribeCount(): number
+  unsubscribeCount(): number
 }
 
 export function makeHandle(taskId: string, pid?: number): FakeHandle {
@@ -42,6 +44,8 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
   })
   const steerCalls: string[] = []
   const followUpCalls: string[] = []
+  let subscribeCalls = 0
+  let unsubscribeCalls = 0
   const handle: ManagedChildHandle = {
     task_id: taskId,
     sessionId: `sess-${taskId}`,
@@ -53,7 +57,12 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
       followUpCalls.push(text)
     },
     abort: async () => {},
-    subscribe: () => () => {},
+    subscribe: () => {
+      subscribeCalls += 1
+      return () => {
+        unsubscribeCalls += 1
+      }
+    },
     waitForOutcome: () => outcome,
     lastAssistantText: () => undefined,
     dispose: async () => {},
@@ -65,7 +74,14 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
     })
     resolveCurrent(value)
   }
-  return { handle, settle, steerCalls, followUpCalls }
+  return {
+    handle,
+    settle,
+    steerCalls,
+    followUpCalls,
+    subscribeCount: () => subscribeCalls,
+    unsubscribeCount: () => unsubscribeCalls,
+  }
 }
 
 export class FakeRunner implements ManagedRunner {
