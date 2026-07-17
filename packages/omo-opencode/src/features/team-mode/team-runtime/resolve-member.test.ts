@@ -69,6 +69,8 @@ describe("resolveMember", () => {
       createExecutorContext(),
       undefined,
       undefined,
+      undefined,
+      { allowPrimaryAgentDelegation: true },
     )
     expect(resolveSubagentExecutionMock).not.toHaveBeenCalled()
     expect(result.agentToUse).toBe("sisyphus-junior")

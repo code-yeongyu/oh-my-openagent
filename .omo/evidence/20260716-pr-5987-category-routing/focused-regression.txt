@@ -1,0 +1,84 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin/tool-execute-before.test.ts:
+(pass) createToolExecuteBeforeHandler > does not execute subagent question blocker hook for question tool [0.88ms]
+(pass) createToolExecuteBeforeHandler > triggers session notification hook for question tools [0.15ms]
+(pass) createToolExecuteBeforeHandler > does not trigger session notification hook for non-question tools [0.28ms]
+(pass) createToolExecuteBeforeHandler > runs compaction todo preserver before hook for todowrite [0.14ms]
+(pass) createToolExecuteBeforeHandler > task tool subagent_type normalization > sets subagent_type to the parent agent's configured category target [0.28ms]
+(pass) createToolExecuteBeforeHandler > task tool subagent_type normalization > preserves existing subagent_type when explicitly provided [0.09ms]
+(pass) createToolExecuteBeforeHandler > task tool subagent_type normalization > sets subagent_type to sisyphus-junior when category provided with different subagent_type [0.07ms]
+(pass) createToolExecuteBeforeHandler > task tool subagent_type normalization > resolves subagent_type from session first message when task_id is provided without subagent_type [0.07ms]
+(pass) createToolExecuteBeforeHandler > task tool subagent_type normalization > normalizes task_id into the canonical resume argument [0.07ms]
+(pass) createToolExecuteBeforeHandler > task tool subagent_type normalization > falls back to 'continue' when session has no agent info [0.08ms]
+(pass) createToolExecuteBeforeHandler > task tool subagent_type normalization > preserves subagent_type when task_id is provided with explicit subagent_type [0.06ms]
+(pass) createToolExecuteBeforeHandler > task tool subagent_type normalization > does not modify args for non-task tools [0.08ms]
+(pass) createToolExecuteBeforeHandler > task tool subagent_type normalization > does not set subagent_type when neither category nor task_id is provided and subagent_type is present [0.07ms]
+(pass) createToolRegistry > #given hashline_edit is undefined > #when creating tool registry > #then should not register edit tool [8.14ms]
+(pass) createToolRegistry > #given hashline_edit is true > #when creating tool registry > #then should register edit tool [2.58ms]
+(pass) createToolRegistry > #given max_tools is lower than or equal to builtin tool count > #when creating the tool registry > #then it trims to the exact configured cap [3.53ms]
+(pass) createToolRegistry > #given max_tools is set below the full plugin tool count > #when creating the tool registry > #then it enforces the exact cap deterministically [1.83ms]
+(pass) createToolRegistry > #given max_tools is set below the full plugin tool count > #when creating the tool registry > #then it keeps the task tool when lower-priority tools can satisfy the cap [1.87ms]
+
+packages/omo-opencode/src/tools/delegate-task/category-target-skill-filtering.test.ts:
+(pass) category target skill filtering > retains a skill restricted to the resolved stack-local target [50.16ms]
+(pass) category target skill filtering > excludes a skill restricted to the category placeholder from the resolved target [2.13ms]
+
+packages/omo-opencode/src/tools/delegate-task/category-target-permission.test.ts:
+(pass) category target permission > asks task permission for the resolved stack-local target [2.31ms]
+(pass) category target permission > does not launch when resolved-target permission is denied [1.57ms]
+
+packages/omo-opencode/src/tools/delegate-task/category-resolver.test.ts:
+(pass) resolveCategoryExecution > returns unpinned resolution when category cache is not ready on first run [0.43ms]
+(pass) resolveCategoryExecution > routes category execution to the configured parent target agent [0.21ms]
+(pass) resolveCategoryExecution > rejects an unknown configured category target before launch [0.20ms]
+(pass) resolveCategoryExecution > rejects a coordinator configured as a category target [0.10ms]
+(pass) resolveCategoryExecution > returns 'unknown category' error for truly unknown categories [0.08ms]
+(pass) resolveCategoryExecution > uses category fallback_models for background/runtime fallback chain [0.21ms]
+(pass) resolveCategoryExecution > promotes object-style fallback model settings to categoryModel when fallback becomes initial model [0.50ms]
+(pass) resolveCategoryExecution > preserves inline variant from category model string when no explicit variant is configured [0.16ms]
+(pass) resolveCategoryExecution > does not apply object-style fallback settings when the configured primary model matches directly [0.16ms]
+(pass) resolveCategoryExecution > matches promoted fallback settings after fuzzy model resolution [0.20ms]
+(pass) resolveCategoryExecution > prefers exact promoted fallback match over earlier fuzzy prefix match [0.14ms]
+(pass) resolveCategoryExecution > matches promoted fallback settings when fuzzy resolution extends configured model without hyphen [0.13ms]
+(pass) resolveCategoryExecution > prefers the most specific prefix match when fallback entries share a prefix [0.13ms]
+(pass) resolveCategoryExecution > does not inherit hardcoded fallbackChain when user configures a category model [regression #3040] [0.11ms]
+(pass) resolveCategoryExecution > does not inherit hardcoded fallbackChain when sisyphus-junior model override is set [regression #2941] [0.08ms]
+(pass) resolveCategoryExecution > uses GPT-5.5 deep prompt append when category model resolves to gpt-5.5 [0.09ms]
+(pass) resolveCategoryExecution > uses legacy deep prompt append when category model resolves to gpt-5.4 [0.08ms]
+(pass) resolveCategoryExecution > appends user prompt_append to GPT-5.5 deep base prompt [0.08ms]
+(pass) resolveCategoryExecution > appends user prompt_append to legacy deep base prompt for non-gpt-5.5 models [0.09ms]
+(pass) resolveCategoryExecution > applyCategoryParams propagates category tools config (issue #5182) [0.07ms]
+(pass) resolveCategoryTargetAgent > defaults to Sisyphus-Junior when no parent agent [0.05ms]
+(pass) resolveCategoryTargetAgent > defaults to Sisyphus-Junior for unknown parent agents [0.05ms]
+(pass) resolveCategoryTargetAgent > uses configured category target for parent config key [0.05ms]
+(pass) resolveCategoryTargetAgent > uses configured category target for parent display name [0.09ms]
+(pass) resolveCategoryTargetAgent > matches parent agents case-insensitively [0.08ms]
+
+packages/omo-opencode/src/features/team-mode/team-runtime/resolve-member.test.ts:
+(pass) resolveMember > routes category members through resolveCategoryExecution [0.41ms]
+(pass) resolveMember > strips sisyphusJuniorModel before resolving category members so each declared category keeps its own model [0.11ms]
+(pass) resolveMember > routes subagent members through resolveSubagentExecution [0.11ms]
+(pass) resolveMember > throws TeamMemberResolutionError without category fallback when subagent resolution fails [0.15ms]
+(pass) resolveMember > reuses buildSystemContent for both resolution kinds without custom prompt concatenation [0.17ms]
+
+packages/omo-opencode/src/features/team-mode/team-runtime/create.test.ts:
+(pass) createTeamRun > spawns 3 members through BackgroundManager.launch without direct session creation [135.67ms]
+(pass) createTeamRun > #given a new team runtime #when createTeamRun succeeds #then it registers the run for session cleanup [4.23ms]
+(pass) createTeamRun > registers a member session as soon as launch reports the real sessionId [56.21ms]
+(pass) createTeamRun > persists the resolved subagent_type and model on each spawned runtime member [108.16ms]
+(pass) createTeamRun > member prompt only documents member-safe communication tools [4.08ms]
+(pass) createTeamRun > rolls back launched members in reverse order when a later spawn fails [107.38ms]
+(pass) createTeamRun > #given member launch throws a non-Error value #when createTeamRun rolls back #then it preserves the fallback error message [2.27ms]
+(pass) createTeamRun > removes all created worktrees when spawn fails after worktree creation [3.78ms]
+(pass) createTeamRun > returns the existing runtime on repeated calls with the same spec and lead session [55.02ms]
+(pass) createTeamRun > #given an existing active runtime with unresolved members #when createTeamRun runs again #then it creates a fresh runtime [6.06ms]
+(pass) createTeamRun > never exceeds max_parallel_members while spawning [160.01ms]
+(pass) createTeamRun > reuses the caller session for the lead when the lead matches the caller agent [4.02ms]
+(pass) createTeamRun > persists the reused caller lead's subagent_type so live deliveries can pin it [3.68ms]
+(pass) createTeamRun > reuses the caller session for the lead even when the lead subagent_type differs [3.50ms]
+
+ 66 pass
+ 0 fail
+ 163 expect() calls
+Ran 66 tests across 6 files. [1087.00ms]

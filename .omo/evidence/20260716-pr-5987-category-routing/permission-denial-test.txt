@@ -1,0 +1,10 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/tools/delegate-task/category-target-permission.test.ts:
+(pass) category target permission > asks task permission for the resolved stack-local target [54.86ms]
+(pass) category target permission > does not launch when resolved-target permission is denied [2.43ms]
+
+ 2 pass
+ 0 fail
+ 4 expect() calls
+Ran 2 tests across 1 file. [159.00ms]

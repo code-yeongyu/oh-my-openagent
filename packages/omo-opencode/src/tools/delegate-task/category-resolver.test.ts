@@ -1,6 +1,6 @@
 declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
-import { resolveCategoryExecution } from "./category-resolver"
+import { resolveCategoryExecution, resolveCategoryTargetAgent } from "./category-resolver"
 import { applyCategoryParams } from "./delegated-model-config"
 import type { DelegatedModelConfig } from "./types"
 import type { CategoryConfig } from "../../config/schema"
@@ -63,6 +63,88 @@ describe("resolveCategoryExecution", () => {
 		expect(result.actualModel).toBeUndefined()
 		expect(result.categoryModel).toBeUndefined()
 		expect(result.agentToUse).toBeDefined()
+	})
+
+	test("routes category execution to the configured parent target agent", async () => {
+		//#given
+		const args = {
+			category: "quick",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = {
+			quick: {
+				model: "anthropic/claude-sonnet-4-6",
+			},
+		}
+		executorCtx.client = unsafeTestValue({
+			app: { agents: async () => ({ data: [{ name: "Custom Builder", mode: "subagent" }] }) },
+		})
+		executorCtx.agentOverrides = {
+			"custom-planner": {
+				category_target_agent: "Custom Builder",
+			},
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, undefined, "custom-planner")
+
+		//#then
+		expect(result.error).toBeUndefined()
+		expect(result.agentToUse).toBe("Custom Builder")
+		expect(result.categoryModel?.modelID).toBe("claude-sonnet-4-6")
+	})
+
+	test("rejects an unknown configured category target before launch", async () => {
+		//#given
+		const args = {
+			category: "quick",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.client = unsafeTestValue({
+			app: { agents: async () => ({ data: [{ name: "Known Worker", mode: "subagent" }] }) },
+		})
+		executorCtx.userCategories = { quick: { model: "anthropic/claude-sonnet-4-6" } }
+		executorCtx.agentOverrides = {
+			"custom-planner": { category_target_agent: "Missing Worker" },
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, undefined, "custom-planner")
+
+		//#then
+		expect(result.error).toContain('Unknown agent: "Missing Worker"')
+	})
+
+	test("rejects a coordinator configured as a category target", async () => {
+		//#given
+		const args = {
+			category: "quick",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = { quick: { model: "anthropic/claude-sonnet-4-6" } }
+		executorCtx.agentOverrides = {
+			"custom-planner": { category_target_agent: "prometheus" },
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, undefined, "custom-planner")
+
+		//#then
+		expect(result.error).toContain('Cannot delegate to coordinator agent "prometheus"')
 	})
 
 	test("returns 'unknown category' error for truly unknown categories", async () => {
@@ -643,5 +725,36 @@ describe("resolveCategoryExecution", () => {
 		//#then tools from the category config should appear in the result
 		// THIS TEST MUST FAIL (RED) - proves bug #5182 that applyCategoryParams drops config.tools
 		expect((result as unknown as { tools?: Record<string, boolean> }).tools).toEqual({ grep: false, read: true })
+	})
+})
+
+describe("resolveCategoryTargetAgent", () => {
+	test("defaults to Sisyphus-Junior when no parent agent", () => {
+		expect(resolveCategoryTargetAgent(undefined, {})).toBe("Sisyphus-Junior")
+	})
+
+	test("defaults to Sisyphus-Junior for unknown parent agents", () => {
+		expect(resolveCategoryTargetAgent("UnknownAgent", {})).toBe("Sisyphus-Junior")
+	})
+
+	test("uses configured category target for parent config key", () => {
+		expect(resolveCategoryTargetAgent("workflow-planner", {
+			"workflow-planner": { category_target_agent: "Workflow Builder" },
+		})).toBe("Workflow Builder")
+	})
+
+	test("uses configured category target for parent display name", () => {
+		expect(resolveCategoryTargetAgent("Research Planner", {
+			"research-planner": {
+				displayName: "Research Planner",
+				category_target_agent: "Research Builder",
+			},
+		})).toBe("Research Builder")
+	})
+
+	test("matches parent agents case-insensitively", () => {
+		expect(resolveCategoryTargetAgent("WORKFLOW-PLANNER", {
+			"workflow-planner": { category_target_agent: "Workflow Builder" },
+		})).toBe("Workflow Builder")
 	})
 })

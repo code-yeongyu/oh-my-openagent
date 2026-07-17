@@ -5,6 +5,8 @@ import { getMainSessionID } from "../features/claude-code-session-state"
 import { log, replaceToolArgs } from "../shared"
 import { stripInvisibleAgentCharacters } from "../shared/agent-display-names"
 import { resolveSessionAgent } from "./session-agent-resolver"
+import { resolveCategoryTargetAgent } from "../tools/delegate-task/category-resolver"
+import type { AgentOverrides } from "../config/schema"
 import { isRalphLoopResumeArgument, parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
 import { ULTRAWORK_VERIFICATION_PROMISE } from "../hooks/ralph-loop/constants"
 import { readState, writeState } from "../hooks/ralph-loop/storage"
@@ -42,12 +44,13 @@ function getLoopCommandArguments(args: Record<string, unknown>, command: "ralph-
 export function createToolExecuteBeforeHandler(args: {
   ctx: PluginContext
   hooks: CreatedHooks
+  agentOverrides?: AgentOverrides
   backgroundManager?: Pick<BackgroundManager, "hasActiveChildTasks" | "hasPendingParentWake">
 }): (
   input: { tool: string; sessionID: string; callID: string },
   output: { args: Record<string, unknown> },
 ) => Promise<void> {
-  const { ctx, hooks, backgroundManager } = args
+  const { ctx, hooks, agentOverrides, backgroundManager } = args
 
   function buildUltraworkOracleVerificationPrompt(prompt: string, originalTask: string, verificationAttemptId: string): string {
     const verificationPrompt = [
@@ -147,7 +150,11 @@ export function createToolExecuteBeforeHandler(args: {
       const taskId = typeof output.args.task_id === "string" ? output.args.task_id : undefined
 
       if (category) {
-        replaceToolArgs(output, { subagent_type: "sisyphus-junior" })
+        const parentAgent = await resolveSessionAgent(ctx.client, input.sessionID)
+        const categoryTarget = resolveCategoryTargetAgent(parentAgent, agentOverrides)
+        replaceToolArgs(output, {
+          subagent_type: categoryTarget === "Sisyphus-Junior" ? "sisyphus-junior" : categoryTarget,
+        })
       } else if (!subagentType && taskId) {
         const resolvedAgent = await resolveSessionAgent(ctx.client, taskId)
         replaceToolArgs(output, { subagent_type: resolvedAgent ?? "continue" })

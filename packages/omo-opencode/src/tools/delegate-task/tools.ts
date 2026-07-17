@@ -54,6 +54,22 @@ function buildPromptNativeSkillInfos(
   }))
 }
 
+async function askTaskPermission(
+  ctx: ToolContextWithMetadata,
+  description: string,
+  agentToUse: string,
+): Promise<void> {
+  await ctx.ask?.({
+    permission: "task",
+    patterns: [agentToUse],
+    always: ["*"],
+    metadata: {
+      description,
+      subagent_type: agentToUse,
+    },
+  })
+}
+
 export { resolveCategoryConfig } from "./categories"
 export type { SyncSessionCreatedEvent, DelegateTaskToolOptions, BuildSystemContentInput } from "./types"
 export { buildSystemContent, buildTaskPrompt } from "./prompt-builder"
@@ -89,6 +105,57 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       const delegateTaskArgs = await prepareDelegateTaskArgs(args, ctx)
 
       const runInBackground = delegateTaskArgs.run_in_background === true
+      const parentContext = await resolveParentContext(ctx, options.client)
+      const inheritedModel = parentContext.model
+        ? `${parentContext.model.providerID}/${parentContext.model.modelID}`
+        : undefined
+
+      let agentToUse = delegateTaskArgs.subagent_type
+      let categoryModel: DelegatedModelConfig | undefined
+      let categoryPromptAppend: string | undefined
+      let modelInfo: import("../../features/task-toast-manager/types").ModelFallbackInfo | undefined
+      let actualModel: string | undefined
+      let isUnstableAgent = false
+      let fallbackChain: import("../../shared/model-requirements").FallbackEntry[] | undefined
+      let maxPromptTokens: number | undefined
+
+      if (!delegateTaskArgs.task_id) {
+        if (!delegateTaskArgs.category && !delegateTaskArgs.subagent_type) {
+          return `Invalid arguments: Must provide either category or subagent_type.`
+        }
+
+        let systemDefaultModel: string | undefined
+        try {
+          const openCodeConfig = await options.client.config.get()
+          systemDefaultModel = (openCodeConfig as { data?: { model?: string } })?.data?.model
+        } catch (error) {
+          if (!(error instanceof Error)) throw error
+          systemDefaultModel = undefined
+        }
+
+        if (delegateTaskArgs.category) {
+          const resolution = await resolveCategoryExecution(delegateTaskArgs, options, inheritedModel, systemDefaultModel, parentContext.agent)
+          if (resolution.error) {
+            return resolution.error
+          }
+          agentToUse = resolution.agentToUse
+          categoryModel = resolution.categoryModel
+          categoryPromptAppend = resolution.categoryPromptAppend
+          modelInfo = resolution.modelInfo
+          actualModel = resolution.actualModel
+          isUnstableAgent = resolution.isUnstableAgent
+          fallbackChain = resolution.fallbackChain
+          maxPromptTokens = resolution.maxPromptTokens
+        } else {
+          const resolution = await resolveSubagentExecution(delegateTaskArgs, options, parentContext.agent, categoryExamples)
+          if (resolution.error) {
+            return resolution.error
+          }
+          agentToUse = resolution.agentToUse
+          categoryModel = resolution.categoryModel
+          fallbackChain = resolution.fallbackChain
+        }
+      }
 
       const { content: skillContent, contents: skillContents, error: skillError } = await resolveSkillContent(delegateTaskArgs.load_skills, {
         gitMasterConfig: options.gitMasterConfig,
@@ -96,7 +163,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         disabledSkills: options.disabledSkills,
         teamModeEnabled: options.teamModeEnabled,
         directory: options.directory,
-        targetAgent: delegateTaskArgs.subagent_type,
+        targetAgent: agentToUse,
         nativeSkills: options.nativeSkills,
         getLoadedSkills: options.getLoadedSkills,
       })
@@ -110,63 +177,27 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         options.disabledSkills,
       )
 
-      const continuationSystemContent = buildSystemContent({
-        skillContent,
-        skillContents,
-        availableCategories,
-        availableSkills,
-        nativeSkillInfos,
-      })
-
-      const parentContext = await resolveParentContext(ctx, options.client)
-
       if (delegateTaskArgs.task_id) {
+        const continuationSystemContent = buildSystemContent({
+          skillContent,
+          skillContents,
+          availableCategories,
+          availableSkills,
+          nativeSkillInfos,
+        })
         if (runInBackground) {
           return executeBackgroundContinuation(delegateTaskArgs, ctx, options, parentContext, continuationSystemContent)
         }
         return executeSyncContinuation(delegateTaskArgs, ctx, options, parentContext, undefined, continuationSystemContent)
       }
 
-      if (!delegateTaskArgs.category && !delegateTaskArgs.subagent_type) {
+      if (!agentToUse) {
         return `Invalid arguments: Must provide either category or subagent_type.`
       }
 
-      let systemDefaultModel: string | undefined
-      try {
-        const openCodeConfig = await options.client.config.get()
-        systemDefaultModel = (openCodeConfig as { data?: { model?: string } })?.data?.model
-      } catch (error) {
-        if (!(error instanceof Error)) throw error
-        systemDefaultModel = undefined
-      }
-
-      const inheritedModel = parentContext.model
-        ? `${parentContext.model.providerID}/${parentContext.model.modelID}`
-        : undefined
-
-      let agentToUse: string
-      let categoryModel: DelegatedModelConfig | undefined
-      let categoryPromptAppend: string | undefined
-      let modelInfo: import("../../features/task-toast-manager/types").ModelFallbackInfo | undefined
-      let actualModel: string | undefined
-      let isUnstableAgent = false
-      let fallbackChain: import("../../shared/model-requirements").FallbackEntry[] | undefined
-      let maxPromptTokens: number | undefined
+      await askTaskPermission(ctx, delegateTaskArgs.description, agentToUse)
 
       if (delegateTaskArgs.category) {
-        const resolution = await resolveCategoryExecution(delegateTaskArgs, options, inheritedModel, systemDefaultModel)
-        if (resolution.error) {
-          return resolution.error
-        }
-        agentToUse = resolution.agentToUse
-        categoryModel = resolution.categoryModel
-        categoryPromptAppend = resolution.categoryPromptAppend
-        modelInfo = resolution.modelInfo
-        actualModel = resolution.actualModel
-        isUnstableAgent = resolution.isUnstableAgent
-        fallbackChain = resolution.fallbackChain
-        maxPromptTokens = resolution.maxPromptTokens
-
         const isRunInBackgroundExplicitlyFalse = isExplicitSyncRun(delegateTaskArgs.run_in_background)
 
         log("[task] unstable agent detection", {
@@ -193,14 +224,6 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
           })
           return executeUnstableAgentTask(delegateTaskArgs, ctx, options, parentContext, agentToUse, categoryModel, systemContent, actualModel)
         }
-      } else {
-        const resolution = await resolveSubagentExecution(delegateTaskArgs, options, parentContext.agent, categoryExamples)
-        if (resolution.error) {
-          return resolution.error
-        }
-        agentToUse = resolution.agentToUse
-        categoryModel = resolution.categoryModel
-        fallbackChain = resolution.fallbackChain
       }
 
       const systemContent = buildSystemContent({

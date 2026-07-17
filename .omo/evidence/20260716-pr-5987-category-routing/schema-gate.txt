@@ -1,0 +1,7 @@
+$ bun run script/build-schema.ts
+Generating JSON Schema...
+✓ JSON Schema generated: assets/oh-my-opencode.schema.json
+
+before=4138d7a1be9b20771895ee74b655fcdb67abd1536126072bde203cdd9789acc4
+after=4138d7a1be9b20771895ee74b655fcdb67abd1536126072bde203cdd9789acc4
+exit=0

@@ -94,6 +94,7 @@ export function createPluginInterface(args: {
     "tool.execute.before": createToolExecuteBeforeHandler({
       ctx,
       hooks,
+      agentOverrides: pluginConfig.agents,
       backgroundManager: managers.backgroundManager,
     }),
 

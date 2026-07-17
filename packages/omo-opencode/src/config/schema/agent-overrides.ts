@@ -9,6 +9,7 @@ export const AgentOverrideConfigSchema = z.object({
   variant: z.string().optional(),
   /** Category name to inherit model and other settings from CategoryConfig */
   category: z.string().optional(),
+  category_target_agent: z.string().optional(),
   /** Skill names to inject into agent prompt */
   skills: z.array(z.string()).optional(),
   temperature: z.number().min(0).max(2).optional(),
