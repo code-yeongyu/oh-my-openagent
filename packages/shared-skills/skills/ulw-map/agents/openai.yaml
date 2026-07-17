@@ -1,0 +1,8 @@
+interface:
+  display_name: "ulw-map (omo)"
+  short_description: "See a ulw-plan as a visual wave execution map"
+  search_terms:
+    - "ulw-map"
+    - "plan map"
+    - "visualize plan"
+  default_prompt: "Use $ulw-map to render my current work plan as a visual wave execution map and open it in the browser."

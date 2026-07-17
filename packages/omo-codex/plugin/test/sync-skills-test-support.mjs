@@ -27,6 +27,7 @@ export const expectedSkills = [
 	"ultimate-browsing",
 	"ultrawork",
 	"ulw-loop",
+	"ulw-map",
 	"ulw-plan",
 	"ulw-research",
 	"visual-qa",
