@@ -18,7 +18,7 @@ import {
   handleMessageRemovedEvent,
   handleMessageUpdatedSessionState,
   handleSessionCreatedEvent,
-  handleSessionDeletedEvent,
+  reserveSessionDeletedEvent,
   TMUX_ACTIVITY_EVENT_TYPES,
 } from "./event-session-lifecycle";
 import { createEventTeamHandlers } from "./event-team-handlers";
@@ -129,12 +129,25 @@ export function createEventHandler(args: {
       }
     }
 
+    const { event } = input;
+    const props = event.properties as Record<string, unknown> | undefined;
+    const deletionReservation = event.type === "session.deleted"
+      ? reserveSessionDeletedEvent({
+          props,
+          tmuxIntegrationEnabled,
+          pluginConfig,
+          pluginContext,
+          managers,
+          firstMessageVariantGate,
+          clearModelFallbackSession: modelFallbackHandler.clearSession,
+          sessionDeletionTasks,
+        })
+      : undefined;
     await dispatchToHooks(input);
     if (syntheticIdle) await dispatchSyntheticIdle(syntheticIdle);
+    deletionReservation?.start();
 
-    const { event } = input;
     managers.tuiStateMirror?.onEvent(event);
-    const props = event.properties as Record<string, unknown> | undefined;
 
     if (tmuxIntegrationEnabled && TMUX_ACTIVITY_EVENT_TYPES.has(event.type)) {
       managers.tmuxSessionManager.onEvent?.(event as { type: string; properties?: Record<string, unknown> });
@@ -154,16 +167,7 @@ export function createEventHandler(args: {
     }
 
     if (event.type === "session.deleted") {
-      await handleSessionDeletedEvent({
-        props,
-        tmuxIntegrationEnabled,
-        pluginConfig,
-        pluginContext,
-        managers,
-        firstMessageVariantGate,
-        clearModelFallbackSession: modelFallbackHandler.clearSession,
-        sessionDeletionTasks,
-      });
+      await deletionReservation?.task;
       await runEventHookSafely("teamLeadOrphanHandler", teamHandlers.teamLeadOrphanHandler, input);
       await runEventHookSafely("teamMemberStatusHandler", teamHandlers.teamMemberStatusHandler, input);
     }

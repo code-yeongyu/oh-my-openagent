@@ -85,11 +85,12 @@ export function createEventHandler(
     const sessionID = resolveSessionEventID(props)
     if (!sessionID) return
 
-    bumpSessionGeneration(deps, sessionID)
+    const sessionGeneration = bumpSessionGeneration(deps, sessionID)
     cancelledSessions.add(sessionID)
     if (sessionRetryInFlight.has(sessionID) || sessionAwaitingFallbackResult.has(sessionID)) {
       await helpers.abortSessionRequest(sessionID, "session.stop")
     }
+    if (!isSessionGenerationCurrent(deps, sessionID, sessionGeneration)) return
 
     resetRetryState(sessionID)
 
