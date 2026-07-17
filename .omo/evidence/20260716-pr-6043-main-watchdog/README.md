@@ -692,6 +692,33 @@ Twenty-seventh-cycle artifacts:
   server, SSE, root lifecycle, fallback, later cancellation, and unchanged-DB
   proof.
 
+The twenty-eighth goal gate passed all runtime behavior but found that two
+oversized legacy test files remained in the full PR diff. Source
+`82debef4dbbbe95d077666e6ed279aaca56d8932` restores those files exactly to
+`origin/dev` and relocates the SDK resolved-abort contract to a focused
+44-pure-line test. The production runtime remains `a5d9298c5581b90cad1822995456edb6f82a9268`.
+
+Twenty-eighth-cycle artifacts:
+
+- `twenty-eighth-goal-review-finding.md`: independent exact-head constraint
+  failure identifying the oversized changed files.
+- `twenty-eighth-review-repair.md`: bounded test relocation, exact counts, and
+  residual-risk statement.
+- `twenty-eighth-exact-focused-regressions.txt`: 21 focused runtime lifecycle,
+  root lifecycle, and model-fallback boundary tests passing.
+- `twenty-eighth-exact-runtime-fallback-suite.txt`: 302 tests passing across 48
+  runtime-fallback files.
+- `twenty-eighth-exact-session-lifecycle-suite.txt`: 66 plugin event,
+  model-fallback, root-lifecycle, and session-state tests passing.
+- `twenty-eighth-exact-omo-opencode-typecheck.txt`,
+  `twenty-eighth-exact-no-excuse.txt`, `twenty-eighth-exact-biome.txt`, and
+  `twenty-eighth-exact-integrity.txt`: exact-source static gates and whole-PR
+  proof that zero changed TypeScript files exceed 250 pure lines.
+- `twenty-eighth-exact-sdk-abort-boundary.txt`,
+  `twenty-eighth-exact-opencode-harness-self-check.txt`, and the complete
+  `twenty-eighth-exact-live-*` set: pinned SDK, isolated production OpenCode,
+  root lifecycle, later cancellation, and unchanged-DB proof.
+
 ## Why It Is Enough
 
 The tests cover main and subagent watchdog ownership, progress and terminal

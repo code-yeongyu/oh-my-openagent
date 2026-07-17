@@ -1,0 +1,7 @@
+source_head=82debef4dbbbe95d077666e6ed279aaca56d8932
+source_commit_subject=test(runtime-fallback): split abort boundary coverage
+runtime_source=a5d9298c5581b90cad1822995456edb6f82a9268
+git_diff_check=pass
+real_db_session_count=5751
+oversized_changed_typescript=0
+packages/omo-opencode/src/plugin/event-model-fallback-abort-boundary.test.ts=44
