@@ -6,7 +6,7 @@
 // bootstrap, no npm/pip install, and no POSIX-shell or python3 precondition - the
 // two things genuinely not guaranteed on native Windows across the omo harnesses.
 //
-// Usage:  node "<skill-root>/scripts/scaffold-plan.mjs" <slug> [--clear|--unclear] [--reset [--force]]
+// Usage:  node "<skill-root>/scripts/scaffold-plan.mjs" <slug> [--clear|--unclear] [--draft-only] [--review-required] [--reset [--force]]
 //
 // RESUME-SAFE: run it ONCE at plan generation. A plain re-run on an existing
 // ulw-plan artifact is a NO-OP success (it never overwrites your appended todos),
@@ -52,20 +52,24 @@ export function parseArgs(argv) {
 	let intent = "unspecified";
 	let force = false;
 	let reset = false;
+	let draftOnly = false;
+	let reviewRequired = false;
 	for (const arg of rest) {
 		if (arg === "--clear") intent = "clear";
 		else if (arg === "--unclear") intent = "unclear";
 		else if (arg === "--reset") reset = true;
 		else if (arg === "--force") force = true;
+		else if (arg === "--draft-only") draftOnly = true;
+		else if (arg === "--review-required") reviewRequired = true;
 		else if (arg.startsWith("--")) throw new Error(`unknown flag: ${arg}`);
 		else if (slug === undefined) slug = arg;
 		else throw new Error(`unexpected argument: ${arg}`);
 	}
-	if (!slug) throw new Error('usage: scaffold-plan.mjs <slug> [--clear|--unclear] [--reset [--force]]');
+	if (!slug) throw new Error('usage: scaffold-plan.mjs <slug> [--clear|--unclear] [--draft-only] [--review-required] [--reset [--force]]');
 	if (!SLUG_PATTERN.test(slug)) {
 		throw new Error(`invalid slug "${slug}" - use lowercase letters, digits, and hyphens only`);
 	}
-	return { slug, intent, reset, force };
+	return { slug, intent, reset, force, draftOnly, reviewRequired };
 }
 
 // Resolve a project-relative path and confine it under .omo/ - the script's own
@@ -147,16 +151,45 @@ export function isUlwArtifact(content) {
 	return isPlan || isDraft;
 }
 
-export function buildDraft(slug, intent) {
+export function buildDraft(slug, intent, { reviewRequired = false } = {}) {
 	const assumptionsNote =
 		intent === "unclear"
 			? "Intent is UNCLEAR: research resolves ambiguity, defaults are adopted (not asked), and each is surfaced in the plan's human TL;DR for veto."
 			: "Record any default you adopt instead of asking, so the user can veto it at the gate.";
+	const reviewState = reviewRequired
+		? `review_required: true
+plan_path: .omo/plans/${slug}.md
+plan_sha256: null
+review_round_id: null
+pending-action: write and review .omo/plans/${slug}.md
+review:
+  momus:
+    status: pending
+    workspace_root: null
+    runtime_home: null
+    target: .omo/plans/${slug}.md
+    round_id: null
+    plan_sha256: null
+    launch_id: null
+    session: null
+    result: null
+  independent:
+    status: pending
+    workspace_root: null
+    runtime_home: null
+    target: .omo/plans/${slug}.md
+    round_id: null
+    plan_sha256: null
+    launch_id: null
+    session: null
+    result: null`
+		: `review_required: false
+pending-action: write .omo/plans/${slug}.md`;
 	return `---
 slug: ${slug}
 status: drafting
 intent: ${intent}
-pending-action: write .omo/plans/${slug}.md
+${reviewState}
 approach: <fill: the approach you intend to plan>
 ---
 
@@ -273,21 +306,24 @@ export async function writeGuarded(cwd, relPath, content, { reset = false, force
 	return { relPath, status: existing ? "reset" : "created" };
 }
 
-export async function scaffold(cwd, { slug, intent, reset = false, force = false }) {
+export async function scaffold(cwd, { slug, intent, reset = false, force = false, draftOnly = false, reviewRequired = false }) {
 	const draftRel = join(".omo", "drafts", `${slug}.md`);
+	const draft = await writeGuarded(cwd, draftRel, buildDraft(slug, intent, { reviewRequired }), { reset, force });
+	if (draftOnly) return [draft];
 	const planRel = join(".omo", "plans", `${slug}.md`);
-	const draft = await writeGuarded(cwd, draftRel, buildDraft(slug, intent), { reset, force });
 	const plan = await writeGuarded(cwd, planRel, buildPlanSkeleton(slug, intent), { reset, force });
 	return [draft, plan];
 }
 
 async function main() {
-	const { slug, intent, reset, force } = parseArgs(process.argv);
-	const results = await scaffold(process.cwd(), { slug, intent, reset, force });
+	const { slug, intent, reset, force, draftOnly, reviewRequired } = parseArgs(process.argv);
+	const results = await scaffold(process.cwd(), { slug, intent, reset, force, draftOnly, reviewRequired });
 	for (const r of results) process.stdout.write(`${r.status}: ${r.relPath}\n`);
 	const created = results.some((r) => r.status !== "exists");
 	process.stdout.write(
-		created
+		draftOnly
+			? `next: record intent, findings, decisions, review state, and the approval gate in the draft; create the plan only after approval.\n`
+			: created
 			? `next: record findings/decisions in the draft, then APPEND task batches into the "## Todos" region of the plan; fill "## TL;DR (For humans)" LAST.\n`
 			: `skeleton already present - left untouched. APPEND task batches into the "## Todos" region; the human "## TL;DR (For humans)" stays on top.\n`,
 	);
