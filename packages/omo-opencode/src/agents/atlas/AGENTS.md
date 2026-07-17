@@ -26,6 +26,8 @@ description: Developer reference for the Atlas todo-list orchestrator agent -- m
 | `packages/prompts-core/prompts/atlas/gpt.md` | GPT-optimized markdown prompt variant |
 | `packages/prompts-core/prompts/atlas/gemini.md` | Gemini-optimized markdown prompt variant |
 | `packages/prompts-core/prompts/atlas/kimi.md` | Kimi K2.x markdown prompt variant |
+| `packages/prompts-core/prompts/atlas/kimi-k2-7.md` | Kimi K2.7 markdown prompt variant |
+| `packages/prompts-core/prompts/atlas/kimi-k3.md` | Kimi K3-native markdown prompt variant |
 | `packages/prompts-core/prompts/atlas/opus-4-7.md` | Claude Opus 4.7 markdown prompt variant |
 
 ## MODEL VARIANT ROUTING
@@ -33,7 +35,10 @@ description: Developer reference for the Atlas todo-list orchestrator agent -- m
 Parent `agent.ts` calls `resolveVariant()` from `@oh-my-opencode/prompts-core` against `atlasPromptVariants`:
 - GPT family -> `gpt.md`
 - Gemini family -> `gemini.md`
+- Kimi K3 -> `kimi-k3.md` (checked first among Kimi)
+- Kimi K2.7 -> `kimi-k2-7.md`
 - Kimi K2.x family -> `kimi.md`
+- GLM family -> `glm.md`
 - Claude Opus 4.7 -> `opus-4-7.md`
 - Default -> `default.md` (Claude 4.6 family)
 
