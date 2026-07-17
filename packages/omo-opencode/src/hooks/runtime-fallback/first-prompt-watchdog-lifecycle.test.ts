@@ -146,7 +146,7 @@ describe("first-prompt watchdog lifecycle", () => {
     watchdog.dispose()
   })
 
-  it("#given the watchdog abort request is not yet acknowledged #when an abort-shaped session error arrives #then it is external cancellation and no fallback is dispatched", async () => {
+  it("#given the watchdog abort response is pending #when OpenCode publishes its abort event #then the owned fallback is still dispatched", async () => {
     const sessionID = "session-external-abort-during-watchdog-abort"
     const deps = createDeps()
     const calls = { dispatch: 0 }
@@ -189,7 +189,7 @@ describe("first-prompt watchdog lifecycle", () => {
       await Promise.resolve()
     }
 
-    expect(calls.dispatch).toBe(0)
+    expect(calls.dispatch).toBe(1)
     expect(deps.internallyAbortedSessions.has(sessionID)).toBe(false)
     watchdog.dispose()
   })

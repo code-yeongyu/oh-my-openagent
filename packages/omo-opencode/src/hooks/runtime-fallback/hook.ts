@@ -157,6 +157,7 @@ export function createRuntimeFallbackHook(
     deps.sessionAwaitingFallbackResult.clear()
     deps.sessionFallbackTimeouts.clear()
     deps.sessionStatusRetryKeys.clear()
+    deps.internalAbortRequests?.clear()
     clearAllInternalAbortOwnership(deps)
   }
 

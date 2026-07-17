@@ -183,25 +183,23 @@ describe("createAbortSessionRequest reservation release", () => {
     expect(getPromptReservation(sessionID)?.source).toBe("model-suggestion-retry")
   })
 
-  test("#given two overlapping internal aborts #when the newer abort fails before the older abort succeeds #then the older abort keeps internal ownership", async () => {
+  test("#given two overlapping internal abort callers #when the first request is still pending #then both callers share one wire abort and one ownership", async () => {
     const deps = createDeps()
     const sessionID = "session-overlapping-internal-aborts"
     const firstAbort = createDeferred<unknown>()
-    const secondAbort = createDeferred<unknown>()
     let abortCallCount = 0
     deps.ctx.client.session.abort = () => {
       abortCallCount += 1
-      return abortCallCount === 1 ? firstAbort.promise : secondAbort.promise
+      return firstAbort.promise
     }
     const abortSessionRequest = createAbortSessionRequest(deps)
 
     const olderRequest = abortSessionRequest(sessionID, "session.status.retry-signal")
     const newerRequest = abortSessionRequest(sessionID, "first-prompt-watchdog")
-    secondAbort.reject(new Error("newer abort failed"))
-    expect(await newerRequest).toBe(false)
     firstAbort.resolve({})
-    expect(await olderRequest).toBe(true)
+    expect(await Promise.all([olderRequest, newerRequest])).toEqual([true, true])
 
+    expect(abortCallCount).toBe(1)
     expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
   })
 

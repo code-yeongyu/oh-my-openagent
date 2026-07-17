@@ -2,6 +2,7 @@ export function createWatchdogAbortProvenance() {
   const generationsBySession = new Map<string, Set<number>>()
   const completedGenerationsBySession = new Map<string, Set<number>>()
   const latestCompletedGenerationBySession = new Map<string, number>()
+  const pendingResponses = new Set<string>()
 
   const removeCompleted = (sessionID: string, generation: number): void => {
     const completedGenerations = completedGenerationsBySession.get(sessionID)
@@ -12,22 +13,42 @@ export function createWatchdogAbortProvenance() {
     latestCompletedGenerationBySession.delete(sessionID)
   }
 
+  const record = (sessionID: string, generation: number): void => {
+    const generations = generationsBySession.get(sessionID) ?? new Set<number>()
+    generations.add(generation)
+    generationsBySession.set(sessionID, generations)
+  }
+
+  const remove = (sessionID: string, generation: number): void => {
+    const generations = generationsBySession.get(sessionID)
+    if (!generations) return
+    generations.delete(generation)
+    if (generations.size === 0) generationsBySession.delete(sessionID)
+    removeCompleted(sessionID, generation)
+  }
+
   return {
     clear(sessionID: string): void {
       generationsBySession.delete(sessionID)
       completedGenerationsBySession.delete(sessionID)
       latestCompletedGenerationBySession.delete(sessionID)
+      pendingResponses.delete(sessionID)
     },
     clearAll(): void {
       generationsBySession.clear()
       completedGenerationsBySession.clear()
       latestCompletedGenerationBySession.clear()
+      pendingResponses.clear()
     },
-    record(sessionID: string, generation: number): void {
-      const generations = generationsBySession.get(sessionID) ?? new Set<number>()
-      generations.add(generation)
-      generationsBySession.set(sessionID, generations)
+    record,
+    remove,
+    reserve(sessionID: string, generation: number): () => void {
+      record(sessionID, generation)
+      return () => remove(sessionID, generation)
     },
+    markResponsePending(sessionID: string): void { pendingResponses.add(sessionID) },
+    clearResponsePending(sessionID: string): void { pendingResponses.delete(sessionID) },
+    isResponsePending(sessionID: string): boolean { return pendingResponses.has(sessionID) },
     hasPrior(sessionID: string, currentGeneration: number | undefined): boolean {
       const generations = generationsBySession.get(sessionID)
       if (currentGeneration === undefined || generations === undefined) return false

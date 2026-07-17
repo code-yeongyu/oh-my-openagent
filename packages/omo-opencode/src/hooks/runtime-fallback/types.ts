@@ -98,4 +98,5 @@ export interface HookDeps {
    */
   internallyAbortedSessions: Set<string>
   internalAbortOwnershipCounts?: Map<string, number>
+  internalAbortRequests?: Map<string, Promise<boolean>>
 }

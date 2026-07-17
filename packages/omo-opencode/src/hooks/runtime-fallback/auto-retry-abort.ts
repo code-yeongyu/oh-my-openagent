@@ -16,56 +16,73 @@ export function createAbortSessionRequest(deps: HookDeps) {
       source === "session.timeout" ||
       source === "first-prompt-watchdog"
 
-    if (isInternalAbort) {
-      acquireInternalAbortOwnership(deps, sessionID)
-      deps.sessionLastAccess.set(sessionID, Date.now())
-    }
-    const reservationToken = getPromptReservation(sessionID)?.token
-    try {
-      const result = await ctx.client.session.abort({
-        path: { id: sessionID },
-        throwOnError: true,
-      })
-      if (
-        typeof result === "object" &&
-        result !== null &&
-        "error" in result &&
-        result.error !== undefined
-      ) {
+    const runAbort = async (): Promise<boolean> => {
+      if (isInternalAbort) {
+        acquireInternalAbortOwnership(deps, sessionID)
+        deps.sessionLastAccess.set(sessionID, Date.now())
+      }
+      const reservationToken = getPromptReservation(sessionID)?.token
+      try {
+        const result = await ctx.client.session.abort({
+          path: { id: sessionID },
+          throwOnError: true,
+        })
+        if (
+          typeof result === "object" &&
+          result !== null &&
+          "error" in result &&
+          result.error !== undefined
+        ) {
+          if (isInternalAbort) {
+            releaseInternalAbortOwnership(deps, sessionID)
+          }
+          log(`[${HOOK_NAME}] Failed to abort in-flight session request (${source})`, {
+            sessionID,
+            error: String(result.error),
+          })
+          return false
+        }
+        if (reservationToken !== undefined && getPromptReservation(sessionID)?.token === reservationToken) {
+          releasePromptAsyncReservation(sessionID, `runtime-fallback-abort:${source}`, {
+            reservedBy: `runtime-fallback:${source}`,
+            reservedByPrefix: "runtime-fallback:",
+            supersedeTransientRetryOwners: true,
+          })
+        }
+        log(`[${HOOK_NAME}] Aborted in-flight session request (${source})`, { sessionID })
+        return true
+      } catch (error) {
         if (isInternalAbort) {
           releaseInternalAbortOwnership(deps, sessionID)
         }
+        if (!(error instanceof Error)) {
+          log(`[${HOOK_NAME}] Failed to abort in-flight session request (${source})`, {
+            sessionID,
+            error: String(error),
+          })
+          return false
+        }
         log(`[${HOOK_NAME}] Failed to abort in-flight session request (${source})`, {
           sessionID,
-          error: String(result.error),
+          error: error.message,
         })
         return false
       }
-      if (reservationToken !== undefined && getPromptReservation(sessionID)?.token === reservationToken) {
-        releasePromptAsyncReservation(sessionID, `runtime-fallback-abort:${source}`, {
-          reservedBy: `runtime-fallback:${source}`,
-          reservedByPrefix: "runtime-fallback:",
-          supersedeTransientRetryOwners: true,
-        })
+    }
+
+    if (!isInternalAbort) return runAbort()
+    deps.internalAbortRequests ??= new Map()
+    const existingRequest = deps.internalAbortRequests.get(sessionID)
+    if (existingRequest) return existingRequest
+
+    const request = runAbort()
+    deps.internalAbortRequests.set(sessionID, request)
+    try {
+      return await request
+    } finally {
+      if (deps.internalAbortRequests.get(sessionID) === request) {
+        deps.internalAbortRequests.delete(sessionID)
       }
-      log(`[${HOOK_NAME}] Aborted in-flight session request (${source})`, { sessionID })
-      return true
-    } catch (error) {
-      if (isInternalAbort) {
-        releaseInternalAbortOwnership(deps, sessionID)
-      }
-      if (!(error instanceof Error)) {
-        log(`[${HOOK_NAME}] Failed to abort in-flight session request (${source})`, {
-          sessionID,
-          error: String(error),
-        })
-        return false
-      }
-      log(`[${HOOK_NAME}] Failed to abort in-flight session request (${source})`, {
-        sessionID,
-        error: String(error),
-      })
-      return false
     }
   }
 }

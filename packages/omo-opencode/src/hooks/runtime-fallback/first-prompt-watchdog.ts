@@ -72,7 +72,9 @@ export function createFirstPromptWatchdog(
           wasSubagent: context.wasSubagent,
           isLifecycleCurrent: () => context.generation === lifecycleGeneration,
           isSessionCurrent: () => context.sessionGeneration === sessionGenerations.get(context.sessionID),
-          recordAbortProvenance: () => abortProvenance.record(context.sessionID, context.sessionGeneration),
+          recordAbortProvenance: () => abortProvenance.reserve(context.sessionID, context.sessionGeneration),
+          markAbortResponsePending: () => abortProvenance.markResponsePending(context.sessionID),
+          clearAbortResponsePending: () => abortProvenance.clearResponsePending(context.sessionID),
         })
       } finally {
         if (
@@ -198,13 +200,11 @@ export function createFirstPromptWatchdog(
         cancel(sessionID)
         return { kind: "resolve-terminal", sessionID }
       }
-      if (
-        eventType === "session.error"
-        && isAbortEvent === true
-      ) {
+      if (eventType === "session.error" && isAbortEvent === true) {
         const currentGeneration = sessionGenerations.get(sessionID)
         const fallbackPending = deps.sessionAwaitingFallbackResult.has(sessionID)
-        const consumedCurrentAbort = !armed.has(sessionID)
+          || deps.internallyAbortedSessions.has(sessionID)
+        const consumedCurrentAbort = (!armed.has(sessionID) || abortProvenance.isResponsePending(sessionID))
           && abortProvenance.consumeCurrent(sessionID, currentGeneration, fallbackPending)
         if (consumedCurrentAbort) return { kind: "consume-terminal", sessionID }
         if (
