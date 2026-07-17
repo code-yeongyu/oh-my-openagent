@@ -1,9 +1,0 @@
-$ if rg -n "resolveModelForDelegateTask|fallbackChain|connectedProviders|hasProviderModelsCache|hasConnectedProvidersCache|7-step|seven-step|provider priority|model order" packages/senpi-task/src/category packages/senpi-task/scripts/manual-category-qa.ts; then echo "Reviewed matches: delegate-core call plus category fallback-chain data only; no local seven-step model-order implementation."; exit 0; else echo "Expected delegate-core/fallback-chain references were not found."; exit 1; fi
-packages/senpi-task/src/category/resolver.ts:2:  resolveModelForDelegateTask,
-packages/senpi-task/src/category/resolver.ts:200:  const fallbackChain = getOwnRecordValue(CATEGORY_FALLBACK_CHAINS, categoryName)
-packages/senpi-task/src/category/resolver.ts:201:  const resolution = resolveModelForDelegateTask(
-packages/senpi-task/src/category/resolver.ts:207:      fallbackChain,
-packages/senpi-task/src/category/resolver.ts:212:      connectedProviders: null,
-packages/senpi-task/src/category/resolver.ts:213:      hasProviderModelsCache: true,
-packages/senpi-task/src/category/resolver.ts:214:      hasConnectedProvidersCache: true,
-Reviewed matches: delegate-core call plus category fallback-chain data only; no local seven-step model-order implementation.

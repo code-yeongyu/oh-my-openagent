@@ -15,7 +15,7 @@ import {
 } from "./types"
 
 const TASK_OUTPUT_SUGGESTION = "Use task_output to read the final result."
-const NOT_FOUND_SUGGESTION = "Use task_list to see available tasks."
+const NOT_FOUND_SUGGESTION = "Use /tasks to see available tasks, or task_output to read a known task."
 
 type QueuedMessage = { readonly message: string; readonly deliverAs: SendDelivery }
 
@@ -95,6 +95,10 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     return { kind: "queued", task_id: taskId, queue_position: queue.length }
   }
 
+  function dropPending(taskId: string): void {
+    pending.delete(taskId)
+  }
+
   async function notifyStarted(taskId: string): Promise<void> {
     const queue = pending.get(taskId)
     if (queue === undefined || queue.length === 0) return
@@ -137,6 +141,21 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
   async function cancelTask(idOrName: string, reason?: string): Promise<CancelOutcome> {
     const record = resolve(idOrName)
     if (record === undefined) return { kind: "not_found", reason: `No task found for "${idOrName}".` }
+    if (record.status === "pending") {
+      const result = port.store.transition(record.task_id, {
+        type: "cancel",
+        timestamp: nowIso(),
+        ...(reason !== undefined ? { error_message: reason } : {}),
+      })
+      if (!result.applied) {
+        return { kind: "noop", task_id: record.task_id, status: result.record.status, reason: `Task ${record.task_id} could not be cancelled from pending.` }
+      }
+      port.dequeuePending(record.task_id)
+      pending.delete(record.task_id)
+      port.store.appendEvent(record.task_id, { type: "cancelled", payload: { previous_status: "pending", ...(reason !== undefined ? { reason } : {}) } })
+      await port.destruction.destroyResidentTask(record.task_id, "cancel")
+      return { kind: "cancelled", task_id: record.task_id, previous_status: "pending" }
+    }
     if (record.status !== "running") {
       const reasonText = record.status === "cancelled" ? `Task ${record.task_id} is already cancelled.` : `Task ${record.task_id} is ${record.status}, not running.`
       return { kind: "noop", task_id: record.task_id, status: record.status, reason: reasonText }
@@ -169,7 +188,7 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     return { kind: "cancelled", task_id: record.task_id, previous_status: "running" }
   }
 
-  return { sendToTask, interruptTask, cancelTask, notifyStarted }
+  return { sendToTask, interruptTask, cancelTask, notifyStarted, dropPending }
 }
 
 function scopeDenied(record: TaskRecord, input: SendInput): SendOutcome | undefined {

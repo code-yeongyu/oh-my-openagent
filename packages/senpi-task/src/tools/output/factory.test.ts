@@ -1,26 +1,22 @@
 import { describe, expect, test } from "bun:test"
 
-import { TaskListParams, createTaskListTool } from "./list"
 import { TaskOutputParams, createTaskOutputTool } from "./output"
-import type { ListManager, OutputManager } from "./types"
+import type { OutputManager } from "./types"
 
-const listManager: ListManager = { list: () => [] }
-const outputManager: OutputManager = { get: () => undefined, list: () => [] }
+const outputManager: OutputManager = { get: () => undefined, list: () => [], waitFor: () => Promise.reject(new Error("unused")) }
+const waitConfig = { min_ms: 5000, default_ms: 60000, max_ms: 600000 } as const
 
 describe("output tool factories", () => {
-  test("#given the two factories #when built #then names, labels, and TypeBox params are wired", () => {
+  test("#given the output factory #when built #then name, label, and TypeBox params are wired", () => {
     // given / when
-    const list = createTaskListTool({ manager: listManager })
-    const output = createTaskOutputTool({ manager: outputManager, stateDir: "/tmp/state" })
+    const output = createTaskOutputTool({ manager: outputManager, stateDir: "/tmp/state", waitConfig })
 
     // then
-    expect(list.name).toBe("task_list")
-    expect(list.parameters).toBe(TaskListParams)
     expect(output.name).toBe("task_output")
     expect(output.parameters).toBe(TaskOutputParams)
-    for (const tool of [list, output]) {
-      expect(tool.description.length).toBeGreaterThan(0)
-      expect(tool.label.length).toBeGreaterThan(0)
-    }
+    expect(output.description.length).toBeGreaterThan(0)
+    expect(output.label.length).toBeGreaterThan(0)
+    expect(typeof output.renderCall).toBe("function")
+    expect(typeof output.renderResult).toBe("function")
   })
 })

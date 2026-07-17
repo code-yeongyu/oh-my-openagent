@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
+import type { ManagedChildHandle } from "../manager/child-handle"
 import type { TaskRecord } from "../state"
 import {
   cleanupSteering,
@@ -8,6 +9,7 @@ import {
   type RunnerFlavor,
   type SteeringHarness,
 } from "./__fixtures__/steering-fakes"
+import { createSteeringEngine } from "./engine"
 
 afterEach(cleanupSteering)
 
@@ -214,6 +216,10 @@ describe("steering engine scope + resolution guards", () => {
 
     // then
     expect(outcome.kind).toBe("not_found")
+    if (outcome.kind !== "not_found") throw new Error("expected not_found")
+    expect(outcome.suggestion).toContain("/tasks")
+    expect(outcome.suggestion).toContain("task_output")
+    expect(outcome.suggestion).not.toContain("task_list")
   })
 
   test("#given a task resolved by name #when sent a steer #then the name resolves to the record", async () => {
@@ -230,5 +236,79 @@ describe("steering engine scope + resolution guards", () => {
     // then
     expect(outcome.kind).toBe("steered")
     expect(fake.steerCalls).toEqual(["go"])
+  })
+})
+
+describe("steering pending cancellation", () => {
+  test("#given a pending child with queued sends w2pend #when cancelled then notified started #then the queue is dropped without delivery", async () => {
+    // given
+    const harness = makeHarness()
+    const record = harness.seedRecord()
+    const live = new Map<string, ManagedChildHandle>()
+    const dequeued: string[] = []
+    const destroyed: string[] = []
+    const engine = createSteeringEngine({
+      store: harness.store,
+      liveHandle: (taskId) => live.get(taskId),
+      reacquireForRevive: () => {},
+      dequeuePending: (taskId) => {
+        dequeued.push(taskId)
+        return true
+      },
+      destruction: {
+        destroyResidentTask: async (taskId) => {
+          destroyed.push(taskId)
+        },
+      },
+      now: Date.now,
+    })
+    await engine.sendToTask({ idOrName: record.task_id, message: "first" })
+    await engine.sendToTask({ idOrName: record.task_id, message: "second" })
+
+    // when
+    const cancelled = await engine.cancelTask(record.task_id, "not needed")
+    const fake = makeFakeHandle(record.task_id, "in-process")
+    live.set(record.task_id, fake.handle)
+    await engine.notifyStarted(record.task_id)
+
+    // then
+    if (cancelled.kind !== "cancelled") throw new Error("expected cancelled")
+    expect(cancelled.previous_status).toBe("pending")
+    expect(harness.store.load(record.task_id)?.status).toBe("cancelled")
+    expect(dequeued).toEqual([record.task_id])
+    expect(destroyed).toEqual([record.task_id])
+    expect(fake.followUpCalls).toEqual([])
+    expect(fake.steerCalls).toEqual([])
+  })
+
+  test("#given a pending child w2pend #when interrupted #then it remains pending with a noop outcome", async () => {
+    // given
+    const harness = makeHarness()
+    const record = harness.seedRecord()
+
+    // when
+    const interrupted = await harness.engine.interruptTask(record.task_id)
+
+    // then
+    expect(interrupted.kind).toBe("noop")
+    expect(harness.store.load(record.task_id)?.status).toBe("pending")
+  })
+
+  test("#given a pending child with queued sends w2pend #when dropPending then notified started #then buffered messages are discarded", async () => {
+    // given a queued task with two buffered messages
+    const harness = makeHarness()
+    const record = harness.seedRecord()
+    await harness.engine.sendToTask({ idOrName: record.task_id, message: "first" })
+    await harness.engine.sendToTask({ idOrName: record.task_id, message: "second" })
+
+    // when the manager forgets the task before it ever launches, then a stale start fires
+    harness.engine.dropPending(record.task_id)
+    const fake = makeFakeHandle(record.task_id, "in-process")
+    harness.setLive(record.task_id, fake.handle)
+    await harness.engine.notifyStarted(record.task_id)
+
+    // then nothing is delivered (the buffer was released, not retained for the session)
+    expect(fake.followUpCalls).toEqual([])
+    expect(fake.steerCalls).toEqual([])
   })
 })

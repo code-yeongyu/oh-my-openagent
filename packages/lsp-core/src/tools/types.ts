@@ -49,7 +49,8 @@ export interface LspDiagnosticsDetails {
 	totalDiagnostics: number;
 	truncated: boolean;
 	error?: string;
-	errorKind?: "missing_dependency" | "no_files" | "invalid_path";
+	errorKind?: "freshness_timeout" | "missing_dependency" | "no_files" | "invalid_path";
+	fileFailures?: Array<{ file: string; error: string }>;
 }
 
 export interface LspGotoDefinitionDetails {

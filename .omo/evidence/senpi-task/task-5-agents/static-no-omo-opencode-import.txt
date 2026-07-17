@@ -1,3 +1,0 @@
-$ rg -n "omo-opencode|@oh-my-opencode/omo-opencode" <touched TS files>
-no matches
-exit=0

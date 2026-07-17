@@ -334,4 +334,43 @@ describe("createBuiltinSkills", () => {
 		expect(playwrightSkill?.mcpConfig).toBeUndefined()
 		expect(agentBrowserSkill).toBeUndefined()
 	})
+
+	test("#given playwrightMcpArgs option #when creating builtin skills #then extra args are appended to the playwright MCP invocation", () => {
+		// #given
+		const options = {
+			browserProvider: "playwright" as const,
+			playwrightMcpArgs: [
+				"--headless",
+				"--no-sandbox",
+				"--executable-path",
+				"/opt/chromium/chrome",
+			],
+		}
+
+		// #when
+		const skills = createBuiltinSkills(options)
+		const playwright = skills.find((s) => s.name === "playwright")
+
+		// #then
+		expect(playwright?.mcpConfig?.playwright?.command).toBe("npx")
+		expect(playwright?.mcpConfig?.playwright?.args).toEqual([
+			"@playwright/mcp@latest",
+			"--headless",
+			"--no-sandbox",
+			"--executable-path",
+			"/opt/chromium/chrome",
+		])
+	})
+
+	test("#given no playwrightMcpArgs option #when creating builtin skills #then the default MCP invocation is unchanged", () => {
+		// #given
+		const options = { browserProvider: "playwright" as const }
+
+		// #when
+		const skills = createBuiltinSkills(options)
+		const playwright = skills.find((s) => s.name === "playwright")
+
+		// #then
+		expect(playwright?.mcpConfig?.playwright?.args).toEqual(["@playwright/mcp@latest"])
+	})
 })

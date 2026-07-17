@@ -1,9 +1,0 @@
-tmproot=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.SYZD4NLGpY
-install_exit=0
-serve=/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.SYZD4NLGpY/codex/plugins/cache/sisyphuslabs/omo/4.10.0/components/codegraph/dist/serve.js
-9:import { fileURLToPath } from "node:url";
-209:if (isDirectInvocation(process.argv[1])) {
-216:function isDirectInvocation(argvPath) {
-219:  return resolve(argvPath) === fileURLToPath(import.meta.url);
-serve_exit=0
-tmproot_removed=true

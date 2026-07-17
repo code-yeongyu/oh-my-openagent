@@ -98,6 +98,7 @@ export async function createSkillContext(args: {
 
   const browserProvider: BrowserAutomationProvider =
     pluginConfig.browser_automation_engine?.provider ?? "playwright"
+  const playwrightMcpArgs = pluginConfig.browser_automation_engine?.playwright_mcp_args
 
   const disabledSkills = collectDisabledSkillAliases(pluginConfig)
 
@@ -105,6 +106,7 @@ export async function createSkillContext(args: {
     browserProvider,
     disabledSkills,
     teamModeEnabled: pluginConfig.team_mode?.enabled ?? false,
+    playwrightMcpArgs,
     systemMcpNames: getSystemMcpServerNames(),
   })
 
