@@ -406,4 +406,34 @@ describe("createTaskStatusUi.scheduleSync", () => {
     // then exactly one sync ran
     expect(ui.statusCalls).toHaveLength(1)
   })
+
+  it("#given a pending debounce #when dispose is called #then the timer is cleared and syncNow never runs", () => {
+    // given a controllable timer with a pending scheduled sync
+    const active = new Map<number, () => void>()
+    let nextHandle = 1
+    let cleared = 0
+    const timers: StatusUiTimers = {
+      set: (callback) => {
+        const handle = nextHandle++
+        active.set(handle, callback)
+        return handle
+      },
+      clear: (handle) => {
+        if (typeof handle === "number" && active.delete(handle)) cleared += 1
+      },
+    }
+    const ui = fakeUi()
+    const manager = fakeManager([record({ task_id: "st_1", status: "running" })])
+    const statusUi = createTaskStatusUi({ manager, runtime: runtimeOf(ui, "session-a", "tui"), timers })
+    statusUi.scheduleSync()
+    expect(active.size).toBe(1)
+
+    // when the component is disposed before the debounce elapses
+    statusUi.dispose()
+
+    // then the pending timer is cleared and no render happens
+    expect(cleared).toBe(1)
+    expect(active.size).toBe(0)
+    expect(ui.statusCalls).toHaveLength(0)
+  })
 })

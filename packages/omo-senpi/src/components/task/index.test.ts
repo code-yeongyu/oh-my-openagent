@@ -80,7 +80,7 @@ function fakeUi(): CapturedUi {
   }
 }
 
-const noopStatusUi = { scheduleSync: () => {}, syncNow: () => {} }
+const noopStatusUi = { scheduleSync: () => {}, syncNow: () => {}, dispose: () => {} }
 
 // Build the real engine and wire its event bridge over a fake ExtensionAPI so tests can drive the
 // registered handlers and observe the captured-ui bridge (todo 18: cleared on switch/shutdown).
