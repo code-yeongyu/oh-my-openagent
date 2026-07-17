@@ -659,15 +659,13 @@ All built-in slash commands are **Ultimate-only** — Codex CLI does not have a 
 
 | Command | Editions | Purpose |
 |---------|:--------:|---------|
-| `/init-deep` | Ultimate | Auto-generate hierarchical `AGENTS.md` files throughout the project |
 | `/start-work` | Ultimate | Spawn Prometheus to interview the user and build a plan, then execute |
-| `/ralph-loop` | Ultimate | Self-referential dev loop until 100% done |
-| `/ulw-loop` | Ultimate | Ultrawork-mode variant of the loop |
-| `/cancel-ralph` | Ultimate | Stop an active Ralph loop |
-| `/stop-continuation` | Ultimate | Stop ralph loop + todo continuation + boulder |
+| `/goal` | Ultimate | Set, show, pause, resume, or clear a persistent thread goal that auto-continues on idle until done |
+| `/stop-continuation` | Ultimate | Stop todo continuation, clear the active Goal, and clear boulder state |
 | `/refactor` | Ultimate | LSP + AST-grep + TDD-verified intelligent refactor |
 | `/handoff` | Ultimate | Generate detailed context summary to continue in a new session |
 | `/remove-ai-slops` | Ultimate | Strip AI-generated code smells from recent changes |
+| `/init-deep` | Ultimate | Generate hierarchical AGENTS.md knowledge base (skill-backed slash command) |
 | `/hyperplan` | Ultimate | Direct invocation of hyperplan skill |
 
 #### Agents (11) — Ultimate only
@@ -834,10 +832,10 @@ Every agent, hook, skill, MCP, command, and tool is configurable via `disabled_*
 ```jsonc
 {
   "disabled_agents": ["multimodal-looker"],
-  "disabled_hooks": ["ralph-loop", "ultrawork"],
+  "disabled_hooks": ["goal", "keyword-detector"],
   "disabled_skills": ["playwright-cli"],
   "disabled_mcps": ["grep_app"],
-  "disabled_commands": ["/handoff"],
+  "disabled_commands": ["hyperplan"],
   "disabled_tools": ["interactive_bash"]
 }
 ```
