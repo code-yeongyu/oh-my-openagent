@@ -719,6 +719,29 @@ Twenty-eighth-cycle artifacts:
   `twenty-eighth-exact-live-*` set: pinned SDK, isolated production OpenCode,
   root lifecycle, later cancellation, and unchanged-DB proof.
 
+The thirty-first fresh goal gate found one forbidden non-null assertion in a
+changed legacy test and a static-evidence scope gap. Source
+`b3762f4888295b2d0d648551f12e85b9501e05ab` replaces the assertion with an
+explicit state-presence guard; runtime production behavior is unchanged.
+
+Thirty-first-cycle artifacts:
+
+- `thirty-first-goal-review-finding.md`: exact-head constraint failure.
+- `thirty-first-review-repair.md`: bounded test-only repair, complete commands,
+  observations, sufficiency, and residual-risk statement.
+- `thirty-first-exact-focused-tests.txt`: 8 event-handler tests passing.
+- `thirty-first-exact-runtime-fallback-suite.txt`: 330 tests passing across 48
+  files.
+- `thirty-first-exact-session-lifecycle-suite.txt`: 33 lifecycle/model boundary
+  tests passing across 5 files.
+- `thirty-first-exact-omo-opencode-typecheck.txt`,
+  `thirty-first-exact-no-excuse.txt`, `thirty-first-exact-biome.txt`, and
+  `thirty-first-exact-integrity.txt`: exact-source type/static gates over all
+  60 changed TypeScript files and whole-PR pure-line proof.
+- `thirty-first-exact-opencode-harness-self-check.txt` and the complete
+  `thirty-first-exact-live-*` set: isolated production-duration OpenCode
+  lifecycle and unchanged-real-DB proof at the exact repair source.
+
 ## Why It Is Enough
 
 The tests cover main and subagent watchdog ownership, progress and terminal
