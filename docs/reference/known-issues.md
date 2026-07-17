@@ -164,7 +164,7 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 
 - **Affects**: Sessions with an active Ralph Loop and background child subagents.
 - **Symptom**: `/tmp/oh-my-opencode.log` repeats `promptAsync reservation release skipped for different source` while child subagents emit message events.
-- **Workaround**: If you are not using Ralph Loop in that workspace, add `"disabled_hooks": ["ralph-loop"]` to `oh-my-openagent.jsonc`. If a loop is already active, run `/cancel-ralph` before disabling the hook.
+- **Workaround**: Ralph Loop was replaced by the Goal subsystem (PR #6184), and the `ralph-loop` hook is no longer wired at HEAD, so the original flooding only affects releases before that migration. On those older releases, the historical controls were `"disabled_hooks": ["ralph-loop"]` in `oh-my-openagent.jsonc` and `/cancel-ralph`. On current releases, Goal is opt-in (`goal.enabled` defaults to `false`); if you see the same log pattern while a Goal continuation is active, disable the hook with `"disabled_hooks": ["goal"]` and run `/goal clear` (or `/stop-continuation`) to stop the active continuation before disabling it.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5105.
 
 ## #5025 — OpenCode Desktop loads the plugin but only shows native modes
