@@ -61,8 +61,12 @@ function truncateResult(value: string): string {
 function formatResult(tasks: BackgroundTask[], timedOut: boolean, timeoutMs: number): string {
   const completed: string[] = []
   const stillRunning: string[] = []
+  const prioritizedTasks = [
+    ...tasks.filter((task) => !isTerminal(task.status)),
+    ...tasks.filter((task) => isTerminal(task.status)),
+  ]
 
-  for (const task of tasks.slice(0, MAX_TASKS_IN_RESULT)) {
+  for (const task of prioritizedTasks.slice(0, MAX_TASKS_IN_RESULT)) {
     if (isTerminal(task.status)) {
       const errorInfo = task.error ? `\n  Error: ${truncateField(task.error, MAX_ERROR_LENGTH)}` : ""
       completed.push(`- \`${task.id}\` (${truncateField(task.description, MAX_DESCRIPTION_LENGTH)}): **${task.status.toUpperCase()}**${errorInfo}`)
@@ -82,11 +86,11 @@ function formatResult(tasks: BackgroundTask[], timedOut: boolean, timeoutMs: num
   if (timedOut) {
     if (stillRunning.length > 0) {
       sections.push(
-        `## Still Running (timed out after ${Math.round(timeoutMs / 1000)}s)\n${stillRunning.join("\n")}\n\nSome tasks did not finish within the timeout. Use \`background_output(task_id="<id>", block=true)\` to wait for individual tasks.`,
+        `## Still Running (timed out after ${Math.round(timeoutMs / 1000)}s)\n${stillRunning.join("\n")}\n\nSome tasks did not finish within the timeout. Do NOT end your turn while they remain active; call \`wait-for-background-tasks\` again.`,
       )
     } else {
       sections.push(
-        `## Wait Timed Out\nBackground work was still being registered or finalized after ${Math.round(timeoutMs / 1000)}s. Re-run this tool or use \`background_output\` to inspect retained task details.`,
+        `## Wait Timed Out\nBackground work was still being registered or finalized after ${Math.round(timeoutMs / 1000)}s. Do NOT end your turn; call \`wait-for-background-tasks\` again.`,
       )
     }
   }

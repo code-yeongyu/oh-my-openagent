@@ -12,8 +12,9 @@ You have background tasks that are still running or pending. You MUST call the \
 
 Do NOT end your turn with a text response while background tasks are active. Instead:
 1. Call \`wait-for-background-tasks\` to block until all tasks finish, the wait times out, or the call is aborted
-2. Process the results
-3. Then provide your final response
+2. If the wait times out with work still active, call the tool again instead of ending your turn
+3. Process the terminal results
+4. Then provide your final response
 </system-reminder>`
 
 export function createSystemTransformHandler(

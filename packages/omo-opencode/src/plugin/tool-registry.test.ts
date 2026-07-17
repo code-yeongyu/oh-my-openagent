@@ -125,6 +125,7 @@ describe("#given block_on_background_tasks configuration", () => {
 
   test("#when disabled_tools removes the wait tool #then delegate guidance sees it as unavailable", () => {
     const delegateCallsBefore = toolFactories.createDelegateTask.mock.calls.length
+    const callOmoAgentCallsBefore = toolFactories.createCallOmoAgent.mock.calls.length
 
     const result = createToolRegistry({
       ctx: { directory: "/tmp" } as Parameters<typeof createToolRegistry>[0]["ctx"],
@@ -148,12 +149,15 @@ describe("#given block_on_background_tasks configuration", () => {
     })
 
     const delegateOptions = toolFactories.createDelegateTask.mock.calls[delegateCallsBefore]?.[0]
+    const callOmoAgentWaitAvailable = toolFactories.createCallOmoAgent.mock.calls[callOmoAgentCallsBefore]?.[6]
     expect(result.filteredTools).not.toHaveProperty("wait-for-background-tasks")
     expect(delegateOptions?.isBackgroundWaitAvailable?.()).toBe(false)
+    expect(callOmoAgentWaitAvailable?.()).toBe(false)
   })
 
   test("#when max_tools is applied #then delegate guidance matches the final capped registry", () => {
     const delegateCallsBefore = toolFactories.createDelegateTask.mock.calls.length
+    const callOmoAgentCallsBefore = toolFactories.createCallOmoAgent.mock.calls.length
 
     const result = createToolRegistry({
       ctx: { directory: "/tmp" } as Parameters<typeof createToolRegistry>[0]["ctx"],
@@ -176,8 +180,10 @@ describe("#given block_on_background_tasks configuration", () => {
     })
 
     const delegateOptions = toolFactories.createDelegateTask.mock.calls[delegateCallsBefore]?.[0]
+    const callOmoAgentWaitAvailable = toolFactories.createCallOmoAgent.mock.calls[callOmoAgentCallsBefore]?.[6]
     const toolAvailable = result.filteredTools["wait-for-background-tasks"] !== undefined
     expect(delegateOptions?.isBackgroundWaitAvailable?.()).toBe(toolAvailable)
+    expect(callOmoAgentWaitAvailable?.()).toBe(toolAvailable)
   })
 
   test("#when background_output is disabled #then the dependent wait tool is removed too", () => {

@@ -16,6 +16,7 @@ import {
   subagentSessions,
 } from "../claude-code-session-state"
 import { _resetTaskToastManagerForTesting, initTaskToastManager } from "../task-toast-manager/manager"
+import { startAttempt } from "./attempt-lifecycle"
 import type { ConcurrencyManager } from "./concurrency"
 import { MIN_IDLE_TIME_MS } from "./constants"
 import { BackgroundManager } from "./manager"
@@ -722,6 +723,59 @@ describe("BackgroundManager pending launch visibility", () => {
     } finally {
       releaseLineage?.()
       manager.shutdown()
+    }
+  })
+
+  test("reports a pending nested launch at the root before lineage lookup completes", async () => {
+    // #given a completed direct child and a nested launch blocked in lineage lookup
+    let releaseLineage: (() => void) | undefined
+    const lineageGate = new Promise<void>((resolve) => { releaseLineage = resolve })
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput({
+        session: {
+          get: async ({ path }: { path: { id: string } }) => {
+            if (path.id === "child-session") {
+              await lineageGate
+              return { data: { id: "child-session", parentID: "root-session" } }
+            }
+            return { data: { id: "root-session" } }
+          },
+          create: async () => ({ data: { id: "grandchild-session" } }),
+          promptAsync: async () => ({}),
+          abort: async () => ({}),
+        },
+      }),
+    })
+    const addTask = cast<{ addTask: (task: BackgroundTask) => void }>(manager).addTask.bind(manager)
+    addTask(createMockTask({
+      id: "completed-direct-child",
+      rootSessionId: "root-session",
+      sessionId: "child-session",
+      parentSessionId: "root-session",
+      status: "completed",
+    }))
+
+    try {
+      // #when the nested launch starts but has not registered its task
+      const launch = manager.launch({
+        description: "delayed nested launch",
+        prompt: "test",
+        agent: "explore",
+        parentSessionId: "child-session",
+        parentMessageId: "child-message",
+      })
+
+      // #then the root remains blocked through the lineage gap
+      const pendingLaunches = cast<{ pendingLaunchesByParentSession: Map<string, number> }>(manager)
+        .pendingLaunchesByParentSession
+      expect(Array.from(pendingLaunches.entries())).toContainEqual(["root-session", 1])
+      expect(manager.hasBackgroundWorkInFlight("root-session")).toBe(true)
+
+      releaseLineage?.()
+      await launch
+    } finally {
+      releaseLineage?.()
+      await manager.shutdown()
     }
   })
 
@@ -8852,6 +8906,124 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
     expect(abortedSessions).toEqual(["session-stale-during-create"])
     expect(getRootDescendantCounts(manager).has(task.rootSessionId)).toBe(false)
     expect(manager.hasBackgroundWorkInFlight(task.rootSessionId)).toBe(false)
+
+    await manager.shutdown()
+  })
+
+  test("releases retained fallback ownership after stale prune and late session creation", async () => {
+    //#given
+    let resolveCreate: ((value: { data: { id: string } }) => void) | undefined
+    let markCreateStarted: (() => void) | undefined
+    const createStarted = new Promise<void>((resolve) => { markCreateStarted = resolve })
+    const createResult = new Promise<{ data: { id: string } }>((resolve) => { resolveCreate = resolve })
+    const abortedSessions: string[] = []
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: tmpdir() } }),
+        create: async () => {
+          markCreateStarted?.()
+          return createResult
+        },
+        promptAsync: async () => ({}),
+        abort: async ({ path }: { path: { id: string } }) => {
+          abortedSessions.push(path.id)
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput(client),
+      config: { defaultConcurrency: 1 },
+    })
+    const task = createMockTask({
+      id: "task-stale-fallback-during-create",
+      parentSessionId: "parent-session",
+      sessionId: undefined,
+      rootSessionId: "root-session-stale-fallback-during-create",
+      status: "pending",
+      queuedAt: new Date(Date.now() - 31 * 60 * 1000),
+    })
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionId: task.parentSessionId,
+    }
+    const key = task.agent
+    const attempt = startAttempt(task, undefined)
+    getTaskMap(manager).set(task.id, task)
+    getQueuesByKey(manager).set(key, [{ task, input, attemptID: attempt.attemptId }])
+    getRootDescendantCounts(manager).set(task.rootSessionId!, 1)
+
+    //#when
+    const processing = processKeyForTest(manager, key)
+    await createStarted
+    pruneStaleTasksAndNotificationsForTest(manager)
+    resolveCreate?.({ data: { id: "session-stale-fallback-during-create" } })
+    await processing
+
+    //#then
+    expect(task.status).toBe("error")
+    expect(abortedSessions).toEqual(["session-stale-fallback-during-create"])
+    expect(getRootDescendantCounts(manager).has(task.rootSessionId!)).toBe(false)
+    expect(manager.hasBackgroundWorkInFlight(task.rootSessionId!)).toBe(false)
+    expect(getConcurrencyManager(manager).getCount(key)).toBe(0)
+
+    await manager.shutdown()
+  })
+
+  test("releases retained fallback ownership after stale prune and failed session creation", async () => {
+    //#given
+    let resolveCreate: ((value: { error: string; data: undefined }) => void) | undefined
+    let markCreateStarted: (() => void) | undefined
+    const createStarted = new Promise<void>((resolve) => { markCreateStarted = resolve })
+    const createResult = new Promise<{ error: string; data: undefined }>((resolve) => { resolveCreate = resolve })
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput({
+        session: {
+          get: async () => ({ data: { directory: tmpdir() } }),
+          create: async () => {
+            markCreateStarted?.()
+            return createResult
+          },
+          promptAsync: async () => ({}),
+          abort: async () => ({}),
+        },
+      }),
+      config: { defaultConcurrency: 1 },
+    })
+    const task = createMockTask({
+      id: "task-stale-fallback-create-failure",
+      parentSessionId: "parent-session",
+      sessionId: undefined,
+      rootSessionId: "root-session-stale-fallback-create-failure",
+      status: "pending",
+      queuedAt: new Date(Date.now() - 31 * 60 * 1000),
+    })
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionId: task.parentSessionId,
+    }
+    const key = task.agent
+    const attempt = startAttempt(task, undefined)
+    getTaskMap(manager).set(task.id, task)
+    getQueuesByKey(manager).set(key, [{ task, input, attemptID: attempt.attemptId }])
+    getRootDescendantCounts(manager).set(task.rootSessionId!, 1)
+
+    //#when
+    const processing = processKeyForTest(manager, key)
+    await createStarted
+    pruneStaleTasksAndNotificationsForTest(manager)
+    resolveCreate?.({ error: "session create failed", data: undefined })
+    await processing
+
+    //#then
+    expect(task.status).toBe("error")
+    expect(getRootDescendantCounts(manager).has(task.rootSessionId!)).toBe(false)
+    expect(manager.hasBackgroundWorkInFlight(task.rootSessionId!)).toBe(false)
+    expect(getConcurrencyManager(manager).getCount(key)).toBe(0)
 
     await manager.shutdown()
   })

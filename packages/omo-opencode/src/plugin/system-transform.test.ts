@@ -46,6 +46,7 @@ describe("createSystemTransformHandler background-wait injection", () => {
     expect(system.some((part) => part.includes("wait-for-background-tasks"))).toBe(true)
     expect(system.some((part) => part.includes("times out"))).toBe(true)
     expect(system.some((part) => part.includes("aborted"))).toBe(true)
+    expect(system.some((part) => part.includes("call the tool again"))).toBe(true)
   })
 
   test("does not inject when the flag is on but the session has no active tasks", async () => {

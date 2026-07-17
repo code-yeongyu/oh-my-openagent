@@ -35,6 +35,34 @@ describe("createToolExecuteBeforeHandler background wait guard", () => {
 
     //#then
     await expect(run).rejects.toThrow("Background task wait is already managed")
+    await expect(run).rejects.toThrow("End this response now")
+  })
+
+  test("directs blocking-mode placeholder waits to the registered wait tool", async () => {
+    //#given
+    const backgroundManager = {
+      hasActiveChildTasks: () => false,
+      hasActiveDescendantTasks: (sessionID: string) => sessionID === "ses_parent",
+      hasPendingParentWake: () => false,
+    }
+    const handler = createToolExecuteBeforeHandler({
+      ctx: createTestContext(),
+      hooks: {},
+      backgroundManager,
+      blockOnBackgroundTasks: true,
+    })
+    const output = {
+      args: {
+        command: "sleep 1",
+      } as Record<string, unknown>,
+    }
+
+    //#when
+    const run = handler({ tool: "bash", sessionID: "ses_parent", callID: "call_blocking_wait" }, output)
+
+    //#then
+    await expect(run).rejects.toThrow("wait-for-background-tasks")
+    await expect(run).rejects.not.toThrow("End this response now")
   })
 
   test("allows sleep commands when the session has no active background children", async () => {

@@ -115,6 +115,7 @@ export function createCallOmoAgent(
   agentOverrides?: AgentOverrides,
   userCategories?: CategoriesConfig,
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor,
+  isBackgroundWaitAvailable?: () => boolean,
 ): ToolDefinition {
   const agentDescriptions = ALLOWED_AGENTS.map(
     (name) => `- ${name}: Specialized agent for ${name} tasks`,
@@ -188,7 +189,15 @@ export function createCallOmoAgent(
         if (args.session_id) {
           return `Error: session_id is not supported in background mode. Use run_in_background=false to continue an existing session.`;
         }
-        return await executeBackground(args, toolCtx, backgroundManager, ctx.client, fallbackChain, resolvedModel)
+        return await executeBackground(
+          args,
+          toolCtx,
+          backgroundManager,
+          ctx.client,
+          fallbackChain,
+          resolvedModel,
+          isBackgroundWaitAvailable,
+        )
       }
 
       if (!args.session_id) {
@@ -222,4 +231,3 @@ export function createCallOmoAgent(
     },
   });
 }
-

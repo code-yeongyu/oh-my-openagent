@@ -492,6 +492,13 @@ export class BackgroundManager {
     this.pendingLaunchesByParentSession.set(parentSessionID, currentCount - 1)
   }
 
+  private getPendingLaunchSessionIDs(parentSessionID: string): string[] {
+    const rootSessionID = this.findBySession(parentSessionID)?.rootSessionId
+    return rootSessionID && rootSessionID !== parentSessionID
+      ? [parentSessionID, rootSessionID]
+      : [parentSessionID]
+  }
+
   private reserveTaskFinalization(task: BackgroundTask): () => void {
     const parentSessionID = task.parentSessionId
     if (!parentSessionID) return () => {}
@@ -526,6 +533,15 @@ export class BackgroundManager {
     }
 
     this.releaseTaskRootDescendant(task)
+  }
+
+  private releaseUnboundStartOwnership(task: BackgroundTask, concurrencyKey: string): void {
+    const hadPreStartReservation = this.preStartDescendantReservations.has(task.id)
+    this.rollbackPreStartDescendantReservation(task)
+    if (!hadPreStartReservation) {
+      this.releaseTaskRootDescendant(task)
+    }
+    this.concurrencyManager.release(concurrencyKey)
   }
 
   private addTask(task: BackgroundTask): void {
@@ -704,7 +720,10 @@ export class BackgroundManager {
       throw new Error("Agent parameter is required after sanitization")
     }
 
-    this.reservePendingLaunch(input.parentSessionId)
+    const pendingLaunchSessionIDs = this.getPendingLaunchSessionIDs(input.parentSessionId)
+    for (const sessionID of pendingLaunchSessionIDs) {
+      this.reservePendingLaunch(sessionID)
+    }
     let spawnReservation: {
       spawnContext: SubagentSpawnContext
       descendantCount: number
@@ -797,7 +816,9 @@ export class BackgroundManager {
       spawnReservation?.rollback()
       throw error
     } finally {
-      this.releasePendingLaunch(input.parentSessionId)
+      for (const sessionID of pendingLaunchSessionIDs) {
+        this.releasePendingLaunch(sessionID)
+      }
     }
   }
 
@@ -846,9 +867,12 @@ export class BackgroundManager {
           )
           if (!releaseTerminalization) {
             const launchSlotStillOwned = this.preStartDescendantReservations.has(item.task.id)
-            this.rollbackPreStartDescendantReservation(item.task)
-            if (launchSlotStillOwned) {
-              this.concurrencyManager.release(key)
+            const retryAttemptStillUnbound = item.attemptID !== undefined
+              && !item.task.attempts?.some((attempt) => attempt.attemptId === item.attemptID && attempt.sessionId)
+            if (launchSlotStillOwned || retryAttemptStillUnbound) {
+              this.releaseUnboundStartOwnership(item.task, key)
+            } else {
+              this.rollbackPreStartDescendantReservation(item.task)
             }
             continue
           }
@@ -929,8 +953,7 @@ export class BackgroundManager {
     log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${parentDirectory}`)
 
     if (this.shutdownTriggered) {
-      this.rollbackPreStartDescendantReservation(task)
-      this.concurrencyManager.release(concurrencyKey)
+      this.releaseUnboundStartOwnership(task, concurrencyKey)
       return
     }
 
@@ -967,8 +990,7 @@ export class BackgroundManager {
     if (this.shutdownTriggered || task.status !== "pending") {
       clearDelegatedChildSessionBootstrap(sessionID)
       await this.abortSessionWithLogging(sessionID, "terminal pre-start cleanup")
-      this.rollbackPreStartDescendantReservation(task)
-      this.concurrencyManager.release(concurrencyKey)
+      this.releaseUnboundStartOwnership(task, concurrencyKey)
       return
     }
 
@@ -982,8 +1004,7 @@ export class BackgroundManager {
     if (this.shutdownTriggered || task.status !== "pending") {
       clearDelegatedChildSessionBootstrap(sessionID)
       await this.abortSessionWithLogging(sessionID, "terminal launch callback cleanup")
-      this.rollbackPreStartDescendantReservation(task)
-      this.concurrencyManager.release(concurrencyKey)
+      this.releaseUnboundStartOwnership(task, concurrencyKey)
       return
     }
     this.settlePreStartDescendantReservation(task)

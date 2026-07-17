@@ -115,6 +115,35 @@ describe("ParentWakeNotifier — in-flight dispatch tracking (P1 race)", () => {
       releaseAllPromptAsyncReservationsForTesting()
     }
   })
+
+  test("#given a parent wake is mid-dispatch #when shutdown wins #then late dispatch completion cannot recreate wake state", async () => {
+    // #given
+    let releaseDispatch: (() => void) | undefined
+    const dispatchGate = new Promise<void>((resolve) => { releaseDispatch = resolve })
+    let signalDispatchStarted: (() => void) | undefined
+    const dispatchStarted = new Promise<void>((resolve) => { signalDispatchStarted = resolve })
+    const { notifier } = createNotifier(async () => {
+      signalDispatchStarted?.()
+      await dispatchGate
+      return { data: {} }
+    })
+    const sessionID = "parent-shutdown-mid-dispatch"
+    notifier.queuePendingParentWake(sessionID, "wake A", { agent: "sisyphus" }, true)
+
+    // #when
+    const flushPromise = notifier.flushPendingParentWake(sessionID)
+    await dispatchStarted
+    notifier.shutdown()
+    releaseDispatch?.()
+    await flushPromise
+
+    // #then
+    expect(notifier.hasInFlightParentWakeDispatch(sessionID)).toBe(false)
+    expect(notifier.getPendingParentWakes().has(sessionID)).toBe(false)
+    expect(notifier.getDispatchedParentWakes().has(sessionID)).toBe(false)
+    expect(notifier.getDispatchedParentWakeTimers().has(sessionID)).toBe(false)
+    releaseAllPromptAsyncReservationsForTesting()
+  })
 })
 
 describe("ParentWakeNotifier — notification-preparation reservation (teardown gap)", () => {

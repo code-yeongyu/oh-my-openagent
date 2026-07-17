@@ -13,6 +13,7 @@ import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import { resolveMetadataModel } from "./resolve-metadata-model"
 import { getPersistedBackgroundTaskDescription } from "./background-task-description"
+import { getBackgroundCompletionGuidance } from "../background-task/completion-guidance"
 
 function registerBackgroundSessionContext(args: {
   sessionId: string
@@ -215,9 +216,7 @@ export async function executeBackgroundTask(
 
     const backgroundWaitAvailable =
       executorCtx.isBackgroundWaitAvailable?.() ?? executorCtx.blockOnBackgroundTasks ?? false
-    const completionGuidance = backgroundWaitAvailable
-      ? "Before ending your turn, you MUST call `wait-for-background-tasks` so the session is not terminated while tasks are still running. It blocks until all tasks finish, the wait times out, or the call is aborted, then returns their final or current statuses. Then call `background_output(task_id=\"<id>\")` for each completed task to retrieve its result."
-      : "Do NOT call background_output now. Wait for <system-reminder> notification first. The system will deliver the result when the task completes; you do not need to poll for it."
+    const completionGuidance = getBackgroundCompletionGuidance(backgroundWaitAvailable)
 
     return `Background task launched.
 

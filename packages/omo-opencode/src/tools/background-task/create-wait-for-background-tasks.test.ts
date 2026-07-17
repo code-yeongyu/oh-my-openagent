@@ -170,6 +170,25 @@ describe("createWaitForBackgroundTasks", () => {
     // #then it reports the task as still running after timing out
     expect(output).toContain("## Still Running (timed out")
     expect(output).toContain("`task-1`")
+    expect(output).toContain("Do NOT end your turn")
+    expect(output).toContain("call `wait-for-background-tasks` again")
+  })
+
+  test("prioritizes active tasks when retained terminal history exceeds the result cap", async () => {
+    // #given 100 retained terminal tasks precede one active descendant
+    const terminalTasks = Array.from({ length: 100 }, (_, index) => createTask({
+      id: `terminal-${index}`,
+      status: "completed",
+    }))
+    const activeTask = createTask({ id: "active-after-history", status: "running" })
+    const manager = createManager([[...terminalTasks, activeTask]])
+
+    // #when
+    const output = await runTool(manager, { timeout: 1 })
+
+    // #then
+    expect(output).toContain("`active-after-history`")
+    expect(output).toContain("## Still Running")
   })
 
   test("keeps the root wait open for an active grandchild after its direct child completes", async () => {

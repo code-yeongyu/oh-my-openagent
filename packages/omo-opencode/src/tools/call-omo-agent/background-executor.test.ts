@@ -281,4 +281,30 @@ describe("executeBackground", () => {
     expect(result).toContain("Do NOT call background_output now")
     expect(result).toContain("<system-reminder>")
   })
+
+  test("directs blocking-mode launches to wait-for-background-tasks", async () => {
+    //#given
+    launchMock.mockResolvedValueOnce({
+      id: "test-task-id",
+      sessionId: "ses-call-omo-blocking",
+      description: "Test task",
+      agent: "test-agent",
+      status: "pending",
+    })
+
+    //#when
+    const result = await executeBackground(
+      testArgs,
+      testContext,
+      mockManager,
+      mockClient,
+      undefined,
+      undefined,
+      () => true,
+    )
+
+    //#then
+    expect(result).toContain("call `wait-for-background-tasks`")
+    expect(result).not.toContain("Wait for <system-reminder>")
+  })
 })
