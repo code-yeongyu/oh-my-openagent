@@ -225,8 +225,8 @@ You can override specific agents or categories in your config:
 
 **GPT models** (explicit reasoning, principle-driven):
 
-- GPT-5.6 Sol — preferred for Hephaestus, Momus, and `ultrabrain` when OpenAI or Vercel exposes it; first fallback for `deep`
-- GPT-5.6 Terra — mid-tier; default for the `deep` category (xhigh)
+- GPT-5.6 Sol — preferred for Hephaestus and `ultrabrain` when OpenAI or Vercel exposes it; first fallback for `deep`
+- GPT-5.6 Terra — mid-tier; default for the `deep` category (xhigh); preferred for Momus (high)
 - GPT-5.6 Luna — light tier; default for the `unspecified-low` category (xhigh)
 - GPT-5.5 — deep coding powerhouse, default for Oracle and the first GPT fallback for GPT-5.6-native roles
 - GPT-5.4 Mini — fast and cheap utility tasks

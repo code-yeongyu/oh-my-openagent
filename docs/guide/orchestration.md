@@ -37,7 +37,7 @@ flowchart TB
         User[(" User")]
         Prometheus[" Prometheus<br/>(Planner)<br/>claude-opus-4-7 / gpt-5.5 / glm-5.2"]
         Metis[" Metis<br/>(Consultant)<br/>claude-sonnet-4-6 / claude-opus-4-7 / gpt-5.5 / glm-5.2"]
-        Momus[" Momus<br/>(Reviewer)<br/>gpt-5.6-sol / gpt-5.5 / claude-opus-4-7 / gemini-3.1-pro / glm-5.2"]
+        Momus[" Momus<br/>(Reviewer)<br/>gpt-5.6-terra / gpt-5.5 / claude-opus-4-7 / gemini-3.1-pro / glm-5.2"]
     end
 
     subgraph Execution["Execution Layer (Orchestrator)"]

@@ -198,7 +198,7 @@ Map their answer to:
    - **no** → `--claude=no`
 
 2. **Do you have an OpenAI/ChatGPT Plus Subscription?**
-   - **yes** → `--openai=yes` (enables OpenAI routes; Hephaestus and Momus prefer GPT-5.6 Sol when available and fall back to GPT-5.5)
+   - **yes** → `--openai=yes` (enables OpenAI routes; Hephaestus prefers GPT-5.6 Sol and Momus prefers GPT-5.6 Terra when available, both falling back to GPT-5.5)
    - **no** → `--openai=no` (default)
 
 3. **Will you integrate Gemini models?**
@@ -542,8 +542,8 @@ Not all models behave the same way. Understanding "similar" families helps you m
 
 | Model             | Provider(s)                      | Notes                                                                                                       |
 | ----------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| **GPT-5.6 Sol**   | openai, vercel                   | Preferred when available for Hephaestus, Momus, and `ultrabrain`, with role-specific effort levels; first fallback for `deep`. |
-| **GPT-5.6 Terra** | openai, vercel                   | GPT-5.6 mid-tier. Default for the `deep` category (xhigh).                                                 |
+| **GPT-5.6 Sol**   | openai, vercel                   | Preferred when available for Hephaestus and `ultrabrain`, with role-specific effort levels; first fallback for `deep`. |
+| **GPT-5.6 Terra** | openai, vercel                   | GPT-5.6 mid-tier. Default for the `deep` category (xhigh) and Momus (high).                                |
 | **GPT-5.6 Luna**  | openai, vercel                   | GPT-5.6 light tier. Default for the `unspecified-low` category (xhigh).                                    |
 | **GPT-5.5-codex** | openai, github-copilot, opencode | Deep coding powerhouse available as an explicit override.                                                  |
 | **GPT-5.5**       | openai, github-copilot, opencode, vercel | Default for Oracle and the first GPT-5.5-family fallback for Hephaestus, Momus, `deep`, and `ultrabrain`. |
@@ -594,7 +594,7 @@ Priority: **Claude > GPT > Claude-like models**
 | -------------- | ---------------------- | -------------------------------------- | ------------------------------------------------------ |
 | **Hephaestus** | Deep autonomous worker | openai\|vercel/gpt-5.6-sol (medium) → openai\|github-copilot\|opencode\|vercel/gpt-5.5 (medium) | "Codex on steroids." GPT-only chain. Requires GPT access. |
 | **Oracle**     | Architecture/debugging | openai\|github-copilot\|opencode/gpt-5.5 (high) → google\|github-copilot\|opencode/gemini-3.1-pro (high) → anthropic\|github-copilot\|opencode/claude-opus-4-7 (max) → opencode-go/glm-5.2 | High-IQ strategic backup. GPT preferred. |
-| **Momus**      | High-accuracy reviewer | openai\|vercel/gpt-5.6-sol (xhigh) → openai\|github-copilot\|opencode\|vercel/gpt-5.5 (xhigh) → anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max) → google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high) → opencode-go\|vercel/glm-5.2 | Verification agent. GPT preferred. |
+| **Momus**      | High-accuracy reviewer | openai\|vercel/gpt-5.6-terra (high) → openai\|github-copilot\|opencode\|vercel/gpt-5.5 (xhigh) → anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max) → google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high) → opencode-go\|vercel/glm-5.2 | Verification agent. GPT preferred. |
 
 **Utility Agents** (speed over intelligence — do not "upgrade" them):
 
