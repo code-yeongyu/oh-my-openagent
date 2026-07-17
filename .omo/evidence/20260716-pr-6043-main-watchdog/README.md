@@ -597,6 +597,45 @@ Twenty-third-cycle artifacts:
   two active roots, deletion restoration, no fallback-owned watchdog re-arm,
   later external cancellation, and unchanged real database all pass.
 
+The twenty-fourth exact-head review then found that the pinned SDK can resolve
+a non-2xx abort with a populated error union. Runtime source
+`3577b62fca083a96c9eea6744be74966b649a711` requested throwing semantics,
+defensively rejected resolved errors, and preserved ownership and reservation
+state on failure. `twenty-fourth-review-repair.md` and its linked artifacts
+record the wire contract and exact-source gates.
+
+The twenty-fifth fresh review found three remaining operation-identity races:
+overlapping internal aborts shared one boolean marker, an older abort could
+release a newer reservation after await, and the sibling model-fallback path
+still treated a resolved SDK abort error as cancellation success. Runtime
+source `0ae2adf79990af78f409e6809fb3ba93af0908a5` counts abort ownership,
+compares reservation tokens, and fails closed in both abort controllers.
+
+Twenty-fifth-cycle artifacts:
+
+- `twenty-fifth-review-repair.md`: finding-to-repair trace, failing-first
+  observations, exact commands/counts, and residual-risk statement.
+- `twenty-fifth-exact-focused-regressions.txt`: 25 tests passing across the two
+  direct regression files.
+- `twenty-fifth-exact-runtime-fallback-suite.txt`: 298 tests passing across 46
+  runtime-fallback files.
+- `twenty-fifth-exact-model-fallback-suite.txt`: 104 model-fallback and shared
+  prompt-gate tests passing across 12 files.
+- `twenty-fifth-exact-session-lifecycle-suite.txt`: 50 lifecycle/state tests
+  passing across 3 files.
+- `twenty-fifth-exact-omo-opencode-typecheck.txt`,
+  `twenty-fifth-exact-no-excuse.txt`, `twenty-fifth-exact-biome.txt`, and
+  `twenty-fifth-exact-integrity.txt`: exact-source type, strict-rule, lint, diff,
+  and pure-LOC gates.
+- `run-sdk-abort-boundary.ts` and
+  `twenty-fifth-exact-sdk-abort-boundary.txt`: pinned SDK 1.15.13 loopback proof
+  through both repaired production controllers.
+- `twenty-fifth-exact-opencode-harness-self-check.txt`: isolated harness
+  preflight and cleanup proof.
+- `twenty-fifth-exact-live-watchdog-run.txt` plus the matching plugin, provider,
+  SSE, root-state, and isolation artifacts: production-duration real OpenCode
+  proof pinned to `0ae2adf79990af78f409e6809fb3ba93af0908a5`.
+
 The live harness intentionally records only sanitized fake-provider, plugin,
 and SSE evidence. Authentication values, raw environment dumps, private
 credentials, and unrelated service logs are omitted.

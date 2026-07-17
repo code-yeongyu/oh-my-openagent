@@ -1,0 +1,16 @@
+source_head=0ae2adf79990af78f409e6809fb3ba93af0908a5
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-abort.test.ts pure_loc=176
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-abort.ts pure_loc=68
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-cleanup.ts pure_loc=40
+packages/omo-opencode/src/hooks/runtime-fallback/event-handler.ts pure_loc=246
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-fire.ts pure_loc=97
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts pure_loc=250
+packages/omo-opencode/src/hooks/runtime-fallback/hook.ts pure_loc=148
+packages/omo-opencode/src/hooks/runtime-fallback/internal-abort-ownership.ts pure_loc=33
+packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.ts pure_loc=199
+packages/omo-opencode/src/hooks/runtime-fallback/types.ts pure_loc=92
+packages/omo-opencode/src/plugin/event-model-fallback-state.ts pure_loc=228
+packages/omo-opencode/src/plugin/event-types.ts pure_loc=50
+packages/omo-opencode/src/plugin/event.model-fallback.test.ts pure_loc=1070
+diff_check=pass
+loc_ceiling=pass

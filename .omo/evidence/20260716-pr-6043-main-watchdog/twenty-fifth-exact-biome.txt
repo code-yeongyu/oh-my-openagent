@@ -1,0 +1,221 @@
+packages/omo-opencode/src/hooks/runtime-fallback/event-handler.ts:75:42 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    73 │     const sessionInfo = props ? props.info : undefined
+    74 │     const sessionRecord = isRuntimeFallbackRecord(sessionInfo) ? sessionInfo : undefined
+  > 75 │     const sessionModel = sessionRecord?.["model"]
+       │                                          ^^^^^^^
+    76 │     const sessionAgent = sessionRecord?.["agent"]
+    77 │     const model = normalizeModelToCanonicalString(sessionModel)
+
+  i Unsafe fix: Use a literal key instead.
+
+    75 │ ····const·sessionModel·=·sessionRecord?.["model"]
+       │                                         --     --
+
+packages/omo-opencode/src/hooks/runtime-fallback/event-handler.ts:76:42 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    74 │     const sessionRecord = isRuntimeFallbackRecord(sessionInfo) ? sessionInfo : undefined
+    75 │     const sessionModel = sessionRecord?.["model"]
+  > 76 │     const sessionAgent = sessionRecord?.["agent"]
+       │                                          ^^^^^^^
+    77 │     const model = normalizeModelToCanonicalString(sessionModel)
+    78 │     const agent = typeof sessionAgent === "string"
+
+  i Unsafe fix: Use a literal key instead.
+
+    76 │ ····const·sessionAgent·=·sessionRecord?.["agent"]
+       │                                         --     --
+
+packages/omo-opencode/src/plugin/event.model-fallback.test.ts:613:27 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    611 │     expect(abortCalls).toEqual([sessionID])
+    612 │     expect(promptCalls).toEqual([sessionID])
+  > 613 │     expect(output.message["model"]).toMatchObject({
+        │                           ^^^^^^^
+    614 │       providerID: "opencode-go",
+    615 │       modelID: "kimi-k2.6",
+
+  i Unsafe fix: Use a literal key instead.
+
+     611  611 │       expect(abortCalls).toEqual([sessionID])
+     612  612 │       expect(promptCalls).toEqual([sessionID])
+     613      │ - ····expect(output.message["model"]).toMatchObject({
+          613 │ + ····expect(output.message.model).toMatchObject({
+     614  614 │         providerID: "opencode-go",
+     615  615 │         modelID: "kimi-k2.6",
+
+
+packages/omo-opencode/src/plugin/event.model-fallback.test.ts:617:27 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    615 │       modelID: "kimi-k2.6",
+    616 │     })
+  > 617 │     expect(output.message["variant"]).toBeUndefined()
+        │                           ^^^^^^^^^
+    618 │   })
+    619 │
+
+  i Unsafe fix: Use a literal key instead.
+
+     615  615 │         modelID: "kimi-k2.6",
+     616  616 │       })
+     617      │ - ····expect(output.message["variant"]).toBeUndefined()
+          617 │ + ····expect(output.message.variant).toBeUndefined()
+     618  618 │     })
+     619  619 │
+
+
+packages/omo-opencode/src/plugin/event.model-fallback.test.ts:862:32 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    860 │     expect(promptCalls).toEqual([sessionID])
+    861 │     expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+  > 862 │     expect(staleOutput.message["model"]).toBeUndefined()
+        │                                ^^^^^^^
+    863 │   })
+    864 │
+
+  i Unsafe fix: Use a literal key instead.
+
+     860  860 │       expect(promptCalls).toEqual([sessionID])
+     861  861 │       expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+     862      │ - ····expect(staleOutput.message["model"]).toBeUndefined()
+          862 │ + ····expect(staleOutput.message.model).toBeUndefined()
+     863  863 │     })
+     864  864 │
+
+
+packages/omo-opencode/src/plugin/event.model-fallback.test.ts:1007:27 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    1005 │     expect(abortCalls).toEqual([sessionID])
+    1006 │     expect(promptCalls).toEqual([sessionID])
+  > 1007 │     expect(output.message["model"]).toEqual({
+         │                           ^^^^^^^
+    1008 │       providerID: "quotio",
+    1009 │       modelID: "gpt-5.5",
+
+  i Unsafe fix: Use a literal key instead.
+
+    1005 1005 │       expect(abortCalls).toEqual([sessionID])
+    1006 1006 │       expect(promptCalls).toEqual([sessionID])
+    1007      │ - ····expect(output.message["model"]).toEqual({
+         1007 │ + ····expect(output.message.model).toEqual({
+    1008 1008 │         providerID: "quotio",
+    1009 1009 │         modelID: "gpt-5.5",
+
+
+packages/omo-opencode/src/plugin/event.model-fallback.test.ts:1011:27 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    1009 │       modelID: "gpt-5.5",
+    1010 │     })
+  > 1011 │     expect(output.message["variant"]).toBeUndefined()
+         │                           ^^^^^^^^^
+    1012 │   })
+    1013 │
+
+  i Unsafe fix: Use a literal key instead.
+
+    1009 1009 │         modelID: "gpt-5.5",
+    1010 1010 │       })
+    1011      │ - ····expect(output.message["variant"]).toBeUndefined()
+         1011 │ + ····expect(output.message.variant).toBeUndefined()
+    1012 1012 │     })
+    1013 1013 │
+
+
+packages/omo-opencode/src/plugin/event.model-fallback.test.ts:1124:26 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    1123 │     //#then - first fallback entry applied (no-op skip: claude-opus-4-7 matches current model after normalization)
+  > 1124 │     expect(first.message["model"]).toMatchObject({
+         │                          ^^^^^^^
+    1125 │       providerID: "opencode-go",
+    1126 │       modelID: "kimi-k2.6",
+
+  i Unsafe fix: Use a literal key instead.
+
+    1122 1122 │
+    1123 1123 │       //#then - first fallback entry applied (no-op skip: claude-opus-4-7 matches current model after normalization)
+    1124      │ - ····expect(first.message["model"]).toMatchObject({
+         1124 │ + ····expect(first.message.model).toMatchObject({
+    1125 1125 │         providerID: "opencode-go",
+    1126 1126 │         modelID: "kimi-k2.6",
+
+
+packages/omo-opencode/src/plugin/event.model-fallback.test.ts:1128:26 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    1126 │       modelID: "kimi-k2.6",
+    1127 │     })
+  > 1128 │     expect(first.message["variant"]).toBeUndefined()
+         │                          ^^^^^^^^^
+    1129 │
+    1130 │     //#when - second retry cycle
+
+  i Unsafe fix: Use a literal key instead.
+
+    1126 1126 │         modelID: "kimi-k2.6",
+    1127 1127 │       })
+    1128      │ - ····expect(first.message["variant"]).toBeUndefined()
+         1128 │ + ····expect(first.message.variant).toBeUndefined()
+    1129 1129 │
+    1130 1130 │       //#when - second retry cycle
+
+
+packages/omo-opencode/src/plugin/event.model-fallback.test.ts:1134:27 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    1133 │     //#then - second fallback entry applied (chain advanced past opencode-go/kimi-k2.6)
+  > 1134 │     expect(second.message["model"]).toMatchObject({
+         │                           ^^^^^^^
+    1135 │       providerID: "kimi-for-coding",
+    1136 │       modelID: "k2p5",
+
+  i Unsafe fix: Use a literal key instead.
+
+    1132 1132 │
+    1133 1133 │       //#then - second fallback entry applied (chain advanced past opencode-go/kimi-k2.6)
+    1134      │ - ····expect(second.message["model"]).toMatchObject({
+         1134 │ + ····expect(second.message.model).toMatchObject({
+    1135 1135 │         providerID: "kimi-for-coding",
+    1136 1136 │         modelID: "k2p5",
+
+
+packages/omo-opencode/src/plugin/event.model-fallback.test.ts:1138:27 lint/complexity/useLiteralKeys  FIXABLE  ━━━━━━━━━━
+
+  i The computed expression can be simplified without the use of a string literal.
+
+    1136 │       modelID: "k2p5",
+    1137 │     })
+  > 1138 │     expect(second.message["variant"]).toBeUndefined()
+         │                           ^^^^^^^^^
+    1139 │     expect(abortCalls).toEqual([sessionID, sessionID])
+    1140 │     expect(promptCalls).toEqual([sessionID, sessionID])
+
+  i Unsafe fix: Use a literal key instead.
+
+    1136 1136 │         modelID: "k2p5",
+    1137 1137 │       })
+    1138      │ - ····expect(second.message["variant"]).toBeUndefined()
+         1138 │ + ····expect(second.message.variant).toBeUndefined()
+    1139 1139 │       expect(abortCalls).toEqual([sessionID, sessionID])
+    1140 1140 │       expect(promptCalls).toEqual([sessionID, sessionID])
+
+
+Checked 13 files in 38ms. No fixes applied.
+Found 11 infos.

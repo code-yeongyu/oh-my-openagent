@@ -1,0 +1,134 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin/event.model-fallback.test.ts:
+(pass) createEventHandler - model fallback > triggers retry prompt for assistant message.updated APIError payloads (headless resume) [155.40ms]
+(pass) createEventHandler - model fallback > #given model-fallback promptAsync may have been accepted before EOF #when the same assistant error repeats after the gate hold #then fallback continue is not duplicated [153.58ms]
+(pass) createEventHandler - model fallback > triggers retry prompt for nested model error payloads [154.71ms]
+(pass) createEventHandler - model fallback > does not dispatch duplicate fallback continuations when error events overlap [156.51ms]
+(pass) createEventHandler - model fallback > does not dispatch duplicate fallback continuations when session.error omits provider after dispatch [154.77ms]
+(pass) createEventHandler - model fallback > #given abort fails before model-fallback continuation #when fallback handles assistant error #then it does not inject another prompt [0.85ms]
+(pass) createEventHandler - model fallback > #given the SDK resolves a non-2xx abort #when model-fallback handles an assistant error #then it requests throwing semantics and does not inject another prompt [0.74ms]
+(pass) createEventHandler - model fallback > does not collapse fallback continuations for different providers with the same model id [309.20ms]
+(pass) createEventHandler - model fallback > triggers retry prompt on session.status retry events and applies fallback [155.56ms]
+(pass) createEventHandler - model fallback > does not spam abort/prompt when session.status retry countdown updates [152.50ms]
+(pass) createEventHandler - model fallback > re-handles the same retry key after session recovers through session.idle [312.29ms]
+(pass) createEventHandler - model fallback > does not leave stale pending fallback when a providerless duplicate arrives after fallback was applied [154.82ms]
+(pass) createEventHandler - model fallback > does not trigger model-fallback from session.status when runtime_fallback is enabled [0.94ms]
+(pass) createEventHandler - model fallback > prefers user-configured fallback_models over hardcoded chain on session.status retry [153.05ms]
+(pass) createEventHandler - model fallback > advances main-session fallback chain across repeated session.error retries end-to-end [307.99ms]
+(pass) createEventHandler - model fallback > does not trigger model-fallback retry when modelFallback hook is not provided (disabled by default) [1.23ms]
+
+packages/omo-opencode/src/shared/prompt-async-gate-client-identity.test.ts:
+(pass) prompt-async-gate client-identity characterization > #given a recording fake client #when the gate dispatches #then status messages and promptAsync are all called on the same session object [3.37ms]
+(pass) prompt-async-gate client-identity characterization > #given checkStatus false and checkToolState false #when the gate dispatches #then status and messages are never invoked [0.78ms]
+(pass) prompt-async-gate client-identity characterization > #given session.status reports the session as busy #when the gate checks activity #then result is active and promptAsync is not called [0.64ms]
+(pass) prompt-async-gate client-identity characterization > #given a dispatch hold is active #when a second dispatch arrives before the hold expires #then it is coalesced and reports reserved or queued [1.01ms]
+(pass) prompt-async-gate client-identity characterization > #given promptAsync rejects after dispatch was attempted #when the result is classified #then status is failed dispatchAttempted is true and isAmbiguousPostDispatchPromptFailure is true [0.66ms]
+
+packages/omo-opencode/src/shared/prompt-async-gate-path-compat.test.ts:
+(pass) dispatchInternalPrompt path compatibility > #given sync prompt rejects object-form session path #when dispatching #then it retries with string-form path [0.80ms]
+(pass) dispatchInternalPrompt path compatibility > #given async prompt rejects object-form session path #when dispatching #then it retries with string-form path [1.34ms]
+
+packages/omo-opencode/src/shared/prompt-async-gate/pending-tool-turn-metadata.test.ts:
+(pass) latestAssistantTurnBlocksInternalPrompt metadata-only messages > #given empty unknown assistant turn has no parts loaded #when checking prompt safety #then internal prompts stay blocked [0.67ms]
+(pass) latestAssistantTurnBlocksInternalPrompt metadata-only messages > #given completed tool-calls assistant turn has no parts loaded #when checking prompt safety #then internal prompts stay blocked [0.40ms]
+
+packages/omo-opencode/src/shared/prompt-async-gate/pending-tool-turn.test.ts:
+(pass) latestAssistantTurnBlocksInternalPrompt > #given completed assistant question tool has no real user answer #when checking prompt safety #then internal prompts stay blocked [0.58ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given internal wake follows an unanswered question #when checking prompt safety #then the internal wake does not count as an answer [0.76ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given opencode question tool field has no real user answer #when checking prompt safety #then internal prompts stay blocked [0.36ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given opencode ask-user-question tool field has no real user answer #when checking prompt safety #then internal prompts stay blocked [0.36ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given answered question tool completed #when checking prompt safety #then internal prompts are not blocked by that question [0.46ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given real user answer follows a question #when checking prompt safety #then internal prompts are not blocked by that question [0.26ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given completed assistant is followed by an orphaned reply-required internal wake #when checking prompt safety #then internal prompts are admitted [0.33ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given internal continuation gets only an empty unknown assistant turn #when checking prompt safety #then internal prompts stay blocked [0.53ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given internal continuation receives assistant text #when checking prompt safety #then internal prompts are not blocked [0.35ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given a completed assistant is followed by a noReply notification tail #when checking prompt safety #then internal prompts are not blocked [0.37ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given a completed assistant is followed by several stacked noReply notification tails #when checking prompt safety #then internal prompts are not blocked [0.26ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given a reply-expecting internal tail sits behind a noReply tail after completion #when checking prompt safety #then internal prompts are admitted [0.27ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given an actively waiting assistant sits behind a noReply tail #when checking prompt safety #then internal prompts stay blocked [0.22ms]
+
+packages/omo-opencode/src/hooks/model-fallback/hook.test.ts:
+(pass) model fallback hook > applies pending fallback on chat.message by overriding model [0.70ms]
+(pass) model fallback hook > preserves fallback progression across repeated session.error retries [0.39ms]
+(pass) model fallback hook > does not re-arm fallback when one is already pending [0.12ms]
+(pass) model fallback hook > isolates stored fallback chains from caller mutations on set and get [0.17ms]
+(pass) model fallback hook > skips no-op fallback entries that resolve to same provider/model [0.24ms]
+(pass) model fallback hook > skips no-op fallback entries even when variant differs [0.20ms]
+(pass) model fallback hook > uses connected preferred provider when fallback entry providers are disconnected [1.81ms]
+(pass) model fallback hook > does not fall back to hardcoded agent chain when session explicitly stores no fallback chain [regression #2941] [0.13ms]
+(pass) model fallback hook > shows toast when fallback is applied [0.29ms]
+(pass) model fallback hook > transforms model names for github-copilot provider via fallback chain [0.33ms]
+(pass) model fallback hook > preserves canonical google preview model names via fallback chain [0.36ms]
+
+packages/omo-opencode/src/hooks/shared/prompt-async-gate-question.test.ts:
+(pass) dispatchInternalPrompt question tool gating > #given completed assistant question has no real user answer #when an internal promptAsync is requested #then no prompt is sent [0.59ms]
+
+packages/omo-opencode/src/hooks/shared/prompt-async-gate-semantic-dedupe.test.ts:
+(pass) dispatchInternalPrompt semantic dedupe > #given the same semantic prompt returns from another source after the broad hold expires #when OpenCode has not surfaced the accepted turn #then the duplicate is coalesced [0.52ms]
+(pass) dispatchInternalPrompt semantic dedupe > #given the same semantic prompt is built with different object key order #when it repeats during the broad hold #then the duplicate is coalesced [0.36ms]
+(pass) dispatchInternalPrompt semantic dedupe > #given a distinct semantic prompt follows the broad hold #when it targets the same session #then it still dispatches [0.37ms]
+(pass) dispatchInternalPrompt semantic dedupe > #given distinct long prompts share the same prefix and length #when the second follows the broad hold #then it still dispatches [0.37ms]
+(pass) dispatchInternalPrompt semantic dedupe > #given synthetic internal prompts lack continuation metadata #when their text differs after the broad hold #then semantic dedupe keeps them distinct [0.33ms]
+(pass) dispatchInternalPrompt semantic dedupe > #given continuation prompts differ by route metadata #when the broad hold has expired #then semantic dedupe still coalesces intent-level duplicates [0.31ms]
+
+packages/omo-opencode/src/hooks/shared/prompt-async-gate.test.ts:
+(pass) dispatchInternalPrompt > #given async mode #when the unified prompt dispatcher runs #then promptAsync is used [0.45ms]
+(pass) dispatchInternalPrompt > #given sync mode #when the unified prompt dispatcher runs #then prompt is used [0.24ms]
+(pass) dispatchInternalPrompt > #given async dispatch holds a session reservation #when sync mode targets the same session #then the unified service defers the duplicate [0.43ms]
+(pass) dispatchInternalPrompt > #given a busy session #when an internal prompt is dispatched #then the unified dispatcher queues and sends after idle [1.67ms]
+(pass) dispatchInternalPrompt > #given duplicate queued prompts for one session #when the session becomes idle #then the dispatcher coalesces them into one prompt [1.60ms]
+(pass) dispatchInternalPrompt > #given distinct queued prompts behind a dispatch hold #when the hold is released #then the dispatcher preserves FIFO order [1.68ms]
+(pass) dispatchInternalPrompt > #given a stateful route defers queued delivery #when a dispatch hold is active #then the prompt is not queued behind the hold [0.28ms]
+(pass) dispatchInternalPrompt > #given a queued prompt is waiting #when a stateful route defers queued delivery #then it does not cut ahead or enqueue [1.58ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given two internal promptAsync calls race for one idle session #when they dispatch concurrently #then only one prompt is accepted [0.32ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given settle is disabled and status is unavailable #when a second promptAsync starts after the first dispatch resolves #then the default dispatch hold keeps the session reserved [0.22ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given SDK promptAsync depends on its session receiver #when the gate dispatches #then method binding is preserved [0.18ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given SDK messages depends on its session receiver #when latest assistant waits on tools #then method binding is preserved and no prompt is sent [0.23ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given session.status reports busy #when an internal promptAsync is requested #then no prompt is sent [0.17ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given latest assistant turn is waiting on tools #when an internal promptAsync is requested #then no prompt is sent [0.20ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given latest assistant turn has a tool-calls finish without pending part state #when an internal promptAsync is requested #then no prompt is sent [0.30ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given latest assistant turn has a running tool-call part #when an internal promptAsync is requested #then no prompt is sent [0.23ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given latest assistant turn is still streaming without a finish reason #when an internal promptAsync is requested #then no prompt is sent [0.18ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given latest assistant turn has unknown finish #when an internal promptAsync is requested #then no prompt is sent [0.22ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given latest assistant turn has boolean finish === true #when checking blocks #then it is treated as terminal (NOT blocking) [0.21ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given latest assistant turn has info.time.completed but no finish field #when checking blocks #then it is treated as terminal [0.21ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given internal user tail follows an assistant waiting on tools #when an internal promptAsync is requested #then no prompt is sent [0.22ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given synthetic user tail follows an assistant waiting on tools #when an internal promptAsync is requested #then no prompt is sent [0.21ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given mixed real user tail follows an assistant waiting on tools #when an internal promptAsync is requested #then promptAsync is sent [0.25ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given latest assistant turn is waiting on tools #when tool-state check is disabled #then promptAsync is sent [0.20ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given dispatch hold has expired #when the same session prompts again #then the next promptAsync is accepted [0.27ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given a peer-message promptAsync hold #when an unrelated route releases the session #then the peer-message hold remains reserved [0.22ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given a route family promptAsync hold #when the same family aborts another source #then the reservation is released [0.22ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given promptAsync dispatch never settles #when dispatch timeout elapses #then reservation is released for the next caller [3.03ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given promptAsync rejects after dispatch #when a second caller races immediately #then post-dispatch hold still blocks duplicate [0.23ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given a similarly named sibling route #when reservedByPrefix uses a strict family prefix #then release does not clear sibling reservation [0.21ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given two internal prompt calls race for one idle session #when they dispatch concurrently #then only one prompt is accepted [0.26ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given settle is disabled and status is unavailable #when a second prompt starts after the first dispatch resolves #then the default dispatch hold keeps the session reserved [0.18ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given session.status never resolves #when promptAsync is requested #then isSessionActive times out and dispatch is attempted [53.04ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given SDK prompt depends on its session receiver #when the gate dispatches #then method binding is preserved [1.07ms]
+(pass) dispatchInternalPrompt shared gate behavior > #given session.status hangs forever #when promptAsync gate checks activity #then it dispatches after status timeout [51.78ms]
+
+packages/omo-opencode/src/hooks/shared/prompt-async-gate-live-routing.test.ts:
+(pass) dispatchInternalPrompt live-server-route routing > #given registered inProcessClient and live route available #when dispatchInternalPrompt runs #then promptAsync is called on the live client not the original [2.24ms]
+(pass) dispatchInternalPrompt live-server-route routing > #given registered inProcessClient and live route available #when dispatchInternalPrompt runs #then status and messages are read on the live client [0.69ms]
+(pass) dispatchInternalPrompt live-server-route routing > #given a child session in subagentSessions #when dispatchInternalPrompt runs #then the original client is used and live client is untouched [0.37ms]
+(pass) dispatchInternalPrompt live-server-route routing > #given an unregistered client #when dispatchInternalPrompt runs #then the original client is used and no probe fetch is made [0.37ms]
+(pass) dispatchInternalPrompt live-server-route routing > #given live routing is disabled via setLiveParentWakeRoutingDisabled #when dispatchInternalPrompt runs #then the original client is used [0.39ms]
+(pass) dispatchInternalPrompt live-server-route routing > #given live dispatch rejects with a pre-send connection failure #when dispatchInternalPrompt runs #then fallback dispatches exactly once on original client and route is marked unavailable [1.15ms]
+(pass) dispatchInternalPrompt live-server-route routing > #given live dispatch hangs past dispatchTimeoutMs #when dispatchInternalPrompt runs #then result is failed with timeout error original client is not called and route is marked unavailable [52.14ms]
+(pass) dispatchInternalPrompt live-server-route routing > #given live route active and queueBehavior enqueue #when session is initially busy then becomes idle #then queued entry dispatches via live client [3.16ms]
+
+packages/omo-opencode/src/hooks/shared/prompt-async-gate-semantic-dedupe-edge.test.ts:
+(pass) semantic prompt dedupe key > #given cyclic prompt inputs #when dedupe keys are created #then equivalent cycles are stable and do not throw [0.57ms]
+(pass) dispatchInternalPrompt semantic dedupe edge cases > #given promptAsync rejects after an attempted dispatch #when the same prompt retries after the post-dispatch hold #then semantic dedupe still coalesces it [0.97ms]
+(pass) dispatchInternalPrompt semantic dedupe edge cases > #given a failed attempted dispatch is intentionally released #when the same prompt retries inside the semantic window #then it can dispatch again [1.08ms]
+
+packages/omo-opencode/src/hooks/shared/prompt-async-gate-message-fetch.test.ts:
+(pass) dispatchInternalPrompt message fetch safety > #given latest-message fetch hangs #when an internal promptAsync is requested #then no prompt is sent [6.59ms]
+(pass) dispatchInternalPrompt message fetch safety > #given latest-message fetch throws #when an internal promptAsync is requested #then no prompt is sent [0.60ms]
+
+ 104 pass
+ 0 fail
+ 254 expect() calls
+Ran 104 tests across 12 files. [2.66s]
