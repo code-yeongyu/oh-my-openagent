@@ -19,7 +19,25 @@ export function createAbortSessionRequest(deps: HookDeps) {
       deps.sessionLastAccess.set(sessionID, Date.now())
     }
     try {
-      await ctx.client.session.abort({ path: { id: sessionID } })
+      const result = await ctx.client.session.abort({
+        path: { id: sessionID },
+        throwOnError: true,
+      })
+      if (
+        typeof result === "object" &&
+        result !== null &&
+        "error" in result &&
+        result.error !== undefined
+      ) {
+        if (isInternalAbort) {
+          deps.internallyAbortedSessions.delete(sessionID)
+        }
+        log(`[${HOOK_NAME}] Failed to abort in-flight session request (${source})`, {
+          sessionID,
+          error: String(result.error),
+        })
+        return false
+      }
       releasePromptAsyncReservation(sessionID, `runtime-fallback-abort:${source}`, {
         reservedBy: `runtime-fallback:${source}`,
         reservedByPrefix: "runtime-fallback:",

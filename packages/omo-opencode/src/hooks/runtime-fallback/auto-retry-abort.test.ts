@@ -141,4 +141,27 @@ describe("createAbortSessionRequest reservation release", () => {
     expect(aborted).toBe(false)
     expect(deps.internallyAbortedSessions.has(sessionID)).toBe(false)
   })
+
+  test("#given the SDK resolves a non-2xx abort #when the watchdog aborts #then ownership and the prompt reservation are preserved", async () => {
+    const deps = createDeps()
+    const sessionID = "session-first-prompt-watchdog-abort-resolved-error"
+    let abortCalledWithThrowOnError = false
+    reserveSession(sessionID, "model-suggestion-retry")
+    deps.ctx.client.session.abort = async (input) => {
+      abortCalledWithThrowOnError = input.throwOnError === true
+      return {
+        data: undefined,
+        error: { name: "NotFoundError" },
+        response: new Response(null, { status: 404 }),
+      }
+    }
+    const abortSessionRequest = createAbortSessionRequest(deps)
+
+    const aborted = await abortSessionRequest(sessionID, "first-prompt-watchdog")
+
+    expect(aborted).toBe(false)
+    expect(abortCalledWithThrowOnError).toBe(true)
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(false)
+    expect(getPromptReservation(sessionID)?.source).toBe("model-suggestion-retry")
+  })
 })

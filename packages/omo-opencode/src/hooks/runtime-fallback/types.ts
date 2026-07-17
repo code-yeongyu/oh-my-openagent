@@ -9,7 +9,7 @@ export type RuntimeFallbackTimeout = object | number
 export interface RuntimeFallbackPluginInput {
   client: {
     session: {
-      abort: (input: { path: { id: string } }) => Promise<unknown>
+      abort: (input: { path: { id: string }; throwOnError?: boolean }) => Promise<unknown>
       messages: (input: { path: { id: string }; query: { directory: string } }) => Promise<unknown>
       status?: (input?: { query: { directory: string } }) => Promise<unknown>
       promptAsync: (input: {
