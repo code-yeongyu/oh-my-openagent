@@ -212,6 +212,7 @@ describe("reconcileOnSessionStart reattach", () => {
     // then
     expect(result.outcomes[0]?.kind).toBe("lost")
     expect(store.load("st_00000002")?.status).toBe("lost")
+    expect(store.load("st_00000002")?.residency_state).toBe("disposed")
     expect(respawnRunner.startedSpecs).toHaveLength(0)
   })
 
@@ -244,6 +245,34 @@ describe("reconcileOnSessionStart reattach", () => {
     // then
     expect(result.outcomes[0]?.kind).toBe("lost")
     expect(respawnRunner.startedSpecs).toHaveLength(0)
+  })
+  test(" w2reattach #given an in-process record marked lost #when reconciled #then its residency claim is released so the slot is reclaimable", async () => {
+    // given
+    const store = tempStore()
+    seedRecord(store, { task_id: "st_00000011", status: "running", residency_state: "resident", execution_mode: "in-process" })
+    const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings(), now, signaller: fakeSignaller(new Set(), []), orphanKillDelayMs: 0 })
+
+    // when
+    const result = await lifecycle.reconcileOnSessionStart()
+
+    // then
+    expect(result.outcomes[0]?.kind).toBe("lost")
+    expect(store.load("st_00000011")?.status).toBe("lost")
+    expect(store.load("st_00000011")?.residency_state).toBe("disposed")
+  })
+
+  test(" w2reattach #given a leaked {lost, resident} record from an earlier session #when reconciled #then it self-heals to disposed", async () => {
+    // given
+    const store = tempStore()
+    seedRecord(store, { task_id: "st_00000012", status: "lost", residency_state: "resident", execution_mode: "in-process" })
+    const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings(), now, signaller: fakeSignaller(new Set(), []), orphanKillDelayMs: 0 })
+
+    // when
+    const result = await lifecycle.reconcileOnSessionStart()
+
+    // then
+    expect(result.outcomes[0]?.kind).toBe("lost")
+    expect(store.load("st_00000012")?.residency_state).toBe("disposed")
   })
 
   test(" w2reattach #given reconcile reattach is disabled #when a durable session exists #then v1 lost behavior runs without respawn", async () => {
