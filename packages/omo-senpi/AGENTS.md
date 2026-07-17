@@ -10,7 +10,7 @@ This package is adapter-only. It may depend on harness-neutral core packages plu
 |------|---------|
 | `package.json` | Private workspace package `@oh-my-opencode/omo-senpi`; exports the adapter, extension, and local installer entrypoints. |
 | `src/extension/` | Senpi ExtensionAPI composition layer. It validates the required API surface, registers global and per-component disable flags, and wires components defensively. |
-| `src/components/` | Six live components: `ultrawork`, `ulw-loop`, `comment-checker`, `telemetry`, `lsp`, and `task`. |
+| `src/components/` | Seven live components: `ultrawork`, `start-work-continuation`, `ulw-loop`, `comment-checker`, `telemetry`, `lsp`, and `task`. |
 | `src/install/` | Local Senpi installer and uninstaller helpers. They add or remove the absolute plugin path in `SENPI_CODING_AGENT_DIR` or `~/.senpi/agent` settings. |
 | `scripts/qa/` | Live Senpi QA drivers, continuation probe, and mock provider used by task 13 validation. |
 | `plugin/` | The single Pi package `@code-yeongyu/omo-senpi`. It contains generated `extensions/omo.js`, generated skills, package metadata, and plugin-local build scripts. |
@@ -20,7 +20,8 @@ The v1 install surface is local-path only. Install the built Pi package from `pa
 ## Components
 
 - `ultrawork`: injects the Senpi ultrawork directive on matching input, backed by `src/components/ultrawork/generated-directive.ts`.
-- `ulw-loop`: detects active `omo ulw-loop` state and injects continuation guidance when the cwd has an incomplete run.
+- `start-work-continuation`: reads `.omo/boulder.json` on `agent_end` (the Senpi analog of Codex's Stop hook) and injects a continuation directive when the current session owns an active or paused Prometheus work plan. It uses `senpi:<session_id>` state produced by the `start-work` skill, suppresses repeats by a `work_id:updated_at:completed/total` signature, and caps consecutive continuations at 8 (reset on user input). It registers before `ulw-loop` so active boulder work takes precedence over ulw-loop continuation.
+- `ulw-loop`: detects active `omo ulw-loop` state and injects continuation guidance when the cwd has an incomplete run. It explicitly defers to `start-work-continuation` when boulder state is continuable for the same session.
 - `comment-checker`: runs the shared comment-checker flow after write-like tool results when a resolver finds the binary.
 - `telemetry`: sends the anonymous once-per-UTC-day `omo_senpi_daily_active` event, with product-specific opt-outs.
 - `lsp`: registers direct LSP tools and optional post-edit diagnostics through the packaged shared LSP daemon runtime. The Senpi adapter owns only descriptors, schemas, renderers, path extraction, and project-config migration warnings.
