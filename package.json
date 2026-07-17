@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode",
-  "version": "4.18.2",
+  "version": "4.19.0",
   "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools",
   "main": "./dist/index.js",
   "types": "dist/index.d.ts",
@@ -212,18 +212,18 @@
     "typescript": "^6.0.3"
   },
   "optionalDependencies": {
-    "oh-my-opencode-darwin-arm64": "4.18.2",
-    "oh-my-opencode-darwin-x64": "4.18.2",
-    "oh-my-opencode-darwin-x64-baseline": "4.18.2",
-    "oh-my-opencode-linux-arm64": "4.18.2",
-    "oh-my-opencode-linux-arm64-musl": "4.18.2",
-    "oh-my-opencode-linux-x64": "4.18.2",
-    "oh-my-opencode-linux-x64-baseline": "4.18.2",
-    "oh-my-opencode-linux-x64-musl": "4.18.2",
-    "oh-my-opencode-linux-x64-musl-baseline": "4.18.2",
-    "oh-my-opencode-windows-arm64": "4.18.2",
-    "oh-my-opencode-windows-x64": "4.18.2",
-    "oh-my-opencode-windows-x64-baseline": "4.18.2"
+    "oh-my-opencode-darwin-arm64": "4.19.0",
+    "oh-my-opencode-darwin-x64": "4.19.0",
+    "oh-my-opencode-darwin-x64-baseline": "4.19.0",
+    "oh-my-opencode-linux-arm64": "4.19.0",
+    "oh-my-opencode-linux-arm64-musl": "4.19.0",
+    "oh-my-opencode-linux-x64": "4.19.0",
+    "oh-my-opencode-linux-x64-baseline": "4.19.0",
+    "oh-my-opencode-linux-x64-musl": "4.19.0",
+    "oh-my-opencode-linux-x64-musl-baseline": "4.19.0",
+    "oh-my-opencode-windows-arm64": "4.19.0",
+    "oh-my-opencode-windows-x64": "4.19.0",
+    "oh-my-opencode-windows-x64-baseline": "4.19.0"
   },
   "overrides": {
     "@earendil-works/pi-agent-core": "0.80.3",
