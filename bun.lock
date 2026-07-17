@@ -218,6 +218,7 @@
       "version": "4.18.2",
       "dependencies": {
         "@code-yeongyu/lsp-daemon": "file:../lsp-daemon",
+        "@oh-my-opencode/boulder-state": "workspace:*",
         "@oh-my-opencode/comment-checker-core": "workspace:*",
         "@oh-my-opencode/delegate-core": "workspace:*",
         "@oh-my-opencode/lsp-core": "workspace:*",

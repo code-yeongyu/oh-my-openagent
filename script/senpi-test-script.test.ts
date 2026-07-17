@@ -53,6 +53,7 @@ describe("Senpi compatibility test script", () => {
       "bun run build:senpi-plugin:stage",
     ].join(" && ")
     const hasStageScript = manifest.scripts?.["build:senpi-plugin:stage"] === [
+      "bun run build:materialize-frontend",
       "node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs",
       "node packages/omo-senpi/plugin/scripts/build-extension.mjs",
       "node packages/omo-senpi/plugin/scripts/sync-skills.mjs",
@@ -86,12 +87,32 @@ describe("Senpi compatibility test script", () => {
     try {
       const pluginRoot = join(tempRoot, "packages", "omo-senpi", "plugin")
       await mkdir(join(pluginRoot, "extensions"), { recursive: true })
-      await mkdir(join(pluginRoot, "skills", "ultrawork"), { recursive: true })
-      await mkdir(join(pluginRoot, "skills", "ulw-loop"), { recursive: true })
+      const requiredSkillNames = [
+        "ast-grep",
+        "coding-agent-sessions",
+        "debugging",
+        "frontend",
+        "git-master",
+        "init-deep",
+        "lsp-setup",
+        "programming",
+        "refactor",
+        "remove-ai-slops",
+        "review-work",
+        "start-work",
+        "ultimate-browsing",
+        "ultrawork",
+        "ulw-loop",
+        "ulw-plan",
+        "ulw-research",
+        "visual-qa",
+      ]
+      for (const skillName of requiredSkillNames) {
+        await mkdir(join(pluginRoot, "skills", skillName), { recursive: true })
+        await writeFile(join(pluginRoot, "skills", skillName, "SKILL.md"), `# ${skillName}\n`)
+      }
       await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: "@code-yeongyu/omo-senpi" }))
       await writeFile(join(pluginRoot, "extensions", "omo.js"), "export default {}\n")
-      await writeFile(join(pluginRoot, "skills", "ultrawork", "SKILL.md"), "# Ultrawork\n")
-      await writeFile(join(pluginRoot, "skills", "ulw-loop", "SKILL.md"), "# ULW Loop\n")
       await mkdir(join(pluginRoot, "scripts"), { recursive: true })
       await writeFile(join(pluginRoot, "scripts", "install.mjs"), "#!/usr/bin/env node\n")
       await mkdir(join(pluginRoot, "runtime", "lsp-daemon", "dist"), { recursive: true })

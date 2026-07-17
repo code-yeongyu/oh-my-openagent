@@ -33,6 +33,7 @@
     "@oh-my-opencode/omo-config-core": "workspace:*",
     "@oh-my-opencode/delegate-core": "workspace:*",
     "@oh-my-opencode/team-core": "workspace:*",
+    "@oh-my-opencode/boulder-state": "workspace:*",
     "@code-yeongyu/lsp-daemon": "file:../lsp-daemon"
   },
   "peerDependencies": {

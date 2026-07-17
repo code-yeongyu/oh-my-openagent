@@ -28,8 +28,29 @@ async function makePluginFixture(options: { readonly runtime?: boolean } = { run
   tempDirs.push(pluginPath)
   await writeFixtureFile(join(pluginPath, "package.json"), JSON.stringify({ name: "@code-yeongyu/omo-senpi" }))
   await writeFixtureFile(join(pluginPath, "extensions", "omo.js"), "export default {}\n")
-  await writeFixtureFile(join(pluginPath, "skills", "ultrawork", "SKILL.md"), "# Ultrawork\n")
-  await writeFixtureFile(join(pluginPath, "skills", "ulw-loop", "SKILL.md"), "# ULW Loop\n")
+  const requiredSkillNames = [
+    "ast-grep",
+    "coding-agent-sessions",
+    "debugging",
+    "frontend",
+    "git-master",
+    "init-deep",
+    "lsp-setup",
+    "programming",
+    "refactor",
+    "remove-ai-slops",
+    "review-work",
+    "start-work",
+    "ultimate-browsing",
+    "ultrawork",
+    "ulw-loop",
+    "ulw-plan",
+    "ulw-research",
+    "visual-qa",
+  ]
+  for (const skillName of requiredSkillNames) {
+    await writeFixtureFile(join(pluginPath, "skills", skillName, "SKILL.md"), `# ${skillName}\n`)
+  }
   await writeFixtureFile(join(pluginPath, "scripts", "install.mjs"), "#!/usr/bin/env node\n")
   if (options.runtime !== false) {
     await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "cli.js"), "console.log('cli')\n")
