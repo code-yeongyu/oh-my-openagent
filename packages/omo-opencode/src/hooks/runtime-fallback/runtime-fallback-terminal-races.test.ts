@@ -150,4 +150,44 @@ describe("runtime fallback terminal ownership races", () => {
     expect(dispatches).toBe(2)
     watchdog.dispose()
   })
+
+  it("restores watchdog ownership when the abort terminal precedes a rejected status replacement", async () => {
+    const sessionID = "status-terminal-before-rejected-replacement"
+    const abortResponse = deferred<boolean>()
+    const abortStarted = deferred<void>()
+    let aborts = 0
+    let dispatches = 0
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    SessionCategoryRegistry.register(sessionID, AGENT)
+    const eventHelpers = helpers({
+      abortSessionRequest: async () => {
+        aborts += 1
+        abortStarted.resolve()
+        return abortResponse.promise
+      },
+      autoRetryWithFallback: async () => {
+        dispatches += 1
+        return dispatches === 1
+          ? { accepted: false, status: "blocked", reason: "test" }
+          : { accepted: true, status: "dispatched" }
+      },
+    })
+    const watchdog = createFirstPromptWatchdog(deps, eventHelpers, 1)
+    const handler = createEventHandler(
+      deps,
+      eventHelpers,
+      (id) => watchdog.onFallbackOwnershipTransferred(id),
+    )
+
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT, "user-1")
+    const retry = handler(retryEvent(sessionID))
+    await abortStarted.promise
+    watchdog.onSessionTerminal(sessionID, "session.error", true)
+    abortResponse.resolve(true)
+    await retry
+    await timers?.advanceBy(10)
+
+    expect({ aborts, dispatches }).toEqual({ aborts: 2, dispatches: 2 })
+    watchdog.dispose()
+  })
 })

@@ -1,0 +1,3 @@
+{"type":"session.created","eventSessionID":"<older-root>","currentSessionID":"<older-root>","roots":[{"id":"<older-root>","active":true}]}
+{"type":"session.created","eventSessionID":"<newer-root>","currentSessionID":"<newer-root>","roots":[{"id":"<older-root>","active":true},{"id":"<newer-root>","active":true}]}
+{"type":"session.deleted","eventSessionID":"<newer-root>","currentSessionID":"<older-root>","roots":[{"id":"<older-root>","active":true},{"id":"<newer-root>","active":false}]}

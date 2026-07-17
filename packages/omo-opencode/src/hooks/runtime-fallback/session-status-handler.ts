@@ -73,6 +73,10 @@ export function createSessionStatusHandler(
       }
     }
     let requestAborted = false
+    const ownershipTransfer = sessionRetryInFlight.has(sessionID) && !timeoutEnabled
+      ? undefined
+      : onFallbackOwnershipTransferred?.(sessionID)
+    const rollbackOwnership = () => ownershipTransfer?.rollback()
 
     if (sessionRetryInFlight.has(sessionID)) {
       if (timeoutEnabled) {
@@ -81,9 +85,10 @@ export function createSessionStatusHandler(
           model,
         })
         requestAborted = await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
-        if (!isCurrent()) { releaseRetryKey(); return }
+        if (!isCurrent()) { releaseRetryKey(); rollbackOwnership(); return }
         if (!requestAborted) {
           releaseRetryKey()
+          rollbackOwnership()
           return
         }
         sessionRetryInFlight.delete(sessionID)
@@ -94,12 +99,13 @@ export function createSessionStatusHandler(
     }
 
     const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
-    if (!isCurrent()) { releaseRetryKey(); return }
+    if (!isCurrent()) { releaseRetryKey(); rollbackOwnership(); return }
     const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
     if (fallbackModels.length === 0) {
       if (!sessionStates.has(sessionID)) {
         sessionStatusRetryKeys.delete(sessionID)
       }
+      rollbackOwnership()
       return
     }
 
@@ -109,14 +115,16 @@ export function createSessionStatusHandler(
         sessionID,
         pendingFallbackModel: state.pendingFallbackModel,
       })
+      rollbackOwnership()
       return
     }
 
     if (!requestAborted) {
       requestAborted = await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
-      if (!isCurrent()) { releaseRetryKey(); return }
+      if (!isCurrent()) { releaseRetryKey(); rollbackOwnership(); return }
       if (!requestAborted) {
         releaseRetryKey()
+        rollbackOwnership()
         return
       }
     }
@@ -131,6 +139,7 @@ export function createSessionStatusHandler(
       })
       if (!initialModel) {
         sessionStatusRetryKeys.delete(sessionID)
+        rollbackOwnership()
         log(`[${HOOK_NAME}] session.status retry missing model info, cannot fallback`, { sessionID })
         return
       }
@@ -154,6 +163,7 @@ export function createSessionStatusHandler(
           sessionID,
           pendingFallbackModel: state.pendingFallbackModel,
         })
+        rollbackOwnership()
         return
       }
     }
@@ -164,7 +174,6 @@ export function createSessionStatusHandler(
       retryAttempt: status.attempt,
     })
 
-    const ownershipTransfer = onFallbackOwnershipTransferred?.(sessionID)
     if (!isCurrent()) { releaseRetryKey(); ownershipTransfer?.rollback(); return }
     const dispatched = await dispatchFallbackRetry(deps, helpers, {
       sessionID,
