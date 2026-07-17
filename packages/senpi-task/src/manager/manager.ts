@@ -39,6 +39,7 @@ import type {
 type LiveTask = {
   readonly handle: ManagedChildHandle
   readonly model: string
+  readonly unsubscribe: () => void
 }
 
 type LaunchContext = {
@@ -66,6 +67,7 @@ type ReattachingTaskManager = TaskManager & {
   respawn(record: TaskRecord, resumeSessionPath: string): Promise<RespawnResult>
   reattach(record: TaskRecord, handle: ManagedChildHandle): Promise<ReattachResult>
   waiterKeyCount(): number
+  releasedKeyCount(): number
 }
 
 const NOOP_DESTRUCTION: DestructionPort = { destroyResidentTask: () => Promise.resolve() }
@@ -98,9 +100,11 @@ class TaskManagerImpl implements TaskManager {
   readonly #rpcRespawnRunner: RpcRespawnRunner
   readonly #names = new NameRegistry()
   readonly #live = new Map<string, LiveTask>()
-  // Release guard keyed by `${taskId}:${runEpoch}` so a revived task (new epoch) can re-acquire a
-  // slot and still have its LATER release counted instead of swallowed by an already-released id.
-  readonly #released = new Set<string>()
+  // Release guard: latest released run_epoch per task_id. A revived task (higher epoch) can still
+  // release its LATER occupancy, while a stale re-release of an already-released epoch is a no-op.
+  // Keyed by task_id (not `${taskId}:${epoch}`) so growth is bounded by live tasks and forget()
+  // prunes in O(1).
+  readonly #released = new Map<string, number>()
   readonly #waiters = new Map<string, TaskWaiter[]>()
   readonly #background = new Set<string>()
   readonly #steering: SteeringEngine
@@ -268,9 +272,11 @@ class TaskManagerImpl implements TaskManager {
   }
 
   forget(taskId: string): void {
+    this.#live.get(taskId)?.unsubscribe()
     this.#live.delete(taskId)
     this.#background.delete(taskId)
-    for (const key of this.#released) if (key.startsWith(`${taskId}:`)) this.#released.delete(key)
+    this.#released.delete(taskId)
+    this.#steering.dropPending(taskId)
   }
 
   getResidentHandle(taskId: string): ManagedChildHandle | undefined { return this.#live.get(taskId)?.handle }
@@ -321,11 +327,11 @@ class TaskManagerImpl implements TaskManager {
       await discardManagedHandle(handle)
       return { ok: false, kind: "already_attached", reason: "task already has a live handle" }
     }
-    this.#live.set(record.task_id, { handle, model: record.model })
     let unsubscribe: (() => void) | undefined
     let acquiredEpoch: number | undefined
     try {
       unsubscribe = subscribeTranscriptLog(handle, this.#options.store, record.task_id)
+      this.#live.set(record.task_id, { handle, model: record.model, unsubscribe })
       if (isTerminalRecord(record) && record.status !== "lost") {
         this.#options.store.replace({
           ...record,
@@ -397,6 +403,9 @@ class TaskManagerImpl implements TaskManager {
   // Test-only observability for proving waitFor never retains empty waiter-map keys.
   waiterKeyCount(): number { return this.#waiters.size }
 
+  // Test-only observability for proving the release guard never grows unboundedly across revives.
+  releasedKeyCount(): number { return this.#released.size }
+
   async #disposeFailedRespawn(handle: RpcChildHandle): Promise<boolean> {
     try {
       await discardRpcHandle(handle)
@@ -412,6 +421,7 @@ class TaskManagerImpl implements TaskManager {
     const startResult = this.#options.store.transition(record.task_id, { type: "start", timestamp: nowIso(this.#now) })
     if (!startResult.applied) {
       this.#releaseSlot(record.task_id, model, record.notification.run_epoch)
+      this.#steering.dropPending(record.task_id)
       this.#settleWaiters(record.task_id)
       return { ok: false, error: "task was cancelled before launch" }
     }
@@ -424,22 +434,23 @@ class TaskManagerImpl implements TaskManager {
       this.#releaseSlot(record.task_id, model, record.notification.run_epoch)
       this.#options.store.transition(record.task_id, { type: "fail", timestamp: nowIso(this.#now), error_message: message })
       this.#options.store.appendEvent(record.task_id, { type: "task_start_failed", payload: { error_message: message } })
+      this.#steering.dropPending(record.task_id)
       this.#settleWaiters(record.task_id)
       return { ok: false, error: message }
     }
 
     const current = this.#tryLoad(record.task_id)
     if (current?.status === "cancelled") {
-      this.#live.set(record.task_id, { handle, model })
+      this.#live.set(record.task_id, { handle, model, unsubscribe: () => undefined })
       await (this.#options.destruction ?? NOOP_DESTRUCTION).destroyResidentTask(record.task_id, "cancel")
       this.#releaseSlot(record.task_id, model, record.notification.run_epoch)
       this.#settleWaiters(record.task_id)
       return { ok: false, error: "task was cancelled during launch" }
     }
 
-    this.#live.set(record.task_id, { handle, model })
+    const unsubscribe = subscribeTranscriptLog(handle, this.#options.store, record.task_id)
+    this.#live.set(record.task_id, { handle, model, unsubscribe })
     this.#recordSpawnFacts(record.task_id, handle)
-    subscribeTranscriptLog(handle, this.#options.store, record.task_id)
     this.#trackOutcome(record.task_id, handle, model, record.notification.run_epoch)
     void this.#steering.notifyStarted(record.task_id)
     return { ok: true }
@@ -501,9 +512,11 @@ class TaskManagerImpl implements TaskManager {
   }
 
   #releaseSlot(taskId: string, model: string, epoch: number): void {
-    const key = `${taskId}:${epoch}`
-    if (this.#released.has(key)) return
-    this.#released.add(key)
+    // Release once per (task, epoch). A stale re-release of an already-released epoch is a no-op;
+    // a revived task's higher epoch supersedes the prior one so its later release still counts.
+    const released = this.#released.get(taskId)
+    if (released !== undefined && released >= epoch) return
+    this.#released.set(taskId, epoch)
     this.#concurrency.release(model)
   }
 
