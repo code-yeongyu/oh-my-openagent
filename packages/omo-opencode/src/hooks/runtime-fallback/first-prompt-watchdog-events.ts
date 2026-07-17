@@ -6,7 +6,6 @@ import type { FirstPromptWatchdog } from "./first-prompt-watchdog"
 import type { WatchdogEventDecision } from "./first-prompt-watchdog-types"
 import { normalizeModelToCanonicalString } from "./normalize-model"
 
-const SESSION_NEXT_EVENT_PREFIX = "session.next."
 const TERMINAL_EVENT_TYPES = new Set([
   "session.idle",
   "session.stop",
@@ -27,6 +26,37 @@ function hasAssistantCompletionMarker(info: Record<string, unknown>): boolean {
     || isCompletionMarker(time?.completed)
 }
 
+function isNonEmptyString(value: unknown): boolean {
+  return typeof value === "string" && value.length > 0
+}
+
+function isSessionNextAssistantProgress(eventType: string, props: Record<string, unknown>): boolean {
+  switch (eventType) {
+    case "session.next.synthetic":
+      return isNonEmptyString(props.text)
+    case "session.next.text.delta":
+    case "session.next.reasoning.delta":
+    case "session.next.tool.input.delta":
+      return isNonEmptyString(props.delta)
+    case "session.next.text.ended":
+    case "session.next.reasoning.ended":
+    case "session.next.tool.input.ended":
+      return isNonEmptyString(props.text)
+    case "session.next.shell.started":
+    case "session.next.shell.ended":
+    case "session.next.step.ended":
+    case "session.next.step.failed":
+    case "session.next.tool.input.started":
+    case "session.next.tool.called":
+    case "session.next.tool.progress":
+    case "session.next.tool.success":
+    case "session.next.tool.failed":
+      return true
+    default:
+      return false
+  }
+}
+
 /** Translate an OpenCode event into a generation-aware watchdog signal. */
 export function observeEventForWatchdog(
   event: { type: string; properties?: unknown },
@@ -35,7 +65,7 @@ export function observeEventForWatchdog(
   const props = isRecord(event.properties) ? event.properties : undefined
   if (!props) return
 
-  if (event.type.startsWith(SESSION_NEXT_EVENT_PREFIX)) {
+  if (isSessionNextAssistantProgress(event.type, props)) {
     const sessionID = resolveSessionEventID(props) ?? resolveMessageEventSessionID(props)
     if (sessionID) watchdog.onAssistantProgress(sessionID)
     return
