@@ -85,4 +85,51 @@ describe("first-prompt watchdog message-fetch ordering", () => {
     expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
     watchdog.dispose()
   })
+
+  it("#given retry messages resolved and the fallback request is busy #when the watchdog terminal arrives #then status inspection preserves fallback ownership", async () => {
+    const sessionID = "session-watchdog-message-fetch-complete"
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const promptResponse = createDeferred<Record<string, never>>()
+    const promptDispatched = createDeferred<void>()
+    const abortSources: string[] = []
+
+    deps.ctx.client.session.abort = async () => ({})
+    deps.ctx.client.session.messages = async () => ({ data: [] })
+    deps.ctx.client.session.promptAsync = async () => {
+      promptDispatched.resolve()
+      return promptResponse.promise
+    }
+
+    const baseHelpers = createAutoRetryHelpers(deps)
+    const helpers: AutoRetryHelpers = {
+      ...baseHelpers,
+      abortSessionRequest: async (ownedSessionID, source) => {
+        abortSources.push(source)
+        return baseHelpers.abortSessionRequest(ownedSessionID, source)
+      },
+      resolveAgentForSessionFromContext: async () => AGENT,
+    }
+    const watchdog = createFirstPromptWatchdog(deps, helpers, 1)
+
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT, "user-1")
+    await promptDispatched.promise
+
+    expect(deps.sessionRetryPayloadPending?.has(sessionID)).toBe(false)
+    expect(watchdog.onSessionTerminal(sessionID, "session.error", true)).toEqual({
+      kind: "inspect-terminal",
+      sessionID,
+    })
+    expect(watchdog.resolveDeferredTerminal(sessionID, true)).toEqual({
+      kind: "consume-terminal",
+      sessionID,
+    })
+
+    promptResponse.resolve({})
+    for (let attempt = 0; attempt < 10; attempt += 1) await Promise.resolve()
+
+    expect(abortSources).toEqual(["first-prompt-watchdog"])
+    expect(deps.sessionStates.get(sessionID)?.currentModel).toBe(FALLBACK_MODEL)
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
+    watchdog.dispose()
+  })
 })

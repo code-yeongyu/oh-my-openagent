@@ -28,6 +28,7 @@ export function createFirstPromptWatchdog(
   const suspended = new Map<string, ArmedWatchdog>()
   const progressed = new Map<string, ArmedWatchdog>()
   const suspendedAfterProgress = new Set<string>()
+  const currentAbortInspections = new Set<string>()
   const currentUserMessageIDs = new Map<string, string>()
   const abortProvenance = createWatchdogAbortProvenance()
   let lifecycleGeneration = 0
@@ -44,6 +45,7 @@ export function createFirstPromptWatchdog(
     suspended.delete(sessionID)
     progressed.delete(sessionID)
     suspendedAfterProgress.delete(sessionID)
+    currentAbortInspections.delete(sessionID)
     if (!preserveAbortProvenance) abortProvenance.clear(sessionID)
     currentUserMessageIDs.delete(sessionID)
     if (deleteGeneration) sessionGenerations.delete(sessionID)
@@ -105,8 +107,8 @@ export function createFirstPromptWatchdog(
   }
 
   const ownershipHandlers = createWatchdogOwnershipHandlers({
-    deps, watchdogMs, timers, armed, suspended, progressed, suspendedAfterProgress,
-    currentUserMessageIDs, sessionGenerations,
+    deps, watchdogMs, timers, armed, suspended, progressed, suspendedAfterProgress, currentAbortInspections,
+    currentUserMessageIDs, sessionGenerations, abortProvenance,
     getLifecycleGeneration: () => lifecycleGeneration,
     cancel,
     arm,
@@ -217,13 +219,12 @@ export function createFirstPromptWatchdog(
       if (eventType === "session.error" && isAbortEvent === true) {
         const currentGeneration = sessionGenerations.get(sessionID)
         const fallbackPending = deps.sessionAwaitingFallbackResult.has(sessionID) || deps.internallyAbortedSessions.has(sessionID)
-        const consumedCompletedAbort = abortProvenance.consumeCurrent(sessionID, currentGeneration, false)
-        const consumedPendingAbort = !consumedCompletedAbort
-          && (!armed.has(sessionID) || abortProvenance.isResponsePending(sessionID)
-            || deps.sessionRetryPayloadPending?.has(sessionID) === true)
-          && abortProvenance.consumeCurrent(sessionID, currentGeneration, fallbackPending)
-        const consumedCurrentAbort = consumedCompletedAbort || consumedPendingAbort
-        if (consumedCurrentAbort) return { kind: "consume-terminal", sessionID }
+        const currentAbortDecision = ownershipHandlers.inspectCurrentAbort({
+          sessionID, currentGeneration, fallbackPending,
+          immediateOwnership: !armed.has(sessionID) || abortProvenance.isResponsePending(sessionID)
+            || deps.sessionRetryPayloadPending?.has(sessionID) === true,
+        })
+        if (currentAbortDecision) return currentAbortDecision
         if (
           abortProvenance.hasPrior(sessionID, currentGeneration)
           && (suspend(sessionID) || suspendAfterProgress(sessionID))
@@ -251,7 +252,7 @@ export function createFirstPromptWatchdog(
     dispose() {
       lifecycleGeneration += 1
       for (const timer of timers.values()) clearTimeout(timer)
-      for (const state of [timers, armed, suspended, progressed]) state.clear()
+      for (const state of [timers, armed, suspended, progressed, currentAbortInspections]) state.clear()
       suspendedAfterProgress.clear()
       sessionGenerations.clear()
       currentUserMessageIDs.clear()

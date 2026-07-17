@@ -61,7 +61,14 @@ describe("first-prompt watchdog terminal races", () => {
     await abortStarted
     resolveAbort?.(true)
     await dispatchStarted
-    watchdog.onSessionTerminal(sessionID, "session.error", true)
+    expect(watchdog.onSessionTerminal(sessionID, "session.error", true)).toEqual({
+      kind: "inspect-terminal",
+      sessionID,
+    })
+    expect(watchdog.resolveDeferredTerminal(sessionID, false)).toEqual({
+      kind: "resolve-terminal",
+      sessionID,
+    })
     await createEventHandler(deps, helpers)({
       event: {
         type: "session.error",

@@ -132,6 +132,11 @@ export function createRuntimeFallbackHook(
         currentRequestActive,
       )
     }
+    if (watchdogDecision?.kind === "defer-terminal") {
+      deferredTerminalEvents.set(watchdogDecision.sessionID, event)
+      return
+    }
+    if (watchdogDecision?.kind === "consume-terminal") return
     if (watchdogDecision?.kind === "resolve-terminal") {
       const deferredEvent = deferredTerminalEvents.get(watchdogDecision.sessionID)
       deferredTerminalEvents.delete(watchdogDecision.sessionID)

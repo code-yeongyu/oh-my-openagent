@@ -53,6 +53,9 @@ export function createWatchdogAbortProvenance() {
     markResponsePending(sessionID: string): void { pendingResponses.add(sessionID) },
     clearResponsePending(sessionID: string): void { pendingResponses.delete(sessionID) },
     isResponsePending(sessionID: string): boolean { return pendingResponses.has(sessionID) },
+    hasCurrent(sessionID: string, currentGeneration: number | undefined): boolean {
+      return currentGeneration !== undefined && generationsBySession.get(sessionID)?.has(currentGeneration) === true
+    },
     hasPrior(sessionID: string, currentGeneration: number | undefined): boolean {
       const generations = generationsBySession.get(sessionID)
       if (currentGeneration === undefined || generations === undefined) return false
@@ -111,3 +114,5 @@ export function createWatchdogAbortProvenance() {
     },
   }
 }
+
+export type WatchdogAbortProvenance = ReturnType<typeof createWatchdogAbortProvenance>
