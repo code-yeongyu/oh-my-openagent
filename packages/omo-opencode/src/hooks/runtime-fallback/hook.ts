@@ -69,6 +69,7 @@ export function createRuntimeFallbackHook(
     sessionStates: new Map(),
     sessionLastAccess: new Map(),
     sessionRetryInFlight: new Set(),
+    sessionRetryPayloadPending: new Set(),
     sessionAwaitingFallbackResult: new Set(),
     sessionFallbackTimeouts: new Map(),
     sessionStatusRetryKeys: new Map(),
@@ -176,6 +177,7 @@ export function createRuntimeFallbackHook(
     deps.sessionStates.clear()
     deps.sessionLastAccess.clear()
     clearAllSessionRetryOwnership(deps)
+    deps.sessionRetryPayloadPending?.clear()
     deps.sessionAwaitingFallbackResult.clear()
     deps.sessionFallbackTimeouts.clear()
     deps.sessionStatusRetryKeys.clear()

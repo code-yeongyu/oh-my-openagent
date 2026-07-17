@@ -72,6 +72,7 @@ export function createEventHandler(
       sessionStates.delete(sessionID)
       sessionLastAccess.delete(sessionID)
       clearSessionRetryOwnership(deps, sessionID)
+      deps.sessionRetryPayloadPending?.delete(sessionID)
       sessionAwaitingFallbackResult.delete(sessionID)
       deps.internalAbortRequests?.delete(sessionID)
       clearInternalAbortOwnership(deps, sessionID)

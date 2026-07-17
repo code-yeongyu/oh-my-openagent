@@ -75,10 +75,12 @@ export function createAutoRetryDispatcher(
     let retryMayHaveBeenAccepted = false
     let acceptedStatus: AutoRetryDispatchOutcome["status"] = "dispatched"
     try {
+      deps.sessionRetryPayloadPending ??= new Set()
+      deps.sessionRetryPayloadPending.add(sessionID)
       const messagesResp = await ctx.client.session.messages({
         path: { id: sessionID },
         query: { directory: ctx.directory },
-      })
+      }).finally(() => deps.sessionRetryPayloadPending?.delete(sessionID))
       if (!isCurrent()) return { accepted: false, status: "blocked", reason: "session lifecycle changed" }
       const retryPayload = getLastUserRetryPayload(messagesResp, sessionID)
       const originalRetryMetadata = resolveOriginalUserRetryMetadata(messagesResp)

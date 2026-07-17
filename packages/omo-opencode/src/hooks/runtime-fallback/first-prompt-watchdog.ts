@@ -219,7 +219,8 @@ export function createFirstPromptWatchdog(
         const fallbackPending = deps.sessionAwaitingFallbackResult.has(sessionID) || deps.internallyAbortedSessions.has(sessionID)
         const consumedCompletedAbort = abortProvenance.consumeCurrent(sessionID, currentGeneration, false)
         const consumedPendingAbort = !consumedCompletedAbort
-          && (!armed.has(sessionID) || abortProvenance.isResponsePending(sessionID))
+          && (!armed.has(sessionID) || abortProvenance.isResponsePending(sessionID)
+            || deps.sessionRetryPayloadPending?.has(sessionID) === true)
           && abortProvenance.consumeCurrent(sessionID, currentGeneration, fallbackPending)
         const consumedCurrentAbort = consumedCompletedAbort || consumedPendingAbort
         if (consumedCurrentAbort) return { kind: "consume-terminal", sessionID }
