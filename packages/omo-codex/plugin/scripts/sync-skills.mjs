@@ -14,6 +14,9 @@ const ignoredSkillSourceDirNames = new Set([".mypy_cache", ".omo", ".pytest_cach
 const ignoredSkillSourceFileNames = new Set([".gitignore", ".npmignore", "pyrightconfig.json"]);
 const skillSources = [
 	["comment-checker", "components/comment-checker/skills/comment-checker"],
+	["lcx-contribute-bug-fix", "components/lcx/skills/lcx-contribute-bug-fix"],
+	["lcx-doctor", "components/lcx/skills/lcx-doctor"],
+	["lcx-report-bug", "components/lcx/skills/lcx-report-bug"],
 	["lsp", "components/lsp/skills/lsp"],
 	["rules", "components/rules/skills/rules"],
 	["teammode", "components/teammode/skills/teammode"],
@@ -22,7 +25,6 @@ const skillSources = [
 	["ultrawork", "components/ultrawork/skills/ultrawork"],
 ];
 const componentSkillNames = new Set(skillSources.map(([name]) => name));
-const codexHiddenSharedSkillNames = new Set(["ultraresearch"]);
 const skillDisplayPrefix = "(OmO) ";
 
 function shouldCopySkillSource(source) {
@@ -182,22 +184,6 @@ prefixes when identity is needed.
 `;
 
 function applyCodexSkillOverlays(skillName, content) {
-	if (skillName === "ulw-research") {
-		return content
-			.replace(
-				", the legacy alias 'ultraresearch', any 'ulw' research wording,",
-				", any 'ulw' research wording,",
-			)
-			.replace(
-				'the legacy alias "ultraresearch" (also `/ultraresearch`, `$ultraresearch`), ',
-				"",
-			)
-			.replace(
-				"answer those normally, and mention that `ulw-research` is available (legacy alias: `ultraresearch`) when a question would clearly benefit from it.",
-				"answer those normally, and mention that `ulw-research` is available when a question would clearly benefit from it.",
-			)
-			.replace("# Ultraresearch Synthesis: <query>", "# ULW-Research Synthesis: <query>");
-	}
 	if (skillName === "start-work") {
 		return content
 			.replace(startWorkOriginalCompletion, startWorkCodexCompletion)
@@ -270,7 +256,6 @@ async function syncSkills() {
 
 	for (const skillName of sharedSkillNames) {
 		if (componentSkillNames.has(skillName)) continue;
-		if (codexHiddenSharedSkillNames.has(skillName)) continue;
 		await cp(join(sharedSkillsRoot, skillName), join(skillsRoot, skillName), {
 			filter: shouldCopySkillSource,
 			recursive: true,

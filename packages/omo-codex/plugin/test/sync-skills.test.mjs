@@ -9,7 +9,6 @@ import {
 	assertPackagedContentMatches,
 	componentSkillSources,
 	expectedSkills,
-	hiddenSharedSkills,
 	listSkillFiles,
 	removeCodexCompatibilityGuidance,
 	removeCodexSkillOverlays,
@@ -113,7 +112,6 @@ test("#given shared skill package source #when aggregate Codex shared skills are
 	// when / then
 	for (const skillName of sharedSkillNames) {
 		if (componentSkillNames.has(skillName)) continue;
-		if (hiddenSharedSkills.includes(skillName)) continue;
 		const sharedContent = await readFile(join(sharedSkillsRoot, skillName, "SKILL.md"), "utf8");
 		const aggregateContent = await readFile(join(aggregateSkillsRoot, skillName, "SKILL.md"), "utf8");
 		assert.equal(
@@ -213,11 +211,8 @@ test("#given synced ulw-loop skill #when Codex hint metadata is inspected #then 
 test("#given shipped Codex skill payloads #when legacy ultraresearch alias is inspected #then it is not packaged", async () => {
 	// given
 	const skillsRoot = join(root, "skills");
-	const skillRoot = join(skillsRoot, "ultraresearch");
 
 	// then
-	await assert.rejects(readFile(join(skillRoot, "SKILL.md"), "utf8"), { code: "ENOENT" });
-	await assert.rejects(readFile(join(skillRoot, "agents", "openai.yaml"), "utf8"), { code: "ENOENT" });
 	await assertNoLegacyResearchAliasInTree(skillsRoot, "skills");
 	for (const [skillName, sourcePath] of componentSkillSources) {
 		await assertNoLegacyResearchAliasInTree(join(root, sourcePath), `components/${skillName}`);

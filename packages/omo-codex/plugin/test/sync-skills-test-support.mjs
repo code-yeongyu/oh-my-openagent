@@ -32,10 +32,11 @@ export const expectedSkills = [
 	"visual-qa",
 ];
 
-export const hiddenSharedSkills = ["ultraresearch"];
-
 export const componentSkillSources = [
 	["comment-checker", "components/comment-checker/skills/comment-checker"],
+	["lcx-contribute-bug-fix", "components/lcx/skills/lcx-contribute-bug-fix"],
+	["lcx-doctor", "components/lcx/skills/lcx-doctor"],
+	["lcx-report-bug", "components/lcx/skills/lcx-report-bug"],
 	["lsp", "components/lsp/skills/lsp"],
 	["rules", "components/rules/skills/rules"],
 	["teammode", "components/teammode/skills/teammode"],
@@ -126,22 +127,6 @@ prefixes when identity is needed.
 const reviewWorkCodexGatePattern = new RegExp(reviewWorkCodexGate.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
 
 export function removeCodexSkillOverlays(skillName, content) {
-	if (skillName === "ulw-research") {
-		return content
-			.replace(
-				", any 'ulw' research wording,",
-				", the legacy alias 'ultraresearch', any 'ulw' research wording,",
-			)
-			.replace(
-				"the word \"ulw-research\" (also `/ulw-research`, `$ulw-research`), ",
-				"the word \"ulw-research\" (also `/ulw-research`, `$ulw-research`), the legacy alias \"ultraresearch\" (also `/ultraresearch`, `$ultraresearch`), ",
-			)
-			.replace(
-				"answer those normally, and mention that `ulw-research` is available when a question would clearly benefit from it.",
-				"answer those normally, and mention that `ulw-research` is available (legacy alias: `ultraresearch`) when a question would clearly benefit from it.",
-			)
-			.replace("# ULW-Research Synthesis: <query>", "# Ultraresearch Synthesis: <query>");
-	}
 	if (skillName === "start-work") {
 		return content
 			.replace(startWorkCodexCompletion, startWorkOriginalCompletion)
