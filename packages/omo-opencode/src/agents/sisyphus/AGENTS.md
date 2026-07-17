@@ -5,7 +5,7 @@ description: Developer reference for Sisyphus orchestrator model-specific prompt
 
 # src/agents/sisyphus/ -- Orchestrator Variants
 
-**Generated:** 2026-05-15
+**Generated:** 2026-07-17
 
 ## OVERVIEW
 
@@ -22,6 +22,7 @@ Model-specific prompt variants for the Sisyphus main orchestrator. Parent `sisyp
 | `gemini.ts` | Gemini-optimized: stricter tool-usage rules, 5 NEVER rules |
 | `gpt-5-4.ts` | GPT-5.4-native: 8-block architecture, entropy-reduced, 449 LOC |
 | `gpt-5-5.ts` | GPT-5.5-native: updated orchestration prompt tuned for GPT-5.5 |
+| `glm-5-2.ts` | GLM-5.2-native variant with explicit failure-mode calibration |
 | `kimi-k2-6.ts` | Kimi K2.6-native variant |
 | `kimi-k2-7.ts` | Kimi K2.7-native variant |
 | `kimi-k3.ts` | Kimi K3-native variant with explicit anti-overthinking calibration |
@@ -38,7 +39,8 @@ Model-specific prompt variants for the Sisyphus main orchestrator. Parent `sisyp
 - Contains "claude-fable-5" -> `claude-fable-5.ts`
 - Contains "claude-opus-4-8" -> `claude-opus-4-8.ts`
 - Contains "claude-opus-4-7" -> `claude-opus-4-7.ts`
-- Default -> fallback prompt (Claude, GLM, etc.; Gemini gets corrective overlays)
+- GLM family -> `glm-5-2.ts`
+- Default -> fallback prompt (Claude, etc.; Gemini gets corrective overlays)
 
 ## KEY EXPORTS
 

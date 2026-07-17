@@ -1,6 +1,6 @@
-# src/hooks/comment-checker/ — AI Slop Comment Blocker
+# src/hooks/comment-checker/ (AI Slop Comment Blocker)
 
-**Generated:** 2026-05-15
+**Generated:** 2026-07-17 (7d664b96b)
 
 ## OVERVIEW
 
@@ -21,10 +21,12 @@ See `@code-yeongyu/comment-checker` for the authoritative blocklist.
 ## EXECUTION FLOW
 
 ```
-tool.execute.after (write | edit | hashline edit)
-  → extract changed lines from tool output
-  → spawn comment-checker binary with changed file path
-  → parse findings (line ranges + violation category)
+tool.execute.before (write | edit | multiedit)
+  → register pending call (filePath + old/new strings) keyed by callID
+tool.execute.after (same callID, or apply_patch)
+  → take pending call (or extract apply_patch edits from metadata)
+  → resolve comment-checker CLI path (node_modules / PATH / cached download)
+  → run CLI on changed content, parse JSON findings (line ranges + category)
   → if findings → inject tool-level error → agent must fix
 ```
 
@@ -32,11 +34,13 @@ tool.execute.after (write | edit | hashline edit)
 
 | File | Purpose |
 |------|---------|
-| `hook.ts` | `createCommentCheckerHook()` — main factory, tool.execute.after handler |
-| `comment-checker-runner.ts` | Spawn binary, parse JSON output |
-| `changed-line-extractor.ts` | Extract which lines changed from tool result |
-| `findings-formatter.ts` | Format violations as actionable error message |
-| `binary-resolver.ts` | Locate `comment-checker` binary (node_modules + PATH) |
+| `hook.ts` | `createCommentCheckerHooks()`: main factory. `tool.execute.before` registers pending calls; `tool.execute.after` runs the CLI check. Accepts an optional `cliRunner` for dependency injection (defaults to `cli-runner.ts` exports) |
+| `cli-runner.ts` | CLI orchestration: resolve path, `processWithCli` / `processApplyPatchEditsWithCli`, per-session dedup, run lock |
+| `cli.ts` | Resolve `comment-checker` binary path (node_modules / PATH / cached download), spawn `runCommentChecker` |
+| `downloader.ts` | Download + cache the binary (`getCachedBinaryPath`, `ensureCommentCheckerBinary`) |
+| `initialization-gate.ts` | `ensureCommentCheckerInitialization()`: run CLI init once |
+| `pending-calls.ts` | Pending-call registry between `tool.execute.before` and `after` (TTL cleanup) |
+| `types.ts` | `PendingCall` and config types |
 
 ## CONFIG
 
@@ -54,7 +58,7 @@ Disable via `"disabled_hooks": ["comment-checker"]`.
 
 ## BYPASS FOR LEGITIMATE COMMENTS
 
-Prefix with `// @allow` or mark file scope with `// comment-checker-disable-file` at top. Use sparingly — defeating the purpose.
+Prefix with `// @allow` or mark file scope with `// comment-checker-disable-file` at top. Use sparingly; it defeats the purpose.
 
 ## RELATED
 
