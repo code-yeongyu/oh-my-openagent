@@ -13,6 +13,7 @@ import {
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 import { resolveOriginalUserRetryMetadata } from "./auto-retry-metadata"
 import { isRuntimeFallbackActive } from "./lifecycle"
+import { getSessionGeneration, isSessionGenerationCurrent } from "./session-generation"
 
 export function createAutoRetryDispatcher(
   deps: HookDeps,
@@ -34,9 +35,10 @@ export function createAutoRetryDispatcher(
     resolvedAgent: string | undefined,
     source: string,
   ): Promise<AutoRetryDispatchOutcome> => {
-    if (!isRuntimeFallbackActive(deps)) {
-      return { accepted: false, status: "blocked", reason: "runtime fallback disposed" }
-    }
+    const sessionGeneration = getSessionGeneration(deps, sessionID)
+    const isCurrent = () => isRuntimeFallbackActive(deps)
+      && isSessionGenerationCurrent(deps, sessionID, sessionGeneration)
+    if (!isCurrent()) return { accepted: false, status: "blocked", reason: "runtime fallback disposed" }
     if (sessionRetryInFlight.has(sessionID)) {
       log(`[${HOOK_NAME}] Retry already in flight, skipping (${source})`, { sessionID })
       return { accepted: false, status: "blocked", reason: "retry already in flight" }
@@ -73,9 +75,7 @@ export function createAutoRetryDispatcher(
         path: { id: sessionID },
         query: { directory: ctx.directory },
       })
-      if (!isRuntimeFallbackActive(deps)) {
-        return { accepted: false, status: "blocked", reason: "runtime fallback disposed" }
-      }
+      if (!isCurrent()) return { accepted: false, status: "blocked", reason: "session lifecycle changed" }
       const retryPayload = getLastUserRetryPayload(messagesResp, sessionID)
       const originalRetryMetadata = resolveOriginalUserRetryMetadata(messagesResp)
       const fetchedParts = originalRetryMetadata.parts.length > 0
@@ -137,17 +137,13 @@ export function createAutoRetryDispatcher(
       })
 
       let promptResult = await dispatchRetryPrompt(`runtime-fallback:${source}`, "defer")
-      if (!isRuntimeFallbackActive(deps)) {
-        return { accepted: false, status: "blocked", reason: "runtime fallback disposed" }
-      }
+      if (!isCurrent()) return { accepted: false, status: "blocked", reason: "session lifecycle changed" }
       if (promptResult.status === "active") {
         log(`[${HOOK_NAME}] Session active, queueing fallback dispatch (${source})`, {
           sessionID,
         })
         promptResult = await dispatchRetryPrompt(`runtime-fallback:${source}:active-queue`)
-        if (!isRuntimeFallbackActive(deps)) {
-          return { accepted: false, status: "blocked", reason: "runtime fallback disposed" }
-        }
+        if (!isCurrent()) return { accepted: false, status: "blocked", reason: "session lifecycle changed" }
         acceptedStatus = "queued"
       }
       if (promptResult.status === "failed") {
@@ -175,16 +171,12 @@ export function createAutoRetryDispatcher(
             maxAttempts: MAX_RESERVED_RETRIES,
           })
           await new Promise((r) => setTimeout(r, delay))
-          if (!isRuntimeFallbackActive(deps)) {
-            return { accepted: false, status: "blocked", reason: "runtime fallback disposed" }
-          }
+          if (!isCurrent()) return { accepted: false, status: "blocked", reason: "session lifecycle changed" }
           reservedResult = await dispatchRetryPrompt(
             `runtime-fallback:${source}:reserved-retry-${attempt + 1}`,
             "defer",
           )
-          if (!isRuntimeFallbackActive(deps)) {
-            return { accepted: false, status: "blocked", reason: "runtime fallback disposed" }
-          }
+          if (!isCurrent()) return { accepted: false, status: "blocked", reason: "session lifecycle changed" }
           if (reservedResult.status !== "reserved") break
         }
         if (reservedResult.status === "failed") {
@@ -231,15 +223,15 @@ export function createAutoRetryDispatcher(
       log(`[${HOOK_NAME}] Auto-retry failed (${source})`, { sessionID, error: String(retryError) })
       return { accepted: false, status: "failed", reason: retryError.message }
     } finally {
+      if (!isCurrent()) return { accepted: false, status: "blocked", reason: "session lifecycle changed" }
       sessionRetryInFlight.delete(sessionID)
-      const lifecycleActive = isRuntimeFallbackActive(deps)
-      if (lifecycleActive && retryMayHaveBeenAccepted) {
+      if (retryMayHaveBeenAccepted) {
         const state = sessionStates.get(sessionID)
         if (state) {
           state.pendingFallbackPromptMayHaveBeenAccepted = true
         }
       }
-      if (lifecycleActive && !retryDispatched && !retryMayHaveBeenAccepted) {
+      if (!retryDispatched && !retryMayHaveBeenAccepted) {
         if (hadAwaitingFallbackResult) {
           sessionAwaitingFallbackResult.add(sessionID)
         } else {

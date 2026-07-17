@@ -11,13 +11,13 @@ import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
 import type { FallbackOwnershipTransfer } from "./first-prompt-watchdog-ownership"
+import { getSessionGeneration, isSessionGenerationCurrent } from "./session-generation"
 
 export function createSessionStatusHandler(
   deps: HookDeps,
   helpers: AutoRetryHelpers,
   onFallbackOwnershipTransferred?: (sessionID: string) => FallbackOwnershipTransfer | undefined,
   isSessionCancelled: (sessionID: string) => boolean = () => false,
-  getSessionGeneration: (sessionID: string) => number = () => 0,
 ) {
   const {
     pluginConfig,
@@ -35,10 +35,10 @@ export function createSessionStatusHandler(
     const timeoutEnabled = deps.config.timeout_seconds > 0
 
     if (!sessionID || status?.type !== "retry") return
-    const sessionGeneration = getSessionGeneration(sessionID)
+    const sessionGeneration = getSessionGeneration(deps, sessionID)
     const isCurrent = () => deps.isLifecycleActive?.() !== false
       && !isSessionCancelled(sessionID)
-      && getSessionGeneration(sessionID) === sessionGeneration
+      && isSessionGenerationCurrent(deps, sessionID, sessionGeneration)
 
     const retryMessage = typeof status.message === "string" ? status.message : ""
     const retrySignal = extractAutoRetrySignal({ status: retryMessage, message: retryMessage })
@@ -68,7 +68,7 @@ export function createSessionStatusHandler(
     }
     sessionStatusRetryKeys.set(sessionID, retryKey)
     const releaseRetryKey = () => {
-      if (sessionStatusRetryKeys.get(sessionID) === retryKey) {
+      if (isCurrent() && sessionStatusRetryKeys.get(sessionID) === retryKey) {
         sessionStatusRetryKeys.delete(sessionID)
       }
     }
@@ -182,6 +182,7 @@ export function createSessionStatusHandler(
       resolvedAgent,
       source: "session.status",
     })
+    if (!isCurrent()) return
     if (!dispatched) {
       releaseRetryKey()
       ownershipTransfer?.rollback()

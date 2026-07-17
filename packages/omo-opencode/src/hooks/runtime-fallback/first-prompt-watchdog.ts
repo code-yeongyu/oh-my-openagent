@@ -40,6 +40,8 @@ export function createFirstPromptWatchdog(
   const currentUserMessageIDs = new Map<string, string>()
   const abortProvenance = createWatchdogAbortProvenance()
   let lifecycleGeneration = 0
+  let nextSessionGeneration = 0
+  const nextGeneration = (): number => (nextSessionGeneration += 1)
 
   const cancel = (sessionID: string, preserveAbortProvenance = false, deleteGeneration = false): void => {
     const timer = timers.get(sessionID)
@@ -53,8 +55,8 @@ export function createFirstPromptWatchdog(
     suspendedAfterProgress.delete(sessionID)
     if (!preserveAbortProvenance) abortProvenance.clear(sessionID)
     currentUserMessageIDs.delete(sessionID)
-    sessionGenerations.set(sessionID, (sessionGenerations.get(sessionID) ?? 0) + 1)
     if (deleteGeneration) sessionGenerations.delete(sessionID)
+    else sessionGenerations.set(sessionID, nextGeneration())
   }
 
   const arm = (context: ArmedWatchdog): void => {
@@ -137,7 +139,7 @@ export function createFirstPromptWatchdog(
       if (!wasSubagent && deps.config.timeout_seconds <= 0) return
 
       const generation = lifecycleGeneration
-      const sessionGeneration = (sessionGenerations.get(sessionID) ?? 0) + 1
+      const sessionGeneration = nextGeneration()
       sessionGenerations.set(sessionID, sessionGeneration)
       if (messageID) currentUserMessageIDs.set(sessionID, messageID)
       else currentUserMessageIDs.delete(sessionID)

@@ -7,6 +7,7 @@ import { createFirstPromptWatchdog, observeEventForWatchdog } from "./first-prom
 import { clearAllInternalAbortOwnership } from "./internal-abort-ownership"
 import { createMessageUpdateHandler } from "./message-update-handler"
 import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
+import { clearSessionGenerations } from "./session-generation"
 
 declare function setInterval(callback: () => void, delay?: number): RuntimeFallbackInterval
 declare function clearInterval(interval: RuntimeFallbackInterval): void
@@ -76,8 +77,10 @@ export function createRuntimeFallbackHook(
 
   const helpers = factories.createAutoRetryHelpers(deps)
   const firstPromptWatchdog = factories.createFirstPromptWatchdog(deps, helpers)
+  const deferredTerminalEvents = new Map<string, { type: string; properties?: unknown }>()
   deps.onStaleSessionCleanup = (sessionID) => {
     firstPromptWatchdog.onSessionTerminal(sessionID, "session.deleted")
+    deferredTerminalEvents.delete(sessionID)
   }
   const baseEventHandler = factories.createEventHandler(
     deps,
@@ -86,7 +89,6 @@ export function createRuntimeFallbackHook(
   )
   const messageUpdateHandler = factories.createMessageUpdateHandler(deps, helpers)
   const chatMessageHandler = factories.createChatMessageHandler(deps)
-  const deferredTerminalEvents = new Map<string, { type: string; properties?: unknown }>()
 
   let cleanupInterval: RuntimeFallbackInterval | null = null
   let intervalStarted = false
@@ -178,6 +180,7 @@ export function createRuntimeFallbackHook(
     deps.sessionStatusRetryKeys.clear()
     deps.internalAbortRequests?.clear()
     clearAllInternalAbortOwnership(deps)
+    clearSessionGenerations(deps)
   }
 
   return {
