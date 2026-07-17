@@ -573,6 +573,30 @@ user-visible watchdog lifecycle; it does not force a live abort rejection,
 which is not deterministic through OpenCode's public server API while an
 actual request remains active.
 
+After the twenty-second evidence head passed CI, `origin/dev` advanced to
+`5ef852a32c2c433386eb009bd92ca7c07359d0e6` through PR #6166. The first fresh
+review lane stopped at its identity gate before inspecting code. Merge commit
+`da10bb68a791be0a104c32f00f9d6acbf09a56b9` integrates that exact base; the
+incoming changes are confined to the shared/Codex `ulw-plan` review workflow,
+and the runtime-fallback diff from the prior evidence head is empty.
+
+Twenty-third-cycle artifacts:
+
+- `twenty-third-integrated-source.md`: stale-base reset, integration identity,
+  exact-source QA, and remaining gates.
+- `twenty-third-exact-runtime-fallback-suite.txt`: 295 tests passing across 46 files.
+- `twenty-third-exact-session-lifecycle-suite.txt`: 53 lifecycle/state tests passing.
+- `twenty-third-exact-omo-opencode-typecheck.txt`,
+  `twenty-third-exact-biome.txt`, and `twenty-third-exact-no-excuse.txt`:
+  integrated-source static passes.
+- `twenty-third-exact-integrity.txt`: integrated source/base/merge-base identity,
+  unchanged runtime diff from the prior evidence head, and pure-LOC receipt.
+- `twenty-third-opencode-harness-self-check.txt`: isolated harness preflight.
+- `twenty-third-exact-live-watchdog-run.txt`: production-duration real OpenCode
+  run pinned to `da10bb68a791be0a104c32f00f9d6acbf09a56b9`; older-root fallback,
+  two active roots, deletion restoration, no fallback-owned watchdog re-arm,
+  later external cancellation, and unchanged real database all pass.
+
 The live harness intentionally records only sanitized fake-provider, plugin,
 and SSE evidence. Authentication values, raw environment dumps, private
 credentials, and unrelated service logs are omitted.
@@ -600,9 +624,9 @@ database isolation.
 Raw environment dumps, credentials, tokens, auth headers, session IDs, local
 paths, transient diagnostic runs, and unrelated shared logs are omitted or
 redacted. The provider API key and server password in the harness are fixed
-local-only dummy values. On the twenty-first exact source commit, the bundled
-TypeScript no-excuse helper, strict package typecheck, and exact-source Biome
-check all completed successfully over the reviewed TypeScript files.
+local-only dummy values. On the twenty-third integrated source commit, the
+bundled TypeScript no-excuse helper, strict package typecheck, and exact-source
+Biome check all completed successfully over the reviewed TypeScript files.
 
 ## Cleanup
 
