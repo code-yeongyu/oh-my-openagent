@@ -8,9 +8,9 @@ Small Node ESM helpers that are intentionally separate from the primary Bun/Type
 
 | File | Purpose |
 |------|---------|
-| `check-third-party-notices.mjs` | Validate third-party notice coverage for source and shipped payloads |
+| `check-third-party-notices.mjs` | Validate third-party notice coverage for source and shipped payloads; `parseNpmPackJson` normalizes npm 11 (array) and npm 12 (keyed object) `npm pack --dry-run --json` manifests |
 | `third-party-notice-requirements.mjs` | Declarative notice requirements and path/package matching |
-| `check-third-party-notices.test.mjs` | Node test coverage for spawn invocation resolution on Windows and non-Windows |
+| `check-third-party-notices.test.mjs` | Node test coverage for spawn invocation resolution (Windows/non-Windows) and `parseNpmPackJson` (npm 11 array, npm 12 keyed, malformed and ambiguous rejection) |
 
 ## COMMANDS
 
@@ -22,7 +22,7 @@ node scripts/check-third-party-notices.mjs --ship
 
 `bun run test:codex` invokes the `--ship` check after building the Codex payload. Release workflows also rely on this surface before publication.
 
-The checker test covers only spawn invocation resolution on Windows and non-Windows; it does not cover notice discovery or failure cases. The default checker command is not a claim that the checker currently passes.
+The checker test covers spawn invocation resolution (Windows/non-Windows) and `parseNpmPackJson` manifest parsing (npm 11/12 formats, malformed and ambiguous payloads); it does not cover notice discovery or failure cases. The default checker command is not a claim that the checker currently passes.
 
 ## CONVENTIONS
 
