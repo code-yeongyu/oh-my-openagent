@@ -9,6 +9,13 @@ Tracks bugs that are present in the current release but have been intentionally 
 - **Workaround**: If a native `plan_exit` prompt appears inside a delegated `ulw` planner, do not switch that nested child to build mode. Interrupt back to the parent, then ask the parent to recover the plan output or rerun planning through Prometheus/OMO planning explicitly.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5850.
 
+## #5839 - Ultrawork verification can miss prose-only Oracle approvals
+
+- **Affects**: Ultrawork/Ralph-loop verification flows that rely on Oracle returning the exact `<promise>VERIFIED</promise>` token.
+- **Symptom**: Oracle can approve the work in normal prose, but the detector treats the verification as failed because the success token was never requested or emitted. The loop may then spend extra iterations re-fixing already-correct work.
+- **Workaround**: When manually asking Oracle to verify completion, explicitly instruct it to end with `<promise>VERIFIED</promise>` only if the work is genuinely complete and correct. If a verification failure follows a clear prose approval, inspect the Oracle transcript before assuming the implementation regressed.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5839.
+
 ## #5746 - tmux subagent panes attach only after focus by default
 
 - **Affects**: `tmux.enabled` sessions that expect every subagent pane to show a live attached session immediately.
