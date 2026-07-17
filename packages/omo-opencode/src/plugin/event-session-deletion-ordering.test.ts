@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import type { Managers } from "../create-managers"
-import { _resetForTesting, getSessionAgent, updateSessionAgent } from "../features/claude-code-session-state"
+import {
+  _resetForTesting,
+  getMainSessionID,
+  getSessionAgent,
+  isMainSession,
+  updateSessionAgent,
+} from "../features/claude-code-session-state"
 import { getSessionModel, setSessionModel } from "../shared/session-model-state"
 import { createEventHandler } from "./event"
 
@@ -17,6 +23,45 @@ afterEach(() => {
 })
 
 describe("plugin session deletion ordering", () => {
+  it("#given creation pauses before registration #when deletion arrives later #then the deleted ID is not resurrected", async () => {
+    const creationHookRelease = deferred<void>()
+    const creationHookStarted = deferred<void>()
+    const sessionID = "creation-before-delete-cleanup"
+    const handler = createEventHandler({
+      ctx: {} as EventHandlerArgs["ctx"],
+      pluginConfig: {} as EventHandlerArgs["pluginConfig"],
+      firstMessageVariantGate: { markSessionCreated: () => {}, clear: () => {} },
+      managers: {
+        skillMcpManager: { disconnectSession: async () => {} },
+        monitorManager: { stopSessionMonitors: async () => {}, handleEvent: () => {} },
+        tmuxSessionManager: { onEvent: () => {}, onSessionCreated: async () => {}, onSessionDeleted: async () => {} },
+      } as Managers,
+      hooks: {
+        autoUpdateChecker: {
+          event: async (input) => {
+            if (input.event.type !== "session.created") return
+            creationHookStarted.resolve()
+            await creationHookRelease.promise
+          },
+        },
+      } as EventHandlerArgs["hooks"],
+    })
+    const creation = handler({
+      event: { type: "session.created", properties: { info: { id: sessionID } } },
+    } as Parameters<typeof handler>[0])
+    await creationHookStarted.promise
+    const deletion = handler({
+      event: { type: "session.deleted", properties: { info: { id: sessionID } } },
+    } as Parameters<typeof handler>[0])
+
+    await Promise.resolve()
+    creationHookRelease.resolve()
+    await Promise.all([creation, deletion])
+
+    expect(getMainSessionID()).not.toBe(sessionID)
+    expect(isMainSession(sessionID)).toBe(false)
+  })
+
   it("#given deletion pauses in an earlier hook #when the same ID is recreated #then creation waits for lifecycle cleanup", async () => {
     const hookRelease = deferred<void>()
     const hookStarted = deferred<void>()

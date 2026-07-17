@@ -4,27 +4,18 @@ import { HOOK_NAME, DEFAULT_FIRST_PROMPT_WATCHDOG_MS } from "./constants"
 import { log } from "../../shared/logger"
 import { getMainSessionID, isMainSession, subagentSessions } from "../../features/claude-code-session-state"
 import { createWatchdogAbortProvenance } from "./watchdog-abort-provenance"
-import type { ArmedWatchdog, WatchdogEventDecision } from "./first-prompt-watchdog-types"
+import type { ArmedWatchdog, FirstPromptWatchdog, WatchdogEventDecision } from "./first-prompt-watchdog-types"
 import { fireFirstPromptWatchdog } from "./first-prompt-watchdog-fire"
 import { acquireInternalAbortOwnership, clearInternalAbortOwnership } from "./internal-abort-ownership"
-import { createWatchdogOwnershipHandlers, type FallbackOwnershipTransfer } from "./first-prompt-watchdog-ownership"
+import { createWatchdogOwnershipHandlers } from "./first-prompt-watchdog-ownership"
 
 const SOURCE = "first-prompt-watchdog"
 
 declare function setTimeout(callback: () => void | Promise<void>, delay?: number): RuntimeFallbackTimeout
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
 
-export interface FirstPromptWatchdog {
-  onUserMessage(sessionID: string, model?: string, agent?: string, messageID?: string): WatchdogEventDecision | undefined
-  onFallbackOwnershipTransferred(sessionID: string): FallbackOwnershipTransfer | undefined
-  onAssistantProgress(sessionID: string, parentMessageID?: string, isAbortEvent?: boolean): WatchdogEventDecision | undefined
-  onFallbackCompleted(sessionID: string): void
-  onSessionTerminal(sessionID: string, eventType?: string, isAbortEvent?: boolean): WatchdogEventDecision | undefined
-  resolveDeferredTerminal(sessionID: string, currentRequestActive: boolean | undefined): WatchdogEventDecision | undefined
-  dispose(): void
-}
-
 export { observeEventForWatchdog } from "./first-prompt-watchdog-events"
+export type { FirstPromptWatchdog } from "./first-prompt-watchdog-types"
 
 export function createFirstPromptWatchdog(
   deps: HookDeps,
