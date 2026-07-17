@@ -57,6 +57,34 @@ describe("first-prompt watchdog boundaries", () => {
     watchdog.dispose()
   })
 
+  it("#given a delta belongs to the current user message #when observed #then it does not disarm silence recovery", async () => {
+    const sessionID = "session-user-delta-provenance"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const watchdog = createFirstPromptWatchdog(deps, createHelpers(calls, AGENT), WATCHDOG_MS)
+
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT, "user-1")
+    await getFakeTimers().advanceBy(SAFE_WAIT_BEFORE_FIRE_MS)
+    observeEventForWatchdog(
+      {
+        type: "message.part.delta",
+        properties: {
+          sessionID,
+          messageID: "user-1",
+          field: "text",
+          delta: "user input",
+        },
+      },
+      watchdog,
+    )
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+
+    expect(calls.abort).toEqual([{ sessionID, source: "first-prompt-watchdog" }])
+    expect(calls.autoRetry).toHaveLength(1)
+    watchdog.dispose()
+  })
+
   it("#given a subagent leaves subagentSessions before the threshold #when the watchdog fires #then it is suppressed", async () => {
     const sessionID = "session-removed-subagent"
     subagentSessions.add(sessionID)

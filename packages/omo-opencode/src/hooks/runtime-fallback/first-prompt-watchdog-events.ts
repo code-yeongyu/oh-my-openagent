@@ -79,7 +79,11 @@ export function observeEventForWatchdog(
     const hasTextDelta = props.field === "text" && typeof props.delta === "string"
     const hasNonEmptySessionPart = typeof part?.sessionID === "string" && Object.keys(part).length > 0
     if (sessionID && (hasPartType || hasTopLevelType || hasTextDelta || hasNonEmptySessionPart)) {
-      const messageID = typeof part?.messageID === "string" ? part.messageID : undefined
+      const messageID = typeof props.messageID === "string"
+        ? props.messageID
+        : typeof part?.messageID === "string"
+          ? part.messageID
+          : undefined
       watchdog.onAssistantProgress(sessionID, messageID)
     }
     return

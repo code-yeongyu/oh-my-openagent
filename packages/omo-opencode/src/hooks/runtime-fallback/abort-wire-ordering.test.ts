@@ -4,7 +4,14 @@ import { createAbortSessionRequest } from "./auto-retry-abort"
 import { createEventHandler } from "./event-handler"
 import { createFallbackState } from "./fallback-state"
 import { createFirstPromptWatchdog } from "./first-prompt-watchdog"
-import { AGENT, createDeps, PLUGIN_CONFIG_WITH_FALLBACK, PRIMARY_MODEL } from "./first-prompt-watchdog-test-helpers"
+import { fireFirstPromptWatchdog } from "./first-prompt-watchdog-fire"
+import {
+  AGENT,
+  createDeps,
+  PLUGIN_CONFIG_WITH_FALLBACK,
+  PRIMARY_MODEL,
+} from "./first-prompt-watchdog-test-helpers"
+import { createSessionStatusHandler } from "./session-status-handler"
 
 function createDeferred<T>(): {
   readonly promise: Promise<T>
@@ -89,7 +96,7 @@ describe("runtime-fallback abort wire ordering", () => {
     const firstAbort = abortSessionRequest(sessionID, "session.status.retry-signal")
     const secondAbort = abortSessionRequest(sessionID, "first-prompt-watchdog")
     abortResponse.resolve({})
-    expect(await Promise.all([firstAbort, secondAbort])).toEqual([true, true])
+    expect(await Promise.all([firstAbort, secondAbort])).toEqual([true, false])
     expect(abortCalls).toBe(1)
 
     const state = createFallbackState(PRIMARY_MODEL)
@@ -110,5 +117,84 @@ describe("runtime-fallback abort wire ordering", () => {
       },
     })
     expect(deps.sessionStates.get(sessionID)?.attemptCount).toBe(0)
+  })
+
+  it("#given status fallback and watchdog share one abort #when the terminal arrives during status dispatch #then the status fallback remains authoritative", async () => {
+    const sessionID = "session-status-watchdog-overlap"
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const abortResponse = createDeferred<unknown>()
+    const abortStarted = createDeferred<void>()
+    const statusDispatch = createDeferred<{ readonly accepted: true; readonly status: "dispatched" }>()
+    const dispatchSources: string[] = []
+    deps.ctx.client.session.abort = async () => {
+      abortStarted.resolve()
+      return abortResponse.promise
+    }
+    const helpers: AutoRetryHelpers = {
+      abortSessionRequest: createAbortSessionRequest(deps),
+      clearSessionFallbackTimeout: () => {},
+      scheduleSessionFallbackTimeout: () => {},
+      autoRetryWithFallback: async (_sessionID, _newModel, _resolvedAgent, source) => {
+        dispatchSources.push(source)
+        if (source === "session.status") {
+          deps.sessionRetryInFlight.add(sessionID)
+          return statusDispatch.promise
+        }
+        if (deps.sessionRetryInFlight.has(sessionID)) {
+          return { accepted: false, status: "blocked", reason: "retry already in flight" }
+        }
+        return { accepted: true, status: "dispatched" }
+      },
+      resolveAgentForSessionFromContext: async () => AGENT,
+      cleanupStaleSessions: () => {},
+    }
+    const eventHandler = createEventHandler(deps, helpers)
+    const statusHandler = createSessionStatusHandler(deps, helpers, deps.sessionStatusRetryKeys)
+
+    const statusPromise = statusHandler({
+      sessionID,
+      model: PRIMARY_MODEL,
+      agent: AGENT,
+      status: {
+        type: "retry",
+        attempt: 1,
+        message: "Provider unavailable, retrying in 1s attempt #1",
+      },
+    })
+    await abortStarted.promise
+    const watchdogPromise = fireFirstPromptWatchdog({
+      deps,
+      helpers,
+      watchdogMs: 1,
+      sessionID,
+      model: PRIMARY_MODEL,
+      agent: AGENT,
+      wasSubagent: false,
+      isLifecycleCurrent: () => true,
+      isSessionCurrent: () => true,
+      recordAbortProvenance: () => () => {},
+      markAbortResponsePending: () => {},
+      clearAbortResponsePending: () => {},
+    })
+    abortResponse.resolve({})
+    for (let attempt = 0; attempt < 10 && dispatchSources.length < 2; attempt += 1) {
+      await Promise.resolve()
+    }
+    await watchdogPromise
+
+    await eventHandler({
+      event: {
+        type: "session.error",
+        properties: { sessionID, error: { name: "MessageAbortedError" } },
+      },
+    })
+
+    expect(deps.sessionStates.get(sessionID)?.currentModel).toBe("anthropic/claude-haiku-4-5")
+    expect(deps.sessionStates.get(sessionID)?.attemptCount).toBe(1)
+    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(true)
+
+    statusDispatch.resolve({ accepted: true, status: "dispatched" })
+    await statusPromise
+    deps.sessionRetryInFlight.delete(sessionID)
   })
 })

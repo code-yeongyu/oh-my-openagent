@@ -79,7 +79,10 @@ export function createAbortSessionRequest(deps: HookDeps) {
     if (!isInternalAbort) return runAbort()
     deps.internalAbortRequests ??= new Map()
     const existingRequest = deps.internalAbortRequests.get(sessionID)
-    if (existingRequest) return existingRequest
+    if (existingRequest) {
+      await existingRequest
+      return false
+    }
 
     const request = runAbort()
     deps.internalAbortRequests.set(sessionID, request)
