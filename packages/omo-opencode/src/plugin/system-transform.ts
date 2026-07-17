@@ -23,6 +23,7 @@ export function createSystemTransformHandler(
   options?: {
     backgroundManager?: Pick<BackgroundManager, "hasActiveDescendantTasks">
     blockOnBackgroundTasks?: boolean
+    canUseBackgroundWaitTool?: (sessionID: string) => boolean
   },
 ): (
   input: { sessionID?: string; model: { id: string; providerID: string; [key: string]: unknown } },
@@ -55,10 +56,15 @@ function injectBackgroundWaitInstruction(
   sessionID: string | undefined,
   system: string[],
   options:
-    | { backgroundManager?: Pick<BackgroundManager, "hasActiveDescendantTasks">; blockOnBackgroundTasks?: boolean }
+    | {
+      backgroundManager?: Pick<BackgroundManager, "hasActiveDescendantTasks">
+      blockOnBackgroundTasks?: boolean
+      canUseBackgroundWaitTool?: (sessionID: string) => boolean
+    }
     | undefined,
 ): void {
   if (!options?.blockOnBackgroundTasks || !options.backgroundManager || !sessionID) return
+  if (options.canUseBackgroundWaitTool?.(sessionID) === false) return
   if (!options.backgroundManager.hasActiveDescendantTasks(sessionID)) return
   if (system.includes(BACKGROUND_WAIT_INSTRUCTION)) return
   system.push(BACKGROUND_WAIT_INSTRUCTION)

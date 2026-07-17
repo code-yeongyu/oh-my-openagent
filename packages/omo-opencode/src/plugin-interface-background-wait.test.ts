@@ -1,14 +1,22 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 
+import { _resetForTesting, setSessionAgent } from "./features/claude-code-session-state"
 import type { ToolsRecord } from "./plugin/types"
 import { createPluginInterface } from "./plugin-interface"
 
 const BACKGROUND_WAIT_TAG = "[CRITICAL — BACKGROUND TASKS RUNNING]"
 
-function createBackgroundWaitPlugin(tools: ToolsRecord) {
+afterEach(() => {
+  _resetForTesting()
+})
+
+function createBackgroundWaitPlugin(
+  tools: ToolsRecord,
+  pluginConfig: Record<string, unknown> = { experimental: { block_on_background_tasks: true } },
+) {
   return createPluginInterface({
     ctx: { directory: "/tmp", client: {} } as never,
-    pluginConfig: { experimental: { block_on_background_tasks: true } } as never,
+    pluginConfig: pluginConfig as never,
     firstMessageVariantGate: {
       shouldOverride: () => false,
       markApplied: () => {},
@@ -71,5 +79,37 @@ describe("createPluginInterface - effective background wait availability", () =>
 
     // then
     await expect(run).rejects.toThrow("Background task wait is already managed")
+  })
+
+  test("does not require a wait tool denied for the active session agent", async () => {
+    // given
+    setSessionAgent("main-denied", "Sisyphus - ultraworker")
+    const pluginInterface = createBackgroundWaitPlugin(
+      { "wait-for-background-tasks": {} as never },
+      {
+        experimental: { block_on_background_tasks: true },
+        agents: {
+          sisyphus: {
+            permission: { "wait-for-background-tasks": "deny" },
+          },
+        },
+      },
+    )
+    const systemOutput = { system: [] as string[] }
+    const sleepOutput = { args: { command: "sleep 1" } }
+
+    // when
+    await pluginInterface["experimental.chat.system.transform"]?.(
+      { sessionID: "main-denied", model: { id: "anthropic/claude-opus-4-8", providerID: "anthropic" } },
+      systemOutput,
+    )
+    const sleepRun = pluginInterface["tool.execute.before"]?.(
+      { tool: "bash", sessionID: "main-denied", callID: "call-denied-sleep" },
+      sleepOutput,
+    )
+
+    // then
+    expect(systemOutput.system.some((part) => part.includes(BACKGROUND_WAIT_TAG))).toBe(false)
+    await expect(sleepRun).resolves.toBeUndefined()
   })
 })

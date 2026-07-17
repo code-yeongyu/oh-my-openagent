@@ -16,6 +16,33 @@ import { createToolExecuteBeforeHandler } from "./plugin/tool-execute-before"
 
 import type { CreatedHooks } from "./create-hooks"
 import type { Managers } from "./create-managers"
+import { getSessionAgent } from "./features/claude-code-session-state"
+import { getAgentConfigKey } from "./shared/agent-display-names"
+
+const BACKGROUND_WAIT_TOOL = "wait-for-background-tasks"
+
+function createBackgroundWaitAvailability(
+  pluginConfig: OhMyOpenCodeConfig,
+  tools: ToolsRecord,
+): (sessionID: string) => boolean {
+  const waitToolRegistered = tools[BACKGROUND_WAIT_TOOL] !== undefined
+
+  return (sessionID): boolean => {
+    if (!waitToolRegistered) return false
+
+    const sessionAgent = getSessionAgent(sessionID)
+    if (!sessionAgent) return true
+
+    const agentOverride = pluginConfig.agents?.[getAgentConfigKey(sessionAgent)]
+    const explicitPermission = agentOverride?.permission?.[BACKGROUND_WAIT_TOOL]
+    if (explicitPermission !== undefined) return explicitPermission !== "deny"
+
+    const legacyToolOverride = agentOverride?.tools?.[BACKGROUND_WAIT_TOOL]
+    if (legacyToolOverride !== undefined) return legacyToolOverride
+
+    return agentOverride?.permission?.["*"] !== "deny"
+  }
+}
 
 export function createPluginInterface(args: {
   ctx: PluginContext
@@ -32,6 +59,7 @@ export function createPluginInterface(args: {
 }): PluginInterface {
   const { ctx, pluginConfig, firstMessageVariantGate, managers, hooks, tools } =
     args
+  const canUseBackgroundWaitTool = createBackgroundWaitAvailability(pluginConfig, tools)
 
   return {
     tool: tools,
@@ -77,7 +105,8 @@ export function createPluginInterface(args: {
       getUltraworkMessage,
       {
         backgroundManager: managers.backgroundManager,
-        blockOnBackgroundTasks: tools["wait-for-background-tasks"] !== undefined,
+        blockOnBackgroundTasks: tools[BACKGROUND_WAIT_TOOL] !== undefined,
+        canUseBackgroundWaitTool,
       },
     ),
 
@@ -99,7 +128,8 @@ export function createPluginInterface(args: {
       ctx,
       hooks,
       backgroundManager: managers.backgroundManager,
-      blockOnBackgroundTasks: tools["wait-for-background-tasks"] !== undefined,
+      blockOnBackgroundTasks: tools[BACKGROUND_WAIT_TOOL] !== undefined,
+      canUseBackgroundWaitTool,
     }),
 
     "tool.execute.after": createToolExecuteAfterHandler({

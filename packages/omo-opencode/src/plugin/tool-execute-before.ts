@@ -53,11 +53,12 @@ export function createToolExecuteBeforeHandler(args: {
     "hasActiveChildTasks" | "hasActiveDescendantTasks" | "hasPendingParentWake"
   >
   blockOnBackgroundTasks?: boolean
+  canUseBackgroundWaitTool?: (sessionID: string) => boolean
 }): (
   input: { tool: string; sessionID: string; callID: string },
   output: { args: Record<string, unknown> },
 ) => Promise<void> {
-  const { ctx, hooks, backgroundManager, blockOnBackgroundTasks } = args
+  const { ctx, hooks, backgroundManager, blockOnBackgroundTasks, canUseBackgroundWaitTool } = args
 
   function buildUltraworkOracleVerificationPrompt(prompt: string, originalTask: string, verificationAttemptId: string): string {
     const verificationPrompt = [
@@ -102,17 +103,20 @@ export function createToolExecuteBeforeHandler(args: {
         })
       }
 
+      const useBlockingWaitTool = blockOnBackgroundTasks === true
+        && canUseBackgroundWaitTool?.(input.sessionID) !== false
+
       if (
         isPureSleepCommand(output.args.command)
         && (
-          (blockOnBackgroundTasks
+          (useBlockingWaitTool
             ? backgroundManager?.hasActiveDescendantTasks(input.sessionID)
             : backgroundManager?.hasActiveChildTasks(input.sessionID)) === true
           || backgroundManager?.hasPendingParentWake(input.sessionID) === true
         )
       ) {
         throw new Error(
-          blockOnBackgroundTasks
+          useBlockingWaitTool
             ? BACKGROUND_TOOL_WAIT_BLOCK_MESSAGE
             : BACKGROUND_REMINDER_WAIT_BLOCK_MESSAGE,
         )
