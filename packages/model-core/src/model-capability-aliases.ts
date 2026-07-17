@@ -40,6 +40,12 @@ const EXACT_ALIAS_RULES: ReadonlyArray<ExactAliasRule> = [
     canonicalModelID: "k2p5",
     rationale: "Kimi for Coding exposes k2pb while the bundled capabilities snapshot uses the canonical k2p5 ID.",
   },
+  {
+    aliasModelID: "k3",
+    ruleID: "kimi-k3-alias",
+    canonicalModelID: "kimi-k3",
+    rationale: "Kimi for Coding exposes k3 while the bundled capabilities snapshot uses the canonical kimi-k3 ID.",
+  },
 ]
 
 const EXACT_ALIAS_RULES_BY_MODEL: ReadonlyMap<string, ExactAliasRule> = new Map(

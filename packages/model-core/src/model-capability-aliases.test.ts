@@ -67,6 +67,48 @@ describe("model-capability-aliases", () => {
     })
   })
 
+  test("normalizes Kimi for Coding k3 aliases to the snapshot ID", () => {
+    const result = resolveModelIDAlias("kimi-for-coding/k3")
+
+    expect(result).toEqual({
+      requestedModelID: "kimi-for-coding/k3",
+      canonicalModelID: "kimi-k3",
+      source: "exact-alias",
+      ruleID: "kimi-k3-alias",
+    })
+  })
+
+  test("normalizes a bare k3 model ID to the kimi-k3 snapshot ID", () => {
+    const result = resolveModelIDAlias("k3")
+
+    expect(result).toEqual({
+      requestedModelID: "k3",
+      canonicalModelID: "kimi-k3",
+      source: "exact-alias",
+      ruleID: "kimi-k3-alias",
+    })
+  })
+
+  test("does not alias unrelated IDs that only contain k3 as a prefix", () => {
+    const result = resolveModelIDAlias("some-provider/k3-highspeed")
+
+    expect(result).toEqual({
+      requestedModelID: "some-provider/k3-highspeed",
+      canonicalModelID: "k3-highspeed",
+      source: "canonical",
+    })
+  })
+
+  test("does not alias Kimi for Coding k3 variant IDs", () => {
+    const result = resolveModelIDAlias("kimi-for-coding/k3-thinking")
+
+    expect(result).toEqual({
+      requestedModelID: "kimi-for-coding/k3-thinking",
+      canonicalModelID: "k3-thinking",
+      source: "canonical",
+    })
+  })
+
   test("treats GitHub Copilot dotted Claude Opus 4.7 as canonical since models.dev now serves it natively", () => {
     const result = resolveModelIDAlias("github-copilot/claude-opus-4.7")
 
