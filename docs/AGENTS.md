@@ -15,6 +15,7 @@
 | How agents collaborate | [docs/guide/orchestration.md](guide/orchestration.md) |
 | Picking the right model per agent | [docs/guide/agent-model-matching.md](guide/agent-model-matching.md) |
 | Team Mode (opt-in multi-agent) | [docs/guide/team-mode.md](guide/team-mode.md) |
+| Senpi task delegation and teams | [docs/guide/senpi-task.md](guide/senpi-task.md) |
 | Configuration field reference | [docs/reference/configuration.md](reference/configuration.md) |
 | Feature-by-feature reference | [docs/reference/features.md](reference/features.md) |
 | CLI command reference | [docs/reference/cli.md](reference/cli.md) |

@@ -1,7 +1,0 @@
-REAL_CODEX_CONFIG_BEFORE: present path=/Users/yeongyu/.codex/config.toml sha256=6bcd81afd2db5ae009bdf2142654348efef8c462f1cab1a8943275846293bc0c mtime=1781485313 size=17303
-REAL_CODEX_CONFIG_AFTER: present path=/Users/yeongyu/.codex/config.toml sha256=6bcd81afd2db5ae009bdf2142654348efef8c462f1cab1a8943275846293bc0c mtime=1781485313 size=17303
-REAL_CODEX_UNTOUCHED: yes
-SANDBOX_AGENTS_MD_FINAL: absent
-REAL_ASSERTIONS_STATUS:0
-POST_GATES_REAL_CODEX_CONFIG: present path=/Users/yeongyu/.codex/config.toml sha256=6bcd81afd2db5ae009bdf2142654348efef8c462f1cab1a8943275846293bc0c mtime=1781485313 size=17303
-POST_GATES_REAL_CODEX_UNTOUCHED: yes

@@ -4,6 +4,7 @@ import { delimiter, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { getMergedServers } from "../src/lsp/config-loader.js";
+import { createStandaloneMcpRequestContext, runWithRequestContext } from "../src/request-context.js";
 
 const tempDirectories: string[] = [];
 
@@ -20,8 +21,7 @@ describe("config loader security", () => {
 		const previousUser = process.env["LSP_TOOLS_MCP_USER_CONFIG"];
 		const root = mkdtempSync(join(tmpdir(), "lsp-tools-project-path-list-"));
 		tempDirectories.push(root);
-		const missingConfig = join(root, ".opencode", "lsp.json");
-		const omoConfig = join(root, ".omo", "lsp.json");
+			const omoConfig = join(root, ".omo", "lsp.json");
 		const userConfig = join(root, "user.json");
 		mkdirSync(join(root, ".omo"), { recursive: true });
 		writeFileSync(
@@ -33,12 +33,14 @@ describe("config loader security", () => {
 			}),
 		);
 		writeFileSync(userConfig, JSON.stringify({ lsp: {} }));
-		process.env["LSP_TOOLS_MCP_PROJECT_CONFIG"] = [missingConfig, omoConfig].join(delimiter);
+			process.env["LSP_TOOLS_MCP_PROJECT_CONFIG"] = [join(".opencode", "lsp.json"), join(".omo", "lsp.json")].join(
+				delimiter,
+			);
 		process.env["LSP_TOOLS_MCP_USER_CONFIG"] = userConfig;
 
 		try {
 			// when
-			const servers = getMergedServers();
+				const servers = runWithRequestContext(createStandaloneMcpRequestContext({ cwd: root }), () => getMergedServers());
 
 			// then
 			expect(servers).toContainEqual(
@@ -77,12 +79,12 @@ describe("config loader security", () => {
 			}),
 		);
 		writeFileSync(userConfig, JSON.stringify({ lsp: {} }));
-		process.env["LSP_TOOLS_MCP_PROJECT_CONFIG"] = projectConfig;
+			process.env["LSP_TOOLS_MCP_PROJECT_CONFIG"] = "project.json";
 		process.env["LSP_TOOLS_MCP_USER_CONFIG"] = userConfig;
 
 		try {
 			// when
-			const servers = getMergedServers();
+				const servers = runWithRequestContext(createStandaloneMcpRequestContext({ cwd: root }), () => getMergedServers());
 
 			// then
 			expect(servers.some((server) => server.id === "malicious")).toBe(false);
@@ -115,12 +117,12 @@ describe("config loader security", () => {
 			}),
 		);
 		writeFileSync(userConfig, JSON.stringify({ lsp: {} }));
-		process.env["LSP_TOOLS_MCP_PROJECT_CONFIG"] = projectConfig;
+			process.env["LSP_TOOLS_MCP_PROJECT_CONFIG"] = "project.json";
 		process.env["LSP_TOOLS_MCP_USER_CONFIG"] = userConfig;
 
 		try {
 			// when
-			const servers = getMergedServers();
+				const servers = runWithRequestContext(createStandaloneMcpRequestContext({ cwd: root }), () => getMergedServers());
 
 			// then
 			expect(servers).toContainEqual(

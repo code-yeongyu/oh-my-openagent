@@ -3,7 +3,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { insertCodexCompatibilityGuidance } from "../scripts/sync-skills.mjs";
+import { codexHarnessToolCompatibility, insertCodexCompatibilityGuidance } from "../scripts/sync-skills.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -29,7 +29,7 @@ function patternFromParts(parts, flags) {
 }
 
 const multiAgentV2RoleGuidance =
-	"On `multi_agent_v2` sessions the same `agent_type` applies (the OMO installer exposes it) with `fork_turns` instead of `fork_context`.";
+	"If instead a flat `spawn_agent` with a required `task_name` exists (`multi_agent_v2`), rewrite every `multi_agent_v1.*` example:";
 const loadSkillsGuidance =
 	"When translating `load_skills=[...]`, include the requested skill names in the spawned agent's `message`.";
 
@@ -148,7 +148,9 @@ call_omo_agent(subagent_type="explore", prompt="inspect")
 	assert.match(adapted, /fork_context":false/);
 	assert.match(adapted, /"agent_type":"explorer"/);
 	assert.match(adapted, /multi_agent_v1\.wait_agent/);
-	assert.doesNotMatch(adapted, /task_name/);
+	assert.match(adapted, /"task_name":"<lowercase_digits_underscores>"/);
+	assert.match(adapted, /fork_turns/);
+	assert.doesNotMatch(adapted, /\| `spawn_agent\({"task_name"/);
 	assert.doesNotMatch(adapted, /Obsolete generated compatibility prose/);
 });
 
@@ -205,7 +207,8 @@ test("#given synced aggregate Codex skills #when they describe background orches
 		["working progress message", /WORKING:/],
 		["blocked progress message", /BLOCKED:/],
 		["mailbox timeout framing", /timeout only means no new mailbox update arrived/],
-		["multi_agent_v1.wait_agent ref", /multi_agent_v1\.wait_agent/],
+		// Skills route by session tool surface: the namespaced V1 tool or the flat V2 tool both count.
+		["wait-agent tool ref", /multi_agent_v1\.wait_agent|`wait_agent`/],
 		["explicit fallback conditions", /Fallback only when|Mark a file for retry only when/],
 	];
 	const bannedPatterns = [
@@ -232,6 +235,18 @@ test("#given synced aggregate Codex skills #when they describe background orches
 	}
 });
 
+test("#given start-work skill #when synced for Codex #then the difficulty-tier delegation guidance survives the overlay", async () => {
+	const content = await readSkill("start-work");
+
+	assert.match(content, /lazycodex-worker-medium/);
+	assert.match(content, /Delegation by difficulty/);
+	assert.match(content, /Global Review and Debugging Gate/);
+	assert.match(content, /full commit SHA/);
+	assert.match(content, /re-read the ledger record/);
+	assert.match(content, /exact lane\/SHA pair/);
+	assert.doesNotMatch(content, /works the same on both surfaces/);
+});
+
 test("#given review-work skill #when some lanes do not finish #then aggregate result remains bounded", async () => {
 	const content = await readSkill("review-work");
 
@@ -242,6 +257,12 @@ test("#given review-work skill #when some lanes do not finish #then aggregate re
 	assert.match(content, /Overall Verdict: PASSED \/ FAILED \/ INCONCLUSIVE/);
 	assert.match(content, /PASS\/FAIL\/INCONCLUSIVE \| HIGH\/MED\/LOW/);
 	assert.match(content, /Do not spin in repeated/);
+	assert.match(content, /bare REJECT\/FAIL token without findings is not a verdict/);
+	assert.match(content, /cites the violated goal criterion/);
+	assert.match(content, /append a durable task-evidence record/);
+	assert.match(content, /full commit SHA/);
+	assert.match(content, /re-read that record/);
+	assert.match(content, /exact lane\/SHA pair/);
 	assert.match(content, /Do not use `multi_agent_v1\.send_input` as an interrupt/);
 });
 
@@ -262,4 +283,10 @@ test("#given PR and review skills #when synced for Codex #then worktree lifecycl
 
 	assert.match(reviewWork, /dedicated review worktree attached to that branch/);
 	assert.match(reviewWork, /Never\s+checkout, test, or edit the review branch in the main worktree/);
+});
+
+test("#given generated Codex compatibility guidance #when multi-agent lifecycle tools are mentioned #then optional tools are guarded by the active tools list", () => {
+	assert.match(codexHarnessToolCompatibility, /when exposed in the active tools list/, "send_input/close_agent must be marked optional (lazycodex#116)");
+	assert.match(codexHarnessToolCompatibility, /multi_agent_v1\.spawn_agent/);
+	assert.match(codexHarnessToolCompatibility, /multi_agent_v1\.wait_agent/);
 });

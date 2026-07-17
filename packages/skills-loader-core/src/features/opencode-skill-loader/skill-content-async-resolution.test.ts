@@ -80,9 +80,9 @@ describe("resolveSkillContentAsync", () => {
 		expect(result).toBeNull()
 	})
 
-	it("#given the shared ulw-plan canonical alias is disabled #when resolving it async #then it does not fall back to the plain shared alias", async () => {
-		// given
-		const options = { directory: testConfigDir, disabledSkills: new Set(["shared/ulw-plan"]) }
+	it("#given the shared/ulw-plan canonical alias is requested #when resolving it async #then it no longer resolves", async () => {
+		// given: shared/ prefix aliases have been removed
+		const options = { directory: testConfigDir }
 
 		// when
 		const result = await resolveSkillContentAsync("shared/ulw-plan", options)
@@ -91,31 +91,7 @@ describe("resolveSkillContentAsync", () => {
 		expect(result).toBeNull()
 	})
 
-	it("#given the shared ulw-plan canonical alias is disabled #when matching against all skills #then no shared fallback match remains", async () => {
-		// given
-		const options = { directory: testConfigDir, disabledSkills: new Set(["shared/ulw-plan"]) }
-
-		// when
-		const skills = await getAllSkills(options)
-		const matchedSkill = matchSkillByName(skills, "shared/ulw-plan")
-
-		// then
-		expect(matchedSkill).toBeUndefined()
-	})
-
-	it("#given a project skill whose literal name starts with shared slash #when matching by exact name #then the project skill remains reachable", () => {
-		// given
-		const skills = [createLoadedSkill("shared/custom", "project")]
-
-		// when
-		const matchedSkill = matchSkillByName(skills, "shared/custom")
-
-		// then
-		expect(matchedSkill?.scope).toBe("project")
-		expect(matchedSkill?.name).toBe("shared/custom")
-	})
-
-	it("#given a local ulw-plan override exists #when only the shared canonical alias is disabled #then the local plain override still resolves", async () => {
+	it("#given a stale shared/ulw-plan disabled entry exists #when resolving the plain ulw-plan name #then it still resolves", async () => {
 		// given
 		const localSkillDir = join(testConfigDir, ".opencode", "skills", "ulw-plan")
 		mkdirSync(localSkillDir, { recursive: true })
@@ -128,19 +104,31 @@ describe("resolveSkillContentAsync", () => {
 		// when
 		const result = await resolveSkillContentAsync("ulw-plan", options)
 
-		// then
+		// then: stale shared/ prefix disable entry is inert
 		expect(result).toBe("local ulw-plan body")
 	})
 
-	it("#given the plain ulw-plan name is disabled #when resolving the shared canonical alias #then the shared alias is disabled too", async () => {
+	it("#given the plain ulw-plan name is disabled #when resolving ulw-plan #then it is disabled", async () => {
 		// given
 		const options = { directory: testConfigDir, disabledSkills: new Set(["ulw-plan"]) }
 
 		// when
-		const result = await resolveSkillContentAsync("shared/ulw-plan", options)
+		const result = await resolveSkillContentAsync("ulw-plan", options)
 
 		// then
 		expect(result).toBeNull()
+	})
+
+	it("#given a project skill whose literal name starts with shared slash #when matching by exact name #then the project skill remains reachable", () => {
+		// given
+		const skills = [createLoadedSkill("shared/custom", "project")]
+
+		// when
+		const matchedSkill = matchSkillByName(skills, "shared/custom")
+
+		// then
+		expect(matchedSkill?.scope).toBe("project")
+		expect(matchedSkill?.name).toBe("shared/custom")
 	})
 
 	it("resolves nested skill by unique short name async", async () => {

@@ -632,24 +632,23 @@ describe("migrateModelVersions", () => {
     expect(sisyphus.temperature).toBe(0.1)
   })
 
-  test("#given a config with explicit gpt-5.5 (#3777) #when migrating #then preserves the codex variant", () => {
-    // given: User explicitly picked the codex powerhouse for token efficiency
-    const agents = {
-      sisyphus: { model: "openai/gpt-5.5", variant: "medium" },
-      hephaestus: {
-        model: "openai/gpt-5.5",
-        fallback_models: [{ model: "openai/gpt-5.5" }],
-      },
+  test("#given explicit gpt-5.5 pins on current entries (#3777) #when migrating #then preserves every user choice", () => {
+    // given: current agent and category entries explicitly select gpt-5.5
+    const configs = {
+      hephaestus: { model: "openai/gpt-5.5", variant: "medium" },
+      momus: { model: "openai/gpt-5.5", variant: "xhigh" },
+      deep: { model: "openai/gpt-5.5", variant: "medium" },
+      ultrabrain: { model: "openai/gpt-5.5", variant: "xhigh" },
     }
 
     // when: Migrate model versions
-    const { migrated, changed, newMigrations } = migrateModelVersions(agents)
+    const { migrated, changed, newMigrations } = migrateModelVersions(configs)
 
-    // then: gpt-5.5 must remain because auto-rewriting silently broke configs
+    // then: current models remain user-selectable and no entry name implies provenance
     expect(changed).toBe(false)
     expect(newMigrations).toEqual([])
-    expect((migrated["sisyphus"] as Record<string, unknown>).model).toBe("openai/gpt-5.5")
-    expect((migrated["hephaestus"] as Record<string, unknown>).model).toBe("openai/gpt-5.5")
+    expect(MODEL_VERSION_MAP["openai/gpt-5.5"]).toBeUndefined()
+    expect(migrated).toEqual(configs)
   })
 
   test("#given current Anthropic models from bundled snapshot #when migrating #then preserves explicit user choices", () => {
@@ -824,6 +823,7 @@ describe("migrateModelVersions", () => {
     expect(newMigrations).toHaveLength(0)
     expect((migrated["sisyphus"] as Record<string, unknown>).model).toBe("openai/gpt-5.4-codex")
   })
+
 })
 
 describe("migrateConfigFile _migrations tracking", () => {

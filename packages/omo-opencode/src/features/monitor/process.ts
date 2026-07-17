@@ -1,9 +1,10 @@
 import { tokenizeCommand } from "../../tools/interactive-bash/tools"
+import { spawn as runtimeSpawn } from "../../shared/bun-spawn-shim"
 
 export type TimerHandle = ReturnType<typeof setTimeout> | number
 
 export interface SpawnDeps {
-  spawn?: typeof Bun.spawn
+  spawn?: SpawnFunction
   setTimer: (fn: () => void, ms: number) => TimerHandle
   clearTimer: (handle: TimerHandle) => void
 }
@@ -15,8 +16,23 @@ export interface MonitoredProcess {
   stderr: ReadableStream<Uint8Array>
 }
 
-type PipeSubprocess = Bun.Subprocess<"ignore", "pipe", "pipe">
 type ExitResult = { code: number | null; signal: string | null }
+interface SpawnedMonitorProcess {
+  readonly exited: Promise<number>
+  readonly stdout: ReadableStream<Uint8Array>
+  readonly stderr: ReadableStream<Uint8Array>
+  readonly pid?: number
+  readonly signalCode?: NodeJS.Signals | null
+}
+
+type SpawnFunction = (argv: readonly string[], options: {
+  readonly cwd?: string
+  readonly env?: Record<string, string>
+  readonly detached: boolean
+  readonly stdin: "ignore"
+  readonly stdout: "pipe"
+  readonly stderr: "pipe"
+}) => SpawnedMonitorProcess
 
 const KILL_GRACE_MS = 5_000
 
@@ -29,11 +45,11 @@ function killProcessGroup(pid: number, signal: NodeJS.Signals | 0): void {
 }
 
 function spawnDetachedProcess(
-  argv: string[],
+  argv: readonly string[],
   opts: { cwd?: string; env?: Record<string, string> },
-  spawn: typeof Bun.spawn,
-): PipeSubprocess {
-  return spawn<"ignore", "pipe", "pipe">(argv, {
+  spawn: SpawnFunction,
+): SpawnedMonitorProcess {
+  return spawn(argv, {
     cwd: opts.cwd,
     env: opts.env,
     detached: true,
@@ -52,7 +68,7 @@ export function spawnMonitoredProcess(
     throw new Error("Cannot spawn an empty monitor command")
   }
 
-  const subprocess = spawnDetachedProcess(argv, opts, deps.spawn ?? Bun.spawn)
+  const subprocess = spawnDetachedProcess(argv, opts, deps.spawn ?? runtimeSpawn)
   let actualExited = false
   let publicExitSettled = false
   let watchdogTimer: TimerHandle | undefined
@@ -86,11 +102,15 @@ export function spawnMonitoredProcess(
   function kill(signal: NodeJS.Signals = "SIGTERM"): void {
     if (actualExited) return
 
-    killProcessGroup(subprocess.pid, signal)
+    if (subprocess.pid !== undefined) {
+      killProcessGroup(subprocess.pid, signal)
+    }
     if (graceTimer === undefined) {
       graceTimer = deps.setTimer(() => {
         if (!actualExited) {
-          killProcessGroup(subprocess.pid, "SIGKILL")
+          if (subprocess.pid !== undefined) {
+            killProcessGroup(subprocess.pid, "SIGKILL")
+          }
         }
       }, KILL_GRACE_MS)
     }
@@ -106,7 +126,7 @@ export function spawnMonitoredProcess(
     actualExited = true
     clearWatchdog()
     clearGraceTimer()
-    settlePublicExit({ code, signal: subprocess.signalCode })
+    settlePublicExit({ code, signal: subprocess.signalCode ?? null })
   }).catch((error) => {
     void error
     actualExited = true

@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
+
+import { isCliEntry } from "./entry-guard.mjs";
 import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -12,6 +14,9 @@ const ignoredSkillSourceDirNames = new Set([".mypy_cache", ".omo", ".pytest_cach
 const ignoredSkillSourceFileNames = new Set([".gitignore", ".npmignore", "pyrightconfig.json"]);
 const skillSources = [
 	["comment-checker", "components/comment-checker/skills/comment-checker"],
+	["lcx-contribute-bug-fix", "components/lcx/skills/lcx-contribute-bug-fix"],
+	["lcx-doctor", "components/lcx/skills/lcx-doctor"],
+	["lcx-report-bug", "components/lcx/skills/lcx-report-bug"],
 	["lsp", "components/lsp/skills/lsp"],
 	["rules", "components/rules/skills/rules"],
 	["teammode", "components/teammode/skills/teammode"],
@@ -20,7 +25,6 @@ const skillSources = [
 	["ultrawork", "components/ultrawork/skills/ultrawork"],
 ];
 const componentSkillNames = new Set(skillSources.map(([name]) => name));
-const codexHiddenSharedSkillNames = new Set(["ultraresearch"]);
 const skillDisplayPrefix = "(OmO) ";
 
 function shouldCopySkillSource(source) {
@@ -36,7 +40,7 @@ function shouldCopySkillSource(source) {
 
 const opencodeOnlyOrchestrationPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/;
 
-const codexHarnessToolCompatibility = `## Codex Harness Tool Compatibility
+export const codexHarnessToolCompatibility = `## Codex Harness Tool Compatibility
 
 This skill may include examples copied from the OpenCode harness. In Codex, do not call OpenCode-only tools such as \`call_omo_agent(...)\`, \`task(...)\`, \`background_output(...)\`, or \`team_*(...)\` literally. Translate those examples to Codex native tools:
 
@@ -48,15 +52,15 @@ This skill may include examples copied from the OpenCode harness. In Codex, do n
 | \`task(subagent_type="oracle", ...)\` for final verification | \`multi_agent_v1.spawn_agent({"message":"TASK: act as a rigorous reviewer. ...","agent_type":"lazycodex-gate-reviewer","fork_context":false})\` |
 | \`task(category="...", ...)\` for implementation or QA | \`multi_agent_v1.spawn_agent({"message":"TASK: act as an implementation or QA worker. ...","fork_context":false})\` |
 | \`background_output(task_id="...")\` | \`multi_agent_v1.wait_agent(...)\` for mailbox signals |
-| \`team_*(...)\` | Use Codex native subagents via \`multi_agent_v1.spawn_agent\`, \`multi_agent_v1.send_input\`, \`multi_agent_v1.wait_agent\`, and \`multi_agent_v1.close_agent\` |
+| \`team_*(...)\` | Use Codex native subagents via \`multi_agent_v1.spawn_agent\` and \`multi_agent_v1.wait_agent\`; use \`multi_agent_v1.send_input\` and \`multi_agent_v1.close_agent\` only when exposed in the active tools list |
 
 Role-specific behavior must be described in a self-contained \`message\`. Use \`fork_context: false\` to start the child with only the initial prompt (no parent history); use \`fork_context: true\` only when full parent history is truly required. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's \`message\`. OMO installs these selectable agent roles into \`~/.codex/agents/\`: \`explorer\`, \`librarian\`, \`plan\`, \`momus\`, \`metis\`, \`lazycodex-code-reviewer\`, \`lazycodex-qa-executor\`, and \`lazycodex-gate-reviewer\` - pass the matching name as \`agent_type\` so the child gets that role's model and instructions. If the spawn tool exposes no \`agent_type\` parameter, omit it and describe the role inside \`message\`. If a code block below conflicts with this section, this section wins.
 
-On \`multi_agent_v2\` sessions the same \`agent_type\` applies (the OMO installer exposes it) with \`fork_turns\` instead of \`fork_context\`. If a code block below conflicts with this section, this section wins.
+Codex exposes ONE of two subagent tool surfaces per session; check your own tool list and route accordingly. If \`multi_agent_v1.*\` tools exist, use the table above as written. If instead a flat \`spawn_agent\` with a required \`task_name\` exists (\`multi_agent_v2\`), rewrite every \`multi_agent_v1.*\` example: \`multi_agent_v1.spawn_agent({...,"fork_context":false})\` becomes \`spawn_agent({"task_name":"<lowercase_digits_underscores>","message":...,"agent_type":...,"fork_turns":"none"})\` (\`"all"\` only when full parent history is truly required); \`send_input\` becomes \`send_message\`; do not call \`close_agent\`/\`resume_agent\` (finished agents end on their own; \`followup_task\` re-tasks one, \`interrupt_agent\` stops one); \`wait_agent\` takes only \`timeout_ms\` and returns on any child mailbox activity. On the v2 surface \`agent_type\` may be ABSENT from the spawn schema (verified 2026-07-11: only \`fork_turns\`/\`message\`/\`task_name\`) — when absent, omit it and describe the role inside \`message\`; installed role TOMLs cannot be selected on that surface. If a code block below conflicts with this section, this section wins.
 
 When translating \`load_skills=[...]\`, include the requested skill names in the spawned agent's \`message\`. If a code block below conflicts with this section, this section wins.
 
-For work likely to exceed one wait cycle, require the child to send \`WORKING: <task> - <current phase>\` before long passes and \`BLOCKED: <reason>\` only when progress stops. A \`multi_agent_v1.wait_agent\` timeout only means no new mailbox update arrived. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly \`BLOCKED:\`, or no longer running.
+For work likely to exceed one wait cycle, require the child to send \`WORKING: <task> - <current phase>\` before long passes and \`BLOCKED: <reason>\` only when progress stops. A \`multi_agent_v1.wait_agent\` timeout only means no new mailbox update arrived; back off between waits (double the timeout up to ~5 minutes) instead of spinning short cycles. Treat a running child as alive. Fallback only when the child is completed without the deliverable, ack-only after followup, explicitly \`BLOCKED:\`, or no longer running.
 
 `;
 
@@ -132,7 +136,8 @@ const startWorkCodexCompletion = `When all top-level checkboxes in \`## TODOs\` 
 1. Run the plan's final verification commands.
 2. Complete the **Global Review and Debugging Gate** before any completion claim, PR creation, PR handoff, branch handoff, or merge:
    - Invoke the \`review-work\` skill with the final diff, changed files, user goal, constraints, run command, and verification evidence. All five review lanes must return PASS. A timeout, missing deliverable, ack-only child, \`BLOCKED:\`, or inconclusive lane is a gate failure, not approval.
-   - Run a debugging-oriented runtime audit even when the review passes: name at least three plausible failure hypotheses for the changed surface, run the distinguishing checks against the actual artifact, and append the ruled-out or confirmed result to \`.omo/start-work/ledger.jsonl\`.
+   - Each passing review lane binds to the exact full commit SHA it reviewed. Immediately append a durable record to \`.omo/start-work/ledger.jsonl\` with the lane name, full SHA, PASS verdict, and report artifact/source. Before same-SHA reuse after any continuation or compaction, re-read the ledger record and require the exact lane/SHA pair; memory, chat history, or an unstamped report is not coverage. New commits require fresh applicable lane coverage.
+   - Run a debugging-oriented runtime audit even when the review passes: name at least three plausible failure hypotheses for the changed surface, run the distinguishing checks against the actual artifact, and append a separate durable record with the audit name, exact full SHA, verdict, and evidence artifact/source to \`.omo/start-work/ledger.jsonl\`. Reuse it only after re-reading an exact audit/SHA match.
    - If any review lane or debugging hypothesis fails, invoke the \`debugging\` skill, confirm root cause with runtime evidence, add the minimal failing test or reproduction, fix it, rerun the affected verification, then rerun the Global Review and Debugging Gate.
    - Evidence hygiene is mandatory: redact or mask secrets and sensitive user data before writing \`.omo/start-work/ledger.jsonl\`, a PR body, or a handoff. Never include raw tokens, credentials, auth headers, cookies, API keys, env dumps, private logs, or PII; use concise summaries, lengths, hashes, or short non-sensitive prefixes instead.
    - If the work includes creating, updating, or handing off a PR, refresh \`git status\` and the PR/branch state from the task-owned worktree after the gate, and include only redacted review/debugging evidence in the PR body or handoff.
@@ -154,6 +159,19 @@ failed, investigate the underlying uncertainty with the \`debugging\` skill when
 runtime behavior may be wrong, fix with evidence, and rerun the affected lane
 before claiming completion, creating or handing off a PR, or merging.
 
+After each lane reaches PASS, immediately append a durable task-evidence record
+to the active ledger with the lane name, exact full commit SHA, PASS verdict,
+and report artifact/source. Before reusing coverage after continuation or
+compaction, re-read that record and require the exact lane/SHA pair. Memory,
+chat history, or an unstamped report is not coverage; a new commit requires
+fresh applicable lane records.
+
+A rejecting lane must name its blockers inline in its final message — each
+blocker cites the violated goal criterion or requirement plus an evidence
+pointer. A bare REJECT/FAIL token without findings is not a verdict; treat it
+as an inconclusive lane (one bounded respawn, then record it inconclusive with
+that reason).
+
 When reviewing a PR or branch, collect diff, file contents, and verification
 results from a dedicated review worktree attached to that branch. Never
 checkout, test, or edit the review branch in the main worktree.
@@ -166,22 +184,6 @@ prefixes when identity is needed.
 `;
 
 function applyCodexSkillOverlays(skillName, content) {
-	if (skillName === "ulw-research") {
-		return content
-			.replace(
-				", the legacy alias 'ultraresearch', any 'ulw' research wording,",
-				", any 'ulw' research wording,",
-			)
-			.replace(
-				'the legacy alias "ultraresearch" (also `/ultraresearch`, `$ultraresearch`), ',
-				"",
-			)
-			.replace(
-				"answer those normally, and mention that `ulw-research` is available (legacy alias: `ultraresearch`) when a question would clearly benefit from it.",
-				"answer those normally, and mention that `ulw-research` is available when a question would clearly benefit from it.",
-			)
-			.replace("# Ultraresearch Synthesis: <query>", "# ULW-Research Synthesis: <query>");
-	}
 	if (skillName === "start-work") {
 		return content
 			.replace(startWorkOriginalCompletion, startWorkCodexCompletion)
@@ -254,7 +256,6 @@ async function syncSkills() {
 
 	for (const skillName of sharedSkillNames) {
 		if (componentSkillNames.has(skillName)) continue;
-		if (codexHiddenSharedSkillNames.has(skillName)) continue;
 		await cp(join(sharedSkillsRoot, skillName), join(skillsRoot, skillName), {
 			filter: shouldCopySkillSource,
 			recursive: true,
@@ -263,6 +264,6 @@ async function syncSkills() {
 	}
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isCliEntry(import.meta.url)) {
 	await syncSkills();
 }

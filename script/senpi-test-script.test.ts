@@ -48,21 +48,33 @@ describe("Senpi compatibility test script", () => {
 
     // #when
     const shipsPluginTree = files.includes("packages/omo-senpi/plugin")
-    const hasBuildScript = manifest.scripts?.["build:senpi-plugin"] === [
+    const hasStandaloneBuildScript = manifest.scripts?.["build:senpi-plugin"] === [
+      "bun run build:lsp-daemon",
+      "bun run build:senpi-plugin:stage",
+    ].join(" && ")
+    const hasStageScript = manifest.scripts?.["build:senpi-plugin:stage"] === [
+      "bun run build:materialize-frontend",
+      "node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs",
       "node packages/omo-senpi/plugin/scripts/build-extension.mjs",
       "node packages/omo-senpi/plugin/scripts/sync-skills.mjs",
       "node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check",
+      "node packages/omo-senpi/plugin/scripts/build-install.mjs",
     ].join(" && ")
+    const senpiNode = /id: "senpi-plugin"[\s\S]*?args: \["run", "build:senpi-plugin:stage"\][\s\S]*?deps: \["lsp-daemon"\]/.test(
+      buildOrchestrator,
+    )
 
     // #then
     expect(
       shipsPluginTree,
       "root npm files must NOT ship packages/omo-senpi/plugin while the senpi platform flag is disabled for release",
     ).toBe(false)
-    expect(hasBuildScript, "root scripts must expose a dedicated Senpi plugin artifact build").toBe(true)
+    expect(hasStandaloneBuildScript, "standalone Senpi build must build the shared daemon once before staging").toBe(true)
+    expect(hasStageScript, "root scripts must expose a stage-only Senpi artifact build").toBe(true)
     expect(buildOrchestrator, "the build orchestrator must generate Senpi plugin artifacts before publishing").toContain(
-      "build:senpi-plugin",
+      "build:senpi-plugin:stage",
     )
+    expect(senpiNode, "build graph senpi-plugin must depend on lsp-daemon and call only the stage script").toBe(true)
     expect(prepublishOnlyScript, "prepublishOnly must route through build, which includes the Senpi plugin build").toContain(
       "bun run build",
     )
@@ -75,12 +87,42 @@ describe("Senpi compatibility test script", () => {
     try {
       const pluginRoot = join(tempRoot, "packages", "omo-senpi", "plugin")
       await mkdir(join(pluginRoot, "extensions"), { recursive: true })
-      await mkdir(join(pluginRoot, "skills", "ultrawork"), { recursive: true })
-      await mkdir(join(pluginRoot, "skills", "ulw-loop"), { recursive: true })
+      const requiredSkillNames = [
+        "ast-grep",
+        "coding-agent-sessions",
+        "debugging",
+        "frontend",
+        "git-master",
+        "init-deep",
+        "lsp-setup",
+        "programming",
+        "refactor",
+        "remove-ai-slops",
+        "review-work",
+        "start-work",
+        "ultimate-browsing",
+        "ultrawork",
+        "ulw-loop",
+        "ulw-plan",
+        "ulw-research",
+        "visual-qa",
+      ]
+      for (const skillName of requiredSkillNames) {
+        await mkdir(join(pluginRoot, "skills", skillName), { recursive: true })
+        await writeFile(join(pluginRoot, "skills", skillName, "SKILL.md"), `# ${skillName}\n`)
+      }
       await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: "@code-yeongyu/omo-senpi" }))
       await writeFile(join(pluginRoot, "extensions", "omo.js"), "export default {}\n")
-      await writeFile(join(pluginRoot, "skills", "ultrawork", "SKILL.md"), "# Ultrawork\n")
-      await writeFile(join(pluginRoot, "skills", "ulw-loop", "SKILL.md"), "# ULW Loop\n")
+      await mkdir(join(pluginRoot, "scripts"), { recursive: true })
+      await writeFile(join(pluginRoot, "scripts", "install.mjs"), "#!/usr/bin/env node\n")
+      await mkdir(join(pluginRoot, "runtime", "lsp-daemon", "dist"), { recursive: true })
+      await writeFile(join(pluginRoot, "runtime", "lsp-daemon", "dist", "cli.js"), "console.log('cli')\n")
+      await writeFile(join(pluginRoot, "runtime", "lsp-daemon", "dist", "index.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "runtime", "lsp-daemon", "dist", "index.d.ts"), "export {}\n")
+      await writeFile(join(pluginRoot, "runtime", "lsp-daemon", "dist", "daemon-client.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "runtime", "lsp-daemon", "dist", "daemon-client.d.ts"), "export {}\n")
+      await writeFile(join(pluginRoot, "runtime", "lsp-daemon", "dist", "package.json"), JSON.stringify({ version: "0.1.0" }))
+      await writeFile(join(pluginRoot, "runtime", "lsp-daemon", "dist", ".omo-runtime-manifest.json"), "{}\n")
 
       const commands: string[] = []
 
@@ -109,9 +151,8 @@ describe("Senpi compatibility test script", () => {
 
     // #when
     const expectedCommands = [
-      "node packages/omo-senpi/plugin/scripts/build-extension.mjs",
-      "node packages/omo-senpi/plugin/scripts/sync-skills.mjs",
-      "node packages/omo-senpi/plugin/scripts/embed-directive.mjs --check",
+      "bun run build:senpi-plugin",
+      "tsgo --noEmit -p packages/omo-senpi/tsconfig.json",
       "bun test packages/omo-senpi",
     ]
     const commandIndexes = expectedCommands.map((command) => script.indexOf(command))
@@ -123,7 +164,7 @@ describe("Senpi compatibility test script", () => {
     }
 
     // #then
-    expect(isOrdered, "test:senpi must build, sync skills, verify directive, then run package tests").toBe(true)
+    expect(isOrdered, "test:senpi must build the daemon, stage artifacts, typecheck, then run package tests").toBe(true)
     expect(script, "test:senpi must stay hermetic and not run a live senpi install").not.toContain("senpi install")
   })
 
@@ -139,7 +180,11 @@ describe("Senpi compatibility test script", () => {
     expect(senpiJob).toContain("os: [ubuntu-latest, macos-latest, windows-latest]")
     expect(senpiJob).toContain('node-version: "24"')
     expect(senpiJob).toContain('bun-version: "1.3.12"')
-    expect(senpiJob).toContain("run: bun run test:senpi")
+    expect(senpiJob).toContain("bun run build:senpi-plugin")
+    expect(senpiJob).toContain("npm pack --pack-destination")
+    expect(senpiJob).toContain("npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts")
+    expect(senpiJob).toContain("tsgo --noEmit -p packages/omo-senpi/tsconfig.json")
+    expect(senpiJob).toContain("bun test packages/omo-senpi")
     expect(senpiJob).not.toContain("senpi install")
     expect(needsReferences.length, "senpi-compatibility must be included in both downstream needs lists").toBeGreaterThanOrEqual(2)
   })

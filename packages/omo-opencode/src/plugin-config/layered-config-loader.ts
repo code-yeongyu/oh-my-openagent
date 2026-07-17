@@ -148,6 +148,7 @@ export function loadPluginConfig(
   }
 
   const userMcpEnvAllowlist = config.mcp_env_allowlist ?? [];
+  const userPlaywrightMcpArgs = config.browser_automation_engine?.playwright_mcp_args;
   const canonicalAncestorPathsFarthestFirst = [...canonicalAncestorPathsNearestFirst].reverse();
   const defaultGitMaster = OhMyOpenCodeConfigSchema.parse({}).git_master;
   const ancestorGitMasterOverridesFarthestFirst: Array<Record<string, unknown>> = [];
@@ -185,6 +186,19 @@ export function loadPluginConfig(
     ...config,
     mcp_env_allowlist: userMcpEnvAllowlist,
   };
+
+  if (config.browser_automation_engine) {
+    const {
+      playwright_mcp_args: _ancestorPlaywrightMcpArgs,
+      ...browserAutomationEngine
+    } = config.browser_automation_engine;
+    config = {
+      ...config,
+      browser_automation_engine: userPlaywrightMcpArgs !== undefined
+        ? { ...browserAutomationEngine, playwright_mcp_args: userPlaywrightMcpArgs }
+        : browserAutomationEngine,
+    };
+  }
 
   applyDisabledProviders(config);
 

@@ -21,10 +21,29 @@ export const RESIDENCY_STATES = [
 export type ResidencyState = (typeof RESIDENCY_STATES)[number]
 export type Messageability = "steer" | "revive" | "not-continuable"
 
+export const RESOLVED_MODEL_SOURCES = ["category", "explicit"] as const
+
+export type ResolvedModelSource = (typeof RESOLVED_MODEL_SOURCES)[number]
+
+export type ResolvedModelRecord = {
+  readonly provider: string
+  readonly model_id: string
+  readonly display: string
+  readonly variant?: string
+  readonly reasoning_effort?: string
+  readonly source: ResolvedModelSource
+}
+
 export type TaskNotification = {
   readonly run_epoch: number
   readonly notified_epoch: number
   readonly notification_failed_epoch?: number
+}
+
+export type TaskSpawnSpec = {
+  readonly cwd: string
+  readonly extensions?: readonly string[]
+  readonly member_env?: Readonly<Record<string, string>>
 }
 
 export type TaskRecordInput = {
@@ -36,6 +55,7 @@ export type TaskRecordInput = {
   readonly category?: string
   readonly execution_mode: string
   readonly model: string
+  readonly resolved_model?: ResolvedModelRecord
   readonly tool_allow?: readonly string[]
   readonly tool_deny?: readonly string[]
 }
@@ -48,8 +68,12 @@ export type TaskRecord = TaskRecordInput & {
   readonly updated_at: string
   readonly pid?: number
   readonly child_session_id?: string
+  readonly spawn_spec?: TaskSpawnSpec
   readonly final_response?: string
   readonly error_message?: string
+  // Set true when the terminal error was an external kill / exit-by-signal (todo-8 kill contract); a
+  // record FACT, not a status - the state vocabulary stays completed/error/cancelled/interrupted/lost.
+  readonly killed?: boolean
   readonly notification: TaskNotification
 }
 
@@ -69,6 +93,7 @@ export type TaskTransition =
       readonly type: "fail"
       readonly timestamp: string
       readonly error_message: string
+      readonly killed?: boolean
     }
   | {
       readonly type: "cancel"

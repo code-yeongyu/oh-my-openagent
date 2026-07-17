@@ -1,3 +1,0 @@
-command: LAZYCODEX_LOCAL_INSTALLER=/Users/yeongyu/.codex-gui-cli-remote/worktrees/2de4/omo/packages/omo-codex/scripts/install-local.mjs npx --yes --package /tmp/lazycodex-ai-npx-smoke.pdQsVx lazycodex-ai --dry-run install --platform=codex --no-tui --codex-autonomous
-npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous
-cleanup: rm -rf /tmp/lazycodex-ai-npx-smoke.pdQsVx

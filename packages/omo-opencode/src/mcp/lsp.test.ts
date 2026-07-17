@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { delimiter, join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { createLspMcpConfig } from "./lsp"
 import type { RuntimeExecutable } from "./runtime-executable"
 
 const temporaryDirectories: string[] = []
+const DAEMON_PACKAGE_VERSION = "0.1.0-test"
 
 function createTemporaryDirectory(prefix: string): string {
   const directory = mkdtempSync(join(tmpdir(), prefix))
@@ -56,6 +57,7 @@ describe("createLspMcpConfig", () => {
     mkdirSync(join(packageRoot, "packages", "lsp-tools-mcp", "dist"), { recursive: true })
     writeFileSync(sourceCliPath, "console.log('mcp')\n", "utf-8")
     writeFileSync(toolsDistPath, "#!/usr/bin/env node\n", "utf-8")
+    writeDaemonPackageJson(packageRoot)
 
     // when
     const config = createLspMcpConfig({
@@ -67,6 +69,8 @@ describe("createLspMcpConfig", () => {
     // then
     expect(config.enabled).toBe(true)
     expect(config.command).toEqual([bunPath, sourceCliPath, "mcp"])
+    expect(config.environment?.OMO_LSP_DAEMON_CLI).toBe(sourceCliPath)
+    expect(config.environment?.OMO_LSP_DAEMON_VERSION).toBe(DAEMON_PACKAGE_VERSION)
   })
 
   it("prefers an ancestor dist cli before an earlier source cli candidate", () => {
@@ -85,6 +89,7 @@ describe("createLspMcpConfig", () => {
     writeFileSync(nearerSourceCliPath, "console.log('near-source')\n", "utf-8")
     writeFileSync(nearerToolsDistPath, "#!/usr/bin/env node\n", "utf-8")
     writeFileSync(ancestorDistCliPath, "#!/usr/bin/env node\n", "utf-8")
+    writeDaemonPackageJson(join(packageRoot, "nested", "src", "mcp"))
 
     // when
     const config = createLspMcpConfig({
@@ -116,6 +121,8 @@ describe("createLspMcpConfig", () => {
     writeFileSync(nearerToolsDistPath, "#!/usr/bin/env node\n", "utf-8")
     writeFileSync(ancestorSourceCliPath, "console.log('ancestor-source')\n", "utf-8")
     writeFileSync(ancestorToolsDistPath, "#!/usr/bin/env node\n", "utf-8")
+    writeDaemonPackageJson(join(packageRoot, "nested", "src", "mcp"))
+    writeDaemonPackageJson(packageRoot, "0.1.0-ancestor")
 
     // when
     const config = createLspMcpConfig({
@@ -127,6 +134,8 @@ describe("createLspMcpConfig", () => {
     // then
     expect(config.enabled).toBe(true)
     expect(config.command).toEqual([bunPath, nearerSourceCliPath, "mcp"])
+    expect(config.environment?.OMO_LSP_DAEMON_CLI).toBe(nearerSourceCliPath)
+    expect(config.environment?.OMO_LSP_DAEMON_VERSION).toBe(DAEMON_PACKAGE_VERSION)
   })
 
   it("does not run the bun daemon source cli when the engine dist is missing; bootstraps instead", () => {
@@ -141,11 +150,7 @@ describe("createLspMcpConfig", () => {
     mkdirSync(join(packageRoot, "packages", "lsp-daemon", "src"), { recursive: true })
     writeFileSync(sourceCliPath, "console.log('mcp')\n", "utf-8")
     writeFileSync(join(packageRoot, "package.json"), JSON.stringify({ name: "oh-my-opencode" }), "utf-8")
-    writeFileSync(
-      join(packageRoot, "packages", "lsp-daemon", "package.json"),
-      JSON.stringify({ name: "@code-yeongyu/lsp-daemon" }),
-      "utf-8",
-    )
+    writeDaemonPackageJson(packageRoot)
 
     // when
     const config = createLspMcpConfig({
@@ -248,9 +253,11 @@ describe("createLspMcpConfig", () => {
     expect(script).not.toContain("submodule")
     expect(script).toContain("npm")
     expect(script).toContain("build")
+    expect(script).toContain("@code-yeongyu/lsp-daemon/cli")
     expect(script).toContain("packages/lsp-tools-mcp")
     expect(script).toContain("packages/lsp-daemon")
     expect(script.indexOf("packages/lsp-tools-mcp")).toBeLessThan(script.indexOf("packages/lsp-daemon"))
+    expect(script).not.toContain("daemonDist")
     expect(config.command[3]).toBe(packageRoot)
     expect(config.command[4]).toBe(npmPath)
     expect(config.command[5]).toBe(bunPath)
@@ -266,19 +273,48 @@ describe("createLspMcpConfig", () => {
     writeFileSync(cliPath, "#!/usr/bin/env node\n", "utf-8")
 
     // when
+    const cwd = createTemporaryDirectory("omo-lsp-no-runtime-cwd-")
     const config = createLspMcpConfig({
-      cwd: createTemporaryDirectory("omo-lsp-no-runtime-cwd-"),
+      cwd,
       moduleUrl: pathToFileURL(moduleFilePath).href,
       resolveExecutable: createResolver({}),
     })
 
     // then
     expect(config.enabled).toBe(false)
-    expect(config.environment?.LSP_TOOLS_MCP_PROJECT_CONFIG).toContain(".opencode/lsp.json")
-    expect(config.environment?.LSP_TOOLS_MCP_PROJECT_CONFIG).toContain(".omo/lsp.json")
-    expect(config.environment?.LSP_TOOLS_MCP_PROJECT_CONFIG).toContain(".omo/lsp-client.json")
+    const projectConfigPaths = config.environment?.LSP_TOOLS_MCP_PROJECT_CONFIG.split(delimiter)
+    expect(projectConfigPaths).toEqual([
+      join(cwd, ".opencode", "lsp.json"),
+      join(cwd, ".omo", "lsp.json"),
+      join(cwd, ".omo", "lsp-client.json"),
+    ])
+    expectPathSuffix(config.environment?.LSP_TOOLS_MCP_USER_CONFIG, ["opencode", "lsp.json"])
+    expectPathSuffix(config.environment?.LSP_TOOLS_MCP_INSTALL_DECISIONS, [
+      "opencode",
+      "lsp-install-decisions.json",
+    ])
+  })
+
+  it("matches user config path suffixes across POSIX and Windows separators", () => {
+    // given
+    const posixUserConfig = "/tmp/omo-test-home/.config/opencode/lsp.json"
+    const windowsUserConfig = "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\omo-test-home\\.config\\opencode\\lsp.json"
+
+    // then
+    expectPathSuffix(posixUserConfig, ["opencode", "lsp.json"])
+    expectPathSuffix(windowsUserConfig, ["opencode", "lsp.json"])
   })
 })
+
+function expectPathSuffix(pathValue: string | undefined, expectedSuffix: readonly string[]): void {
+  expect(pathValue?.split(/[\\/]+/).slice(-expectedSuffix.length)).toEqual(expectedSuffix)
+}
+
+function writeDaemonPackageJson(packageRoot: string, version: string = DAEMON_PACKAGE_VERSION): void {
+  mkdirSync(join(packageRoot, "packages", "lsp-daemon"), { recursive: true })
+  const packageJson = { name: "@code-yeongyu/lsp-daemon", version, exports: { "./cli": "./dist/cli.js" } }
+  writeFileSync(join(packageRoot, "packages", "lsp-daemon", "package.json"), JSON.stringify(packageJson), "utf-8")
+}
 
 function createResolver(commands: Readonly<Record<string, string>>) {
   return (commandName: string): RuntimeExecutable => {

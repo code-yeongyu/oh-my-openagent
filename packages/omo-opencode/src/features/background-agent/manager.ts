@@ -69,6 +69,7 @@ import {
   getSessionErrorMessage,
   isAbortedSessionError,
   isRecord,
+  isTerminalSessionError,
 } from "./error-classifier"
 import { isEmptyNoProgressAssistantTurnInfo } from "./empty-assistant-turn"
 import { tryFallbackRetry } from "./fallback-retry-handler"
@@ -1308,11 +1309,10 @@ The fallback retry session is now created and can be inspected directly.
     }
 
     if (existingTask.status === "running") {
-      log("[background-agent] Resume skipped - task already running:", {
-        taskId: existingTask.id,
-        sessionID: existingTask.sessionId,
-      })
-      return existingTask
+      throw new Error(
+        `Task ${existingTask.id} is currently running and cannot accept a continuation prompt. ` +
+        "Wait for it to complete before resuming it with task_id.",
+      )
     }
 
     const resumeSnapshot = this.captureResumeTaskSnapshot(existingTask)
@@ -2081,13 +2081,21 @@ The fallback retry session is now created and can be inspected directly.
     const sessionId = task.sessionId
     if (sessionId) {
       const sessionStillAlive = await this.verifySessionExists(sessionId)
-      if (sessionStillAlive) {
+      if (sessionStillAlive && !isTerminalSessionError(errorInfo)) {
         this.logger("[background-agent] session.error received but session still alive, treating as transient:", {
           taskId: task.id,
           sessionId,
           errorMessage: errorMsg?.slice(0, 200),
         })
         return
+      }
+      if (sessionStillAlive && isTerminalSessionError(errorInfo)) {
+        this.logger("[background-agent] Finalizing task after terminal session.error (session shell alive but will never produce output):", {
+          taskId: task.id,
+          sessionId,
+          errorName,
+          errorMessage: errorMsg?.slice(0, 200),
+        })
       }
     }
 
