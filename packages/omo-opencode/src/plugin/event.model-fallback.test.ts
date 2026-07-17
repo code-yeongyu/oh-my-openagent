@@ -562,7 +562,7 @@ describe("createEventHandler - model fallback", () => {
     expect(promptCalls).toEqual([sessionID])
     expect(output.message["model"]).toMatchObject({
       providerID: "opencode-go",
-      modelID: "kimi-k2.6",
+      modelID: "kimi-k3",
     })
     expect(output.message["variant"]).toBeUndefined()
   })
@@ -1073,17 +1073,17 @@ describe("createEventHandler - model fallback", () => {
     //#then - first fallback entry applied (no-op skip: claude-opus-4-7 matches current model after normalization)
     expect(first.message["model"]).toMatchObject({
       providerID: "opencode-go",
-      modelID: "kimi-k2.6",
+      modelID: "kimi-k3",
     })
     expect(first.message["variant"]).toBeUndefined()
 
     //#when - second retry cycle
-    const second = await triggerRetryCycle("opencode-go", "kimi-k2.6")
+    const second = await triggerRetryCycle("opencode-go", "kimi-k3")
 
-    //#then - second fallback entry applied (chain advanced past opencode-go/kimi-k2.6)
+    //#then - second fallback entry applied (chain advanced past opencode-go/kimi-k3)
     expect(second.message["model"]).toMatchObject({
-      providerID: "kimi-for-coding",
-      modelID: "k2p5",
+      providerID: "opencode-go",
+      modelID: "kimi-k2.6",
     })
     expect(second.message["variant"]).toBeUndefined()
     expect(abortCalls).toEqual([sessionID, sessionID])
