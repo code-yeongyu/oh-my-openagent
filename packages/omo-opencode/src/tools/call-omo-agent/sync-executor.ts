@@ -35,6 +35,7 @@ type ExecuteSyncDeps = {
 type SpawnReservation = {
   commit: () => number
   rollback: () => void
+  release?: () => void
 }
 
 const defaultDeps: ExecuteSyncDeps = {
@@ -187,6 +188,7 @@ export async function executeSync(
     spawnReservation?.rollback()
     throw error
   } finally {
+    spawnReservation?.release?.()
     if (sessionID && appliedFallbackChain) {
       deps.clearSessionFallbackChain(sessionID)
     }
