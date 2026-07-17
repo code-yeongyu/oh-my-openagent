@@ -2,9 +2,11 @@
 
 ## Source Identity
 
+- Integrated exact head: `801aedfaa06daf090df57d1ddf676458ad1e1b2e`
 - Runtime commit: `0e9ea8ff9c929ca2672064dfbc10b9219b9b50cb`
 - Runtime tree: `41300676c55d178ff790cf2d0a829cb9483791b2`
-- The live harness compares every repaired production/test path with the runtime commit and records `source_matches=yes`.
+- Integrated parent from current `origin/dev`: `8af398565abfaece6d5fc3e6bc4ef0c7efa9bb7a`
+- The live harness ran at the integrated exact head, compares every repaired production/test path with the runtime commit, and records `source_matches=yes`.
 
 ## What Was Tested
 
