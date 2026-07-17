@@ -52,7 +52,12 @@ export function createCompletionNotifier(deps: CompletionNotifierDeps): Completi
     const key = retryKey(entry)
     if (scheduledRetries.has(key)) return
     const retryNumber = (scheduledRetryCounts.get(key) ?? 0) + 1
-    if (retryNumber > MAX_SCHEDULED_RETRIES) return
+    if (retryNumber > MAX_SCHEDULED_RETRIES) {
+      // Exhausted the backoff ladder: drop the retry state so it does not leak for the lifetime of
+      // the process. A later reconcile or notifyTerminal for the same epoch will restart fresh.
+      finishRetryChain(entry)
+      return
+    }
     scheduledRetryCounts.set(key, retryNumber)
     const cancel = schedule(() => {
       scheduledRetries.delete(key)

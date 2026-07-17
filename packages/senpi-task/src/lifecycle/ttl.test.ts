@@ -7,6 +7,7 @@ import { createTaskLifecycle } from "./create"
 import type { ProcessSignaller } from "./port"
 import {
   cleanupProjects,
+  fakeHandle,
   FakeRegistry,
   seedRecord,
   settings,
@@ -99,5 +100,29 @@ describe("cleanupExpiredRecords (TTL)", () => {
 
     // then
     expect(result.deleted).toContain("st_00000005")
+  })
+
+  test("#given an expired terminal record owned by a live resident handle #when cleaning #then it is retained until the handle is forgotten", () => {
+    // given
+    const store = tempStore()
+    seedRecord(store, { task_id: "st_00000006", status: "completed", updated_at: iso(TTL + 1) })
+    const registry = new FakeRegistry()
+    registry.add(fakeHandle("st_00000006", "in-process", []))
+    const lifecycle = createTaskLifecycle({ store, registry, config: settings({ ttl_ms: TTL }), now })
+
+    // when
+    const retained = lifecycle.cleanupExpiredRecords()
+
+    // then the live resident protects the record; deleting it would orphan an in-memory handle
+    expect(retained.retained).toContain("st_00000006")
+    expect(existsSync(recordPath(store, "st_00000006"))).toBe(true)
+
+    // when the resident is forgotten and cleanup runs again
+    registry.forget("st_00000006")
+    const afterForget = lifecycle.cleanupExpiredRecords()
+
+    // then the expired terminal record can be safely removed
+    expect(afterForget.deleted).toContain("st_00000006")
+    expect(existsSync(recordPath(store, "st_00000006"))).toBe(false)
   })
 })
