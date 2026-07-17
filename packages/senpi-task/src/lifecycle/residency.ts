@@ -1,10 +1,8 @@
 import type { TaskRecord } from "../state"
-import type { LifecycleContext } from "./context"
+import { TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import { AgentLimitReached } from "./errors"
 import type { AdmissionResult } from "./types"
-
-const EVICTABLE_STATUSES = new Set<TaskRecord["status"]>(["completed", "error", "interrupted"])
 
 /**
  * Residency cap gate (codex residency contract). A resident is a spawned-not-disposed child of the
@@ -39,9 +37,10 @@ function residentsFor(context: LifecycleContext, parentSessionId: string): reado
 }
 
 // Oldest-first scan (updated_at is touched on every steer/revive, so it tracks recency of use). The
-// first terminal resident with no pending send is the LRU victim.
+// first terminal resident with no pending send is the LRU victim. EVERY terminal status (including
+// lost and cancelled) is reclaimable: a lost child is unreachable and must never pin a slot.
 function lruEvictable(context: LifecycleContext, residents: readonly TaskRecord[]): TaskRecord | undefined {
   return [...residents]
-    .filter((record) => EVICTABLE_STATUSES.has(record.status) && !context.registry.hasPendingSends(record.task_id))
+    .filter((record) => TERMINAL_STATUSES.has(record.status) && !context.registry.hasPendingSends(record.task_id))
     .toSorted((left, right) => left.updated_at.localeCompare(right.updated_at))[0]
 }
