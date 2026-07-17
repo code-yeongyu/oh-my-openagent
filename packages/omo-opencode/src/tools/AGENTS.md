@@ -1,6 +1,6 @@
-# src/tools/ — 12–31 Native Tools Across 13 Tool Directories (+ shared utilities)
+# src/tools/ — 12–36 Native Tools Across 14 Tool Directories (+ shared utilities)
 
-**Generated:** 2026-05-15
+**Generated:** 2026-07-17
 
 ## OVERVIEW
 
@@ -20,14 +20,16 @@ Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `sr
 
 > LSP tools are provided by the built-in `lsp` MCP (Tier-1 stdio), backed by `packages/lsp-tools-mcp/`. AST-aware code search and rewrite is available through the `ast-grep` skill using `sg`.
 
-### Conditional (up to +19 native tools)
+### Conditional (up to +24 native tools)
 
 | Tool(s) | Gate | Source |
 |---------|------|--------|
 | `look_at` | not in `disabled_agents` for `multimodal-looker` | `look-at/` |
 | `interactive_bash` | `isInteractiveBashEnabled(config)` (tmux config) | `interactive-bash/` |
+| `monitor_start`, `monitor_stop`, `monitor_list`, `monitor_output` | `monitor.enabled` | `monitor/` |
 | `task_create`, `task_get`, `task_list`, `task_update` | `experimental.task_system` | `task/` |
 | `edit` (hashline-edit) | `hashline_edit: true` | `hashline-edit/` |
+| `wait-for-background-tasks` | `experimental.block_on_background_tasks` and retained by final tool filtering | `background-task/` |
 | 12 `team_*` tools | `team_mode.enabled: true` | `../features/team-mode/tools/` |
 
 ### 12 team_* Tools (when team_mode enabled)
@@ -68,7 +70,7 @@ User-defined categories declared in `categories: { ... }` config override and ex
 
 ```
 tools/
-├── background-task/      # background_output, background_cancel (LLM interface; engine in features/background-agent)
+├── background-task/      # background_output, background_cancel, conditional wait-for-background-tasks
 ├── call-omo-agent/       # call_omo_agent (explore + librarian only)
 ├── delegate-task/        # task — full delegation with categories + skills
 ├── glob/                 # glob (60s timeout, 100 file limit)
@@ -76,6 +78,7 @@ tools/
 ├── hashline-edit/        # edit — hash-anchored line edits with LINE#ID validation
 ├── interactive-bash/     # interactive_bash — tmux session control
 ├── look-at/              # look_at — image/PDF analysis
+├── monitor/              # 4 monitor_* tools (config-gated)
 ├── session-manager/      # 4 session_* tools
 ├── skill/                # skill — load skill or run command
 ├── skill-mcp/            # skill_mcp — call skill-embedded MCP servers

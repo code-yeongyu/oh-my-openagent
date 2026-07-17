@@ -129,7 +129,7 @@ pluginModule.server(input, options)   # serverPlugin() in packages/omo-opencode/
 | Handler | OpenCode Hook | Purpose |
 |---------|---------------|---------|
 | `config` | `config` | 6-phase pipeline: provider → plugin-components → agents → tools → MCPs → commands |
-| `tool` | `tool` | 12–35 registered tools (config-gated: team-mode +12, monitor +4, task system +4, hashline +1, interactive_bash +1, look_at +1) |
+| `tool` | `tool` | 12–36 registered tools (config-gated: team-mode +12, monitor +4, task system +4, hashline +1, interactive_bash +1, look_at +1, background wait +1) |
 | `tool.definition` | `tool.definition` | Per-tool definition transform (applies `todo-description-override`) |
 | `chat.message` | `chat.message` | First-message variant, session setup, keyword detection (ultrawork/search/analyze/team) |
 | `chat.params` | `chat.params` | Anthropic effort, think mode, runtime fallback override |
@@ -149,7 +149,7 @@ pluginModule.server(input, options)   # serverPlugin() in packages/omo-opencode/
 
 > Note: the 8 LSP aliases (`lsp_status`, `lsp_diagnostics`, `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_prepare_rename`, `lsp_rename`, `lsp_install_decision`) are NOT registry registrations — they are served by the built-in `lsp` MCP via `packages/lsp-tools-mcp`. Structural search and rewrite is provided by the `ast-grep` skill using `sg`.
 
-**Conditional (up to 35 total):** `look_at` (+1, multimodal-looker not disabled), `interactive_bash` (+1, `tmux` binary available on PATH via `isInteractiveBashEnabled()`), `monitor_start`/`monitor_stop`/`monitor_list`/`monitor_output` (+4, `monitor.enabled`), `task_create`/`task_get`/`task_list`/`task_update` (+4, `experimental.task_system`), `edit` (+1, `hashline_edit`), `team_create`/`team_delete`/`team_shutdown_request`/`team_approve_shutdown`/`team_reject_shutdown`/`team_send_message`/`team_task_create`/`team_task_list`/`team_task_update`/`team_task_get`/`team_status`/`team_list` (+12, `team_mode.enabled`).
+**Conditional (up to 36 total):** `look_at` (+1, multimodal-looker not disabled), `interactive_bash` (+1, `tmux` binary available on PATH via `isInteractiveBashEnabled()`), `monitor_start`/`monitor_stop`/`monitor_list`/`monitor_output` (+4, `monitor.enabled`), `task_create`/`task_get`/`task_list`/`task_update` (+4, `experimental.task_system`), `edit` (+1, `hashline_edit`), `wait-for-background-tasks` (+1, `experimental.block_on_background_tasks` and retained by final tool filtering), `team_create`/`team_delete`/`team_shutdown_request`/`team_approve_shutdown`/`team_reject_shutdown`/`team_send_message`/`team_task_create`/`team_task_list`/`team_task_update`/`team_task_get`/`team_status`/`team_list` (+12, `team_mode.enabled`).
 
 ## TEAM MODE
 

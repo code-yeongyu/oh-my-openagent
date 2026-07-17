@@ -11,7 +11,7 @@ Core glue layer. Files assemble the 12 OpenCode hook handlers wired into `Plugin
 | File | OpenCode Hook | Purpose |
 |------|---------------|---------|
 | `config.ts` | `config` | 6-phase config loading pipeline (delegates to `plugin-handlers/`) |
-| `tool-registry.ts` | `tool` | 12–35 tools assembled with config gates (team-mode +12, monitor +4, task system +4, hashline +1, interactive_bash +1, look_at +1); split across `tool-registry-{core-tools,team-tools,gated-tools}.ts` |
+| `tool-registry.ts` | `tool` | 12–36 tools assembled with config gates (team-mode +12, monitor +4, task system +4, hashline +1, interactive_bash +1, look_at +1, background wait +1); split across `tool-registry-{core-tools,team-tools,gated-tools}.ts` |
 | `tool-definition.ts` | `tool.definition` | Per-tool definition transform (applies todo-description-override) |
 | `chat-message.ts` | `chat.message` | First-message variant resolution, session setup, keyword detection trigger |
 | `chat-params.ts` | `chat.params` | Anthropic effort, think mode, runtime fallback model override |
