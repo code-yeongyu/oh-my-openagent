@@ -11,45 +11,9 @@ import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { createSessionStatusHandler } from "./session-status-handler"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
-import { normalizeModelToCanonicalString } from "./normalize-model"
 import { clearInternalAbortOwnership, consumeInternalAbortOwnership } from "./internal-abort-ownership"
 import { isRuntimeFallbackActive } from "./lifecycle"
-
-function isRuntimeFallbackRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
-
-function resolveEventModel(props: Record<string, unknown> | undefined): string | undefined {
-  const normalizedModel = normalizeModelToCanonicalString(props?.model)
-  if (normalizedModel) {
-    return normalizedModel
-  }
-
-  const providerID = props?.providerID
-  const modelID = props?.modelID
-  if (typeof providerID === "string" && typeof modelID === "string") {
-    return `${providerID}/${modelID}`
-  }
-
-  return undefined
-}
-
-function resolvePreferredSessionModel(
-  sessionID: string,
-  agent: string | undefined,
-  pluginConfig: HookDeps["pluginConfig"],
-): string | undefined {
-  const agentConfig = agent && pluginConfig?.agents
-    ? pluginConfig.agents[agent]
-    : undefined
-  if (typeof agentConfig?.model === "string") return agentConfig.model
-
-  const category = typeof agentConfig?.category === "string"
-    ? agentConfig.category
-    : SessionCategoryRegistry.get(sessionID)
-  const categoryModel = category ? pluginConfig?.categories?.[category]?.model : undefined
-  return typeof categoryModel === "string" ? categoryModel : undefined
-}
+import { resolveCreatedSessionModel, resolveEventModel } from "./event-model"
 
 export function createEventHandler(
   deps: HookDeps,
@@ -79,23 +43,11 @@ export function createEventHandler(
 
   const handleSessionCreated = (props: Record<string, unknown> | undefined) => {
     const sessionID = resolveSessionEventID(props)
-    const sessionInfo = props ? props.info : undefined
-    const sessionRecord = isRuntimeFallbackRecord(sessionInfo) ? sessionInfo : undefined
-    const sessionModel = sessionRecord?.["model"]
-    const sessionAgent = sessionRecord?.["agent"]
-    const model = normalizeModelToCanonicalString(sessionModel)
-    const agent = typeof sessionAgent === "string"
-      ? sessionAgent
-      : props && typeof props.agent === "string"
-        ? props.agent
-        : undefined
-
-    if (sessionID && model) {
+    if (sessionID) {
+      const sessionModel = resolveCreatedSessionModel(sessionID, props, pluginConfig)
+      if (!sessionModel) return
+      const { model, preferredModel, fallbackIndex } = sessionModel
       log(`[${HOOK_NAME}] Session created with model`, { sessionID, model })
-      const preferredModel = resolvePreferredSessionModel(sessionID, agent, pluginConfig)
-      const fallbackIndex = preferredModel && preferredModel !== model
-        ? getFallbackModelsForSession(sessionID, agent, pluginConfig).indexOf(model)
-        : -1
       const state = createFallbackState(fallbackIndex >= 0 && preferredModel ? preferredModel : model)
       if (fallbackIndex >= 0) {
         state.currentModel = model
