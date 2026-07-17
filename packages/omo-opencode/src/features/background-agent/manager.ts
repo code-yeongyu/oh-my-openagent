@@ -600,6 +600,15 @@ export class BackgroundManager {
     snapshot: ResumeTaskSnapshot,
     skippedStatus: Exclude<PromptAsyncGateResult["status"], "dispatched" | "queued" | "failed">,
   ): void {
+    if (task.status !== "running" || this.shutdownTriggered) {
+      log("[background-agent] Skipping stale resume restoration after task state changed:", {
+        taskId: task.id,
+        status: task.status,
+        skippedStatus,
+      })
+      return
+    }
+
     log("[background-agent] Restoring task after skipped resume prompt:", {
       taskId: task.id,
       sessionID: task.sessionId,
@@ -2574,6 +2583,8 @@ The task was re-queued on a fallback model after a retryable failure.
   }
 
   private scheduleTaskRemoval(taskId: string, rescheduleCount = 0): void {
+    if (this.shutdownTriggered) return
+
     const existingTimer = this.completionTimers.get(taskId)
     if (existingTimer) {
       clearTimeout(existingTimer)
@@ -2843,6 +2854,8 @@ The task was re-queued on a fallback model after a retryable failure.
           log("[background-agent] onSubagentSessionDeleted callback failed:", { taskId: task.id, sessionID: task.sessionId, error: String(error) })
         })
       }
+
+      if (this.shutdownTriggered) return true
 
       // Update continuation marker for CLI run mode
       if (task.parentSessionId) {
@@ -3165,7 +3178,11 @@ The task was re-queued on a fallback model after a retryable failure.
           task.completedAt = new Date()
           if (wasPending) {
             if (removedFromQueue) {
+              const hadPreStartReservation = this.preStartDescendantReservations.has(task.id)
               this.rollbackPreStartDescendantReservation(task)
+              if (!hadPreStartReservation) {
+                this.releaseTaskRootDescendant(task)
+              }
             }
           } else {
             this.releaseTaskRootDescendant(task)

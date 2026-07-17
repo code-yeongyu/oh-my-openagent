@@ -278,6 +278,12 @@ function getPendingParentWakes(manager: BackgroundManager): Map<string, PendingP
   }>(manager)).parentWakeNotifier.getPendingParentWakes()
 }
 
+function getPendingParentWakeTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
+  return (cast<{
+    parentWakeNotifier: { getPendingParentWakeTimers: () => Map<string, ReturnType<typeof setTimeout>> }
+  }>(manager)).parentWakeNotifier.getPendingParentWakeTimers()
+}
+
 function getDispatchedParentWakes(manager: BackgroundManager): Map<string, PendingParentWakeForTest> {
   return (cast<{
     parentWakeNotifier: { getDispatchedParentWakes: () => Map<string, PendingParentWakeForTest> }
@@ -3877,6 +3883,47 @@ describe("BackgroundManager.tryCompleteTask", () => {
     }
   })
 
+  test("does not recreate parent wakes or cleanup timers when completion resumes after shutdown", async () => {
+    //#given
+    let releaseAbort: (() => void) | undefined
+    let signalAbortStarted: (() => void) | undefined
+    const abortGate = new Promise<void>((resolve) => { releaseAbort = resolve })
+    const abortStarted = new Promise<void>((resolve) => { signalAbortStarted = resolve })
+    const client = {
+      session: {
+        status: async () => ({ data: { "parent-session-shutdown-completion": { type: "busy" } } }),
+        messages: async () => ({ data: [] }),
+        abort: async () => {
+          signalAbortStarted?.()
+          await abortGate
+          return {}
+        },
+      },
+    }
+    manager.shutdown()
+    manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const task = createMockTask({
+      id: "task-shutdown-during-completion",
+      sessionId: "session-shutdown-during-completion",
+      parentSessionId: "parent-session-shutdown-completion",
+      status: "running",
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    const completion = tryCompleteTaskForTest(manager, task)
+    await abortStarted
+    const shutdown = manager.shutdown()
+    releaseAbort?.()
+    await Promise.all([completion, shutdown])
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(getPendingParentWakes(manager).size).toBe(0)
+    expect(getPendingParentWakeTimers(manager).size).toBe(0)
+    expect(getCompletionTimers(manager).size).toBe(0)
+  })
+
   test("background work clears once finalization queues a wake for the active parent turn", () => {
     // #given completion preparation is in flight for a parent session
     const parentSessionID = "session-parent-active-wait"
@@ -4417,6 +4464,55 @@ describe("BackgroundManager.resume promptAsync gate state", () => {
     expect(getPendingByParent(manager).get("parent-session-new")).toBeUndefined()
 
     manager.shutdown()
+  })
+
+  test("does not restore a completed snapshot after cancellation wins a delayed skipped resume", async () => {
+    //#given
+    let resolveStatus: ((value: { data: Record<string, { type: string }> }) => void) | undefined
+    const statusGate = new Promise<{ data: Record<string, { type: string }> }>((resolve) => {
+      resolveStatus = resolve
+    })
+    const client = {
+      session: {
+        status: async () => statusGate,
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const task = createMockTask({
+      id: "task-cancelled-delayed-resume-skip",
+      sessionId: "session-cancelled-delayed-resume-skip",
+      parentSessionId: "parent-session-original",
+      parentMessageId: "msg-original",
+      status: "completed",
+      completedAt: new Date(),
+      concurrencyGroup: "explore",
+      rootSessionId: "root-session-cancelled-delayed-resume-skip",
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    await manager.resume({
+      sessionId: task.sessionId!,
+      prompt: "continue",
+      parentSessionId: "parent-session-new",
+      parentMessageId: "msg-new",
+    })
+    const cancelled = await manager.cancelTask(task.id, { source: "test", skipNotification: true })
+    expect(cancelled).toBe(true)
+    expect(task.status).toBe("cancelled")
+
+    resolveStatus?.({ data: { [task.sessionId!]: { type: "busy" } } })
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(task.status).toBe("cancelled")
+    expect(task.parentSessionId).toBe("parent-session-new")
+    expect(task.parentMessageId).toBe("msg-new")
+    expect(task.concurrencyKey).toBeUndefined()
+
+    await manager.shutdown()
   })
 
   test("restores completed task state when resume prompt is skipped by an existing reservation", async () => {
@@ -8725,6 +8821,40 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
     expect(getRootDescendantCounts(manager).has(task.rootSessionId)).toBe(false)
     expect(manager.hasActiveDescendantTasks(task.rootSessionId)).toBe(false)
     expect(manager.hasBackgroundWorkInFlight(task.rootSessionId)).toBe(false)
+
+    manager.shutdown()
+  })
+
+  test("releases retained root ownership when a stale fallback retry is removed from its queue", () => {
+    //#given
+    const manager = createBackgroundManager()
+    const task = createMockTask({
+      id: "task-stale-fallback-retry",
+      parentSessionId: "parent-session",
+      status: "pending",
+      queuedAt: new Date(Date.now() - 31 * 60 * 1000),
+      startedAt: undefined,
+      rootSessionId: "root-session-stale-fallback-retry",
+    })
+    const key = task.agent
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionId: task.parentSessionId,
+    }
+    getTaskMap(manager).set(task.id, task)
+    getQueuesByKey(manager).set(key, [{ task, input }])
+    getRootDescendantCounts(manager).set(task.rootSessionId!, 1)
+
+    //#when
+    pruneStaleTasksAndNotificationsForTest(manager)
+
+    //#then
+    expect(getQueuesByKey(manager).get(key)).toBeUndefined()
+    expect(task.status).toBe("error")
+    expect(getRootDescendantCounts(manager).has(task.rootSessionId!)).toBe(false)
+    expect(manager.hasBackgroundWorkInFlight(task.rootSessionId!)).toBe(false)
 
     manager.shutdown()
   })

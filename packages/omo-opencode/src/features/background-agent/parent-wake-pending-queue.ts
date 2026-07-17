@@ -19,6 +19,7 @@ type ParentWakePendingQueueOptions = {
 export class ParentWakePendingQueue {
   private pendingParentWakes: Map<string, PendingParentWake> = new Map()
   private pendingParentWakeTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
+  private shutdownTriggered = false
 
   constructor(private readonly options: ParentWakePendingQueueOptions) {}
 
@@ -48,6 +49,8 @@ export class ParentWakePendingQueue {
     promptContext: ParentWakePromptContext,
     shouldReply: boolean,
   ): void {
+    if (this.shutdownTriggered) return
+
     const now = Date.now()
     const resolvedPromptContext = resolveParentWakePromptContext(promptContext)
     const pendingWake = this.pendingParentWakes.get(sessionID)
@@ -75,6 +78,8 @@ export class ParentWakePendingQueue {
   }
 
   requeueWake(sessionID: string, latestWake: PendingParentWake): void {
+    if (this.shutdownTriggered) return
+
     const now = Date.now()
     const pendingWake = this.pendingParentWakes.get(sessionID)
     if (pendingWake) {
@@ -105,6 +110,8 @@ export class ParentWakePendingQueue {
   }
 
   scheduleFlush(sessionID: string, operation: () => Promise<void>, delayMs?: number): void {
+    if (this.shutdownTriggered) return
+
     if (this.pendingParentWakeTimers.has(sessionID)) {
       return
     }
@@ -131,6 +138,7 @@ export class ParentWakePendingQueue {
   }
 
   shutdown(): void {
+    this.shutdownTriggered = true
     for (const timer of this.pendingParentWakeTimers.values()) {
       clearTimeout(timer)
     }
