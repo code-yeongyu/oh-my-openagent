@@ -1,0 +1,18 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-abort-lifecycle-races.test.ts:
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort is rejected #when the same retry arrives again #then the hook retries cancellation and dispatches fallback [4.45ms]
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort event precedes its response #when the next retry arrives #then fallback ownership advances to the second model [0.99ms]
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort is pending #when the hook is disposed #then its response cannot dispatch or recreate a timeout [0.15ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/abort-rejection-handlers.test.ts:
+(pass) runtime fallback abort rejection > #given a message retry signal while a retry is active #when abort is rejected #then ownership and the active retry are preserved [0.50ms]
+(pass) runtime fallback abort rejection > #given a quota error with a fallback #when abort is rejected #then no replacement request is dispatched [0.48ms]
+(pass) runtime fallback abort rejection > #given a session retry signal while a retry is active #when abort is rejected #then the active retry remains authoritative [0.11ms]
+(pass) runtime fallback abort rejection > #given a rejected session retry abort #when the same retry signal arrives again #then it can acquire ownership and dispatch fallback [0.15ms]
+(pass) runtime fallback abort rejection > #given a pending fallback and a newer session retry signal #when abort is rejected #then pending ownership is preserved [0.10ms]
+
+ 8 pass
+ 0 fail
+ 17 expect() calls
+Ran 8 tests across 2 files. [180.00ms]
