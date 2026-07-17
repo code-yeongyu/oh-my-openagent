@@ -1,0 +1,26 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/event-handler.test.ts:
+(pass) createEventHandler > #given a session retry dedupe key #when session.stop fires #then the retry dedupe key is cleared [0.76ms]
+(pass) createEventHandler > #given a session retry dedupe key without a pending fallback result #when session.idle fires #then the retry dedupe key is cleared [0.15ms]
+(pass) createEventHandler > #given a cancelled session #when session.error receives an abort error #then fallback retry state is reset [0.30ms]
+(pass) createEventHandler > #given a cancelled session #when session.idle fires #then fallback retry state stays cleared [0.15ms]
+(pass) createEventHandler > #given a session we aborted ourselves (internal abort flag set) #when session.error fires with isAbort #then fallback retry state is preserved (issue #4006) [0.13ms]
+(pass) createEventHandler > #given an external abort (no internal flag) #when session.error fires with isAbort #then state is still reset as a real cancellation [0.10ms]
+(pass) createEventHandler > #given two consecutive internal-abort cycles #when session.error fires each time #then attemptCount can progress past 1 [0.10ms]
+(pass) createEventHandler > #given session.created with an object-shaped model (opencode 1.15.x) #when the event fires #then state stores a canonical string model (issue #4315) [0.16ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.test.ts:
+(pass) createSessionStatusHandler > #given pending fallback prompt may already be accepted #when provider retry status arrives #then it keeps waiting for that accepted prompt [0.99ms]
+(pass) createSessionStatusHandler > #given a pending fallback model #when a new provider cooldown retry arrives #then the handler overrides the pending fallback and advances the chain [0.50ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/abort-wire-ordering.test.ts:
+(pass) runtime-fallback abort wire ordering > #given OpenCode publishes the watchdog abort before its HTTP response #when the event is observed #then fallback ownership survives and dispatch continues [2.47ms]
+(pass) runtime-fallback abort wire ordering > #given overlapping internal abort callers for one session #when OpenCode emits one internal terminal #then the next abort event remains a genuine cancellation [0.22ms]
+(pass) runtime-fallback abort wire ordering > #given status fallback and watchdog share one abort #when the terminal arrives during status dispatch #then the status fallback remains authoritative [0.26ms]
+(pass) runtime-fallback abort wire ordering > #given a status fallback replaces the silent request #when the original watchdog deadline passes #then the accepted fallback is not aborted or advanced [0.48ms]
+
+ 14 pass
+ 0 fail
+ 54 expect() calls
+Ran 14 tests across 3 files. [87.00ms]
