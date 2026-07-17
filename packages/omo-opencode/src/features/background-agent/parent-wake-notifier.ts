@@ -16,6 +16,7 @@ import {
 export type { ParentWakePromptContext, PendingParentWake } from "./parent-wake-dedupe"
 
 export class ParentWakeNotifier {
+  private shutdownTriggered = false
   private readonly pendingQueue: ParentWakePendingQueue
   private readonly dispatchedTracker: ParentWakeDispatchedTracker
   private readonly sessionInspector: ParentWakeSessionInspector
@@ -66,6 +67,7 @@ export class ParentWakeNotifier {
       pendingQueue: this.pendingQueue,
       dispatchedTracker: this.dispatchedTracker,
       sessionInspector: this.sessionInspector,
+      shouldDispatch: () => !this.shutdownTriggered,
     })
   }
 
@@ -174,6 +176,7 @@ export class ParentWakeNotifier {
   }
 
   shutdown(): void {
+    this.shutdownTriggered = true
     this.pendingQueue.shutdown()
     this.dispatchedTracker.shutdown()
     this.sessionInspector.shutdown()
