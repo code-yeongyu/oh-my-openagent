@@ -758,6 +758,14 @@ cleanup. See `thirty-second-review-repair.md` and the refreshed sanitized
 `live-*` artifacts. Fresh dev integration and exact-head evidence follow in
 the terminal cycle.
 
+Fresh dev `3a1b5f91a6e2628b66dfbaa9d9dca7c21269626d` was then merged as
+the second parent of `f3acdc5cbb52ec14a6eed2743a07fcb3d6b3223b`.
+Integrated verification passed `17/17` focused, `332/332` runtime-fallback,
+and `66/66` lifecycle/model tests plus every static gate and a fresh
+production-duration isolated OpenCode run on that exact merge source. See
+`thirty-second-integrated-evidence.md` and the refreshed sanitized `live-*`
+artifacts.
+
 The tests cover main and subagent watchdog ownership, progress and terminal
 cancellation, cancellation while abort is in flight, pre-acknowledgement
 external abort errors, acknowledged internal abort errors, expected
