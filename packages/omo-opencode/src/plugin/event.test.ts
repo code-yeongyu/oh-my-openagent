@@ -567,7 +567,7 @@ describe("createEventHandler - idle deduplication", () => {
 	it("does NOT dedup session.idle events for DIFFERENT sessionIDs", async () => {
 		//#given
 		const originalDateNow = Date.now
-		const currentNow = 20_000
+		let currentNow = 20_000
 		Date.now = () => currentNow
 		const onEvent = mock<(event: EventInput["event"]) => void>(() => {})
 		const sessionNotification = mock(async (_input: EventInput) => {})
