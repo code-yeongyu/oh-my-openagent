@@ -233,6 +233,26 @@ describe("tryFallbackRetry", () => {
       expect(settled).toBe(true)
     })
 
+    test("does not enqueue when shutdown begins while aborting the failed session", async () => {
+      const args = createDefaultArgs({ sessionId: "session-to-abort" })
+      const deferred = createDeferredPromise()
+      let shuttingDown = false
+      args.abortMock.mockImplementationOnce(() => deferred.promise)
+
+      const retryPromise = tryFallbackRetry({
+        ...args,
+        isShuttingDown: () => shuttingDown,
+      })
+      while (args.abortMock.mock.calls.length === 0) await Promise.resolve()
+      shuttingDown = true
+      deferred.resolve()
+      const retried = await retryPromise
+
+      expect(retried).toBe(false)
+      expect(args.queuesByKey.size).toBe(0)
+      expect(args.processKey).not.toHaveBeenCalled()
+    })
+
     test("adds retry input to queue and calls processKey", async () => {
       const args = createDefaultArgs()
 

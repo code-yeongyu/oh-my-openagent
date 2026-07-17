@@ -58,6 +58,7 @@ export async function tryFallbackRetry(args: {
   idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>>
   queuesByKey: Map<string, QueueItem[]>
   processKey: (key: string) => void
+  isShuttingDown?: () => boolean
   onRetrying?: (details: {
     task: BackgroundTask
     source: string
@@ -70,6 +71,7 @@ export async function tryFallbackRetry(args: {
 }): Promise<boolean> {
   const { task, errorInfo, source, concurrencyManager, client, idleDeferralTimers, queuesByKey, processKey, onRetrying } = args
   const deps = { ...defaultFallbackRetryHandlerDeps, ...args.deps }
+  if (args.isShuttingDown?.()) return false
   const fallbackChain = task.fallbackChain
   const canUseProviderExhaustionFallback = deps.isProviderExhaustionFallbackEligible(errorInfo)
   const canRetry =
@@ -230,6 +232,8 @@ export async function tryFallbackRetry(args: {
   if (previousSessionID) {
     await abortWithTimeout(client, previousSessionID).catch(() => {})
   }
+
+  if (args.isShuttingDown?.()) return false
 
   queue.push({ task, input: retryInput, attemptID: nextAttempt.attemptId, rawConcurrencyKey: rawKey })
   queuesByKey.set(key, queue)

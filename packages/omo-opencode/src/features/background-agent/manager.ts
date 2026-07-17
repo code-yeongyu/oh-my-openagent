@@ -865,7 +865,7 @@ export class BackgroundManager {
   }
 
   private async processKey(key: string): Promise<void> {
-    if (this.processingKeys.has(key)) {
+    if (this.shutdownTriggered || this.processingKeys.has(key)) {
       return
     }
 
@@ -873,7 +873,7 @@ export class BackgroundManager {
 
     try {
       const queue = this.queuesByKey.get(key)
-      while (queue && queue.length > 0) {
+      while (!this.shutdownTriggered && queue && queue.length > 0) {
         const item = queue.shift()
         if (!item) {
           continue
@@ -887,6 +887,12 @@ export class BackgroundManager {
             continue
           }
           throw error
+        }
+
+        if (this.shutdownTriggered) {
+          this.rollbackPreStartDescendantReservation(item.task)
+          this.concurrencyManager.release(key)
+          return
         }
 
         if (item.task.status === "cancelled" || item.task.status === "error" || item.task.status === "interrupt") {
@@ -1513,6 +1519,10 @@ The fallback retry session is now created and can be inspected directly.
     parentAgent?: string
     concurrencyKey?: string
   }): Promise<BackgroundTask> {
+    if (this.shutdownTriggered) {
+      throw new Error("Background manager is shutting down")
+    }
+
     const existingTask = this.tasks.get(input.taskId)
     if (existingTask) {
       // P2 fix: Clean up old parent's pending set BEFORE changing parent
@@ -2533,6 +2543,7 @@ The fallback retry session is now created and can be inspected directly.
         idleDeferralTimers: this.idleDeferralTimers,
         queuesByKey: this.queuesByKey,
         processKey: (key: string) => this.processKey(key),
+        isShuttingDown: () => this.shutdownTriggered,
         onRetrying: ({ task, source }) => {
           const currentAttempt = getCurrentAttempt(task)
           const previousAttempt = getPreviousAttempt(task, currentAttempt?.attemptId)
@@ -2790,6 +2801,7 @@ The task was re-queued on a fallback model after a retryable failure.
       if (wasRunning && abortSession && task.sessionId) {
         const aborted = await this.abortSessionWithLogging(task.sessionId, `task cancellation (${source})`)
         if (!aborted) return false
+        if (this.shutdownTriggered) return false
         if (task.status !== "running") return false
 
         clearDelegatedChildSessionBootstrap(task.sessionId)

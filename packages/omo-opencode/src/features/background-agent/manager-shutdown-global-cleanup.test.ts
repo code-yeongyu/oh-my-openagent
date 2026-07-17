@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { tmpdir } from "node:os"
 
 import { _resetForTesting, subagentSessions } from "../claude-code-session-state"
@@ -48,6 +48,21 @@ function createBackgroundManager(): BackgroundManager {
     serverUrl: new URL("https://example.com"),
     $: {} as never,
   } as never })
+}
+
+type ManagerInternals = {
+  tasks: Map<string, BackgroundTask>
+  queuesByKey: Map<string, Array<{ task: BackgroundTask; input: never; rawConcurrencyKey: string }>>
+  pendingByParent: Map<string, Set<string>>
+  notifications: Map<string, BackgroundTask[]>
+  taskHistory: { getByParentSession: (parentSessionID: string) => unknown[] }
+  pollingInterval?: ReturnType<typeof setInterval>
+  concurrencyManager: { acquire: (key: string, taskID: string) => Promise<void> }
+  processKey: (key: string) => Promise<void>
+}
+
+function getInternals(manager: BackgroundManager): ManagerInternals {
+  return manager as unknown as ManagerInternals
 }
 
 describe("BackgroundManager shutdown global cleanup", () => {
@@ -151,5 +166,93 @@ describe("BackgroundManager shutdown global cleanup", () => {
     await shutdownPromise
 
     expect(settled).toBe(true)
+  })
+
+  test("rejects externally tracked tasks after shutdown", async () => {
+    // given
+    const manager = createBackgroundManager()
+    await manager.shutdown()
+
+    // when / then
+    await expect(manager.trackTask({
+      taskId: "task-after-shutdown",
+      sessionId: "session-after-shutdown",
+      parentSessionId: "parent-after-shutdown",
+      description: "must not be tracked",
+      agent: "explore",
+    })).rejects.toThrow("Background manager is shutting down")
+
+    const internals = getInternals(manager)
+    expect(internals.tasks.size).toBe(0)
+    expect(internals.pendingByParent.size).toBe(0)
+    expect(internals.pollingInterval).toBeUndefined()
+    expect(manager.hasBackgroundWorkInFlight("parent-after-shutdown")).toBe(false)
+  })
+
+  test("does not process a queue after shutdown", async () => {
+    // given
+    const manager = createBackgroundManager()
+    await manager.shutdown()
+    const internals = getInternals(manager)
+    const acquire = mock(async () => {})
+    internals.concurrencyManager.acquire = acquire
+    const task = createTask({
+      id: "task-queued-after-shutdown",
+      sessionId: "",
+      status: "pending",
+    })
+    internals.queuesByKey.set("explore", [{
+      task,
+      input: {} as never,
+      rawConcurrencyKey: "explore",
+    }])
+
+    // when
+    await internals.processKey("explore")
+
+    // then
+    expect(acquire).not.toHaveBeenCalled()
+  })
+
+  test("does not recreate cancellation state when an abort resumes after shutdown", async () => {
+    // given
+    const firstAbort = createDeferredPromise()
+    let abortCalls = 0
+    const manager = createBackgroundManager()
+    const internals = getInternals(manager)
+    const task = createTask({
+      id: "task-cancel-resumes-after-shutdown",
+      sessionId: "session-cancel-resumes-after-shutdown",
+    })
+    internals.tasks.set(task.id, task)
+    Object.assign(manager, {
+      client: {
+        session: {
+          abort: () => {
+            abortCalls += 1
+            return abortCalls === 1 ? firstAbort.promise : Promise.resolve({})
+          },
+          prompt: async () => ({}),
+          promptAsync: async () => ({}),
+        },
+      },
+    })
+
+    // when
+    const cancellation = manager.cancelTask(task.id, { source: "test" })
+    while (abortCalls === 0) await Promise.resolve()
+    await manager.shutdown()
+    firstAbort.resolve()
+    const cancelled = await cancellation
+
+    // then
+    expect(cancelled).toBe(false)
+    expect(abortCalls).toBe(2)
+    expect(internals.tasks.size).toBe(0)
+    expect(internals.notifications.size).toBe(0)
+    expect(internals.pendingByParent.size).toBe(0)
+    expect(internals.taskHistory.getByParentSession(task.parentSessionId)).toHaveLength(0)
+    expect(internals.pollingInterval).toBeUndefined()
+    expect(manager.hasBackgroundWorkInFlight(task.parentSessionId)).toBe(false)
   })
 })
