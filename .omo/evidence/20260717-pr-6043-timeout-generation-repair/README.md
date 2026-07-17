@@ -22,6 +22,8 @@
 - Full runtime-fallback suite: `364 pass`, `0 fail` across 58 files.
 - Typecheck, scoped Biome lint, no-excuse, source diff, and pure-LOC gates passed.
 - Changed files remain at 102, 224, and 233 pure LOC.
+- The clean committed live run at `74c448e76e17efe4700a1294035f617247dfcf8a` recovered the silent main/root request through one owned fallback, restored the older root after deleting the newer root, did not re-arm the fallback-owned turn, and classified a later user abort as external cancellation.
+- The real OpenCode database remained unchanged at 5,751 sessions; the isolated sandbox contained one QA session and was removed.
 
 ## Why It Is Enough
 

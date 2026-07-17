@@ -1,4 +1,6 @@
-Resolving dependencies
-Resolved, downloaded and extracted [2]
-Saved lockfile
-Checked 3 files in 7ms. No fixes applied.
+command=bunx @biomejs/biome lint --no-errors-on-unmatched <three timeout-generation repair paths>
+biome_version=2.5.4
+files_checked=3
+fixes_applied=0
+observed=Checked 3 files in 7ms. No fixes applied.
+verdict=PASS
