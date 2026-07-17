@@ -16,6 +16,8 @@ export function createAbortSessionRequest(deps: HookDeps) {
       source === "message.updated.quota-fallback" ||
       source === "session.timeout" ||
       source === "first-prompt-watchdog"
+    let request: Promise<boolean> | undefined
+    const isCurrentAbortRequest = () => deps.internalAbortRequests?.get(sessionID) === request
 
     const runAbort = async (): Promise<boolean> => {
       if (!isRuntimeFallbackActive(deps)) return false
@@ -29,6 +31,10 @@ export function createAbortSessionRequest(deps: HookDeps) {
           path: { id: sessionID },
           throwOnError: true,
         })
+        if (isInternalAbort && !isCurrentAbortRequest()) {
+          releaseInternalAbortOwnership(deps, sessionID)
+          return false
+        }
         if (!isRuntimeFallbackActive(deps)) {
           if (isInternalAbort) releaseInternalAbortOwnership(deps, sessionID)
           return false
@@ -58,6 +64,10 @@ export function createAbortSessionRequest(deps: HookDeps) {
         log(`[${HOOK_NAME}] Aborted in-flight session request (${source})`, { sessionID })
         return true
       } catch (error) {
+        if (isInternalAbort && !isCurrentAbortRequest()) {
+          releaseInternalAbortOwnership(deps, sessionID)
+          return false
+        }
         if (isInternalAbort) {
           releaseInternalAbortOwnership(deps, sessionID)
         }
@@ -84,7 +94,7 @@ export function createAbortSessionRequest(deps: HookDeps) {
       return false
     }
 
-    const request = runAbort()
+    request = runAbort()
     deps.internalAbortRequests.set(sessionID, request)
     try {
       return await request

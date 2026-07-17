@@ -137,6 +137,7 @@ export function createRuntimeFallbackHook(
       if (!config.enabled) return
       const props = event.properties as Record<string, unknown> | undefined
       const info = props?.info as Record<string, unknown> | undefined
+      if (info?.role === "user") await baseEventHandler({ event })
       const sessionID = typeof info?.sessionID === "string" ? info.sessionID : undefined
       const awaitingFallback = sessionID !== undefined && deps.sessionAwaitingFallbackResult.has(sessionID)
       await messageUpdateHandler(props)

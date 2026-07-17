@@ -4,6 +4,12 @@ import { createAutoRetryHelpers } from "./auto-retry"
 import { createFallbackState } from "./fallback-state"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((done) => { resolve = done })
+  return { promise, resolve }
+}
+
 function createContext(promptCalls: { count: number }): RuntimeFallbackPluginInput {
   const session = {
     abort: async () => ({}),
@@ -201,6 +207,32 @@ describe("createAutoRetryHelpers", () => {
     // then
     expect(deps.sessionStates.has(sessionID)).toBe(false)
     expect(deps.sessionLastAccess.has(sessionID)).toBe(false)
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(false)
+  })
+
+  test("#given a stale session has a pending internal abort #when cleanup evicts it #then a late response stays invalidated", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    const abortResponse = deferred<unknown>()
+    const abortStarted = deferred<void>()
+    deps.ctx.client.session.abort = async () => {
+      abortStarted.resolve()
+      return abortResponse.promise
+    }
+    const helpers = createAutoRetryHelpers(deps)
+    const sessionID = "session-stale-pending-abort"
+
+    // when
+    const pendingAbort = helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
+    await abortStarted.promise
+    deps.sessionLastAccess.set(sessionID, Date.now() - 31 * 60 * 1000)
+    helpers.cleanupStaleSessions()
+    abortResponse.resolve({})
+
+    // then
+    expect(await pendingAbort).toBe(false)
+    expect(deps.internalAbortRequests?.has(sessionID)).toBe(false)
     expect(deps.internallyAbortedSessions.has(sessionID)).toBe(false)
   })
 })

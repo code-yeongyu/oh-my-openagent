@@ -28,6 +28,7 @@ export function createStaleSessionCleanup(
         sessionLastAccess.delete(sessionID)
         sessionRetryInFlight.delete(sessionID)
         sessionAwaitingFallbackResult.delete(sessionID)
+        deps.internalAbortRequests?.delete(sessionID)
         clearInternalAbortOwnership(deps, sessionID)
         clearSessionFallbackTimeout(sessionID)
         clearDelegatedChildSessionBootstrap(sessionID)

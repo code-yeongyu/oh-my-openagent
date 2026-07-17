@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { createAutoRetryHelpers } from "./auto-retry"
 import { createRuntimeFallbackHook } from "./hook"
 import type { RuntimeFallbackPluginInput } from "./types"
 
@@ -163,5 +164,53 @@ describe("runtime-fallback composed abort lifecycle races", () => {
     await retry
 
     expect(promptModels).toEqual([])
+  })
+
+  it("#given an older status retry is resolving #when a newer user turn arrives #then the stale retry cannot abort or dispatch", async () => {
+    const resolution = createDeferred<string | undefined>()
+    const resolutionStarted = createDeferred<void>()
+    const promptModels: string[] = []
+    let abortCalls = 0
+    const hook = createRuntimeFallbackHook(
+      createContext(async () => { abortCalls += 1; return {} }, promptModels),
+      {
+        config: {
+          enabled: true,
+          retry_on_errors: [429, 503, 529],
+          max_fallback_attempts: 3,
+          cooldown_seconds: 60,
+          timeout_seconds: 30,
+          notify_on_fallback: false,
+          restore_primary_after_cooldown: false,
+        },
+        pluginConfig: {
+          categories: { test: { fallback_models: ["openai/fallback-one"] } },
+        },
+      },
+      {
+        createAutoRetryHelpers: (deps) => ({
+          ...createAutoRetryHelpers(deps),
+          resolveAgentForSessionFromContext: async () => {
+            resolutionStarted.resolve()
+            return resolution.promise
+          },
+        }),
+      },
+    )
+    SessionCategoryRegistry.register(SESSION_ID, "test")
+
+    const pendingRetry = hook.event(retryEvent(1))
+    await resolutionStarted.promise
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: { info: { id: "new-user-message", role: "user", sessionID: SESSION_ID } },
+      },
+    })
+    resolution.resolve("test")
+    await pendingRetry
+
+    expect({ abortCalls, promptModels }).toEqual({ abortCalls: 0, promptModels: [] })
+    hook.dispose?.()
   })
 })
