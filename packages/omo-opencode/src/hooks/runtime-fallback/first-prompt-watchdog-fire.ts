@@ -2,10 +2,11 @@ import { subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
-import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { getFallbackModelsForSession } from "./fallback-models"
+import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { createFallbackState } from "./fallback-state"
+import { releaseInternalAbortOwnership } from "./internal-abort-ownership"
 import type { HookDeps } from "./types"
 
 const SOURCE = "first-prompt-watchdog"
@@ -98,7 +99,7 @@ export async function fireFirstPromptWatchdog(input: FireFirstPromptWatchdogInpu
       source: SOURCE,
     })
   } finally {
-    deps.internallyAbortedSessions.delete(sessionID)
+    releaseInternalAbortOwnership(deps, sessionID)
   }
 
   if (isLifecycleCurrent() && !isSessionCurrent()) {

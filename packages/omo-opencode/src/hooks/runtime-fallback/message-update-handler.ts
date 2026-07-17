@@ -11,6 +11,7 @@ import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { resolveMessageEventSessionID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
+import { clearInternalAbortOwnership } from "./internal-abort-ownership"
 
 export { hasVisibleAssistantResponse } from "./visible-assistant-response"
 
@@ -44,7 +45,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
 
     if (sessionID && role === "user") {
       if (!sessionAwaitingFallbackResult.has(sessionID)) {
-        deps.internallyAbortedSessions.delete(sessionID)
+        clearInternalAbortOwnership(deps, sessionID)
       }
       return
     }

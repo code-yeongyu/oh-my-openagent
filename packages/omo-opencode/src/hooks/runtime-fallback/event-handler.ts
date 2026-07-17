@@ -12,6 +12,7 @@ import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { createSessionStatusHandler } from "./session-status-handler"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
+import { clearInternalAbortOwnership, consumeInternalAbortOwnership } from "./internal-abort-ownership"
 
 function isRuntimeFallbackRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
@@ -62,7 +63,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
 
     sessionRetryInFlight.delete(sessionID)
     sessionAwaitingFallbackResult.delete(sessionID)
-    deps.internallyAbortedSessions.delete(sessionID)
+    clearInternalAbortOwnership(deps, sessionID)
     sessionStatusRetryKeys.delete(sessionID)
     helpers.clearSessionFallbackTimeout(sessionID)
   }
@@ -106,7 +107,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       sessionLastAccess.delete(sessionID)
       sessionRetryInFlight.delete(sessionID)
       sessionAwaitingFallbackResult.delete(sessionID)
-      deps.internallyAbortedSessions.delete(sessionID)
+      clearInternalAbortOwnership(deps, sessionID)
       helpers.clearSessionFallbackTimeout(sessionID)
       sessionStatusRetryKeys.delete(sessionID)
       SessionCategoryRegistry.remove(sessionID)
@@ -183,8 +184,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       // If we triggered this abort to swap in a fallback model, consume the
       // flag and preserve state — wiping attemptCount here is what causes
       // the infinite retry loop (issue #4006).
-      if (deps.internallyAbortedSessions.has(sessionID)) {
-        deps.internallyAbortedSessions.delete(sessionID)
+      if (consumeInternalAbortOwnership(deps, sessionID)) {
         log(`[${HOOK_NAME}] session.error matched internal abort; preserving retry state`, { sessionID, resolvedAgent })
         return
       }

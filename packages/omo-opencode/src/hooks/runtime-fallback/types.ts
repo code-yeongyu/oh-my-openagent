@@ -1,4 +1,4 @@
-import type { RuntimeFallbackConfig, OhMyOpenCodeConfig } from "../../config"
+import type { OhMyOpenCodeConfig, RuntimeFallbackConfig } from "../../config"
 
 export interface RuntimeFallbackInterval {
   unref: () => void
@@ -97,4 +97,5 @@ export interface HookDeps {
    * loop (every cycle started over at attempt:1). See issue #4006.
    */
   internallyAbortedSessions: Set<string>
+  internalAbortOwnershipCounts?: Map<string, number>
 }

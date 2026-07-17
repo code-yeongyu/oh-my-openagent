@@ -6,6 +6,7 @@ import { getMainSessionID, isMainSession, subagentSessions } from "../../feature
 import { createWatchdogAbortProvenance } from "./watchdog-abort-provenance"
 import type { ArmedWatchdog, WatchdogEventDecision } from "./first-prompt-watchdog-types"
 import { fireFirstPromptWatchdog } from "./first-prompt-watchdog-fire"
+import { acquireInternalAbortOwnership, clearInternalAbortOwnership } from "./internal-abort-ownership"
 
 const SOURCE = "first-prompt-watchdog"
 
@@ -107,8 +108,7 @@ export function createFirstPromptWatchdog(
 
   return {
     onUserMessage(sessionID, model, agent, messageID) {
-      if (!sessionID || deps.sessionAwaitingFallbackResult.has(sessionID)) return
-      if (armed.has(sessionID)) return
+      if (!sessionID || deps.sessionAwaitingFallbackResult.has(sessionID) || armed.has(sessionID)) return
       progressed.delete(sessionID)
 
       const wasSubagent = subagentSessions.has(sessionID)
@@ -149,14 +149,14 @@ export function createFirstPromptWatchdog(
           && abortProvenance.consumePrior(sessionID, suspendedContext.sessionGeneration)
         if (isPriorGeneration) return { kind: "inspect-terminal", sessionID }
         suspended.delete(sessionID)
-        deps.internallyAbortedSessions.delete(sessionID)
+        clearInternalAbortOwnership(deps, sessionID)
         cancel(sessionID, true)
         log(`[${HOOK_NAME}] ${SOURCE}: resolved external cancellation`, { sessionID })
         return { kind: "resolve-terminal", sessionID }
       }
       if (suspendedContext) {
         abortProvenance.consumePrior(sessionID, suspendedContext.sessionGeneration)
-        deps.internallyAbortedSessions.add(sessionID)
+        acquireInternalAbortOwnership(deps, sessionID)
         cancel(sessionID, true)
         return { kind: "resolve-terminal", sessionID }
       }
@@ -183,7 +183,7 @@ export function createFirstPromptWatchdog(
         if (eventType === "session.idle") return
         if (eventType === "session.error" && isAbortEvent === false) {
           abortProvenance.consumePrior(sessionID, suspendedContext.sessionGeneration)
-          deps.internallyAbortedSessions.add(sessionID)
+          acquireInternalAbortOwnership(deps, sessionID)
           cancel(sessionID, true)
           return { kind: "resolve-terminal", sessionID }
         }
@@ -194,7 +194,7 @@ export function createFirstPromptWatchdog(
         ) {
           return { kind: "consume-terminal", sessionID }
         }
-        deps.internallyAbortedSessions.delete(sessionID)
+        clearInternalAbortOwnership(deps, sessionID)
         cancel(sessionID)
         return { kind: "resolve-terminal", sessionID }
       }
@@ -214,7 +214,7 @@ export function createFirstPromptWatchdog(
           log(`[${HOOK_NAME}] ${SOURCE}: deferred ambiguous abort for message correlation`, { sessionID })
           return { kind: "defer-terminal", sessionID }
         }
-        deps.internallyAbortedSessions.delete(sessionID)
+        clearInternalAbortOwnership(deps, sessionID)
         abortProvenance.clear(sessionID)
       }
       if (!armed.has(sessionID)) {
@@ -240,11 +240,11 @@ export function createFirstPromptWatchdog(
       suspended.delete(sessionID)
       const shouldResumeWatchdog = !suspendedAfterProgress.delete(sessionID)
       if (currentRequestActive) {
-        deps.internallyAbortedSessions.add(sessionID)
+        acquireInternalAbortOwnership(deps, sessionID)
         if (shouldResumeWatchdog && !armed.has(sessionID)) arm(suspendedContext)
         log(`[${HOOK_NAME}] ${SOURCE}: resolved delayed prior-generation abort`, { sessionID })
       } else {
-        deps.internallyAbortedSessions.delete(sessionID)
+        clearInternalAbortOwnership(deps, sessionID)
         cancel(sessionID, true)
         log(`[${HOOK_NAME}] ${SOURCE}: resolved external cancellation`, { sessionID })
       }

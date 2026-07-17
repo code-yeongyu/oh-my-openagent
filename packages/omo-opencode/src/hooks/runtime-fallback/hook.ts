@@ -1,10 +1,11 @@
+import { isSessionActive } from "../../shared/session-idle-settle"
 import { createAutoRetryHelpers } from "./auto-retry"
 import { createChatMessageHandler } from "./chat-message-handler"
 import { DEFAULT_CONFIG } from "./constants"
 import { createEventHandler } from "./event-handler"
 import { createFirstPromptWatchdog, observeEventForWatchdog } from "./first-prompt-watchdog"
+import { clearAllInternalAbortOwnership } from "./internal-abort-ownership"
 import { createMessageUpdateHandler } from "./message-update-handler"
-import { isSessionActive } from "../../shared/session-idle-settle"
 import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
 
 declare function setInterval(callback: () => void, delay?: number): RuntimeFallbackInterval
@@ -156,7 +157,7 @@ export function createRuntimeFallbackHook(
     deps.sessionAwaitingFallbackResult.clear()
     deps.sessionFallbackTimeouts.clear()
     deps.sessionStatusRetryKeys.clear()
-    deps.internallyAbortedSessions.clear()
+    clearAllInternalAbortOwnership(deps)
   }
 
   return {

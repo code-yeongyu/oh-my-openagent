@@ -1,7 +1,9 @@
-import type { HookDeps } from "./types"
-import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
+import { getPromptReservation } from "../../shared/prompt-async-gate/reservations"
 import { releasePromptAsyncReservation } from "../shared/prompt-async-gate"
+import { HOOK_NAME } from "./constants"
+import { acquireInternalAbortOwnership, releaseInternalAbortOwnership } from "./internal-abort-ownership"
+import type { HookDeps } from "./types"
 
 export function createAbortSessionRequest(deps: HookDeps) {
   const { ctx } = deps
@@ -15,9 +17,10 @@ export function createAbortSessionRequest(deps: HookDeps) {
       source === "first-prompt-watchdog"
 
     if (isInternalAbort) {
-      deps.internallyAbortedSessions.add(sessionID)
+      acquireInternalAbortOwnership(deps, sessionID)
       deps.sessionLastAccess.set(sessionID, Date.now())
     }
+    const reservationToken = getPromptReservation(sessionID)?.token
     try {
       const result = await ctx.client.session.abort({
         path: { id: sessionID },
@@ -30,7 +33,7 @@ export function createAbortSessionRequest(deps: HookDeps) {
         result.error !== undefined
       ) {
         if (isInternalAbort) {
-          deps.internallyAbortedSessions.delete(sessionID)
+          releaseInternalAbortOwnership(deps, sessionID)
         }
         log(`[${HOOK_NAME}] Failed to abort in-flight session request (${source})`, {
           sessionID,
@@ -38,16 +41,18 @@ export function createAbortSessionRequest(deps: HookDeps) {
         })
         return false
       }
-      releasePromptAsyncReservation(sessionID, `runtime-fallback-abort:${source}`, {
-        reservedBy: `runtime-fallback:${source}`,
-        reservedByPrefix: "runtime-fallback:",
-        supersedeTransientRetryOwners: true,
-      })
+      if (reservationToken !== undefined && getPromptReservation(sessionID)?.token === reservationToken) {
+        releasePromptAsyncReservation(sessionID, `runtime-fallback-abort:${source}`, {
+          reservedBy: `runtime-fallback:${source}`,
+          reservedByPrefix: "runtime-fallback:",
+          supersedeTransientRetryOwners: true,
+        })
+      }
       log(`[${HOOK_NAME}] Aborted in-flight session request (${source})`, { sessionID })
       return true
     } catch (error) {
       if (isInternalAbort) {
-        deps.internallyAbortedSessions.delete(sessionID)
+        releaseInternalAbortOwnership(deps, sessionID)
       }
       if (!(error instanceof Error)) {
         log(`[${HOOK_NAME}] Failed to abort in-flight session request (${source})`, {

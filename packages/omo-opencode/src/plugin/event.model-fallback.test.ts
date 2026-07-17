@@ -1,16 +1,15 @@
 /// <reference types="bun-types" />
 import { afterEach, describe, expect, spyOn, test } from "bun:test"
-
-import { createEventHandler } from "./event"
-import { createChatMessageHandler } from "./chat-message"
+import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 import { _resetForTesting, setMainSession } from "../features/claude-code-session-state"
-import { createModelFallbackHook, clearPendingModelFallback } from "../hooks/model-fallback/hook"
-import * as connectedProvidersCache from "../shared/connected-providers-cache"
+import { clearPendingModelFallback, createModelFallbackHook } from "../hooks/model-fallback/hook"
 import {
   releaseAllPromptAsyncReservationsForTesting,
   releasePromptAsyncReservation,
 } from "../hooks/shared/prompt-async-gate"
-import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
+import * as connectedProvidersCache from "../shared/connected-providers-cache"
+import { createChatMessageHandler } from "./chat-message"
+import { createEventHandler } from "./event"
 
 type EventInput = { event: { type: string; properties?: unknown } }
 type EventHandlerInput = Parameters<ReturnType<typeof createEventHandler>>[0]
@@ -35,7 +34,7 @@ describe("createEventHandler - model fallback", () => {
   const createHandler = (args?: {
     hooks?: unknown
     pluginConfig?: unknown
-    abort?: (input: { path: { id: string } }) => Promise<unknown>
+    abort?: (input: { path: { id: string }; throwOnError?: boolean }) => Promise<unknown>
     promptAsync?: (input: { path: { id: string } }) => Promise<unknown>
   }) => {
     setupConnectedProviderCacheMocks()
@@ -44,10 +43,11 @@ describe("createEventHandler - model fallback", () => {
     const promptAsyncCalls: string[] = []
 
     const sessionClient = {
-      abort: async ({ path }: { path: { id: string } }) => {
+      abort: async (input: { path: { id: string }; throwOnError?: boolean }) => {
+        const { path } = input
         abortCalls.push(path.id)
         if (args?.abort) {
-          return args.abort({ path })
+          return args.abort(input)
         }
         return {}
       },
@@ -413,6 +413,56 @@ describe("createEventHandler - model fallback", () => {
     //#then
     expect(pendingFallbackArms).toBe(1)
     expect(abortCalls).toEqual([sessionID])
+    expect(promptAsyncCalls).toEqual([])
+  })
+
+  test("#given the SDK resolves a non-2xx abort #when model-fallback handles an assistant error #then it requests throwing semantics and does not inject another prompt", async () => {
+    const sessionID = "ses_model_fallback_abort_resolved_error"
+    setMainSession(sessionID)
+    let abortCalledWithThrowOnError = false
+    const modelFallback = unsafeTestValue({
+      setSessionFallbackChain: () => {},
+      setPendingModelFallback: () => true,
+    })
+    const { handler, abortCalls, promptAsyncCalls } = createHandler({
+      hooks: { modelFallback },
+      abort: async (input) => {
+        abortCalledWithThrowOnError = input.throwOnError === true
+        return {
+          data: undefined,
+          error: { name: "NotFoundError" },
+          response: new Response(null, { status: 404 }),
+        }
+      },
+      promptAsync: async () => ({}),
+    })
+    const assistantError = {
+      name: "APIError",
+      data: {
+        message: "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+        isRetryable: true,
+      },
+    }
+
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_err_abort_resolved_error",
+            sessionID,
+            role: "assistant",
+            error: assistantError,
+            modelID: "claude-opus-4-7-thinking",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    expect(abortCalls).toEqual([sessionID])
+    expect(abortCalledWithThrowOnError).toBe(true)
     expect(promptAsyncCalls).toEqual([])
   })
 

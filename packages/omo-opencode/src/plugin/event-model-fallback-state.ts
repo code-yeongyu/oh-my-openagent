@@ -12,9 +12,9 @@ import { createInternalAgentContinuationTextPart } from "../shared";
 import { getAgentConfigKey } from "../shared/agent-display-names";
 import { readConnectedProvidersCache } from "../shared/connected-providers-cache";
 import { buildFallbackChainFromModels } from "../shared/fallback-chain-from-models";
+import { log } from "../shared/logger";
 import { isAmbiguousPostDispatchPromptFailure } from "../shared/prompt-failure-classifier";
 import { getSessionModel } from "../shared/session-model-state";
-import { log } from "../shared/logger";
 import type { PluginEventContext } from "./event-types";
 
 export type FallbackContinuationContext = {
@@ -166,7 +166,23 @@ export function createModelFallbackContinuationController(args: {
     let dispatched = false;
     try {
       try {
-        await pluginContext.client.session.abort({ path: { id: sessionID } });
+        const abortResult = await pluginContext.client.session.abort({
+          path: { id: sessionID },
+          throwOnError: true,
+        });
+        if (
+          typeof abortResult === "object"
+          && abortResult !== null
+          && "error" in abortResult
+          && abortResult.error !== undefined
+        ) {
+          log("[event] model-fallback abort failed", {
+            sessionID,
+            source,
+            error: abortResult.error,
+          });
+          return;
+        }
       } catch (error) {
         log("[event] model-fallback abort failed", {
           sessionID,

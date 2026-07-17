@@ -1,8 +1,9 @@
-import type { HookDeps } from "./types"
-import { HOOK_NAME } from "./constants"
+import { clearDelegatedChildSessionBootstrap } from "../../shared/delegated-child-session-bootstrap"
 import { log } from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
-import { clearDelegatedChildSessionBootstrap } from "../../shared/delegated-child-session-bootstrap"
+import { HOOK_NAME } from "./constants"
+import { clearInternalAbortOwnership } from "./internal-abort-ownership"
+import type { HookDeps } from "./types"
 
 const SESSION_TTL_MS = 30 * 60 * 1000
 
@@ -16,7 +17,6 @@ export function createStaleSessionCleanup(
     sessionRetryInFlight,
     sessionAwaitingFallbackResult,
     sessionStatusRetryKeys,
-    internallyAbortedSessions,
   } = deps
 
   return () => {
@@ -28,7 +28,7 @@ export function createStaleSessionCleanup(
         sessionLastAccess.delete(sessionID)
         sessionRetryInFlight.delete(sessionID)
         sessionAwaitingFallbackResult.delete(sessionID)
-        internallyAbortedSessions.delete(sessionID)
+        clearInternalAbortOwnership(deps, sessionID)
         clearSessionFallbackTimeout(sessionID)
         clearDelegatedChildSessionBootstrap(sessionID)
         SessionCategoryRegistry.remove(sessionID)
