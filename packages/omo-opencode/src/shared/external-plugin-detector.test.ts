@@ -20,12 +20,15 @@ describe("external-plugin-detector", () => {
   let tempDir: string
   let tempHomeDir: string
   let originalOpencodeConfigDir: string | undefined
+  let originalXdgConfigHome: string | undefined
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "omo-test-"))
     tempHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), "omo-home-"))
     originalOpencodeConfigDir = process.env.OPENCODE_CONFIG_DIR
+    originalXdgConfigHome = process.env.XDG_CONFIG_HOME
     delete process.env.OPENCODE_CONFIG_DIR
+    process.env.XDG_CONFIG_HOME = path.join(tempHomeDir, ".config")
   })
 
   afterEach(() => {
@@ -33,6 +36,11 @@ describe("external-plugin-detector", () => {
       delete process.env.OPENCODE_CONFIG_DIR
     } else {
       process.env.OPENCODE_CONFIG_DIR = originalOpencodeConfigDir
+    }
+    if (originalXdgConfigHome === undefined) {
+      delete process.env.XDG_CONFIG_HOME
+    } else {
+      process.env.XDG_CONFIG_HOME = originalXdgConfigHome
     }
     mock.restore()
     fs.rmSync(tempDir, { recursive: true, force: true })
@@ -458,11 +466,6 @@ describe("external-plugin-detector", () => {
       fs.writeFileSync(path.join(projectConfigDir, "opencode.json"), JSON.stringify({}))
       fs.writeFileSync(path.join(userConfigDir, "opencode.json"), JSON.stringify({ plugin: ["opencode-skills"] }))
 
-      const nodeOs = await import("node:os")
-      mock.module("node:os", () => ({
-        ...nodeOs,
-        homedir: () => tempHomeDir,
-      }))
       const { detectExternalSkillPlugin: detectExternalSkillPluginFresh } = await importFreshExternalPluginDetectorModule()
 
       // when
@@ -509,11 +512,6 @@ describe("external-plugin-detector", () => {
       )
       process.env.OPENCODE_CONFIG_DIR = profileConfigDir
 
-      const nodeOs = await import("node:os")
-      mock.module("node:os", () => ({
-        ...nodeOs,
-        homedir: () => tempHomeDir,
-      }))
       const { detectDuplicateOmoPlugin: detectDuplicateOmoPluginFresh } = await importFreshExternalPluginDetectorModule()
 
       // when
@@ -536,11 +534,6 @@ describe("external-plugin-detector", () => {
         path.join(opencodeDir, "opencode.json"),
         JSON.stringify({ plugin: ["oh-my-opencode", "npm:oh-my-openagent@latest"] }),
       )
-      const nodeOs = await import("node:os")
-      mock.module("node:os", () => ({
-        ...nodeOs,
-        homedir: () => tempHomeDir,
-      }))
       const { detectDuplicateOmoPlugin: detectDuplicateOmoPluginFresh } = await importFreshExternalPluginDetectorModule()
 
       // when

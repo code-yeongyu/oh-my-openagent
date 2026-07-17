@@ -1,4 +1,0 @@
-133:- **Browsing, 0-3 workers.** Pages plain fetch cannot read (WAF, 403, Cloudflare, dynamic rendering, login): the worker loads the `ultimate-browsing` skill and escalates through its tiers — Tier-1 insane-search engine first, then Tier-2 Chrome stealth — rather than abandoning the source. Capture screenshots when visual context matters. When one blocked territory hides many leads, fan out more browsing subagents in parallel for breadth instead of serializing one worker through them.
-raise law OK
-never a job title OK
-broadcast every lead OK

@@ -1,6 +1,0 @@
-scenario: 01-git-status-before
-surface: git worktree status
-invocation: git status --short --untracked-files=all
-started_at: 2026-07-06T11:02:01Z
-finished_at: 2026-07-06T11:02:01Z
-exit: 0

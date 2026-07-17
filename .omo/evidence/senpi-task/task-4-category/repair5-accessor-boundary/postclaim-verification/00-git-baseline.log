@@ -1,4 +1,0 @@
-cwd: /Volumes/mengmotaStorage/local-workspaces/omo-wt/senpi-task-w0-category
-head: cb3e0cc6ed37df463f9bbf241ee3198b16d62191
-head_oneline: cb3e0cc6e fix(senpi-task): reject accessor-backed category models
-status_before_postclaim_artifacts:

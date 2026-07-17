@@ -157,7 +157,7 @@
         "verify": "VERIFY — 동작 증명"
       },
       "tagline": "'적당히'로는 충분하지 않을 때.",
-      "model": "GPT 5.5 Medium"
+      "model": "GPT 5.6 Sol Medium"
     },
     "teamMode": {
       "badge": "v4.0+",
@@ -226,13 +226,13 @@
       "momus": {
         "name": "Momus",
         "role": "Plan Reviewer",
-        "model": "GPT 5.5 xHigh",
+        "model": "GPT 5.6 Sol xHigh",
         "description": "무자비한 검증. 계획이 완벽하지 않으면 승인하지 않습니다."
       },
       "atlas": {
         "name": "Atlas",
         "role": "병렬 태스크 실행가",
-        "model": "Claude Opus 4.7",
+        "model": "Claude Sonnet 4.6",
         "description": "의존성 추적과 함께 다단계 계획을 오케스트레이션. 전문가에게 위임하고 독립적으로 검증합니다."
       },
       "sisyphusJunior": {
@@ -244,7 +244,7 @@
       "multimodalLooker": {
         "name": "Multimodal-Looker",
         "role": "미디어 분석",
-        "model": "Claude Sonnet 4.6",
+        "model": "GPT 5.5 Medium",
         "description": "PDF, 이미지, 다이어그램에서 정보를 추출. 전체 읽기 없이 빠르게 요약을 뽑아냅니다."
       },
       "dynamicSystem": {

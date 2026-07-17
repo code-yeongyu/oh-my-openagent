@@ -20,4 +20,5 @@ test("#given aggregate MCP config #when inspected #then registers research MCPs 
 	assert.equal(Object.hasOwn(mcp.mcpServers, "ast_grep"), false);
 	assert.deepEqual(mcp.mcpServers.codegraph.args, ["components/codegraph/dist/serve.js"]);
 	assert.equal(mcp.mcpServers.codegraph.required, false);
+	assert.equal(mcp.mcpServers.lsp.startup_timeout_sec, 10);
 });

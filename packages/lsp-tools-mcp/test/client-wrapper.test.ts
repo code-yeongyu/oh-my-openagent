@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -9,6 +9,7 @@ import { findWorkspaceRoot, formatServerLookupError, withLspClient } from "../sr
 import { LspManager } from "../src/lsp/manager.js";
 import { recordInstallDecision } from "../src/lsp/server-install-state.js";
 import type { ResolvedServer, ServerLookupResult } from "../src/lsp/types.js";
+import { createStandaloneMcpRequestContext, runWithRequestContext } from "../src/request-context.js";
 
 import { FakeLspClient } from "./helpers/fake-lsp-client.js";
 
@@ -26,6 +27,10 @@ const notInstalled: Exclude<ServerLookupResult, { status: "found" }> = {
 	server: { id: "rust", command: ["rust-analyzer"], extensions: [".rs"] },
 	installHint: "rustup component add rust-analyzer",
 };
+
+function withRequestContext<T>(fn: () => T): T {
+	return runWithRequestContext(createStandaloneMcpRequestContext(), fn);
+}
 
 describe("formatServerLookupError install decisions", () => {
 	const tempDirectories: string[] = [];
@@ -55,7 +60,7 @@ describe("formatServerLookupError install decisions", () => {
 
 	it("#given no recorded decision #when formatting not_installed #then asks the user and explains decline recording", () => {
 		// when
-		const message = formatServerLookupError(notInstalled);
+		const message = withRequestContext(() => formatServerLookupError(notInstalled));
 
 		// then
 		expect(message).toContain("NOT INSTALLED");
@@ -69,10 +74,10 @@ describe("formatServerLookupError install decisions", () => {
 
 	it("#given a declined decision #when formatting not_installed #then returns a minimal one-line ignorable note", () => {
 		// given
-		recordInstallDecision("rust", "declined");
+		withRequestContext(() => recordInstallDecision("rust", "declined"));
 
 		// when
-		const message = formatServerLookupError(notInstalled);
+		const message = withRequestContext(() => formatServerLookupError(notInstalled));
 
 		// then
 		expect(message.trim().split("\n")).toHaveLength(1);
@@ -84,10 +89,10 @@ describe("formatServerLookupError install decisions", () => {
 
 	it("#given an allowed decision #when formatting not_installed #then keeps install steps but skips the ask", () => {
 		// given
-		recordInstallDecision("rust", "allowed");
+		withRequestContext(() => recordInstallDecision("rust", "allowed"));
 
 		// when
-		const message = formatServerLookupError(notInstalled);
+		const message = withRequestContext(() => formatServerLookupError(notInstalled));
 
 		// then
 		expect(message).toContain("NOT INSTALLED");
@@ -97,11 +102,11 @@ describe("formatServerLookupError install decisions", () => {
 	});
 
 	it("#given any decision state #when formatting not_installed #then keeps the hook quiet marker", () => {
-		const noDecision = formatServerLookupError(notInstalled);
-		recordInstallDecision("rust", "declined");
-		const declined = formatServerLookupError(notInstalled);
-		recordInstallDecision("rust", "allowed");
-		const allowed = formatServerLookupError(notInstalled);
+		const noDecision = withRequestContext(() => formatServerLookupError(notInstalled));
+		withRequestContext(() => recordInstallDecision("rust", "declined"));
+		const declined = withRequestContext(() => formatServerLookupError(notInstalled));
+		withRequestContext(() => recordInstallDecision("rust", "allowed"));
+		const allowed = withRequestContext(() => formatServerLookupError(notInstalled));
 
 		for (const message of [noDecision, declined, allowed]) {
 			expect(message).toContain("NOT INSTALLED");
@@ -148,20 +153,24 @@ describe("withLspClient", () => {
 
 		try {
 			// when
-			const result = await withLspClient(
-				filePath,
-				async (_client, workspaceRoot) => {
-					rootsSeen.push(workspaceRoot);
-					return workspaceRoot;
-				},
-				"rename",
-				{ manager },
+			const context = createStandaloneMcpRequestContext({ cwd: root });
+			const canonicalNestedWorkspace = realpathSync(nestedWorkspace);
+			const result = await runWithRequestContext(context, () =>
+				withLspClient(
+					filePath,
+					async (_client, workspaceRoot) => {
+						rootsSeen.push(workspaceRoot);
+						return workspaceRoot;
+					},
+					"rename",
+					{ manager },
+				),
 			);
 
 			// then
-			expect(findWorkspaceRoot(filePath)).toBe(nestedWorkspace);
-			expect(result).toBe(nestedWorkspace);
-			expect(rootsSeen).toEqual([nestedWorkspace]);
+			expect(runWithRequestContext(context, () => findWorkspaceRoot(filePath))).toBe(canonicalNestedWorkspace);
+			expect(result).toBe(canonicalNestedWorkspace);
+			expect(rootsSeen).toEqual([canonicalNestedWorkspace]);
 			expect(clients[0]?.stopCallCount).toBe(0);
 		} finally {
 			restoreEnv("LSP_TOOLS_MCP_USER_CONFIG", previousUserConfig);

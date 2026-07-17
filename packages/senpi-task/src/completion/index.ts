@@ -1,4 +1,4 @@
-export { buildCompletionDetails, buildCompletionMessage } from "./notification"
+export { buildCompletionDetails, buildCompletionMessage, completionMessageLines } from "./notification"
 export type { BuildDetailsOptions } from "./notification"
 export { routeCompletion, shouldNotifyStatus } from "./routing"
 export { createCompletionNotifier } from "./notifier"
@@ -7,15 +7,16 @@ export type {
   CompletionNotifier,
   CompletionNotifierDeps,
   CompletionNotifierStore,
+  CompletionRetrySchedule,
   CompletionRequest,
   DeliveredDecision,
   FlushInput,
   FlushResult,
-  NotificationConfig,
   NotifyResult,
   ParentNotifier,
   ParentNotifierMessage,
   ParentState,
+  ReconcileFailedNotificationsInput,
   RoutingDecision,
   SkipReason,
   TransitionReason,

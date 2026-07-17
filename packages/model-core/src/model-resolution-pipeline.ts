@@ -71,6 +71,25 @@ const DEFAULT_MODEL_RESOLUTION_DEPS: ModelResolutionDeps = {
   transformModelForProvider,
 }
 
+function findFallbackVariantForModel(
+  model: string,
+  fallbackChain: FallbackEntry[] | undefined,
+  transformModelForProvider: ModelResolutionDeps["transformModelForProvider"],
+): string | undefined {
+  const [provider, ...modelParts] = model.split("/")
+  if (!provider || modelParts.length === 0) {
+    return undefined
+  }
+
+  const modelID = modelParts.join("/")
+  return fallbackChain?.find(
+    (entry) =>
+      entry.providers.includes(provider) &&
+      transformModelForProvider(provider, entry.model) === modelID &&
+      entry.variant,
+  )?.variant
+}
+
 
 export function resolveModelPipeline(
   request: ModelResolutionRequest,
@@ -94,8 +113,15 @@ export function resolveModelPipeline(
 
   const normalizedUserModel = normalizeModel(intent?.userModel)
   if (normalizedUserModel) {
+    const inheritedVariant = findFallbackVariantForModel(
+      normalizedUserModel,
+      fallbackChain,
+      deps.transformModelForProvider,
+    )
     log("Model resolved via config override", { model: normalizedUserModel })
-    return { model: normalizedUserModel, provenance: "override" }
+    return inheritedVariant
+      ? { model: normalizedUserModel, provenance: "override", variant: inheritedVariant }
+      : { model: normalizedUserModel, provenance: "override" }
   }
 
   const normalizedCategoryDefault = normalizeModel(intent?.categoryDefaultModel)
@@ -209,20 +235,26 @@ export function resolveModelPipeline(
     } else {
       for (const entry of fallbackChain) {
         for (const provider of entry.providers) {
-          const fullModel = `${provider}/${entry.model}`
-          const match = deps.fuzzyMatchModel(fullModel, availableModels, [provider])
-          if (match) {
-            log("Model resolved via fallback chain (availability confirmed)", {
-              provider,
-              model: entry.model,
-              match,
-              variant: entry.variant,
-            })
-            return {
-              model: match,
-              provenance: "provider-fallback",
-              variant: entry.variant,
-              attempted,
+          const transformedModelId = deps.transformModelForProvider(provider, entry.model)
+          const candidateModelIds = transformedModelId === entry.model
+            ? [entry.model]
+            : [entry.model, transformedModelId]
+          for (const modelID of candidateModelIds) {
+            const fullModel = `${provider}/${modelID}`
+            const match = deps.fuzzyMatchModel(fullModel, availableModels, [provider])
+            if (match) {
+              log("Model resolved via fallback chain (availability confirmed)", {
+                provider,
+                model: entry.model,
+                match,
+                variant: entry.variant,
+              })
+              return {
+                model: match,
+                provenance: "provider-fallback",
+                variant: entry.variant,
+                attempted,
+              }
             }
           }
         }

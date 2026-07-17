@@ -185,4 +185,64 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
     expect(state.pendingFallbackModel).toBe("openai/gpt-5.4")
   })
+
+  test("#given a session WE internally aborted whose dangling assistant turn has no finish, no output and no terminal error #when auto retry runs #then the fallback dispatch fires immediately instead of looping forever on active-queue", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    const sessionID = "session-internally-aborted-dangling-assistant"
+    deps.internallyAbortedSessions.add(sessionID)
+    deps.ctx.client.session.messages = async () => ({
+      data: [
+        {
+          info: { role: "user" },
+          parts: [{ type: "text", text: "retry this" }],
+        },
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "reasoning", text: "aborted mid-reasoning" }],
+        },
+      ],
+    })
+    const helpers = createAutoRetryHelpers(deps)
+    const state = createFallbackState("openai/gpt-5.5")
+    state.pendingFallbackModel = "anthropic/claude-opus-4-8"
+    deps.sessionStates.set(sessionID, state)
+
+    // when
+    await helpers.autoRetryWithFallback(sessionID, "anthropic/claude-opus-4-8", undefined, "session.status")
+
+    // then
+    expect(promptCalls.count).toBe(1)
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
+  })
+
+  test("#given a session NOT internally aborted whose assistant turn is genuinely active #when auto retry runs #then the dispatch is still withheld (active-check preserved for live turns)", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    const sessionID = "session-genuinely-active-not-aborted"
+    deps.ctx.client.session.messages = async () => ({
+      data: [
+        {
+          info: { role: "user" },
+          parts: [{ type: "text", text: "retry this" }],
+        },
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "reasoning", text: "genuinely still working" }],
+        },
+      ],
+    })
+    const helpers = createAutoRetryHelpers(deps)
+    const state = createFallbackState("openai/gpt-5.5")
+    state.pendingFallbackModel = "anthropic/claude-opus-4-8"
+    deps.sessionStates.set(sessionID, state)
+
+    // when
+    await helpers.autoRetryWithFallback(sessionID, "anthropic/claude-opus-4-8", undefined, "session.status")
+
+    // then
+    expect(promptCalls.count).toBe(0)
+  })
 })

@@ -17,7 +17,7 @@ Print the following message to the user EXACTLY as written (in a friendly, celeb
 
 **Oh My OpenCode** is a powerful OpenCode plugin that transforms your AI agent into a full development team:
 
-- 🤖 **Multi-Agent Orchestration**: Oracle (GPT-5.5), Librarian (Claude), Explore (Grok), Frontend Engineer (Gemini), and more
+- 🤖 **Multi-Agent Orchestration**: Oracle (GPT-5.5), Librarian & Explore (GPT-5.4 Mini Fast), Frontend Engineer (Gemini), and more
 - 🔧 **LSP Tools**: Full IDE capabilities for your agents - hover, goto definition, find references, rename, code actions
 - 🔍 **AST-Grep**: Structural code search and replace across 25 languages
 - 📚 **Built-in MCPs**: Context7 for docs, Exa for web search, grep.app for GitHub code search

@@ -497,6 +497,28 @@ describe("getSisyphusJuniorPromptSource", () => {
     expect(source).toBe("kimi-k2")
   })
 
+  test("returns 'kimi-k3' for kimi-k3 model, not 'kimi-k2-7' or 'kimi-k2'", () => {
+    // given
+    const model = "opencode-go/kimi-k3"
+
+    // when
+    const source = getSisyphusJuniorPromptSource(model)
+
+    // then
+    expect(source).toBe("kimi-k3")
+  })
+
+  test("returns 'kimi-k3' for k3p1 shorthand", () => {
+    // given
+    const model = "kimi-for-coding/k3p1"
+
+    // when
+    const source = getSisyphusJuniorPromptSource(model)
+
+    // then
+    expect(source).toBe("kimi-k3")
+  })
+
   test("returns 'kimi-k2-7' for kimi-k2.7 model, not 'kimi-k2'", () => {
     // given
     const model = "opencode-go/kimi-k2.7"
@@ -663,6 +685,16 @@ describe("buildSisyphusJuniorPrompt", () => {
     expect(prompt).toContain("<Role>")
     expect(prompt).toContain("<Todo_Discipline>")
     expect(prompt).toContain("todowrite")
+  })
+
+  test("K3 model uses the K3-native prompt, not the K2.7 or K2.6 prompt", () => {
+    // given
+    const k3 = buildSisyphusJuniorPrompt("opencode-go/kimi-k3", false)
+
+    // then
+    expect(k3).toContain("running on Kimi K3")
+    expect(k3).not.toContain("running on Kimi K2.7")
+    expect(k3).not.toContain("Toggle RL")
   })
 
   test("K2.7 model uses the from-scratch K2.7 prompt, not the K2.6 prompt", () => {

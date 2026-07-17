@@ -1,3 +1,0 @@
-No escape-hatch matches found.
-
-EXIT_STATUS=0

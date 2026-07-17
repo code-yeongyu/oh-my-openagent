@@ -1,4 +1,4 @@
-export type IdleInjectionSource = "task-completion" | "team-message" | "ulw-continuation"
+export type IdleInjectionSource = "task-completion" | "team-message" | "boulder-continuation" | "ulw-continuation"
 
 export interface IdleInjection {
   // Dedupe/order key. Task completions key on their task id; the ulw continuation keys on its source
@@ -6,6 +6,7 @@ export interface IdleInjection {
   readonly key: string
   readonly source: IdleInjectionSource
   readonly content: string
+  readonly onFlushed?: () => void
 }
 
 export type IdleInjectionDelivery = (content: string, options: { deliverAs: "steer" | "followUp" }) => void
@@ -24,20 +25,24 @@ export interface IdleInjectionCoordinatorOptions {
 const SOURCE_RANK: Readonly<Record<IdleInjectionSource, number>> = {
   "task-completion": 0,
   "team-message": 1,
-  "ulw-continuation": 2,
+  "boulder-continuation": 2,
+  "ulw-continuation": 3,
 }
 
 /**
- * The single injection queue for one idle edge. Task completion wakes and the ulw-loop continuation
- * both enqueue here; flushOnIdle collapses everything pending into exactly ONE sendUserMessage so the
- * parent never receives two competing wakes on the same idle edge (the Oracle arbitration blocker).
- * comment-checker's tool_result transform is intentionally NOT routed here.
+ * The single injection queue for the parent session. EVERY delivered notification (task completions,
+ * team lead-messages, the ulw-loop continuation) enqueues here; a deferred flush collapses everything
+ * that became ready within the batch window into exactly ONE injection, steered into the running turn
+ * at the next tool-call boundary (unconditional batched-steer contract: N ready notifications never
+ * produce N separate injections). comment-checker's tool_result transform is intentionally NOT routed
+ * here.
  */
 export class IdleInjectionCoordinator {
   readonly #deliver: IdleInjectionDelivery
   readonly #pending = new Map<string, IdleInjection>()
   readonly #scheduleFlush: FlushScheduler
   #flushScheduled = false
+  #soonScheduled = false
 
   constructor(deliver: IdleInjectionDelivery, options: IdleInjectionCoordinatorOptions = {}) {
     this.#deliver = deliver
@@ -61,6 +66,18 @@ export class IdleInjectionCoordinator {
     })
   }
 
+  // Immediate coalesced flush for an IDLE parent: a microtask is soon enough to land the steer before
+  // senpi's print mode can decide the session is over (the windowed timer is not - live-driver proven),
+  // while still batching every notification that becomes ready in the same tick into one injection.
+  flushSoon(): void {
+    if (this.#soonScheduled) return
+    this.#soonScheduled = true
+    queueMicrotask(() => {
+      this.#soonScheduled = false
+      this.flushOnIdle()
+    })
+  }
+
   pendingCount(): number {
     return this.#pending.size
   }
@@ -73,7 +90,8 @@ export class IdleInjectionCoordinator {
     )
     const collapsed = ordered.length
     this.#pending.clear()
-    this.#deliver(ordered.map((injection) => injection.content).join("\n\n"), { deliverAs: "followUp" })
+    this.#deliver(ordered.map((injection) => injection.content).join("\n\n"), { deliverAs: "steer" })
+    for (const injection of ordered) injection.onFlushed?.()
     return collapsed
   }
 }

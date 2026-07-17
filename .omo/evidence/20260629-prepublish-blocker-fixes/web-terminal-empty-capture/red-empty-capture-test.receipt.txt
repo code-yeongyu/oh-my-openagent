@@ -1,2 +1,0 @@
-command: bun test script/web-terminal-visual-qa.test.ts
-exit_code: 1

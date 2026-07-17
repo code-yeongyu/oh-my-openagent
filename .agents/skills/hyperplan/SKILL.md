@@ -32,10 +32,10 @@ Required categories are `unspecified-low`, `unspecified-high`, `ultrabrain`, and
 
 | Category | Model | Native Mindset | Why This Adversarial Role Fits |
 |----------|-------|----------------|--------------------------------|
-| `unspecified-low` | claude-sonnet-4-6 | Mid-tier, simplicity-leaning, structure-demanding | Pragmatist Skeptic — model bias toward simplicity makes it the natural enemy of over-engineering |
+| `unspecified-low` | gpt-5.6-luna xhigh | Mid-tier, simplicity-leaning, structure-demanding | Pragmatist Skeptic — model bias toward simplicity makes it the natural enemy of over-engineering |
 | `unspecified-high` | claude-opus-4-7 max | High-effort, broad-impact, coordination-aware | Integration Tester — max-tier broad-scope thinking exposes cross-module fragility |
-| `deep` | gpt-5.5 medium | Autonomous, exploration-heavy, evidence-driven | Autonomous Researcher — natural exploration bias attacks unfounded claims |
-| `ultrabrain` | gpt-5.5 xhigh | Hard-logic, simplicity-biased, strategic advisor | Architect Strategist — xhigh reasoning sees structural flaws others miss |
+| `deep` | gpt-5.6-terra xhigh | Autonomous, exploration-heavy, evidence-driven | Autonomous Researcher — natural exploration bias attacks unfounded claims |
+| `ultrabrain` | gpt-5.6-sol xhigh | Hard-logic, simplicity-biased, strategic advisor | Architect Strategist — xhigh reasoning sees structural flaws others miss |
 | `artistry` | gemini-3.1-pro high | Unconventional, pattern-breaking, lateral | Creative Challenger — pattern-breaking bias attacks orthodox thinking |
 
 ### MEMBER 1: `skeptic` (category: `unspecified-low`)
