@@ -95,6 +95,24 @@ afterEach(() => {
 })
 
 describe("runtime-fallback composed abort lifecycle races", () => {
+  it("#given a status abort is rejected #when the same retry arrives again #then the hook retries cancellation and dispatches fallback", async () => {
+    const promptModels: string[] = []
+    let abortCalls = 0
+    const hook = createHook(async () => {
+      abortCalls += 1
+      return abortCalls === 1 ? { error: { name: "AbortError" } } : {}
+    }, promptModels)
+    SessionCategoryRegistry.register(SESSION_ID, "test")
+    const event = retryEvent(1)
+
+    await hook.event(event)
+    await hook.event(event)
+
+    expect(abortCalls).toBe(2)
+    expect(promptModels).toEqual(["openai/fallback-one"])
+    hook.dispose?.()
+  })
+
   it("#given a status abort event precedes its response #when the next retry arrives #then fallback ownership advances to the second model", async () => {
     const firstAbort = createDeferred<unknown>()
     const abortStarted = createDeferred<void>()

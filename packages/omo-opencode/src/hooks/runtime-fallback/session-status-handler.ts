@@ -59,6 +59,11 @@ export function createSessionStatusHandler(
       return
     }
     sessionStatusRetryKeys.set(sessionID, retryKey)
+    const releaseRetryKey = () => {
+      if (sessionStatusRetryKeys.get(sessionID) === retryKey) {
+        sessionStatusRetryKeys.delete(sessionID)
+      }
+    }
     let requestAborted = false
 
     if (sessionRetryInFlight.has(sessionID)) {
@@ -69,6 +74,7 @@ export function createSessionStatusHandler(
         })
         requestAborted = await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
         if (!requestAborted) {
+          releaseRetryKey()
           return
         }
         sessionRetryInFlight.delete(sessionID)
@@ -99,6 +105,7 @@ export function createSessionStatusHandler(
     if (!requestAborted) {
       requestAborted = await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
       if (!requestAborted) {
+        releaseRetryKey()
         return
       }
     }

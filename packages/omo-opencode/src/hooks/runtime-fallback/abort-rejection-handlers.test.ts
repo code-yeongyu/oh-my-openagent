@@ -141,6 +141,37 @@ describe("runtime fallback abort rejection", () => {
     expect(deps.sessionStates.has(sessionID)).toBe(false)
   })
 
+  it("#given a rejected session retry abort #when the same retry signal arrives again #then it can acquire ownership and dispatch fallback", async () => {
+    const sessionID = "status-abort-retry-after-rejection"
+    const operations: string[] = []
+    const deps = createDeps()
+    const abortResults = [false, true]
+    SessionCategoryRegistry.register(sessionID, "test")
+    const helpers: AutoRetryHelpers = {
+      ...createRejectingHelpers(operations),
+      abortSessionRequest: async (_sessionID: string, source: string) => {
+        operations.push(`abort:${source}`)
+        return abortResults.shift() ?? false
+      },
+    }
+    const handler = createSessionStatusHandler(deps, helpers, deps.sessionStatusRetryKeys)
+    const retryEvent = {
+      sessionID,
+      model: "openai/gpt-5.4",
+      status: { type: "retry", attempt: 2, message: "rate limit, retrying in 30 seconds" },
+    }
+
+    await handler(retryEvent)
+    await handler(retryEvent)
+
+    expect(operations).toEqual([
+      "abort:session.status.retry-signal",
+      "abort:session.status.retry-signal",
+      `retry:${FALLBACK_MODEL}`,
+    ])
+    expect(deps.sessionStates.get(sessionID)?.currentModel).toBe(FALLBACK_MODEL)
+  })
+
   it("#given a pending fallback and a newer session retry signal #when abort is rejected #then pending ownership is preserved", async () => {
     const sessionID = "status-pending-abort-rejected"
     const operations: string[] = []
