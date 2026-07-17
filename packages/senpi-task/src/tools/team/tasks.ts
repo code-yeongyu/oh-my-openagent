@@ -107,17 +107,17 @@ export async function runTeamTaskUpdate(service: TeamToolsService, params: TeamT
 }
 
 export function createTeamTaskCreateTool(deps: TeamToolDeps): ToolDefinition {
-  return { name: "team_task_create", label: "Team Task Create", description: "Create a task on the team tasklist.", parameters: TeamTaskCreateParams, execute: (_toolCallId: string, params: TeamTaskCreateInput) => runTeamTaskCreate(deps.service, params) }
+  return { name: "task_create", label: "Task Create", description: "Create a task on the team tasklist.", parameters: TeamTaskCreateParams, execute: (_toolCallId: string, params: TeamTaskCreateInput) => runTeamTaskCreate(deps.service, params) }
 }
 
 export function createTeamTaskListTool(deps: TeamToolDeps): ToolDefinition {
-  return { name: "team_task_list", label: "Team Task List", description: "List the team tasklist, optionally filtered by status or owner.", parameters: TeamTaskListParams, execute: (_toolCallId: string, params: TeamTaskListInput) => runTeamTaskList(deps.service, params) }
+  return { name: "task_list", label: "Task List", description: "List the team tasklist, optionally filtered by status or owner.", parameters: TeamTaskListParams, execute: (_toolCallId: string, params: TeamTaskListInput) => runTeamTaskList(deps.service, params) }
 }
 
 export function createTeamTaskGetTool(deps: TeamToolDeps): ToolDefinition {
-  return { name: "team_task_get", label: "Team Task Get", description: "Read a single team task by id.", parameters: TeamTaskGetParams, execute: (_toolCallId: string, params: TeamTaskGetInput) => runTeamTaskGet(deps.service, params) }
+  return { name: "task_get", label: "Task Get", description: "Read a single team task by id.", parameters: TeamTaskGetParams, execute: (_toolCallId: string, params: TeamTaskGetInput) => runTeamTaskGet(deps.service, params) }
 }
 
 export function createTeamTaskUpdateTool(deps: TeamToolDeps): ToolDefinition {
-  return { name: "team_task_update", label: "Team Task Update", description: "Update a team task's status (status='claimed' claims it for the owner).", parameters: TeamTaskUpdateParams, execute: (_toolCallId: string, params: TeamTaskUpdateInput) => runTeamTaskUpdate(deps.service, params) }
+  return { name: "task_update", label: "Task Update", description: "Update a team task's status (status='claimed' claims it for the owner).", parameters: TeamTaskUpdateParams, execute: (_toolCallId: string, params: TeamTaskUpdateInput) => runTeamTaskUpdate(deps.service, params) }
 }

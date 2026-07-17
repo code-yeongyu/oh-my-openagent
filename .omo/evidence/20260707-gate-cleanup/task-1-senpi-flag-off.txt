@@ -1,2 +1,0 @@
-error: option '--platform <platform>' argument 'senpi' is invalid. Allowed choices are opencode, codex, both.
-exit=1

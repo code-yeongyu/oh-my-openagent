@@ -1,5 +1,0 @@
-$ bun install --ignore-scripts
-bun install v1.3.14 (0d9b296a)
-
-308 packages installed [2.45s]
-EXIT_CODE=0

@@ -1,4 +1,5 @@
 import { describe, expect, mock, test } from "bun:test"
+import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 
 import { createCommandExecuteBeforeHandler } from "./command-execute-before"
 
@@ -8,7 +9,8 @@ describe("createCommandExecuteBeforeHandler", () => {
     const clear = mock(() => {})
     const isStopped = mock(() => true)
     const startLoop = mock(() => true)
-    const handler = createCommandExecuteBeforeHandler({
+    const handler = createCommandExecuteBeforeHandler(unsafeTestValue({
+      directory: process.cwd(),
       hooks: {
         ralphLoop: {
           startLoop,
@@ -19,7 +21,7 @@ describe("createCommandExecuteBeforeHandler", () => {
           clear,
         },
       },
-    })
+    }))
 
     // when
     await handler(
@@ -45,7 +47,8 @@ describe("createCommandExecuteBeforeHandler", () => {
     const clear = mock(() => {})
     const isStopped = mock(() => true)
     const startWorkHook = mock(async () => {})
-    const handler = createCommandExecuteBeforeHandler({
+    const handler = createCommandExecuteBeforeHandler(unsafeTestValue({
+      directory: process.cwd(),
       hooks: {
         startWork: {
           "command.execute.before": startWorkHook,
@@ -55,7 +58,7 @@ describe("createCommandExecuteBeforeHandler", () => {
           clear,
         },
       },
-    })
+    }))
 
     // when
     await handler(
@@ -81,7 +84,8 @@ describe("createCommandExecuteBeforeHandler", () => {
     const clear = mock(() => {})
     const isStopped = mock(() => false)
     const startLoop = mock(() => true)
-    const handler = createCommandExecuteBeforeHandler({
+    const handler = createCommandExecuteBeforeHandler(unsafeTestValue({
+      directory: process.cwd(),
       hooks: {
         ralphLoop: {
           startLoop,
@@ -92,7 +96,7 @@ describe("createCommandExecuteBeforeHandler", () => {
           clear,
         },
       },
-    })
+    }))
 
     // when
     await handler(
@@ -116,7 +120,8 @@ describe("createCommandExecuteBeforeHandler", () => {
     // given
     const startLoop = mock(() => true)
     const resumeLoop = mock(() => true)
-    const handler = createCommandExecuteBeforeHandler({
+    const handler = createCommandExecuteBeforeHandler(unsafeTestValue({
+      directory: process.cwd(),
       hooks: {
         ralphLoop: {
           startLoop,
@@ -124,7 +129,7 @@ describe("createCommandExecuteBeforeHandler", () => {
           cancelLoop: mock(() => true),
         },
       },
-    })
+    }))
 
     // when
     await handler(

@@ -17,6 +17,7 @@ import {
   RecipientBackpressureError,
   sendMessage,
 } from "./send"
+import { listUnreadMessages } from "./inbox"
 
 async function createBaseDirectory(): Promise<string> {
   return await mkdtemp(path.join(tmpdir(), "team-mailbox-send-"))
@@ -165,6 +166,47 @@ describe("sendMessage", () => {
     expect(result.deliveredTo).toEqual(["m2"])
     const inboxFiles = await readdir(getInboxDir(resolveBaseDir(config), teamRunId, "m2"))
     expect(inboxFiles.filter((entry) => entry.endsWith(".json"))).toHaveLength(1)
+  })
+
+  test("#given a configured lead recipient w2tc #when a member sends to the lead #then the message remains unread and visible", async () => {
+    // given
+    const baseDir = await createBaseDirectory()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const leadRecipient = "team-lead"
+    const message = createMessage({ from: "m1", to: leadRecipient })
+
+    // when
+    const result = await sendMessage(message, teamRunId, config, {
+      isLead: false,
+      activeMembers: ["m1"],
+      leadRecipient,
+    })
+    const inboxDir = getInboxDir(resolveBaseDir(config), teamRunId, leadRecipient)
+    const inboxEntries = await readdir(inboxDir)
+    const unreadMessages = await listUnreadMessages(teamRunId, leadRecipient, config)
+
+    // then
+    expect(result.deliveredTo).toEqual([leadRecipient])
+    expect(inboxEntries).toContain(`${message.messageId}.json`)
+    expect(inboxEntries).not.toContain(`.delivering-${message.messageId}.json`)
+    expect(unreadMessages.map((unreadMessage) => unreadMessage.messageId)).toEqual([message.messageId])
+  })
+
+  test("#given a non-member that is not the configured lead w2tc #when a direct send is attempted #then it remains invalid", async () => {
+    // given
+    const config = createConfig(await createBaseDirectory())
+    const message = createMessage({ to: "outsider" })
+
+    // when
+    const result = sendMessage(message, randomUUID(), config, {
+      isLead: false,
+      activeMembers: ["m1"],
+      leadRecipient: "team-lead",
+    })
+
+    // then
+    await expect(result).rejects.toBeInstanceOf(InvalidRecipientError)
   })
 
   test("gates broadcasts to leads and fans out to each active member", async () => {

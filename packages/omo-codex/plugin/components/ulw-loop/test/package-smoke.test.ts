@@ -141,7 +141,9 @@ describe("skills/ulw-loop/SKILL.md", () => {
 		expect(text).toContain('- "ulw-loop"');
 	});
 
-	it("#given PATH omo lacks ulw-loop #when bootstrap runs #then falls back to cached ulw-loop CLI", async () => {
+	it.skipIf(process.platform === "win32")(
+		"#given PATH omo lacks ulw-loop #when bootstrap runs #then falls back to cached ulw-loop CLI",
+		async () => {
 		const text = await readText("skills/ulw-loop/references/full-workflow.md");
 		const bootstrap = bootstrapScriptFrom(text);
 		const root = await mkdtemp(join(tmpdir(), "omo-ulw-loop-bootstrap-"));
@@ -191,7 +193,8 @@ describe("source LOC budget", () => {
 	it("every source file stays at or under 250 pure LOC", async () => {
 		const files = [
 			"src/types.ts", "src/paths.ts", "src/plan-io.ts", "src/plan-crud.ts", "src/goal-status.ts",
-			"src/evidence.ts", "src/quality-gate.ts", "src/checkpoint.ts", "src/review-blockers.ts",
+			"src/evidence.ts", "src/quality-gate.ts", "src/quality-gate-verdicts.ts", "src/checkpoint.ts", "src/review-blockers.ts",
+			"src/stop-resume-hook.ts", "src/spawn-guard.ts",
 			"src/steering.ts", "src/codex-goal-instruction.ts", "src/codex-goal-snapshot.ts", "src/codex-hook.ts",
 			"src/cli.ts", "src/cli-arg-parser.ts", "src/cli-output.ts", "src/cli-steering.ts", "src/cli-commands.ts",
 		];

@@ -28,14 +28,6 @@ function nativeSkill(name: string, description: string): NativeSkillEntry {
   }
 }
 
-function requireSkillContent(value: string | undefined): string {
-  expect(value).toBeDefined()
-  if (value === undefined) {
-    throw new Error("Expected captured delegate skill content")
-  }
-  return value
-}
-
 describe("createDelegateTask native skill prompt filtering", () => {
   afterEach(() => {
     mock.restore()
@@ -43,7 +35,7 @@ describe("createDelegateTask native skill prompt filtering", () => {
     releaseAllPromptAsyncReservationsForTesting()
   })
 
-  it("#given disabled and protected native skills #when delegate system content is built #then hostile native descriptions are excluded", async () => {
+  it("#given native skills and a non-plan target #when delegate system content is built #then native descriptions are omitted", async () => {
     // given
     __setTimingConfig({
       POLL_INTERVAL_MS: 10,
@@ -167,12 +159,7 @@ describe("createDelegateTask native skill prompt filtering", () => {
     )
 
     // then
-    const skillContent = requireSkillContent(capturedLaunch?.skillContent)
-    expect(skillContent).toContain("safe-native-skill")
-    expect(skillContent).toContain("Safe native guidance")
-    expect(skillContent).not.toContain("blocked-native-skill")
-    expect(skillContent).not.toContain("BLOCKED_NATIVE_PROMPT_INJECTION")
-    expect(skillContent).not.toContain("DISABLED_SHARED_ALIAS_INJECTION")
-    expect(skillContent).not.toContain("IGNORE_ALL_PRIOR_INSTRUCTIONS")
+    expect(capturedLaunch).toBeDefined()
+    expect(capturedLaunch?.skillContent).toBeUndefined()
   })
 })

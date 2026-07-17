@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "../types";
-import { isGpt5_5Model } from "../types";
+import { isGpt5_5Model, isGpt5_6Model } from "../types";
 import type {
   AvailableAgent,
   AvailableTool,
@@ -13,20 +13,22 @@ import { getFrontierToolSchemaPermission } from "../frontier-tool-schema-guard";
 import { buildHephaestusPrompt as buildGptPrompt } from "./gpt";
 import { buildHephaestusPrompt as buildGpt54Prompt } from "./gpt-5-4";
 import { buildGpt55HephaestusPrompt as buildGpt55Prompt } from "./gpt-5-5";
+import { buildGpt56HephaestusPrompt as buildGpt56Prompt } from "./gpt-5-6";
 
 const MODE: AgentMode = "primary";
 const GPT_5_3_CODEX_RE = /^gpt-5[.-]3-codex(?:$|[.-])/i;
 const GPT_5_4_RE = /^gpt-5[.-]4(?:$|[.-])/i;
 const GPT_5_5_RE = /^gpt-5[.-]5(?:$|[.-])/i;
+const GPT_5_6_RE = /^gpt-5[.-]6(?:$|[.-])/i;
 
-export type HephaestusPromptSource = "gpt-5-5" | "gpt-5-4" | "gpt";
+export type HephaestusPromptSource = "gpt-5-6" | "gpt-5-5" | "gpt-5-4" | "gpt";
 
 export class UnsupportedHephaestusModelError extends Error {
   readonly model: string | undefined;
 
   constructor(model: string | undefined) {
     super(
-      `Hephaestus only supports GPT-5.3 Codex, GPT-5.4, and GPT-5.5 models; received ${model ?? "no model"}.`,
+      `Hephaestus only supports GPT-5.3 Codex, GPT-5.4, GPT-5.5, and GPT-5.6 models; received ${model ?? "no model"}.`,
     );
     this.name = "UnsupportedHephaestusModelError";
     this.model = model;
@@ -40,7 +42,12 @@ function extractModelName(model: string): string {
 export function isHephaestusSupportedModel(model: string | undefined): boolean {
   if (!model) return false;
   const modelName = extractModelName(model);
-  return GPT_5_3_CODEX_RE.test(modelName) || GPT_5_4_RE.test(modelName) || GPT_5_5_RE.test(modelName);
+  return (
+    GPT_5_3_CODEX_RE.test(modelName) ||
+    GPT_5_4_RE.test(modelName) ||
+    GPT_5_5_RE.test(modelName) ||
+    GPT_5_6_RE.test(modelName)
+  );
 }
 
 function assertHephaestusSupportedModel(model: string | undefined): void {
@@ -53,6 +60,9 @@ export function getHephaestusPromptSource(
   model?: string,
 ): HephaestusPromptSource {
   assertHephaestusSupportedModel(model);
+  if (model && isGpt5_6Model(model)) {
+    return "gpt-5-6";
+  }
   if (model && isGpt5_5Model(model)) {
     return "gpt-5-5";
   }
@@ -90,6 +100,15 @@ function buildDynamicHephaestusPrompt(ctx?: HephaestusContext): string {
 
   let basePrompt: string;
   switch (source) {
+    case "gpt-5-6":
+      basePrompt = buildGpt56Prompt(
+        agents,
+        tools,
+        skills,
+        categories,
+        useTaskSystem,
+      );
+      break;
     case "gpt-5-5":
       basePrompt = buildGpt55Prompt(
         agents,

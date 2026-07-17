@@ -17,15 +17,73 @@ const agentSchemaKeys = new Set([
 
 const lazycodexAgentInvariants = new Map([
 	[
-		"lazycodex-executor.toml",
+		"explorer.toml",
 		{
+			model: "gpt-5.6-luna",
+			effort: "low",
+			includes: [/Read-only/, /working tree/, /rg/],
+		},
+	],
+	[
+		"librarian.toml",
+		{
+			model: "gpt-5.6-luna",
+			effort: "low",
+			includes: [/Read-only/, /SHA-pinned GitHub permalink/, /external/],
+		},
+	],
+	[
+		"metis.toml",
+		{
+			model: "gpt-5.6-sol",
 			effort: "high",
-			includes: [/EVIDENCE_RECORDED: <path>/, /scenario/i, /artifact/i],
+			includes: [/pre-planning analyst/i, /contradictions/, /Read-only/],
+		},
+	],
+	[
+		"momus.toml",
+		{
+			model: "gpt-5.6-sol",
+			effort: "ultra",
+			includes: [/plan reviewer/i, /OKAY, ITERATE, or REJECT/, /Read-only/],
+		},
+	],
+	[
+		"plan.toml",
+		{
+			model: "gpt-5.6-sol",
+			effort: "max",
+			includes: [/strategic planning consultant/i, /\.omo\/plans\/<slug>\.md/, /never implements/i],
+		},
+	],
+	[
+		"lazycodex-worker-low.toml",
+		{
+			model: "gpt-5.6-luna",
+			effort: "high",
+			includes: [/EVIDENCE_RECORDED: <path>/, /low-difficulty/i, /smallest correct change/i],
+		},
+	],
+	[
+		"lazycodex-worker-medium.toml",
+		{
+			model: "gpt-5.6-luna",
+			effort: "max",
+			includes: [/EVIDENCE_RECORDED: <path>/, /medium-difficulty/i, /smallest correct change/i],
+		},
+	],
+	[
+		"lazycodex-worker-high.toml",
+		{
+			model: "gpt-5.6-sol",
+			effort: "max",
+			includes: [/EVIDENCE_RECORDED: <path>/, /high-difficulty/i, /smallest correct change/i],
 		},
 	],
 	[
 		"lazycodex-clone-fidelity-reviewer.toml",
 		{
+			model: "gpt-5.6-sol",
 			effort: "xhigh",
 			includes: [/recommendation/, /blockers/, /\.omo\/evidence\/<goal>-clone-fidelity\.md/],
 		},
@@ -33,22 +91,25 @@ const lazycodexAgentInvariants = new Map([
 	[
 		"lazycodex-code-reviewer.toml",
 		{
+			model: "gpt-5.6-sol",
 			effort: "xhigh",
-			includes: [/codeQualityStatus/, /recommendation/, /\.omo\/evidence\/<goal>-code-review\.md/],
+			includes: [/codeQualityStatus/, /recommendation/, /<attemptDir>\/<goalId>-code-review\.md/, /currentAttemptDir/],
 		},
 	],
 	[
 		"lazycodex-qa-executor.toml",
 		{
-			effort: "medium",
-			includes: [/not_applicable/, /surfaceEvidence/, /adversarialCases/],
+			model: "gpt-5.6-luna",
+			effort: "high",
+			includes: [/not_applicable/, /surfaceEvidence/, /adversarialCases/, /<attemptDir>\/<goalId>-manual-qa\.md/],
 		},
 	],
 	[
 		"lazycodex-gate-reviewer.toml",
 		{
-			effort: "xhigh",
-			includes: [/APPROVE\/REJECT/, /blockers/, /\.omo\/evidence\/<goal>-gate-review\.md/],
+			model: "gpt-5.6-sol",
+			effort: "high",
+			includes: [/APPROVE\/REJECT/, /blockers/, /<attemptDir>\/<goalId>-gate-review\.md/, /currentAttemptDir/],
 		},
 	],
 ]);
@@ -69,9 +130,11 @@ test("#given bundled Codex agents #when components/ultrawork/agents directory is
 		"explorer.toml",
 		"lazycodex-clone-fidelity-reviewer.toml",
 		"lazycodex-code-reviewer.toml",
-		"lazycodex-executor.toml",
 		"lazycodex-gate-reviewer.toml",
 		"lazycodex-qa-executor.toml",
+		"lazycodex-worker-high.toml",
+		"lazycodex-worker-low.toml",
+		"lazycodex-worker-medium.toml",
 		"librarian.toml",
 		"metis.toml",
 		"momus.toml",
@@ -94,11 +157,29 @@ test("#given bundled Codex agents #when components/ultrawork/agents directory is
 	}
 });
 
+test("#given bundled agent TOMLs #when nickname_candidates are inspected #then they use only the codex-accepted charset", async () => {
+	// given: codex_app_server ignores a role whose nickname has characters outside
+	// ASCII letters, digits, spaces, hyphens, underscores (observed live in task-15 QA)
+	const agentsDir = join(root, "components", "ultrawork", "agents");
+	const files = (await readdir(agentsDir)).filter((name) => name.endsWith(".toml"));
+
+	// when/then
+	for (const file of files) {
+		const text = await readFile(join(agentsDir, file), "utf8");
+		for (const match of text.matchAll(/nickname_candidates\s*=\s*\[([^\]]*)\]/g)) {
+			for (const nickname of match[1].matchAll(/"([^"]*)"/g)) {
+				assert.match(nickname[1], /^[A-Za-z0-9 _-]+$/, `${file}: nickname "${nickname[1]}"`);
+			}
+		}
+	}
+});
+
 test("#given planner agent prompt #when inspected #then generated artifacts stay under .omo", async () => {
 	const prompt = await readFile(join(root, "components", "ultrawork", "agents", "plan.toml"), "utf8");
 
 	assert.match(prompt, /\.omo\/plans\/<slug>\.md/);
-	assert.match(prompt, /\.omo\/evidence\/task-<N>-<slug>\.<ext>/);
+	assert.match(prompt, /<attemptDir>\/task-<N>-<slug>\.<ext>/);
+	assert.match(prompt, /\.omo\/evidence\/ulw\/<session>\/<goalId>\/a<attempt>/);
 	assert.doesNotMatch(prompt, /(?<!\.omo\/)plans\/<slug>\.md/);
 	assert.doesNotMatch(prompt, /(?<!\.omo\/)evidence\/task-/);
 });
@@ -109,7 +190,8 @@ test("#given lazycodex agent prompts #when inspected #then each role pins model 
 	for (const [fileName, invariant] of lazycodexAgentInvariants) {
 		const prompt = await readFile(join(agentsDir, fileName), "utf8");
 
-		assert.match(prompt, /^model\s*=\s*"gpt-5\.5"$/m);
+		const escapedModel = invariant.model.replace(/\./g, "\\.");
+		assert.match(prompt, new RegExp(`^model\\s*=\\s*"${escapedModel}"$`, "m"));
 		assert.match(prompt, new RegExp(`^model_reasoning_effort\\s*=\\s*"${invariant.effort}"$`, "m"));
 		assert.doesNotMatch(prompt, /^tools\s*=/m);
 		assert.doesNotMatch(prompt, /^blocking\s*=/m);
@@ -161,3 +243,27 @@ test("#given LazyCodex reviewer prompts #when inspected #then anti-slop review c
 		"gate reviewer must perform the overfit/slop pass directly before checking report coverage",
 	);
 });
+
+test("#given done-gate reviewer prompts #when inspected #then burden of proof is approve-unless-cited and reject priors are gone", async () => {
+	const agentsDir = join(root, "components", "ultrawork", "agents");
+	const gateReviewer = await readFile(join(agentsDir, "lazycodex-gate-reviewer.toml"), "utf8");
+	const qaExecutor = await readFile(join(agentsDir, "lazycodex-qa-executor.toml"), "utf8");
+	const codeReviewer = await readFile(join(agentsDir, "lazycodex-code-reviewer.toml"), "utf8");
+
+	assert.match(gateReviewer, /APPROVE unless you can cite/);
+	assert.match(gateReviewer, /violatedCriterion/);
+	assert.match(gateReviewer, /evidencePointer/);
+	assert.match(gateReviewer, /top blockers inline/);
+	assert.match(gateReviewer, /is a NOTE, not a blocker/);
+	assert.match(gateReviewer, /You do NOT check/);
+	assert.doesNotMatch(gateReviewer, /Assume the work has already failed/);
+	assert.doesNotMatch(gateReviewer, /Return exactly one recommendation: APPROVE\/REJECT\./);
+
+	assert.match(qaExecutor, /one-line reason/);
+	assert.match(qaExecutor, /rejecting a legitimately untriggered class is itself an error/);
+	assert.doesNotMatch(qaExecutor, /Trust nothing\./);
+
+	assert.match(codeReviewer, /MEDIUM by default/);
+	assert.doesNotMatch(codeReviewer, /Treat useless tests or needless production complexity as CRITICAL\/HIGH/);
+});
+

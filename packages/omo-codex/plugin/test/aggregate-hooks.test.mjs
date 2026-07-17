@@ -48,6 +48,22 @@ test("#given isolated components #when hooks are inspected #then commands stay i
 	assert.equal(await exists("scripts/migrate-codex-config.mjs"), true);
 });
 
+test("#given aggregate Stop hooks #when inspected #then start-work continuation and ulw-loop resume are separate groups", async () => {
+	// given
+	const manifests = await readAggregateHookManifests();
+
+	// when
+	const stopCommands = manifests
+		.filter(({ hooks }) => hooks.hooks.Stop)
+		.flatMap(({ hooks }) => hooks.hooks.Stop)
+		.flatMap((group) => group.hooks.map((handler) => handler.command));
+
+	// then
+	assert.equal(stopCommands.length, 2);
+	assert.ok(stopCommands.some((command) => command.includes("start-work-continuation/dist/cli.js")));
+	assert.ok(stopCommands.some((command) => command.includes("ulw-loop/dist/cli.js\" hook stop")));
+});
+
 test("#given aggregate SubagentStop hooks #when inspected #then start-work and LazyCodex executor verifier are separate groups", async () => {
 	// given
 	const manifests = await readAggregateHookManifests();
@@ -64,11 +80,11 @@ test("#given aggregate SubagentStop hooks #when inspected #then start-work and L
 	// then
 	assert.equal(subagentStopGroups.length, 2);
 	assert.equal(subagentStopGroups[0]?.matcher, undefined);
-	assert.equal(subagentStopGroups[1]?.matcher, "^lazycodex-executor$");
+	assert.equal(subagentStopGroups[1]?.matcher, "^lazycodex-worker-(low|medium|high)$");
 	assert.equal(verifierGroups.length, 1);
 	assert.equal(verifierGroups[0]?.groupIndex, 0);
 	assert.equal(verifierGroups[0]?.handler.timeout, 10);
-	assert.equal(verifierGroups[0]?.handler.statusMessage, "(OmO) Verifying LazyCodex Executor Evidence");
+	assert.match(verifierGroups[0]?.handler.statusMessage ?? "", /^\(OmO [^)]+\) Verifying LazyCodex Executor Evidence$/);
 });
 
 test("#given aggregate PostCompact hooks #when hooks are inspected #then LSP diagnostics cache reset is registered", async () => {
@@ -84,7 +100,7 @@ test("#given aggregate PostCompact hooks #when hooks are inspected #then LSP dia
 
 	// then
 	assert.equal(lspPostCompactHooks.length, 1);
-	assert.equal(lspPostCompactHooks[0]?.handler.statusMessage, "(OmO) Resetting LSP Diagnostics Cache");
+	assert.match(lspPostCompactHooks[0]?.handler.statusMessage ?? "", /^\(OmO [^)]+\) Resetting LSP Diagnostics Cache$/);
 });
 
 test("#given aggregate hook commands #when inspected #then every command exposes a Codex status message", async () => {
@@ -158,7 +174,12 @@ test("#given aggregate OMO plugin is enabled #when hooks are inspected #then she
 	assert.match(text, /Resetting Git Bash MCP Reminder/);
 	assert.match(text, /components\/ulw-loop\/dist\/cli\.js/);
 	assert.match(text, /hook pre-tool-use/);
-	assert.deepEqual(preToolUseGroups.map((group) => group.matcher), ["^Bash$", "^create_goal$"]);
+	assert.deepEqual(preToolUseGroups.map((group) => group.matcher), [
+		"^Bash$",
+		"^create_goal$",
+		"^(spawn_agent|collaborationspawn_agent|collaboration\\.spawn_agent)$",
+	]);
+	assert.match(text, /hook pre-tool-use-spawn/);
 });
 
 test("#given aggregate OMO plugin has a dedicated ultrawork trigger #when hooks are inspected #then ulw-loop does not duplicate ultrawork injection", async () => {
@@ -218,7 +239,7 @@ test("#given aggregate PostToolUse hooks #when inspected #then CodeGraph init gu
 	// then
 	assert.equal(codegraphPostToolUseHooks.length, 1);
 	assert.equal(codegraphPostToolUseHooks[0]?.matcher, "^(codegraph[._].*|mcp__codegraph__.*)$");
-	assert.equal(codegraphPostToolUseHooks[0]?.handler.statusMessage, "(OmO) Checking CodeGraph Init Guidance");
+	assert.match(codegraphPostToolUseHooks[0]?.handler.statusMessage ?? "", /^\(OmO [^)]+\) Checking CodeGraph Init Guidance$/);
 });
 
 test("#given aggregate PostToolUse hooks #when inspected #then thread title hygiene is registered for created Codex threads", async () => {
@@ -235,7 +256,7 @@ test("#given aggregate PostToolUse hooks #when inspected #then thread title hygi
 	// then
 	assert.equal(threadTitleHooks.length, 1);
 	assert.equal(threadTitleHooks[0]?.matcher, "^(create_thread|codex_app\\.create_thread)$");
-	assert.equal(threadTitleHooks[0]?.handler.statusMessage, "(OmO) Checking Thread Title Hygiene");
+	assert.match(threadTitleHooks[0]?.handler.statusMessage ?? "", /^\(OmO [^)]+\) Checking Thread Title Hygiene$/);
 });
 
 test("#given aggregate plugin packaging #when inspected #then hooks and compatibility sentinels stay Python-free", async () => {

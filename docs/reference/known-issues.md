@@ -2,11 +2,18 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
-## #5604 - Invalid delegation routing can look like a silent subagent skip
+## #5529 - GPT-5.5 reasoning effort can conflict with some OpenAI-compatible chat providers
 
-- **Affects**: Multi-agent runs where an invalid subagent/category route is attempted.
-- **Symptom**: The harness can create child-session-like artifacts without a usable model or stream, while the parent continues directly. From the outside this can look like subagents were called but hidden, stuck, or skipped.
-- **Workaround**: When delegation appears missing, inspect whether the child session has a resolved provider/model and stream events before treating it as running. If routing is invalid, stop the parent workflow and reroute through a valid category or subagent instead of letting the parent implement directly.
+- **Affects**: Third-party OpenAI-compatible providers that expose `gpt-5.5` through `/v1/chat/completions` but reject tool requests when `reasoning_effort` is present. Native OpenAI supports tools and reasoning effort for GPT-5.5.
+- **Symptom**: Tool requests can fail because OMO agent configs and OpenCode's GPT model transforms may supply reasoning effort based on the model ID, even when the compatible provider's chat-completions implementation does not support that combination.
+- **Workaround**: Use a provider-native route or adapter that supports GPT-5.5 reasoning with tools, or use a model/provider configuration that does not emit the unsupported reasoning setting for tool-heavy agents.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5529.
+
+## #5604 - Required-model delegation can fail before the child stream starts
+
+- **Affects**: OpenCode delegation when provider connectivity is known and none of the connected providers can serve a required-model subagent's fallback chain.
+- **Symptom**: Model resolution can return success without pinning a provider/model. The harness may then create a child session that fails before producing assistant or tool output, which can look like a hidden, stuck, or skipped subagent.
+- **Workaround**: Connect a provider supported by the target agent, or reroute through a category or subagent whose fallback chain has an available provider. If a child produces no assistant/tool output, treat the dispatch as failed and retry through a supported route.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5604.
 
 ## #4184 - Custom provider models without `limit` do not auto-compact

@@ -1,2 +1,0 @@
-=== bun run typecheck (exit capture) ===
-typecheck exit=0

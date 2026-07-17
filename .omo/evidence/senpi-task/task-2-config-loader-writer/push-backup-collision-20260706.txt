@@ -1,2 +1,0 @@
-To https://github.com/code-yeongyu/oh-my-openagent.git
-   b0b757e5f..656432d6e  HEAD -> code-yeongyu/senpi-task-w0-config-loader-writer

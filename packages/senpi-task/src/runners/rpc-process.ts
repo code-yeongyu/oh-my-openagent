@@ -14,6 +14,9 @@ export type RpcProcessRunnerOptions = {
   readonly heartbeatIntervalMs?: number
   readonly onMalformedLine?: MalformedLineHandler
   readonly now?: () => number
+  // The parent's `-e` extension entries, forwarded to every child so a detached process reproduces the
+  // parent's extensions. Applied only when a spec does not already carry its own extensions.
+  readonly inheritedExtensions?: readonly string[]
 }
 
 /**
@@ -28,6 +31,7 @@ export class RpcProcessRunner {
   private readonly heartbeatIntervalMs: number
   private readonly onMalformedLine: MalformedLineHandler | undefined
   private readonly now: () => number
+  private readonly inheritedExtensions: readonly string[]
 
   constructor(options: RpcProcessRunnerOptions = {}) {
     this.spawnChild = options.spawnChild ?? defaultSpawnChild
@@ -35,9 +39,14 @@ export class RpcProcessRunner {
     this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS
     this.onMalformedLine = options.onMalformedLine
     this.now = options.now ?? Date.now
+    this.inheritedExtensions = options.inheritedExtensions ?? []
   }
 
-  start(spec: RpcRunnerSpec): RpcChildHandle {
+  start(specInput: RpcRunnerSpec): RpcChildHandle {
+    const spec =
+      specInput.extensions === undefined && this.inheritedExtensions.length > 0
+        ? { ...specInput, extensions: this.inheritedExtensions }
+        : specInput
     const descriptor = this.buildSpawn(spec)
     const child = this.spawnChild(descriptor)
     const client = new RpcProtocolClient({ child, onMalformedLine: this.onMalformedLine })
@@ -48,10 +57,28 @@ export class RpcProcessRunner {
       heartbeatIntervalMs: this.heartbeatIntervalMs,
       now: this.now,
     })
-    client.send({ type: "prompt", message: spec.prompt }).catch((error: unknown) => {
-      log("senpi-task rpc initial prompt failed", { taskId: spec.task_id, error: String(error) })
+    const resume = spec.resumeSessionPath === undefined ? undefined : client.switchSession(spec.resumeSessionPath)
+    if (resume === undefined) {
+      client.send({ type: "prompt", message: spec.prompt }).catch((error: unknown) => {
+        log("senpi-task rpc initial prompt failed", { taskId: spec.task_id, error: String(error) })
+      })
+    } else {
+      void resume.catch((error: unknown) => {
+        log("senpi-task rpc switch_session failed", { taskId: spec.task_id, error: String(error) })
+      })
+    }
+    return Object.assign(handle, {
+      spawnSpec: {
+        cwd: spec.cwd,
+        ...(spec.extensions === undefined ? {} : { extensions: spec.extensions }),
+        ...(spec.memberEnv === undefined ? {} : { memberEnv: spec.memberEnv }),
+      },
+      switchSession: (sessionPath: string) =>
+        sessionPath === spec.resumeSessionPath && resume !== undefined
+          ? resume
+          : client.switchSession(sessionPath),
+      getEntries: (since?: string) => client.getEntries(since),
     })
-    return handle
   }
 }
 

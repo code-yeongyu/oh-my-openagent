@@ -24,5 +24,6 @@ export * from "./lsp/utils.js";
 export * from "./lsp/workspace-edit.js";
 export * from "./mcp.js";
 export * from "./missing-dependency-result.js";
+export * from "./post-edit/index.js";
 export * from "./request-context.js";
 export * from "./tools.js";
