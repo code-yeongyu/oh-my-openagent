@@ -214,8 +214,7 @@ export function createFirstPromptWatchdog(
           log(`[${HOOK_NAME}] ${SOURCE}: deferred ambiguous abort for message correlation`, { sessionID })
           return { kind: "defer-terminal", sessionID }
         }
-        clearInternalAbortOwnership(deps, sessionID)
-        abortProvenance.clear(sessionID)
+        if (abortProvenance.clear(sessionID)) clearInternalAbortOwnership(deps, sessionID)
       }
       if (!armed.has(sessionID)) {
         if (

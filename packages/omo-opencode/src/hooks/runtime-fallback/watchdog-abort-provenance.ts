@@ -28,11 +28,15 @@ export function createWatchdogAbortProvenance() {
   }
 
   return {
-    clear(sessionID: string): void {
+    clear(sessionID: string): boolean {
+      const hadProvenance = generationsBySession.has(sessionID)
+        || completedGenerationsBySession.has(sessionID)
+        || pendingResponses.has(sessionID)
       generationsBySession.delete(sessionID)
       completedGenerationsBySession.delete(sessionID)
       latestCompletedGenerationBySession.delete(sessionID)
       pendingResponses.delete(sessionID)
+      return hadProvenance
     },
     clearAll(): void {
       generationsBySession.clear()

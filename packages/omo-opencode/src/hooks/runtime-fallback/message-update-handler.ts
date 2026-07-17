@@ -12,6 +12,7 @@ import { subagentSessions } from "../../features/claude-code-session-state"
 import { resolveMessageEventSessionID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
 import { clearInternalAbortOwnership } from "./internal-abort-ownership"
+import { isRuntimeFallbackActive } from "./lifecycle"
 
 export { hasVisibleAssistantResponse } from "./visible-assistant-response"
 
@@ -56,6 +57,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       }
 
       const hasVisible = await checkVisibleResponse(ctx, sessionID, info)
+      if (!isRuntimeFallbackActive(deps)) return
       if (!hasVisible) {
         log(`[${HOOK_NAME}] Assistant update observed without visible final response; keeping fallback timeout`, {
           sessionID,
@@ -142,6 +144,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
 
       const agent = info?.agent as string | undefined
       const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
+      if (!isRuntimeFallbackActive(deps)) return
       const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
 
       if (fallbackModels.length === 0) {

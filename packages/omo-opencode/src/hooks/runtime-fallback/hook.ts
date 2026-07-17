@@ -43,6 +43,7 @@ export function createRuntimeFallbackHook(
   options?: RuntimeFallbackOptions,
   factoryOverrides: Partial<RuntimeFallbackHookFactories> = {},
 ): RuntimeFallbackHook {
+  let disposed = false
   const factories = {
     ...defaultRuntimeFallbackHookFactories,
     ...factoryOverrides,
@@ -69,6 +70,7 @@ export function createRuntimeFallbackHook(
     sessionFallbackTimeouts: new Map(),
     sessionStatusRetryKeys: new Map(),
     internallyAbortedSessions: new Set(),
+    isLifecycleActive: () => !disposed,
   }
 
   const helpers = factories.createAutoRetryHelpers(deps)
@@ -93,6 +95,7 @@ export function createRuntimeFallbackHook(
   }
 
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
+    if (disposed) return
     ensureInterval()
 
     let watchdogDecision: ReturnType<typeof observeEventForWatchdog>
@@ -107,6 +110,7 @@ export function createRuntimeFallbackHook(
     if (watchdogDecision?.kind === "consume-terminal") return
     if (watchdogDecision?.kind === "inspect-terminal") {
       const currentRequestActive = await isCurrentRequestActive(ctx, watchdogDecision.sessionID)
+      if (disposed) return
       watchdogDecision = firstPromptWatchdog.resolveDeferredTerminal(
         watchdogDecision.sessionID,
         currentRequestActive,
@@ -140,6 +144,7 @@ export function createRuntimeFallbackHook(
   }
 
   const dispose = () => {
+    disposed = true
     if (cleanupInterval) {
       clearInterval(cleanupInterval)
     }
@@ -163,7 +168,10 @@ export function createRuntimeFallbackHook(
 
   return {
     event: eventHandler,
-    "chat.message": chatMessageHandler,
+    "chat.message": async (input, output) => {
+      if (disposed) return
+      await chatMessageHandler(input, output)
+    },
     dispose,
   } as RuntimeFallbackHook
 }

@@ -5,6 +5,7 @@ import { getFallbackModelsForSession } from "./fallback-models"
 import { prepareFallback } from "./fallback-state"
 import { restoreFallbackState, snapshotFallbackState } from "./fallback-state-snapshot"
 import { subagentSessions } from "../../features/claude-code-session-state"
+import { isRuntimeFallbackActive } from "./lifecycle"
 
 declare function setTimeout(callback: () => void | Promise<void>, delay?: number): RuntimeFallbackTimeout
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
@@ -37,6 +38,7 @@ export function createFallbackTimeoutHelpers(
   }
 
   const scheduleSessionFallbackTimeout = (sessionID: string, resolvedAgent?: string) => {
+    if (!isRuntimeFallbackActive(deps)) return
     clearSessionFallbackTimeout(sessionID)
 
     const timeoutMs = options?.session_timeout_ms ?? config.timeout_seconds * 1000
@@ -45,6 +47,7 @@ export function createFallbackTimeoutHelpers(
 
     const timer = setTimeout(async () => {
       sessionFallbackTimeouts.delete(sessionID)
+      if (!isRuntimeFallbackActive(deps)) return
 
       if (wasSubagentSession && !subagentSessions.has(sessionID)) {
         log(`[${HOOK_NAME}] Session fallback timeout skipped for completed subagent`, { sessionID })
@@ -59,6 +62,7 @@ export function createFallbackTimeoutHelpers(
       }
 
       const abortSucceeded = await abortSessionRequest(sessionID, "session.timeout")
+      if (!isRuntimeFallbackActive(deps)) return
       if (!abortSucceeded) {
         log(`[${HOOK_NAME}] Session fallback timeout abort failed; preserving retry ownership`, { sessionID })
         return

@@ -3,6 +3,7 @@ import { getPromptReservation } from "../../shared/prompt-async-gate/reservation
 import { releasePromptAsyncReservation } from "../shared/prompt-async-gate"
 import { HOOK_NAME } from "./constants"
 import { acquireInternalAbortOwnership, releaseInternalAbortOwnership } from "./internal-abort-ownership"
+import { isRuntimeFallbackActive } from "./lifecycle"
 import type { HookDeps } from "./types"
 
 export function createAbortSessionRequest(deps: HookDeps) {
@@ -17,6 +18,7 @@ export function createAbortSessionRequest(deps: HookDeps) {
       source === "first-prompt-watchdog"
 
     const runAbort = async (): Promise<boolean> => {
+      if (!isRuntimeFallbackActive(deps)) return false
       if (isInternalAbort) {
         acquireInternalAbortOwnership(deps, sessionID)
         deps.sessionLastAccess.set(sessionID, Date.now())
@@ -27,6 +29,10 @@ export function createAbortSessionRequest(deps: HookDeps) {
           path: { id: sessionID },
           throwOnError: true,
         })
+        if (!isRuntimeFallbackActive(deps)) {
+          if (isInternalAbort) releaseInternalAbortOwnership(deps, sessionID)
+          return false
+        }
         if (
           typeof result === "object" &&
           result !== null &&

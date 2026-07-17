@@ -13,6 +13,7 @@ import { createSessionStatusHandler } from "./session-status-handler"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
 import { clearInternalAbortOwnership, consumeInternalAbortOwnership } from "./internal-abort-ownership"
+import { isRuntimeFallbackActive } from "./lifecycle"
 
 function isRuntimeFallbackRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
@@ -179,6 +180,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     }
 
     const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
+    if (!isRuntimeFallbackActive(deps)) return
 
     if (isAbortError(error)) {
       // If we triggered this abort to swap in a fallback model, consume the
