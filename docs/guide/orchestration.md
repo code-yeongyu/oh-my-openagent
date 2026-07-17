@@ -93,6 +93,20 @@ Mode distinction:
 - `mode: "primary"`: top-level session agents selected directly in UI/CLI
 - `mode: "subagent"`: worker/consultant agents invoked via `task(..., subagent_type="...")` or `call_omo_agent(...)`
 
+### Display Names vs Providers
+
+`Sisyphus - ultraworker` is the display name for the primary Sisyphus agent. It is not a separate provider, proxy, or replacement for your original model account.
+
+Three names can appear together in logs or the TUI:
+
+- **Agent display name**: `Sisyphus - ultraworker`, `Atlas - Plan Executor`, `Hephaestus - Deep Agent`
+- **Provider namespace**: `anthropic`, `openai`, `github-copilot`, `opencode`, `opencode-go`, `vercel`
+- **Model id**: `claude-opus-4-7`, `kimi-k2.6`, `gpt-5.5`, `glm-5`
+
+The agent decides the prompt and behavior. The provider namespace decides which connected account or gateway serves the request. The model id decides the model family. If you see Sisyphus running through `opencode-go/kimi-k2.6`, that means the Sisyphus prompt is using Kimi through the OpenCode Go provider path; it does not mean OMO replaced your provider silently.
+
+When `ulw` or `ultrawork` is present, Sisyphus receives the ultrawork instruction set for a harder autonomous task. By default it keeps the agent's configured model or fallback chain. An explicit `agents.sisyphus.ultrawork.model` or `variant` setting can override that routing for ultrawork prompts.
+
 ### Delegation Semantics (Important)
 
 - `task(category="...")` routes to **Sisyphus-Junior** with category-optimized model routing
@@ -528,6 +542,31 @@ Use the `ulw` keyword in Sisyphus when:
 
 - **For most users**: Use `ulw` keyword in Sisyphus. It's the default path and works excellently for 90% of complex tasks.
 - **For power users**: Switch to Hephaestus when you want GPT-native reasoning or the "AmpCode deep mode" experience of fully autonomous exploration and execution.
+
+### Brownfield / KISS Mode
+
+For mature projects, the safest default is not "make the best architecture." It is "make the smallest correct change that fits the architecture already here."
+
+Use Prometheus first when a brownfield task could invite broad cleanup, rewrites, or speculative abstractions. Select Prometheus with the agent selector or `/agent`, then ask it to produce a constrained plan with explicit boundaries:
+
+```text
+Fix <problem> in this existing codebase.
+Preserve the current architecture and public behavior.
+Use the smallest viable change.
+Follow local patterns in <files or areas>.
+Do not refactor, rename, reorganize, or clean up unrelated code.
+List exact files in scope and exact verification commands.
+```
+
+Then run `/start-work` from that plan. Atlas will execute against the written scope instead of treating the task as an open-ended modernization pass.
+
+Use `ulw` directly only when the target is already narrow:
+
+```text
+ulw fix the null handling in packages/foo/src/bar.ts using the existing helper style. No unrelated cleanup.
+```
+
+Use Hephaestus when you deliberately want autonomous deep implementation or architectural exploration. If the job is "touch the old system without disturbing it," an explicit Prometheus plan provides written scope boundaries before Atlas starts execution.
 
 ---
 
