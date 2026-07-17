@@ -1,7 +1,6 @@
 import type { OhMyOpenCodeConfig } from "../../config"
 import type { MonitorManager } from "../../features/monitor"
 import type { PluginContext } from "../types"
-import type { RalphLoopHook } from "../../hooks/ralph-loop"
 
 import {
   createClaudeCodeHooksHook,
@@ -32,10 +31,9 @@ export function createTransformHooks(args: {
   pluginConfig: OhMyOpenCodeConfig
   isHookEnabled: (hookName: string) => boolean
   safeHookEnabled?: boolean
-  ralphLoop?: RalphLoopHook | null
   monitorManager?: MonitorManager
 }): TransformHooks {
-  const { ctx, pluginConfig, isHookEnabled, ralphLoop, monitorManager } = args
+  const { ctx, pluginConfig, isHookEnabled, monitorManager } = args
   const safeHookEnabled = args.safeHookEnabled ?? true
 
   const claudeCodeHooks = isHookEnabled("claude-code-hooks")
@@ -61,7 +59,7 @@ export function createTransformHooks(args: {
           createKeywordDetectorHook(
             ctx,
             contextCollector,
-            ralphLoop ?? undefined,
+            undefined,
             pluginConfig.keyword_detector,
             pluginConfig.default_mode,
           ),
