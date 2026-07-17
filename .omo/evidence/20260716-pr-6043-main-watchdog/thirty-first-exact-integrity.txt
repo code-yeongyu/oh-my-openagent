@@ -1,5 +1,10 @@
-source_head=b3762f4888295b2d0d648551f12e85b9501e05ab
+source_head=871a5d8cf84cf8ab4490f3385f110834c2907fca
+integrated_base=c6b845f3057ccfeb3c210fd3a0a352a2cf253879
 tracked_status_begin
+ M .omo/evidence/20260716-pr-6043-main-watchdog/thirty-first-exact-focused-tests.txt
+ M .omo/evidence/20260716-pr-6043-main-watchdog/thirty-first-exact-integrity.txt
+ M .omo/evidence/20260716-pr-6043-main-watchdog/thirty-first-exact-runtime-fallback-suite.txt
+ M .omo/evidence/20260716-pr-6043-main-watchdog/thirty-first-exact-session-lifecycle-suite.txt
 tracked_status_end
 changed_ts=60
 over_limit=0

@@ -4,9 +4,10 @@ Date: 2026-07-17 (Asia/Seoul)
 
 ## Exact Source
 
-- Repair source: `b3762f4888295b2d0d648551f12e85b9501e05ab`
+- Test repair: `b3762f4888295b2d0d648551f12e85b9501e05ab`
+- Integrated merge-candidate source: `871a5d8cf84cf8ab4490f3385f110834c2907fca`
+- Integrated `origin/dev`: `c6b845f3057ccfeb3c210fd3a0a352a2cf253879`
 - Superseded evidence head: `2701dbc52fda1dac8155bdb5684b1c2f75fd0f23`
-- Integrated base: `09557b20a0913f26392515e658892a5658a6808c`
 
 ## Finding
 
@@ -64,5 +65,4 @@ plugin, SSE, root-state, and isolation artifacts are preserved instead.
 
 ## Verdict
 
-PASS at exact source `b3762f4888295b2d0d648551f12e85b9501e05ab`.
-
+PASS at exact integrated source `871a5d8cf84cf8ab4490f3385f110834c2907fca`.

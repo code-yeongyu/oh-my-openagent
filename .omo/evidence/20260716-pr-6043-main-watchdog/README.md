@@ -720,9 +720,12 @@ Twenty-eighth-cycle artifacts:
   root lifecycle, later cancellation, and unchanged-DB proof.
 
 The thirty-first fresh goal gate found one forbidden non-null assertion in a
-changed legacy test and a static-evidence scope gap. Source
+changed legacy test and a static-evidence scope gap. Test repair
 `b3762f4888295b2d0d648551f12e85b9501e05ab` replaces the assertion with an
-explicit state-presence guard; runtime production behavior is unchanged.
+explicit state-presence guard; integrated source
+`871a5d8cf84cf8ab4490f3385f110834c2907fca` merges current `origin/dev`
+`c6b845f3057ccfeb3c210fd3a0a352a2cf253879`. Runtime production behavior is
+unchanged.
 
 Thirty-first-cycle artifacts:
 

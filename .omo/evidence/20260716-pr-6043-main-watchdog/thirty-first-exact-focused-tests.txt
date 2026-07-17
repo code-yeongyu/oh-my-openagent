@@ -1,16 +1,16 @@
 bun test v1.3.14 (0d9b296a)
 
 packages/omo-opencode/src/hooks/runtime-fallback/event-handler.test.ts:
-(pass) createEventHandler > #given a session retry dedupe key #when session.stop fires #then the retry dedupe key is cleared [0.99ms]
-(pass) createEventHandler > #given a session retry dedupe key without a pending fallback result #when session.idle fires #then the retry dedupe key is cleared [0.18ms]
-(pass) createEventHandler > #given a cancelled session #when session.error receives an abort error #then fallback retry state is reset [0.39ms]
+(pass) createEventHandler > #given a session retry dedupe key #when session.stop fires #then the retry dedupe key is cleared [0.94ms]
+(pass) createEventHandler > #given a session retry dedupe key without a pending fallback result #when session.idle fires #then the retry dedupe key is cleared [0.19ms]
+(pass) createEventHandler > #given a cancelled session #when session.error receives an abort error #then fallback retry state is reset [0.36ms]
 (pass) createEventHandler > #given a cancelled session #when session.idle fires #then fallback retry state stays cleared [0.17ms]
 (pass) createEventHandler > #given a session we aborted ourselves (internal abort flag set) #when session.error fires with isAbort #then fallback retry state is preserved (issue #4006) [0.16ms]
-(pass) createEventHandler > #given an external abort (no internal flag) #when session.error fires with isAbort #then state is still reset as a real cancellation [0.12ms]
+(pass) createEventHandler > #given an external abort (no internal flag) #when session.error fires with isAbort #then state is still reset as a real cancellation [0.11ms]
 (pass) createEventHandler > #given two consecutive internal-abort cycles #when session.error fires each time #then attemptCount can progress past 1 [0.12ms]
 (pass) createEventHandler > #given session.created with an object-shaped model (opencode 1.15.x) #when the event fires #then state stores a canonical string model (issue #4315) [0.18ms]
 
  8 pass
  0 fail
  33 expect() calls
-Ran 8 tests across 1 file. [84.00ms]
+Ran 8 tests across 1 file. [80.00ms]
