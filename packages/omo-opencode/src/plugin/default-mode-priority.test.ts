@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import type { OhMyOpenCodeConfig } from "../config"
 import type { DefaultModeConfig } from "../config/schema/default-mode"
-import type { CreatedHooks } from "../create-hooks"
 import { _resetForTesting, setMainSession } from "../features/claude-code-session-state"
 import { createKeywordDetectorHook } from "../hooks/keyword-detector"
 import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 import { createChatMessageHandler, type ChatMessageHandlerOutput } from "./chat-message"
+import type { ChatMessageHooks } from "./chat-message/types"
 import { createSystemTransformHandler } from "./system-transform"
 import type { PluginContext } from "./types"
 
@@ -22,60 +22,59 @@ type ToastCall = {
   }
 }
 
-type RalphLoopCall = {
+type GoalCall = {
   readonly sessionID: string
-  readonly prompt: string
-  readonly options: Record<string, unknown>
+  readonly objective: string
 }
 
 type MatrixCase = {
   readonly name: string
   readonly ultrawork: boolean
-  readonly ralphLoop: boolean
+  readonly goal: boolean
   readonly expectUltraworkSystem: boolean
   readonly expectToast: boolean
-  readonly expectRalphLoop: boolean
+  readonly expectGoal: boolean
 }
 
 const DEFAULT_MODE_CASES = [
   {
     name: "neither default mode enabled",
     ultrawork: false,
-    ralphLoop: false,
+    goal: false,
     expectUltraworkSystem: false,
     expectToast: false,
-    expectRalphLoop: false,
+    expectGoal: false,
   },
   {
     name: "ultrawork default mode only",
     ultrawork: true,
-    ralphLoop: false,
+    goal: false,
     expectUltraworkSystem: true,
     expectToast: true,
-    expectRalphLoop: false,
+    expectGoal: false,
   },
   {
-    name: "ralph loop default mode only",
+    name: "goal default mode only",
     ultrawork: false,
-    ralphLoop: true,
+    goal: true,
     expectUltraworkSystem: false,
     expectToast: false,
-    expectRalphLoop: true,
+    expectGoal: true,
   },
   {
-    name: "ultrawork and ralph loop default modes together",
+    name: "ultrawork and goal default modes together",
     ultrawork: true,
-    ralphLoop: true,
+    goal: true,
     expectUltraworkSystem: true,
     expectToast: true,
-    expectRalphLoop: true,
+    expectGoal: true,
   },
 ] satisfies readonly MatrixCase[]
 
 function createDefaultMode(testCase: MatrixCase): DefaultModeConfig {
   return {
     ultrawork: testCase.ultrawork,
-    ralph_loop: testCase.ralphLoop,
+    goal: testCase.goal,
   }
 }
 
@@ -100,24 +99,28 @@ function createPluginConfig(defaultMode: DefaultModeConfig): OhMyOpenCodeConfig 
 function createFirstMessageVariantGate() {
   let isFirstMessage = true
   return {
-    shouldOverride: (): boolean => isFirstMessage,
-    markApplied: (): void => {
+    shouldOverride: (_sessionID: string): boolean => isFirstMessage,
+    markApplied: (_sessionID: string): void => {
       isFirstMessage = false
     },
   }
 }
 
-function createHooks(startLoopCalls: RalphLoopCall[]): CreatedHooks {
-  return unsafeTestValue<CreatedHooks>({
-    ralphLoop: {
-      startLoop: (sessionID: string, prompt: string, options?: Record<string, unknown>): boolean => {
-        startLoopCalls.push({ sessionID, prompt, options: options ?? {} })
-        return true
-      },
-      cancelLoop: (): boolean => true,
-      getState: () => null,
-      event: async (): Promise<void> => {},
-    },
+function createHooks(goalEnabled: boolean, goalCalls: GoalCall[]): ChatMessageHooks {
+  return unsafeTestValue<ChatMessageHooks>({
+    goal: goalEnabled
+      ? {
+          setGoal: (sessionID: string, objective: string) => {
+            goalCalls.push({ sessionID, objective })
+            return { objective, status: "active" }
+          },
+          getGoal: () => null,
+          pauseGoal: () => null,
+          resumeGoal: () => null,
+          clearGoal: () => true,
+          markComplete: () => null,
+        }
+      : null,
   })
 }
 
@@ -163,16 +166,16 @@ async function collectDefaultModeToasts(
   return toasts
 }
 
-async function collectRalphLoopCalls(
+async function collectGoalCreations(
   defaultMode: DefaultModeConfig,
   sessionID: string,
-): Promise<readonly RalphLoopCall[]> {
-  const startLoopCalls: RalphLoopCall[] = []
+): Promise<readonly GoalCall[]> {
+  const goalCalls: GoalCall[] = []
   const handler = createChatMessageHandler({
     ctx: createPluginContext([]),
     pluginConfig: createPluginConfig(defaultMode),
     firstMessageVariantGate: createFirstMessageVariantGate(),
-    hooks: createHooks(startLoopCalls),
+    hooks: createHooks(defaultMode.goal ?? false, goalCalls),
   })
   const output: ChatMessageHandlerOutput = {
     message: {},
@@ -188,7 +191,7 @@ async function collectRalphLoopCalls(
     output,
   )
 
-  return startLoopCalls
+  return goalCalls
 }
 
 describe("default-mode priority matrix", () => {
@@ -204,13 +207,13 @@ describe("default-mode priority matrix", () => {
     test(`#given ${testCase.name} #when first user turn runs #then prompt toast and loop state match config`, async () => {
       // given
       const defaultMode = createDefaultMode(testCase)
-      const sessionID = `default-mode-${testCase.ultrawork}-${testCase.ralphLoop}`
+      const sessionID = `default-mode-${testCase.ultrawork}-${testCase.goal}`
       setMainSession(sessionID)
 
       // when
       const systemPrompt = await renderSystemPrompt(defaultMode)
       const toasts = await collectDefaultModeToasts(defaultMode, sessionID)
-      const startLoopCalls = await collectRalphLoopCalls(defaultMode, sessionID)
+      const goalCalls = await collectGoalCreations(defaultMode, sessionID)
 
       // then
       expect(systemPrompt.includes(ULTRAWORK_INSTRUCTION_MARKER)).toBe(
@@ -219,12 +222,11 @@ describe("default-mode priority matrix", () => {
       expect(toasts.map((toast) => toast.body.message)).toEqual(
         testCase.expectToast ? [DEFAULT_ULTRAWORK_TOAST] : [],
       )
-      expect(startLoopCalls.length > 0).toBe(testCase.expectRalphLoop)
-      if (testCase.expectRalphLoop) {
-        expect(startLoopCalls).toHaveLength(1)
-        expect(startLoopCalls[0]?.sessionID).toBe(sessionID)
-        expect(startLoopCalls[0]?.prompt).toBe(FIRST_TURN_PROMPT)
-        expect(startLoopCalls[0]?.options["ultrawork"]).toBe(testCase.ultrawork)
+      expect(goalCalls.length > 0).toBe(testCase.expectGoal)
+      if (testCase.expectGoal) {
+        expect(goalCalls).toHaveLength(1)
+        expect(goalCalls[0]?.sessionID).toBe(sessionID)
+        expect(goalCalls[0]?.objective).toBe(FIRST_TURN_PROMPT)
       }
     })
   }

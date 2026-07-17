@@ -225,4 +225,46 @@ describe("validatePluginConfig", () => {
       expect(existsSync(join(configDir, "oh-my-openagent.json"))).toBe(false)
     })
   })
+
+  it("migrates deprecated ralph_loop config to goal", () => {
+    withIsolatedConfig("ralph-loop-migration", (root) => {
+      const project = join(root, "project")
+      mkdirSync(join(project, ".opencode"), { recursive: true })
+      writeJson(join(project, ".opencode", "oh-my-openagent.json"), {
+        ralph_loop: {
+          enabled: true,
+          default_max_iterations: 50,
+        },
+      })
+
+      const result = validatePluginConfig(project)
+
+      expect(result.valid).toBe(true)
+      expect(result.config.goal?.enabled).toBe(true)
+      expect(result.config.goal?.auto_start).toBe(false)
+      expect(result.config.goal?.default_max_iterations).toBe(50)
+    })
+  })
+
+  it("preserves explicit goal config over migrated ralph_loop values", () => {
+    withIsolatedConfig("ralph-loop-goal-override", (root) => {
+      const project = join(root, "project")
+      mkdirSync(join(project, ".opencode"), { recursive: true })
+      writeJson(join(project, ".opencode", "oh-my-openagent.json"), {
+        goal: {
+          enabled: false,
+          default_max_iterations: 75,
+        },
+        ralph_loop: {
+          enabled: true,
+          default_max_iterations: 50,
+        },
+      })
+
+      const result = validatePluginConfig(project)
+
+      expect(result.config.goal?.enabled).toBe(false)
+      expect(result.config.goal?.default_max_iterations).toBe(75)
+    })
+  })
 })

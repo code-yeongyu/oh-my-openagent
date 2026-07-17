@@ -170,11 +170,11 @@ describe("createPluginInterface - command.execute.before", () => {
   })
 })
 
-describe("createPluginInterface - ulw-loop native command smoke", () => {
+describe("createPluginInterface - goal native command smoke", () => {
   let testDir = ""
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `plugin-interface-ulw-loop-${randomUUID()}`)
+    testDir = join(tmpdir(), `plugin-interface-goal-${randomUUID()}`)
     mkdirSync(testDir, { recursive: true })
     _resetForTesting()
     registerAgentName("sisyphus")
@@ -185,13 +185,9 @@ describe("createPluginInterface - ulw-loop native command smoke", () => {
     rmSync(testDir, { recursive: true, force: true })
   })
 
-  test("starts the ultrawork loop from the native command flow with parsed arguments intact", async () => {
+  test("starts the goal from the native command flow with parsed arguments intact", async () => {
     // given
-    const startLoopCalls: Array<{
-      sessionID: string
-      prompt: string
-      options: Record<string, unknown>
-    }> = []
+    const setGoalCalls: Array<{ sessionID: string; objective: string }> = []
     const pluginInterface = createPluginInterface({
       ctx: {
         directory: testDir,
@@ -207,13 +203,17 @@ describe("createPluginInterface - ulw-loop native command smoke", () => {
       managers: {} as never,
       hooks: {
         autoSlashCommand: createAutoSlashCommandHook({ skills: [] }),
-        ralphLoop: {
-          startLoop: (sessionID: string, prompt: string, options?: Record<string, unknown>) => {
-            startLoopCalls.push({ sessionID, prompt, options: options ?? {} })
-            return true
+        goal: {
+          setGoal: (sessionID: string, objective: string) => {
+            setGoalCalls.push({ sessionID, objective })
+            return { id: "goal-1", sessionID, objective, status: "active" } as never
           },
-          cancelLoop: () => true,
-          getState: () => null,
+          getGoal: () => null,
+          pauseGoal: () => null,
+          resumeGoal: () => null,
+          clearGoal: () => false,
+          markComplete: () => null,
+          event: async () => {},
         },
       } as never,
       tools: {},
@@ -226,32 +226,26 @@ describe("createPluginInterface - ulw-loop native command smoke", () => {
     // when
     await pluginInterface["command.execute.before"]?.(
       {
-        command: "ulw-loop",
-        sessionID: "ses-ulw-native",
-        arguments: '"Ship feature" --strategy=continue',
+        command: "goal",
+        sessionID: "ses-goal-native",
+        arguments: "Ship feature",
       },
       output as never,
     )
     await pluginInterface["chat.message"]?.(
       {
-        sessionID: "ses-ulw-native",
+        sessionID: "ses-goal-native",
         agent: "sisyphus",
       } as never,
       output as never,
     )
 
     // then
-    expect(output.parts[0]?.text).toContain("/ulw-loop Command")
-    expect(startLoopCalls).toEqual([
+    expect(output.parts[0]?.text).toContain("/goal <objective>")
+    expect(setGoalCalls).toEqual([
       {
-        sessionID: "ses-ulw-native",
-        prompt: "Ship feature",
-        options: {
-          ultrawork: true,
-          maxIterations: undefined,
-          completionPromise: undefined,
-          strategy: "continue",
-        },
+        sessionID: "ses-goal-native",
+        objective: "Ship feature",
       },
     ])
   })
