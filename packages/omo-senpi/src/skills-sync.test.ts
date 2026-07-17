@@ -11,6 +11,7 @@ const expectedSkillNames = [
   "debugging",
   "frontend",
   "git-master",
+  "hyperplan",
   "init-deep",
   "lsp-setup",
   "programming",
@@ -30,7 +31,14 @@ const CODEX_DERIVED_SKILL_NAMES: Record<string, true> = {
   ultrawork: true,
   "ulw-loop": true,
 }
-const sharedSkillNames = expectedSkillNames.filter((name) => !(name in CODEX_DERIVED_SKILL_NAMES))
+// Skills authored directly against the omo-senpi tool surface. They already speak native Senpi tools,
+// so they carry no OpenCode examples and need no "Senpi Harness Tool Compatibility" translation banner.
+const NATIVE_SENPI_SKILL_NAMES: Record<string, true> = {
+  hyperplan: true,
+}
+const sharedSkillNames = expectedSkillNames.filter(
+  (name) => !(name in CODEX_DERIVED_SKILL_NAMES) && !(name in NATIVE_SENPI_SKILL_NAMES),
+)
 const namePattern = /^[a-z0-9-]{1,64}$/
 const forbiddenTokenPattern = /\b(?:codex|multi_agent|spawn_agent)\b/i
 const opencodeOrchestrationPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/
@@ -82,7 +90,7 @@ function extractFrontmatterField(frontmatter: string, field: string): string | u
 }
 
 describe("OMO Senpi scoped skill sync", () => {
-  test("#given synced skill output #when inspected #then exactly 18 roots exist with valid names", () => {
+  test("#given synced skill output #when inspected #then exactly 19 roots exist with valid names", () => {
     const actualNames = listDirectoryNames(skillsRoot)
     expect(actualNames).toEqual([...expectedSkillNames].sort())
 
