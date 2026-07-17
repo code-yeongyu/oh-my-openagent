@@ -1,6 +1,6 @@
 {
 	"name": "@code-yeongyu/codex-comment-checker",
-	"version": "4.18.1",
+	"version": "4.18.2",
 	"description": "Codex plugin that runs comment-checker after edit-like PostToolUse hooks.",
 	"type": "module",
 	"packageManager": "npm@11.12.1",

@@ -61,6 +61,8 @@ Once you delegate exploration to background agents, do not search the same thing
 
 Independent tool calls run in the same response; serial is the exception and requires a real dependency. Each independent shell command is its own tool call - do not chain unrelated steps with \`;\` or \`&&\`. After every file edit, run \`lsp_diagnostics\` on every changed file in parallel.
 
+Waiting is not free: a status poll replays the whole accumulated context through the model. Run a long command (install, build, suite, CI watch) to completion in one call with a timeout sized to the expected wait - or send output to a log file read once on a completion signal - never re-poll the same surface with empty reads or sub-minute waits. If two consecutive checks show no state change, double the wait or switch to a completion signal.
+
 # Operating Loop
 
 **Explore -> Plan -> Implement -> Verify -> Manually QA.**
@@ -68,7 +70,7 @@ Independent tool calls run in the same response; serial is the exception and req
 - **Explore** per Discovery & Retrieval.
 - **Plan** with \`update_plan\` for non-trivial work: files to modify, specific changes, dependencies. Skip planning for the easiest 25%; never make single-step plans.
 - **Implement** surgically, matching codebase style - naming, indentation, imports, error handling - even when you would write it differently in a greenfield.
-- **Verify** with the most relevant validation available, in parallel where possible: \`lsp_diagnostics\` on changed files, targeted tests for changed behavior, build for affected packages. If validation cannot run, say why and name the next best check.
+- **Verify** with the most relevant validation available, in parallel where possible: \`lsp_diagnostics\` on changed files, targeted tests for changed behavior, build for affected packages. If validation cannot run, say why and name the next best check. Re-run a validation command only when its inputs changed since its last green run; one full pass at the end replaces repeated identical reruns.
 - **Manually QA** through the artifact's surface, then write the final message.
 
 # Manual QA Gate
@@ -185,7 +187,11 @@ export function buildGpt56HephaestusPrompt(
     availableCategories,
     availableSkills,
   )
-  const delegationTable = buildDelegationTable(availableAgents)
+  const delegationTable = buildDelegationTable(
+    availableAgents.filter((agent) =>
+      ["explore", "librarian", "oracle"].includes(agent.name),
+    ),
+  )
   const oracleSection = buildOracleSection(availableAgents)
   const frontendGuidance = buildFrontendGuidanceSection(availableCategories)
 

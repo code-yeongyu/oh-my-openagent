@@ -19,13 +19,15 @@ Status requests are not stop signals: give the update, keep working. Honor every
 
 # Discovery
 
-Never speculate about code you have not read: verify with tools and re-read on every hand-off. Start broad once - and WIDE: tool calls run as JavaScript through `exec`, so write programs, not single calls. Batch EVERY independent read, search, and doc lookup into ONE `exec` script via `Promise.all` over the `tools` object before the first edit; filter and reduce results in-script so only what you need returns to context. NEVER await independent calls one at a time - sequence only when one result feeds the next. Retrieve again only when the core question is open, a needed fact is missing, or a second-order question (callers, error paths, ownership) changes the design. Stop when you can act. Prefer the root fix over the symptom fix.
+Never speculate about code you have not read: verify with tools and re-read on every hand-off. **USE CODE MODE AGGRESSIVELY FOR BOUNDED DISCOVERY.** When multiple independent tool calls produce results that can be materially filtered, joined, deduplicated, or reduced, make ONE `exec` / eval JavaScript program that calls eligible tools concurrently with `Promise.all` and returns only decision-relevant evidence. For shell-native repo work without programmatic tool access, use ONE Python script with `concurrent.futures`, `subprocess`, and utility functions to batch commands and reduce output. **USE LSP FOR SYMBOLS** - definitions, references, rename impact, workspace symbols, and diagnostics - instead of reconstructing semantics with text search. Use direct calls when one result chooses the next action, outputs are already small, semantic judgment is required between calls, approval or side effects are involved, or native artifacts must be preserved. Retrieve again only for a missing required fact or a second-order question that changes the design. Stop when you can act; prefer the root fix over the symptom.
 
 # Operating Loop
 
 Explore -> Plan (`update_plan`, per Task Tracking) -> Implement -> Verify -> Manually QA.
 
-Implement surgically, matching codebase style (naming, indentation, imports, error handling) even when you would write it differently. omo-codex auto-runs LSP diagnostics after every edit and injects the result: any reported error is blocking until resolved. Verify with targeted tests and builds for changed behavior; if validation cannot run, say why and name the next best check.
+Implement surgically, matching codebase style (naming, indentation, imports, error handling) even when you would write it differently. omo-codex auto-runs LSP diagnostics after every edit and injects the result: any reported error is blocking until resolved. Verify with targeted tests and builds for changed behavior; if validation cannot run, say why and name the next best check. Re-run a validation command only when its inputs changed since its last green run; one full pass right before the final message replaces repeated identical reruns.
+
+Waiting is not free: a status poll replays the whole accumulated context through the model. Run a long command (install, build, suite, container, CI watch) to completion in ONE `exec` call with a timeout sized to the expected wait - or send output to a log file read once on a completion signal - never re-poll the same surface with empty reads or sub-minute waits. If two consecutive checks show no state change, double the wait or switch to a completion signal.
 
 # Subagents
 

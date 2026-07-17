@@ -235,20 +235,26 @@ export function resolveModelPipeline(
     } else {
       for (const entry of fallbackChain) {
         for (const provider of entry.providers) {
-          const fullModel = `${provider}/${entry.model}`
-          const match = deps.fuzzyMatchModel(fullModel, availableModels, [provider])
-          if (match) {
-            log("Model resolved via fallback chain (availability confirmed)", {
-              provider,
-              model: entry.model,
-              match,
-              variant: entry.variant,
-            })
-            return {
-              model: match,
-              provenance: "provider-fallback",
-              variant: entry.variant,
-              attempted,
+          const transformedModelId = deps.transformModelForProvider(provider, entry.model)
+          const candidateModelIds = transformedModelId === entry.model
+            ? [entry.model]
+            : [entry.model, transformedModelId]
+          for (const modelID of candidateModelIds) {
+            const fullModel = `${provider}/${modelID}`
+            const match = deps.fuzzyMatchModel(fullModel, availableModels, [provider])
+            if (match) {
+              log("Model resolved via fallback chain (availability confirmed)", {
+                provider,
+                model: entry.model,
+                match,
+                variant: entry.variant,
+              })
+              return {
+                model: match,
+                provenance: "provider-fallback",
+                variant: entry.variant,
+                attempted,
+              }
             }
           }
         }
