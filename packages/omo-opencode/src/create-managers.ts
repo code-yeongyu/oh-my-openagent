@@ -166,6 +166,11 @@ export function createManagers(args: {
           })
         }
 
+        if (event.signal.aborted) {
+          await tmuxSessionManager.onSessionDeleted({ sessionID: event.sessionID })
+          return
+        }
+
         log("[create-managers] onSubagentSessionCreated callback completed")
     },
     onSubagentSessionDeleted: async (event: { sessionID: string }) => {

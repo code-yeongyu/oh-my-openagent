@@ -9326,7 +9326,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
     await manager.shutdown()
   })
 
-  test("keeps a cancelled dequeued launch visible until late session creation is aborted", async () => {
+  test("releases a cancelled dequeued launch before late session creation settles", async () => {
     //#given
     let resolveCreate: ((value: { data: { id: string } }) => void) | undefined
     let markCreateStarted: (() => void) | undefined
@@ -9381,7 +9381,8 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
     expect(cancelled).toBe(true)
     expect(task.status).toBe("cancelled")
     expect(abortedSessions).toEqual([])
-    expect(manager.hasBackgroundWorkInFlight(task.rootSessionId)).toBe(true)
+    expect(manager.hasBackgroundWorkInFlight(task.rootSessionId)).toBe(false)
+    expect(getConcurrencyManager(manager).getCount(key)).toBe(0)
 
     resolveCreate?.({ data: { id: "session-cancelled-during-create" } })
     await processing

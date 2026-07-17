@@ -47,6 +47,7 @@ type InternalPromptDispatchCommonArgs<TInput> = {
   readonly dispatchTimeoutMs?: number
   readonly checkStatus?: boolean
   readonly checkToolState?: boolean
+  readonly shouldDispatch?: () => boolean
 }
 
 export type InternalPromptDispatchArgs<TInput = PromptAsyncInput> = InternalPromptDispatchCommonArgs<TInput> & (
@@ -102,5 +103,6 @@ export type QueuedInternalPrompt = {
   readonly queueRetryMs: number
   readonly checkStatus: boolean
   readonly checkToolState: boolean
+  readonly shouldDispatch?: () => boolean
   readonly dispatch: (input: unknown) => Promise<unknown>
 }

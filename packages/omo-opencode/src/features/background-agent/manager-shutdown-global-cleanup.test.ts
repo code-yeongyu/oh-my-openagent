@@ -55,6 +55,8 @@ type ManagerInternals = {
   queuesByKey: Map<string, Array<{ task: BackgroundTask; input: never; rawConcurrencyKey: string }>>
   pendingByParent: Map<string, Set<string>>
   notifications: Map<string, BackgroundTask[]>
+  notificationQueueByParent: Map<string, Promise<void>>
+  completedTaskSummaries: Map<string, unknown[]>
   taskHistory: { getByParentSession: (parentSessionID: string) => unknown[] }
   pollingInterval?: ReturnType<typeof setInterval>
   concurrencyManager: {
@@ -394,7 +396,7 @@ describe("BackgroundManager shutdown global cleanup", () => {
     expect(promptCalls).toBe(0)
     messages.resolve()
     await shutdown
-    expect(promptCalls).toBe(1)
+    expect(promptCalls).toBe(0)
   })
 
   test("waits for an admitted tmux session-created callback before shutdown completes", async () => {
@@ -657,5 +659,74 @@ describe("BackgroundManager shutdown global cleanup", () => {
 
     // then
     expect(cleanupCalls).toBe(0)
+  })
+
+  test("does not recreate notification state when session.error finishes after shutdown deadline", async () => {
+    // given
+    const delayedAbort = createDeferredPromise()
+    const delayedMessages = createDeferredPromise()
+    let abortCalls = 0
+    let messagesCalls = 0
+    const manager = createBackgroundManager()
+    const internals = getInternals(manager)
+    const task = createTask({
+      id: "task-session-error-after-shutdown-deadline",
+      sessionId: "session-error-after-shutdown-deadline",
+      parentSessionId: "parent-session-error-after-shutdown-deadline",
+    })
+    internals.tasks.set(task.id, task)
+    internals.shutdownTimeoutMs = 15
+    Object.assign(manager, {
+      client: {
+        session: {
+          abort: () => {
+            abortCalls += 1
+            return abortCalls === 1 ? delayedAbort.promise : Promise.resolve({})
+          },
+          messages: async () => {
+            messagesCalls += 1
+            await delayedMessages.promise
+            return { data: [] }
+          },
+          prompt: async () => ({}),
+          promptAsync: async () => ({}),
+        },
+      },
+    })
+
+    manager.handleEvent({
+      type: "session.error",
+      properties: {
+        sessionID: task.sessionId,
+        error: {
+          name: "AgentNotFoundError",
+          message: `Agent not found: ${task.agent}`,
+        },
+      },
+    })
+    while (abortCalls === 0) await Promise.resolve()
+
+    // when
+    await manager.shutdown()
+    delayedAbort.resolve()
+    for (let index = 0; index < 20; index += 1) await Promise.resolve()
+
+    const observedAfterLateContinuation = {
+      messagesCalls,
+      notifications: internals.notifications.size,
+      notificationQueues: internals.notificationQueueByParent.size,
+      completedTaskSummaries: internals.completedTaskSummaries.size,
+      hasBackgroundWork: manager.hasBackgroundWorkInFlight(task.parentSessionId),
+    }
+    delayedMessages.resolve()
+
+    // then
+    expect(observedAfterLateContinuation).toEqual({
+      messagesCalls: 0,
+      notifications: 0,
+      notificationQueues: 0,
+      completedTaskSummaries: 0,
+      hasBackgroundWork: false,
+    })
   })
 })

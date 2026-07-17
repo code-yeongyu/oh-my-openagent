@@ -227,6 +227,7 @@ export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
       dispatchTimeoutMs,
       checkStatus: args.checkStatus !== false,
       checkToolState: args.checkToolState !== false,
+      shouldDispatch: args.shouldDispatch,
       dispatch: (dispatchInput) => dispatchWithPathCompatibility(dispatch, dispatchInput),
     })
     if (
@@ -261,6 +262,7 @@ export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
       queueRetryMs,
       checkStatus: args.checkStatus !== false,
       checkToolState: args.checkToolState !== false,
+      shouldDispatch: args.shouldDispatch,
       dispatch: async (_dispatchInput: unknown) => dispatchWithPathCompatibility(dispatch, input),
     })
   }
@@ -283,6 +285,7 @@ export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
     dispatchTimeoutMs,
     checkStatus: args.checkStatus !== false,
     checkToolState: args.checkToolState !== false,
+    shouldDispatch: args.shouldDispatch,
     dispatch: (dispatchInput) => dispatchWithPathCompatibility(dispatch, dispatchInput),
   })
   if (

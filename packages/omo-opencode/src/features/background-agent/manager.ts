@@ -266,6 +266,7 @@ export class BackgroundManager {
   private readonly shutdownAbortController = new AbortController()
   private readonly inFlightOperations = new Set<Promise<unknown>>()
   private readonly pendingTaskRegistrations = new Map<string, Promise<BackgroundTask>>()
+  private readonly unboundStartConcurrencyOwners = new Set<string>()
   private config?: BackgroundTaskConfig
   private tmuxEnabled: boolean
   private onSubagentSessionCreated?: OnSubagentSessionCreated
@@ -637,6 +638,7 @@ export class BackgroundManager {
   }
 
   private releaseUnboundStartOwnership(task: BackgroundTask, concurrencyKey: string): void {
+    if (!this.unboundStartConcurrencyOwners.delete(task.id)) return
     const hadPreStartReservation = this.preStartDescendantReservations.has(task.id)
     this.rollbackPreStartDescendantReservation(task)
     if (!hadPreStartReservation) {
@@ -961,20 +963,15 @@ export class BackgroundManager {
           }
           throw error
         }
+        this.unboundStartConcurrencyOwners.add(item.task.id)
 
         if (this.shutdownTriggered) {
-          this.rollbackPreStartDescendantReservation(item.task)
-          this.concurrencyManager.release(key)
+          this.releaseUnboundStartOwnership(item.task, key)
           return
         }
 
         if (item.task.status === "cancelled" || item.task.status === "error" || item.task.status === "interrupt") {
-          const hadPreStartReservation = this.preStartDescendantReservations.has(item.task.id)
-          this.rollbackPreStartDescendantReservation(item.task)
-          if (!hadPreStartReservation) {
-            this.releaseTaskRootDescendant(item.task)
-          }
-          this.concurrencyManager.release(key)
+          this.releaseUnboundStartOwnership(item.task, key)
           continue
         }
 
@@ -1015,7 +1012,7 @@ export class BackgroundManager {
             if (item.task.concurrencyKey) {
               this.concurrencyManager.release(item.task.concurrencyKey)
               item.task.concurrencyKey = undefined
-            } else {
+            } else if (this.unboundStartConcurrencyOwners.delete(item.task.id)) {
               this.concurrencyManager.release(key)
             }
 
@@ -1128,6 +1125,7 @@ export class BackgroundManager {
       this.releaseUnboundStartOwnership(task, concurrencyKey)
       return
     }
+    this.unboundStartConcurrencyOwners.delete(task.id)
     this.settlePreStartDescendantReservation(task)
     subagentSessions.add(sessionID)
     setSessionAgent(sessionID, input.agent)
@@ -1869,6 +1867,7 @@ The fallback retry session is now created and can be inspected directly.
       source: "background-agent-resume",
       settleMs: 0,
       queueBehavior: "defer",
+      shouldDispatch: () => !this.shutdownTriggered,
       input: {
         path: { id: existingTask.sessionId },
         body: {
@@ -1892,6 +1891,7 @@ The fallback retry session is now created and can be inspected directly.
         query: { directory: this.directory },
       },
     }).then((promptResult) => {
+      if (this.shutdownTriggered) return
       if (promptResult.status === "failed") {
         if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
           log("[background-agent] resume prompt may have been accepted before ambiguous failure; continuing to poll", {
@@ -2735,6 +2735,7 @@ The task was re-queued on a fallback model after a retryable failure.
   }
 
   markForNotification(task: BackgroundTask): void {
+    if (this.shutdownTriggered) return
     const queue = this.notifications.get(task.parentSessionId) ?? []
     queue.push(task)
     this.notifications.set(task.parentSessionId, queue)
@@ -2947,10 +2948,12 @@ The task was re-queued on a fallback model after a retryable failure.
             }
           }
         }
-        if (removedFromQueue) {
+        const cancelledConcurrencyWaiter = this.concurrencyManager.cancelWaiter(rawKey, taskId)
+        if (removedFromQueue || cancelledConcurrencyWaiter) {
           this.rollbackPreStartDescendantReservation(task)
+        } else if (this.unboundStartConcurrencyOwners.has(task.id)) {
+          this.releaseUnboundStartOwnership(task, key)
         }
-        this.concurrencyManager.cancelWaiter(rawKey, taskId)
         log("[background-agent] Cancelled pending task:", { taskId, key })
       }
 
@@ -3470,6 +3473,9 @@ The task was re-queued on a fallback model after a retryable failure.
             if (!removedFromQueue) {
               cancelledConcurrencyWaiter = this.concurrencyManager.cancelWaiter(key, task.id)
             }
+            if (!removedFromQueue && !cancelledConcurrencyWaiter && this.unboundStartConcurrencyOwners.has(task.id)) {
+              this.releaseUnboundStartOwnership(task, key)
+            }
           }
 
           task.status = "error"
@@ -3884,6 +3890,7 @@ The task was re-queued on a fallback model after a retryable failure.
     this.pendingLaunchesByParentSession.clear()
     this.pendingResumesBySession.clear()
     this.pendingTaskRegistrations.clear()
+    this.unboundStartConcurrencyOwners.clear()
     this.inFlightOperations.clear()
     this.queuesByKey.clear()
     this.processingKeys.clear()
@@ -3897,8 +3904,13 @@ The task was re-queued on a fallback model after a retryable failure.
     parentSessionID: string | undefined,
     operation: () => Promise<void>
   ): Promise<void> {
-    if (!parentSessionID) {
+    const runWhileActive = (): Promise<void> => {
+      if (this.shutdownTriggered) return Promise.resolve()
       return operation()
+    }
+
+    if (!parentSessionID) {
+      return runWhileActive()
     }
 
     const previous = this.notificationQueueByParent.get(parentSessionID) ?? Promise.resolve()
@@ -3915,7 +3927,7 @@ The task was re-queued on a fallback model after a retryable failure.
           error,
         })
       })
-      .then(operation)
+      .then(runWhileActive)
 
     this.notificationQueueByParent.set(parentSessionID, current)
 
