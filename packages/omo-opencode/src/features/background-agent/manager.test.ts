@@ -1,6 +1,7 @@
 import { tmpdir } from "node:os"
 import { describe, test, expect, beforeEach, afterEach, afterAll, spyOn, mock } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
+import type { BackgroundTaskConfig } from "../../config/schema"
 import * as sharedModule from "../../shared"
 import {
   clearAllDelegatedChildSessionBootstrap,
@@ -231,7 +232,7 @@ function createPluginInput(client: unknown, directory = tmpdir()): PluginInput {
   return cast<PluginInput>({ client, directory })
 }
 
-function createBackgroundManager(): BackgroundManager {
+function createBackgroundManager(config?: BackgroundTaskConfig): BackgroundManager {
   const client = {
     session: {
       prompt: async () => ({}),
@@ -239,7 +240,7 @@ function createBackgroundManager(): BackgroundManager {
       abort: async () => ({}),
     },
   }
-  return new BackgroundManager({ pluginContext: createPluginInput(client) })
+  return new BackgroundManager({ pluginContext: createPluginInput(client), config })
 }
 
 function createBackgroundManagerWithOptions(options: Partial<ConstructorParameters<typeof BackgroundManager>[0]>): BackgroundManager {
@@ -4717,6 +4718,46 @@ describe("BackgroundManager.trackTask", () => {
     expect(concurrencyManager.getCount("external-key")).toBe(1)
     expect(getTaskMap(manager).size).toBe(1)
   })
+
+  test("joins concurrent duplicate registration before a one-slot concurrency wait", async () => {
+    //#given
+    await manager.shutdown()
+    manager = createBackgroundManager({ defaultConcurrency: 1 })
+    stubNotifyParentSession(manager)
+    const input = {
+      taskId: "task-concurrent-one-slot",
+      sessionId: "session-concurrent-one-slot",
+      parentSessionId: "parent-session",
+      description: "external concurrent one-slot task",
+      agent: "task",
+      concurrencyKey: "external-key",
+    }
+
+    //#when
+    const firstRegistration = manager.trackTask(input)
+    const secondRegistration = manager.trackTask(input)
+    const registrations = Promise.all([firstRegistration, secondRegistration])
+    const outcome = await Promise.race([
+      registrations.then((tasks) => ({ kind: "resolved" as const, tasks })),
+      new Promise<{ kind: "timed-out" }>((resolve) => {
+        setTimeout(() => resolve({ kind: "timed-out" }), 100)
+      }),
+    ])
+
+    if (outcome.kind === "timed-out") {
+      await manager.shutdown()
+      await Promise.allSettled([firstRegistration, secondRegistration])
+    }
+
+    //#then
+    expect(outcome.kind).toBe("resolved")
+    if (outcome.kind !== "resolved") return
+    const concurrencyManager = getConcurrencyManager(manager)
+    expect(outcome.tasks[0]).toBe(outcome.tasks[1])
+    expect(concurrencyManager.getCount("external-key")).toBe(1)
+    expect(concurrencyManager.getQueueLength("external-key")).toBe(0)
+    expect(getTaskMap(manager).size).toBe(1)
+  })
 })
 
 describe("BackgroundManager.resume concurrency key", () => {
@@ -7535,7 +7576,7 @@ describe("BackgroundManager.shutdown session abort", () => {
     expect(abortedSessionIDs).toHaveLength(0)
   })
 
-   test("should call onShutdown callback during shutdown", () => {
+   test("should call onShutdown callback before shutdown resolves", async () => {
      // given
      let shutdownCalled = false
      const client = {
@@ -7552,7 +7593,7 @@ describe("BackgroundManager.shutdown session abort", () => {
     )
 
     // when
-    manager.shutdown()
+    await manager.shutdown()
 
     // then
     expect(shutdownCalled).toBe(true)

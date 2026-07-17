@@ -63,6 +63,7 @@ type ManagerInternals = {
     getQueueLength: (key: string) => number
   }
   processKey: (key: string) => Promise<void>
+  shutdownTimeoutMs: number
 }
 
 function getInternals(manager: BackgroundManager): ManagerInternals {
@@ -293,5 +294,212 @@ describe("BackgroundManager shutdown global cleanup", () => {
     expect(internals.taskHistory.getByParentSession(task.parentSessionId)).toHaveLength(0)
     expect(internals.pollingInterval).toBeUndefined()
     expect(manager.hasBackgroundWorkInFlight(task.parentSessionId)).toBe(false)
+  })
+
+  test("waits for an admitted launch prompt before shutdown completes", async () => {
+    // given
+    const prompt = createDeferredPromise()
+    let promptStarted = false
+    const manager = new BackgroundManager({ pluginContext: {
+      client: {
+        session: {
+          get: async () => ({ data: { directory: tmpdir() } }),
+          create: async () => ({ data: { id: "session-launch-owned-by-shutdown" } }),
+          promptAsync: async () => {
+            promptStarted = true
+            await prompt.promise
+            return {}
+          },
+          abort: async () => ({}),
+        },
+      } as never,
+      directory: tmpdir(),
+    } as never })
+    const task = createTask({
+      id: "task-launch-owned-by-shutdown",
+      sessionId: "",
+      status: "pending",
+      startedAt: undefined,
+      queuedAt: new Date(),
+    })
+    const input = {
+      description: "owned launch prompt",
+      prompt: "work",
+      agent: "general",
+      parentSessionId: "parent-launch-owned-by-shutdown",
+      parentMessageId: "message-launch-owned-by-shutdown",
+    }
+    await (manager as unknown as {
+      startTask: (item: { task: BackgroundTask; input: typeof input }) => Promise<void>
+    }).startTask({ task, input })
+    while (!promptStarted) await Promise.resolve()
+
+    // when
+    const shutdown = manager.shutdown()
+    const outcome = await Promise.race([
+      shutdown.then(() => "resolved" as const),
+      new Promise<"pending">((resolve) => setTimeout(() => resolve("pending"), 50)),
+    ])
+
+    // then
+    expect(outcome).toBe("pending")
+    prompt.resolve()
+    await shutdown
+  })
+
+  test("waits for an admitted resume dispatch before shutdown completes", async () => {
+    // given
+    const messages = createDeferredPromise()
+    let promptCalls = 0
+    const manager = new BackgroundManager({ pluginContext: {
+      client: {
+        session: {
+          messages: async () => {
+            await messages.promise
+            return { data: [] }
+          },
+          promptAsync: async () => {
+            promptCalls += 1
+            return {}
+          },
+          abort: async () => ({}),
+        },
+      } as never,
+      directory: tmpdir(),
+    } as never })
+    const task = createTask({
+      id: "task-resume-owned-by-shutdown",
+      sessionId: "session-resume-owned-by-shutdown",
+      status: "completed",
+      completedAt: new Date(),
+    })
+    getInternals(manager).tasks.set(task.id, task)
+    await manager.resume({
+      sessionId: task.sessionId!,
+      prompt: "continue",
+      parentSessionId: task.parentSessionId,
+      parentMessageId: task.parentMessageId,
+    })
+    for (let index = 0; index < 12; index += 1) await Promise.resolve()
+
+    // when
+    const shutdown = manager.shutdown()
+    const outcome = await Promise.race([
+      shutdown.then(() => "resolved" as const),
+      new Promise<"pending">((resolve) => setTimeout(() => resolve("pending"), 50)),
+    ])
+
+    // then
+    expect(outcome).toBe("pending")
+    expect(promptCalls).toBe(0)
+    messages.resolve()
+    await shutdown
+    expect(promptCalls).toBe(1)
+  })
+
+  test("waits for an admitted tmux session-created callback before shutdown completes", async () => {
+    // given
+    const callback = createDeferredPromise()
+    const events: string[] = []
+    let callbackStarted = false
+    const originalTmux = process.env.TMUX
+    process.env.TMUX = "/tmp/pr6005-owned-tmux"
+    const manager = new BackgroundManager({
+      pluginContext: {
+        client: {
+          session: {
+            get: async () => ({ data: { directory: tmpdir() } }),
+            create: async () => ({ data: { id: "session-tmux-owned-by-shutdown" } }),
+            promptAsync: async () => ({}),
+            abort: async () => ({}),
+          },
+        } as never,
+        directory: tmpdir(),
+      } as never,
+      tmuxConfig: { enabled: true } as never,
+      onSubagentSessionCreated: async () => {
+        events.push("session-created:start")
+        callbackStarted = true
+        await callback.promise
+        events.push("session-created:end")
+      },
+      onShutdown: () => { events.push("shutdown-cleanup") },
+    })
+
+    try {
+      const task = createTask({
+        id: "task-tmux-owned-by-shutdown",
+        sessionId: "",
+        status: "pending",
+        startedAt: undefined,
+        queuedAt: new Date(),
+      })
+      const input = {
+        description: "owned tmux callback",
+        prompt: "work",
+        agent: "general",
+        parentSessionId: "parent-tmux-owned-by-shutdown",
+        parentMessageId: "message-tmux-owned-by-shutdown",
+      }
+      await (manager as unknown as {
+        startTask: (item: { task: BackgroundTask; input: typeof input }) => Promise<void>
+      }).startTask({ task, input })
+      while (!callbackStarted) await Promise.resolve()
+
+      // when
+      const shutdown = manager.shutdown()
+      const outcome = await Promise.race([
+        shutdown.then(() => "resolved" as const),
+        new Promise<"pending">((resolve) => setTimeout(() => resolve("pending"), 50)),
+      ])
+
+      // then
+      expect(outcome).toBe("pending")
+      callback.resolve()
+      await shutdown
+      expect(events).toEqual([
+        "session-created:start",
+        "session-created:end",
+        "shutdown-cleanup",
+      ])
+    } finally {
+      callback.resolve()
+      await manager.shutdown()
+      if (originalTmux === undefined) delete process.env.TMUX
+      else process.env.TMUX = originalTmux
+    }
+  })
+
+  test("bounds the complete shutdown drain with one shared deadline", async () => {
+    // given
+    const stalledShutdown = createDeferredPromise()
+    const manager = new BackgroundManager({
+      pluginContext: {
+        client: {
+          session: {
+            abort: async () => ({}),
+            promptAsync: async () => ({}),
+          },
+        } as never,
+        directory: tmpdir(),
+      } as never,
+      onShutdown: () => stalledShutdown.promise,
+    })
+    getInternals(manager).shutdownTimeoutMs = 25
+
+    // when
+    const shutdown = manager.shutdown()
+    const outcome = await Promise.race([
+      shutdown.then(() => "resolved" as const),
+      new Promise<"timed-out">((resolve) => {
+        setTimeout(() => resolve("timed-out"), 250)
+      }),
+    ])
+
+    // then
+    stalledShutdown.resolve()
+    await shutdown
+    expect(outcome).toBe("resolved")
+    expect(getInternals(manager).tasks.size).toBe(0)
   })
 })

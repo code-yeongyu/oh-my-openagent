@@ -231,6 +231,7 @@ export type OnSubagentSessionDeleted = (event: SubagentSessionDeletedEvent) => P
 const MAX_TASK_REMOVAL_RESCHEDULES = 6
 const MAX_COMPLETED_TASK_ARCHIVE_SIZE = 100
 const PARENT_WAKE_FAILURE_REQUEUE_WINDOW_MS = 5_000
+const BACKGROUND_MANAGER_SHUTDOWN_TIMEOUT_MS = 10_000
 
 export interface BackgroundManagerConfig {
   pluginContext: PluginInput
@@ -259,7 +260,10 @@ export class BackgroundManager {
   private concurrencyManager: ConcurrencyManager
   private shutdownTriggered = false
   private shutdownPromise?: Promise<void>
+  private shutdownTimeoutMs = BACKGROUND_MANAGER_SHUTDOWN_TIMEOUT_MS
+  private shutdownDeadlineAt?: number
   private readonly inFlightOperations = new Set<Promise<unknown>>()
+  private readonly pendingTaskRegistrations = new Map<string, Promise<BackgroundTask>>()
   private config?: BackgroundTaskConfig
   private tmuxEnabled: boolean
   private onSubagentSessionCreated?: OnSubagentSessionCreated
@@ -364,9 +368,41 @@ export class BackgroundManager {
     return operation
   }
 
+  private async settleWithinShutdownDeadline<T>(
+    label: string,
+    operation: Promise<T>,
+  ): Promise<{ status: "settled"; value: T } | { status: "timed_out" }> {
+    const remainingMs = (this.shutdownDeadlineAt ?? performance.now()) - performance.now()
+    if (remainingMs <= 0) {
+      log("[background-agent] Shutdown deadline exhausted before phase:", { label })
+      return { status: "timed_out" }
+    }
+
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined
+    try {
+      return await Promise.race([
+        operation.then((value) => ({ status: "settled" as const, value })),
+        new Promise<{ status: "timed_out" }>((resolve) => {
+          timeoutHandle = setTimeout(() => resolve({ status: "timed_out" }), remainingMs)
+        }),
+      ])
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle)
+    }
+  }
+
   private async drainInFlightOperations(): Promise<void> {
     while (this.inFlightOperations.size > 0) {
-      await Promise.allSettled(Array.from(this.inFlightOperations))
+      const result = await this.settleWithinShutdownDeadline(
+        "in-flight operations",
+        Promise.allSettled(Array.from(this.inFlightOperations)),
+      )
+      if (result.status === "timed_out") {
+        log("[background-agent] Timed out draining in-flight operations:", {
+          remainingOperations: this.inFlightOperations.size,
+        })
+        return
+      }
     }
   }
 
@@ -1228,7 +1264,7 @@ The fallback retry session is now created and can be inspected directly.
       parts: [createInternalAgentTextPart(input.prompt)],
     }
 
-    promptWithRetryInDirectory(this.client, {
+    const promptOperation = promptWithRetryInDirectory(this.client, {
       path: { id: sessionID },
       body: promptBody,
     }, parentDirectory).catch(async (error) => {
@@ -1331,6 +1367,7 @@ The fallback retry session is now created and can be inspected directly.
         }
       }
     })
+    this.trackInFlightOperation(promptOperation)
 
     log("[background-agent] tmux callback check", {
       hasCallback: !!this.onSubagentSessionCreated,
@@ -1342,13 +1379,14 @@ The fallback retry session is now created and can be inspected directly.
 
     if (!input.suppressTmuxSpawn && this.onSubagentSessionCreated && this.tmuxEnabled && isInsideTmux()) {
       log("[background-agent] Invoking tmux callback (fire-and-forget)", { sessionID })
-      void this.onSubagentSessionCreated({
+      const tmuxCallback = this.onSubagentSessionCreated({
         sessionID,
         parentID: input.parentSessionId,
         title: input.description,
       }).catch((err) => {
         log("[background-agent] Failed to spawn tmux pane:", err)
       })
+      this.trackInFlightOperation(tmuxCallback)
     } else {
       log("[background-agent] SKIP tmux callback - conditions not met", {
         suppressTmuxSpawn: !!input.suppressTmuxSpawn,
@@ -1557,7 +1595,20 @@ The fallback retry session is now created and can be inspected directly.
     if (this.shutdownTriggered) {
       return Promise.reject(new Error("Background manager is shutting down"))
     }
-    return this.trackInFlightOperation(this.performTrackTask(input))
+    const pendingRegistration = this.pendingTaskRegistrations.get(input.taskId)
+    if (pendingRegistration) {
+      return this.trackInFlightOperation(
+        pendingRegistration.then(() => this.performTrackTask(input)),
+      )
+    }
+
+    const registration = this.performTrackTask(input)
+    this.pendingTaskRegistrations.set(input.taskId, registration)
+    void registration.then(
+      () => this.pendingTaskRegistrations.delete(input.taskId),
+      () => this.pendingTaskRegistrations.delete(input.taskId),
+    )
+    return this.trackInFlightOperation(registration)
   }
 
   private async performTrackTask(input: {
@@ -1800,7 +1851,7 @@ The fallback retry session is now created and can be inspected directly.
       applySessionPromptParams(existingTask.sessionId!, existingTask.model)
     }
 
-    dispatchInternalPrompt({
+    const promptOperation = dispatchInternalPrompt({
       mode: "async",
       client: this.client,
       sessionID: existingTask.sessionId,
@@ -1904,6 +1955,7 @@ The fallback retry session is now created and can be inspected directly.
         releaseTerminalization()
       }
     })
+    this.trackInFlightOperation(promptOperation)
 
     return existingTask
   }
@@ -3686,6 +3738,7 @@ The task was re-queued on a fallback model after a retryable failure.
 
   private async performShutdown(): Promise<void> {
     log("[background-agent] Shutting down BackgroundManager")
+    this.shutdownDeadlineAt = performance.now() + this.shutdownTimeoutMs
     this.stopPolling()
     this.concurrencyManager.clear()
 
@@ -3701,15 +3754,6 @@ The task was re-queued on a fallback model after a retryable failure.
 
     this.parentWakeNotifier.shutdown()
     this.unregisterProcessCleanup()
-
-    let onShutdownPromise: Promise<void> | undefined
-    if (this.onShutdown) {
-      try {
-        onShutdownPromise = Promise.resolve(this.onShutdown())
-      } catch (error) {
-        log("[background-agent] Error in onShutdown callback:", error)
-      }
-    }
 
     const trackedSessionIDs = new Set<string>()
     const abortRequests: Array<{ sessionID: string; promise: Promise<unknown> }> = []
@@ -3729,26 +3773,55 @@ The task was re-queued on a fallback model after a retryable failure.
     }
 
     if (abortRequests.length > 0) {
-      const abortResults = await Promise.allSettled(abortRequests.map((request) => request.promise))
-      for (const [index, abortResult] of abortResults.entries()) {
-        if (abortResult.status === "fulfilled") continue
-
-        log("[background-agent] Error aborting session during shutdown:", {
-          error: abortResult.reason,
-          sessionID: abortRequests[index]?.sessionID,
+      const abortPhase = await this.settleWithinShutdownDeadline(
+        "session aborts",
+        Promise.allSettled(abortRequests.map((request) => request.promise)),
+      )
+      if (abortPhase.status === "timed_out") {
+        log("[background-agent] Timed out waiting for session aborts:", {
+          sessionCount: abortRequests.length,
         })
+      } else {
+        for (const [index, abortResult] of abortPhase.value.entries()) {
+          if (abortResult.status === "fulfilled") continue
+
+          log("[background-agent] Error aborting session during shutdown:", {
+            error: abortResult.reason,
+            sessionID: abortRequests[index]?.sessionID,
+          })
+        }
       }
     }
 
     await this.drainInFlightOperations()
 
     while (this.notificationQueueByParent.size > 0) {
-      await Promise.allSettled(Array.from(this.notificationQueueByParent.values()))
+      const notificationPhase = await this.settleWithinShutdownDeadline(
+        "notification queues",
+        Promise.allSettled(Array.from(this.notificationQueueByParent.values())),
+      )
+      if (notificationPhase.status === "timed_out") {
+        log("[background-agent] Timed out draining notification queues:", {
+          remainingQueues: this.notificationQueueByParent.size,
+        })
+        break
+      }
     }
 
-    if (onShutdownPromise) {
+    if (this.onShutdown) {
       try {
-        await onShutdownPromise
+        const shutdownCallbackPhase = await this.settleWithinShutdownDeadline(
+          "onShutdown callback",
+          Promise.resolve(this.onShutdown()).then(
+            () => undefined,
+            (error) => {
+              log("[background-agent] Error in onShutdown callback:", error)
+            },
+          ),
+        )
+        if (shutdownCallbackPhase.status === "timed_out") {
+          log("[background-agent] Timed out waiting for onShutdown callback")
+        }
       } catch (error) {
         log("[background-agent] Error in onShutdown callback:", error)
       }
@@ -3791,6 +3864,8 @@ The task was re-queued on a fallback model after a retryable failure.
     this.terminalizationWaiters.clear()
     this.pendingLaunchesByParentSession.clear()
     this.pendingResumesBySession.clear()
+    this.pendingTaskRegistrations.clear()
+    this.inFlightOperations.clear()
     this.queuesByKey.clear()
     this.processingKeys.clear()
     this.taskHistory.clearAll()
