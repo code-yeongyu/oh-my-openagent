@@ -1,0 +1,27 @@
+pending {
+  abortRequests: 1,
+  internalOwner: true,
+  retryKey: true,
+  fallbackState: false,
+  dispatches: 0,
+  commits: 0,
+  rollbacks: 0,
+}
+afterCleanup {
+  abortRequests: 0,
+  internalOwner: false,
+  retryKey: false,
+  fallbackState: false,
+  dispatches: 0,
+  commits: 0,
+  rollbacks: 0,
+}
+afterLateAbort {
+  abortRequests: 0,
+  internalOwner: false,
+  retryKey: false,
+  fallbackState: false,
+  dispatches: 0,
+  commits: 0,
+  rollbacks: 1,
+}
