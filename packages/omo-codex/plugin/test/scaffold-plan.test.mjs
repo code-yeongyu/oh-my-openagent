@@ -135,7 +135,27 @@ test("#given an explicit review modifier at startup #when draft-only scaffold ru
 	}
 });
 
-test("#given pre-approval planning #when draft-only scaffold runs #then it creates the durable draft without creating a plan", async () => {
+test("#given automatic review for non-Trivial UNCLEAR intent #when draft-only scaffold runs #then the first durable write contains the complete pending review request", async () => {
+	const { scaffold } = await import(scriptUrl);
+	const dir = await mkdtemp(join(tmpdir(), "ulwp-"));
+	try {
+		await scaffold(dir, { slug: "demo", intent: "unclear", draftOnly: true, reviewRequired: true });
+		const draft = await readFile(join(dir, ".omo", "drafts", "demo.md"), "utf8");
+		assert.match(draft, /intent: unclear/);
+		assert.match(draft, /review_required: true/);
+		assert.match(draft, /plan_path: \.omo\/plans\/demo\.md/);
+		assert.match(draft, /plan_sha256: null/);
+		assert.match(draft, /review_round_id: null/);
+		assert.match(draft, /pending-action: write and review \.omo\/plans\/demo\.md/);
+		assert.match(draft, /momus:\n\s+status: pending[\s\S]*?target: \.omo\/plans\/demo\.md[\s\S]*?result: null/);
+		assert.match(draft, /independent:\n\s+status: pending[\s\S]*?target: \.omo\/plans\/demo\.md[\s\S]*?result: null/);
+		await assert.rejects(() => readFile(join(dir, ".omo", "plans", "demo.md"), "utf8"), /ENOENT/);
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
+});
+
+test("#given Trivial UNCLEAR pre-approval planning #when draft-only scaffold runs #then it creates a review-optional draft without creating a plan", async () => {
 	const { scaffold } = await import(scriptUrl);
 	const dir = await mkdtemp(join(tmpdir(), "ulwp-"));
 	try {
@@ -143,6 +163,7 @@ test("#given pre-approval planning #when draft-only scaffold runs #then it creat
 		assert.equal(first.length, 1);
 		assert.equal(first[0].status, "created");
 		assert.match(await readFile(join(dir, ".omo", "drafts", "demo.md"), "utf8"), /intent: unclear/);
+		assert.match(await readFile(join(dir, ".omo", "drafts", "demo.md"), "utf8"), /review_required: false/);
 		await assert.rejects(() => readFile(join(dir, ".omo", "plans", "demo.md"), "utf8"), /ENOENT/);
 
 		const afterApproval = await scaffold(dir, { slug: "demo", intent: "unclear" });

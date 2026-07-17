@@ -40,7 +40,7 @@ If a draft/plan already exists and the user says a review modifier - even append
 
 Both paths record `intent`, `review_required`, and decisions to `.omo/drafts/<slug>.md` as they go - long sessions outlive your context, and plan generation reads the draft, not your memory.
 
-As soon as `<slug>` and intent are known, run the scaffold with `--draft-only`; when an explicit review modifier is already known, add `--review-required` so the first durable write contains the complete request state below. All later pre-approval edits target that script-created draft. If review becomes required later through the non-Trivial UNCLEAR route, atomically replace stale action/review fields with this request state in the same edit that records the decision. If a complete plan already exists, skip this pre-plan state and initialize a review round directly.
+As soon as `<slug>`, intent, and classification are known, run the scaffold with `--draft-only`. Add `--review-required` when an explicit modifier requires review or intent is UNCLEAR and classification is non-Trivial, so the first durable write contains the complete request state below; never defer that already-known obligation to a later edit. If review becomes required only after the draft exists, atomically replace stale action/review fields with this request state. If a complete plan already exists, initialize a review round directly.
 
 <!-- ulw-plan-review-request-state-contract -->
 ```json
@@ -75,6 +75,7 @@ After approval and only after the plan is complete, replace the request state at
   "plan_path": ".omo/plans/<slug>.md",
   "plan_sha256": "<sha256-of-complete-plan>",
   "review_round_id": "<fresh-unique-round-id>",
+  "round_status": "active",
   "completion_cas": ["status=in_flight", "workspace_root", "runtime_home", "target", "launch_id", "round_id", "plan_sha256", "session", "receipt_identity=session", "live_plan_sha256=plan_sha256", "echoed_binding", "terminal_transition=in_flight->approved|changes_requested|inconclusive"],
   "pending-action": "review .omo/plans/<slug>.md",
   "review": {
@@ -84,9 +85,40 @@ After approval and only after the plan is complete, replace the request state at
 }
 ```
 
+<!-- ulw-plan-review-lifecycle-state-contract -->
+```json
+{
+  "transitions": {
+    "launch": { "from": "pending", "to": "launching", "cas": ["round_status=active", "status=pending"], "writes": ["launch_id=<fresh-launch-id>"] },
+    "receipt": { "from": "launching", "to": "in_flight", "cas": ["round_status=active", "status=launching", "launch_id"], "writes": ["session=<session-or-process-receipt>"] },
+    "complete": {
+      "from": "in_flight",
+      "to": ["approved", "changes_requested", "inconclusive"],
+      "one_shot": true,
+      "cas": ["round_status=active", "workspace_root", "runtime_home", "target", "launch_id", "round_id", "plan_sha256", "session", "receipt_identity=session", "live_plan_sha256=plan_sha256", "echoed_binding"]
+    },
+    "launch_interrupted": {
+      "from": { "round_status": "active", "lane_status": "launching" },
+      "to": { "round_status": "inconclusive", "lane_status": "inconclusive", "result": "launch_interrupted_without_receipt" },
+      "cas": ["round_status=active", "status=launching", "launch_id"],
+      "invalidates_other_lane": true,
+      "next": "fresh_review_round"
+    }
+  },
+  "resume_after_compaction": {
+    "pending": "dispatch_with_launch_cas",
+    "launching": "apply_launch_interrupted_transition",
+    "in_flight": "wait_for_matching_completion_only",
+    "approved|changes_requested|inconclusive": "do_not_mutate",
+    "round_status=inconclusive": "start_fresh_review_round"
+  },
+  "rejected_completions": ["duplicate", "late", "stale", "mismatched"]
+}
+```
+
 `plan_path` must equal `.omo/plans/<validated-slug>.md`; reject absolute paths, `..`, and normalization drift. Bind the file operation to the workspace itself: open the canonical workspace root as a directory descriptor, then open `.omo`, `plans`, and the final file descriptor-relative with no-follow semantics on every segment, requiring directories for ancestors and a regular final file. Compute `plan_sha256` only from bytes read from that final descriptor. If the platform cannot provide that descriptor chain, return `INCONCLUSIVE`; do not substitute path-based validate-then-open checks.
 
-Before publishing a round, have the reviewer launcher create the disposable workspace and isolated `CODEX_HOME`, materialize and descriptor-chain digest-verify the plan copy, and persist both literal roots. These OS-temp runtime resources are launcher-owned review infrastructure, not project/source edits; they do not relax the planner's write boundary, and inability to provision them under current policy is `INCONCLUSIVE`. Before dispatching a lane, atomically CAS it from `pending` to `launching` with a fresh `launch_id`; only then launch with that launch ID and literal runtime home in the prompt. When dispatch returns a receipt, CAS that lane from `launching` to `in_flight` with the same launch ID and persisted session/process receipt. Interruption while `launching` is `INCONCLUSIVE` and starts a fresh round; never relaunch ambiguously. A matching completion atomically replaces `status: in_flight` with exactly one terminal status (`approved`, `changes_requested`, or `inconclusive`) and stores the result; a duplicate then fails the status precondition. Completion CAS also matches workspace, runtime home, target, launch, round, digest, persisted session, the completion envelope's receipt identity, live bytes, and echoed binding. Late, duplicate, stale, or mismatched completions cannot mutate the round; any plan change invalidates both lanes.
+Before publishing a round, have the reviewer launcher create the disposable workspace and isolated `CODEX_HOME`, materialize and descriptor-chain digest-verify the plan copy, and persist both literal roots. These OS-temp runtime resources are launcher-owned review infrastructure, not project/source edits; they do not relax the planner's write boundary, and inability to provision them under current policy is `INCONCLUSIVE`. Apply the lifecycle transition table exactly. On compaction, resume from persisted round and lane state: dispatch only `pending`, terminalize stranded `launching`, wait only for the matching `in_flight` completion, and never mutate terminal lanes. A launch interruption terminalizes the round as inconclusive, invalidates the other lane, and requires a fresh round. Any plan change also invalidates both lanes.
 
 ## Approval gate (DO NOT SKIP)
 This gate is the only thing between a finished brief and the plan file, and the one place a planner can loop. Handle it as a decision with durable state, not a passphrase hunt.

@@ -10,6 +10,7 @@ const repositoryRoot = dirname(dirname(dirname(pluginRoot)));
 const surfaces = [
 	{
 		name: "shared OpenCode",
+		skillPath: join(repositoryRoot, "packages", "shared-skills", "skills", "ulw-plan", "SKILL.md"),
 		workflowPath: join(repositoryRoot, "packages", "shared-skills", "skills", "ulw-plan", "references", "full-workflow.md"),
 		independentReviewer: "oracle",
 		reviewRoots: {
@@ -20,6 +21,7 @@ const surfaces = [
 	},
 	{
 		name: "Codex",
+		skillPath: join(pluginRoot, "components", "ultrawork", "skills", "ulw-plan", "SKILL.md"),
 		workflowPath: join(pluginRoot, "components", "ultrawork", "skills", "ulw-plan", "references", "full-workflow.md"),
 		independentReviewer: "codex-cli:gpt-5.6-sol:xhigh",
 		reviewRoots: {
@@ -40,12 +42,14 @@ function readJsonContract(workflow, contractName) {
 
 for (const surface of surfaces) {
 	test(`#given ${surface.name} #when deeper review becomes required before plan completion #then durable request state covers explicit and automatic review without inventing a digest`, async () => {
+		const skill = await readFile(surface.skillPath, "utf8");
 		const workflow = await readFile(surface.workflowPath, "utf8");
 		const contract = readJsonContract(workflow, "ulw-plan-review-request-state-contract");
 
 		assert.equal(contract.transition, "replace");
 		assert.equal(contract.phase, "review_requested");
 		assert.deepEqual(contract.applies_when, ["explicit_review_modifier_before_complete_plan", "intent=unclear_and_nontrivial"]);
+		assert.match(skill, /Include `--review-required`[\s\S]{0,180}non-Trivial UNCLEAR/);
 		assert.match(workflow, /--draft-only/);
 		assert.equal(contract.atomic, true);
 		assert.equal(contract.review_required, true);
@@ -90,6 +94,7 @@ for (const surface of surfaces) {
 		assert.equal(contract.plan_path, ".omo/plans/<slug>.md");
 		assert.equal(contract.plan_sha256, "<sha256-of-complete-plan>");
 		assert.equal(contract.review_round_id, "<fresh-unique-round-id>");
+		assert.equal(contract.round_status, "active");
 		assert.deepEqual(contract.completion_cas, [
 			"status=in_flight",
 			"workspace_root",
@@ -119,6 +124,61 @@ for (const surface of surfaces) {
 				result: null,
 			});
 		}
+	});
+
+	test(`#given a ${surface.name} review round #when launch, interruption, completion, or compaction occurs #then the durable transition table fails closed`, async () => {
+		const workflow = await readFile(surface.workflowPath, "utf8");
+		const contract = readJsonContract(workflow, "ulw-plan-review-lifecycle-state-contract");
+
+		assert.deepEqual(contract.transitions.launch, {
+			from: "pending",
+			to: "launching",
+			cas: ["round_status=active", "status=pending"],
+			writes: ["launch_id=<fresh-launch-id>"],
+		});
+		assert.deepEqual(contract.transitions.receipt, {
+			from: "launching",
+			to: "in_flight",
+			cas: ["round_status=active", "status=launching", "launch_id"],
+			writes: ["session=<session-or-process-receipt>"],
+		});
+		assert.deepEqual(contract.transitions.complete, {
+			from: "in_flight",
+			to: ["approved", "changes_requested", "inconclusive"],
+			one_shot: true,
+			cas: [
+				"round_status=active",
+				"workspace_root",
+				"runtime_home",
+				"target",
+				"launch_id",
+				"round_id",
+				"plan_sha256",
+				"session",
+				"receipt_identity=session",
+				"live_plan_sha256=plan_sha256",
+				"echoed_binding",
+			],
+		});
+		assert.deepEqual(contract.transitions.launch_interrupted, {
+			from: { round_status: "active", lane_status: "launching" },
+			to: {
+				round_status: "inconclusive",
+				lane_status: "inconclusive",
+				result: "launch_interrupted_without_receipt",
+			},
+			cas: ["round_status=active", "status=launching", "launch_id"],
+			invalidates_other_lane: true,
+			next: "fresh_review_round",
+		});
+		assert.deepEqual(contract.resume_after_compaction, {
+			pending: "dispatch_with_launch_cas",
+			launching: "apply_launch_interrupted_transition",
+			in_flight: "wait_for_matching_completion_only",
+			"approved|changes_requested|inconclusive": "do_not_mutate",
+			"round_status=inconclusive": "start_fresh_review_round",
+		});
+		assert.deepEqual(contract.rejected_completions, ["duplicate", "late", "stale", "mismatched"]);
 	});
 
 	test(`#given ${surface.name} independent reviewers #when exact-path retrieval drifts #then intake fails closed without alternate artifact recovery`, async () => {
