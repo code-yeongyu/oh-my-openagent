@@ -35,7 +35,7 @@ export function createToolExecuteBeforeHandler(args: {
   hooks: CreatedHooks
   backgroundManager?: Pick<
     BackgroundManager,
-    "hasActiveChildTasks" | "hasActiveDescendantTasks" | "hasPendingParentWake"
+    "hasActiveChildTasks" | "hasBackgroundWorkInFlight" | "hasPendingParentWake"
   >
   blockOnBackgroundTasks?: boolean
   canUseBackgroundWaitTool?: (sessionID: string) => boolean
@@ -75,7 +75,7 @@ export function createToolExecuteBeforeHandler(args: {
         isPureSleepCommand(output.args.command)
         && (
           (useBlockingWaitTool
-            ? backgroundManager?.hasActiveDescendantTasks(input.sessionID)
+            ? backgroundManager?.hasBackgroundWorkInFlight(input.sessionID)
             : backgroundManager?.hasActiveChildTasks(input.sessionID)) === true
           || backgroundManager?.hasPendingParentWake(input.sessionID) === true
         )

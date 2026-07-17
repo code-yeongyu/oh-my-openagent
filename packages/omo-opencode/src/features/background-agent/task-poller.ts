@@ -127,6 +127,7 @@ async function interruptStaleTask(args: {
   logReason: string
   reserveTaskTerminalization?: (task: BackgroundTask) => (() => void) | undefined
   reserveTaskFinalization?: (task: BackgroundTask) => () => void
+  isOperationActive?: () => boolean
 }): Promise<void> {
   const {
     task,
@@ -142,6 +143,7 @@ async function interruptStaleTask(args: {
     logReason,
     reserveTaskTerminalization,
     reserveTaskFinalization,
+    isOperationActive = () => true,
   } = args
 
   const releaseTerminalization = reserveTaskTerminalization?.(task)
@@ -150,6 +152,7 @@ async function interruptStaleTask(args: {
 
   try {
     const aborted = await abortWithTimeout(client, sessionID)
+    if (!isOperationActive()) return
     if (!aborted) {
       log("[background-agent] Task stale interruption skipped because session abort failed:", {
         taskId: task.id,
@@ -196,6 +199,7 @@ export async function checkAndInterruptStaleTasks(args: {
   getSessionActivity?: SessionActivityResolver
   reserveTaskTerminalization?: (task: BackgroundTask) => (() => void) | undefined
   reserveTaskFinalization?: (task: BackgroundTask) => () => void
+  isOperationActive?: () => boolean
 }): Promise<void> {
   const {
     tasks,
@@ -277,6 +281,7 @@ export async function checkAndInterruptStaleTasks(args: {
           logReason: "no progress since start",
           reserveTaskTerminalization: args.reserveTaskTerminalization,
           reserveTaskFinalization: args.reserveTaskFinalization,
+          isOperationActive: args.isOperationActive,
         }),
       )
       continue
@@ -329,6 +334,7 @@ export async function checkAndInterruptStaleTasks(args: {
         logReason: "stale timeout",
         reserveTaskTerminalization: args.reserveTaskTerminalization,
         reserveTaskFinalization: args.reserveTaskFinalization,
+        isOperationActive: args.isOperationActive,
       }),
     )
   }

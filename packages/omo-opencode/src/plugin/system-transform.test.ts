@@ -6,8 +6,8 @@ import { createSystemTransformHandler } from "./system-transform"
 
 const WAIT_TAG = "[CRITICAL — BACKGROUND TASKS RUNNING]"
 
-function backgroundManager(hasActive: boolean): Pick<BackgroundManager, "hasActiveDescendantTasks"> {
-  return { hasActiveDescendantTasks: () => hasActive }
+function backgroundManager(hasWorkInFlight: boolean): Pick<BackgroundManager, "hasBackgroundWorkInFlight"> {
+  return { hasBackgroundWorkInFlight: () => hasWorkInFlight }
 }
 
 function runHandler(
@@ -47,6 +47,17 @@ describe("createSystemTransformHandler background-wait injection", () => {
     expect(system.some((part) => part.includes("times out"))).toBe(true)
     expect(system.some((part) => part.includes("aborted"))).toBe(true)
     expect(system.some((part) => part.includes("call the tool again"))).toBe(true)
+  })
+
+  test("injects the wait reminder while launch or resume admission is pending", async () => {
+    // #given admitted background work exists before a descendant task is registered
+    const options = { backgroundManager: backgroundManager(true), blockOnBackgroundTasks: true }
+
+    // #when the handler runs during the admission window
+    const system = await runHandler(options, { sessionID: "main-admitted" })
+
+    // #then the authoritative in-flight predicate keeps the wait contract active
+    expect(system.some((part) => part.includes(WAIT_TAG))).toBe(true)
   })
 
   test("does not inject when the flag is on but the session has no active tasks", async () => {

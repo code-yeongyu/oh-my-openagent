@@ -17,7 +17,7 @@ describe("createToolExecuteBeforeHandler background wait guard", () => {
     //#given
     const backgroundManager = {
       hasActiveChildTasks: (sessionID: string) => sessionID === "ses_parent",
-      hasActiveDescendantTasks: (sessionID: string) => sessionID === "ses_parent",
+      hasBackgroundWorkInFlight: (sessionID: string) => sessionID === "ses_parent",
     }
     const handler = createToolExecuteBeforeHandler({
       ctx: createTestContext(),
@@ -42,7 +42,7 @@ describe("createToolExecuteBeforeHandler background wait guard", () => {
     //#given
     const backgroundManager = {
       hasActiveChildTasks: () => false,
-      hasActiveDescendantTasks: (sessionID: string) => sessionID === "ses_parent",
+      hasBackgroundWorkInFlight: (sessionID: string) => sessionID === "ses_parent",
       hasPendingParentWake: () => false,
     }
     const handler = createToolExecuteBeforeHandler({
@@ -69,7 +69,7 @@ describe("createToolExecuteBeforeHandler background wait guard", () => {
     //#given
     const backgroundManager = {
       hasActiveChildTasks: () => false,
-      hasActiveDescendantTasks: () => false,
+      hasBackgroundWorkInFlight: () => false,
       hasPendingParentWake: () => false,
     }
     const handler = createToolExecuteBeforeHandler({
@@ -94,7 +94,7 @@ describe("createToolExecuteBeforeHandler background wait guard", () => {
     //#given
     const backgroundManager = {
       hasActiveChildTasks: () => false,
-      hasActiveDescendantTasks: () => false,
+      hasBackgroundWorkInFlight: () => false,
       hasPendingParentWake: (sessionID: string) => sessionID === "ses_parent",
     }
     const handler = createToolExecuteBeforeHandler({
@@ -119,7 +119,7 @@ describe("createToolExecuteBeforeHandler background wait guard", () => {
     //#given
     const backgroundManager = {
       hasActiveChildTasks: () => true,
-      hasActiveDescendantTasks: () => true,
+      hasBackgroundWorkInFlight: () => true,
       hasPendingParentWake: () => false,
     }
     const handler = createToolExecuteBeforeHandler({
@@ -138,5 +138,29 @@ describe("createToolExecuteBeforeHandler background wait guard", () => {
 
     //#then
     await expect(run).resolves.toBeUndefined()
+  })
+
+  test("blocks placeholder sleep while launch or resume admission is pending", async () => {
+    //#given admitted background work exists before a descendant task is registered
+    const backgroundManager = {
+      hasActiveChildTasks: () => false,
+      hasBackgroundWorkInFlight: (sessionID: string) => sessionID === "ses_parent",
+      hasPendingParentWake: () => false,
+    }
+    const handler = createToolExecuteBeforeHandler({
+      ctx: createTestContext(),
+      hooks: {},
+      backgroundManager,
+      blockOnBackgroundTasks: true,
+    })
+
+    //#when a placeholder wait is attempted during the admission window
+    const run = handler(
+      { tool: "bash", sessionID: "ses_parent", callID: "call_admitted_wait" },
+      { args: { command: "sleep 1" } },
+    )
+
+    //#then the authoritative in-flight predicate blocks the placeholder wait
+    await expect(run).rejects.toThrow("wait-for-background-tasks")
   })
 })

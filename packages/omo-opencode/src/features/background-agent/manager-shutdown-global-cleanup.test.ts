@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import { _resetForTesting, subagentSessions } from "../claude-code-session-state"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { readContinuationMarker, setContinuationMarkerSource } from "../run-continuation-state/storage"
 import { BackgroundManager } from "./manager"
 import type { BackgroundTask } from "./types"
 
@@ -57,6 +60,8 @@ type ManagerInternals = {
   notifications: Map<string, BackgroundTask[]>
   notificationQueueByParent: Map<string, Promise<void>>
   completedTaskSummaries: Map<string, unknown[]>
+  releasedRootDescendantTasks: Set<string>
+  rootDescendantCounts: Map<string, number>
   taskHistory: { getByParentSession: (parentSessionID: string) => unknown[] }
   pollingInterval?: ReturnType<typeof setInterval>
   concurrencyManager: {
@@ -65,6 +70,7 @@ type ManagerInternals = {
     getQueueLength: (key: string) => number
   }
   processKey: (key: string) => Promise<void>
+  pollRunningTasks: () => Promise<void>
   shutdownTimeoutMs: number
 }
 
@@ -296,6 +302,76 @@ describe("BackgroundManager shutdown global cleanup", () => {
     expect(internals.taskHistory.getByParentSession(task.parentSessionId)).toHaveLength(0)
     expect(internals.pollingInterval).toBeUndefined()
     expect(manager.hasBackgroundWorkInFlight(task.parentSessionId)).toBe(false)
+  })
+
+  test("does not mutate cleared ownership or successor continuation state when stale interruption resumes after shutdown", async () => {
+    // given
+    const directory = await mkdtemp(join(tmpdir(), "pr6005-stale-shutdown-"))
+    const firstAbort = createDeferredPromise()
+    const firstAbortStarted = createDeferredPromise()
+    let abortCalls = 0
+    const manager = new BackgroundManager({
+      pluginContext: {
+        client: {
+          session: {
+            status: async () => ({ data: { "stale-session": { type: "idle" } } }),
+            abort: async () => {
+              abortCalls += 1
+              if (abortCalls === 1) {
+                firstAbortStarted.resolve()
+                await firstAbort.promise
+              }
+              return {}
+            },
+            promptAsync: async () => ({}),
+          },
+        } as never,
+        directory,
+      } as never,
+      config: { messageStalenessTimeoutMs: 1 },
+    })
+    const internals = getInternals(manager)
+    const task = createTask({
+      id: "stale-task-after-shutdown",
+      sessionId: "stale-session",
+      rootSessionId: "parent-session",
+      parentSessionId: "parent-session",
+      startedAt: new Date(Date.now() - 60_000),
+      concurrencyKey: "explore",
+      concurrencyGroup: "explore",
+    })
+    internals.tasks.set(task.id, task)
+    internals.rootDescendantCounts.set(task.parentSessionId, 1)
+    internals.shutdownTimeoutMs = 15
+
+    try {
+      const poll = internals.pollRunningTasks()
+      await firstAbortStarted.promise
+      await manager.shutdown()
+      setContinuationMarkerSource(
+        directory,
+        task.parentSessionId,
+        "background-task",
+        "active",
+        "replacement manager active",
+      )
+
+      // when
+      firstAbort.resolve()
+      await poll
+
+      // then
+      expect(internals.tasks.size).toBe(0)
+      expect(internals.releasedRootDescendantTasks.size).toBe(0)
+      expect(task.status).toBe("running")
+      expect(readContinuationMarker(directory, task.parentSessionId)?.sources["background-task"]).toMatchObject({
+        state: "active",
+        reason: "replacement manager active",
+      })
+    } finally {
+      firstAbort.resolve()
+      await rm(directory, { recursive: true, force: true })
+    }
   })
 
   test("waits for an admitted launch prompt before shutdown completes", async () => {

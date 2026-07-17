@@ -480,7 +480,7 @@ export class BackgroundManager {
   }
 
   private releaseTaskRootDescendant(task: BackgroundTask): void {
-    if (!task.rootSessionId || this.releasedRootDescendantTasks.has(task.id)) return
+    if (this.shutdownTriggered || !task.rootSessionId || this.releasedRootDescendantTasks.has(task.id)) return
     this.releasedRootDescendantTasks.add(task.id)
     this.unregisterRootDescendant(task.rootSessionId)
   }
@@ -610,6 +610,7 @@ export class BackgroundManager {
     return () => {
       if (released) return
       released = true
+      if (this.shutdownTriggered) return
       this.finalizingTasks.delete(task.id)
       for (const sessionID of waitSessionIDs) {
         this.parentWakeNotifier.releaseNotificationPreparation(sessionID)
@@ -3543,6 +3544,7 @@ The task was re-queued on a fallback model after a retryable failure.
         RUNNING_BACKGROUND_TASK_STATUSES,
       ),
       reserveTaskFinalization: (task) => this.reserveTaskFinalization(task),
+      isOperationActive: () => !this.shutdownTriggered,
     })
   }
 
