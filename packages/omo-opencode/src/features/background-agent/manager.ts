@@ -1569,6 +1569,10 @@ The fallback retry session is now created and can be inspected directly.
     // Acquire concurrency slot if a key is provided
     if (concurrencyKey) {
       await this.concurrencyManager.acquire(concurrencyKey)
+      if (this.shutdownTriggered) {
+        this.concurrencyManager.release(concurrencyKey)
+        throw new Error("Background manager is shutting down")
+      }
     }
 
     const task: BackgroundTask = {

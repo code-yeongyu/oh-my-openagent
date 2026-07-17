@@ -33,7 +33,7 @@ function createTask(overrides: Partial<BackgroundTask> & { id: string; sessionId
   }
 }
 
-function createBackgroundManager(): BackgroundManager {
+function createBackgroundManager(config?: { defaultConcurrency?: number }): BackgroundManager {
   return new BackgroundManager({ pluginContext: {
     client: {
       session: {
@@ -47,7 +47,7 @@ function createBackgroundManager(): BackgroundManager {
     worktree: tmpdir(),
     serverUrl: new URL("https://example.com"),
     $: {} as never,
-  } as never })
+  } as never, config })
 }
 
 type ManagerInternals = {
@@ -57,7 +57,11 @@ type ManagerInternals = {
   notifications: Map<string, BackgroundTask[]>
   taskHistory: { getByParentSession: (parentSessionID: string) => unknown[] }
   pollingInterval?: ReturnType<typeof setInterval>
-  concurrencyManager: { acquire: (key: string, taskID: string) => Promise<void> }
+  concurrencyManager: {
+    acquire: (key: string, taskID?: string) => Promise<void>
+    release: (key: string) => void
+    getQueueLength: (key: string) => number
+  }
   processKey: (key: string) => Promise<void>
 }
 
@@ -187,6 +191,35 @@ describe("BackgroundManager shutdown global cleanup", () => {
     expect(internals.pendingByParent.size).toBe(0)
     expect(internals.pollingInterval).toBeUndefined()
     expect(manager.hasBackgroundWorkInFlight("parent-after-shutdown")).toBe(false)
+  })
+
+  test("does not register a tracked task whose concurrency wait resumes after shutdown", async () => {
+    // given
+    const manager = createBackgroundManager({ defaultConcurrency: 1 })
+    const internals = getInternals(manager)
+    await internals.concurrencyManager.acquire("shared", "slot-holder")
+    const tracking = manager.trackTask({
+      taskId: "task-waiting-during-shutdown",
+      sessionId: "session-waiting-during-shutdown",
+      parentSessionId: "parent-waiting-during-shutdown",
+      description: "must not resume after shutdown",
+      agent: "explore",
+      concurrencyKey: "shared",
+    })
+    expect(internals.concurrencyManager.getQueueLength("shared")).toBe(1)
+
+    // when
+    internals.concurrencyManager.release("shared")
+    await manager.shutdown()
+
+    // then
+    await expect(tracking).rejects.toThrow("Background manager is shutting down")
+    expect(internals.tasks.size).toBe(0)
+    expect(internals.notifications.size).toBe(0)
+    expect(internals.pendingByParent.size).toBe(0)
+    expect(internals.taskHistory.getByParentSession("parent-waiting-during-shutdown")).toHaveLength(0)
+    expect(internals.pollingInterval).toBeUndefined()
+    expect(manager.hasBackgroundWorkInFlight("parent-waiting-during-shutdown")).toBe(false)
   })
 
   test("does not process a queue after shutdown", async () => {
