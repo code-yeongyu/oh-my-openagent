@@ -1,0 +1,5 @@
+packages/omo-opencode/src/plugin/event.ts 244
+packages/omo-opencode/src/plugin/event-session-lifecycle-queue.ts 21
+packages/omo-opencode/src/plugin/event-session-deletion-ordering.test.ts 221
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts 247
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-types.ts 25

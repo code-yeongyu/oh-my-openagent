@@ -1,0 +1,12 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin/event-session-deletion-ordering.test.ts:
+(pass) plugin session deletion ordering > #given creation pauses before registration #when deletion arrives later #then the deleted ID is not resurrected [1.44ms]
+(pass) plugin session deletion ordering > #given deletion pauses in an earlier hook #when the same ID is recreated #then creation waits for lifecycle cleanup [0.29ms]
+(pass) plugin session deletion ordering > #given overlapping deletions for one ID #when recreation starts #then all cleanup completes before replacement creation [1.61ms]
+(pass) plugin session deletion ordering > #given deletion pauses before later hooks #when the same ID is recreated #then replacement hooks wait for deletion fan-out [1.64ms]
+
+ 4 pass
+ 0 fail
+ 12 expect() calls
+Ran 4 tests across 1 file. [77.00ms]

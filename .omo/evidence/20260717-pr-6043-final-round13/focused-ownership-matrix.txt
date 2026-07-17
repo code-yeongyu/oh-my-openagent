@@ -1,0 +1,48 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin/event-main-session-lifecycle.test.ts:
+(pass) main session lifecycle > #given roots A and B #when root B is deleted #then root A remains active and becomes current [0.96ms]
+(pass) main session lifecycle > #given an active root #when session.created has no ID #then current identity and membership are preserved [0.10ms]
+(pass) main session lifecycle > #given deletion pauses during monitor cleanup #when the same ID is recreated #then stale cleanup cannot clear or disconnect replacement state [0.43ms]
+
+packages/omo-opencode/src/plugin/event-session-deletion-ordering.test.ts:
+(pass) plugin session deletion ordering > #given creation pauses before registration #when deletion arrives later #then the deleted ID is not resurrected [1.14ms]
+(pass) plugin session deletion ordering > #given deletion pauses in an earlier hook #when the same ID is recreated #then creation waits for lifecycle cleanup [0.37ms]
+(pass) plugin session deletion ordering > #given overlapping deletions for one ID #when recreation starts #then all cleanup completes before replacement creation [1.72ms]
+(pass) plugin session deletion ordering > #given deletion pauses before later hooks #when the same ID is recreated #then replacement hooks wait for deletion fan-out [2.70ms]
+
+packages/omo-opencode/src/plugin/event-model-fallback-generation.test.ts:
+(pass) model-fallback continuation generation ownership > #given an old continuation is paused during abort #when the session ID is cleared and reused #then only the replacement continuation can dispatch and release ownership [154.73ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/session-stop-generation-ownership.test.ts:
+(pass) runtime-fallback session.stop generation ownership > #given stop awaits an old abort #when the ID is deleted and reused #then stale stop cannot clear replacement retry state [0.61ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/dispatch-generation-ownership.test.ts:
+(pass) runtime-fallback dispatch generation ownership > #given message loading belongs to an old generation #when a newer user turn arrives #then stale dispatch releases retry ownership [1.02ms]
+(pass) runtime-fallback dispatch generation ownership > #given a fallback prompt is accepted #when its user event advances generation before promptAsync resolves #then accepted ownership is committed and released [0.69ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/event-generation-ownership.test.ts:
+(pass) runtime-fallback event generation ownership > #given an old status handler is resolving its agent #when an identical retry arrives in a newer user turn #then the newer retry is not poisoned by stale dedupe [1.13ms]
+(pass) runtime-fallback event generation ownership > #given session.error is resolving an agent #when a newer user turn arrives #then the stale error cannot dispatch fallback [0.30ms]
+(pass) runtime-fallback event generation ownership > #given fallback completion visibility is pending #when the same user message is updated again #then the completion keeps generation ownership [0.78ms]
+(pass) runtime-fallback event generation ownership > #given an abort is pending for a deleted session #when the same ID is reused #then replacement abort issues a fresh wire request [0.38ms]
+(pass) runtime-fallback event generation ownership > #given an assistant quota error is awaiting abort #when a newer user turn arrives #then the stale message cannot dispatch fallback [0.44ms]
+(pass) runtime-fallback event generation ownership > #given an assistant error is resolving its agent #when a newer user turn arrives #then the stale message cannot create fallback state [0.24ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.test.ts:
+(pass) first-prompt-watchdog > #given a main session stays silent past the threshold and has a fallback configured #when the watchdog fires #then it aborts the in-flight request and dispatches the fallback model [0.89ms]
+(pass) first-prompt-watchdog > #given the watchdog cannot abort a silent main session #when the abort fails #then it does not dispatch a competing fallback request [0.19ms]
+(pass) first-prompt-watchdog > #given timeout escalation is disabled for a main session #when the first prompt stays silent #then the main-session watchdog does not arm [0.09ms]
+(pass) first-prompt-watchdog > #given an active subagent stays silent past the threshold and has a fallback configured #when the watchdog fires #then it still aborts and dispatches the fallback model [0.12ms]
+(pass) first-prompt-watchdog > #given timeout escalation is disabled and an active subagent stays silent #when the watchdog fires #then the historical subagent safety net remains active [0.10ms]
+(pass) first-prompt-watchdog > #given a main session produces assistant text before the threshold #when progress is observed #then the watchdog is cancelled and no fallback is dispatched [0.12ms]
+(pass) first-prompt-watchdog > #given a fallback dispatch is already awaiting its result #when its internal user update is observed #then the first-prompt watchdog does not arm for that retry [0.07ms]
+(pass) first-prompt-watchdog > #given assistant progress cancels an armed watchdog #when a later user turn stays silent #then the watchdog re-arms for the new turn [0.11ms]
+(pass) first-prompt-watchdog > #given a watchdog is armed for one user message #when a distinct user message arrives #then the deadline belongs to the newer turn [0.15ms]
+(pass) first-prompt-watchdog > #given session emits message.part.updated with sessionID under properties.part #when watchdog tracks #then the watchdog recognizes progress and resets the silence timer [0.24ms]
+(pass) first-prompt-watchdog > #given the user prompt part arrives after the watchdog arms #when the provider stays silent #then the user part does not cancel fallback recovery [0.15ms]
+
+ 28 pass
+ 0 fail
+ 74 expect() calls
+Ran 28 tests across 7 files. [256.00ms]

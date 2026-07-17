@@ -1,0 +1,9 @@
+raw_live_last_removed=yes
+debug_journal_removed=yes
+reviewer_scratch_removed=yes
+opencode_sandbox_removed=yes
+qa_processes_remaining=0
+qa_tmux_sessions_remaining=0
+real_db_count_before=5751
+real_db_count_after=5751
+source_candidate_tree_match=yes
