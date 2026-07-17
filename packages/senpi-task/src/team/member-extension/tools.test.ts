@@ -102,13 +102,9 @@ describe("member extension tools", () => {
     // given
     const harness = createHarness()
     const value = message("88888888-8888-4888-8888-888888888888")
-    const deps = {
-      poller: harness.poller,
-      waitRegistry: harness.registry,
-      waitBounds: { min_ms: 5, default_ms: 100, max_ms: 200 },
-    }
-    const pending = runMemberTeamWait(deps, { from: "bob", timeout_ms: 100 }, undefined).then((result) => ({
-      result,
+    const registration = harness.registry.register({ from: "bob" })
+    const observed = registration.promise.then((resolved) => ({
+      resolved,
       processedAtResolve: existsSync(join(harness.inboxDir, "processed", `${value.messageId}.json`)),
     }))
     expect(harness.registry.size).toBe(1)
@@ -116,11 +112,11 @@ describe("member extension tools", () => {
     // when
     await seed(harness, value)
     await harness.poller.pollOnce()
-    const observed = await pending
+    const result = await observed
 
     // then
-    expect(observed.processedAtResolve).toBe(true)
-    expect(observed.result.details).toMatchObject({ kind: "message", message_id: value.messageId })
+    expect(result.resolved).toEqual(value)
+    expect(result.processedAtResolve).toBe(true)
     expect(harness.registry.size).toBe(0)
   })
 
