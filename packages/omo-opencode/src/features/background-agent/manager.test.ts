@@ -10819,6 +10819,7 @@ describe("BackgroundManager - tool permission spread order", () => {
       agent: task.agent,
       parentSessionId: task.parentSessionId,
       parentMessageId: task.parentMessageId,
+      userPermission: { "wait-for-background-tasks": "deny" },
     }
 
     try {
@@ -10831,6 +10832,9 @@ describe("BackgroundManager - tool permission spread order", () => {
       expect(promptCalls).toHaveLength(2)
       expect(promptCalls[0].body.agent).toBe("missing-agent")
       expect(promptCalls[1].body.agent).toBe("general")
+      expect(
+        (promptCalls[1].body.tools as Record<string, boolean>)["wait-for-background-tasks"],
+      ).toBe(false)
       expect(task.agent).toBe("general")
       expect(getSessionAgent("session-manager-fallback")).toBe("general")
       expect(getDelegatedChildSessionBootstrap("session-manager-fallback")?.tools?.call_omo_agent).toBe(true)
@@ -10881,6 +10885,48 @@ describe("BackgroundManager - tool permission spread order", () => {
     expect(capturedTools?.task).toBe(false)
     expect(capturedTools?.write).toBe(false)
     expect(capturedTools?.edit).toBe(false)
+
+    manager.shutdown()
+  })
+
+  test("resume preserves explicit launch tool denials", async () => {
+    //#given
+    let capturedTools: Record<string, unknown> | undefined
+    const client = {
+      session: {
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          capturedTools = args.body.tools as Record<string, unknown>
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const task = cast<BackgroundTask>({
+      id: "task-denied-wait-resume",
+      sessionId: "session-denied-wait-resume",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+      description: "resume task with denied waiter",
+      prompt: "resume prompt",
+      agent: "sisyphus-junior",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      userPermission: { "wait-for-background-tasks": "deny" },
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    await manager.resume({
+      sessionId: "session-denied-wait-resume",
+      prompt: "continue",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+    })
+
+    //#then
+    expect(capturedTools?.["wait-for-background-tasks"]).toBe(false)
 
     manager.shutdown()
   })

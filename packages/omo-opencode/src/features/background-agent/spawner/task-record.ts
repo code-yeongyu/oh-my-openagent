@@ -18,6 +18,7 @@ export function buildTaskRecord(input: LaunchInput, id: string, queuedAt: Date):
     fallbackChain: input.fallbackChain,
     skillContent: input.skillContent,
     sessionPermission: input.sessionPermission,
+    userPermission: input.userPermission,
     category: input.category,
     isUnstableAgent: input.isUnstableAgent,
     onSessionCreated: input.onSessionCreated,

@@ -112,6 +112,7 @@ export async function startTask(
     model: input.model,
     prompt: input.prompt,
     includeTeamToolDenylist: input.teamRunId === undefined,
+    userPermission: input.userPermission,
   })
   setSessionTools(sessionID, promptBody.tools)
 
@@ -129,6 +130,7 @@ export async function startTask(
       try {
         const fallbackBody = buildFallbackBody(promptBody, FALLBACK_AGENT, {
           includeTeamToolDenylist: input.teamRunId === undefined,
+          userPermission: input.userPermission,
         })
         const fallbackTools = fallbackBody.tools as Record<string, boolean>
         setSessionTools(sessionID, fallbackTools)
@@ -240,6 +242,7 @@ export async function resumeTask(
     model: task.model,
     prompt: input.prompt,
     includeTeamToolDenylist: task.teamRunId === undefined,
+    userPermission: task.userPermission,
   })
   setSessionTools(sessionID, resumeBody.tools)
 
@@ -256,6 +259,7 @@ export async function resumeTask(
       try {
         const fallbackBody = buildFallbackBody(resumeBody, FALLBACK_AGENT, {
           includeTeamToolDenylist: task.teamRunId === undefined,
+          userPermission: task.userPermission,
         })
         const fallbackTools = fallbackBody.tools as Record<string, boolean>
         setSessionTools(sessionID, fallbackTools)

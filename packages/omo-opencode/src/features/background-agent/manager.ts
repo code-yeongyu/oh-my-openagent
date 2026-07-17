@@ -99,6 +99,7 @@ import {
 } from "./session-stream-activity"
 import { isActiveSessionStatus, isTerminalSessionStatus } from "./session-status-classifier"
 import { buildFallbackBody, FALLBACK_AGENT, isAgentNotFoundError } from "./spawner"
+import { buildUserDeniedTools } from "./spawner/task-prompt-body"
 import {
   createSubagentDepthLimitError,
   getMaxSubagentDepth,
@@ -877,6 +878,7 @@ export class BackgroundManager {
         fallbackChain: input.fallbackChain,
         skillContent: input.skillContent,
         sessionPermission: input.sessionPermission,
+        userPermission: input.userPermission,
         attemptCount: 0,
         category: input.category,
         onSessionCreated: input.onSessionCreated,
@@ -1213,18 +1215,11 @@ The fallback retry session is now created and can be inspected directly.
       applySessionPromptParams(sessionID, input.model)
     }
 
-    const userDenied: Record<string, boolean> = {}
-    if (input.userPermission) {
-      for (const [tool, value] of Object.entries(input.userPermission)) {
-        if (value === "deny") userDenied[tool] = false
-      }
-    }
-
     const launchTools = {
       task: false,
       call_omo_agent: true,
       question: false,
-      ...userDenied,
+      ...buildUserDeniedTools(input.userPermission),
       ...getAgentToolRestrictions(input.agent, {
         includeTeamToolDenylist: input.teamRunId === undefined,
       }),
@@ -1286,6 +1281,7 @@ The fallback retry session is now created and can be inspected directly.
         try {
           const fallbackBody = buildFallbackBody(promptBody, FALLBACK_AGENT, {
             includeTeamToolDenylist: input.teamRunId === undefined,
+            userPermission: input.userPermission,
           })
           const fallbackTools = fallbackBody.tools as Record<string, boolean>
           setSessionTools(sessionID, fallbackTools)
@@ -1879,6 +1875,7 @@ The fallback retry session is now created and can be inspected directly.
               task: false,
               call_omo_agent: true,
               question: false,
+              ...buildUserDeniedTools(existingTask.userPermission),
               ...getAgentToolRestrictions(existingTask.agent, {
                 includeTeamToolDenylist: existingTask.teamRunId === undefined,
               }),

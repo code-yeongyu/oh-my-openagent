@@ -309,6 +309,7 @@ describe("tryFallbackRetry", () => {
       const args = createDefaultArgs({
         skillContent: "delegated skill system",
         sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
+        userPermission: { "wait-for-background-tasks": "deny" },
       })
 
       await tryFallbackRetry(args)
@@ -317,6 +318,7 @@ describe("tryFallbackRetry", () => {
       const retryInput = args.queuesByKey.get(key)?.[0]?.input
       expect(retryInput?.skillContent).toBe("delegated skill system")
       expect(retryInput?.sessionPermission).toEqual(QUESTION_DENIED_SESSION_PERMISSION)
+      expect(retryInput?.userPermission).toEqual({ "wait-for-background-tasks": "deny" })
     })
 
     test("finalizes the failed attempt, creates a new pending attempt, and enqueues its explicit attemptID", async () => {

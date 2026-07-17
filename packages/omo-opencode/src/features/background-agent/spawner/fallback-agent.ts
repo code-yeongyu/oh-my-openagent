@@ -1,5 +1,7 @@
 import { getAgentToolRestrictions } from "../../../shared"
 import type { TaskPromptBody } from "./task-prompt-body"
+import { buildUserDeniedTools } from "./task-prompt-body"
+import type { UserToolPermission } from "../types"
 
 export const FALLBACK_AGENT = "general"
 
@@ -27,7 +29,10 @@ function getErrorMessage(error: unknown): string {
 export function buildFallbackBody(
   originalBody: TaskPromptBody,
   fallbackAgent: string,
-  options: { includeTeamToolDenylist?: boolean } = {},
+  options: {
+    includeTeamToolDenylist?: boolean
+    userPermission?: UserToolPermission
+  } = {},
 ): TaskPromptBody {
   return {
     ...originalBody,
@@ -36,6 +41,7 @@ export function buildFallbackBody(
       task: false,
       call_omo_agent: true,
       question: false,
+      ...buildUserDeniedTools(options.userPermission),
       ...getAgentToolRestrictions(fallbackAgent, options),
     },
   }

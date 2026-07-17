@@ -1,5 +1,5 @@
 import { createInternalAgentTextPart, getAgentToolRestrictions } from "../../../shared"
-import type { LaunchInput } from "../types"
+import type { LaunchInput, UserToolPermission } from "../types"
 
 type PromptModel = LaunchInput["model"]
 
@@ -11,6 +11,7 @@ type TaskPromptBodyOptions =
       readonly system: LaunchInput["skillContent"]
       readonly prompt: string
       readonly includeTeamToolDenylist: boolean
+      readonly userPermission?: UserToolPermission
     }
   | {
       readonly kind: "resume"
@@ -18,6 +19,7 @@ type TaskPromptBodyOptions =
       readonly model: PromptModel
       readonly prompt: string
       readonly includeTeamToolDenylist: boolean
+      readonly userPermission?: UserToolPermission
     }
 
 export type TaskPromptBody = {
@@ -34,6 +36,18 @@ export type TaskPromptBody = {
     readonly text: string
     readonly synthetic?: boolean
   }>
+}
+
+export function buildUserDeniedTools(
+  permission: UserToolPermission | undefined,
+): Record<string, boolean> {
+  const deniedTools: Record<string, boolean> = {}
+  if (!permission) return deniedTools
+
+  for (const [tool, value] of Object.entries(permission)) {
+    if (value === "deny") deniedTools[tool] = false
+  }
+  return deniedTools
 }
 
 export function buildTaskPromptBody(options: TaskPromptBodyOptions): TaskPromptBody {
@@ -54,6 +68,7 @@ export function buildTaskPromptBody(options: TaskPromptBodyOptions): TaskPromptB
       task: false,
       call_omo_agent: true,
       question: false,
+      ...buildUserDeniedTools(options.userPermission),
       ...getAgentToolRestrictions(options.agent, {
         includeTeamToolDenylist: options.includeTeamToolDenylist,
       }),
