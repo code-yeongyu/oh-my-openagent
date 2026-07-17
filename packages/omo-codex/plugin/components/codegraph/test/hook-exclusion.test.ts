@@ -21,7 +21,7 @@ describe("CodeGraph SessionStart exclusion policy", () => {
 		const stdout: string[] = [];
 		const spawned: WorkerSpawnInvocation[] = [];
 		const stateRoot = createAllowedWorkspace("codegraph-omo-state");
-		const workspace = join(stateRoot, ".omo", "ultraresearch", "run", "clones", "repo");
+		const workspace = join(stateRoot, ".omo", "ulw-research", "run", "clones", "repo");
 		mkdirSync(workspace, { recursive: true });
 
 		try {

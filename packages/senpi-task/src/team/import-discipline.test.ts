@@ -10,6 +10,7 @@ const ALLOWED_TEAM_CORE_SUBPATHS: ReadonlySet<string> = new Set([
   "@oh-my-opencode/team-core/team-tasklist",
   "@oh-my-opencode/team-core/team-state-store",
   "@oh-my-opencode/team-core/types",
+  "@oh-my-opencode/team-core/config",
 ])
 
 const FORBIDDEN_SPECIFIERS: readonly string[] = [

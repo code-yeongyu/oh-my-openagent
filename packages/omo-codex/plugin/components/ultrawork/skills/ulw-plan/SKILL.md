@@ -1,6 +1,6 @@
 ---
 name: ulw-plan
-description: "MUST USE for planning before coding: 5+ steps, ambiguous scope, multiple modules, architecture decisions, a vague 'just make it good / figure out what to build' brief, or any request to plan, interview, or break work down. Explore-first planning consultant (Prometheus) that grounds in the codebase, asks only the forks exploration cannot resolve - or researches them to best practice when the intent is fuzzy - waits for explicit approval, then writes ONE decision-complete work plan a worker executes with zero further interview. Triggers: ulw-plan, plan this, make a plan, plan before coding, interview me, break this down, start planning, plan mode, just make it good, figure out what to build."
+description: "MUST USE for planning before coding when design uncertainty remains after discovery: ambiguous scope, competing decompositions, unclear boundaries, uncertain dependency ordering, architecture decisions, a vague 'just make it good / figure out what to build' brief, or any request to plan, interview, or break work down. Explore-first planning consultant (Prometheus) that grounds in the codebase, asks only the forks exploration cannot resolve - or researches them to best practice when the intent is fuzzy - waits for explicit approval, then writes ONE decision-complete work plan a worker executes with zero further interview. Triggers: ulw-plan, plan this, make a plan, plan before coding, interview me, break this down, start planning, plan mode, just make it good, figure out what to build."
 metadata:
   short-description: Explore-first planning consultant that waits for your okay before planning
 ---
@@ -24,28 +24,33 @@ After grounding, make ONE judgment, record `intent: clear|unclear` plus `review_
 
 - **OVERRIDE - explicit ask wins:** if the user explicitly asks to be questioned or interviewed ("ask me", "interview me", "why aren't you asking me" - in any language), route **CLEAR**, run the interview, and turn the adopt-default filter OFF: the user has claimed the forks, so every surviving one is ASKED, not defaulted. This beats the OUTCOME test below, even on a fuzzy brief.
 - **CLEAR** - the user knows the outcome; the only open items are preferences/tradeoffs the repo cannot answer (genuine owner-decisions). Read **`references/intent-clear.md`**: ask the surviving forks with WHY, run the normal approval gate, and offer high-accuracy review only when `review_required` is false.
-- **UNCLEAR** - the outcome itself is fuzzy (a vague brief, a bootstrap, `$start-work` with no selectable plan, a goal the user cannot yet articulate). Asking would offload your own job onto the user. Read **`references/intent-unclear.md`**: research maximally, adopt and ANNOUNCE best-practice defaults, do NOT ask the user extra questions, and run high-accuracy review AUTOMATICALLY (unless Classify sized the work Trivial).
+- **UNCLEAR** - the outcome itself is fuzzy (a vague brief, a bootstrap, `$start-work` with no selectable plan, a goal the user cannot yet articulate). Asking would offload your own job onto the user. Read **`references/intent-unclear.md`**: research maximally, adopt and ANNOUNCE best-practice defaults, do NOT ask the user extra questions, and, unless Classify sized the work Trivial, set `review_required: true` before the approval gate and run high-accuracy review AUTOMATICALLY.
 - **ON THE FENCE** - when CLEAR vs UNCLEAR is genuinely ambiguous, treat it as CLEAR and ask exactly ONE question. A user wrongly silenced is worse than one extra question. The dominant failure to guard against is mis-routing a CLEAR request to UNCLEAR, which silently applies defaults and overrides forks the user wanted to own.
 
 WORKED: "add a 5/min-per-IP rate-limit to `/login`" = CLEAR. "make auth better" = UNCLEAR.
 
 Both intent paths ALSO read **`references/full-workflow.md`** for the shared mechanics - the plan template, the final verification wave, the APPEND protocol, and the full delegation/wait syntax. Read the phase you are in.
 
-## RUN THE SCRIPT - do not hand-build the plan files
+## RUN THE SCRIPT - do not hand-build artifacts
 
-Before writing any plan or draft by hand, RUN:
+As soon as `<slug>` and intent are known, before recording draft state, RUN:
 
 ```
-node "<skill-root>/scripts/scaffold-plan.mjs" <slug> [--clear|--unclear]
+node "<skill-root>/scripts/scaffold-plan.mjs" <slug> [--clear|--unclear] --draft-only [--review-required]
 ```
 
-(Replace `<skill-root>` with this skill's own directory; `bun` is an accepted substitute for `node`.) It creates `.omo/drafts/<slug>.md` (your durable, compaction-safe resume point) and `.omo/plans/<slug>.md` (skeleton with the human `## TL;DR (For humans)` block on top and every plan header below). Then **APPEND** task batches into the marked `## Todos` region with edit/apply_patch - **never rewrite the script-emitted headers**. This replaces ~10 manual file writes and guarantees the human-readable summary always leads the plan.
+(Replace `<skill-root>` with this skill's own directory; `bun` is accepted.) This creates only `.omo/drafts/<slug>.md`, the compaction-safe resume point; it does not create a plan before approval. Include `--review-required` when an explicit modifier requires review or the classified route is non-Trivial UNCLEAR, so the first durable write contains the complete pending review request. After approval, rerun without `--draft-only` to create `.omo/plans/<slug>.md`, then **APPEND** task batches into `## Todos` - never rewrite script-emitted headers.
 
-Run it ONCE at plan generation. A plain re-run on an existing plan is a safe no-op - it never overwrites your appended todos - so resuming after compaction cannot crash the turn or clobber the plan. Do NOT hand-build these files; if a structural reset is ever needed, use `--reset` (and `--reset --force` to discard hand edits). If it refuses because a same-named NON-artifact file exists, pick a different `<slug>` - do NOT `--reset` over a human file you did not create.
+Both invocations are resume-safe no-ops for artifacts already present. Do NOT hand-build them; use `--reset` only for a structural reset (`--reset --force` discards edits). If a same-named non-artifact file exists, choose another slug.
+
+## Plan artifact producer contract
+
+When producing the plan, encode every executable item as a column-zero Markdown task row: implementation rows MUST match `- [ ] N. <title>` (where `N` is a positive decimal integer), and final-verifier rows MUST match `- [ ] F<number>. <title>`. Prose headings, numbered paragraphs, and ordinary bullets are not task substitutes and MUST NOT be counted as implementation or final-verifier tasks. Before handoff, run a structural self-check over the plan: verify that every implementation row and final-verifier row is column-zero, matches its required grammar, and appears in the intended `## Todos` or `## Final verification wave` section; verify that no prose heading or bullet is being used as a task; and repair the plan before handoff if any check fails.
 
 ## Universal invariants (hold on every path)
 
 - **Decision-complete is the north star.** The executor has NO interview context - spell out exact paths, "every X in Y", and an explicit Must-NOT-Have. Leave the implementer ZERO judgment calls.
+- **Full scope is the default.** Plan the ENTIRE request; "MVP", "v1", "phase 1", or any reduced subset is never an option you invent or ask about - it exists only if the user introduces it. Scope OUT / Must-NOT-Have entries are guardrails against unrequested additions, never reductions of the request.
 - **Explore before asking.** Discoverable facts (repo/system/docs truth) -> research and cite, never ask. Preferences/tradeoffs -> the only things you bring to the user. When unsure which, treat it as a user-decision.
 - **CodeGraph first when present.** Use `codegraph_explore` for repo how/where/what/flow questions before wider reads; if codegraph_* tools are absent, inactive/uninitialized, or cold-start unavailable, continue with Read/Grep/Glob/LSP and the ast-grep skill.
 - **Two filters** on every candidate question, in order: (1) Could collected evidence answer it? -> explore instead. (2) Could the user's stated intent plus a defensible default answer it? -> adopt the default, record it, do not ask - UNLESS it is an owner-decision, which always survives as a question even when a default exists: anything irreversible / destructive / safety-critical, or a cross-cutting product choice the user lives with (public config surface, distribution / packaging, external dependency or pinned SHA, data / schema shape). Default the reversible internals; surface the owner-decisions.
@@ -57,7 +62,7 @@ Run it ONCE at plan generation. A plain re-run on an existing plan is a safe no-
 
 ## Approval gate
 
-When exploration is exhausted and the unknowns are answered, record the gate in the draft (`status: awaiting-approval`, the pending action `write .omo/plans/<slug>.md`, the approach), present a short brief once, then **wait for the user's explicit okay**. Read their next reply as a decision (approve / scope-change / still-unclear). Full gate mechanics: `references/full-workflow.md`.
+When exploration is exhausted and the unknowns are answered, record the gate in the draft (`status: awaiting-approval`, approach, and the next workflow action), present a short brief once, then **wait for the user's explicit okay**. Approval authorizes plan creation only; any already-required review runs afterward under its existing authorization. Full mechanics: `references/full-workflow.md`.
 
 ## Delegation (Codex-native)
 
@@ -66,6 +71,19 @@ Fan out read-only research before deciding. Every spawn names DELIVERABLE / SCOP
 ```
 multi_agent_v1.spawn_agent({"message":"TASK: act as an explorer. DELIVERABLE: ... SCOPE: ... VERIFY: ...","agent_type":"explorer","fork_context":false})
 ```
+
+If your tool list has a flat `spawn_agent` with a required `task_name` instead of `multi_agent_v1.*` (`multi_agent_v2`), rewrite: add `"task_name":"<lowercase_digits_underscores>"`, replace `"fork_context":false` with `"fork_turns":"none"`, and `wait_agent` takes only `timeout_ms`, returning on any child mailbox activity (finished agents end on their own).
+
+Spawn every independent child for the current wave first. After the wave
+is launched, use `multi_agent_v1.wait_agent` for each child until each
+reaches terminal status. A timeout is not terminal status. Do not start dependent planning, drafting, approval-gate work, or final handoff until each child result is integrated or recorded as inconclusive.
+
+For work likely to exceed one wait cycle, require the child to send
+`WORKING: <task> - <current phase>` before long passes and
+`BLOCKED: <reason>` only when progress stops. A `multi_agent_v1.wait_agent`
+timeout only means no new mailbox update arrived. Treat a running child as
+alive. Fallback only when the child is completed without the deliverable,
+ack-only after followup, explicitly `BLOCKED:`, or no longer running.
 
 Roles: `explorer` (internal patterns/conventions/tests), `librarian` (external docs/contracts), `metis` (gap analysis), `momus` (high-accuracy plan review). Full spawn/wait/fallback discipline is in `references/full-workflow.md`.
 

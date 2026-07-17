@@ -16,7 +16,6 @@ import {
   isSystemDirective,
   removeSystemReminders,
 } from "../../shared/system-directive"
-import type { RalphLoopHook } from "../ralph-loop"
 import { isNonOmoAgent, isPlannerAgent } from "./constants"
 import type { DetectedKeyword } from "./detector"
 import { detectKeywordsWithType, extractPromptText, looksLikeSlashCommand } from "./detector"
@@ -39,7 +38,7 @@ function filterAlreadyInjectedKeywords(
 export function createKeywordDetectorHook(
   ctx: PluginInput,
   _collector?: ContextCollector,
-  _ralphLoop?: Pick<RalphLoopHook, "startLoop">,
+  _ralphLoop?: unknown,
   config?: KeywordDetectorConfig,
   defaultMode?: DefaultModeConfig,
 ) {

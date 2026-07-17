@@ -1,3 +1,0 @@
-/Users/yeongyu/.bash_profile: line 3: /usr/local/bin/gog.bash: No such file or directory
-bash: packages/senpi-task/src/category/resolve-category.ts: No such file or directory
-bash: line 0: [: : integer expression expected

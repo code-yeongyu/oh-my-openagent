@@ -1,15 +1,16 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-
-import { afterEach, describe, expect, it } from "bun:test"
+import { describe, expect, it } from "bun:test"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext, ComponentLogger } from "../../extension/types"
-import { createLspComponent, handlePostEditDiagnosticsToolResult } from "./index"
-import { setServerStatusProvider } from "./lsp/server-resolution"
-import { lsp_diagnostics } from "./lsp/tools/diagnostics"
-import type { Diagnostic, ResolvedServer } from "./lsp/types"
+import {
+  lsp_diagnostics,
+  lsp_find_references,
+  lsp_goto_definition,
+  lsp_prepare_rename,
+  lsp_rename,
+  lsp_symbols,
+} from "./adapter/descriptors"
+import { createLspComponent } from "./index"
 
 const EXPECTED_TOOL_NAMES = [
   "lsp_diagnostics",
@@ -18,6 +19,15 @@ const EXPECTED_TOOL_NAMES = [
   "lsp_prepare_rename",
   "lsp_rename",
   "lsp_symbols",
+] as const
+
+const LEGACY_TOOL_DESCRIPTORS = [
+  lsp_diagnostics,
+  lsp_find_references,
+  lsp_goto_definition,
+  lsp_prepare_rename,
+  lsp_rename,
+  lsp_symbols,
 ] as const
 
 class TestLogger implements ComponentLogger {
@@ -38,28 +48,11 @@ class TestLogger implements ComponentLogger {
   }
 }
 
-interface WidgetCall {
-  readonly key: string
-  readonly content: readonly string[] | undefined
-  readonly placement: "aboveEditor" | "belowEditor" | undefined
-}
-
 interface TestContext {
   readonly pi: FakeExtensionAPI
   readonly logger: TestLogger
   readonly ctx: ComponentContext
 }
-
-const fakeServer: ResolvedServer = {
-  id: "fake-typescript",
-  command: ["omo-senpi-fake-ls"],
-  extensions: [".ts"],
-  priority: 0,
-}
-
-afterEach(() => {
-  setServerStatusProvider(undefined)
-})
 
 function setup(): TestContext {
   const pi = new FakeExtensionAPI()
@@ -78,20 +71,7 @@ function setup(): TestContext {
   }
 }
 
-function serverStatus() {
-  return {
-    id: fakeServer.id,
-    installed: true,
-    extensions: fakeServer.extensions,
-    disabled: false,
-    source: "test",
-    priority: 0,
-    server: fakeServer,
-  }
-}
-
-function registerWithServer(): TestContext {
-  setServerStatusProvider(() => [serverStatus()])
+function registerLsp(): TestContext {
   const test = setup()
   createLspComponent().register(test.pi, test.ctx)
   return test
@@ -105,34 +85,27 @@ function toolNames(pi: FakeExtensionAPI): string[] {
   }).sort()
 }
 
-function lspDiagnosticsTool(pi: FakeExtensionAPI): {
-  execute(
-    toolCallId: string,
-    params: { filePath: string; severity?: "error" | "warning" | "information" | "hint" | "all" },
-  ): Promise<{ content: readonly { type: "text"; text: string }[] }>
-} {
-  const tool = pi.tools.find((candidate) => candidate["name"] === "lsp_diagnostics")
-  if (!tool) throw new Error("lsp_diagnostics was not registered")
-  const execute = tool["execute"]
-  if (typeof execute !== "function") throw new TypeError("lsp_diagnostics missing execute")
-  return {
-    async execute(toolCallId, params) {
-      return execute(toolCallId, params, undefined, undefined, undefined)
-    },
-  }
-}
-
-function makeFile(contents = "export const value: string = 1\n"): { readonly root: string; readonly filePath: string } {
-  const root = mkdtempSync(join(tmpdir(), "omo-senpi-lsp-"))
-  const filePath = join(root, "sample.ts")
-  writeFileSync(filePath, contents)
-  return { root, filePath }
-}
-
 describe("omo-senpi lsp component", () => {
+  it("#given the legacy Senpi LSP descriptors #when the daemon-backed component registers #then all non-executor descriptor fields are preserved", () => {
+    // given / when
+    const { pi } = registerLsp()
+
+    // then
+    for (const legacyTool of LEGACY_TOOL_DESCRIPTORS) {
+      const registered = pi.tools.find((tool) => tool["name"] === legacyTool.name)
+      expect(registered).toBeDefined()
+      const registeredDescriptor = descriptorWithoutExecute(registered)
+      const legacyDescriptor = descriptorWithoutExecute(legacyTool)
+      expect(registeredDescriptor).toEqual(legacyDescriptor)
+      expect(registered?.["execute"]).not.toBe(legacyTool.execute)
+    }
+    const rename = pi.tools.find((tool) => tool["name"] === "lsp_rename")
+    expect(rename?.["executionMode"]).toBe("sequential")
+  })
+
   it("#given an installed language server #when the component registers #then the exact six LSP tools are exposed", () => {
     // given / when
-    const { pi } = registerWithServer()
+    const { pi } = registerLsp()
 
     // then
     expect(toolNames(pi)).toEqual([...EXPECTED_TOOL_NAMES])
@@ -140,7 +113,6 @@ describe("omo-senpi lsp component", () => {
 
   it("#given renamed omo-senpi lsp flags #when diagnostics are disabled #then no LSP tools register", () => {
     // given
-    setServerStatusProvider(() => [serverStatus()])
     const test = setup()
     test.pi.setFlag("omo-senpi-lsp-tools-enabled", false)
 
@@ -155,183 +127,31 @@ describe("omo-senpi lsp component", () => {
     ])
   })
 
-  it("#given a fake injected language server #when diagnostics runs #then diagnostics round-trip through the vendored client seam", async () => {
+  it("#given no language server is resolvable for any file type #when the lsp component registers #then the six tools remain exposed", () => {
     // given
-    const { root, filePath } = makeFile()
-    const diagnostic: Diagnostic = {
-      range: {
-        start: { line: 0, character: 28 },
-        end: { line: 0, character: 29 },
-      },
-      severity: 1,
-      source: "ts",
-      code: "TS2322",
-      message: "Type 'number' is not assignable to type 'string'.",
-    }
-    setServerStatusProvider(() => [
-      {
-        ...serverStatus(),
-        server: {
-          ...fakeServer,
-          command: ["omo-senpi-fake-ls", JSON.stringify({ diagnostics: [diagnostic] })],
-        },
-      },
-    ])
-    const test = setup()
-    createLspComponent().register(test.pi, test.ctx)
-
-    try {
-      // when
-      const result = await lspDiagnosticsTool(test.pi).execute("call-1", { filePath, severity: "error" })
-
-      // then
-      expect(result.content.map((block) => block.text).join("\n")).toContain(
-        "error[ts] (TS2322) at 1:28: Type 'number' is not assignable to type 'string'.",
-      )
-    } finally {
-      rmSync(root, { recursive: true, force: true })
-    }
-  })
-
-  it("#given post-edit diagnostics with errors #when a write tool result arrives #then model-visible diagnostics are injected", async () => {
-    // given
-    const event = {
-      type: "tool_result",
-      toolCallId: "write-1",
-      toolName: "write",
-      input: { path: "src/broken.ts" },
-      content: [{ type: "text", text: "Wrote file successfully." }],
-      isError: false,
-    }
-    const widgetCalls: WidgetCall[] = []
-
-    // when
-    const result = await handlePostEditDiagnosticsToolResult(
-      event,
-      {
-        ui: {
-          setWidget(
-            key: string,
-            content: readonly string[] | undefined,
-            options?: { placement?: "aboveEditor" | "belowEditor" },
-          ) {
-            widgetCalls.push({ key, content, placement: options?.placement })
-          },
-        },
-      },
-      async () => "error[typescript] (2322) at 1:13: broken",
-    )
-
-    // then
-    expect(result?.content?.at(-1)).toEqual({
-      type: "text",
-      text: "\n\nLSP errors detected in src/broken.ts, please fix:\nerror[typescript] (2322) at 1:13: broken",
-    })
-    expect(widgetCalls).toEqual([{ key: "omo-senpi-lsp", content: undefined, placement: "belowEditor" }])
-  })
-
-  it("#given a context with updateToolHookStatus #when post-edit diagnostics run #then the live status label is reported", async () => {
-    // given
-    const statuses: string[] = []
-    const event = {
-      type: "tool_result",
-      toolCallId: "write-1",
-      toolName: "write",
-      input: { path: "src/clean.ts" },
-      content: [{ type: "text", text: "Wrote file successfully." }],
-      isError: false,
-    }
-
-    // when
-    await handlePostEditDiagnosticsToolResult(
-      event,
-      {
-        updateToolHookStatus(message: string) {
-          statuses.push(message)
-        },
-      },
-      async () => "No diagnostics found",
-    )
-
-    // then
-    expect(statuses).toEqual(["(OmO) Checking LSP Diagnostics"])
-  })
-
-  it("#given a non-mutation tool result #when the post-edit handler runs #then no live status is reported", async () => {
-    // given
-    const statuses: string[] = []
-    const event = {
-      type: "tool_result",
-      toolCallId: "bash-1",
-      toolName: "bash",
-      input: { command: "ls" },
-      content: [{ type: "text", text: "ok" }],
-      isError: false,
-    }
-
-    // when
-    await handlePostEditDiagnosticsToolResult(
-      event,
-      {
-        updateToolHookStatus(message: string) {
-          statuses.push(message)
-        },
-      },
-      async () => "No diagnostics found",
-    )
-
-    // then
-    expect(statuses).toEqual([])
-  })
-
-  it("#given post-edit diagnostics are clean #when a write tool result arrives #then no diagnostics are injected", async () => {
-    // given
-    const event = {
-      type: "tool_result",
-      toolCallId: "write-1",
-      toolName: "write",
-      input: { path: "src/clean.ts" },
-      content: [{ type: "text", text: "Wrote file successfully." }],
-      isError: false,
-    }
-
-    // when
-    const result = await handlePostEditDiagnosticsToolResult(event, undefined, async () => "No diagnostics found")
-
-    // then
-    expect(result).toBeUndefined()
-  })
-
-  it("#given no language server is resolvable for any file type #when the lsp component registers #then it is inert with one notice", () => {
-    // given
-    setServerStatusProvider(() => [])
     const test = setup()
 
     // when
     createLspComponent().register(test.pi, test.ctx)
 
     // then
-    expect(toolNames(test.pi)).toEqual([])
-    expect(test.pi.handlers).toEqual([])
-    expect(test.logger.warnings).toHaveLength(1)
-    expect(test.logger.warnings[0]?.message).toBe("omo-senpi lsp component inert: no installed language server is resolvable")
-  })
-
-  it("#given malformed tool arguments #when diagnostics runs #then the result is a safe invalid-path response", async () => {
-    // given
-    const params: Record<string, unknown> = {}
-
-    // when
-    const result: unknown = await Reflect.apply(lsp_diagnostics.execute, undefined, [
-      "verify-malformed",
-      params,
-      undefined,
-      undefined,
-      undefined,
+    expect(toolNames(test.pi)).toEqual([...EXPECTED_TOOL_NAMES])
+    expect(test.pi.handlers.map((handler) => handler.event).sort()).toEqual([
+      "session_compact",
+      "session_shutdown",
+      "session_start",
+      "tool_result",
     ])
-
-    // then
-    expect(result).toMatchObject({ details: { errorKind: "invalid_path" } })
-    expect(JSON.stringify(result)).toContain("Invalid LSP diagnostics arguments")
+    expect(test.logger.warnings).toEqual([])
   })
+
 })
+
+function descriptorWithoutExecute(tool: Record<string, unknown> | undefined): Record<string, unknown> {
+  if (tool === undefined) throw new Error("missing tool descriptor")
+  const descriptor: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(tool)) {
+    if (key !== "execute") descriptor[key] = value
+  }
+  return descriptor
+}

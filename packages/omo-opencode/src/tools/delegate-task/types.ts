@@ -136,6 +136,5 @@ export interface BuildSystemContentInput {
   agentName?: string
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]
-  /** OpenCode native skill list to merge into the <available_skills> block. */
   nativeSkillInfos?: { name: string; description: string; location: string }[]
 }

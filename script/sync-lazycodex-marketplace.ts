@@ -222,7 +222,13 @@ const PLUGIN_COPY_DENYLIST = new Set([".git", "node_modules", ".ulw", ".claude"]
 function shouldCopyPluginPath(path: string, root: string): boolean {
   const relative = path === root ? "" : path.slice(root.length + sep.length)
   if (relative.length === 0) return true
-  return !relative.split(sep).some((part) => PLUGIN_COPY_DENYLIST.has(part))
+  const parts = relative.split(sep)
+  if (parts.some((part) => PLUGIN_COPY_DENYLIST.has(part))) return false
+  // Codex loads MCP servers only from the plugin-root .mcp.json (.codex-plugin/plugin.json declares
+  // "mcpServers": "./.mcp.json"). A component's own nested .mcp.json is a standalone-plugin dev
+  // manifest whose relative daemon path dangles once the plugin is flattened into the bundle, so it
+  // must never ship in plugins/omo.
+  return !(parts.length > 1 && parts.at(-1) === ".mcp.json")
 }
 
 

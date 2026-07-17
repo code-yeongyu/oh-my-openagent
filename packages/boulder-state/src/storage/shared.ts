@@ -2,9 +2,12 @@ import type { BoulderState, BoulderWorkState, BoulderWorkStatus } from "../types
 
 export const RESERVED_KEYS = new Set(["__proto__", "prototype", "constructor"])
 
-type SessionPlatform = "codex" | "opencode"
+// Bare session ids default to "opencode" for legacy compatibility.
+// Senpi callers MUST pass pre-prefixed "senpi:<id>" to read APIs such as
+// getWorkForSession, because the default platform remains "opencode".
+type SessionPlatform = "codex" | "opencode" | "senpi"
 
-const SESSION_ID_PREFIX_PATTERN = /^(codex|opencode):/
+const SESSION_ID_PREFIX_PATTERN = /^(codex|opencode|senpi):/
 
 export function normalizeSessionId(sessionId: string, platform: SessionPlatform = "opencode"): string {
   if (SESSION_ID_PREFIX_PATTERN.test(sessionId)) {

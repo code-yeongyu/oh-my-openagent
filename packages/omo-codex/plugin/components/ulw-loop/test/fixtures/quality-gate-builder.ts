@@ -1,29 +1,40 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-export const QA_DIR = ".omo/ulw-loop/qa";
+// v2 evidence layout: artifacts must live inside the goal's current attempt dir
+export function qaDirFor(goalId: string, attempt = 1, sessionId = "session"): string {
+	return `.omo/evidence/ulw/${sessionId}/${goalId}/a${attempt}`;
+}
+
+export const QA_DIR = qaDirFor("G001-finished");
 export const CODE_REVIEW_PATH = `${QA_DIR}/code-review.md`;
 export const GATE_REVIEW_PATH = `${QA_DIR}/gate-review.md`;
 export const CLI_PASS_PATH = `${QA_DIR}/cli-pass.txt`;
 export const REJECTION_LOG_PATH = `${QA_DIR}/rejection.txt`;
 export const MISSING_ARTIFACT_PATH = `${QA_DIR}/missing.txt`;
 
-export async function writeQualityGateArtifacts(repoRoot: string): Promise<void> {
-	await mkdir(join(repoRoot, QA_DIR), { recursive: true });
-	await writeFile(join(repoRoot, CODE_REVIEW_PATH), "code review approved\n", "utf8");
-	await writeFile(join(repoRoot, GATE_REVIEW_PATH), "gate review approved\n", "utf8");
-	await writeFile(join(repoRoot, CLI_PASS_PATH), "cli scenario passed\n", "utf8");
-	await writeFile(join(repoRoot, REJECTION_LOG_PATH), "invalid gate rejected\n", "utf8");
+export async function writeQualityGateArtifacts(repoRoot: string, qaDir = QA_DIR): Promise<void> {
+	await mkdir(join(repoRoot, qaDir), { recursive: true });
+	await writeFile(join(repoRoot, `${qaDir}/code-review.md`), "code review approved\n", "utf8");
+	await writeFile(join(repoRoot, `${qaDir}/gate-review.md`), "gate review approved\n", "utf8");
+	await writeFile(join(repoRoot, `${qaDir}/cli-pass.txt`), "cli scenario passed\n", "utf8");
+	await writeFile(join(repoRoot, `${qaDir}/rejection.txt`), "invalid gate rejected\n", "utf8");
 }
 
-export async function qualityGateJson(repoRoot: string, cliArtifactPath = CLI_PASS_PATH): Promise<string> {
-	await writeQualityGateArtifacts(repoRoot);
+export async function qualityGateJson(
+	repoRoot: string,
+	cliArtifactPath?: string,
+	goalId = "G001-finished",
+): Promise<string> {
+	const qaDir = qaDirFor(goalId);
+	await writeQualityGateArtifacts(repoRoot, qaDir);
+	const cliPath = cliArtifactPath ?? `${qaDir}/cli-pass.txt`;
 	return JSON.stringify({
 		codeReview: {
 			by: "lazycodex-code-reviewer",
 			recommendation: "APPROVE",
 			codeQualityStatus: "CLEAR",
-			reportPath: CODE_REVIEW_PATH,
+			reportPath: `${qaDir}/code-review.md`,
 			evidence: "Reviewed implementation and tests; no blockers remain.",
 			blockers: [],
 		},
@@ -56,20 +67,20 @@ export async function qualityGateJson(repoRoot: string, cliArtifactPath = CLI_PA
 					id: "artifact-cli-pass",
 					kind: "cli-transcript",
 					description: "CLI transcript for valid final checkpoint.",
-					path: cliArtifactPath,
+					path: cliPath,
 				},
 				{
 					id: "artifact-cli-reject",
 					kind: "log",
 					description: "Log proving invalid final checkpoint rejection.",
-					path: REJECTION_LOG_PATH,
+					path: `${qaDir}/rejection.txt`,
 				},
 			],
 		},
 		gateReview: {
 			by: "lazycodex-gate-reviewer",
 			recommendation: "APPROVE",
-			reportPath: GATE_REVIEW_PATH,
+			reportPath: `${qaDir}/gate-review.md`,
 			evidence: "Verified all criteria and artifact evidence.",
 			blockers: [],
 		},

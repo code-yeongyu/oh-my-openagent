@@ -27,7 +27,7 @@ describe("IdleInjectionCoordinator", () => {
     expect(collapsed).toBe(2)
     expect(calls).toHaveLength(1)
     expect(calls[0]?.content).toBe("task st_1 completed\n\ncontinue the run")
-    expect(calls[0]?.options).toEqual({ deliverAs: "followUp" })
+    expect(calls[0]?.options).toEqual({ deliverAs: "steer" })
   })
 
   it("#given repeated continuation enqueues #when flushed #then they collapse to one keyed injection", () => {
@@ -130,5 +130,25 @@ describe("IdleInjectionCoordinator", () => {
     coordinator.enqueue({ key: "ulw", source: "ulw-continuation", content: "again" })
     coordinator.scheduleFlush()
     expect(scheduledCount).toBe(2)
+  })
+
+  it("#given an injection callback w2lead #when the queue flushes #then onFlushed runs synchronously after delivery returns", () => {
+    // given
+    const order: string[] = []
+    const coordinator = new IdleInjectionCoordinator(() => {
+      order.push("deliver")
+    })
+    coordinator.enqueue({
+      key: "team-message:m1",
+      source: "team-message",
+      content: "alpha: ready",
+      onFlushed: () => order.push("flushed"),
+    })
+
+    // when
+    coordinator.flushOnIdle()
+
+    // then
+    expect(order).toEqual(["deliver", "flushed"])
   })
 })
