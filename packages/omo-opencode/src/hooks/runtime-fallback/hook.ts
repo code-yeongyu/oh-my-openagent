@@ -76,6 +76,9 @@ export function createRuntimeFallbackHook(
 
   const helpers = factories.createAutoRetryHelpers(deps)
   const firstPromptWatchdog = factories.createFirstPromptWatchdog(deps, helpers)
+  deps.onStaleSessionCleanup = (sessionID) => {
+    firstPromptWatchdog.onSessionTerminal(sessionID, "session.deleted")
+  }
   const baseEventHandler = factories.createEventHandler(
     deps,
     helpers,
@@ -164,6 +167,7 @@ export function createRuntimeFallbackHook(
     }
 
     firstPromptWatchdog.dispose()
+    delete deps.onStaleSessionCleanup
     deferredTerminalEvents.clear()
 
     deps.sessionStates.clear()

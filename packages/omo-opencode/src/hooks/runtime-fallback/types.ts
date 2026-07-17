@@ -99,5 +99,6 @@ export interface HookDeps {
   internallyAbortedSessions: Set<string>
   internalAbortOwnershipCounts?: Map<string, number>
   internalAbortRequests?: Map<string, Promise<boolean>>
+  onStaleSessionCleanup?: (sessionID: string) => void
   isLifecycleActive?: () => boolean
 }

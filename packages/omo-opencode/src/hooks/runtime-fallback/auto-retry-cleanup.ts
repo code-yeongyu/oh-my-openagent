@@ -24,6 +24,7 @@ export function createStaleSessionCleanup(
     let cleanedCount = 0
     for (const [sessionID, lastAccess] of sessionLastAccess.entries()) {
       if (now - lastAccess > SESSION_TTL_MS) {
+        deps.onStaleSessionCleanup?.(sessionID)
         sessionStates.delete(sessionID)
         sessionLastAccess.delete(sessionID)
         sessionRetryInFlight.delete(sessionID)
