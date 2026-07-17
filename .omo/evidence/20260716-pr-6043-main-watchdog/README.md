@@ -666,6 +666,32 @@ Twenty-sixth-cycle artifacts:
   `twenty-sixth-exact-live-*` set: isolated production-duration OpenCode server,
   SSE, root-lifecycle, fallback, later-cancellation, and unchanged-DB proof.
 
+The twenty-seventh fresh review found two remaining lifecycle races: generic
+internal abort ownership could be cleared by the watchdog observer before the
+abort response, and async status-abort work could resume after hook disposal.
+Source `a5d9298c5581b90cad1822995456edb6f82a9268` preserves foreign abort
+ownership and makes disposal terminal across asynchronous continuation points.
+
+Twenty-seventh-cycle artifacts:
+
+- `twenty-seventh-review-repair.md`: failing-first finding, bounded repair,
+  exact commands/counts, and residual-risk statement.
+- `twenty-seventh-exact-focused-regressions.txt`: 24 direct composed lifecycle,
+  ordering, ownership, and generation-race tests passing.
+- `twenty-seventh-exact-runtime-fallback-suite.txt`: 302 tests passing across
+  48 runtime-fallback files.
+- `twenty-seventh-exact-session-lifecycle-suite.txt`: 66 model-fallback,
+  lifecycle, event, and session-state tests passing.
+- `twenty-seventh-exact-omo-opencode-typecheck.txt`,
+  `twenty-seventh-exact-no-excuse.txt`, `twenty-seventh-exact-biome.txt`, and
+  `twenty-seventh-exact-integrity.txt`: exact-source static and pure-LOC gates.
+- `twenty-seventh-exact-sdk-abort-boundary.txt`: pinned SDK 1.15.13 loopback
+  cancellation-failure proof.
+- `twenty-seventh-exact-opencode-harness-self-check.txt` and the complete
+  `twenty-seventh-exact-live-*` set: isolated production-duration OpenCode
+  server, SSE, root lifecycle, fallback, later cancellation, and unchanged-DB
+  proof.
+
 ## Why It Is Enough
 
 The tests cover main and subagent watchdog ownership, progress and terminal
