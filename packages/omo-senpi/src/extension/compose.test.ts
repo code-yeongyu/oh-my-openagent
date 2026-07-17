@@ -126,6 +126,82 @@ describe("composeOmoSenpiExtension", () => {
     })
   })
 
+  it("#given a component using optional registerMcpServer on an old API #when composed #then skips that component and registers later components", async () => {
+    // given
+    const pi: Omit<FakeExtensionAPI, "registerMcpServer"> & { registerMcpServer?: undefined } = {
+      handlers: [],
+      tools: [],
+      commands: [],
+      flags: [],
+      messages: [],
+      userMessages: [],
+      messageRenderers: [],
+      mcpServers: [],
+      on(event, handler) {
+        this.handlers.push({ event, handler })
+      },
+      registerTool(tool) {
+        this.tools.push(tool)
+      },
+      registerCommand(name, options) {
+        this.commands.push({ name, options })
+      },
+      registerFlag(name, options) {
+        this.flags.push({ name, options })
+      },
+      getFlag() {
+        return undefined
+      },
+      sendMessage(message, options) {
+        this.messages.push({ message, options })
+      },
+      sendUserMessage(content, options) {
+        this.userMessages.push({ content, options })
+      },
+      registerMessageRenderer() {},
+      setFlag() {},
+      async dispatch(event, payload, ctx) {
+        const results: unknown[] = []
+        for (const registration of this.handlers) {
+          if (registration.event !== event) continue
+          results.push(await registration.handler(payload, ctx))
+        }
+        return results
+      },
+    }
+    const logger = createRecordingLogger()
+    const components: OmoSenpiComponent[] = [
+      {
+        name: "codegraph-like",
+        register(api, ctx) {
+          if (typeof api.registerMcpServer !== "function") {
+            ctx.logger.info("skipped: missing registerMcpServer")
+            return
+          }
+          api.registerMcpServer("x", {})
+        },
+      },
+      {
+        name: "after",
+        register(api) {
+          api.registerCommand("after", { description: "After command", handler: () => undefined })
+        },
+      },
+    ]
+
+    // when
+    await composeOmoSenpiExtension(components, { logger })(pi as unknown as FakeExtensionAPI)
+
+    // then
+    expect(pi.commands.map((command) => command.name)).toEqual(["after"])
+    expect(pi.mcpServers).toHaveLength(0)
+    expect(logger.entries).toContainEqual({
+      level: "info",
+      message: "skipped: missing registerMcpServer",
+      details: undefined,
+    })
+  })
+
   it("#given a fake missing sendUserMessage #when composed #then logs one version mismatch and registers nothing", async () => {
     // given
     const logger = createRecordingLogger()
