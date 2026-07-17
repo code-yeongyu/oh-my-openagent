@@ -13,36 +13,12 @@ import { createEventHandler } from "./plugin/event"
 import { createToolDefinitionHandler } from "./plugin/tool-definition"
 import { createToolExecuteAfterHandler } from "./plugin/tool-execute-after"
 import { createToolExecuteBeforeHandler } from "./plugin/tool-execute-before"
+import { createBackgroundWaitAvailability } from "./plugin/background-wait-availability"
 
 import type { CreatedHooks } from "./create-hooks"
 import type { Managers } from "./create-managers"
-import { getSessionAgent } from "./features/claude-code-session-state"
-import { getAgentConfigKey } from "./shared/agent-display-names"
 
 const BACKGROUND_WAIT_TOOL = "wait-for-background-tasks"
-
-function createBackgroundWaitAvailability(
-  pluginConfig: OhMyOpenCodeConfig,
-  tools: ToolsRecord,
-): (sessionID: string) => boolean {
-  const waitToolRegistered = tools[BACKGROUND_WAIT_TOOL] !== undefined
-
-  return (sessionID): boolean => {
-    if (!waitToolRegistered) return false
-
-    const sessionAgent = getSessionAgent(sessionID)
-    if (!sessionAgent) return true
-
-    const agentOverride = pluginConfig.agents?.[getAgentConfigKey(sessionAgent)]
-    const explicitPermission = agentOverride?.permission?.[BACKGROUND_WAIT_TOOL]
-    if (explicitPermission !== undefined) return explicitPermission !== "deny"
-
-    const legacyToolOverride = agentOverride?.tools?.[BACKGROUND_WAIT_TOOL]
-    if (legacyToolOverride !== undefined) return legacyToolOverride
-
-    return agentOverride?.permission?.["*"] !== "deny"
-  }
-}
 
 export function createPluginInterface(args: {
   ctx: PluginContext
@@ -59,7 +35,10 @@ export function createPluginInterface(args: {
 }): PluginInterface {
   const { ctx, pluginConfig, firstMessageVariantGate, managers, hooks, tools } =
     args
-  const canUseBackgroundWaitTool = createBackgroundWaitAvailability(pluginConfig, tools)
+  const canUseBackgroundWaitTool = createBackgroundWaitAvailability(
+    pluginConfig,
+    () => tools[BACKGROUND_WAIT_TOOL] !== undefined,
+  )
 
   return {
     tool: tools,

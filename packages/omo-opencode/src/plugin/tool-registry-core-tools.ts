@@ -21,7 +21,7 @@ export function createCoreTools(args: {
   readonly skillContext: SkillContext
   readonly availableCategories: AvailableCategory[]
   readonly factories: ToolRegistryFactories
-  readonly isBackgroundWaitAvailable: () => boolean
+  readonly isBackgroundWaitAvailable: (sessionID: string) => boolean
 }): Record<string, ToolDefinition> {
   const { ctx, pluginConfig, managers, skillContext, availableCategories, factories, isBackgroundWaitAvailable } = args
   const backgroundTools = factories.createBackgroundTools(managers.backgroundManager, ctx.client, {

@@ -215,7 +215,13 @@ describe("executeBackgroundContinuation - subagent metadata", () => {
     const result = await executeBackgroundContinuation(
       args,
       mockCtx,
-      { manager: mockManager, isBackgroundWaitAvailable: () => true },
+      {
+        manager: mockManager,
+        isBackgroundWaitAvailable: (sessionID) => {
+          expect(sessionID).toBe("parent-session")
+          return true
+        },
+      },
       { sessionID: "parent-session", messageID: "msg-parent", agent: "sisyphus" },
     )
 

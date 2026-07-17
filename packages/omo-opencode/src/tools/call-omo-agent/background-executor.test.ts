@@ -300,7 +300,10 @@ describe("executeBackground", () => {
       mockClient,
       undefined,
       undefined,
-      () => true,
+      (sessionID) => {
+        expect(sessionID).toBe("test-session")
+        return true
+      },
     )
 
     //#then

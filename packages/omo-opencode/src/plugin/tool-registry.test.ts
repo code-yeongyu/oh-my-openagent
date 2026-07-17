@@ -1,7 +1,8 @@
-const { beforeEach, describe, expect, mock, spyOn, test } = require("bun:test")
+const { afterEach, beforeEach, describe, expect, mock, spyOn, test } = require("bun:test")
 import { tool } from "@opencode-ai/plugin"
 
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "../config"
+import { _resetForTesting, setSessionAgent } from "../features/claude-code-session-state"
 import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
 import type { ToolsRecord } from "./types"
 
@@ -99,6 +100,10 @@ beforeEach(() => {
   syncSessionCreatedCallbacks.length = 0
 })
 
+afterEach(() => {
+  _resetForTesting()
+})
+
 describe("#given tool trimming prioritization", () => {
   test("#when max_tools trims a hashline edit registration named edit #then edit is removed before higher-priority tools", () => {
     const filteredTools = {
@@ -151,8 +156,8 @@ describe("#given block_on_background_tasks configuration", () => {
     const delegateOptions = toolFactories.createDelegateTask.mock.calls[delegateCallsBefore]?.[0]
     const callOmoAgentWaitAvailable = toolFactories.createCallOmoAgent.mock.calls[callOmoAgentCallsBefore]?.[6]
     expect(result.filteredTools).not.toHaveProperty("wait-for-background-tasks")
-    expect(delegateOptions?.isBackgroundWaitAvailable?.()).toBe(false)
-    expect(callOmoAgentWaitAvailable?.()).toBe(false)
+    expect(delegateOptions?.isBackgroundWaitAvailable?.("main-filtered")).toBe(false)
+    expect(callOmoAgentWaitAvailable?.("main-filtered")).toBe(false)
   })
 
   test("#when max_tools is applied #then delegate guidance matches the final capped registry", () => {
@@ -182,8 +187,91 @@ describe("#given block_on_background_tasks configuration", () => {
     const delegateOptions = toolFactories.createDelegateTask.mock.calls[delegateCallsBefore]?.[0]
     const callOmoAgentWaitAvailable = toolFactories.createCallOmoAgent.mock.calls[callOmoAgentCallsBefore]?.[6]
     const toolAvailable = result.filteredTools["wait-for-background-tasks"] !== undefined
-    expect(delegateOptions?.isBackgroundWaitAvailable?.()).toBe(toolAvailable)
-    expect(callOmoAgentWaitAvailable?.()).toBe(toolAvailable)
+    expect(delegateOptions?.isBackgroundWaitAvailable?.("main-capped")).toBe(toolAvailable)
+    expect(callOmoAgentWaitAvailable?.("main-capped")).toBe(toolAvailable)
+  })
+
+  test("#when the active session agent denies the wait tool #then launch guidance sees it as unavailable", () => {
+    // #given the final registry contains the tool but Sisyphus explicitly denies it
+    const delegateCallsBefore = toolFactories.createDelegateTask.mock.calls.length
+    const callOmoAgentCallsBefore = toolFactories.createCallOmoAgent.mock.calls.length
+    setSessionAgent("main-denied", "Sisyphus - ultraworker")
+
+    createToolRegistry({
+      ctx: { directory: "/tmp" } as Parameters<typeof createToolRegistry>[0]["ctx"],
+      pluginConfig: createPluginConfig({
+        agents: {
+          sisyphus: {
+            permission: { "wait-for-background-tasks": "deny" },
+          },
+        },
+        experimental: { block_on_background_tasks: true },
+      }),
+      managers: {
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+      } as Parameters<typeof createToolRegistry>[0]["managers"],
+      skillContext: {
+        mergedSkills: [],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+      toolFactories: { ...toolFactories, createBackgroundTools },
+    })
+
+    // #when launch guidance asks about the active parent session
+    const delegateOptions = toolFactories.createDelegateTask.mock.calls[delegateCallsBefore]?.[0]
+    const delegateWaitAvailable: (sessionID: string) => boolean =
+      delegateOptions?.isBackgroundWaitAvailable ?? (() => false)
+    const callOmoAgentWaitAvailable: (sessionID: string) => boolean =
+      toolFactories.createCallOmoAgent.mock.calls[callOmoAgentCallsBefore]?.[6] ?? (() => false)
+
+    // #then both launch surfaces honor the same agent permission as hook guidance
+    expect(delegateWaitAvailable("main-denied")).toBe(false)
+    expect(callOmoAgentWaitAvailable("main-denied")).toBe(false)
+  })
+
+  test("#when wildcard permission denies tools #then an explicit wait-tool allow still wins", () => {
+    // #given the active agent denies tools by default but explicitly allows the wait tool
+    const delegateCallsBefore = toolFactories.createDelegateTask.mock.calls.length
+    setSessionAgent("main-explicit-allow", "Sisyphus - ultraworker")
+
+    createToolRegistry({
+      ctx: { directory: "/tmp" } as Parameters<typeof createToolRegistry>[0]["ctx"],
+      pluginConfig: createPluginConfig({
+        agents: {
+          sisyphus: {
+            permission: {
+              "*": "deny",
+              "wait-for-background-tasks": "allow",
+            },
+          },
+        },
+        experimental: { block_on_background_tasks: true },
+      }),
+      managers: {
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+      } as Parameters<typeof createToolRegistry>[0]["managers"],
+      skillContext: {
+        mergedSkills: [],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+      toolFactories: { ...toolFactories, createBackgroundTools },
+    })
+
+    // #when launch guidance resolves the session permission
+    const delegateOptions = toolFactories.createDelegateTask.mock.calls[delegateCallsBefore]?.[0]
+
+    // #then the explicit tool rule takes precedence over the wildcard deny
+    expect(delegateOptions?.isBackgroundWaitAvailable?.("main-explicit-allow")).toBe(true)
   })
 
   test("#when background_output is disabled #then the dependent wait tool is removed too", () => {

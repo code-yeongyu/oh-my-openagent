@@ -115,7 +115,7 @@ export function createCallOmoAgent(
   agentOverrides?: AgentOverrides,
   userCategories?: CategoriesConfig,
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor,
-  isBackgroundWaitAvailable?: () => boolean,
+  isBackgroundWaitAvailable?: (sessionID: string) => boolean,
 ): ToolDefinition {
   const agentDescriptions = ALLOWED_AGENTS.map(
     (name) => `- ${name}: Specialized agent for ${name} tasks`,

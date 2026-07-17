@@ -726,7 +726,10 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
       {
         manager,
         blockOnBackgroundTasks: true,
-        isBackgroundWaitAvailable: () => false,
+        isBackgroundWaitAvailable: (sessionID) => {
+          expectFn(sessionID).toBe("ses_parent")
+          return false
+        },
       },
       { sessionID: "ses_parent", messageID: "msg_filtered_wait" },
       "explore",

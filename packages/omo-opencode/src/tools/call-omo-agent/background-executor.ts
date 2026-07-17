@@ -25,7 +25,7 @@ export async function executeBackground(
   client: PluginInput["client"],
   fallbackChain?: FallbackEntry[],
   model?: DelegatedModelConfig,
-  isBackgroundWaitAvailable?: () => boolean,
+  isBackgroundWaitAvailable?: (sessionID: string) => boolean,
 ): Promise<string> {
   try {
     const messageDir = getMessageDir(toolContext.sessionID)
@@ -92,7 +92,7 @@ Description: ${task.description}
 Agent: ${task.agent} (subagent)
 Status: ${task.status}
 
-${getBackgroundCompletionGuidance(isBackgroundWaitAvailable?.() ?? false)}`
+${getBackgroundCompletionGuidance(isBackgroundWaitAvailable?.(toolContext.sessionID) ?? false)}`
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return `Failed to launch background agent task: ${message}`

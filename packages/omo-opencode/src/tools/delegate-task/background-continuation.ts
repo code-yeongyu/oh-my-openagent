@@ -40,7 +40,9 @@ export async function executeBackgroundContinuation(
     const backgroundTaskId = task.id
     const resolvedModel = resolveMetadataModel(task.model, parentContext.model)
     const backgroundWaitAvailable =
-      executorCtx.isBackgroundWaitAvailable?.() ?? executorCtx.blockOnBackgroundTasks ?? false
+      executorCtx.isBackgroundWaitAvailable?.(parentContext.sessionID)
+      ?? executorCtx.blockOnBackgroundTasks
+      ?? false
     const completionGuidance = getBackgroundCompletionGuidance(backgroundWaitAvailable)
 
     const bgContMeta = {

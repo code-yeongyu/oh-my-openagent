@@ -215,7 +215,9 @@ export async function executeBackgroundTask(
       : ""
 
     const backgroundWaitAvailable =
-      executorCtx.isBackgroundWaitAvailable?.() ?? executorCtx.blockOnBackgroundTasks ?? false
+      executorCtx.isBackgroundWaitAvailable?.(parentContext.sessionID)
+      ?? executorCtx.blockOnBackgroundTasks
+      ?? false
     const completionGuidance = getBackgroundCompletionGuidance(backgroundWaitAvailable)
 
     return `Background task launched.

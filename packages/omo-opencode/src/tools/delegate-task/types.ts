@@ -114,7 +114,7 @@ export interface DelegateTaskToolOptions {
   onSyncSessionCreated?: (event: SyncSessionCreatedEvent) => Promise<void>
   syncPollTimeoutMs?: number
   blockOnBackgroundTasks?: boolean
-  isBackgroundWaitAvailable?: () => boolean
+  isBackgroundWaitAvailable?: (sessionID: string) => boolean
   /** OpenCode native skill accessor for skills registered via config.skills.paths. Same shape as SkillLoadOptions.nativeSkills. */
   nativeSkills?: {
     all(): { name: string; description: string; location: string; content: string }[] | Promise<{ name: string; description: string; location: string; content: string }[]>
