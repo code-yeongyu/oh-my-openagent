@@ -9,6 +9,13 @@ Tracks bugs that are present in the current release but have been intentionally 
 - **Workaround**: Focus a pane to activate its `opencode attach` session, or inspect subagent status through normal task/background outputs when live pane rendering is not necessary. Treat the placeholder as current behavior unless an eager-attach option is added.
 - **Status**: Open enhancement. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5746.
 
+## #5809 - cmux tmux panes can stay on the focus-to-attach placeholder
+
+- **Affects**: Users running OMO inside cmux's tmux-compat native split layer.
+- **Symptom**: Subagent panes can be created with the "Focus this pane to attach" placeholder but never transition into `opencode attach`, because the activation path relies on `tmux respawn-pane -k`, which cmux may treat as a no-op.
+- **Workaround**: Use a real tmux server for subagent pane visualization when interactive attach matters, or avoid relying on focus-to-attach behavior inside cmux until an eager attach path is available. The underlying subagent work can still be inspected through non-pane outputs/logs.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5809.
+
 ## #5806 - `ulw` mode does not persist across follow-up messages
 
 - **Affects**: Multi-turn Sisyphus sessions that rely on `ulw` or `ultrawork` keyword injection.
