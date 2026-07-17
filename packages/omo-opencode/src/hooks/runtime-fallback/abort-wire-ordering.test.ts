@@ -8,6 +8,7 @@ import { fireFirstPromptWatchdog } from "./first-prompt-watchdog-fire"
 import {
   AGENT,
   createDeps,
+  installFakeTimers,
   PLUGIN_CONFIG_WITH_FALLBACK,
   PRIMARY_MODEL,
 } from "./first-prompt-watchdog-test-helpers"
@@ -149,7 +150,7 @@ describe("runtime-fallback abort wire ordering", () => {
       cleanupStaleSessions: () => {},
     }
     const eventHandler = createEventHandler(deps, helpers)
-    const statusHandler = createSessionStatusHandler(deps, helpers, deps.sessionStatusRetryKeys)
+    const statusHandler = createSessionStatusHandler(deps, helpers)
 
     const statusPromise = statusHandler({
       sessionID,
@@ -196,5 +197,67 @@ describe("runtime-fallback abort wire ordering", () => {
     statusDispatch.resolve({ accepted: true, status: "dispatched" })
     await statusPromise
     deps.sessionRetryInFlight.delete(sessionID)
+  })
+
+  it("#given a status fallback replaces the silent request #when the original watchdog deadline passes #then the accepted fallback is not aborted or advanced", async () => {
+    const fakeTimers = installFakeTimers()
+    const sessionID = "session-status-cancels-stale-watchdog"
+    const secondFallback = "google/gemini-3-flash"
+    const deps = createDeps({
+      ...PLUGIN_CONFIG_WITH_FALLBACK,
+      agents: {
+        [AGENT]: {
+          model: PRIMARY_MODEL,
+          fallback_models: [
+            { model: "anthropic/claude-haiku-4-5" },
+            { model: secondFallback },
+          ],
+        },
+      },
+    })
+    const dispatchSources: string[] = []
+    const helpers: AutoRetryHelpers = {
+      abortSessionRequest: createAbortSessionRequest(deps),
+      clearSessionFallbackTimeout: () => {},
+      scheduleSessionFallbackTimeout: () => {},
+      autoRetryWithFallback: async (_sessionID, _newModel, _resolvedAgent, source) => {
+        dispatchSources.push(source)
+        return { accepted: true, status: "dispatched" }
+      },
+      resolveAgentForSessionFromContext: async () => AGENT,
+      cleanupStaleSessions: () => {},
+    }
+    const watchdog = createFirstPromptWatchdog(deps, helpers, 100)
+    const statusHandler = createSessionStatusHandler(
+      deps,
+      helpers,
+      (ownedSessionID) => watchdog.onFallbackOwnershipTransferred(ownedSessionID),
+    )
+
+    try {
+      watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+      await fakeTimers.advanceBy(40)
+
+      await statusHandler({
+        sessionID,
+        model: PRIMARY_MODEL,
+        agent: AGENT,
+        status: {
+          type: "retry",
+          attempt: 1,
+          message: "Provider unavailable, retrying in 1s attempt #1",
+        },
+      })
+      watchdog.onAssistantProgress(sessionID)
+      watchdog.onSessionTerminal(sessionID, "session.idle")
+      await fakeTimers.advanceBy(100)
+
+      expect(dispatchSources).toEqual(["session.status"])
+      expect(deps.sessionStates.get(sessionID)?.currentModel).toBe("anthropic/claude-haiku-4-5")
+      expect(deps.sessionStates.get(sessionID)?.attemptCount).toBe(1)
+    } finally {
+      watchdog.dispose()
+      fakeTimers.restore()
+    }
   })
 })

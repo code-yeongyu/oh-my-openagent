@@ -127,7 +127,6 @@ describe("runtime fallback abort rejection", () => {
     const handler = createSessionStatusHandler(
       deps,
       createRejectingHelpers(operations),
-      deps.sessionStatusRetryKeys,
     )
 
     await handler({
@@ -154,7 +153,7 @@ describe("runtime fallback abort rejection", () => {
         return abortResults.shift() ?? false
       },
     }
-    const handler = createSessionStatusHandler(deps, helpers, deps.sessionStatusRetryKeys)
+    const handler = createSessionStatusHandler(deps, helpers)
     const retryEvent = {
       sessionID,
       model: "openai/gpt-5.4",
@@ -184,7 +183,6 @@ describe("runtime fallback abort rejection", () => {
     const handler = createSessionStatusHandler(
       deps,
       createRejectingHelpers(operations),
-      deps.sessionStatusRetryKeys,
     )
 
     await handler({

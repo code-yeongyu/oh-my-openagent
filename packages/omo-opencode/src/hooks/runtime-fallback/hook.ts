@@ -74,10 +74,14 @@ export function createRuntimeFallbackHook(
   }
 
   const helpers = factories.createAutoRetryHelpers(deps)
-  const baseEventHandler = factories.createEventHandler(deps, helpers)
+  const firstPromptWatchdog = factories.createFirstPromptWatchdog(deps, helpers)
+  const baseEventHandler = factories.createEventHandler(
+    deps,
+    helpers,
+    (sessionID) => firstPromptWatchdog.onFallbackOwnershipTransferred(sessionID),
+  )
   const messageUpdateHandler = factories.createMessageUpdateHandler(deps, helpers)
   const chatMessageHandler = factories.createChatMessageHandler(deps)
-  const firstPromptWatchdog = factories.createFirstPromptWatchdog(deps, helpers)
   const deferredTerminalEvents = new Map<string, { type: string; properties?: unknown }>()
 
   let cleanupInterval: RuntimeFallbackInterval | null = null

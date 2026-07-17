@@ -51,9 +51,17 @@ function resolvePreferredSessionModel(
   return typeof categoryModel === "string" ? categoryModel : undefined
 }
 
-export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
+export function createEventHandler(
+  deps: HookDeps,
+  helpers: AutoRetryHelpers,
+  onStatusFallbackOwnershipTransferred?: (sessionID: string) => void,
+) {
   const { config, pluginConfig, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionFallbackTimeouts, sessionStatusRetryKeys } = deps
-  const sessionStatusHandler = createSessionStatusHandler(deps, helpers, sessionStatusRetryKeys)
+  const sessionStatusHandler = createSessionStatusHandler(
+    deps,
+    helpers,
+    onStatusFallbackOwnershipTransferred,
+  )
   const cancelledSessions = new Set<string>()
 
   const resetRetryState = (sessionID: string) => {

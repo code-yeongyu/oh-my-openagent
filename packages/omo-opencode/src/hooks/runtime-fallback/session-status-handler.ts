@@ -14,13 +14,14 @@ import { normalizeModelToCanonicalString } from "./normalize-model"
 export function createSessionStatusHandler(
   deps: HookDeps,
   helpers: AutoRetryHelpers,
-  sessionStatusRetryKeys: Map<string, string>,
+  onFallbackOwnershipTransferred?: (sessionID: string) => void,
 ) {
   const {
     pluginConfig,
     sessionStates,
     sessionLastAccess,
     sessionRetryInFlight,
+    sessionStatusRetryKeys,
   } = deps
 
   return async (props: Record<string, unknown> | undefined) => {
@@ -153,6 +154,7 @@ export function createSessionStatusHandler(
       retryAttempt: status.attempt,
     })
 
+    onFallbackOwnershipTransferred?.(sessionID)
     await dispatchFallbackRetry(deps, helpers, {
       sessionID,
       state,

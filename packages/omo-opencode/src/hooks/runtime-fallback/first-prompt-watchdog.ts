@@ -15,6 +15,7 @@ declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
 
 export interface FirstPromptWatchdog {
   onUserMessage(sessionID: string, model?: string, agent?: string, messageID?: string): void
+  onFallbackOwnershipTransferred(sessionID: string): void
   onAssistantProgress(sessionID: string, parentMessageID?: string, isAbortEvent?: boolean): WatchdogEventDecision | undefined
   onFallbackCompleted(sessionID: string): void
   onSessionTerminal(sessionID: string, eventType?: string, isAbortEvent?: boolean): WatchdogEventDecision | undefined
@@ -77,10 +78,7 @@ export function createFirstPromptWatchdog(
           clearAbortResponsePending: () => abortProvenance.clearResponsePending(context.sessionID),
         })
       } finally {
-        if (
-          context.sessionGeneration === sessionGenerations.get(context.sessionID)
-          && armed.get(context.sessionID) === context
-        ) {
+        if (context.sessionGeneration === sessionGenerations.get(context.sessionID) && armed.get(context.sessionID) === context) {
           armed.delete(context.sessionID)
         }
       }
@@ -135,6 +133,11 @@ export function createFirstPromptWatchdog(
 
       log(`[${HOOK_NAME}] ${SOURCE}: armed`, { sessionID, model, agent, watchdogMs })
     },
+    onFallbackOwnershipTransferred(sessionID) {
+      if (!armed.has(sessionID) && !suspended.has(sessionID) && !progressed.has(sessionID)) return
+      cancel(sessionID)
+      log(`[${HOOK_NAME}] ${SOURCE}: cancelled (fallback ownership transferred)`, { sessionID })
+    },
     onAssistantProgress(sessionID, parentMessageID, isAbortEvent) {
       if (!sessionID) return
       if (
@@ -145,10 +148,8 @@ export function createFirstPromptWatchdog(
       const suspendedContext = suspended.get(sessionID)
       if (suspendedContext && isAbortEvent === true) {
         const currentUserMessageID = currentUserMessageIDs.get(sessionID)
-        const isPriorGeneration = parentMessageID !== undefined
-          && currentUserMessageID !== undefined
-          && parentMessageID !== currentUserMessageID
-          && abortProvenance.consumePrior(sessionID, suspendedContext.sessionGeneration)
+        const isPriorGeneration = parentMessageID !== undefined && currentUserMessageID !== undefined
+          && parentMessageID !== currentUserMessageID && abortProvenance.consumePrior(sessionID, suspendedContext.sessionGeneration)
         if (isPriorGeneration) return { kind: "inspect-terminal", sessionID }
         suspended.delete(sessionID)
         clearInternalAbortOwnership(deps, sessionID)
