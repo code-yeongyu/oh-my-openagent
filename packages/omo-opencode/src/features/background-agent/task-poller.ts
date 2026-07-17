@@ -126,6 +126,7 @@ async function interruptStaleTask(args: {
   errorSuffix: string
   logReason: string
   reserveTaskTerminalization?: (task: BackgroundTask) => (() => void) | undefined
+  reserveTaskFinalization?: (task: BackgroundTask) => () => void
 }): Promise<void> {
   const {
     task,
@@ -140,10 +141,12 @@ async function interruptStaleTask(args: {
     errorSuffix,
     logReason,
     reserveTaskTerminalization,
+    reserveTaskFinalization,
   } = args
 
   const releaseTerminalization = reserveTaskTerminalization?.(task)
   if (reserveTaskTerminalization && !releaseTerminalization) return
+  const releaseTaskFinalization = reserveTaskFinalization?.(task)
 
   try {
     const aborted = await abortWithTimeout(client, sessionID)
@@ -176,6 +179,7 @@ async function interruptStaleTask(args: {
       log("[background-agent] Error in notifyParentSession for stale task:", { taskId: task.id, error: err })
     }
   } finally {
+    releaseTaskFinalization?.()
     releaseTerminalization?.()
   }
 }
@@ -191,6 +195,7 @@ export async function checkAndInterruptStaleTasks(args: {
   onTaskInterrupted?: (task: BackgroundTask) => void
   getSessionActivity?: SessionActivityResolver
   reserveTaskTerminalization?: (task: BackgroundTask) => (() => void) | undefined
+  reserveTaskFinalization?: (task: BackgroundTask) => () => void
 }): Promise<void> {
   const {
     tasks,
@@ -271,6 +276,7 @@ export async function checkAndInterruptStaleTasks(args: {
           errorSuffix: " since start",
           logReason: "no progress since start",
           reserveTaskTerminalization: args.reserveTaskTerminalization,
+          reserveTaskFinalization: args.reserveTaskFinalization,
         }),
       )
       continue
@@ -322,6 +328,7 @@ export async function checkAndInterruptStaleTasks(args: {
         errorSuffix: "",
         logReason: "stale timeout",
         reserveTaskTerminalization: args.reserveTaskTerminalization,
+        reserveTaskFinalization: args.reserveTaskFinalization,
       }),
     )
   }

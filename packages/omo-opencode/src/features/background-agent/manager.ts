@@ -686,6 +686,10 @@ export class BackgroundManager {
         descendantCount: spawnReservation.descendantCount,
       })
 
+      if (this.shutdownTriggered) {
+        throw new Error("Background manager is shutting down")
+      }
+
       // Create task immediately with status="pending"
       const task: BackgroundTask = {
         id: `bg_${crypto.randomUUID().slice(0, 8)}`,
@@ -886,6 +890,12 @@ export class BackgroundManager {
     const parentDirectory = parentSession?.data?.directory ?? this.directory
     log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${parentDirectory}`)
 
+    if (this.shutdownTriggered) {
+      this.rollbackPreStartDescendantReservation(task)
+      this.concurrencyManager.release(concurrencyKey)
+      return
+    }
+
     const createResult = await this.client.session.create({
       body: {
         parentID: input.parentSessionId,
@@ -916,7 +926,7 @@ export class BackgroundManager {
 
     const sessionID = createResult.data.id
 
-    if (task.status !== "pending") {
+    if (this.shutdownTriggered || task.status !== "pending") {
       clearDelegatedChildSessionBootstrap(sessionID)
       await this.abortSessionWithLogging(sessionID, "terminal pre-start cleanup")
       this.rollbackPreStartDescendantReservation(task)
@@ -924,7 +934,20 @@ export class BackgroundManager {
       return
     }
 
-    await input.onSessionCreated?.(sessionID)
+    try {
+      await input.onSessionCreated?.(sessionID)
+    } catch (error) {
+      clearDelegatedChildSessionBootstrap(sessionID)
+      await this.abortSessionWithLogging(sessionID, "onSessionCreated failure cleanup")
+      throw error
+    }
+    if (this.shutdownTriggered || task.status !== "pending") {
+      clearDelegatedChildSessionBootstrap(sessionID)
+      await this.abortSessionWithLogging(sessionID, "terminal launch callback cleanup")
+      this.rollbackPreStartDescendantReservation(task)
+      this.concurrencyManager.release(concurrencyKey)
+      return
+    }
     this.settlePreStartDescendantReservation(task)
     subagentSessions.add(sessionID)
     setSessionAgent(sessionID, input.agent)
@@ -1640,6 +1663,8 @@ The fallback retry session is now created and can be inspected directly.
       }
       const releaseTerminalization = await this.reserveTaskTerminalizationWhenAvailable(existingTask, RUNNING_BACKGROUND_TASK_STATUSES)
       if (!releaseTerminalization) return
+      const releaseTaskFinalization = this.reserveTaskFinalization(existingTask)
+      let notificationQueued = false
 
       try {
         existingTask.status = "interrupt"
@@ -1666,8 +1691,10 @@ The fallback retry session is now created and can be inspected directly.
         this.markForNotification(existingTask)
         this.enqueueNotificationForParent(existingTask.parentSessionId, () => this.notifyParentSession(existingTask)).catch(err => {
           log("[background-agent] Failed to notify on resume error:", err)
-        })
+        }).finally(releaseTaskFinalization)
+        notificationQueued = true
       } finally {
+        if (!notificationQueued) releaseTaskFinalization()
         releaseTerminalization()
       }
     })
@@ -2294,6 +2321,8 @@ The fallback retry session is now created and can be inspected directly.
       RUNNING_BACKGROUND_TASK_STATUSES,
     )
     if (!releaseTerminalization) return
+    const releaseTaskFinalization = this.reserveTaskFinalization(task)
+    let notificationQueued = false
 
     try {
       if (task.currentAttemptID) {
@@ -2343,8 +2372,10 @@ The fallback retry session is now created and can be inspected directly.
       this.markForNotification(task)
       this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
         log("[background-agent] Error in notifyParentSession for errored task:", { taskId: task.id, error: err })
-      })
+      }).finally(releaseTaskFinalization)
+      notificationQueued = true
     } finally {
+      if (!notificationQueued) releaseTaskFinalization()
       releaseTerminalization()
     }
   }
@@ -2354,53 +2385,63 @@ The fallback retry session is now created and can be inspected directly.
     errorInfo: { name?: string; message?: string; statusCode?: number },
     source: string,
   ): Promise<boolean> {
-    const previousSessionID = task.sessionId
-    let retryingNotification: string | undefined
-    const result = tryFallbackRetry({
+    const releaseRetryTransition = this.reserveTaskTerminalization(
       task,
-      errorInfo,
-      source,
-      concurrencyManager: this.concurrencyManager,
-      client: this.client,
-      idleDeferralTimers: this.idleDeferralTimers,
-      queuesByKey: this.queuesByKey,
-      processKey: (key: string) => this.processKey(key),
-      onRetrying: ({ task, source }) => {
-        const currentAttempt = getCurrentAttempt(task)
-        const previousAttempt = getPreviousAttempt(task, currentAttempt?.attemptId)
-        const sourceText = source ? ` via ${source}` : ""
-        const failedSessionLine = previousAttempt?.sessionId ? `\n- Failed session: \`${previousAttempt.sessionId}\`` : ""
-        const failedModel = formatAttemptModelSummary(previousAttempt)
-        const failedModelLine = failedModel ? `\n- Failed model: \`${failedModel}\`` : ""
-        const failedErrorLine = previousAttempt?.error ? `\n- Error: ${previousAttempt.error}` : ""
-        const nextModel = formatAttemptModelSummary(currentAttempt)
-        retryingNotification = `<system-reminder>
+      RUNNING_BACKGROUND_TASK_STATUSES,
+    ) ?? await this.reserveTaskTerminalizationWhenAvailable(task, RUNNING_BACKGROUND_TASK_STATUSES)
+    if (!releaseRetryTransition) return false
+
+    try {
+      const previousSessionID = task.sessionId
+      let retryingNotification: string | undefined
+      const result = tryFallbackRetry({
+        task,
+        errorInfo,
+        source,
+        concurrencyManager: this.concurrencyManager,
+        client: this.client,
+        idleDeferralTimers: this.idleDeferralTimers,
+        queuesByKey: this.queuesByKey,
+        processKey: (key: string) => this.processKey(key),
+        onRetrying: ({ task, source }) => {
+          const currentAttempt = getCurrentAttempt(task)
+          const previousAttempt = getPreviousAttempt(task, currentAttempt?.attemptId)
+          const sourceText = source ? ` via ${source}` : ""
+          const failedSessionLine = previousAttempt?.sessionId ? `\n- Failed session: \`${previousAttempt.sessionId}\`` : ""
+          const failedModel = formatAttemptModelSummary(previousAttempt)
+          const failedModelLine = failedModel ? `\n- Failed model: \`${failedModel}\`` : ""
+          const failedErrorLine = previousAttempt?.error ? `\n- Error: ${previousAttempt.error}` : ""
+          const nextModel = formatAttemptModelSummary(currentAttempt)
+          retryingNotification = `<system-reminder>
 [BACKGROUND TASK RETRYING]
 **ID:** \`${task.id}\`
 **Description:** ${task.description}${sourceText}${failedSessionLine}${failedModelLine}${failedErrorLine}${nextModel ? `\n- Next model: \`${nextModel}\`` : ""}
 
 The task was re-queued on a fallback model after a retryable failure.
 </system-reminder>`
-      },
-    })
-    const retried = await result
-    if (retried && retryingNotification) {
-      const parentPromptContext = await this.resolveParentWakePromptContext(task)
-      this.queuePendingParentWake(
-        task.parentSessionId,
-        retryingNotification,
-        parentPromptContext,
-        false,
-        PENDING_PARENT_WAKE_DEBOUNCE_MS,
-      )
+        },
+      })
+      const retried = await result
+      if (retried && retryingNotification) {
+        const parentPromptContext = await this.resolveParentWakePromptContext(task)
+        this.queuePendingParentWake(
+          task.parentSessionId,
+          retryingNotification,
+          parentPromptContext,
+          false,
+          PENDING_PARENT_WAKE_DEBOUNCE_MS,
+        )
+      }
+      if (retried && previousSessionID) {
+        this.clearSessionOutputObserved(previousSessionID)
+        this.clearSessionTodoObservation(previousSessionID)
+        clearDelegatedChildSessionBootstrap(previousSessionID)
+        subagentSessions.delete(previousSessionID)
+      }
+      return retried
+    } finally {
+      releaseRetryTransition()
     }
-    if (retried && previousSessionID) {
-      this.clearSessionOutputObserved(previousSessionID)
-      this.clearSessionTodoObservation(previousSessionID)
-      clearDelegatedChildSessionBootstrap(previousSessionID)
-      subagentSessions.delete(previousSessionID)
-    }
-    return retried
   }
 
   markForNotification(task: BackgroundTask): void {
@@ -2579,8 +2620,12 @@ The task was re-queued on a fallback model after a retryable failure.
     if (!task) {
       return false
     }
-    const releaseTerminalization = this.reserveTaskTerminalization(task, CANCELLABLE_BACKGROUND_TASK_STATUSES)
+    const releaseTerminalization = this.reserveTaskTerminalization(
+      task,
+      CANCELLABLE_BACKGROUND_TASK_STATUSES,
+    ) ?? await this.reserveTaskTerminalizationWhenAvailable(task, CANCELLABLE_BACKGROUND_TASK_STATUSES)
     if (!releaseTerminalization) return false
+    const releaseTaskFinalization = this.reserveTaskFinalization(task)
 
     try {
       const source = options?.source ?? "cancel"
@@ -2627,7 +2672,9 @@ The task was re-queued on a fallback model after a retryable failure.
           task.error = reason
         }
       }
-      if (wasRunning) this.releaseTaskRootDescendant(task)
+      if (!this.preStartDescendantReservations.has(task.id)) {
+        this.releaseTaskRootDescendant(task)
+      }
       this.taskHistory.record(task.parentSessionId, { id: task.id, sessionID: task.sessionId, agent: task.agent, description: task.description, status: "cancelled", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
 
       if (task.concurrencyKey) {
@@ -2672,6 +2719,7 @@ The task was re-queued on a fallback model after a retryable failure.
 
       return true
     } finally {
+      releaseTaskFinalization()
       releaseTerminalization()
     }
   }
@@ -3090,6 +3138,8 @@ The task was re-queued on a fallback model after a retryable failure.
           CANCELLABLE_BACKGROUND_TASK_STATUSES,
         )
         if (!releaseTerminalization) return
+        const releaseTaskFinalization = this.reserveTaskFinalization(task)
+        let notificationQueued = false
 
         try {
           const wasPending = task.status === "pending"
@@ -3144,8 +3194,10 @@ The task was re-queued on a fallback model after a retryable failure.
           this.markForNotification(task)
           this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
             log("[background-agent] Error in notifyParentSession for stale-pruned task:", { taskId: task.id, error: err })
-          })
+          }).finally(releaseTaskFinalization)
+          notificationQueued = true
         } finally {
+          if (!notificationQueued) releaseTaskFinalization()
           releaseTerminalization()
         }
       },
@@ -3171,6 +3223,7 @@ The task was re-queued on a fallback model after a retryable failure.
         task,
         RUNNING_BACKGROUND_TASK_STATUSES,
       ),
+      reserveTaskFinalization: (task) => this.reserveTaskFinalization(task),
     })
   }
 
@@ -3184,6 +3237,8 @@ The task was re-queued on a fallback model after a retryable failure.
       RUNNING_BACKGROUND_TASK_STATUSES,
     )
     if (!releaseTerminalization) return
+    const releaseTaskFinalization = this.reserveTaskFinalization(task)
+    let notificationQueued = false
 
     try {
       if (task.currentAttemptID) {
@@ -3228,8 +3283,10 @@ The task was re-queued on a fallback model after a retryable failure.
       this.markForNotification(task)
       this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
         log("[background-agent] Error in notifyParentSession for crashed task:", { taskId: task.id, error: err })
-      })
+      }).finally(releaseTaskFinalization)
+      notificationQueued = true
     } finally {
+      if (!notificationQueued) releaseTaskFinalization()
       releaseTerminalization()
     }
   }
