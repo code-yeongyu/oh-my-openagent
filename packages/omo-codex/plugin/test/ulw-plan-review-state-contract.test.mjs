@@ -40,6 +40,18 @@ function readJsonContract(workflow, contractName) {
 	return JSON.parse(match[1]);
 }
 
+function matchesCas(state, expected, clauses) {
+	return clauses.every((clause) => {
+		const separator = clause.indexOf("=");
+		if (separator !== -1) {
+			const key = clause.slice(0, separator);
+			const value = clause.slice(separator + 1);
+			return state[key] === value;
+		}
+		return Object.hasOwn(expected, clause) && state[clause] === expected[clause];
+	});
+}
+
 for (const surface of surfaces) {
 	test(`#given ${surface.name} #when deeper review becomes required before plan completion #then durable request state covers explicit and automatic review without inventing a digest`, async () => {
 		const skill = await readFile(surface.skillPath, "utf8");
@@ -133,13 +145,22 @@ for (const surface of surfaces) {
 		assert.deepEqual(contract.transitions.launch, {
 			from: "pending",
 			to: "launching",
-			cas: ["round_status=active", "status=pending"],
+			cas: ["round_status=active", "status=pending", "workspace_root", "runtime_home", "target", "round_id", "plan_sha256"],
 			writes: ["launch_id=<fresh-launch-id>"],
 		});
 		assert.deepEqual(contract.transitions.receipt, {
 			from: "launching",
 			to: "in_flight",
-			cas: ["round_status=active", "status=launching", "launch_id"],
+			cas: [
+				"round_status=active",
+				"status=launching",
+				"workspace_root",
+				"runtime_home",
+				"target",
+				"round_id",
+				"plan_sha256",
+				"launch_id",
+			],
 			writes: ["session=<session-or-process-receipt>"],
 		});
 		assert.deepEqual(contract.transitions.complete, {
@@ -167,7 +188,16 @@ for (const surface of surfaces) {
 				lane_status: "inconclusive",
 				result: "launch_interrupted_without_receipt",
 			},
-			cas: ["round_status=active", "status=launching", "launch_id"],
+			cas: [
+				"round_status=active",
+				"status=launching",
+				"workspace_root",
+				"runtime_home",
+				"target",
+				"round_id",
+				"plan_sha256",
+				"launch_id",
+			],
 			invalidates_other_lane: true,
 			next: "fresh_review_round",
 		});
@@ -179,6 +209,35 @@ for (const surface of surfaces) {
 			"round_status=inconclusive": "start_fresh_review_round",
 		});
 		assert.deepEqual(contract.rejected_completions, ["duplicate", "late", "stale", "mismatched"]);
+	});
+
+	test(`#given ${surface.name} round R2 replaced R1 #when a delayed R1 launch or receipt arrives #then identity-bound CAS leaves R2 unchanged`, async () => {
+		const workflow = await readFile(surface.workflowPath, "utf8");
+		const contract = readJsonContract(workflow, "ulw-plan-review-lifecycle-state-contract");
+		const currentRound = {
+			round_status: "active",
+			status: "pending",
+			workspace_root: surface.reviewRoots.independent,
+			runtime_home: surface.runtimeHomes.independent,
+			target: ".omo/plans/demo.md",
+			round_id: "round-r2",
+			plan_sha256: "sha-r2",
+			launch_id: null,
+		};
+		const staleRound = {
+			...currentRound,
+			round_id: "round-r1",
+			plan_sha256: "sha-r1",
+			launch_id: "launch-r1",
+		};
+
+		assert.equal(matchesCas(currentRound, currentRound, contract.transitions.launch.cas), true);
+		assert.equal(matchesCas(currentRound, staleRound, contract.transitions.launch.cas), false);
+
+		const launchedCurrentRound = { ...currentRound, status: "launching", launch_id: "launch-r2" };
+		assert.equal(matchesCas(launchedCurrentRound, launchedCurrentRound, contract.transitions.receipt.cas), true);
+		assert.equal(matchesCas(launchedCurrentRound, staleRound, contract.transitions.receipt.cas), false);
+		assert.equal(matchesCas(launchedCurrentRound, staleRound, contract.transitions.launch_interrupted.cas), false);
 	});
 
 	test(`#given ${surface.name} independent reviewers #when exact-path retrieval drifts #then intake fails closed without alternate artifact recovery`, async () => {

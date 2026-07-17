@@ -89,8 +89,8 @@ After approval and only after the plan is complete, replace the request state at
 ```json
 {
   "transitions": {
-    "launch": { "from": "pending", "to": "launching", "cas": ["round_status=active", "status=pending"], "writes": ["launch_id=<fresh-launch-id>"] },
-    "receipt": { "from": "launching", "to": "in_flight", "cas": ["round_status=active", "status=launching", "launch_id"], "writes": ["session=<session-or-process-receipt>"] },
+    "launch": { "from": "pending", "to": "launching", "cas": ["round_status=active", "status=pending", "workspace_root", "runtime_home", "target", "round_id", "plan_sha256"], "writes": ["launch_id=<fresh-launch-id>"] },
+    "receipt": { "from": "launching", "to": "in_flight", "cas": ["round_status=active", "status=launching", "workspace_root", "runtime_home", "target", "round_id", "plan_sha256", "launch_id"], "writes": ["session=<session-or-process-receipt>"] },
     "complete": {
       "from": "in_flight",
       "to": ["approved", "changes_requested", "inconclusive"],
@@ -100,7 +100,7 @@ After approval and only after the plan is complete, replace the request state at
     "launch_interrupted": {
       "from": { "round_status": "active", "lane_status": "launching" },
       "to": { "round_status": "inconclusive", "lane_status": "inconclusive", "result": "launch_interrupted_without_receipt" },
-      "cas": ["round_status=active", "status=launching", "launch_id"],
+      "cas": ["round_status=active", "status=launching", "workspace_root", "runtime_home", "target", "round_id", "plan_sha256", "launch_id"],
       "invalidates_other_lane": true,
       "next": "fresh_review_round"
     }
@@ -118,7 +118,7 @@ After approval and only after the plan is complete, replace the request state at
 
 `plan_path` must equal `.omo/plans/<validated-slug>.md`; reject absolute paths, `..`, and normalization drift. Bind the file operation to the workspace itself: open the canonical workspace root as a directory descriptor, then open `.omo`, `plans`, and the final file descriptor-relative with no-follow semantics on every segment, requiring directories for ancestors and a regular final file. Compute `plan_sha256` only from bytes read from that final descriptor. If the platform cannot provide that descriptor chain, return `INCONCLUSIVE`; do not substitute path-based validate-then-open checks.
 
-Before publishing a round, have the reviewer launcher create the disposable workspace and isolated `CODEX_HOME`, materialize and descriptor-chain digest-verify the plan copy, and persist both literal roots. These OS-temp runtime resources are launcher-owned review infrastructure, not project/source edits; they do not relax the planner's write boundary, and inability to provision them under current policy is `INCONCLUSIVE`. Apply the lifecycle transition table exactly. On compaction, resume from persisted round and lane state: dispatch only `pending`, terminalize stranded `launching`, wait only for the matching `in_flight` completion, and never mutate terminal lanes. A launch interruption terminalizes the round as inconclusive, invalidates the other lane, and requires a fresh round. Any plan change also invalidates both lanes.
+Before publishing a round, have the reviewer launcher create the disposable workspace and isolated `CODEX_HOME`, materialize and descriptor-chain digest-verify the plan copy, and persist both literal roots. These OS-temp runtime resources are launcher-owned review infrastructure, not project/source edits; they do not relax the planner's write boundary, and inability to provision them under current policy is `INCONCLUSIVE`. Apply the lifecycle transition table exactly. Every launch, receipt, interruption, and completion CAS compares the persisted workspace, runtime, target, round, and digest binding; a delayed action from a replaced round cannot claim or terminalize the new round. On compaction, resume from persisted round and lane state: dispatch only `pending`, terminalize stranded `launching`, wait only for the matching `in_flight` completion, and never mutate terminal lanes. A matching launch interruption terminalizes the round as inconclusive, invalidates the other lane, and requires a fresh round. Any plan change also invalidates both lanes.
 
 ## Approval gate (DO NOT SKIP)
 This gate is the only thing between a finished brief and the plan file, and the one place a planner can loop. Handle it as a decision with durable state, not a passphrase hunt.
