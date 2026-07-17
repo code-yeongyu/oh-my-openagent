@@ -7,7 +7,7 @@ describe("model-fallback abort boundary", () => {
     const sessionID = "ses_model_fallback_abort_resolved_error"
     let abortCalledWithThrowOnError = false
     const promptCalls: string[] = []
-    const continuationsInFlight = new Set<string>()
+    const continuationOwners = new Map<string, symbol>()
     const controller = createModelFallbackContinuationController({
       pluginConfig: unsafeTestValue({}),
       pluginContext: unsafeTestValue({
@@ -30,7 +30,7 @@ describe("model-fallback abort boundary", () => {
         },
       }),
       lastKnownModelBySession: new Map(),
-      continuationsInFlight,
+      continuationOwners,
       lastDispatchedContinuationKeys: new Map(),
     })
 
@@ -42,6 +42,6 @@ describe("model-fallback abort boundary", () => {
 
     expect(abortCalledWithThrowOnError).toBe(true)
     expect(promptCalls).toEqual([])
-    expect(continuationsInFlight.has(sessionID)).toBe(false)
+    expect(continuationOwners.has(sessionID)).toBe(false)
   })
 })

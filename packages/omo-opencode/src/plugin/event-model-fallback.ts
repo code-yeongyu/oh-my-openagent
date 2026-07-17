@@ -34,7 +34,7 @@ export function createModelFallbackEventHandler(args: {
   const lastHandledModelErrorMessageID = new Map<string, string>();
   const lastHandledRetryStatusKey = new Map<string, string>();
   const lastKnownModelBySession = new Map<string, { providerID: string; modelID: string }>();
-  const continuationsInFlight = new Set<string>();
+  const continuationOwners = new Map<string, symbol>();
   const lastDispatchedContinuationKeys = new Map<
     string,
     {
@@ -47,7 +47,7 @@ export function createModelFallbackEventHandler(args: {
     pluginConfig: args.pluginConfig,
     pluginContext: args.pluginContext,
     lastKnownModelBySession,
-    continuationsInFlight,
+    continuationOwners,
     lastDispatchedContinuationKeys,
   });
 
@@ -55,7 +55,7 @@ export function createModelFallbackEventHandler(args: {
     lastHandledModelErrorMessageID.delete(sessionID);
     lastHandledRetryStatusKey.delete(sessionID);
     lastKnownModelBySession.delete(sessionID);
-    continuationsInFlight.delete(sessionID);
+    continuationOwners.delete(sessionID);
     lastDispatchedContinuationKeys.delete(sessionID);
     if (args.modelFallback) {
       clearPendingModelFallback(args.modelFallback, sessionID);

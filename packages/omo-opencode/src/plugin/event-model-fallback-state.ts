@@ -57,10 +57,10 @@ export function createModelFallbackContinuationController(args: {
   pluginConfig: OhMyOpenCodeConfig;
   pluginContext: PluginEventContext;
   lastKnownModelBySession: Map<string, { providerID: string; modelID: string }>;
-  continuationsInFlight: Set<string>;
+  continuationOwners: Map<string, symbol>;
   lastDispatchedContinuationKeys: Map<string, FallbackContinuationDedupeState>;
 }) {
-  const { pluginConfig, pluginContext, lastKnownModelBySession, continuationsInFlight } = args;
+  const { pluginConfig, pluginContext, lastKnownModelBySession, continuationOwners } = args;
   const lastDispatchedContinuationKeys = args.lastDispatchedContinuationKeys;
 
   const resolveFallbackProviderID = (sessionID: string, providerHint?: string): string => {
@@ -125,7 +125,7 @@ export function createModelFallbackContinuationController(args: {
   ): boolean => {
     const fallbackKeys = getFallbackContinuationKeys(fallbackContext);
 
-    if (continuationsInFlight.has(sessionID)) {
+    if (continuationOwners.has(sessionID)) {
       log("[event] model-fallback continuation skipped because one is already in flight", { sessionID, source });
       return true;
     }
@@ -162,7 +162,9 @@ export function createModelFallbackContinuationController(args: {
   ): Promise<void> => {
     if (shouldSkipFallbackContinuation(sessionID, source, fallbackContext)) return;
 
-    continuationsInFlight.add(sessionID);
+    const owner = Symbol(sessionID);
+    continuationOwners.set(sessionID, owner);
+    const isCurrentOwner = (): boolean => continuationOwners.get(sessionID) === owner;
     let dispatched = false;
     try {
       try {
@@ -191,6 +193,7 @@ export function createModelFallbackContinuationController(args: {
         });
         return;
       }
+      if (!isCurrentOwner()) return;
       releasePromptAsyncReservation(sessionID, `model-fallback-abort:${source}`, {
         reservedBy: [`model-fallback:${source}`, `model-fallback:${source}:sync`],
         reservedByPrefix: "model-fallback:",
@@ -227,6 +230,7 @@ export function createModelFallbackContinuationController(args: {
         queueBehavior: "defer",
         input: promptBody,
       });
+      if (!isCurrentOwner()) return;
       if (isInternalPromptDispatchAccepted(promptResult)) {
         dispatched = true;
       } else if (promptResult.status === "failed") {
@@ -244,8 +248,10 @@ export function createModelFallbackContinuationController(args: {
         });
       }
     } finally {
-      if (dispatched) markDispatched(sessionID, fallbackContext);
-      continuationsInFlight.delete(sessionID);
+      if (isCurrentOwner()) {
+        if (dispatched) markDispatched(sessionID, fallbackContext);
+        continuationOwners.delete(sessionID);
+      }
     }
   };
 
