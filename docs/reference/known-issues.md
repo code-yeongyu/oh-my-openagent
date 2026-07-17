@@ -5,8 +5,8 @@ Tracks bugs that are present in the current release but have been intentionally 
 ## #5784 - Reserved retry window can be too short for shared-quota providers
 
 - **Affects**: Runtime fallback from providers that keep retrying internally after shared quota exhaustion.
-- **Symptom**: OMO can queue a fallback toast, but the dispatch sees the session as `reserved` through the entire short retry window and gives up before OpenCode's own provider retry cycle releases the reservation. The session can remain stuck on the exhausted provider.
-- **Workaround**: When a shared-quota provider is exhausted, wait for the provider retry cycle to settle or start a fresh session directly on the fallback provider. If this repeats for a provider, avoid putting that exhausted provider first in the fallback chain until the quota window resets.
+- **Symptom**: OMO can start a fallback attempt, but the dispatch sees the session as `reserved` through the entire short retry window and gives up before OpenCode's own provider retry cycle releases the reservation. No fallback toast appears and no later fallback remains queued, so the session can remain stuck on the exhausted provider.
+- **Workaround**: When a shared-quota provider is exhausted, wait for the provider retry cycle to settle, then retry the request or start a fresh session directly on the fallback provider. If this repeats for a provider, avoid selecting that exhausted provider before usable providers in the active model and fallback configuration until the quota window resets.
 - **Status**: Open tuning request. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5784.
 
 ## #5529 - GPT-5.5 reasoning effort can conflict with some OpenAI-compatible chat providers
