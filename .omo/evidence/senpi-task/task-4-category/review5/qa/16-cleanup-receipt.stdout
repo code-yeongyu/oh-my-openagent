@@ -1,4 +1,0 @@
-Cleanup receipt
-No servers, tmux sessions, temp directories, or background processes were intentionally created for this QA lane.
-Shell jobs visible in this non-interactive command:
-tmux sessions matching review5/senpi-task, if tmux is available:

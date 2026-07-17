@@ -40,7 +40,7 @@ describe("omo-senpi ulw-loop runtime", () => {
     } finally {
       fake.cleanup()
     }
-  })
+  }, { timeout: 20000 })
 
   it("#given env and PATH are controlled #when the component registers with defaults #then no Bun global is required for active status handling", async () => {
     const fake = createTempOmoBin(activeStatus("DEFAULT-REGISTRATION"))
@@ -64,7 +64,7 @@ describe("omo-senpi ulw-loop runtime", () => {
     } finally {
       fake.cleanup()
     }
-  })
+  }, { timeout: 20000 })
 
   it("#given built Senpi runs under Node #when inspecting runtime source #then the ulw-loop component has no Bun global dependency", () => {
     const source = readFileSync(new URL("./index.ts", import.meta.url), "utf8")

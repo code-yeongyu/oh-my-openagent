@@ -1,3 +1,0 @@
-$ timeout 10 node packages/omo-codex/plugin/components/codegraph/dist/cli.js hook session-start <<<'{}'; echo EXIT:0
-{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"LazyCodex CodeGraph bootstrap scheduled in background"},"codegraph":{"action":"spawned"}}
-EXIT:0

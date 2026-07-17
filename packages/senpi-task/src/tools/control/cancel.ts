@@ -3,6 +3,7 @@ import { Type } from "typebox"
 import type { Static } from "typebox"
 
 import type { TaskStatus } from "../../state"
+import { renderTaskCancelCall, renderTaskCancelResult } from "./renderers"
 import { toolResult } from "./tool-result"
 import type { CancelManager, CancelResultDetails, CancelToolResult } from "./types"
 
@@ -16,8 +17,8 @@ export type TaskCancelInput = Static<typeof TaskCancelParams>
 
 const DESCRIPTION = [
   "Cancel a running child task and release its resources; the cancelled status is preserved so task_output can still report the outcome.",
-  "Cancelling a child that is not running is a no-op that reports its unchanged status.",
-  "Use this to end work you no longer need; use task_interrupt to only stop the current turn while keeping the child, or task_send to redirect it.",
+  "Cancel is terminal and NOT resumable; cancelling a child that is not running is a no-op that reports its unchanged status.",
+  'Use this to end work you no longer need; to stop-but-keep the current child, use task_send(deliver_as:"interrupt").',
 ].join(" ")
 
 export type TaskCancelDeps = {
@@ -63,5 +64,7 @@ export function createTaskCancelTool(deps: TaskCancelDeps): ToolDefinition<typeo
     description: DESCRIPTION,
     parameters: TaskCancelParams,
     execute: (_toolCallId, params) => runTaskCancel(deps.manager, params),
+    renderCall: (args, theme) => renderTaskCancelCall(args, theme),
+    renderResult: (result, options, theme) => renderTaskCancelResult(result, options, theme),
   }
 }

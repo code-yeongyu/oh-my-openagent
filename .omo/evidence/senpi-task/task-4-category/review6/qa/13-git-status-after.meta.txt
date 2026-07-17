@@ -1,6 +1,0 @@
-scenario: 13-git-status-after
-surface: git worktree status after QA
-invocation: git status --short --untracked-files=all
-started_at: 2026-07-06T11:03:17Z
-finished_at: 2026-07-06T11:03:17Z
-exit: 0

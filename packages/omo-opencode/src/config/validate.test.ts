@@ -65,6 +65,7 @@ function pickRenderedConfigFields(config: ReturnType<typeof validatePluginConfig
     categories: config.categories,
     disabled_providers: config.disabled_providers,
     mcp_env_allowlist: config.mcp_env_allowlist,
+    browser_automation_engine: config.browser_automation_engine,
     team_mode: config.team_mode,
     tui: config.tui,
   }
@@ -135,6 +136,37 @@ describe("validatePluginConfig", () => {
 
       expect(readonlyResult.config.tui?.sidebar.enabled).toBe(true)
       expect(pickRenderedConfigFields(readonlyResult.config)).toEqual(pickRenderedConfigFields(runtimeConfig))
+    })
+  })
+
+  it("preserves user-only playwright MCP arguments like the runtime loader", () => {
+    withIsolatedConfig("playwright-user-only", (root) => {
+      const userConfigDir = process.env.OPENCODE_CONFIG_DIR
+      if (!userConfigDir) throw new Error("OPENCODE_CONFIG_DIR must be set by the test harness")
+
+      const project = join(root, "project")
+      writeJson(join(userConfigDir, "oh-my-openagent.json"), {
+        browser_automation_engine: {
+          provider: "playwright",
+          playwright_mcp_args: ["--headless"],
+        },
+      })
+      writeJson(join(project, ".opencode", "oh-my-openagent.json"), {
+        browser_automation_engine: {
+          provider: "playwright",
+          playwright_mcp_args: ["--user-agent", "${GITHUB_TOKEN}"],
+        },
+      })
+
+      const readonlyResult = validatePluginConfig(project)
+      const runtimeConfig = loadPluginConfig(project, {})
+
+      expect(readonlyResult.config.browser_automation_engine).toEqual(
+        runtimeConfig.browser_automation_engine,
+      )
+      expect(readonlyResult.config.browser_automation_engine?.playwright_mcp_args).toEqual([
+        "--headless",
+      ])
     })
   })
 

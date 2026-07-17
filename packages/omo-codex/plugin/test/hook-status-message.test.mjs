@@ -128,7 +128,7 @@ function collectCommandHooks(hooks, source, version) {
 	return commandHooks;
 }
 
-test("#given hook status label #when formatting #then prefixes OmO display namespace", async () => {
+test("#given hook status label #when formatting #then prefixes OmO display namespace and version", async () => {
 	// given
 	const version = (await readRepoJson("package.json")).version;
 	const label = "Checking Comments";
@@ -137,10 +137,10 @@ test("#given hook status label #when formatting #then prefixes OmO display names
 	const message = formatLazyCodexHookStatusMessage(version, label);
 
 	// then
-	assert.equal(message, "(OmO) Checking Comments");
+	assert.equal(message, `(OmO ${version}) Checking Comments`);
 });
 
-test("#given hook status label with blank version #when formatting #then still prefixes OmO display namespace", () => {
+test("#given hook status label with blank version #when formatting #then uses local OmO display version", () => {
 	// given
 	const version = "  ";
 	const label = "Checking Comments";
@@ -149,7 +149,7 @@ test("#given hook status label with blank version #when formatting #then still p
 	const message = formatLazyCodexHookStatusMessage(version, label);
 
 	// then
-	assert.equal(message, "(OmO) Checking Comments");
+	assert.equal(message, "(OmO local) Checking Comments");
 });
 
 test("#given loose legacy status label #when normalizing #then removes OMO wording and title-cases label", async () => {
@@ -163,7 +163,7 @@ test("#given loose legacy status label #when normalizing #then removes OMO wordi
 
 	// then
 	assert.equal(normalized, "Checking Comments");
-	assert.equal(message, "(OmO) Checking Comments");
+	assert.equal(message, `(OmO ${version}) Checking Comments`);
 });
 
 test("#given LazyCodex appears inside hook label #when normalizing #then product casing is preserved", async () => {
@@ -177,7 +177,7 @@ test("#given LazyCodex appears inside hook label #when normalizing #then product
 
 	// then
 	assert.equal(normalized, "Verifying LazyCodex Executor Evidence");
-	assert.equal(message, "(OmO) Verifying LazyCodex Executor Evidence");
+	assert.equal(message, `(OmO ${version}) Verifying LazyCodex Executor Evidence`);
 });
 
 test("#given MCP appears inside hook label #when normalizing #then protocol casing is preserved", () => {
@@ -190,7 +190,20 @@ test("#given MCP appears inside hook label #when normalizing #then protocol casi
 
 	// then
 	assert.equal(normalized, "Recommending Git Bash MCP");
-	assert.equal(message, "(OmO) Recommending Git Bash MCP");
+	assert.equal(message, "(OmO 4.10.0) Recommending Git Bash MCP");
+});
+
+test("#given versioned OmO status label #when normalizing #then it does not duplicate display prefix", () => {
+	// given
+	const label = "(OmO 4.16.0) checking comments";
+
+	// when
+	const parsed = parseLazyCodexHookStatusMessage(label);
+	const message = formatLazyCodexHookStatusMessage("4.16.1", label);
+
+	// then
+	assert.deepEqual(parsed, { version: "4.16.0", label: "checking comments" });
+	assert.equal(message, "(OmO 4.16.1) Checking Comments");
 });
 test("#given aggregate comment-checker hook #when status is inspected #then it uses OmO comments label", async () => {
 	// given
@@ -201,7 +214,7 @@ test("#given aggregate comment-checker hook #when status is inspected #then it u
 	const commentCheckerHook = hooks.find((hook) => hook.command.includes("components/comment-checker/dist/cli.js"));
 
 	// then
-	assert.equal(commentCheckerHook?.statusMessage, formatLazyCodexHookStatusMessage("", "Checking Comments"));
+	assert.equal(commentCheckerHook?.statusMessage, formatLazyCodexHookStatusMessage(commentCheckerHook?.version ?? "", "Checking Comments"));
 	assert.doesNotMatch(JSON.stringify(aggregateManifests), /checking\s+OMO\s+comments/i);
 });
 
@@ -231,6 +244,6 @@ test("#given aggregate and component hooks #when status messages are inspected #
 	const actualLabels = new Set(commandHooks.map((hook) => parseLazyCodexHookStatusMessage(hook.statusMessage)?.label));
 	assert.deepEqual([...expectedLabels.values()].filter((label) => !actualLabels.has(label)), []);
 	for (const hook of commandHooks) {
-		assert.match(hook.statusMessage, /^\(OmO\) /);
+		assert.match(hook.statusMessage, /^\(OmO [^)]+\) /);
 	}
 });

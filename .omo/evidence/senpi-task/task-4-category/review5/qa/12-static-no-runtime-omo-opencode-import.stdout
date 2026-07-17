@@ -1,4 +1,0 @@
-Surface: static import-only source guard for forbidden omo-opencode runtime imports
-Invocation: rg -n "^(import|export).*omo-opencode" packages/senpi-task/scripts/manual-category-qa.ts packages/senpi-task/src/category packages/senpi-task/src/index.ts
-
-PASS: no forbidden runtime import/export matched. Comment provenance references are excluded from this import-only guard.

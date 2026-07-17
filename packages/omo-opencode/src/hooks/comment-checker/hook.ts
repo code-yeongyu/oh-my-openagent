@@ -33,7 +33,23 @@ function debugLog(...args: unknown[]) {
   }
 }
 
-export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
+export function createCommentCheckerHooks(
+  config?: CommentCheckerConfig,
+  cliRunner?: {
+    initializeCommentCheckerCli: typeof initializeCommentCheckerCli
+    getCommentCheckerCliPathPromise: typeof getCommentCheckerCliPathPromise
+    isCliPathUsable: typeof isCliPathUsable
+    processWithCli: typeof processWithCli
+    processApplyPatchEditsWithCli: typeof processApplyPatchEditsWithCli
+  },
+) {
+  const runner = cliRunner ?? {
+    initializeCommentCheckerCli,
+    getCommentCheckerCliPathPromise,
+    isCliPathUsable,
+    processWithCli,
+    processApplyPatchEditsWithCli,
+  }
   debugLog("createCommentCheckerHooks called", { config })
 
   return {
@@ -43,7 +59,7 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
     ): Promise<void> => {
       ensureCommentCheckerInitialization(() => {
         startPendingCallCleanup()
-        initializeCommentCheckerCli(debugLog)
+        runner.initializeCommentCheckerCli(debugLog)
       })
 
       debugLog("tool.execute.before:", {
@@ -120,14 +136,14 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
         }
 
         try {
-          const cliPath = await getCommentCheckerCliPathPromise()
-          if (!isCliPathUsable(cliPath)) {
+          const cliPath = await runner.getCommentCheckerCliPathPromise()
+          if (!runner.isCliPathUsable(cliPath)) {
             debugLog("CLI not available, skipping comment check")
             return
           }
 
           debugLog("using CLI for apply_patch:", cliPath)
-          await processApplyPatchEditsWithCli(
+          await runner.processApplyPatchEditsWithCli(
             input.sessionID,
             edits,
             output,
@@ -150,14 +166,14 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
       debugLog("processing pendingCall:", pendingCall)
 
       try {
-        const cliPath = await getCommentCheckerCliPathPromise()
-        if (!isCliPathUsable(cliPath)) {
+        const cliPath = await runner.getCommentCheckerCliPathPromise()
+        if (!runner.isCliPathUsable(cliPath)) {
           debugLog("CLI not available, skipping comment check")
           return
         }
 
         debugLog("using CLI:", cliPath)
-        await processWithCli(input, pendingCall, output, cliPath, config?.custom_prompt, debugLog)
+        await runner.processWithCli(input, pendingCall, output, cliPath, config?.custom_prompt, debugLog)
       } catch (err) {
         debugLog("tool.execute.after failed:", err)
       }

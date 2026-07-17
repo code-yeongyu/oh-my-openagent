@@ -71,16 +71,30 @@ export function clearPromptReservationsForTesting(): void {
   promptAsyncReservations.clear()
 }
 
+export const TRANSIENT_RETRY_RESERVATION_OWNER = "model-suggestion-retry"
+
+export function isTransientRetryReservationOwner(reservationSource: string): boolean {
+  return (
+    reservationSource === TRANSIENT_RETRY_RESERVATION_OWNER ||
+    reservationSource.startsWith(`${TRANSIENT_RETRY_RESERVATION_OWNER}:`)
+  )
+}
+
 export function reservationSourceMatches(
   reservationSource: string,
   expectedSource: string | readonly string[],
   expectedPrefix?: PromptAsyncReservationReleaseOptions["reservedByPrefix"],
+  supersedeTransientRetryOwners?: boolean,
 ): boolean {
   if (typeof expectedSource === "string") {
     if (reservationSource === expectedSource) {
       return true
     }
   } else if (expectedSource.includes(reservationSource)) {
+    return true
+  }
+
+  if (supersedeTransientRetryOwners && isTransientRetryReservationOwner(reservationSource)) {
     return true
   }
 

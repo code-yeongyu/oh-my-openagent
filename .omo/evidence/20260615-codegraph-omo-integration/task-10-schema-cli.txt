@@ -1,7 +1,0 @@
-{
-  "optOut": {
-    "auto_provision": true,
-    "enabled": false
-  },
-  "malformed": "REJECTED"
-}
