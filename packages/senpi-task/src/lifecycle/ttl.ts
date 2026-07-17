@@ -3,10 +3,10 @@ import { TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import type { CleanupResult } from "./types"
 
 /**
- * On component start, delete terminal records + logs older than task.ttl_ms. Non-terminal records
- * are always kept. A `lost` rpc record is NEVER deleted without pid-dead proof (its breadcrumbs may
- * still be needed). Because this runs at start, fresh in-run records are far younger than the TTL,
- * so evidence-referenced logs of the current run are never touched.
+ * Delete terminal records + logs older than task.ttl_ms. Non-terminal records are always kept. A
+ * `lost` process record is NEVER deleted without pid-dead proof (its breadcrumbs may still be
+ * needed). Records with a live resident handle in this process are also retained: deleting them
+ * would orphan an in-memory handle and allow late transcript appends to recreate the deleted log.
  */
 export function cleanupExpiredRecords(context: LifecycleContext): CleanupResult {
   const deleted: string[] = []
@@ -25,6 +25,7 @@ export function cleanupExpiredRecords(context: LifecycleContext): CleanupResult 
 }
 
 function isExpungeable(context: LifecycleContext, record: TaskRecord, cutoff: number): boolean {
+  if (context.registry.get(record.task_id) !== undefined) return false
   if (!TERMINAL_STATUSES.has(record.status)) return false
   if (Date.parse(record.updated_at) > cutoff) return false
   if (record.status === "lost" && record.execution_mode === "process") {
