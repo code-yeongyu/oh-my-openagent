@@ -9,6 +9,41 @@ Tracks bugs that are present in the current release but have been intentionally 
 - **Workaround**: When manually asking Oracle to verify completion, explicitly instruct it to end with `<promise>VERIFIED</promise>` only if the work is genuinely complete and correct. If a verification failure follows a clear prose approval, inspect the Oracle transcript before assuming the implementation regressed.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5839.
 
+## #5746 - tmux subagent panes attach only after focus by default
+
+- **Affects**: `tmux.enabled` sessions that expect every subagent pane to show a live attached session immediately.
+- **Symptom**: New panes can show only the placeholder text `Focus this pane to attach` until the user focuses each pane. With high background concurrency, the tmux layout can look blank or inactive even though subagents are running.
+- **Workaround**: Focus a pane to activate its `opencode attach` session, or inspect subagent status through normal task/background outputs when live pane rendering is not necessary. Treat the placeholder as current behavior unless an eager-attach option is added.
+- **Status**: Open enhancement. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5746.
+
+## #5806 - `ulw` mode does not persist across follow-up messages
+
+- **Affects**: Multi-turn Sisyphus sessions that rely on `ulw` or `ultrawork` keyword injection.
+- **Symptom**: The keyword detector is edge-triggered per message. A first prompt that includes `ulw` gets the ultrawork prompt, but a follow-up that omits the keyword can fall back to default Sisyphus behavior and lose the expected delegation pattern.
+- **Workaround**: Repeat `ulw` or `ultrawork` in every follow-up message that should stay in ultrawork mode. For long tasks, prefer starting a fresh prompt that includes the keyword instead of assuming the mode remains active.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5806.
+
+## #5838 - LazyCodex frontend runs can skip the visual QA gate
+
+- **Affects**: Codex Light / LazyCodex sessions where the frontend skill is used for UI work.
+- **Symptom**: The frontend skill prompt requires a visual QA evidence pass, but Codex currently enforces that requirement through prose instructions rather than a hard completion gate. Under long context or inconvenient browser setup, the model can report completion without screenshots or a dual-oracle visual verdict.
+- **Workaround**: Add an explicit instruction such as "verify with visual-qa before claiming done" to frontend prompts, and require screenshot/evidence output before accepting UI work as complete. If no rendered surface is available, ask the agent to state that limitation directly.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5838.
+
+## #5529 - GPT-5.5 reasoning effort can conflict with some OpenAI-compatible chat providers
+
+- **Affects**: Third-party OpenAI-compatible providers that expose `gpt-5.5` through `/v1/chat/completions` but reject tool requests when `reasoning_effort` is present. Native OpenAI supports tools and reasoning effort for GPT-5.5.
+- **Symptom**: Tool requests can fail because OMO agent configs and OpenCode's GPT model transforms may supply reasoning effort based on the model ID, even when the compatible provider's chat-completions implementation does not support that combination.
+- **Workaround**: Use a provider-native route or adapter that supports GPT-5.5 reasoning with tools, or use a model/provider configuration that does not emit the unsupported reasoning setting for tool-heavy agents.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5529.
+
+## #5604 - Required-model delegation can fail before the child stream starts
+
+- **Affects**: OpenCode delegation when provider connectivity is known and none of the connected providers can serve a required-model subagent's fallback chain.
+- **Symptom**: Model resolution can return success without pinning a provider/model. The harness may then create a child session that fails before producing assistant or tool output, which can look like a hidden, stuck, or skipped subagent.
+- **Workaround**: Connect a provider supported by the target agent, or reroute through a category or subagent whose fallback chain has an available provider. If a child produces no assistant/tool output, treat the dispatch as failed and retry through a supported route.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5604.
+
 ## #4184 - Custom provider models without `limit` do not auto-compact
 
 - **Affects**: OpenAI-compatible custom providers whose models are written to `opencode.json` without a `limit` block.

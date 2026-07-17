@@ -36,8 +36,9 @@ function parseLine(line: string): unknown {
   if (trimmed.length === 0) return undefined
   try {
     return JSON.parse(trimmed)
-  } catch {
-    return undefined
+  } catch (error) {
+    if (error instanceof SyntaxError) return undefined
+    throw error
   }
 }
 
@@ -50,6 +51,9 @@ function transcriptEntryOf(entry: unknown): TranscriptEntry | undefined {
   }
   if (entry.type === TRANSCRIPT_TOOL_EVENT && typeof payload.tool === "string") {
     return { kind: "tool", tool: payload.tool, is_error: payload.is_error === true }
+  }
+  if (entry.type === "team_message_waited" && typeof payload.from === "string" && typeof payload.body === "string") {
+    return { kind: "assistant", text: `[team message from ${payload.from}] ${payload.body}` }
   }
   return undefined
 }

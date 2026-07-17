@@ -20,7 +20,7 @@ import type { AvailableSkill, AvailableCategory } from "../../agents/dynamic-age
 describe("prompt-builder", () => {
   describe("buildSystemContent", () => {
     describe("#given non-plan agent with availableSkills", () => {
-      test("#when availableSkills contains project-level skills #then system content includes available_skills section", () => {
+      test("#when availableSkills contains project-level skills #then system content omits skill list section", () => {
         // given
         const availableSkills: AvailableSkill[] = [
           { name: "git-master", description: "Git workflow automation", location: "plugin" },
@@ -38,12 +38,10 @@ describe("prompt-builder", () => {
         })
 
         // then
-        expect(result).toBeDefined()
-        expect(result).toContain("my-project-skill")
-        expect(result).toContain("git-master")
+        expect(result).toBeUndefined()
       })
 
-      test("#when agent is explore #then system content includes available_skills section", () => {
+      test("#when agent is explore #then system content omits skill list section", () => {
         // given
         const availableSkills: AvailableSkill[] = [
           { name: "review-work", description: "Review code quality", location: "project" },
@@ -56,8 +54,7 @@ describe("prompt-builder", () => {
         })
 
         // then
-        expect(result).toBeDefined()
-        expect(result).toContain("review-work")
+        expect(result).toBeUndefined()
       })
 
       test("#when availableSkills is empty #then system content does not include available_skills section", () => {
@@ -102,7 +99,7 @@ describe("prompt-builder", () => {
     })
 
     describe("#given non-plan agent with agentsContext override", () => {
-      test("#when agentsContext is provided #then it takes precedence and skills section is appended", () => {
+      test("#when agentsContext is provided #then it is preserved without appending skills section", () => {
         // given
         const availableSkills: AvailableSkill[] = [
           { name: "deploy-skill", description: "Deployment automation", location: "project" },
@@ -118,14 +115,14 @@ describe("prompt-builder", () => {
         // then
         expect(result).toBeDefined()
         expect(result).toContain("Custom agent context here")
-        expect(result).toContain("deploy-skill")
+        expect(result).not.toContain("deploy-skill")
       })
     })
   })
 })
 
 describe("buildSystemContent — nativeSkillInfos merging", () => {
-  test("#given a nativeSkill name not in availableSkills #when block is built #then native name appears", () => {
+  test("#given plan agent and a nativeSkill name not in availableSkills #when block is built #then native name appears", () => {
     // given
     const availableSkills: AvailableSkill[] = [
       { name: "omo-skill", description: "From OMO disk", location: "project" },
@@ -136,19 +133,20 @@ describe("buildSystemContent — nativeSkillInfos merging", () => {
 
     // when
     const result = buildSystemContent({
-      agentName: "explore",
+      agentName: "plan",
       availableSkills,
       nativeSkillInfos,
     })
 
     // then
     expect(result).toBeDefined()
+    expect(result).toContain("AVAILABLE SKILLS")
     expect(result).toContain("omo-skill")
     expect(result).toContain("test-driven-development")
     expect(result).toContain("TDD discipline")
   })
 
-  test("#given a name in BOTH availableSkills AND nativeSkillInfos #when block is built #then OMO description wins", () => {
+  test("#given plan agent and a name in BOTH availableSkills AND nativeSkillInfos #when block is built #then OMO description wins", () => {
     // given
     const availableSkills: AvailableSkill[] = [
       { name: "shared", description: "omo-version-of-shared", location: "project" },
@@ -159,7 +157,7 @@ describe("buildSystemContent — nativeSkillInfos merging", () => {
 
     // when
     const result = buildSystemContent({
-      agentName: "explore",
+      agentName: "plan",
       availableSkills,
       nativeSkillInfos,
     })
@@ -170,7 +168,25 @@ describe("buildSystemContent — nativeSkillInfos merging", () => {
     expect(result).not.toContain("native-version-of-shared")
   })
 
-  test("#given empty availableSkills and a nativeSkillInfo #when block is built #then native skill renders", () => {
+  test("#given plan agent with empty availableSkills and a nativeSkillInfo #when block is built #then native skill renders", () => {
+    // given
+    const nativeSkillInfos = [
+      { name: "brainstorming", description: "Use before any creative work", location: "/fake/SKILL.md" },
+    ]
+
+    // when
+    const result = buildSystemContent({
+      agentName: "plan",
+      availableSkills: [],
+      nativeSkillInfos,
+    })
+
+    // then
+    expect(result).toBeDefined()
+    expect(result).toContain("brainstorming")
+  })
+
+  test("#given non-plan agent and a nativeSkillInfo #when block is built #then native skill is omitted", () => {
     // given
     const nativeSkillInfos = [
       { name: "brainstorming", description: "Use before any creative work", location: "/fake/SKILL.md" },
@@ -184,7 +200,6 @@ describe("buildSystemContent — nativeSkillInfos merging", () => {
     })
 
     // then
-    expect(result).toBeDefined()
-    expect(result).toContain("brainstorming")
+    expect(result).toBeUndefined()
   })
 })

@@ -1,6 +1,0 @@
-scenario: 09-no-omo-opencode-runtime-import
-surface: Static guard: no runtime omo-opencode imports in senpi-task scoped files
-invocation: ! rg -n "(from|require\\() ['\"]([^'\"]*omo-opencode|[^'\"]*packages/omo-opencode)|omo-opencode/src|packages/omo-opencode" packages/senpi-task/src/category packages/senpi-task/scripts/manual-category-qa.ts packages/senpi-task/src/index.ts
-started_at: 2026-07-06T11:02:24Z
-finished_at: 2026-07-06T11:02:24Z
-exit: 1

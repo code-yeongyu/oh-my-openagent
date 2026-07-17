@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { access, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { pathToFileURL } from "node:url";
 import { fileURLToPath } from "node:url";
 
+import { isCliEntry } from "./entry-guard.mjs";
 import { formatLazyCodexHookStatusMessage, normalizeLazyCodexHookStatusLabel } from "./hook-status-message.mjs";
 
 const defaultRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -102,6 +102,6 @@ export async function syncHookStatusMessages(root = defaultRoot, options = {}) {
 	}
 }
 
-if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isCliEntry(import.meta.url)) {
 	await syncHookStatusMessages();
 }

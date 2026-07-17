@@ -1,13 +1,12 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { dirname, join, resolve } from "node:path"
 import { runSenpiInstaller, runSenpiUninstaller } from "./install-senpi"
 
 const repoRoot = resolve(import.meta.dir, "../../../..")
-const pluginPath = join(repoRoot, "packages", "omo-senpi", "plugin")
 const tempDirs: string[] = []
 
 async function makeAgentDir(): Promise<string> {
@@ -24,6 +23,52 @@ async function backupFiles(agentDir: string): Promise<readonly string[]> {
   return (await readdir(agentDir)).filter((entry) => entry.startsWith("settings.json.") && entry.endsWith(".backup"))
 }
 
+async function makePluginFixture(options: { readonly runtime?: boolean } = { runtime: true }): Promise<string> {
+  const pluginPath = await mkdtemp(join(tmpdir(), "omo-senpi-plugin-fixture-"))
+  tempDirs.push(pluginPath)
+  await writeFixtureFile(join(pluginPath, "package.json"), JSON.stringify({ name: "@code-yeongyu/omo-senpi" }))
+  await writeFixtureFile(join(pluginPath, "extensions", "omo.js"), "export default {}\n")
+  const requiredSkillNames = [
+    "ast-grep",
+    "coding-agent-sessions",
+    "debugging",
+    "frontend",
+    "git-master",
+    "init-deep",
+    "lsp-setup",
+    "programming",
+    "refactor",
+    "remove-ai-slops",
+    "review-work",
+    "start-work",
+    "ultimate-browsing",
+    "ultrawork",
+    "ulw-loop",
+    "ulw-plan",
+    "ulw-research",
+    "visual-qa",
+  ]
+  for (const skillName of requiredSkillNames) {
+    await writeFixtureFile(join(pluginPath, "skills", skillName, "SKILL.md"), `# ${skillName}\n`)
+  }
+  await writeFixtureFile(join(pluginPath, "scripts", "install.mjs"), "#!/usr/bin/env node\n")
+  if (options.runtime !== false) {
+    await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "cli.js"), "console.log('cli')\n")
+    await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "index.js"), "export {}\n")
+    await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "index.d.ts"), "export {}\n")
+    await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "daemon-client.js"), "export {}\n")
+    await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "daemon-client.d.ts"), "export {}\n")
+    await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", "package.json"), JSON.stringify({ version: "0.1.0" }))
+    await writeFixtureFile(join(pluginPath, "runtime", "lsp-daemon", "dist", ".omo-runtime-manifest.json"), "{}\n")
+  }
+  return pluginPath
+}
+
+async function writeFixtureFile(path: string, content: string): Promise<void> {
+  await mkdir(dirname(path), { recursive: true })
+  await writeFile(path, content, "utf8")
+}
+
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
 })
@@ -32,11 +77,12 @@ describe("runSenpiInstaller", () => {
   test("#given temp SENPI_CODING_AGENT_DIR #when installing twice #then it writes one absolute plugin package entry and creates backups", async () => {
     // given
     const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture()
     const env = { SENPI_CODING_AGENT_DIR: agentDir }
 
     // when
-    const first = await runSenpiInstaller({ env, repoRoot })
-    const second = await runSenpiInstaller({ env, repoRoot })
+    const first = await runSenpiInstaller({ env, repoRoot, pluginPath })
+    const second = await runSenpiInstaller({ env, repoRoot, pluginPath })
 
     // then
     const settings = await readSettings(agentDir)
@@ -49,6 +95,7 @@ describe("runSenpiInstaller", () => {
   test("#given existing user settings #when installing #then unrelated values are preserved and package entries are deduped", async () => {
     // given
     const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture()
     await writeFile(
       join(agentDir, "settings.json"),
       JSON.stringify({
@@ -59,7 +106,7 @@ describe("runSenpiInstaller", () => {
     )
 
     // when
-    await runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot })
+    await runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
 
     // then
     const settings = await readSettings(agentDir)
@@ -68,12 +115,29 @@ describe("runSenpiInstaller", () => {
     expect(settings.packages).toEqual(["keep-me", pluginPath])
     expect(await backupFiles(agentDir)).toHaveLength(1)
   })
+
+  test("#given packed plugin missing runtime #when installing #then settings stay unchanged and no backup is written", async () => {
+    // given
+    const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture({ runtime: false })
+    await mkdir(agentDir, { recursive: true })
+    await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me"] }), "utf8")
+
+    // when
+    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+
+    // then
+    await expect(install).rejects.toThrow("missing required runtime artifacts")
+    expect(await readSettings(agentDir)).toEqual({ packages: ["keep-me"] })
+    expect(await backupFiles(agentDir)).toHaveLength(0)
+  })
 })
 
 describe("runSenpiUninstaller", () => {
   test("#given mixed package settings #when uninstalling #then only the omo-senpi plugin path is removed", async () => {
     // given
     const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture()
     await writeFile(
       join(agentDir, "settings.json"),
       JSON.stringify({
@@ -83,7 +147,7 @@ describe("runSenpiUninstaller", () => {
     )
 
     // when
-    const result = await runSenpiUninstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot })
+    const result = await runSenpiUninstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
 
     // then
     const settings = await readSettings(agentDir)

@@ -43,17 +43,48 @@ export async function* readStdioJsonRpcMessages(input: Readable): AsyncGenerator
   }
 }
 
-export function writeStdioJsonRpcResponse(
+export async function writeStdioJsonRpcResponse(
   output: Writable,
   response: unknown,
   responseMode: StdioJsonRpcResponseMode,
-): void {
+): Promise<void> {
   const body = JSON.stringify(response)
-  if (responseMode === "framed") {
-    output.write(`Content-Length: ${Buffer.byteLength(body, "utf8")}\r\n\r\n${body}`)
-    return
-  }
-  output.write(`${body}\n`)
+  const payload =
+    responseMode === "framed"
+      ? `Content-Length: ${Buffer.byteLength(body, "utf8")}\r\n\r\n${body}`
+      : `${body}\n`
+  await writeChunk(output, payload)
+}
+
+function writeChunk(output: Writable, chunk: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const onError = (error: Error): void => {
+      if (settled) return
+      settled = true
+      reject(error)
+    }
+    output.once("error", onError)
+
+    try {
+      output.write(chunk, (error?: Error | null) => {
+        if (settled) return
+        settled = true
+        if (error) {
+          queueMicrotask(() => output.removeListener("error", onError))
+          reject(error)
+          return
+        }
+        output.removeListener("error", onError)
+        resolve()
+      })
+    } catch (error) {
+      output.removeListener("error", onError)
+      if (settled) return
+      settled = true
+      reject(error)
+    }
+  })
 }
 
 function readNextMessage(buffer: Buffer<ArrayBufferLike>): ReadResult {

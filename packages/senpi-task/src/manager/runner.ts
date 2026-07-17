@@ -45,6 +45,11 @@ export function createRpcManagedRunner(runner: RpcRunnerLike): ManagedRunner {
         cwd: spec.cwd,
         state_dir: spec.stateDir,
         prompt: spec.prompt,
+        // A detached rpc child cannot share the parent's in-memory model registry; thread the resolved
+        // provider/modelId so the child resolves the requested model on its own command line.
+        ...(spec.model !== undefined ? { model: spec.model } : {}),
+        ...(spec.extensions !== undefined ? { extensions: spec.extensions } : {}),
+        ...(spec.memberEnv !== undefined ? { memberEnv: spec.memberEnv } : {}),
       }
       return Promise.resolve(adaptRpcHandle(runner.start(rpcSpec)))
     },

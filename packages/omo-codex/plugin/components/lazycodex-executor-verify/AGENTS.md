@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Codex `SubagentStop` hook component: the evidence gate for the `lazycodex-executor` subagent (ultrawork implementation executor). When the executor stops without a valid evidence receipt, the hook emits `{"decision": "block", "reason": <directive>}` and Codex sends it back to work. Matcher is `^lazycodex-executor$` only; `lazycodex-qa-executor` and `lazycodex-gate-reviewer` (same `ultrawork/agents/` family) are NOT gated by this hook.
+Codex `SubagentStop` hook component: the evidence gate for the ultrawork implementation workers (`lazycodex-worker-low|medium|high`). When a worker stops without a valid evidence receipt, the hook emits `{"decision": "block", "reason": <directive>}` and Codex sends it back to work. Matcher is `^lazycodex-worker-(low|medium|high)$`; read-only roles like `lazycodex-qa-executor` and `lazycodex-gate-reviewer` (same `ultrawork/agents/` family) are NOT gated by this hook. (The historical `lazycodex-executor` agent was removed; this component keeps its name.)
 
 Valid receipt: `last_assistant_message` contains `EVIDENCE_RECORDED: <path>` where `<path>` resolves to a non-empty regular file strictly inside `<cwd>/.omo/evidence/`. Symlinks and directories rejected; containment checked on realpaths (file inside evidence root inside cwd, traversal-safe). A valid receipt clears attempt state and exits silently.
 
@@ -30,7 +30,7 @@ Escape hatches: after 3 blocked attempts (`MAX_ATTEMPTS`) the stop passes and st
 | Change the block message | `directive.md`; keep both `{{...}}` placeholders and the literal `EVIDENCE_RECORDED: <path>` final-line contract |
 | Change receipt validation | `src/codex-hook.ts` (`hasValidEvidenceReceipt`, `extractEvidencePath`, `isNonEmptyFileInsideEvidenceRoot`) |
 | Change the retry budget | `src/state.ts` `MAX_ATTEMPTS` |
-| Executor-side contract | `../ultrawork/agents/lazycodex-executor.toml` instructs the final `EVIDENCE_RECORDED: <path>` line this hook parses |
+| Worker-side contract | `../ultrawork/agents/lazycodex-worker-{low,medium,high}.toml` instruct the final `EVIDENCE_RECORDED: <path>` line this hook parses |
 | Plugin-level wiring | `../../hooks/subagent-stop-verifying-lazycodex-executor-evidence.json` (adds `commandWindows` via `../bootstrap/scripts/node-dispatch.ps1`) |
 | Wiring + contract tests | `../../test/aggregate-hooks.test.mjs`, `../../test/component-hook-contract-cases.mjs`, `../../test/hook-status-message.test.mjs`, `../../test/component-bundled-cli.test.mjs` |
 

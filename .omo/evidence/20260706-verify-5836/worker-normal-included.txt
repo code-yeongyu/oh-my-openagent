@@ -1,6 +1,0 @@
-$ /opt/homebrew/Cellar/node/26.4.0/bin/node /Users/yeongyu/local-workspaces/omo/.local-ignore/pr-worktrees/verify-5836/packages/omo-codex/plugin/components/codegraph/dist/cli.js hook session-start-worker
-EXIT_CODE=0
-
-STDOUT:
-
-STDERR:

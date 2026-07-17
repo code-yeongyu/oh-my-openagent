@@ -1,2 +1,0 @@
-
-EXIT_STATUS=0

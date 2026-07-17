@@ -114,15 +114,12 @@ describe("InProcessRunner", () => {
   })
 
   test("#given a running child #when steered while the prompt is in flight #then the fake session receives it", async () => {
-    // given
     const fake = createFakeSession()
     const runner = new InProcessRunner({ createSession: async () => fake.session })
     const handle = await runner.start(baseSpec())
 
-    // when
     await handle.steer("adjust course")
 
-    // then
     expect(fake.promptCalls).toBe(1)
     expect(fake.steerCalls).toEqual(["adjust course"])
 
@@ -133,39 +130,49 @@ describe("InProcessRunner", () => {
   })
 
   test("#given a running child #when aborted mid-run #then outcome is cancelled and the session was aborted", async () => {
-    // given
     const fake = createFakeSession()
     const runner = new InProcessRunner({ createSession: async () => fake.session })
     const handle = await runner.start(baseSpec())
 
-    // when
     await handle.abort()
     fake.resolvePrompt()
     const outcome = await handle.waitForIdle()
 
-    // then
     expect(fake.abortCalls).toBe(1)
     expect(outcome).toEqual({ status: "cancelled" })
   })
 
+  test("#given an aborted child #when a follow-up revives it #then the revived turn completes with new final text", async () => {
+    const fake = createFakeSession()
+    const runner = new InProcessRunner({ createSession: async () => fake.session })
+    const handle = await runner.start(baseSpec())
+    await handle.abort()
+    fake.resolvePrompt()
+    await handle.waitForIdle()
+
+    await handle.followUp("revive with new work")
+    fake.lastText.value = "revived final"
+    fake.resolvePrompt()
+    const outcome = await handle.waitForIdle()
+
+    expect(fake.promptCalls).toBe(2)
+    expect(outcome).toEqual({ status: "completed", finalResponse: "revived final" })
+  })
+
   test("#given a completing child #when idle #then the last assistant text is extracted", async () => {
-    // given
     const fake = createFakeSession()
     fake.lastText.value = "final answer"
     const runner = new InProcessRunner({ createSession: async () => fake.session })
     const handle = await runner.start(baseSpec())
 
-    // when
     fake.resolvePrompt()
     const outcome = await handle.waitForIdle()
 
-    // then
     expect(outcome).toEqual({ status: "completed", finalResponse: "final answer" })
     expect(handle.lastAssistantText()).toBe("final answer")
   })
 
   test("#given shared and member-scoped tools #when a child is started #then only member-scoped tools cross the family exclusion", async () => {
-    // given
     let captured: CreateAgentSessionOptions | undefined
     const fake = createFakeSession()
     const runner = new InProcessRunner({
@@ -177,21 +184,18 @@ describe("InProcessRunner", () => {
       },
     })
 
-    // when
-    const handle = await runner.start(baseSpec({ memberScopedTools: [makeTool("team_send_message")] }))
+    const handle = await runner.start(baseSpec({ memberScopedTools: [makeTool("task_send")] }))
     fake.resolvePrompt()
     await handle.waitForIdle()
 
-    // then
     const names = (captured?.customTools ?? []).map((tool) => tool.name)
-    expect(names).toEqual(["grep", "team_send_message"])
+    expect(names).toEqual(["grep", "task_send"])
     for (const tool of captured?.customTools ?? []) {
       expect(typeof tool.execute).toBe("function")
     }
   })
 
   test("#given a started child #when the session is constructed #then an in-memory session manager is used", async () => {
-    // given
     let captured: CreateAgentSessionOptions | undefined
     const fake = createFakeSession()
     const runner = new InProcessRunner({
@@ -201,27 +205,22 @@ describe("InProcessRunner", () => {
       },
     })
 
-    // when
     const handle = await runner.start(baseSpec())
     fake.resolvePrompt()
     await handle.waitForIdle()
 
-    // then
     expect(captured?.sessionManager?.isPersisted()).toBe(false)
     expect(captured?.resourceLoader?.getExtensions().extensions).toHaveLength(0)
   })
 
   test("#given a completed child #when the runner finishes #then it never disposes and dispose stays idempotent", async () => {
-    // given
     const fake = createFakeSession()
     const runner = new InProcessRunner({ createSession: async () => fake.session })
     const handle = await runner.start(baseSpec())
 
-    // when
     fake.resolvePrompt()
     await handle.waitForIdle()
 
-    // then
     expect(fake.disposeCount).toBe(0)
     handle.dispose()
     handle.dispose()
@@ -229,7 +228,6 @@ describe("InProcessRunner", () => {
   })
 
   test("#given a depth over policy #when start is called #then it refuses to construct the session", async () => {
-    // given
     let createCalls = 0
     const runner = new InProcessRunner({
       depthPolicy: { maxDepth: 2 },
@@ -239,10 +237,8 @@ describe("InProcessRunner", () => {
       },
     })
 
-    // when
     const start = runner.start(baseSpec({ depth: 3 }))
 
-    // then
     await expect(start).rejects.toBeInstanceOf(RunnerError)
     expect(createCalls).toBe(0)
     try {
@@ -253,7 +249,6 @@ describe("InProcessRunner", () => {
   })
 
   test("#given a session that fails to construct #when start is called #then a typed session-create failure is thrown with cause", async () => {
-    // given
     const cause = new Error("boot failed")
     const runner = new InProcessRunner({
       createSession: async () => {
@@ -261,26 +256,22 @@ describe("InProcessRunner", () => {
       },
     })
 
-    // when / then
     await expect(runner.start(baseSpec())).rejects.toMatchObject({
       failure: { kind: "session-create-failed", cause },
     })
   })
 
   test("#given a prompt that throws #when the child runs #then a typed failure is recorded, the child stays resident, and no rejection escapes", async () => {
-    // given
     process.on("unhandledRejection", onUnhandled)
     const cause = new Error("prompt boom")
     const fake = createFakeSession()
     const runner = new InProcessRunner({ createSession: async () => fake.session })
     const handle = await runner.start(baseSpec())
 
-    // when
     fake.rejectPrompt(cause)
     const outcome = await handle.waitForIdle()
     await new Promise((resolve) => setTimeout(resolve, 10))
 
-    // then
     expect(outcome).toEqual({
       status: "error",
       failure: { kind: "child-prompt-failed", message: "prompt boom", cause },
@@ -290,20 +281,17 @@ describe("InProcessRunner", () => {
   })
 
   test("#given a subscribed listener #when the child emits lifecycle events #then it observes agent_start before agent_end", async () => {
-    // given
     const fake = createFakeSession()
     const runner = new InProcessRunner({ createSession: async () => fake.session })
     const handle = await runner.start(baseSpec())
     const seen: string[] = []
     handle.subscribe((event) => seen.push(event.type))
 
-    // when
     fake.emit({ type: "agent_start" })
     fake.emit({ type: "agent_end" })
     fake.resolvePrompt()
     await handle.waitForIdle()
 
-    // then
     expect(seen).toEqual(["agent_start", "agent_end"])
   })
 })

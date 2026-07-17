@@ -1,7 +1,0 @@
-.omo/evidence/20260704-fix-5786/isolated-doctor-final/artifacts.txt
-.omo/evidence/20260704-fix-5786/isolated-doctor-final/assertion.txt
-.omo/evidence/20260704-fix-5786/isolated-doctor-final/doctor-exit.txt
-.omo/evidence/20260704-fix-5786/isolated-doctor-final/doctor.json
-.omo/evidence/20260704-fix-5786/isolated-doctor-final/doctor.stderr
-.omo/evidence/20260704-fix-5786/isolated-doctor-final/missing-warning-grep.txt
-.omo/evidence/20260704-fix-5786/isolated-doctor-final/tui-plugin-result.json

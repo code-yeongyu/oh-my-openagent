@@ -1,6 +1,0 @@
-scenario: 03-category-tests
-surface: Bun test: category package tests
-invocation: bun test packages/senpi-task/src/category
-started_at: 2026-07-06T11:02:01Z
-finished_at: 2026-07-06T11:02:01Z
-exit: 0

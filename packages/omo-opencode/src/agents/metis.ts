@@ -93,7 +93,6 @@ call_omo_agent(subagent_type="librarian", prompt="I'm implementing [technology] 
 **Questions to Ask** (AFTER exploration):
 1. Found pattern X in codebase. Should new code follow this, or deviate? Why?
 2. What should explicitly NOT be built? (scope boundaries)
-3. What's the minimum viable version vs full vision?
 
 **Directives for Prometheus**:
 - MUST: Follow patterns from \`[discovered file:lines]\`
@@ -180,7 +179,6 @@ Task(
 **Directives for Prometheus**:
 - MUST: Consult Oracle before finalizing plan
 - MUST: Document architectural decisions with rationale
-- MUST: Define "minimum viable architecture"
 - MUST NOT: Introduce complexity without justification
 
 ---
@@ -256,6 +254,8 @@ call_omo_agent(subagent_type="librarian", prompt="I'm looking for proven impleme
 - MUST NOT: Create criteria requiring "user clicks/interacts..."
 - MUST NOT: Use placeholders without concrete examples (bad: "[endpoint]", good: "/api/users")
 - MUST NOT: Write vague QA scenarios ("verify it works", "check the page loads", "test the API returns data")
+- MUST: For a PROSE deliverable (a prompt, \`SKILL.md\`, rule, or markdown/instruction file), make QA a human/agent READ against the intended behavior, or assert only a machine-consumed value (a parsed field, a sentinel a runtime greps, a doc JSON sample through its real validator) — the file's wording has no behavioral seam
+- MUST NOT: Turn a prompt/doc change into a text-grep acceptance criterion (\`grep "<sentence>" SKILL.md\`, word/char counts, phrase presence/absence) — that pins a diff, not behavior, and blocks every legitimate edit
 
 ## Recommended Approach
 [1-2 sentence summary of how to proceed]
@@ -323,13 +323,13 @@ If the type is genuinely ambiguous between two of these, ask before proceeding; 
 
 **Refactoring** — protect behavior. Recommend the tools that make changes safe: \`lsp_find_references\` to map usages, \`lsp_rename\` / \`lsp_prepare_rename\` for safe renames, and the \`ast-grep\` skill or \`sg --pattern '...' --rewrite '...' --lang ts\` to preview structural transforms. Ask what behavior must be preserved and with which test command, what the rollback is, and whether the change propagates or stays isolated. Direct Prometheus to define pre-refactor verification (exact commands and expected outputs), verify after each change rather than only at the end, never change behavior while restructuring, and never touch adjacent out-of-scope code.
 
-**Build from scratch** — discover before asking. Fire explore/librarian first to learn the codebase's patterns and the library's best practices, then ask only what the code could not answer: follow the found pattern or deviate; what must explicitly NOT be built; the minimum viable version versus the full vision. Direct Prometheus to follow the discovered patterns by \`file:lines\`, define a "Must NOT Have" section against over-engineering, and add nothing unrequested.
+**Build from scratch** — discover before asking. Fire explore/librarian first to learn the codebase's patterns and the library's best practices, then ask only what the code could not answer: follow the found pattern or deviate; what must explicitly NOT be built. Direct Prometheus to follow the discovered patterns by \`file:lines\`, define a "Must NOT Have" section against over-engineering, and add nothing unrequested.
 
 **Mid-sized task** — define exact boundaries; this is where AI slop creeps in. Ask for the exact outputs (files, endpoints, UI), the explicit exclusions, the hard boundaries, and the done-criteria. Turn the slop patterns into questions: scope inflation ("tests for adjacent modules too?"), premature abstraction ("abstraction or inline?"), over-validation ("minimal or comprehensive error handling?"), documentation bloat ("how much documentation?"). Direct Prometheus to write Must-Have and Must-NOT-Have sections with per-task guardrails.
 
 **Collaborative** — build understanding through dialogue, no rush. Start from the problem, not the proposed solution; gather context with explore/librarian as the user gives direction; refine incrementally; do not finalize until the user confirms. Ask what problem they are solving, what constraints exist, and what tradeoffs are acceptable. Direct Prometheus to record every decision and flag every assumption.
 
-**Architecture** — strategic and long-term. Recommend Prometheus consult Oracle with the request and the gathered context for options, tradeoffs, and risks. Ask the expected lifespan, the scale and load, the non-negotiable constraints, and the systems it must integrate with. Guard against over-engineering for hypothetical futures and unnecessary abstraction layers; direct Prometheus to document decisions with rationale and define a minimum viable architecture.
+**Architecture** — strategic and long-term. Recommend Prometheus consult Oracle with the request and the gathered context for options, tradeoffs, and risks. Ask the expected lifespan, the scale and load, the non-negotiable constraints, and the systems it must integrate with. Guard against over-engineering for hypothetical futures and unnecessary abstraction layers; direct Prometheus to document decisions with rationale.
 
 **Research** — bound the investigation. Ask the decision the research informs, the exit criteria, the time box, and the expected output. Structure parallel probes via explore/librarian. Direct Prometheus to define clear exit criteria, parallel tracks, and a synthesis format, and never to research without convergence.
 

@@ -63,18 +63,30 @@ export async function runBridgedCodegraphProcess(
 			resolveExit(signal === null ? 0 : 1);
 		});
 	});
-	const bridgeDone = Promise.all([
-		forwardClientToCodegraph(options.input, childInput, pendingResponses, (mode) => {
-			defaultResponseMode = mode;
-		}),
-		forwardCodegraphToClient(childOutput, options.output, pendingResponses, () => defaultResponseMode),
-	]);
+	const clientForwardingDone = forwardClientToCodegraph(options.input, childInput, pendingResponses, (mode) => {
+		defaultResponseMode = mode;
+	});
+	const responseForwardingDone = forwardCodegraphToClient(
+		childOutput,
+		options.output,
+		pendingResponses,
+		() => defaultResponseMode,
+	);
+	const bridgeDone = Promise.all([clientForwardingDone, responseForwardingDone]);
+	const childAndResponsesDone = Promise.all([childExit, responseForwardingDone]).then(([exitCode]) => exitCode);
 	const destroyChildPipes = (): void => {
 		childInput.destroy();
 		childOutput.destroy();
 	};
 	void childExit.then(destroyChildPipes, destroyChildPipes);
-	return Promise.race([childExit, bridgeDone.then(() => childExit)]);
+	try {
+		return await Promise.race([childAndResponsesDone, bridgeDone.then(() => childExit)]);
+	} catch (error) {
+		destroyChildPipes();
+		if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+		await childExit.catch(() => undefined);
+		throw error;
+	}
 }
 
 async function forwardClientToCodegraph(
@@ -110,14 +122,14 @@ async function forwardCodegraphToClient(
 ): Promise<void> {
 	for await (const message of readStdioJsonRpcMessages(childOutput)) {
 		if (message.kind === "parse_error") {
-			writeStdioJsonRpcResponse(output, errorResponse(null, -32700, "Parse error", message.message), defaultResponseMode());
+			await writeStdioJsonRpcResponse(output, errorResponse(null, -32700, "Parse error", message.message), defaultResponseMode());
 			continue;
 		}
 		const key = responseModeKey(message.payload);
 		const pendingResponse = key === null ? undefined : pendingResponses.get(key);
 		const responseMode = pendingResponse?.responseMode ?? defaultResponseMode();
 		if (key !== null) pendingResponses.delete(key);
-		writeStdioJsonRpcResponse(output, clarifyCodegraphResponse(message.payload, pendingResponse), responseMode);
+		await writeStdioJsonRpcResponse(output, clarifyCodegraphResponse(message.payload, pendingResponse), responseMode);
 	}
 }
 
