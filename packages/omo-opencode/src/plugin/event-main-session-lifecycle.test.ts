@@ -2,9 +2,13 @@ import { afterEach, describe, expect, it } from "bun:test"
 import type { Managers } from "../create-managers"
 import {
   _resetForTesting,
+  getSessionAgent,
   getMainSessionID,
   isMainSession,
+  updateSessionAgent,
 } from "../features/claude-code-session-state"
+import { getSessionModel, setSessionModel } from "../shared/session-model-state"
+import { getSessionPromptParams, setSessionPromptParams } from "../shared/session-prompt-params-state"
 import { handleSessionCreatedEvent, handleSessionDeletedEvent } from "./event-session-lifecycle"
 import type { FirstMessageVariantGate, PluginEventContext } from "./event-types"
 
@@ -21,9 +25,11 @@ const managers = {
     onSessionDeleted: async () => {},
   },
 } as Managers
+const sessionDeletionTasks = new Map<string, Promise<void>>()
 
 afterEach(() => {
   _resetForTesting()
+  sessionDeletionTasks.clear()
 })
 
 async function createRoot(sessionID?: string): Promise<void> {
@@ -38,6 +44,7 @@ async function createRoot(sessionID?: string): Promise<void> {
     pluginContext,
     managers,
     firstMessageVariantGate,
+    sessionDeletionTasks,
   })
 }
 
@@ -54,6 +61,7 @@ describe("main session lifecycle", () => {
       managers,
       firstMessageVariantGate,
       clearModelFallbackSession: () => {},
+      sessionDeletionTasks,
     })
 
     expect(getMainSessionID()).toBe("root-a")
@@ -68,5 +76,63 @@ describe("main session lifecycle", () => {
 
     expect(getMainSessionID()).toBe("root-preserved")
     expect(isMainSession("root-preserved")).toBe(true)
+  })
+
+  it("#given deletion pauses during monitor cleanup #when the same ID is recreated #then stale cleanup cannot clear or disconnect replacement state", async () => {
+    const sessionID = "root-reused-during-delete"
+    let releaseMonitor: (() => void) | undefined
+    const monitorBlocked = new Promise<void>((resolve) => { releaseMonitor = resolve })
+    let monitorStartedResolve: (() => void) | undefined
+    const monitorStarted = new Promise<void>((resolve) => { monitorStartedResolve = resolve })
+    let disconnectCalls = 0
+    const lifecycleCalls: string[] = []
+    const raceManagers = {
+      monitorManager: {
+        stopSessionMonitors: async () => { monitorStartedResolve?.(); await monitorBlocked },
+      },
+      skillMcpManager: { disconnectSession: async () => { disconnectCalls += 1; lifecycleCalls.push("disconnect") } },
+      tmuxSessionManager: {
+        onSessionCreated: async () => {
+          lifecycleCalls.push("create")
+          updateSessionAgent(sessionID, "hephaestus")
+          setSessionModel(sessionID, { providerID: "openai", modelID: "new-generation-model" })
+          setSessionPromptParams(sessionID, { temperature: 0.7 })
+        },
+        onSessionDeleted: async () => {},
+      },
+    } as Managers
+
+    await createRoot(sessionID)
+    const deletion = handleSessionDeletedEvent({
+      props: { info: { id: sessionID } },
+      tmuxIntegrationEnabled: false,
+      pluginConfig,
+      pluginContext,
+      managers: raceManagers,
+      firstMessageVariantGate,
+      clearModelFallbackSession: () => {},
+      sessionDeletionTasks,
+    })
+    await monitorStarted
+    const recreation = handleSessionCreatedEvent({
+      event: { type: "session.created", properties: { info: { id: sessionID } } },
+      props: { info: { id: sessionID } },
+      tmuxIntegrationEnabled: true,
+      pluginConfig,
+      pluginContext,
+      managers: raceManagers,
+      firstMessageVariantGate,
+      sessionDeletionTasks,
+    })
+    await Promise.resolve()
+    releaseMonitor?.()
+    await Promise.all([deletion, recreation])
+
+    expect(getMainSessionID()).toBe(sessionID)
+    expect(getSessionAgent(sessionID)).toBe("hephaestus")
+    expect(getSessionModel(sessionID)).toEqual({ providerID: "openai", modelID: "new-generation-model" })
+    expect(getSessionPromptParams(sessionID)).toEqual({ temperature: 0.7 })
+    expect(disconnectCalls).toBe(1)
+    expect(lifecycleCalls).toEqual(["disconnect", "create"])
   })
 })

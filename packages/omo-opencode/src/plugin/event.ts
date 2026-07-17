@@ -50,6 +50,7 @@ export function createEventHandler(args: {
   const recentAnyIdles = new Map<string, number>();
   const dedupWindowMs = 500;
   const teamHandlers = createEventTeamHandlers({ pluginConfig, pluginContext, managers });
+  const sessionDeletionTasks = new Map<string, Promise<void>>();
 
   const shouldAutoRetrySession = (sessionID: string): boolean => {
     if (syncSubagentSessions.has(sessionID)) return true;
@@ -148,6 +149,7 @@ export function createEventHandler(args: {
         pluginContext,
         managers,
         firstMessageVariantGate,
+        sessionDeletionTasks,
       });
     }
 
@@ -160,6 +162,7 @@ export function createEventHandler(args: {
         managers,
         firstMessageVariantGate,
         clearModelFallbackSession: modelFallbackHandler.clearSession,
+        sessionDeletionTasks,
       });
       await runEventHookSafely("teamLeadOrphanHandler", teamHandlers.teamLeadOrphanHandler, input);
       await runEventHookSafely("teamMemberStatusHandler", teamHandlers.teamMemberStatusHandler, input);
