@@ -2,6 +2,7 @@ import type { FallbackEntry } from "../../shared/model-requirements"
 import { readConnectedProvidersCache, readProviderModelsCache } from "../../shared/connected-providers-cache"
 import { selectFallbackProvider } from "../../shared/model-error-classifier"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
+import { isProviderFailed, clearProviderFailure } from "../../shared/provider-failure-state"
 import { log } from "../../shared/logger"
 import type { ModelFallbackState } from "./hook"
 
@@ -56,6 +57,12 @@ export function getNextReachableFallback(
 
     const providerID = selectFallbackProvider(fallback.providers, state.providerID)
     const modelID = transformModelForProvider(providerID, fallback.model)
+
+    if (isProviderFailed(providerID)) {
+      log("[model-fallback] Skipping fallback on failed provider for session: " + sessionID + ", attempt: " + attemptCount + ", provider: " + providerID + ", model: " + fallback.model)
+      continue
+    }
+
     const isNoOpFallback =
       providerID.toLowerCase() === state.providerID.toLowerCase()
       && canonicalizeModelID(modelID) === canonicalizeModelID(state.modelID)

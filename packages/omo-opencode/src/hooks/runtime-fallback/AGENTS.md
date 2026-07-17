@@ -28,14 +28,25 @@ Default retry codes: `429, 500, 502, 503, 504`
 /rate.?limit/i, /too.?many.?requests/i, /quota.*reset.*after/i,
 /exhausted.*capacity/i, /all.*credentials.*for.*model/i,
 /cool(?:ing)?.?down/i, /model.*not.*supported/i,
-/service.?unavailable/i, /overloaded/i, /temporarily.?unavailable/i
+/service.?unavailable/i, /overloaded/i, /temporarily.?unavailable/i,
+/creditserror/i, /insufficient\s+balance/i, /free\s+promotion\s+has\s+ended/i,
+/authentication\s+error/i, /invalid\s+authentication/i
 ```
 
 ### Error Type Classification (error-classifier.ts)
-- `missing_api_key` — provider rejects auth
-- `model_not_found` — model unavailable
-- `quota_exceeded` — billing/quota hit
+- `missing_api_key` — provider rejects auth (checks name, code, and type fields)
+- `model_not_found` — model unavailable (checks name, code, and type fields)
+- `quota_exceeded` — billing/quota hit (checks name, code, and type fields)
+- `empty_output` — model returned no visible content
 - Auto-retry signal detection via `auto-retry-signal.ts` — extracts "retrying in ~2 weeks" style signals, triggers immediate fallback
+
+**Error Field Extraction:**
+The classifier reads error identifiers from multiple fields to support different provider APIs:
+- `name` field — Standard error name (e.g., `InsufficientQuotaError`)
+- `code` field — OpenCode Go style (e.g., `{ error: { code: "insufficient_quota" } }`)
+- `type` field — OpenCode Zen style (e.g., `{ type: "error", error: { type: "CreditsError" } }`)
+
+All three extractors are normalized (lowercased, underscores/dashes stripped) and combined for classification.
 
 ## FALLBACK STATE MACHINE
 
@@ -70,6 +81,14 @@ session.error / message.updated (with error) / session.status (retry signal)
   → 30s timeout — abort and try next if exceeded
 ```
 
+## SYNC DELEGATION HANDOFF
+
+A synchronous `task(..., run_in_background=false)` prompt initially owns the prompt-gate reservation as `model-suggestion-retry:sync`. If `session.status` emits a provider retry signal before that prompt completes, runtime-fallback aborts the request before scheduling the replacement model.
+
+`auto-retry.ts` must release either its own `runtime-fallback:*` reservation or the interrupted `model-suggestion-retry:sync` reservation before dispatching the fallback. Otherwise the replacement prompt is rejected as reserved, and the sync poller can wait indefinitely on a session no longer present in status.
+
+Regression coverage: `auto-retry.test.ts` owns a sync reservation, injects the retry-signal abort path, and verifies that the fallback prompt dispatches.
+
 ## COOLDOWN MECHANISM
 
 Failed models enter 60s cooldown. `findNextAvailableFallback()` skips models in cooldown, preventing thrashing on persistently failing models.
@@ -98,5 +117,5 @@ Failed models enter 60s cooldown. `findNextAvailableFallback()` skips models in 
 ## NOTES
 
 - Cooldown and failure tracking are **per-session** — concurrent sessions don't share state
-- `visible-assistant-response.ts` prevents retry if the assistant already produced a partial valid response
+- `visible-assistant-response.ts` prevents retry if the assistant already produced a partial valid response (including reasoning content)
 - Runtime-fallback is registered in the Session Tier via `create-session-hooks.ts`

@@ -388,3 +388,13 @@ Cross-harness, one-command dev setup. The **single source of truth** is [`script
 - **ParentWakeNotifier:** Background-agent parent-wake state in `packages/omo-opencode/src/features/background-agent/parent-wake-notifier.ts` with dependency-injected client and enqueue callback.
 - **Workspace migration:** Runtime state migrated from `.sisyphus/` → `.omo/`. Legacy `.sisyphus/` still exists during transition; `packages/omo-opencode/src/shared/legacy-workspace-migration.ts` copies it forward on first load.
 - **CI nuance:** PRs targeting `master` are hard-blocked — they MUST target `dev`. CI auto-commits schema changes on master push and creates a draft "next" release on dev push.
+
+## AGENT BEHAVIORAL PATTERNS
+
+### Silent Executor Subagents (e.g., Sisyphus-Junior)
+Subagents like `Sisyphus-Junior` are designed as "silent executors" optimized for speed. Their system instructions explicitly forbid conversational acknowledgments and force them to stop immediately upon task completion (e.g., `<Termination> STOP after first successful verification. Do NOT re-verify.`).
+
+**When delegating to these subagents (from Prometheus, Sisyphus, or others):**
+- **Do not expect a final summary report** unless you explicitly request one in the `EXPECTED OUTPUT` section of your prompt.
+- If the subagent's execution loop ends without a written report, **this is normal behavior**, not a failure.
+- To force a report, append: `- Leave a 1-sentence final report when done.` to the delegation prompt.

@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { createFallbackState, findNextAvailableFallback, stringifyRuntimeModelWithVariant } from "./fallback-state"
+import { createFallbackState, findNextAvailableFallback, stringifyRuntimeModelWithVariant, stripVariant } from "./fallback-state"
 
 describe("runtime-fallback fallback state", () => {
   test("#given object-shaped current model #when finding the next fallback #then equivalent models are skipped without crashing", () => {
@@ -36,5 +36,51 @@ describe("runtime-fallback fallback state", () => {
 
     // then
     expect(runtimeModel).toBe("github-copilot/claude-haiku-4.5(low)")
+  })
+
+  describe("stripVariant", () => {
+    test("#given model with variant suffix #when stripping variant #then suffix is removed", () => {
+      // given
+      const model = "openai/gpt-5.5(medium)"
+
+      // when
+      const result = stripVariant(model)
+
+      // then
+      expect(result).toBe("openai/gpt-5.5")
+    })
+
+    test("#given model without variant #when stripping variant #then model is unchanged", () => {
+      // given
+      const model = "openai/gpt-5.5"
+
+      // when
+      const result = stripVariant(model)
+
+      // then
+      expect(result).toBe("openai/gpt-5.5")
+    })
+
+    test("#given model with leading/trailing whitespace and variant #when stripping variant #then whitespace is trimmed and suffix removed", () => {
+      // given
+      const model = "  openai/gpt-5.5(high)  "
+
+      // when
+      const result = stripVariant(model)
+
+      // then
+      expect(result).toBe("openai/gpt-5.5")
+    })
+
+    test("#given model with non-suffix parentheses #when stripping variant #then parentheses are preserved", () => {
+      // given
+      const model = "foo(bar)baz"
+
+      // when
+      const result = stripVariant(model)
+
+      // then
+      expect(result).toBe("foo(bar)baz")
+    })
   })
 })

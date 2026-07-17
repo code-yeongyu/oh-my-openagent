@@ -16,7 +16,24 @@ export const extractStatusCode = getRuntimeFallbackStatusCode
 export const extractErrorName = getRuntimeFallbackErrorName
 export const extractRetryableSignal = getRuntimeFallbackRetryableSignal
 
-export const classifyErrorType = classifyRuntimeFallbackError
+export function classifyErrorType(error: unknown): string | undefined {
+  const baseType = classifyRuntimeFallbackError(error)
+  if (baseType) return baseType
+
+  const message = getErrorMessage(error)
+  const errorName = extractErrorName(error)?.toLowerCase()?.replace(/[_-]/g, "")
+
+  if (
+    errorName?.includes("emptyoutput") ||
+    /empty\s*output/i.test(message) ||
+    /no\s*text\s*output/i.test(message) ||
+    /no\s*content/i.test(message)
+  ) {
+    return "empty_output"
+  }
+
+  return undefined
+}
 
 export function containsErrorContent(
   parts: Array<{ type?: string; text?: string }> | undefined
@@ -34,6 +51,10 @@ export function containsErrorContent(
 }
 
 export function isRetryableError(error: unknown, retryOnErrors: number[]): boolean {
+  if (classifyErrorType(error) === "empty_output") {
+    return true
+  }
+
   return isRuntimeFallbackRetryableError(error, retryOnErrors, {
     onUnsafeRetryableSignalRejected: ({ statusCode, retryOnErrors }) => {
       log(`[${HOOK_NAME}] Retryable signal rejected due to unsafe status code`, {

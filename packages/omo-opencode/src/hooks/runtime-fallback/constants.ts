@@ -49,6 +49,15 @@ export const RETRYABLE_ERROR_PATTERNS = [
   /暂时不可用/,
   /服务不可用/,
   /请稍后重试/,
+  /empty\s*output/i,
+  /no\s*text\s*output/i,
+  /model\s+not\s+found/i,
+  /provider\s+not\s+found/i,
+  /creditserror/i,
+  /insufficient\s+balance/i,
+  /free\s+promotion\s+has\s+ended/i,
+  /authentication\s+error/i,
+  /invalid\s+authentication/i,
 ]
 
 /**

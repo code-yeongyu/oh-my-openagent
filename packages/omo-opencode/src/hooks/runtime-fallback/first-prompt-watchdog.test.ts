@@ -343,6 +343,27 @@ describe("first-prompt-watchdog", () => {
 
     watchdog.dispose()
   })
+  it("#given a subagent session has completed #when a late user message.updated arrives #then the watchdog does not re-arm and no fallback is dispatched", async () => {
+    // given
+    const sessionID = "session-completed-then-updated"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const helpers = createHelpers(calls, AGENT)
+    const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
+
+    // when
+    watchdog.onSessionTerminal(sessionID)
+    // The session is completed but not yet deleted from subagentSessions
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+
+    // then
+    expect(calls.abort).toEqual([])
+    expect(calls.autoRetry).toEqual([])
+
+    watchdog.dispose()
+  })
 })
 
 interface RecordedWatchdogCalls {

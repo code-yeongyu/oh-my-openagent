@@ -1,7 +1,7 @@
 import type { HookDeps } from "./types"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
-import { createFallbackState, isModelInCooldown } from "./fallback-state"
+import { createFallbackState, isModelInCooldown, stripVariant } from "./fallback-state"
 
 export function createChatMessageHandler(deps: HookDeps) {
   const { config, sessionStates, sessionLastAccess } = deps
@@ -23,8 +23,10 @@ export function createChatMessageHandler(deps: HookDeps) {
       ? `${input.model.providerID}/${input.model.modelID}`
       : undefined
 
-    if (requestedModel && requestedModel !== state.currentModel) {
-      if (state.pendingFallbackModel && state.pendingFallbackModel === requestedModel) {
+    const reqLower = requestedModel ? requestedModel.toLowerCase() : undefined
+
+    if (reqLower && reqLower !== stripVariant(state.currentModel).toLowerCase()) {
+      if (state.pendingFallbackModel && stripVariant(state.pendingFallbackModel).toLowerCase() === reqLower) {
         state.pendingFallbackModel = undefined
         state.pendingFallbackPromptMayHaveBeenAccepted = false
         return
@@ -34,8 +36,10 @@ export function createChatMessageHandler(deps: HookDeps) {
         sessionID,
         from: state.currentModel,
         to: requestedModel,
+        debug_reqLower: reqLower,
+        debug_stripVariant: stripVariant(state.currentModel).toLowerCase()
       })
-      state = createFallbackState(requestedModel)
+      state = createFallbackState(requestedModel!)
       sessionStates.set(sessionID, state)
       return
     }
@@ -58,7 +62,7 @@ export function createChatMessageHandler(deps: HookDeps) {
       if (parts.length >= 2) {
         output.message.model = {
           providerID: parts[0],
-          modelID: parts.slice(1).join("/"),
+          modelID: stripVariant(parts.slice(1).join("/")),
         }
       }
       return
@@ -77,9 +81,12 @@ export function createChatMessageHandler(deps: HookDeps) {
     if (output.message && activeModel) {
       const parts = activeModel.split("/")
       if (parts.length >= 2) {
+        // Strip the variant suffix (e.g. '(medium)') from the modelID.
+        // Opencode requires variants to be stored in the agentSettings payload rather than the modelID itself.
+        // Failing to strip the variant will result in a ProviderModelNotFoundError and break the fallback chain.
         output.message.model = {
           providerID: parts[0],
-          modelID: parts.slice(1).join("/"),
+          modelID: stripVariant(parts.slice(1).join("/")),
         }
       }
     }

@@ -369,3 +369,64 @@ describe("model support fallback", () => {
     expect(retryable3).toBe(true)
   })
 })
+
+describe("empty output fallback", () => {
+  test("detects empty_output errors as retryable for fallback chain", () => {
+    //#given
+    const error1 = { message: "empty output" }
+    const error2 = { name: "EmptyOutputError", message: "no text output" }
+
+    //#when
+    const type1 = classifyErrorType(error1)
+    const type2 = classifyErrorType(error2)
+    const retryable1 = isRetryableError(error1, [])
+    const retryable2 = isRetryableError(error2, [])
+
+    //#then
+    expect(type1).toBe("empty_output")
+    expect(type2).toBe("empty_output")
+    expect(retryable1).toBe(true)
+    expect(retryable2).toBe(true)
+  })
+})
+
+describe("OpenCode Go/Zen error classification", () => {
+  test("classifies insufficient_quota via code field as quota_exceeded", () => {
+    //#given
+    const error = {
+      error: {
+        code: "insufficient_quota",
+        type: "insufficient_quota",
+        message: "You exceeded your current quota, please check your plan and billing details."
+      }
+    }
+
+    //#when
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
+
+  test("classifies Zen CreditsError via type field as quota_exceeded", () => {
+    //#given
+    const error = {
+      type: "error",
+      error: {
+        type: "CreditsError",
+        message: "Insufficient balance. Manage your billing here: https://opencode.ai/workspace/..."
+      }
+    }
+
+    //#when
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
+
+})

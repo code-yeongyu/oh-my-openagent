@@ -7,10 +7,16 @@ export function handleSessionIdleBackgroundEvent(args: {
   properties: Record<string, unknown>
   findBySession: (sessionID: string) => BackgroundTask | undefined
   idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>>
-  validateSessionHasOutput: (sessionID: string) => Promise<boolean>
+  validateSessionHasOutput: (sessionID: string) => Promise<{ hasOutput: boolean; hasText: boolean }>
   checkSessionTodos: (sessionID: string) => Promise<boolean>
   tryCompleteTask: (task: BackgroundTask, source: string) => Promise<boolean>
   emitIdleEvent: (sessionID: string) => void
+  /**
+   * Called when the session is idle but has produced no valid output.
+   * This typically means the model returned an empty response (e.g. rate-limited).
+   * The callback should attempt a fallback retry or mark the task as error.
+   */
+  onNoValidOutput?: (task: BackgroundTask, sessionID: string) => Promise<void>
 }): void {
   const {
     properties,
@@ -20,6 +26,7 @@ export function handleSessionIdleBackgroundEvent(args: {
     checkSessionTodos,
     tryCompleteTask,
     emitIdleEvent,
+    onNoValidOutput,
   } = args
 
   const sessionID = resolveSessionEventID(properties)
@@ -52,7 +59,7 @@ export function handleSessionIdleBackgroundEvent(args: {
   }
 
   validateSessionHasOutput(sessionID)
-    .then(async (hasValidOutput) => {
+    .then(async ({ hasOutput }) => {
       if (task.status !== "running") {
         log("[background-agent] Task status changed during validation, skipping:", {
           taskId: task.id,
@@ -61,8 +68,13 @@ export function handleSessionIdleBackgroundEvent(args: {
         return
       }
 
-      if (!hasValidOutput) {
-        log("[background-agent] Session.idle but no valid output yet, waiting:", task.id)
+      if (!hasOutput) {
+        if (onNoValidOutput) {
+          log("[background-agent] Session.idle with no valid output, triggering fallback:", task.id)
+          await onNoValidOutput(task, sessionID)
+        } else {
+          log("[background-agent] Session.idle but no valid output yet, waiting:", task.id)
+        }
         return
       }
 

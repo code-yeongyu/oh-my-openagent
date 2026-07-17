@@ -26,6 +26,23 @@ function getAssistantText(parts: SessionMessagePart[] | undefined): string {
     .join("\n")
 }
 
+function hasAssistantContent(parts: SessionMessagePart[] | undefined): boolean {
+  if (!parts || parts.length === 0) return false
+
+  return parts.some((part) => {
+    if (part.type === "text") {
+      const text = typeof part.text === "string" ? part.text.trim() : ""
+      return text.length > 0
+    }
+
+    if (typeof part.type === "string" && part.type !== "error") {
+      return true
+    }
+
+    return false
+  })
+}
+
 export function hasVisibleAssistantResponse(extractAutoRetrySignalFn: typeof extractAutoRetrySignal) {
   return async (
     ctx: HookDeps["ctx"],
@@ -60,12 +77,13 @@ export function hasVisibleAssistantResponse(extractAutoRetrySignalFn: typeof ext
         const parts = message.parts && message.parts.length > 0
           ? message.parts
           : infoMessageParts
-        const assistantText = getAssistantText(parts)
-        if (!assistantText) {
+        const hasContent = hasAssistantContent(parts)
+        if (!hasContent) {
           continue
         }
 
-        if (extractAutoRetrySignalFn({ message: assistantText })) {
+        const assistantText = getAssistantText(parts)
+        if (assistantText && extractAutoRetrySignalFn({ message: assistantText })) {
           continue
         }
 
