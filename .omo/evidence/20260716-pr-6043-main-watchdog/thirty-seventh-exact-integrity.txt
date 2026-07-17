@@ -1,0 +1,12 @@
+HEAD=3b069303b32c72859b697f94a169f243c0a545e0
+PARENTS=6d64eaa81266cee435e8821a28c266cdd88a0a79 955c614077e50185769cdf3410ee579b323a6754
+prior_qa_source=6d64eaa81266cee435e8821a28c266cdd88a0a79
+prior_runtime_tree=2c9c67dadfc9b9724cb574465dceb42c71feaf91
+current_runtime_tree=2c9c67dadfc9b9724cb574465dceb42c71feaf91
+runtime_tree_identical=yes
+incoming_delta_scope=docs-and-omo-senpi-only
+packages/omo-opencode/src/hooks/runtime-fallback/abort-wire-ordering.test.ts pure_lines=188
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-abort.test.ts pure_lines=174
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-abort.ts pure_lines=92
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-boundaries.test.ts pure_lines=116
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-events.ts pure_lines=118
