@@ -201,7 +201,7 @@ describe("omo-senpi task component wiring", () => {
     expect(leadCalls.ticks).toBe(2)
   })
 
-  it("#given a session start #when reconciliation runs #then reattach, mailbox reclaim, notification retry, and lead polling stay ordered", async () => {
+  it("#given a session start #when reconciliation runs #then reattach, cleanup, mailbox reclaim, notification retry, and lead polling stay ordered", async () => {
     // given
     const cwd = tempProject()
     const pi = new FakeExtensionAPI()
@@ -215,6 +215,10 @@ describe("omo-senpi task component wiring", () => {
         reconcileOnSessionStart: async () => {
           order.push("reattach")
           return { outcomes: [] }
+        },
+        cleanupExpiredRecords: () => {
+          order.push("cleanup")
+          return { deleted: [], retained: [] }
         },
       },
       notifier: {
@@ -246,7 +250,7 @@ describe("omo-senpi task component wiring", () => {
     })
 
     // then
-    expect(order).toEqual(["reattach", "reclaim", "notify", "poll"])
+    expect(order).toEqual(["reattach", "cleanup", "reclaim", "notify", "poll"])
   })
 
   it("#given a captured ui #when session_before_switch fires #then the ui bridge is cleared", async () => {

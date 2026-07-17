@@ -7,6 +7,8 @@ import { RpcCommandError } from "./errors"
 import { tailStderr } from "./exit-mapping"
 import { buildAutoUiResponse } from "./ui-auto-answer"
 
+const STDERR_BUFFER_CAP = 16_384
+
 export type MalformedLineHandler = (line: string, error: unknown) => void
 
 export type RpcProtocolClientOptions = {
@@ -57,6 +59,11 @@ export class RpcProtocolClient {
 
   get stderrTail(): string {
     return tailStderr(this.stderrBuffer)
+  }
+
+  /** Length of the raw stderr buffer, exposed for tests/diagnostics. */
+  get stderrBufferLength(): number {
+    return this.stderrBuffer.length
   }
 
   send(command: RpcCommand): Promise<RpcResponse> {
@@ -113,7 +120,7 @@ export class RpcProtocolClient {
     this.child.stdout?.on("data", (chunk: string) => this.ingest(chunk))
     this.child.stderr?.setEncoding("utf8")
     this.child.stderr?.on("data", (chunk: string) => {
-      this.stderrBuffer += chunk
+      this.stderrBuffer = (this.stderrBuffer + chunk).slice(-STDERR_BUFFER_CAP)
     })
     this.child.once("error", (error) => this.finalize(error))
     this.child.once("exit", () => this.finalize())
