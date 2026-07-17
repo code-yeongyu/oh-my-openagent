@@ -1,0 +1,21 @@
+COMMAND: bun test packages/omo-opencode/src/hooks/runtime-fallback/stale-cleanup-*.test.ts
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/stale-cleanup-deferred-terminal.test.ts:
+(pass) runtime-fallback stale deferred terminal cleanup > #given an abort event is deferred #when stale cleanup evicts the session #then later resolution cannot replay the retained payload [1.14ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/stale-cleanup-session-reuse.test.ts:
+(pass) runtime-fallback stale cleanup session reuse > #given a cleaned session ID is reused #when the old abort resolves #then rollback cannot revive its watchdog [2.33ms]
+(pass) runtime-fallback stale cleanup session reuse > #given a cleaned session ID is reused #when the old abort rejects #then rollback cannot revive its watchdog [0.28ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/stale-cleanup-watchdog-race.test.ts:
+(pass) runtime-fallback stale cleanup watchdog race > #given cleanup evicts a detached status watchdog #when the stale abort resolves #then rollback cannot restore the watchdog [0.36ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/stale-cleanup-status-continuation.test.ts:
+(pass) runtime-fallback stale status continuation > #given cleanup evicts a status retry during agent resolution #when resolution resumes #then it cannot abort or recreate state [0.38ms]
+(pass) runtime-fallback stale status continuation > #given cleanup evicts a status retry during message loading #when loading resumes #then it cannot dispatch or recreate state [1.17ms]
+
+ 6 pass
+ 0 fail
+ 6 expect() calls
+Ran 6 tests across 4 files. [76.00ms]

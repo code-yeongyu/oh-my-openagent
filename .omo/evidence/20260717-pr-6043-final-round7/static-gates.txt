@@ -1,0 +1,19 @@
+COMMAND: bun run --cwd packages/omo-opencode typecheck
+$ tsgo --noEmit -p tsconfig.json
+COMMAND: biome current repair files
+Resolving dependencies
+Resolved, downloaded and extracted [2]
+Saved lockfile
+COMMAND: git diff --check
+PURE LOC
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-cleanup.ts       44
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.ts      241
+packages/omo-opencode/src/hooks/runtime-fallback/event-handler.ts      222
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts      250
+packages/omo-opencode/src/hooks/runtime-fallback/hook.ts      174
+packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.ts      173
+packages/omo-opencode/src/hooks/runtime-fallback/session-generation.ts       40
+packages/omo-opencode/src/hooks/runtime-fallback/stale-cleanup-deferred-terminal.test.ts       71
+packages/omo-opencode/src/hooks/runtime-fallback/stale-cleanup-session-reuse.test.ts      171
+packages/omo-opencode/src/hooks/runtime-fallback/stale-cleanup-status-continuation.test.ts      175
+packages/omo-opencode/src/hooks/runtime-fallback/stale-cleanup-watchdog-race.test.ts      142
