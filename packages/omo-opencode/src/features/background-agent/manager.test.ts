@@ -643,6 +643,33 @@ describe("BackgroundManager delegated child-session bootstrap", () => {
 })
 
 describe("BackgroundManager pending launch visibility", () => {
+  test("keeps root wait visible while a nested task finalizes", () => {
+    // #given a nested task whose terminal status is already visible
+    const manager = createBackgroundManager()
+    const task = createMockTask({
+      id: "task-nested-finalizing",
+      rootSessionId: "root-session",
+      sessionId: "nested-session",
+      parentSessionId: "direct-child-session",
+      status: "completed",
+    })
+    const reserveFinalization = cast<{
+      reserveTaskFinalization: (task: BackgroundTask) => () => void
+    }>(manager).reserveTaskFinalization.bind(manager)
+
+    // #when notification preparation is reserved for nested finalization
+    const release = reserveFinalization(task)
+
+    try {
+      // #then both the immediate parent and root wait observe the in-flight work
+      expect(manager.hasBackgroundWorkInFlight(task.parentSessionId)).toBe(true)
+      expect(manager.hasBackgroundWorkInFlight(task.rootSessionId ?? "")).toBe(true)
+    } finally {
+      release()
+      manager.shutdown()
+    }
+  })
+
   test("reports a running nested descendant after its direct parent completes", () => {
     // #given a completed direct child with a grandchild still running
     const manager = createBackgroundManager()
@@ -8758,6 +8785,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
   test("releases fallback root ownership when stale prune follows an immediately acquired shifted slot", async () => {
     //#given
     const manager = createBackgroundManagerWithOptions({ config: { defaultConcurrency: 1 } })
+    stubNotifyParentSession(manager)
     const task = createMockTask({
       id: "task-stale-shifted-immediate-fallback",
       parentSessionId: "parent-session",
@@ -8781,6 +8809,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
     const processing = processKeyForTest(manager, key)
     pruneStaleTasksAndNotificationsForTest(manager)
     await processing
+    await flushBackgroundNotifications()
 
     //#then
     expect(task.status).toBe("error")
@@ -8992,6 +9021,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
       }),
       config: { defaultConcurrency: 1 },
     })
+    stubNotifyParentSession(manager)
     const task = createMockTask({
       id: "task-stale-fallback-create-failure",
       parentSessionId: "parent-session",
@@ -9018,6 +9048,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
     pruneStaleTasksAndNotificationsForTest(manager)
     resolveCreate?.({ error: "session create failed", data: undefined })
     await processing
+    await flushBackgroundNotifications()
 
     //#then
     expect(task.status).toBe("error")
@@ -9224,9 +9255,10 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
     await manager.shutdown()
   })
 
-  test("removes stale pending task from queue", () => {
+  test("removes stale pending task from queue", async () => {
     //#given
     const manager = createBackgroundManager()
+    stubNotifyParentSession(manager)
     const queuedAt = new Date(Date.now() - 31 * 60 * 1000)
     const task: BackgroundTask = {
       id: "task-stale-pending",
@@ -9256,6 +9288,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
 
     //#when
     pruneStaleTasksAndNotificationsForTest(manager)
+    await flushBackgroundNotifications()
 
     //#then
     expect(getQueuesByKey(manager).get(key)).toBeUndefined()
@@ -9268,9 +9301,10 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
     manager.shutdown()
   })
 
-  test("releases retained root ownership when a stale fallback retry is removed from its queue", () => {
+  test("releases retained root ownership when a stale fallback retry is removed from its queue", async () => {
     //#given
     const manager = createBackgroundManager()
+    stubNotifyParentSession(manager)
     const task = createMockTask({
       id: "task-stale-fallback-retry",
       parentSessionId: "parent-session",
@@ -9292,6 +9326,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
 
     //#when
     pruneStaleTasksAndNotificationsForTest(manager)
+    await flushBackgroundNotifications()
 
     //#then
     expect(getQueuesByKey(manager).get(key)).toBeUndefined()
@@ -10124,6 +10159,34 @@ describe("BackgroundManager regression fixes - resume and aborted notification",
     expect(archivedTask?.sessionId).toBe(task.sessionId)
     expect(archivedTask?.prompt).toBe("[redacted]")
     expect(archivedTask?.startedAt).toEqual(task.startedAt)
+
+    manager.shutdown()
+  })
+
+  test("should retain archived terminal tasks in their root wait snapshot", () => {
+    //#given
+    const manager = createBackgroundManager()
+    const task: BackgroundTask = {
+      id: "task-root-wait-archive-regression",
+      rootSessionId: "root-session",
+      sessionId: "session-root-wait-archive-regression",
+      parentSessionId: "nested-parent-session",
+      parentMessageId: "msg-1",
+      description: "root wait archive regression",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    ;(cast<{ removeTask: (task: BackgroundTask) => void }>(manager)).removeTask(task)
+
+    //#then
+    expect(manager.getTask(task.id)?.rootSessionId).toBe(task.rootSessionId)
+    expect(manager.getTasksForBackgroundWait(task.rootSessionId ?? "").map(({ id }) => id)).toContain(task.id)
 
     manager.shutdown()
   })

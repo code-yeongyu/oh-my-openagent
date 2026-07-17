@@ -499,19 +499,30 @@ export class BackgroundManager {
       : [parentSessionID]
   }
 
+  private getTaskWaitSessionIDs(task: BackgroundTask): string[] {
+    const sessionIDs = new Set<string>()
+    if (task.parentSessionId) sessionIDs.add(task.parentSessionId)
+    if (task.rootSessionId) sessionIDs.add(task.rootSessionId)
+    return Array.from(sessionIDs)
+  }
+
   private reserveTaskFinalization(task: BackgroundTask): () => void {
-    const parentSessionID = task.parentSessionId
-    if (!parentSessionID) return () => {}
+    const waitSessionIDs = this.getTaskWaitSessionIDs(task)
+    if (waitSessionIDs.length === 0) return () => {}
 
     this.finalizingTasks.add(task.id)
-    this.parentWakeNotifier.reserveNotificationPreparation(parentSessionID)
+    for (const sessionID of waitSessionIDs) {
+      this.parentWakeNotifier.reserveNotificationPreparation(sessionID)
+    }
     let released = false
     return () => {
       if (released) return
       released = true
       this.finalizingTasks.delete(task.id)
-      this.parentWakeNotifier.releaseNotificationPreparation(parentSessionID)
-      this.updateBackgroundTaskMarker(parentSessionID)
+      for (const sessionID of waitSessionIDs) {
+        this.parentWakeNotifier.releaseNotificationPreparation(sessionID)
+        this.updateBackgroundTaskMarker(sessionID)
+      }
     }
   }
 
@@ -581,6 +592,7 @@ export class BackgroundManager {
 
     const archivedTask: BackgroundTask = {
       id: task.id,
+      rootSessionId: task.rootSessionId,
       parentSessionId: task.parentSessionId,
       parentMessageId: task.parentMessageId,
       description: task.description,
@@ -1324,9 +1336,16 @@ The fallback retry session is now created and can be inspected directly.
   }
 
   getTasksForBackgroundWait(sessionID: string): BackgroundTask[] {
-    const rootTasks = Array.from(this.tasks.values()).filter(task => task.rootSessionId === sessionID)
-    if (rootTasks.length > 0 || this.rootDescendantCounts.has(sessionID)) return rootTasks
-    return this.getAllDescendantTasks(sessionID)
+    const liveRootTasks = Array.from(this.tasks.values()).filter(task => task.rootSessionId === sessionID)
+    const archivedTasks = Array.from(this.completedTaskArchive.values()).filter(task => (
+      task.rootSessionId === sessionID || (!task.rootSessionId && task.parentSessionId === sessionID)
+    ))
+    const liveTasks = liveRootTasks.length > 0 || this.rootDescendantCounts.has(sessionID)
+      ? liveRootTasks
+      : this.getAllDescendantTasks(sessionID)
+    const tasksByID = new Map(archivedTasks.map(task => [task.id, task]))
+    for (const task of liveTasks) tasksByID.set(task.id, task)
+    return Array.from(tasksByID.values())
   }
 
   hasBackgroundWorkInFlight(sessionID: string): boolean {
@@ -2252,14 +2271,14 @@ The fallback retry session is now created and can be inspected directly.
     // parent wake is not queued until after the awaited session abort below. The
     // notification is fire-and-forget here, so the reservation is released when that
     // promise settles (see the `.finally` on the enqueue call).
-    const notificationParentSessionID = task.parentSessionId
-    if (notificationParentSessionID) {
-      this.parentWakeNotifier.reserveNotificationPreparation(notificationParentSessionID)
+    const notificationSessionIDs = this.getTaskWaitSessionIDs(task)
+    for (const sessionID of notificationSessionIDs) {
+      this.parentWakeNotifier.reserveNotificationPreparation(sessionID)
     }
     const releaseNotificationPreparation = (): void => {
-      if (notificationParentSessionID) {
-        this.parentWakeNotifier.releaseNotificationPreparation(notificationParentSessionID)
-        this.updateBackgroundTaskMarker(notificationParentSessionID)
+      for (const sessionID of notificationSessionIDs) {
+        this.parentWakeNotifier.releaseNotificationPreparation(sessionID)
+        this.updateBackgroundTaskMarker(sessionID)
       }
     }
     let notificationQueued = false
@@ -2872,9 +2891,9 @@ The task was re-queued on a fallback model after a retryable failure.
     // "no active children and no pending wake" during that window and settle on a
     // stale, pre-result turn. The reservation is released in `finally`, by which
     // point the wake has been queued (or notification has otherwise concluded).
-    const notificationParentSessionID = task.parentSessionId
-    if (notificationParentSessionID) {
-      this.parentWakeNotifier.reserveNotificationPreparation(notificationParentSessionID)
+    const notificationSessionIDs = this.getTaskWaitSessionIDs(task)
+    for (const sessionID of notificationSessionIDs) {
+      this.parentWakeNotifier.reserveNotificationPreparation(sessionID)
     }
     try {
       // Atomically mark as completed to prevent race conditions
@@ -2939,9 +2958,9 @@ The task was re-queued on a fallback model after a retryable failure.
       return true
     } finally {
       releaseTerminalization()
-      if (notificationParentSessionID) {
-        this.parentWakeNotifier.releaseNotificationPreparation(notificationParentSessionID)
-        this.updateBackgroundTaskMarker(notificationParentSessionID)
+      for (const sessionID of notificationSessionIDs) {
+        this.parentWakeNotifier.releaseNotificationPreparation(sessionID)
+        this.updateBackgroundTaskMarker(sessionID)
       }
     }
   }
