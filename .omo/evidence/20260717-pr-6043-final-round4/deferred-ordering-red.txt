@@ -1,0 +1,49 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-deferred-terminal.test.ts:
+ 99 |           },
+100 |         },
+101 |       },
+102 |     })
+103 |
+104 |     expect(calls).toEqual(["terminal", "message"])
+                        ^
+error: expect(received).toEqual(expected)
+
+  [
+    "terminal",
++   "terminal",
+    "message",
+  ]
+
+- Expected  - 0
++ Received  + 1
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/hook-deferred-terminal.test.ts:104:19)
+(fail) runtime-fallback deferred watchdog terminal events > #given an ambiguous watchdog abort #when assistant parent correlation resolves it #then the deferred terminal event is handled before the message update [0.85ms]
+147 |         },
+148 |       },
+149 |     })
+150 |
+151 |     expect(inspectedActive).toBe(true)
+152 |     expect(calls).toEqual(["terminal", "message"])
+                        ^
+error: expect(received).toEqual(expected)
+
+  [
+    "terminal",
++   "terminal",
+    "message",
+  ]
+
+- Expected  - 0
++ Received  + 1
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/hook-deferred-terminal.test.ts:152:19)
+(fail) runtime-fallback deferred watchdog terminal events > #given an old-parent terminal candidate #when the newer request is busy #then the deferred event resolves as internal before the message update [0.36ms]
+(pass) runtime-fallback deferred watchdog terminal events > #given a current cancellation is deferred #when an old assistant abort arrives while the session is idle #then cancellation resets retry state [2.94ms]
+
+ 1 pass
+ 2 fail
+ 7 expect() calls
+Ran 3 tests across 1 file. [59.00ms]
