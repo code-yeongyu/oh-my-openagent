@@ -1529,6 +1529,62 @@ session_id: ses_untrusted_999
       expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
     })
 
+    test("should not re-inject completion nudge once boulder work is completed and ended", async () => {
+      // given - boulder state with completed work (ended_at set) and complete plan
+      const planPath = join(TEST_DIR, "complete-plan.md")
+      writeFileSync(planPath, "# Plan\n- [x] Task 1\n- [x] Task 2")
+
+      writeBoulderState(TEST_DIR, {
+        schema_version: 2,
+        active_work_id: "work-completed",
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        status: "completed",
+        ended_at: "2026-01-02T10:05:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        session_origins: { [MAIN_SESSION_ID]: "direct" },
+        plan_name: "complete-plan",
+        works: {
+          "work-completed": {
+            work_id: "work-completed",
+            active_plan: planPath,
+            plan_name: "complete-plan",
+            started_at: "2026-01-02T10:00:00Z",
+            ended_at: "2026-01-02T10:05:00Z",
+            status: "completed",
+            session_ids: [MAIN_SESSION_ID],
+            session_origins: { [MAIN_SESSION_ID]: "direct" },
+          },
+        },
+      })
+
+      const mockInput = createMockPluginInput()
+      const hook = createTestAtlasHook(mockInput)
+
+      // when - multiple idle events after completion
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+      await hook.handler({
+        event: {
+          type: "session.compacted",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+
+      // then
+      expect(mockInput._promptMock).not.toHaveBeenCalled()
+    })
+
     test("should inject completion nudge when mirrored worktree plan is complete even if the main repo plan is stale", async () => {
       // given
       const mainPlanPath = join(TEST_DIR, ".omo", "plans", "worktree-complete-plan.md")
