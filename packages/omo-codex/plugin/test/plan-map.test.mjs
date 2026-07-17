@@ -441,3 +441,20 @@ test("#given a slug instead of a path #when the plan lives in .omo/plans #then i
 		assert.equal(code, 0);
 	});
 });
+
+test("#given a fresh scaffold skeleton whose placeholder todo was never filled #when parsed #then the map warns about the template placeholder", async () => {
+	// given
+	const { parsePlanMap } = await import(scriptUrl);
+	const plan = `# fresh - Work Plan
+
+## Todos
+
+- [ ] 1. <title>
+  Parallelization: Wave <N> | Blocked by: <...> | Blocks: <...>
+`;
+	// when
+	const map = parsePlanMap(plan);
+	// then --- the map still renders, but says the plan may not contain real todos yet
+	assert.equal(map.taskCount, 1);
+	assert.ok(map.warnings.some((warning) => warning.includes("unfilled template placeholder")));
+});

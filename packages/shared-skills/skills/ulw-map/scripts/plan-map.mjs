@@ -161,6 +161,11 @@ export function parsePlanMap(content) {
 				if (count > 1) {
 					warnings.push(`duplicate task number ${number} - node ids stay unique (T${number}_${count})`);
 				}
+				if (/^<.*>$/.test(taskTitle)) {
+					warnings.push(
+						`task ${number} title looks like an unfilled template placeholder (${taskTitle}) - the plan may not contain real todos yet`,
+					);
+				}
 				currentTask = {
 					id: count === 1 ? `T${number}` : `T${number}_${count}`,
 					number,
