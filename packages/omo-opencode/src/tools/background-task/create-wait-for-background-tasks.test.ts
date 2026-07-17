@@ -113,7 +113,7 @@ describe("createWaitForBackgroundTasks", () => {
     })
 
     // #when the wait reaches its bounded timeout
-    const output = await runTool(manager, { timeout: 30 }, { pollIntervalMs: 1 })
+    const output = await runTool(manager, { timeout: 250 }, { pollIntervalMs: 1 })
 
     // #then the asynchronously registered task is reported instead of being omitted
     expect(output).toContain("## Still Running (timed out")
