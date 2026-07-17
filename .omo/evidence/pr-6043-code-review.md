@@ -1,21 +1,22 @@
-# PR #6043 Independent Exact-Head Code Review #1
+# PR #6043 Exact-Head Code Review
 
-Date: 2026-07-16
+Date: 2026-07-17
 
 ## Review Identity
 
-- HEAD: `38fbb576823955386e9a78a8362305d4af9aa110` (verified exact)
-- origin/dev: `6457ca1da78fcfd2a39ea391ee559b8d945b240a` (verified exact)
-- Merge base: `6457ca1da78fcfd2a39ea391ee559b8d945b240a`
-- Runtime source commit: `1e0b44d5a8a08ec168a14d542456c11212a7c610`
-- `1e0b44d5..HEAD` changes only committed evidence files.
+- Requested HEAD: `72b6e1bf14e29a3300d8a4d64830083b45c59616`
+- Observed HEAD: `72b6e1bf14e29a3300d8a4d64830083b45c59616`
+- Requested base: `14083b89f1cbf4680be13493a6c4afd67c957e8a`
+- Observed merge base: `14083b89f1cbf4680be13493a6c4afd67c957e8a`
+- Runtime source is unchanged from `3bb8bb8067e8ff98043aadfadf63a4db62c7fa8b`; the 16 later files are committed evidence only.
+- `omo ulw-loop status --json` returned `ULW_LOOP_PLAN_MISSING`, so the required fallback report path is used.
 
 ## Skill-Perspective Check
 
-The `remove-ai-slops` and `programming` skills were explicitly loaded and applied before judging tests and maintainability.
+The `remove-ai-slops` and `programming` skills, including the TypeScript and code-smell criteria, were explicitly consulted before judging maintainability and tests.
 
-- `remove-ai-slops`: VIOLATION. The deletion-cleanup tests expose and assert private generation bookkeeping through a test-only production parameter instead of observable behavior.
-- `programming`: VIOLATION. The same test seam mirrors implementation state, and this PR adds more tests to `plugin/event.test.ts`, which is already far beyond the documented 250 pure-LOC ceiling.
+- `remove-ai-slops`: **violated**. The PR adds 4,689 test lines and many repeated local harness helpers, but omits four observable interleavings that leave fallback state stuck or suppress recovery. This is false confidence rather than behavior-locking coverage.
+- `programming`: **violated**. Async lifecycle ownership is only partly generation-bound; `session.error`, timeout, and message continuations still carry a raw session ID across awaits. Tests mostly select individual implementation windows instead of proving the full observable retry transaction. No production file exceeds the 250 pure-LOC ceiling, although `first-prompt-watchdog.ts` is exactly 250.
 
 ## CRITICAL
 
@@ -23,64 +24,194 @@ None.
 
 ## HIGH
 
-### 1. The committed live OpenCode QA does not exercise the twentieth active-root repair
+### 1. A fallback prompt's own user event invalidates the dispatcher, and `finally` strands retry ownership
 
-The live harness creates one root session, prompts that same session twice, and aborts the second turn. It never creates roots A and B concurrently, never deletes B to restore A, and never proves that an older active root remains watchdog-eligible after B becomes latest. See `.omo/evidence/20260716-pr-6043-main-watchdog/run-live-watchdog-qa.sh:136-165`.
+`createAutoRetryDispatcher()` captures a generation at `packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.ts:38-40`. Every user `message.updated` bumps that generation at `packages/omo-opencode/src/hooks/runtime-fallback/event-handler.ts:97-104`, including the user event emitted for the fallback prompt itself.
 
-The only two-root watchdog test manually seeds the registry with `setMainSession()` and invokes the watchdog directly (`packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-main-session.test.ts:22-55`). The deletion test separately checks only the latest getter (`packages/omo-opencode/src/plugin/event.test.ts:1390-1422`). Neither drives the real plugin event ordering, where runtime-fallback hooks run before lifecycle registration/removal.
+If that event arrives before `promptAsync` returns, the accepted prompt is reclassified as blocked at `auto-retry-dispatch.ts:139-146`. The `return` inside `finally` at `auto-retry-dispatch.ts:225-227` overrides any prior outcome and exits before deleting `sessionRetryInFlight`. `dispatchFallbackRetry()` then restores the pre-fallback model because it sees an unaccepted result (`fallback-retry-dispatcher.ts:37-61`).
 
-This leaves the exact behavior introduced by the twentieth repair without the mandatory real-harness proof required for OpenCode-connected lifecycle changes. The README's sufficiency claim at `.omo/evidence/20260716-pr-6043-main-watchdog/README.md:495-509` is therefore unsupported for the active-root change.
+Exact-head probe observation:
 
-Required before approval: add exact-source isolated OpenCode QA that creates root A, creates root B, keeps A silent and proves A still falls back; then deletes B and proves A remains current/eligible. Commit the resulting event and isolation artifacts.
+```json
+{
+  "promptModels": ["openai/fallback"],
+  "retryInFlight": true,
+  "awaiting": true,
+  "state": {
+    "originalModel": "openai/primary",
+    "currentModel": "openai/primary",
+    "fallbackIndex": -1,
+    "attemptCount": 0
+  }
+}
+```
 
-### 2. The final evidence labels non-executed/sanitized checks as successful exact-source gates
+The fallback request was accepted on the wire, but bookkeeping says the primary model still owns the turn and retry remains permanently in flight. Later errors are skipped and the timeout path can clobber the accepted request again.
 
-The committed whole-file Biome artifact records one error and two warnings (`twentieth-biome-all-changed.txt:1-62`). The purported passing Biome artifact states that it modified three legacy lines in temporary copies before checking them (`twentieth-biome-scoped.txt:1-5`), so it is not a check of the exact repository source.
+### 2. A stale status retry key survives generation rollover and suppresses the next turn
 
-The README also says the standalone no-excuse helper could not load TypeScript (`README.md:485-486`), but later states that the helper completed successfully (`README.md:516-518`). `twentieth-no-excuse-scoped.txt:1-2` is a manual diff-pattern assertion, not output from the documented helper. I independently reproduced both facts: typecheck passed, while exact-source Biome failed and the no-excuse helper threw before analysis.
+`session-status-handler.ts:65-73` stores a dedupe key and only releases it while the captured generation is current. A newer user turn bumps generation at `event-handler.ts:97-104` but does not clear `sessionStatusRetryKeys`. Therefore a stale status continuation correctly stops after an await, yet leaves its key behind. A normal next turn commonly emits the same normalized `attempt:1` key and is dropped at `session-status-handler.ts:65-67` before abort or fallback dispatch.
 
-This is contradictory success reporting in the required QA evidence. The pre-existing nature of the Biome diagnostics can be documented, but a temporary-copy pass and a manual substitute must not be represented as successful exact-source tool gates.
+Exact-head probe observation:
 
-Required before approval: correct the evidence narrative and provide honest exact-source gate results. If a gate is waived because failures predate the PR, prove that with base/head comparison and label it as a qualified failure, not a pass.
+```json
+{
+  "keyAfterOld": "1:provider unavailable, retrying",
+  "keyAfterNew": "1:provider unavailable, retrying",
+  "abortCalls": 0,
+  "promptModels": []
+}
+```
+
+The existing lifecycle test at `hook-abort-lifecycle-races.test.ts:169-214` proves only that the old continuation stops. It never sends the same retry signal in the new generation, so it misses the poisoned dedupe state.
+
+### 3. An old `session.error` continuation can dispatch into and overwrite a newer user turn
+
+`handleSessionError()` resolves agent context asynchronously at `event-handler.ts:139-150`, then continues using only `sessionID`. It captures no generation before the await and performs no generation check afterward. If a newer user message arrives while resolution is pending, the old error resumes against the newer turn's maps, clears awaiting/timeout state, advances the fallback state, and dispatches a prompt at `event-handler.ts:187-244`.
+
+Exact-head probe observation after pausing old-error agent resolution, sending a newer user message, and then resuming:
+
+```json
+{
+  "promptModels": ["openai/fallback"],
+  "retryInFlight": false,
+  "awaiting": true,
+  "state": {
+    "currentModel": "openai/fallback",
+    "attemptCount": 1,
+    "pendingFallbackModel": "openai/fallback"
+  }
+}
+```
+
+The old error has become a continuation in the new transaction. This is direct cross-generation state clobbering, not merely redundant work.
+
+### 4. `session.deleted` retains a pending abort request, blocking same-ID reuse
+
+Stale TTL cleanup deletes `internalAbortRequests` at `auto-retry-cleanup.ts:27-39`, but explicit deletion at `event-handler.ts:64-79` does not. `createAbortSessionRequest()` coalesces solely by session ID (`auto-retry-abort.ts:87-103`) and carries no generation/token identity.
+
+When an ID is deleted and reused before its old abort settles, the replacement abort waits on the deleted generation's request and returns `false` without issuing a new wire abort. The old request remains recognized as current because the map entry was never invalidated.
+
+Exact-head probe observation:
+
+```json
+{
+  "mapRetainedAfterDelete": true,
+  "beforeResolve": {"abortCalls": 1, "replacementSettled": false},
+  "results": [true, false],
+  "ownership": false
+}
+```
+
+The new session cannot cancel its own request or enter fallback. `stale-cleanup-session-reuse.test.ts:91-183` covers TTL eviction, where the map is explicitly deleted, and therefore does not exercise the explicit-deletion lifecycle.
 
 ## MEDIUM
 
-### 1. Missing-ID coverage does not assert the active-root membership contract
+### 1. Large, duplicated test growth provides false confidence while missing transaction-level races
 
-The malformed `session.created` regression asserts only `getMainSessionID()` (`packages/omo-opencode/src/plugin/event.test.ts:1424-1450`). The watchdog now relies on `isMainSession()` (`packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts:114-117`). A regression that preserved `_mainSessionID` while clearing `mainSessionIDs` would pass this test but disable the watchdog for the preserved root.
+The PR changes 43 TypeScript test files with `+4,689/-370` lines. At least 26 runtime-fallback test files independently reimplement helpers such as deferred promises, prompt-model parsing, or hook contexts. The tests are green, but no test covers:
 
-Add an assertion on `isMainSession(rootSessionID)` or, preferably, drive a subsequent user event and prove the root watchdog still arms.
+- the fallback prompt's own user event arriving before `promptAsync` settles;
+- the identical status retry key after generation rollover;
+- stale `session.error` agent resolution crossing a user turn;
+- explicit `session.deleted` with a pending abort followed by same-ID reuse.
 
-### 2. Deletion tests mirror private bookkeeping through a test-only production seam
+This violates both loaded skill perspectives: duplicated implementation-shaped fixtures make interleavings expensive to add, and the volume obscures the absence of end-to-end state invariants. Consolidate only where it enables observable transaction tests; test count alone is not the goal.
 
-`createFirstPromptWatchdog()` accepts a mutable `sessionGenerations` map (`first-prompt-watchdog.ts:27-32`) solely so `first-prompt-watchdog-deletion.test.ts:18-64` can inspect whether internal entries were deleted. This is implementation-mirroring coverage and unnecessary production API surface under both required skill perspectives.
+### 2. Generation protection is applied inconsistently across adjacent async lifecycle paths
 
-Cover deletion through observable behavior: delete an armed/suspended session, reuse the ID or advance the old timer, and assert that no stale abort/fallback occurs and a fresh generation behaves correctly.
+The new token is used in the status handler and dispatcher, but neighboring paths still continue after awaits with raw session identity:
 
-### 3. New tests extend an already oversized test module
+- `message-update-handler.ts:104-170` awaits abort and agent resolution without a generation check;
+- `auto-retry-timeout.ts:48-101` awaits abort and dispatch against a captured mutable state object without generation identity;
+- `hook.ts:125-138` resolves a deferred terminal after an async status probe using only session ID.
 
-`packages/omo-opencode/src/plugin/event.test.ts` is approximately 1,566 pure LOC after this PR, and the twentieth repair adds another 70 lines there. This violates the loaded programming skill's 250 pure-LOC ceiling and makes lifecycle regressions harder to isolate. Move the new root-registry lifecycle cases to a focused module.
+The four reproduced blockers already demonstrate that this inconsistency is operationally unsafe. These adjacent paths need adversarial transaction tests before the generation design can be considered complete.
 
 ## LOW
 
-None.
+### 1. The review surface is disproportionately inflated by committed evidence
+
+The full PR is 668 files and `+40,229/-704` lines. TypeScript production is `+1,766/-331`; tests are `+4,689/-370`; the remaining 590 files contribute `+33,774/-3`, primarily QA evidence. Repository policy requires evidence, but this volume materially raises review and repository-maintenance cost. The final 16 post-source files are evidence-only, so they do not mitigate the code defects above.
 
 ## Independent Verification
 
-- `bun test packages/omo-opencode/src/hooks/runtime-fallback`: 291 pass, 0 fail.
-- `bun test` for `event.test.ts`, `event.monitor.test.ts`, and session state: 53 pass, 0 fail.
-- `bunx tsgo --noEmit -p packages/omo-opencode/tsconfig.json`: pass.
-- Exact-source Biome over the six twentieth-repair files: fail with 1 error and 2 warnings, matching the committed failure artifact.
-- No-excuse helper: crashes before analysis because `ts.ScriptTarget` is unavailable, matching the committed qualification.
-- `git diff --check origin/dev...HEAD`: pass.
-- Worktree was clean before review commands; tests did not alter tracked source.
+- Exact HEAD and merge base: verified.
+- `bun test packages/omo-opencode/src/hooks/runtime-fallback`: **350 pass, 0 fail, 702 expectations across 54 files**.
+- `bun run --cwd packages/omo-opencode typecheck`: pass.
+- `bun run --cwd packages/utils typecheck`: pass.
+- `git diff --check base..head`: pass.
+- Pure LOC: `first-prompt-watchdog.ts` 250; `auto-retry-dispatch.ts` 241; `event-handler.ts` 222; `message-update-handler.ts` 202.
+- The documented no-excuse helper could not be independently rerun: it failed before analysis with `TypeError: undefined is not an object (evaluating 'ts.ScriptTarget.Latest')`. This is a tool failure, but it means the committed claim that this exact gate passed remains unverified.
+- No usable Biome executable was found in the checked dependency paths during this review; committed Biome output was treated as untrusted rather than promoted as independent evidence.
+- Worktree was clean before the required report write; no source or GitHub state was mutated.
 
-## Verdict
+## Decision
 
-- codeQualityStatus: BLOCK
-- recommendation: REQUEST_CHANGES
-- blockers:
-  1. Add real OpenCode QA for the two-active-root and deletion-restoration behavior.
-  2. Correct the contradictory/static-gate evidence and stop labeling temporary-copy/manual audits as successful exact-source tool runs.
+- `codeQualityStatus`: **BLOCK**
+- `recommendation`: **REQUEST_CHANGES**
+- `reportPath`: `.omo/evidence/pr-6043-code-review.md`
+- `blockers`:
+  1. Make accepted fallback dispatch cleanup transaction-safe when its own user event advances lifecycle state; a `finally` return must not override accepted dispatch or retain `sessionRetryInFlight`.
+  2. Scope or clear status dedupe keys on user-generation rollover.
+  3. Bind `session.error` continuations to the generation that emitted the error.
+  4. Invalidate pending abort requests on explicit deletion and prove same-ID reuse issues a fresh abort.
+  5. Add deterministic tests for all four exact interleavings above.
 
-BLOCK
+<verdict>FAIL</verdict>
+
+## Repair Verification
+
+The blocking exact-head verdict above applies to contributor head
+`72b6e1bf14e29a3300d8a4d64830083b45c59616`. The repair built on that head now
+closes all reproduced ownership gaps plus four additional adversarial races found
+while widening the transaction review:
+
+1. retry dispatch uses an opaque owner token, releases only matching ownership,
+   and preserves a prompt that was accepted before its own user event advanced
+   lifecycle state;
+2. status retry keys are cleared on a genuinely new user-message generation;
+3. `session.error` and assistant-message continuations recheck generation after
+   asynchronous abort or agent/message resolution;
+4. explicit deletion invalidates a pending abort request before same-ID reuse;
+5. model-fallback continuation ownership is tokenized across deletion and reuse;
+6. session deletion detaches synchronous state and serializes same-ID recreation
+   before awaited resource cleanup;
+7. delayed cleanup, timeout, idle, disposal, and abort paths share retry-owner
+   cleanup rather than deleting another transaction's marker; and
+8. repeated `message.updated` events for the same user message no longer advance
+   generation while a visible fallback-completion probe is in flight.
+
+The eighth repair was discovered by the production-duration OpenCode run. The
+first round-eight run emitted the complete fallback assistant response on SSE but
+never logged completion bookkeeping. Its event stream showed a trailing update
+for the same user message racing the asynchronous visibility lookup. A new
+failing interleaving test and user-message-ID generation dedupe repaired that
+path; the repeated real run then logged `Assistant response observed; cleared
+fallback timeout` before a later genuine abort was classified as external.
+
+Fresh candidate verification is preserved under
+`.omo/evidence/20260717-pr-6043-final-round8/`:
+
+- focused ownership matrix: 12 pass, 0 fail;
+- full runtime-fallback suite: 358 pass, 0 fail, 717 expectations;
+- lifecycle/model matrix: 25 pass, 0 fail;
+- complete plugin event matrix: 60 pass, 0 fail;
+- OpenCode adapter typecheck, pinned Biome 2.4.16 lint, no-excuse rules, and
+  `git diff --check`: pass;
+- isolated production-duration OpenCode QA: real 90-second watchdog fallback,
+  primary transport abort, fallback completion, two-root deletion/restoration,
+  and later external cancellation all observed; real DB count unchanged.
+
+The repaired candidate requires fresh exact-head CI and independent review after
+commit/push; those downstream gates do not retroactively change this original
+head's `<verdict>FAIL</verdict>`.
+
+The exact repaired source is split into three atomic commits:
+
+- `fffed869ef00426a3b8df905324d5edcbbf217a9` binds runtime retry and
+  continuation work to generation-aware ownership;
+- `473d6a9c2a1ab4dae356013c09776571eeadf77e` tokenizes model-fallback
+  continuation ownership; and
+- `ec4beb1a5368a638167568759c5adb5a84ff1eb3` serializes deletion and
+  recreation for a reused session ID.
