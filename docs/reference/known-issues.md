@@ -2,11 +2,11 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
-## #5529 - GPT-5.5 reasoning effort can conflict with OpenAI-compatible chat providers
+## #5529 - GPT-5.5 reasoning effort can conflict with some OpenAI-compatible chat providers
 
-- **Affects**: OpenAI-compatible providers that expose `gpt-5.5` through `/v1/chat/completions` while OMO injects `reasoningEffort` for agent configs.
-- **Symptom**: Requests that combine tools with `reasoning_effort` can be rejected by the provider because that combination is unsupported on the chat-completions route.
-- **Workaround**: Use a native provider route that supports the Responses API for GPT-5.5 reasoning, or avoid GPT-5.5 on OpenAI-compatible chat providers for tool-heavy OMO agents until reasoning-effort injection is provider-aware.
+- **Affects**: Third-party OpenAI-compatible providers that expose `gpt-5.5` through `/v1/chat/completions` but reject tool requests when `reasoning_effort` is present. Native OpenAI supports tools and reasoning effort for GPT-5.5.
+- **Symptom**: Tool requests can fail because OMO agent configs and OpenCode's GPT model transforms may supply reasoning effort based on the model ID, even when the compatible provider's chat-completions implementation does not support that combination.
+- **Workaround**: Use a provider-native route or adapter that supports GPT-5.5 reasoning with tools, or use a model/provider configuration that does not emit the unsupported reasoning setting for tool-heavy agents.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5529.
 
 ## #4184 - Custom provider models without `limit` do not auto-compact
