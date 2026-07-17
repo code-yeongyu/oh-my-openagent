@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5806 - `ulw` mode does not persist across follow-up messages
+
+- **Affects**: Multi-turn Sisyphus sessions that rely on `ulw` or `ultrawork` keyword injection.
+- **Symptom**: The keyword detector is edge-triggered per message. A first prompt that includes `ulw` gets the ultrawork prompt, but a follow-up that omits the keyword can fall back to default Sisyphus behavior and lose the expected delegation pattern.
+- **Workaround**: Repeat `ulw` or `ultrawork` in every follow-up message that should stay in ultrawork mode. For long tasks, prefer starting a fresh prompt that includes the keyword instead of assuming the mode remains active.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5806.
+
 ## #5838 - LazyCodex frontend runs can skip the visual QA gate
 
 - **Affects**: Codex Light / LazyCodex sessions where the frontend skill is used for UI work.
