@@ -747,6 +747,17 @@ Thirty-first-cycle artifacts:
 
 ## Why It Is Enough
 
+The thirty-second review cycle repaired coalesced abort continuation ownership
+and top-level delta message provenance. Source `3349c256b` elects the wire
+abort initiator as the sole post-abort continuation owner and prefers
+top-level `messageID` while retaining nested compatibility. Failing-first
+proof was `6 pass, 2 fail`; repaired focused and full runtime-fallback results
+were `17/17` and `332/332`. The isolated production-duration OpenCode harness
+also passed before the source commit with unchanged real DB and complete
+cleanup. See `thirty-second-review-repair.md` and the refreshed sanitized
+`live-*` artifacts. Fresh dev integration and exact-head evidence follow in
+the terminal cycle.
+
 The tests cover main and subagent watchdog ownership, progress and terminal
 cancellation, cancellation while abort is in flight, pre-acknowledgement
 external abort errors, acknowledged internal abort errors, expected
