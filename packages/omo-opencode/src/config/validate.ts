@@ -13,6 +13,7 @@ import {
   parseJsonc,
 } from "../shared"
 import { applyDisabledProviders } from "../shared/disabled-providers"
+import { log } from "../shared/logger"
 import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "../shared/plugin-identity"
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./schema"
 
@@ -167,15 +168,15 @@ function migrateRalphLoopConfig(config: OhMyOpenCodeConfig): OhMyOpenCodeConfig 
     return config
   }
 
-  console.warn("[config] ralph_loop is deprecated and will be removed in a future release. Use goal instead.")
+  log("[config] ralph_loop is deprecated and will be removed in a future release. Use goal instead.")
 
   const existingGoal = config.goal
   return {
     ...config,
     goal: {
-      enabled: enabled ?? existingGoal?.enabled ?? false,
+      enabled: existingGoal?.enabled ?? enabled ?? false,
       auto_start: existingGoal?.auto_start ?? false,
-      default_max_iterations: defaultMaxIterations ?? existingGoal?.default_max_iterations ?? 100,
+      default_max_iterations: existingGoal?.default_max_iterations ?? defaultMaxIterations ?? 100,
     },
   }
 }
