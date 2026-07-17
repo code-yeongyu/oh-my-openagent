@@ -12,6 +12,7 @@ import { resolveSessionEventID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
 import type { FallbackOwnershipTransfer } from "./first-prompt-watchdog-ownership"
 import { getSessionGeneration, isSessionGenerationCurrent } from "./session-generation"
+import { clearSessionRetryOwnership } from "./session-retry-ownership"
 
 export function createSessionStatusHandler(
   deps: HookDeps,
@@ -91,7 +92,7 @@ export function createSessionStatusHandler(
           rollbackOwnership()
           return
         }
-        sessionRetryInFlight.delete(sessionID)
+        clearSessionRetryOwnership(deps, sessionID)
       } else {
         log(`[${HOOK_NAME}] session.status retry skipped - retry already in flight`, { sessionID })
         return

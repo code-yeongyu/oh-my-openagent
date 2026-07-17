@@ -15,7 +15,8 @@ import { clearInternalAbortOwnership, consumeInternalAbortOwnership } from "./in
 import { isRuntimeFallbackActive } from "./lifecycle"
 import { resolveCreatedSessionModel, resolveEventModel } from "./event-model"
 import type { FallbackOwnershipTransfer } from "./first-prompt-watchdog-ownership"
-import { bumpSessionGeneration, invalidateSessionGeneration } from "./session-generation"
+import { advanceSessionGenerationForUserMessage, bumpSessionGeneration, getSessionGeneration, invalidateSessionGeneration, isSessionGenerationCurrent } from "./session-generation"
+import { clearSessionRetryOwnership } from "./session-retry-ownership"
 
 export function createEventHandler(
   deps: HookDeps,
@@ -37,7 +38,7 @@ export function createEventHandler(
       sessionStates.set(sessionID, createFallbackState(state.originalModel))
     }
 
-    sessionRetryInFlight.delete(sessionID)
+    clearSessionRetryOwnership(deps, sessionID)
     sessionAwaitingFallbackResult.delete(sessionID)
     clearInternalAbortOwnership(deps, sessionID)
     sessionStatusRetryKeys.delete(sessionID)
@@ -70,8 +71,9 @@ export function createEventHandler(
       cancelledSessions.delete(sessionID)
       sessionStates.delete(sessionID)
       sessionLastAccess.delete(sessionID)
-      sessionRetryInFlight.delete(sessionID)
+      clearSessionRetryOwnership(deps, sessionID)
       sessionAwaitingFallbackResult.delete(sessionID)
+      deps.internalAbortRequests?.delete(sessionID)
       clearInternalAbortOwnership(deps, sessionID)
       helpers.clearSessionFallbackTimeout(sessionID)
       sessionStatusRetryKeys.delete(sessionID)
@@ -100,7 +102,9 @@ export function createEventHandler(
     const role = info?.role as string | undefined
     if (!sessionID || role !== "user") return
 
-    bumpSessionGeneration(deps, sessionID)
+    const messageID = typeof info?.id === "string" ? info.id : undefined
+    if (!advanceSessionGenerationForUserMessage(deps, sessionID, messageID)) return
+    sessionStatusRetryKeys.delete(sessionID)
     cancelledSessions.delete(sessionID)
   }
 
@@ -122,7 +126,7 @@ export function createEventHandler(
 
     const hadTimeout = sessionFallbackTimeouts.has(sessionID)
     helpers.clearSessionFallbackTimeout(sessionID)
-    sessionRetryInFlight.delete(sessionID)
+    clearSessionRetryOwnership(deps, sessionID)
     sessionStatusRetryKeys.delete(sessionID)
 
     const state = sessionStates.get(sessionID)
@@ -146,8 +150,9 @@ export function createEventHandler(
       return
     }
 
+    const sessionGeneration = getSessionGeneration(deps, sessionID)
     const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
-    if (!isRuntimeFallbackActive(deps)) return
+    if (!isRuntimeFallbackActive(deps) || !isSessionGenerationCurrent(deps, sessionID, sessionGeneration)) return
 
     if (isAbortError(error)) {
       // If we triggered this abort to swap in a fallback model, consume the

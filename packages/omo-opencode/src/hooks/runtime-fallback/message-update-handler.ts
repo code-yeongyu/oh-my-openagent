@@ -13,6 +13,8 @@ import { resolveMessageEventSessionID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
 import { clearInternalAbortOwnership } from "./internal-abort-ownership"
 import { isRuntimeFallbackActive } from "./lifecycle"
+import { clearSessionRetryOwnership } from "./session-retry-ownership"
+import { getSessionGeneration, isSessionGenerationCurrent } from "./session-generation"
 
 export { hasVisibleAssistantResponse } from "./visible-assistant-response"
 
@@ -43,6 +45,11 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       (errorContentResult.hasError ? { name: "MessageContentError", message: errorContentResult.errorMessage || "Message contains error content" } : undefined)
     const role = info?.role as string | undefined
     const model = normalizeModelToCanonicalString(info?.model)
+    const sessionGeneration = sessionID && role === "assistant" ? getSessionGeneration(deps, sessionID) : undefined
+    const isCurrent = () => sessionID !== undefined
+      && sessionGeneration !== undefined
+      && isRuntimeFallbackActive(deps)
+      && isSessionGenerationCurrent(deps, sessionID, sessionGeneration)
 
     if (sessionID && role === "user") {
       if (!sessionAwaitingFallbackResult.has(sessionID)) {
@@ -57,7 +64,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       }
 
       const hasVisible = await checkVisibleResponse(ctx, sessionID, info)
-      if (!isRuntimeFallbackActive(deps)) return
+      if (!isCurrent()) return
       if (!hasVisible) {
         log(`[${HOOK_NAME}] Assistant update observed without visible final response; keeping fallback timeout`, {
           sessionID,
@@ -107,10 +114,11 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
           model,
         })
         requestAborted = await helpers.abortSessionRequest(sessionID, "message.updated.retry-signal")
+        if (!isCurrent()) return
         if (!requestAborted) {
           return
         }
-        sessionRetryInFlight.delete(sessionID)
+        clearSessionRetryOwnership(deps, sessionID)
       }
       if (wasAwaitingFallbackResult) {
         sessionAwaitingFallbackResult.delete(sessionID)
@@ -144,7 +152,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
 
       const agent = info?.agent as string | undefined
       const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
-      if (!isRuntimeFallbackActive(deps)) return
+      if (!isCurrent()) return
       const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
 
       if (fallbackModels.length === 0) {
@@ -163,10 +171,11 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
 
       if (classifyErrorType(error) === "quota_exceeded" && !requestAborted) {
         requestAborted = await helpers.abortSessionRequest(sessionID, "message.updated.quota-fallback")
+        if (!isCurrent()) return
         if (!requestAborted) {
           return
         }
-        sessionRetryInFlight.delete(sessionID)
+        clearSessionRetryOwnership(deps, sessionID)
       }
 
       if (!state) {

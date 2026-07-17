@@ -6,6 +6,7 @@ import { prepareFallback } from "./fallback-state"
 import { restoreFallbackState, snapshotFallbackState } from "./fallback-state-snapshot"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { isRuntimeFallbackActive } from "./lifecycle"
+import { clearSessionRetryOwnership } from "./session-retry-ownership"
 
 declare function setTimeout(callback: () => void | Promise<void>, delay?: number): RuntimeFallbackTimeout
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
@@ -67,7 +68,7 @@ export function createFallbackTimeoutHelpers(
         log(`[${HOOK_NAME}] Session fallback timeout abort failed; preserving retry ownership`, { sessionID })
         return
       }
-      sessionRetryInFlight.delete(sessionID)
+      clearSessionRetryOwnership(deps, sessionID)
 
       if (state.pendingFallbackModel) {
         state.pendingFallbackModel = undefined

@@ -8,6 +8,7 @@ import { clearAllInternalAbortOwnership } from "./internal-abort-ownership"
 import { createMessageUpdateHandler } from "./message-update-handler"
 import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
 import { clearSessionGenerations } from "./session-generation"
+import { clearAllSessionRetryOwnership } from "./session-retry-ownership"
 
 declare function setInterval(callback: () => void, delay?: number): RuntimeFallbackInterval
 declare function clearInterval(interval: RuntimeFallbackInterval): void
@@ -174,7 +175,7 @@ export function createRuntimeFallbackHook(
 
     deps.sessionStates.clear()
     deps.sessionLastAccess.clear()
-    deps.sessionRetryInFlight.clear()
+    clearAllSessionRetryOwnership(deps)
     deps.sessionAwaitingFallbackResult.clear()
     deps.sessionFallbackTimeouts.clear()
     deps.sessionStatusRetryKeys.clear()

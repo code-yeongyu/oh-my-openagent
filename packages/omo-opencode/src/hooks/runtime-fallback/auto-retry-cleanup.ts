@@ -5,6 +5,7 @@ import { HOOK_NAME } from "./constants"
 import { clearInternalAbortOwnership } from "./internal-abort-ownership"
 import type { HookDeps } from "./types"
 import { invalidateSessionGeneration } from "./session-generation"
+import { clearSessionRetryOwnership } from "./session-retry-ownership"
 
 const SESSION_TTL_MS = 30 * 60 * 1000
 
@@ -15,7 +16,6 @@ export function createStaleSessionCleanup(
   const {
     sessionStates,
     sessionLastAccess,
-    sessionRetryInFlight,
     sessionAwaitingFallbackResult,
     sessionStatusRetryKeys,
   } = deps
@@ -29,7 +29,7 @@ export function createStaleSessionCleanup(
         deps.onStaleSessionCleanup?.(sessionID)
         sessionStates.delete(sessionID)
         sessionLastAccess.delete(sessionID)
-        sessionRetryInFlight.delete(sessionID)
+        clearSessionRetryOwnership(deps, sessionID)
         sessionAwaitingFallbackResult.delete(sessionID)
         deps.internalAbortRequests?.delete(sessionID)
         clearInternalAbortOwnership(deps, sessionID)

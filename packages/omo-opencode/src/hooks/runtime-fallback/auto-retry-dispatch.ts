@@ -14,6 +14,7 @@ import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failur
 import { resolveOriginalUserRetryMetadata } from "./auto-retry-metadata"
 import { isRuntimeFallbackActive } from "./lifecycle"
 import { getSessionGeneration, isSessionGenerationCurrent } from "./session-generation"
+import { acquireSessionRetryOwnership, releaseSessionRetryOwnership } from "./session-retry-ownership"
 
 export function createAutoRetryDispatcher(
   deps: HookDeps,
@@ -23,7 +24,6 @@ export function createAutoRetryDispatcher(
   const {
     ctx,
     sessionStates,
-    sessionRetryInFlight,
     sessionAwaitingFallbackResult,
     internallyAbortedSessions,
     pluginConfig,
@@ -39,7 +39,7 @@ export function createAutoRetryDispatcher(
     const isCurrent = () => isRuntimeFallbackActive(deps)
       && isSessionGenerationCurrent(deps, sessionID, sessionGeneration)
     if (!isCurrent()) return { accepted: false, status: "blocked", reason: "runtime fallback disposed" }
-    if (sessionRetryInFlight.has(sessionID)) {
+    if (deps.sessionRetryInFlight.has(sessionID)) {
       log(`[${HOOK_NAME}] Retry already in flight, skipping (${source})`, { sessionID })
       return { accepted: false, status: "blocked", reason: "retry already in flight" }
     }
@@ -62,11 +62,15 @@ export function createAutoRetryDispatcher(
       }
       return { accepted: false, status: "invalid-model", reason: "missing provider prefix" }
     }
+    const retryOwner = acquireSessionRetryOwnership(deps, sessionID)
+    if (!retryOwner) {
+      log(`[${HOOK_NAME}] Retry already in flight, skipping (${source})`, { sessionID })
+      return { accepted: false, status: "blocked", reason: "retry already in flight" }
+    }
 
     const hadAwaitingFallbackResult = sessionAwaitingFallbackResult.has(sessionID)
     const previousPendingFallbackModel = sessionStates.get(sessionID)?.pendingFallbackModel
     const previousPendingFallbackPromptMayHaveBeenAccepted = sessionStates.get(sessionID)?.pendingFallbackPromptMayHaveBeenAccepted
-    sessionRetryInFlight.add(sessionID)
     let retryDispatched = false
     let retryMayHaveBeenAccepted = false
     let acceptedStatus: AutoRetryDispatchOutcome["status"] = "dispatched"
@@ -137,8 +141,8 @@ export function createAutoRetryDispatcher(
       })
 
       let promptResult = await dispatchRetryPrompt(`runtime-fallback:${source}`, "defer")
-      if (!isCurrent()) return { accepted: false, status: "blocked", reason: "session lifecycle changed" }
       if (promptResult.status === "active") {
+        if (!isCurrent()) return { accepted: false, status: "blocked", reason: "session lifecycle changed" }
         log(`[${HOOK_NAME}] Session active, queueing fallback dispatch (${source})`, {
           sessionID,
         })
@@ -223,15 +227,14 @@ export function createAutoRetryDispatcher(
       log(`[${HOOK_NAME}] Auto-retry failed (${source})`, { sessionID, error: String(retryError) })
       return { accepted: false, status: "failed", reason: retryError.message }
     } finally {
-      if (!isCurrent()) return { accepted: false, status: "blocked", reason: "session lifecycle changed" }
-      sessionRetryInFlight.delete(sessionID)
-      if (retryMayHaveBeenAccepted) {
+      releaseSessionRetryOwnership(deps, sessionID, retryOwner)
+      if (isCurrent() && retryMayHaveBeenAccepted) {
         const state = sessionStates.get(sessionID)
         if (state) {
           state.pendingFallbackPromptMayHaveBeenAccepted = true
         }
       }
-      if (!retryDispatched && !retryMayHaveBeenAccepted) {
+      if (isCurrent() && !retryDispatched && !retryMayHaveBeenAccepted) {
         if (hadAwaitingFallbackResult) {
           sessionAwaitingFallbackResult.add(sessionID)
         } else {
