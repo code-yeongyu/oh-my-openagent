@@ -61,6 +61,9 @@ export type SteeringEngine = {
   cancelTask(idOrName: string, reason?: string): Promise<CancelOutcome>
   // Called by the manager right after a queued child launches: drains ordered pending messages.
   notifyStarted(taskId: string): Promise<void>
+  // Called by the manager when a task is forgotten (destroyed/evicted/failed to launch) so buffered
+  // messages for a child that will never start are not retained for the session.
+  dropPending(taskId: string): void
 }
 
 export type { TaskRecord }
