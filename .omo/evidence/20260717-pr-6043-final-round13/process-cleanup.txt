@@ -1,1 +1,5 @@
 qa_processes_remaining=0
+qa_tmux_sessions_remaining=0
+live_last_files_remaining=0
+isolated_sandbox_remaining=0
+real_db_count_after=5751

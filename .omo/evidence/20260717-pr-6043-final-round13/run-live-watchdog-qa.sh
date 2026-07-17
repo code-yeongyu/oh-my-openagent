@@ -3,6 +3,15 @@ set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
 EVIDENCE="$ROOT/.omo/evidence/20260717-pr-6043-final-round13"
+EXPECTED_SOURCE_COMMIT="093efc8c713d66c78cef65c5210af622a029c22a"
+EXPECTED_SOURCE_TREE="402ef28ff67606eb98116910222fcefbe2ed4514"
+SOURCE_PATHS=(
+  packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-types.ts
+  packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts
+  packages/omo-opencode/src/plugin/event-session-deletion-ordering.test.ts
+  packages/omo-opencode/src/plugin/event-session-lifecycle-queue.ts
+  packages/omo-opencode/src/plugin/event.ts
+)
 FAKE_SCRIPT="$EVIDENCE/fake-silent-provider.mjs"
 ROOT_PROBE="$EVIDENCE/root-state-probe.ts"
 REAL_DB="$(opencode db path 2>/dev/null | head -1)"
@@ -19,6 +28,12 @@ SSE_LOG=""
 ROOT_PROBE_LOG=""
 OMO_LOG="${TMPDIR:-/tmp}/oh-my-opencode.log"
 OMO_OFFSET=0
+
+RUN_HEAD="$(git rev-parse HEAD)"
+SOURCE_TREE="$(git rev-parse "${EXPECTED_SOURCE_COMMIT}^{tree}")"
+[ "$SOURCE_TREE" = "$EXPECTED_SOURCE_TREE" ]
+git diff --quiet "$EXPECTED_SOURCE_COMMIT" -- "${SOURCE_PATHS[@]}"
+SOURCE_MATCHES=yes
 
 cleanup() {
   [ -n "$FAKE_LOG" ] && [ -f "$FAKE_LOG" ] && cp "$FAKE_LOG" "$EVIDENCE/live-last-fake-provider.txt" || true
@@ -202,13 +217,15 @@ REAL_COUNT_AFTER="$(sqlite3 "$REAL_DB" 'SELECT count(*) FROM session;')"
 cp "$FAKE_LOG" "$EVIDENCE/live-fake-provider.txt"
 sed -e "s/${SESSION_ID}/<qa-session>/g" -e "s#${TMP_ROOT}#<isolated-sandbox>#g" -e "s#${ROOT}#<worktree>#g" \
   "$TMP_ROOT/plugin-watchdog.log" > "$EVIDENCE/live-plugin-watchdog.txt"
-sed -n 's/^data: //p' "$SSE_LOG" | jq -c 'select(.type == "server.connected" or .type == "message.updated" or .type == "message.part.updated" or .type == "message.part.delta" or .type == "session.error" or .type == "session.idle") | {type, session:(if (.properties.sessionID // .properties.info.sessionID // .properties.part.sessionID // null) then "<qa-session>" else null end), role:(.properties.info.role // null), text:(.properties.part.text // .properties.delta // null)}' > "$EVIDENCE/live-sse-events.jsonl"
+sed -n 's/^data: //p' "$SSE_LOG" | jq -c 'select(.type == "server.connected" or .type == "session.created" or .type == "session.deleted" or .type == "message.updated" or .type == "message.part.updated" or .type == "message.part.delta" or .type == "session.error" or .type == "session.idle") | {type, session:(if (.properties.sessionID // .properties.info.sessionID // .properties.info.id // .properties.part.sessionID // null) then "<qa-session>" else null end), role:(.properties.info.role // null), text:(.properties.part.text // .properties.delta // null)}' > "$EVIDENCE/live-sse-events.jsonl"
 sed -e "s/${OLDER_SESSION_ID}/<older-root>/g" -e "s/${NEWER_SESSION_ID}/<newer-root>/g" "$ROOT_PROBE_LOG" > "$EVIDENCE/live-root-state.jsonl"
-printf 'real_db_unchanged=yes\nsandbox_isolated=yes\nsandbox_session_count=%s\nprompt_http_code=%s\nsecond_prompt_http_code=%s\nuser_abort_http_code=%s\nnewer_root_delete_http_code=%s\nolder_root_watchdog_fallback=yes\ntwo_active_roots_observed=yes\nolder_root_restored_after_delete=yes\nprimary_requests=%s\nfallback_requests=%s\nprimary_connection_closed=%s\nfallback_response_seen=%s\nfallback_watchdog_rearmed=no\nwatchdog_arm_count_after_success=%s\nwatchdog_arm_count_after_settle=%s\nuser_abort_classified_external=yes\n' \
+printf 'run_head=%s\nsource_commit=%s\nsource_tree=%s\nsource_matches=%s\nreal_db_unchanged=yes\nsandbox_isolated=yes\nsandbox_session_count=%s\nprompt_http_code=%s\nsecond_prompt_http_code=%s\nuser_abort_http_code=%s\nnewer_root_delete_http_code=%s\nolder_root_watchdog_fallback=yes\ntwo_active_roots_observed=yes\nolder_root_restored_after_delete=yes\nprimary_requests=%s\nfallback_requests=%s\nprimary_connection_closed=%s\nfallback_response_seen=%s\nfallback_watchdog_rearmed=no\nwatchdog_arm_count_after_success=%s\nwatchdog_arm_count_after_settle=%s\nuser_abort_classified_external=yes\n' \
+  "$RUN_HEAD" "$EXPECTED_SOURCE_COMMIT" "$SOURCE_TREE" "$SOURCE_MATCHES" \
   "$SANDBOX_COUNT" "$HTTP_CODE" "$SECOND_HTTP_CODE" "$ABORT_HTTP_CODE" "$DELETE_HTTP_CODE" \
   "$(grep -c 'REQUEST model=primary' "$FAKE_LOG")" "$(grep -c 'REQUEST model=fallback' "$FAKE_LOG")" \
   "$(grep -c 'PRIMARY_CONNECTION_CLOSED' "$FAKE_LOG")" "$(grep -c 'QA_FALLBACK_OK' "$SSE_LOG")" \
   "$ARM_COUNT_AFTER_SUCCESS" "$ARM_COUNT_AFTER_SETTLE" \
   > "$EVIDENCE/live-isolation-receipt.txt"
 
-printf 'PASS source_head=%s real_db_unchanged=yes older_root_fallback=yes two_active_roots=yes deletion_restored_older=yes fallback_watchdog_rearmed=no later_user_abort=external\n' "$(git rev-parse HEAD)"
+printf 'PASS run_head=%s source_commit=%s source_tree=%s source_matches=%s real_db_unchanged=yes older_root_fallback=yes two_active_roots=yes deletion_restored_older=yes fallback_watchdog_rearmed=no later_user_abort=external\n' \
+  "$RUN_HEAD" "$EXPECTED_SOURCE_COMMIT" "$SOURCE_TREE" "$SOURCE_MATCHES"

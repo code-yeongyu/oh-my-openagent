@@ -1,4 +1,6 @@
 {"type":"server.connected","session":null,"role":null,"text":null}
+{"type":"session.created","session":"<qa-session>","role":null,"text":null}
+{"type":"session.created","session":"<qa-session>","role":null,"text":null}
 {"type":"message.updated","session":"<qa-session>","role":"user","text":null}
 {"type":"message.part.updated","session":"<qa-session>","role":null,"text":"Reply exactly QA_FALLBACK_OK"}
 {"type":"message.updated","session":"<qa-session>","role":"assistant","text":null}
@@ -18,6 +20,7 @@
 {"type":"message.updated","session":"<qa-session>","role":"assistant","text":null}
 {"type":"session.idle","session":"<qa-session>","role":null,"text":null}
 {"type":"message.updated","session":"<qa-session>","role":"user","text":null}
+{"type":"session.deleted","session":"<qa-session>","role":null,"text":null}
 {"type":"message.updated","session":"<qa-session>","role":"user","text":null}
 {"type":"message.part.updated","session":"<qa-session>","role":null,"text":"Second turn for user cancellation QA"}
 {"type":"message.updated","session":"<qa-session>","role":"assistant","text":null}

@@ -50,15 +50,26 @@ implementation to 247 pure lines.
   fallback, two active roots, newer-root deletion and older-root restoration,
   no fallback-owned re-arm, later external user cancellation, unchanged real
   database, and complete sandbox/process cleanup.
+- Live-source binding: `run-live-watchdog-qa.sh` refuses to start unless all
+  five repaired source paths are byte-identical to repair commit
+  `093efc8c713d66c78cef65c5210af622a029c22a`, whose tree is
+  `402ef28ff67606eb98116910222fcefbe2ed4514`. The accepted receipt records the
+  evidence run head, source commit, source tree, and `source_matches=yes`.
+- Lifecycle wire proof: the sanitized SSE artifact retains
+  `session.created` and `session.deleted` alongside message, idle, and error
+  events; session identifiers are replaced with reviewer-safe placeholders.
+- Exact invocations and arguments for every red, green, static, harness, and
+  production-duration check are indexed in `qa-commands.txt`.
 
 ## Sufficiency And Omissions
 
 The deterministic regression directly controls the reverse lifecycle order
 that caused resurrection. The full event matrix covers all sibling lifecycle
 paths, while the runtime suite and real OpenCode run cover the watchdog,
-fallback, deletion, and cancellation integration boundaries. Candidate-tree
-equality binds the pre-commit live run to the committed source, and the
-exact-commit smoke rechecks the changed behavior after commit.
+fallback, deletion, and cancellation integration boundaries. The live script's
+source-path assertion binds the production-duration run to the repair commit,
+while its recorded run head identifies the evidence revision that performed
+the check. The exact-commit smoke independently rechecks the changed behavior.
 
 Raw `live-last-*` captures, the debug journal, and the temporary reviewer report
 were removed. Sanitized artifacts contain no tokens, auth headers, credentials,
