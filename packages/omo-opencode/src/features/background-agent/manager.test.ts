@@ -806,6 +806,57 @@ describe("BackgroundManager pending launch visibility", () => {
     }
   })
 
+  test("reports an archived parent's pending nested launch at the root before lineage lookup completes", async () => {
+    // #given a removed direct child and a nested launch blocked in lineage lookup
+    let releaseLineage: (() => void) | undefined
+    const lineageGate = new Promise<void>((resolve) => { releaseLineage = resolve })
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput({
+        session: {
+          get: async ({ path }: { path: { id: string } }) => {
+            if (path.id === "child-session") {
+              await lineageGate
+              return { data: { id: "child-session", parentID: "root-session" } }
+            }
+            return { data: { id: "root-session" } }
+          },
+          create: async () => ({ data: { id: "grandchild-session" } }),
+          promptAsync: async () => ({}),
+          abort: async () => ({}),
+        },
+      }),
+    })
+    const directChild = createMockTask({
+      id: "archived-direct-child",
+      rootSessionId: "root-session",
+      sessionId: "child-session",
+      parentSessionId: "root-session",
+      status: "completed",
+    })
+    getTaskMap(manager).set(directChild.id, directChild)
+    ;(cast<{ removeTask: (task: BackgroundTask) => void }>(manager)).removeTask(directChild)
+
+    try {
+      // #when the archived child launches before lineage resolution completes
+      const launch = manager.launch({
+        description: "delayed archived-parent launch",
+        prompt: "test",
+        agent: "explore",
+        parentSessionId: "child-session",
+        parentMessageId: "child-message",
+      })
+
+      // #then the retained lineage keeps the root wait authoritative
+      expect(manager.hasBackgroundWorkInFlight("root-session")).toBe(true)
+
+      releaseLineage?.()
+      await launch
+    } finally {
+      releaseLineage?.()
+      await manager.shutdown()
+    }
+  })
+
   test("clears the pending launch reservation when lineage lookup fails", async () => {
     // #given lineage lookup rejects before task registration
     const client = {
@@ -2179,6 +2230,49 @@ describe("BackgroundManager terminal ownership and root reservations", () => {
     expect(completed).toBe(true)
     expect(getRootDescendantCounts(manager).get("root-session")).toBe(1)
 
+    await manager.shutdown()
+  })
+
+  test("reports a terminal task resume waiting for concurrency as root work in flight", async () => {
+    //#given
+    const client = {
+      session: {
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput(client),
+      config: { defaultConcurrency: 1 },
+    })
+    stubNotifyParentSession(manager)
+    const task = createMockTask({
+      id: "task-queued-resume-liveness",
+      parentSessionId: "root-session",
+      sessionId: "session-queued-resume-liveness",
+      rootSessionId: "root-session",
+      status: "completed",
+      completedAt: new Date(),
+      concurrencyGroup: "explore",
+    })
+    getTaskMap(manager).set(task.id, task)
+    const concurrencyManager = getConcurrencyManager(manager)
+    await concurrencyManager.acquire("explore", "slot-holder")
+
+    //#when
+    const resume = manager.resume({
+      sessionId: task.sessionId,
+      prompt: "continue",
+      parentSessionId: "root-session",
+      parentMessageId: "resume-message",
+    })
+    await Promise.resolve()
+
+    //#then
+    expect(manager.hasBackgroundWorkInFlight("root-session")).toBe(true)
+
+    concurrencyManager.release("explore")
+    await resume
     await manager.shutdown()
   })
 
@@ -10187,6 +10281,53 @@ describe("BackgroundManager regression fixes - resume and aborted notification",
     //#then
     expect(manager.getTask(task.id)?.rootSessionId).toBe(task.rootSessionId)
     expect(manager.getTasksForBackgroundWait(task.rootSessionId ?? "").map(({ id }) => id)).toContain(task.id)
+
+    manager.shutdown()
+  })
+
+  test("should retain archived terminal tasks in their immediate parent wait snapshot", () => {
+    //#given
+    const manager = createBackgroundManager()
+    const task: BackgroundTask = {
+      id: "task-parent-wait-archive-regression",
+      rootSessionId: "root-session",
+      sessionId: "session-parent-wait-archive-regression",
+      parentSessionId: "nested-parent-session",
+      parentMessageId: "msg-1",
+      description: "parent wait archive regression",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    ;(cast<{ removeTask: (task: BackgroundTask) => void }>(manager)).removeTask(task)
+
+    //#then
+    expect(manager.getTasksForBackgroundWait(task.parentSessionId).map(({ id }) => id)).toContain(task.id)
+
+    manager.shutdown()
+  })
+
+  test("should release a committed synchronous spawn reservation", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    ;(cast<{ assertCanSpawn: (parentSessionID: string) => Promise<SubagentSpawnContext> }>(manager)).assertCanSpawn = async () => ({
+      rootSessionID: "root-session",
+      parentDepth: 0,
+      childDepth: 1,
+    })
+    const reservation = await manager.reserveSubagentSpawn("root-session")
+    reservation.commit()
+
+    //#when
+    reservation.release()
+
+    //#then
+    expect(manager.hasBackgroundWorkInFlight("root-session")).toBe(false)
 
     manager.shutdown()
   })

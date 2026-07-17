@@ -283,6 +283,7 @@ export class BackgroundManager {
   private terminalizationWaiters = new Map<string, Set<() => void>>()
   private preStartDescendantReservations: Set<string>
   private pendingLaunchesByParentSession: Map<string, number>
+  private pendingResumesBySession: Map<string, number>
   private enableParentSessionNotifications: boolean
   private modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   private logger: typeof log
@@ -310,6 +311,7 @@ export class BackgroundManager {
     this.rootDescendantCounts = new Map()
     this.preStartDescendantReservations = new Set()
     this.pendingLaunchesByParentSession = new Map()
+    this.pendingResumesBySession = new Map()
     this.enableParentSessionNotifications = options?.enableParentSessionNotifications ?? true
     this.modelFallbackControllerAccessor = options?.modelFallbackControllerAccessor
     this.logger = options?.log ?? log
@@ -371,21 +373,28 @@ export class BackgroundManager {
     descendantCount: number
     commit: () => number
     rollback: () => void
+    release: () => void
   }> {
     const spawnContext = await this.assertCanSpawn(parentSessionID)
     const descendantCount = this.registerRootDescendant(spawnContext.rootSessionID)
-    let settled = false
+    let committed = false
+    let released = false
 
     return {
       spawnContext,
       descendantCount,
       commit: () => {
-        settled = true
+        committed = true
         return descendantCount
       },
       rollback: () => {
-        if (settled) return
-        settled = true
+        if (committed || released) return
+        released = true
+        this.unregisterRootDescendant(spawnContext.rootSessionID)
+      },
+      release: () => {
+        if (released) return
+        released = true
         this.unregisterRootDescendant(spawnContext.rootSessionID)
       },
     }
@@ -493,10 +502,30 @@ export class BackgroundManager {
   }
 
   private getPendingLaunchSessionIDs(parentSessionID: string): string[] {
-    const rootSessionID = this.findBySession(parentSessionID)?.rootSessionId
+    const rootSessionID = this.findRetainedTaskBySession(parentSessionID)?.rootSessionId
     return rootSessionID && rootSessionID !== parentSessionID
       ? [parentSessionID, rootSessionID]
       : [parentSessionID]
+  }
+
+  private findRetainedTaskBySession(sessionID: string): BackgroundTask | undefined {
+    const liveTask = this.findBySession(sessionID)
+    if (liveTask) return liveTask
+    return Array.from(this.completedTaskArchive.values()).find(task => task.sessionId === sessionID)
+  }
+
+  private reservePendingResume(sessionID: string): void {
+    const nextCount = (this.pendingResumesBySession.get(sessionID) ?? 0) + 1
+    this.pendingResumesBySession.set(sessionID, nextCount)
+  }
+
+  private releasePendingResume(sessionID: string): void {
+    const currentCount = this.pendingResumesBySession.get(sessionID) ?? 0
+    if (currentCount <= 1) {
+      this.pendingResumesBySession.delete(sessionID)
+      return
+    }
+    this.pendingResumesBySession.set(sessionID, currentCount - 1)
   }
 
   private getTaskWaitSessionIDs(task: BackgroundTask): string[] {
@@ -741,6 +770,7 @@ export class BackgroundManager {
       descendantCount: number
       commit: () => number
       rollback: () => void
+      release: () => void
     } | undefined
     try {
       spawnReservation = await this.reserveSubagentSpawn(input.parentSessionId)
@@ -1338,7 +1368,7 @@ The fallback retry session is now created and can be inspected directly.
   getTasksForBackgroundWait(sessionID: string): BackgroundTask[] {
     const liveRootTasks = Array.from(this.tasks.values()).filter(task => task.rootSessionId === sessionID)
     const archivedTasks = Array.from(this.completedTaskArchive.values()).filter(task => (
-      task.rootSessionId === sessionID || (!task.rootSessionId && task.parentSessionId === sessionID)
+      task.rootSessionId === sessionID || task.parentSessionId === sessionID
     ))
     const liveTasks = liveRootTasks.length > 0 || this.rootDescendantCounts.has(sessionID)
       ? liveRootTasks
@@ -1351,6 +1381,7 @@ The fallback retry session is now created and can be inspected directly.
   hasBackgroundWorkInFlight(sessionID: string): boolean {
     return (
       (this.pendingLaunchesByParentSession.get(sessionID) ?? 0) > 0 ||
+      (this.pendingResumesBySession.get(sessionID) ?? 0) > 0 ||
       this.hasActiveDescendantTasks(sessionID) ||
       this.parentWakeNotifier.hasNotificationPreparation(sessionID)
     )
@@ -1596,6 +1627,10 @@ The fallback retry session is now created and can be inspected directly.
         "Wait for it to complete before resuming it with task_id.",
       )
     }
+    const resumeWaitSessionIDs = new Set(
+      [input.parentSessionId, existingTask.rootSessionId].filter((id): id is string => Boolean(id)),
+    )
+    for (const sessionID of resumeWaitSessionIDs) this.reservePendingResume(sessionID)
 
     const resumeSnapshot = this.captureResumeTaskSnapshot(existingTask)
     const completionTimer = this.completionTimers.get(existingTask.id)
@@ -1621,12 +1656,13 @@ The fallback retry session is now created and can be inspected directly.
         this.reacquireTaskRootDescendant(existingTask)
       }
       existingTask.status = "running"
+      this.updateTaskParent(existingTask, input.parentSessionId)
     } finally {
       releaseResume()
+      for (const sessionID of resumeWaitSessionIDs) this.releasePendingResume(sessionID)
     }
     existingTask.completedAt = undefined
     existingTask.error = undefined
-    this.updateTaskParent(existingTask, input.parentSessionId)
     existingTask.parentMessageId = input.parentMessageId
     existingTask.parentModel = input.parentModel
     existingTask.parentAgent = input.parentAgent
@@ -3617,6 +3653,7 @@ The task was re-queued on a fallback model after a retryable failure.
     }
     this.terminalizationWaiters.clear()
     this.pendingLaunchesByParentSession.clear()
+    this.pendingResumesBySession.clear()
     this.queuesByKey.clear()
     this.processingKeys.clear()
     this.taskHistory.clearAll()
