@@ -13,7 +13,7 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
     {
       name: "momus",
       requirement: AGENT_MODEL_REQUIREMENTS.momus,
-      expectedModel: "github-copilot/gpt-5.6-sol",
+      expectedModel: "github-copilot/gpt-5.6-terra",
     },
     {
       name: "ultrabrain",
@@ -53,9 +53,9 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
     })
   }
 
-  test("warm cache resolves transformed Vercel GPT-5.6 with xhigh", () => {
+  test("warm cache resolves transformed Vercel GPT-5.6 with high", () => {
     // given
-    const availableModels = new Set(["vercel/openai/gpt-5.6-sol"])
+    const availableModels = new Set(["vercel/openai/gpt-5.6-terra"])
 
     // when
     const result = resolveModelWithFallback({
@@ -66,17 +66,17 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
 
     // then
     expect(result).toEqual({
-      model: "vercel/openai/gpt-5.6-sol",
+      model: "vercel/openai/gpt-5.6-terra",
       source: "provider-fallback",
-      variant: "xhigh",
+      variant: "high",
     })
   })
 
-  test("warm cache keeps transformed Vercel xhigh ahead of Copilot high", () => {
+  test("warm cache keeps transformed Vercel terra ahead of Copilot terra", () => {
     // given
     const availableModels = new Set([
-      "github-copilot/gpt-5.6-sol",
-      "vercel/openai/gpt-5.6-sol",
+      "github-copilot/gpt-5.6-terra",
+      "vercel/openai/gpt-5.6-terra",
     ])
 
     // when
@@ -88,9 +88,9 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
 
     // then
     expect(result).toEqual({
-      model: "vercel/openai/gpt-5.6-sol",
+      model: "vercel/openai/gpt-5.6-terra",
       source: "provider-fallback",
-      variant: "xhigh",
+      variant: "high",
     })
   })
 

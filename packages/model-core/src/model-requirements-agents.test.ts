@@ -169,7 +169,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     })
   })
 
-  test("momus keeps native gpt-5.6-sol xhigh before Copilot high and gpt-5.5", () => {
+  test("momus keeps native gpt-5.6-terra high before Copilot high and gpt-5.5", () => {
     // given
     const momus = AGENT_MODEL_REQUIREMENTS["momus"]
 
@@ -180,12 +180,12 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(momus.fallbackChain.length).toBeGreaterThan(1)
     expect(primary).toEqual({
       providers: ["openai", "vercel"],
-      model: "gpt-5.6-sol",
-      variant: "xhigh",
+      model: "gpt-5.6-terra",
+      variant: "high",
     })
     expect(copilot).toEqual({
       providers: ["github-copilot"],
-      model: "gpt-5.6-sol",
+      model: "gpt-5.6-terra",
       variant: "high",
     })
     expect(legacyFallback).toEqual({

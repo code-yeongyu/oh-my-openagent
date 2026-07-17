@@ -210,8 +210,8 @@ Used by: Hephaestus, Oracle, Momus, `deep`, `ultrabrain`, `quick`, `unspecified-
 
 | Priority | Model | Provider | Why |
 |---|---|---|---|
-| 1 | `gpt-5.6-sol` (xhigh / high / medium) | `openai`, `vercel` | The GPT-5.6 flagship. Default for Hephaestus (medium), Momus (xhigh), and `ultrabrain` (xhigh); first fallback for `deep`. |
-| 1 | `gpt-5.6-terra` (xhigh) | `openai`, `vercel` | GPT-5.6 mid-tier. New default for the `deep` category. |
+| 1 | `gpt-5.6-sol` (xhigh / high / medium) | `openai`, `vercel` | The GPT-5.6 flagship. Default for Hephaestus (medium) and `ultrabrain` (xhigh); first fallback for `deep`. |
+| 1 | `gpt-5.6-terra` (xhigh / high) | `openai`, `vercel` | GPT-5.6 mid-tier. New default for the `deep` category; default for Momus (high). |
 | 1 | `gpt-5.6-luna` (xhigh) | `openai`, `vercel` | GPT-5.6 light tier. New default for the `unspecified-low` category. |
 | 2 | `gpt-5.5` / `gpt-5.4` (pro / xhigh / high / medium) | `openai`, `github-copilot`, `opencode`, `vercel` | Previous flagship generation; first fallback on providers without GPT-5.6. Hephaestus requires this family. |
 | 3 | `gpt-5.5-codex` | same | Still the deep-coding powerhouse. Kept as an explicit override option. |
@@ -275,7 +275,7 @@ These agents are built for GPT's principle-driven style. Their prompts assume au
 |---|---|---|
 | **Hephaestus** | Autonomous deep worker | `openai\|vercel/gpt-5.6-sol` (medium) → `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (medium) — GPT-only chain, requires one of those providers. The craftsman. |
 | **Oracle** | Architecture consultant | `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (high) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `opencode-go\|vercel/glm-5.2` |
-| **Momus** | Ruthless reviewer | `openai\|vercel/gpt-5.6-sol` (xhigh) → `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (xhigh) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `opencode-go\|vercel/glm-5.2` |
+| **Momus** | Ruthless reviewer | `openai\|vercel/gpt-5.6-terra` (high) → `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (xhigh) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `opencode-go\|vercel/glm-5.2` |
 
 ### Utility Runners → Speed over Intelligence
 
@@ -315,8 +315,8 @@ Principle-driven, explicit reasoning, deep technical capability. Best for agents
 | Model             | Strengths                                                                                       |
 | ----------------- | ----------------------------------------------------------------------------------------------- |
 | **GPT-5.5 Codex** | Deep coding powerhouse. Autonomous exploration. Still available for deep category and explicit overrides. |
-| **GPT-5.6 Sol**   | The GPT-5.6 flagship. Default for Hephaestus (medium) and Momus (xhigh); default for the `ultrabrain` category and first fallback for `deep`. |
-| **GPT-5.6 Terra** | GPT-5.6 mid-tier. Default for the `deep` category (xhigh). |
+| **GPT-5.6 Sol**   | The GPT-5.6 flagship. Default for Hephaestus (medium); default for the `ultrabrain` category and first fallback for `deep`. |
+| **GPT-5.6 Terra** | GPT-5.6 mid-tier. Default for the `deep` category (xhigh) and Momus (high). |
 | **GPT-5.6 Luna**  | GPT-5.6 light tier. Default for the `unspecified-low` category (xhigh). |
 | **GPT-5.5**       | High intelligence, strategic reasoning. Default for Oracle, first fallback for Momus (xhigh) and Hephaestus, and a key fallback for Prometheus / Atlas. |
 | **GPT-5.4 Mini**  | Fast + strong reasoning. Good for lightweight autonomous tasks. Default for quick category. |

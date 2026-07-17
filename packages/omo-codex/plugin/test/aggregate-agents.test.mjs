@@ -43,8 +43,8 @@ const lazycodexAgentInvariants = new Map([
 	[
 		"momus.toml",
 		{
-			model: "gpt-5.6-sol",
-			effort: "ultra",
+			model: "gpt-5.6-terra",
+			effort: "high",
 			includes: [/plan reviewer/i, /OKAY, ITERATE, or REJECT/, /Read-only/],
 		},
 	],
