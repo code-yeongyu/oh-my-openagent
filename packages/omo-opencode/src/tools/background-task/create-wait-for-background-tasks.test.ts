@@ -192,6 +192,45 @@ describe("createWaitForBackgroundTasks", () => {
     expect(output).toContain("## Still Running")
   })
 
+  test("preserves active task statuses when terminal history exhausts the output length cap", async () => {
+    // #given oversized retained terminal history and one active descendant
+    const terminalTasks = Array.from({ length: 99 }, (_, index) => createTask({
+      id: `terminal-oversized-${index}`,
+      description: "D".repeat(300),
+      error: "E".repeat(1_000),
+      status: "error",
+    }))
+    const activeTask = createTask({ id: "active-must-remain-visible", status: "running" })
+    const manager = createManager([[...terminalTasks, activeTask]])
+
+    // #when the bounded waiter result is formatted
+    const output = await runTool(manager, { timeout: 1 })
+
+    // #then the active status and retry instruction survive aggregate truncation
+    expect(output.length).toBeLessThanOrEqual(24_000)
+    expect(output).toContain("## Still Running")
+    expect(output).toContain("`active-must-remain-visible`")
+    expect(output).toContain("call `wait-for-background-tasks` again")
+  })
+
+  test("does not direct omitted active tasks to background_output", async () => {
+    // #given more active tasks than the retained task summary cap
+    const activeTasks = Array.from({ length: 101 }, (_, index) => createTask({
+      id: `active-${index}`,
+      status: "running",
+    }))
+    const manager = createManager([activeTasks])
+
+    // #when the bounded waiter result is formatted
+    const output = await runTool(manager, { timeout: 1 })
+
+    // #then overflow guidance keeps callers on the waiter until omitted tasks are terminal
+    expect(output).toContain("Result limited to 100 of 101 retained tasks")
+    expect(output).toContain("Omitted tasks may still be active")
+    expect(output).toContain("call `wait-for-background-tasks` again")
+    expect(output).not.toContain("Use `background_output` for omitted task details")
+  })
+
   test("keeps the root wait open for an active grandchild after its direct child completes", async () => {
     // #given a completed direct child whose nested descendant is still running
     const directChild = createTask({

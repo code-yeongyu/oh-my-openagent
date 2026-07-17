@@ -10,6 +10,7 @@ const POLL_INTERVAL_MS = 3000
 const MAX_RESULT_LENGTH = 24_000
 const MAX_TASKS_IN_RESULT = 100
 const MAX_DESCRIPTION_LENGTH = 300
+const MAX_ACTIVE_DESCRIPTION_LENGTH = 120
 const MAX_ERROR_LENGTH = 1_000
 
 const TERMINAL_STATUSES: ReadonlySet<BackgroundTaskStatus> = new Set([
@@ -65,23 +66,19 @@ function formatResult(tasks: BackgroundTask[], timedOut: boolean, timeoutMs: num
     ...tasks.filter((task) => !isTerminal(task.status)),
     ...tasks.filter((task) => isTerminal(task.status)),
   ]
+  const displayedTasks = prioritizedTasks.slice(0, MAX_TASKS_IN_RESULT)
+  const omittedTasks = prioritizedTasks.slice(MAX_TASKS_IN_RESULT)
 
-  for (const task of prioritizedTasks.slice(0, MAX_TASKS_IN_RESULT)) {
+  for (const task of displayedTasks) {
     if (isTerminal(task.status)) {
       const errorInfo = task.error ? `\n  Error: ${truncateField(task.error, MAX_ERROR_LENGTH)}` : ""
       completed.push(`- \`${task.id}\` (${truncateField(task.description, MAX_DESCRIPTION_LENGTH)}): **${task.status.toUpperCase()}**${errorInfo}`)
     } else {
-      stillRunning.push(`- \`${task.id}\` (${truncateField(task.description, MAX_DESCRIPTION_LENGTH)}): ${task.status}`)
+      stillRunning.push(`- \`${task.id}\` (${truncateField(task.description, MAX_ACTIVE_DESCRIPTION_LENGTH)}): ${task.status}`)
     }
   }
 
   const sections: string[] = []
-
-  if (completed.length > 0) {
-    sections.push(
-      `## Terminal Tasks\n${completed.join("\n")}\n\nUse \`background_output(task_id="<id>")\` to retrieve detailed results for each task.`,
-    )
-  }
 
   if (timedOut) {
     if (stillRunning.length > 0) {
@@ -102,8 +99,17 @@ function formatResult(tasks: BackgroundTask[], timedOut: boolean, timeoutMs: num
     sections.unshift(`## Wait Aborted\nBackground task wait cancelled because the tool call was aborted.${current}`)
   }
 
-  if (tasks.length > MAX_TASKS_IN_RESULT) {
-    sections.push(`Result limited to ${MAX_TASKS_IN_RESULT} of ${tasks.length} retained tasks. Use \`background_output\` for omitted task details.`)
+  if (omittedTasks.length > 0) {
+    const omittedGuidance = omittedTasks.some((task) => !isTerminal(task.status))
+      ? "Omitted tasks may still be active; call `wait-for-background-tasks` again before retrieving their output."
+      : "Use `background_output` for omitted task details."
+    sections.push(`Result limited to ${MAX_TASKS_IN_RESULT} of ${tasks.length} retained tasks. ${omittedGuidance}`)
+  }
+
+  if (completed.length > 0) {
+    sections.push(
+      `## Terminal Tasks\n${completed.join("\n")}\n\nUse \`background_output(task_id="<id>")\` to retrieve detailed results for each task.`,
+    )
   }
 
   return truncateResult(sections.join("\n\n").trim())
