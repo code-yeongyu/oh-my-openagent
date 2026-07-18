@@ -103,6 +103,7 @@ export function createSessionManagerTools(
     description: SESSION_READ_DESCRIPTION,
     args: {
       session_id: tool.schema.string().describe("Session ID to read"),
+      offset: tool.schema.number().optional().describe("Message offset. Positive: skip first N messages. Negative: count from end (-1 = last message). Default: 0"),
       include_todos: tool.schema.boolean().optional().describe("Include todo list if available (default: false)"),
       include_transcript: tool.schema.boolean().optional().describe("Include transcript log if available (default: false)"),
       limit: tool.schema.number().optional().describe("Maximum number of messages to return (default: all messages)"),
@@ -118,6 +119,15 @@ export function createSessionManagerTools(
 
         if (messages.length === 0) {
           return `Session not found: ${args.session_id}`
+        }
+
+        if (args.offset !== undefined && args.offset !== 0) {
+          if (args.offset < 0) {
+            const startIndex = Math.max(0, messages.length + args.offset)
+            messages = messages.slice(startIndex)
+          } else {
+            messages = messages.slice(args.offset)
+          }
         }
 
         if (args.limit && args.limit > 0) {

@@ -25,9 +25,13 @@ Returns a formatted view of session messages with role, timestamp, and content. 
 
 Arguments:
 - session_id (required): Session ID to read
+- offset (optional): Message index to start from. Positive values skip from the beginning (0-based). Negative values count from the end: -1 starts at the last message, -2 starts at the second-to-last, etc. (default: 0, start from first)
 - include_todos (optional): Include todo list if available (default: false)
 - include_transcript (optional): Include transcript log if available (default: false)
 - limit (optional): Maximum number of messages to return (default: all)
+
+Example — read last 5 messages:
+session_read(session_id="ses_abc123", offset=-5, limit=5)
 
 Example output:
 Session: ses_abc123
