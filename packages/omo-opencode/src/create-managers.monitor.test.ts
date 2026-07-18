@@ -153,7 +153,6 @@ function createDeps(): NonNullable<Parameters<typeof createManagers>[0]["deps"]>
       errors: [],
     })) as typeof import("./features/team-mode/team-runtime/session-cleanup").cleanupSessionTeamRuns,
     createConfigHandlerFn: createConfigHandler,
-    markServerRunningInProcessFn: mock(() => {}),
   }
 }
 
