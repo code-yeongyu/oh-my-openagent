@@ -169,5 +169,5 @@ export const EXT_TO_LANG: Record<string, string> = {
 };
 
 export function getLanguageId(ext: string): string {
-	return EXT_TO_LANG[ext] ?? "plaintext";
+	return EXT_TO_LANG[ext.toLowerCase()] ?? "plaintext";
 }
