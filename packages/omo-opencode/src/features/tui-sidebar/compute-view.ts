@@ -7,6 +7,7 @@ import type {
   LoopState,
   RosterState,
   SidebarView,
+  TeamsState,
 } from "./state-types"
 
 export type ComputeViewSections = {
@@ -15,6 +16,7 @@ export type ComputeViewSections = {
   readonly agents: AgentsState
   readonly jobs: JobBoardState
   readonly loop: LoopState
+  readonly teams: TeamsState
 }
 
 export function computeView(sections: ComputeViewSections): SidebarView {
@@ -24,6 +26,7 @@ export function computeView(sections: ComputeViewSections): SidebarView {
       loop: sections.loop,
       agents: sections.agents,
       jobs: sections.jobs,
+      teams: sections.teams,
       configBanner: sections.config.kind === "invalid" ? { kind: "invalid" } : { kind: "none" },
     }
   }
@@ -43,6 +46,7 @@ export function viewKey(view: SidebarView): string {
         loopKeyParts(view.loop),
         agentsKeyParts(view.agents),
         jobsKeyParts(view.jobs),
+        teamsKeyParts(view.teams),
         ["configBanner", view.configBanner.kind],
       ])
     case "broken":
@@ -55,7 +59,10 @@ export function viewKey(view: SidebarView): string {
 }
 
 function isActive(sections: ComputeViewSections): boolean {
-  return sections.agents.kind === "list" || sections.jobs.kind === "list" || sections.loop.kind === "live"
+  return sections.agents.kind === "list"
+    || sections.jobs.kind === "list"
+    || sections.loop.kind === "live"
+    || sections.teams.kind === "list"
 }
 
 function stableKey(parts: readonly unknown[]): string {
@@ -96,6 +103,24 @@ function jobsKeyParts(jobs: JobBoardState): readonly unknown[] {
       ]
     default:
       return assertNever(jobs)
+  }
+}
+
+function teamsKeyParts(teams: TeamsState): readonly unknown[] {
+  switch (teams.kind) {
+    case "none":
+      return ["teams", "none"]
+    case "list":
+      return [
+        "teams",
+        "list",
+        teams.teams.map((team) => [
+          team.name,
+          team.members.map((member) => [member.name, member.status, member.work, member.sessionId]),
+        ]),
+      ]
+    default:
+      return assertNever(teams)
   }
 }
 
