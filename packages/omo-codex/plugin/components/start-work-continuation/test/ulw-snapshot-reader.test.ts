@@ -223,7 +223,7 @@ describe("ULW snapshot bridge", () => {
 		expect(summary).toBeNull();
 	});
 
-	it("#given an oversized snapshot stat #when reader runs #then contents are not loaded", () => {
+	it("#given an oversized snapshot file #when reader runs #then contents are not loaded", () => {
 		// given
 		const workspace = createWorkspace({ worktreePath: null });
 		const snapshotPath = writeSnapshot(
@@ -235,13 +235,43 @@ describe("ULW snapshot bridge", () => {
 		);
 		let readCount = 0;
 		const fs: ReadonlyFileSystem = {
-			statSync(path) {
+			lstatSync(path) {
 				expect(path).toBe(snapshotPath);
-				return { size: 32 * 1024 + 1 };
+				return { size: 32 * 1024 + 1, isFile: () => true };
 			},
 			readFileSync() {
 				readCount += 1;
 				throw new Error("Oversized snapshot should not be loaded");
+			},
+		};
+
+		// when
+		const summary = readUlwSnapshotSummary(workspace, "sess_abc", null, fs);
+
+		// then
+		expect(summary).toBeNull();
+		expect(readCount).toBe(0);
+	});
+
+	it("#given a non-regular scoped snapshot #when reader runs #then contents are not loaded", () => {
+		// given
+		const workspace = createWorkspace({ worktreePath: null });
+		const snapshotPath = writeSnapshot(
+			workspace,
+			createSnapshotMarkdown({
+				metadata: ["- Session ID: sess_abc", "- Plan Path: .omo/ulw-loop/goals.json"],
+				nextAction: "Do not open a non-regular snapshot",
+			}),
+		);
+		let readCount = 0;
+		const fs = {
+			lstatSync(path: string) {
+				expect(path).toBe(snapshotPath);
+				return { size: 0, isFile: () => false };
+			},
+			readFileSync() {
+				readCount += 1;
+				throw new Error("Non-regular snapshot should not be loaded");
 			},
 		};
 

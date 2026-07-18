@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect } from "vitest";
@@ -81,10 +81,10 @@ export function createBoulderJson(input: BoulderInput = {}): string {
 
 export function createMemoryFs(files: Record<string, string> = {}): ReadonlyFileSystem {
 	return {
-		statSync(path) {
+		lstatSync(path) {
 			const value = files[path];
 			if (value === undefined) throw new Error(`Missing fixture: ${path}`);
-			return { size: Buffer.byteLength(value, "utf8") };
+			return { size: Buffer.byteLength(value, "utf8"), isFile: () => true };
 		},
 		readFileSync(path, encoding) {
 			expect(encoding).toBe("utf8");
@@ -97,11 +97,11 @@ export function createMemoryFs(files: Record<string, string> = {}): ReadonlyFile
 
 export function createDiskBackedFs(files: Record<string, string | Error> = {}): ReadonlyFileSystem {
 	return {
-		statSync(path) {
+		lstatSync(path) {
 			const value = files[path];
 			if (value instanceof Error) throw value;
-			if (value !== undefined) return { size: Buffer.byteLength(value, "utf8") };
-			return statSync(path);
+			if (value !== undefined) return { size: Buffer.byteLength(value, "utf8"), isFile: () => true };
+			return lstatSync(path);
 		},
 		readFileSync(path, encoding) {
 			expect(encoding).toBe("utf8");

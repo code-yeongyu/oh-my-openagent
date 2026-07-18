@@ -19,10 +19,11 @@ export type StopHookOutput = {
 };
 
 export type ReadonlyFileSystem = {
-	statSync(path: string): ReadonlyFileStat;
+	lstatSync(path: string): ReadonlyFileStat;
 	readFileSync(path: string, encoding: "utf8"): string;
 };
 
 export type ReadonlyFileStat = {
 	readonly size: number;
+	isFile(): boolean;
 };
