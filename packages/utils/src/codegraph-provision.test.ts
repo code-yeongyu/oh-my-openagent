@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test"
 import { execFileSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -24,7 +24,7 @@ function fixtureArchive(
   const binDir = join(root, rootName, "bin")
   mkdirSync(binDir, { recursive: true })
   writeFileSync(join(binDir, executableName), "#!/bin/sh\nprintf 'codegraph fixture\\n'\n")
-  execFileSync("chmod", ["755", join(binDir, executableName)])
+  chmodSync(join(binDir, executableName), 0o755)
   execFileSync("tar", ["-czf", archive, rootName], { cwd: root })
   const bytes = readFileSync(archive)
   const sha256 = createHash("sha256").update(bytes).digest("hex")
