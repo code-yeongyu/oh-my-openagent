@@ -1,10 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test"
-import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, statSync } from "fs"
-import { join } from "path"
+import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, statSync, readdirSync } from "fs"
+import { basename, join } from "path"
 import { tmpdir } from "os"
 import { writeFileAtomically } from "./write-file-atomically"
 
 const testDir = join(tmpdir(), "write-file-atomically-test-" + Date.now())
+
+function temporaryFilesFor(filePath: string): readonly string[] {
+  const prefix = `${basename(filePath)}.`
+  return readdirSync(testDir).filter((name) => name.startsWith(prefix) && name.endsWith(".tmp"))
+}
 
 beforeEach(() => {
   mkdirSync(testDir, { recursive: true })
@@ -41,7 +46,22 @@ describe("writeFileAtomically", () => {
     // then
     expect(existsSync(filePath)).toBe(true)
     expect(readFileSync(filePath, "utf-8")).toBe(newContent)
-    expect(existsSync(`${filePath}.tmp`)).toBe(false)
+    expect(temporaryFilesFor(filePath)).toEqual([])
+  })
+
+  it("#given a reentrant write to the same target #when the outer write renames #then both writes complete without sharing a temporary path", () => {
+    // given
+    const filePath = join(testDir, "reentrant-write.txt")
+
+    // when
+    writeFileAtomically(filePath, "outer", {
+      beforeRenameSync: () => {
+        writeFileAtomically(filePath, "inner")
+      },
+    })
+
+    // then
+    expect(readFileSync(filePath, "utf-8")).toBe("outer")
   })
 
   it("#given private mode #when writeFileAtomically called #then temp and final files use that mode", () => {
@@ -108,5 +128,32 @@ describe("writeFileAtomically", () => {
         },
       }),
     ).toThrow("EIO")
+    expect(temporaryFilesFor(filePath)).toEqual([])
+  })
+
+  it("#given the before-rename hook fails #when writeFileAtomically is called #then it removes its unique temporary file", () => {
+    // given
+    const filePath = join(testDir, "before-rename-error.txt")
+
+    // when/then
+    expect(() => writeFileAtomically(filePath, "content", {
+      beforeRenameSync: () => {
+        throw new Error("before rename failed")
+      },
+    })).toThrow("before rename failed")
+    expect(temporaryFilesFor(filePath)).toEqual([])
+  })
+
+  it("#given rename fails #when writeFileAtomically is called #then it removes its unique temporary file", () => {
+    // given
+    const filePath = join(testDir, "rename-error.txt")
+
+    // when/then
+    expect(() => writeFileAtomically(filePath, "content", {
+      renameSync: () => {
+        throw new Error("rename failed")
+      },
+    })).toThrow("rename failed")
+    expect(temporaryFilesFor(filePath)).toEqual([])
   })
 })
