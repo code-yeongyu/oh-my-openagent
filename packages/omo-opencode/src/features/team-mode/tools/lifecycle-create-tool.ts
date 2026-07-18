@@ -28,6 +28,7 @@ const TeamCreateInlineMemberToolSchema = tool.schema.object({
   loadSkills: tool.schema.array(tool.schema.string()).optional().describe("Optional skills to load for this member."),
   role: tool.schema.string().optional().describe("Optional natural-language role used to build a prompt when prompt is omitted."),
   description: tool.schema.string().optional().describe("Optional natural-language description used to build a prompt when prompt is omitted."),
+  allowedPaths: tool.schema.array(tool.schema.string()).optional().describe("Inline-mode-only file protection. When set on an inline member (no worktreePath), the `edit` tool is hard-gated to these glob patterns (picomatch) and the `bash` tool gets a best-effort destructive-command guardrail. Worktree members bypass; unset = unrestricted. Glob patterns are matched relative to the repo cwd."),
 })
 
 const TeamCreateInlineSpecToolSchema = tool.schema.union([
