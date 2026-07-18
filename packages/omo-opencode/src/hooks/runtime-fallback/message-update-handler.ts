@@ -13,7 +13,10 @@ import { resolveMessageEventSessionID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
 import { clearInternalAbortOwnership } from "./internal-abort-ownership"
 import { isRuntimeFallbackActive } from "./lifecycle"
-import { clearSessionRetryOwnership } from "./session-retry-ownership"
+import {
+  clearSessionRetryOwnershipIfUnchanged,
+  snapshotSessionRetryOwnership,
+} from "./session-retry-ownership"
 import { getSessionGeneration, isSessionGenerationCurrent } from "./session-generation"
 
 export { hasVisibleAssistantResponse } from "./visible-assistant-response"
@@ -109,6 +112,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       }
 
       if (retrySignal && timeoutEnabled && (sessionRetryInFlight.has(sessionID) || wasAwaitingFallbackResult)) {
+        const retryOwnership = snapshotSessionRetryOwnership(deps, sessionID)
         log(`[${HOOK_NAME}] Overriding active retry due to provider auto-retry signal`, {
           sessionID,
           model,
@@ -118,7 +122,9 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         if (!requestAborted) {
           return
         }
-        clearSessionRetryOwnership(deps, sessionID)
+        if (!clearSessionRetryOwnershipIfUnchanged(deps, sessionID, retryOwnership)) {
+          return
+        }
       }
       if (wasAwaitingFallbackResult) {
         sessionAwaitingFallbackResult.delete(sessionID)
@@ -170,12 +176,15 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       }
 
       if (classifyErrorType(error) === "quota_exceeded" && !requestAborted) {
+        const retryOwnership = snapshotSessionRetryOwnership(deps, sessionID)
         requestAborted = await helpers.abortSessionRequest(sessionID, "message.updated.quota-fallback")
         if (!isCurrent()) return
         if (!requestAborted) {
           return
         }
-        clearSessionRetryOwnership(deps, sessionID)
+        if (!clearSessionRetryOwnershipIfUnchanged(deps, sessionID, retryOwnership)) {
+          return
+        }
       }
 
       if (!state) {

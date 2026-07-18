@@ -1,5 +1,31 @@
 import type { HookDeps } from "./types"
 
+export type SessionRetryOwnershipSnapshot = {
+  readonly inFlight: boolean
+  readonly owner: symbol | undefined
+}
+
+export function snapshotSessionRetryOwnership(
+  deps: HookDeps,
+  sessionID: string,
+): SessionRetryOwnershipSnapshot {
+  return {
+    inFlight: deps.sessionRetryInFlight.has(sessionID),
+    owner: deps.sessionRetryOwners?.get(sessionID),
+  }
+}
+
+export function clearSessionRetryOwnershipIfUnchanged(
+  deps: HookDeps,
+  sessionID: string,
+  snapshot: SessionRetryOwnershipSnapshot,
+): boolean {
+  if (deps.sessionRetryInFlight.has(sessionID) !== snapshot.inFlight) return false
+  if (deps.sessionRetryOwners?.get(sessionID) !== snapshot.owner) return false
+  clearSessionRetryOwnership(deps, sessionID)
+  return true
+}
+
 export function acquireSessionRetryOwnership(deps: HookDeps, sessionID: string): symbol | undefined {
   if (deps.sessionRetryInFlight.has(sessionID)) return undefined
   const owner = Symbol(sessionID)

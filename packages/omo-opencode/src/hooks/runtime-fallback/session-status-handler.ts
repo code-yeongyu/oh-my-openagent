@@ -12,7 +12,10 @@ import { resolveSessionEventID } from "../../shared/event-session-id"
 import { normalizeModelToCanonicalString } from "./normalize-model"
 import type { FallbackOwnershipTransfer } from "./first-prompt-watchdog-ownership"
 import { getSessionGeneration, isSessionGenerationCurrent } from "./session-generation"
-import { clearSessionRetryOwnership } from "./session-retry-ownership"
+import {
+  clearSessionRetryOwnershipIfUnchanged,
+  snapshotSessionRetryOwnership,
+} from "./session-retry-ownership"
 
 export function createSessionStatusHandler(
   deps: HookDeps,
@@ -81,6 +84,7 @@ export function createSessionStatusHandler(
 
     if (sessionRetryInFlight.has(sessionID)) {
       if (timeoutEnabled) {
+        const retryOwnership = snapshotSessionRetryOwnership(deps, sessionID)
         log(`[${HOOK_NAME}] Overriding in-flight retry due to provider auto-retry signal`, {
           sessionID,
           model,
@@ -92,7 +96,11 @@ export function createSessionStatusHandler(
           rollbackOwnership()
           return
         }
-        clearSessionRetryOwnership(deps, sessionID)
+        if (!clearSessionRetryOwnershipIfUnchanged(deps, sessionID, retryOwnership)) {
+          releaseRetryKey()
+          rollbackOwnership()
+          return
+        }
       } else {
         log(`[${HOOK_NAME}] session.status retry skipped - retry already in flight`, { sessionID })
         return
@@ -121,9 +129,15 @@ export function createSessionStatusHandler(
     }
 
     if (!requestAborted) {
+      const retryOwnership = snapshotSessionRetryOwnership(deps, sessionID)
       requestAborted = await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
       if (!isCurrent()) { releaseRetryKey(); rollbackOwnership(); return }
       if (!requestAborted) {
+        releaseRetryKey()
+        rollbackOwnership()
+        return
+      }
+      if (!clearSessionRetryOwnershipIfUnchanged(deps, sessionID, retryOwnership)) {
         releaseRetryKey()
         rollbackOwnership()
         return
