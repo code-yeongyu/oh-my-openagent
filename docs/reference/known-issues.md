@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5911 - Worktree merge status can ignore dirty filesystem changes
+
+- **Affects**: Agent-managed git worktree handoff and cleanup flows.
+- **Symptom**: A worktree can be reported as already merged when `HEAD` matches the target branch, even though modified, untracked, or ignored task-state files still exist only in the worktree. Treating commit ancestry as the whole truth can make users believe work has been integrated before it has been committed, merged, or cleaned up.
+- **Workaround**: Before deleting a worktree or accepting an "already merged" answer, run `git status --short --untracked-files=all` from the worktree root. If task state may be ignored, also run `git status --short --ignored --untracked-files=all -- .omo` there. Inspect both results, and delete the worktree only after the filesystem is clean or after the remaining changes have been intentionally copied, committed, or discarded.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5911.
+
 ## #5850 - `ulw` planner can fall into native OpenCode plan mode
 
 - **Affects**: Complex `ulw` runs where planning is delegated through a subagent named `plan` while OpenCode's experimental plan mode is enabled.
