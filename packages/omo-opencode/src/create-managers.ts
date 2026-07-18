@@ -20,7 +20,6 @@ import * as openclawRuntimeDispatch from "./openclaw/runtime-dispatch"
 import { registerManagerForCleanup } from "./features/background-agent/process-cleanup"
 import { createConfigHandler } from "./plugin-handlers"
 import { log } from "./shared"
-import { markServerRunningInProcess } from "./shared/tmux/tmux-utils/server-health"
 import type { ModelFallbackControllerAccessor } from "./hooks/model-fallback"
 
 type CreateManagersDeps = {
@@ -33,7 +32,6 @@ type CreateManagersDeps = {
   registerManagerForCleanupFn: typeof registerManagerForCleanup
   cleanupSessionTeamRunsFn: typeof cleanupSessionTeamRuns
   createConfigHandlerFn: typeof createConfigHandler
-  markServerRunningInProcessFn: typeof markServerRunningInProcess
 }
 
 const defaultCreateManagersDeps: CreateManagersDeps = {
@@ -46,7 +44,6 @@ const defaultCreateManagersDeps: CreateManagersDeps = {
   registerManagerForCleanupFn: registerManagerForCleanup,
   cleanupSessionTeamRunsFn: cleanupSessionTeamRuns,
   createConfigHandlerFn: createConfigHandler,
-  markServerRunningInProcessFn: markServerRunningInProcess,
 }
 
 export type Managers = {
@@ -71,17 +68,6 @@ export function createManagers(args: {
   const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled, runtimeSkillSourceUrl } = args
   const deps = { ...defaultCreateManagersDeps, ...args.deps }
 
-  // Only mark the server as in-process when the SDK actually exposes a
-  // serverUrl. `tmuxConfig.enabled` alone is not proof of a running server —
-  // a vanilla `opencode` session (no `opencode serve`/`opencode web`) leaves
-  // `ctx.serverUrl` undefined, and marking it running would make
-  // `isServerRunning` short-circuit to true. That bypasses the guard in
-  // `createTeamLayout` and lets it spawn tmux panes whose `opencode attach`
-  // command then fails because nothing is actually listening on the
-  // fallback port (issue #3894).
-  if (tmuxConfig.enabled && ctx.serverUrl) {
-    deps.markServerRunningInProcessFn()
-  }
   const tmuxSessionManager = new deps.TmuxSessionManagerClass(ctx, tmuxConfig, {
     isInsideTmux: selectTmuxManagerEnvironmentPredicate(tmuxConfig.isolation),
   }, {
