@@ -1,12 +1,9 @@
 let serverAvailable: boolean | null = null
 let serverCheckUrl: string | null = null
 
-const SERVER_RUNNING_KEY = Symbol.for("oh-my-opencode:server-running-in-process")
-
 export type ServerHealthState = {
 	serverAvailable: boolean | null
 	serverCheckUrl: string | null
-	serverRunningInProcess: boolean
 }
 
 type IsServerRunningOptions = {
@@ -18,19 +15,10 @@ function delay(milliseconds: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
-export function markServerRunningInProcess(): void {
-	;(globalThis as Record<symbol, boolean>)[SERVER_RUNNING_KEY] = true
-}
-
-function isMarkedRunningInProcess(): boolean {
-	return (globalThis as Record<symbol, boolean>)[SERVER_RUNNING_KEY] === true
-}
-
 export function createServerHealthState(): ServerHealthState {
 	return {
 		serverAvailable: null,
 		serverCheckUrl: null,
-		serverRunningInProcess: false,
 	}
 }
 
@@ -39,11 +27,6 @@ export const createServerHealthStateForTesting = createServerHealthState
 export async function isServerRunning(serverUrl: string, options: IsServerRunningOptions = {}): Promise<boolean> {
 	const fetchImplementation = options.fetchImplementation ?? fetch
 	const state = options.state
-	const markedRunning = state?.serverRunningInProcess ?? isMarkedRunningInProcess()
-	if (markedRunning) {
-		return true
-	}
-
 	const cachedUrl = state?.serverCheckUrl ?? serverCheckUrl
 	const cachedAvailable = state?.serverAvailable ?? serverAvailable
 	if (cachedUrl === serverUrl && cachedAvailable === true) {
@@ -89,5 +72,4 @@ export async function isServerRunning(serverUrl: string, options: IsServerRunnin
 export function resetServerCheck(): void {
 	serverAvailable = null
 	serverCheckUrl = null
-	delete (globalThis as Record<symbol, boolean>)[SERVER_RUNNING_KEY]
 }

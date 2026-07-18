@@ -110,6 +110,24 @@ describe("isServerRunning", () => {
     expect(result).toBe(false)
   })
 
+  test("checks external health when the legacy in-process marker is set", async () => {
+    // given
+    const serverRunningKey = Symbol.for("oh-my-opencode:server-running-in-process")
+    const globalState = globalThis as Record<symbol, boolean>
+    const fetchMock = createFetchRecorder(async () => new Response(null, { status: 503 }))
+    globalState[serverRunningKey] = true
+
+    try {
+      // when
+      const result = await isServerRunning("http://localhost:4096", { fetchImplementation: fetchMock })
+
+      // then
+      expect({ result, fetchCalls: fetchMock.calls.length }).toEqual({ result: false, fetchCalls: 2 })
+    } finally {
+      delete globalState[serverRunningKey]
+    }
+  })
+
   test("caches successful result", async () => {
     // given
     const state = createServerHealthStateForTesting()
