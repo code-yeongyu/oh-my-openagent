@@ -546,6 +546,8 @@ Resolution pipeline (from [`packages/omo-opencode/src/shared/model-resolution-pi
 5. System default    → Ultimate safety net
 ```
 
+Delegated `task` calls run through Sisyphus-Junior, but a category can still choose the effective model for that delegated worker. For example, `task({ category: "ultrabrain" })` uses the category model and category `fallback_models` before the generic Sisyphus-Junior chain. If a category is likely to hit a provider quota, configure the backup chain on that category instead of relying only on the agent-wide fallback.
+
 Core-agent tab cycling is deterministic via injected runtime order field. The fixed priority order is Sisyphus (order: 0), Hephaestus (order: 1), Prometheus (order: 2), and Atlas (order: 3), then the remaining agents follow.
 
 Your explicit configuration always wins. If you set a specific model for an agent, that choice takes precedence even when resolution data is cold.

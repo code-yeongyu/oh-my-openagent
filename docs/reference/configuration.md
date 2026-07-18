@@ -727,6 +727,30 @@ Define `fallback_models` per agent or category:
 }
 ```
 
+#### Designing Fallback Chains
+
+Keep each fallback chain short and mix quota families on purpose. If the primary model and every fallback route through the same subscription, quota, or proxy account, a quota-exhaustion error can still leave the session without a useful recovery path.
+
+For delegated `task` work, category config can select a different model from the base `sisyphus-junior` agent config. Put category-specific fallbacks under `categories.<name>.fallback_models` when the risk belongs to that task type. Put agent-wide fallbacks under `agents.sisyphus-junior.fallback_models` only when they are safe for every category that uses the delegated executor.
+
+Prefer one reliable backup per quota family before adding another model from the same family:
+
+```jsonc
+{
+  "agents": {
+    "sisyphus-junior": {
+      "model": "github-copilot/claude-sonnet-4.6",
+      "fallback_models": [
+        { "model": "openai/gpt-5.5", "variant": "medium" },
+        "opencode-go/minimax-m3"
+      ]
+    }
+  }
+}
+```
+
+Use `max_fallback_attempts` as a bounded safety net. It limits retries, but it does not make two exhausted models from the same subscription family independent.
+
 `fallback_models` also supports object-style entries so you can attach settings to a specific fallback model:
 
 ```json
