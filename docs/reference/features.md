@@ -690,6 +690,14 @@ AST-aware search and rewrite now lives in the `ast-grep` skill. Load it with the
 | **background_output** | Retrieve background task results                                                                                                                                                                                                        |
 | **background_cancel** | Cancel running background tasks                                                                                                                                                                                                         |
 
+`task` is the broader delegation path for category routing, direct
+`subagent_type` calls, skills, and sync/background execution.
+`call_omo_agent` is the narrow compatibility path for the small
+explore/librarian-style agent allowlist. Keep the split in mind when
+configuring permissions: Sisyphus-Junior blocks `task` to avoid nested
+delegation loops, but can still use `call_omo_agent` where that narrower
+path is explicitly allowed.
+
 ### Visual Analysis Tools
 
 | Tool        | Description                                                                                                                                                    |
