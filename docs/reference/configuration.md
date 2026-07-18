@@ -48,6 +48,10 @@ User config loads first. Project configs are discovered by walking from the work
 1. Walked configs: `.opencode/oh-my-openagent.json[c]` or legacy `.opencode/oh-my-opencode.json[c]`
 2. User config (`.jsonc` preferred over `.json`):
 
+Project config files must live under `.opencode/`. A root-level
+`oh-my-openagent.json` or `oh-my-openagent.jsonc` file in the workspace
+root is not discovered.
+
 | Platform    | Path candidates |
 | ----------- | --------------- |
 | macOS/Linux | `~/.config/opencode/oh-my-openagent.json[c]`, `~/.config/opencode/oh-my-opencode.json[c]` |
