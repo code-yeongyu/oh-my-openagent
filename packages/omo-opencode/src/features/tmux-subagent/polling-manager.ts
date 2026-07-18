@@ -13,9 +13,18 @@ import { parseSessionStatusResponse } from "./session-status-parser"
 const MIN_STABILITY_TIME_MS = 10 * 1000
 const STABLE_POLLS_REQUIRED = 3
 
+// Soft cap on `this.sessions` size. Reaching this threshold means either a
+// genuine high-workload run OR a leak the existing close paths failed to
+// catch. We do NOT auto-evict — silent eviction could kill panes the user
+// is actively using. Instead we log loudly so the operator can investigate.
+// Warnings are deduped by doubling (50 → 100 → 200 → ...) to keep logs
+// readable while still surfacing growth that's worth attention.
+export const TRACKED_SESSIONS_WARN_THRESHOLD = 50
+
 export class TmuxPollingManager {
   private pollInterval?: ReturnType<typeof setInterval>
   private pollingInFlight = false
+  private lastWarnedTrackedSize?: number
 
   constructor(
     private client: OpencodeClient,
@@ -26,6 +35,27 @@ export class TmuxPollingManager {
     private activateSessionPane?: (tracked: TrackedSession) => Promise<boolean>,
     private canActivatePane: (state: WindowState) => boolean = (state) => state.windowActive !== false && state.sessionAttached !== false,
   ) {}
+
+  private warnIfTrackedSessionsExceedThreshold(): void {
+    const size = this.sessions.size
+    if (size < TRACKED_SESSIONS_WARN_THRESHOLD) {
+      // Reset so a fresh climb past the threshold logs again.
+      this.lastWarnedTrackedSize = undefined
+      return
+    }
+    // Re-emit only when size has doubled relative to the last warning (or
+    // on the first crossing of the threshold). Prevents log spam while
+    // still surfacing real growth.
+    if (this.lastWarnedTrackedSize !== undefined && size < this.lastWarnedTrackedSize * 2) {
+      return
+    }
+    log("[tmux-session-manager] tracked-sessions count exceeded soft cap; investigate for leak or runaway spawn", {
+      count: size,
+      threshold: TRACKED_SESSIONS_WARN_THRESHOLD,
+      previousWarnAt: this.lastWarnedTrackedSize,
+    })
+    this.lastWarnedTrackedSize = size
+  }
 
   handleEvent(event: { type: string; properties?: Record<string, unknown> }): void {
     const sessionId = this.getEventSessionId(event)
@@ -63,6 +93,8 @@ export class TmuxPollingManager {
         this.stopPolling()
         return
       }
+
+      this.warnIfTrackedSessionsExceedThreshold()
 
       await this.activateFocusedPanes()
 

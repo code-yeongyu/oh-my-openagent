@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test"
-import { TmuxPollingManager } from "./polling-manager"
+import { TRACKED_SESSIONS_WARN_THRESHOLD, TmuxPollingManager } from "./polling-manager"
 import type { TrackedSession, WindowState } from "./types"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
@@ -500,5 +500,113 @@ describe("TmuxPollingManager overlap", () => {
 
     //#then
     expect(closedSessionIds).toEqual(["ses-1"])
+  })
+
+  describe("warnIfTrackedSessionsExceedThreshold (soft-cap observability)", () => {
+    function seedSessions(sessions: Map<string, TrackedSession>, count: number): void {
+      const now = Date.now()
+      for (let index = 0; index < count; index += 1) {
+        sessions.set(`ses-${index}`, {
+          sessionId: `ses-${index}`,
+          paneId: `%${index}`,
+          description: "seeded",
+          attachActivated: true,
+          createdAt: new Date(now),
+          lastSeenAt: new Date(now),
+          closePending: false,
+          closeRetryCount: 0,
+          activityVersion: 0,
+        })
+      }
+    }
+
+    function makeManager(sessions: Map<string, TrackedSession>): TmuxPollingManager {
+      // Use a status client whose `data` mirrors the seeded sessions so
+      // none get marked missing during the test — we only care about the
+      // soft-cap warning state transitions.
+      const client = {
+        session: {
+          status: async () => {
+            const data: Record<string, { type: string }> = {}
+            for (const id of sessions.keys()) {
+              data[id] = { type: "running" }
+            }
+            return { data }
+          },
+          messages: async () => ({ data: [] }),
+        },
+      }
+      return new TmuxPollingManager(
+        unsafeTestValue<import("../../tools/delegate-task/types").OpencodeClient>(client),
+        sessions,
+        async () => {},
+      )
+    }
+
+    function getLastWarnedSize(manager: TmuxPollingManager): number | undefined {
+      return Reflect.get(manager, "lastWarnedTrackedSize") as number | undefined
+    }
+
+    test("does not warn while session count is below the threshold", async () => {
+      const sessions = new Map<string, TrackedSession>()
+      seedSessions(sessions, TRACKED_SESSIONS_WARN_THRESHOLD - 1)
+      const manager = makeManager(sessions)
+      const pollSessions = unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager).pollSessions
+
+      await pollSessions.call(manager)
+
+      expect(getLastWarnedSize(manager)).toBeUndefined()
+    })
+
+    test("warns once when the count first crosses the threshold and records the size", async () => {
+      const sessions = new Map<string, TrackedSession>()
+      seedSessions(sessions, TRACKED_SESSIONS_WARN_THRESHOLD)
+      const manager = makeManager(sessions)
+      const pollSessions = unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager).pollSessions
+
+      await pollSessions.call(manager)
+      expect(getLastWarnedSize(manager)).toBe(TRACKED_SESSIONS_WARN_THRESHOLD)
+
+      // Same size on the next pass → no re-warn (dedup), state unchanged.
+      await pollSessions.call(manager)
+      expect(getLastWarnedSize(manager)).toBe(TRACKED_SESSIONS_WARN_THRESHOLD)
+
+      // Small growth (under 2x of the last-warned size) → still no re-warn.
+      seedSessions(sessions, TRACKED_SESSIONS_WARN_THRESHOLD + 10)
+      await pollSessions.call(manager)
+      expect(getLastWarnedSize(manager)).toBe(TRACKED_SESSIONS_WARN_THRESHOLD)
+    })
+
+    test("re-warns when the count doubles past the last-warned size", async () => {
+      const sessions = new Map<string, TrackedSession>()
+      seedSessions(sessions, TRACKED_SESSIONS_WARN_THRESHOLD)
+      const manager = makeManager(sessions)
+      const pollSessions = unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager).pollSessions
+
+      await pollSessions.call(manager)
+      expect(getLastWarnedSize(manager)).toBe(TRACKED_SESSIONS_WARN_THRESHOLD)
+
+      // Grow to 2x the previous warn point.
+      seedSessions(sessions, TRACKED_SESSIONS_WARN_THRESHOLD * 2)
+      await pollSessions.call(manager)
+      expect(getLastWarnedSize(manager)).toBe(TRACKED_SESSIONS_WARN_THRESHOLD * 2)
+    })
+
+    test("resets the last-warned size once the count drops back below the threshold", async () => {
+      const sessions = new Map<string, TrackedSession>()
+      seedSessions(sessions, TRACKED_SESSIONS_WARN_THRESHOLD)
+      const manager = makeManager(sessions)
+      const pollSessions = unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager).pollSessions
+
+      await pollSessions.call(manager)
+      expect(getLastWarnedSize(manager)).toBe(TRACKED_SESSIONS_WARN_THRESHOLD)
+
+      // Drop below threshold: forget the previous warn so a fresh climb
+      // back over re-warns.
+      sessions.clear()
+      seedSessions(sessions, TRACKED_SESSIONS_WARN_THRESHOLD - 10)
+      await pollSessions.call(manager)
+      expect(getLastWarnedSize(manager)).toBeUndefined()
+    })
   })
 })
