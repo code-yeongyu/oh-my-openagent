@@ -1,0 +1,32 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/retry-owner-abort-overlap.test.ts:
+(pass) stale session status abort preserves replacement retry ownership [1.18ms]
+(pass) stale message retry abort preserves replacement retry ownership [0.50ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-ownership-races.test.ts:
+(pass) first-prompt watchdog ownership races > re-arms after an accepted abort when fallback dispatch is rejected [1.42ms]
+(pass) first-prompt watchdog ownership races > does not let a detached callback abort a replacement watchdog retry [0.33ms]
+(pass) first-prompt watchdog ownership races > restores suspended ownership without arming a new timer [0.37ms]
+(pass) first-prompt watchdog ownership races > discards inconclusive suspended ownership before a distinct user generation [0.23ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/abort-wire-ordering.test.ts:
+(pass) runtime-fallback abort wire ordering > #given OpenCode publishes the watchdog abort before its HTTP response #when the event is observed #then fallback ownership survives and dispatch continues [1.82ms]
+(pass) runtime-fallback abort wire ordering > #given overlapping internal abort callers for one session #when OpenCode emits one internal terminal #then the next abort event remains a genuine cancellation [0.44ms]
+(pass) runtime-fallback abort wire ordering > #given status fallback and watchdog share one abort #when the terminal arrives during status dispatch #then the status fallback remains authoritative [0.29ms]
+(pass) runtime-fallback abort wire ordering > #given a status fallback replaces the silent request #when the original watchdog deadline passes #then the accepted fallback is not aborted or advanced [0.31ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-timeout-overlap.test.ts:
+(pass) stale same-generation timeout preserves replacement retry ownership [3.04ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/abort-rejection-handlers.test.ts:
+(pass) runtime fallback abort rejection > #given a message retry signal while a retry is active #when abort is rejected #then ownership and the active retry are preserved [0.43ms]
+(pass) runtime fallback abort rejection > #given a quota error with a fallback #when abort is rejected #then no replacement request is dispatched [0.48ms]
+(pass) runtime fallback abort rejection > #given a session retry signal while a retry is active #when abort is rejected #then the active retry remains authoritative [0.11ms]
+(pass) runtime fallback abort rejection > #given a rejected session retry abort #when the same retry signal arrives again #then it can acquire ownership and dispatch fallback [0.19ms]
+(pass) runtime fallback abort rejection > #given a pending fallback and a newer session retry signal #when abort is rejected #then pending ownership is preserved [0.10ms]
+
+ 16 pass
+ 0 fail
+ 49 expect() calls
+Ran 16 tests across 5 files. [79.00ms]
