@@ -77,7 +77,7 @@ export function formatDiagnostic(diag: Diagnostic): string {
 	const line = diag.range.start.line + 1;
 	const char = diag.range.start.character;
 	const source = diag.source ? `[${diag.source}]` : "";
-	const code = diag.code ? ` (${diag.code})` : "";
+	const code = diag.code === undefined ? "" : ` (${diag.code})`;
 	return `${severity}${source}${code} at ${line}:${char}: ${diag.message}`;
 }
 
