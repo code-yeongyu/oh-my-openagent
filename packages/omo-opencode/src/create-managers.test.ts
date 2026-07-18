@@ -230,6 +230,45 @@ describe("createManagers", () => {
     expect(markServerRunningInProcess).not.toHaveBeenCalled()
   })
 
+  it("#given tmux is enabled and ctx.ensureServer is available #when managers are created #then ensureServer is called (fire-and-forget)", async () => {
+    // ctx.ensureServer() is an upcoming OpenCode plugin API (anomalyco/opencode#31821).
+    // When OpenCode merges it, OMO will call it as a fire-and-forget side effect
+    // during init to ensure an HTTP server is listening before tmux panes spawn.
+    const ensureServerMock = mock(() => Promise.resolve())
+    const ctx = createContext("/tmp")
+    const ctxWithEnsureServer = { ...ctx, ensureServer: ensureServerMock }
+    const args = {
+      ctx: ctxWithEnsureServer,
+      pluginConfig: OhMyOpenCodeConfigSchema.parse({}),
+      tmuxConfig: createTmuxConfig(true),
+      modelCacheState: createModelCacheState(),
+      backgroundNotificationHookEnabled: false,
+      deps: createDeps(),
+    }
+
+    createManagers(args)
+
+    // Fire-and-forget: ensureServer is called but not awaited
+    expect(ensureServerMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("#given tmux is enabled but ctx.ensureServer is not available #when managers are created #then no error is thrown (backward compatible)", () => {
+    // Before OpenCode merges ensureServer, ctx won't have the method.
+    // This test verifies OMO works without it (backward compatible).
+    const ctx = createContext("/tmp")
+    const args = {
+      ctx,
+      pluginConfig: OhMyOpenCodeConfigSchema.parse({}),
+      tmuxConfig: createTmuxConfig(true),
+      modelCacheState: createModelCacheState(),
+      backgroundNotificationHookEnabled: false,
+      deps: createDeps(),
+    }
+
+    // Should not throw
+    createManagers(args)
+  })
+
   it("#given openclaw is enabled #when the background session-created callback runs #then it dispatches openclaw with the tracked pane id", async () => {
     const args = {
       ctx: createContext("/tmp/project"),

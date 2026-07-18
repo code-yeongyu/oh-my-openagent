@@ -68,6 +68,33 @@ export function createManagers(args: {
   const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled, runtimeSkillSourceUrl } = args
   const deps = { ...defaultCreateManagersDeps, ...args.deps }
 
+  // Ensure a real HTTP server is running when tmux visualization is enabled.
+  // In default `opencode` TUI mode (no --port), no HTTP listener exists, so
+  // sub-agent panes cannot spawn `opencode attach` commands.
+  //
+  // ctx.ensureServer() is an upcoming OpenCode plugin API (anomalyco/opencode#31821).
+  // When available, it starts an HTTP server if one isn't already listening,
+  // so tmux panes work out of the box without requiring users to pass --port.
+  //
+  // The runtime check via (ctx as any) is intentional: the API is in review
+  // and not yet published in the @opencode-ai/plugin type definitions.
+  if (tmuxConfig.enabled) {
+    const ensureServer = (ctx as Record<string, unknown>).ensureServer
+    if (typeof ensureServer === "function") {
+      void (ensureServer as () => Promise<unknown>).call(ctx).then(() => {
+        log("[create-managers] ensureServer succeeded — HTTP server is now listening")
+      }).catch((error: unknown) => {
+        log("[create-managers] ensureServer failed", {
+          error: error instanceof Error ? error.message : String(error),
+        })
+        console.warn(
+          "[omo] Unable to start HTTP server for tmux visualization.\n" +
+          "      Sub-agent panes may not work. Start opencode with --port 4096.",
+        )
+      })
+    }
+  }
+
   // Only mark the server as in-process when the SDK actually exposes a
   // serverUrl. `tmuxConfig.enabled` alone is not proof of a running server —
   // a vanilla `opencode` session (no `opencode serve`/`opencode web`) leaves
