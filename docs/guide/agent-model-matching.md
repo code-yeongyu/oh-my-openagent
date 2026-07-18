@@ -15,7 +15,7 @@
 - **GLM:** 5 / 5.1 *(acceptable — slightly looser on the long nested workflows)*
 - **GPT:** 5.4 / 5.5 *(dedicated GPT prompt path exists — supported, but still **NOT** the recommended default for the orchestrator)*
 
-**Experimental, not supported: GLM 5.2.** A dedicated GLM-5.2-calibrated prompt exists, and the selector uses it for the whole GLM family. One community report describes good results, but maintainers have not yet validated the nested todo, delegation, long-context, and non-ultrawork behavior end to end. The Sisyphus fallback chain is configured with the `glm-5` model literal, but fuzzy availability matching can resolve that entry to GLM 5.1 or GLM 5.2. Any resulting GLM 5.2 use remains experimental, not a supported configuration.
+**Experimental, not supported: GLM 5.2.** A dedicated GLM-5.2-calibrated prompt exists, and the selector uses it for model IDs recognized as GLM. One community report describes good results, but maintainers have not yet validated the nested todo, delegation, long-context, and non-ultrawork behavior end to end. The Sisyphus fallback chain is configured with the `glm-5` model literal, but fuzzy availability matching can resolve that entry to GLM 5.1 or GLM 5.2. Any resulting GLM 5.2 use remains experimental, not a supported configuration.
 
 **IF A MODEL IS NOT ON THE SUPPORTED LIST, IT IS NOT MAINTAINER-VERIFIED WITH SISYPHUS.** A community report does not change that status. It may not work at all. It may *look* like it works and then fall apart three tool-calls later. **IT IS NOT A SUPPORTED CONFIGURATION, IT IS NOT BLESSED, AND IT IS NOT A PROMISE THAT IT WILL STILL WORK TOMORROW.**
 
@@ -57,7 +57,7 @@ Using Sisyphus with older GPT models would be like taking your best project mana
 
 > **⚠️ Sisyphus is ONLY tested on Claude (Fable 5 / Opus 4.8 / 4.7 / Sonnet 4.6), Kimi (**K3** / K2.7 / K2.6 / K2.5), GLM (5 / 5.1), and GPT (5.4 / 5.5).** Anything else is not maintainer-verified or supported and can break without warning. **MiniMax and Qwen as Sisyphus are strongly discouraged to the point we'd almost forbid it.** Read the **🚨 READ THIS FIRST** warning at the very top of this guide before you override the orchestrator's model.
 
-> **GLM 5.2 remains experimental.** It has a calibrated prompt and one community report, but no maintainer end-to-end validation. The prompt selector is GLM-family-wide. The hardcoded Sisyphus fallback entry is the `glm-5` literal, which fuzzy availability matching may resolve to GLM 5.1 or GLM 5.2.
+> **GLM 5.2 remains experimental.** It has a calibrated prompt and one community report, but no maintainer end-to-end validation. The prompt selector applies to model IDs recognized as GLM. The hardcoded Sisyphus fallback entry is the `glm-5` literal, which fuzzy availability matching may resolve to GLM 5.1 or GLM 5.2.
 
 ### Hephaestus: The Deep Specialist
 
@@ -241,7 +241,7 @@ The priorities below include manual model choices. They are not a literal copy o
 | 4 | **`kimi-k2.7` - RECOMMENDED ALTERNATIVE** | same as K3 | Restrained, outcome-first, and the top Kimi when Anthropic isn't connected. Agents with Kimi-specific prompt paths use their K2.7 tuning; Prometheus keeps its `ulw-plan`-backed prompt. |
 | 5 | **`kimi-k2.6` or `kimi-k2.5` — RECOMMENDED ALTERNATIVE** | same as K3 | Instruction-following mirrors Claude closely. Current default Kimi in the chains after K3. |
 | 6 | **`glm-5` or `glm-5.1` — ACCEPTABLE ALTERNATIVE** | `opencode-go`, `zai-coding-plan`, `opencode`, `vercel` | Claude-like, slightly looser on long nested workflows. The automatic Sisyphus chain is configured with `glm-5`; fuzzy availability matching may select GLM 5.1 or GLM 5.2 for that literal. |
-| 7 | **`glm-5.2` — EXPERIMENTAL** | `opencode-go`, `zai-coding-plan`, `opencode`, `vercel` | Uses the GLM-5.2-calibrated prompt through the family-wide GLM selector. It may be selected by fuzzy matching or configured directly, but remains backed by one community report rather than maintainer end-to-end validation. |
+| 7 | **`glm-5.2` — EXPERIMENTAL** | `opencode-go`, `zai-coding-plan`, `opencode`, `vercel` | Uses the GLM-5.2-calibrated prompt because its model ID is recognized as GLM. It may be selected by fuzzy matching or configured directly, but remains backed by one community report rather than maintainer end-to-end validation. |
 | 8 | `big-pickle` (GLM 4.6) | `opencode` | Free-tier safety net. |
 
 > **Kimi ≻ GLM.** Kimi (K3 newest, then K2.7, then K2.6/K2.5) holds up under Sisyphus's nested todo+delegation prompts better than GLM. Use Kimi whenever both are available.
@@ -564,7 +564,7 @@ If you have OpenRouter and want DeepSeek in the chain when GPT is unavailable:
 
 **Experimental** — not maintainer-verified:
 
-- Sisyphus: GLM 5.2. The family-wide selector uses the calibrated GLM 5.2 prompt. The hardcoded fallback entry is `glm-5`, and fuzzy availability matching may select GLM 5.2 for it, but the model is not in the maintainer-verified set.
+- Sisyphus: GLM 5.2. Model IDs recognized as GLM use the calibrated GLM 5.2 prompt. The hardcoded fallback entry is `glm-5`, and fuzzy availability matching may select GLM 5.2 for it, but the model is not in the maintainer-verified set.
 
 **Dangerous** — personality mismatch:
 
