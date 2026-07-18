@@ -173,6 +173,7 @@ describe("runtime-fallback abort wire ordering", () => {
       wasSubagent: false,
       isLifecycleCurrent: () => true,
       isSessionCurrent: () => true,
+      isCallbackCurrent: () => true,
       recordAbortProvenance: () => () => {},
       markAbortCompleted: () => {},
       markAbortResponsePending: () => {},

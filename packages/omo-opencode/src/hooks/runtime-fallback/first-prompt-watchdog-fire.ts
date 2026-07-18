@@ -21,6 +21,7 @@ type FireFirstPromptWatchdogInput = {
   readonly wasSubagent: boolean
   readonly isLifecycleCurrent: () => boolean
   readonly isSessionCurrent: () => boolean
+  readonly isCallbackCurrent: () => boolean
   readonly recordAbortProvenance: () => () => void
   readonly markAbortCompleted: () => void
   readonly markAbortResponsePending: () => void
@@ -38,6 +39,7 @@ export async function fireFirstPromptWatchdog(input: FireFirstPromptWatchdogInpu
     wasSubagent,
     isLifecycleCurrent,
     isSessionCurrent,
+    isCallbackCurrent,
     recordAbortProvenance,
     markAbortCompleted,
     markAbortResponsePending,
@@ -50,7 +52,7 @@ export async function fireFirstPromptWatchdog(input: FireFirstPromptWatchdogInpu
   }
 
   const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
-  if (!isLifecycleCurrent() || !isSessionCurrent()) return
+  if (!isLifecycleCurrent() || !isSessionCurrent() || !isCallbackCurrent()) return
   const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, deps.pluginConfig)
 
   if (fallbackModels.length === 0) {
@@ -89,14 +91,14 @@ export async function fireFirstPromptWatchdog(input: FireFirstPromptWatchdogInpu
   const rollbackAbortProvenance = recordAbortProvenance()
   markAbortResponsePending()
   const abortSucceeded = await helpers.abortSessionRequest(sessionID, SOURCE).finally(clearAbortResponsePending)
-  if (!isLifecycleCurrent() || !isSessionCurrent()) return
+  if (!isLifecycleCurrent() || !isSessionCurrent() || !isCallbackCurrent()) return
   if (abortSucceeded === false) {
     rollbackAbortProvenance()
     log(`[${HOOK_NAME}] ${SOURCE}: abort failed, skipping fallback dispatch`, { sessionID })
     return "retry"
   }
   await Promise.resolve()
-  if (!isLifecycleCurrent() || !isSessionCurrent()) return
+  if (!isLifecycleCurrent() || !isSessionCurrent() || !isCallbackCurrent()) return
 
   try {
     const dispatched = await dispatchFallbackRetry(deps, helpers, {

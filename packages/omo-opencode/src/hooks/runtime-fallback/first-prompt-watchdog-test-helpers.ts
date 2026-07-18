@@ -23,6 +23,7 @@ export const PLUGIN_CONFIG_WITH_FALLBACK = {
 
 export type FakeTimers = {
   advanceBy: (ms: number) => Promise<void>
+  startDueBy: (ms: number) => Array<Promise<void>>
   restore: () => void
 }
 
@@ -74,6 +75,22 @@ export function installFakeTimers(): FakeTimers {
       }
       now = target
       await flushMicrotasks()
+    },
+    startDueBy(ms) {
+      const target = now + ms
+      const due = [...dueTimes.entries()]
+        .filter(([, dueAt]) => dueAt <= target)
+        .sort((left, right) => left[1] - right[1])
+      const started: Array<Promise<void>> = []
+      for (const [timer, dueAt] of due) {
+        now = dueAt
+        const callback = callbacks.get(timer)
+        callbacks.delete(timer)
+        dueTimes.delete(timer)
+        started.push(Promise.resolve(callback?.()))
+      }
+      now = target
+      return started
     },
     restore() {
       globalThis.setTimeout = originalSetTimeout

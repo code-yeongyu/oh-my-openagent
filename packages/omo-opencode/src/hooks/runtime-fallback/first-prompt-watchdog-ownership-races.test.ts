@@ -56,6 +56,37 @@ describe("first-prompt watchdog ownership races", () => {
     watchdog.dispose()
   })
 
+  it("does not let a detached callback abort a replacement watchdog retry", async () => {
+    const sessionID = "watchdog-overlapping-callbacks"
+    const calls = { aborts: 0, dispatches: 0 }
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    let resolverCalls = 0
+    let resolveFirstAgent: ((agent: string) => void) | undefined
+    const firstAgent = new Promise<string>((resolve) => {
+      resolveFirstAgent = resolve
+    })
+    const helpers = createHelpers(calls)
+    helpers.resolveAgentForSessionFromContext = async () => {
+      resolverCalls += 1
+      return resolverCalls === 1 ? firstAgent : AGENT
+    }
+    const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
+
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT, "user-1")
+    const [oldCallback] = timers?.startDueBy(WATCHDOG_MS) ?? []
+    const transfer = watchdog.onFallbackOwnershipTransferred(sessionID)
+    transfer?.rollback()
+    const [replacementCallback] = timers?.startDueBy(0) ?? []
+    await replacementCallback
+    expect(calls).toEqual({ aborts: 1, dispatches: 1 })
+
+    resolveFirstAgent?.(AGENT)
+    await oldCallback
+
+    expect(calls).toEqual({ aborts: 1, dispatches: 1 })
+    watchdog.dispose()
+  })
+
   it("restores suspended ownership without arming a new timer", async () => {
     const sessionID = "suspended-transfer-rejected"
     const calls = { aborts: 0, dispatches: 0 }

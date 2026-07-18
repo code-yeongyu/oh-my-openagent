@@ -33,14 +33,11 @@ export function createFirstPromptWatchdog(
   const abortProvenance = createWatchdogAbortProvenance()
   let lifecycleGeneration = 0
   let nextSessionGeneration = 0
-  const nextGeneration = (): number => (nextSessionGeneration += 1)
 
   const cancel = (sessionID: string, preserveAbortProvenance = false, deleteGeneration = false): void => {
     const timer = timers.get(sessionID)
-    if (timer) {
-      clearTimeout(timer)
-      timers.delete(sessionID)
-    }
+    if (timer) clearTimeout(timer)
+    timers.delete(sessionID)
     armed.delete(sessionID)
     suspended.delete(sessionID)
     progressed.delete(sessionID)
@@ -49,7 +46,10 @@ export function createFirstPromptWatchdog(
     if (!preserveAbortProvenance) abortProvenance.clear(sessionID)
     currentUserMessageIDs.delete(sessionID)
     if (deleteGeneration) sessionGenerations.delete(sessionID)
-    else sessionGenerations.set(sessionID, nextGeneration())
+    else {
+      nextSessionGeneration += 1
+      sessionGenerations.set(sessionID, nextSessionGeneration)
+    }
   }
 
   const arm = (context: ArmedWatchdog): void => {
@@ -69,18 +69,17 @@ export function createFirstPromptWatchdog(
           wasSubagent: context.wasSubagent,
           isLifecycleCurrent: () => context.generation === lifecycleGeneration,
           isSessionCurrent: () => context.sessionGeneration === sessionGenerations.get(context.sessionID),
+          isCallbackCurrent: () => armed.get(context.sessionID) === context,
           recordAbortProvenance: () => abortProvenance.reserve(context.sessionID, context.sessionGeneration),
           markAbortCompleted: () => abortProvenance.markCurrentCompleted(context.sessionID, context.sessionGeneration),
           markAbortResponsePending: () => abortProvenance.markResponsePending(context.sessionID),
           clearAbortResponsePending: () => abortProvenance.clearResponsePending(context.sessionID),
         }) === "retry"
       } finally {
-        if (context.sessionGeneration === sessionGenerations.get(context.sessionID) && armed.get(context.sessionID) === context) {
-          armed.delete(context.sessionID)
-        }
-        if (retry && context.generation === lifecycleGeneration && context.sessionGeneration === sessionGenerations.get(context.sessionID)) {
-          arm({ ...context, deadlineAt: Date.now() + watchdogMs })
-        }
+        const isCurrent = context.sessionGeneration === sessionGenerations.get(context.sessionID)
+          && armed.get(context.sessionID) === context
+        if (retry && context.generation === lifecycleGeneration && isCurrent) arm({ ...context, deadlineAt: Date.now() + watchdogMs })
+        else if (isCurrent) armed.delete(context.sessionID)
       }
     }, remainingMs)
     timers.set(context.sessionID, timer)
@@ -137,7 +136,8 @@ export function createFirstPromptWatchdog(
       if (!wasSubagent && deps.config.timeout_seconds <= 0) return
 
       const generation = lifecycleGeneration
-      const sessionGeneration = nextGeneration()
+      nextSessionGeneration += 1
+      const sessionGeneration = nextSessionGeneration
       sessionGenerations.set(sessionID, sessionGeneration)
       if (messageID) currentUserMessageIDs.set(sessionID, messageID)
       else currentUserMessageIDs.delete(sessionID)
