@@ -85,7 +85,7 @@ Sisyphus is your main orchestrator. He plans, delegates to specialists, and driv
 - **Claude Opus 4.8** / **Opus 4.7** — Best overall experience. Sisyphus was built with Claude-optimized prompts.
 - **Kimi K3** — Strongest Kimi for Sisyphus. Recommended when you can accept its thinking-token cost; the K3 prompt is calibrated to stop overthinking and keep work moving.
 - **Kimi K2.6** / **K2.5** — Great Claude-like alternatives. K2.6 is the current default fallback in the primary Sisyphus chain after K3; many users run K2.6 or the K2.5/K2.6 combo exclusively.
-- **GLM 5** — Solid option, especially via Z.ai. **GLM 5.2 is experimental:** Sisyphus has a GLM-5.2-calibrated prompt selected for the whole GLM family, but current evidence is one community report without maintainer end-to-end validation, and the automatic chain still uses `glm-5`.
+- **GLM 5** — Solid option, especially via Z.ai. **GLM 5.2 is experimental:** Sisyphus has a GLM-5.2-calibrated prompt selected for the whole GLM family, but current evidence is one community report without maintainer end-to-end validation. The automatic chain is configured with `glm-5`, and fuzzy availability matching may resolve that entry to GLM 5.1 or GLM 5.2.
 
 Sisyphus works best on Claude Opus 4.8 / 4.7, Kimi K3 / K2.6 (or K2.5), and GLM 5. GPT-5.4 and GPT-5.5 now have dedicated prompt paths, but older GPT models are still a poor fit and should route to Hephaestus instead.
 
