@@ -516,7 +516,7 @@ Switch to Hephaestus (Tab → Select Hephaestus) when:
    - "Migrate from MongoDB to PostgreSQL with zero downtime"
 
 4. **You specifically want GPT-native autonomous reasoning**
-   - Hephaestus prefers GPT-5.6 Sol when OpenAI or Vercel exposes it and retains GPT-5.5 as the broad fallback
+   - Hephaestus prefers GPT-5.6 Sol when OpenAI, GitHub Copilot, or Vercel exposes it and retains GPT-5.5 as the broad fallback
 
 **When to Use Sisyphus + `ulw`:**
 

@@ -211,8 +211,8 @@ Used by: Hephaestus, Oracle, Momus, `deep`, `ultrabrain`, `quick`, `unspecified-
 | Priority | Model | Provider | Why |
 |---|---|---|---|
 | 1 | `gpt-5.6-sol` (xhigh / high / medium) | `openai`, `github-copilot`, `vercel` | The GPT-5.6 flagship. Default for Hephaestus (`high` variant, `reasoningEffort: medium`) and `ultrabrain` (xhigh); first fallback for `deep`. |
-| 1 | `gpt-5.6-terra` (xhigh / high) | `openai`, `vercel` | GPT-5.6 mid-tier. New default for the `deep` category; default for Momus (high). |
-| 1 | `gpt-5.6-luna` (xhigh) | `openai`, `vercel` | GPT-5.6 light tier. New default for the `unspecified-low` category. |
+| 1 | `gpt-5.6-terra` (xhigh / high) | `openai`, `github-copilot`, `vercel` | GPT-5.6 mid-tier. Default for `deep` (native xhigh; Copilot high) and Momus (high). |
+| 1 | `gpt-5.6-luna` (xhigh / high) | `openai`, `github-copilot`, `vercel` | GPT-5.6 light tier. Default for `unspecified-low` (native xhigh; Copilot high). |
 | 2 | `gpt-5.5` / `gpt-5.4` (pro / xhigh / high / medium) | `openai`, `github-copilot`, `opencode`, `vercel` | Previous flagship generation; first fallback on providers without GPT-5.6. Hephaestus requires this family. |
 | 3 | `gpt-5.5-codex` | same | Still the deep-coding powerhouse. Kept as an explicit override option. |
 | 3 | **DeepSeek — LIMITED ALTERNATIVE** (`deepseek-v3.2`, `deepseek-chat-v3.1`) | `openrouter/deepseek` | Closest OSS equivalent for autonomous coding behavior. Not wired into default chains — add via `fallback_models`. |
@@ -275,7 +275,7 @@ These agents are built for GPT's principle-driven style. Their prompts assume au
 |---|---|---|
 | **Hephaestus** | Autonomous deep worker | `openai\|github-copilot\|vercel/gpt-5.6-sol` (`high` variant, `reasoningEffort: medium`) → `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (medium) — GPT-only chain, requires one of those providers. The craftsman. |
 | **Oracle** | Architecture consultant | `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (high) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `opencode-go\|vercel/glm-5.2` |
-| **Momus** | Ruthless reviewer | `openai\|vercel/gpt-5.6-terra` (high) → `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (xhigh) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `opencode-go\|vercel/glm-5.2` |
+| **Momus** | Ruthless reviewer | `openai\|vercel/gpt-5.6-terra` (high) → `github-copilot/gpt-5.6-terra` (high) → `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (xhigh) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `opencode-go\|vercel/glm-5.2` |
 
 ### Utility Runners → Speed over Intelligence
 
@@ -372,11 +372,11 @@ When agents delegate work, they don't pick a model name — they pick a **catego
 |---|---|---|---|
 | `visual-engineering` | Frontend, UI, CSS, design | `google/gemini-3.1-pro` (high) | Gemini → `zai-coding-plan/glm-5` → `claude-opus-4-7` (max) → `opencode-go/glm-5.2` → `kimi-for-coding/k2p5` |
 | `artistry` | Creative, novel approaches | `google/gemini-3.1-pro` (high) | Gemini → `claude-opus-4-7` (max) → `gpt-5.5` |
-| `ultrabrain` | Maximum reasoning needed | `openai/gpt-5.6-sol` (xhigh) | `openai\|vercel/gpt-5.6-sol` (xhigh) → `openai\|opencode\|vercel/gpt-5.5` (xhigh) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `opencode-go\|vercel/glm-5.2` |
-| `deep` | Deep coding, complex logic | `openai/gpt-5.6-terra` (xhigh) | `openai\|vercel/gpt-5.6-terra` (xhigh) → `openai\|vercel/gpt-5.6-sol` (high) → `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (medium) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `opencode-go\|vercel/kimi-k2.6` → `opencode-go\|vercel/glm-5.2` |
+| `ultrabrain` | Maximum reasoning needed | `openai/gpt-5.6-sol` (xhigh) | `openai\|vercel/gpt-5.6-sol` (xhigh) → `github-copilot/gpt-5.6-sol` (high) → `openai\|opencode\|vercel/gpt-5.5` (xhigh) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `opencode-go\|vercel/glm-5.2` |
+| `deep` | Deep coding, complex logic | `openai/gpt-5.6-terra` (xhigh) | `openai\|vercel/gpt-5.6-terra` (xhigh) → `github-copilot/gpt-5.6-terra` (high) → `openai\|github-copilot\|vercel/gpt-5.6-sol` (high) → `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (medium) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `opencode-go\|vercel/kimi-k2.6` → `opencode-go\|vercel/glm-5.2` |
 | `quick` | Simple, fast tasks | `openai/gpt-5.4-mini` | GPT-5.4-mini → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `gemini-3-flash` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` → `opencode/gpt-5-nano` |
 | `unspecified-high` | General complex work | `anthropic/claude-opus-4-7` (max) | Opus → `gpt-5.5` (high) → `zai-coding-plan/glm-5` → `kimi-for-coding/k2p5` → `opencode-go/glm-5.2` → `opencode/kimi-k2.5` → `moonshotai/kimi-k2.5` |
-| `unspecified-low` | General standard work | `openai/gpt-5.6-luna` (xhigh) | `openai\|vercel/gpt-5.6-luna` (xhigh) → `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `openai\|opencode\|vercel/gpt-5.5` (medium) → `opencode-go\|vercel/kimi-k2.6` → `google\|github-copilot\|opencode\|vercel/gemini-3-flash` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` |
+| `unspecified-low` | General standard work | `openai/gpt-5.6-luna` (xhigh) | `openai\|vercel/gpt-5.6-luna` (xhigh) → `github-copilot/gpt-5.6-luna` (high) → `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `openai\|opencode\|vercel/gpt-5.5` (medium) → `opencode-go\|vercel/kimi-k2.6` → `google\|github-copilot\|opencode\|vercel/gemini-3-flash` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` |
 | `writing` | Text, docs, prose | `kimi-for-coding/k2p5` | `gemini-3-flash` → `opencode-go/kimi-k2.6` → `claude-sonnet-4-6` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` |
 
 See the [Orchestration System Guide](./orchestration.md) for how agents dispatch tasks to categories.
