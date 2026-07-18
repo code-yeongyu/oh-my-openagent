@@ -113,7 +113,9 @@ export async function fireFirstPromptWatchdog(input: FireFirstPromptWatchdogInpu
       return "retry"
     }
   } finally {
-    releaseInternalAbortOwnership(deps, sessionID)
+    if (isLifecycleCurrent() && isSessionCurrent() && isCallbackCurrent()) {
+      releaseInternalAbortOwnership(deps, sessionID)
+    }
   }
 
   if (isLifecycleCurrent() && !isSessionCurrent()) {

@@ -8,6 +8,7 @@ import { clearAllInternalAbortOwnership } from "./internal-abort-ownership"
 import { createMessageUpdateHandler } from "./message-update-handler"
 import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
 import { clearSessionGenerations } from "./session-generation"
+import { getSessionGeneration, isSessionGenerationCurrent } from "./session-generation"
 import { clearAllSessionRetryOwnership } from "./session-retry-ownership"
 
 declare function setInterval(callback: () => void, delay?: number): RuntimeFallbackInterval
@@ -69,7 +70,7 @@ export function createRuntimeFallbackHook(
     sessionStates: new Map(),
     sessionLastAccess: new Map(),
     sessionRetryInFlight: new Set(),
-    sessionRetryPayloadPending: new Set(),
+    sessionRetryPayloadPending: new Map(),
     sessionAwaitingFallbackResult: new Set(),
     sessionFallbackTimeouts: new Map(),
     sessionStatusRetryKeys: new Map(),
@@ -125,8 +126,9 @@ export function createRuntimeFallbackHook(
       watchdogDecision = undefined
     }
     if (watchdogDecision?.kind === "inspect-terminal") {
+      const inspectionGeneration = getSessionGeneration(deps, watchdogDecision.sessionID)
       const currentRequestActive = await isCurrentRequestActive(ctx, watchdogDecision.sessionID)
-      if (disposed) return
+      if (disposed || !isSessionGenerationCurrent(deps, watchdogDecision.sessionID, inspectionGeneration)) return
       watchdogDecision = firstPromptWatchdog.resolveDeferredTerminal(
         watchdogDecision.sessionID,
         currentRequestActive,

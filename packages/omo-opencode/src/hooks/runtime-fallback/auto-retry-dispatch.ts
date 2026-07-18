@@ -36,9 +36,9 @@ export function createAutoRetryDispatcher(
     source: string,
   ): Promise<AutoRetryDispatchOutcome> => {
     const sessionGeneration = getSessionGeneration(deps, sessionID)
-    const isCurrent = () => isRuntimeFallbackActive(deps)
+    const isLifecycleCurrent = () => isRuntimeFallbackActive(deps)
       && isSessionGenerationCurrent(deps, sessionID, sessionGeneration)
-    if (!isCurrent()) return { accepted: false, status: "blocked", reason: "runtime fallback disposed" }
+    if (!isLifecycleCurrent()) return { accepted: false, status: "blocked", reason: "runtime fallback disposed" }
     if (deps.sessionRetryInFlight.has(sessionID)) {
       log(`[${HOOK_NAME}] Retry already in flight, skipping (${source})`, { sessionID })
       return { accepted: false, status: "blocked", reason: "retry already in flight" }
@@ -67,6 +67,7 @@ export function createAutoRetryDispatcher(
       log(`[${HOOK_NAME}] Retry already in flight, skipping (${source})`, { sessionID })
       return { accepted: false, status: "blocked", reason: "retry already in flight" }
     }
+    const isCurrent = () => isLifecycleCurrent() && deps.sessionRetryOwners?.get(sessionID) === retryOwner
 
     const hadAwaitingFallbackResult = sessionAwaitingFallbackResult.has(sessionID)
     const previousPendingFallbackModel = sessionStates.get(sessionID)?.pendingFallbackModel
@@ -75,12 +76,17 @@ export function createAutoRetryDispatcher(
     let retryMayHaveBeenAccepted = false
     let acceptedStatus: AutoRetryDispatchOutcome["status"] = "dispatched"
     try {
-      deps.sessionRetryPayloadPending ??= new Set()
-      deps.sessionRetryPayloadPending.add(sessionID)
+      deps.sessionRetryPayloadPending ??= new Map()
+      const payloadToken = Symbol(sessionID)
+      deps.sessionRetryPayloadPending.set(sessionID, payloadToken)
       const messagesResp = await ctx.client.session.messages({
         path: { id: sessionID },
         query: { directory: ctx.directory },
-      }).finally(() => deps.sessionRetryPayloadPending?.delete(sessionID))
+      }).finally(() => {
+        if (deps.sessionRetryPayloadPending?.get(sessionID) === payloadToken) {
+          deps.sessionRetryPayloadPending.delete(sessionID)
+        }
+      })
       if (!isCurrent()) return { accepted: false, status: "blocked", reason: "session lifecycle changed" }
       const retryPayload = getLastUserRetryPayload(messagesResp, sessionID)
       const originalRetryMetadata = resolveOriginalUserRetryMetadata(messagesResp)
@@ -229,14 +235,15 @@ export function createAutoRetryDispatcher(
       log(`[${HOOK_NAME}] Auto-retry failed (${source})`, { sessionID, error: String(retryError) })
       return { accepted: false, status: "failed", reason: retryError.message }
     } finally {
+      const stillOwned = isCurrent()
       releaseSessionRetryOwnership(deps, sessionID, retryOwner)
-      if (isCurrent() && retryMayHaveBeenAccepted) {
+      if (stillOwned && retryMayHaveBeenAccepted) {
         const state = sessionStates.get(sessionID)
         if (state) {
           state.pendingFallbackPromptMayHaveBeenAccepted = true
         }
       }
-      if (isCurrent() && !retryDispatched && !retryMayHaveBeenAccepted) {
+      if (stillOwned && !retryDispatched && !retryMayHaveBeenAccepted) {
         if (hadAwaitingFallbackResult) {
           sessionAwaitingFallbackResult.add(sessionID)
         } else {

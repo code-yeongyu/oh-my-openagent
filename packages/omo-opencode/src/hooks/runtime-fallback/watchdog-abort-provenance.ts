@@ -2,7 +2,7 @@ export function createWatchdogAbortProvenance() {
   const generationsBySession = new Map<string, Set<number>>()
   const completedGenerationsBySession = new Map<string, Set<number>>()
   const latestCompletedGenerationBySession = new Map<string, number>()
-  const pendingResponses = new Set<string>()
+  const pendingResponses = new Map<string, number>()
 
   const removeCompleted = (sessionID: string, generation: number): void => {
     const completedGenerations = completedGenerationsBySession.get(sessionID)
@@ -50,8 +50,10 @@ export function createWatchdogAbortProvenance() {
       record(sessionID, generation)
       return () => remove(sessionID, generation)
     },
-    markResponsePending(sessionID: string): void { pendingResponses.add(sessionID) },
-    clearResponsePending(sessionID: string): void { pendingResponses.delete(sessionID) },
+    markResponsePending(sessionID: string, generation: number): void { pendingResponses.set(sessionID, generation) },
+    clearResponsePending(sessionID: string, generation: number): void {
+      if (pendingResponses.get(sessionID) === generation) pendingResponses.delete(sessionID)
+    },
     isResponsePending(sessionID: string): boolean { return pendingResponses.has(sessionID) },
     hasCurrent(sessionID: string, currentGeneration: number | undefined): boolean {
       return currentGeneration !== undefined && generationsBySession.get(sessionID)?.has(currentGeneration) === true

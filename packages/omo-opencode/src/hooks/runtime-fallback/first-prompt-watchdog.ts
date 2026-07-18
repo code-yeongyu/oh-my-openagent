@@ -72,8 +72,8 @@ export function createFirstPromptWatchdog(
           isCallbackCurrent: () => armed.get(context.sessionID) === context,
           recordAbortProvenance: () => abortProvenance.reserve(context.sessionID, context.sessionGeneration),
           markAbortCompleted: () => abortProvenance.markCurrentCompleted(context.sessionID, context.sessionGeneration),
-          markAbortResponsePending: () => abortProvenance.markResponsePending(context.sessionID),
-          clearAbortResponsePending: () => abortProvenance.clearResponsePending(context.sessionID),
+          markAbortResponsePending: () => abortProvenance.markResponsePending(context.sessionID, context.sessionGeneration),
+          clearAbortResponsePending: () => abortProvenance.clearResponsePending(context.sessionID, context.sessionGeneration),
         }) === "retry"
       } finally {
         const isCurrent = context.sessionGeneration === sessionGenerations.get(context.sessionID)
@@ -198,6 +198,9 @@ export function createFirstPromptWatchdog(
       }
       const suspendedContext = suspended.get(sessionID)
       if (suspendedContext) {
+        if (currentAbortInspections.has(sessionID) && eventType === "session.error" && isAbortEvent === true) {
+          return { kind: "defer-terminal", sessionID }
+        }
         if (eventType === "session.idle") return
         if (eventType === "session.error" && isAbortEvent === false) {
           abortProvenance.consumePrior(sessionID, suspendedContext.sessionGeneration)
