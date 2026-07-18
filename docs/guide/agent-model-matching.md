@@ -210,7 +210,7 @@ Used by: Hephaestus, Oracle, Momus, `deep`, `ultrabrain`, `quick`, `unspecified-
 
 | Priority | Model | Provider | Why |
 |---|---|---|---|
-| 1 | `gpt-5.6-sol` (xhigh / high / medium) | `openai`, `github-copilot`, `vercel` | The GPT-5.6 flagship. Default for Hephaestus (`high` variant, `reasoningEffort: medium`) and `ultrabrain` (xhigh); first fallback for `deep`. |
+| 1 | `gpt-5.6-sol` (xhigh / high) | `openai`, `github-copilot`, `vercel` | The GPT-5.6 flagship. Default for Hephaestus (`high` variant, `reasoningEffort: medium`) and `ultrabrain` (xhigh); first fallback for `deep`. |
 | 1 | `gpt-5.6-terra` (xhigh / high) | `openai`, `github-copilot`, `vercel` | GPT-5.6 mid-tier. Default for `deep` (native xhigh; Copilot high) and Momus (high). |
 | 1 | `gpt-5.6-luna` (xhigh / high) | `openai`, `github-copilot`, `vercel` | GPT-5.6 light tier. Default for `unspecified-low` (native xhigh; Copilot high). |
 | 2 | `gpt-5.5` / `gpt-5.4` (pro / xhigh / high / medium) | `openai`, `github-copilot`, `opencode`, `vercel` | Previous flagship generation; first fallback on providers without GPT-5.6. Hephaestus requires this family. |
