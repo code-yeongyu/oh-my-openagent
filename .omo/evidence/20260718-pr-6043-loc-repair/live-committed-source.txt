@@ -1,0 +1,8 @@
+commit_head=783ee580b514256079be9ff69324247e6947c4e3
+source_files_sha256_before=45371215a8fa25cbf0f1b5f8f9e6a721fc3dff937b266c117bb686063fa4421f
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.ts
+packages/omo-opencode/src/hooks/runtime-fallback/reserved-retry-dispatch.ts
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-state.ts
+source_files_sha256_after=45371215a8fa25cbf0f1b5f8f9e6a721fc3dff937b266c117bb686063fa4421f
+source_unchanged_during_qa=yes
