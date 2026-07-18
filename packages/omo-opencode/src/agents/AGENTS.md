@@ -20,7 +20,7 @@ Modes verified from each agent file's `const MODE: AgentMode = ...` and (for Pro
 | Agent | Default Model | Temp | Mode | Fallback (after default) | Purpose |
 |-------|---------------|------|------|--------------------------|---------|
 | **Sisyphus** | claude-opus-4-7 max | (model default) | primary | kimi-k2.6 → k2p5 → kimi-k2.5 → gpt-5.5 medium → glm-5 → big-pickle | Main orchestrator, plans + delegates; `thinking: { type: "enabled", budgetTokens: 32000 }` |
-| **Hephaestus** | gpt-5.6-sol medium | (model default) | primary | gpt-5.5 medium (`requiresProvider`: openai \| github-copilot \| opencode \| vercel) | Autonomous deep worker |
+| **Hephaestus** | gpt-5.6-sol high | (model default) | primary | gpt-5.5 medium (`requiresProvider`: openai \| github-copilot \| opencode \| vercel) | Autonomous deep worker |
 | **Oracle** | gpt-5.5 high | 0.1 | subagent | gemini-3.1-pro high → claude-opus-4-7 max → glm-5.2 | Read-only consultation |
 | **Librarian** | gpt-5.4-mini-fast | 0.1 | subagent | qwen3.5-plus → minimax-m2.7-highspeed → minimax-m3 → minimax-m2.7 → claude-haiku-4-5 → gpt-5.4-nano | External docs/code search |
 | **Explore** | gpt-5.4-mini-fast | 0.1 | subagent | qwen3.5-plus → minimax-m2.7-highspeed → minimax-m3 → minimax-m2.7 → claude-haiku-4-5 → gpt-5.4-nano | Contextual grep |
