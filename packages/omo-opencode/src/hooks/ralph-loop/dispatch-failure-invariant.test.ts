@@ -696,6 +696,67 @@ describe("ralph-loop dispatch failure invariants", () => {
 		expect(toastCalls.some((toast) => toast.title === "Ralph Loop Failed" && toast.variant === "error")).toBe(true)
 	})
 
+	test("#given ultrawork completion path #when verification prompt injection is deferred #then no toast and no state clear", async () => {
+		// given
+		let cleared = false
+		const loopState = {
+			clear: () => {
+				cleared = true
+				return true
+			},
+			markVerificationPending: (sessionID: string) => ({
+				active: true,
+				iteration: 2,
+				prompt: "Build API",
+				started_at: new Date().toISOString(),
+				session_id: sessionID,
+				completion_promise: ULTRAWORK_VERIFICATION_PROMISE,
+				verification_pending: true,
+			}),
+		}
+
+		await handleDetectedCompletion({
+			directory: testDirectory,
+			project: testDirectory,
+			worktree: testDirectory,
+			serverUrl: "http://localhost:4096",
+			$: async () => ({}),
+			client: {
+				session: {
+					messages: async () => {
+						throw new Error("messages unavailable")
+					},
+					promptAsync: async () => ({}),
+					abort: async () => ({}),
+				},
+				tui: {
+					showToast: (options: { body: { title: string; message: string; variant: string } }) => {
+						toastCalls.push(options.body)
+					},
+				},
+			},
+		} as never, {
+			sessionID: "session-123",
+			state: {
+				active: true,
+				iteration: 2,
+				prompt: "Build API",
+				started_at: new Date().toISOString(),
+				session_id: "session-123",
+				completion_promise: "DONE",
+				ultrawork: true,
+			},
+			loopState,
+			directory: testDirectory,
+			apiTimeoutMs: 5000,
+		})
+
+		// then
+		expect(cleared).toBe(false)
+		expect(toastCalls.some((toast) => toast.title === "ULTRAWORK LOOP")).toBe(false)
+		expect(toastCalls.some((toast) => toast.title === "Ralph Loop Failed")).toBe(false)
+	})
+
 	test("#given reset strategy #when session.create throws #then dispatch failure surfaces", async () => {
 		// given
 		const hook = createRalphLoopHook({
