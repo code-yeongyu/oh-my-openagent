@@ -150,7 +150,7 @@ stateDiagram-v2
 
     state "Momus + Oracle review" as DualReview
 
-    HighAccuracyChoice --> DualReview: User wants high accuracy
+    HighAccuracyChoice --> DualReview: High accuracy required or selected
     HighAccuracyChoice --> Done: User accepts plan
 
     DualReview --> WritePlan: EITHER REJECTS - fix issues
@@ -195,13 +195,15 @@ High-accuracy mode runs two independent reviews in parallel: Momus checks plan q
 
 **The Dual-Review Loop:**
 
-Momus only says "OKAY" when:
+Momus is approval-biased and rejects only verified blockers. It checks that:
 
-- 100% of file references verified
-- ≥80% of tasks have clear reference sources
-- ≥90% of tasks have concrete acceptance criteria
-- Zero tasks require assumptions about business logic
-- Zero critical red flags
+- Referenced files exist and support the plan's claims
+- Every task gives a developer a usable starting point
+- Tasks do not contradict each other
+- QA scenarios name the tool, steps, and expected result
+- No missing information would completely stop execution
+
+Minor gaps and details that a developer can resolve during implementation do not block approval; a plan that is roughly 80% clear is considered executable.
 
 If either reviewer rejects the plan, Prometheus fixes every cited issue and resubmits to both reviewers. No maximum retry limit.
 
