@@ -20,6 +20,24 @@ describe("validateArchiveEntries", () => {
 		expect(rejectTraversalPath).toThrow(/path traversal/i)
 	})
 
+	it("rejects Windows-style absolute paths and backslash traversal entries", () => {
+		//#given
+		const destDir = "/tmp/archive-root"
+
+		//#when
+		const rejectDriveAbsolutePath = () =>
+			validateArchiveEntries([{ path: String.raw`C:\Windows\System32\drivers\etc\hosts`, type: "file" }], destDir)
+		const rejectUncAbsolutePath = () =>
+			validateArchiveEntries([{ path: String.raw`\\server\share\payload.txt`, type: "file" }], destDir)
+		const rejectBackslashTraversalPath = () =>
+			validateArchiveEntries([{ path: String.raw`nested\..\..\evil.txt`, type: "file" }], destDir)
+
+		//#then
+		expect(rejectDriveAbsolutePath).toThrow(/absolute path/i)
+		expect(rejectUncAbsolutePath).toThrow(/absolute path/i)
+		expect(rejectBackslashTraversalPath).toThrow(/path traversal/i)
+	})
+
 	it("rejects symlink targets that escape the extraction directory", () => {
 		//#given
 		const destDir = "/tmp/archive-root"
