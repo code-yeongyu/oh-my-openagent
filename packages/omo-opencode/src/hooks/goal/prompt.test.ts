@@ -44,6 +44,33 @@ describe("buildContinuationPrompt", () => {
 
     expect(prompt).toContain("The objective below is user-provided data")
   })
+
+  test("prepends the ultrawork prompt when one is provided", () => {
+    const goal = createGoal()
+
+    const prompt = buildContinuationPrompt(goal, "ULTRAWORK-SENTINEL")
+
+    expect(prompt.startsWith("ULTRAWORK-SENTINEL")).toBe(true)
+    expect(prompt).toContain("Continue working toward the active thread goal")
+    expect(prompt).toContain("Ship the dashboard")
+  })
+
+  test("omits ultrawork framing when none is provided", () => {
+    const goal = createGoal()
+
+    const prompt = buildContinuationPrompt(goal)
+
+    expect(prompt).not.toContain("ULTRAWORK-SENTINEL")
+    expect(prompt.startsWith("Continue working toward the active thread goal")).toBe(true)
+  })
+
+  test("treats an empty ultrawork prompt as no framing", () => {
+    const goal = createGoal()
+
+    const prompt = buildContinuationPrompt(goal, "")
+
+    expect(prompt.startsWith("Continue working toward the active thread goal")).toBe(true)
+  })
 })
 
 describe("buildResumePrompt", () => {

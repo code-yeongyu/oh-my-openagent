@@ -10,7 +10,6 @@ export const DefaultModeConfigSchema = z.object({
  /**
  * Automatically create a goal from the first main-session message
  * without requiring the /goal command.
- * When ultrawork is also enabled, the goal continuation prompt uses ultrawork mode.
  */
  goal: z.boolean().default(false),
 })

@@ -2,6 +2,7 @@ import type { PluginContext } from "./types"
 
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { log, replaceToolArgs } from "../shared"
+import { checkObjective } from "../hooks/goal/validation"
 import { resolveSessionAgent } from "./session-agent-resolver"
 import { stopContinuation } from "./stop-continuation"
 
@@ -135,7 +136,9 @@ export function createToolExecuteBeforeHandler(args: {
             ? output.args.arguments.trim()
             : ""
         if (rawArgs.length > 0) {
-          hooks.goal.setGoal(sessionID, rawArgs)
+          const check = checkObjective(rawArgs)
+          if (check.ok) hooks.goal.setGoal(sessionID, check.objective)
+          else log("[goal] skill objective not set: invalid objective", { sessionID, reason: check.error })
         }
       }
 

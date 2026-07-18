@@ -22,6 +22,11 @@ describe("GoalConfigSchema", () => {
     expect(result.default_max_iterations).toBe(50)
   })
 
+  test("defaults ultrawork to false and accepts true", () => {
+    expect(GoalConfigSchema.parse({}).ultrawork).toBe(false)
+    expect(GoalConfigSchema.parse({ ultrawork: true }).ultrawork).toBe(true)
+  })
+
   test("rejects out-of-range max iterations", () => {
     expect(() => GoalConfigSchema.parse({ default_max_iterations: 0 })).toThrow()
     expect(() => GoalConfigSchema.parse({ default_max_iterations: 1001 })).toThrow()

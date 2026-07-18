@@ -36,7 +36,6 @@ import {
   log,
 } from "../../shared"
 import { safeCreateHook } from "../../shared/safe-create-hook"
-import { sessionExists } from "../../tools"
 import { isTmuxIntegrationEnabled } from "../../create-runtime-tmux-config"
 import { createModelFallbackTitleUpdater } from "./model-fallback-title-updater"
 
@@ -169,9 +168,7 @@ export function createSessionHooks(args: {
     ? safeHook("goal", () =>
         createGoalHook(ctx, {
           projectDir: ctx.directory,
-          autoStart: pluginConfig.goal?.auto_start ?? false,
-          ultrawork: pluginConfig.default_mode?.ultrawork ?? false,
-          getSessionExists: async (sessionId) => await sessionExists(sessionId),
+          ultrawork: pluginConfig.goal?.ultrawork ?? false,
         }))
     : null
 

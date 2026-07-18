@@ -14,6 +14,7 @@ import { getOmoOpenCodeCacheDir, getOpenCodeCacheDir } from "../shared/data-path
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../shared/internal-initiator-marker"
 import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state"
 import { createChatMessageHandler } from "./chat-message"
+import { MAX_OBJECTIVE_LENGTH, validateObjective } from "../hooks/goal/validation"
 import type { PluginContext } from "./types"
 
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
@@ -453,7 +454,7 @@ describe("createChatMessageHandler - goal command handling and stop continuation
     const handler = createChatMessageHandler(args)
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "Ship it" }],
+      parts: [{ type: "text", text: "/goal Ship it" }],
     }
 
     // when
@@ -475,7 +476,7 @@ describe("createChatMessageHandler - goal command handling and stop continuation
     const handler = createChatMessageHandler(args)
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "pause" }],
+      parts: [{ type: "text", text: "/goal pause" }],
     }
 
     // when
@@ -497,7 +498,7 @@ describe("createChatMessageHandler - goal command handling and stop continuation
     const handler = createChatMessageHandler(args)
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "resume" }],
+      parts: [{ type: "text", text: "/goal resume" }],
     }
 
     // when
@@ -519,7 +520,7 @@ describe("createChatMessageHandler - goal command handling and stop continuation
     const handler = createChatMessageHandler(args)
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "clear" }],
+      parts: [{ type: "text", text: "/goal clear" }],
     }
 
     // when
@@ -578,19 +579,19 @@ describe("createChatMessageHandler - goal command handling and stop continuation
     })
     await handler(createMockInput("sisyphus"), {
       message: {},
-      parts: [{ type: "text", text: "Ship it" }],
+      parts: [{ type: "text", text: "/goal Ship it" }],
     })
     await handler(createMockInput("sisyphus"), {
       message: {},
-      parts: [{ type: "text", text: "pause" }],
+      parts: [{ type: "text", text: "/goal pause" }],
     })
     await handler(createMockInput("sisyphus"), {
       message: {},
-      parts: [{ type: "text", text: "resume" }],
+      parts: [{ type: "text", text: "/goal resume" }],
     })
     await handler(createMockInput("sisyphus"), {
       message: {},
-      parts: [{ type: "text", text: "clear" }],
+      parts: [{ type: "text", text: "/goal clear" }],
     })
 
     // then
@@ -602,10 +603,6 @@ describe("createChatMessageHandler - goal command handling and stop continuation
       "test-session",
     ])
     expect(goalMock.setGoalCalls).toEqual([
-      {
-        sessionID: "test-session",
-        objective: "<session-context>context</session-context>\nYou are starting an Atlas work session.",
-      },
       { sessionID: "test-session", objective: "Ship it" },
     ])
     expect(goalMock.pauseGoalCalls).toEqual(["test-session"])
@@ -626,7 +623,7 @@ describe("createChatMessageHandler - /goal raw slash fallback", () => {
     const input = createMockInput("sisyphus")
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "Ship the dashboard" }],
+      parts: [{ type: "text", text: "/goal Ship the dashboard" }],
     }
 
     // when
@@ -647,7 +644,7 @@ describe("createChatMessageHandler - /goal raw slash fallback", () => {
     const input = createMockInput("sisyphus")
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "pause" }],
+      parts: [{ type: "text", text: "/goal pause" }],
     }
 
     // when
@@ -667,7 +664,7 @@ describe("createChatMessageHandler - /goal raw slash fallback", () => {
     const input = createMockInput("sisyphus")
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "resume" }],
+      parts: [{ type: "text", text: "/goal resume" }],
     }
 
     // when
@@ -687,7 +684,7 @@ describe("createChatMessageHandler - /goal raw slash fallback", () => {
     const input = createMockInput("sisyphus")
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "clear" }],
+      parts: [{ type: "text", text: "/goal clear" }],
     }
 
     // when
@@ -722,6 +719,97 @@ describe("createChatMessageHandler - /goal raw slash fallback", () => {
     ])
   })
 
+  test("does not abort the message when the first message exceeds the objective limit", async () => {
+    // given: setGoal validates like the real controller, throwing for over-limit objectives
+    const goalMock = createGoalHookMock()
+    const recordingSetGoal = goalMock.hook.setGoal
+    goalMock.hook.setGoal = (sessionID: string, objective: string) => {
+      validateObjective(objective)
+      return recordingSetGoal(sessionID, objective)
+    }
+    const args = createMockHandlerArgs({
+      shouldOverride: true,
+      pluginConfig: { default_mode: { goal: true } },
+    })
+    args.hooks.goal = goalMock.hook
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("sisyphus")
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [{ type: "text", text: "x".repeat(MAX_OBJECTIVE_LENGTH + 500) }],
+    }
+
+    // when / then: the over-limit first message must still send (no throw); goal is skipped
+    await expect(handler(input, output)).resolves.toBeUndefined()
+    expect(goalMock.setGoalCalls).toHaveLength(0)
+  })
+
+})
+
+describe("createChatMessageHandler - goal handling uses the raw prompt", () => {
+  test("sets the goal from /goal even after autoSlashCommand rewrites the message part", async () => {
+    const goalMock = createGoalHookMock()
+    const args = createMockHandlerArgs()
+    args.hooks.goal = goalMock.hook
+    args.hooks.autoSlashCommand = {
+      "chat.message": async (_input: { sessionID: string }, output: ChatMessageHandlerOutput) => {
+        const part = output.parts[0]
+        if (part && typeof part.text === "string" && part.text.trimStart().startsWith("/goal")) {
+          part.text = "<auto-slash-command>\nexpanded goal template\n</auto-slash-command>"
+        }
+      },
+    }
+    const handler = createChatMessageHandler(args)
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [{ type: "text", text: "/goal Ship it" }],
+    }
+
+    await handler(createMockInput("sisyphus"), output)
+
+    expect(goalMock.setGoalCalls).toEqual([{ sessionID: "test-session", objective: "Ship it" }])
+  })
+
+  test("auto-starts the goal from the RAW first message even when a hook wraps it", async () => {
+    const goalMock = createGoalHookMock()
+    const args = createMockHandlerArgs({
+      shouldOverride: true,
+      pluginConfig: { default_mode: { goal: true } },
+    })
+    args.hooks.goal = goalMock.hook
+    args.hooks.keywordDetector = {
+      "chat.message": async (_input: { sessionID: string }, output: ChatMessageHandlerOutput) => {
+        const part = output.parts[0]
+        if (part && typeof part.text === "string") {
+          part.text = `<session-context>injected</session-context>\n${part.text}`
+        }
+      },
+    }
+    const handler = createChatMessageHandler(args)
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [{ type: "text", text: "Ship the dashboard" }],
+    }
+
+    await handler(createMockInput("sisyphus"), output)
+
+    expect(goalMock.setGoalCalls).toEqual([{ sessionID: "test-session", objective: "Ship the dashboard" }])
+  })
+
+  test("preserves a multi-line /goal objective", async () => {
+    const goalMock = createGoalHookMock()
+    const args = createMockHandlerArgs()
+    args.hooks.goal = goalMock.hook
+    const handler = createChatMessageHandler(args)
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [{ type: "text", text: "/goal Fix these:\n1. First\n2. Second" }],
+    }
+
+    await handler(createMockInput("sisyphus"), output)
+
+    expect(goalMock.setGoalCalls).toEqual([{ sessionID: "test-session", objective: "Fix these:\n1. First\n2. Second" }])
+  })
 })
 
 function createMockInput(agent?: string, model?: { providerID: string; modelID: string }) {

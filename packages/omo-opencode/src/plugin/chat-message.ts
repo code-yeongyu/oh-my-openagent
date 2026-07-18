@@ -100,7 +100,8 @@ export function createChatMessageHandler(args: {
       updateSessionAgent(input.sessionID, input.agent)
     }
 
-    const slashCommand = detectSlashCommand(extractPromptText(output.parts))
+    const rawPromptText = extractPromptText(output.parts)
+    const slashCommand = detectSlashCommand(rawPromptText)
     if (slashCommand?.command === "stop-continuation") {
       stopContinuation({
         directory: ctx.directory,
@@ -138,6 +139,7 @@ export function createChatMessageHandler(args: {
       isFirstMessage,
       pluginConfig,
       nativeGoalCommand,
+      rawPromptText,
     })
     await applyUltraworkModelOverrideOnMessage(
       pluginConfig,
