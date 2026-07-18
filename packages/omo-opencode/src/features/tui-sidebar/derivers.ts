@@ -8,6 +8,7 @@ import type {
   LoopState,
   RosterRow,
   RosterState,
+  TeamsState,
 } from "./state-types"
 import type { BackgroundTaskStatus } from "../background-agent/types"
 
@@ -66,6 +67,14 @@ export function deriveJobBoard(snap: TuiRuntimeSnapshot | null): JobBoardState {
 
 export function deriveLoop(snap: TuiRuntimeSnapshot | null): LoopState {
   return snap?.loop ?? { kind: "none" }
+}
+
+export function deriveTeams(snap: TuiRuntimeSnapshot | null): TeamsState {
+  if (!snap || snap.teams.length === 0) {
+    return { kind: "none" }
+  }
+
+  return { kind: "list", teams: snap.teams }
 }
 
 function compareRosterRows(left: RosterRow, right: RosterRow): number {

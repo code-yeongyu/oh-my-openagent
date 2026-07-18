@@ -6,10 +6,11 @@ import {
   deriveJobBoard,
   deriveLoop,
   deriveRoster,
+  deriveTeams,
 } from "./derivers"
 import { MAX_AGENTS, MAX_JOBS, MIRROR_SCHEMA_VERSION } from "./constants"
 import type { TuiRuntimeSnapshot } from "./snapshot-schema"
-import type { AgentRow, JobRow, LoopLive, RosterRow } from "./state-types"
+import type { AgentRow, JobRow, LoopLive, RosterRow, TeamRow } from "./state-types"
 
 const liveLoop: LoopLive = {
   kind: "live",
@@ -26,6 +27,7 @@ function snapshot(input: {
   readonly activeAgents?: readonly AgentRow[]
   readonly jobBoard?: readonly JobRow[]
   readonly loop?: LoopLive | null
+  readonly teams?: readonly TeamRow[]
 }): TuiRuntimeSnapshot {
   return {
     version: MIRROR_SCHEMA_VERSION,
@@ -34,6 +36,7 @@ function snapshot(input: {
     activeAgents: [...(input.activeAgents ?? [])],
     jobBoard: [...(input.jobBoard ?? [])],
     loop: input.loop ?? null,
+    teams: [...(input.teams ?? [])],
   }
 }
 
@@ -199,6 +202,25 @@ describe("tui sidebar section derivers", () => {
     // then
     expect(nullState).toEqual({ kind: "none" })
     expect(emptyState).toEqual({ kind: "none" })
+  })
+
+  it("#given a snapshot with idle team members #when deriving teams #then it keeps every member for rendering", () => {
+    // given
+    const teams: readonly TeamRow[] = [
+      {
+        name: "sidebar-team",
+        members: [
+          { name: "running", status: "running", work: "Implementing sidebar", sessionId: "ses-running" },
+          { name: "idle", status: "idle", work: null, sessionId: null },
+        ],
+      },
+    ]
+
+    // when
+    const state = deriveTeams(snapshot({ teams }))
+
+    // then
+    expect(state).toEqual({ kind: "list", teams })
   })
 
   it("#given a live loop with pass fail pending and blocked counts #when deriving loop #then it passes the live state through", () => {
