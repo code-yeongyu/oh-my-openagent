@@ -34,7 +34,10 @@ const packageRoot = dirname(pluginRoot)
 const repoRoot = join(packageRoot, "..", "..")
 const entryPath = join(packageRoot, "src", "extension", "index.ts")
 const outputPath = join(pluginRoot, "extensions", "omo.js")
+const memberEntryPath = join(repoRoot, "packages", "senpi-task", "src", "team", "member-extension", "index.ts")
+const memberOutputPath = join(pluginRoot, "extensions", "omo-member.js")
 const sourceRoots = [join(packageRoot, "src", "extension"), join(packageRoot, "src", "components")]
+const memberSourceRoots = [join(repoRoot, "packages", "senpi-task", "src", "team", "member-extension")]
 const builtinModuleNames = builtinModules.filter((moduleName) => !moduleName.startsWith("_"))
 const externalSpecifiers = [
   ...SENPI_LOADER_ALIASES,
@@ -44,17 +47,25 @@ const externalSpecifiers = [
 
 export async function buildExtension(options = {}) {
   const output = options.outputPath ?? outputPath
+  const memberOutput = options.memberOutputPath ?? (options.outputPath === undefined
+    ? memberOutputPath
+    : join(dirname(output), "omo-member.js"))
+  await buildEntry(entryPath, output)
+  await buildEntry(memberEntryPath, memberOutput)
+}
+
+async function buildEntry(entry, output) {
   await mkdir(dirname(output), { recursive: true })
   run("bun", [
     "build",
-    entryPath,
+    entry,
     "--target",
     "node",
     "--format",
     "esm",
     "--outfile",
     output,
-    "--no-minify",
+    "--minify",
     ...externalSpecifiers.flatMap((specifier) => ["--external", specifier]),
   ])
   await normalizeBuiltinImports(output)
@@ -62,17 +73,26 @@ export async function buildExtension(options = {}) {
 
 export async function checkExtensionCurrent(options = {}) {
   const output = options.outputPath ?? outputPath
+  const memberOutput = options.memberOutputPath ?? (options.outputPath === undefined
+    ? memberOutputPath
+    : join(dirname(output), "omo-member.js"))
+  const mainResult = await checkBuiltEntry(output, sourceRoots)
+  if (!mainResult.ok) return mainResult
+  const memberResult = await checkBuiltEntry(memberOutput, memberSourceRoots)
+  if (!memberResult.ok) return memberResult
+  return { ok: true, output, memberOutput }
+}
+
+async function checkBuiltEntry(output, roots) {
   let outputStats
   try {
     outputStats = await stat(output)
   } catch (error) {
-    if (isErrno(error, "ENOENT")) {
-      return { ok: false, reason: "missing-output", output }
-    }
+    if (isErrno(error, "ENOENT")) return { ok: false, reason: "missing-output", output }
     throw error
   }
 
-  const latestSource = await latestMtimeMs(sourceRoots)
+  const latestSource = await latestMtimeMs(roots)
   if (latestSource > outputStats.mtimeMs) {
     return { ok: false, reason: "stale-output", output, latestSource, outputMtime: outputStats.mtimeMs }
   }
@@ -106,8 +126,10 @@ function run(command, args) {
 
 async function normalizeBuiltinImports(output) {
   const bundled = await readFile(output, "utf8")
+  // Whitespace-tolerant so minified output (`from"path"`, `import"path"`) normalizes too, not just the
+  // spaced non-minified shape.
   const normalized = bundled.replace(
-    /(from\s+["']|import\s*\(\s*["']|import\s+["'])([^"']+)(["'])/g,
+    /(from\s*["']|import\s*\(\s*["']|import\s*["'])([^"']+)(["'])/g,
     (match, prefix, specifier, suffix) => {
       if (specifier.startsWith("node:")) return match
       if (!builtinModuleNames.includes(specifier)) return match
@@ -134,6 +156,6 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     console.log(`omo-senpi extension build is current: ${result.output}`)
   } else {
     await buildExtension()
-    console.log(`Built omo-senpi extension: ${outputPath}`)
+    console.log(`Built omo-senpi extensions: ${outputPath}, ${memberOutputPath}`)
   }
 }

@@ -75,6 +75,9 @@ export type PromptAsyncGateResult = InternalPromptDispatchResult
 export type PromptAsyncReservationReleaseOptions = {
   readonly reservedBy?: string | readonly string[]
   readonly reservedByPrefix?: string | readonly string[]
+  // Lets an intentional recovery release clear a stale `model-suggestion-retry`
+  // reservation that outlived its aborted dispatch. Never matches `user-prompt`.
+  readonly supersedeTransientRetryOwners?: boolean
 }
 
 export type PromptDispatchClient = {

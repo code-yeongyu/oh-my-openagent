@@ -1,9 +1,0 @@
-$ bun /Users/yeongyu/local-workspaces/omo/.local-ignore/pr-worktrees/verify-5836/.omo/evidence/20260706-verify-5836/worker-normal-probe.mjs
-EXIT_CODE=0
-
-STDOUT:
-{
-  "action": "initialized"
-}
-
-STDERR:

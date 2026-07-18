@@ -1,6 +1,0 @@
-scenario: 12b-cleanup-receipt-corrected
-surface: Cleanup receipt corrected: no review6 tmux/server/temp processes left by this QA run
-invocation: printf "No servers or tmux sessions were started by review6 QA. Checking for lingering review6/manual-category processes.\n"; tmux_matches=$(tmux ls 2>/dev/null | awk "/review6|senpi-task-review6|manual-category-qa/ { print }"); ps_matches=$(ps ax -o pid=,command= | awk "/manual-category-qa|senpi-task-review6|review6-qa/ && !/awk/ && !/bash -lc/ { print }"); if [ -n "$tmux_matches$ps_matches" ]; then printf "%s\n%s\n" "$tmux_matches" "$ps_matches"; exit 1; fi; printf "cleanup_receipt=clean\n"
-started_at: 2026-07-06T11:03:33Z
-finished_at: 2026-07-06T11:03:33Z
-exit: 0

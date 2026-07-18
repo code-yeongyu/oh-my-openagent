@@ -1,10 +1,12 @@
-# src/hooks/ralph-loop/ — Self-Referential Dev Loop
+# src/hooks/ralph-loop/ -- Self-Referential Dev Loop
 
-**Generated:** 2026-05-15
+**Generated:** 2026-07-17
 
 ## OVERVIEW
 
-14 files (~1687 LOC). The `ralphLoop` Session Tier hook — powers the `/ralph-loop` command. Iterates a development loop until the agent emits `<promise>DONE</promise>` or max iterations reached.
+**DEPRECATED.** Superseded by [`goal/`](../goal/) (PR #6184 "goal-replaces-ralph"). `ralphLoop` was removed from `HookNameSchema` and `create-session-hooks.ts`; the `/ralph-loop`, `/ulw-loop`, `/cancel-ralph` builtin commands and templates were removed; `ralph_loop` config is a deprecated passthrough for migration. The directory, `createRalphLoopHook` factory, and barrel export remain, but no composer imports them.
+
+~52 .ts files (31 impl + 21 tests). Iterates a development loop until the agent emits `<promise>DONE</promise>` or max iterations reached. No longer wired into any tier.
 
 ## LOOP LIFECYCLE
 
@@ -21,8 +23,8 @@
 
 | File | Purpose |
 |------|---------|
-| `ralph-loop-hook.ts` | `createRalphLoopHook()` — composes controller + recovery + event handler |
-| `ralph-loop-event-handler.ts` | `createRalphLoopEventHandler()` — handles session.idle, drives loop |
+| `ralph-loop-hook.ts` | `createRalphLoopHook()` -- composes controller + recovery + event handler |
+| `ralph-loop-event-handler.ts` | `createRalphLoopEventHandler()` -- handles session.idle, drives loop |
 | `loop-state-controller.ts` | State CRUD: startLoop, cancelLoop, getState, persist to disk |
 | `loop-session-recovery.ts` | Recover from crashed/interrupted loop sessions |
 | `completion-promise-detector.ts` | Scan session transcript for `<promise>DONE</promise>` |

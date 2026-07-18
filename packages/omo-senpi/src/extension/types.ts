@@ -1,3 +1,7 @@
+import type { ToolDefinition } from "@code-yeongyu/senpi"
+
+import type { IdleInjectionCoordinator } from "./idle-injection-coordinator"
+
 export interface SenpiExtensionAPI {
   on(event: string, handler: (payload: unknown, ctx?: unknown) => unknown | Promise<unknown>): void
   registerTool(tool: Record<string, unknown>): void
@@ -13,6 +17,8 @@ export interface SenpiExtensionAPI {
   getFlag(name: string): boolean | string | undefined
   sendMessage(message: Record<string, unknown>, options?: Record<string, unknown>): void
   sendUserMessage(content: string | readonly Record<string, unknown>[], options?: { deliverAs?: "steer" | "followUp" }): void
+  registerMessageRenderer?(customType: string, renderer: unknown): void
+  registerMcpServer?(name: string, config: Record<string, unknown>): void
 }
 
 export interface ComponentLogger {
@@ -26,6 +32,12 @@ export interface ComponentContext {
   config: {
     getFlag(name: string): boolean | string | undefined
   }
+  // Registration-time capture registry (todo 17): every full ToolDefinition registered by any omo
+  // component, captured with its live execute closure. Absent in isolated component unit tests.
+  getCapturedTools?(): readonly ToolDefinition[]
+  // Single-queue idle-edge injection arbiter (todo 17). When present, ulw-loop continuation and task
+  // completion wakes route through it so one idle edge yields exactly one injection.
+  idleCoordinator?: IdleInjectionCoordinator
 }
 
 export interface OmoSenpiComponent {

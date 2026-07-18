@@ -1,4 +1,4 @@
-import { z } from "zod"
+import * as z from "zod"
 
 const OmoTeamMemberBaseSchema = z.object({
   name: z.string().min(1).regex(/^[a-z0-9-]+$/),

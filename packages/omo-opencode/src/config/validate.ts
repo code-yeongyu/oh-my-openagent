@@ -13,6 +13,7 @@ import {
   parseJsonc,
 } from "../shared"
 import { applyDisabledProviders } from "../shared/disabled-providers"
+import { log } from "../shared/logger"
 import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "../shared/plugin-identity"
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./schema"
 
@@ -133,12 +134,51 @@ function mergeLoadedConfig(
   }
 
   const userMcpEnvAllowlist = config.mcp_env_allowlist ?? []
+  const userPlaywrightMcpArgs = config.browser_automation_engine?.playwright_mcp_args
   for (const layer of [...projectLayersNearestFirst].reverse()) {
     if (layer.config) config = mergeConfigs(config, layer.config)
   }
 
   config = { ...config, mcp_env_allowlist: userMcpEnvAllowlist }
+  if (config.browser_automation_engine) {
+    const {
+      playwright_mcp_args: _projectPlaywrightMcpArgs,
+      ...browserAutomationEngine
+    } = config.browser_automation_engine
+    config = {
+      ...config,
+      browser_automation_engine: userPlaywrightMcpArgs !== undefined
+        ? { ...browserAutomationEngine, playwright_mcp_args: userPlaywrightMcpArgs }
+        : browserAutomationEngine,
+    }
+  }
   return applyDisabledProviders(config)
+}
+
+function migrateRalphLoopConfig(config: OhMyOpenCodeConfig): OhMyOpenCodeConfig {
+  const legacy = config.ralph_loop
+  if (legacy === undefined) {
+    return config
+  }
+
+  const enabled = typeof legacy.enabled === "boolean" ? legacy.enabled : undefined
+  const defaultMaxIterations = typeof legacy.default_max_iterations === "number" ? legacy.default_max_iterations : undefined
+
+  if (enabled === undefined && defaultMaxIterations === undefined) {
+    return config
+  }
+
+  log("[config] ralph_loop is deprecated and will be removed in a future release. Use goal instead.")
+
+  const existingGoal = config.goal
+  return {
+    ...config,
+    goal: {
+      enabled: existingGoal?.enabled ?? enabled ?? false,
+      auto_start: existingGoal?.auto_start ?? false,
+      default_max_iterations: existingGoal?.default_max_iterations ?? defaultMaxIterations ?? 100,
+    },
+  }
 }
 
 export function validatePluginConfig(directory: string): PluginConfigValidation {
@@ -151,6 +191,6 @@ export function validatePluginConfig(directory: string): PluginConfigValidation 
     valid: messages.length === 0,
     messages,
     path: firstFailingPath(layers) ?? firstPath(layers),
-    config: mergeLoadedConfig(userLayersNearestFirst, projectLayersNearestFirst),
+    config: migrateRalphLoopConfig(mergeLoadedConfig(userLayersNearestFirst, projectLayersNearestFirst)),
   }
 }

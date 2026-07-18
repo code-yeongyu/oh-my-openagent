@@ -8,7 +8,7 @@ import path from "node:path"
 
 import { TeamModeConfigSchema } from "../config"
 import type { TeamModeConfig } from "../config"
-import type { RuntimeState, TeamSpec } from "../types"
+import type { ActiveTeamSummary, RuntimeState, TeamSpec } from "../types"
 import {
   InvalidTransitionError,
   RuntimeStateError,
@@ -231,6 +231,28 @@ describe("runtime state store", () => {
       { teamRunId: firstState.teamRunId, teamName: "alpha-team", status: "creating", memberCount: 2, scope: "user" },
       { teamRunId: secondState.teamRunId, teamName: "beta-team", status: "creating", memberCount: 2, scope: "project" },
     ])
+  })
+
+  test("#given an active runtime with a lead session w2tc #when active teams are listed #then the typed summary carries leadSessionId", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const runtimeState = await createRuntimeState(createSpec("lead-session-team"), "lead-session-14", "project", config)
+
+    // when
+    const activeTeams = await listActiveTeams(config)
+    const summary: ActiveTeamSummary | undefined = activeTeams[0]
+
+    // then
+    expect(summary).toEqual({
+      teamRunId: runtimeState.teamRunId,
+      teamName: "lead-session-team",
+      status: "creating",
+      memberCount: 2,
+      scope: "project",
+      leadSessionId: "lead-session-14",
+    })
   })
 
   test("listActiveTeams removes deleted runtime directories left by interrupted cleanup", async () => {

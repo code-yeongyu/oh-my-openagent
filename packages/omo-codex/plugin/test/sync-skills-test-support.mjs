@@ -32,10 +32,11 @@ export const expectedSkills = [
 	"visual-qa",
 ];
 
-export const hiddenSharedSkills = ["ultraresearch"];
-
 export const componentSkillSources = [
 	["comment-checker", "components/comment-checker/skills/comment-checker"],
+	["lcx-contribute-bug-fix", "components/lcx/skills/lcx-contribute-bug-fix"],
+	["lcx-doctor", "components/lcx/skills/lcx-doctor"],
+	["lcx-report-bug", "components/lcx/skills/lcx-report-bug"],
 	["lsp", "components/lsp/skills/lsp"],
 	["rules", "components/rules/skills/rules"],
 	["teammode", "components/teammode/skills/teammode"],
@@ -79,7 +80,8 @@ const startWorkCodexCompletion = `When all top-level checkboxes in \`## TODOs\` 
 1. Run the plan's final verification commands.
 2. Complete the **Global Review and Debugging Gate** before any completion claim, PR creation, PR handoff, branch handoff, or merge:
    - Invoke the \`review-work\` skill with the final diff, changed files, user goal, constraints, run command, and verification evidence. All five review lanes must return PASS. A timeout, missing deliverable, ack-only child, \`BLOCKED:\`, or inconclusive lane is a gate failure, not approval.
-   - Run a debugging-oriented runtime audit even when the review passes: name at least three plausible failure hypotheses for the changed surface, run the distinguishing checks against the actual artifact, and append the ruled-out or confirmed result to \`.omo/start-work/ledger.jsonl\`.
+   - Each passing review lane binds to the exact full commit SHA it reviewed. Immediately append a durable record to \`.omo/start-work/ledger.jsonl\` with the lane name, full SHA, PASS verdict, and report artifact/source. Before same-SHA reuse after any continuation or compaction, re-read the ledger record and require the exact lane/SHA pair; memory, chat history, or an unstamped report is not coverage. New commits require fresh applicable lane coverage.
+   - Run a debugging-oriented runtime audit even when the review passes: name at least three plausible failure hypotheses for the changed surface, run the distinguishing checks against the actual artifact, and append a separate durable record with the audit name, exact full SHA, verdict, and evidence artifact/source to \`.omo/start-work/ledger.jsonl\`. Reuse it only after re-reading an exact audit/SHA match.
    - If any review lane or debugging hypothesis fails, invoke the \`debugging\` skill, confirm root cause with runtime evidence, add the minimal failing test or reproduction, fix it, rerun the affected verification, then rerun the Global Review and Debugging Gate.
    - Evidence hygiene is mandatory: redact or mask secrets and sensitive user data before writing \`.omo/start-work/ledger.jsonl\`, a PR body, or a handoff. Never include raw tokens, credentials, auth headers, cookies, API keys, env dumps, private logs, or PII; use concise summaries, lengths, hashes, or short non-sensitive prefixes instead.
    - If the work includes creating, updating, or handing off a PR, refresh \`git status\` and the PR/branch state from the task-owned worktree after the gate, and include only redacted review/debugging evidence in the PR body or handoff.
@@ -91,26 +93,40 @@ const startWorkOriginalHardRule = "- No completion claim while an applicable ult
 
 const startWorkCodexHardRule = "- No completion claim while an applicable ultraqa adversarial class was never probed. Each applicable class needs a captured observable result; each skipped class needs a one-line not-applicable reason in the ledger.\n- No `ORCHESTRATION COMPLETE`, final response, PR creation, PR handoff, or merge before the Global Review and Debugging Gate passes with recorded evidence.\n- No PR/branch implementation or review in the main worktree; create or use a task-owned git worktree first.\n- No unprefixed session ids in Boulder state. Codex sessions are always `codex:<session_id>`.";
 
-const reviewWorkCodexGatePattern =
-	/\nWhen `review-work` is used as a final implementation, PR, or `\$start-work`\ngate, it is blocking\. A timeout, missing deliverable, ack-only response,\nexplicit `BLOCKED:`, or inconclusive lane is not a pass\. Treat that lane as\nfailed, investigate the underlying uncertainty with the `debugging` skill when\nruntime behavior may be wrong, fix with evidence, and rerun the affected lane\nbefore claiming completion, creating or handing off a PR, or merging\.\n\nWhen reviewing a PR or branch, collect diff, file contents, and verification\nresults from a dedicated review worktree attached to that branch\. Never\ncheckout, test, or edit the review branch in the main worktree\.\n\nReview evidence must be safe to share\. Redact or mask secrets and sensitive\nuser data before including evidence in logs, PR bodies, or handoffs\. Never\ninclude raw tokens, credentials, auth headers, cookies, API keys, env dumps,\nprivate logs, or PII; summarize with lengths, hashes, and short non-sensitive\nprefixes when identity is needed\.\n/;
+const reviewWorkCodexGate = `
+When \`review-work\` is used as a final implementation, PR, or \`$start-work\`
+gate, it is blocking. A timeout, missing deliverable, ack-only response,
+explicit \`BLOCKED:\`, or inconclusive lane is not a pass. Treat that lane as
+failed, investigate the underlying uncertainty with the \`debugging\` skill when
+runtime behavior may be wrong, fix with evidence, and rerun the affected lane
+before claiming completion, creating or handing off a PR, or merging.
+
+After each lane reaches PASS, immediately append a durable task-evidence record
+to the active ledger with the lane name, exact full commit SHA, PASS verdict,
+and report artifact/source. Before reusing coverage after continuation or
+compaction, re-read that record and require the exact lane/SHA pair. Memory,
+chat history, or an unstamped report is not coverage; a new commit requires
+fresh applicable lane records.
+
+A rejecting lane must name its blockers inline in its final message — each
+blocker cites the violated goal criterion or requirement plus an evidence
+pointer. A bare REJECT/FAIL token without findings is not a verdict; treat it
+as an inconclusive lane (one bounded respawn, then record it inconclusive with
+that reason).
+
+When reviewing a PR or branch, collect diff, file contents, and verification
+results from a dedicated review worktree attached to that branch. Never
+checkout, test, or edit the review branch in the main worktree.
+
+Review evidence must be safe to share. Redact or mask secrets and sensitive
+user data before including evidence in logs, PR bodies, or handoffs. Never
+include raw tokens, credentials, auth headers, cookies, API keys, env dumps,
+private logs, or PII; summarize with lengths, hashes, and short non-sensitive
+prefixes when identity is needed.
+`;
+const reviewWorkCodexGatePattern = new RegExp(reviewWorkCodexGate.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
 
 export function removeCodexSkillOverlays(skillName, content) {
-	if (skillName === "ulw-research") {
-		return content
-			.replace(
-				", any 'ulw' research wording,",
-				", the legacy alias 'ultraresearch', any 'ulw' research wording,",
-			)
-			.replace(
-				"the word \"ulw-research\" (also `/ulw-research`, `$ulw-research`), ",
-				"the word \"ulw-research\" (also `/ulw-research`, `$ulw-research`), the legacy alias \"ultraresearch\" (also `/ultraresearch`, `$ultraresearch`), ",
-			)
-			.replace(
-				"answer those normally, and mention that `ulw-research` is available when a question would clearly benefit from it.",
-				"answer those normally, and mention that `ulw-research` is available (legacy alias: `ultraresearch`) when a question would clearly benefit from it.",
-			)
-			.replace("# ULW-Research Synthesis: <query>", "# Ultraresearch Synthesis: <query>");
-	}
 	if (skillName === "start-work") {
 		return content
 			.replace(startWorkCodexCompletion, startWorkOriginalCompletion)

@@ -1,3 +1,0 @@
-COMMAND: find .omo/evidence/senpi-task/task-2-config-loader-writer/manual-fixtures -mindepth 1 -maxdepth 1 -print
-OBSERVED: no output above means all manual fixture run directories were removed
-EXIT_STATUS: 0

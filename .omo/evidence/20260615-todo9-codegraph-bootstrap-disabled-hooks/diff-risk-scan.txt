@@ -1,4 +1,0 @@
-
-COMMAND=git diff -- <owned OpenCode files> | rg -n "session\.prompt|promptAsync|codegraph serve|omo-codex|packages/omo-codex|from .*codex|@sisyphuslabs/omo-codex"
-EXIT_STATUS=1
-NOTE=exit 1 means no matches for forbidden risk patterns.

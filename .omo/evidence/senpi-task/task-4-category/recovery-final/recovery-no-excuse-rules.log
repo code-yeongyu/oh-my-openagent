@@ -1,3 +1,0 @@
-scripts/typescript/check-no-excuse-rules.ts is absent in this checkout; using direct Todo 4 static guard.
-Patterns: as any, : any, @ts-ignore, @ts-expect-error, non-null assertion, empty catch.
-PASS: no banned TypeScript escape hatch pattern found in Todo 4 source scope.

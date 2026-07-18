@@ -190,7 +190,7 @@ describe("codex ultrawork hook", () => {
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/# Manual-QA channels/);
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/TESTS ALONE NEVER PROVE DONE/);
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/1\. HTTP call/);
-		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/2\. tmux/);
+		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/2\. Terminal \/ TUI/);
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/3\. Browser use/);
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/4\. Computer use/);
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/CLEANUP \(PAIRED/);
@@ -244,6 +244,27 @@ describe("codex ultrawork hook", () => {
 		expect(directive).toMatch(/WORKING:/);
 	});
 
+	it("#given directive #when inspected #then blocks dependent work until spawned planners finish", () => {
+		// given
+		const payload = {
+			hook_event_name: "UserPromptSubmit",
+			prompt: "ulw",
+		};
+
+		// when
+		const output = runUserPromptSubmitHook(payload, { skillFilePath: null });
+		const parsed = parseHookOutput(output);
+
+		// then
+		const directive = parsed.hookSpecificOutput.additionalContext;
+		expect(directive).toMatch(/Subagent-dependent transition barrier/);
+		expect(directive).toMatch(/Spawn every independent child for the current wave first/);
+		expect(directive).toMatch(/After the wave\s+is launched[\s\S]{0,240}wait_agent[\s\S]{0,240}terminal status/);
+		expect(directive).not.toMatch(/Immediately after any `multi_agent_v1\.spawn_agent`/);
+		expect(directive).toMatch(/Do not start dependent implementation/);
+		expect(directive).toMatch(/Do not mark an `update_plan` step `completed`/);
+	});
+
 	it("#given directive #when inspected #then keeps impact-proportional sizing invariants", () => {
 		// given
 		const payload = {
@@ -262,5 +283,30 @@ describe("codex ultrawork hook", () => {
 		expect(directive).toMatch(/Take HEAVY/);
 		expect(directive).toMatch(/ratchet up only/i);
 		expect(directive).toMatch(/`plan` agent/);
+	});
+
+	it("#given directive #when discovery leaves known execution steps #then planning stays direct unless design uncertainty remains", () => {
+		// given
+		const payload = {
+			hook_event_name: "UserPromptSubmit",
+			prompt: "ulw",
+		};
+
+		// when
+		const output = runUserPromptSubmitHook(payload, { skillFilePath: null });
+		const parsed = parseHookOutput(output);
+
+		// then
+		const directive = parsed.hookSpecificOutput.additionalContext;
+		const discoveryIndex = directive.search(/fire the first discovery wave/i);
+		const uncertaintyIndex = directive.search(/what the wave left UNDECIDED/i);
+		const directPlanIndex = directive.search(/known procedure[\s\S]*plan directly/i);
+		expect(discoveryIndex).toBeGreaterThanOrEqual(0);
+		expect(uncertaintyIndex).toBeGreaterThan(discoveryIndex);
+		expect(directPlanIndex).toBeGreaterThan(uncertaintyIndex);
+		expect(directive).toMatch(/unclear module boundaries[\s\S]*viable decompositions[\s\S]*dependency order/i);
+		expect(directive).toMatch(/A known procedure.*however many steps.*never justify a planner/is);
+		expect(directive).toMatch(/[Nn]ever spawn `plan` before the discovery wave/);
+		expect(directive).toMatch(/tier sizes\s+evidence and review, never who plans/i);
 	});
 });
