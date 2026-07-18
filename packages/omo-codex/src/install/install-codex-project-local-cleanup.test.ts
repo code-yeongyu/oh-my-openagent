@@ -98,9 +98,13 @@ describe("install-codex project-local cleanup", () => {
     const repoRoot = await createPackagedCodexRepoRoot()
     await mkdir(projectDirectory, { recursive: true })
     await mkdir(codexHome, { recursive: true })
+    // A pinned v1 model keeps the legacy cap raise observable; the stamped
+    // v2-preferred default would remove agents.max_threads instead.
     await writeFile(
       globalConfigPath,
       [
+        'model = "gpt-5.5"',
+        "",
         "[features.multi_agent_v2]",
         "enabled = true",
         "",

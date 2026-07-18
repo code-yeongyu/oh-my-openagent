@@ -1,6 +1,6 @@
-# lsp-core — Harness-Neutral LSP Engine (Core)
+# lsp-core -- Harness-Neutral LSP Engine (Core)
 
-**Generated:** 2026-06-16
+**Generated:** 2026-07-17 / 7d664b96b
 
 ## OVERVIEW
 
@@ -10,25 +10,26 @@ Harness-neutral LSP engine (`@oh-my-opencode/lsp-core`). Manages language server
 
 | File | Role |
 |------|------|
-| `src/lsp/manager.ts` | `LspManager` — ref-counted client pool, init timeout, idle reaper, abort signals |
-| `src/lsp/client.ts` | `LspClient` — `openFile`, `definition`, `references`, `symbols`, `diagnostics`, `rename` |
-| `src/lsp/client-wrapper.ts` | `withLspClient()` — workspace root discovery, retry on dead connection, release |
-| `src/lsp/connection.ts` | `LspClientConnection` — `initialize` request with capabilities, settle delay |
+| `src/lsp/manager.ts` | `LspManager`: ref-counted client pool, init timeout, idle reaper, abort signals |
+| `src/lsp/client.ts` | `LspClient`: `openFile`, `definition`, `references`, `symbols`, `diagnostics`, `rename` |
+| `src/lsp/client-wrapper.ts` | `withLspClient()`: workspace root discovery, retry on dead connection, release |
+| `src/lsp/connection.ts` | `LspClientConnection`: `initialize` request with capabilities, settle delay |
 | `src/lsp/json-rpc-connection.ts` | Raw JSON-RPC 2.0 framing over stdio |
 | `src/lsp/config-loader.ts` | Load `.codex/lsp-client.json` (project + user), merge with builtins |
 | `src/lsp/server-definitions.ts` | `BUILTIN_SERVERS` (51 languages), `LSP_INSTALL_HINTS`, `AUTO_INSTALLABLE_SERVERS` |
-| `src/lsp/server-resolution.ts` | `findServerForExtension()` — map extension to installed server |
-| `src/lsp/server-installation.ts` | `isServerInstalled()` — PATH lookup with Windows extension handling |
-| `src/lsp/directory-diagnostics.ts` | `aggregateDiagnosticsForDirectory()` — walk directory, cap files + diagnostics |
+| `src/lsp/server-resolution.ts` | `findServerForExtension()`: map extension to installed server |
+| `src/lsp/server-installation.ts` | `isServerInstalled()`: PATH lookup with Windows extension handling |
+| `src/lsp/directory-diagnostics.ts` | `aggregateDiagnosticsForDirectory()`: walk directory, cap files + diagnostics; `AbortSignal` cancels acquisition and per-file scans |
 | `src/lsp/formatters.ts` | Format locations, symbols, diagnostics, rename results, workspace edits |
-| `src/tools/definitions.ts` | `LSP_MCP_TOOLS` — 7 tool schemas exported to MCP |
+| `src/tools/definitions.ts` | `LSP_MCP_TOOLS`: 8 tool schemas exported to MCP |
 | `src/tools/runtime.ts` | `executeLspTool()` + `coerceToolArguments()` dispatch |
 | `src/request-context.ts` | `runWithRequestContext()` / `contextCwd()` / `contextEnv()` via `AsyncLocalStorage` |
-| `src/mcp.ts` | `handleLspMcpRequest()` + `runMcpStdioServer()` — MCP entry over `mcp-stdio-core` |
+| `src/mcp.ts` | `handleLspMcpRequest()` + `runMcpStdioServer()`: MCP entry over `mcp-stdio-core` |
 
 ## NOTES
 
-- **Tool surface:** 7 tools: `lsp_diagnostics`, `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_prepare_rename`, `lsp_rename`, `lsp_status`, plus `lsp_install_decision`.
+- **Tool surface:** 8 tools: `lsp_diagnostics`, `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_prepare_rename`, `lsp_rename`, `lsp_status`, and `lsp_install_decision`.
 - **RequestContext seam:** `request-context.ts` uses `AsyncLocalStorage` so the MCP proxy can thread `cwd` and `env` through shared daemon sessions.
 - **Config priority:** project `.codex/lsp-client.json` beats user `~/.codex/lsp-client.json` beats `BUILTIN_SERVERS`.
 - **Reaper:** `LspManager` reaps clients idle longer than `IDLE_TIMEOUT_MS` (default 5 min) or stuck initializing past `INIT_TIMEOUT_MS` (default 30 s).
+- **Directory diagnostics cancellation:** `aggregateDiagnosticsForDirectory()` accepts an `AbortSignal`; it throws if aborted before acquisition, threads the signal into `manager.getClient()` so a cold acquisition is cancellable, and checks it between files. An aborted cold start rejects with `AbortError` and leaves `clientCount()` at 0.

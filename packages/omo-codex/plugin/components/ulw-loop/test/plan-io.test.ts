@@ -1,16 +1,18 @@
-import { copyFile, mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
+import { appendFile, copyFile, mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { setImmediate as tick } from "node:timers/promises";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ulwLoopDir, ulwLoopGoalsPath, ulwLoopLedgerPath } from "../src/paths.js";
 import {
 	appendLedger,
+	findAcceptedSteeringLedgerEntry,
 	readSteeringLedgerEntries,
 	readUlwLoopPlan,
 	withUlwLoopMutationLock,
 	writePlan,
 } from "../src/plan-io.js";
-import type { UlwLoopItem, UlwLoopLedgerEntry, UlwLoopPlan } from "../src/types.js";
+import type { UlwLoopItem, UlwLoopLedgerEntry, UlwLoopPlan, UlwLoopSteeringAudit } from "../src/types.js";
 import { UlwLoopError } from "../src/types.js";
 
 const NOW = "2026-05-23T00:00:00.000Z";
@@ -49,6 +51,45 @@ function makePlan(overrides: Partial<UlwLoopPlan> = {}): UlwLoopPlan {
 
 function entry(kind: UlwLoopLedgerEntry["kind"], goalId = "G001"): UlwLoopLedgerEntry {
 	return { at: NOW, kind, goalId };
+}
+
+function steeringAudit(overrides: Partial<UlwLoopSteeringAudit> = {}): UlwLoopSteeringAudit {
+	return {
+		kind: "revise_pending_wording",
+		source: "cli",
+		targetGoalIds: ["G001"],
+		evidence: "observed evidence",
+		rationale: "needed change",
+		invariant: {
+			accepted: true,
+			structuralInvariantAccepted: true,
+			evidenceBackedNecessity: true,
+			noEasierCompletion: true,
+			rejectedReasons: [],
+		},
+		...overrides,
+	};
+}
+
+function rejectedSteeringAudit(overrides: Partial<UlwLoopSteeringAudit> = {}): UlwLoopSteeringAudit {
+	return steeringAudit({
+		invariant: {
+			accepted: false,
+			structuralInvariantAccepted: false,
+			evidenceBackedNecessity: false,
+			noEasierCompletion: true,
+			rejectedReasons: ["missing evidence"],
+		},
+		...overrides,
+	});
+}
+
+function steeringEntry(
+	kind: UlwLoopLedgerEntry["kind"],
+	audit: UlwLoopSteeringAudit,
+	overrides: Partial<UlwLoopLedgerEntry> = {},
+): UlwLoopLedgerEntry {
+	return { at: NOW, kind, goalId: "G001", steering: audit, ...overrides };
 }
 
 async function makeRepo(): Promise<string> {
@@ -209,6 +250,112 @@ describe("readSteeringLedgerEntries", () => {
 	});
 });
 
+describe("findAcceptedSteeringLedgerEntry", () => {
+	it.each([
+		[
+			"top-level idempotencyKey",
+			steeringEntry("steering_accepted", steeringAudit(), { idempotencyKey: "needle-key" }),
+		],
+		["steering.idempotencyKey", steeringEntry("steering_accepted", steeringAudit({ idempotencyKey: "needle-key" }))],
+		[
+			"steering.promptSignature",
+			steeringEntry("steering_accepted", steeringAudit({ promptSignature: "needle-key" })),
+		],
+	] as const)("finds an accepted entry by %s", async (_name, target) => {
+		// given
+		const repoRoot = await makeRepo();
+		await appendLedger(repoRoot, steeringEntry("steering_accepted", steeringAudit({ idempotencyKey: "other-key" })));
+		await appendLedger(repoRoot, target);
+
+		// when
+		const found = await findAcceptedSteeringLedgerEntry(repoRoot, "needle-key");
+
+		// then
+		expect(found).toEqual(target);
+	});
+
+	it("skips a rejected entry carrying the same key", async () => {
+		// given
+		const repoRoot = await makeRepo();
+		await appendLedger(
+			repoRoot,
+			steeringEntry("steering_rejected", rejectedSteeringAudit({ idempotencyKey: "needle-key" })),
+		);
+
+		// when/then
+		await expect(findAcceptedSteeringLedgerEntry(repoRoot, "needle-key")).resolves.toBeUndefined();
+	});
+
+	it("returns the accepted entry even when a rejected one with the same key precedes it", async () => {
+		// given
+		const repoRoot = await makeRepo();
+		const accepted = steeringEntry("steering_accepted", steeringAudit({ idempotencyKey: "needle-key" }));
+		await appendLedger(
+			repoRoot,
+			steeringEntry("steering_rejected", rejectedSteeringAudit({ idempotencyKey: "needle-key" })),
+		);
+		await appendLedger(repoRoot, accepted);
+
+		// when/then
+		await expect(findAcceptedSteeringLedgerEntry(repoRoot, "needle-key")).resolves.toEqual(accepted);
+	});
+
+	it("returns undefined when the ledger file is missing", async () => {
+		// given
+		const repoRoot = await makeRepo();
+
+		// when/then
+		await expect(findAcceptedSteeringLedgerEntry(repoRoot, "needle-key")).resolves.toBeUndefined();
+	});
+
+	it("ignores the key when it only appears in non-steering entries", async () => {
+		// given
+		const repoRoot = await makeRepo();
+		await appendLedger(repoRoot, { at: NOW, kind: "goal_completed", goalId: "G001", idempotencyKey: "needle-key" });
+		await appendLedger(repoRoot, { at: NOW, kind: "evidence_captured", goalId: "G001", evidence: "needle-key" });
+
+		// when/then
+		await expect(findAcceptedSteeringLedgerEntry(repoRoot, "needle-key")).resolves.toBeUndefined();
+	});
+
+	it("ignores an accepted entry whose key only appears in evidence text", async () => {
+		// given
+		const repoRoot = await makeRepo();
+		await appendLedger(repoRoot, steeringEntry("steering_accepted", steeringAudit({ evidence: "needle-key" })));
+
+		// when/then
+		await expect(findAcceptedSteeringLedgerEntry(repoRoot, "needle-key")).resolves.toBeUndefined();
+	});
+
+	it("finds the key inside a legacy entry embedding full before/after plans", async () => {
+		// given
+		const repoRoot = await makeRepo();
+		const bulkyGoals = Array.from({ length: 20 }, (_, index) =>
+			makeGoal({ id: `G${String(index + 1).padStart(3, "0")}`, objective: `evidence detail ${index} `.repeat(200) }),
+		);
+		const bulkyPlan = makePlan({ goals: bulkyGoals });
+		const legacyLine = JSON.stringify({
+			at: NOW,
+			kind: "steering_accepted",
+			goalId: "G001",
+			idempotencyKey: "needle-key",
+			before: bulkyPlan,
+			after: bulkyPlan,
+			steering: { ...steeringAudit({ idempotencyKey: "needle-key" }), before: bulkyPlan, after: bulkyPlan },
+		});
+		await mkdir(ulwLoopDir(repoRoot), { recursive: true });
+		await appendFile(ulwLoopLedgerPath(repoRoot), `${legacyLine}\n`, "utf8");
+
+		// when
+		const found = await findAcceptedSteeringLedgerEntry(repoRoot, "needle-key");
+
+		// then
+		expect(legacyLine.length).toBeGreaterThan(100_000);
+		expect(found?.kind).toBe("steering_accepted");
+		expect(found?.idempotencyKey).toBe("needle-key");
+	});
+});
+
 describe("withUlwLoopMutationLock", () => {
 	it("serializes concurrent invocations", async () => {
 		// given
@@ -235,5 +382,116 @@ describe("withUlwLoopMutationLock", () => {
 		// then
 		expect(maxActive).toBe(1);
 		expect(await readFile(counterPath, "utf8")).toBe("3");
+	});
+
+	it("propagates the body rejection and keeps later calls working", async () => {
+		// given
+		const repoRoot = await makeRepo();
+
+		// when
+		const failure = withUlwLoopMutationLock(repoRoot, async () => {
+			throw new Error("body exploded");
+		});
+
+		// then
+		await expect(failure).rejects.toThrow("body exploded");
+		await expect(withUlwLoopMutationLock(repoRoot, async () => "recovered")).resolves.toBe("recovered");
+	});
+
+	it("still serializes a second batch after the first batch's gate settles", async () => {
+		// given
+		const repoRoot = await makeRepo();
+		let active = 0;
+		let maxActive = 0;
+		const body = async (): Promise<void> => {
+			active += 1;
+			maxActive = Math.max(maxActive, active);
+			await tick();
+			active -= 1;
+		};
+
+		// when
+		await Promise.all([1, 2, 3].map(() => withUlwLoopMutationLock(repoRoot, body)));
+		await tick();
+		await Promise.all([1, 2].map(() => withUlwLoopMutationLock(repoRoot, body)));
+
+		// then
+		expect(maxActive).toBe(1);
+	});
+
+	it("keeps an in-flight successor locked when an earlier gate settles", async () => {
+		// given
+		const repoRoot = await makeRepo();
+		const events: string[] = [];
+		let releaseSecond = false;
+
+		// when
+		const first = withUlwLoopMutationLock(repoRoot, async () => {
+			events.push("first");
+		});
+		const second = withUlwLoopMutationLock(repoRoot, async () => {
+			events.push("second:start");
+			while (!releaseSecond) await tick();
+			events.push("second:end");
+		});
+		await first;
+		await tick();
+		const third = withUlwLoopMutationLock(repoRoot, async () => {
+			events.push("third");
+		});
+		releaseSecond = true;
+		await Promise.all([second, third]);
+
+		// then
+		expect(events).toEqual(["first", "second:start", "second:end", "third"]);
+	});
+
+	it("does not serialize distinct repo roots against each other", async () => {
+		// given
+		const rootA = await makeRepo();
+		const rootB = await makeRepo();
+		const events: string[] = [];
+		let releaseA = false;
+
+		// when
+		const held = withUlwLoopMutationLock(rootA, async () => {
+			events.push("a:start");
+			while (!releaseA) await tick();
+			events.push("a:end");
+		});
+		await withUlwLoopMutationLock(rootB, async () => {
+			events.push("b");
+		});
+		releaseA = true;
+		await held;
+
+		// then
+		expect(events).toEqual(["a:start", "b", "a:end"]);
+	});
+
+	it("serializes per scope while distinct scopes stay independent", async () => {
+		// given
+		const repoRoot = await makeRepo();
+		const scoped = { sessionId: "session-a" };
+		const events: string[] = [];
+		let releaseScoped = false;
+
+		// when
+		const heldScoped = withUlwLoopMutationLock(repoRoot, scoped, async () => {
+			events.push("scoped-1:start");
+			while (!releaseScoped) await tick();
+			events.push("scoped-1:end");
+		});
+		const queuedScoped = withUlwLoopMutationLock(repoRoot, scoped, async () => {
+			events.push("scoped-2");
+		});
+		await withUlwLoopMutationLock(repoRoot, async () => {
+			events.push("root-scope");
+		});
+		releaseScoped = true;
+		await Promise.all([heldScoped, queuedScoped]);
+
+		// then
+		expect(events).toEqual(["scoped-1:start", "root-scope", "scoped-1:end", "scoped-2"]);
 	});
 });

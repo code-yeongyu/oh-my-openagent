@@ -1,5 +1,0 @@
-$ rg -n 'list_agents|fork_turns="none"|fork_turns=\\"none\\"' packages/shared-skills packages/omo-codex/plugin
-
-Result: PASS
-Exit status: 1
-Output: no matches.

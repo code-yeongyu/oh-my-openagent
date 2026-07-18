@@ -1,6 +1,6 @@
-# model-core — Model Resolution (Core)
+# model-core - Model Resolution (Core)
 
-**Generated:** 2026-06-16
+**Generated:** 2026-07-17 (7d664b96b)
 
 ## OVERVIEW
 
@@ -11,13 +11,15 @@ Harness-neutral model resolution core (`@oh-my-opencode/model-core`). Resolves w
 | File | Role |
 |------|------|
 | `model-resolver.ts` | Entry: `resolveModel()`, `resolveModelWithFallback()`, `normalizeFallbackModels()` |
-| `model-resolution-pipeline.ts` | `resolveModelPipeline()` — 6-step resolution with logging hooks for testing |
+| `model-resolution-pipeline.ts` | `resolveModelPipeline()` - 6-step resolution with logging hooks for testing |
 | `provider-cache.ts` | `ProviderCache` DI interface: `readConnectedProvidersCache()`, `findProviderModelMetadata()` |
-| `model-availability.ts` | `fuzzyMatchModel()` — exact, then shortest prefix match against `availableModels` |
+| `model-availability.ts` | `fuzzyMatchModel()` - exact, then shortest prefix match against `availableModels` |
 | `agent-model-requirements.ts` | Hardcoded `AGENT_MODEL_REQUIREMENTS` fallback chains (11 agents) |
 | `category-model-requirements.ts` | Hardcoded `CATEGORY_MODEL_REQUIREMENTS` fallback chains (8 categories) |
 | `provider-model-id-transform.ts` | Provider-specific ID transforms (Vercel sub-provider inference, Claude version dots, Gemini preview suffixes) |
 | `model-capabilities/index.ts` | Capability queries against bundled snapshot + runtime readers |
+| `model-capability-aliases.ts` | `resolveModelIDAlias(modelID, providerID?)` canonicalizes exact + pattern aliases; OpenAI GPT-5.6 fast service-tier alias scoped to `openai` and the `vercel` subprovider |
+| `model-family-detectors.ts` | Family predicates (`isGptModel`, `isClaudeOpus47OrLaterModel`, `isClaudeFableOrMythosModel`, `isKimiK3Model`, `isGeminiModel`, ...) |
 | `runtime-fallback-*.ts` | Error classification, auto-retry signals, and runtime fallback model selection |
 
 ## FLOW
@@ -37,5 +39,5 @@ resolveModelPipeline(request, providerCache)
 - **ProviderCache is injected**, not imported. `omo-opencode` implements it with runtime cache state; `model-core` stays pure.
 - **Two resolution APIs:** `resolveModel()` for simple 3-tier fallback; `resolveModelWithFallback()` for full pipeline with `ExtendedModelResolutionInput`.
 - **`connected-providers-cache.ts`** exports no-op defaults. Adapters override via the `ProviderCache` parameter.
-- **59 source files.** Barrel `index.ts` re-exports ~25 public modules. Tests co-located as `*.test.ts`.
+- **39 source files.** Barrel `index.ts` re-exports ~27 public modules. Tests co-located as `*.test.ts`.
 - Parent: [`packages/AGENTS.md`](../AGENTS.md)

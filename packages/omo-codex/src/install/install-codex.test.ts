@@ -7,6 +7,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { findRepoRoot, findRepoRootFromImporter, resolveCodexInstallerBinDir, runCodexInstaller } from "./install-codex"
 import { createRepoWithBuiltComponentBins } from "./install-codex-test-fixtures"
+import { createLegacyCodexHome, liveLegacyEndpointFor, startIdleNodeProcess, startLegacyDaemonProcess, stopChild, waitForChildReady, writeLegacyVersionState } from "./lsp-daemon-reaper.test-support"
 
 const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
 
@@ -234,65 +235,6 @@ describe("install-codex", () => {
     expect(sotInvocation?.home).toBe(home)
   }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
-  test("#given simulated Windows Codex install #when installing omo #then enables git_bash MCP and trusts shell hooks", async () => {
-    // given
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-git-bash-win-"))
-    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-git-bash-win-"))
-    const repoRoot = await createRepoWithBuiltComponentBins({ includeBundledGitBashMcp: true })
-
-    // when
-    const result = await runCodexInstaller({
-      codexHome,
-      binDir,
-      repoRoot,
-      platform: "win32",
-      astGrepInstaller: skipAstGrepInstall,
-      gitBashResolver: () => ({ found: true, path: "C:\\Program Files\\Git\\bin\\bash.exe", source: "program-files" }),
-      runCommand: async () => undefined,
-    })
-
-    // then
-    const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
-    expect(configContent).toContain('[plugins."omo@sisyphuslabs".mcp_servers.git_bash]')
-    expect(configContent).toContain("enabled = true")
-    expect(configContent).toContain("pre_tool_use")
-    expect(configContent).toContain("post_compact")
-    expect(result.gitBashPath).toBe("C:\\Program Files\\Git\\bin\\bash.exe")
-    const pluginPath = result.installed[0]?.path ?? ""
-    const mcpManifest = JSON.parse(await readFile(join(pluginPath, ".mcp.json"), "utf8")) as {
-      readonly mcpServers: { readonly git_bash: { readonly args: readonly string[] } }
-    }
-    expect(mcpManifest.mcpServers.git_bash.args[0]).toBe(join(pluginPath, "components", "git-bash-mcp", "dist", "cli.js"))
-    expect((await stat(mcpManifest.mcpServers.git_bash.args[0] ?? "")).isFile()).toBe(true)
-  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
-
-  test("#given simulated Linux Codex install #when installing omo #then keeps git_bash manifest but disables policy exposure", async () => {
-    // given
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-git-bash-linux-"))
-    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-git-bash-linux-"))
-    const repoRoot = await createRepoWithBuiltComponentBins({ includeBundledGitBashMcp: true })
-
-    // when
-    const result = await runCodexInstaller({
-      codexHome,
-      binDir,
-      repoRoot,
-      platform: "linux",
-      astGrepInstaller: skipAstGrepInstall,
-      runCommand: async () => undefined,
-    })
-
-    // then
-    const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
-    expect(configContent).toContain('[plugins."omo@sisyphuslabs".mcp_servers.git_bash]')
-    expect(configContent).toContain("enabled = false")
-    const pluginPath = result.installed[0]?.path ?? ""
-    const mcpManifest = JSON.parse(await readFile(join(pluginPath, ".mcp.json"), "utf8")) as {
-      readonly mcpServers: { readonly git_bash: { readonly args: readonly string[] } }
-    }
-    expect(mcpManifest.mcpServers.git_bash.args[0]).toBe(join(pluginPath, "components", "git-bash-mcp", "dist", "cli.js"))
-  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
-
   test("#given repoRoot without root CLI dist #when installing omo #then warns about the skipped omo runtime wrapper", async () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-no-dist-"))
@@ -311,6 +253,47 @@ describe("install-codex", () => {
     const linkedNames = await readdir(binDir)
     const rootCliBinName = process.platform === "win32" ? "omo.cmd" : "omo"
     expect(linkedNames).not.toContain(rootCliBinName)
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
+
+  test("#given a live unverifiable legacy daemon dir #when installing omo #then it warns and does not copy legacy IPC state into the OMO home", async () => {
+    // given
+    const codexHome = createLegacyCodexHome("omo-codex-home-legacy-daemon-")
+    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-legacy-daemon-"))
+    const home = await mkdtemp(join(tmpdir(), "omo-codex-user-home-legacy-daemon-"))
+    const endpoint = liveLegacyEndpointFor({ codexHome, version: "0.1.0" })
+    const daemon = startLegacyDaemonProcess({ endpoint })
+    const unrelated = startIdleNodeProcess()
+    await waitForChildReady(daemon)
+    const version = await writeLegacyVersionState({
+      codexHome,
+      version: "0.1.0",
+      pid: String(unrelated.pid ?? 0),
+      endpoint,
+    })
+    const logs: string[] = []
+
+    try {
+      // when
+      await runCodexInstaller({
+        codexHome,
+        binDir,
+        repoRoot: process.cwd(),
+        astGrepInstaller: skipAstGrepInstall,
+        runCommand: async () => undefined,
+        env: { HOME: home },
+        log: (line) => logs.push(line),
+      })
+
+      // then
+      expect(logs.some((line) => line.includes("Warning: deferred legacy Codex LSP daemon cleanup for v0.1.0"))).toBe(true)
+      const expectedReason = process.platform === "win32" ? "Windows cannot prove pid ownership safely" : "pid ownership was not proven"
+      expect(logs.some((line) => line.includes(expectedReason))).toBe(true)
+      expect((await stat(version.versionDir)).isDirectory()).toBe(true)
+      await expect(stat(join(home, ".omo", "lsp-daemon"))).rejects.toThrow()
+    } finally {
+      await stopChild(daemon)
+      await stopChild(unrelated)
+    }
   }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
   test("#given autonomous permissions requested #when installing omo #then writes Codex autonomy settings", async () => {

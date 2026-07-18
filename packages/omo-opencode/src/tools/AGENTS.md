@@ -49,16 +49,16 @@ Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `sr
 
 ## DELEGATION CATEGORIES (built-in 8)
 
-`task` (delegate) selects model by category. Default category models live in provider-specific files under `src/tools/delegate-task/` and aggregate via `BUILTIN_CATEGORIES` in `builtin-categories.ts`. Authoritative fallback chains in [`src/shared/model-requirements.ts`](../shared/model-requirements.ts) `CATEGORY_MODEL_REQUIREMENTS`.
+`task` (delegate) selects model by category. Default category models live in provider-specific files under `src/tools/delegate-task/` and aggregate via `BUILTIN_CATEGORIES` in `builtin-categories.ts`. Authoritative fallback chains live in [`packages/model-core/src/category-model-requirements.ts`](../../../model-core/src/category-model-requirements.ts) `CATEGORY_MODEL_REQUIREMENTS`.
 
 | Category | Default Model | Source File | Domain |
 |----------|---------------|-------------|--------|
 | `visual-engineering` | google/gemini-3.1-pro (variant: high) | google-categories.ts | Frontend, UI/UX |
-| `ultrabrain` | openai/gpt-5.5 (variant: xhigh) | openai-categories.ts | Hard logic / heavy reasoning |
-| `deep` | openai/gpt-5.5 (variant: medium) | openai-categories.ts | Autonomous multi-step problem-solving |
+| `ultrabrain` | openai/gpt-5.6-sol (variant: xhigh) | openai-categories.ts | Hard logic / heavy reasoning |
+| `deep` | openai/gpt-5.6-terra (variant: xhigh) | openai-categories.ts | Autonomous multi-step problem-solving |
 | `artistry` | google/gemini-3.1-pro (variant: high) | google-categories.ts | Creative / unconventional approaches |
 | `quick` | openai/gpt-5.4-mini | openai-categories.ts | Trivial single-file changes |
-| `unspecified-low` | anthropic/claude-sonnet-4-6 | anthropic-categories.ts | Moderate effort fallback |
+| `unspecified-low` | openai/gpt-5.6-luna (variant: xhigh) | openai-categories.ts | Moderate effort fallback |
 | `unspecified-high` | anthropic/claude-opus-4-7 (variant: max) | anthropic-categories.ts | High effort fallback |
 | `writing` | kimi-for-coding/k2p5 (default) → gemini-3-flash (first fallback) | kimi-categories.ts | Documentation, prose |
 

@@ -1,4 +1,0 @@
-$ for f in packages/senpi-task/src/category/resolver.ts packages/senpi-task/src/category/resolve-category-boundary.test.ts packages/senpi-task/scripts/manual-category-qa.ts; do printf "%s " "$f"; awk 'NF && $0 !~ /^[[:space:]]*\/\//' "$f" | wc -l; done
-packages/senpi-task/src/category/resolver.ts      248
-packages/senpi-task/src/category/resolve-category-boundary.test.ts      187
-packages/senpi-task/scripts/manual-category-qa.ts      227

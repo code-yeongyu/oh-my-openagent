@@ -1,6 +1,0 @@
-scenario: 04-senpi-task-bail
-surface: Bun test: senpi-task package with bail
-invocation: bun test packages/senpi-task --bail
-started_at: 2026-07-06T11:02:01Z
-finished_at: 2026-07-06T11:02:03Z
-exit: 0

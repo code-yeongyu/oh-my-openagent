@@ -1,4 +1,4 @@
-import { isGpt5_5Model } from "../../agents/types"
+import { isGpt5_5Model, isGpt5_6Model } from "../../agents/types"
 import type { BuiltinCategoryDefinition } from "./builtin-category-definition"
 
 const ULTRABRAIN_CATEGORY_PROMPT_APPEND = `<Category_Context>
@@ -67,7 +67,7 @@ The orchestrator chose this category because the task benefits from depth over s
 </Category_Context>`
 
 export function resolveDeepCategoryPromptAppend(model: string | undefined): string {
-  if (model && isGpt5_5Model(model)) {
+  if (model && (isGpt5_5Model(model) || isGpt5_6Model(model))) {
     return DEEP_CATEGORY_PROMPT_APPEND_GPT_5_5
   }
   return DEEP_CATEGORY_PROMPT_APPEND
@@ -124,16 +124,39 @@ EXPECTED OUTPUT:
 If your prompt lacks this structure, REWRITE IT before delegating.
 </Caller_Warning>`
 
+const UNSPECIFIED_LOW_CATEGORY_PROMPT_APPEND = `<Category_Context>
+You are working on tasks that don't fit specific categories but require moderate effort.
+
+<Selection_Gate>
+BEFORE selecting this category, VERIFY ALL conditions:
+1. Task does NOT fit: quick (trivial), visual-engineering (UI), ultrabrain (deep logic), artistry (creative), writing (docs)
+2. Task requires more than trivial effort but is NOT system-wide
+3. Scope is contained within a few files/modules
+
+If task fits ANY other category, DO NOT select unspecified-low.
+This is NOT a default choice - it's for genuinely unclassifiable moderate-effort work.
+</Selection_Gate>
+</Category_Context>
+
+<Caller_Warning>
+THIS CATEGORY USES A LIGHTWEIGHT MODEL (gpt-5.6-luna).
+
+**PROVIDE CLEAR STRUCTURE:**
+1. MUST DO: Enumerate required actions explicitly
+2. MUST NOT DO: State forbidden actions to prevent scope creep
+3. EXPECTED OUTPUT: Define concrete success criteria
+</Caller_Warning>`
+
 export const OPENAI_CATEGORIES: BuiltinCategoryDefinition[] = [
   {
     name: "ultrabrain",
-    config: { model: "openai/gpt-5.5", variant: "xhigh" },
+    config: { model: "openai/gpt-5.6-sol", variant: "xhigh" },
     description: "Use ONLY for genuinely hard, logic-heavy tasks. Give clear goals only, not step-by-step instructions.",
     promptAppend: ULTRABRAIN_CATEGORY_PROMPT_APPEND,
   },
   {
     name: "deep",
-    config: { model: "openai/gpt-5.5", variant: "medium" },
+    config: { model: "openai/gpt-5.6-terra", variant: "xhigh" },
     description: "Goal-oriented autonomous problem-solving on hairy problems requiring deep research. ONE goal + ONE deliverable per call — multiple goals must fan out as parallel `deep` calls, never bundled into one.",
     promptAppend: DEEP_CATEGORY_PROMPT_APPEND,
     resolvePromptAppend: resolveDeepCategoryPromptAppend,
@@ -143,5 +166,11 @@ export const OPENAI_CATEGORIES: BuiltinCategoryDefinition[] = [
     config: { model: "openai/gpt-5.4-mini" },
     description: "Trivial tasks - single file changes, typo fixes, simple modifications",
     promptAppend: QUICK_CATEGORY_PROMPT_APPEND,
+  },
+  {
+    name: "unspecified-low",
+    config: { model: "openai/gpt-5.6-luna", variant: "xhigh" },
+    description: "Tasks that don't fit other categories, low effort required",
+    promptAppend: UNSPECIFIED_LOW_CATEGORY_PROMPT_APPEND,
   },
 ]

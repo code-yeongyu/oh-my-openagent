@@ -1,6 +1,6 @@
-# src/plugin-handlers/ — 6-Phase Config Loading Pipeline
+# src/plugin-handlers/ -- 6-Phase Config Loading Pipeline
 
-**Generated:** 2026-05-20
+**Generated:** 2026-07-17 / 7d664b96b
 
 ## CRITICAL: AGENT ORDERING
 
@@ -20,7 +20,7 @@ OpenCode 1.4.x sorts agents purely by `agent.name` via Remeda `sortBy`, which us
 
 The sort shim resolves this by intercepting only the narrow case it cares about, with strict activation guards to prevent collateral damage from a global prototype patch:
 - The activation predicate (`isAgentArray`) requires `arr.length >= 2`, every element is a non-null object with a string `.name`, and at least 2 elements have a `.name` ranked by the active order. This rejects mixed-type arrays (numbers, strings, plain objects without `.name`) so unrelated `.sort()` / `.toSorted()` calls execute native semantics.
-- The comparator never throws on mixed input — it defensively extracts `.name` and falls back to the user-supplied `compareFn`.
+- The comparator never throws on mixed input -- it defensively extracts `.name` and falls back to the user-supplied `compareFn`.
 - `installAgentSortShim()` is idempotent.
 
 ### History
@@ -45,7 +45,7 @@ PRs attempting any of the forbidden patterns will be rejected.
 
 ## OVERVIEW
 
-14 non-test files implementing the `ConfigHandler` — the `config` hook handler. Executes 6 sequential phases to register agents, tools, MCPs, and commands with OpenCode.
+14 non-test files implementing the `ConfigHandler` -- the `config` hook handler. Executes 6 sequential phases to register agents, tools, MCPs, and commands with OpenCode.
 
 ## 6-PHASE PIPELINE
 
@@ -69,8 +69,8 @@ PRs attempting any of the forbidden patterns will be rejected.
 | `command-config-handler.ts` | ~200 | 9 parallel sources for commands/skills |
 | `tool-config-handler.ts` | ~100 | Agent-specific tool grants/denials |
 | `provider-config-handler.ts` | ~80 | Provider config + model cache |
-| `prometheus-agent-config-builder.ts` | ~100 | Prometheus config with model resolution |
-| `plan-model-inheritance.ts` | 28 | Plan demotion logic |
+| `prometheus-agent-config-builder.ts` | ~140 | Prometheus config with model + fallback_models resolution |
+| `plan-model-inheritance.ts` | 28 | Plan demotion logic (inherits model settings incl. fallback_models) |
 | `agent-priority-order.ts` | ~30 | sisyphus, hephaestus, prometheus, atlas first |
 | `agent-key-remapper.ts` | ~30 | Agent key → display name |
 | `category-config-resolver.ts` | ~40 | User vs default category lookup |
@@ -80,10 +80,10 @@ PRs attempting any of the forbidden patterns will be rejected.
 
 | Agent | Granted | Denied |
 |-------|---------|--------|
-| Librarian | grep_app_* | — |
-| Atlas, Sisyphus, Prometheus | task, task_*, teammate | — |
-| Hephaestus | task | — |
-| Default (all others) | — | grep_app_*, task_*, teammate, LSP |
+| Librarian | grep_app_* | - |
+| Atlas, Sisyphus, Prometheus | task, task_*, teammate | - |
+| Hephaestus | task | - |
+| Default (all others) | - | grep_app_*, task_*, teammate, LSP |
 
 ## MULTI-LEVEL CONFIG MERGE
 

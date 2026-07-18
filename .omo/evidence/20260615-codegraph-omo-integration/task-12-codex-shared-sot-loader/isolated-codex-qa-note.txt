@@ -1,7 +1,0 @@
-No direct interactive Codex install/run was performed for TODO 12 because this change only adds an unwired shared source loader module. It does not register a Codex hook, component CLI, or MCP entry yet; TODO 13/14 will provide the real Codex runtime surface.
-
-Codex compatibility was still exercised through the canonical repo gate:
-- bun run test:codex exited 0.
-- That gate builds the local Codex plugin payload and runs installer/config/plugin tests in temporary homes.
-
-Real ~/.codex/config.toml note: this task did not run `node packages/omo-codex/scripts/install-local.mjs install` and did not launch Codex, so no direct Codex install/run touched the real Codex home. Manual QA used injected temp `homeDir` values and did not read or write ~/.codex/config.toml.

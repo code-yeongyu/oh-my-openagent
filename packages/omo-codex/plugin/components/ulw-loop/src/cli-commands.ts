@@ -39,8 +39,8 @@ export async function ulwLoopCommand(argv: readonly string[]): Promise<number> {
 	const rest = argv.slice(1);
 	const repoRoot = process.cwd();
 	const json = hasFlag(rest, "--json");
-	const scope = commandScope(rest);
 	try {
+		const scope = commandScope(rest);
 		if (!isUlwLoopSubcommand(command)) {
 			if (json) {
 				printJsonError(
@@ -94,7 +94,22 @@ function unhandledSubcommand(command: never): never {
 	throw new UlwLoopError(`Unhandled ulw-loop subcommand: ${String(command)}.`, "ULW_LOOP_SUBCOMMAND_UNHANDLED");
 }
 
+const SESSION_ID_FLAG = "--session-id";
+
+function sessionIdFlagPresent(argv: readonly string[]): boolean {
+	return hasFlag(argv, SESSION_ID_FLAG) || argv.some((arg) => arg.startsWith(`${SESSION_ID_FLAG}=`));
+}
+
 function commandScope(argv: readonly string[]): UlwLoopScope | undefined {
-	const sessionId = readValue(argv, "--session-id") ?? resolveUlwLoopSessionIdFromEnv();
+	if (sessionIdFlagPresent(argv)) {
+		const sessionId = readValue(argv, SESSION_ID_FLAG)?.trim();
+		if (!sessionId) {
+			throw new UlwLoopError(`${SESSION_ID_FLAG} requires a non-empty value.`, "ULW_LOOP_SESSION_ID_REQUIRED", {
+				details: { flag: SESSION_ID_FLAG },
+			});
+		}
+		return { sessionId };
+	}
+	const sessionId = resolveUlwLoopSessionIdFromEnv();
 	return sessionId === null ? undefined : { sessionId };
 }
