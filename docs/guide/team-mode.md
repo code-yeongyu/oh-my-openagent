@@ -113,9 +113,9 @@ Add `"worktreePath": "../wt-scout"` to a member entry. Path is filesystem-relati
 
 ## tmux visualization (optional)
 
-Set `tmux_visualization: true`. Requires running inside a tmux session and tmux on PATH. Failures are isolated - a missing tmux never blocks team creation.
+Set `tmux_visualization: true`. Requires running inside a tmux session, tmux on PATH, and an external OpenCode HTTP listener started with `opencode --port <port>`. Failures are isolated: if tmux is missing or the listener is unreachable, pane creation is skipped without blocking team execution.
 
-When enabled, each member gets a dedicated tmux pane attached to that member's session via `opencode attach`. The pane runs the full interactive opencode TUI for the member so you can watch streaming output in real time. Panes start in each member worktree when configured, otherwise the repo root.
+When enabled, each member gets a dedicated tmux pane that uses `opencode attach` to connect to that external listener and open the member's session. The pane runs the full interactive opencode TUI for the member so you can watch streaming output in real time. Panes start in each member worktree when configured, otherwise the repo root.
 
 `team_delete` closes the panes and tears down the team layout. Per-member shutdown closes just that pane and rebalances the remaining layout.
 
