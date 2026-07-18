@@ -29,4 +29,5 @@ export type SubagentAgentMatch =
 export interface ResolvedSubagentModel {
   readonly categoryModel: DelegatedModelConfig | undefined
   readonly fallbackChain: FallbackEntry[] | undefined
+  readonly error?: string
 }
