@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import { rendererVisibleWidth, type ListedTask, type TaskRecord, type TaskStatus } from "@oh-my-opencode/senpi-task"
 
-import type { CapturedUi } from "./runtime-context"
+import type { CapturedUi, StatusTheme } from "./runtime-context"
 import {
   buildWidgetRows,
   createTaskStatusUi,
@@ -56,17 +56,31 @@ interface FakeUi extends CapturedUi {
   readonly widgetCalls: Array<{ content: string[] | undefined; placement: string | undefined }>
 }
 
-function fakeUi(): FakeUi {
+function fakeUi(theme?: StatusTheme): FakeUi {
   const statusCalls: Array<string | undefined> = []
   const widgetCalls: Array<{ content: string[] | undefined; placement: string | undefined }> = []
   return {
     statusCalls,
     widgetCalls,
+    theme,
     notify: () => undefined,
     setStatus: (_key, text) => statusCalls.push(text),
     setWidget: (_key, content, options) => widgetCalls.push({ content, placement: options?.placement }),
     select: () => Promise.resolve(undefined),
     confirm: () => Promise.resolve(false),
+  }
+}
+
+// Real-shaped ANSI painter: emits actual color escapes (stripped by rendererVisibleWidth) and
+// records every (color, token) pair so tests can assert the painted structure.
+function fakeTheme(): StatusTheme & { readonly calls: Array<{ color: string; text: string }> } {
+  const calls: Array<{ color: string; text: string }> = []
+  return {
+    calls,
+    fg: (color, text) => {
+      calls.push({ color, text })
+      return `\u001b[35m${text}\u001b[39m`
+    },
   }
 }
 
@@ -95,7 +109,7 @@ describe("formatFooterStatus", () => {
     const footer = formatFooterStatus(records)
 
     // then
-    expect(footer).toContain("t2/r2")
+    expect(footer).toContain("\u25cf 2/2")
     expect(footer).toContain("st_aaaa")
   })
 
@@ -116,9 +130,7 @@ describe("formatFooterStatus", () => {
     const footer = formatFooterStatus(records) ?? ""
 
     // then all three terminal, two of them error-like (error + lost)
-    expect(footer).toContain("run:0")
-    expect(footer).toContain("done:3")
-    expect(footer).toContain("err:2")
+    expect(footer).toBe("\u2717 3 done \u00b7 2 err")
   })
 
   it("#given a 137-column active task #when formatting the footer #then it remains one physical line at 72 and 120 columns", () => {
@@ -128,7 +140,7 @@ describe("formatFooterStatus", () => {
     // then
     expect(footer).not.toContain("\n")
     for (const columns of [72, 120]) expect(rendererVisibleWidth(footer)).toBeLessThanOrEqual(columns)
-    expect(footer).toBe("t1/r1 st_01acti...|c:ultrabrain omo-mock/mock-1 xhigh in-process running")
+    expect(footer).toBe("\u25cf 1/1 st_01acti... c:ultrabrain omo-mock/mock-1 xhigh in-process running")
   })
 })
 
@@ -142,7 +154,7 @@ describe("buildWidgetRows", () => {
 
     // then
     expect(rows).toHaveLength(6)
-    expect(rows[5]).toBe("+2 more")
+    expect(rows[5]).toBe("  +2 more")
   })
 
   it("#given only terminal tasks #when building rows #then no rows render (widget clears)", () => {
@@ -299,7 +311,7 @@ describe("createTaskStatusUi.syncNow", () => {
     statusUi.syncNow()
 
     // then footer counts scoped to session-a only (2 tasks, not 3)
-    expect(ui.statusCalls.at(-1)).toContain("t2/r2")
+    expect(ui.statusCalls.at(-1)).toContain("2/2")
     // widget shows the two session-a rows below the editor
     const widget = ui.widgetCalls.at(-1)
     expect(widget?.content).toHaveLength(2)
@@ -331,8 +343,64 @@ describe("createTaskStatusUi.syncNow", () => {
     expect(widgetRow).toContain("xhigh")
     expect(widgetRow).toContain("in-process")
     expect(widgetRow).toContain("running")
-    expect(footer).toContain("t1/r1")
+    expect(footer).toContain("1/1")
     expect(`${footer} ${widgetRow}`).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/u)
+  })
+
+  it("#given a captured theme #when syncing #then rows are painted with status colors yet stay width-safe", () => {
+    // given a running task and a recording ANSI theme
+    const theme = fakeTheme()
+    const ui = fakeUi(theme)
+    const records = [record({ task_id: "st_paint", name: "painter", status: "running", category: "quick" })]
+    const statusUi = createTaskStatusUi({ manager: fakeManager(records), runtime: runtimeOf(ui, "session-a", "tui") })
+
+    // when
+    statusUi.syncNow()
+
+    // then the widget row carries ANSI paint but its visible width still respects the cap
+    const row = ui.widgetCalls.at(-1)?.content?.[0] ?? ""
+    expect(row).toContain("\u001b[35m")
+    expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(70)
+    // glyph and status word are painted with the running status color; id is dimmed; context muted
+    expect(theme.calls).toContainEqual({ color: "accent", text: "\u25cf" })
+    expect(theme.calls).toContainEqual({ color: "accent", text: "running" })
+    expect(theme.calls).toContainEqual({ color: "dim", text: "st_paint" })
+    expect(theme.calls.some((call) => call.color === "muted" && call.text.includes("c:quick"))).toBe(true)
+    // footer painted too and width-safe
+    const footer = ui.statusCalls.at(-1) ?? ""
+    expect(footer).toContain("\u001b[35m")
+    expect(rendererVisibleWidth(footer)).toBeLessThanOrEqual(72)
+  })
+
+  it("#given an unchanged task list #when syncing twice #then the second sync skips redundant UI updates", () => {
+    // given one running task
+    const records = [record({ task_id: "st_memo", status: "running" })]
+    const ui = fakeUi()
+    const statusUi = createTaskStatusUi({ manager: fakeManager(records), runtime: runtimeOf(ui, "session-a", "tui") })
+
+    // when syncing twice with identical data
+    statusUi.syncNow()
+    statusUi.syncNow()
+
+    // then only one setStatus/setWidget pair reached the UI
+    expect(ui.statusCalls).toHaveLength(1)
+    expect(ui.widgetCalls).toHaveLength(1)
+  })
+
+  it("#given a task list change between syncs #when syncing again #then the UI is updated", () => {
+    // given a mutable record list backing the manager
+    const records: TaskRecord[] = [record({ task_id: "st_grow", status: "running" })]
+    const ui = fakeUi()
+    const statusUi = createTaskStatusUi({ manager: fakeManager(records), runtime: runtimeOf(ui, "session-a", "tui") })
+    statusUi.syncNow()
+
+    // when a second task appears and we sync again
+    records.push(record({ task_id: "st_new", status: "running" }))
+    statusUi.syncNow()
+
+    // then a second render reached the UI with both rows
+    expect(ui.widgetCalls).toHaveLength(2)
+    expect(ui.widgetCalls.at(-1)?.content).toHaveLength(2)
   })
 
   it("#given no captured ui context #when syncing #then it is a no-op", () => {
