@@ -46,8 +46,7 @@ function validateParsedTarListing(
 export function parseTarListingOutput(stdout: string): ArchiveEntry[] {
 	const listingLines = stdout
 		.split(/\r?\n/)
-		.map(line => line.trim())
-		.filter(Boolean)
+		.filter(line => line.trim().length > 0)
 
 	if (listingLines.length === 0) {
 		return []
