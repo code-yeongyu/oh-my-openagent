@@ -5,9 +5,9 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import type { TuiPluginApi, TuiPluginMeta, TuiSlotPlugin } from "@opencode-ai/plugin/tui"
+import type { TuiSlotPlugin } from "@opencode-ai/plugin/tui"
 
-import tuiModule, { handleTuiPollError } from "./tui"
+import tuiModule, { handleTuiPollError, materializeReactive, navigateToTeamSession } from "./tui"
 
 type SolidNode = {
   readonly tag: string
@@ -89,7 +89,7 @@ describe("TUI sidebar polling", () => {
     } satisfies SidebarApiForTest
 
     // when
-    await tuiModule.tui(api as unknown as TuiPluginApi, undefined, {} as TuiPluginMeta)
+    await Reflect.apply(tuiModule.tui, undefined, [api, undefined, {}])
 
     // then
     expect(calls).toEqual(["register", "render"])
@@ -122,5 +122,51 @@ describe("TUI sidebar polling", () => {
     const thrownValue = "bad poll state"
 
     expect(() => handleTuiPollError(thrownValue)).toThrow(thrownValue)
+  })
+
+  it("#given a Team member session id #when navigating #then it opens the OpenCode session route", () => {
+    // given
+    const navigations: Array<{ readonly name: string; readonly params: Record<string, unknown> | undefined }> = []
+
+    // when
+    navigateToTeamSession(
+      {
+        navigate: (name, params): void => {
+          navigations.push({ name, params })
+        },
+      },
+      "ses-member",
+    )
+
+    // then
+    expect(navigations).toEqual([{ name: "session", params: { sessionID: "ses-member" } }])
+  })
+})
+
+describe("reactive sidebar materialization", () => {
+  it("#given a changing node accessor #when the sidebar root is created #then node construction remains reactive", () => {
+    // given
+    let readCount = 0
+    const solid = {
+      createElement: (tag: string): SolidNode => ({ tag, props: {}, children: [] }),
+      insert: (parent: SolidNode, child: unknown): void => {
+        parent.children.push(child)
+      },
+      setProp: (node: SolidNode, name: string, value: unknown): void => {
+        node.props[name] = value
+      },
+    }
+
+    // when
+    const root = materializeReactive(() => {
+      readCount += 1
+      return []
+    }, solid)
+
+    // then
+    expect(readCount).toBe(0)
+    expect(root.children[0]).toBeFunction()
+    Reflect.apply(root.children[0] as () => SolidNode, undefined, [])
+    expect(readCount).toBe(1)
   })
 })
