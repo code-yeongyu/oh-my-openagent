@@ -1,5 +1,0 @@
-241 packages/senpi-task/src/category/resolver.ts
-69 packages/senpi-task/src/category/types.ts
-250 packages/senpi-task/src/category/resolve-category.test.ts
-120 packages/senpi-task/scripts/manual-category-qa.ts
-PASS: scoped changed files are <=250 pure LOC

@@ -3,41 +3,28 @@ import { INIT_TIMEOUT_MS, REQUEST_TIMEOUT_MS, STOP_HARD_KILL_TIMEOUT_MS, STOP_SI
 import { LspConnectionClosedError, LspProcessExitedError, LspRequestTimeoutError } from "./errors.js";
 import { JsonRpcConnection } from "./json-rpc-connection.js";
 import { type SpawnedProcess, spawnProcess } from "./process.js";
+import { createLspSpawnEnv, parseConfigurationItems, parseDiagnosticsParams } from "./transport-protocol.js";
 import type { Diagnostic, ResolvedServer } from "./types.js";
+import type { WorkspaceApplyEditResponse } from "./workspace-mutation-controller.js";
 
-interface ConfigurationItem {
-	section?: string;
-}
-
-interface DiagnosticsParams {
-	uri: string;
-	diagnostics: Diagnostic[];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function parseConfigurationItems(params: unknown): ConfigurationItem[] {
-	if (!isRecord(params) || !Array.isArray(params["items"])) return [];
-	const items: ConfigurationItem[] = [];
-	for (const item of params["items"]) {
-		if (!isRecord(item)) continue;
-		const section = item["section"];
-		items.push(section === undefined || typeof section !== "string" ? {} : { section });
-	}
-	return items;
-}
-
-function parseDiagnosticsParams(params: unknown): DiagnosticsParams | null {
-	if (!isRecord(params) || typeof params["uri"] !== "string") return null;
-	const diagnostics = Array.isArray(params["diagnostics"]) ? params["diagnostics"].filter(isDiagnostic) : [];
-	return { uri: params["uri"], diagnostics };
-}
+export { createLspSpawnEnv } from "./transport-protocol.js";
 
 export interface LspClientTimeoutOptions {
 	requestTimeoutMs?: number;
 	initializeTimeoutMs?: number;
+}
+
+type WorkspaceApplyEditHandler = (params: unknown) => Promise<WorkspaceApplyEditResponse>;
+
+class LspClientNotStartedError extends Error {
+	override readonly name = "LspClientNotStartedError";
+
+	constructor(
+		readonly serverId: string,
+		readonly root: string,
+	) {
+		super("LSP client not started");
+	}
 }
 
 export class LspClientTransport {
@@ -48,6 +35,8 @@ export class LspClientTransport {
 	protected readonly diagnosticsStore = new Map<string, Diagnostic[]>();
 	protected readonly requestTimeoutMs: number;
 	protected readonly initializeTimeoutMs: number;
+	private workspaceApplyEditHandler: WorkspaceApplyEditHandler | null = null;
+	private diagnosticPullSupported = false;
 
 	constructor(
 		protected readonly root: string,
@@ -66,6 +55,30 @@ export class LspClientTransport {
 		return [...this.server.command];
 	}
 
+	protected setWorkspaceApplyEditHandler(handler: WorkspaceApplyEditHandler): void {
+		this.workspaceApplyEditHandler = handler;
+	}
+
+	protected hasWorkspaceApplyEditHandler(): boolean {
+		return this.workspaceApplyEditHandler !== null;
+	}
+
+	protected setDiagnosticPullSupported(supported: boolean): void {
+		this.diagnosticPullSupported = supported;
+	}
+
+	protected isDiagnosticPullSupported(): boolean {
+		return this.diagnosticPullSupported;
+	}
+
+	protected handlePublishDiagnostics(params: {
+		readonly uri: string;
+		readonly diagnostics: readonly Diagnostic[];
+		readonly version?: number;
+	}): void {
+		this.diagnosticsStore.set(params.uri, [...params.diagnostics]);
+	}
+
 	async start(): Promise<void> {
 		const env = createLspSpawnEnv(this.root, {
 			...process.env,
@@ -78,8 +91,6 @@ export class LspClientTransport {
 		});
 		this.startStderrReading();
 
-		await new Promise<void>((resolve) => setTimeout(resolve, 100));
-
 		if (this.proc.exitCode !== null) {
 			const stderr = this.stderrBuffer.join("\n");
 			throw new LspProcessExitedError(this.server.id, this.root, this.proc.exitCode, stderr.slice(-2000));
@@ -90,7 +101,7 @@ export class LspClientTransport {
 		this.connection.onNotification("textDocument/publishDiagnostics", (params) => {
 			const diagnosticsParams = parseDiagnosticsParams(params);
 			if (diagnosticsParams?.uri) {
-				this.diagnosticsStore.set(diagnosticsParams.uri, diagnosticsParams.diagnostics);
+				this.handlePublishDiagnostics(diagnosticsParams);
 			}
 		});
 
@@ -104,6 +115,9 @@ export class LspClientTransport {
 
 		this.connection.onRequest("client/registerCapability", () => null);
 		this.connection.onRequest("window/workDoneProgress/create", () => null);
+		if (this.workspaceApplyEditHandler) {
+			this.connection.onRequest("workspace/applyEdit", this.workspaceApplyEditHandler);
+		}
 
 		this.connection.onClose(() => {
 			this.processExited = true;
@@ -140,12 +154,16 @@ export class LspClientTransport {
 
 	protected sendRequest<T>(method: string): Promise<T>;
 	protected sendRequest<T>(method: string, params: unknown): Promise<T>;
-	protected sendRequest<T>(method: string, params: unknown, options: { timeoutMs?: number }): Promise<T>;
+	protected sendRequest<T>(
+		method: string,
+		params: unknown,
+		options: { timeoutMs?: number; signal?: AbortSignal },
+	): Promise<T>;
 	protected async sendRequest<T>(
 		method: string,
-		...args: [] | [unknown] | [unknown, { timeoutMs?: number }]
+		...args: [] | [unknown] | [unknown, { timeoutMs?: number; signal?: AbortSignal }]
 	): Promise<T> {
-		if (!this.connection) throw new Error("LSP client not started");
+		if (!this.connection) throw new LspClientNotStartedError(this.server.id, this.root);
 
 		if (this.processExited || (this.proc && this.proc.exitCode !== null)) {
 			const stderrTail = this.stderrBuffer.slice(-10).join("\n");
@@ -157,25 +175,22 @@ export class LspClientTransport {
 			);
 		}
 
-		const timeoutMs = args[1]?.timeoutMs ?? this.requestTimeoutMs;
-		let timeoutHandle: NodeJS.Timeout | null = null;
-		const timeoutPromise = new Promise<never>((_, reject) => {
-			timeoutHandle = setTimeout(() => {
-				const stderrTail = this.stderrBuffer.slice(-5).join("\n");
-				reject(new LspRequestTimeoutError(method, stderrTail || undefined));
-			}, timeoutMs);
-		});
+		const options = args[1];
+		const timeoutMs = options?.timeoutMs ?? this.requestTimeoutMs;
+		const timeoutController = new AbortController();
+		const timeoutHandle = setTimeout(() => {
+			const stderrTail = this.stderrBuffer.slice(-5).join("\n");
+			timeoutController.abort(new LspRequestTimeoutError(method, stderrTail || undefined));
+		}, timeoutMs);
+		const combinedSignal = combineAbortSignals(options?.signal, timeoutController.signal);
 
 		try {
-			const requestPromise =
+			const result =
 				args.length === 0
-					? this.connection.sendRequest<T>(method)
-					: this.connection.sendRequest<T>(method, args[0]);
-			const result = await Promise.race([requestPromise, timeoutPromise]);
-			if (timeoutHandle !== null) clearTimeout(timeoutHandle);
+					? await this.connection.sendRequest<T>(method, undefined, { signal: combinedSignal.signal })
+					: await this.connection.sendRequest<T>(method, args[0], { signal: combinedSignal.signal });
 			return result;
 		} catch (error) {
-			if (timeoutHandle !== null) clearTimeout(timeoutHandle);
 			if (this.processExited || (this.proc && this.proc.exitCode !== null)) {
 				throw new LspProcessExitedError(
 					this.server.id,
@@ -188,6 +203,9 @@ export class LspClientTransport {
 				throw new LspConnectionClosedError(this.server.id, this.root, error.message);
 			}
 			throw error;
+		} finally {
+			clearTimeout(timeoutHandle);
+			combinedSignal.dispose();
 		}
 	}
 
@@ -219,17 +237,17 @@ export class LspClientTransport {
 			try {
 				await this.sendRequest<null>("shutdown");
 			} catch (error) {
-				reportBestEffortCleanupError("shutdown request", error);
+				reportBestEffortCleanupError("shutdown request", error instanceof Error ? error : String(error));
 			}
 			try {
 				await this.sendNotification("exit");
 			} catch (error) {
-				reportBestEffortCleanupError("exit notification", error);
+				reportBestEffortCleanupError("exit notification", error instanceof Error ? error : String(error));
 			}
 			try {
 				this.connection.dispose();
 			} catch (error) {
-				reportBestEffortCleanupError("connection dispose", error);
+				reportBestEffortCleanupError("connection dispose", error instanceof Error ? error : String(error));
 			}
 			this.connection = null;
 		}
@@ -262,11 +280,11 @@ export class LspClientTransport {
 							new Promise<void>((resolve) => setTimeout(resolve, STOP_SIGKILL_GRACE_MS)),
 						]);
 					} catch (error) {
-						reportBestEffortCleanupError("hard process kill", error);
+						reportBestEffortCleanupError("hard process kill", error instanceof Error ? error : String(error));
 					}
 				}
 			} catch (error) {
-				reportBestEffortCleanupError("process stop", error);
+				reportBestEffortCleanupError("process stop", error instanceof Error ? error : String(error));
 			}
 		}
 
@@ -279,21 +297,29 @@ export class LspClientTransport {
 	}
 }
 
-export function createLspSpawnEnv(
-	_root: string,
-	input: Record<string, string | undefined>,
-): Record<string, string | undefined> {
-	return { ...input };
-}
+function combineAbortSignals(
+	primary: AbortSignal | undefined,
+	secondary: AbortSignal,
+): { readonly signal: AbortSignal; readonly dispose: () => void } {
+	const controller = new AbortController();
+	const abortFrom = (signal: AbortSignal): void => {
+		if (!controller.signal.aborted) controller.abort(signal.reason);
+	};
+	const onPrimaryAbort = (): void => {
+		if (primary) abortFrom(primary);
+	};
+	const onSecondaryAbort = (): void => abortFrom(secondary);
 
-function isDiagnostic(value: unknown): value is Diagnostic {
-	return isRecord(value) && isRange(value["range"]) && typeof value["message"] === "string";
-}
+	if (primary?.aborted) abortFrom(primary);
+	else primary?.addEventListener("abort", onPrimaryAbort, { once: true });
+	if (secondary.aborted) abortFrom(secondary);
+	else secondary.addEventListener("abort", onSecondaryAbort, { once: true });
 
-function isRange(value: unknown): value is Diagnostic["range"] {
-	return isRecord(value) && isPosition(value["start"]) && isPosition(value["end"]);
-}
-
-function isPosition(value: unknown): value is Diagnostic["range"]["start"] {
-	return isRecord(value) && typeof value["line"] === "number" && typeof value["character"] === "number";
+	return {
+		signal: controller.signal,
+		dispose: () => {
+			primary?.removeEventListener("abort", onPrimaryAbort);
+			secondary.removeEventListener("abort", onSecondaryAbort);
+		},
+	};
 }

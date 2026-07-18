@@ -1,8 +1,0 @@
-packages/omo-opencode/src/config/schema.test.ts
-packages/omo-opencode/src/config/schema/hooks.ts
-packages/omo-opencode/src/plugin/hooks/create-session-hooks.test.ts
-packages/omo-opencode/src/plugin/hooks/create-session-hooks.ts
- M packages/omo-opencode/src/config/schema.test.ts
- M packages/omo-opencode/src/config/schema/hooks.ts
- M packages/omo-opencode/src/plugin/hooks/create-session-hooks.test.ts
- M packages/omo-opencode/src/plugin/hooks/create-session-hooks.ts

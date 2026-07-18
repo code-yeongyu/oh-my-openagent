@@ -1,44 +1,50 @@
 {
-	"name": "@oh-my-opencode/omo-senpi",
-	"version": "4.15.1",
-	"type": "module",
-	"private": true,
-	"description": "Senpi harness adapter for oh-my-openagent.",
-	"exports": {
-		".": {
-			"types": "./src/index.ts",
-			"import": "./src/index.ts"
-		},
-		"./install": {
-			"types": "./src/install/index.ts",
-			"import": "./src/install/index.ts"
-		},
-		"./extension": {
-			"types": "./src/index.ts",
-			"import": "./src/index.ts"
-		}
-	},
-	"types": "./src/index.ts",
-	"scripts": {
-		"typecheck": "tsgo --noEmit -p tsconfig.json",
-		"test": "bun test src/**/*.test.ts"
-	},
-	"dependencies": {
-		"@oh-my-opencode/utils": "workspace:*",
-		"@oh-my-opencode/comment-checker-core": "workspace:*",
-		"@oh-my-opencode/telemetry-core": "workspace:*",
-		"@oh-my-opencode/prompts-core": "workspace:*",
-		"vscode-jsonrpc": "^8.2.1"
-	},
-	"peerDependencies": {
-		"@code-yeongyu/senpi": "2026.7.5-2"
-	},
-	"peerDependenciesMeta": {
-		"@code-yeongyu/senpi": {
-			"optional": true
-		}
-	},
-	"devDependencies": {
-		"@code-yeongyu/senpi": "2026.7.5-2"
-	}
+  "name": "@oh-my-opencode/omo-senpi",
+  "version": "4.19.0",
+  "type": "module",
+  "private": true,
+  "description": "Senpi harness adapter for oh-my-openagent.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./install": {
+      "types": "./src/install/index.ts",
+      "import": "./src/install/index.ts"
+    },
+    "./extension": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "bun test src/**/*.test.ts"
+  },
+  "dependencies": {
+    "@oh-my-opencode/utils": "workspace:*",
+    "@oh-my-opencode/comment-checker-core": "workspace:*",
+    "@oh-my-opencode/telemetry-core": "workspace:*",
+    "@oh-my-opencode/prompts-core": "workspace:*",
+    "@oh-my-opencode/lsp-core": "workspace:*",
+    "@oh-my-opencode/senpi-task": "workspace:*",
+    "@oh-my-opencode/omo-config-core": "workspace:*",
+    "@oh-my-opencode/delegate-core": "workspace:*",
+    "@oh-my-opencode/team-core": "workspace:*",
+    "@oh-my-opencode/boulder-state": "workspace:*",
+    "@code-yeongyu/lsp-daemon": "file:../lsp-daemon"
+  },
+  "peerDependencies": {
+    "@code-yeongyu/senpi": "2026.7.5-2"
+  },
+  "peerDependenciesMeta": {
+    "@code-yeongyu/senpi": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@code-yeongyu/senpi": "2026.7.5-2"
+  }
 }

@@ -15,7 +15,6 @@ import {
   discoverProjectAgentsSkills,
   discoverGlobalAgentsSkills,
   discoverSharedSkills,
-  createSharedCanonicalAliases,
   collectDisabledSkillAliases,
   isDisabledSkillAlias,
   mergeSkills,
@@ -65,18 +64,6 @@ function filterDisabledSkills(
   return skills.filter((skill) => !isDisabledSkillAlias(skill, disabledSkills))
 }
 
-function filterProtectedSharedAliasCollisions(
-  skills: LoadedSkill[],
-  protectedSharedAliasNames: ReadonlySet<string>,
-): LoadedSkill[] {
-  if (protectedSharedAliasNames.size === 0) return skills
-
-  return skills.filter((skill) => {
-    if (skill.scope === "shared") return true
-    return !protectedSharedAliasNames.has(normalizeSkillAliasName(skill.name))
-  })
-}
-
 function isDisabledConfigSkillEntryName(
   name: string,
   disabledSkills: ReadonlySet<string>,
@@ -98,6 +85,7 @@ export async function createSkillContext(args: {
 
   const browserProvider: BrowserAutomationProvider =
     pluginConfig.browser_automation_engine?.provider ?? "playwright"
+  const playwrightMcpArgs = pluginConfig.browser_automation_engine?.playwright_mcp_args
 
   const disabledSkills = collectDisabledSkillAliases(pluginConfig)
 
@@ -105,6 +93,7 @@ export async function createSkillContext(args: {
     browserProvider,
     disabledSkills,
     teamModeEnabled: pluginConfig.team_mode?.enabled ?? false,
+    playwrightMcpArgs,
     systemMcpNames: getSystemMcpServerNames(),
   })
 
@@ -183,41 +172,21 @@ export async function createSkillContext(args: {
     filteredAgentsGlobalSkills,
     disabledSkills,
   )
-  const sharedSkillAliases = createSharedCanonicalAliases(sharedSkills)
-  const protectedSharedAliasNames = new Set(
-    sharedSkillAliases.map((skill) => normalizeSkillAliasName(skill.name)),
-  )
   const filteredSharedSkills = filterDisabledSkills(
     filterProviderGatedSkills(sharedSkills, browserProvider),
-    disabledSkills,
-  )
-  const filteredSharedSkillAliases = filterDisabledSkills(
-    filterProviderGatedSkills(sharedSkillAliases, browserProvider),
     disabledSkills,
   )
   const mergedSkills = mergeSkills(
     builtinSkills,
     pluginConfig.skills,
-    filterProtectedSharedAliasCollisions(activeConfigSourceSkills, protectedSharedAliasNames),
-    [
-      ...filterProtectedSharedAliasCollisions(
-        [...activeUserSkills, ...activeAgentsGlobalSkills],
-        protectedSharedAliasNames,
-      ),
-      ...filteredSharedSkillAliases,
-      ...filteredSharedSkills,
-    ],
-    filterProtectedSharedAliasCollisions(activeGlobalSkills, protectedSharedAliasNames),
-    filterProtectedSharedAliasCollisions(
-      [...activeProjectSkills, ...activeAgentsProjectSkills],
-      protectedSharedAliasNames,
-    ),
-    filterProtectedSharedAliasCollisions(activeOpencodeProjectSkills, protectedSharedAliasNames),
+    activeConfigSourceSkills,
+    [...activeUserSkills, ...activeAgentsGlobalSkills, ...filteredSharedSkills],
+    activeGlobalSkills,
+    [...activeProjectSkills, ...activeAgentsProjectSkills],
+    activeOpencodeProjectSkills,
     {
       configDir: directory,
-      isConfigEntryAllowed: (name) =>
-        !protectedSharedAliasNames.has(normalizeSkillAliasName(name)) &&
-        !isDisabledConfigSkillEntryName(name, disabledSkills),
+      isConfigEntryAllowed: (name) => !isDisabledConfigSkillEntryName(name, disabledSkills),
     },
   )
 

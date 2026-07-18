@@ -225,9 +225,10 @@ export function resolveModelForDelegateTask(
         }
       }
     } else {
-      for (const entry of fallbackChain) {
+      for (const [entryIndex, entry] of fallbackChain.entries()) {
         for (const provider of entry.providers) {
-          const fullModel = `${provider}/${entry.model}`
+          const transformedModelId = transformModelForProvider(provider, entry.model)
+          const fullModel = `${provider}/${transformedModelId}`
           const match = fuzzyMatchModel(fullModel, new Set(input.availableModels), [provider])
           if (match) {
             if (explicitHighModel && entry.variant === "high" && match === explicitHighBaseModel) {
@@ -238,7 +239,19 @@ export function resolveModelForDelegateTask(
           }
         }
 
-        const crossProviderMatch = fuzzyMatchModel(entry.model, new Set(input.availableModels))
+        const laterRungProviders = new Set(
+          fallbackChain
+            .slice(entryIndex + 1)
+            .filter((candidate) => candidate.model === entry.model)
+            .flatMap((candidate) => candidate.providers),
+        )
+        const crossProviderCandidates = new Set(
+          [...input.availableModels].filter((model) => {
+            const [provider] = model.split("/")
+            return provider !== undefined && !laterRungProviders.has(provider)
+          }),
+        )
+        const crossProviderMatch = fuzzyMatchModel(entry.model, crossProviderCandidates)
         if (crossProviderMatch) {
           if (explicitHighModel && entry.variant === "high" && crossProviderMatch === explicitHighBaseModel) {
             return { model: explicitHighModel, fallbackEntry: entry, matchedFallback: true }

@@ -38,12 +38,12 @@ Before touching any UI code, before routing to any reference, before even thinki
 
 1. Read `design-system-architecture.md` — it defines the exact structure.
 2. Identify the branch: greenfield setup, existing UI with implicit patterns/components, or existing UI with no reusable component layer.
-3. **Greenfield setup:** if the user gave no concrete visual reference, use `_INDEX.md` to shortlist 2-3 plausible Layer B references, then deeply load exactly one Layer A style skill and one Layer B brand/design-system reference; use `open-design` only when the curated set has no fit. Treat those references as source material, not mood labels: extract tokens, layout grammar, component anatomy, interaction states, motion, and taste decisions into `DESIGN.md`, then recombine them into project-specific primitives. Customize for the user's product and content, but do not freestyle past the selected references; never copy logos, trademarked assets, or brand-specific copy.
+3. **Greenfield setup:** if the user gave no concrete visual reference, use `_INDEX.md` to shortlist 2-3 plausible Layer B references, then read exactly one Layer A style skill and one Layer B brand/design-system reference in full — every line, no partial reads; use `open-design` only when the curated set has no fit. Open `DESIGN.md` with a `## 0. Research Log` recording each research lane's deliverable (embedded-reference shortlist + pick, lazyweb screens viewed, imagen drafts — see the SKILL.md workflow); a lane with no line did not run. Treat those references as source material, not mood labels: extract tokens, layout grammar, component anatomy, interaction states, motion, and taste decisions into `DESIGN.md`, then recombine them into project-specific primitives. Customize for the user's product and content, but do not freestyle past the selected references; never copy logos, trademarked assets, or brand-specific copy.
    - **Commit a distinctive direction BEFORE extracting tokens.** In 1-2 sentences, name the atmosphere, the signature material, the color story, and the one moment a visitor will remember. For an expressive brief, sketch 2-3 genuinely different directions and pick the boldest one you can defend with the loaded reference; do not average them, because the average IS the generic default this skill exists to beat. A locked, never-revisited one-shot decision is how a page ends up flat.
    - **The reference's distinctive material MUST survive extraction (expressive briefs).** The common failure is loading a rich reference and then distilling it into a generic dark-SaaS token set. Your `DESIGN.md` must carry the *non-default* decisions forward and name which reference each came from: the actual elevation recipe (the specific layers that make a surface read as glass/glossy, not a single blur), a multi-stop perceptual color ramp (not one brand hex reused at varied opacity), the explicit display/body/mono type choices, and one signature interaction. Self-check before writing code: if your `DESIGN.md` could describe any generic dark SaaS, you flattened the reference — go back and put the specific material in.
 4. **Existing UI with implicit patterns/components:** extract the colors, typography, spacing, primitives, states, and motion already in use. Write `DESIGN.md` to codify what exists before changing UI code.
 5. **Existing UI with no reusable component layer:** STOP and ask whether to preserve the current style with copy-nearby edits or extract a `DESIGN.md` plus reusable components first. Do not silently choose the cheaper path or the larger refactor.
-6. **Do not proceed to product screens until `DESIGN.md` exists, Section 5 names the reusable primitives and their states, and each primitive plus required state passes mobile/tablet/desktop visual QA in a component showcase or equivalent state harness.**
+6. Finish the triage at the Primitive Showcase Gate below.
 
 #### If YES design system exists → READ IT, FOLLOW IT
 
@@ -52,7 +52,11 @@ Before touching any UI code, before routing to any reference, before even thinki
 3. If you need a token that doesn't exist, **add it to `DESIGN.md` first**, then use it.
 4. Never introduce raw hex codes, arbitrary px values, or ad-hoc component patterns that bypass the system.
 
-**This gate is non-negotiable. No design system = no UI work. Period.**
+**The Design System Gate is non-negotiable. No design system = no UI work. Period.**
+
+### Primitive Showcase Gate (MANDATORY)
+
+**Do not proceed to product screens until `DESIGN.md` exists, Section 5 names the reusable primitives and their states, and each primitive plus required state passes mobile/tablet/desktop visual QA in a component showcase or equivalent state harness.** Skipping this gate ships ad-hoc-styled product screens and re-enters the redesign loop.
 
 
 ## Phase 0.5 — React Dev Tooling Gate (MANDATORY for React projects)
@@ -165,6 +169,12 @@ Triggers (mid-conversation, not initial): "you keep leaving placeholders", "stop
 
 **Action:** Add `output-skill.md` on top of whatever is currently loaded. This stacks cleanly — it is purely about output completeness, not visual style.
 
+### Step 8 — Is the screen an app shell, not a scroll-the-page site?
+
+Triggers: dashboard, settings, mail/inbox, list-detail, command surface, split panes, fixed sidebar + scrolling body, admin console — or the user reports a layout that breaks when content gets long, empty, or unbroken (panel won't scroll, footer pushed off-screen, horizontal overflow on mobile).
+
+**Action:** Add `layout-skill.md` on top of whatever style skill you selected in Steps 1-2. It carries scroll-ownership doctrine, the two silently-failing CSS contracts (`min-block-size: 0` scroll shells, `minmax(min(…),100%)` grids), the named-primitive vocabulary, container-vs-viewport routing, and the content-stress matrix. It adds no visual direction — the style skill still owns taste. Skip it for pure scroll-the-document marketing pages, where `taste-skill` layout guidance already fits.
+
 ## Stacking rules (read this once, internalize it)
 
 1. **At most one Layer A *style* skill at a time.** A layout cannot be both `minimalist-skill` and `brutalist-skill` simultaneously — they encode opposite spacing and typography philosophies. Pick one.
@@ -173,6 +183,7 @@ Triggers (mid-conversation, not initial): "you keep leaving placeholders", "stop
 4. **`redesign-skill.md` replaces a style-skill** when the task is auditing, not building. Stack a Layer B brand if the user wants a specific direction.
 5. **`image-to-code-skill.md` pairs with one imagegen skill** for the full flow.
 6. **Layer B (brand DESIGN.md) is orthogonal to Layer A.** You can pair any Layer A skill with any Layer B brand. Use Layer B as the source of color/type/component tokens; let Layer A drive the execution discipline.
+7. **`layout-skill.md` stacks on top of any style skill** for app-shell / dashboard / split-pane work. It owns spatial structure and scroll ownership only — no visual direction — so it never conflicts with the style skill you picked.
 
 ## Anti-patterns — do not do these
 
@@ -214,6 +225,8 @@ Once references are loaded, before writing any UI code:
 | "Generate a brand identity board for {company}" | `imagegen-brandkit.md` |
 | "Stop using placeholders" | Add `output-skill.md` to current stack |
 | "Also output a DESIGN.md doc" | Add `stitch-skill.md` to current stack |
+| "Build a dashboard / settings / inbox / app shell" | one style skill (usually `taste-skill.md`) + `layout-skill.md` |
+| "Panel won't scroll / footer pushed off-screen / mobile overflow" | Add `layout-skill.md` to current stack |
 
 ## Phase Final — Design QA (MANDATORY, runs after implementation)
 

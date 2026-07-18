@@ -2,13 +2,13 @@
 	"hooks": {
 		"SubagentStop": [
 			{
-				"matcher": "^lazycodex-executor$",
+				"matcher": "^lazycodex-worker-(low|medium|high)$",
 				"hooks": [
 					{
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/lazycodex-executor-verify/dist/cli.js\" hook subagent-stop",
 						"timeout": 10,
-						"statusMessage": "(OmO) Verifying LazyCodex Executor Evidence"
+						"statusMessage": "(OmO 4.19.0) Verifying LazyCodex Executor Evidence"
 					}
 				]
 			}

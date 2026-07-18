@@ -1,25 +1,18 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import type { Message, Part } from "@opencode-ai/sdk"
 import type { AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
 import { getSessionAgent } from "../../features/claude-code-session-state"
-import { log } from "../../shared"
+import { isRealUserTextPart, log } from "../../shared"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { buildReminderMessage } from "./formatter"
 
-/**
- * Target agents that should receive category+skill reminders.
- * These are orchestrator agents that delegate work to specialized agents.
- */
 const TARGET_AGENTS = new Set([
   "sisyphus",
   "sisyphus-junior",
   "atlas",
 ])
 
-/**
- * Tools that indicate the agent is doing work that could potentially be delegated.
- * When these tools are used, we remind the agent about the category+skill system.
- */
 const DELEGATABLE_WORK_TOOLS = new Set([
   "edit",
   "write",
@@ -29,12 +22,9 @@ const DELEGATABLE_WORK_TOOLS = new Set([
   "glob",
 ])
 
-/**
- * Tools that indicate the agent is already using delegation properly.
- */
 const DELEGATION_TOOLS = new Set([
-   "task",
-   "call_omo_agent",
+  "task",
+  "call_omo_agent",
 ])
 
 interface ToolExecuteInput {
@@ -52,13 +42,49 @@ interface ToolExecuteOutput {
 
 interface SessionState {
   delegationUsed: boolean
+  reminderPending: boolean
   reminderShown: boolean
   toolCallCount: number
 }
 
+type MessageWithParts = { info: Message; parts: Part[] }
+
+interface ReminderInjectionTarget {
+  message: MessageWithParts
+  messageID: string
+  sessionID: string
+  state: SessionState
+  textPartIndex: number
+}
+
+function findLatestReminderTarget(
+  messages: MessageWithParts[],
+  sessionStates: Map<string, SessionState>,
+): ReminderInjectionTarget | undefined {
+  for (let messageIndex = messages.length - 1; messageIndex >= 0; messageIndex -= 1) {
+    const message = messages[messageIndex]
+    if (message?.info.role !== "user") continue
+    const sessionID = message.info.sessionID
+    const messageID = message.info.id
+    if (typeof sessionID !== "string" || typeof messageID !== "string") continue
+
+    const state = sessionStates.get(sessionID)
+    if (!state?.reminderPending || state.reminderShown || state.delegationUsed) continue
+
+    for (let partIndex = message.parts.length - 1; partIndex >= 0; partIndex -= 1) {
+      const part = message.parts[partIndex]
+      if (part && isRealUserTextPart(part)) {
+        return { message, messageID, sessionID, state, textPartIndex: partIndex }
+      }
+    }
+  }
+
+  return undefined
+}
+
 export function createCategorySkillReminderHook(
   _ctx: PluginInput,
-  availableSkills: AvailableSkill[] = []
+  availableSkills: AvailableSkill[] = [],
 ) {
   const sessionStates = new Map<string, SessionState>()
   const reminderMessage = buildReminderMessage(availableSkills)
@@ -67,6 +93,7 @@ export function createCategorySkillReminderHook(
     if (!sessionStates.has(sessionID)) {
       sessionStates.set(sessionID, {
         delegationUsed: false,
+        reminderPending: false,
         reminderShown: false,
         toolCallCount: 0,
       })
@@ -85,7 +112,7 @@ export function createCategorySkillReminderHook(
     )
   }
 
-  const toolExecuteAfter = async (input: ToolExecuteInput, output: ToolExecuteOutput) => {
+  const toolExecuteAfter = async (input: ToolExecuteInput, _output: ToolExecuteOutput) => {
     const { tool, sessionID } = input
     const toolLower = tool.toLowerCase()
 
@@ -97,6 +124,7 @@ export function createCategorySkillReminderHook(
 
     if (DELEGATION_TOOLS.has(toolLower)) {
       state.delegationUsed = true
+      state.reminderPending = false
       log("[category-skill-reminder] Delegation tool used", { sessionID, tool })
       return
     }
@@ -107,14 +135,40 @@ export function createCategorySkillReminderHook(
 
     state.toolCallCount++
 
-    if (state.toolCallCount >= 3 && !state.delegationUsed && !state.reminderShown) {
-      output.output += reminderMessage
-      state.reminderShown = true
-      log("[category-skill-reminder] Reminder injected", {
+    if (
+      state.toolCallCount >= 3
+      && !state.delegationUsed
+      && !state.reminderPending
+      && !state.reminderShown
+    ) {
+      state.reminderPending = true
+      log("[category-skill-reminder] Reminder queued", {
         sessionID,
         toolCallCount: state.toolCallCount,
       })
     }
+  }
+
+  const messagesTransform = async (
+    _input: Record<string, never>,
+    output: { messages: MessageWithParts[] },
+  ): Promise<void> => {
+    const target = findLatestReminderTarget(output.messages, sessionStates)
+    if (!target) return
+
+    target.message.parts.splice(target.textPartIndex, 0, {
+      id: `prt_category_skill_reminder_${target.messageID}`,
+      sessionID: target.sessionID,
+      messageID: target.messageID,
+      type: "text",
+      text: reminderMessage,
+      synthetic: true,
+    })
+    target.state.reminderPending = false
+    target.state.reminderShown = true
+    log("[category-skill-reminder] Reminder injected", {
+      sessionID: target.sessionID,
+    })
   }
 
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
@@ -130,6 +184,7 @@ export function createCategorySkillReminderHook(
 
   return {
     "tool.execute.after": toolExecuteAfter,
+    "experimental.chat.messages.transform": messagesTransform,
     event: eventHandler,
   }
 }

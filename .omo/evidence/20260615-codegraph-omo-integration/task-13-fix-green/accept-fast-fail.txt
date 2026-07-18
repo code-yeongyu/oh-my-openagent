@@ -1,3 +1,0 @@
-$ OMO_CODEGRAPH_BIN=/nonexistent timeout 5 node packages/omo-codex/plugin/components/codegraph/dist/serve.js; echo $?
-CodeGraph MCP skipped: codegraph binary not found. Install CodeGraph or set OMO_CODEGRAPH_BIN.
-exit=1

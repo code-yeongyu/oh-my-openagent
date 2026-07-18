@@ -1,4 +1,4 @@
-import { z } from "zod"
+import * as z from "zod"
 import { createParseMember } from "./member-parser"
 
 export const MESSAGE_KINDS = [
@@ -270,3 +270,10 @@ export type Message = z.infer<typeof MessageSchema>
 export type Task = z.infer<typeof TaskSchema>
 export type RuntimeStateMember = z.infer<typeof RuntimeStateMemberSchema>
 export type RuntimeState = z.infer<typeof RuntimeStateSchema>
+
+export type ActiveTeamSummary = Readonly<
+  Pick<RuntimeState, "teamRunId" | "teamName" | "status" | "leadSessionId"> & {
+    memberCount: number
+    scope: RuntimeState["specSource"]
+  }
+>

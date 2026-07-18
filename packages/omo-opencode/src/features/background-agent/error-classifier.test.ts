@@ -6,6 +6,7 @@ import {
   extractErrorName,
   extractErrorMessage,
   getSessionErrorMessage,
+  isTerminalSessionError,
 } from "./error-classifier"
 
 describe("isRecord", () => {
@@ -363,6 +364,71 @@ describe("getSessionErrorMessage", () => {
 
     test("returns undefined when data.message is not string", () => {
       expect(getSessionErrorMessage({ error: { data: { message: null } } })).toBe(undefined)
+    })
+  })
+})
+
+describe("isTerminalSessionError", () => {
+  describe("#given terminal provider/model errors", () => {
+    test.each([
+      ["no provider available"],
+      ["No provider available for model 'kimi-k2.7'"],
+      ["provider not available"],
+      ["provider not found"],
+      ["provider not configured"],
+      ["provider is forbidden"],
+      ["selected provider is forbidden"],
+      ["unknown provider 'foo'"],
+      ["model not supported"],
+      ["model_not_supported"],
+      ["Model not found: openai/gpt-missing"],
+      ["ProviderModelNotFoundError"],
+      ["No API key found for provider openai"],
+      ["Google Generative AI API key is missing"],
+      ["MissingApiKeyError"],
+      ["no models available for provider"],
+      ["no connected providers"],
+      ["all providers unavailable"],
+      ["all providers are disconnected"],
+      ["all providers exhausted"],
+    ])("classifies %s as terminal", (message) => {
+      expect(isTerminalSessionError({ message })).toBe(true)
+    })
+  })
+
+  describe("#given transient/recoverable errors", () => {
+    test.each([
+      ["Out of memory"],
+      ["rate limit exceeded"],
+      ["503 service unavailable temporarily"],
+      ["temporarily unavailable"],
+      ["try again later"],
+      ["timeout reached"],
+      ["socket hang up"],
+    ])("does NOT classify %s as terminal", (message) => {
+      expect(isTerminalSessionError({ message })).toBe(false)
+    })
+  })
+
+  describe("#given empty or missing error info", () => {
+    test("returns false for undefined message and name", () => {
+      expect(isTerminalSessionError({})).toBe(false)
+    })
+
+    test("returns false for empty message string", () => {
+      expect(isTerminalSessionError({ message: "" })).toBe(false)
+    })
+  })
+
+  describe("#given name and message together", () => {
+    test("classifies as terminal when message matches even with generic name", () => {
+      expect(
+        isTerminalSessionError({ name: "Error", message: "no provider available" }),
+      ).toBe(true)
+    })
+
+    test("does NOT classify as terminal when only a generic error name is present", () => {
+      expect(isTerminalSessionError({ name: "ProviderNotFoundError" })).toBe(false)
     })
   })
 })

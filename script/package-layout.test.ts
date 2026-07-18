@@ -27,10 +27,11 @@ const codexMaterializedRuntimePayloadPaths = [
   "packages/omo-codex/plugin/components/ulw-loop/dist/cli.js",
 ] as const
 const webTerminalVisualQaRuntimePaths = [
+  "script/qa/strip-ansi.mjs",
   "script/qa/web-terminal-redaction.d.mts",
   "script/qa/web-terminal-redaction.mjs",
-  "script/qa/web-terminal-renderer.mjs",
   "script/qa/web-terminal-visual-qa.mjs",
+  "script/qa/xterm-live-terminal.mjs",
 ] as const
 const packageGuidanceDocPaths = [
   "docs/reference/github-attachment-upload.md",

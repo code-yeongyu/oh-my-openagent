@@ -77,8 +77,8 @@ test("#given sisyphuslabs lazycodex install #when installing locally #then stamp
 	assert.equal(manifest.version, "4.7.6");
 	assert.equal(packageJson.version, "4.7.6");
 	assert.equal(componentPackageJson.version, "4.7.6");
-	assert.equal(hooks.hooks.PostToolUse[0].hooks[0].statusMessage, "(OmO) Checking Comments");
-	assert.equal(componentHooks.hooks.UserPromptSubmit[0].hooks[0].statusMessage, "(OmO) Checking Ulw-Loop Steering");
+	assert.equal(hooks.hooks.PostToolUse[0].hooks[0].statusMessage, "(OmO 4.7.6) Checking Comments");
+	assert.equal(componentHooks.hooks.UserPromptSubmit[0].hooks[0].statusMessage, "(OmO 4.7.6) Checking Ulw-Loop Steering");
 	assert.deepEqual(snapshot, {
 		packageName: "lazycodex-ai",
 		version: "4.7.6",

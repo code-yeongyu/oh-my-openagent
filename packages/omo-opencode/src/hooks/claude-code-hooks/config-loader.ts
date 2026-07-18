@@ -2,7 +2,7 @@ import { existsSync } from "fs"
 import { join } from "path"
 import type { ClaudeHookEvent } from "./types"
 import { log } from "../../shared/logger"
-import { getOpenCodeConfigDir } from "../../shared"
+import { getOpenCodeConfigDirs } from "../../shared"
 import { bunFile } from "../../shared/bun-file-shim"
 
 const CONFIG_CACHE_TTL_MS = 30_000
@@ -33,8 +33,10 @@ interface PluginExtendedConfigCacheEntry {
 
 const configCache = new Map<string, PluginExtendedConfigCacheEntry>()
 
-function getUserConfigPath(): string {
-  return join(getOpenCodeConfigDir({ binary: "opencode" }), "opencode-cc-plugin.json")
+function getUserConfigPaths(): string[] {
+  return getOpenCodeConfigDirs({ binary: "opencode" }).map((dir) =>
+    join(dir, "opencode-cc-plugin.json"),
+  )
 }
 
 function getProjectConfigPath(): string {
@@ -42,7 +44,7 @@ function getProjectConfigPath(): string {
 }
 
 function getCacheKey(): string {
-  return `${process.cwd()}::${getUserConfigPath()}`
+  return `${process.cwd()}::${getUserConfigPaths().join("|")}`
 }
 
 function getCachedConfig(cacheKey: string): PluginExtendedConfig | undefined {
@@ -108,21 +110,32 @@ export async function loadPluginExtendedConfig(): Promise<PluginExtendedConfig> 
     return cachedConfig
   }
 
-  const userConfig = await loadConfigFromPath(getUserConfigPath())
-  const projectConfig = await loadConfigFromPath(getProjectConfigPath())
+  // User configs: iterate reversed so custom (last in array) overrides default (first)
+  const userPaths = [...getUserConfigPaths()].reverse()
+  let mergedDisabledHooks: DisabledHooksConfig = {}
 
-  const merged: PluginExtendedConfig = {
-    disabledHooks: mergeDisabledHooks(
-      userConfig?.disabledHooks,
-      projectConfig?.disabledHooks
-    ),
+  for (const userPath of userPaths) {
+    const userConfig = await loadConfigFromPath(userPath)
+    if (userConfig?.disabledHooks) {
+      mergedDisabledHooks = mergeDisabledHooks(mergedDisabledHooks, userConfig.disabledHooks)
+    }
   }
 
-  if (userConfig || projectConfig) {
+  // Project config overrides all user configs
+  const projectConfig = await loadConfigFromPath(getProjectConfigPath())
+  if (projectConfig?.disabledHooks) {
+    mergedDisabledHooks = mergeDisabledHooks(mergedDisabledHooks, projectConfig.disabledHooks)
+  }
+
+  const merged: PluginExtendedConfig = {
+    disabledHooks: mergedDisabledHooks,
+  }
+
+  if (Object.keys(mergedDisabledHooks).length > 0 || projectConfig) {
     log("Plugin extended config loaded", {
-      userConfigExists: userConfig !== null,
+      userConfigPaths: getUserConfigPaths(),
       projectConfigExists: projectConfig !== null,
-      mergedDisabledHooks: merged.disabledHooks,
+      mergedDisabledHooks,
     })
   }
 
