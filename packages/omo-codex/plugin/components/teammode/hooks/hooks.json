@@ -8,7 +8,7 @@
 						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook post-tool-use",
 						"timeout": 10,
-						"statusMessage": "(OmO) Checking Thread Title Hygiene"
+						"statusMessage": "(OmO 4.19.0) Checking Thread Title Hygiene"
 					}
 				]
 			}

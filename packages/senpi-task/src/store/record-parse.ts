@@ -1,4 +1,10 @@
-import { RESIDENCY_STATES, TASK_STATUSES, type TaskRecord } from "../state"
+import {
+  RESIDENCY_STATES,
+  RESOLVED_MODEL_SOURCES,
+  TASK_STATUSES,
+  type ResolvedModelRecord,
+  type TaskRecord,
+} from "../state"
 import { parseTaskId } from "../state/id"
 
 export function parseTaskRecord(value: unknown, path: string): TaskRecord {
@@ -13,6 +19,9 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
   const childSessionId = readOptionalString(value, "child_session_id")
   const finalResponse = readOptionalString(value, "final_response")
   const errorMessage = readOptionalString(value, "error_message")
+  const killed = readOptionalBoolean(value, "killed")
+  const resolvedModel = readOptionalResolvedModel(value)
+  const spawnSpec = readOptionalSpawnSpec(value)
 
   return {
     task_id: parseTaskId(readString(value, "task_id")),
@@ -31,10 +40,36 @@ export function parseTaskRecord(value: unknown, path: string): TaskRecord {
     ...(category === undefined ? {} : { category }),
     ...(toolAllow === undefined ? {} : { tool_allow: toolAllow }),
     ...(toolDeny === undefined ? {} : { tool_deny: toolDeny }),
+    ...(resolvedModel === undefined ? {} : { resolved_model: resolvedModel }),
+    ...(spawnSpec === undefined ? {} : { spawn_spec: spawnSpec }),
     ...(pid === undefined ? {} : { pid }),
     ...(childSessionId === undefined ? {} : { child_session_id: childSessionId }),
     ...(finalResponse === undefined ? {} : { final_response: finalResponse }),
     ...(errorMessage === undefined ? {} : { error_message: errorMessage }),
+    ...(killed === undefined ? {} : { killed }),
+  }
+}
+
+function readOptionalSpawnSpec(record: Record<string, unknown>): TaskRecord["spawn_spec"] {
+  const value = record["spawn_spec"]
+  if (value === undefined) return undefined
+  if (!isRecord(value)) throw new Error("spawn_spec is not an object")
+  return { cwd: readString(value, "cwd") }
+}
+
+function readOptionalResolvedModel(record: Record<string, unknown>): ResolvedModelRecord | undefined {
+  const value = record["resolved_model"]
+  if (value === undefined) return undefined
+  if (!isRecord(value)) throw new Error("resolved_model is not an object")
+  const variant = readOptionalString(value, "variant")
+  const reasoningEffort = readOptionalString(value, "reasoning_effort")
+  return {
+    provider: readString(value, "provider"),
+    model_id: readString(value, "model_id"),
+    display: readString(value, "display"),
+    source: readResolvedModelSource(value),
+    ...(variant === undefined ? {} : { variant }),
+    ...(reasoningEffort === undefined ? {} : { reasoning_effort: reasoningEffort }),
   }
 }
 
@@ -62,6 +97,17 @@ function readTaskStatus(record: Record<string, unknown>): TaskRecord["status"] {
       return status
     default:
       throw new Error(`Invalid task status [REDACTED]; expected one of ${TASK_STATUSES.join(", ")}`)
+  }
+}
+
+function readResolvedModelSource(record: Record<string, unknown>): ResolvedModelRecord["source"] {
+  const source = readString(record, "source")
+  switch (source) {
+    case "category":
+    case "explicit":
+      return source
+    default:
+      throw new Error(`resolved_model.source must be ${RESOLVED_MODEL_SOURCES.join(" or ")}`)
   }
 }
 
@@ -105,6 +151,13 @@ function readOptionalNumber(record: Record<string, unknown>, key: string): numbe
   return value
 }
 
+function readOptionalBoolean(record: Record<string, unknown>, key: string): boolean | undefined {
+  const value = record[key]
+  if (value === undefined) return undefined
+  if (typeof value !== "boolean") throw new Error(`${key} is not a boolean`)
+  return value
+}
+
 function readOptionalStringArray(record: Record<string, unknown>, key: string): readonly string[] | undefined {
   const value = record[key]
   if (value === undefined) return undefined
@@ -113,6 +166,7 @@ function readOptionalStringArray(record: Record<string, unknown>, key: string): 
   }
   return value
 }
+
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)

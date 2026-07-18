@@ -1,6 +1,11 @@
 import { existsSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { contextCwd } from "../request-context.js";
+import {
+	canonicalizeExistingOrNearestAncestor,
+	contextCwd,
+	isPathInside,
+	lspRequestContext,
+} from "../request-context.js";
 import type { LspClient } from "./client.js";
 import { effectiveExtension } from "./effective-extension.js";
 import {
@@ -26,7 +31,7 @@ export function isDirectoryPath(filePath: string): boolean {
 }
 
 export function findWorkspaceRoot(filePath: string): string {
-	const abs = resolve(contextCwd(), filePath);
+	const abs = resolvePathInsideContext(filePath);
 	let dir = abs;
 
 	if (!isDirectoryPath(dir)) {
@@ -47,10 +52,22 @@ export function findWorkspaceRoot(filePath: string): string {
 	return dirname(abs);
 }
 
+export function resolvePathInsideContext(filePath: string): string {
+	const cwd = contextCwd();
+	const abs = resolve(cwd, filePath);
+	const canonical = canonicalizeExistingOrNearestAncestor(abs);
+	if (!isPathInside(cwd, canonical)) {
+		throw new LspInvalidPathError(`LSP file path must be inside request cwd: ${filePath}`);
+	}
+	return canonical;
+}
+
 export function formatServerLookupError(result: Exclude<ServerLookupResult, { status: "found" }>): string {
 	if (result.status === "not_installed") {
 		return formatNotInstalled(result);
 	}
+	const context = lspRequestContext();
+	const firstProjectConfigPath = context.projectConfigPaths[0] ?? "<project lsp config>";
 
 	return [
 		`No LSP server configured for extension: ${result.extension}`,
@@ -59,7 +76,7 @@ export function formatServerLookupError(result: Exclude<ServerLookupResult, { st
 			result.availableServers.length > 10 ? "..." : ""
 		}`,
 		"",
-		"Configure a custom server in '.codex/lsp-client.json':",
+		`Configure a custom server in '${firstProjectConfigPath}' or '${context.userConfigPath}':`,
 		"  {",
 		'    "lsp": {',
 		'      "my-server": {',
@@ -75,6 +92,7 @@ function formatNotInstalled(result: Extract<ServerLookupResult, { status: "not_i
 	const { server, installHint } = result;
 	const extensions = server.extensions.join(", ");
 	const decision = loadInstallDecision(server.id)?.decision;
+	const context = lspRequestContext();
 
 	if (decision === "declined") {
 		return `LSP server '${server.id}' (${extensions}) is NOT INSTALLED; user previously declined installation — proceed without LSP.`;
@@ -95,6 +113,17 @@ function formatNotInstalled(result: Extract<ServerLookupResult, { status: "not_i
 		].join("\n");
 	}
 
+	if (!context.capabilities.installDecisionTool) {
+		return [
+			...header,
+			"To install, run:",
+			`  ${installHint}`,
+			"",
+			"ACTION REQUIRED — ASK THE USER whether to install this LSP server.",
+			"Install-decision recording is unavailable in this harness; proceed without LSP if the user declines.",
+		].join("\n");
+	}
+
 	return [
 		...header,
 		"To install, run:",
@@ -104,6 +133,7 @@ function formatNotInstalled(result: Extract<ServerLookupResult, { status: "not_i
 		"- If the user agrees: run the install command above, then retry this tool.",
 		"- If the user declines, OR has NOT explicitly asked for LSP installation:",
 		`    call lsp_install_decision { server_id: "${server.id}", decision: "declined" },`,
+		`    which writes to ${context.installDecisionsPath},`,
 		"    then ignore this message and proceed WITHOUT LSP.",
 	].join("\n");
 }
@@ -128,7 +158,7 @@ export async function withLspClient<T>(
 	toolName: string,
 	options: WithLspClientOptions = {},
 ): Promise<T> {
-	const absPath = resolve(contextCwd(), filePath);
+	const absPath = resolvePathInsideContext(filePath);
 
 	if (isDirectoryPath(absPath)) {
 		throw new LspInvalidPathError(
@@ -140,7 +170,7 @@ export async function withLspClient<T>(
 	const ext = effectiveExtension(absPath);
 	const result = findServerForExtension(ext);
 	if (result.status !== "found") {
-		throw new LspServerLookupError(formatServerLookupError(result));
+		throw new LspServerLookupError(formatServerLookupError(result), result);
 	}
 
 	const server = result.server;

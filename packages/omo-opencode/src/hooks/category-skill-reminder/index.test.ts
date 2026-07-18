@@ -1,441 +1,373 @@
-import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
-import { createCategorySkillReminderHook } from "./index"
-import { updateSessionAgent, clearSessionAgent, _resetForTesting } from "../../features/claude-code-session-state"
+import { afterEach, describe, expect, test } from "bun:test"
+import type { Message, Part } from "@opencode-ai/sdk"
 import type { AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
-import * as sharedModule from "../../shared"
+import {
+  _resetForTesting,
+  updateSessionAgent,
+} from "../../features/claude-code-session-state"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
+import { createCategorySkillReminderHook } from "./index"
+
+const REMINDER_MARKER = "[Category+Skill Reminder]"
+
+function createHook(availableSkills: AvailableSkill[] = []) {
+  return createCategorySkillReminderHook(
+    unsafeTestValue({
+      client: { tui: { showToast: async () => {} } },
+    }),
+    availableSkills,
+  )
+}
+
+function createOutput(text = "result") {
+  return { title: "", output: text, metadata: {} }
+}
+
+type MessageWithParts = {
+  info: Message
+  parts: Part[]
+}
+
+function createUserTurn(
+  sessionID: string,
+  text: string,
+  options: { id?: string; synthetic?: boolean } = {},
+): MessageWithParts {
+  const messageID = options.id ?? `msg_${sessionID}`
+  return {
+    info: {
+      id: messageID,
+      sessionID,
+      role: "user",
+      time: { created: 1 },
+      agent: "sisyphus",
+      model: { providerID: "test", modelID: "test" },
+    },
+    parts: [{
+      id: `prt_${messageID}`,
+      sessionID,
+      messageID,
+      type: "text",
+      text,
+      ...(options.synthetic === true ? { synthetic: true } : {}),
+    }],
+  }
+}
+
+function findReminderParts(messages: MessageWithParts[]): Part[] {
+  return messages.flatMap((message) => message.parts).filter(
+    (part) => part.type === "text"
+      && part.synthetic === true
+      && part.text.includes(REMINDER_MARKER),
+  )
+}
+
+async function transformMessages(
+  hook: ReturnType<typeof createHook>,
+  messages: MessageWithParts[],
+): Promise<void> {
+  await hook["experimental.chat.messages.transform"]({}, { messages })
+}
+
+async function useTools(input: {
+  hook: ReturnType<typeof createHook>
+  sessionID: string
+  tools: readonly string[]
+  output?: ReturnType<typeof createOutput>
+  agent?: string
+}): Promise<ReturnType<typeof createOutput>> {
+  const output = input.output ?? createOutput()
+  for (const [index, tool] of input.tools.entries()) {
+    await input.hook["tool.execute.after"]({
+      tool,
+      sessionID: input.sessionID,
+      callID: String(index + 1),
+      ...(input.agent === undefined ? {} : { agent: input.agent }),
+    }, output)
+  }
+  return output
+}
+
+afterEach(() => {
+  _resetForTesting()
+})
 
 describe("category-skill-reminder hook", () => {
-  let logCalls: Array<{ msg: string; data?: unknown }>
-  let logSpy: ReturnType<typeof spyOn>
+  test.each(["Sisyphus", "Atlas", "sisyphus-junior"])(
+    "#given target agent %s #when three delegatable tools finish #then one reminder is injected before the user text",
+    async (agent) => {
+      const hook = createHook()
+      const sessionID = `target-${agent}`
+      updateSessionAgent(sessionID, agent)
 
-  beforeEach(() => {
-    _resetForTesting()
-    logCalls = []
-    logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
-      logCalls.push({ msg, data })
-    })
+      const output = await useTools({ hook, sessionID, tools: ["edit", "bash", "write"] })
+      const messages = [createUserTurn(sessionID, "continue working")]
+      await transformMessages(hook, messages)
+
+      expect(output.output).toBe("result")
+      expect(findReminderParts(messages)).toHaveLength(1)
+      expect(messages[0]?.parts[0]).toMatchObject({ synthetic: true, type: "text" })
+      expect(messages[0]?.parts[1]).toMatchObject({ text: "continue working", type: "text" })
+    },
+  )
+
+  test("#given a non-target agent #when three delegatable tools finish #then no reminder is queued", async () => {
+    const hook = createHook()
+    const sessionID = "librarian-session"
+    updateSessionAgent(sessionID, "librarian")
+
+    const output = await useTools({ hook, sessionID, tools: ["edit", "edit", "edit"] })
+    const messages = [createUserTurn(sessionID, "continue")]
+    await transformMessages(hook, messages)
+
+    expect(output.output).toBe("result")
+    expect(findReminderParts(messages)).toHaveLength(0)
   })
 
-  afterEach(() => {
-    logSpy?.mockRestore()
+  test("#given a later message belongs to another session #when one session has a queued reminder #then the reminder stays with its request", async () => {
+    const hook = createHook()
+    const targetSessionID = "target-session"
+    const otherSessionID = "other-session"
+    updateSessionAgent(targetSessionID, "Sisyphus")
+    await useTools({ hook, sessionID: targetSessionID, tools: ["read", "grep", "glob"] })
+    const targetMessage = createUserTurn(targetSessionID, "target request")
+    const otherMessage = createUserTurn(otherSessionID, "other request")
+
+    await transformMessages(hook, [targetMessage, otherMessage])
+
+    expect(findReminderParts([targetMessage])).toHaveLength(1)
+    expect(findReminderParts([otherMessage])).toHaveLength(0)
   })
 
-  function createMockPluginInput() {
-    return unsafeTestValue({
-      client: {
-        tui: {
-          showToast: async () => {},
-        },
-      },
+  test("#given no tracked agent #when the tool input identifies Sisyphus #then the reminder is injected", async () => {
+    const hook = createHook()
+    const sessionID = "input-agent-session"
+
+    const output = await useTools({
+      hook,
+      sessionID,
+      tools: ["edit", "edit", "edit"],
+      agent: "Sisyphus",
     })
-  }
+    const messages = [createUserTurn(sessionID, "continue")]
+    await transformMessages(hook, messages)
 
-  function createHook(availableSkills: AvailableSkill[] = []) {
-    return createCategorySkillReminderHook(createMockPluginInput(), availableSkills)
-  }
-
-  describe("target agent detection", () => {
-    test("should inject reminder for sisyphus agent after 3 tool calls", async () => {
-      // given - sisyphus agent session with multiple tool calls
-      const hook = createHook()
-      const sessionID = "sisyphus-session"
-      updateSessionAgent(sessionID, "Sisyphus")
-
-      const output = { title: "", output: "file content", metadata: {} }
-
-      // when - 3 edit tool calls are made
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "1" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "2" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "3" }, output)
-
-      // then - reminder should be injected
-      expect(output.output).toContain("[Category+Skill Reminder]")
-      expect(output.output).toContain("task")
-
-      clearSessionAgent(sessionID)
-    })
-
-    test("should inject reminder for atlas agent", async () => {
-      // given - atlas agent session
-      const hook = createHook()
-      const sessionID = "atlas-session"
-      updateSessionAgent(sessionID, "Atlas")
-
-      const output = { title: "", output: "result", metadata: {} }
-
-      // when - 3 tool calls are made
-      await hook["tool.execute.after"]({ tool: "bash", sessionID, callID: "1" }, output)
-      await hook["tool.execute.after"]({ tool: "bash", sessionID, callID: "2" }, output)
-      await hook["tool.execute.after"]({ tool: "bash", sessionID, callID: "3" }, output)
-
-      // then - reminder should be injected
-      expect(output.output).toContain("[Category+Skill Reminder]")
-
-      clearSessionAgent(sessionID)
-    })
-
-    test("should inject reminder for sisyphus-junior agent", async () => {
-      // given - sisyphus-junior agent session
-      const hook = createHook()
-      const sessionID = "junior-session"
-      updateSessionAgent(sessionID, "sisyphus-junior")
-
-      const output = { title: "", output: "result", metadata: {} }
-
-      // when - 3 tool calls are made
-      await hook["tool.execute.after"]({ tool: "write", sessionID, callID: "1" }, output)
-      await hook["tool.execute.after"]({ tool: "write", sessionID, callID: "2" }, output)
-      await hook["tool.execute.after"]({ tool: "write", sessionID, callID: "3" }, output)
-
-      // then - reminder should be injected
-      expect(output.output).toContain("[Category+Skill Reminder]")
-
-      clearSessionAgent(sessionID)
-    })
-
-    test("should NOT inject reminder for non-target agents", async () => {
-      // given - librarian agent session (not a target)
-      const hook = createHook()
-      const sessionID = "librarian-session"
-      updateSessionAgent(sessionID, "librarian")
-
-      const output = { title: "", output: "result", metadata: {} }
-
-      // when - 3 tool calls are made
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "1" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "2" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "3" }, output)
-
-      // then - reminder should NOT be injected
-      expect(output.output).not.toContain("[Category+Skill Reminder]")
-
-      clearSessionAgent(sessionID)
-    })
-
-    test("should detect agent from input.agent when session state is empty", async () => {
-      // given - no session state, agent provided in input
-      const hook = createHook()
-      const sessionID = "input-agent-session"
-
-      const output = { title: "", output: "result", metadata: {} }
-
-      // when - 3 tool calls with agent in input
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "1", agent: "Sisyphus" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "2", agent: "Sisyphus" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "3", agent: "Sisyphus" }, output)
-
-      // then - reminder should be injected
-      expect(output.output).toContain("[Category+Skill Reminder]")
-    })
+    expect(output.output).toBe("result")
+    expect(findReminderParts(messages)).toHaveLength(1)
   })
 
-  describe("delegation tool tracking", () => {
-    test("should NOT inject reminder if task is used", async () => {
-      // given - sisyphus agent that uses task
+  test.each([
+    { delegationTool: "task", order: "before", tools: ["task", "edit", "edit", "edit"] },
+    { delegationTool: "task", order: "after", tools: ["edit", "edit", "edit", "task"] },
+    { delegationTool: "call_omo_agent", order: "before", tools: ["call_omo_agent", "edit", "edit", "edit"] },
+    { delegationTool: "call_omo_agent", order: "after", tools: ["edit", "edit", "edit", "call_omo_agent"] },
+  ])(
+    "#given $delegationTool finishes $order the threshold #when messages transform runs #then no reminder is injected",
+    async ({ tools }) => {
       const hook = createHook()
       const sessionID = "delegation-session"
       updateSessionAgent(sessionID, "Sisyphus")
 
-      const output = { title: "", output: "result", metadata: {} }
+      const output = await useTools({
+        hook,
+        sessionID,
+        tools,
+      })
+      const messages = [createUserTurn(sessionID, "continue")]
+      await transformMessages(hook, messages)
 
-      // when - task is used, then more tool calls
-      await hook["tool.execute.after"]({ tool: "task", sessionID, callID: "1" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "2" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "3" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "4" }, output)
+      expect(output.output).toBe("result")
+      expect(findReminderParts(messages)).toHaveLength(0)
+    },
+  )
 
-      // then - reminder should NOT be injected (delegation was used)
-      expect(output.output).not.toContain("[Category+Skill Reminder]")
+  test("#given mixed tools #when fewer than three delegatable tools finish #then no reminder is injected", async () => {
+    const hook = createHook()
+    const sessionID = "mixed-tools-session"
+    updateSessionAgent(sessionID, "Sisyphus")
 
-      clearSessionAgent(sessionID)
+    const output = await useTools({
+      hook,
+      sessionID,
+      tools: ["edit", "lsp_goto_definition", "read", "lsp_symbols"],
     })
+    const messages = [createUserTurn(sessionID, "continue")]
+    await transformMessages(hook, messages)
 
-    test("should NOT inject reminder if call_omo_agent is used", async () => {
-      // given - sisyphus agent that uses call_omo_agent
-      const hook = createHook()
-      const sessionID = "omo-agent-session"
-      updateSessionAgent(sessionID, "Sisyphus")
+    expect(output.output).toBe("result")
+    expect(findReminderParts(messages)).toHaveLength(0)
+  })
 
-      const output = { title: "", output: "result", metadata: {} }
+  test("#given the third eligible tool call #when the reminder is queued #then tool output remains byte-identical", async () => {
+    const hook = createHook()
+    const sessionID = "byte-identical-session"
+    const original = "stdout\r\nwith trailing bytes\u0000\n"
+    const output = createOutput(original)
+    updateSessionAgent(sessionID, "Sisyphus")
 
-      // when - call_omo_agent is used first
-      await hook["tool.execute.after"]({ tool: "call_omo_agent", sessionID, callID: "1" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "2" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "3" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "4" }, output)
+    await useTools({ hook, sessionID, tools: ["read", "grep", "bash"], output })
 
-      // then - reminder should NOT be injected
-      expect(output.output).not.toContain("[Category+Skill Reminder]")
+    expect(output.output).toBe(original)
+  })
 
-      clearSessionAgent(sessionID)
-    })
+  test("#given a queued reminder and no real user text #when messages transform retries #then pending is retained", async () => {
+    const hook = createHook()
+    const sessionID = "pending-without-text"
+    updateSessionAgent(sessionID, "Sisyphus")
+    await useTools({ hook, sessionID, tools: ["read", "grep", "glob"] })
 
-    test("should NOT inject reminder if task tool is used", async () => {
-      // given - sisyphus agent that uses task tool
-      const hook = createHook()
-      const sessionID = "task-session"
-      updateSessionAgent(sessionID, "Sisyphus")
+    const noText = createUserTurn(sessionID, "unused")
+    noText.parts = []
+    await transformMessages(hook, [])
+    await transformMessages(hook, [noText])
+    await transformMessages(hook, [createUserTurn(sessionID, "internal", { synthetic: true })])
+    const realMessages = [createUserTurn(sessionID, "real user text", { id: "msg_real" })]
+    await transformMessages(hook, realMessages)
 
-      const output = { title: "", output: "result", metadata: {} }
+    expect(findReminderParts(realMessages)).toHaveLength(1)
+  })
 
-      // when - task tool is used
-      await hook["tool.execute.after"]({ tool: "task", sessionID, callID: "1" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "2" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "3" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "4" }, output)
+  test("#given multiple real and synthetic user texts #when a reminder is pending #then exactly one is inserted before the latest real text", async () => {
+    const hook = createHook()
+    const sessionID = "latest-real-text"
+    updateSessionAgent(sessionID, "Sisyphus")
+    await useTools({ hook, sessionID, tools: ["edit", "write", "bash"] })
 
-      // then - reminder should NOT be injected
-      expect(output.output).not.toContain("[Category+Skill Reminder]")
+    const latestTurn = createUserTurn(sessionID, "earlier text in latest turn", { id: "msg_latest" })
+    latestTurn.parts.push(
+      {
+        id: "prt_internal",
+        sessionID,
+        messageID: "msg_latest",
+        type: "text",
+        text: "internal context",
+        synthetic: true,
+      },
+      {
+        id: "prt_latest_real",
+        sessionID,
+        messageID: "msg_latest",
+        type: "text",
+        text: "latest real text",
+      },
+    )
+    const messages = [
+      createUserTurn(sessionID, "older real text", { id: "msg_old" }),
+      latestTurn,
+      createUserTurn(sessionID, "synthetic tail", { id: "msg_tail", synthetic: true }),
+    ]
 
-      clearSessionAgent(sessionID)
+    await transformMessages(hook, messages)
+    await transformMessages(hook, messages)
+
+    const reminderIndex = latestTurn.parts.findIndex(
+      (part) => part.type === "text" && part.text.includes(REMINDER_MARKER),
+    )
+    const latestTextIndex = latestTurn.parts.findIndex(
+      (part) => part.type === "text" && part.text === "latest real text",
+    )
+    expect(findReminderParts(messages)).toHaveLength(1)
+    expect(reminderIndex).toBe(latestTextIndex - 1)
+    expect(latestTurn.parts[reminderIndex]).toMatchObject({
+      messageID: "msg_latest",
+      sessionID,
+      synthetic: true,
+      type: "text",
     })
   })
 
-  describe("tool call counting", () => {
-    test("should NOT inject reminder before 3 tool calls", async () => {
-      // given - sisyphus agent with only 2 tool calls
-      const hook = createHook()
-      const sessionID = "few-calls-session"
-      updateSessionAgent(sessionID, "Sisyphus")
+  test("#given a reminder is inserted #when transforms and tools repeat without assistant completion #then the same bytes appear only once", async () => {
+    const hook = createHook()
+    const sessionID = "once-session"
+    updateSessionAgent(sessionID, "Sisyphus")
+    const firstOutput = await useTools({ hook, sessionID, tools: ["edit", "edit", "edit"] })
+    const firstMessages = [createUserTurn(sessionID, "first continuation")]
+    await transformMessages(hook, firstMessages)
+    const injectedBytes = JSON.stringify(findReminderParts(firstMessages)[0])
+    await transformMessages(hook, firstMessages)
 
-      const output = { title: "", output: "result", metadata: {} }
+    const secondOutput = await useTools({ hook, sessionID, tools: ["edit", "edit", "edit"] })
+    const secondMessages = [createUserTurn(sessionID, "second continuation", { id: "msg_second" })]
+    await transformMessages(hook, secondMessages)
 
-      // when - only 2 tool calls are made
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "1" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "2" }, output)
-
-      // then - reminder should NOT be injected yet
-      expect(output.output).not.toContain("[Category+Skill Reminder]")
-
-      clearSessionAgent(sessionID)
-    })
-
-    test("should only inject reminder once per session", async () => {
-      // given - sisyphus agent session
-      const hook = createHook()
-      const sessionID = "once-session"
-      updateSessionAgent(sessionID, "Sisyphus")
-
-      const output1 = { title: "", output: "result1", metadata: {} }
-      const output2 = { title: "", output: "result2", metadata: {} }
-
-      // when - 6 tool calls are made (should trigger at 3, not again at 6)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "1" }, output1)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "2" }, output1)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "3" }, output1)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "4" }, output2)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "5" }, output2)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "6" }, output2)
-
-      // then - reminder should be in output1 but not output2
-      expect(output1.output).toContain("[Category+Skill Reminder]")
-      expect(output2.output).not.toContain("[Category+Skill Reminder]")
-
-      clearSessionAgent(sessionID)
-    })
-
-    test("should only count delegatable work tools", async () => {
-      // given - sisyphus agent with mixed tool calls
-      const hook = createHook()
-      const sessionID = "mixed-tools-session"
-      updateSessionAgent(sessionID, "Sisyphus")
-
-      const output = { title: "", output: "result", metadata: {} }
-
-      // when - non-delegatable tools are called (should not count)
-      await hook["tool.execute.after"]({ tool: "lsp_goto_definition", sessionID, callID: "1" }, output)
-      await hook["tool.execute.after"]({ tool: "lsp_find_references", sessionID, callID: "2" }, output)
-      await hook["tool.execute.after"]({ tool: "lsp_symbols", sessionID, callID: "3" }, output)
-
-      // then - reminder should NOT be injected (LSP tools don't count)
-      expect(output.output).not.toContain("[Category+Skill Reminder]")
-
-      clearSessionAgent(sessionID)
-    })
+    expect(firstOutput.output).toBe("result")
+    expect(secondOutput.output).toBe("result")
+    expect(findReminderParts(firstMessages)).toHaveLength(1)
+    expect(JSON.stringify(findReminderParts(firstMessages)[0])).toBe(injectedBytes)
+    expect(findReminderParts(secondMessages)).toHaveLength(0)
   })
 
-  describe("event handling", () => {
-    test("should reset state on session.deleted event", async () => {
-      // given - sisyphus agent with reminder already shown
-      const hook = createHook()
-      const sessionID = "delete-session"
-      updateSessionAgent(sessionID, "Sisyphus")
+  test("#given a reminder is pending #when the session is deleted #then pending state and counts are cleared", async () => {
+    const hook = createHook()
+    const sessionID = "delete-session"
+    updateSessionAgent(sessionID, "Sisyphus")
+    await useTools({ hook, sessionID, tools: ["edit", "edit", "edit"] })
 
-      const output1 = { title: "", output: "result1", metadata: {} }
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "1" }, output1)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "2" }, output1)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "3" }, output1)
-      expect(output1.output).toContain("[Category+Skill Reminder]")
+    await hook.event({ event: { type: "session.deleted", properties: { info: { id: sessionID } } } })
+    const clearedMessages = [createUserTurn(sessionID, "after deletion")]
+    await transformMessages(hook, clearedMessages)
+    const output = await useTools({ hook, sessionID, tools: ["edit", "edit", "edit"] })
+    const freshMessages = [createUserTurn(sessionID, "after fresh threshold", { id: "msg_fresh" })]
+    await transformMessages(hook, freshMessages)
 
-      // when - session is deleted and new session starts
-      await hook.event({ event: { type: "session.deleted", properties: { info: { id: sessionID } } } })
-
-      const output2 = { title: "", output: "result2", metadata: {} }
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "4" }, output2)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "5" }, output2)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "6" }, output2)
-
-      // then - reminder should be shown again (state was reset)
-      expect(output2.output).toContain("[Category+Skill Reminder]")
-
-      clearSessionAgent(sessionID)
-    })
-
-    test("should preserve suppression state on session.compacted event", async () => {
-      // given - sisyphus agent with reminder already shown
-      const hook = createHook()
-      const sessionID = "compact-session"
-      updateSessionAgent(sessionID, "Sisyphus")
-
-      const output1 = { title: "", output: "result1", metadata: {} }
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "1" }, output1)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "2" }, output1)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "3" }, output1)
-      expect(output1.output).toContain("[Category+Skill Reminder]")
-
-      // when - session is compacted
-      await hook.event({ event: { type: "session.compacted", properties: { sessionID } } })
-
-      const output2 = { title: "", output: "result2", metadata: {} }
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "4" }, output2)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "5" }, output2)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "6" }, output2)
-
-      // then - reminder should NOT be shown again (state remains suppressed)
-      expect(output2.output).not.toContain("[Category+Skill Reminder]")
-
-      clearSessionAgent(sessionID)
-    })
-
-    test("should preserve partial tool-call count across session.compacted", async () => {
-      // given - sisyphus agent with 2 delegatable tool calls
-      const hook = createHook()
-      const sessionID = "compact-partial-count-session"
-      updateSessionAgent(sessionID, "Sisyphus")
-
-      const output = { title: "", output: "result", metadata: {} }
-
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "1" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "2" }, output)
-      expect(output.output).not.toContain("[Category+Skill Reminder]")
-
-      // when - the session compacts before the third tool call
-      await hook.event({ event: { type: "session.compacted", properties: { sessionID } } })
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "3" }, output)
-
-      // then - the third call should still trigger the reminder
-      expect(output.output).toContain("[Category+Skill Reminder]")
-
-      clearSessionAgent(sessionID)
-    })
+    expect(output.output).toBe("result")
+    expect(findReminderParts(clearedMessages)).toHaveLength(0)
+    expect(findReminderParts(freshMessages)).toHaveLength(1)
   })
 
-  describe("case insensitivity", () => {
-    test("should handle tool names case-insensitively", async () => {
-      // given - sisyphus agent with mixed case tool names
-      const hook = createHook()
-      const sessionID = "case-session"
-      updateSessionAgent(sessionID, "Sisyphus")
+  test("#given mixed-case tool names #when the threshold is reached #then counting and delegation remain case-insensitive", async () => {
+    const hook = createHook()
+    updateSessionAgent("case-count", "Sisyphus")
+    updateSessionAgent("case-delegate", "Sisyphus")
 
-      const output = { title: "", output: "result", metadata: {} }
+    const counted = await useTools({ hook, sessionID: "case-count", tools: ["EDIT", "Edit", "edit"] })
+    const delegated = await useTools({ hook, sessionID: "case-delegate", tools: ["TASK", "edit", "edit", "edit"] })
+    const countedMessages = [createUserTurn("case-count", "continue counted")]
+    const delegatedMessages = [createUserTurn("case-delegate", "continue delegated")]
+    await transformMessages(hook, countedMessages)
+    await transformMessages(hook, delegatedMessages)
 
-      // when - tool calls with different cases
-      await hook["tool.execute.after"]({ tool: "EDIT", sessionID, callID: "1" }, output)
-      await hook["tool.execute.after"]({ tool: "Edit", sessionID, callID: "2" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "3" }, output)
-
-      // then - reminder should be injected (all counted)
-      expect(output.output).toContain("[Category+Skill Reminder]")
-
-      clearSessionAgent(sessionID)
-    })
-
-    test("should handle delegation tool names case-insensitively", async () => {
-      // given - sisyphus agent using TASK in uppercase
-      const hook = createHook()
-      const sessionID = "case-delegate-session"
-      updateSessionAgent(sessionID, "Sisyphus")
-
-      const output = { title: "", output: "result", metadata: {} }
-
-      // when - TASK in uppercase is used
-      await hook["tool.execute.after"]({ tool: "TASK", sessionID, callID: "1" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "2" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "3" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "4" }, output)
-
-      // then - reminder should NOT be injected (delegation was detected)
-      expect(output.output).not.toContain("[Category+Skill Reminder]")
-
-      clearSessionAgent(sessionID)
-    })
+    expect(counted.output).toBe("result")
+    expect(delegated.output).toBe("result")
+    expect(findReminderParts(countedMessages)).toHaveLength(1)
+    expect(findReminderParts(delegatedMessages)).toHaveLength(0)
   })
 
-  describe("dynamic skills reminder message", () => {
-    test("shows built-in skills when only built-in skills are available", async () => {
-      // given
-      const availableSkills: AvailableSkill[] = [
+  test.each([
+    {
+      name: "built-in skills",
+      skills: [
         { name: "frontend", description: "Frontend UI/UX work", location: "plugin" },
         { name: "git-master", description: "Git operations", location: "plugin" },
-        { name: "playwright", description: "Browser automation", location: "plugin" },
-      ]
-      const hook = createHook(availableSkills)
-      const sessionID = "builtins-only"
-      updateSessionAgent(sessionID, "Sisyphus")
-      const output = { title: "", output: "result", metadata: {} }
-
-      // when
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "1" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "2" }, output)
-      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "3" }, output)
-
-      // then
-      expect(output.output).toContain("**Built-in**:")
-      expect(output.output).toContain("frontend")
-      expect(output.output).toContain("**⚡ YOUR SKILLS (PRIORITY)**")
-      expect(output.output).toContain("load_skills=[\"frontend\"")
-    })
-
-    test("emphasizes user skills with PRIORITY and uses first user skill in example", async () => {
-      // given
-      const availableSkills: AvailableSkill[] = [
+      ] satisfies AvailableSkill[],
+      expected: ["**Built-in**:", "frontend", "load_skills=[\"frontend\""],
+    },
+    {
+      name: "user skills",
+      skills: [
         { name: "frontend", description: "Frontend UI/UX work", location: "plugin" },
-        { name: "react-19", description: "React 19 expertise", location: "user" },
-        { name: "web-designer", description: "Visual design", location: "user" },
-      ]
-      const hook = createHook(availableSkills)
-      const sessionID = "user-skills"
-      updateSessionAgent(sessionID, "Atlas")
-      const output = { title: "", output: "result", metadata: {} }
+        { name: "react-19", description: "React expertise", location: "user" },
+      ] satisfies AvailableSkill[],
+      expected: ["**⚡ YOUR SKILLS (PRIORITY)**", "react-19", "load_skills=[\"react-19\""],
+    },
+    {
+      name: "no skills",
+      skills: [] satisfies AvailableSkill[],
+      expected: [REMINDER_MARKER, "load_skills=[]"],
+    },
+  ])("#given $name #when the reminder fires #then it formats the available skills", async ({ skills, expected }) => {
+    const hook = createHook(skills)
+    const sessionID = `skills-${skills.length}`
+    updateSessionAgent(sessionID, "Sisyphus")
 
-      // when
-      await hook["tool.execute.after"]({ tool: "bash", sessionID, callID: "1" }, output)
-      await hook["tool.execute.after"]({ tool: "bash", sessionID, callID: "2" }, output)
-      await hook["tool.execute.after"]({ tool: "bash", sessionID, callID: "3" }, output)
+    const output = await useTools({ hook, sessionID, tools: ["read", "read", "read"] })
+    const messages = [createUserTurn(sessionID, "continue")]
+    await transformMessages(hook, messages)
 
-      // then
-      expect(output.output).toContain("**⚡ YOUR SKILLS (PRIORITY)**")
-      expect(output.output).toContain("react-19")
-      expect(output.output).toContain("> User-installed skills OVERRIDE")
-      expect(output.output).toContain("load_skills=[\"react-19\"")
-    })
-
-    test("still injects a generic reminder when no skills are provided", async () => {
-      // given
-      const hook = createHook([])
-      const sessionID = "no-skills"
-      updateSessionAgent(sessionID, "Sisyphus")
-      const output = { title: "", output: "result", metadata: {} }
-
-      // when
-      await hook["tool.execute.after"]({ tool: "read", sessionID, callID: "1" }, output)
-      await hook["tool.execute.after"]({ tool: "read", sessionID, callID: "2" }, output)
-      await hook["tool.execute.after"]({ tool: "read", sessionID, callID: "3" }, output)
-
-      // then
-      expect(output.output).toContain("[Category+Skill Reminder]")
-      expect(output.output).toContain("load_skills=[]")
-    })
+    expect(output.output).toBe("result")
+    const reminder = findReminderParts(messages)[0]
+    expect(reminder?.type).toBe("text")
+    if (reminder?.type !== "text") throw new Error("expected reminder text part")
+    for (const text of expected) expect(reminder.text).toContain(text)
   })
 })

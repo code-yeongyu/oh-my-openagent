@@ -103,6 +103,8 @@ describe("ulwLoopCommand create-goals", () => {
 
 	it("#given completed default aggregate #when creating another default plan #then guides to a fresh session", async () => {
 		await createPlan("- Finished");
+		expect(await ulwLoopCommand(["complete-goals"])).toBe(0);
+		resetOutput();
 		for (const criterionId of ["C001", "C002", "C003"]) await passCriterion("G001-finished", criterionId);
 		expect(
 			await ulwLoopCommand([
@@ -126,6 +128,16 @@ describe("ulwLoopCommand create-goals", () => {
 		expect(err.join("")).toContain("Existing ulw-loop aggregate is already complete");
 		expect(err.join("")).toContain("create-goals --session-id <new-id>");
 		expect(err.join("")).toContain("--force only");
+	});
+
+	it("#given an active goal on a v2 plan #when reading status --json #then exposes the current attempt dir", async () => {
+		await createPlan();
+		expect(await ulwLoopCommand(["complete-goals"])).toBe(0);
+		resetOutput();
+
+		expect(await ulwLoopCommand(["status", "--json"])).toBe(0);
+
+		expect(stdoutJson()).toMatchObject({ currentAttemptDir: ".omo/evidence/ulw/session/G001-goal-a/a1" });
 	});
 
 	it("#given two session ids #when creating goals #then writes isolated session-scoped plans", async () => {
@@ -168,5 +180,21 @@ describe("ulwLoopCommand create-goals", () => {
 		).toBe(0);
 
 		expect(await readFile(join(testDir, ".omo/ulw-loop/manual-456/goals.json"), "utf8")).toContain("Manual scoped");
+	});
+
+	it("#given a valueless --session-id #when creating goals #then it fails and writes no plan", async () => {
+		const code = await ulwLoopCommand(["create-goals", "--session-id", "--brief", "- Alpha"]);
+
+		expect(code).toBe(1);
+		expect(err.join("")).toContain("--session-id requires a non-empty value");
+		await expect(readFile(join(testDir, ".omo/ulw-loop/goals.json"), "utf8")).rejects.toThrow();
+	});
+
+	it("#given an empty --session-id= #when creating goals #then it fails and writes no plan", async () => {
+		const code = await ulwLoopCommand(["create-goals", "--session-id=", "--brief", "- Alpha"]);
+
+		expect(code).toBe(1);
+		expect(err.join("")).toContain("--session-id requires a non-empty value");
+		await expect(readFile(join(testDir, ".omo/ulw-loop/goals.json"), "utf8")).rejects.toThrow();
 	});
 });

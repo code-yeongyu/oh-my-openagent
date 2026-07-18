@@ -1,6 +1,0 @@
-$ HOME="$tmp_home" CODEX_CODEGRAPH_ENABLED=0 node packages/omo-codex/plugin/scripts/migrate-omo-sot.mjs --seed 2>stderr.txt
-$ diff -u before current (malformed untouched)
-$ cat stderr.txt
-Could not parse /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.nVSfyUNfy3/.omo/config.jsonc; left existing OMO SOT untouched: Unexpected end of JSON input
-$ grep warning
-Could not parse /var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/tmp.nVSfyUNfy3/.omo/config.jsonc; left existing OMO SOT untouched: Unexpected end of JSON input

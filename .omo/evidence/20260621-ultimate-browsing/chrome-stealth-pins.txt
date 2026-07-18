@@ -1,8 +1,0 @@
-6:- **agent-browser** (`npm`, Apache-2.0) — native CDP automation CLI that drives CloakBrowser. AX-tree snapshots, `@eN` refs, click/fill/type/scroll, screenshots, video, cookie/state/session management. Pin **0.27.1**.
-24:uv pip install "cloakbrowser==0.3.28"
-27:# agent-browser (Apache-2.0, pin 0.27.1):
-28:npm i -g agent-browser@0.27.1 && agent-browser install
-29:agent-browser --version   # 0.27.1
-117:uv pip install --upgrade "cloakbrowser==0.3.28" && python -c "import cloakbrowser; cloakbrowser.ensure_binary()"
-118:npm i -g agent-browser@0.27.1
-pin_lines=7

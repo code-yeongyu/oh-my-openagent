@@ -19,9 +19,11 @@ const STALE_CODEX_COMPONENT_BINS = [
 const LAZYCODEX_AGENT_ROLE_NAMES = [
   "lazycodex-clone-fidelity-reviewer",
   "lazycodex-code-reviewer",
-  "lazycodex-executor",
   "lazycodex-gate-reviewer",
   "lazycodex-qa-executor",
+  "lazycodex-worker-high",
+  "lazycodex-worker-low",
+  "lazycodex-worker-medium",
 ] as const
 
 const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000

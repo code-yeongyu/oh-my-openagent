@@ -813,7 +813,7 @@ describe("createBuiltinAgents with requiresProvider gating (hephaestus)", () => 
 
       // #then
       expect(agents.hephaestus).toBeDefined()
-      expect(agents.hephaestus.model).toBe("openai/gpt-5.5")
+      expect(agents.hephaestus.model).toBe("openai/gpt-5.6-sol")
     } finally {
       cacheSpy.mockRestore()
       fetchSpy.mockRestore()
@@ -1309,7 +1309,7 @@ describe("buildAgent with category and skills", () => {
     const agent = resolveAgentSkills(buildAgent(source["test-agent"], TEST_MODEL))
 
     // #then - category's built-in model and skills are applied
-    expect(agent.model).toBe("openai/gpt-5.5")
+    expect(agent.model).toBe("openai/gpt-5.6-sol")
     expect(agent.variant).toBe("xhigh")
     expect(agent.prompt).toContain("router, not a rulebook")
     expect(agent.prompt).toContain("Task description")
@@ -1455,9 +1455,9 @@ describe("override.category expansion in createBuiltinAgents", () => {
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - ultrabrain category: model=openai/gpt-5.5, variant=xhigh
+    // #then - ultrabrain category: model=openai/gpt-5.6-sol, variant=xhigh
     expect(agents.oracle).toBeDefined()
-    expect(agents.oracle.model).toBe("openai/gpt-5.5")
+    expect(agents.oracle.model).toBe("openai/gpt-5.6-sol")
     expect(agents.oracle.variant).toBe("xhigh")
   })
 
@@ -1524,9 +1524,9 @@ describe("override.category expansion in createBuiltinAgents", () => {
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - ultrabrain category: model=openai/gpt-5.5, variant=xhigh
+    // #then - ultrabrain category: model=openai/gpt-5.6-sol, variant=xhigh
     expect(agents.sisyphus).toBeDefined()
-    expect(agents.sisyphus.model).toBe("openai/gpt-5.5")
+    expect(agents.sisyphus.model).toBe("openai/gpt-5.6-sol")
     expect(agents.sisyphus.variant).toBe("xhigh")
   })
 
@@ -1539,9 +1539,9 @@ describe("override.category expansion in createBuiltinAgents", () => {
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - ultrabrain category: model=openai/gpt-5.5, variant=xhigh
+    // #then - ultrabrain category: model=openai/gpt-5.6-sol, variant=xhigh
     expect(agents.atlas).toBeDefined()
-    expect(agents.atlas.model).toBe("openai/gpt-5.5")
+    expect(agents.atlas.model).toBe("openai/gpt-5.6-sol")
     expect(agents.atlas.variant).toBe("xhigh")
   })
 
@@ -1649,19 +1649,19 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
      cacheSpy.mockRestore?.()
    })
   test("Hephaestus variant override respects user config over hardcoded default", async () => {
-    // #given - user provides variant in config
+    // #given - user provides a non-default variant in config
     const providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue(null)
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set())
     const overrides = {
-      hephaestus: { variant: "high" },
+      hephaestus: { variant: "medium" },
     }
 
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - user variant takes precedence over hardcoded "medium"
+    // #then - user variant takes precedence over hardcoded "high"
     expect(agents.hephaestus).toBeDefined()
-    expect(agents.hephaestus.variant).toBe("high")
+    expect(agents.hephaestus.variant).toBe("medium")
     providerModelsSpy.mockRestore()
     fetchSpy.mockRestore()
   })
@@ -1676,9 +1676,9 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - default "medium" variant is applied
+    // #then - default "high" variant is applied
     expect(agents.hephaestus).toBeDefined()
-    expect(agents.hephaestus.variant).toBe("medium")
+    expect(agents.hephaestus.variant).toBe("high")
     providerModelsSpy.mockRestore()
     connectedSpy.mockRestore()
     fetchSpy.mockRestore()

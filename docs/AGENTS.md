@@ -1,6 +1,6 @@
 # docs/ — User-Facing Documentation
 
-**Generated:** 2026-07-03
+**Generated:** 2026-07-17 / 7d664b96b
 
 ## OVERVIEW
 
@@ -15,7 +15,9 @@
 | How agents collaborate | [docs/guide/orchestration.md](guide/orchestration.md) |
 | Picking the right model per agent | [docs/guide/agent-model-matching.md](guide/agent-model-matching.md) |
 | Team Mode (opt-in multi-agent) | [docs/guide/team-mode.md](guide/team-mode.md) |
+| Senpi task delegation and teams | [docs/guide/senpi-task.md](guide/senpi-task.md) |
 | Configuration field reference | [docs/reference/configuration.md](reference/configuration.md) |
+| Harness-neutral `omo.json` config reference | [docs/reference/omo-json.md](reference/omo-json.md) |
 | Feature-by-feature reference | [docs/reference/features.md](reference/features.md) |
 | CLI command reference | [docs/reference/cli.md](reference/cli.md) |
 | Known issues & workarounds | [docs/reference/known-issues.md](reference/known-issues.md) |
@@ -41,8 +43,8 @@
 docs/
 ├── manifesto.md                              # The "why" — referenced from README
 ├── model-capabilities-maintenance.md         # How model-capabilities cache is refreshed
-├── guide/                                    # User-facing tutorial-style guides (5 files)
-├── reference/                                # API / config / CLI reference (14 files)
+├── guide/                                    # User-facing tutorial-style guides (6 files)
+├── reference/                                # API / config / CLI reference (15 files)
 ├── examples/                                 # Sample JSONC configs (3 files)
 ├── legal/                                    # privacy-policy.md + terms-of-service.md
 ├── templates/

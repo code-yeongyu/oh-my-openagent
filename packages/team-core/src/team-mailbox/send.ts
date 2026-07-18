@@ -11,6 +11,7 @@ import type { Message } from "../types"
 type SendContext = {
   isLead: boolean
   activeMembers: string[]
+  leadRecipient?: string
   reservedRecipients?: ReadonlySet<string>
 }
 
@@ -81,6 +82,9 @@ async function assertTeamAcceptsMessages(teamRunId: string, config: TeamModeConf
 function resolveRecipients(message: Message, context: SendContext): string[] {
   if (message.to !== "*") {
     const allowedRecipients = new Set([...context.activeMembers, ...(context.reservedRecipients ?? [])])
+    if (context.leadRecipient !== undefined) {
+      allowedRecipients.add(context.leadRecipient)
+    }
     if (!allowedRecipients.has(message.to)) {
       throw new InvalidRecipientError(message.to)
     }
@@ -168,7 +172,9 @@ export async function sendMessage(
         throw new DuplicateMessageIdError()
       }
 
-      const targetPath = reservedRecipients.has(recipient) ? reservedPath : unreservedPath
+      const targetPath = recipient !== context.leadRecipient && reservedRecipients.has(recipient)
+        ? reservedPath
+        : unreservedPath
       await atomicWrite(targetPath, serializedMessage)
       deliveredTo.push(recipient)
     }, { ownerTag: `team-mailbox:${recipient}` })

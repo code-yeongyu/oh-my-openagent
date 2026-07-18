@@ -24,11 +24,15 @@ description: Developer reference for the Sisyphus-Junior category-spawned execut
 | `gpt-5-4.ts` | GPT-5.4-native prompt variant |
 | `gpt-5-5.ts` | GPT-5.5-native prompt variant |
 | `kimi-k2-6.ts` | Kimi K2.6 prompt variant |
+| `kimi-k2-7.ts` | Kimi K2.7-native prompt variant |
+| `kimi-k3.ts` | Kimi K3-native prompt variant (reasoning depth with built-in stop conditions) |
 | `index.test.ts` | Unit tests |
 
 ## VARIANT SELECTION
 
 Parent `agent.ts` selects prompt variant by model name:
+- Kimi K3 -> `kimi-k3.ts`
+- Kimi K2.7 -> `kimi-k2-7.ts`
 - Contains "kimi-k2" -> `kimi-k2-6.ts`
 - Contains "gpt-5.5" -> `gpt-5-5.ts`
 - Contains "gpt-5.4" -> `gpt-5-4.ts`
