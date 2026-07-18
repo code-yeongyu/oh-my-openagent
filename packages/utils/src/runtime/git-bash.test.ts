@@ -47,6 +47,22 @@ describe("runtime git-bash resolver", () => {
     expect(result.installHint).toContain("OMO_CODEX_GIT_BASH_PATH=C:\\path\\to\\bash.exe")
   })
 
+  test("#given blank Windows env override #when resolving #then fallback probing continues", () => {
+    const result = resolveGitBash({
+      platform: "win32",
+      env: { OMO_CODEX_GIT_BASH_PATH: "  " },
+      exists: (path: string) => path === PROGRAM_FILES_GIT_BASH,
+      where: () => [],
+    })
+
+    expect(result).toEqual({
+      found: true,
+      path: PROGRAM_FILES_GIT_BASH,
+      source: "program-files",
+      checkedPaths: [PROGRAM_FILES_GIT_BASH],
+    })
+  })
+
   test("#given both standard Windows installs exist #when resolving #then Program Files has priority", () => {
     const result = resolveGitBash({
       platform: "win32",
