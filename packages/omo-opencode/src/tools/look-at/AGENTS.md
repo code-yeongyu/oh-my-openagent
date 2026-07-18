@@ -4,16 +4,17 @@
 
 ## OVERVIEW
 
-14 files. The `look_at` tool delegates image, PDF, and diagram analysis to the `multimodal-looker` subagent. Conditional gate: tool is only registered when `multimodal-looker` is not in `disabled_agents`. Default subagent model: gpt-5.5 medium. This is a summary extractor, not a precise reader.
+14 files. The `look_at` tool delegates image, PDF, and diagram analysis to the `multimodal-looker` subagent only when the current model is not known to support native vision. If the current parent-session model is in the vision-capable model cache, `look_at` skips child-session delegation and tells the caller to use the native `Read` path so the current model can inspect the media directly. Conditional gate: tool is only registered when `multimodal-looker` is not in `disabled_agents`. Default subagent model: gpt-5.5 medium. This is a summary extractor, not a precise reader.
 
 ## EXECUTION FLOW
 
 1. **Args** (`look-at-arguments.ts`) -- normalize `file_path`/`image_data` aliases, validate one-of requirement, reject remote URLs
 2. **Prep** (`look-at-input-preparer.ts`) -- resolve path, detect MIME from extension or Base64 header, convert unsupported images to JPEG
-3. **Spawn** (`look-at-session-runner.ts`) -- create child session with `multimodal-looker` agent, attach file as message part, disable `task`/`call_omo_agent`/`look_at` to prevent recursion
-4. **Poll** (`session-poller.ts`) -- wait until idle (1s interval, 120s timeout)
-5. **Extract** (`assistant-message-extractor.ts`) -- pull latest assistant text from session messages
-6. **Return** -- summary text back to caller
+3. **Native vision check** (`tools.ts`) -- if the current session message model matches the vision-capable cache, skip delegation and return native `Read` guidance
+4. **Spawn** (`look-at-session-runner.ts`) -- otherwise create child session with `multimodal-looker` agent, attach file as message part, disable `task`/`call_omo_agent`/`look_at` to prevent recursion
+5. **Poll** (`session-poller.ts`) -- wait until idle (1s interval, 120s timeout)
+6. **Extract** (`assistant-message-extractor.ts`) -- pull latest assistant text from session messages
+7. **Return** -- summary text back to caller
 
 ## FILE CATALOG
 
@@ -44,7 +45,7 @@ PDFs, screenshots, diagrams -- quick summary extraction. NOT for visual precisio
 
 ## DISTINCTION
 
-This is the TOOL that DELEGATES TO the `multimodal-looker` AGENT. The agent lives in `src/agents/builtin-agents/multimodal-looker.ts`; this tool is the invocation harness.
+This is the TOOL that usually DELEGATES TO the `multimodal-looker` AGENT. The agent lives in `src/agents/builtin-agents/multimodal-looker.ts`; this tool is the invocation harness. Native-vision parent models bypass that delegation path.
 
 ## NOTES
 
