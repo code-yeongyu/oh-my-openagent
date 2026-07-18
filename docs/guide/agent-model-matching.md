@@ -68,7 +68,7 @@ Hephaestus is the developer who stays in their room coding all day. Doesn't talk
 
 Using Hephaestus with GLM or Kimi would be like assigning your most communicative, sociable developer to sit alone and do nothing but deep technical work. They'd get it done eventually, but they wouldn't shine — you'd be wasting exactly the skills that make them valuable.
 
-Configuration note: `agents.hephaestus.allow_non_gpt_model: true` does **not** make a non-GPT Hephaestus appear in the agent list. Registration still requires a GPT-family model. That flag only tells the runtime `no-hephaestus-non-gpt` guard not to switch away from an already-registered Hephaestus session if the active model later resolves outside the expected GPT path. If your configured Hephaestus model is `opencode-go/glm-5.1`, `volcengine/glm-5.2`, Kimi, Claude, DeepSeek, or MiniMax, Hephaestus is still skipped during registration.
+Configuration note: `agents.hephaestus.allow_non_gpt_model: true` does **not** make a non-GPT Hephaestus appear in the agent list. Registration still requires a supported GPT-5.3 Codex, GPT-5.4, GPT-5.5, or GPT-5.6 identifier. That flag only tells the runtime `no-hephaestus-non-gpt` guard not to switch away from an already-registered Hephaestus session if the active model later resolves to a non-GPT identifier. If your configured Hephaestus model is `opencode-go/glm-5.1`, `volcengine/glm-5.2`, Kimi, Claude, DeepSeek, or MiniMax, Hephaestus is still skipped during registration.
 
 ### The Takeaway
 
@@ -218,7 +218,7 @@ Used by: Hephaestus, Oracle, Momus, `deep`, `ultrabrain`, `quick`, Prometheus (G
 
 > **DeepSeek ≻≻ MiniMax.** DeepSeek retains GPT's autonomous exploration character. MiniMax loses coherence on multi-step deep work. MiniMax is fine for grep-style utility agents, nothing more.
 
-> **Why Hephaestus still hard-requires GPT:** the DeepSeek entry above is for fallback chains on model-flexible GPT-family routes such as Oracle, `deep`, `ultrabrain`, or custom categories. Hephaestus is a dedicated GPT-native agent with prompt scaffolding and QA expectations tuned against GPT behavior, so its registration stays single-entry. If you want to experiment with DeepSeek, route that work through `fallback_models` on a category or custom agent instead of making Hephaestus pretend DeepSeek is the same runtime contract.
+> **Why Hephaestus still hard-requires GPT:** the DeepSeek entry above is for fallback chains on model-flexible GPT-family routes such as Oracle, `deep`, `ultrabrain`, or custom categories. Hephaestus is a dedicated GPT-native agent with prompt scaffolding and QA expectations tuned against GPT behavior, so registration remains restricted to its supported GPT identifiers. If you want to experiment with DeepSeek, route that work through `fallback_models` on a category or custom agent instead of making Hephaestus pretend DeepSeek is the same runtime contract.
 
 ### Gemini Family (visual, different reasoning style)
 
