@@ -1,4 +1,5 @@
 import type { BackgroundTaskStatus } from "../background-agent/types"
+import type { RuntimeState } from "@oh-my-opencode/team-core/types"
 
 export type AgentStatus = "busy" | "idle" | "error" | "running" | "retry"
 
@@ -12,6 +13,20 @@ export type JobRow = {
   readonly status: BackgroundTaskStatus
   readonly toolCalls: number | null
   readonly lastTool: string | null
+}
+
+export type TeamMemberStatus = RuntimeState["members"][number]["status"]
+
+export type TeamMemberRow = {
+  readonly name: string
+  readonly status: TeamMemberStatus
+  readonly work: string | null
+  readonly sessionId: string | null
+}
+
+export type TeamRow = {
+  readonly name: string
+  readonly members: readonly TeamMemberRow[]
 }
 
 export type RosterRow = {
@@ -34,6 +49,10 @@ export type AgentsState =
 export type JobBoardState =
   | { readonly kind: "none" }
   | { readonly kind: "list"; readonly jobs: readonly JobRow[] }
+
+export type TeamsState =
+  | { readonly kind: "none" }
+  | { readonly kind: "list"; readonly teams: readonly TeamRow[] }
 
 export type LoopLive = {
   readonly kind: "live"
@@ -58,6 +77,7 @@ export type SidebarView =
       readonly loop: LoopState
       readonly agents: AgentsState
       readonly jobs: JobBoardState
+      readonly teams: TeamsState
       readonly configBanner: ConfigBanner
     }
   | { readonly kind: "broken"; readonly messages: readonly string[] }

@@ -33,6 +33,7 @@ describe("TuiRuntimeSnapshotSchema", () => {
         blocked: 1,
         activeGoal: "Render sidebar",
       },
+      teams: [],
     }
 
     // when
@@ -60,6 +61,24 @@ describe("TuiRuntimeSnapshotSchema", () => {
 
     // then
     expect(parsed).toBeNull()
+  })
+
+  it("#given a v1 mirror without teams #when parsed #then it supplies the additive empty teams projection", () => {
+    // given
+    const legacySnapshot = {
+      version: MIRROR_SCHEMA_VERSION,
+      projectDir: "/tmp/project",
+      updatedAt: 1,
+      activeAgents: [],
+      jobBoard: [],
+      loop: null,
+    }
+
+    // when
+    const parsed = parseSnapshot(legacySnapshot)
+
+    // then
+    expect(parsed).toMatchObject({ teams: [] })
   })
 
   it("#given a snapshot without projectDir #when parsed #then it returns null", () => {
