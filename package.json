@@ -172,6 +172,7 @@
     "picocolors": "^1.1.1",
     "picomatch": "^4.0.4",
     "posthog-node": "^5.34.3",
+    "solid-js": "1.9.12",
     "zod": "^4.4.3"
   },
   "devDependencies": {
