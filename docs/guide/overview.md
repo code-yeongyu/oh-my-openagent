@@ -93,11 +93,11 @@ Sisyphus works best on Claude Opus 4.8 / 4.7, Kimi K3 / K2.6 (or K2.5), and GLM 
 
 Named with intentional irony. Anthropic blocked OpenCode from using their API because of this project. So the team built an autonomous GPT-native agent instead.
 
-Hephaestus prefers GPT-5.6 Sol at medium effort through OpenAI or Vercel, then falls back to GPT-5.5 at medium effort across OpenAI, GitHub Copilot, OpenCode, or Vercel. Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding.
+Hephaestus prefers GPT-5.6 Sol with the `high` variant through OpenAI, GitHub Copilot, or Vercel, while the agent keeps `reasoningEffort: medium`. It then falls back to GPT-5.5 with the `medium` variant across OpenAI, GitHub Copilot, OpenCode, or Vercel. Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding.
 
 Use Hephaestus when you need deep architectural reasoning, complex debugging across many files, or cross-domain knowledge synthesis. Switch to him explicitly when the work benefits from a GPT-native autonomous agent.
 
-The `deep` category is a delegated task route with a GPT-oriented model and category prompt. Hephaestus is a full agent with dedicated GPT-native prompt scaffolding and agent-specific project-context injection. Choose Hephaestus when that complete agent behavior matters, not merely a deep model assignment.
+The `deep` category is an orchestrator-routed task executed by Sisyphus-Junior with a category prompt and category-scoped permissions. Hephaestus is a primary agent that you select directly, with its own GPT-native prompt, agent permissions, and direct-session behavior. Choose Hephaestus when that complete agent behavior matters, not merely a deep model assignment.
 
 **Why this beats vanilla Codex CLI:**
 
@@ -199,8 +199,8 @@ You can override specific agents or categories in your config:
     // Hard logic and architecture: GPT-5.6 Sol xhigh
     "ultrabrain": { "model": "openai/gpt-5.6-sol", "variant": "xhigh" },
 
-    // GPT-native autonomous category. Use Hephaestus when you need its
-    // dedicated agent prompt and project-context scaffolding.
+    // GPT-native delegated category. Use Hephaestus when you need a directly
+    // selected primary agent with its own prompt and permissions.
     "deep": { "model": "openai/gpt-5.6-terra", "variant": "xhigh" },
 
     // Creative and design work
@@ -232,7 +232,7 @@ You can override specific agents or categories in your config:
 
 **GPT models** (explicit reasoning, principle-driven):
 
-- GPT-5.6 Sol — preferred for Hephaestus and `ultrabrain` when OpenAI or Vercel exposes it; first fallback for `deep`
+- GPT-5.6 Sol — preferred for Hephaestus (`high`) through OpenAI, GitHub Copilot, or Vercel and for `ultrabrain` (`xhigh`) through OpenAI or Vercel; first fallback for `deep`
 - GPT-5.6 Terra — mid-tier; default for the `deep` category (xhigh); preferred for Momus (high)
 - GPT-5.6 Luna — light tier; default for the `unspecified-low` category (xhigh)
 - GPT-5.5 — deep coding powerhouse, default for Oracle and the first GPT fallback for GPT-5.6-native roles
