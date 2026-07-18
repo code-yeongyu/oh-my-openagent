@@ -351,7 +351,7 @@ Communicative, instruction-following, structured output. Best for agents that ne
 | **Kimi K2.7**         | Restrained and outcome-first, a GPT-5.5-leaning Opus 4.8 in a Claude-family body. Top Kimi for the orchestrators; agents with Kimi-specific prompt paths use K2.7 tuning while Prometheus keeps its `ulw-plan`-backed prompt. |
 | **Kimi K2.6 / K2.5**  | Behave very similarly to Claude. Great all-rounders at lower cost; K2.6 is the default Kimi in the Sisyphus chain after K3. |
 | **GLM 5**             | Claude-like behavior. Solid for orchestration tasks.                         |
-| **GLM 5.2**           | Experimental for Sisyphus. The GLM-family selector uses a GLM-5.2-calibrated prompt, but evidence is one community report without maintainer end-to-end validation. |
+| **GLM 5.2**           | Experimental for Sisyphus. Model IDs recognized as GLM use a GLM-5.2-calibrated prompt, but evidence is one community report without maintainer end-to-end validation. |
 
 ### GPT Family
 
