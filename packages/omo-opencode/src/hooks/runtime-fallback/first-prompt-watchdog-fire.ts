@@ -91,16 +91,25 @@ export async function fireFirstPromptWatchdog(input: FireFirstPromptWatchdogInpu
   const rollbackAbortProvenance = recordAbortProvenance()
   markAbortResponsePending()
   const abortSucceeded = await helpers.abortSessionRequest(sessionID, SOURCE).finally(clearAbortResponsePending)
-  if (!isLifecycleCurrent() || !isSessionCurrent() || !isCallbackCurrent()) return
   if (abortSucceeded === false) {
     rollbackAbortProvenance()
     log(`[${HOOK_NAME}] ${SOURCE}: abort failed, skipping fallback dispatch`, { sessionID })
     return "retry"
   }
-  await Promise.resolve()
-  if (!isLifecycleCurrent() || !isSessionCurrent() || !isCallbackCurrent()) return
 
   try {
+    if (!isLifecycleCurrent() || !isSessionCurrent()) return
+    if (!isCallbackCurrent()) {
+      markAbortCompleted()
+      return
+    }
+    await Promise.resolve()
+    if (!isLifecycleCurrent() || !isSessionCurrent()) return
+    if (!isCallbackCurrent()) {
+      markAbortCompleted()
+      return
+    }
+
     const dispatched = await dispatchFallbackRetry(deps, helpers, {
       sessionID,
       state,
@@ -113,7 +122,7 @@ export async function fireFirstPromptWatchdog(input: FireFirstPromptWatchdogInpu
       return "retry"
     }
   } finally {
-    if (isLifecycleCurrent() && isSessionCurrent() && isCallbackCurrent()) {
+    if (isLifecycleCurrent() && isSessionCurrent()) {
       releaseInternalAbortOwnership(deps, sessionID)
     }
   }

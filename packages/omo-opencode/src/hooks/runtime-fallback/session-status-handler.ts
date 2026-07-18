@@ -98,7 +98,7 @@ export function createSessionStatusHandler(
         }
         if (!clearSessionRetryOwnershipIfUnchanged(deps, sessionID, retryOwnership)) {
           releaseRetryKey()
-          rollbackOwnership()
+          ownershipTransfer?.commit()
           return
         }
       } else {
@@ -139,7 +139,7 @@ export function createSessionStatusHandler(
       }
       if (!clearSessionRetryOwnershipIfUnchanged(deps, sessionID, retryOwnership)) {
         releaseRetryKey()
-        rollbackOwnership()
+        ownershipTransfer?.commit()
         return
       }
     }
