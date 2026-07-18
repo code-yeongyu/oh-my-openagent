@@ -28,6 +28,7 @@ import {
   createPreemptiveCompactionHook,
   createRuntimeFallbackHook,
   createLegacyPluginToastHook,
+  createSilentFallbackGuardHook,
 } from "../../hooks"
 import { createGoalHook } from "../../hooks/goal"
 import {
@@ -65,6 +66,7 @@ export type SessionHooks = {
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
   legacyPluginToast: ReturnType<typeof createLegacyPluginToastHook> | null
+  silentFallbackGuard: ReturnType<typeof createSilentFallbackGuardHook> | null
 }
 
 export function createSessionHooks(args: {
@@ -235,6 +237,14 @@ export function createSessionHooks(args: {
     ? safeHook("legacy-plugin-toast", () => createLegacyPluginToastHook(ctx))
     : null
 
+  const silentFallbackGuard =
+    isHookEnabled("silent-fallback-guard") && pluginConfig.silent_fallback_guard?.enabled === true
+      ? safeHook("silent-fallback-guard", () =>
+          createSilentFallbackGuardHook(ctx, {
+            config: pluginConfig.silent_fallback_guard,
+          }))
+      : null
+
   return {
     preemptiveCompaction,
     sessionNotification,
@@ -260,5 +270,6 @@ export function createSessionHooks(args: {
     taskResumeInfo,
     runtimeFallback,
     legacyPluginToast,
+    silentFallbackGuard,
   }
 }
