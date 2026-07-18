@@ -69,8 +69,8 @@ export const config = {
      */
     "/((?!api|_next|_vercel|opengraph-image|twitter-image|icon|apple-icon|manifest\\.webmanifest|robots\\.txt|sitemap\\.xml|.*\\..*).+)",
     "/installation.md",
-    "/:locale(en|ko|ja|zh)/installation.md",
+    "/:locale(en|ko|ja|zh|ru)/installation.md",
     "/docs/installation.md",
-    "/:locale(en|ko|ja|zh)/docs/installation.md",
+    "/:locale(en|ko|ja|zh|ru)/docs/installation.md",
   ],
 }

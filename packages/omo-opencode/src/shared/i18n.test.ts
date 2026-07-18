@@ -51,6 +51,17 @@ describe("t()", () => {
     })
   })
 
+  describe("#given current locale is ru and a known key", () => {
+    it("#then uses ru override, not en baseline", () => {
+      // given - locale is ru, fallback is en
+      initI18n({ locale: "ru", fallback: "en" })
+      // when
+      const result = t("toast.task_completed")
+      // then - ru override takes priority over en baseline
+      expect(result).toBe("Задача завершена")
+    })
+  })
+
   describe("#given current locale is zh and a known key", () => {
     it("#then uses zh override, not en baseline", () => {
       // given - locale is zh, fallback is en
@@ -80,6 +91,17 @@ describe("initI18n()", () => {
   afterEach(() => {
     if (originalLang != null) process.env.LANG = originalLang
     initI18n({ locale: "en", fallback: "en" })
+  })
+
+  describe("#given LANG=ru_RU.UTF-8", () => {
+    it("#then auto-detects locale as ru", () => {
+      // given
+      process.env.LANG = "ru_RU.UTF-8"
+      // when
+      initI18n()
+      // then
+      expect(getLocale()).toBe("ru")
+    })
   })
 
   describe("#given LANG=zh_CN.UTF-8", () => {
@@ -112,6 +134,18 @@ describe("initI18n()", () => {
       initI18n()
       // then
       expect(getLocale()).toBe("en")
+    })
+  })
+
+  describe("#given an explicit locale 'ru'", () => {
+    it("#then uses that locale", () => {
+      // given
+      process.env.LANG = "en_US.UTF-8"
+      // when
+      initI18n({ locale: "ru" })
+      // then
+      expect(getLocale()).toBe("ru")
+      expect(t("toast.task_completed")).toBe("Задача завершена")
     })
   })
 
@@ -155,6 +189,17 @@ describe("initI18n()", () => {
 describe("setLocale() / getLocale()", () => {
   beforeEach(() => {
     initI18n({ locale: "en", fallback: "en" })
+  })
+
+  describe("#given setLocale('ru')", () => {
+    it("#then getLocale returns ru and translations switch to Russian", () => {
+      // given - en
+      // when
+      setLocale("ru")
+      // then
+      expect(getLocale()).toBe("ru")
+      expect(t("toast.task_completed")).toBe("Задача завершена")
+    })
   })
 
   describe("#given setLocale('zh')", () => {

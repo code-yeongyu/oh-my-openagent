@@ -9,7 +9,7 @@ const VIEWPORTS = [
   { name: "desktop-1920", width: 1920, height: 1080 },
 ] as const
 
-const LOCALES = ["en", "ko", "ja", "zh"] as const
+const LOCALES = ["en", "ko", "ja", "zh", "ru"] as const
 
 async function assertNoHorizontalOverflow(page: Page) {
   const result = await page.evaluate(() => {

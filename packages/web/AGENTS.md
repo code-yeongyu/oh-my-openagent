@@ -14,7 +14,7 @@ Public-facing marketing site for oh-my-opencode / oh-my-openagent. Next.js 15 (A
 | Runtime target | Cloudflare Workers (`compatibility_flags: ["nodejs_compat"]`)                       |
 | Adapter        | `@opennextjs/cloudflare` (build → `.open-next/worker.js`)                           |
 | Styling        | Tailwind v4 (`@tailwindcss/postcss`) + shadcn/ui (`components.json`)                |
-| i18n           | `next-intl` with `app/[locale]/...` routing; 4 locales (en/ja/ko/zh) in `messages/` |
+| i18n           | `next-intl` with `app/[locale]/...` routing; 5 locales (en/ja/ko/zh/ru) in `messages/` |
 | Animation      | `motion` (Framer Motion v12)                                                        |
 | E2E            | Playwright (`e2e/*.spec.ts`)                                                        |
 | Lint/Format    | ESLint flat config + Prettier (Tailwind plugin)                                     |
@@ -26,7 +26,7 @@ packages/web/
 ├── app/[locale]/         # localized routes (App Router)
 ├── components/           # shared UI primitives + shadcn-generated
 ├── lib/                  # utility helpers (cn, etc.)
-├── messages/{en,ja,ko,zh}.json  # i18n strings
+├── messages/{en,ja,ko,zh,ru}.json  # i18n strings
 ├── i18n/                 # next-intl request/routing config
 ├── middleware.ts         # next-intl middleware
 ├── public/               # static assets (largest dir, ~4 MB)
