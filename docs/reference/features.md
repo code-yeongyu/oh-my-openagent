@@ -115,6 +115,8 @@ project context.
 
 #### Visual Multi-Agent with Tmux
 
+Start the host with `opencode --port <port>` to provide the external OpenCode HTTP listener used by visualization panes. Child panes connect to it with `opencode attach`. If the listener is unreachable, background agents and teams continue to run, but pane creation and visualization are skipped.
+
 Enable `tmux.enabled` to see background agents in separate tmux panes:
 
 ```json
