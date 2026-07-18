@@ -2,6 +2,11 @@ import type { SenpiExtensionAPI } from "../src/extension/types"
 
 export type FakeEventHandler = (payload: unknown, ctx?: unknown) => unknown | Promise<unknown>
 
+export interface FakeMessageRendererRegistration {
+  customType: string
+  renderer: unknown
+}
+
 export interface FakeFlagRegistration {
   name: string
   options: {
@@ -33,6 +38,8 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
   readonly flags: FakeFlagRegistration[] = []
   readonly messages: FakeSendMessageCall[] = []
   readonly userMessages: FakeSendUserMessageCall[] = []
+  readonly messageRenderers: FakeMessageRendererRegistration[] = []
+  readonly mcpServers: Array<{ name: string; config: Record<string, unknown> }> = []
 
   private readonly flagValues = new Map<string, boolean | string | undefined>()
 
@@ -42,6 +49,10 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
 
   registerTool(tool: Record<string, unknown>): void {
     this.tools.push(tool)
+  }
+
+  registerMessageRenderer(customType: string, renderer: unknown): void {
+    this.messageRenderers.push({ customType, renderer })
   }
 
   registerCommand(name: string, options: Record<string, unknown>): void {
@@ -69,6 +80,10 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
 
   sendUserMessage(content: string | readonly Record<string, unknown>[], options?: { deliverAs?: "steer" | "followUp" }): void {
     this.userMessages.push({ content, options })
+  }
+
+  registerMcpServer(name: string, config: Record<string, unknown>): void {
+    this.mcpServers.push({ name, config })
   }
 
   async dispatch(event: string, payload: unknown, ctx?: unknown): Promise<unknown[]> {

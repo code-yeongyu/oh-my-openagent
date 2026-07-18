@@ -17,5 +17,6 @@
   },
   "dependencies": {
     "@oh-my-opencode/utils": "workspace:*"
-  }
+  },
+  "sideEffects": false
 }

@@ -1,6 +1,6 @@
-# src/ — Plugin Source
+# src/ - Plugin Source
 
-**Generated:** 2026-06-23
+**Generated:** 2026-07-17 / 7d664b96b
 
 ## STOP. THIS IS THE OPENCODE PLUGIN. QA IS MANDATORY. EVERY SINGLE TIME YOU CHANGE ANYTHING HERE.
 
@@ -29,7 +29,7 @@ Entry `index.ts` orchestrates a staged initialization across the directories bel
 |------|---------|
 | `index.ts` | Plugin entry; default-exports `pluginModule: PluginModule` with `{ id, server }` |
 | `plugin-config.ts` | JSONC parse, multi-level merge (user + walked project), Zod v4 validation, migration |
-| `plugin-state.ts` | `createModelCacheState()` — model resolution cache shared across handlers |
+| `plugin-state.ts` | `createModelCacheState()`: model resolution cache shared across handlers |
 | `plugin-interface.ts` | 12 OpenCode hook handlers wired into `Hooks` (a further 2, `experimental.session.compacting` + `experimental.compaction.autocontinue`, are wired in `src/testing/create-plugin-module.ts`, for 14 total) |
 | `create-managers.ts` | TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler |
 | `create-tools.ts` | SkillContext + AvailableCategories + ToolRegistry composition |
@@ -60,6 +60,7 @@ loadPluginConfig(directory, ctx)
      - agents/categories/claude_code: deepMerge (recursive, prototype-pollution safe)
      - disabled_*: Set union
      - mcp_env_allowlist: user-only (security)
+     - playwright_mcp_args: user-only (security)
      - others: override replaces
   4. Zod safeParse → defaults for omitted fields
   5. migrateConfigFile() → idempotent via _migrations tracking + timestamped backups
@@ -76,7 +77,7 @@ createHooks()
   │   │                             sessionNotification, thinkMode, modelFallback,
   │   │                             anthropicContextWindowLimitRecovery, autoUpdateChecker,
   │   │                             agentUsageReminder, nonInteractiveEnv, interactiveBashSession,
-  │   │                             ralphLoop, editErrorRecovery, delegateTaskRetry, startWork,
+  │   │                             goal, editErrorRecovery, delegateTaskRetry, startWork,
   │   │                             prometheusMdOnly, sisyphusJuniorNotepad, noSisyphusGpt,
   │   │                             noHephaestusNonGpt, hephaestusAgentsMdInjector,
   │   │                             questionLabelTruncator, taskResumeInfo,
@@ -117,14 +118,14 @@ Total: 53 base, 60 with team-mode. Each tier produces an object whose values are
 | `config/` | Zod v4 schema files | yes |
 | `plugin-handlers/` | 6-phase config loading pipeline | yes |
 | `openclaw/` | Bidirectional Discord/Telegram/HTTP integration | yes |
-| `__tests__/` | Plugin-level integration tests + perf fixtures | — |
+| `__tests__/` | Plugin-level integration tests + perf fixtures | no |
 | `mcp/` | 5 built-in MCPs (3 remote + local stdio lsp + codegraph) | yes |
-| `testing/` | Test utilities + `create-plugin-module.ts` | — |
-| `help/` | CLI help schema definitions (acp, doctor, sandbox, status) | — |
-| `locales/` | i18n strings (en, zh): toasts + model-fallback labels | — |
+| `testing/` | Test utilities + `create-plugin-module.ts` | no |
+| `help/` | CLI help schema definitions (acp, doctor, sandbox, status) | no |
+| `locales/` | i18n strings (en, zh): toasts + model-fallback labels | no |
 
 ## NOTES
 
 - `plugin-interface.ts` is the **only** layer that talks to OpenCode's `Plugin` API. Every other file goes through it.
-- Reach for `shared/` before adding helpers anywhere else — duplicate utilities WILL be flagged in review.
+- Reach for `shared/` before adding helpers anywhere else; duplicate utilities WILL be flagged in review.
 - Path aliases are forbidden. Use relative imports within a module, barrel imports across modules.

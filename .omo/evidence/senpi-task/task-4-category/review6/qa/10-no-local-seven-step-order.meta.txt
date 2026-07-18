@@ -1,6 +1,0 @@
-scenario: 10-no-local-seven-step-order
-surface: Static guard: no local seven-step model-order implementation in senpi-task scoped files
-invocation: ! rg -n -i "seven[- ]step|7[- ]step|model[-_ ]order|orderModels|sortModels|model.*sort|sort.*model" packages/senpi-task/src/category packages/senpi-task/scripts/manual-category-qa.ts packages/senpi-task/src/index.ts
-started_at: 2026-07-06T11:02:24Z
-finished_at: 2026-07-06T11:02:24Z
-exit: 1

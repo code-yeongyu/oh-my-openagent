@@ -30,6 +30,7 @@ function writeProfileConfig(directory: string, pluginEntries: readonly string[])
 describe("loadOpencodePlugins", () => {
   const tempDirs: string[] = []
   let originalOpencodeConfigDir: string | undefined
+  let originalXdgConfigHome: string | undefined
 
   function createTempDir(prefix: string): string {
     const directory = mkdtempSync(join(os.tmpdir(), prefix))
@@ -39,8 +40,10 @@ describe("loadOpencodePlugins", () => {
 
   beforeEach(() => {
     originalOpencodeConfigDir = process.env.OPENCODE_CONFIG_DIR
+    originalXdgConfigHome = process.env.XDG_CONFIG_HOME
 
     delete process.env.OPENCODE_CONFIG_DIR
+    process.env.XDG_CONFIG_HOME = createTempDir("omo-load-opencode-xdg-home-")
   })
 
   afterEach(() => {
@@ -48,6 +51,11 @@ describe("loadOpencodePlugins", () => {
       delete process.env.OPENCODE_CONFIG_DIR
     } else {
       process.env.OPENCODE_CONFIG_DIR = originalOpencodeConfigDir
+    }
+    if (originalXdgConfigHome === undefined) {
+      delete process.env.XDG_CONFIG_HOME
+    } else {
+      process.env.XDG_CONFIG_HOME = originalXdgConfigHome
     }
     while (tempDirs.length > 0) {
       const directory = tempDirs.pop()
@@ -144,6 +152,35 @@ describe("loadOpencodePlugins", () => {
         expect(result).toContain(projectPlugin)
         expect(result).toContain(profilePlugin)
         expect(result.indexOf(projectPlugin)).toBeLessThan(result.indexOf(profilePlugin))
+      })
+    })
+  })
+
+  describe("#given XDG_CONFIG_HOME is set", () => {
+    describe("#when loading plugins for the project", () => {
+      it("#then discovers plugins from the XDG config directory (not just hardcoded ~/.config)", async () => {
+        // given
+        const projectDirectory = createTempDir("omo-load-opencode-project-")
+        const xdgHomeDirectory = createTempDir("omo-load-opencode-xdg-")
+        const xdgOpencodeDir = join(xdgHomeDirectory, "opencode")
+        mkdirSync(xdgOpencodeDir, { recursive: true })
+
+        process.env.XDG_CONFIG_HOME = xdgHomeDirectory
+        delete process.env.OPENCODE_CONFIG_DIR
+
+        const projectPlugin = `file://${join(projectDirectory, "src", "index.ts")}`
+        const xdgPlugin = `file://${join(xdgOpencodeDir, "xdg-plugin.ts")}`
+        writeOpencodeConfig(projectDirectory, [projectPlugin])
+        writeFileSync(join(xdgOpencodeDir, "opencode.json"), JSON.stringify({ plugin: [xdgPlugin] }))
+
+        const { loadOpencodePlugins } = await importFreshLoadOpencodePluginsModule()
+
+        // when
+        const result = loadOpencodePlugins(projectDirectory)
+
+        // then
+        expect(result).toContain(projectPlugin)
+        expect(result).toContain(xdgPlugin)
       })
     })
   })

@@ -7,6 +7,8 @@ import type { PluginContext, ToolsRecord } from "./types"
 import type { ToolRegistryFactories } from "./tool-registry-factories"
 
 import { getMainSessionID } from "../features/claude-code-session-state"
+import { createGoalController, type GoalController } from "../hooks/goal/controller"
+import { createGoalTools } from "../hooks/goal/tools"
 import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
 import { log } from "../shared"
 import { getSisyphusJuniorModelOverride } from "./tool-registry-team-tools"
@@ -134,6 +136,14 @@ export function createCoreTools(args: {
   tools.task = delegateTask
   tools.skill_mcp = skillMcpTool
   tools.skill = skillTool
+
+  if (pluginConfig.goal?.enabled) {
+    const goalController: GoalController = createGoalController({ projectDir: ctx.directory })
+    Object.assign(tools, createGoalTools({
+      controller: goalController,
+      getSessionID: getMainSessionID,
+    }))
+  }
 
   return tools
 }

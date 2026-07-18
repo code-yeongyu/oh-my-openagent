@@ -1,6 +1,6 @@
 # src/features/builtin-skills/ — 12 Built-in Skill Files
 
-**Generated:** 2026-05-15
+**Generated:** 2026-07-17 (7d664b96b)
 
 ## OVERVIEW
 
@@ -62,7 +62,9 @@ Config `browser_automation_engine` selects which browser skill loads:
 | `"playwright-cli"` | playwright-cli (CLI-backed) |
 | `"agent-browser"` | agent-browser (in playwright.ts) |
 
-Only one browser skill is active per session — non-selected variants are skipped.
+Only one browser skill is active per session; non-selected variants are skipped.
+
+For the `playwright` (MCP) variant, `browser_automation_engine.playwright_mcp_args` (string array) appends extra CLI flags after the default `npx @playwright/mcp@latest` invocation, e.g. `--executable-path` or `--no-sandbox` for sandboxed envs lacking a system Chrome. Threaded via `createBuiltinSkills({ playwrightMcpArgs })` into `createPlaywrightSkill({ mcp_args })` (`skills/playwright-mcp-skill.ts`); absent or empty leaves the default singleton byte-identical.
 
 ## TEAM-MODE SKILL GATING
 

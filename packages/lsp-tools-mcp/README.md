@@ -11,7 +11,7 @@ This package is the upstream source of truth for downstream plugins. In `oh-my-o
 | Project | Path | Role |
 |---------|------|------|
 | **[codex-lsp](https://github.com/code-yeongyu/codex-lsp)** | `packages/lsp-tools-mcp/` | Codex plugin that ships these LSP MCP tools plus a Codex-specific PostToolUse diagnostics hook. |
-| **[oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent)** (a.k.a. `oh-my-opencode`) | `packages/lsp-tools-mcp/` | OpenCode plugin that registers this server as a built-in Tier-1 stdio MCP. Exposes `lsp_diagnostics`, `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_prepare_rename`, `lsp_rename`, and `lsp_status` to all agents. |
+| **[oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent)** (a.k.a. `oh-my-opencode`) | `packages/lsp-tools-mcp/` | OpenCode plugin that registers this server as a built-in Tier-1 stdio MCP and starts the shared OMO daemon through the `@code-yeongyu/lsp-daemon` proxy. Exposes `lsp_diagnostics`, `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_prepare_rename`, `lsp_rename`, `lsp_status`, and `lsp_install_decision` to all agents. |
 
 If you fix or extend the LSP runtime here, downstreams should sync the vendored package source rather than carrying divergent forks.
 
@@ -36,6 +36,7 @@ This server exposes the following tools:
 - `lsp.symbols`
 - `lsp.prepare_rename`
 - `lsp.rename`
+- `lsp.install_decision`
 
 Tool aliases are also available for compatibility:
 
@@ -46,26 +47,31 @@ Tool aliases are also available for compatibility:
 - `lsp_symbols`
 - `lsp_prepare_rename`
 - `lsp_rename`
+- `lsp_install_decision`
 
 When an MCP host registers this server under the name `lsp` (the default in both downstreams), the tools are exposed to agents as `lsp_status`, `lsp_diagnostics`, and so on, matching the alias names above.
 
 ## Configuration
 
-Default config paths (matches codex-lsp's historical layout):
+Standalone MCP hosts translate these environment variables into the typed request context sent to the shared OMO daemon:
 
-- Project: `.codex/lsp-client.json`
-- User: `~/.codex/lsp-client.json`
+- `LSP_TOOLS_MCP_PROJECT_CONFIG`: delimiter-separated project config paths. Relative entries are resolved inside the canonical request cwd.
+- `LSP_TOOLS_MCP_USER_CONFIG`: user-level config path. Relative entries are resolved inside the user's home directory.
+- `LSP_TOOLS_MCP_INSTALL_DECISIONS`: install-decision cache path. Relative entries are resolved inside the user's home directory.
 
-Path overrides via environment variables:
+When an MCP host omits the variables, the standalone default remains the Codex-compatible fallback. OpenCode sets all three variables explicitly:
 
-- `LSP_TOOLS_MCP_PROJECT_CONFIG`
-- `LSP_TOOLS_MCP_USER_CONFIG`
+- Project paths, in order: `<cwd>/.opencode/lsp.json`, `<cwd>/.omo/lsp.json`, `<cwd>/.omo/lsp-client.json`
+- User config: `<opencode config dir>/lsp.json`
+- Install decisions: `<opencode config dir>/lsp-install-decisions.json`
 
-Examples (oh-my-openagent points the project config at `.opencode/lsp.json` via the env var):
+The shared daemon runtime itself is configured only through `OMO_LSP_DAEMON_DIR`, or the paired `OMO_LSP_DAEMON_CLI` plus `OMO_LSP_DAEMON_VERSION` override. OpenCode source mode uses the paired override to run `packages/lsp-daemon/src/cli.ts` with Bun; dist mode resolves the daemon package `./cli` export.
+
+Examples:
 
 ```bash
-LSP_TOOLS_MCP_PROJECT_CONFIG=.opencode/lsp.json node dist/cli.js mcp
-LSP_TOOLS_MCP_USER_CONFIG=.opencode/lsp.json node dist/cli.js mcp
+LSP_TOOLS_MCP_PROJECT_CONFIG="$PWD/.opencode/lsp.json:$PWD/.omo/lsp.json:$PWD/.omo/lsp-client.json" node dist/cli.js mcp
+LSP_TOOLS_MCP_USER_CONFIG="$HOME/.config/opencode/lsp.json" node dist/cli.js mcp
 ```
 
 Example config file:
@@ -87,6 +93,7 @@ Example config file:
 - `src/tools.ts` MCP tool definitions and handlers
 - `src/mcp.ts` stdio MCP server entry and registration
 - `src/cli.ts` standalone CLI entry (`mcp` subcommand only)
+- `../lsp-daemon` shared authenticated OMO daemon/proxy layer used by Codex, OpenCode, and Senpi adapters
 
 ## Local Development
 

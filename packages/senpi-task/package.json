@@ -16,20 +16,32 @@
     "test": "bun test src/*.test.ts src/**/*.test.ts"
   },
   "dependencies": {
-    "@oh-my-opencode/utils": "workspace:*",
-    "@oh-my-opencode/omo-config-core": "workspace:*",
     "@oh-my-opencode/delegate-core": "workspace:*",
-    "@oh-my-opencode/team-core": "workspace:*"
+    "@oh-my-opencode/omo-config-core": "workspace:*",
+    "@oh-my-opencode/team-core": "workspace:*",
+    "@oh-my-opencode/utils": "workspace:*",
+    "typebox": "1.1.38"
   },
   "peerDependencies": {
-    "@code-yeongyu/senpi": "2026.7.5-2"
+    "@code-yeongyu/senpi": "2026.7.5-2",
+    "@earendil-works/pi-tui": "0.80.3",
+    "typebox": "*"
   },
   "peerDependenciesMeta": {
     "@code-yeongyu/senpi": {
       "optional": true
+    },
+    "@earendil-works/pi-tui": {
+      "optional": true
+    },
+    "typebox": {
+      "optional": true
     }
   },
   "devDependencies": {
-    "@code-yeongyu/senpi": "2026.7.5-2"
-  }
+    "@code-yeongyu/senpi": "2026.7.5-2",
+    "@earendil-works/pi-tui": "0.80.3",
+    "typebox": "1.1.38"
+  },
+  "sideEffects": false
 }

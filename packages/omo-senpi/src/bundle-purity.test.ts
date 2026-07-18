@@ -49,9 +49,11 @@ describe("omo-senpi bundle purity", () => {
 
 function collectStaticImportSpecifiers(source: string): string[] {
   const specifiers = new Set<string>()
+  // Whitespace-tolerant so the minified bundle shape (`import{x}from"y"`, `import"y"`, `export*from"y"`)
+  // is scanned exactly like the spaced shape - otherwise the guard would pass vacuously on minified output.
   const patterns = [
-    /\bimport\s+(?:[^"'()]*?\s+from\s+)?["']([^"']+)["']/g,
-    /\bexport\s+[^"']*?\s+from\s+["']([^"']+)["']/g,
+    /\bimport\s*(?:[^"'()]*?\bfrom\s*)?["']([^"']+)["']/g,
+    /\bexport\s*[^"'()]*?\bfrom\s*["']([^"']+)["']/g,
   ]
 
   for (const pattern of patterns) {

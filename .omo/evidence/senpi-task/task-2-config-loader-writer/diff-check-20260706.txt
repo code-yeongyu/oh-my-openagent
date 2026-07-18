@@ -1,2 +1,0 @@
-Command: git diff --check code-yeongyu/senpi-task-w0-config-schema...HEAD
-PASS: no whitespace errors reported by git diff --check after evidence summary.

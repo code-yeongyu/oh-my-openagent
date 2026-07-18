@@ -23,7 +23,7 @@ exports[`builtin category defaults #given ported builtin defaults #when snapshot
   {
     "name": "ultrabrain",
     "config": {
-      "model": "openai/gpt-5.5",
+      "model": "openai/gpt-5.6-sol",
       "variant": "xhigh"
     },
     "description": "Use ONLY for genuinely hard, logic-heavy tasks. Give clear goals only, not step-by-step instructions.",
@@ -32,8 +32,8 @@ exports[`builtin category defaults #given ported builtin defaults #when snapshot
   {
     "name": "deep",
     "config": {
-      "model": "openai/gpt-5.5",
-      "variant": "medium"
+      "model": "openai/gpt-5.6-terra",
+      "variant": "xhigh"
     },
     "description": "Goal-oriented autonomous problem-solving on hairy problems requiring deep research. ONE goal + ONE deliverable per call — multiple goals must fan out as parallel \`deep\` calls, never bundled into one.",
     "promptAppend": "<Category_Context>\\nYou are working on GOAL-ORIENTED AUTONOMOUS tasks.\\n\\nYou are NOT an interactive assistant. You are an autonomous problem-solver.\\n\\nBEFORE making ANY changes:\\n1. Silently explore the codebase extensively (5-15 minutes of reading is normal)\\n2. Read related files, trace dependencies, understand the full context\\n3. Build a complete mental model of the problem space\\n4. Do not ask clarifying questions - the goal is already defined\\n\\nYou receive a GOAL. When the goal includes numbered steps or phases, treat them as one atomic task broken into sub-steps, not as separate independent tasks. Figure out HOW to achieve it yourself. Thorough research before any action.\\n\\nSub-steps of ONE goal = execute all steps as phases of one atomic task.\\nGenuinely independent tasks = flag and refuse, require separate delegations.\\n\\nApproach: explore extensively, understand deeply, then act decisively. Prefer comprehensive solutions over quick patches. If the goal is unclear, make reasonable assumptions and proceed.\\n\\nMinimal status updates. Focus on results, not play-by-play. Report completion with summary of changes.\\n</Category_Context>"
@@ -49,10 +49,11 @@ exports[`builtin category defaults #given ported builtin defaults #when snapshot
   {
     "name": "unspecified-low",
     "config": {
-      "model": "anthropic/claude-sonnet-4-6"
+      "model": "openai/gpt-5.6-luna",
+      "variant": "xhigh"
     },
     "description": "Tasks that don't fit other categories, low effort required",
-    "promptAppend": "<Category_Context>\\nYou are working on tasks that don't fit specific categories but require moderate effort.\\n\\n<Selection_Gate>\\nBEFORE selecting this category, VERIFY ALL conditions:\\n1. Task does NOT fit: quick (trivial), visual-engineering (UI), ultrabrain (deep logic), artistry (creative), writing (docs)\\n2. Task requires more than trivial effort but is NOT system-wide\\n3. Scope is contained within a few files/modules\\n\\nIf task fits ANY other category, DO NOT select unspecified-low.\\nThis is NOT a default choice - it's for genuinely unclassifiable moderate-effort work.\\n</Selection_Gate>\\n</Category_Context>\\n\\n<Caller_Warning>\\nTHIS CATEGORY USES A MID-TIER MODEL (claude-sonnet-4-6).\\n\\n**PROVIDE CLEAR STRUCTURE:**\\n1. MUST DO: Enumerate required actions explicitly\\n2. MUST NOT DO: State forbidden actions to prevent scope creep\\n3. EXPECTED OUTPUT: Define concrete success criteria\\n</Caller_Warning>"
+    "promptAppend": "<Category_Context>\\nYou are working on tasks that don't fit specific categories but require moderate effort.\\n\\n<Selection_Gate>\\nBEFORE selecting this category, VERIFY ALL conditions:\\n1. Task does NOT fit: quick (trivial), visual-engineering (UI), ultrabrain (deep logic), artistry (creative), writing (docs)\\n2. Task requires more than trivial effort but is NOT system-wide\\n3. Scope is contained within a few files/modules\\n\\nIf task fits ANY other category, DO NOT select unspecified-low.\\nThis is NOT a default choice - it's for genuinely unclassifiable moderate-effort work.\\n</Selection_Gate>\\n</Category_Context>\\n\\n<Caller_Warning>\\nTHIS CATEGORY USES A LIGHTWEIGHT MODEL (gpt-5.6-luna).\\n\\n**PROVIDE CLEAR STRUCTURE:**\\n1. MUST DO: Enumerate required actions explicitly\\n2. MUST NOT DO: State forbidden actions to prevent scope creep\\n3. EXPECTED OUTPUT: Define concrete success criteria\\n</Caller_Warning>"
   },
   {
     "name": "unspecified-high",

@@ -1,8 +1,0 @@
-bun test v1.3.14 (0d9b296a)
-The following filters did not match any test files:
- ./packages/omo-codex/plugin/components/codegraph/test/serve.test.ts
-
-note: Tests need ".test", "_test_", ".spec" or "_spec_" in the filename (ex: "MyApp.test.ts")
-note: To treat the "./packages/omo-codex/plugin/components/codegraph/test/serve.test.ts" filter as a path, run "bun test ././packages/omo-codex/plugin/components/codegraph/test/serve.test.ts"
-
-Learn more about bun test: https://bun.com/docs/cli/test

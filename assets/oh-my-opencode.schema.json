@@ -59,6 +59,7 @@
       "items": {
         "type": "string",
         "enum": [
+          "goal",
           "ralph-loop",
           "ulw-loop",
           "cancel-ralph",
@@ -6131,6 +6132,31 @@
         }
       ]
     },
+    "goal": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "auto_start": {
+          "default": false,
+          "type": "boolean"
+        },
+        "default_max_iterations": {
+          "default": 100,
+          "type": "number",
+          "minimum": 1,
+          "maximum": 1000
+        }
+      },
+      "required": [
+        "enabled",
+        "auto_start",
+        "default_max_iterations"
+      ],
+      "additionalProperties": false
+    },
     "ralph_loop": {
       "type": "object",
       "properties": {
@@ -6747,6 +6773,12 @@
             "dev-browser",
             "playwright-cli"
           ]
+        },
+        "playwright_mcp_args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
@@ -6896,6 +6928,10 @@
           "default": false,
           "type": "boolean"
         },
+        "goal": {
+          "default": false,
+          "type": "boolean"
+        },
         "ralph_loop": {
           "default": false,
           "type": "boolean"
@@ -6903,6 +6939,7 @@
       },
       "required": [
         "ultrawork",
+        "goal",
         "ralph_loop"
       ],
       "additionalProperties": false

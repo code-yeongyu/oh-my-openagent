@@ -1,6 +1,0 @@
-real_config_before=ec5291a41e64f9e2a991f8e7e5485763c13a8228f8bf33e9b169fad04645fa0b
-real_config_after=ec5291a41e64f9e2a991f8e7e5485763c13a8228f8bf33e9b169fad04645fa0b
-unchanged=yes
-cleanup=tmp projects and isolated homes removed by QA script
-script=/Users/yeongyu/local-workspaces/omo/.local-ignore/pr-worktrees/cg-tmpdir/.omo/evidence/20260706-cg-tmpdir/live-sessionstart-qa.ts
-exit=0

@@ -35,9 +35,9 @@ The orchestration system uses a three-layer architecture that solves context ove
 flowchart TB
     subgraph Planning["Planning Layer (Human + Prometheus)"]
         User[(" User")]
-        Prometheus[" Prometheus<br/>(Planner)<br/>claude-opus-4-7 / gpt-5.5 / glm-5"]
-        Metis[" Metis<br/>(Consultant)<br/>claude-sonnet-4-6 / claude-opus-4-7 / gpt-5.5 / glm-5"]
-        Momus[" Momus<br/>(Reviewer)<br/>gpt-5.5 / claude-opus-4-7 / gemini-3.1-pro / glm-5"]
+        Prometheus[" Prometheus<br/>(Planner)<br/>claude-opus-4-7 / gpt-5.5 / glm-5.2"]
+        Metis[" Metis<br/>(Consultant)<br/>claude-sonnet-4-6 / claude-opus-4-7 / gpt-5.5 / glm-5.2"]
+        Momus[" Momus<br/>(Reviewer)<br/>gpt-5.6-terra / gpt-5.5 / claude-opus-4-7 / gemini-3.1-pro / glm-5.2"]
     end
 
     subgraph Execution["Execution Layer (Orchestrator)"]
@@ -46,7 +46,7 @@ flowchart TB
 
     subgraph Workers["Worker Layer (Specialized Agents)"]
         Junior[" Sisyphus-Junior<br/>(Task Executor)<br/>claude-sonnet-4-6 / kimi-k2.6 / gpt-5.5 / minimax-m3 / minimax-m2.7"]
-        Oracle[" Oracle<br/>(Architecture)<br/>gpt-5.5 / gemini-3.1-pro / claude-opus-4-7 / glm-5"]
+        Oracle[" Oracle<br/>(Architecture)<br/>gpt-5.5 / gemini-3.1-pro / claude-opus-4-7 / glm-5.2"]
         Explore[" Explore<br/>(Codebase Grep)<br/>gpt-5.4-mini-fast / minimax-m2.7-highspeed / minimax-m3 / claude-haiku-4-5"]
         Librarian[" Librarian<br/>(Docs/OSS)<br/>gpt-5.4-mini-fast / minimax-m2.7-highspeed / minimax-m3 / claude-haiku-4-5"]
         Frontend[" visual-engineering<br/>(category + frontend)<br/>gemini-3.1-pro / glm-5 / claude-opus-4-7"]
@@ -92,6 +92,20 @@ Mode distinction:
 
 - `mode: "primary"`: top-level session agents selected directly in UI/CLI
 - `mode: "subagent"`: worker/consultant agents invoked via `task(..., subagent_type="...")` or `call_omo_agent(...)`
+
+### Display Names vs Providers
+
+`Sisyphus - ultraworker` is the display name for the primary Sisyphus agent. It is not a separate provider, proxy, or replacement for your original model account.
+
+Three names can appear together in logs or the TUI:
+
+- **Agent display name**: `Sisyphus - ultraworker`, `Atlas - Plan Executor`, `Hephaestus - Deep Agent`
+- **Provider namespace**: `anthropic`, `openai`, `github-copilot`, `opencode`, `opencode-go`, `vercel`
+- **Model id**: `claude-opus-4-7`, `kimi-k2.6`, `gpt-5.5`, `glm-5`
+
+The agent decides the prompt and behavior. The provider namespace decides which connected account or gateway serves the request. The model id decides the model family. If you see Sisyphus running through `opencode-go/kimi-k2.6`, that means the Sisyphus prompt is using Kimi through the OpenCode Go provider path; it does not mean OMO replaced your provider silently.
+
+When `ulw` or `ultrawork` is present, Sisyphus receives the ultrawork instruction set for a harder autonomous task. By default it keeps the agent's configured model or fallback chain. An explicit `agents.sisyphus.ultrawork.model` or `variant` setting can override that routing for ultrawork prompts.
 
 ### Delegation Semantics (Important)
 
@@ -318,7 +332,7 @@ Junior doesn't need to be the smartest - it needs to be reliable. With:
 3. Clear MUST DO / MUST NOT DO constraints
 4. Verification requirements
 
-Even a mid-tier execution model works when the harness is strict. The current fallback order is `claude-sonnet-4-6` → `kimi-k2.5` → `gpt-5.5` → `minimax-m3` → `minimax-m2.7` → `big-pickle`. The intelligence is in the **system**, not a single worker model.
+Even a mid-tier execution model works when the harness is strict. The current fallback order is `claude-sonnet-4-6` → `kimi-k2.6` → `gpt-5.5` → `minimax-m3` → `minimax-m2.7` → `big-pickle`. The intelligence is in the **system**, not a single worker model.
 
 ### System Reminder Mechanism
 
@@ -522,7 +536,7 @@ Atlas is automatically activated when you run `/start-work`. You don't need to m
 
 | Aspect          | Hephaestus                                 | Sisyphus + `ulw` / `ultrawork`                       |
 | --------------- | ------------------------------------------ | ---------------------------------------------------- |
-| **Model**       | `gpt-5.5` (`medium`)                       | `claude-opus-4-7` / `kimi-k2.5` / `gpt-5.5` / `glm-5` depending on setup |
+| **Model**       | `gpt-5.6-sol` (`medium`) when available, then `gpt-5.5` (`medium`) | `claude-opus-4-7` / `kimi-k2.6` / `gpt-5.5` / `glm-5` depending on setup |
 | **Approach**    | Autonomous deep worker                     | Keyword-activated ultrawork mode                     |
 | **Best For**    | Complex architectural work, deep reasoning | General complex tasks, "just do it" scenarios        |
 | **Planning**    | Self-plans during execution                | Uses Prometheus plans if available                   |
@@ -545,8 +559,8 @@ Switch to Hephaestus (Tab → Select Hephaestus) when:
    - "Integrate our Rust core with the TypeScript frontend"
    - "Migrate from MongoDB to PostgreSQL with zero downtime"
 
-4. **You specifically want GPT-5.5 reasoning**
-   - Some problems benefit from GPT-5.5's training characteristics
+4. **You specifically want GPT-native autonomous reasoning**
+   - Hephaestus prefers GPT-5.6 Sol when OpenAI or Vercel exposes it and retains GPT-5.5 as the broad fallback
 
 **When to Use Sisyphus + `ulw`:**
 
@@ -571,7 +585,32 @@ Use the `ulw` keyword in Sisyphus when:
 **Recommendation:**
 
 - **For most users**: Use `ulw` keyword in Sisyphus. It's the default path and works excellently for 90% of complex tasks.
-- **For power users**: Switch to Hephaestus when you specifically need GPT-5.5's reasoning style or want the "AmpCode deep mode" experience of fully autonomous exploration and execution.
+- **For power users**: Switch to Hephaestus when you want GPT-native reasoning or the "AmpCode deep mode" experience of fully autonomous exploration and execution.
+
+### Brownfield / KISS Mode
+
+For mature projects, the safest default is not "make the best architecture." It is "make the smallest correct change that fits the architecture already here."
+
+Use Prometheus first when a brownfield task could invite broad cleanup, rewrites, or speculative abstractions. Select Prometheus with the agent selector or `/agent`, then ask it to produce a constrained plan with explicit boundaries:
+
+```text
+Fix <problem> in this existing codebase.
+Preserve the current architecture and public behavior.
+Use the smallest viable change.
+Follow local patterns in <files or areas>.
+Do not refactor, rename, reorganize, or clean up unrelated code.
+List exact files in scope and exact verification commands.
+```
+
+Then run `/start-work` from that plan. Atlas will execute against the written scope instead of treating the task as an open-ended modernization pass.
+
+Use `ulw` directly only when the target is already narrow:
+
+```text
+ulw fix the null handling in packages/foo/src/bar.ts using the existing helper style. No unrelated cleanup.
+```
+
+Use Hephaestus when you deliberately want autonomous deep implementation or architectural exploration. If the job is "touch the old system without disturbing it," an explicit Prometheus plan provides written scope boundaries before Atlas starts execution.
 
 ---
 
@@ -622,7 +661,7 @@ Type `exit` or start a new session. Atlas is primarily entered via `/start-work`
 
 **For most tasks**: Type `ulw` in Sisyphus.
 
-**Use Hephaestus when**: You specifically need GPT-5.5's reasoning style for deep architectural work or complex debugging.
+**Use Hephaestus when**: You need GPT-native reasoning for deep architectural work or complex debugging.
 
 ---
 

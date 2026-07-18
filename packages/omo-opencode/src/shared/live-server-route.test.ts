@@ -50,6 +50,10 @@ function makeNeverResolvingFetch(): {
   return { fetch: fake as unknown as typeof fetch, callCount: () => calls }
 }
 
+function countHealthProbes(urls: readonly string[]): number {
+  return urls.filter((url) => url.includes("/global/health")).length
+}
+
 const FAKE_SERVER_URL = new URL("http://127.0.0.1:19999")
 
 const fakeInProcessClient = { _marker: "in-process" } as unknown
@@ -128,7 +132,11 @@ describe("live-server-route", () => {
   describe("resolveDispatchClient — 200 probe → live + client cached", () => {
     test("#given probe returns 200 #when resolveDispatchClient called twice #then returns live route and caches same client object", async () => {
       //#given
-      const { fetch: fakeFetch, callCount } = makeFakeFetch([{ ok: true, status: 200 }])
+      const seenUrls: string[] = []
+      const fakeFetch = (async (url: RequestInfo | URL) => {
+        seenUrls.push(String(url))
+        return { ok: true, status: 200 } as Response
+      }) as unknown as typeof fetch
       _setFetchImplementationForTesting(fakeFetch)
       initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/test", inProcessClient: fakeInProcessClient })
       _setLiveClientForTesting(fakeLiveClient)
@@ -137,12 +145,12 @@ describe("live-server-route", () => {
       const result1 = await resolveDispatchClient(fakeInProcessClient, "ses_live1")
       const result2 = await resolveDispatchClient(fakeInProcessClient, "ses_live2")
 
-      //#then
+      //#then — one health probe; per-session affinity probes are separate
       expect(result1.route).toBe("live")
       expect(result1.client).toBe(fakeLiveClient)
       expect(result2.route).toBe("live")
       expect(result2.client).toBe(fakeLiveClient)
-      expect(callCount()).toBe(1)
+      expect(countHealthProbes(seenUrls)).toBe(1)
     })
   })
 
@@ -196,9 +204,13 @@ describe("live-server-route", () => {
   })
 
   describe("resolveDispatchClient — TTL: second resolve within 60s skips re-fetch", () => {
-    test("#given two sequential resolves within TTL #when resolveDispatchClient called twice #then fetch is called only once", async () => {
+    test("#given two sequential resolves within TTL #when resolveDispatchClient called twice #then the health probe fires only once", async () => {
       //#given
-      const { fetch: fakeFetch, callCount } = makeFakeFetch([{ ok: true, status: 200 }, { ok: true, status: 200 }])
+      const seenUrls: string[] = []
+      const fakeFetch = (async (url: RequestInfo | URL) => {
+        seenUrls.push(String(url))
+        return { ok: true, status: 200 } as Response
+      }) as unknown as typeof fetch
       _setFetchImplementationForTesting(fakeFetch)
       _setLiveClientForTesting(fakeLiveClient)
       initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/test", inProcessClient: fakeInProcessClient })
@@ -208,16 +220,16 @@ describe("live-server-route", () => {
       await resolveDispatchClient(fakeInProcessClient, "ses_ttl2")
 
       //#then
-      expect(callCount()).toBe(1)
+      expect(countHealthProbes(seenUrls)).toBe(1)
     })
   })
 
   describe("resolveDispatchClient — shared in-flight: concurrent resolves trigger ONE fetch", () => {
     test("#given two concurrent resolveDispatchClient calls #when both start simultaneously #then only one fetch is triggered", async () => {
       //#given
-      let fetchCalls = 0
-      const sharedFetch = async (_url: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
-        fetchCalls++
+      const seenUrls: string[] = []
+      const sharedFetch = async (url: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
+        seenUrls.push(String(url))
         await new Promise<void>((r) => setTimeout(r, 50))
         return { ok: true, status: 200 } as Response
       }
@@ -231,7 +243,7 @@ describe("live-server-route", () => {
         resolveDispatchClient(fakeInProcessClient, "ses_concurrent_b"),
       ])
       //#then
-      expect(fetchCalls).toBe(1)
+      expect(countHealthProbes(seenUrls)).toBe(1)
       expect(r1.route).toBe("live")
       expect(r2.route).toBe("live")
     })
@@ -346,13 +358,14 @@ describe("live-server-route", () => {
       expect(result).toBeUndefined()
     })
 
-    test("#given a registered client with a fresh available probe #when tryResolveDispatchClientSync called #then it returns the live route synchronously", async () => {
-      //#given
+    test("#given a fresh probe and verified session affinity #when tryResolveDispatchClientSync called #then it returns the live route synchronously", async () => {
+      //#given — the async path verifies session affinity; the sync fast path may
+      // only serve sessions with cached affinity evidence (#5569)
       const { fetch: fakeFetch } = makeFakeFetch([{ ok: true, status: 200 }])
       _setFetchImplementationForTesting(fakeFetch)
       initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/sync", inProcessClient: fakeInProcessClient })
       _setLiveClientForTesting(fakeLiveClient)
-      await resolveDispatchClient(fakeInProcessClient, "ses_sync_warm")
+      await resolveDispatchClient(fakeInProcessClient, "ses_sync_fresh")
 
       //#when
       const result = tryResolveDispatchClientSync(fakeInProcessClient, "ses_sync_fresh")
@@ -406,6 +419,107 @@ describe("live-server-route", () => {
       //#when / then — must not throw, must not return a promise that callers must await
       const result = warmLiveServerProbe()
       expect(result).toBeUndefined()
+    })
+  })
+
+  describe("session affinity", () => {
+    function makeUrlAwareFakeFetch(handler: (url: string) => FakeFetchResponse): {
+      fetch: typeof fetch
+      urls: () => string[]
+    } {
+      const seen: string[] = []
+      const fake = async (url: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
+        const asString = String(url)
+        seen.push(asString)
+        const resp = handler(asString)
+        return { ok: resp.ok, status: resp.status } as Response
+      }
+      return { fetch: fake as unknown as typeof fetch, urls: () => [...seen] }
+    }
+
+    test("#given healthy listener that does not own the session #when resolving dispatch client #then falls back to in-process", async () => {
+      //#given — health probe succeeds but the listener 404s the target session
+      const { fetch: fakeFetch, urls } = makeUrlAwareFakeFetch((url) => {
+        if (url.includes("/global/health")) return { ok: true, status: 200 }
+        return { ok: false, status: 404 }
+      })
+      _setFetchImplementationForTesting(fakeFetch)
+      initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/test", inProcessClient: fakeInProcessClient })
+
+      //#when
+      const result = await resolveDispatchClient(fakeInProcessClient, "ses_not_owned")
+
+      //#then — wake must not vanish into a listener that has no such session (#5569)
+      expect(result.route).toBe("in-process")
+      expect(result.reason).toBe("affinity")
+      expect(urls().some((url) => url.includes("/session/ses_not_owned"))).toBe(true)
+    })
+
+    test("#given listener that owns the session #when resolving twice #then routes live and caches the affinity probe", async () => {
+      //#given
+      const { fetch: fakeFetch, urls } = makeUrlAwareFakeFetch(() => ({ ok: true, status: 200 }))
+      _setFetchImplementationForTesting(fakeFetch)
+      initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/test", inProcessClient: fakeInProcessClient })
+
+      //#when
+      const first = await resolveDispatchClient(fakeInProcessClient, "ses_owned")
+      const second = await resolveDispatchClient(fakeInProcessClient, "ses_owned")
+
+      //#then
+      expect(first.route).toBe("live")
+      expect(second.route).toBe("live")
+      const affinityProbes = urls().filter((url) => url.includes("/session/ses_owned"))
+      expect(affinityProbes.length).toBe(1)
+    })
+
+    test("#given transient non-404 affinity failure #when resolving dispatch client #then keeps live routing (status quo)", async () => {
+      //#given — a 500 on the session probe must not force in-process (would reintroduce runner-split in serve topology)
+      const { fetch: fakeFetch } = makeUrlAwareFakeFetch((url) => {
+        if (url.includes("/global/health")) return { ok: true, status: 200 }
+        return { ok: false, status: 500 }
+      })
+      _setFetchImplementationForTesting(fakeFetch)
+      initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/test", inProcessClient: fakeInProcessClient })
+
+      //#when
+      const result = await resolveDispatchClient(fakeInProcessClient, "ses_transient")
+
+      //#then
+      expect(result.route).toBe("live")
+    })
+
+    test("#given fresh health probe but unknown session affinity #when sync resolution runs #then defers to the async path", async () => {
+      //#given — availability is warm but the session was never affinity-checked
+      const { fetch: fakeFetch } = makeUrlAwareFakeFetch(() => ({ ok: true, status: 200 }))
+      _setFetchImplementationForTesting(fakeFetch)
+      initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/test", inProcessClient: fakeInProcessClient })
+      await resolveDispatchClient(fakeInProcessClient, "ses_warm")
+
+      //#when — a different session with no cached affinity
+      const syncResult = tryResolveDispatchClientSync(fakeInProcessClient, "ses_unknown_affinity")
+
+      //#then — sync path must not claim live without affinity evidence
+      expect(syncResult).toBeUndefined()
+    })
+
+    test("#given cached negative affinity #when sync resolution runs #then returns in-process without refetching", async () => {
+      //#given
+      const { fetch: fakeFetch, urls } = makeUrlAwareFakeFetch((url) => {
+        if (url.includes("/global/health")) return { ok: true, status: 200 }
+        return { ok: false, status: 404 }
+      })
+      _setFetchImplementationForTesting(fakeFetch)
+      initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/test", inProcessClient: fakeInProcessClient })
+      await resolveDispatchClient(fakeInProcessClient, "ses_cached_missing")
+      const fetchCountAfterAsync = urls().length
+
+      //#when
+      const syncResult = tryResolveDispatchClientSync(fakeInProcessClient, "ses_cached_missing")
+
+      //#then
+      expect(syncResult?.route).toBe("in-process")
+      expect(syncResult?.reason).toBe("affinity")
+      expect(urls().length).toBe(fetchCountAfterAsync)
     })
   })
 })

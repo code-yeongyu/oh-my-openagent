@@ -65,6 +65,7 @@ function pickRenderedConfigFields(config: ReturnType<typeof validatePluginConfig
     categories: config.categories,
     disabled_providers: config.disabled_providers,
     mcp_env_allowlist: config.mcp_env_allowlist,
+    browser_automation_engine: config.browser_automation_engine,
     team_mode: config.team_mode,
     tui: config.tui,
   }
@@ -138,6 +139,37 @@ describe("validatePluginConfig", () => {
     })
   })
 
+  it("preserves user-only playwright MCP arguments like the runtime loader", () => {
+    withIsolatedConfig("playwright-user-only", (root) => {
+      const userConfigDir = process.env.OPENCODE_CONFIG_DIR
+      if (!userConfigDir) throw new Error("OPENCODE_CONFIG_DIR must be set by the test harness")
+
+      const project = join(root, "project")
+      writeJson(join(userConfigDir, "oh-my-openagent.json"), {
+        browser_automation_engine: {
+          provider: "playwright",
+          playwright_mcp_args: ["--headless"],
+        },
+      })
+      writeJson(join(project, ".opencode", "oh-my-openagent.json"), {
+        browser_automation_engine: {
+          provider: "playwright",
+          playwright_mcp_args: ["--user-agent", "${GITHUB_TOKEN}"],
+        },
+      })
+
+      const readonlyResult = validatePluginConfig(project)
+      const runtimeConfig = loadPluginConfig(project, {})
+
+      expect(readonlyResult.config.browser_automation_engine).toEqual(
+        runtimeConfig.browser_automation_engine,
+      )
+      expect(readonlyResult.config.browser_automation_engine?.playwright_mcp_args).toEqual([
+        "--headless",
+      ])
+    })
+  })
+
   it("keeps valid config sections from a partially invalid layer", () => {
     withIsolatedConfig("partial", (root) => {
       const project = join(root, "project")
@@ -191,6 +223,48 @@ describe("validatePluginConfig", () => {
       expect(result.config.tui?.sidebar.enabled).toBe(false)
       expect(snapshotFiles(configDir)).toEqual(before)
       expect(existsSync(join(configDir, "oh-my-openagent.json"))).toBe(false)
+    })
+  })
+
+  it("migrates deprecated ralph_loop config to goal", () => {
+    withIsolatedConfig("ralph-loop-migration", (root) => {
+      const project = join(root, "project")
+      mkdirSync(join(project, ".opencode"), { recursive: true })
+      writeJson(join(project, ".opencode", "oh-my-openagent.json"), {
+        ralph_loop: {
+          enabled: true,
+          default_max_iterations: 50,
+        },
+      })
+
+      const result = validatePluginConfig(project)
+
+      expect(result.valid).toBe(true)
+      expect(result.config.goal?.enabled).toBe(true)
+      expect(result.config.goal?.auto_start).toBe(false)
+      expect(result.config.goal?.default_max_iterations).toBe(50)
+    })
+  })
+
+  it("preserves explicit goal config over migrated ralph_loop values", () => {
+    withIsolatedConfig("ralph-loop-goal-override", (root) => {
+      const project = join(root, "project")
+      mkdirSync(join(project, ".opencode"), { recursive: true })
+      writeJson(join(project, ".opencode", "oh-my-openagent.json"), {
+        goal: {
+          enabled: false,
+          default_max_iterations: 75,
+        },
+        ralph_loop: {
+          enabled: true,
+          default_max_iterations: 50,
+        },
+      })
+
+      const result = validatePluginConfig(project)
+
+      expect(result.config.goal?.enabled).toBe(false)
+      expect(result.config.goal?.default_max_iterations).toBe(75)
     })
   })
 })

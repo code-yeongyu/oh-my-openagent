@@ -171,7 +171,7 @@ describe("sisyphus-task", () => {
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("openai/gpt-5.5")
+      expect(category.model).toBe("openai/gpt-5.6-sol")
       expect(category.variant).toBe("xhigh")
     })
 
@@ -181,8 +181,8 @@ describe("sisyphus-task", () => {
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("openai/gpt-5.5")
-      expect(category.variant).toBe("medium")
+      expect(category.model).toBe("openai/gpt-5.6-terra")
+      expect(category.variant).toBe("xhigh")
     })
 
     test("unspecified-high category uses claude-opus-4-7 max as primary", () => {
@@ -3765,7 +3765,7 @@ describe("sisyphus-task", () => {
       
       // then - catalog model is used
       const category = expectResolvedCategoryConfig(resolved)
-      expect(category.config.model).toBe("openai/gpt-5.5")
+      expect(category.config.model).toBe("openai/gpt-5.6-sol")
       expect(category.config.variant).toBe("xhigh")
     })
 
@@ -3778,7 +3778,8 @@ describe("sisyphus-task", () => {
       
       // then - default model from DEFAULT_CATEGORIES is used
       const category = expectResolvedCategoryConfig(resolved)
-      expect(category.config.model).toBe("anthropic/claude-sonnet-4-6")
+      expect(category.config.model).toBe("openai/gpt-5.6-luna")
+      expect(category.config.variant).toBe("xhigh")
     })
 
     test("category built-in model takes precedence over inheritedModel for builtin category", () => {
@@ -3789,10 +3790,10 @@ describe("sisyphus-task", () => {
       // when
       const resolved = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
-      // then - category's built-in model wins (ultrabrain uses gpt-5.5)
+      // then - category's built-in model wins (ultrabrain uses gpt-5.6-sol)
       const category = expectResolvedCategoryConfig(resolved)
       const actualModel = category.config.model
-      expect(actualModel).toBe("openai/gpt-5.5")
+      expect(actualModel).toBe("openai/gpt-5.6-sol")
     })
 
     test("when user defines model - modelInfo should report user-defined regardless of inheritedModel", () => {
@@ -3846,12 +3847,12 @@ describe("sisyphus-task", () => {
       const categoryName = "ultrabrain"
       const inheritedModel = "anthropic/claude-opus-4-7"
       
-      // when category has a built-in model (gpt-5.5 for ultrabrain)
+      // when category has a built-in model (gpt-5.6-sol for ultrabrain)
       const resolved = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
       // then category's built-in model should be used, NOT inheritedModel
       const category = expectResolvedCategoryConfig(resolved)
-      expect(category.model).toBe("openai/gpt-5.5")
+      expect(category.model).toBe("openai/gpt-5.6-sol")
     })
 
     test("FIXED: systemDefaultModel is used when no userConfig.model and no inheritedModel", () => {
