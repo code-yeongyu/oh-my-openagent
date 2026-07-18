@@ -32,6 +32,7 @@ function snapshotFor(projectDir: string, updatedAt: number): TuiRuntimeSnapshot 
       },
     ],
     loop: null,
+    teams: [],
   }
 }
 

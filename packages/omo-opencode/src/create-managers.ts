@@ -196,6 +196,7 @@ export function createManagers(args: {
       client: ctx.client,
       projectDir: ctx.directory,
       backgroundManager,
+      teamModeConfig: pluginConfig.team_mode,
     })
     tuiStateMirror.start()
   }
