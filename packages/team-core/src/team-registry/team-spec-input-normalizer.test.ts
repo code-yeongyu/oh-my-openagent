@@ -232,4 +232,79 @@ describe("normalizeTeamSpecInput", () => {
       members: [{ name: "worker", kind: "category", category: "quick" }],
     })
   })
+
+  test("preserves category-name lead shorthand", () => {
+    // given
+    const rawSpec = {
+      name: "project-analysis-team",
+      lead: { kind: "quick" },
+      members: [{ name: "worker", kind: "category", category: "quick", prompt: "Inspect the workspace." }],
+    }
+
+    // when
+    const normalizedSpec = normalizeTeamSpecInput(rawSpec, {
+      callerTeamLead: resolveCallerTeamLead("Sisyphus - Ultraworker"),
+    })
+
+    // then kind values that are category names remain explicit leads
+    expect(normalizedSpec).toMatchObject({
+      name: "project-analysis-team",
+      leadAgentId: "lead",
+      members: [
+        { name: "lead", kind: "category", category: "quick" },
+        { name: "worker", kind: "category", category: "quick", prompt: "Inspect the workspace." },
+      ],
+    })
+  })
+
+  test("treats a kind-only empty lead object from the tool host as absent", () => {
+    // given
+    const rawSpec = {
+      name: "project-analysis-team",
+      leadSessionId: "",
+      teamAllowedPaths: [],
+      lead: {
+        name: "",
+        kind: "category",
+        category: "",
+        subagent_type: "",
+        prompt: "",
+        systemPrompt: "",
+        loadSkills: [],
+        role: "",
+        description: "",
+      },
+      members: [
+        {
+          name: "worker",
+          kind: "category",
+          category: "quick",
+          subagent_type: "",
+          prompt: "Inspect the workspace.",
+          systemPrompt: "",
+          loadSkills: [],
+          role: "",
+          description: "",
+        },
+      ],
+    }
+
+    // when
+    const normalizedSpec = normalizeTeamSpecInput(rawSpec, {
+      callerTeamLead: resolveCallerTeamLead("Sisyphus - Ultraworker"),
+    }) as Record<string, unknown>
+
+    // then the host-injected lead skeleton is ignored and the caller becomes lead
+    expect(normalizedSpec).toMatchObject({
+      name: "project-analysis-team",
+      leadAgentId: "lead",
+      members: [
+        { name: "lead", kind: "subagent_type", subagent_type: "sisyphus" },
+        { name: "worker", kind: "category", category: "quick", prompt: "Inspect the workspace." },
+      ],
+    })
+    expect(JSON.stringify(normalizedSpec.members)).not.toContain("subagent_type\":\"\"")
+    expect(normalizedSpec.leadSessionId ?? undefined).toBeUndefined()
+    expect(normalizedSpec.teamAllowedPaths ?? undefined).toBeUndefined()
+  })
 })

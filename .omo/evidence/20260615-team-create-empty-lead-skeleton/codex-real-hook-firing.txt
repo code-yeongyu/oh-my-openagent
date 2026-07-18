@@ -1,0 +1,89 @@
+started_at=2026-06-15T19:41:22+09:00
+repo=/tmp/opencode/pr-5298-work/oh-my-openagent
+CODEX_HOME=/tmp/tmp.tFS9VEtPue/codex
+real_config_path=/home/leejunwoo/.codex/config.toml
+real_config_hash_before=4b1cfdbf0807bde49e0bf295d0903b22a96b237a39211874b051861f5e6e7974
+
+## Local install
+
+Command:
+
+```bash
+export CODEX_HOME=/tmp/tmp.tFS9VEtPue/codex
+node packages/omo-codex/scripts/install-local.mjs install
+```
+
+Result summary:
+
+```text
+Installed 1 plugin(s) from sisyphuslabs.
+```
+
+Sandbox config excerpts confirmed:
+
+```toml
+[features]
+plugin_hooks = true
+plugins = true
+
+[marketplaces.sisyphuslabs]
+
+[plugins."omo@sisyphuslabs"]
+enabled = true
+```
+
+Installed hook manifest:
+
+```text
+hook_manifest=/tmp/tmp.tFS9VEtPue/codex/plugins/cache/sisyphuslabs/omo/4.10.0/hooks/hooks.json
+SessionStart: node "$PLUGIN_ROOT/scripts/auto-update.mjs" | node "$PLUGIN_ROOT/components/bootstrap/dist/cli.js" hook session-start | node "$PLUGIN_ROOT/components/rules/dist/cli.js" hook session-start | node "$PLUGIN_ROOT/components/telemetry/dist/cli.js" hook session-start
+UserPromptSubmit: node "$PLUGIN_ROOT/components/rules/dist/cli.js" hook user-prompt-submit | node "$PLUGIN_ROOT/components/ulw-loop/dist/cli.js" hook user-prompt-submit | node "$PLUGIN_ROOT/components/ultrawork/dist/cli.js" hook user-prompt-submit
+PreToolUse: node "$PLUGIN_ROOT/components/git-bash/dist/cli.js" hook pre-tool-use | node "$PLUGIN_ROOT/components/ulw-loop/dist/cli.js" hook pre-tool-use
+PostToolUse: node "$PLUGIN_ROOT/components/comment-checker/dist/cli.js" hook post-tool-use | node "$PLUGIN_ROOT/components/lsp/dist/cli.js" hook post-tool-use | node "$PLUGIN_ROOT/components/rules/dist/cli.js" hook post-tool-use
+PostCompact: node "$PLUGIN_ROOT/components/git-bash/dist/cli.js" hook post-compact | node "$PLUGIN_ROOT/components/lsp/dist/cli.js" hook post-compact | node "$PLUGIN_ROOT/components/rules/dist/cli.js" hook post-compact
+Stop: node "$PLUGIN_ROOT/components/start-work-continuation/dist/cli.js" hook stop
+SubagentStop: node "$PLUGIN_ROOT/components/lazycodex-executor-verify/dist/cli.js" hook subagent-stop
+```
+
+## Real Codex exec with hooks enabled
+
+The first `codex exec --oss` attempt stopped before session startup because no default OSS provider was configured. It is not used as hook-firing proof.
+
+Command rerun with an explicit local provider:
+
+```bash
+OMO_CODEX_DISABLE_POSTHOG=1 codex exec --json \
+  --dangerously-bypass-hook-trust \
+  --skip-git-repo-check \
+  --oss --local-provider ollama \
+  -C "$PWD" \
+  'please ultrawork; respond with exactly: hook qa ok'
+```
+
+Codex JSONL stream showed a real session and hooks enabled for the invocation:
+
+```jsonl
+{"type":"thread.started","thread_id":"019ecadf-c9de-7c23-84ee-00b813e9303a"}
+{"type":"item.completed","item":{"id":"item_0","type":"error","message":"`--dangerously-bypass-hook-trust` is enabled. Enabled hooks may run without review for this invocation."}}
+{"type":"turn.started"}
+{"type":"turn.completed","usage":{"input_tokens":16384,"cached_input_tokens":0,"output_tokens":321,"reasoning_output_tokens":0}}
+```
+
+Persisted Codex session JSONL contains the `UserPromptSubmit` hook output injected by the installed plugin:
+
+```text
+/tmp/tmp.tFS9VEtPue/codex/sessions/2026/06/15/rollout-2026-06-15T10-42-04-019ecadf-c9de-7c23-84ee-00b813e9303a.jsonl:
+10:{"timestamp":"2026-06-15T10:42:05.857Z","type":"response_item","payload":{"type":"message","role":"developer","content":[{"type":"input_text","text":"Total output lines: 360\n\n<ultrawork-mode>\n\n**MANDATORY**: First user-visible line this turn MUST be exactly:\n`ULTRAWORK MODE ENABLED!`\n...\n</ultrawork-mode>\n\nFull hook output saved to: /tmp/hook_outputs/019ecadf-c9de-7c23-84ee-00b813e9303a/fa4232fb-332a-459d-a929-ec1ef86553e5.txt"}]}}
+```
+
+This proves the real Codex process loaded the local `omo@sisyphuslabs` plugin and fired at least the `UserPromptSubmit` hook during a live `codex exec` turn.
+
+## Isolation receipt
+
+```text
+real_config_hash_before_rerun=4b1cfdbf0807bde49e0bf295d0903b22a96b237a39211874b051861f5e6e7974
+real_config_hash_after_rerun=4b1cfdbf0807bde49e0bf295d0903b22a96b237a39211874b051861f5e6e7974
+real_config_hash_unchanged_after_rerun=yes
+```
+
+finished_at=2026-06-15T19:42:05+09:00

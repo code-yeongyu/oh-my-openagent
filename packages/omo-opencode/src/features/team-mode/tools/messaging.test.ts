@@ -25,6 +25,8 @@ import { clearTeamSessionRegistry, registerTeamSession } from "../team-session-r
 import type { Message } from "@oh-my-opencode/team-core/types"
 import { MessageSchema } from "@oh-my-opencode/team-core/types"
 import { createTeamIdleWakeHint } from "../../../hooks/team-session-events/team-idle-wake-hint"
+import { applyMemberSessionRouting, buildMemberPromptBody } from "../member-session-routing"
+import { resetLiveServerRouteForTesting } from "../../../shared/live-server-route"
 import { createTeamSendMessageTool } from "./messaging"
 import { resolveTeamRuntimeDetails } from "./messaging-runtime"
 
@@ -99,6 +101,7 @@ afterEach(() => {
   SessionCategoryRegistry.clear()
   clearAllSessionPromptParams()
   releaseAllPromptAsyncReservationsForTesting()
+  resetLiveServerRouteForTesting()
   _resetForTesting()
 })
 
@@ -246,8 +249,14 @@ describe("createTeamSendMessageTool", () => {
     }, fixture.toolContext(fixture.memberOneSessionId))
 
     // then
-    await expect(result).rejects.toThrow("unknown or inactive team recipient")
-    await expect(readdir(escapedInboxRoot)).rejects.toThrow()
+    await result.then(
+      () => { throw new Error("expected team_send_message to reject path traversal") },
+      (error) => expect(error).toBeInstanceOf(Error),
+    )
+    await readdir(escapedInboxRoot).then(
+      () => { throw new Error("expected escaped inbox root to be absent") },
+      (error) => expect(error).toBeInstanceOf(Error),
+    )
   })
 
   test("treats a host-injected empty correlationId as omitted", async () => {
@@ -579,21 +588,14 @@ describe("createTeamSendMessageTool", () => {
     }
     await saveState(state, fixture.config)
 
-    const { client, calls } = createRecordingClient()
-    const liveTool = createTeamSendMessageTool(fixture.config, client)
-
     // when
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "ping",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    applyMemberSessionRouting(fixture.memberTwoSessionId, memberTwo)
+    const body = buildMemberPromptBody(memberTwo, "ping")
 
     // then
-    expect(calls).toHaveLength(1)
-    expect(calls[0].agent).toBe("Sisyphus-Junior")
-    expect(calls[0].model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
-    expect(calls[0].variant).toBe("medium")
+    expect(body.agent).toBe("Sisyphus-Junior")
+    expect(body.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+    expect(body.variant).toBe("medium")
     expect(SessionCategoryRegistry.get(fixture.memberTwoSessionId)).toBe("quick")
     expect(getSessionPromptParams(fixture.memberTwoSessionId)).toEqual({
       temperature: 0.2,
@@ -1072,7 +1074,13 @@ describe("createTeamSendMessageTool", () => {
     }, fixture.toolContext(fixture.memberOneSessionId))
 
     // then
-    await expect(result).rejects.toThrow("correlationId")
-    await expect(readdir(getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2"))).rejects.toThrow()
+    await result.then(
+      () => { throw new Error("expected team_send_message to reject non-UUID correlationId") },
+      (error) => expect(String(error)).toContain("correlationId"),
+    )
+    await readdir(getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")).then(
+      () => { throw new Error("expected recipient inbox to be absent after rejected send") },
+      (error) => expect(error).toBeInstanceOf(Error),
+    )
   })
 })

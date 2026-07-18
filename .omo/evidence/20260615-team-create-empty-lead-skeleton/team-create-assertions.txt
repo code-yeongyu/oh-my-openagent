@@ -1,0 +1,8 @@
+PASS: opencode run emitted a team_create tool_use event
+PASS: team_create input included the host-style lead skeleton discriminator
+PASS: opencode run emitted a team_list verification tool_use event
+PASS: team_create result preserved the requested team name
+PASS: team_create did not return the stale exactly-one validation error
+PASS: real OpenCode DB path was stable before and after isolated run
+PASS: real OpenCode DB session count was unchanged before and after isolated run
+PASS: isolated run used a sandbox OpenCode DB path distinct from the real DB

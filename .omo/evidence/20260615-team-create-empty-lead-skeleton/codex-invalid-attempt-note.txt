@@ -1,0 +1,3 @@
+first_attempt_note=Invalid initial QA attempt did not export CODEX_HOME, so installer used real Codex home; do not use codex-isolated-install.txt as isolation proof.
+real_config_hash_before_invalid_attempt=2af8ab384e4ea463b2629fed3205ffae132bb67216cdb3e32443b634c026e02c
+real_config_hash_after_invalid_attempt=4b1cfdbf0807bde49e0bf295d0903b22a96b237a39211874b051861f5e6e7974
