@@ -21,6 +21,10 @@ const activeSections: ComputeViewSections = {
   roster: { kind: "empty" },
   agents: { kind: "list", agents: [{ name: "fixer", status: "busy" }] },
   jobs: { kind: "list", jobs: [{ title: "explore repo", status: "running", toolCalls: 3, lastTool: "grep" }] },
+  teams: {
+    kind: "list",
+    teams: [{ name: "sidebar-team", members: [{ name: "idle-member", status: "idle", work: "Reviewing sidebar", sessionId: null }] }],
+  },
   loop: {
     kind: "live",
     goalsDone: 0,
@@ -34,7 +38,7 @@ const activeSections: ComputeViewSections = {
 }
 
 describe("tui sidebar renderView", () => {
-  it("#given active view #when building nodes #then it renders ULW agents jobs and invalid banner in order", () => {
+  it("#given active view #when building nodes #then it renders ULW agents jobs Team and invalid banner in order", () => {
     // given
     const view = computeView(activeSections)
 
@@ -46,11 +50,13 @@ describe("tui sidebar renderView", () => {
     expect(description).toContain("config invalid")
     expect(description.indexOf("ULW")).toBeLessThan(description.indexOf("Agents"))
     expect(description.indexOf("Agents")).toBeLessThan(description.indexOf("Jobs"))
+    expect(description.indexOf("Jobs")).toBeLessThan(description.indexOf("Team (1)"))
     expect(description).toContain("0/1")
     expect(description).toContain("pass 1")
     expect(description).toContain("fail 1")
     expect(description).toContain("fixer")
     expect(description).toContain("explore repo")
+    expect(description).toContain("sidebar-team/idle-mem...")
     expect(nodes[0]?.kind).toBe("box")
   })
 
@@ -76,6 +82,7 @@ describe("tui sidebar renderView", () => {
       roster: { kind: "empty" },
       agents: { kind: "none" },
       jobs: { kind: "none" },
+      teams: { kind: "none" },
       loop: { kind: "none" },
     })
 

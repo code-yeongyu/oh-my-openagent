@@ -2,6 +2,8 @@ import { LABEL_MAX } from "./constants"
 import { box, text } from "./element-helpers"
 import type { ViewNode } from "./element-helpers"
 import { assertNever } from "./state-types"
+import { teamLines, teamNodes } from "./team-section"
+import type { TeamSectionInteraction } from "./team-section"
 import type {
   AgentsState,
   ConfigBanner,
@@ -22,7 +24,7 @@ type ThemeLike = {
   readonly borderSubtle?: unknown
 }
 
-export function buildViewNodes(view: SidebarView, theme: ThemeLike): ViewNode[] {
+export function buildViewNodes(view: SidebarView, theme: ThemeLike, teamInteraction?: TeamSectionInteraction): ViewNode[] {
   switch (view.kind) {
     case "active":
       return [
@@ -31,6 +33,7 @@ export function buildViewNodes(view: SidebarView, theme: ThemeLike): ViewNode[] 
           ...loopNodes(view.loop, theme),
           ...agentNodes(view.agents, theme),
           ...jobNodes(view.jobs, theme),
+          ...teamNodes(view.teams, theme, teamInteraction),
         ]),
       ]
     case "broken":
@@ -54,6 +57,7 @@ function linesForView(view: SidebarView): string[] {
         ...loopLines(view.loop),
         ...agentLines(view.agents),
         ...jobLines(view.jobs),
+        ...teamLines(view.teams),
       ]
     case "broken":
       return ["config invalid - run doctor", ...view.messages]
