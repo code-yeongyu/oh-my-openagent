@@ -47,12 +47,14 @@ export const AgentOverrideConfigSchema = z.object({
     .object({
       model: z.string().optional(),
       variant: z.string().optional(),
+      fallback_models: FallbackModelsSchema.optional(),
     })
     .optional(),
   compaction: z
     .object({
       model: z.string().optional(),
       variant: z.string().optional(),
+      fallback_models: FallbackModelsSchema.optional(),
     })
     .optional(),
 })
