@@ -204,6 +204,30 @@ describe("agent-sort-shim", () => {
     })
   })
 
+  describe("#given plan and build in agent_order config (#4039)", () => {
+    describe("#when toSorted is called with plan and build ranked before core agents", () => {
+      test("#then plan and build sort before unordered core agents", () => {
+        // given
+        setAgentSortOrder(["plan", "build", "sisyphus", "hephaestus", "prometheus", "atlas"])
+        const sisyphus = { name: "Sisyphus - Ultraworker" }
+        const hephaestus = { name: "Hephaestus - Deep Agent" }
+        const prometheus = { name: "Prometheus - Plan Builder" }
+        const atlas = { name: "Atlas - Plan Executor" }
+        const plan = { name: "plan" }
+        const build = { name: "build" }
+        const input = [atlas, prometheus, hephaestus, sisyphus, plan, build]
+
+        // when
+        const result = input.toSorted((a, b) => a.name.localeCompare(b.name))
+
+        // then plan and build are not ranked at UNRANKED (MAX_SAFE_INTEGER) — they come before sisyphus
+        const names = result.map((x) => x.name)
+        expect(names.indexOf("plan")).toBeLessThan(names.indexOf("Sisyphus - Ultraworker"))
+        expect(names.indexOf("build")).toBeLessThan(names.indexOf("Sisyphus - Ultraworker"))
+      })
+    })
+  })
+
   describe("#given installAgentSortShim has been invoked multiple times", () => {
     describe("#when toSorted is called on core agents after duplicate installs", () => {
       test("#then result is canonical order with no double-wrapping side effects", () => {
