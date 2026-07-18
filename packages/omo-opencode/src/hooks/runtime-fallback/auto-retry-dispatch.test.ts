@@ -105,6 +105,38 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     expect(state.pendingFallbackModel).toBe("openai/gpt-5.4")
   })
 
+  test("#given custom reserved retry settings #when a reservation outlasts the first retry #then the configured retry window is used", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    deps.config.reserved_retry_attempts = 2
+    deps.config.reserved_retry_base_delay_ms = 100
+    const helpers = createAutoRetryHelpers(deps)
+    const sessionID = "session-custom-reserved-retry"
+    const state = createFallbackState("anthropic/claude-opus-4-7")
+    state.pendingFallbackModel = "openai/gpt-5.4"
+    deps.sessionStates.set(sessionID, state)
+    reserveSession(sessionID, 250)
+    const clock = installRuntimeFallbackTestClock()
+
+    // when
+    const retryPromise = helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", undefined, "session.error")
+    await flushPromptGateMicrotasks()
+    await clock.advanceBy(100)
+    await flushPromptGateMicrotasks()
+
+    // then - first configured retry still sees the reservation
+    expect(promptCalls.count).toBe(0)
+
+    // when
+    await clock.advanceBy(200)
+    const result = await retryPromise
+
+    // then - the second configured retry runs at 300ms total and succeeds
+    expect(result).toEqual({ accepted: true, status: "queued" })
+    expect(promptCalls.count).toBe(1)
+  })
+
   test("#given the retried dispatch fails ambiguously after the reservation releases #when auto retry runs #then the pending fallback is preserved as possibly accepted", async () => {
     // given
     const promptCalls = { count: 0 }

@@ -19,6 +19,7 @@ export function createAutoRetryDispatcher(
   clearSessionFallbackTimeout: (sessionID: string) => void,
 ) {
   const {
+    config,
     ctx,
     sessionStates,
     sessionRetryInFlight,
@@ -151,15 +152,15 @@ export function createAutoRetryDispatcher(
       if (promptResult.status === "reserved") {
         // Session still has an active reservation from the cancelled stream.
         // Retry with linear backoff until the reservation is released.
-        const MAX_RESERVED_RETRIES = 6
-        const BASE_DELAY_MS = 500
+        const maxReservedRetries = config.reserved_retry_attempts ?? 6
+        const baseDelayMs = config.reserved_retry_base_delay_ms ?? 500
         let reservedResult: InternalPromptDispatchResult = promptResult
-        for (let attempt = 0; attempt < MAX_RESERVED_RETRIES; attempt++) {
-          const delay = BASE_DELAY_MS * (attempt + 1)
+        for (let attempt = 0; attempt < maxReservedRetries; attempt++) {
+          const delay = baseDelayMs * (attempt + 1)
           log(`[${HOOK_NAME}] Session reserved, retrying fallback dispatch in ${delay}ms (${source})`, {
             sessionID,
             attempt: attempt + 1,
-            maxAttempts: MAX_RESERVED_RETRIES,
+            maxAttempts: maxReservedRetries,
           })
           await new Promise((r) => setTimeout(r, delay))
           reservedResult = await dispatchRetryPrompt(

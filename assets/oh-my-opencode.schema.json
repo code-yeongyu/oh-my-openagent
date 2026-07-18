@@ -6219,6 +6219,16 @@
               "type": "number",
               "minimum": 0
             },
+            "reserved_retry_attempts": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 60
+            },
+            "reserved_retry_base_delay_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 60000
+            },
             "notify_on_fallback": {
               "type": "boolean"
             },
