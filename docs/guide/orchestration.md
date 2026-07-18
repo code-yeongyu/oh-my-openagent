@@ -180,16 +180,16 @@ Before Prometheus writes the plan, Metis catches what Prometheus missed:
 
 The plan author (Prometheus) has "ADHD working memory" - it makes connections that never make it onto the page. Metis forces externalization of implicit knowledge.
 
-### Momus: The Ruthless Reviewer
+### High-Accuracy Review: Momus + Oracle
 
-For high-accuracy mode, Momus validates plans against four core criteria:
+High-accuracy mode runs two independent reviews in parallel: Momus checks plan quality and Oracle checks the plan on the strongest available reasoning model. Both must approve before handoff. Momus validates plans against four core criteria:
 
 1. **Clarity**: Does each task specify WHERE to find implementation details?
 2. **Verification**: Are acceptance criteria concrete and measurable?
 3. **Context**: Is there sufficient context to proceed without >10% guesswork?
 4. **Big Picture**: Is the purpose, background, and workflow clear?
 
-**The Momus Loop:**
+**The Dual-Review Loop:**
 
 Momus only says "OKAY" when:
 
@@ -199,51 +199,13 @@ Momus only says "OKAY" when:
 - Zero tasks require assumptions about business logic
 - Zero critical red flags
 
-If REJECTED, Prometheus fixes issues and resubmits. No maximum retry limit.
+If either reviewer rejects the plan, Prometheus fixes every cited issue and resubmits to both reviewers. No maximum retry limit.
 
 ### Where to Spend a Scarce Premium Model
 
-If you have exactly one quota-limited premium model and every other model is effectively unlimited, spend the premium model on low-frequency advisory roles, not high-churn execution.
+Choose a compatible role before optimizing for invocation frequency. For example, a scarce Claude-family model such as Fable 5 fits Metis better than GPT-oriented Oracle or Momus. High-accuracy planning also runs Oracle and Momus together on every review round, so neither is purely an on-demand slot in that workflow.
 
-Recommended order:
-
-1. **Metis** - Best default placement. Metis usually runs once before implementation and catches hidden intent, ambiguity, missing acceptance criteria, and bad plan shape before any code is written.
-2. **Oracle** - Best on-demand placement. Use the premium model for hard architecture/debug consultations that Sisyphus or Atlas explicitly ask for.
-3. **Momus** - Good when you regularly use high-accuracy planning. Momus can loop, so it may spend more quota than Metis, but each pass gates plan quality before implementation.
-4. **Prometheus** - Use only when the planning interview itself needs the premium model. It is lower frequency than Sisyphus, but a long interview can still burn quota.
-
-Avoid these placements for a scarce premium model:
-
-- **Sisyphus**: high-frequency orchestrator; every normal turn spends quota.
-- **Atlas**: executes plan orchestration and verification loops; still too chatty for scarce quota.
-- **Sisyphus-Junior / categories**: execution layer; the system is designed so workers do not need the rarest model.
-- **Explore / Librarian**: search and lookup work; speed and parallelism matter more than peak reasoning.
-
-Example "surgical premium model" config:
-
-```jsonc
-{
-  "agents": {
-    "metis": {
-      "model": "anthropic/claude-fable-5",
-      "variant": "max",
-      "fallback_models": [
-        { "model": "anthropic/claude-sonnet-4-6" },
-        { "model": "openai/gpt-5.5", "variant": "high" },
-        { "model": "kimi-for-coding/k2p5" }
-      ]
-    },
-    "oracle": {
-      "fallback_models": [
-        { "model": "anthropic/claude-fable-5", "variant": "max" },
-        { "model": "openai/gpt-5.5", "variant": "high" }
-      ]
-    }
-  }
-}
-```
-
-This keeps Fable 5 out of the high-frequency path while still making it available at the moments where one better judgment call can prevent many downstream edits.
+See [Agent-Model Matching: Where to Spend One Scarce Premium Model](./agent-model-matching.md#where-to-spend-one-scarce-premium-model) for the family-aware heuristic and a concrete configuration.
 
 ---
 
