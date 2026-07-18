@@ -1,9 +1,8 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { describe, test, expect, beforeEach } from "bun:test"
 import {
   isInsideTmux,
   isServerRunning,
   resetServerCheck,
-  markServerRunningInProcess,
   spawnTmuxPane,
   closeTmuxPane,
   applyLayout,
@@ -111,6 +110,24 @@ describe("isServerRunning", () => {
     expect(result).toBe(false)
   })
 
+  test("checks external health when the legacy in-process marker is set", async () => {
+    // given
+    const serverRunningKey = Symbol.for("oh-my-opencode:server-running-in-process")
+    const globalState = globalThis as Record<symbol, boolean>
+    const fetchMock = createFetchRecorder(async () => new Response(null, { status: 503 }))
+    globalState[serverRunningKey] = true
+
+    try {
+      // when
+      const result = await isServerRunning("http://localhost:4096", { fetchImplementation: fetchMock })
+
+      // then
+      expect({ result, fetchCalls: fetchMock.calls.length }).toEqual({ result: false, fetchCalls: 2 })
+    } finally {
+      delete globalState[serverRunningKey]
+    }
+  })
+
   test("caches successful result", async () => {
     // given
     const state = createServerHealthStateForTesting()
@@ -173,44 +190,6 @@ describe("resetServerCheck", () => {
     // then - should call fetch twice after reset
     expect(fetchMock.calls.length).toBe(2)
 
-  })
-})
-
-describe("markServerRunningInProcess", () => {
-  const SERVER_RUNNING_KEY = Symbol.for("oh-my-opencode:server-running-in-process")
-
-  beforeEach(() => {
-    resetServerCheck()
-    delete (globalThis as Record<symbol, boolean>)[SERVER_RUNNING_KEY]
-  })
-
-  afterEach(() => {
-    delete (globalThis as Record<symbol, boolean>)[SERVER_RUNNING_KEY]
-  })
-
-  test("skips HTTP fetch when marked as running in-process", async () => {
-    // given
-    const state = createServerHealthStateForTesting()
-    state.serverRunningInProcess = true
-    const fetchMock = createFetchRecorder(async () => new Response(null, { status: 200 }))
-
-    // when
-    const result = await isServerRunning("http://localhost:4096", { fetchImplementation: fetchMock, state })
-
-    // then
-    expect(result).toBe(true)
-    expect(fetchMock.calls.length).toBe(0)
-  })
-
-  test("uses globalThis so flag survives across module instances", () => {
-    // given
-    markServerRunningInProcess()
-
-    // when
-    const flag = (globalThis as Record<symbol, boolean>)[SERVER_RUNNING_KEY]
-
-    // then
-    expect(flag).toBe(true)
   })
 })
 
