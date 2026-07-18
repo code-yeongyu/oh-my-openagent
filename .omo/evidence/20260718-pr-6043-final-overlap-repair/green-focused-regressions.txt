@@ -1,0 +1,19 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/generation-token-regressions.test.ts:
+(pass) runtime-fallback generation token cleanup > #given a replacement payload fetch #when the stale fetch settles #then its cleanup preserves the replacement token [1.11ms]
+(pass) runtime-fallback generation token cleanup > #given a newer watchdog response marker #when stale cleanup runs #then the newer generation remains pending [0.09ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/watchdog-status-overlap-regression.test.ts:
+(pass) runtime-fallback watchdog and status overlap > #given a replacement retry owner appears during status abort #when the old transaction settles #then the detached watchdog is committed [1.00ms]
+(pass) runtime-fallback watchdog and status overlap > #given watchdog and status coalesce one abort #when its terminal is consumed #then the next user abort remains external [1.20ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/retry-owner-abort-overlap.test.ts:
+(pass) stale session status abort preserves replacement retry ownership [0.26ms]
+(pass) stale message retry abort preserves replacement retry ownership [0.42ms]
+
+ 6 pass
+ 0 fail
+ 15 expect() calls
+Ran 6 tests across 3 files. [61.00ms]
+green_exit=0

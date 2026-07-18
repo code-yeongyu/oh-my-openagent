@@ -1,0 +1,9 @@
+head=6a3567fbd1ddcabedcd56ec6e11da23f19ed78ec
+branch=review/pr-6043
+real_db_count=5751
+diff_check=pass
+pure_loc=121 packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-fire.ts
+pure_loc=188 packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.ts
+pure_loc=48 packages/omo-opencode/src/hooks/runtime-fallback/generation-token-regressions.test.ts
+pure_loc=130 packages/omo-opencode/src/hooks/runtime-fallback/watchdog-status-overlap-regression.test.ts
+pure_loc_gate=pass
