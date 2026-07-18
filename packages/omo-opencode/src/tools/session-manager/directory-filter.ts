@@ -1,18 +1,21 @@
-import { normalize } from "node:path"
+import { normalize, parse, sep } from "node:path"
 
 /**
  * Normalize session directory strings for filter comparison.
- * Strips trailing slashes (except root "/") and applies path.normalize.
+ * Strips trailing separators (except platform roots) and applies path.normalize.
  * Does not resolve symlinks or change case.
  */
-function toPosixSeparators(path: string): string {
-  return path.replace(/\\/g, "/")
+function toComparisonSeparators(path: string): string {
+  return sep === "\\" ? path.replace(/\\/g, "/") : path
 }
 
 export function normalizeSessionDirectory(directory: string): string {
-  if (directory === "/" || directory === "\\") return "/"
-  const withoutTrailing = directory.replace(/[/\\]+$/, "") || "/"
-  return toPosixSeparators(normalize(withoutTrailing))
+  const normalized = normalize(directory)
+  const root = parse(normalized).root
+  const withoutTrailing = normalized !== root && normalized.endsWith(sep)
+    ? normalized.slice(0, -1)
+    : normalized
+  return toComparisonSeparators(withoutTrailing)
 }
 
 export function sessionDirectoriesMatch(stored: string, filter: string): boolean {

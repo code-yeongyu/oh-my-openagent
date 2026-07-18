@@ -23,4 +23,24 @@ describe("directory-filter", () => {
   test("sessionDirectoriesMatch normalizes dot segments", () => {
     expect(sessionDirectoriesMatch("/path/to/./projectA", "/path/to/projectA")).toBe(true)
   })
+
+  test("sessionDirectoriesMatch preserves literal POSIX backslashes", () => {
+    if (process.platform === "win32") return
+
+    expect(sessionDirectoriesMatch("/tmp/project\\child", "/tmp/project/child")).toBe(false)
+    expect(sessionDirectoriesMatch("/tmp/\\", "/tmp")).toBe(false)
+  })
+
+  test("sessionDirectoriesMatch preserves Windows drive roots", () => {
+    if (process.platform !== "win32") return
+
+    expect(sessionDirectoriesMatch("C:\\", "C:\\project\\..")).toBe(true)
+    expect(sessionDirectoriesMatch("C:\\", "C:")).toBe(false)
+  })
+
+  test("sessionDirectoriesMatch accepts mixed Windows separators", () => {
+    if (process.platform !== "win32") return
+
+    expect(sessionDirectoriesMatch("C:\\project\\child", "C:/project/child/")).toBe(true)
+  })
 })
