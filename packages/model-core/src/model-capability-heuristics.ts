@@ -15,12 +15,14 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
     family: "claude-opus",
     pattern: /claude(?:-\d+(?:-\d+)*)?-opus/,
     variants: ["low", "medium", "high", "max"],
+    reasoningEfforts: ["low", "medium", "high", "max"],
     supportsThinking: true,
   },
   {
     family: "claude-non-opus",
     includes: ["claude"],
     variants: ["low", "medium", "high"],
+    reasoningEfforts: ["low", "medium", "high"],
     supportsThinking: true,
   },
   {
