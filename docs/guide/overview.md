@@ -103,7 +103,7 @@ The `deep` category is an orchestrator-routed task executed by Sisyphus-Junior w
 
 - **Multi-model orchestration.** Pure Codex is single-model. OmO routes different tasks to different models automatically. GPT for deep reasoning. Gemini for frontend. GPT-5.4 Mini for speed. The right brain for the right job.
 - **Background agents.** Fire 5+ agents in parallel. Something Codex simply cannot do. While one agent writes code, another researches patterns, another checks documentation. Like a real dev team.
-- **Category system.** Tasks are routed by intent, not model name. `visual-engineering` gets Gemini. `ultrabrain` prefers GPT-5.6 Sol xhigh through OpenAI or Vercel. `deep` prefers GPT-5.6 Terra xhigh through OpenAI or Vercel. `artistry` gets Gemini. `quick` gets GPT-5.4 Mini. `unspecified-low` prefers GPT-5.6 Luna xhigh. `unspecified-high` gets Claude Opus. `writing` gets prose-optimized models. No manual juggling.
+- **Category system.** Tasks are routed by intent, not model name. `visual-engineering` gets Gemini. `ultrabrain` prefers GPT-5.6 Sol `xhigh` through OpenAI or Vercel, or `high` through GitHub Copilot. `deep` prefers GPT-5.6 Terra `xhigh` through OpenAI or Vercel, or `high` through GitHub Copilot. `artistry` gets Gemini. `quick` gets GPT-5.4 Mini. `unspecified-low` prefers GPT-5.6 Luna `xhigh` through OpenAI or Vercel, or `high` through GitHub Copilot. `unspecified-high` gets Claude Opus. `writing` gets prose-optimized models. No manual juggling.
 - **Accumulated wisdom.** Subagents learn from previous results. Conventions discovered in task 1 are passed to task 5. Mistakes made early aren't repeated. The system gets smarter as it works.
 
 ### Prometheus: The Strategic Planner
@@ -232,9 +232,9 @@ You can override specific agents or categories in your config:
 
 **GPT models** (explicit reasoning, principle-driven):
 
-- GPT-5.6 Sol — preferred for Hephaestus (`high`) through OpenAI, GitHub Copilot, or Vercel and for `ultrabrain` (`xhigh`) through OpenAI or Vercel; first fallback for `deep`
-- GPT-5.6 Terra — mid-tier; default for the `deep` category (xhigh); preferred for Momus (high)
-- GPT-5.6 Luna — light tier; default for the `unspecified-low` category (xhigh)
+- GPT-5.6 Sol — preferred for Hephaestus (`high`) through OpenAI, GitHub Copilot, or Vercel; preferred for `ultrabrain` (`xhigh` through OpenAI or Vercel, `high` through GitHub Copilot); first fallback for `deep` (`high`)
+- GPT-5.6 Terra — mid-tier; default for `deep` (`xhigh` through OpenAI or Vercel, `high` through GitHub Copilot); preferred for Momus (`high`)
+- GPT-5.6 Luna — light tier; default for `unspecified-low` (`xhigh` through OpenAI or Vercel, `high` through GitHub Copilot)
 - GPT-5.5 — deep coding powerhouse, default for Oracle and the first GPT fallback for GPT-5.6-native roles
 - GPT-5.4 Mini — fast and cheap utility tasks
 
