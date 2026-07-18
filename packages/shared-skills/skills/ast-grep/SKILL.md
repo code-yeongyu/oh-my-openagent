@@ -73,10 +73,12 @@ python3 scripts/ast_grep_helper.py search 'console.log($MSG)' --lang ts src/
 Validates the pattern offline first. If the pattern looks like regex (`\w`, `.*`, `|`, etc.) the helper exits with a hint and never calls `sg` — saves a round-trip. Pass `--force` to skip validation.
 
 Flags:
-- `--lang ts` (or any of the 25 languages; aliases like `js`, `py`, `rs`, `kt` accepted)
+- `--lang ts` (or any built-in/custom language; aliases like `js`, `py`, `rs`, `kt` accepted)
 - `--globs '!**/*.test.ts'` (repeatable; prefix `!` to exclude)
 - `-C 3` (context lines)
 - `--json-out` (raw JSON instead of human format)
+
+Custom languages registered under `customLanguages` in the nearest `sgconfig.yml` are accepted and passed through to `sg`. For explicit session-level additions, set `OMO_AST_GREP_EXTRA_LANGUAGES=systemverilog,mojo`.
 
 ### `replace` — rewrite by pattern, dry-run by default
 
@@ -124,7 +126,7 @@ python3 scripts/ast_grep_helper.py validate 'console.log($MSG)' --lang ts
 ### `langs` / `doctor` / `install`
 
 ```bash
-python3 scripts/ast_grep_helper.py langs       # list 25 supported languages and aliases
+python3 scripts/ast_grep_helper.py langs       # list built-in/custom languages and aliases
 python3 scripts/ast_grep_helper.py doctor      # check ast-grep binary availability
 python3 scripts/ast_grep_helper.py install     # delegate to install.sh / install.ps1
 ```
