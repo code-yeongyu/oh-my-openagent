@@ -380,7 +380,7 @@ To remove oh-my-openagent:
 
    ```bash
    # Using jq
-   jq '.plugin = [.plugin[] | select(. != "oh-my-openagent" and . != "oh-my-opencode")]' \
+   jq '.plugin = [.plugin[] | select(split("@")[0] != "oh-my-openagent" and split("@")[0] != "oh-my-opencode")]' \
        ~/.config/opencode/opencode.json > /tmp/oc.json && \
        mv /tmp/oc.json ~/.config/opencode/opencode.json
    ```

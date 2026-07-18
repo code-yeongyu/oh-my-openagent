@@ -943,7 +943,7 @@ See [Privacy Policy](../legal/privacy-policy.md) and [Terms of Service](../legal
 
 ```bash
 # 1. Remove the plugin entry from opencode.json
-jq '.plugin = [.plugin[] | select(. != "oh-my-openagent" and . != "oh-my-opencode")]' \
+jq '.plugin = [.plugin[] | select(split("@")[0] != "oh-my-openagent" and split("@")[0] != "oh-my-opencode")]' \
     ~/.config/opencode/opencode.json > /tmp/oc.json && \
     mv /tmp/oc.json ~/.config/opencode/opencode.json
 
