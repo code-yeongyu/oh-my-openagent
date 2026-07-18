@@ -56,8 +56,10 @@ flowchart TB
     Prometheus -->|"Consult"| Metis
     Prometheus -->|"Interview"| User
     Prometheus -->|"Generate plan"| Plan[".omo/plans/*.md"]
-    Plan -->|"High accuracy?"| Momus
+    Plan -->|"High accuracy review"| Momus
+    Plan -->|"Independent review"| Oracle
     Momus -->|"OKAY / REJECT"| Prometheus
+    Oracle -->|"OKAY / REJECT"| Prometheus
 
     User -->|"/start-work"| Orchestrator
     Plan -->|"Read"| Orchestrator
@@ -115,7 +117,7 @@ When `ulw` or `ultrawork` is present, Sisyphus receives the ultrawork instructio
 
 ---
 
-## Planning: Prometheus + Metis + Momus
+## Planning: Prometheus + Metis + Momus + Oracle
 
 ### Prometheus: Your Strategic Consultant
 
@@ -146,11 +148,13 @@ stateDiagram-v2
     MetisConsult --> WritePlan: Incorporate findings
     WritePlan --> HighAccuracyChoice: Present to user
 
-    HighAccuracyChoice --> MomusLoop: User wants high accuracy
+    state "Momus + Oracle review" as DualReview
+
+    HighAccuracyChoice --> DualReview: User wants high accuracy
     HighAccuracyChoice --> Done: User accepts plan
 
-    MomusLoop --> WritePlan: REJECTED - fix issues
-    MomusLoop --> Done: OKAY - plan approved
+    DualReview --> WritePlan: EITHER REJECTS - fix issues
+    DualReview --> Done: BOTH APPROVE - plan approved
 
     Done --> [*]: Guide to /start-work
 ```
