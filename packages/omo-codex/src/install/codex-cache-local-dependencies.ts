@@ -4,10 +4,11 @@ import { readFile, readdir, writeFile } from "node:fs/promises"
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { isPathInside } from "./codex-cache-paths"
 
-export async function rewriteCachedPackageLocalFileDependencies(pluginRoot: string, sourceRoot: string): Promise<void> {
+export async function rewriteCachedPackageLocalFileDependencies(pluginRoot: string, sourceRoot: string): Promise<boolean> {
   const packageJsonPaths: string[] = []
   await collectPackageJsonPaths(pluginRoot, pluginRoot, packageJsonPaths)
   const packageLock = await readPackageLock(pluginRoot)
+  let anyManifestChanged = false
   for (const packageJsonPath of packageJsonPaths) {
     const raw = await readFile(packageJsonPath, "utf8")
     const parsed: unknown = JSON.parse(raw)
@@ -38,9 +39,13 @@ export async function rewriteCachedPackageLocalFileDependencies(pluginRoot: stri
         changed = true
       }
     }
-    if (changed) await writeFile(packageJsonPath, `${JSON.stringify(parsed, null, "\t")}\n`)
+    if (changed) {
+      await writeFile(packageJsonPath, `${JSON.stringify(parsed, null, "\t")}\n`)
+      anyManifestChanged = true
+    }
   }
   if (packageLock.changed) await writeFile(packageLock.path, `${JSON.stringify(packageLock.value, null, "\t")}\n`)
+  return anyManifestChanged || packageLock.changed
 }
 
 type PackageLockState = {
