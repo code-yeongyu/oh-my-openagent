@@ -238,15 +238,15 @@ describe("resolveMultipleSkillsAsync", () => {
 
 	it("resolves nested skill by unique short name in mixed batch", async () => {
 		// given: nested skill and builtin skill
-		createNestedSkill(testConfigDir, "toolkit", "systematic-debugging", "short name resolved")
+		createNestedSkill(testConfigDir, "toolkit", "nested-debug-fixture", "short name resolved")
 
 		// when: mixing short name with full builtin name
-		const result = await resolveMultipleSkillsAsync(["systematic-debugging", "playwright"])
+		const result = await resolveMultipleSkillsAsync(["nested-debug-fixture", "playwright"])
 
 		// then: both resolved
 		expect(result.resolved.size).toBe(2)
 		expect(result.notFound).toEqual([])
-		expect(result.resolved.get("systematic-debugging")).toContain("short name resolved")
+		expect(result.resolved.get("nested-debug-fixture")).toContain("short name resolved")
 		expect(result.resolved.get("playwright")).toContain("Playwright Browser Automation")
 	})
 

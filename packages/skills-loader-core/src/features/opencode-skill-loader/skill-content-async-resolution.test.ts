@@ -132,11 +132,11 @@ describe("resolveSkillContentAsync", () => {
 	})
 
 	it("resolves nested skill by unique short name async", async () => {
-		// given: a discovered nested skill toolkit/systematic-debugging
-		createNestedSkill(testConfigDir, "toolkit", "systematic-debugging", "Short name test content")
+		// given: a discovered nested skill toolkit/nested-debug-fixture
+		createNestedSkill(testConfigDir, "toolkit", "nested-debug-fixture", "Short name test content")
 
 		// when: resolving by short name
-		const result = await resolveSkillContentAsync("systematic-debugging")
+		const result = await resolveSkillContentAsync("nested-debug-fixture")
 
 		// then: finds the nested skill
 		expect(result).not.toBeNull()
@@ -173,10 +173,10 @@ describe("resolveSkillContentAsync", () => {
 
 	it("is case-insensitive for short name matching async", async () => {
 		// given: a nested skill with lowercase name
-		createNestedSkill(testConfigDir, "toolkit", "systematic-debugging", "case insensitive match")
+		createNestedSkill(testConfigDir, "toolkit", "nested-debug-fixture", "case insensitive match")
 
 		// when: resolving by uppercase short name
-		const result = await resolveSkillContentAsync("Systematic-Debugging")
+		const result = await resolveSkillContentAsync("Nested-Debug-Fixture")
 
 		// then: finds it case-insensitively
 		expect(result).not.toBeNull()
