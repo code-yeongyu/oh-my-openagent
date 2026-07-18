@@ -139,6 +139,28 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4863.
 
+## #5367 — OpenCode-managed `@latest` cache can stay pinned after update
+
+- **Affects**: OpenCode installs that load `oh-my-openagent@latest` or legacy `oh-my-opencode@latest` through OpenCode's `Npm.add()` package sandbox under `~/.cache/opencode/packages/`.
+- **Symptom**: OMO reports that an update is available, or `doctor` reports a loaded-version mismatch, but restarting OpenCode keeps loading the older package. Clearing the general npm cache does not necessarily change the sandbox path OpenCode is using.
+- **Why it happens**: When the plugin is running from an OpenCode-managed sandbox such as `~/.cache/opencode/packages/oh-my-openagent@latest/node_modules/oh-my-openagent/`, OMO cannot reliably rewrite that sandbox itself. The auto-update checker therefore avoids claiming "Updated!" from that path and should surface an update-available notice instead.
+- **Workaround**: Close OpenCode and keep exactly one OMO entry in the config that currently owns the plugin. If that entry still uses `oh-my-opencode@latest`, replace it with `oh-my-openagent@latest` instead of adding a second entry. Remove the stale OpenCode package sandbox, then reinstall with `--force` in the same config scope:
+
+  ```sh
+  rm -rf ~/.cache/opencode/packages/oh-my-openagent@latest \
+         ~/.cache/opencode/packages/oh-my-opencode@latest
+
+  # User/global config:
+  opencode plugin --global --force oh-my-openagent@latest
+
+  # Project config (run from that project root instead):
+  opencode plugin --force oh-my-openagent@latest
+
+  bunx oh-my-openagent doctor --json
+  ```
+
+- **Status**: Open. The runtime now avoids the misleading auto-updated toast when it detects an OpenCode-managed sandbox, but users may still need the manual cache refresh above until OpenCode exposes a reliable package-sandbox update path. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5367.
+
 ## #4710: `@plan` may stay in Sisyphus instead of switching to Prometheus
 
 - **Affects**: Current OpenCode/Ultimate planning flow.
