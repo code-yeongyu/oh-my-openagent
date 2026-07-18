@@ -186,12 +186,7 @@ The plan author (Prometheus) has "ADHD working memory" - it makes connections th
 
 ### High-Accuracy Review: Momus + Oracle
 
-High-accuracy mode runs two independent reviews in parallel: Momus checks plan quality and Oracle checks the plan on the strongest available reasoning model. Both must approve before handoff. Momus validates plans against four core criteria:
-
-1. **Clarity**: Does each task specify WHERE to find implementation details?
-2. **Verification**: Are acceptance criteria concrete and measurable?
-3. **Context**: Is there sufficient context to proceed without >10% guesswork?
-4. **Big Picture**: Is the purpose, background, and workflow clear?
+High-accuracy mode runs two independent reviews in parallel: Momus checks plan quality and Oracle checks the plan on the strongest available reasoning model. Both must approve before handoff.
 
 **The Dual-Review Loop:**
 
