@@ -183,6 +183,15 @@ describe("OpenClaw Dispatcher", () => {
     }
   })
 
+  test("resolveCommandTimeoutMs clamps explicit and env timeout values", () => {
+    expect(resolveCommandTimeoutMs(99)).toBe(100)
+    expect(resolveCommandTimeoutMs(300_001)).toBe(300_000)
+    expect(resolveCommandTimeoutMs(1500.9)).toBe(1500)
+    expect(resolveCommandTimeoutMs(undefined, "not-a-number")).toBe(5_000)
+    expect(resolveCommandTimeoutMs(undefined, "50")).toBe(100)
+    expect(resolveCommandTimeoutMs(undefined, "400000")).toBe(300_000)
+  })
+
   test("terminateCommandProcess kills process group on unix when pid exists", () => {
     const killSpy = spyOn(process, "kill").mockImplementation(() => true)
     const proc = {
