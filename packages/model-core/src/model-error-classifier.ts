@@ -38,6 +38,12 @@ const NON_RETRYABLE_ERROR_NAMES = new Set([
  * Message patterns that indicate a retryable error even without a known error name.
  */
 const RETRYABLE_MESSAGE_PATTERNS = [
+  "socket connection",
+  "unable to connect",
+  "cannot connect",
+  "connection was closed",
+  "connection reset",
+  "econnreset",
   "rate_limit",
   "rate limit",
   "usage_limit_reached",

@@ -25,6 +25,12 @@ export type RuntimeFallbackErrorType =
   | "abort"
 
 export const RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERNS = [
+  /socket\s+connection/i,
+  /unable\s+to\s+connect/i,
+  /cannot\s+connect/i,
+  /connection\s+(?:was\s+)?closed/i,
+  /connection\s+reset/i,
+  /econnreset/i,
   /rate.?limit/i,
   /too.?many.?requests/i,
   /quota\s+will\s+reset\s+after/i,
