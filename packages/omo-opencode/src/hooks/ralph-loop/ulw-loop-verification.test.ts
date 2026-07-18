@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createRalphLoopHook } from "./index"
 import { ULTRAWORK_VERIFICATION_PROMISE } from "./constants"
+import { buildContinuationPrompt, buildVerificationFailurePrompt } from "./continuation-prompt-builder"
 import { clearState, writeState } from "./storage"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import type { RalphLoopState } from "./types"
@@ -51,6 +52,36 @@ describe("ulw-loop verification", () => {
 		}
 		return state
 	}
+
+	function createVerificationState(overrides: Partial<RalphLoopState> = {}): RalphLoopState {
+		return {
+			active: true,
+			completion_promise: "DONE",
+			initial_completion_promise: "DONE",
+			iteration: 2,
+			prompt: "Build API",
+			started_at: new Date().toISOString(),
+			ultrawork: true,
+			verification_pending: true,
+			...overrides,
+		}
+	}
+
+	test("#given verification is pending #when building the Oracle prompt #then it tells Oracle to emit VERIFIED on success", () => {
+		const prompt = buildContinuationPrompt(createVerificationState())
+
+		expect(prompt).toContain("explicitly instruct Oracle to end its reply with the exact line <promise>VERIFIED</promise>")
+		expect(prompt).toContain("if and only if the task is genuinely complete and correct")
+		expect(prompt).toContain("Oracle MUST be told to emit it")
+	})
+
+	test("#given verification failed #when building retry prompt #then it repeats the Oracle VERIFIED token protocol", () => {
+		const prompt = buildVerificationFailurePrompt(createVerificationState({ verification_pending: undefined }))
+
+		expect(prompt).toContain("explicitly instruct Oracle to end its reply with the exact line <promise>VERIFIED</promise>")
+		expect(prompt).toContain("if and only if the task is genuinely complete and correct")
+		expect(prompt).toContain("Oracle MUST be told to emit it")
+	})
 
 	beforeEach(() => {
 		promptCalls = []
