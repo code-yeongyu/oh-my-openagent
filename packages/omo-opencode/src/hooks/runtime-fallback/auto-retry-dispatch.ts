@@ -8,13 +8,13 @@ import { createInternalAgentContinuationTextPart } from "../../shared/internal-i
 import {
   dispatchInternalPrompt,
   isInternalPromptDispatchAccepted,
-  type InternalPromptDispatchResult,
 } from "../shared/prompt-async-gate"
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 import { resolveOriginalUserRetryMetadata } from "./auto-retry-metadata"
 import { isRuntimeFallbackActive } from "./lifecycle"
 import { getSessionGeneration, isSessionGenerationCurrent } from "./session-generation"
 import { acquireSessionRetryOwnership, releaseSessionRetryOwnership } from "./session-retry-ownership"
+import { retryReservedDispatch } from "./reserved-retry-dispatch"
 
 export function createAutoRetryDispatcher(
   deps: HookDeps,
@@ -170,27 +170,17 @@ export function createAutoRetryDispatcher(
         throw promptResult.error
       }
       if (promptResult.status === "reserved") {
-        // Session still has an active reservation from the cancelled stream.
-        // Retry with linear backoff until the reservation is released.
-        const MAX_RESERVED_RETRIES = 6
-        const BASE_DELAY_MS = 500
-        let reservedResult: InternalPromptDispatchResult = promptResult
-        for (let attempt = 0; attempt < MAX_RESERVED_RETRIES; attempt++) {
-          const delay = BASE_DELAY_MS * (attempt + 1)
-          log(`[${HOOK_NAME}] Session reserved, retrying fallback dispatch in ${delay}ms (${source})`, {
-            sessionID,
-            attempt: attempt + 1,
-            maxAttempts: MAX_RESERVED_RETRIES,
-          })
-          await new Promise((r) => setTimeout(r, delay))
-          if (!isCurrent()) return { accepted: false, status: "blocked", reason: "session lifecycle changed" }
-          reservedResult = await dispatchRetryPrompt(
-            `runtime-fallback:${source}:reserved-retry-${attempt + 1}`,
-            "defer",
-          )
-          if (!isCurrent()) return { accepted: false, status: "blocked", reason: "session lifecycle changed" }
-          if (reservedResult.status !== "reserved") break
+        const reservedOutcome = await retryReservedDispatch({
+          sessionID,
+          source,
+          initialResult: promptResult,
+          isCurrent,
+          dispatch: dispatchRetryPrompt,
+        })
+        if (reservedOutcome.status === "blocked") {
+          return { accepted: false, status: "blocked", reason: "session lifecycle changed" }
         }
+        const reservedResult = reservedOutcome.result
         if (reservedResult.status === "failed") {
           if (isAmbiguousPostDispatchPromptFailure(reservedResult)) {
             retryMayHaveBeenAccepted = true

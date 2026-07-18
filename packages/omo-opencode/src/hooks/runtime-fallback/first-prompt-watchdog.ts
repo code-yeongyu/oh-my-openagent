@@ -8,6 +8,10 @@ import type { ArmedWatchdog, FirstPromptWatchdog, WatchdogEventDecision } from "
 import { fireFirstPromptWatchdog } from "./first-prompt-watchdog-fire"
 import { acquireInternalAbortOwnership, clearInternalAbortOwnership } from "./internal-abort-ownership"
 import { createWatchdogOwnershipHandlers } from "./first-prompt-watchdog-ownership"
+import {
+  createFirstPromptWatchdogCanceller,
+  disposeFirstPromptWatchdog,
+} from "./first-prompt-watchdog-state"
 
 const SOURCE = "first-prompt-watchdog"
 
@@ -34,23 +38,15 @@ export function createFirstPromptWatchdog(
   let lifecycleGeneration = 0
   let nextSessionGeneration = 0
 
-  const cancel = (sessionID: string, preserveAbortProvenance = false, deleteGeneration = false): void => {
-    const timer = timers.get(sessionID)
-    if (timer) clearTimeout(timer)
-    timers.delete(sessionID)
-    armed.delete(sessionID)
-    suspended.delete(sessionID)
-    progressed.delete(sessionID)
-    suspendedAfterProgress.delete(sessionID)
-    currentAbortInspections.delete(sessionID)
-    if (!preserveAbortProvenance) abortProvenance.clear(sessionID)
-    currentUserMessageIDs.delete(sessionID)
-    if (deleteGeneration) sessionGenerations.delete(sessionID)
-    else {
+  const cancel = createFirstPromptWatchdogCanceller({
+    timers, armed, suspended, progressed, suspendedAfterProgress, currentAbortInspections,
+    currentUserMessageIDs, sessionGenerations, abortProvenance,
+    clearTimer: clearTimeout,
+    nextSessionGeneration: () => {
       nextSessionGeneration += 1
-      sessionGenerations.set(sessionID, nextSessionGeneration)
-    }
-  }
+      return nextSessionGeneration
+    },
+  })
 
   const arm = (context: ArmedWatchdog): void => {
     armed.set(context.sessionID, context)
@@ -253,13 +249,12 @@ export function createFirstPromptWatchdog(
     },
     resolveDeferredTerminal: ownershipHandlers.resolveDeferredTerminal,
     dispose() {
-      lifecycleGeneration += 1
-      for (const timer of timers.values()) clearTimeout(timer)
-      for (const state of [timers, armed, suspended, progressed, currentAbortInspections]) state.clear()
-      suspendedAfterProgress.clear()
-      sessionGenerations.clear()
-      currentUserMessageIDs.clear()
-      abortProvenance.clearAll()
+      disposeFirstPromptWatchdog({
+        timers, armed, suspended, progressed, currentAbortInspections, suspendedAfterProgress,
+        sessionGenerations, currentUserMessageIDs, abortProvenance,
+        clearTimer: clearTimeout,
+        advanceLifecycleGeneration: () => { lifecycleGeneration += 1 },
+      })
     },
   }
 }
