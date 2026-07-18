@@ -56,8 +56,10 @@ flowchart TB
     Prometheus -->|"Consult"| Metis
     Prometheus -->|"Interview"| User
     Prometheus -->|"Generate plan"| Plan[".omo/plans/*.md"]
-    Plan -->|"High accuracy?"| Momus
+    Plan -->|"High accuracy review"| Momus
+    Plan -->|"Independent review"| Oracle
     Momus -->|"OKAY / REJECT"| Prometheus
+    Oracle -->|"OKAY / REJECT"| Prometheus
 
     User -->|"/start-work"| Orchestrator
     Plan -->|"Read"| Orchestrator
@@ -115,7 +117,7 @@ When `ulw` or `ultrawork` is present, Sisyphus receives the ultrawork instructio
 
 ---
 
-## Planning: Prometheus + Metis + Momus
+## Planning: Prometheus + Metis + Momus + Oracle
 
 ### Prometheus: Your Strategic Consultant
 
@@ -146,11 +148,13 @@ stateDiagram-v2
     MetisConsult --> WritePlan: Incorporate findings
     WritePlan --> HighAccuracyChoice: Present to user
 
-    HighAccuracyChoice --> MomusLoop: User wants high accuracy
+    state "Momus + Oracle review" as DualReview
+
+    HighAccuracyChoice --> DualReview: High accuracy required or selected
     HighAccuracyChoice --> Done: User accepts plan
 
-    MomusLoop --> WritePlan: REJECTED - fix issues
-    MomusLoop --> Done: OKAY - plan approved
+    DualReview --> WritePlan: EITHER REJECTS - fix issues
+    DualReview --> Done: BOTH APPROVE - plan approved
 
     Done --> [*]: Guide to /start-work
 ```
@@ -180,26 +184,29 @@ Before Prometheus writes the plan, Metis catches what Prometheus missed:
 
 The plan author (Prometheus) has "ADHD working memory" - it makes connections that never make it onto the page. Metis forces externalization of implicit knowledge.
 
-### Momus: The Ruthless Reviewer
+### High-Accuracy Review: Momus + Oracle
 
-For high-accuracy mode, Momus validates plans against four core criteria:
+High-accuracy mode runs two independent reviews in parallel: Momus checks plan quality and Oracle checks the plan on the strongest available reasoning model. Both must approve before handoff.
 
-1. **Clarity**: Does each task specify WHERE to find implementation details?
-2. **Verification**: Are acceptance criteria concrete and measurable?
-3. **Context**: Is there sufficient context to proceed without >10% guesswork?
-4. **Big Picture**: Is the purpose, background, and workflow clear?
+**The Dual-Review Loop:**
 
-**The Momus Loop:**
+Momus is approval-biased and rejects only verified blockers. It checks that:
 
-Momus only says "OKAY" when:
+- Referenced files exist and support the plan's claims
+- Every task gives a developer a usable starting point
+- Tasks do not contradict each other
+- QA scenarios name the tool, steps, and expected result
+- No missing information would completely stop execution
 
-- 100% of file references verified
-- ≥80% of tasks have clear reference sources
-- ≥90% of tasks have concrete acceptance criteria
-- Zero tasks require assumptions about business logic
-- Zero critical red flags
+Minor gaps and details that a developer can resolve during implementation do not block approval; a plan that is roughly 80% clear is considered executable.
 
-If REJECTED, Prometheus fixes issues and resubmits. No maximum retry limit.
+If either reviewer rejects the plan, Prometheus fixes every cited issue and resubmits to both reviewers. No maximum retry limit.
+
+### Where to Spend a Scarce Premium Model
+
+Choose a compatible role before optimizing for invocation frequency. For example, a scarce Claude-family model such as Fable 5 fits Metis better than GPT-oriented Oracle or Momus. High-accuracy planning also runs Oracle and Momus together on every review round, so neither is purely an on-demand slot in that workflow.
+
+See [Agent-Model Matching: Where to Spend One Scarce Premium Model](./agent-model-matching.md#where-to-spend-one-scarce-premium-model) for the family-aware heuristic and a concrete configuration.
 
 ---
 

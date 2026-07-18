@@ -172,6 +172,41 @@ Add `--claude=max20` (or `yes`) on install. The Claude chain default (Opus 4.7, 
 
 OpenCode Go alone gets Sisyphus/Atlas/Oracle/Librarian/Explore working. Hephaestus won't activate without GPT access, so you lose autonomous deep work. Consider adding ChatGPT Plus as soon as you can.
 
+### Where to Spend One Scarce Premium Model
+
+If one premium model is quota-limited while your other models are effectively unlimited, optimize in this order:
+
+1. **Match the model family to the agent.** A premium model is not an interchangeable upgrade. Claude-family models fit communicators such as Metis, Sisyphus, and Atlas; GPT-family models fit deep specialists such as Oracle, Momus, and Hephaestus.
+2. **Prefer a low-frequency, high-leverage role.** Avoid spending scarce quota on continuous orchestration, execution, search, or retrieval unless that is the workflow you explicitly want to improve.
+3. **Account for loops.** Metis normally contributes one gap-analysis pass per plan generation. High-accuracy planning runs one Momus pass and one independent Oracle pass per round, then repeats both after any rejection. Oracle can also be invoked separately for architecture or debugging advice.
+
+For a scarce Claude Fable 5 allocation, **Metis is the default value-per-token placement**. It is compatible with Metis's prompt style, runs before the plan is finalized, and can prevent expensive downstream work without putting every Sisyphus, Atlas, or worker turn on the limited quota.
+
+```jsonc
+{
+  "agents": {
+    "metis": {
+      "model": "anthropic/claude-fable-5",
+      "variant": "max",
+      "fallback_models": [
+        { "model": "anthropic/claude-sonnet-4-6" },
+        { "model": "openai/gpt-5.5", "variant": "high" },
+        { "model": "kimi-for-coding/k2p5" }
+      ]
+    }
+  }
+}
+```
+
+The explicit `model` and `variant` make Fable 5 the normal Metis model. `fallback_models` only supplies secondary candidates; putting Fable 5 there without an explicit `model` does not assign it as the normal model for an agent whose primary model is available.
+
+Use a different slot only when the model family and workflow justify it:
+
+- A scarce **GPT-family** reasoning model can be valuable on Oracle or Momus, but high-accuracy planning spends both once per review round. Hephaestus is a better target when the scarce model's purpose is autonomous deep implementation rather than advisory review.
+- Prometheus is lower-frequency than Sisyphus, but a planning interview can span many turns.
+- Sisyphus and Atlas are valid homes for Fable 5 when maximum orchestration quality matters more than quota. They are not the default for a scarce allocation because they run throughout the workflow.
+- Sisyphus-Junior and categories are execution-heavy. Explore and Librarian favor speed and parallelism. These are usually poor places for the rarest model.
+
 ---
 
 ## Step 3 — Model Family Alternatives (Priority Order)
