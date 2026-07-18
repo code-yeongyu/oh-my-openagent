@@ -1,11 +1,14 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { stdin as processStdin, stdout as processStdout } from "node:process";
 
 import { runStopHook } from "./codex-hook.js";
 import type { ReadonlyFileSystem } from "./types.js";
 
 const nodeFileSystem: ReadonlyFileSystem = {
+	statSync(path) {
+		return statSync(path);
+	},
 	readFileSync(path, encoding) {
 		return readFileSync(path, encoding);
 	},

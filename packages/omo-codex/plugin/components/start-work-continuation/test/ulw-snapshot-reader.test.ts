@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { runStopHook } from "../src/codex-hook.js";
+import type { ReadonlyFileSystem } from "../src/types.js";
 import { readUlwSnapshotSummary } from "../src/ulw-snapshot-reader.js";
 import {
 	cleanupTestRoots,
@@ -220,6 +221,36 @@ describe("ULW snapshot bridge", () => {
 
 		// then
 		expect(summary).toBeNull();
+	});
+
+	it("#given an oversized snapshot stat #when reader runs #then contents are not loaded", () => {
+		// given
+		const workspace = createWorkspace({ worktreePath: null });
+		const snapshotPath = writeSnapshot(
+			workspace,
+			createSnapshotMarkdown({
+				metadata: ["- Session ID: sess_abc", "- Plan Path: .omo/ulw-loop/goals.json"],
+				nextAction: "Do not load this snapshot",
+			}),
+		);
+		let readCount = 0;
+		const fs: ReadonlyFileSystem = {
+			statSync(path) {
+				expect(path).toBe(snapshotPath);
+				return { size: 32 * 1024 + 1 };
+			},
+			readFileSync() {
+				readCount += 1;
+				throw new Error("Oversized snapshot should not be loaded");
+			},
+		};
+
+		// when
+		const summary = readUlwSnapshotSummary(workspace, "sess_abc", null, fs);
+
+		// then
+		expect(summary).toBeNull();
+		expect(readCount).toBe(0);
 	});
 
 	it("#given scoped ULW snapshot changes between runs #when reader runs twice #then it reads current filesystem state", () => {

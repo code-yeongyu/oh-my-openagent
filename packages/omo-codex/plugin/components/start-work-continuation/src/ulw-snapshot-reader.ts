@@ -93,6 +93,7 @@ function readSnapshotCandidate(
 
 function readBoundedText(path: string, fs: ReadonlyFileSystem): string | null {
 	try {
+		if (fs.statSync(path).size > SNAPSHOT_MAX_BYTES) return null;
 		const text = fs.readFileSync(path, "utf8");
 		return Buffer.byteLength(text, "utf8") <= SNAPSHOT_MAX_BYTES ? text : null;
 	} catch (error) {
