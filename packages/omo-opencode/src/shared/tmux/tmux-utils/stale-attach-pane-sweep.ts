@@ -13,9 +13,57 @@ export type SweepAttachPaneDeps = {
 	readonly isInsideTmux: () => boolean
 	readonly getTmuxPath: () => Promise<string | null | undefined>
 	readonly listCandidatePanes: (tmux: string) => Promise<readonly TmuxAttachPane[]>
-	readonly isServerRunning: (serverUrl: string) => Promise<boolean>
+	readonly probeServerReachability: (serverUrl: string) => Promise<HistoricalAttachServerReachability>
 	readonly closePane: (paneId: string) => Promise<boolean>
 	readonly log: (message: string, payload?: unknown) => void
+}
+
+export type HistoricalAttachServerReachability = "reachable" | "unreachable"
+
+export type HistoricalAttachServerProbeOptions = {
+	readonly fetchImplementation?: typeof fetch
+	readonly retryDelayMs?: number
+	readonly timeoutMs?: number
+}
+
+const HISTORICAL_SERVER_PROBE_ATTEMPTS = 2
+const HISTORICAL_SERVER_PROBE_RETRY_DELAY_MS = 250
+const HISTORICAL_SERVER_PROBE_TIMEOUT_MS = 3000
+
+function delay(milliseconds: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, milliseconds))
+}
+
+export async function probeHistoricalAttachServerReachability(
+	serverUrl: string,
+	options: HistoricalAttachServerProbeOptions = {},
+): Promise<HistoricalAttachServerReachability> {
+	const fetchImplementation = options.fetchImplementation ?? fetch
+	const healthUrl = new URL("/global/health", serverUrl).toString()
+	const retryDelayMs = options.retryDelayMs ?? HISTORICAL_SERVER_PROBE_RETRY_DELAY_MS
+	const timeoutMs = options.timeoutMs ?? HISTORICAL_SERVER_PROBE_TIMEOUT_MS
+
+	for (let attempt = 1; attempt <= HISTORICAL_SERVER_PROBE_ATTEMPTS; attempt++) {
+		const controller = new AbortController()
+		const timeout = setTimeout(() => controller.abort(), timeoutMs)
+
+		try {
+			await fetchImplementation(healthUrl, {
+				credentials: "omit",
+				redirect: "manual",
+				signal: controller.signal,
+			})
+			return "reachable"
+		} catch {
+			if (attempt < HISTORICAL_SERVER_PROBE_ATTEMPTS) {
+				await delay(retryDelayMs)
+			}
+		} finally {
+			clearTimeout(timeout)
+		}
+	}
+
+	return "unreachable"
 }
 
 function getErrorMessage(error: unknown): string {
@@ -55,11 +103,10 @@ async function listTmuxPanesViaTmux(tmux: string): Promise<TmuxAttachPane[]> {
 }
 
 async function buildRuntimeAttachPaneDeps(): Promise<SweepAttachPaneDeps> {
-	const [{ log }, { isInsideTmux }, { getTmuxPath }, serverHealth, { closeTmuxPane }] = await Promise.all([
+	const [{ log }, { isInsideTmux }, { getTmuxPath }, { closeTmuxPane }] = await Promise.all([
 		import("../../logger"),
 		import("./environment"),
 		import("../../../tools/interactive-bash/tmux-path-resolver"),
-		import("./server-health"),
 		import("./pane-close"),
 	])
 
@@ -67,9 +114,7 @@ async function buildRuntimeAttachPaneDeps(): Promise<SweepAttachPaneDeps> {
 		isInsideTmux,
 		getTmuxPath,
 		listCandidatePanes: listTmuxPanesViaTmux,
-		isServerRunning: (serverUrl) => serverHealth.isServerRunning(serverUrl, {
-			state: serverHealth.createServerHealthState(),
-		}),
+		probeServerReachability: probeHistoricalAttachServerReachability,
 		closePane: closeTmuxPane,
 		log,
 	}
@@ -102,7 +147,7 @@ function isLoopbackHostname(hostname: string): boolean {
 	})
 }
 
-function normalizeTrustedAttachServerUrl(serverUrl: string): string | null {
+function normalizeHistoricalAttachServerUrl(serverUrl: string): string | null {
 	let parsed: URL
 	try {
 		parsed = new URL(serverUrl)
@@ -111,6 +156,10 @@ function normalizeTrustedAttachServerUrl(serverUrl: string): string | null {
 	}
 
 	if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+		return null
+	}
+
+	if (parsed.username || parsed.password || parsed.port === "0") {
 		return null
 	}
 
@@ -152,27 +201,27 @@ export async function sweepStaleOmoAttachPanesWith(deps: SweepAttachPaneDeps): P
 		const rawServerUrl = pane.attachServerUrl || extractAttachServerUrl(pane.commandLine)
 		if (rawServerUrl === null) continue
 
-		const serverUrl = normalizeTrustedAttachServerUrl(rawServerUrl)
+		const serverUrl = normalizeHistoricalAttachServerUrl(rawServerUrl)
 		if (serverUrl === null) {
 			deps.log("[sweepStaleOmoAttachPanesWith] skipped untrusted attach server URL", {
 				paneId: pane.paneId,
-				serverUrl: rawServerUrl,
+				reason: "invalid-or-untrusted-url",
 			})
 			continue
 		}
 
-		let serverRunning: boolean
+		let serverReachability: HistoricalAttachServerReachability
 		try {
-			serverRunning = await deps.isServerRunning(serverUrl)
+			serverReachability = await deps.probeServerReachability(serverUrl)
 		} catch (error) {
-			deps.log("[sweepStaleOmoAttachPanesWith] failed to check pane server health", {
+			deps.log("[sweepStaleOmoAttachPanesWith] failed to probe pane listener reachability", {
 				error: getErrorMessage(error),
 				paneId: pane.paneId,
-				serverUrl,
+				serverOrigin: new URL(serverUrl).origin,
 			})
 			continue
 		}
-		if (serverRunning) continue
+		if (serverReachability === "reachable") continue
 
 		try {
 			const closed = await deps.closePane(pane.paneId)
@@ -183,7 +232,7 @@ export async function sweepStaleOmoAttachPanesWith(deps: SweepAttachPaneDeps): P
 			deps.log("[sweepStaleOmoAttachPanesWith] failed to close stale pane", {
 				error: getErrorMessage(error),
 				paneId: pane.paneId,
-				serverUrl,
+				serverOrigin: new URL(serverUrl).origin,
 			})
 		}
 	}
