@@ -110,22 +110,32 @@ describe("isServerRunning", () => {
     expect(result).toBe(false)
   })
 
-  test("checks external health when the legacy in-process marker is set", async () => {
+  test("performs an external health check even when the legacy in-process marker is set", async () => {
     // given
     const serverRunningKey = Symbol.for("oh-my-opencode:server-running-in-process")
-    const globalState = globalThis as Record<symbol, boolean>
+    const originalDescriptor = Object.getOwnPropertyDescriptor(globalThis, serverRunningKey)
     const fetchMock = createFetchRecorder(async () => new Response(null, { status: 503 }))
-    globalState[serverRunningKey] = true
+    Reflect.set(globalThis, serverRunningKey, true)
 
-    try {
-      // when
-      const result = await isServerRunning("http://localhost:4096", { fetchImplementation: fetchMock })
+    // when
+    const result = await (async () => {
+      try {
+        return await isServerRunning("http://localhost:4096", { fetchImplementation: fetchMock })
+      } finally {
+        if (originalDescriptor) {
+          Object.defineProperty(globalThis, serverRunningKey, originalDescriptor)
+        }
+        if (!originalDescriptor) {
+          Reflect.deleteProperty(globalThis, serverRunningKey)
+        }
+      }
+    })()
 
-      // then
-      expect({ result, fetchCalls: fetchMock.calls.length }).toEqual({ result: false, fetchCalls: 2 })
-    } finally {
-      delete globalState[serverRunningKey]
-    }
+    // then
+    const healthUrl = new URL("/global/health", "http://localhost:4096").toString()
+    expect(result).toBe(false)
+    expect(fetchMock.calls.some(([input]) => input.toString() === healthUrl)).toBe(true)
+    expect(Object.getOwnPropertyDescriptor(globalThis, serverRunningKey)).toEqual(originalDescriptor)
   })
 
   test("caches successful result", async () => {
