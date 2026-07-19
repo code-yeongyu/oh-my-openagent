@@ -1,4 +1,13 @@
-import { isServerRunning, runTmuxCommand, type TmuxCommandResult } from "@oh-my-opencode/tmux-core"
+import {
+  buildTmuxEnvironmentArgs,
+  getHttpServerOriginForLog,
+  isServerRunning,
+  normalizeTmuxServerTarget,
+  runTmuxCommand,
+  type TmuxCommandResult,
+  type TmuxPaneEnvironment,
+  type TmuxServerAccess,
+} from "@oh-my-opencode/tmux-core"
 import { log } from "../logger"
 import { shellSingleQuote } from "../shell-quote"
 import { resolveCallerTmuxSession } from "./resolve-caller-tmux-session"
@@ -7,6 +16,7 @@ type TeamLayoutMember = { name: string; sessionId: string; worktreePath?: string
 type TmuxSessionManager = {
   getServerUrl: () => string
   getCtxServerUrl?: () => string | undefined
+  getTmuxServerAccess?: () => TmuxServerAccess | undefined
 }
 const TEAM_PANE_TITLE_PREFIX = "omo-team-"
 const OMO_ATTACH_SERVER_URL_OPTION = "@omo_attach_server_url"
@@ -22,7 +32,7 @@ export type TeamLayoutDeps = {
 
 const defaultDeps: TeamLayoutDeps = {
   runTmuxCommand,
-  isServerRunning: (serverUrl) => isServerRunning(serverUrl, { authentication: "opencode-server" }),
+  isServerRunning,
   getTmuxPath: async () => "tmux",
   resolveCallerTmuxSession,
   log,
@@ -55,19 +65,9 @@ function buildAttachCommand(member: TeamLayoutMember, serverUrl: string): string
   return `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(member.sessionId)} --dir ${shellSingleQuote(getPaneWorkingDirectory(member))}`
 }
 
-function buildPaneEnvironmentArgs(): string[] {
-  const password = process.env.OPENCODE_SERVER_PASSWORD
-  if (!password) {
-    return []
-  }
-
-  const environmentArgs = ["-e", `OPENCODE_SERVER_PASSWORD=${password}`]
-  const username = process.env.OPENCODE_SERVER_USERNAME
-  if (username !== undefined) {
-    environmentArgs.push("-e", `OPENCODE_SERVER_USERNAME=${username}`)
-  }
-
-  return environmentArgs
+function resolveTmuxServerAccess(tmuxMgr: TmuxSessionManager, deps: TeamLayoutDeps): TmuxServerAccess {
+  const serverAccess = tmuxMgr.getTmuxServerAccess?.()
+  return serverAccess ?? normalizeTmuxServerTarget(tmuxMgr.getServerUrl(), deps.isServerRunning)
 }
 
 async function listPanesInWindow(tmuxPath: string, windowTarget: string, deps: TeamLayoutDeps): Promise<Array<string>> {
@@ -80,8 +80,13 @@ function selectExistingTeammatePane(teammatePanes: Array<string>, callerPaneId: 
   return teammatePanes[Math.floor(teammatePanes.length / 2)] ?? teammatePanes[teammatePanes.length - 1] ?? callerPaneId
 }
 
-function buildSplitArgs(callerPaneId: string, teammatePanes: Array<string>, member: TeamLayoutMember): Array<string> {
-  const environmentArgs = buildPaneEnvironmentArgs()
+function buildSplitArgs(
+  callerPaneId: string,
+  teammatePanes: Array<string>,
+  member: TeamLayoutMember,
+  paneEnvironment: TmuxPaneEnvironment,
+): Array<string> {
+  const environmentArgs = buildTmuxEnvironmentArgs(paneEnvironment)
   if (teammatePanes.length === 0) {
     return ["split-window", ...environmentArgs, "-t", callerPaneId, "-h", "-d", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", getPaneWorkingDirectory(member)]
   }
@@ -106,7 +111,7 @@ async function createTeamLayoutInCallerWindow(
   callerPaneId: string,
   windowTarget: string,
   members: Array<TeamLayoutMember>,
-  serverUrl: string,
+  serverAccess: TmuxServerAccess,
   deps: TeamLayoutDeps,
 ): Promise<{ focusWindowId: string; focusPanesByMember: Record<string, string> } | null> {
   const panesByMember: Record<string, string> = {}
@@ -114,16 +119,19 @@ async function createTeamLayoutInCallerWindow(
   let teammatePanes = existingPanes.filter((paneId) => paneId !== callerPaneId)
 
   for (const member of members) {
-    const split = await deps.runTmuxCommand(tmuxPath, buildSplitArgs(callerPaneId, teammatePanes, member))
+    const split = await deps.runTmuxCommand(
+      tmuxPath,
+      buildSplitArgs(callerPaneId, teammatePanes, member, serverAccess.getPaneEnvironment()),
+    )
     if (!split.success || !split.output) return null
 
     const paneId = split.output.trim()
     teammatePanes = [...teammatePanes, paneId]
     panesByMember[member.name] = paneId
     await deps.runTmuxCommand(tmuxPath, ["select-pane", "-t", paneId, "-T", `${TEAM_PANE_TITLE_PREFIX}${member.name}`])
-    await deps.runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, OMO_ATTACH_SERVER_URL_OPTION, serverUrl])
+    await deps.runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, OMO_ATTACH_SERVER_URL_OPTION, serverAccess.serverUrl])
     await deps.runTmuxCommand(tmuxPath, ["set-option", "-p", "-t", paneId, OMO_ATTACH_SESSION_ID_OPTION, member.sessionId])
-    await deps.runTmuxCommand(tmuxPath, ["send-keys", "-t", paneId, buildAttachCommand(member, serverUrl), "Enter"])
+    await deps.runTmuxCommand(tmuxPath, ["send-keys", "-t", paneId, buildAttachCommand(member, serverAccess.serverUrl), "Enter"])
   }
 
   const layoutResult = await deps.runTmuxCommand(tmuxPath, ["select-layout", "-t", windowTarget, "main-vertical"])
@@ -145,18 +153,16 @@ export async function createTeamLayout(teamRunId: string, members: Array<TeamLay
   }
 
   try {
-    const serverUrl = tmuxMgr.getServerUrl()
-    if (!(await deps.isServerRunning(serverUrl))) {
+    const serverAccess = resolveTmuxServerAccess(tmuxMgr, deps)
+    if (!(await serverAccess.checkServerHealth())) {
       const ctxServerUrl = tmuxMgr.getCtxServerUrl?.()
-      deps.log("opencode server not reachable, skipping team layout (see issue #3963)", {
+      const serverOrigin = getHttpServerOriginForLog(serverAccess.serverUrl)
+      const ctxServerOrigin = getHttpServerOriginForLog(ctxServerUrl)
+      deps.log("server listener not ready, skipping team layout", {
         kind: "warning",
         teamRunId,
-        serverUrl,
-        ctxServerUrl: ctxServerUrl && ctxServerUrl !== serverUrl ? ctxServerUrl : undefined,
-        hint:
-          ctxServerUrl && ctxServerUrl !== serverUrl
-            ? "ctx.serverUrl was discarded (likely port 0); launch opencode with --port N and OPENCODE_PORT=N to bind a real port"
-            : "no opencode server is listening on the fallback URL",
+        serverOrigin,
+        ctxServerOrigin: ctxServerOrigin !== serverOrigin ? ctxServerOrigin : undefined,
       })
       return null
     }
@@ -173,7 +179,14 @@ export async function createTeamLayout(teamRunId: string, members: Array<TeamLay
       return null
     }
 
-    const focus = await createTeamLayoutInCallerWindow(tmuxPath, callerSession.paneId, callerSession.windowTarget, members, serverUrl, deps)
+    const focus = await createTeamLayoutInCallerWindow(
+      tmuxPath,
+      callerSession.paneId,
+      callerSession.windowTarget,
+      members,
+      serverAccess,
+      deps,
+    )
     if (!focus) return null
 
     return {

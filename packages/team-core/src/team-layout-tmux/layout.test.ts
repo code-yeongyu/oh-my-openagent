@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 
 import { beforeEach, describe, expect, mock, test } from "bun:test"
+import type { TmuxServerAccess } from "@oh-my-opencode/tmux-core"
 
 import { canVisualize, createTeamLayout, removeTeamLayout, type TeamLayoutCleanupTarget, type TeamLayoutDeps } from "./layout"
 
@@ -100,7 +101,10 @@ async function loadLayoutModule() {
   }
 }
 
-type TmuxMgrLike = { getServerUrl: () => string }
+type TmuxMgrLike = {
+  getServerUrl: () => string
+  getTmuxServerAccess?: () => TmuxServerAccess | undefined
+}
 
 const tmuxMgr: TmuxMgrLike = { getServerUrl: () => "http://127.0.0.1:12345" }
 
@@ -155,6 +159,43 @@ describe("team-layout-tmux", () => {
     expect(runTmuxCommandMock).toHaveBeenCalledTimes(0)
   })
 
+  test("#given secret-bearing listener URLs #when health fails #then the warning logs only origins", async () => {
+    const manager: TmuxMgrLike = {
+      getServerUrl: () => { throw new Error("legacy URL must not be read") },
+      getCtxServerUrl: () => "https://127.0.0.2:43128/ctx-private?ctx-query=secret#ctx-fragment",
+      getTmuxServerAccess: () => ({
+        serverUrl: "https://user-fixture:password-fixture@127.0.0.1:43127/private-fixture?query-fixture=secret#fragment-fixture",
+        checkServerHealth: async () => false,
+        getPaneEnvironment: () => ({}),
+      }),
+    }
+    const { createTeamLayout } = await loadLayoutModule()
+
+    const result = await createTeamLayout(
+      "run-log-sanitization",
+      [{ name: "lead", sessionId: "s1", worktreePath: "/tmp/lead" }],
+      manager as never,
+    )
+
+    const serializedLogs = JSON.stringify(logMock.mock.calls)
+    expect(result).toBeNull()
+    expect(serializedLogs).toContain("https://127.0.0.1:43127")
+    expect(serializedLogs).toContain("https://127.0.0.2:43128")
+    expect(serializedLogs).toContain("server listener not ready")
+    for (const secret of [
+      "user-fixture",
+      "password-fixture",
+      "private-fixture",
+      "query-fixture",
+      "fragment-fixture",
+      "ctx-private",
+      "ctx-query",
+      "ctx-fragment",
+    ]) {
+      expect(serializedLogs).not.toContain(secret)
+    }
+  })
+
   test("#given tmux path lookup throws a non-Error value #when createTeamLayout runs #then it falls back to null", async () => {
     // given
     const deps: TeamLayoutDeps = {
@@ -196,63 +237,99 @@ describe("team-layout-tmux", () => {
     expect(literals.some((s) => s.includes("--session 's-m2'"))).toBe(true)
   })
 
-  test("#given env auth set #when createTeamLayout runs #then send-keys attach commands omit secrets while split-window forwards pane env", async () => {
-    // given — fixtures assembled at runtime (never literals) so static secret
-    // scanners don't flag a username/password pair (GitGuardian false-positive,
-    // #4466). The embedded single quote still exercises the shell-escape path.
-    const fixturePassword = ["a", String.fromCharCode(0x27), "b"].join("") // -> a'b
-    const fixtureUsername = "u"
-    const originalPwd = process.env.OPENCODE_SERVER_PASSWORD
-    const originalUser = process.env.OPENCODE_SERVER_USERNAME
-    process.env.OPENCODE_SERVER_PASSWORD = fixturePassword
-    process.env.OPENCODE_SERVER_USERNAME = fixtureUsername
-    try {
-      const { createTeamLayout } = await loadLayoutModule()
-      const members = [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }]
-
-      // when
-      await createTeamLayout("run-auth", members, tmuxMgr as never)
-
-      // then
-      const commands = getCommands()
-      const sendKeys = commands.filter((args) => args[0] === "send-keys").map((args) => args.join(" "))
-      const attach = sendKeys.find((s) => s.includes("opencode attach"))
-      expect(attach).toBeDefined()
-      if (attach === undefined) throw new Error("expected attach command")
-      expect(attach).not.toContain("OPENCODE_SERVER_PASSWORD")
-      expect(attach).not.toContain("OPENCODE_SERVER_USERNAME")
-      expect(attach).not.toContain(fixturePassword)
-      expect(attach).not.toContain(fixtureUsername)
-
-      const splitWindow = commands.find((args) => args[0] === "split-window")
-      expect(splitWindow).toBeDefined()
-      expect(splitWindow).toContain("-e")
-      expect(splitWindow).toContain(`OPENCODE_SERVER_PASSWORD=${fixturePassword}`)
-      expect(splitWindow).toContain(`OPENCODE_SERVER_USERNAME=${fixtureUsername}`)
-    } finally {
-      if (originalPwd === undefined) delete process.env.OPENCODE_SERVER_PASSWORD; else process.env.OPENCODE_SERVER_PASSWORD = originalPwd
-      if (originalUser === undefined) delete process.env.OPENCODE_SERVER_USERNAME; else process.env.OPENCODE_SERVER_USERNAME = originalUser
+  test("#given a server access capability #when health fails #then it uses the capability health check without consulting the legacy URL", async () => {
+    // given
+    const checkServerHealth = mock(async () => false)
+    const manager: TmuxMgrLike = {
+      getServerUrl: () => { throw new Error("legacy URL must not be read") },
+      getTmuxServerAccess: () => ({
+        serverUrl: "http://127.0.0.1:43127",
+        checkServerHealth,
+        getPaneEnvironment: () => ({}),
+      }),
     }
+    const { createTeamLayout } = await loadLayoutModule()
+
+    // when
+    const result = await createTeamLayout(
+      "run-capability-health",
+      [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }],
+      manager,
+    )
+
+    // then
+    expect(result).toBeNull()
+    expect(checkServerHealth).toHaveBeenCalledTimes(1)
+    expect(isServerRunningMock).toHaveBeenCalledTimes(0)
   })
 
-  test("#given no OPENCODE_SERVER_PASSWORD #when createTeamLayout runs #then attach command has no env-prefix", async () => {
+  test("#given a rotating pane environment #when both split paths create panes #then each pane receives the environment resolved at its own spawn", async () => {
     // given
-    const originalPwd = process.env.OPENCODE_SERVER_PASSWORD
-    delete process.env.OPENCODE_SERVER_PASSWORD
+    let environmentRevision = 0
+    const getPaneEnvironment = mock(() => ({
+      HARNESS_ENDPOINT: "http://127.0.0.1:43127",
+      TEAM_ACCESS_TOKEN: `revision-${++environmentRevision}`,
+    }))
+    const manager: TmuxMgrLike = {
+      getServerUrl: () => { throw new Error("legacy URL must not be read") },
+      getTmuxServerAccess: () => ({
+        serverUrl: "http://127.0.0.1:43127/capability",
+        checkServerHealth: async () => true,
+        getPaneEnvironment,
+      }),
+    }
+    const { createTeamLayout } = await loadLayoutModule()
+    const members = [
+      { name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" },
+      { name: "m2", sessionId: "s-m2", worktreePath: "/tmp/m2" },
+    ]
+
+    // when
+    const result = await createTeamLayout("run-rotating-environment", members, manager)
+
+    // then
+    expect(result).not.toBeNull()
+    const splitCalls = getCommands().filter((args) => args[0] === "split-window")
+    expect(splitCalls).toHaveLength(2)
+    expect(splitCalls[0]).toContain("HARNESS_ENDPOINT=http://127.0.0.1:43127")
+    expect(splitCalls[0]).toContain("TEAM_ACCESS_TOKEN=revision-1")
+    expect(splitCalls[0]).not.toContain("TEAM_ACCESS_TOKEN=revision-2")
+    expect(splitCalls[1]).toContain("HARNESS_ENDPOINT=http://127.0.0.1:43127")
+    expect(splitCalls[1]).toContain("TEAM_ACCESS_TOKEN=revision-2")
+    expect(splitCalls[1]).not.toContain("TEAM_ACCESS_TOKEN=revision-1")
+    expect(getPaneEnvironment).toHaveBeenCalledTimes(2)
+
+    const attachCommands = getCommands().filter((args) => args[0] === "send-keys")
+    expect(attachCommands).toHaveLength(2)
+    expect(attachCommands.every((args) => args.join(" ").includes("http://127.0.0.1:43127/capability"))).toBe(true)
+  })
+
+  test("#given a legacy manager and ambient credentials #when a pane is created #then no ambient environment is injected", async () => {
+    // given
+    const ambientVariableName = ["OPEN", "CODE", "_SERVER_", "PASSWORD"].join("")
+    const originalValue = process.env[ambientVariableName]
+    const ambientValue = "ambient-layout-fixture"
+    process.env[ambientVariableName] = ambientValue
+
     try {
       const { createTeamLayout } = await loadLayoutModule()
-      const members = [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }]
 
       // when
-      await createTeamLayout("run-noauth", members, tmuxMgr as never)
+      const result = await createTeamLayout(
+        "run-legacy-anonymous",
+        [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }],
+        tmuxMgr,
+      )
 
       // then
-      const sendKeys = getCommands().filter((args) => args[0] === "send-keys").map((args) => args.join(" "))
-      const attach = sendKeys.find((s) => s.includes("opencode attach"))
-      expect(attach).toBeDefined()
-      expect(attach).not.toContain("OPENCODE_SERVER_PASSWORD")
+      expect(result).not.toBeNull()
+      const split = getCommands().find((args) => args[0] === "split-window")
+      expect(split).toBeDefined()
+      expect(split).not.toContain("-e")
+      expect(split?.some((arg) => arg.includes(ambientValue))).toBe(false)
     } finally {
-      if (originalPwd !== undefined) process.env.OPENCODE_SERVER_PASSWORD = originalPwd
+      if (originalValue === undefined) delete process.env[ambientVariableName]
+      else process.env[ambientVariableName] = originalValue
     }
   })
 
