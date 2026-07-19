@@ -19,6 +19,19 @@ const enabledTmuxConfig = {
   isolation: "inline",
 } satisfies TmuxConfig
 
+type Deferred<T> = {
+  readonly promise: Promise<T>
+  resolve(value: T): void
+}
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
+}
+
 function tmuxResult(output: string, exitCode: number = 0): TmuxCommandResult {
   return {
     success: exitCode === 0,
@@ -56,6 +69,59 @@ function creationCommands(commands: string[][]): string[][] {
 }
 
 describe("OMO tmux listener access", () => {
+  it("rejects a stale successful health probe before it can create a tmux pane with rotated credentials", async () => {
+    const firstRequestStarted = createDeferred<void>()
+    const firstResponse = createDeferred<Response>()
+    const recorder = createTmuxRecorder()
+    const contacts: Array<string | null> = []
+    let panePassword = "first-password-fixture"
+    const access = createOpenCodeTmuxServerAccess({
+      serverUrl: "http://127.0.0.1:5316",
+      source: "current-context",
+      trusted: true,
+    }, {
+      getEnvironment: () => ({ OPENCODE_SERVER_PASSWORD: panePassword }),
+      fetchImplementation: (async (_input: RequestInfo | URL, init?: RequestInit) => {
+        contacts.push(new Headers(init?.headers).get("authorization"))
+        if (contacts.length === 1) {
+          firstRequestStarted.resolve(undefined)
+          return firstResponse.promise
+        }
+        return new Response(null, { status: 401 })
+      }) as typeof fetch,
+    })
+    const spawnDeps = {
+      log: () => undefined,
+      runTmuxCommand: recorder.runTmuxCommand,
+      isInsideTmux: () => true,
+      getTmuxPath: async () => "tmux",
+    }
+
+    const pendingSpawn = spawnTmuxPane(
+      "pane-session",
+      "pane",
+      enabledTmuxConfig,
+      access,
+      "/tmp",
+      undefined,
+      "-h",
+      spawnDeps,
+    )
+    await firstRequestStarted.promise
+    panePassword = "rotated-password-fixture"
+    const rotatedHealth = await access.checkServerHealth()
+    firstResponse.resolve(new Response(null, { status: 200 }))
+    const spawnResult = await pendingSpawn
+
+    expect([spawnResult.success, rotatedHealth]).toEqual([false, false])
+    expect(creationCommands(recorder.commands)).toEqual([])
+    expect(contacts).toEqual([
+      `Basic ${Buffer.from("opencode:first-password-fixture", "utf8").toString("base64")}`,
+      `Basic ${Buffer.from("opencode:rotated-password-fixture", "utf8").toString("base64")}`,
+      `Basic ${Buffer.from("opencode:rotated-password-fixture", "utf8").toString("base64")}`,
+    ])
+  })
+
   it("propagates one trusted capability through pane, window, session, replace, and activate", async () => {
     const contacts: Array<string | null> = []
     const recorder = createTmuxRecorder()
