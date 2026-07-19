@@ -10,9 +10,14 @@ import {
 import { getTmuxPath } from "../../tools/interactive-bash/tmux-path-resolver"
 import { queryWindowState } from "./pane-state-querier"
 import { log } from "../../shared"
-import type { ActionResult } from "./action-executor-core"
+import {
+  resolveExecuteServerTarget,
+  type ActionResult,
+  type ExecuteContext as CoreExecuteContext,
+} from "./action-executor-core"
 
 export type { ActionExecutorDeps, ActionResult } from "./action-executor-core"
+export { resolveExecuteServerTarget } from "./action-executor-core"
 
 export interface ExecuteActionsResult {
   success: boolean
@@ -20,11 +25,7 @@ export interface ExecuteActionsResult {
   results: Array<{ action: PaneAction; result: ActionResult }>
 }
 
-export interface ExecuteContext {
-  config: TmuxConfig
-  directory: string
-  serverUrl: string
-  windowState: WindowState
+export interface ExecuteContext extends CoreExecuteContext {
   sourcePaneId?: string
 }
 
@@ -96,7 +97,7 @@ export async function executeAction(
       action.newSessionId,
 		action.description,
 		ctx.config,
-		ctx.serverUrl,
+		resolveExecuteServerTarget(ctx),
 		ctx.directory,
 	)
     if (result.success) {
@@ -112,7 +113,7 @@ export async function executeAction(
     action.sessionId,
 		action.description,
 		ctx.config,
-		ctx.serverUrl,
+		resolveExecuteServerTarget(ctx),
 		ctx.directory,
 		action.targetPaneId,
 		action.splitDirection

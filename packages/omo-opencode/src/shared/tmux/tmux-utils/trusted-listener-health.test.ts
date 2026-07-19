@@ -2,7 +2,10 @@
 
 import { describe, expect, it } from "bun:test"
 
-import type { TmuxCommandResult, TmuxConfig } from "@oh-my-opencode/tmux-core"
+import type { TmuxCommandResult, TmuxConfig, TmuxServerAccess } from "@oh-my-opencode/tmux-core"
+import { createOpenCodeTmuxServerAccess } from "../opencode-server-access"
+import { activateTmuxPane } from "./pane-activate"
+import { replaceTmuxPane } from "./pane-replace"
 import { spawnTmuxPane } from "./pane-spawn"
 import { spawnTmuxSession } from "./session-spawn"
 import { spawnTmuxWindow } from "./window-spawn"
@@ -16,15 +19,7 @@ const enabledTmuxConfig = {
   isolation: "inline",
 } satisfies TmuxConfig
 
-const healthPath = "/global/health"
-const password = "adapter-listener-password-fixture"
-
-type Contact = {
-  readonly path: string
-  readonly authorization: string | null
-}
-
-function tmuxResult(output: string, exitCode: number): TmuxCommandResult {
+function tmuxResult(output: string, exitCode: number = 0): TmuxCommandResult {
   return {
     success: exitCode === 0,
     output,
@@ -34,144 +29,135 @@ function tmuxResult(output: string, exitCode: number): TmuxCommandResult {
   }
 }
 
-function createTmuxRunner(onCommand?: () => void) {
-  return async (_command: string, args: string[]): Promise<TmuxCommandResult> => {
-    onCommand?.()
-    switch (args[0]) {
-      case "split-window":
-        return tmuxResult("%pane", 0)
-      case "new-window":
-        return tmuxResult("%window", 0)
-      case "has-session":
-        return tmuxResult("", 1)
-      case "new-session":
-        return tmuxResult("%session", 0)
-      case "select-pane":
-        return tmuxResult("", 0)
-      default:
-        throw new Error(`Unexpected tmux command: ${args.join(" ")}`)
-    }
-  }
-}
-
-function createProtectedListener(contacts: Contact[], expectedAuthorization: string) {
-  return Bun.serve({
-    hostname: "127.0.0.1",
-    port: 0,
-    fetch(request) {
-      const path = new URL(request.url).pathname
-      const authorization = request.headers.get("authorization")
-      contacts.push({ path, authorization })
-      if (path !== healthPath) return new Response(null, { status: 404 })
-      return new Response(null, { status: authorization === expectedAuthorization ? 200 : 401 })
+function createTmuxRecorder() {
+  const commands: string[][] = []
+  return {
+    commands,
+    runTmuxCommand: async (_command: string, args: string[]): Promise<TmuxCommandResult> => {
+      commands.push(args)
+      switch (args[0]) {
+        case "split-window": return tmuxResult("%pane")
+        case "new-window": return tmuxResult("%window")
+        case "has-session": return tmuxResult("", 1)
+        case "new-session": return tmuxResult("%session")
+        default: return tmuxResult("")
+      }
     },
-  })
-}
-
-function restoreEnvironmentVariable(name: "OPENCODE_SERVER_PASSWORD" | "OPENCODE_SERVER_USERNAME", value: string | undefined): void {
-  if (value === undefined) {
-    delete process.env[name]
-    return
   }
-  process.env[name] = value
 }
 
-describe("OMO trusted tmux listener health", () => {
-  it("#given a password-protected listener #when public pane, window, and session wrappers spawn with partial deps #then each authenticates and succeeds", async () => {
-    // given
-    const environment = {
-      password: process.env.OPENCODE_SERVER_PASSWORD,
-      username: process.env.OPENCODE_SERVER_USERNAME,
+function creationCommands(commands: string[][]): string[][] {
+  return commands.filter((args) => (
+    args[0] === "split-window"
+    || args[0] === "new-window"
+    || args[0] === "new-session"
+    || args[0] === "respawn-pane"
+  ))
+}
+
+describe("OMO tmux listener access", () => {
+  it("propagates one trusted capability through pane, window, session, replace, and activate", async () => {
+    const contacts: Array<string | null> = []
+    const recorder = createTmuxRecorder()
+    const access = createOpenCodeTmuxServerAccess({
+      serverUrl: "http://127.0.0.1:5317",
+      source: "current-context",
+      trusted: true,
+    }, {
+      getEnvironment: () => ({ OPENCODE_SERVER_PASSWORD: "trusted-password" }),
+      fetchImplementation: (async (_input: RequestInfo | URL, init?: RequestInit) => {
+        contacts.push(new Headers(init?.headers).get("authorization"))
+        return new Response(null, { status: 200 })
+      }) as typeof fetch,
+    })
+    const spawnDeps = {
+      log: () => undefined,
+      runTmuxCommand: recorder.runTmuxCommand,
+      isInsideTmux: () => true,
+      getTmuxPath: async () => "tmux",
     }
-    const contacts: Contact[] = []
-    const expectedAuthorization = `Basic ${Buffer.from(`opencode:${password}`, "utf8").toString("base64")}`
-    process.env.OPENCODE_SERVER_PASSWORD = password
-    delete process.env.OPENCODE_SERVER_USERNAME
+
+    const pane = await spawnTmuxPane("pane-session", "pane", enabledTmuxConfig, access, "/tmp", undefined, "-h", spawnDeps)
+    const window = await spawnTmuxWindow("window-session", "window", enabledTmuxConfig, access, "/tmp", spawnDeps)
+    const session = await spawnTmuxSession("session-session", "session", enabledTmuxConfig, access, "/tmp", undefined, spawnDeps)
+    const replaced = await replaceTmuxPane("%replace", "replace-session", "replace", enabledTmuxConfig, access, "/tmp", spawnDeps)
+    const activated = await activateTmuxPane("%activate", "activate-session", access, "/tmp", spawnDeps)
+
+    expect([pane.success, window.success, session.success, replaced.success, activated]).toEqual([
+      true, true, true, true, true,
+    ])
+    expect(contacts).toEqual([
+      `Basic ${Buffer.from("opencode:trusted-password", "utf8").toString("base64")}`,
+    ])
+    const created = creationCommands(recorder.commands)
+    expect(created).toHaveLength(5)
+    expect(created.every((args) => args.includes("OPENCODE_SERVER_PASSWORD=trusted-password"))).toBe(true)
+    expect(created.every((args) => args.includes("OPENCODE_SERVER_USERNAME=opencode"))).toBe(true)
+    const activateCommand = created.at(-1)?.at(-1) ?? ""
+    expect(activateCommand).toContain("opencode attach")
+    expect(activateCommand).not.toContain("trusted-password")
+  })
+
+  it("converts raw URLs to anonymous access and actively clears inherited credentials", async () => {
+    const originalPassword = process.env.OPENCODE_SERVER_PASSWORD
+    const originalUsername = process.env.OPENCODE_SERVER_USERNAME
+    const recorder = createTmuxRecorder()
+    const rawServerUrl = "http://127.0.0.1:5318"
+    const spawnDeps = {
+      log: () => undefined,
+      runTmuxCommand: recorder.runTmuxCommand,
+      isInsideTmux: () => true,
+      isServerRunning: async () => true,
+      getTmuxPath: async () => "tmux",
+    }
+    process.env.OPENCODE_SERVER_PASSWORD = "ambient-password"
+    process.env.OPENCODE_SERVER_USERNAME = "ambient-user"
 
     try {
-      const server = createProtectedListener(contacts, expectedAuthorization)
+      await spawnTmuxPane("pane-session", "pane", enabledTmuxConfig, rawServerUrl, "/tmp", undefined, "-h", spawnDeps)
+      await spawnTmuxWindow("window-session", "window", enabledTmuxConfig, rawServerUrl, "/tmp", spawnDeps)
+      await spawnTmuxSession("session-session", "session", enabledTmuxConfig, rawServerUrl, "/tmp", undefined, spawnDeps)
+      await replaceTmuxPane("%replace", "replace-session", "replace", enabledTmuxConfig, rawServerUrl, "/tmp", spawnDeps)
+      await activateTmuxPane("%activate", "activate-session", rawServerUrl, "/tmp", spawnDeps)
 
-      try {
-        const deps = {
-          log: () => undefined,
-          runTmuxCommand: createTmuxRunner(),
-          isInsideTmux: () => true,
-          getTmuxPath: async () => "tmux",
-        }
-        const serverUrl = `http://127.0.0.1:${server.port}`
-
-        // when
-        const pane = await spawnTmuxPane("pane-session", "pane", enabledTmuxConfig, `${serverUrl}?caller=pane`, "/tmp", undefined, "-h", deps)
-        const window = await spawnTmuxWindow("window-session", "window", enabledTmuxConfig, `${serverUrl}?caller=window`, "/tmp", deps)
-        const session = await spawnTmuxSession("tmux-session", "session", enabledTmuxConfig, `${serverUrl}?caller=session`, "/tmp", undefined, deps)
-
-        // then
-        expect({
-          results: [pane, window, session],
-          contacted: contacts.length > 0,
-          exactHealthPath: contacts.every((contact) => contact.path === healthPath),
-          authenticated: contacts.every((contact) => contact.authorization === expectedAuthorization),
-        }).toEqual({
-          results: [
-            { success: true, paneId: "%pane" },
-            { success: true, paneId: "%window" },
-            { success: true, paneId: "%session" },
-          ],
-          contacted: true,
-          exactHealthPath: true,
-          authenticated: true,
-        })
-      } finally {
-        await server.stop(true)
-      }
+      const created = creationCommands(recorder.commands)
+      expect(created).toHaveLength(5)
+      expect(created.every((args) => args.includes("OPENCODE_SERVER_PASSWORD="))).toBe(true)
+      expect(created.every((args) => args.includes("OPENCODE_SERVER_USERNAME="))).toBe(true)
+      expect(created.some((args) => args.some((arg) => arg.includes("ambient-password") || arg.includes("ambient-user")))).toBe(false)
     } finally {
-      restoreEnvironmentVariable("OPENCODE_SERVER_PASSWORD", environment.password)
-      restoreEnvironmentVariable("OPENCODE_SERVER_USERNAME", environment.username)
+      if (originalPassword === undefined) delete process.env.OPENCODE_SERVER_PASSWORD
+      else process.env.OPENCODE_SERVER_PASSWORD = originalPassword
+      if (originalUsername === undefined) delete process.env.OPENCODE_SERVER_USERNAME
+      else process.env.OPENCODE_SERVER_USERNAME = originalUsername
     }
   })
 
-  it("#given an explicit unavailable health override #when public pane, window, and session wrappers spawn #then the override prevents every spawn", async () => {
-    // given
-    const environment = {
-      password: process.env.OPENCODE_SERVER_PASSWORD,
-      username: process.env.OPENCODE_SERVER_USERNAME,
+  it("lets an explicit per-call health override win without calling bound health", async () => {
+    const recorder = createTmuxRecorder()
+    let boundHealthCalls = 0
+    const access: TmuxServerAccess = {
+      serverUrl: "http://127.0.0.1:5319",
+      checkServerHealth: async () => {
+        boundHealthCalls += 1
+        return true
+      },
+      getPaneEnvironment: () => ({ HARNESS_TOKEN: "kept" }),
     }
-    const contacts: Contact[] = []
-    const expectedAuthorization = `Basic ${Buffer.from(`opencode:${password}`, "utf8").toString("base64")}`
-    let tmuxCommands = 0
-    process.env.OPENCODE_SERVER_PASSWORD = password
-    delete process.env.OPENCODE_SERVER_USERNAME
-
-    try {
-      const server = createProtectedListener(contacts, expectedAuthorization)
-
-      try {
-        const deps = {
-          log: () => undefined,
-          runTmuxCommand: createTmuxRunner(() => tmuxCommands++),
-          isInsideTmux: () => true,
-          getTmuxPath: async () => "tmux",
-          isServerRunning: async () => false,
-        }
-        const serverUrl = `http://127.0.0.1:${server.port}`
-
-        // when
-        const pane = await spawnTmuxPane("pane-override", "pane", enabledTmuxConfig, `${serverUrl}?caller=pane`, "/tmp", undefined, "-h", deps)
-        const window = await spawnTmuxWindow("window-override", "window", enabledTmuxConfig, `${serverUrl}?caller=window`, "/tmp", deps)
-        const session = await spawnTmuxSession("session-override", "session", enabledTmuxConfig, `${serverUrl}?caller=session`, "/tmp", undefined, deps)
-
-        // then
-        expect(pane).toEqual({ success: false })
-        expect(window).toEqual({ success: false })
-        expect(session).toEqual({ success: false })
-        expect(contacts).toEqual([])
-        expect(tmuxCommands).toBe(0)
-      } finally {
-        await server.stop(true)
-      }
-    } finally {
-      restoreEnvironmentVariable("OPENCODE_SERVER_PASSWORD", environment.password)
-      restoreEnvironmentVariable("OPENCODE_SERVER_USERNAME", environment.username)
+    const deps = {
+      log: () => undefined,
+      runTmuxCommand: recorder.runTmuxCommand,
+      isInsideTmux: () => true,
+      isServerRunning: async () => false,
+      getTmuxPath: async () => "tmux",
     }
+
+    const pane = await spawnTmuxPane("pane", "pane", enabledTmuxConfig, access, "/tmp", undefined, "-h", deps)
+    const window = await spawnTmuxWindow("window", "window", enabledTmuxConfig, access, "/tmp", deps)
+    const session = await spawnTmuxSession("session", "session", enabledTmuxConfig, access, "/tmp", undefined, deps)
+
+    expect([pane.success, window.success, session.success]).toEqual([false, false, false])
+    expect(boundHealthCalls).toBe(0)
+    expect(recorder.commands).toEqual([])
   })
 })

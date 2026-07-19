@@ -30,8 +30,8 @@ export function withSessionSpawnDeps(deps?: Partial<SpawnTmuxSessionDeps>): Part
   return { log, runTmuxCommand, isInsideTmux, getTmuxPath, ...deps }
 }
 
-export function paneActivateDeps(): ActivateTmuxPaneDeps {
-  return { log, runTmuxCommand, isInsideTmux, getTmuxPath }
+export function paneActivateDeps(deps?: Partial<ActivateTmuxPaneDeps>): ActivateTmuxPaneDeps {
+  return { log, runTmuxCommand, isInsideTmux, getTmuxPath, ...deps }
 }
 
 export function paneDimensionsDeps(): GetPaneDimensionsDeps {

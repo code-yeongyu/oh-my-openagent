@@ -1,6 +1,7 @@
 /// <reference path="../../../../../bun-test.d.ts" />
 import { describe, test, expect, mock, beforeEach, spyOn, afterAll, afterEach } from 'bun:test'
 import type { TmuxConfig } from '../../config/schema'
+import type { TmuxServerTarget } from '@oh-my-opencode/tmux-core'
 import type { WindowState, PaneAction } from './types'
 import type { ActionResult, ExecuteContext } from './action-executor'
 import type { TmuxSessionManager as TmuxSessionManagerType, TmuxUtilDeps } from './manager'
@@ -73,7 +74,7 @@ const mockSpawnTmuxWindow = mock<(
   sessionId: string,
   description: string,
   config: TmuxConfig,
-  serverUrl: string
+  serverTarget: TmuxServerTarget
 ) => Promise<SpawnTmuxContainerResult>>(async () => ({
   success: true,
   paneId: '%isolated-window',
@@ -82,7 +83,7 @@ const mockSpawnTmuxSession = mock<(
   sessionId: string,
   description: string,
   config: TmuxConfig,
-  serverUrl: string,
+  serverTarget: TmuxServerTarget,
   sourcePaneId?: string
 ) => Promise<SpawnTmuxContainerResult>>(async () => ({
   success: true,
@@ -91,6 +92,7 @@ const mockSpawnTmuxSession = mock<(
 const mockKillTmuxSessionIfExists = mock<(sessionName: string) => Promise<boolean>>(async () => true)
 const mockSweepStaleOmoAgentSessions = mock<() => Promise<number>>(async () => 0)
 const mockSweepStaleOmoAttachPanes = mock<() => Promise<number>>(async () => 0)
+const mockActivateTmuxPane = mock(async () => true)
 const mockIsInsideTmux = mock<() => boolean>(() => true)
 const mockGetCurrentPaneId = mock<() => string | undefined>(() => '%0')
 
@@ -132,6 +134,7 @@ function registerModuleMocks(): void {
       getIsolatedSessionName: (pid: number = 12345) => `omo-agents-${pid}`,
       sweepStaleOmoAgentSessions: mockSweepStaleOmoAgentSessions,
       sweepStaleOmoAttachPanes: mockSweepStaleOmoAttachPanes,
+      activateTmuxPane: mockActivateTmuxPane,
     }
   })
 }
@@ -257,6 +260,7 @@ describe('TmuxSessionManager', () => {
     mockSpawnTmuxWindow.mockClear()
     mockSpawnTmuxSession.mockClear()
     mockSweepStaleOmoAttachPanes.mockClear()
+    mockActivateTmuxPane.mockClear()
     mockIsInsideTmux.mockClear()
     mockGetCurrentPaneId.mockClear()
     trackedSessions.clear()
@@ -495,11 +499,11 @@ describe('TmuxSessionManager', () => {
         const manager = new TmuxSessionManager(ctx, config, trackingDeps)
 
         // then
-        const warning = logCalls.find((entry) => entry.message.includes('ctx.serverUrl has port 0'))
+        const warning = logCalls.find((entry) => entry.message.includes('listener URL with port 0'))
         expect(warning).toBeDefined()
         expect(warning?.data).toMatchObject({
           kind: 'warning',
-          ctxServerUrl: 'http://127.0.0.1:0/',
+          ctxServerOrigin: 'http://127.0.0.1:0',
           fallbackUrl: 'http://localhost:4096',
         })
         expect(manager.getCtxServerUrl()).toBe('http://127.0.0.1:0/')
@@ -531,13 +535,40 @@ describe('TmuxSessionManager', () => {
       const manager = new TmuxSessionManager(ctx, config, trackingDeps)
 
       // then
-      const warning = logCalls.find((entry) => entry.message.includes('ctx.serverUrl has port 0'))
+      const warning = logCalls.find((entry) => entry.message.includes('listener URL with port 0'))
       expect(warning).toBeUndefined()
       expect(manager.getCtxServerUrl()).toBe('http://127.0.0.1:12345/')
     })
   })
 
-  describe('getServerUrl', () => {
+  describe('server access', () => {
+    test('exposes one stable server access bound to the retained URL', async () => {
+      // given
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = {
+        ...createMockContext(),
+        serverUrl: new URL('http://127.0.0.1:5317/'),
+      }
+      const manager = new TmuxSessionManager(ctx, createTmuxConfig({ enabled: true }), mockTmuxDeps)
+
+      // when
+      const first = manager.getTmuxServerAccess()
+      const second = manager.getTmuxServerAccess()
+
+      // then
+      expect(first).toBe(second)
+      expect(first.serverUrl).toBe(manager.getServerUrl())
+    })
+
+    test('passes the same server access to activation', async () => {
+      const { TmuxSessionManager } = await import('./manager')
+      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({ enabled: true }), mockTmuxDeps)
+      const activate = Reflect.get(manager, 'activateTrackedSessionPane') as (tracked: { paneId: string; sessionId: string }) => Promise<boolean>
+
+      expect(await activate.call(manager, { paneId: '%activate', sessionId: 'ses-activate' })).toBe(true)
+      expect(mockActivateTmuxPane.mock.calls[0]?.[2]).toBe(manager.getTmuxServerAccess())
+    })
+
     test('returns normalized serverUrl from ctx', async () => {
       // given
       mockIsInsideTmux.mockReturnValue(true)
@@ -800,6 +831,9 @@ describe('TmuxSessionManager', () => {
       }
 
       expect(context?.sourcePaneId).toBe('%isolated-session-ses_first')
+      expect(mockSpawnTmuxSession.mock.calls[0]?.[3]).toBe(manager.getTmuxServerAccess())
+      expect(context?.tmuxServerAccess).toBe(manager.getTmuxServerAccess())
+      expect(context?.serverUrl).toBe(manager.getServerUrl())
     })
 
     test('#given window isolation with healthy existing container #when second subagent is created #then it spawns inline from isolated pane', async () => {
