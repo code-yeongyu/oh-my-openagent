@@ -22,6 +22,9 @@ const enabledTmuxConfig = {
 
 type TmuxCall = readonly [command: string, args: readonly string[]]
 
+let originalPassword: string | undefined
+let originalUsername: string | undefined
+
 function toStringArray(value: unknown): string[] {
 	if (!Array.isArray(value)) {
 		throw new Error("Expected array value")
@@ -94,12 +97,14 @@ function expectNoAuthEnvArgs(args: readonly string[]): void {
 
 describe("tmux pane auth environment propagation", () => {
 	beforeEach(() => {
+		originalPassword = process.env.OPENCODE_SERVER_PASSWORD
+		originalUsername = process.env.OPENCODE_SERVER_USERNAME
 		process.env.TMUX = "/tmp/tmux-1000/default,1234,0"
 		delete process.env.CMUX_SOCKET_PATH
 	})
 
 	afterEach(() => {
-		setAuthEnv()
+		setAuthEnv(originalPassword, originalUsername)
 		if (originalTmux === undefined) delete process.env.TMUX
 		else process.env.TMUX = originalTmux
 		if (originalCmuxSocketPath === undefined) delete process.env.CMUX_SOCKET_PATH
@@ -197,5 +202,26 @@ describe("tmux pane auth environment propagation", () => {
 
 		// then
 		expectNoAuthEnvArgs(paneRecorder.getCall(0)[1])
+	})
+
+	it("#given password-only auth #when a pane spawns #then tmux receives the password without a username", async () => {
+		// given
+		const password = "password-only-fixture"
+		setAuthEnv(password)
+		const paneRecorder = createTmuxCommandRecorder([successResult("%pane"), successResult()])
+
+		// when
+		await spawnTmuxPane("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:4321", "/tmp/project", undefined, "-h", {
+			log: () => undefined,
+			runTmuxCommand: paneRecorder.runTmuxCommand,
+			isInsideTmux: () => true,
+			isServerRunning: async () => true,
+			getTmuxPath: async () => "tmux",
+		})
+
+		// then
+		const args = paneRecorder.getCall(0)[1]
+		expect(args.some((arg) => arg === `OPENCODE_SERVER_PASSWORD=${password}`)).toBe(true)
+		expect(args.some((arg) => arg.startsWith("OPENCODE_SERVER_USERNAME="))).toBe(false)
 	})
 })
