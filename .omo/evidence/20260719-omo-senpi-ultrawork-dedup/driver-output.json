@@ -1,0 +1,31 @@
+{
+  "result": "PASS",
+  "scenarios": [
+    {
+      "name": "trigger-still-injects",
+      "prompt": "ulw please respond",
+      "pass": true,
+      "detail": "expects directive body injected for a bare ulw trigger"
+    },
+    {
+      "name": "ulw-plan-does-not-arm",
+      "prompt": "ulw-plan please respond",
+      "pass": true,
+      "detail": "expects NO directive when the prompt only names the ulw-plan skill"
+    },
+    {
+      "name": "pasted-block-not-reinjected",
+      "prompt": "review this transcript <ultrawork-mode> pasted copy </ultrawork-mode> and ulw it",
+      "pass": true,
+      "detail": "expects NO directive body when the prompt already carries an <ultrawork-mode> block"
+    },
+    {
+      "name": "skill-command-appends",
+      "prompt": "/skill:frontend ulw please tidy this up",
+      "pass": true,
+      "detail": "expects native /skill: expansion AND the directive appended after the command"
+    }
+  ],
+  "realSenpiUntouched": true,
+  "senpiBin": "/home/roach/.local/bin/senpi"
+}
