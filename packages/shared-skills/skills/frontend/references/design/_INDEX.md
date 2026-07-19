@@ -1,11 +1,11 @@
 # Frontend Design References — Index
 
-All reference files live flat in this directory. Three layers:
+All reference files live flat in this directory. Three visual layers:
 - **Layer 0 — design system architecture** (1 file): the mandatory gate. Defines `DESIGN.md` structure, creation workflow, validation rules. Always loaded by Phase 0 when no design system exists.
 - **Layer A — taste skills** (12 files): how to execute. Discipline, motion, spacing, anti-slop, output completeness.
 - **Layer B — design systems** (70 files): what it should look like. Brand-specific color/type/component tokens.
 
-**Phase 0 runs first** (check/create `DESIGN.md`), then most non-trivial tasks load **one Layer A + one Layer B** together. See the routing flow in the sibling `README.md`.
+**Phase 0 runs first** (check/create `DESIGN.md`), then most non-trivial visual tasks load **one Layer A + one Layer B** together. Project-original structural mechanics stack outside those visual layers when the surface calls for them. See the routing flow in the sibling `README.md`.
 
 ---
 
@@ -52,9 +52,20 @@ From [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill).
 
 ---
 
+## Project-original structural mechanics (2)
+
+These references stack with one visual style. They do not replace OMO routing or choose visual taste.
+
+| File | Purpose | Load when |
+|---|---|---|
+| `composition-skill.md` | Keeps the content decision path, dominant page composition, nav/footer voice, proof basis, and comparable-route rationale visible while the concept evolves. | A new or substantially restructured multi-section marketing, editorial, portfolio, or discovery page has no user-supplied exact visual reference, or a comparable sibling risks becoming a color-only structural clone. Skip component-only work, app shells, and exact-reference reproduction. |
+| `layout-skill.md` | Defines spatial primitives, scroll ownership, content stress, and responsive shell mechanics without choosing a visual style. | A dashboard, settings surface, inbox, split pane, fixed-sidebar shell, or other operational UI needs layout mechanics. |
+
+---
+
 ## Layer B — Design Systems (70)
 
-Most Layer B files are materialized from [VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md), based on [Google Stitch DESIGN.md format](https://stitch.withgoogle.com/docs/design-md/overview/). Project-original entries such as `aside.md` are listed here only when `ATTRIBUTION.md` and `frontend-refs-manifest.mjs` mark them as original. Each file captures one website's complete visual language: color palette, typography, components, layout principles, depth, do/don't, responsive behavior, and an agent prompt guide.
+Most Layer B files are materialized from the pinned [Open Design](https://github.com/nexu-io/open-design) submodule; `ATTRIBUTION.md` records the exact commit and license boundary. Project-original entries such as `aside.md` are listed here only when `ATTRIBUTION.md` and `frontend-refs-manifest.mjs` mark them as original. Each file captures one website's visual language: color palette, typography, components, layout principles, depth, responsive behavior, and usage guidance.
 
 ### How to use
 
