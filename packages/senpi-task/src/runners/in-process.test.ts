@@ -195,6 +195,26 @@ describe("InProcessRunner", () => {
     }
   })
 
+  test("#given a tool allowlist and shared lsp tools #when a child is started #then options.tools equals the allowlist while customTools still carries the lsp tool", async () => {
+    let captured: CreateAgentSessionOptions | undefined
+    const fake = createFakeSession()
+    const runner = new InProcessRunner({
+      sharedParentTools: [makeTool("lsp_diagnostics"), makeTool("grep")],
+      createSession: async (options) => {
+        captured = options
+        return fake.session
+      },
+    })
+
+    const handle = await runner.start(baseSpec({ toolAllowlist: ["read", "find", "grep", "ls", "bash"] }))
+    fake.resolvePrompt()
+    await handle.waitForIdle()
+
+    expect(captured?.tools).toEqual(["read", "find", "grep", "ls", "bash"])
+    const customNames = (captured?.customTools ?? []).map((tool) => tool.name)
+    expect(customNames).toEqual(["lsp_diagnostics", "grep"])
+  })
+
   test("#given a started child #when the session is constructed #then an in-memory session manager is used", async () => {
     let captured: CreateAgentSessionOptions | undefined
     const fake = createFakeSession()
