@@ -2641,7 +2641,7 @@ describe("runtime-fallback", () => {
       expect(output.message.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
     })
 
-    test("should restore configured primary when reopened on a configured fallback model", async () => {
+    test("should keep a user-selected configured fallback model instead of restoring the configured primary", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig({ notify_on_fallback: false, restore_primary_after_cooldown: true }),
         pluginConfig: createMockPluginConfigWithCategoryModel(
@@ -2666,7 +2666,7 @@ describe("runtime-fallback", () => {
       }
       await hook["chat.message"]?.({ sessionID, model: { providerID: "openai", modelID: "gpt-5.4" } }, output)
 
-      expect(output.message.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-5" })
+      expect(output.message.model).toBeUndefined()
     })
 
     test("should notify when fallback occurs", async () => {

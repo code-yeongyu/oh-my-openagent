@@ -274,4 +274,60 @@ describe("createEventHandler", () => {
     expect(created?.currentModel).toBe("openai/gpt-5.5-codex")
     expect(typeof created?.currentModel).toBe("string")
   })
+  it("#given session.created uses a fallback-listed manual model #when an agent has a preferred model #then the manual model is not treated as active fallback (#5816)", async () => {
+    const sessionID = "session-manual-model"
+    const deps = createDeps()
+    deps.pluginConfig = {
+      agents: {
+        sisyphus: {
+          model: "provider-a/model-a",
+          fallback_models: ["provider-b/model-b"],
+        },
+      },
+    }
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
+
+    await handler({
+      event: {
+        type: "session.created",
+        properties: {
+          info: { id: sessionID, agent: "sisyphus", model: "provider-b/model-b" },
+        },
+      },
+    })
+
+    const created = deps.sessionStates.get(sessionID)
+    expect(created?.originalModel).toBe("provider-b/model-b")
+    expect(created?.currentModel).toBe("provider-b/model-b")
+    expect(created?.fallbackIndex).toBe(-1)
+  })
+
+  it("#given session.created follows an already pending fallback #when the event fires #then existing fallback state is preserved", async () => {
+    const sessionID = "session-pending-fallback"
+    const deps = createDeps()
+    const state = createFallbackState("provider-a/model-a")
+    state.currentModel = "provider-b/model-b"
+    state.fallbackIndex = 0
+    state.pendingFallbackModel = "provider-b/model-b"
+    deps.sessionStates.set(sessionID, state)
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
+
+    await handler({
+      event: {
+        type: "session.created",
+        properties: { info: { id: sessionID, model: "provider-b/model-b" } },
+      },
+    })
+
+    const preserved = deps.sessionStates.get(sessionID)
+    expect(preserved?.originalModel).toBe("provider-a/model-a")
+    expect(preserved?.currentModel).toBe("provider-b/model-b")
+    expect(preserved?.fallbackIndex).toBe(0)
+    expect(preserved?.pendingFallbackModel).toBe("provider-b/model-b")
+    expect(deps.sessionLastAccess.has(sessionID)).toBe(true)
+  })
 })

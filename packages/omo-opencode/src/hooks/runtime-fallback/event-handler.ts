@@ -32,22 +32,6 @@ function resolveEventModel(props: Record<string, unknown> | undefined): string |
   return undefined
 }
 
-function resolvePreferredSessionModel(
-  sessionID: string,
-  agent: string | undefined,
-  pluginConfig: HookDeps["pluginConfig"],
-): string | undefined {
-  const agentConfig = agent && pluginConfig?.agents
-    ? pluginConfig.agents[agent]
-    : undefined
-  if (typeof agentConfig?.model === "string") return agentConfig.model
-
-  const category = typeof agentConfig?.category === "string"
-    ? agentConfig.category
-    : SessionCategoryRegistry.get(sessionID)
-  const categoryModel = category ? pluginConfig?.categories?.[category]?.model : undefined
-  return typeof categoryModel === "string" ? categoryModel : undefined
-}
 
 export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   const { config, pluginConfig, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionFallbackTimeouts, sessionStatusRetryKeys } = deps
@@ -72,26 +56,18 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     const sessionInfo = props ? props.info : undefined
     const sessionRecord = isRuntimeFallbackRecord(sessionInfo) ? sessionInfo : undefined
     const sessionModel = sessionRecord?.["model"]
-    const sessionAgent = sessionRecord?.["agent"]
+
     const model = normalizeModelToCanonicalString(sessionModel)
-    const agent = typeof sessionAgent === "string"
-      ? sessionAgent
-      : props && typeof props.agent === "string"
-        ? props.agent
-        : undefined
 
     if (sessionID && model) {
       log(`[${HOOK_NAME}] Session created with model`, { sessionID, model })
-      const preferredModel = resolvePreferredSessionModel(sessionID, agent, pluginConfig)
-      const fallbackIndex = preferredModel && preferredModel !== model
-        ? getFallbackModelsForSession(sessionID, agent, pluginConfig).indexOf(model)
-        : -1
-      const state = createFallbackState(fallbackIndex >= 0 && preferredModel ? preferredModel : model)
-      if (fallbackIndex >= 0) {
-        state.currentModel = model
-        state.fallbackIndex = fallbackIndex
+
+      if (sessionStates.has(sessionID)) {
+        sessionLastAccess.set(sessionID, Date.now())
+        return
       }
-      sessionStates.set(sessionID, state)
+
+      sessionStates.set(sessionID, createFallbackState(model))
       sessionLastAccess.set(sessionID, Date.now())
     }
   }
