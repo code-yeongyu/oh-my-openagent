@@ -15,6 +15,7 @@ const LAZYCODEX_PR_SOURCE_GUIDANCE_SOURCE_PATH = join(
   "pr-source-guidance.yml",
 )
 const MARKETPLACE_DESTINATION_PATH = join(".agents", "plugins", "marketplace.json")
+const ROOT_MARKETPLACE_DESTINATION_PATH = "marketplace.json"
 const PLUGIN_DESTINATION_PATH = join("plugins", "omo")
 const LAZYCODEX_PR_SOURCE_GUIDANCE_DESTINATION_PATH = join(".github", "workflows", "pr-source-guidance.yml")
 const GIT_BASH_MCP_SOURCE_ARG = "../../git-bash-mcp/dist/cli.js"
@@ -65,7 +66,17 @@ export async function syncLazycodexMarketplace(input: SyncLazycodexMarketplaceIn
 
   const destinationMarketplacePath = join(lazycodexRoot, MARKETPLACE_DESTINATION_PATH)
   await mkdir(dirname(destinationMarketplacePath), { recursive: true })
-  await writeFile(destinationMarketplacePath, await readFile(marketplacePath, "utf8"))
+  const marketplaceContents = await readFile(marketplacePath, "utf8")
+  await writeFile(destinationMarketplacePath, marketplaceContents)
+
+  // `codex plugin marketplace add <git repo>` scans only the marketplace ROOT for a
+  // supported manifest (Codex 0.144.x), so a manifest that lives solely under
+  // .agents/plugins/ is invisible: `codex plugin list` shows nothing and
+  // `codex plugin add omo@sisyphuslabs` fails (lazycodex #139). Emit a byte-identical
+  // root-level marketplace.json as well; its `source: "./plugins/omo"` already resolves
+  // against the repo root where the plugin bundle is copied below.
+  const rootMarketplacePath = join(lazycodexRoot, ROOT_MARKETPLACE_DESTINATION_PATH)
+  await writeFile(rootMarketplacePath, marketplaceContents)
 
   const destinationPluginRoot = join(lazycodexRoot, PLUGIN_DESTINATION_PATH)
   await rm(destinationPluginRoot, { recursive: true, force: true })
