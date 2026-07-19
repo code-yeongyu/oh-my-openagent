@@ -22,7 +22,7 @@ export type TeamLayoutDeps = {
 
 const defaultDeps: TeamLayoutDeps = {
   runTmuxCommand,
-  isServerRunning,
+  isServerRunning: (serverUrl) => isServerRunning(serverUrl, { authentication: "opencode-server" }),
   getTmuxPath: async () => "tmux",
   resolveCallerTmuxSession,
   log,
