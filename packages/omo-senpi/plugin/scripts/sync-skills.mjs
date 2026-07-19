@@ -146,6 +146,22 @@ function applyStartWorkOverlay(content) {
   return content.replace(/codex:<session_id>/g, "senpi:<session_id>").replace(/\bcodex:/g, "senpi:")
 }
 
+// The Codex edition injects a short skill POINTER, so its SKILL.md description tells the
+// model to read the whole file. The Senpi hook injects the FULL directive inline instead
+// (src/components/ultrawork/generated-directive.ts); shipping the Codex wording makes the
+// model re-read this file and duplicate ~17KB of identical rules in context.
+const ultraworkSenpiDescription =
+  "Binding ultrawork mode directive for omo-senpi. When a prompt contains ultrawork or ulw, the omo input hook injects the full directive inline as an <ultrawork-mode> block in the same message, so when that block is already present do not read this file again - it duplicates the same directive. Read this file only when ultrawork mode is requested and no <ultrawork-mode> block is present in the conversation."
+
+function applyUltraworkSkillOverlay(content) {
+  return content.replace(/^description: .*$/m, `description: ${ultraworkSenpiDescription}`)
+}
+
+function applyComponentTierAdaptation(skillName, content) {
+  const adapted = applyTier1Adaptation(content)
+  return skillName === "ultrawork" ? applyUltraworkSkillOverlay(adapted) : adapted
+}
+
 function findSenpiCompatibilitySectionEnd(content, searchStart) {
   const structuralEndPattern = /\n(?:---|export\s+const\s+|#{1,6}\s)/g
   structuralEndPattern.lastIndex = searchStart
@@ -262,7 +278,7 @@ export async function syncSkills() {
     await assertSourceExists(source)
     const destination = join(skillsRoot, name)
     await cp(source, destination, { filter: shouldCopySkillSource, recursive: true })
-    await adaptSkillTree(destination, applyTier1Adaptation)
+    await adaptSkillTree(destination, (content) => applyComponentTierAdaptation(name, content))
   }
 
   for (const { name, source } of nativeSkillSources) {

@@ -133,6 +133,116 @@ describe("omo-senpi ultrawork component", () => {
     ])
   })
 
+  it("#given ulw-prefixed skill names #when user input dispatches #then injects nothing", async () => {
+    // given
+    const prompts = [
+      "/skill:ulw-plan 네 plan 을 작성해주세요",
+      "ulw-plan 스킬 좀 검토해줘",
+      "omo ulw-loop status --json 확인",
+    ] as const
+
+    for (const prompt of prompts) {
+      const pi = new FakeExtensionAPI()
+      await createUltraworkComponent().register(pi, createTestContext(pi))
+
+      // when
+      const result = await dispatchInput(pi, prompt)
+
+      // then
+      expect(result).toEqual({ action: "continue" })
+    }
+  })
+
+  it("#given input already carrying an ultrawork block #when trigger word dispatches #then does not reinject", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    await createUltraworkComponent().register(pi, createTestContext(pi))
+    const prompt = "이 기록 확인해줘 <ultrawork-mode>\n# Role\n</ultrawork-mode> 그리고 ulw 모드로 부탁해"
+
+    // when
+    const result = await dispatchInput(pi, prompt)
+
+    // then
+    expect(result).toEqual({ action: "continue" })
+  })
+
+  it("#given /skill: command with a trigger word in args #when dispatched #then appends the directive after the command", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    await createUltraworkComponent().register(pi, createTestContext(pi))
+    const prompt = "/skill:frontend ulw 수준으로 다듬어줘"
+
+    // when
+    const result = await dispatchInput(pi, prompt)
+    const transformed = getTransformedText(result)
+
+    // then
+    expect(transformed.startsWith("/skill:frontend")).toBe(true)
+    expect(markerCount(transformed)).toBe(1)
+    expect(transformed).toContain(prompt)
+    expect(transformed).toContain("ULTRAWORK MODE ENABLED!")
+  })
+
+  it("#given a lone open-tag mention without a closing tag #when trigger word dispatches #then still injects", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    await createUltraworkComponent().register(pi, createTestContext(pi))
+    const prompt = "Explain what <ultrawork-mode> means, then ulw this fix"
+
+    // when
+    const result = await dispatchInput(pi, prompt)
+    const transformed = getTransformedText(result)
+
+    // then
+    expect(transformed).toContain("ULTRAWORK MODE ENABLED!")
+    expect(markerCount(transformed)).toBe(2)
+  })
+
+  it("#given the /skill:ultrawork command itself #when dispatched #then passes through untouched", async () => {
+    // given: expansion inlines the full SKILL.md (whose body IS the directive);
+    // appending would duplicate it (with args) or corrupt the parsed skill name
+    // (without args, senpi reads the name up to the first SPACE only).
+    const prompts = ["/skill:ultrawork fix this login bug", "/skill:ultrawork"] as const
+
+    for (const prompt of prompts) {
+      const pi = new FakeExtensionAPI()
+      await createUltraworkComponent().register(pi, createTestContext(pi))
+
+      // when
+      const result = await dispatchInput(pi, prompt)
+
+      // then
+      expect(result).toEqual({ action: "continue" })
+    }
+  })
+
+  it("#given /skill: command whose trigger appears only in the skill name #when dispatched #then injects nothing", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    await createUltraworkComponent().register(pi, createTestContext(pi))
+    const prompt = "/skill:myulw run it"
+
+    // when
+    const result = await dispatchInput(pi, prompt)
+
+    // then
+    expect(result).toEqual({ action: "continue" })
+  })
+
+  it("#given synced senpi skill artifact #when description is read #then documents inline injection instead of inviting a re-read", () => {
+    // given
+    const skillPath = resolve("packages/omo-senpi/plugin/skills/ultrawork/SKILL.md")
+    const skillContent = readFileSync(skillPath, "utf8")
+    const description = skillContent.match(/^description: (.*)$/m)?.[1] ?? ""
+
+    // then
+    expect(description).toContain("injects the full directive inline")
+    expect(description).toContain("do not read this file again")
+    expect(description.length).toBeLessThanOrEqual(1024)
+    expect(description).not.toContain("short bootstrap")
+    expect(description).not.toContain("Read the whole file")
+  })
+
   it("#given embedded directive #when inspected #then contains zero forbidden Codex tokens", () => {
     // then
     for (const token of FORBIDDEN_DIRECTIVE_TOKENS) {
