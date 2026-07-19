@@ -1,0 +1,26 @@
+bun test v1.3.14 (0d9b296a)
+
+packages\lsp-core\src\lsp\client-diagnostics-freshness.integration.test.ts:
+267 | 
+268 | 		const startedAt = Date.now();
+269 | 		const result = await context.client.diagnostics(context.source);
+270 | 		const elapsedMs = Date.now() - startedAt;
+271 | 
+272 | 		expect(result.transientError).toBeUndefined();
+                                      ^
+error: expect(received).toBeUndefined()
+
+Received: {
+  kind: "freshness_timeout",
+  message: "Timed out waiting for fresh diagnostics for C:\\Users\\pss\\AppData\\Local\\Temp\\lsp-apply-edit-klqpQC\\source.ts within 60ms.",
+}
+
+      at <anonymous> (C:\Users\pss\.omo-contrib\work\dev-baseline\packages\lsp-core\src\lsp\client-diagnostics-freshness.integration.test.ts:272:33)
+(fail) LspClient diagnostics freshness > #given a server without pull support that never publishes diagnostics #when diagnostics run on a clean file #then the request resolves clean after the freshness window instead of reporting a timeout [821.38ms]
+
+ 0 pass
+ 10 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [1383.00ms]
+exit=1

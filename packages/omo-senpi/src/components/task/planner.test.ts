@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
+import { BUILTIN_AGENTS } from "@oh-my-opencode/senpi-task"
+
 import { createTaskChildPlanner, type TaskModelRegistry } from "./planner"
 
 type FakeModel = {
@@ -39,6 +41,7 @@ describe("createTaskChildPlanner", () => {
           },
         },
       },
+      {},
       () => registry([model("google", "gemini-3.1-pro")]),
     )
 
@@ -66,6 +69,7 @@ describe("createTaskChildPlanner", () => {
   test("#given ultrabrain falls back to a variant-bearing model #when planned #then resolved_model keeps fallback variant metadata", () => {
     // given
     const planner = createTaskChildPlanner(
+      {},
       {},
       () => registry([model("google", "gemini-3.1-pro")]),
     )
@@ -101,6 +105,7 @@ describe("createTaskChildPlanner", () => {
           },
         },
       },
+      {},
       () => registry([model("google", "gemini-3.1-pro")]),
     )
 
@@ -125,166 +130,206 @@ describe("createTaskChildPlanner", () => {
     })
   })
 
-  test("#given a subagent_type with an explicit model #when planned #then resolves via the agent definition and preserves agent metadata", () => {
-    // given — hephaestus is a user-defined agent in omo.json, NOT a category.
+  test("#given subagent_type naming a builtin agent #when planned against a registry serving its chain #then the plan carries the agent persona and an agent-sourced model", () => {
+    // given
     const planner = createTaskChildPlanner(
-      {
-        agents: {
-          hephaestus: {
-            model: "openai/gpt-5.6-luna",
-            execution_mode: "in-process",
-            allowed_subagents: ["oracle"],
-            max_depth: 2,
-            prompt: "You are Hephaestus, the implementer.",
-          },
-        },
-      },
-      () => registry([model("openai", "gpt-5.6-luna")]),
+      {},
+      BUILTIN_AGENTS,
+      () => registry([model("openai", "gpt-5.4-mini-fast")]),
     )
 
     // when
     const result = planner({
-      prompt: "Build the thing.",
+      prompt: "Find the auth flow.",
       parent_session_id: "parent-1",
       depth: 0,
-      subagent_type: "hephaestus",
+      subagent_type: "explore",
     })
 
-    // then — must resolve as the agent's model, NOT fall through to category resolution.
+    // then
     const resolved = expectResolved(result)
-    expect(resolved.plan.model).toBe("openai/gpt-5.6-luna")
-    expect(resolved.plan.agentType).toBe("hephaestus")
+    expect(resolved.plan.model).toBe("openai/gpt-5.4-mini-fast")
+    expect(resolved.plan.resolved_model).toEqual({
+      source: "agent",
+      provider: "openai",
+      model_id: "gpt-5.4-mini-fast",
+      display: "openai/gpt-5.4-mini-fast",
+    })
+    expect(resolved.plan.agentType).toBe("explore")
+    expect(resolved.plan.instructions).toContain("codebase search specialist")
+    expect(resolved.plan.toolAllowlist).toEqual([
+      "read",
+      "find",
+      "grep",
+      "ls",
+      "bash",
+      "lsp_diagnostics",
+      "lsp_goto_definition",
+      "lsp_find_references",
+      "lsp_symbols",
+    ])
     expect(resolved.plan.agentExecutionMode).toBe("in-process")
-    expect(resolved.plan.allowedSubagents).toEqual(["oracle"])
-    expect(resolved.plan.maxDepth).toBe(2)
-    expect(resolved.plan.instructions).toBe("You are Hephaestus, the implementer.")
+  })
+
+  test("#given an explicit model with subagent_type and no registry #when planned #then the agent persona is kept and the model stays explicit", () => {
+    // given
+    const planner = createTaskChildPlanner({}, BUILTIN_AGENTS, () => undefined)
+
+    // when
+    const result = planner({
+      prompt: "Review this design.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      subagent_type: "oracle",
+      model: "openai/gpt-5.5",
+    })
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.plan.model).toBe("openai/gpt-5.5")
     expect(resolved.plan.resolved_model).toEqual({
       source: "explicit",
       provider: "openai",
-      model_id: "gpt-5.6-luna",
-      display: "openai/gpt-5.6-luna",
+      model_id: "gpt-5.5",
+      display: "openai/gpt-5.5",
     })
+    expect(resolved.plan.agentType).toBe("oracle")
+    expect(resolved.plan.instructions).toBeDefined()
+    expect(resolved.plan.toolAllowlist).toHaveLength(9)
+    expect(resolved.plan.agentExecutionMode).toBe("in-process")
   })
 
-  test("#given an unknown subagent_type #when planned #then fails with unknown_target and lists no categories (subagent_type is not a category lookup)", () => {
-    // given — no `ghost` agent in omo.json.
-    const planner = createTaskChildPlanner(
-      { agents: { hephaestus: { model: "openai/gpt-5.6-luna" } } },
-      () => registry([model("openai", "gpt-5.6-luna")]),
-    )
+  test("#given subagent_type naming a builtin agent with no registry #when planned #then it fails closed with the registry-unavailable error", () => {
+    // given
+    const planner = createTaskChildPlanner({}, BUILTIN_AGENTS, () => undefined)
 
     // when
     const result = planner({
-      prompt: "Do the thing.",
+      prompt: "Find the auth flow.",
       parent_session_id: "parent-1",
       depth: 0,
-      subagent_type: "ghost",
+      subagent_type: "explore",
     })
 
-    // then — error must be unknown_target, NOT "Category ghost not found".
-    if (result.kind !== "error") throw new Error(`Expected error, got ${result.kind}`)
-    expect(result.error.code).toBe("unknown_target")
-    expect(result.error.message).toContain('subagent_type "ghost"')
-    expect(result.error.message).not.toContain('Category "ghost"')
+    // then
+    expect(result).toEqual({
+      kind: "error",
+      error: {
+        code: "model_unavailable",
+        message: "No senpi model registry is available yet to resolve a task model.",
+      },
+    })
   })
 
-  test("#given a disabled subagent_type #when planned #then fails with category_disabled", () => {
+  test("#given subagent_type naming a category rather than an agent #when planned #then category resolution still applies", () => {
     // given
     const planner = createTaskChildPlanner(
-      {
-        agents: {
-          hephaestus: {
-            model: "openai/gpt-5.6-luna",
-            disable: true,
-          },
-        },
-      },
-      () => registry([model("openai", "gpt-5.6-luna")]),
+      {},
+      BUILTIN_AGENTS,
+      () => registry([model("google", "gemini-3.1-pro")]),
     )
 
     // when
     const result = planner({
-      prompt: "Do the thing.",
+      prompt: "Think hard.",
       parent_session_id: "parent-1",
       depth: 0,
-      subagent_type: "hephaestus",
-    })
-
-    // then
-    if (result.kind !== "error") throw new Error(`Expected error, got ${result.kind}`)
-    expect(result.error.code).toBe("category_disabled")
-  })
-
-  test("#given a subagent_type whose primary model is unavailable and models[] carries a variant suffix #when planned #then resolves via the first available fallback model stripped of its variant", () => {
-    // given — sisyphus's primary model is cliproxy/kimi-k3 low, but the registry only has
-    // cliproxy/grok-4.5 (not cliproxy/kimi-k3). The fallback models[] entry is
-    // "cliproxy/grok-4.5 high" — a space-separated variant suffix that must be stripped
-    // before matching against the registry, exactly like resolveCategory does for
-    // fallback_models. This mirrors the user's real ~/.config/omo/omo.json shape.
-    const planner = createTaskChildPlanner(
-      {
-        agents: {
-          sisyphus: {
-            model: "cliproxy/kimi-k3 low",
-            models: ["cliproxy/grok-4.5 high"],
-          },
-        },
-      },
-      () => registry([model("cliproxy", "grok-4.5")]),
-    )
-
-    // when
-    const result = planner({
-      prompt: "Orchestrate.",
-      parent_session_id: "parent-1",
-      depth: 0,
-      subagent_type: "sisyphus",
-    })
-
-    // then — the variant-suffixed fallback must resolve to cliproxy/grok-4.5 with variant high
-    // propagated to resolved_model. Before the fix, availableSet.has("cliproxy/grok-4.5 high")
-    // returned false and the planner returned model_unavailable.
-    const resolved = expectResolved(result)
-    expect(resolved.plan.model).toBe("cliproxy/grok-4.5")
-    expect(resolved.plan.resolved_model).toMatchObject({
-      source: "explicit",
-      provider: "cliproxy",
-      model_id: "grok-4.5",
-      variant: "high",
-    })
-  })
-
-  test("#given a subagent_type whose primary model is unavailable and models[] has no variant suffix #when planned #then resolves via the first available fallback model", () => {
-    // given — no variant suffix on the fallback entry; this is the already-working path
-    // and must stay green after the variant-stripping change.
-    const planner = createTaskChildPlanner(
-      {
-        agents: {
-          sisyphus: {
-            model: "cliproxy/kimi-k3",
-            models: ["cliproxy/grok-4.5"],
-          },
-        },
-      },
-      () => registry([model("cliproxy", "grok-4.5")]),
-    )
-
-    // when
-    const result = planner({
-      prompt: "Orchestrate.",
-      parent_session_id: "parent-1",
-      depth: 0,
-      subagent_type: "sisyphus",
+      subagent_type: "ultrabrain",
     })
 
     // then
     const resolved = expectResolved(result)
-    expect(resolved.plan.model).toBe("cliproxy/grok-4.5")
-    expect(resolved.plan.resolved_model).toMatchObject({
-      source: "explicit",
-      provider: "cliproxy",
-      model_id: "grok-4.5",
+    expect(resolved.plan.resolved_model).toMatchObject({ source: "category", provider: "google" })
+    expect(resolved.plan.category).toBe("ultrabrain")
+  })
+
+  test("#given a disabled agent sharing a category name #when planned without an explicit model #then category fallback remains available", () => {
+    // given
+    const agents = { ...BUILTIN_AGENTS, explore: { name: "explore", disable: true } }
+    const planner = createTaskChildPlanner(
+      { categories: { explore: { model: "google/gemini-3.1-pro" } } },
+      agents,
+      () => registry([model("google", "gemini-3.1-pro")]),
+    )
+
+    // when
+    const result = planner({
+      prompt: "Find the auth flow.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      subagent_type: "explore",
     })
-    expect(resolved.plan.resolved_model).not.toHaveProperty("variant")
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.plan.agentType).toBeUndefined()
+    expect(resolved.plan.category).toBe("explore")
+    expect(resolved.plan.resolved_model?.source).toBe("category")
+  })
+
+  test("#given a disabled agent and explicit model #when planned via subagent_type #then the model cannot bypass disablement", () => {
+    // given
+    const agents = { ...BUILTIN_AGENTS, oracle: { name: "oracle", disable: true } }
+    const planner = createTaskChildPlanner({}, agents, () => undefined)
+
+    // when
+    const result = planner({
+      prompt: "Review this design.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      subagent_type: "oracle",
+      model: "openai/gpt-5.5",
+    })
+
+    // then
+    if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
+    expect(result.error.code).toBe("unknown_target")
+    expect(result.error.availableAgents).toEqual(["explore", "librarian", "metis", "momus"])
+  })
+
+  test("#given an unknown subagent_type #when planned #then the unknown-target error lists available agents and categories", () => {
+    // given
+    const planner = createTaskChildPlanner(
+      {},
+      BUILTIN_AGENTS,
+      () => registry([model("google", "gemini-3.1-pro")]),
+    )
+
+    // when
+    const result = planner({
+      prompt: "Do something.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      subagent_type: "nonexistent",
+    })
+
+    // then
+    if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
+    expect(result.error.code).toBe("unknown_target")
+    expect(result.error.availableAgents).toEqual(["explore", "librarian", "metis", "momus", "oracle"])
+    expect(result.error.availableCategories).toContain("ultrabrain")
+  })
+
+  test("#given subagent_type naming a builtin agent whose chain no registry model satisfies #when planned #then it reports model_unavailable with the agent list", () => {
+    // given
+    const planner = createTaskChildPlanner(
+      {},
+      BUILTIN_AGENTS,
+      () => registry([model("acme", "unrelated-1")]),
+    )
+
+    // when
+    const result = planner({
+      prompt: "Find the auth flow.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      subagent_type: "explore",
+    })
+
+    // then
+    if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
+    expect(result.error.code).toBe("model_unavailable")
+    expect(result.error.message).toContain('No available model for agent "explore"')
+    expect(result.error.availableAgents).toEqual(["explore", "librarian", "metis", "momus", "oracle"])
   })
 })

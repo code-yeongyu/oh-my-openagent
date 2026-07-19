@@ -5,10 +5,9 @@ import { createHash } from "node:crypto"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 
-// senpi writes ONE machine-global append-only diagnostic log at getAgentDir()/senpi-debug.log
-// (senpi config.js getDebugLogPath). Every concurrent senpi process on the host - including sibling QA
-// lanes - appends to the REAL ~/.senpi/agent copy, so it is the only real-dir path a correctly isolated
-// run may see mutate; the pollution gate exempts exactly this shared log.
+// senpi writes one machine-global append-only diagnostic log at getAgentDir()/senpi-debug.log
+// (senpi config.js getDebugLogPath). Every concurrent senpi process on the host can append to the real
+// ~/.senpi/agent copy, so the pollution gate exempts exactly this shared log.
 export const SHARED_SENPI_LOG = "senpi-debug.log"
 
 // Per-file content snapshot of a directory (relpath -> sha256), for precise pollution attribution.
@@ -33,6 +32,21 @@ export function changedRealPaths(before, after) {
   for (const [rel, sha] of after) if (rel !== SHARED_SENPI_LOG && before.get(rel) !== sha) changed.push(rel)
   for (const rel of before.keys()) if (rel !== SHARED_SENPI_LOG && !after.has(rel)) changed.push(rel)
   return changed
+}
+
+// A busy host can persist unrelated real sessions while this isolated QA run is active. Keep those
+// paths visible without blaming this run. Any global config/state change, or any session path carrying
+// one of this run's unique sandbox tokens, remains attributed to QA and fails the pollution gate.
+export function classifyRealSenpiChanges(changedPaths, sandboxTokens) {
+  const tokens = sandboxTokens.filter((token) => typeof token === "string" && token.length > 0)
+  const qaAttributedPaths = []
+  const concurrentSessionPaths = []
+  for (const path of changedPaths) {
+    const unrelatedSession = tokens.length > 0 && path.startsWith("sessions/") && !tokens.some((token) => path.includes(token))
+    if (unrelatedSession) concurrentSessionPaths.push(path)
+    else qaAttributedPaths.push(path)
+  }
+  return { qaAttributedPaths, concurrentSessionPaths }
 }
 
 // Parse a senpi `--mode json` stdout stream into the array of JSON event objects, ignoring banner lines.
