@@ -36,9 +36,9 @@ function defaultTmuxCommandResults(): TmuxCommandResult[] {
 	]
 }
 
-function createHarness() {
+function createHarness(serverReady = true) {
 	const calls: Array<[string, string[]]> = []
-	const logs: string[] = []
+	const logs: Array<readonly [message: string, data?: unknown]> = []
 	const tmuxCommandResults = defaultTmuxCommandResults()
 	const runTmuxCommand = async (command: string, args: string[]): Promise<TmuxCommandResult> => {
 		calls.push([command, [...args]])
@@ -49,19 +49,19 @@ function createHarness() {
 		return nextResult
 	}
 	const deps: SpawnTmuxSessionDeps = {
-		log: (message) => {
-			logs.push(message)
+		log: (message, data) => {
+			logs.push([message, data])
 		},
 		runTmuxCommand,
 		isInsideTmux: (): boolean => true,
-		isServerRunning: async (): Promise<boolean> => true,
+		isServerRunning: async (): Promise<boolean> => serverReady,
 		getTmuxPath: async (): Promise<string | null> => "sh",
 	}
 
 	function getRunTmuxCommandCall(index: number): [string, string[]] {
 		const call = calls[index]
 		if (!call) {
-			throw new Error(`Expected tmux runner call at index ${index}; logs: ${logs.join(", ")}`)
+			throw new Error(`Expected tmux runner call at index ${index}; logs: ${JSON.stringify(logs)}`)
 		}
 
 		return [call[0], toStringArray(call[1])]
@@ -77,7 +77,7 @@ function createHarness() {
 		return newSessionCommand
 	}
 
-	return { deps, getRunTmuxCommandCall, getSpawnCommand }
+	return { deps, getRunTmuxCommandCall, getSpawnCommand, logs }
 }
 
 describe("spawnTmuxSession runner integration", () => {
@@ -105,6 +105,20 @@ describe("spawnTmuxSession runner integration", () => {
 		expect(harness.getSpawnCommand()).toContain("Focus this pane to attach.")
 		expect(harness.getSpawnCommand()).toContain("while :; do sleep 86400; done")
 		expect(harness.getSpawnCommand()).not.toContain("opencode attach")
+	})
+
+	it("#given a secret-bearing listener URL #when readiness fails #then lifecycle logs contain only its origin", async () => {
+		const harness = createHarness(false)
+		const serverUrl = "https://user-fixture:password-fixture@127.0.0.1:43127/private-fixture?query-fixture=secret#fragment-fixture"
+
+		await spawnTmuxSession("session-log", "worker", enabledTmuxConfig, serverUrl, "/tmp/project", "%0", harness.deps)
+
+		const serializedLogs = JSON.stringify(harness.logs)
+		expect(serializedLogs).toContain("https://127.0.0.1:43127")
+		expect(serializedLogs).toContain("server listener not ready")
+		for (const secret of ["user-fixture", "password-fixture", "private-fixture", "query-fixture", "fragment-fixture"]) {
+			expect(serializedLogs).not.toContain(secret)
+		}
 	})
 
 	it("#given description with spaces #when spawnTmuxSession called #then includes it in the placeholder", async () => {

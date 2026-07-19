@@ -1,10 +1,17 @@
 import type { TmuxConfig } from "../types"
 import type { SpawnPaneResult } from "../types"
+import type { TmuxServerTarget } from "../types"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
+import { getHttpServerOriginForLog, normalizeTmuxServerTarget } from "../tmux-server-target"
 import type { SplitDirection } from "./environment"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
-import { buildPaneAuthEnvironmentArgs, buildTmuxAttachCommand, buildTmuxPlaceholderCommand } from "./pane-command"
+import {
+	buildTmuxAttachCommand,
+	buildTmuxEnvironmentArgs,
+	buildTmuxPlaceholderCommand,
+	canOmitTmuxPaneEnvironment,
+} from "./pane-command"
 import { isCmuxCompatEnvironment as _isCmuxCompatEnvironment } from "../cmux-detect"
 
 export type SpawnTmuxPaneDeps = {
@@ -23,7 +30,7 @@ async function resolveSpawnTmuxPaneDeps(deps?: Partial<SpawnTmuxPaneDeps>): Prom
 		log: () => undefined,
 		runTmuxCommand,
 		isInsideTmux,
-		isServerRunning: (serverUrl) => isServerRunning(serverUrl, { authentication: "opencode-server" }),
+		isServerRunning,
 		getTmuxPath: async () => null,
 		isCmuxCompatEnvironment: _isCmuxCompatEnvironment,
 		...deps,
@@ -34,7 +41,7 @@ export async function spawnTmuxPane(
 	sessionId: string,
 	description: string,
 	config: TmuxConfig,
-	serverUrl: string,
+	serverTarget: TmuxServerTarget,
 	_directory: string,
 	targetPaneId?: string,
 	splitDirection: SplitDirection = "-h",
@@ -42,11 +49,13 @@ export async function spawnTmuxPane(
 ): Promise<SpawnPaneResult> {
 	const deps = await resolveSpawnTmuxPaneDeps(depsInput)
 	const { log, runTmuxCommand } = deps
+	const serverAccess = normalizeTmuxServerTarget(serverTarget, depsInput?.isServerRunning)
+	const serverOrigin = getHttpServerOriginForLog(serverAccess.serverUrl)
 
 	log("[spawnTmuxPane] called", {
 		sessionId,
 		description,
-		serverUrl,
+		serverOrigin,
 		configEnabled: config.enabled,
 		targetPaneId,
 		splitDirection,
@@ -64,11 +73,19 @@ export async function spawnTmuxPane(
 		return { success: false }
 	}
 
-	const serverRunning = await deps.isServerRunning(serverUrl)
+	const serverRunning = await serverAccess.checkServerHealth()
 	if (!serverRunning) {
-		log("[spawnTmuxPane] SKIP: server not running", { serverUrl })
+		log("[spawnTmuxPane] SKIP: server listener not ready", { serverOrigin })
 		return { success: false }
 	}
+
+	const paneEnvironment = serverAccess.getPaneEnvironment()
+	const isCmux = deps.isCmuxCompatEnvironment()
+	if (isCmux && !canOmitTmuxPaneEnvironment(paneEnvironment)) {
+		log("[spawnTmuxPane] SKIP: authenticated cmux panes are unsupported")
+		return { success: false }
+	}
+	const paneEnvironmentArgs = isCmux ? [] : buildTmuxEnvironmentArgs(paneEnvironment)
 
 	const tmux = await deps.getTmuxPath()
 	if (!tmux) {
@@ -78,14 +95,8 @@ export async function spawnTmuxPane(
 
 	log("[spawnTmuxPane] all checks passed, spawning...")
 
-	const authEnvArgs = buildPaneAuthEnvironmentArgs()
-	if (deps.isCmuxCompatEnvironment() && authEnvArgs.length > 0) {
-		log("[spawnTmuxPane] SKIP: authenticated cmux panes are unsupported")
-		return { success: false }
-	}
-
-	const initialCmd = deps.isCmuxCompatEnvironment()
-		? buildTmuxAttachCommand(serverUrl, sessionId, _directory)
+	const initialCmd = isCmux
+		? buildTmuxAttachCommand(serverAccess.serverUrl, sessionId, _directory)
 		: buildTmuxPlaceholderCommand(description)
 
 	const args = [
@@ -96,7 +107,7 @@ export async function spawnTmuxPane(
 		"-F",
 		"#{pane_id}",
 		...(targetPaneId ? ["-t", targetPaneId] : []),
-		...authEnvArgs,
+		...paneEnvironmentArgs,
 		initialCmd,
 	]
 

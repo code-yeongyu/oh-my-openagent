@@ -1,7 +1,9 @@
 import { runTmuxCommand } from "../runner"
 import { isCmuxCompatEnvironment } from "../cmux-detect"
+import { normalizeTmuxServerTarget } from "../tmux-server-target"
+import type { TmuxServerTarget } from "../types"
 import { isInsideTmux } from "./environment"
-import { buildPaneAuthEnvironmentArgs, buildTmuxAttachCommand } from "./pane-command"
+import { buildTmuxAttachCommand, buildTmuxEnvironmentArgs, canOmitTmuxPaneEnvironment } from "./pane-command"
 
 export type ActivateTmuxPaneDeps = {
   readonly isInsideTmux: () => boolean
@@ -13,7 +15,7 @@ export type ActivateTmuxPaneDeps = {
 export async function activateTmuxPane(
   paneId: string,
   sessionId: string,
-  serverUrl: string,
+  serverTarget: TmuxServerTarget,
   directory: string,
   deps: ActivateTmuxPaneDeps = {
     isInsideTmux,
@@ -22,16 +24,20 @@ export async function activateTmuxPane(
     log: () => undefined,
   },
 ): Promise<boolean> {
+  const serverAccess = normalizeTmuxServerTarget(serverTarget)
+
   if (!deps.isInsideTmux()) {
     deps.log("[activateTmuxPane] SKIP: not inside tmux", { paneId, sessionId })
     return false
   }
 
-  const authEnvArgs = buildPaneAuthEnvironmentArgs()
-  if (isCmuxCompatEnvironment() && authEnvArgs.length > 0) {
+  const paneEnvironment = serverAccess.getPaneEnvironment()
+  const isCmux = isCmuxCompatEnvironment()
+  if (isCmux && !canOmitTmuxPaneEnvironment(paneEnvironment)) {
     deps.log("[activateTmuxPane] SKIP: authenticated cmux panes are unsupported", { paneId, sessionId })
     return false
   }
+  const paneEnvironmentArgs = isCmux ? [] : buildTmuxEnvironmentArgs(paneEnvironment)
 
   const tmux = await deps.getTmuxPath()
   if (!tmux) {
@@ -39,14 +45,14 @@ export async function activateTmuxPane(
     return false
   }
 
-  const opencodeCmd = buildTmuxAttachCommand(serverUrl, sessionId, directory)
+  const attachCommand = buildTmuxAttachCommand(serverAccess.serverUrl, sessionId, directory)
   const result = await deps.runTmuxCommand(tmux, [
     "respawn-pane",
     "-k",
-    ...authEnvArgs,
+    ...paneEnvironmentArgs,
     "-t",
     paneId,
-    opencodeCmd,
+    attachCommand,
   ])
   if (result.exitCode !== 0) {
     deps.log("[activateTmuxPane] FAILED", { paneId, sessionId, exitCode: result.exitCode, stderr: result.stderr.trim() })

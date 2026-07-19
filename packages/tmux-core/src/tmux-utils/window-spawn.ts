@@ -1,10 +1,12 @@
 import type { TmuxConfig } from "../types"
 import type { SpawnPaneResult } from "../types"
 import { isCmuxCompatEnvironment } from "../cmux-detect"
+import type { TmuxServerTarget } from "../types"
+import { getHttpServerOriginForLog, normalizeTmuxServerTarget } from "../tmux-server-target"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
-import { buildPaneAuthEnvironmentArgs, buildTmuxPlaceholderCommand } from "./pane-command"
+import { buildTmuxEnvironmentArgs, buildTmuxPlaceholderCommand, canOmitTmuxPaneEnvironment } from "./pane-command"
 
 const ISOLATED_WINDOW_NAME = "omo-agents"
 
@@ -23,7 +25,7 @@ async function resolveSpawnTmuxWindowDeps(deps?: Partial<SpawnTmuxWindowDeps>): 
 		log: () => undefined,
 		runTmuxCommand,
 		isInsideTmux,
-		isServerRunning: (serverUrl) => isServerRunning(serverUrl, { authentication: "opencode-server" }),
+		isServerRunning,
 		getTmuxPath: async () => null,
 		...deps,
 	}
@@ -33,17 +35,19 @@ export async function spawnTmuxWindow(
 	sessionId: string,
 	description: string,
 	config: TmuxConfig,
-	serverUrl: string,
+	serverTarget: TmuxServerTarget,
 	_directory: string,
 	depsInput?: Partial<SpawnTmuxWindowDeps>,
 ): Promise<SpawnPaneResult> {
 	const deps = await resolveSpawnTmuxWindowDeps(depsInput)
 	const { log, runTmuxCommand } = deps
+	const serverAccess = normalizeTmuxServerTarget(serverTarget, depsInput?.isServerRunning)
+	const serverOrigin = getHttpServerOriginForLog(serverAccess.serverUrl)
 
 	log("[spawnTmuxWindow] called", {
 		sessionId,
 		description,
-		serverUrl,
+		serverOrigin,
 		configEnabled: config.enabled,
 	})
 
@@ -56,17 +60,19 @@ export async function spawnTmuxWindow(
 		return { success: false }
 	}
 
-	const serverRunning = await deps.isServerRunning(serverUrl)
+	const serverRunning = await serverAccess.checkServerHealth()
 	if (!serverRunning) {
-		log("[spawnTmuxWindow] SKIP: server not running", { serverUrl })
+		log("[spawnTmuxWindow] SKIP: server listener not ready", { serverOrigin })
 		return { success: false }
 	}
 
-	const authEnvArgs = buildPaneAuthEnvironmentArgs()
-	if (isCmuxCompatEnvironment() && authEnvArgs.length > 0) {
+	const paneEnvironment = serverAccess.getPaneEnvironment()
+	const isCmux = isCmuxCompatEnvironment()
+	if (isCmux && !canOmitTmuxPaneEnvironment(paneEnvironment)) {
 		log("[spawnTmuxWindow] SKIP: authenticated cmux windows are unsupported")
 		return { success: false }
 	}
+	const paneEnvironmentArgs = isCmux ? [] : buildTmuxEnvironmentArgs(paneEnvironment)
 
 	const tmux = await deps.getTmuxPath()
 	if (!tmux) {
@@ -84,7 +90,7 @@ export async function spawnTmuxWindow(
 		"-n", ISOLATED_WINDOW_NAME,
 		"-P",
 		"-F", "#{pane_id}",
-		...authEnvArgs,
+		...paneEnvironmentArgs,
 		placeholderCmd,
 	]
 

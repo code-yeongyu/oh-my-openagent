@@ -1,10 +1,12 @@
 import type { TmuxConfig } from "../types"
 import type { SpawnPaneResult } from "../types"
+import type { TmuxServerTarget } from "../types"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
 import { isCmuxCompatEnvironment } from "../cmux-detect"
+import { getHttpServerOriginForLog, normalizeTmuxServerTarget } from "../tmux-server-target"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
-import { buildPaneAuthEnvironmentArgs, buildTmuxPlaceholderCommand } from "./pane-command"
+import { buildTmuxEnvironmentArgs, buildTmuxPlaceholderCommand, canOmitTmuxPaneEnvironment } from "./pane-command"
 
 const ISOLATED_SESSION_NAME_PREFIX = "omo-agents"
 
@@ -23,7 +25,7 @@ async function resolveSpawnTmuxSessionDeps(deps?: Partial<SpawnTmuxSessionDeps>)
 		log: () => undefined,
 		runTmuxCommand,
 		isInsideTmux,
-		isServerRunning: (serverUrl) => isServerRunning(serverUrl, { authentication: "opencode-server" }),
+		isServerRunning,
 		getTmuxPath: async () => null,
 		...deps,
 	}
@@ -59,7 +61,7 @@ export async function spawnTmuxSession(
 	sessionId: string,
 	description: string,
 	config: TmuxConfig,
-	serverUrl: string,
+	serverTarget: TmuxServerTarget,
 	_directory: string,
 	sourcePaneId?: string,
 	depsInput?: Partial<SpawnTmuxSessionDeps>,
@@ -67,11 +69,13 @@ export async function spawnTmuxSession(
 ): Promise<SpawnPaneResult> {
 	const deps = await resolveSpawnTmuxSessionDeps(depsInput)
 	const { log, runTmuxCommand } = deps
+	const serverAccess = normalizeTmuxServerTarget(serverTarget, depsInput?.isServerRunning)
+	const serverOrigin = getHttpServerOriginForLog(serverAccess.serverUrl)
 
 	log("[spawnTmuxSession] called", {
 		sessionId,
 		description,
-		serverUrl,
+		serverOrigin,
 		configEnabled: config.enabled,
 	})
 
@@ -84,17 +88,19 @@ export async function spawnTmuxSession(
 		return { success: false }
 	}
 
-	const serverRunning = await deps.isServerRunning(serverUrl)
+	const serverRunning = await serverAccess.checkServerHealth()
 	if (!serverRunning) {
-		log("[spawnTmuxSession] SKIP: server not running", { serverUrl })
+		log("[spawnTmuxSession] SKIP: server listener not ready", { serverOrigin })
 		return { success: false }
 	}
 
-	const authEnvArgs = buildPaneAuthEnvironmentArgs()
-	if (isCmuxCompatEnvironment() && authEnvArgs.length > 0) {
+	const paneEnvironment = serverAccess.getPaneEnvironment()
+	const isCmux = isCmuxCompatEnvironment()
+	if (isCmux && !canOmitTmuxPaneEnvironment(paneEnvironment)) {
 		log("[spawnTmuxSession] SKIP: authenticated cmux sessions are unsupported")
 		return { success: false }
 	}
+	const paneEnvironmentArgs = isCmux ? [] : buildTmuxEnvironmentArgs(paneEnvironment)
 
 	const tmux = await deps.getTmuxPath()
 	if (!tmux) {
@@ -123,7 +129,7 @@ export async function spawnTmuxSession(
 			"-t", isolatedSessionName,
 			"-P",
 			"-F", "#{pane_id}",
-			...authEnvArgs,
+			...paneEnvironmentArgs,
 			placeholderCmd,
 		]
 		: [
@@ -133,7 +139,7 @@ export async function spawnTmuxSession(
 			...sizeArgs,
 			"-P",
 			"-F", "#{pane_id}",
-			...authEnvArgs,
+			...paneEnvironmentArgs,
 			placeholderCmd,
 		]
 

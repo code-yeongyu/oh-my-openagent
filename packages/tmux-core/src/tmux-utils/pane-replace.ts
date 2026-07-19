@@ -1,9 +1,11 @@
 import type { TmuxConfig } from "../types"
 import type { SpawnPaneResult } from "../types"
+import type { TmuxServerTarget } from "../types"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
 import { isCmuxCompatEnvironment } from "../cmux-detect"
+import { normalizeTmuxServerTarget } from "../tmux-server-target"
 import { isInsideTmux } from "./environment"
-import { buildPaneAuthEnvironmentArgs, buildTmuxPlaceholderCommand } from "./pane-command"
+import { buildTmuxEnvironmentArgs, buildTmuxPlaceholderCommand, canOmitTmuxPaneEnvironment } from "./pane-command"
 
 export type ReplaceTmuxPaneDeps = {
 	readonly log: (message: string, data?: unknown) => void
@@ -29,12 +31,13 @@ export async function replaceTmuxPane(
 	sessionId: string,
 	description: string,
 	config: TmuxConfig,
-	_serverUrl: string,
+	serverTarget: TmuxServerTarget,
 	_directory: string,
 	depsInput?: Partial<ReplaceTmuxPaneDeps>,
 ): Promise<SpawnPaneResult> {
 	const deps = await resolveReplaceTmuxPaneDeps(depsInput)
 	const { log, runTmuxCommand } = deps
+	const serverAccess = normalizeTmuxServerTarget(serverTarget)
 
 	log("[replaceTmuxPane] called", { paneId, sessionId, description })
 
@@ -45,11 +48,13 @@ export async function replaceTmuxPane(
 		return { success: false }
 	}
 
-	const authEnvArgs = buildPaneAuthEnvironmentArgs()
-	if (isCmuxCompatEnvironment() && authEnvArgs.length > 0) {
+	const paneEnvironment = serverAccess.getPaneEnvironment()
+	const isCmux = isCmuxCompatEnvironment()
+	if (isCmux && !canOmitTmuxPaneEnvironment(paneEnvironment)) {
 		log("[replaceTmuxPane] SKIP: authenticated cmux panes are unsupported", { paneId, sessionId })
 		return { success: false }
 	}
+	const paneEnvironmentArgs = isCmux ? [] : buildTmuxEnvironmentArgs(paneEnvironment)
 
 	const tmux = await deps.getTmuxPath()
 	if (!tmux) {
@@ -61,7 +66,7 @@ export async function replaceTmuxPane(
 
 	const placeholderCmd = buildTmuxPlaceholderCommand(description)
 
-	const result = await runTmuxCommand(tmux, ["respawn-pane", "-k", ...authEnvArgs, "-t", paneId, placeholderCmd])
+	const result = await runTmuxCommand(tmux, ["respawn-pane", "-k", ...paneEnvironmentArgs, "-t", paneId, placeholderCmd])
 
 	if (result.exitCode !== 0) {
 		log("[replaceTmuxPane] FAILED", { paneId, exitCode: result.exitCode, stderr: result.stderr.trim() })
