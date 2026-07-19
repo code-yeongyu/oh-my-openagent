@@ -73,6 +73,7 @@ export type ResolvedChildPlan = {
 export type PlanResolutionError = {
   readonly code: "unknown_target" | "model_unavailable" | "category_disabled" | "invalid_target"
   readonly message: string
+  readonly availableAgents?: readonly string[]
   readonly availableCategories?: readonly string[]
 }
 

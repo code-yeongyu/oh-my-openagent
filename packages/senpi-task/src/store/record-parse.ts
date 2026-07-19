@@ -105,6 +105,7 @@ function readResolvedModelSource(record: Record<string, unknown>): ResolvedModel
   switch (source) {
     case "category":
     case "explicit":
+    case "agent":
       return source
     default:
       throw new Error(`resolved_model.source must be ${RESOLVED_MODEL_SOURCES.join(" or ")}`)

@@ -149,9 +149,11 @@ async function runSpawn(
   const spec = buildStartSpec(params, target, ctx.sessionManager.getSessionId(), deps, ctx.cwd)
   const started = await deps.manager.start(spec)
   if (started.kind === "plan_unresolved") {
-    const available = started.error.availableCategories
-    const suffix = available && available.length > 0 ? ` Available categories: ${available.join(", ")}.` : ""
-    return result(started.error.message + suffix, { task_id: "", status: "plan_error", mode: "spawn", reason: started.error.message })
+    const agents = started.error.availableAgents
+    const categories = started.error.availableCategories
+    const agentSuffix = agents && agents.length > 0 ? ` Available agents: ${agents.join(", ")}.` : ""
+    const categorySuffix = categories && categories.length > 0 ? ` Available categories: ${categories.join(", ")}.` : ""
+    return result(started.error.message + agentSuffix + categorySuffix, { task_id: "", status: "plan_error", mode: "spawn", reason: started.error.message })
   }
   if (started.kind === "depth_denied") {
     return result(started.reason, { task_id: "", status: "denied", mode: "spawn", reason: started.reason })
