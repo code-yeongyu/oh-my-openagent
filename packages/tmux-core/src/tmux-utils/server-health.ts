@@ -1,3 +1,5 @@
+import { getServerCredentials } from "./server-credentials"
+
 let serverAvailable: boolean | null = null
 let serverCheckUrl: string | null = null
 
@@ -7,6 +9,7 @@ export type ServerHealthState = {
 }
 
 type IsServerRunningOptions = {
+	authentication?: "opencode-server"
 	fetchImplementation?: typeof fetch
 	state?: ServerHealthState
 }
@@ -36,6 +39,7 @@ export async function isServerRunning(serverUrl: string, options: IsServerRunnin
 	const healthUrl = new URL("/global/health", serverUrl).toString()
 	const timeoutMs = 3000
 	const maxAttempts = 2
+	const credentials = options.authentication === "opencode-server" ? getServerCredentials() : undefined
 
 	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
 		const controller = new AbortController()
@@ -43,6 +47,12 @@ export async function isServerRunning(serverUrl: string, options: IsServerRunnin
 
 		try {
 			const response = await fetchImplementation(healthUrl, {
+				headers: credentials
+					? {
+							Authorization: `Basic ${Buffer.from(`${credentials.username ?? "opencode"}:${credentials.password}`, "utf8").toString("base64")}`,
+						}
+					: undefined,
+				redirect: "error",
 				signal: controller.signal,
 			}).catch(() => null)
 			clearTimeout(timeout)
