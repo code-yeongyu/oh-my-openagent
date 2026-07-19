@@ -13,6 +13,23 @@ export const EXPECTED_EXPLORE_TOOL_ALLOW = [
 export const EXPLORE_PERSONA_SENTINEL = "You are a codebase search specialist.";
 export const EXPLORE_TASK_SENTINEL = "OMO_CURATED_EXPLORE_E2E_20260719";
 
+export function analyzeCuratedSandboxFiles(cwd, expectedProbe) {
+	return {
+		probe_unchanged:
+			readFileSync(join(cwd, "qa-probe.ts"), "utf8") === expectedProbe
+				? "PASS"
+				: "FAIL",
+		direct_forbidden_file_absent: !existsSync(join(cwd, "forbidden.txt"))
+			? "PASS"
+			: "FAIL",
+		bash_forbidden_file_absent: !existsSync(
+			join(cwd, "forbidden-via-bash.txt"),
+		)
+			? "PASS"
+			: "FAIL",
+	};
+}
+
 export function analyzeCuratedAgentRun(input) {
 	const record = isRecord(input.record) ? input.record : {};
 	const contexts = Array.isArray(input.childContexts)
@@ -51,6 +68,8 @@ export function analyzeCuratedAgentRun(input) {
 			!visibleTools.includes("edit") && !visibleTools.includes("write"),
 		),
 		lsp_invoked: verdict(hasToolEvent(taskEvents, "lsp_diagnostics", false)),
+		bash_read_succeeded: verdict(hasToolEvent(taskEvents, "bash", false)),
+		bash_mutation_rejected: verdict(hasToolEvent(taskEvents, "bash", true)),
 		mutation_calls_rejected: verdict(
 			hasToolEvent(taskEvents, "edit", true) &&
 				hasToolEvent(taskEvents, "write", true),
@@ -97,3 +116,5 @@ function verdict(condition) {
 function isRecord(value) {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";

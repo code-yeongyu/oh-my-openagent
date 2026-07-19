@@ -68,14 +68,27 @@ export function createTaskChildPlanner(
   }
 }
 
-// Agent-first target handling. Returns undefined when the name is absent or disabled so the caller
-// falls through to the explicit-model and category paths unchanged.
+// Agent-first target handling. Unknown and disabled names may retain category fallback, but a known
+// disabled name cannot use an explicit model to bypass agent disablement.
 function resolveAgentTarget(
   agentName: string,
   explicitModel: string | undefined,
   agents: Readonly<Record<string, AgentDefinition>>,
   resolveRegistry: ResolveModelRegistry,
 ): PlanResolution | undefined {
+  const definition = Object.hasOwn(agents, agentName) ? agents[agentName] : undefined
+  if (definition?.disable === true) {
+    if (explicitModel === undefined || explicitModel.length === 0) return undefined
+    return {
+      kind: "error",
+      error: {
+        code: "unknown_target",
+        message: `Target "${agentName}" not found.`,
+        availableAgents: listAvailableAgents(agents),
+      },
+    }
+  }
+
   if (explicitModel !== undefined && explicitModel.length > 0) {
     const resolution = resolveAgent(agentName, agents, undefined, { modelOverride: explicitModel })
     if (resolution.kind !== "resolved") return undefined

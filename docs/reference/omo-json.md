@@ -117,7 +117,7 @@ A record of agent name to definition (`schema/agent.ts`).
 | `model` | string | |
 | `models` | string[] | |
 | `tools` | record<string, boolean> | |
-| `execution_mode` | `in-process \| process` | overrides `task.default_execution_mode` for this agent |
+| `execution_mode` | `in-process \| process` | overrides `task.default_execution_mode`; curated builtin agents remain in-process |
 | `background` | boolean | |
 | `max_depth` | int >= 0 | |
 | `allowed_subagents` | string[] | |
@@ -136,7 +136,7 @@ The Senpi task engine ships five builtin curated agents. Any Senpi session can d
 | `metis` | Pre-planning consultant that analyzes requests to surface hidden intentions, ambiguities, and AI failure points. |
 | `momus` | Expert reviewer that evaluates work plans against clarity, verifiability, and completeness standards. |
 
-Each builtin carries its own persona prompt, a read-only tool allowlist, and a per-agent model fallback chain, and is pinned to `execution_mode: "in-process"`.
+Each builtin carries its own persona prompt, a read-only tool policy, and a per-agent model fallback chain, and is pinned to `execution_mode: "in-process"`. The nine-name allowlist includes a curated `bash` override, but it is not Senpi's general shell: it directly runs only validated read-only `gh` queries and HTTPS `curl` retrievals, with no shell parsing, redirects, output files, uploads, request bodies, or mutating HTTP methods. Direct `edit`, `write`, and mutating LSP tools are excluded.
 
 Overriding a builtin. An `agents.<name>` entry matching a builtin overlays the builtin definition field by field: only the fields you set replace the builtin values, and every unset field keeps the builtin default. Names that do not match a builtin are appended as user-defined agents. To pin `explore` to a different model while keeping its builtin prompt and tool policy:
 
@@ -158,7 +158,7 @@ To hide a builtin from the task tool description and from spawn resolution, disa
 }
 ```
 
-Overriding `execution_mode` on a curated agent is unsupported. The builtin persona prompt and tool allowlist only thread through the in-process runner; a `process` child receives prompt and model but not the persona instructions or tool policy, so a curated agent forced into process mode would silently run without its persona.
+Overriding `execution_mode` on a curated agent is ignored. All other configured fields retain normal field-level overlay behavior, but curated agents remain in-process because the process runner cannot carry their persona instructions or tool policy. User-defined agents keep the configured execution mode.
 
 Curated agents and teams. A team member spec naming a curated read-only agent (`kind: "subagent_type"`) is rejected at member validation with this error:
 

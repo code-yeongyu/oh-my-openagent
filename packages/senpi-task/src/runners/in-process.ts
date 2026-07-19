@@ -1,7 +1,9 @@
 import { createAgentSession, SessionManager, type CreateAgentSessionOptions, type ToolDefinition } from "@code-yeongyu/senpi"
 
+import { CURATED_READONLY_AGENT_NAMES } from "../agents/builtin"
 import { createChildResourceLoader } from "./in-process/child-loader"
 import { createChildHandle, type ChildHandle, type ChildSession } from "./in-process/child-handle"
+import { createCuratedReadonlyBashTool } from "./in-process/curated-readonly-bash"
 import { RunnerError } from "./in-process/runner-error"
 import { mergeChildCustomTools } from "./in-process/shared-tool-filter"
 import { buildSubagentPrompt } from "./in-process/subagent-prompt"
@@ -83,9 +85,12 @@ export class InProcessRunner {
       })
     }
 
-    const customTools = mergeChildCustomTools(this.#sharedParentTools, spec.memberScopedTools, {
+    const mergedCustomTools = mergeChildCustomTools(this.#sharedParentTools, spec.memberScopedTools, {
       uiOnlyToolNames: this.#uiOnlyToolNames,
     })
+    const customTools = spec.agentType !== undefined && CURATED_READONLY_AGENT_NAMES.has(spec.agentType)
+      ? [...mergedCustomTools.filter((tool) => tool.name !== "bash"), createCuratedReadonlyBashTool(spec.cwd)]
+      : mergedCustomTools
     const options: CreateAgentSessionOptions = {
       cwd: spec.cwd,
       sessionManager: SessionManager.inMemory(spec.cwd),

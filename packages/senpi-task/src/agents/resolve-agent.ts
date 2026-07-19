@@ -2,6 +2,11 @@ import { resolveModelForDelegateTask } from "@oh-my-opencode/delegate-core"
 
 import type { SenpiModelPort, SenpiModelRegistryPort } from "../category"
 import type { ResolvedModelRecord } from "../state"
+import {
+  findExactAgentModel,
+  parseAvailableAgentModels,
+  type ParsedAgentModel,
+} from "./agent-model-registry"
 import { AGENT_FALLBACK_CHAINS } from "./builtin/fallback-chains"
 import type { AgentDefinition } from "./types"
 
@@ -41,22 +46,11 @@ export type AgentModelUnavailableResult = {
 
 export type AgentResolutionResult = ResolvedAgentResult | AgentNotFoundResult | AgentModelUnavailableResult
 
-type ParsedModel = {
-  readonly provider: string
-  readonly modelId: string
-}
-
 type AgentResolutionContext = {
   readonly name: string
   readonly persona: AgentPersona
   readonly availableAgents: readonly string[]
 }
-
-const SECRET_LIKE_MODEL_FIELD_NAMES: ReadonlySet<string> = new Set([
-  "accesstoken", "apikey", "auth", "authorization",
-  "bearertoken", "clientsecret", "password", "privatekey",
-  "privatetoken", "secret", "secretkey", "token",
-] as const)
 
 export function resolveAgent<TModel extends SenpiModelPort>(
   name: string,
@@ -106,13 +100,13 @@ export function resolveAgent<TModel extends SenpiModelPort>(
   ]
   for (const candidate of directModels) {
     attemptedModel = candidate
-    const found = findExactModel(candidate, registry)
+    const found = findExactAgentModel(candidate, registry)
     if (found !== undefined) {
       return resolvedAgent(context, found)
     }
   }
 
-  const availableModels = parseAvailableModels(registry.getAvailable())
+  const availableModels = parseAvailableAgentModels(registry.getAvailable())
   if (availableModels !== undefined && fallbackChain !== undefined) {
     const resolution = resolveModelForDelegateTask(
       { fallbackChain, availableModels: new Set(availableModels) },
@@ -124,7 +118,7 @@ export function resolveAgent<TModel extends SenpiModelPort>(
     )
     if (resolution !== undefined && !("skipped" in resolution)) {
       attemptedModel = resolution.model
-      const found = findExactModel(resolution.model, registry)
+      const found = findExactAgentModel(resolution.model, registry)
       if (found !== undefined) {
         return resolvedAgent(context, found, resolution.variant)
       }
@@ -151,7 +145,7 @@ function agentPersona(name: string, definition: AgentDefinition): AgentPersona {
 
 function resolvedAgent(
   context: AgentResolutionContext,
-  model: ParsedModel,
+  model: ParsedAgentModel,
   variant?: string,
 ): ResolvedAgentResult {
   const display = `${model.provider}/${model.modelId}`
@@ -169,52 +163,6 @@ function resolvedAgent(
     availableAgents: context.availableAgents,
     ...context.persona,
   }
-}
-
-function findExactModel<TModel extends SenpiModelPort>(
-  candidate: string,
-  registry: SenpiModelRegistryPort<TModel>,
-): ParsedModel | undefined {
-  const expected = parseModel(candidate)
-  return expected === undefined ? undefined : parseRegistryModel(registry.find(expected.provider, expected.modelId), expected)
-}
-
-function parseAvailableModels(models: unknown): readonly string[] | undefined {
-  if (!Array.isArray(models)) return undefined
-  return models
-    .map((model) => parseRegistryModel(model))
-    .filter((model) => model !== undefined)
-    .map((model) => `${model.provider}/${model.modelId}`)
-    .sort()
-}
-
-// Mirrors category/resolver.ts registry parsing so agent resolution preserves the same safe boundary.
-function parseRegistryModel(model: unknown, expected?: ParsedModel): ParsedModel | undefined {
-  if (typeof model !== "object" || model === null || hasSecretLikeModelField(model)) return undefined
-  const provider = ownStringDataProperty(model, "provider")
-  const modelId = ownStringDataProperty(model, "id")
-  if (!provider || !modelId) return undefined
-  if (expected !== undefined && (provider !== expected.provider || modelId !== expected.modelId)) return undefined
-  return { provider, modelId }
-}
-
-function parseModel(model: string): ParsedModel | undefined {
-  const separatorIndex = model.indexOf("/")
-  if (separatorIndex <= 0 || separatorIndex === model.length - 1) return undefined
-  return { provider: model.slice(0, separatorIndex), modelId: model.slice(separatorIndex + 1) }
-}
-
-function hasSecretLikeModelField(model: object): boolean {
-  return Object.getOwnPropertyNames(model).some((key) =>
-    SECRET_LIKE_MODEL_FIELD_NAMES.has(key.replaceAll(/[^a-zA-Z0-9]/g, "").toLowerCase())
-  )
-}
-
-function ownStringDataProperty(model: object, key: "provider" | "id"): string | undefined {
-  const descriptor = Object.getOwnPropertyDescriptor(model, key)
-  return descriptor && "value" in descriptor && typeof descriptor.value === "string"
-    ? descriptor.value
-    : undefined
 }
 
 function toExecutionMode(value: string | undefined): AgentPersona["agentExecutionMode"] {

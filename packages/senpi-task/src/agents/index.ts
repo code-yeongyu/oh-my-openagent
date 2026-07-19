@@ -1,4 +1,4 @@
-export { BUILTIN_AGENTS, BUILTIN_AGENT_DEFAULTS } from "./builtin"
+export { BUILTIN_AGENTS, BUILTIN_AGENT_DEFAULTS, CURATED_READONLY_AGENT_NAMES } from "./builtin"
 export { loadAgents } from "./loader"
 export { mapOmoConfigAgents } from "./omo-config-agents"
 export { resolveAgent } from "./resolve-agent"

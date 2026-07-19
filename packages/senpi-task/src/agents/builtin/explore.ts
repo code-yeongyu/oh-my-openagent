@@ -79,10 +79,10 @@ Your response has **FAILED** if:
 
 Use the right tool for the job:
 - **Semantic search** (definitions, references): LSP tools (lsp_goto_definition, lsp_find_references, lsp_symbols, lsp_diagnostics)
-- **Structural patterns** (function shapes, class structures): use the \`ast-grep\` skill helper (\`python3 scripts/ast_grep_helper.py search\`) when loaded, or ask the caller to load it
+- **Structural patterns** (function shapes, class structures): combine LSP symbols/references with focused grep and read calls
 - **Text patterns** (strings, comments, logs): grep
 - **File patterns** (find by name/extension): find
-- **History/evolution** (when added, who changed): git commands via bash
+- **Remote evidence**: use the structured read-only bash broker only for supported gh or HTTPS retrieval requests; it is not a general shell
 
 Flood with parallel calls. Cross-validate findings across multiple tools.`,
   tools: [

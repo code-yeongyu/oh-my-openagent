@@ -243,10 +243,14 @@ describe("createTaskChildPlanner", () => {
     expect(resolved.plan.category).toBe("ultrabrain")
   })
 
-  test("#given a disabled agent #when planned via subagent_type #then it falls through to the category path as unknown", () => {
+  test("#given a disabled agent sharing a category name #when planned without an explicit model #then category fallback remains available", () => {
     // given
     const agents = { ...BUILTIN_AGENTS, explore: { name: "explore", disable: true } }
-    const planner = createTaskChildPlanner({}, agents, () => registry([model("google", "gemini-3.1-pro")]))
+    const planner = createTaskChildPlanner(
+      { categories: { explore: { model: "google/gemini-3.1-pro" } } },
+      agents,
+      () => registry([model("google", "gemini-3.1-pro")]),
+    )
 
     // when
     const result = planner({
@@ -257,9 +261,30 @@ describe("createTaskChildPlanner", () => {
     })
 
     // then
+    const resolved = expectResolved(result)
+    expect(resolved.plan.agentType).toBeUndefined()
+    expect(resolved.plan.category).toBe("explore")
+    expect(resolved.plan.resolved_model?.source).toBe("category")
+  })
+
+  test("#given a disabled agent and explicit model #when planned via subagent_type #then the model cannot bypass disablement", () => {
+    // given
+    const agents = { ...BUILTIN_AGENTS, oracle: { name: "oracle", disable: true } }
+    const planner = createTaskChildPlanner({}, agents, () => undefined)
+
+    // when
+    const result = planner({
+      prompt: "Review this design.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      subagent_type: "oracle",
+      model: "openai/gpt-5.5",
+    })
+
+    // then
     if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
     expect(result.error.code).toBe("unknown_target")
-    expect(result.error.availableAgents).toEqual(["librarian", "metis", "momus", "oracle"])
+    expect(result.error.availableAgents).toEqual(["explore", "librarian", "metis", "momus"])
   })
 
   test("#given an unknown subagent_type #when planned #then the unknown-target error lists available agents and categories", () => {

@@ -1,16 +1,13 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import {
-	existsSync,
-	mkdirSync,
-	readdirSync,
-	readFileSync,
-	writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { analyzeCuratedAgentRun } from "./curated-agents-e2e-analysis.mjs";
+import {
+	analyzeCuratedAgentRun,
+	analyzeCuratedSandboxFiles,
+} from "./curated-agents-e2e-analysis.mjs";
 import {
 	CURATED_AGENT_OMO_CONFIG,
 	CURATED_AGENT_SCRIPT,
@@ -27,6 +24,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const mockProvider = join(scriptDir, "curated-agents-e2e-mock-provider.ts");
 const realSenpiAgentDir = join(homedir(), ".senpi", "agent");
 const childContextsFile = "curated-child-contexts.jsonl";
+const probeContents = "export const probe: string = 42\n";
 
 function seedScenario() {
 	const sandbox = createSandbox();
@@ -45,7 +43,7 @@ function seedScenario() {
 	);
 	writeFileSync(
 		join(sandbox.cwd, "qa-probe.ts"),
-		"export const probe: string = 42\n",
+		probeContents,
 	);
 	return {
 		sandbox,
@@ -167,6 +165,7 @@ function main() {
 	const checks = {
 		...analysis.checks,
 		senpi_exit: run.status === 0 ? "PASS" : "FAIL",
+		...analyzeCuratedSandboxFiles(scenario.sandbox.cwd, probeContents),
 		real_senpi_untouched: qaAttributedPaths.length === 0 ? "PASS" : "FAIL",
 	};
 	const payload = {

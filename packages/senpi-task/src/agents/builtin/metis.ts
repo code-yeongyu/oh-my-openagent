@@ -1,9 +1,8 @@
 import type { AgentDefinition } from "../types"
 
 // Ported and senpi-adapted from packages/omo-opencode/src/agents/metis.ts (base prompt only).
-// Adaptation: all child-side delegation guidance (call_omo_agent explore/librarian/oracle blocks,
-// anti-duplication section) deleted - senpi children cannot spawn agents; exploration is done with
-// the child's own read-only tools. "Prometheus" directives retargeted to the calling planner.
+// Adaptation: child-side delegation and anti-duplication guidance deleted; exploration uses the
+// child's own read-only tools. "Prometheus" directives retargeted to the calling planner.
 export const METIS_AGENT: AgentDefinition = {
   name: "metis",
   description:
@@ -50,8 +49,7 @@ Confirm:
 **Tool Guidance** (recommend to the planner):
 - \`lsp_find_references\`: Map all usages before changes
 - \`lsp_rename\` / \`lsp_prepare_rename\`: Safe symbol renames
-- \`ast-grep\` skill helper: Find structural patterns to preserve
-- \`sg --pattern '...' --rewrite '...' --lang ts\`: Preview transformations before applying
+- \`lsp_symbols\` plus \`grep\`: Find structural patterns to preserve without relying on unavailable helpers
 
 **Questions to Ask**:
 1. What specific behavior must be preserved? (test commands to verify)
@@ -73,7 +71,7 @@ Confirm:
 **Pre-Analysis Actions** (do these YOURSELF before questioning, in parallel):
 1. Find similar implementations in this codebase - their structure and conventions: \`grep\`/\`find\` for the feature's key nouns, then \`read\` the 2-3 closest matches.
 2. Find how similar features are organized - file structure, naming patterns, architectural approach.
-3. For unfamiliar technologies, check best practices and known pitfalls via \`bash\`: \`gh search code "<usage pattern>" --language <lang>\` and \`curl -sL <official documentation page>\`.
+3. For unfamiliar technologies, use the structured read-only \`bash\` broker with \`{ program: "gh", args: ["search", "code", "<usage pattern>", "--language", "<lang>"] }\` or \`{ program: "curl", args: ["--silent", "--location", "https://official-docs.example/page"] }\`.
 
 **Questions to Ask** (AFTER exploration):
 1. Found pattern X in codebase. Should new code follow this, or deviate? Why?
@@ -174,8 +172,8 @@ Advise the planner to delegate a read-only architecture consultation to the \`or
 
 **Investigation Structure** (run these probes YOURSELF, in parallel):
 1. Current approach: \`grep\`/\`find\` how X is currently handled - implementation details, edge cases, known issues.
-2. External best practices via \`bash\`: \`gh search code "<pattern>" --language <lang>\` for proven open-source implementations and lessons learned.
-3. Official documentation via \`bash\`: \`curl -sL <official docs>\` for API reference, configuration options, recommended patterns.
+2. External best practices via structured read-only \`bash\` using \`program: "gh"\` and a \`search code\` argument vector.
+3. Official documentation via structured read-only \`bash\` using \`program: "curl"\` and an HTTPS GET argument vector.
 
 **Directives for the Planner**:
 - MUST: Define clear exit criteria
@@ -243,9 +241,9 @@ Advise the planner to delegate a read-only architecture consultation to the \`or
 
 - **\`lsp_find_references\`**: Map impact before changes - Refactoring
 - **\`lsp_rename\`**: Safe symbol renames - Refactoring (recommend to the planner; you are read-only)
-- **\`ast-grep\` skill / \`sg\` CLI**: Find structural patterns - Refactoring, Build
+- **\`lsp_symbols\` / \`lsp_find_references\`**: Find structural patterns - Refactoring, Build
 - **\`grep\` / \`find\` / \`read\`**: Codebase pattern discovery - Build, Research
-- **\`bash\` + \`gh\` / \`curl\`**: External docs, OSS implementations, best practices - Build, Architecture, Research
+- **Structured read-only \`bash\` with \`gh\` / \`curl\`**: External docs, OSS implementations, best practices - Build, Architecture, Research
 - **\`oracle\` agent**: Read-only high-reasoning consultation - Architecture (planner delegates; you cannot)
 
 ---

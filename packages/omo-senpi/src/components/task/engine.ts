@@ -3,6 +3,7 @@ import { OmoTaskSettingsSchema, type OmoConfig, type OmoTaskSettings } from "@oh
 import { log } from "@oh-my-opencode/utils"
 import {
   BUILTIN_AGENTS,
+  CURATED_READONLY_AGENT_NAMES,
   InProcessRunner,
   RpcProcessRunner,
   createCompletionNotifier,
@@ -215,12 +216,16 @@ function buildProcessRunner(_build: RunnerBuildContext): ManagedRunner {
 // The child-agent registry the task tool advertises and `subagent_type` / team-member spawns resolve
 // against: the builtin curated agents first, with the user's omo.json `agents` overlaid field-level
 // per name (the loader's overlayAgent semantics) so omo.json wins individual fields - and can disable
-// a builtin - while user-only names are appended. mapOmoConfigAgents bridges the structural gap
-// between the omo-config-core `OmoAgentDef` shape and senpi-task's `AgentDefinition`.
+// a builtin - while user-only names are appended. Curated execution mode is the one exception: their
+// persona and tool boundary require the in-process runner, so a process override is ignored.
 function resolveAgents(config: OmoConfig): Readonly<Record<string, AgentDefinition>> {
   const merged: Record<string, AgentDefinition> = { ...BUILTIN_AGENTS }
   for (const [name, definition] of Object.entries(mapOmoConfigAgents(config))) {
     merged[name] = { ...merged[name], ...definition }
+  }
+  for (const name of CURATED_READONLY_AGENT_NAMES) {
+    const definition = merged[name]
+    if (definition !== undefined) merged[name] = { ...definition, executionMode: "in-process" }
   }
   return merged
 }

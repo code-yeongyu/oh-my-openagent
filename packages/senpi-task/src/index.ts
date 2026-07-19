@@ -177,6 +177,7 @@ export type {
 export {
   BUILTIN_AGENTS,
   BUILTIN_AGENT_DEFAULTS,
+  CURATED_READONLY_AGENT_NAMES,
   defineAgent,
   loadAgents,
   mapOmoConfigAgents,

@@ -86,6 +86,32 @@ describe("task engine builtin agent overlay", () => {
     expect(engine.agents["scout"]?.prompt).toBe("Scout the repo.")
   })
 
+  test("#given a process override for a curated agent #when the engine resolves agents #then in-process execution remains pinned", () => {
+    // given
+    const cwd = tempProject()
+    writeOmoJson(cwd, { agents: { explore: { execution_mode: "process" } } })
+
+    // when
+    const engine = composeIn(cwd)
+
+    // then
+    expect(engine.agents["explore"]?.executionMode).toBe("in-process")
+  })
+
+  test("#given a process-mode user agent #when the engine resolves agents #then its execution mode remains configurable", () => {
+    // given
+    const cwd = tempProject()
+    writeOmoJson(cwd, {
+      agents: { scout: { description: "Project scout", execution_mode: "process" } },
+    })
+
+    // when
+    const engine = composeIn(cwd)
+
+    // then
+    expect(engine.agents["scout"]?.executionMode).toBe("process")
+  })
+
   test("#given the default engine agents #when the task tool description renders #then all 5 builtin names are advertised sorted", () => {
     // given
     const engine = composeIn(tempProject())

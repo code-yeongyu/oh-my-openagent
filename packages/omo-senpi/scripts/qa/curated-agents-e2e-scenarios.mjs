@@ -18,6 +18,19 @@ export const CURATED_AGENT_SCRIPT = {
 		},
 		{
 			type: "tool_call",
+			name: "bash",
+			arguments: { program: "curl", args: ["--version"] },
+		},
+		{
+			type: "tool_call",
+			name: "bash",
+			arguments: {
+				program: "curl",
+				args: ["--output", "forbidden-via-bash.txt", "https://example.invalid"],
+			},
+		},
+		{
+			type: "tool_call",
 			name: "edit",
 			arguments: { path: "qa-probe.ts", oldText: "probe", newText: "changed" },
 		},
