@@ -124,6 +124,50 @@ A record of agent name to definition (`schema/agent.ts`).
 | `temperature` | number 0..2 | |
 | `disable` | boolean | |
 
+#### Builtin agents
+
+The Senpi task engine ships five builtin curated agents. Any Senpi session can delegate to them by name through the task tool with zero configuration, for example `task(subagent_type: "explore", ...)`. They are read-only research and review specialists; implementation and orchestration agents stay category-routed.
+
+| Name | Purpose |
+|------|---------|
+| `explore` | Codebase search specialist. Answers "Where is X?", "Which file has Y?", "Find the code that does Z". Supports thoroughness levels from quick to very thorough. |
+| `librarian` | Remote codebase and documentation research: searches open-source repositories, retrieves official documentation, and finds implementation examples via the GitHub CLI and direct documentation retrieval. |
+| `oracle` | Read-only consultation agent for debugging hard problems and high-difficulty architecture design. |
+| `metis` | Pre-planning consultant that analyzes requests to surface hidden intentions, ambiguities, and AI failure points. |
+| `momus` | Expert reviewer that evaluates work plans against clarity, verifiability, and completeness standards. |
+
+Each builtin carries its own persona prompt, a read-only tool allowlist, and a per-agent model fallback chain, and is pinned to `execution_mode: "in-process"`.
+
+Overriding a builtin. An `agents.<name>` entry matching a builtin overlays the builtin definition field by field: only the fields you set replace the builtin values, and every unset field keeps the builtin default. Names that do not match a builtin are appended as user-defined agents. To pin `explore` to a different model while keeping its builtin prompt and tool policy:
+
+```jsonc
+{
+  "agents": {
+    "explore": { "model": "anthropic/claude-sonnet-4-5" }
+  }
+}
+```
+
+To hide a builtin from the task tool description and from spawn resolution, disable it:
+
+```jsonc
+{
+  "agents": {
+    "oracle": { "disable": true }
+  }
+}
+```
+
+Overriding `execution_mode` on a curated agent is unsupported. The builtin persona prompt and tool allowlist only thread through the in-process runner; a `process` child receives prompt and model but not the persona instructions or tool policy, so a curated agent forced into process mode would silently run without its persona.
+
+Curated agents and teams. A team member spec naming a curated read-only agent (`kind: "subagent_type"`) is rejected at member validation with this error:
+
+```
+curated read-only agent "oracle" cannot be a team member; delegate via the task tool instead
+```
+
+Team members always spawn in `process` mode, which cannot carry the curated persona or tool policy, so delegate to these agents through the task tool instead of naming them as team members.
+
 ### `task`
 
 Task engine settings; every field has a default, so the whole object is optional (`schema/task.ts`).

@@ -19,7 +19,7 @@ The Senpi-coupled engine behind the `omo-senpi` task component: a durable task s
 | Steering | `src/steering/` | `createSteeringEngine` - send / interrupt / cancel against a live or resident child. |
 | Team | `src/team/` | Named-team registry, normalize/validate, durable pull mailboxes, lead poller, member self-polling extension, tasklist, shutdown handshake, and runtime (`team/runtime.ts`). |
 | Tools | `src/tools/` | `task/` (single or `tasks:[...]` batch spawn), `control/` (`task_send`/`task_cancel`), `output/` (`task_output`), `team/` (the 7 lead-only tools, including `team_wait`). |
-| Agents | `src/agents/` | `loadAgents` + `mapOmoConfigAgents` - omo.json agent definitions to task-tool targets. |
+| Agents | `src/agents/` | `loadAgents` + `mapOmoConfigAgents` - omo.json agent definitions to task-tool targets - plus the builtin curated agents (`agents/builtin/`) and `resolveAgent` agent-aware model/persona resolution. |
 | Category | `src/category/` | `resolveCategory` + per-provider builtin category tables (anthropic/openai/google/kimi). |
 | Adversarial | `src/__adversarial__/` | Seeded 200-iteration chaos bench asserting the four W1 invariants (`chaos-bench.test.ts`). |
 
@@ -44,7 +44,11 @@ The Senpi-coupled engine behind the `omo-senpi` task component: a durable task s
 
 ### Engine primitives
 
-`createTaskManager`, `createTaskLifecycle`, `createCompletionNotifier` / `routeCompletion` / `shouldNotifyStatus`, `createSteeringEngine`, `InProcessRunner`, `RpcProcessRunner`, `createTaskRecordStore` / `resolveStateDir`, `transitionTaskRecord` / `createTaskRecord`, `resolveCategory`, `loadAgents` / `mapOmoConfigAgents`, plus the team runtime (`createTeam`, `deleteTeam`, `sendTeamMessage`, `createLeadPoller`, `WaitRegistry`, `resolveMemberExtensionEntryPath`, `createTeamTask`, `requestShutdown`/`approveShutdown`/`rejectShutdown`, ...) and their typed errors (`SenpiTeamSpecError`, `SenpiTeamRuntimeError`, `SenpiShutdownError`, `RunnerError`, `TaskRecordCollisionError`).
+`createTaskManager`, `createTaskLifecycle`, `createCompletionNotifier` / `routeCompletion` / `shouldNotifyStatus`, `createSteeringEngine`, `InProcessRunner`, `RpcProcessRunner`, `createTaskRecordStore` / `resolveStateDir`, `transitionTaskRecord` / `createTaskRecord`, `resolveCategory`, `loadAgents` / `mapOmoConfigAgents`, `resolveAgent` / `BUILTIN_AGENTS` / `BUILTIN_AGENT_DEFAULTS` / `CURATED_READONLY_AGENT_NAMES`, plus the team runtime (`createTeam`, `deleteTeam`, `sendTeamMessage`, `createLeadPoller`, `WaitRegistry`, `resolveMemberExtensionEntryPath`, `createTeamTask`, `requestShutdown`/`approveShutdown`/`rejectShutdown`, ...) and their typed errors (`SenpiTeamSpecError`, `SenpiTeamRuntimeError`, `SenpiShutdownError`, `RunnerError`, `TaskRecordCollisionError`).
+
+### Builtin curated agents
+
+`agents/builtin/` ships five read-only curated subagents - `explore`, `librarian`, `oracle`, `metis`, `momus` - as `BUILTIN_AGENTS` / `BUILTIN_AGENT_DEFAULTS`, each pinned to `executionMode: "in-process"` with a senpi-adapted persona prompt, a 9-name read-only tool allowlist (`read`, `find`, `grep`, `ls`, `bash`, `lsp_diagnostics`, `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`), and a mirrored per-agent fallback chain in `agents/builtin/fallback-chains.ts` (hand-mirrored from `packages/model-core/src/agent-model-requirements.ts`, same convention as `category/fallback-chains.ts`; no model-core dependency). `CURATED_READONLY_AGENT_NAMES` feeds `team/member-validator.ts`, which rejects a curated name in a team member spec because process-mode spawns (mandatory for members) drop persona instructions and the tool allowlist. `resolveAgent(name, agents, registry, options?)` resolves one merged agent definition into the persona (`instructions`, `toolAllowlist`, `agentType`, `agentExecutionMode`, `allowedSubagents`, `maxDepth`) plus a model, trying `def.model`, then each `def.models` entry, then the agent fallback chain; `disable: true` resolves `not_found`, and an explicit `options.modelOverride` skips registry access entirely so headless explicit-model spawns keep working. A successful resolution records `resolved_model.source: "agent"` (added to `RESOLVED_MODEL_SOURCES` in `state/types.ts` and parsed by `store/record-parse.ts`), alongside `"category"` and `"explicit"`.
 
 ## TEAM DELIVERY MODEL
 
