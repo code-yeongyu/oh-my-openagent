@@ -17,7 +17,6 @@ import * as openclawRuntimeDispatch from "./openclaw/runtime-dispatch"
 import { registerManagerForCleanup } from "./features/background-agent/process-cleanup"
 import { createConfigHandler } from "./plugin-handlers"
 import { log } from "./shared"
-import { markServerRunningInProcess } from "./shared/tmux/tmux-utils/server-health"
 import type { ModelFallbackControllerAccessor } from "./hooks/model-fallback"
 
 type CreateManagersDeps = {
@@ -30,7 +29,6 @@ type CreateManagersDeps = {
   registerManagerForCleanupFn: typeof registerManagerForCleanup
   cleanupSessionTeamRunsFn: typeof cleanupSessionTeamRuns
   createConfigHandlerFn: typeof createConfigHandler
-  markServerRunningInProcessFn: typeof markServerRunningInProcess
 }
 
 const defaultCreateManagersDeps: CreateManagersDeps = {
@@ -43,7 +41,6 @@ const defaultCreateManagersDeps: CreateManagersDeps = {
   registerManagerForCleanupFn: registerManagerForCleanup,
   cleanupSessionTeamRunsFn: cleanupSessionTeamRuns,
   createConfigHandlerFn: createConfigHandler,
-  markServerRunningInProcessFn: markServerRunningInProcess,
 }
 
 export type Managers = {
@@ -68,17 +65,17 @@ export function createManagers(args: {
   const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled, runtimeSkillSourceUrl } = args
   const deps = { ...defaultCreateManagersDeps, ...args.deps }
 
-  // Only mark the server as in-process when the SDK actually exposes a
-  // serverUrl. `tmuxConfig.enabled` alone is not proof of a running server —
-  // a vanilla `opencode` session (no `opencode serve`/`opencode web`) leaves
-  // `ctx.serverUrl` undefined, and marking it running would make
-  // `isServerRunning` short-circuit to true. That bypasses the guard in
-  // `createTeamLayout` and lets it spawn tmux panes whose `opencode attach`
-  // command then fails because nothing is actually listening on the
-  // fallback port (issue #3894).
-  if (tmuxConfig.enabled && ctx.serverUrl) {
-    deps.markServerRunningInProcessFn()
-  }
+  // The in-process server mark was removed because ctx.serverUrl is always
+  // truthy (OpenCode's plugin getter falls back to http://localhost:4096
+  // even when Server.listen() was never called).  Marking it running
+  // short-circuited isServerRunning() and let tmux panes spawn with
+  // `opencode attach` commands that failed because no HTTP listener existed.
+  //
+  // Now isServerRunning() always performs a real HTTP health check against
+  // the resolved URL.  In default TUI mode (no --port flag) there is no
+  // HTTP listener → health check fails → spawn is skipped.
+  // When using --port 4096 or `omo run`, the HTTP server is listening →
+  // health check succeeds → tmux panes work correctly.
   const tmuxSessionManager = new deps.TmuxSessionManagerClass(ctx, tmuxConfig, undefined, {
     // Team-mode members get their tmux panes from team-layout-tmux, which
     // owns the lifecycle via runtimeState.tmuxLayout. Telling the subagent
