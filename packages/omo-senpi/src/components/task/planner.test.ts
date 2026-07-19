@@ -214,4 +214,77 @@ describe("createTaskChildPlanner", () => {
     if (result.kind !== "error") throw new Error(`Expected error, got ${result.kind}`)
     expect(result.error.code).toBe("category_disabled")
   })
+
+  test("#given a subagent_type whose primary model is unavailable and models[] carries a variant suffix #when planned #then resolves via the first available fallback model stripped of its variant", () => {
+    // given — sisyphus's primary model is cliproxy/kimi-k3 low, but the registry only has
+    // cliproxy/grok-4.5 (not cliproxy/kimi-k3). The fallback models[] entry is
+    // "cliproxy/grok-4.5 high" — a space-separated variant suffix that must be stripped
+    // before matching against the registry, exactly like resolveCategory does for
+    // fallback_models. This mirrors the user's real ~/.config/omo/omo.json shape.
+    const planner = createTaskChildPlanner(
+      {
+        agents: {
+          sisyphus: {
+            model: "cliproxy/kimi-k3 low",
+            models: ["cliproxy/grok-4.5 high"],
+          },
+        },
+      },
+      () => registry([model("cliproxy", "grok-4.5")]),
+    )
+
+    // when
+    const result = planner({
+      prompt: "Orchestrate.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      subagent_type: "sisyphus",
+    })
+
+    // then — the variant-suffixed fallback must resolve to cliproxy/grok-4.5 with variant high
+    // propagated to resolved_model. Before the fix, availableSet.has("cliproxy/grok-4.5 high")
+    // returned false and the planner returned model_unavailable.
+    const resolved = expectResolved(result)
+    expect(resolved.plan.model).toBe("cliproxy/grok-4.5")
+    expect(resolved.plan.resolved_model).toMatchObject({
+      source: "explicit",
+      provider: "cliproxy",
+      model_id: "grok-4.5",
+      variant: "high",
+    })
+  })
+
+  test("#given a subagent_type whose primary model is unavailable and models[] has no variant suffix #when planned #then resolves via the first available fallback model", () => {
+    // given — no variant suffix on the fallback entry; this is the already-working path
+    // and must stay green after the variant-stripping change.
+    const planner = createTaskChildPlanner(
+      {
+        agents: {
+          sisyphus: {
+            model: "cliproxy/kimi-k3",
+            models: ["cliproxy/grok-4.5"],
+          },
+        },
+      },
+      () => registry([model("cliproxy", "grok-4.5")]),
+    )
+
+    // when
+    const result = planner({
+      prompt: "Orchestrate.",
+      parent_session_id: "parent-1",
+      depth: 0,
+      subagent_type: "sisyphus",
+    })
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.plan.model).toBe("cliproxy/grok-4.5")
+    expect(resolved.plan.resolved_model).toMatchObject({
+      source: "explicit",
+      provider: "cliproxy",
+      model_id: "grok-4.5",
+    })
+    expect(resolved.plan.resolved_model).not.toHaveProperty("variant")
+  })
 })

@@ -34,6 +34,7 @@
     "@oh-my-opencode/delegate-core": "workspace:*",
     "@oh-my-opencode/team-core": "workspace:*",
     "@oh-my-opencode/boulder-state": "workspace:*",
+    "@oh-my-opencode/model-core": "workspace:*",
     "@code-yeongyu/lsp-daemon": "file:../lsp-daemon"
   },
   "peerDependencies": {

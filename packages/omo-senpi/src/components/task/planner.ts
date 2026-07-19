@@ -1,4 +1,5 @@
 import type { OmoAgentDef, OmoConfig } from "@oh-my-opencode/omo-config-core"
+import { parseModelString } from "@oh-my-opencode/model-core"
 import {
   resolveCategory,
   type ChildPlanner,
@@ -58,11 +59,13 @@ export function createTaskChildPlanner(omoConfig: OmoConfig, resolveRegistry: Re
           },
         }
       }
-      // Resolve the agent's model. Prefer an explicit `model` (bypass-validated, like the
-      // `isUserConfiguredCategoryModel` path in resolveCategory); fall back to the first entry of
-      // `models` the registry actually has available; finally fall back to a single explicit model
-      // string used verbatim without provider split (the manager will surface a clearer error if it
-      // cannot resolve). An agent with neither `model` nor `models` cannot be spawned.
+      // Resolve the agent's model. Prefer an explicit `model`: when the registry is available,
+      // it must be reachable (variant suffix stripped, so `"cliproxy/kimi-k3 low"` matches a
+      // registry entry `cliproxy/kimi-k3`); when the registry is cold, it is trusted verbatim so
+      // the agent can still be addressed before the model cache warms. If the primary is
+      // unreachable, fall back to the first `models[]` entry the registry reports available
+      // (also variant-stripped). An agent with neither a reachable primary nor a reachable
+      // fallback cannot be spawned.
       const registry = resolveRegistry()
       const resolvedModel = resolveAgentModel(agentDef, registry)
       if (resolvedModel === undefined) {
@@ -111,42 +114,66 @@ export function createTaskChildPlanner(omoConfig: OmoConfig, resolveRegistry: Re
   }
 }
 
-// Resolve a model for an `OmoAgentDef`. Returns the verbatim model string plus its metadata. A
-// user-configured `model` is trusted verbatim (matches `isUserConfiguredCategoryModel` semantics in
-// resolveCategory). When only `models` is set, the first entry the live registry reports as available
-// wins; if none are available we return undefined so the caller surfaces model_unavailable rather
-// than spawning against a provider the parent session never connected.
+// Resolve a model for an `OmoAgentDef`. Mirrors the user-model path of `resolveModelForDelegateTask`:
+// the primary `model` is checked against the live registry (variant suffix stripped via
+// `parseModelString`, so `"cliproxy/kimi-k3 low"` matches a registry that has `cliproxy/kimi-k3`);
+// if it is unavailable, the first reachable `models[]` entry wins (also variant-stripped). When no
+// registry is available (headless / before first live context) the primary is trusted verbatim so
+// an agent can still be addressed before the model cache warms. An agent with neither `model` nor a
+// reachable `models[]` entry returns undefined so the caller surfaces `model_unavailable`.
 function resolveAgentModel(
   agentDef: OmoAgentDef,
   registry: TaskModelRegistry | undefined,
 ): { readonly model: string; readonly metadata: ResolvedModelMetadata } | undefined {
+  const availableSet = buildAvailableModelSet(registry)
+
   if (agentDef.model !== undefined && agentDef.model.length > 0) {
-    const metadata = explicitModelMetadata(agentDef.model)
-    if (metadata === undefined) {
-      // No provider/modelId split — still honor the explicit string; the manager will surface a
-      // clearer error if senpi cannot resolve it.
-      return { model: agentDef.model, metadata: { source: "explicit", provider: "", model_id: agentDef.model, display: agentDef.model } }
-    }
-    return { model: agentDef.model, metadata }
-  }
-  if (agentDef.models !== undefined && agentDef.models.length > 0 && registry !== undefined) {
-    const available = registry.getAvailable()
-    const availableSet = new Set<string>()
-    if (Array.isArray(available)) {
-      for (const m of available) {
-        if (m !== null && typeof m === "object" && "provider" in m && "id" in m) {
-          availableSet.add(`${(m as { provider: string }).provider}/${(m as { id: string }).id}`)
-        }
+    const parsed = parseModelString(agentDef.model)
+    const primaryAvailable = parsed === undefined
+      || availableSet === undefined
+      || availableSet.has(`${parsed.providerID}/${parsed.modelID}`)
+    if (primaryAvailable) {
+      const metadata = explicitModelMetadata(agentDef.model)
+      if (metadata === undefined) {
+        return { model: agentDef.model, metadata: { source: "explicit", provider: "", model_id: agentDef.model, display: agentDef.model } }
       }
+      return { model: agentDef.model, metadata }
     }
+  }
+
+  if (agentDef.models !== undefined && agentDef.models.length > 0 && availableSet !== undefined) {
     for (const candidate of agentDef.models) {
-      if (availableSet.has(candidate)) {
-        const metadata = explicitModelMetadata(candidate)
-        if (metadata !== undefined) return { model: candidate, metadata }
+      const parsed = parseModelString(candidate)
+      if (parsed === undefined) continue
+      if (availableSet.has(`${parsed.providerID}/${parsed.modelID}`)) {
+        const metadata: ResolvedModelMetadata = {
+          source: "explicit",
+          provider: parsed.providerID,
+          model_id: parsed.modelID,
+          display: candidate,
+          ...(parsed.variant !== undefined ? { variant: parsed.variant } : {}),
+        }
+        return { model: `${parsed.providerID}/${parsed.modelID}`, metadata }
       }
     }
   }
   return undefined
+}
+
+// Build a `provider/modelID` set from the registry, or undefined when the registry is absent. The
+// variant suffix is NOT included in the set keys, so `parseModelString` callers can match
+// `"cliproxy/kimi-k3 low"` against a set containing `"cliproxy/kimi-k3"`.
+function buildAvailableModelSet(registry: TaskModelRegistry | undefined): Set<string> | undefined {
+  if (registry === undefined) return undefined
+  const available = registry.getAvailable()
+  if (!Array.isArray(available)) return undefined
+  const set = new Set<string>()
+  for (const m of available) {
+    if (m !== null && typeof m === "object" && "provider" in m && "id" in m) {
+      set.add(`${(m as { provider: string }).provider}/${(m as { id: string }).id}`)
+    }
+  }
+  return set
 }
 
 // `OmoAgentDef.tools` is `{ name: boolean }` (allow/deny). Convert allow entries to a tool allowlist;
