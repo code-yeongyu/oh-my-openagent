@@ -994,9 +994,11 @@ When enabled, OmO registers the hash-anchored `edit` tool and activates the `has
 | `dynamic_context_pruning.notification`   | `detailed` | Pruning notifications: `off` / `minimal` / `detailed`                                |
 | `turn_protection.turns`                  | `3`        | Recent turns protected from pruning (1–10)                                           |
 | `strategies.deduplication`               | `true`     | Remove duplicate tool calls                                                          |
-| `strategies.supersede_writes`            | `true`     | Prune write inputs when file later read                                              |
-| `strategies.supersede_writes.aggressive` | `false`    | Prune any write if ANY subsequent read exists                                        |
-| `strategies.purge_errors.turns`          | `5`        | Turns before pruning errored tool inputs                                             |
+| `strategies.supersede_writes`            | `true`     | Schema-visible experimental option; no active runtime pruning path in current `dev`   |
+| `strategies.supersede_writes.aggressive` | `false`    | Schema-visible experimental option; no active runtime pruning path in current `dev`   |
+| `strategies.purge_errors.turns`          | `5`        | Schema-visible experimental option; no active runtime pruning path in current `dev`   |
+
+Current runtime scope: dynamic context pruning currently wires the deduplication recovery path. `supersede_writes` and `purge_errors` remain accepted by the schema for compatibility, but do not rely on them to prune context until a runtime implementation lands.
 
 ### Telemetry
 
