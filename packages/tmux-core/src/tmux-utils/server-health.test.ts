@@ -1,8 +1,25 @@
 import { describe, expect, it } from "bun:test"
 
-import { createServerHealthStateForTesting, isServerRunning } from "./server-health"
+import {
+	createServerHealthStateForTesting,
+	isServerRunning,
+	resetServerCheck,
+} from "./server-health"
 
 type FetchCall = readonly [input: RequestInfo | URL, init: RequestInit | undefined]
+
+type Deferred<T> = {
+	readonly promise: Promise<T>
+	resolve(value: T): void
+}
+
+function createDeferred<T>(): Deferred<T> {
+	let resolve!: (value: T) => void
+	const promise = new Promise<T>((resolvePromise) => {
+		resolve = resolvePromise
+	})
+	return { promise, resolve }
+}
 
 function createFetchRecorder(
 	responseFactory: (call: FetchCall, index: number) => Promise<Response>,
@@ -17,6 +34,65 @@ function createFetchRecorder(
 }
 
 describe("isServerRunning request policy", () => {
+	async function runStaleSuccessScenario(useInjectedState: boolean): Promise<void> {
+		const state = useInjectedState ? createServerHealthStateForTesting() : undefined
+		const firstResponse = createDeferred<Response>()
+		const observedTokens: Array<string | null> = []
+		let firstPolicyContacts = 0
+		const fetchImplementation = createFetchRecorder(async ([, init]) => {
+			const token = new Headers(init?.headers).get("authorization")
+			observedTokens.push(token)
+			if (token === "Bearer first-policy-fixture") {
+				firstPolicyContacts += 1
+				if (firstPolicyContacts === 1) return firstResponse.promise
+				return new Response(null, { status: 200 })
+			}
+			return new Response(null, { status: 401 })
+		})
+		const serverUrl = "http://127.0.0.1:4321"
+
+		if (!useInjectedState) resetServerCheck()
+		try {
+			const firstCheck = isServerRunning(serverUrl, {
+				fetchImplementation,
+				headers: { Authorization: "Bearer first-policy-fixture" },
+				state,
+			})
+			const rotatedCheck = isServerRunning(serverUrl, {
+				fetchImplementation,
+				headers: { Authorization: "Bearer rotated-policy-fixture" },
+				state,
+			})
+			const rotatedResult = await rotatedCheck
+			firstResponse.resolve(new Response(null, { status: 200 }))
+			const firstResult = await firstCheck
+
+			expect([firstResult, rotatedResult]).toEqual([false, false])
+			expect(state?.serverAvailable).not.toBe(true)
+			expect(observedTokens).toEqual([
+				"Bearer first-policy-fixture",
+				"Bearer rotated-policy-fixture",
+				"Bearer rotated-policy-fixture",
+			])
+
+			const recheckedFirst = await isServerRunning(serverUrl, {
+				fetchImplementation,
+				headers: { Authorization: "Bearer first-policy-fixture" },
+				state,
+			})
+			expect(recheckedFirst).toBe(true)
+			expect(observedTokens).toEqual([
+				"Bearer first-policy-fixture",
+				"Bearer rotated-policy-fixture",
+				"Bearer rotated-policy-fixture",
+				"Bearer first-policy-fixture",
+			])
+		} finally {
+			firstResponse.resolve(new Response(null, { status: 500 }))
+			if (!useInjectedState) resetServerCheck()
+		}
+	}
+
 	it("#given custom headers #when health is checked #then it sends them and requests redirect rejection by default", async () => {
 		// given
 		const fetchImplementation = createFetchRecorder(async () => new Response(null, { status: 200 }))
@@ -95,43 +171,98 @@ describe("isServerRunning request policy", () => {
 		])
 	})
 
-	it("#given one policy succeeded and a rotated policy fails #when the first policy returns #then its stale success is rechecked", async () => {
+	it("#given an injected state and a stale in-flight success #when a rotated policy fails #then the stale result cannot authorize a caller", async () => {
+		await runStaleSuccessScenario(true)
+	})
+
+	it("#given global state and a stale in-flight success #when a rotated policy fails #then the stale result cannot authorize a caller", async () => {
+		await runStaleSuccessScenario(false)
+	})
+
+	it("#given a policy is waiting to retry #when another policy becomes current #then the stale policy does not retry", async () => {
 		// given
 		const state = createServerHealthStateForTesting()
 		const observedTokens: Array<string | null> = []
-		const fetchImplementation = createFetchRecorder(async ([, init], index) => {
-			observedTokens.push(new Headers(init?.headers).get("authorization"))
-			return new Response(null, { status: index === 0 || index === 3 ? 200 : 401 })
+		let firstPolicyContacts = 0
+		const fetchImplementation = createFetchRecorder(async ([, init]) => {
+			const token = new Headers(init?.headers).get("authorization")
+			observedTokens.push(token)
+			if (token === "Bearer first-policy-fixture") {
+				firstPolicyContacts += 1
+				return new Response(null, { status: firstPolicyContacts === 1 ? 503 : 200 })
+			}
+			return new Response(null, { status: 200 })
 		})
-		const serverUrl = "http://127.0.0.1:4321"
-		const firstPolicy = { Authorization: "Bearer first-credential-fixture" }
-		const rotatedPolicy = { Authorization: "Bearer rejected-credential-fixture" }
 
 		// when
-		const firstSuccess = await isServerRunning(serverUrl, {
+		const firstCheck = isServerRunning("http://127.0.0.1:4321", {
 			fetchImplementation,
-			headers: firstPolicy,
+			headers: { Authorization: "Bearer first-policy-fixture" },
 			state,
 		})
-		const rotatedFailure = await isServerRunning(serverUrl, {
+		await new Promise((resolve) => setTimeout(resolve, 10))
+		const rotatedResult = await isServerRunning("http://127.0.0.1:4321", {
 			fetchImplementation,
-			headers: rotatedPolicy,
+			headers: { Authorization: "Bearer rotated-policy-fixture" },
 			state,
 		})
-		const recheckedFirst = await isServerRunning(serverUrl, {
-			fetchImplementation,
-			headers: firstPolicy,
-			state,
-		})
+		const firstResult = await firstCheck
 
 		// then
-		expect([firstSuccess, rotatedFailure, recheckedFirst]).toEqual([true, false, true])
+		expect([firstResult, rotatedResult]).toEqual([false, true])
 		expect(observedTokens).toEqual([
-			"Bearer first-credential-fixture",
-			"Bearer rejected-credential-fixture",
-			"Bearer rejected-credential-fixture",
-			"Bearer first-credential-fixture",
+			"Bearer first-policy-fixture",
+			"Bearer rotated-policy-fixture",
 		])
+	})
+
+	it("#given an ABA policy sequence #when the first policy becomes current again #then authority follows semantic identity", async () => {
+		// given
+		const state = createServerHealthStateForTesting()
+		const firstAResponse = createDeferred<Response>()
+		const bResponse = createDeferred<Response>()
+		const secondAResponse = createDeferred<Response>()
+		const observedTokens: Array<string | null> = []
+		let aContacts = 0
+		const fetchImplementation = createFetchRecorder(async ([, init]) => {
+			const token = new Headers(init?.headers).get("authorization")
+			observedTokens.push(token)
+			if (token === "Bearer policy-a-fixture") {
+				aContacts += 1
+				return aContacts === 1 ? firstAResponse.promise : secondAResponse.promise
+			}
+			return bResponse.promise
+		})
+
+		// when
+		const firstA = isServerRunning("http://127.0.0.1:4321", {
+			fetchImplementation,
+			headers: { Authorization: "Bearer policy-a-fixture" },
+			state,
+		})
+		const policyB = isServerRunning("http://127.0.0.1:4321", {
+			fetchImplementation,
+			headers: { Authorization: "Bearer policy-b-fixture" },
+			state,
+		})
+		const secondA = isServerRunning("http://127.0.0.1:4321", {
+			fetchImplementation,
+			headers: { Authorization: "Bearer policy-a-fixture" },
+			state,
+		})
+		firstAResponse.resolve(new Response(null, { status: 200 }))
+		secondAResponse.resolve(new Response(null, { status: 200 }))
+		bResponse.resolve(new Response(null, { status: 200 }))
+		const results = await Promise.all([firstA, policyB, secondA])
+
+		// then
+		expect(results).toEqual([true, false, true])
+		expect(observedTokens).toEqual([
+			"Bearer policy-a-fixture",
+			"Bearer policy-b-fixture",
+			"Bearer policy-a-fixture",
+		])
+		expect(state.serverAvailable).toBe(true)
 	})
 
 	it("#given a successful manual-redirect policy #when redirect mode changes #then the cache is isolated", async () => {
