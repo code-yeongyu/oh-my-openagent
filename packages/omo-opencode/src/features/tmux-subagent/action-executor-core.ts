@@ -1,4 +1,5 @@
 import type { TmuxConfig } from "../../config/schema"
+import type { TmuxServerAccess, TmuxServerTarget } from "@oh-my-opencode/tmux-core"
 import type { applyLayout, closeTmuxPane, enforceMainPaneWidth, replaceTmuxPane, spawnTmuxPane } from "../../shared/tmux"
 import type { PaneAction, WindowState } from "./types"
 
@@ -12,7 +13,12 @@ export interface ExecuteContext {
 	config: TmuxConfig
 	directory: string
 	serverUrl: string
+	tmuxServerAccess?: TmuxServerAccess
 	windowState: WindowState
+}
+
+export function resolveExecuteServerTarget(ctx: ExecuteContext): TmuxServerTarget {
+	return ctx.tmuxServerAccess ?? ctx.serverUrl
 }
 
 export interface ActionExecutorDeps {
@@ -55,7 +61,7 @@ export async function executeActionWithDeps(
 			action.newSessionId,
 			action.description,
 			ctx.config,
-			ctx.serverUrl,
+			resolveExecuteServerTarget(ctx),
 			ctx.directory,
 		)
 		return {
@@ -68,7 +74,7 @@ export async function executeActionWithDeps(
 		action.sessionId,
 		action.description,
 		ctx.config,
-		ctx.serverUrl,
+		resolveExecuteServerTarget(ctx),
 		ctx.directory,
 		action.targetPaneId,
 		action.splitDirection,

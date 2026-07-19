@@ -1,13 +1,14 @@
 import { spawnTmuxWindow as spawnTmuxWindowCore } from "@oh-my-opencode/tmux-core"
-import type { SpawnTmuxWindowDeps, TmuxConfig } from "@oh-my-opencode/tmux-core"
+import type { SpawnTmuxWindowDeps, TmuxConfig, TmuxServerTarget } from "@oh-my-opencode/tmux-core"
 import type { SpawnPaneResult } from "../types"
+import { normalizeOpenCodeTmuxServerTarget } from "../opencode-server-access"
 import { withWindowSpawnDeps } from "./adapter-deps"
 
 export async function spawnTmuxWindow(
 	sessionId: string,
 	description: string,
 	config: TmuxConfig,
-	serverUrl: string,
+	serverTarget: TmuxServerTarget,
 	_directory: string,
 	depsInput?: Partial<SpawnTmuxWindowDeps>,
 ): Promise<SpawnPaneResult> {
@@ -15,7 +16,7 @@ export async function spawnTmuxWindow(
 		sessionId,
 		description,
 		config,
-		serverUrl,
+		normalizeOpenCodeTmuxServerTarget(serverTarget),
 		_directory,
 		withWindowSpawnDeps(depsInput),
 	)

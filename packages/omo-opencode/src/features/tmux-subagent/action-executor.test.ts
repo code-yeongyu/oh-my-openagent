@@ -3,6 +3,8 @@ import type { TmuxConfig } from "../../config/schema"
 import { executeActionWithDeps } from "./action-executor-core"
 import type { ActionExecutorDeps, ExecuteContext } from "./action-executor-core"
 import type { WindowState } from "./types"
+import { resolveExecuteServerTarget, type ExecuteContext as RuntimeExecuteContext } from "./action-executor"
+import type { TmuxServerAccess } from "@oh-my-opencode/tmux-core"
 
 type SpawnPaneResult = Awaited<ReturnType<ActionExecutorDeps["spawnTmuxPane"]>>
 
@@ -60,6 +62,14 @@ function createContext(overrides?: Partial<ExecuteContext>): ExecuteContext {
 	}
 }
 
+function createServerAccess(): TmuxServerAccess {
+	return {
+		serverUrl: "http://127.0.0.1:5317",
+		checkServerHealth: async () => true,
+		getPaneEnvironment: () => ({ OPENCODE_SERVER_PASSWORD: "current" }),
+	}
+}
+
 describe("executeAction", () => {
 	beforeEach(() => {
 		mockSpawnTmuxPane.mockClear()
@@ -68,6 +78,7 @@ describe("executeAction", () => {
 		mockReplaceTmuxPane.mockClear()
 		mockApplyLayout.mockClear()
 		mockSpawnTmuxPane.mockImplementation(async () => ({ success: true, paneId: "%7" }))
+		mockReplaceTmuxPane.mockImplementation(async () => ({ success: true, paneId: "%7" }))
 	})
 
 	test("enforces main pane width with configured percentage after successful spawn", async () => {
@@ -114,5 +125,60 @@ describe("executeAction", () => {
 		expect(mockApplyLayout).not.toHaveBeenCalled()
 		expect(mockEnforceMainPaneWidth).not.toHaveBeenCalled()
 		mockSpawnTmuxPane.mockImplementation(async (): Promise<SpawnPaneResult> => ({ success: true, paneId: "%7" }))
+	})
+
+	test("passes the exact server capability to spawn", async () => {
+		const access = createServerAccess()
+
+		await executeActionWithDeps(
+			{
+				type: "spawn",
+				sessionId: "ses_new",
+				description: "background task",
+				targetPaneId: "%0",
+				splitDirection: "-h",
+			},
+			createContext({ tmuxServerAccess: access }),
+			mockDeps,
+		)
+
+		expect(mockSpawnTmuxPane.mock.calls[0]?.[3]).toBe(access)
+	})
+
+	test("passes the exact server capability to replace", async () => {
+		const access = createServerAccess()
+
+		await executeActionWithDeps(
+			{
+				type: "replace",
+				paneId: "%5",
+				newSessionId: "ses_replacement",
+				description: "replacement task",
+			},
+			createContext({ tmuxServerAccess: access }),
+			mockDeps,
+		)
+
+		expect(mockReplaceTmuxPane.mock.calls[0]?.[4]).toBe(access)
+	})
+})
+
+describe("resolveExecuteServerTarget", () => {
+	test("prefers the capability while retaining the legacy URL", () => {
+		const access = createServerAccess()
+		const context = {
+			...createContext(),
+			serverUrl: "http://legacy.invalid:4096",
+			tmuxServerAccess: access,
+		} satisfies RuntimeExecuteContext
+
+		expect(resolveExecuteServerTarget(context)).toBe(access)
+		expect(context.serverUrl).toBe("http://legacy.invalid:4096")
+	})
+
+	test("falls back to the legacy URL when no capability is present", () => {
+		const context = createContext() satisfies RuntimeExecuteContext
+
+		expect(resolveExecuteServerTarget(context)).toBe("http://localhost:4096")
 	})
 })

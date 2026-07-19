@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { getHttpServerOriginForLog, type TmuxServerAccess } from "@oh-my-opencode/tmux-core"
 import type { TmuxConfig } from "../../config/schema"
 import type { TrackedSession, CapacityConfig, WindowState } from "./types"
 import * as sharedModule from "../../shared"
@@ -14,6 +15,7 @@ import {
   sweepStaleOmoAgentSessions,
   sweepStaleOmoAttachPanes,
   activateTmuxPane,
+  createOpenCodeTmuxServerAccess,
 } from "../../shared/tmux"
 import { queryWindowState as defaultQueryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, decideCloseAction, type SessionMapping } from "./decision-engine"
@@ -25,7 +27,7 @@ import { waitForSessionReady } from "./session-ready-waiter"
 import { isAttachableSessionStatus } from "./attachable-session-status"
 import { parseSessionStatusResponse } from "./session-status-parser"
 import { FailedReadinessCache, type FailedReadinessSessionSeed } from "./failed-readiness-cache"
-import { resolveServerUrl } from "./resolve-server-url"
+import { resolveServerTarget } from "./resolve-server-url"
 import { sweepStaleTmuxResources } from "./stale-tmux-resource-sweeper"
 type OpencodeClient = PluginInput["client"]
 
@@ -112,6 +114,7 @@ export class TmuxSessionManager {
   private tmuxConfig: TmuxConfig
   private projectDirectory: string
   private serverUrl: string
+  private tmuxServerAccess: TmuxServerAccess
   private ctxServerUrl: string | undefined
   private sourcePaneId: string | undefined
   private sessions = new Map<string, TrackedSession>()
@@ -151,7 +154,9 @@ export class TmuxSessionManager {
     })
     const rawServerUrl = ctx.serverUrl?.toString()
     this.ctxServerUrl = rawServerUrl
-    this.serverUrl = resolveServerUrl(rawServerUrl, process.env, this.deps.log)
+    const serverTarget = resolveServerTarget(rawServerUrl, process.env, this.deps.log)
+    this.tmuxServerAccess = createOpenCodeTmuxServerAccess(serverTarget)
+    this.serverUrl = this.tmuxServerAccess.serverUrl
     this.sourcePaneId = this.deps.getCurrentPaneId()
     this.pollingManager = new TmuxPollingManager(
       this.client,
@@ -166,7 +171,7 @@ export class TmuxSessionManager {
       configEnabled: this.tmuxConfig.enabled,
       tmuxConfig: this.tmuxConfig,
       projectDirectory: this.projectDirectory,
-      serverUrl: this.serverUrl,
+      serverOrigin: getHttpServerOriginForLog(this.serverUrl),
       sourcePaneId: this.sourcePaneId,
     })
   }
@@ -224,13 +229,13 @@ export class TmuxSessionManager {
         sessionId,
         title,
         this.tmuxConfig,
-        this.serverUrl,
+        this.tmuxServerAccess,
         this.projectDirectory,
         this.sourcePaneId,
         undefined,
         this.isolatedSessionManagerId,
       )
-      : await spawnTmuxWindow(sessionId, title, this.tmuxConfig, this.serverUrl, this.projectDirectory)
+      : await spawnTmuxWindow(sessionId, title, this.tmuxConfig, this.tmuxServerAccess, this.projectDirectory)
 
     if (result.success && result.paneId) {
       this.isolatedContainerPaneId = result.paneId
@@ -269,6 +274,10 @@ export class TmuxSessionManager {
 
   getServerUrl(): string {
     return this.serverUrl
+  }
+
+  getTmuxServerAccess(): TmuxServerAccess {
+    return this.tmuxServerAccess
   }
 
   getCtxServerUrl(): string | undefined {
@@ -331,6 +340,7 @@ export class TmuxSessionManager {
           config: this.tmuxConfig,
           directory: this.projectDirectory,
           serverUrl: this.serverUrl,
+          tmuxServerAccess: this.tmuxServerAccess,
           windowState: state,
           sourcePaneId: this.sourcePaneId ?? tracked.paneId,
         },
@@ -378,7 +388,7 @@ export class TmuxSessionManager {
   }
 
   private async activateTrackedSessionPane(tracked: TrackedSession): Promise<boolean> {
-    return activateTmuxPane(tracked.paneId, tracked.sessionId, this.serverUrl, this.projectDirectory)
+    return activateTmuxPane(tracked.paneId, tracked.sessionId, this.tmuxServerAccess, this.projectDirectory)
   }
 
   private windowStateContainsPane(state: WindowState, paneId: string): boolean {
@@ -461,6 +471,7 @@ export class TmuxSessionManager {
           config: this.tmuxConfig,
           directory: this.projectDirectory,
           serverUrl: this.serverUrl,
+          tmuxServerAccess: this.tmuxServerAccess,
           windowState: state,
           sourcePaneId: this.getEffectiveSourcePaneId(),
         }
@@ -834,6 +845,7 @@ export class TmuxSessionManager {
         config: this.tmuxConfig,
         directory: this.projectDirectory,
         serverUrl: this.serverUrl,
+        tmuxServerAccess: this.tmuxServerAccess,
         windowState: state,
         sourcePaneId,
       },
@@ -895,6 +907,7 @@ export class TmuxSessionManager {
           config: this.tmuxConfig,
           directory: this.projectDirectory,
           serverUrl: this.serverUrl,
+          tmuxServerAccess: this.tmuxServerAccess,
           windowState: state,
         },
       )
@@ -1068,6 +1081,7 @@ export class TmuxSessionManager {
         config: this.tmuxConfig,
         directory: this.projectDirectory,
         serverUrl: this.serverUrl,
+        tmuxServerAccess: this.tmuxServerAccess,
         windowState: state,
         sourcePaneId: effectiveSourcePaneId,
       })
@@ -1223,6 +1237,7 @@ export class TmuxSessionManager {
         config: this.tmuxConfig,
         directory: this.projectDirectory,
         serverUrl: this.serverUrl,
+        tmuxServerAccess: this.tmuxServerAccess,
         windowState: state,
         sourcePaneId: this.getEffectiveSourcePaneId(),
       })
