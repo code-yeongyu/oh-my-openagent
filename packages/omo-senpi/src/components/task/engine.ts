@@ -2,6 +2,7 @@ import type { ToolDefinition } from "@code-yeongyu/senpi"
 import { OmoTaskSettingsSchema, type OmoConfig, type OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 import { log } from "@oh-my-opencode/utils"
 import {
+  BUILTIN_AGENTS,
   InProcessRunner,
   RpcProcessRunner,
   createCompletionNotifier,
@@ -87,6 +88,7 @@ const DEFAULT_RUNNER_FACTORIES: TaskRunnerFactories = {
 export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   const settings: OmoTaskSettings = deps.omoConfig.task ?? OmoTaskSettingsSchema.parse({})
   const runtime = new TaskRuntimeContext(deps.cwd)
+  const agents = resolveAgents(deps.omoConfig)
 
   const baseStore = createTaskRecordStore({
     project_dir: deps.cwd,
@@ -138,7 +140,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   const manager = createTaskManager({
     store: notifyingStore,
     runners: { "in-process": factories.inProcess(runnerContext), process: factories.process(runnerContext) },
-    planner: createTaskChildPlanner(deps.omoConfig, () => runtime.modelRegistry()),
+    planner: createTaskChildPlanner(deps.omoConfig, agents, () => runtime.modelRegistry()),
     config: settings,
     cwd: deps.cwd,
     destruction: { destroyResidentTask: (taskId) => lifecycle.destroyResidentTask(taskId, "cancel") },
@@ -162,7 +164,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     lifecycle,
     notifier,
     runtime,
-    agents: resolveAgents(deps.omoConfig),
+    agents,
     omoConfig: deps.omoConfig,
     settings,
     stateDir: baseStore.stateDir,
@@ -210,9 +212,15 @@ function buildProcessRunner(_build: RunnerBuildContext): ManagedRunner {
   return createRpcManagedRunner(new RpcProcessRunner({ inheritedExtensions }))
 }
 
-// Fold the user's omo.json `agents` into the child-agent registry so the task tool advertises them and
-// `subagent_type` / team-member spawns can address them. mapOmoConfigAgents bridges the structural gap
+// The child-agent registry the task tool advertises and `subagent_type` / team-member spawns resolve
+// against: the builtin curated agents first, with the user's omo.json `agents` overlaid field-level
+// per name (the loader's overlayAgent semantics) so omo.json wins individual fields - and can disable
+// a builtin - while user-only names are appended. mapOmoConfigAgents bridges the structural gap
 // between the omo-config-core `OmoAgentDef` shape and senpi-task's `AgentDefinition`.
 function resolveAgents(config: OmoConfig): Readonly<Record<string, AgentDefinition>> {
-  return mapOmoConfigAgents(config)
+  const merged: Record<string, AgentDefinition> = { ...BUILTIN_AGENTS }
+  for (const [name, definition] of Object.entries(mapOmoConfigAgents(config))) {
+    merged[name] = { ...merged[name], ...definition }
+  }
+  return merged
 }
