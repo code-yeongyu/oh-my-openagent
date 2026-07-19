@@ -113,7 +113,7 @@ Add `"worktreePath": "../wt-scout"` to a member entry. Path is filesystem-relati
 
 ## tmux visualization (optional)
 
-Set `tmux_visualization: true`. Requires running inside a tmux session, tmux on PATH, and an external OpenCode HTTP listener started with `opencode --port <port>`. Failures are isolated: if tmux is missing or the listener is unreachable, pane creation is skipped without blocking team execution.
+Set `tmux_visualization: true`. Requires running inside a tmux session, tmux on PATH, and an OpenCode HTTP listener started with `opencode --port <port>`. Reachability alone does not establish readiness. The readiness probe calls `/global/health`, reusing `OPENCODE_SERVER_PASSWORD` and optional `OPENCODE_SERVER_USERNAME`; when a password is set, the HTTP username defaults to `opencode`. Redirects and unsuccessful responses do not establish readiness. Successful readiness is cached by listener URL, while failed checks are not cached. Failures are isolated: if tmux is missing or the listener is not ready, background agents and teams continue while only pane visualization is skipped.
 
 When enabled, each member gets a dedicated tmux pane that uses `opencode attach` to connect to that external listener and open the member's session. The pane runs the full interactive opencode TUI for the member so you can watch streaming output in real time. Panes start in each member worktree when configured, otherwise the repo root.
 
