@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 
 import type { TmuxCommandResult } from "../runner"
 import type { TmuxConfig } from "../types"
@@ -18,6 +18,9 @@ const enabledTmuxConfig = {
 } satisfies TmuxConfig
 
 type TmuxCall = readonly [command: string, args: readonly string[]]
+
+let originalPassword: string | undefined
+let originalUsername: string | undefined
 
 function toStringArray(value: unknown): string[] {
 	if (!Array.isArray(value)) {
@@ -90,8 +93,13 @@ function expectNoAuthEnvArgs(args: readonly string[]): void {
 }
 
 describe("tmux pane auth environment propagation", () => {
+	beforeEach(() => {
+		originalPassword = process.env.OPENCODE_SERVER_PASSWORD
+		originalUsername = process.env.OPENCODE_SERVER_USERNAME
+	})
+
 	afterEach(() => {
-		setAuthEnv()
+		setAuthEnv(originalPassword, originalUsername)
 	})
 
 	it("#given auth env vars with spaces #when activateTmuxPane respawns attach #then tmux receives env args and quoted attach values", async () => {
@@ -185,5 +193,26 @@ describe("tmux pane auth environment propagation", () => {
 
 		// then
 		expectNoAuthEnvArgs(paneRecorder.getCall(0)[1])
+	})
+
+	it("#given password-only auth #when a pane spawns #then tmux receives the password without a username", async () => {
+		// given
+		const password = "password-only-fixture"
+		setAuthEnv(password)
+		const paneRecorder = createTmuxCommandRecorder([successResult("%pane"), successResult()])
+
+		// when
+		await spawnTmuxPane("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:4321", "/tmp/project", undefined, "-h", {
+			log: () => undefined,
+			runTmuxCommand: paneRecorder.runTmuxCommand,
+			isInsideTmux: () => true,
+			isServerRunning: async () => true,
+			getTmuxPath: async () => "tmux",
+		})
+
+		// then
+		const args = paneRecorder.getCall(0)[1]
+		expect(args.some((arg) => arg === `OPENCODE_SERVER_PASSWORD=${password}`)).toBe(true)
+		expect(args.some((arg) => arg.startsWith("OPENCODE_SERVER_USERNAME="))).toBe(false)
 	})
 })

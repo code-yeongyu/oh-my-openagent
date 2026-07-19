@@ -1,5 +1,7 @@
 import { shellEscapeForDoubleQuotedCommand } from "@oh-my-opencode/utils"
 
+import { getServerCredentials } from "./server-credentials"
+
 const TMUX_COMMAND_SHELL = "/bin/sh"
 
 function shellQuoteForNestedCommand(value: string): string {
@@ -23,15 +25,14 @@ export function buildTmuxPlaceholderCommand(description: string): string {
 }
 
 export function buildPaneAuthEnvironmentArgs(): string[] {
-  const password = process.env.OPENCODE_SERVER_PASSWORD
-  if (!password) {
+  const credentials = getServerCredentials()
+  if (!credentials) {
     return []
   }
 
-  const args = ["-e", `OPENCODE_SERVER_PASSWORD=${password}`]
-  const username = process.env.OPENCODE_SERVER_USERNAME
-  if (username !== undefined) {
-    args.push("-e", `OPENCODE_SERVER_USERNAME=${username}`)
+  const args = ["-e", `OPENCODE_SERVER_PASSWORD=${credentials.password}`]
+  if (credentials.username !== undefined) {
+    args.push("-e", `OPENCODE_SERVER_USERNAME=${credentials.username}`)
   }
 
   return args
