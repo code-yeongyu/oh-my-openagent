@@ -17,31 +17,35 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary?.variant).toBe("high")
   })
 
-  test("sisyphus keeps opus primary before k2p5, kimi-k2.5, gpt-5.5 medium, and big-pickle", () => {
+  test("sisyphus keeps opus primary before kimi-k3, k2p5, kimi-k2.5, gpt-5.5 medium, and big-pickle", () => {
     // given
     const sisyphus = AGENT_MODEL_REQUIREMENTS["sisyphus"]
 
     // when
-    const [primary, second, third, fourth, fifth, sixth, last] = sisyphus.fallbackChain
+    const [primary, second, third, fourth, fifth, sixth, seventh, last] = sisyphus.fallbackChain
 
     // then
-    expect(sisyphus.fallbackChain).toHaveLength(7)
+    expect(sisyphus.fallbackChain).toHaveLength(8)
     expect(sisyphus.requiresAnyModel).toBe(true)
     expect(primary).toEqual({
       providers: ["anthropic", "github-copilot", "opencode", "vercel"],
       model: "claude-opus-4-7",
       variant: "max",
     })
-    expect(second).toEqual({ providers: ["opencode-go", "vercel"], model: "kimi-k2.6" })
-    expect(third).toEqual({ providers: ["kimi-for-coding"], model: "k2p5" })
-    expect(fourth?.model).toBe("kimi-k2.5")
-    expect(fifth).toEqual({
+    expect(second).toEqual({
+      providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode", "vercel"],
+      model: "kimi-k3",
+    })
+    expect(third).toEqual({ providers: ["opencode-go", "vercel"], model: "kimi-k2.6" })
+    expect(fourth).toEqual({ providers: ["kimi-for-coding"], model: "k2p5" })
+    expect(fifth?.model).toBe("kimi-k2.5")
+    expect(sixth).toEqual({
       providers: ["openai", "github-copilot", "opencode", "vercel"],
       model: "gpt-5.5",
       variant: "medium",
     })
-    expect(sixth?.providers[0]).toBe("zai-coding-plan")
-    expect(sixth?.model).toBe("glm-5")
+    expect(seventh?.providers[0]).toBe("zai-coding-plan")
+    expect(seventh?.model).toBe("glm-5")
     expect(last?.providers[0]).toBe("opencode")
     expect(last?.model).toBe("big-pickle")
   })
@@ -165,21 +169,26 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     })
   })
 
-  test("momus has gpt-5.6-sol xhigh as primary before gpt-5.5 xhigh", () => {
+  test("momus keeps native gpt-5.6-terra high before Copilot high and gpt-5.5", () => {
     // given
     const momus = AGENT_MODEL_REQUIREMENTS["momus"]
 
     // when
-    const [primary, secondary] = momus.fallbackChain
+    const [primary, copilot, legacyFallback] = momus.fallbackChain
 
     // then
     expect(momus.fallbackChain.length).toBeGreaterThan(1)
     expect(primary).toEqual({
       providers: ["openai", "vercel"],
-      model: "gpt-5.6-sol",
-      variant: "xhigh",
+      model: "gpt-5.6-terra",
+      variant: "high",
     })
-    expect(secondary).toEqual({
+    expect(copilot).toEqual({
+      providers: ["github-copilot"],
+      model: "gpt-5.6-terra",
+      variant: "high",
+    })
+    expect(legacyFallback).toEqual({
       providers: ["openai", "github-copilot", "opencode", "vercel"],
       model: "gpt-5.5",
       variant: "xhigh",
@@ -277,7 +286,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     // then
     expect(primary).toEqual({
-      providers: ["openai", "vercel"],
+      providers: ["openai", "github-copilot", "vercel"],
       model: "gpt-5.6-sol",
       variant: "high",
     })

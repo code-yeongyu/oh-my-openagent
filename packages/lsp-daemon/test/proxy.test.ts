@@ -167,7 +167,7 @@ describe("mcp stdio proxy", () => {
 		expect((responses[0]?.["error"] as { code: number }).code).toBe(-32700);
 	});
 
-	it("#given an idle proxy #when the next request arrives after ten minutes #then it still responds", async () => {
+	it("#given an initialized idle proxy #when the next request arrives after ten minutes #then it still responds", async () => {
 		vi.useFakeTimers();
 		try {
 			const paths = tempPaths();
@@ -180,12 +180,14 @@ describe("mcp stdio proxy", () => {
 				ensure: noSpawn,
 			});
 
+			input.write(`${JSON.stringify({ jsonrpc: "2.0", id: 6, method: "initialize", params: {} })}\n`);
 			await vi.advanceTimersByTimeAsync(10 * 60 * 1000 + 1);
-			input.end(`${JSON.stringify({ jsonrpc: "2.0", id: 6, method: "initialize", params: {} })}\n`);
+			input.end(`${JSON.stringify({ jsonrpc: "2.0", id: 7, method: "initialize", params: {} })}\n`);
 			await server;
 
 			const responses = parseResponses(out);
 			expect((responses[0]?.["result"] as { serverInfo?: unknown }).serverInfo).toBeDefined();
+			expect((responses[1]?.["result"] as { serverInfo?: unknown }).serverInfo).toBeDefined();
 		} finally {
 			vi.useRealTimers();
 		}

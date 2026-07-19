@@ -1,6 +1,6 @@
 {
   "name": "@oh-my-opencode/omo-senpi",
-  "version": "4.18.1",
+  "version": "4.19.0",
   "type": "module",
   "private": true,
   "description": "Senpi harness adapter for oh-my-openagent.",
@@ -33,6 +33,7 @@
     "@oh-my-opencode/omo-config-core": "workspace:*",
     "@oh-my-opencode/delegate-core": "workspace:*",
     "@oh-my-opencode/team-core": "workspace:*",
+    "@oh-my-opencode/boulder-state": "workspace:*",
     "@code-yeongyu/lsp-daemon": "file:../lsp-daemon"
   },
   "peerDependencies": {

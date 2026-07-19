@@ -2,7 +2,7 @@
 
 // components/codegraph/src/cli.ts
 import { realpathSync as realpathSync6 } from "node:fs";
-import { basename as basename5, resolve as resolve6 } from "node:path";
+import { basename as basename5, resolve as resolve7 } from "node:path";
 import { stderr as processStderr4 } from "node:process";
 import { fileURLToPath as fileURLToPath4 } from "node:url";
 
@@ -98,8 +98,9 @@ function buildCodegraphChildEnv(options = {}) {
 import { homedir as homedir5 } from "node:os";
 
 // ../../utils/src/codegraph/workspace.ts
+import { execFileSync } from "node:child_process";
 import { appendFileSync, existsSync as existsSync2, lstatSync as lstatSync2, mkdirSync, realpathSync as realpathSync3, readFileSync as readFileSync2, statSync, symlinkSync } from "node:fs";
-import { join as join5 } from "node:path";
+import { dirname, join as join5, resolve as resolve3 } from "node:path";
 
 // ../../utils/src/codegraph/paths.ts
 import { createHash } from "node:crypto";
@@ -305,12 +306,52 @@ function prepareCodegraphWorkspace(workspace, options = {}) {
   }
 }
 function ensureCodegraphGitignored(workspace) {
-  const gitDir = join5(workspace, ".git");
-  if (!existsSync2(gitDir))
+  const gitMarkerPath = join5(workspace, ".git");
+  if (!existsSync2(gitMarkerPath))
     return false;
-  const excludePath = join5(gitDir, "info", "exclude");
   try {
-    mkdirSync(join5(gitDir, "info"), { recursive: true });
+    const isWorktree = execFileSync("git", ["rev-parse", "--is-inside-work-tree"], {
+      cwd: workspace,
+      encoding: "utf8",
+      shell: false,
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5000,
+      windowsHide: true
+    }).trim();
+    if (isWorktree !== "true")
+      return false;
+    const gitTopLevel = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+      cwd: workspace,
+      encoding: "utf8",
+      shell: false,
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5000,
+      windowsHide: true
+    }).trim();
+    if (gitTopLevel.length === 0 || realpathSync3.native(gitTopLevel) !== realpathSync3.native(workspace))
+      return false;
+    const gitDir = execFileSync("git", ["rev-parse", "--absolute-git-dir"], {
+      cwd: workspace,
+      encoding: "utf8",
+      shell: false,
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5000,
+      windowsHide: true
+    }).trim();
+    if (gitDir.length === 0 || !gitMarkerOwnsGitDir(gitMarkerPath, workspace, gitDir))
+      return false;
+    const gitExcludePath = execFileSync("git", ["rev-parse", "--git-path", "info/exclude"], {
+      cwd: workspace,
+      encoding: "utf8",
+      shell: false,
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5000,
+      windowsHide: true
+    }).trim();
+    if (gitExcludePath.length === 0)
+      return false;
+    const excludePath = resolve3(workspace, gitExcludePath);
+    mkdirSync(dirname(excludePath), { recursive: true });
     const existing = existsSync2(excludePath) ? readFileSync2(excludePath, "utf8") : "";
     if (existing.split(/\r?\n/).includes(".codegraph"))
       return true;
@@ -319,11 +360,37 @@ function ensureCodegraphGitignored(workspace) {
 `}.codegraph
 `);
     return true;
-  } catch (error) {
-    if (error instanceof Error)
-      return false;
-    throw error;
+  } catch {
+    return false;
   }
+}
+function gitMarkerOwnsGitDir(gitMarkerPath, workspace, gitDir) {
+  const markerStat = lstatSync2(gitMarkerPath);
+  if (markerStat.isSymbolicLink())
+    return false;
+  const resolvedGitDir = realpathSync3.native(gitDir);
+  if (markerStat.isDirectory())
+    return realpathSync3.native(gitMarkerPath) === resolvedGitDir;
+  if (!markerStat.isFile())
+    return false;
+  const markerMatch = /^gitdir:\s*(.+)\s*$/i.exec(readFileSync2(gitMarkerPath, "utf8").trim());
+  if (markerMatch?.[1] === undefined)
+    return false;
+  if (realpathSync3.native(resolve3(workspace, markerMatch[1])) !== resolvedGitDir)
+    return false;
+  const backlinkPath = join5(resolvedGitDir, "gitdir");
+  if (existsSync2(backlinkPath)) {
+    const backlink = readFileSync2(backlinkPath, "utf8").trim();
+    return backlink.length > 0 && realpathSync3.native(resolve3(resolvedGitDir, backlink)) === realpathSync3.native(gitMarkerPath);
+  }
+  const coreWorktree = execFileSync("git", ["config", "--file", join5(resolvedGitDir, "config"), "--get", "core.worktree"], {
+    encoding: "utf8",
+    shell: false,
+    stdio: ["ignore", "pipe", "ignore"],
+    timeout: 5000,
+    windowsHide: true
+  }).trim();
+  return coreWorktree.length > 0 && realpathSync3.native(resolve3(resolvedGitDir, coreWorktree)) === realpathSync3.native(workspace);
 }
 
 // ../../utils/src/codegraph/guidance.ts
@@ -416,7 +483,7 @@ function isRecord(value) {
 import { existsSync as existsSync3 } from "node:fs";
 import { homedir as homedir6 } from "node:os";
 import { spawnSync } from "node:child_process";
-import { basename as basename2, dirname, join as join7 } from "node:path";
+import { basename as basename2, dirname as dirname2, join as join7 } from "node:path";
 import { createRequire } from "node:module";
 
 // ../../utils/src/runtime/which.ts
@@ -603,7 +670,7 @@ function defaultProvisionedBin(homeDir, fileExists) {
 function resolveBundledShim(requireResolve, fileExists) {
   try {
     const packageJson = requireResolve(`${CODEGRAPH_PACKAGE}/package.json`);
-    const packageRoot = dirname(packageJson);
+    const packageRoot = dirname2(packageJson);
     const candidates = [join7(packageRoot, "bin", "codegraph.js"), join7(packageRoot, "npm-shim.js")];
     return candidates.find((candidate) => fileExists(candidate)) ?? null;
   } catch (error) {
@@ -1819,14 +1886,14 @@ function buildEnvOverrides(harness, env, warnings, merge) {
 
 // ../../utils/src/omo-config/resolve.ts
 import { existsSync as existsSync4 } from "node:fs";
-import { dirname as dirname2, isAbsolute as isAbsolute2, join as join8, relative, resolve as resolve3 } from "node:path";
+import { dirname as dirname3, isAbsolute as isAbsolute2, join as join8, relative, resolve as resolve4 } from "node:path";
 function containsPath(parent, child) {
   const pathToChild = relative(parent, child);
   return pathToChild === "" || !pathToChild.startsWith("..") && !isAbsolute2(pathToChild);
 }
 function findProjectConfigPathsNearestFirst(cwd, homeDir) {
-  const startDir = resolve3(cwd);
-  const stopBeforeDir = containsPath(resolve3(homeDir), startDir) ? resolve3(homeDir) : null;
+  const startDir = resolve4(cwd);
+  const stopBeforeDir = containsPath(resolve4(homeDir), startDir) ? resolve4(homeDir) : null;
   const paths = [];
   let currentDir = startDir;
   while (true) {
@@ -1836,7 +1903,7 @@ function findProjectConfigPathsNearestFirst(cwd, homeDir) {
     if (existsSync4(configPath)) {
       paths.push(configPath);
     }
-    const parentDir = dirname2(currentDir);
+    const parentDir = dirname3(currentDir);
     if (parentDir === currentDir)
       break;
     currentDir = parentDir;
@@ -1844,7 +1911,7 @@ function findProjectConfigPathsNearestFirst(cwd, homeDir) {
   return paths;
 }
 function resolveOmoConfigPaths(options) {
-  const globalPath = join8(resolve3(options.homeDir), ".omo", "config.jsonc");
+  const globalPath = join8(resolve4(options.homeDir), ".omo", "config.jsonc");
   const projectPathsFarthestFirst = findProjectConfigPathsNearestFirst(options.cwd, options.homeDir).reverse();
   return [
     { path: globalPath, scope: "global" },
@@ -1943,7 +2010,7 @@ import { fileURLToPath } from "node:url";
 // ../../utils/src/codegraph/process-sweeper.ts
 import { existsSync as existsSync7, mkdirSync as mkdirSync2, statSync as statSync2, utimesSync, writeFileSync as writeFileSync2 } from "node:fs";
 import { homedir as homedir10 } from "node:os";
-import { dirname as dirname3, join as join10 } from "node:path";
+import { dirname as dirname4, join as join10 } from "node:path";
 
 // ../../utils/src/codegraph/process-exec.ts
 import { execFile } from "node:child_process";
@@ -2188,7 +2255,7 @@ function processKillErrorMeansAlive(error) {
 // ../../utils/src/codegraph/process-roots.ts
 import { existsSync as existsSync6, readdirSync as readdirSync2, realpathSync as realpathSync4 } from "node:fs";
 import { homedir as homedir9 } from "node:os";
-import { join as join9, resolve as resolve4 } from "node:path";
+import { join as join9, resolve as resolve5 } from "node:path";
 function discoverCodegraphOwnedRoots(options = {}) {
   const env = options.env ?? process.env;
   const homeDir = options.homeDir ?? env["HOME"] ?? env["USERPROFILE"] ?? homedir9();
@@ -2222,7 +2289,7 @@ function readCodexPluginCacheRoots(codexHome) {
 function addRoot(roots, root) {
   if (root === undefined || root.trim().length === 0)
     return;
-  const resolved = resolve4(root);
+  const resolved = resolve5(root);
   roots.add(resolved);
   roots.add(realpathIfPossible2(resolved));
 }
@@ -2240,7 +2307,7 @@ function realpathIfPossible2(path) {
     return realpathSync4(path);
   } catch (error) {
     if (error instanceof Error)
-      return resolve4(path);
+      return resolve5(path);
     throw error;
   }
 }
@@ -2325,7 +2392,7 @@ function isSweepThrottled(stampFile, nowMs, throttleMs) {
   return nowMs - statSync2(stampFile).mtimeMs < throttleMs;
 }
 function writeSweepStamp(stampFile, nowMs) {
-  mkdirSync2(dirname3(stampFile), { recursive: true });
+  mkdirSync2(dirname4(stampFile), { recursive: true });
   writeFileSync2(stampFile, `${new Date(nowMs).toISOString()}
 `);
   const stampDate = new Date(nowMs);
@@ -2442,7 +2509,7 @@ async function removeEmptyDirectory(path) {
   }
 }
 function sleep(ms) {
-  return new Promise((resolve5) => setTimeout(resolve5, ms));
+  return new Promise((resolve6) => setTimeout(resolve6, ms));
 }
 async function defaultDownloader(asset, timeoutMs = DEFAULT_DOWNLOAD_TIMEOUT_MS) {
   const response = await fetch(asset.url, { signal: AbortSignal.timeout(timeoutMs) });
@@ -2962,7 +3029,7 @@ function defaultWorkerCliPath() {
 // components/codegraph/src/serve.ts
 import { existsSync as existsSync10, realpathSync as realpathSync5 } from "node:fs";
 import { homedir as homedir14 } from "node:os";
-import { basename as basename4, join as join14, resolve as resolve5 } from "node:path";
+import { basename as basename4, join as join14, resolve as resolve6 } from "node:path";
 import {
   cwd as processCwd3,
   env as processEnv3,
@@ -3023,7 +3090,7 @@ ${body}` : `${body}
   await writeChunk(output, payload);
 }
 function writeChunk(output, chunk) {
-  return new Promise((resolve5, reject) => {
+  return new Promise((resolve6, reject) => {
     let settled = false;
     const onError = (error) => {
       if (settled)
@@ -3043,7 +3110,7 @@ function writeChunk(output, chunk) {
           return;
         }
         output.removeListener("error", onError);
-        resolve5();
+        resolve6();
       });
     } catch (error) {
       output.removeListener("error", onError);
@@ -3624,11 +3691,11 @@ function resolveProjectCwd(env, fallback) {
     const candidate = env[key]?.trim();
     if (candidate === undefined || candidate.length === 0)
       continue;
-    const resolved = resolve5(candidate);
+    const resolved = resolve6(candidate);
     if (existsSync10(resolved))
       return resolved;
   }
-  return resolve5(fallback);
+  return resolve6(fallback);
 }
 function provisionedBinFromInstallDir3(installDir) {
   if (installDir === undefined)
@@ -3653,7 +3720,7 @@ function isDirectInvocation(argvPath) {
   const moduleName = basename4(modulePath);
   if (moduleName !== "serve.js" && moduleName !== "serve.ts")
     return false;
-  return realpathSync5(resolve5(argvPath)) === realpathSync5(modulePath);
+  return realpathSync5(resolve6(argvPath)) === realpathSync5(modulePath);
 }
 
 // components/codegraph/src/sweep-cli.ts
@@ -3763,7 +3830,7 @@ function isDirectInvocation2(argvPath) {
   const moduleName = basename5(modulePath);
   if (moduleName !== "cli.js" && moduleName !== "cli.ts")
     return false;
-  return realpathSync6(resolve6(argvPath)) === realpathSync6(modulePath);
+  return realpathSync6(resolve7(argvPath)) === realpathSync6(modulePath);
 }
 export {
   runCodegraphCli

@@ -17,8 +17,24 @@ import { promisify } from "node:util";
 var execFileAsync = promisify(execFile);
 var REQUIRED_PLUGIN_ARTIFACTS = [
   join("extensions", "omo.js"),
+  join("skills", "ast-grep", "SKILL.md"),
+  join("skills", "coding-agent-sessions", "SKILL.md"),
+  join("skills", "debugging", "SKILL.md"),
+  join("skills", "frontend", "SKILL.md"),
+  join("skills", "git-master", "SKILL.md"),
+  join("skills", "init-deep", "SKILL.md"),
+  join("skills", "lsp-setup", "SKILL.md"),
+  join("skills", "programming", "SKILL.md"),
+  join("skills", "refactor", "SKILL.md"),
+  join("skills", "remove-ai-slops", "SKILL.md"),
+  join("skills", "review-work", "SKILL.md"),
+  join("skills", "start-work", "SKILL.md"),
+  join("skills", "ultimate-browsing", "SKILL.md"),
   join("skills", "ultrawork", "SKILL.md"),
   join("skills", "ulw-loop", "SKILL.md"),
+  join("skills", "ulw-plan", "SKILL.md"),
+  join("skills", "ulw-research", "SKILL.md"),
+  join("skills", "visual-qa", "SKILL.md"),
   join("runtime", "lsp-daemon", "dist", "cli.js"),
   join("runtime", "lsp-daemon", "dist", "index.js"),
   join("runtime", "lsp-daemon", "dist", "index.d.ts"),
@@ -91,6 +107,7 @@ async function ensurePluginArtifacts(context) {
     throw new Error(`Packed omo-senpi plugin is missing required runtime artifacts at ${context.pluginPath}`);
   }
   await context.runCommand("node", [join(context.pluginPath, "scripts", "build-extension.mjs")], { cwd: context.repoRoot });
+  await context.runCommand("node", [join("packages", "omo-codex", "plugin", "scripts", "materialize-shared-upstreams.mjs")], { cwd: context.repoRoot });
   await context.runCommand("node", [join(context.pluginPath, "scripts", "sync-skills.mjs")], { cwd: context.repoRoot });
   await context.runCommand("node", [join(context.pluginPath, "scripts", "build-install.mjs")], { cwd: context.repoRoot });
   await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-lsp-daemon-runtime.mjs")], { cwd: context.repoRoot });

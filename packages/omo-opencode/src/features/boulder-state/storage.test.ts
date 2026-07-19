@@ -144,7 +144,7 @@ describe("boulder-state", () => {
       expect(result!.session_ids).toEqual([])
     })
 
-    test("should default session_ids to [] for empty object", () => {
+    test("should return null for empty object", () => {
       //#given - boulder.json with empty object
       const boulderFile = join(OMO_DIR, "boulder.json")
       writeFileSync(boulderFile, JSON.stringify({}))
@@ -153,8 +153,7 @@ describe("boulder-state", () => {
       const result = readBoulderState(TEST_DIR)
 
       //#then
-      expect(result).not.toBeNull()
-      expect(result!.session_ids).toEqual([])
+      expect(result).toBeNull()
     })
 
     test("should backfill missing origin as direct only for a single tracked session", () => {
@@ -809,6 +808,45 @@ describe("boulder-state", () => {
       expect(progress.isComplete).toBe(false)
     })
 
+    test("#given a child heading inside TODOs #when progress is read #then parent-section rows remain counted", () => {
+      // given
+      const planPath = join(TEST_DIR, "todo-subsection-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [x] 1. Canonical task
+
+### Notes
+- [ ] 2. Canonical task after child heading
+`)
+
+      // when
+      const progress = getPlanProgress(planPath)
+
+      // then
+      expect(progress).toEqual({ total: 2, completed: 1, isComplete: false })
+    })
+
+    test("#given fenced task examples #when progress is read #then fenced rows match continuation scope", () => {
+      // given
+      const planPath = join(TEST_DIR, "fenced-task-example-plan.md")
+      writeFileSync(planPath, `# Plan
+
+## TODOs
+- [x] 1. Canonical task
+
+\`\`\`md
+- [ ] 2. Fenced example
+\`\`\`
+`)
+
+      // when
+      const progress = getPlanProgress(planPath)
+
+      // then
+      expect(progress).toEqual({ total: 1, completed: 1, isComplete: true })
+    })
+
     test("should ignore indented checkboxes under top-level tasks", () => {
       // given - plan with indented unchecked nested checkboxes
       const planPath = join(TEST_DIR, "nested-indented-plan.md")
@@ -915,8 +953,8 @@ describe("boulder-state", () => {
       expect(progress.isComplete).toBe(false)
     })
 
-    test("should support asterisk bullet top-level tasks", () => {
-      // given - plan with asterisk bullet tasks
+    test("should reject noncanonical asterisk bullets in structured task sections", () => {
+      // given - structured rows that do not use the canonical dash marker
       const planPath = join(TEST_DIR, "asterisk-bullet-plan.md")
       writeFileSync(planPath, `# Plan
 
@@ -929,8 +967,8 @@ describe("boulder-state", () => {
       const progress = getPlanProgress(planPath)
 
       // then
-      expect(progress.total).toBe(2)
-      expect(progress.completed).toBe(1)
+      expect(progress.total).toBe(0)
+      expect(progress.completed).toBe(0)
       expect(progress.isComplete).toBe(false)
     })
 

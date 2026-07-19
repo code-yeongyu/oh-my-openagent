@@ -243,7 +243,7 @@ test("#given user-customized Codex model config #when migrating #then user value
 	assert.doesNotMatch(content, /^\s*multi_agent_mode\s*=/m);
 	assert.match(content, /\[agents\][\s\S]*?max_threads = 1000/);
 	assert.match(content, /\[features\.multi_agent_v2\][\s\S]*?enabled = false/);
-	assert.match(content, /max_concurrent_threads_per_session = 1000/);
+	assert.match(content, /max_concurrent_threads_per_session = 16/);
 });
 
 test("#given managed config state is malformed #when migrating #then migration ignores stale state safely", async () => {
@@ -405,7 +405,7 @@ test("#given config already matches current catalog #when catalog version advanc
 	const content = await readFile(configPath, "utf8");
 	assert.doesNotMatch(content, /^\s*multi_agent_mode\s*=/m);
 	assert.match(content, /\[agents\][\s\S]*?max_threads = 1000/);
-	assert.match(content, /max_concurrent_threads_per_session = 1000/);
+	assert.match(content, /max_concurrent_threads_per_session = 16/);
 });
 
 test("#given stale Context7 placeholder MCP config #when migrating #then removes it and keeps plugin policy", async () => {
@@ -642,7 +642,7 @@ test("#given global config without multi_agent_v2 section #when full migration r
 	assert.deepEqual(result.modeChanged, []);
 	const content = await readFile(configPath, "utf8");
 	assert.match(content, /\[features\.multi_agent_v2\][\s\S]*?enabled = false/);
-	assert.match(content, /max_concurrent_threads_per_session = 1000/);
+	assert.match(content, /max_concurrent_threads_per_session = 16/);
 	assert.match(content, /\[agents\][\s\S]*?max_threads = 1000/);
 	assert.doesNotMatch(content, /^\s*multi_agent_mode\s*=/m);
 });
@@ -749,7 +749,7 @@ test("#given global config with forced multi_agent_v2 #when full migration runs 
 	const content = await readFile(configPath, "utf8");
 	assert.match(content, /enabled = false/);
 	assert.doesNotMatch(content, /enabled = true/);
-	assert.match(content, /max_concurrent_threads_per_session = 1000/);
+	assert.match(content, /max_concurrent_threads_per_session = 10000/);
 	assert.match(content, /\[agents\][\s\S]*?max_threads = 1000/);
 });
 
@@ -1030,7 +1030,7 @@ test("#given legacy shorthand and no session model on hook path #when full migra
 	const parsed = parseTomlWithPython(content);
 	assert.doesNotMatch(content, /^\s*multi_agent_v2\s*=\s*(?:true|false)/m);
 	assert.equal(parsed.features.plugins, true);
-	assert.equal(parsed.features.multi_agent_v2.max_concurrent_threads_per_session, 1000);
+	assert.equal(parsed.features.multi_agent_v2.max_concurrent_threads_per_session, 16);
 	assert.equal("enabled" in parsed.features.multi_agent_v2, false);
 });
 
@@ -1151,7 +1151,7 @@ test("#given user-modified config without root model #when full non-hook migrati
 	assert.doesNotMatch(content, /^\s*enabled\s*=\s*false/m);
 	assert.doesNotMatch(content, /openai\/codex#26753/);
 	assert.doesNotMatch(content, /^\s*max_threads\s*=/m);
-	assert.match(content, /max_concurrent_threads_per_session = 1000/);
+	assert.match(content, /max_concurrent_threads_per_session = 16/);
 });
 
 async function canCreateSymlink(type) {

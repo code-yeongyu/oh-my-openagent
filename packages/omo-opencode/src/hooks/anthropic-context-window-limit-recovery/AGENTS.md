@@ -1,4 +1,4 @@
-# src/hooks/anthropic-context-window-limit-recovery/ — Multi-Strategy Context Recovery
+# src/hooks/anthropic-context-window-limit-recovery/ (Multi-Strategy Context Recovery)
 
 **Generated:** 2026-05-15
 
@@ -20,10 +20,10 @@
 
 | File | Purpose |
 |------|---------|
-| `recovery-hook.ts` | Main hook entry — `session.error` handler, strategy orchestration |
+| `recovery-hook.ts` | Main hook entry: `session.error` handler, strategy orchestration |
 | `executor.ts` | Execute recovery strategies in sequence |
 | `parser.ts` | Parse Anthropic token limit error messages |
-| `state.ts` | `AutoCompactState` — per-session retry/truncation tracking |
+| `state.ts` | `AutoCompactState`: per-session retry/truncation tracking |
 | `types.ts` | `ParsedTokenLimitError`, `RetryState`, `TruncateState`, config constants |
 | `storage.ts` | Persist tool results for later truncation |
 | `tool-result-storage.ts` | Store/retrieve individual tool call results |
@@ -40,9 +40,9 @@
 ## PRUNING SYSTEM
 
 `pruning-*.ts` files handle intelligent output pruning:
-- `pruning-deduplication.ts` — Remove duplicate content across tool results
-- `pruning-tool-output-truncation.ts` — Truncate oversized tool outputs
-- `pruning-types.ts` — Pruning-specific type definitions
+- `pruning-deduplication.ts`: Remove duplicate content across tool results
+- `pruning-tool-output-truncation.ts`: Truncate oversized tool outputs
+- `pruning-types.ts`: Pruning-specific type definitions
 
 ## SDK VARIANTS
 

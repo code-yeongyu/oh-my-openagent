@@ -10,7 +10,7 @@ Core-agent tab cycling is deterministic via injected runtime order field. The fi
 
 | Agent                 | Model              | Purpose                                                                                                                                                                                                                                                                                                                                                          |
 | --------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Sisyphus**          | `claude-opus-4-7`  | The default orchestrator. Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Todo-driven workflow with extended thinking (32k budget). Fallback: `opencode-go\|vercel/kimi-k2.6` → `kimi-for-coding/k2p5` → `opencode\|bailian-coding-plan\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix\|vercel/kimi-k2.5` → `openai\|github-copilot\|opencode\|vercel/gpt-5.5 (medium)` → `zai-coding-plan\|opencode\|bailian-coding-plan\|vercel/glm-5` → `opencode/big-pickle`. |
+|| **Sisyphus**          | `claude-opus-4-7`  | The default orchestrator. Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Todo-driven workflow with extended thinking (32k budget). Fallback: `opencode-go\|kimi-for-coding\|moonshotai\|opencode\|vercel/kimi-k3` → `opencode-go\|vercel/kimi-k2.6` → `kimi-for-coding/k2p5` → `opencode\|bailian-coding-plan\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix\|vercel/kimi-k2.5` → `openai\|github-copilot\|opencode\|vercel/gpt-5.5 (medium)` → `zai-coding-plan\|opencode\|bailian-coding-plan\|vercel/glm-5` → `opencode/big-pickle` |
 | **Hephaestus**        | `gpt-5.6-sol`      | The Legitimate Craftsman. Autonomous deep worker inspired by AmpCode's deep mode. Goal-oriented execution with thorough research before action. Uses `openai\|vercel/gpt-5.6-sol (medium)` when available, then `openai\|github-copilot\|opencode\|vercel/gpt-5.5 (medium)`. Named after the Greek god of forge and craftsmanship. |
 | **Oracle**            | `gpt-5.5`          | Architecture decisions, code review, debugging. Read-only consultation with stellar logical reasoning and deep analysis. Inspired by AmpCode. Fallback: `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max)` → `opencode-go\|vercel/glm-5.2`.                                                                                                                                 |
 | **Librarian**         | `gpt-5.4-mini-fast` | Multi-repo analysis, documentation lookup, OSS implementation examples. Deep codebase understanding with evidence-based answers. Fallback: `opencode-go\|bailian-coding-plan/qwen3.5-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano`. |
@@ -22,7 +22,7 @@ Core-agent tab cycling is deterministic via injected runtime order field. The fi
 | -------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Prometheus** | `claude-opus-4-7` | Strategic planner with interview mode. Creates detailed work plans through iterative questioning. Fallback: `openai\|github-copilot\|opencode\|vercel/gpt-5.5 (high)` → `opencode-go\|vercel/glm-5.2` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro`. |
 | **Metis**      | `claude-sonnet-4-6` | Plan consultant — pre-planning analysis. Identifies hidden intentions, ambiguities, and AI failure points. Fallback: `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max)` → `openai\|github-copilot\|opencode\|vercel/gpt-5.5 (high)` → `opencode-go\|vercel/glm-5.2` → `kimi-for-coding/k2p5`. |
-| **Momus**      | `gpt-5.6-sol`     | Plan reviewer — validates plans against clarity, verifiability, and completeness standards. Uses `openai\|vercel/gpt-5.6-sol (xhigh)` when available, then `openai\|github-copilot\|opencode\|vercel/gpt-5.5 (xhigh)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `opencode-go\|vercel/glm-5.2`. |
+| **Momus**      | `gpt-5.6-terra`   | Plan reviewer — validates plans against clarity, verifiability, and completeness standards. Uses `openai\|vercel/gpt-5.6-terra (high)` when available, then `openai\|github-copilot\|opencode\|vercel/gpt-5.5 (xhigh)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `opencode-go\|vercel/glm-5.2`. |
 
 ### Orchestration Agents
 
@@ -51,6 +51,22 @@ Ask @explore for the policy on this feature
 | multimodal-looker | Allowlist: `read` only                                                                  |
 | atlas             | Cannot delegate (blocked: task, call_omo_agent)                                         |
 | momus             | Cannot write, edit, or delegate (blocked: write, edit, task)                            |
+
+### Instruction Files vs Enforcement
+
+`AGENTS.md` files are instruction context. They tell agents how to work in a
+project, and OMO can inject that context into prompts, but they are not a
+deterministic permission boundary.
+
+Deterministic enforcement today comes from OMO config (`agents.*.permission`,
+agent `tools`, disabled tools/agents), built-in agent restrictions, OpenCode's
+own permission gate when it is available, and guard hooks such as
+`team-tool-gating`, `write-existing-file-guard`, and `prometheus-md-only`.
+
+OMO does not currently read an `AGENTOWNERS.yml` file or run a generic
+AGENTOWNERS policy-enforcer hook. If a project needs hard agent boundaries,
+encode them in config permissions, tool allowlists, repository protections, or
+review gates rather than relying on prose-only instructions.
 
 ### Background Agents
 
@@ -321,12 +337,10 @@ Commands are slash-triggered workflows that execute predefined templates.
 | Command              | Description                                                                                |
 | -------------------- | ------------------------------------------------------------------------------------------ |
 | `/init-deep`         | Initialize hierarchical AGENTS.md knowledge base                                           |
-| `/ralph-loop`        | Start self-referential development loop until completion                                   |
-| `/ulw-loop`          | Start ultrawork loop - continues with ultrawork mode                                       |
-| `/cancel-ralph`      | Cancel active Ralph Loop                                                                   |
+| `/goal`              | Set, show, pause, resume, or clear the active thread goal                                  |
 | `/refactor`          | Intelligent refactoring with LSP, AST-grep, architecture analysis, and TDD verification    |
 | `/start-work`        | Start Atlas work session from Prometheus plan                                              |
-| `/stop-continuation` | Stop all continuation mechanisms (ralph loop, todo continuation, boulder) for this session |
+| `/stop-continuation` | Stop all continuation mechanisms (todo continuation, Goal, boulder) for this session       |
 | `/handoff`           | Create a detailed context summary for continuing work in a new session                     |
 
 ### /init-deep
@@ -350,33 +364,55 @@ project/
 │       └── AGENTS.md                # Component-specific context
 ```
 
-### /ralph-loop
+### /goal
 
-**Purpose**: Self-referential development loop that runs until task completion
-
-**Named after**: Anthropic's Ralph Wiggum plugin
+**Purpose**: Set a persistent thread objective the agent pursues across turns until paused, cleared, or completed.
 
 **Usage**:
 
 ```
-/ralph-loop "Build a REST API with authentication"
-/ralph-loop "Refactor the payment module" --max-iterations=50
+/goal "Build a REST API with authentication"
+/goal                    # show the current goal
+/goal pause              # stop idle continuations
+/goal resume             # resume a paused goal
+/goal clear              # clear the current goal
 ```
 
 **Behavior**:
 
-- Agent works continuously toward the goal
-- Detects `<promise>DONE</promise>` to know when complete
-- Auto-continues if agent stops without completion
-- Ends when: completion detected, max iterations reached (default 100), or `/cancel-ralph`
+- The goal persists for the session and is shown in the TUI.
+- While a goal is active, every `session.idle` re-injects a continuation prompt that tracks `tokensUsed` and `timeUsedSeconds`.
+- The agent calls `update_goal({ status: "complete" })` only after a completion audit confirms the objective is achieved.
+- `pause` stops idle continuations without clearing the goal; `clear` removes it. `session.deleted` also clears the goal.
+- Goal state is stored in `.omo/goal/<sessionID>.json`.
 
-**Configure**: `{ "ralph_loop": { "enabled": true, "default_max_iterations": 100 } }`
+**Tools** (registered only when `goal.enabled` is true):
+
+- `create_goal` - create or replace the active goal objective.
+- `update_goal` - pause, resume, mark complete, or change the objective.
+- `get_goal` - read the current objective, status, and usage accounting.
+
+**Configure**:
+
+```jsonc
+{
+  "goal": {
+    "enabled": true,
+    "auto_start": false,
+    "default_max_iterations": 100
+  }
+}
+```
+
+- `enabled` (default `false`) gates the Goal subsystem and its tools.
+- `auto_start` (default `false`) allows a goal to be auto-created from the first main-session message when `default_mode.goal` is true.
+- `default_max_iterations` (1-1000, default `100`) is the continuation iteration cap, preserved for Ralph Loop behavioral parity.
+
+**Migration**: the legacy top-level `ralph_loop` config auto-migrates to `goal` at load time and logs a deprecation warning; explicit `goal` config wins over migrated values. `default_mode.ralph_loop` was renamed to `default_mode.goal`.
 
 ### /ulw-loop
 
-**Purpose**: Same as ralph-loop but with ultrawork mode active
-
-Everything runs at maximum intensity - parallel agents, background tasks, aggressive exploration.
+The `/ulw-loop` slash command has been removed; continuous goal pursuit is now handled by `/goal`. The `omo ulw-loop` CLI subcommand remains as a passthrough to the Codex LazyCodex ulw-loop CLI.
 
 ### /refactor
 
@@ -412,7 +448,7 @@ Uses atlas agent to execute planned tasks systematically.
 
 **Purpose**: Stop all continuation mechanisms for this session
 
-Stops ralph loop, todo continuation, and boulder state. Use when you want the agent to stop its current multi-step workflow.
+Stops todo continuation, clears the active Goal, and clears boulder state. Use when you want the agent to stop its current multi-step workflow.
 
 ### /handoff
 
@@ -443,10 +479,10 @@ Skill sets provide specialized workflows with embedded MCP servers and detailed 
 | **dev-browser**        | Stateful browser scripting                              | Browser automation with persistent page state for iterative workflows and authenticated sessions.                                                                                                                                                                                                                                             |
 | **frontend**           | UI/UX tasks, styling                                    | Designer-turned-developer persona. Crafts strong UI/UX even without design mockups. Emphasizes bold aesthetic direction, distinctive typography, cohesive color palettes.                                                                                                                                                                     |
 | **review-work**        | "review work", "review my work", "QA my work"          | Post-implementation review orchestrator. Launches 5 parallel background sub-agents for comprehensive review: goal verification, code quality, security, hands-on QA, and context mining. All must pass for review to pass.                                                                                                                     |
-| **ulw-research**       | `ulw-research`, `ultraresearch`, deep research requests | Maximum-saturation research. Runs parallel explore/librarian swarms across code, docs, web, and OSS repos; recursively follows `EXPAND` leads until convergence; proves contested claims by running code; and returns cited synthesis. Epistemic instrumentation covers intent-vs-reality diffing, claim graph, observation manifest, independent-observation convergence, temporal evidence, verification economics, and cause-disappearance records. `ultraresearch` is the legacy alias. |
+| **ulw-research**       | `ulw-research`, deep research requests | Maximum-saturation research. Runs parallel explore/librarian swarms across code, docs, web, and OSS repos; recursively follows `EXPAND` leads until convergence; proves contested claims by running code; and returns cited synthesis. Epistemic instrumentation covers intent-vs-reality diffing, claim graph, observation manifest, independent-observation convergence, temporal evidence, verification economics, and cause-disappearance records. |
 | **$omo:remove-ai-slops** | "remove AI slop", "de-AI", "humanize"                 | Removes AI-generated code smells from files while preserving functionality. Identifies and eliminates verbose comments, redundant error handling, over-engineered patterns, and generic AI phrasing.                                                                                                                                           |
 
-`ulw-research` is intentionally explicit. Ordinary questions and normal implementation context-gathering will not trigger a saturation swarm. Use `ulw-research` or `ultraresearch` when the research itself is the deliverable and every claim needs a citation, a proof artifact, or an execution-backed verdict.
+`ulw-research` is intentionally explicit. Ordinary questions and normal implementation context-gathering will not trigger a saturation swarm. Use `ulw-research` when the research itself is the deliverable and every claim needs a citation, a proof artifact, or an execution-backed verdict.
 
 #### git-master Core Principles
 
@@ -843,7 +879,7 @@ Current composition counts:
 | --------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **keyword-detector**        | Message + Transform | IntentGate detector. Activates `ultrawork`/`ulw`, `search`, `analyze`, and `team` modes from message keywords. |
 | **think-mode**              | Params              | Auto-detects extended thinking needs. Catches "think deeply", "ultrathink" and adjusts model settings.                                                      |
-| **ralph-loop**              | Event + Message     | Manages self-referential loop continuation.                                                                                                                 |
+| **goal**                    | Event               | Re-injects a goal continuation prompt on session.idle while a goal is active; clears the goal on session.deleted.                                           |
 | **start-work**              | Message             | Handles /start-work command execution.                                                                                                                      |
 | **auto-slash-command**      | Message             | Automatically executes slash commands from prompts.                                                                                                         |
 | **stop-continuation-guard** | Event + Message     | Guards the stop-continuation mechanism.                                                                                                                     |

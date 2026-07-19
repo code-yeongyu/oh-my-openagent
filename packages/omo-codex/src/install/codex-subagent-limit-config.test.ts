@@ -28,7 +28,7 @@ describe("codex subagent limit config", () => {
     const content = await readFile(configPath, "utf8")
     expect(content).not.toMatch(/^\s*max_threads\s*=/m)
     expect(content).toContain("[features.multi_agent_v2]")
-    expect(content).toContain("max_concurrent_threads_per_session = 1000")
+    expect(content).toContain("max_concurrent_threads_per_session = 16")
   })
 
   test("#given existing low agents max_threads #when updating config #then raises only the root cap", async () => {

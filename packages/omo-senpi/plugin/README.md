@@ -2,6 +2,30 @@
 
 `@code-yeongyu/omo-senpi` is the Senpi edition of OMO packaged as one Pi package. It loads one generated extension entry from `extensions/omo.js` and generated skills from `skills/`.
 
+## Shipped skills
+
+The plugin ships 19 skills by default:
+
+- `ast-grep` — structural code search and rewrites
+- `coding-agent-sessions` — find, read, and reconstruct coding-agent session transcripts
+- `debugging` — hypothesis-driven runtime debugging across languages
+- `frontend` — UI/UX/visual design, styling, layout, and frontend implementation
+- `git-master` — advanced Git operations, history surgery, and workflow automation
+- `hyperplan` — adversarial 5-member cross-critique planning
+- `init-deep` — deep project initialization and scaffold setup
+- `lsp-setup` — Language Server configuration and troubleshooting
+- `programming` — type-strict, modern-stack programming guidance
+- `refactor` — safe refactoring and code quality improvement
+- `remove-ai-slops` — clean AI-generated code smells
+- `review-work` — multi-angle implementation and PR review
+- `start-work` — execute a Prometheus work plan with Boulder state
+- `ultimate-browsing` — escalation browsing for blocked or hard-to-reach pages
+- `ultrawork` — ultrawork mode directive
+- `ulw-loop` — goal-like ultrawork loop
+- `ulw-plan` — adversarial planning workflow
+- `ulw-research` — ultra-wide research orchestration
+- `visual-qa` — visual QA for web and terminal UIs
+
 ## Install
 
 Build the plugin artifacts before installing:

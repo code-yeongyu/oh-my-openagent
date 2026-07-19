@@ -53,9 +53,13 @@ describe("generateModelConfig", () => {
       )
       expect(unsupportedEntries).toEqual([])
       expect(result.agents?.momus).toEqual({
-        model: "github-copilot/gpt-5.5",
+        model: "github-copilot/gpt-5.6-terra",
         variant: "high",
         fallback_models: [
+          {
+            model: "github-copilot/gpt-5.5",
+            variant: "high",
+          },
           {
             model: "github-copilot/claude-opus-4.7",
             variant: "max",
@@ -66,6 +70,12 @@ describe("generateModelConfig", () => {
           },
         ],
       })
+      expect(result.categories?.ultrabrain?.model).toBe("github-copilot/gpt-5.6-sol")
+      expect(result.categories?.ultrabrain?.variant).toBe("high")
+      expect(result.categories?.deep?.model).toBe("github-copilot/gpt-5.6-terra")
+      expect(result.categories?.deep?.variant).toBe("high")
+      expect(result.categories?.["unspecified-low"]?.model).toBe("github-copilot/gpt-5.6-luna")
+      expect(result.categories?.["unspecified-low"]?.variant).toBe("high")
     })
     test("omits librarian when only ZAI is available", () => {
       // #given only ZAI is available
@@ -265,7 +275,7 @@ describe("generateModelConfig", () => {
   })
 
   describe("Momus agent model resolution", () => {
-    test("Momus resolves to gpt-5.6-sol xhigh when OpenAI is available", () => {
+    test("Momus resolves to gpt-5.6-terra high when OpenAI is available", () => {
       // #given
       const config = createConfig({ hasOpenAI: true })
 
@@ -273,8 +283,8 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.momus?.model).toBe("openai/gpt-5.6-sol")
-      expect(result.agents?.momus?.variant).toBe("xhigh")
+      expect(result.agents?.momus?.model).toBe("openai/gpt-5.6-terra")
+      expect(result.agents?.momus?.variant).toBe("high")
       expect(result.agents?.momus?.fallback_models?.[0]).toEqual({
         model: "openai/gpt-5.5",
         variant: "xhigh",
@@ -295,7 +305,7 @@ describe("generateModelConfig", () => {
       expect(result.agents?.hephaestus?.variant).toBe("high")
     })
 
-    test("Hephaestus falls back to Copilot GPT-5.5 when only Copilot is available", () => {
+    test("Hephaestus uses Copilot GPT-5.6 Sol high when only Copilot is available", () => {
       // #given
       const config = createConfig({ hasCopilot: true })
 
@@ -304,8 +314,14 @@ describe("generateModelConfig", () => {
 
       // #then
       expect(result.agents?.hephaestus).toEqual({
-        model: "github-copilot/gpt-5.5",
-        variant: "medium",
+        model: "github-copilot/gpt-5.6-sol",
+        variant: "high",
+        fallback_models: [
+          {
+            model: "github-copilot/gpt-5.5",
+            variant: "medium",
+          },
+        ],
       })
     })
 

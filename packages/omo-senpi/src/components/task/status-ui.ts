@@ -52,6 +52,8 @@ export interface TaskStatusUi {
   scheduleSync(): void
   // Immediate render (used on session/model events and internally by the debounce timer).
   syncNow(): void
+  // Cancel any pending debounce timer so shutdown does not leave a render scheduled past teardown.
+  dispose(): void
 }
 
 function isTerminal(status: TaskStatus): boolean {
@@ -196,7 +198,14 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
     }, debounceMs)
   }
 
-  return { scheduleSync, syncNow }
+  function dispose(): void {
+    if (pending !== undefined) {
+      timers.clear(pending)
+      pending = undefined
+    }
+  }
+
+  return { scheduleSync, syncNow, dispose }
 }
 
 function scopedRecords(manager: StatusUiManager, sessionId: string | undefined): readonly TaskRecord[] {
