@@ -115,7 +115,9 @@ project context.
 
 #### Visual Multi-Agent with Tmux
 
-Start the host with `opencode --port <port>` to provide the OpenCode HTTP listener used by visualization panes. Child panes connect to it with `opencode attach`. Reachability alone does not establish readiness. The readiness probe calls `/global/health`, reusing `OPENCODE_SERVER_PASSWORD` and optional `OPENCODE_SERVER_USERNAME`; when a password is set, the HTTP username defaults to `opencode`. Redirects and unsuccessful responses do not establish readiness. Successful readiness is cached by listener URL, while failed checks are not cached. Failures are isolated: if the listener is not ready, background agents and teams continue while only pane visualization is skipped.
+Start the host with `opencode --port <port>` to provide the OpenCode HTTP listener used by visualization panes. Child panes connect with `opencode attach`. The `/global/health` probe reuses `OPENCODE_SERVER_PASSWORD` and optional `OPENCODE_SERVER_USERNAME` only when OpenCode reports the current listener URL or `OPENCODE_PORT` identifies it explicitly; the username defaults to `opencode`. If OMO cannot verify that an address belongs to the current listener, such as a default address or one left by an older pane, it probes without credentials. Redirects and unsuccessful responses do not establish readiness. Successful readiness is cached for the listener address and current authentication settings, including credential changes, without storing the credentials; failed checks are not cached.
+
+Each newly spawned or respawned pane targeting that verified listener receives the current server authentication variables. Panes targeting any other address explicitly clear those variables. Existing panes and tmux's global environment are not changed retroactively. If the listener is not ready, background agents and teams continue while only pane visualization is skipped.
 
 Enable `tmux.enabled` to see background agents in separate tmux panes:
 
