@@ -115,7 +115,7 @@ project context.
 
 #### Visual Multi-Agent with Tmux
 
-Start the host with `opencode --port <port>` to provide the external OpenCode HTTP listener used by visualization panes. Child panes connect to it with `opencode attach`. If the listener is unreachable, background agents and teams continue to run, but pane creation and visualization are skipped.
+Start the host with `opencode --port <port>` to provide the OpenCode HTTP listener used by visualization panes. Child panes connect to it with `opencode attach`. Reachability alone does not establish readiness. The readiness probe calls `/global/health`, reusing `OPENCODE_SERVER_PASSWORD` and optional `OPENCODE_SERVER_USERNAME`; when a password is set, the HTTP username defaults to `opencode`. Redirects and unsuccessful responses do not establish readiness. Successful readiness is cached by listener URL, while failed checks are not cached. Failures are isolated: if the listener is not ready, background agents and teams continue while only pane visualization is skipped.
 
 Enable `tmux.enabled` to see background agents in separate tmux panes:
 
