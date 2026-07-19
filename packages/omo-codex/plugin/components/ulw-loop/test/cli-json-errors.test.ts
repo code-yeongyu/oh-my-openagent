@@ -49,10 +49,10 @@ function stdoutJson(): Record<string, unknown> {
 }
 
 describe("ulwLoopCommand --json error contract", () => {
-	it("#given no plan #when status --json #then emits JSON error on stdout, nothing on stderr, exit 1", async () => {
+	it("#given no plan #when status --json #then emits JSON error on stdout, nothing on stderr, exit 0 (missing plan is not an error for JSON consumers)", async () => {
 		const code = await ulwLoopCommand(["status", "--json"]);
 
-		expect(code).toBe(1);
+		expect(code).toBe(0);
 		expect(err.join("")).toBe("");
 		expect(stdoutJson()).toMatchObject({
 			ok: false,

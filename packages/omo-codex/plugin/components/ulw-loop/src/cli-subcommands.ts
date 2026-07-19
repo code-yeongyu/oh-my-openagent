@@ -9,7 +9,7 @@ import {
 	readStdin,
 	readValue,
 } from "./cli-arg-parser.js";
-import { blockedDecisionHandoff, normalizeCodexGoalMode, printJson, printStatus } from "./cli-output.js";
+import { blockedDecisionHandoff, normalizeCodexGoalMode, printJson, printJsonError, printStatus } from "./cli-output.js";
 import { parseSteeringProposal, printSteerResult } from "./cli-steering.js";
 import { buildCodexGoalInstruction } from "./codex-goal-instruction.js";
 import { recordEvidence } from "./evidence.js";
@@ -61,21 +61,33 @@ export async function createGoals(
 }
 
 export async function status(repoRoot: string, json: boolean, scope?: UlwLoopScope): Promise<number> {
-	const plan = await readUlwLoopPlan(repoRoot, scope);
-	if (json) {
-		const active = plan.goals.find((goal) => goal.id === plan.activeGoalId);
-		const currentAttemptDir =
-			plan.evidenceLayoutVersion === 2 && active
-				? ulwLoopAttemptEvidenceDir(active.id, active.attempt, scope)
-				: undefined;
-		printJson({
-			ok: true,
-			plan,
-			summary: summarizeUlwLoopPlan(plan),
-			...(currentAttemptDir === undefined ? {} : { currentAttemptDir }),
-		});
-	} else printStatus(plan);
-	return 0;
+	try {
+		const plan = await readUlwLoopPlan(repoRoot, scope);
+		if (json) {
+			const active = plan.goals.find((goal) => goal.id === plan.activeGoalId);
+			const currentAttemptDir =
+				plan.evidenceLayoutVersion === 2 && active
+					? ulwLoopAttemptEvidenceDir(active.id, active.attempt, scope)
+					: undefined;
+			printJson({
+				ok: true,
+				plan,
+				summary: summarizeUlwLoopPlan(plan),
+				...(currentAttemptDir === undefined ? {} : { currentAttemptDir }),
+			});
+		} else printStatus(plan);
+		return 0;
+	} catch (error) {
+		// `status` is a query; a missing plan is the normal "no active run" state, not
+		// a command failure. JSON consumers (e.g. the senpi ulw-loop component polling
+		// for an active run) treat non-zero exit as a hard error and log noise on every
+		// poll in a no-plan cwd. Emit the same {ok:false,error:{code}} body but exit 0.
+		if (json && error instanceof UlwLoopError && error.code === "ULW_LOOP_PLAN_MISSING") {
+			printJsonError(error);
+			return 0;
+		}
+		throw error;
+	}
 }
 
 export async function completeGoals(
