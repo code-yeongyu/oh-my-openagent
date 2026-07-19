@@ -1,10 +1,12 @@
 import type { TmuxConfig } from "../types"
 import type { SpawnPaneResult } from "../types"
+import type { TmuxServerTarget } from "../types"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
+import { getHttpServerOriginForLog, normalizeTmuxServerTarget } from "../tmux-server-target"
 import type { SplitDirection } from "./environment"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
-import { buildPaneAuthEnvironmentArgs, buildTmuxPlaceholderCommand } from "./pane-command"
+import { buildTmuxEnvironmentArgs, buildTmuxPlaceholderCommand } from "./pane-command"
 
 export type SpawnTmuxPaneDeps = {
 	readonly log: (message: string, data?: unknown) => void
@@ -21,7 +23,7 @@ async function resolveSpawnTmuxPaneDeps(deps?: Partial<SpawnTmuxPaneDeps>): Prom
 		log: () => undefined,
 		runTmuxCommand,
 		isInsideTmux,
-		isServerRunning: (serverUrl) => isServerRunning(serverUrl, { authentication: "opencode-server" }),
+		isServerRunning,
 		getTmuxPath: async () => null,
 		...deps,
 	}
@@ -31,7 +33,7 @@ export async function spawnTmuxPane(
 	sessionId: string,
 	description: string,
 	config: TmuxConfig,
-	serverUrl: string,
+	serverTarget: TmuxServerTarget,
 	_directory: string,
 	targetPaneId?: string,
 	splitDirection: SplitDirection = "-h",
@@ -39,11 +41,13 @@ export async function spawnTmuxPane(
 ): Promise<SpawnPaneResult> {
 	const deps = await resolveSpawnTmuxPaneDeps(depsInput)
 	const { log, runTmuxCommand } = deps
+	const serverAccess = normalizeTmuxServerTarget(serverTarget, depsInput?.isServerRunning)
+	const serverOrigin = getHttpServerOriginForLog(serverAccess.serverUrl)
 
 	log("[spawnTmuxPane] called", {
 		sessionId,
 		description,
-		serverUrl,
+		serverOrigin,
 		configEnabled: config.enabled,
 		targetPaneId,
 		splitDirection,
@@ -58,9 +62,9 @@ export async function spawnTmuxPane(
 		return { success: false }
 	}
 
-	const serverRunning = await deps.isServerRunning(serverUrl)
+	const serverRunning = await serverAccess.checkServerHealth()
 	if (!serverRunning) {
-		log("[spawnTmuxPane] SKIP: server not running", { serverUrl })
+		log("[spawnTmuxPane] SKIP: server listener not ready", { serverOrigin })
 		return { success: false }
 	}
 
@@ -73,7 +77,7 @@ export async function spawnTmuxPane(
 	log("[spawnTmuxPane] all checks passed, spawning...")
 
 	const placeholderCmd = buildTmuxPlaceholderCommand(description)
-	const authEnvArgs = buildPaneAuthEnvironmentArgs()
+	const paneEnvironmentArgs = buildTmuxEnvironmentArgs(serverAccess.getPaneEnvironment())
 
 	const args = [
 		"split-window",
@@ -83,7 +87,7 @@ export async function spawnTmuxPane(
 		"-F",
 		"#{pane_id}",
 		...(targetPaneId ? ["-t", targetPaneId] : []),
-		...authEnvArgs,
+		...paneEnvironmentArgs,
 		placeholderCmd,
 	]
 

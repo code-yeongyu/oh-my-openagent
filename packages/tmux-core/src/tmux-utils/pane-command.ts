@@ -1,6 +1,6 @@
 import { shellEscapeForDoubleQuotedCommand } from "@oh-my-opencode/utils"
 
-import { getServerCredentials } from "./server-credentials"
+import type { TmuxPaneEnvironment } from "../types"
 
 const TMUX_COMMAND_SHELL = "/bin/sh"
 
@@ -24,16 +24,8 @@ export function buildTmuxPlaceholderCommand(description: string): string {
   return `${TMUX_COMMAND_SHELL} -c "printf '%s\\n%s\\n' \\"OMO subagent pane ready: ${escapedDescription}\\" \\"Focus this pane to attach.\\"; while :; do sleep 86400; done"`
 }
 
-export function buildPaneAuthEnvironmentArgs(): string[] {
-  const credentials = getServerCredentials()
-  if (!credentials) {
-    return []
-  }
-
-  const args = ["-e", `OPENCODE_SERVER_PASSWORD=${credentials.password}`]
-  if (credentials.username !== undefined) {
-    args.push("-e", `OPENCODE_SERVER_USERNAME=${credentials.username}`)
-  }
-
-  return args
+export function buildTmuxEnvironmentArgs(environment: TmuxPaneEnvironment): string[] {
+  return Object.entries(environment)
+    .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+    .flatMap(([name, value]) => ["-e", `${name}=${value}`])
 }
