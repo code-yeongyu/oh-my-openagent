@@ -21,7 +21,7 @@ async function resolveSpawnTmuxPaneDeps(deps?: Partial<SpawnTmuxPaneDeps>): Prom
 		log: () => undefined,
 		runTmuxCommand,
 		isInsideTmux,
-		isServerRunning,
+		isServerRunning: (serverUrl) => isServerRunning(serverUrl, { authentication: "opencode-server" }),
 		getTmuxPath: async () => null,
 		...deps,
 	}

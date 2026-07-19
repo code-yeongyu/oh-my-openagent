@@ -22,7 +22,7 @@ async function resolveSpawnTmuxSessionDeps(deps?: Partial<SpawnTmuxSessionDeps>)
 		log: () => undefined,
 		runTmuxCommand,
 		isInsideTmux,
-		isServerRunning,
+		isServerRunning: (serverUrl) => isServerRunning(serverUrl, { authentication: "opencode-server" }),
 		getTmuxPath: async () => null,
 		...deps,
 	}
