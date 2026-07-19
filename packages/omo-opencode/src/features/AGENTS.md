@@ -14,7 +14,7 @@ Standalone feature modules wired into `plugin/` layer. Each is self-contained wi
 | **background-agent** | HIGH | yes | Task lifecycle, concurrency (5/key), 3s polling, spawner pattern, circuit breaker. Newer files include `parent-wake-notifier.ts`, `loop-detector`, `error-classifier`, `fallback-retry-handler`, `process-cleanup`, `subagent-spawn-limits`, `session-status-classifier`, and `compaction-aware-message-resolver`. |
 | **tmux-subagent** | HIGH | yes | Tmux pane management, grid planning, session orchestration via `runTmuxCommand`; reusable tmux primitives live in `packages/tmux-core/` |
 | **opencode-skill-loader** | HIGH | yes | OpenCode adapter for YAML frontmatter skill discovery; reusable loader primitives live in `packages/skills-loader-core/` |
-| **builtin-skills** | LOW–MED | yes | Built-in skill files (git-master, playwright, frontend, review-work, remove-ai-slops, init-deep, security-research, security-review, dev-browser, playwright-cli, **team-mode**, …) |
+| **builtin-skills** | LOW-MED | yes | Built-in skill adapters. Frontend loads the canonical shared OMO source through skills-loader-core; this package owns no duplicate frontend SKILL file. |
 | **skill-mcp-manager** | HIGH | yes | OpenCode adapter for tier-3 MCP client lifecycle; reusable client/OAuth primitives live in `packages/mcp-client-core/` |
 | **claude-code-plugin-loader** | MEDIUM | yes | OpenCode adapter for Claude Code plugin discovery; reusable compatibility loaders live in `packages/claude-code-compat-core/` |
 | **builtin-commands** | LOW | yes | Command templates: refactor, init-deep, handoff, ulw-loop, etc. |
@@ -83,7 +83,7 @@ State-first tmux integration. Shared tmux primitives are extracted to `packages/
 | security-research | SKILL.md | — | Team Mode exploitability-driven security research |
 | security-review | wrapper | — | Alias for security-research |
 | **team-mode** | — | — | Loaded only when `team_mode.enabled` (skill explains the 12 tools to agents) |
-| frontend | 79 | — | Design-first UI development |
+| frontend | shared source | none | Loaded from `packages/shared-skills/skills/frontend` through skills-loader-core |
 | (git-master-skill-metadata) | — | — | Companion to git-master |
 
 Browser variant selected by `browser_automation_engine` config: `playwright` (default) | `playwright-cli` | `agent-browser`.

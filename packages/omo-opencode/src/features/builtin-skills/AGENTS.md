@@ -6,6 +6,8 @@
 
 Skills shipped inside the plugin (always available, no install). Registered via `createBuiltinSkills()`. Each skill implements the `BuiltinSkill` interface with name, description, content, and optional MCP config. Loaded by `opencode-skill-loader` with priority: project > opencode > user > **builtin**. User-installed skills with the same name override built-ins.
 
+Frontend instruction content is canonical under `packages/shared-skills/skills/frontend` and is loaded through `@oh-my-opencode/skills-loader-core`. Do not recreate an OpenCode-owned `frontend/SKILL.md` copy here.
+
 ## STRUCTURE
 
 ```
@@ -29,7 +31,6 @@ builtin-skills/
 │   ├── git-master-sections/           # Git-master prompt sub-sections
 │   └── index.ts                       # skill barrel
 ├── git-master/                        # Resources for git-master skill
-├── frontend/                    # Resources for frontend skill
 ├── agent-browser/                     # Resources for agent-browser variant
 ├── dev-browser/                       # Resources for dev-browser
 └── security-research/                 # Resources for security-research
@@ -44,7 +45,7 @@ builtin-skills/
 | `playwright-cli` | 268 | — | Browser automation via shell CLI (no MCP) |
 | `agent-browser` | (in playwright.ts) | — | Browser via `agent-browser:*` Bash commands |
 | `dev-browser` | 221 | — | Persistent page state browser for dev work |
-| `frontend` | 79 | — | Design-first UI development guidance |
+| `frontend` | shared source | none | Canonical OMO frontend content loaded through skills-loader-core |
 | `review-work` | ~500 | — | Post-implementation review orchestrator (5 parallel agents) |
 | `$omo:remove-ai-slops` | — | — | Remove AI-generated code smells |
 | `init-deep` | — | — | Hierarchical AGENTS.md generation |
@@ -83,6 +84,6 @@ When disabled, the skill is filtered out before agent prompt assembly so agents 
 
 1. Create `skills/{name}.ts` exporting a `BuiltinSkill` object
 2. Register in `skills.ts` `createBuiltinSkills()` factory
-3. Add resources (if any) under a sibling directory: `{name}/SKILL.md`, prompt sections, etc.
+3. Put cross-runtime instruction content under `packages/shared-skills/skills/{name}`; keep a sibling resource directory only for OpenCode-specific content.
 4. If the skill is conditional, set `shouldLoad: (config) => …`
 5. Optionally declare an MCP server in the skill (loaded by `skill-mcp-manager` per session)

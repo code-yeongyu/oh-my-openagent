@@ -13,7 +13,13 @@ const MAINTAINER_LOCAL_PATH_RE = /file:\/\/\/(?:Users|home)\/|(?:^|[\s(`'"])(?:\
 function collectMarkdownFiles(): string[] {
   const output = Bun.spawnSync(["git", "ls-files", "*.md"], { cwd: WORKSPACE_ROOT, stdout: "pipe" })
   expect(output.exitCode).toBe(0)
-  return output.stdout.toString("utf-8").trim().split("\n").filter(Boolean).map((filePath) => resolve(WORKSPACE_ROOT, filePath))
+  return resolveExistingMarkdownFiles(output.stdout.toString("utf-8").trim().split("\n").filter(Boolean))
+}
+
+function resolveExistingMarkdownFiles(filePaths: readonly string[]): string[] {
+  return filePaths
+    .map((filePath) => resolve(WORKSPACE_ROOT, filePath))
+    .filter((filePath) => existsSync(filePath))
 }
 
 function stripFencedCodeBlocks(markdown: string): string {
@@ -142,6 +148,13 @@ function collectMaintainerLocalPathLines(markdown: string): number[] {
 }
 
 describe("markdown local link audit", () => {
+  test("#given a missing indexed markdown file #when files are collected #then the deleted path is ignored", () => {
+    const existingPath = "packages/omo-opencode/src/shared/markdown-link-audit.test.ts"
+    const missingPath = "packages/omo-opencode/src/shared/__deleted-markdown-fixture__.md"
+
+    expect(resolveExistingMarkdownFiles([existingPath, missingPath])).toEqual([resolve(WORKSPACE_ROOT, existingPath)])
+  })
+
   test("#given external markdown links #when resolving targets #then http and https links are ignored", () => {
     expect(resolveMarkdownTarget("docs/AGENTS.md", "http://example.com/readme.md")).toBeUndefined()
     expect(resolveMarkdownTarget("docs/AGENTS.md", "https://example.com/readme.md")).toBeUndefined()
