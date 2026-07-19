@@ -43,6 +43,16 @@ function createRequestPolicyId(headers: RequestHeaders, redirect: RedirectMode):
 	return createHmac("sha256", REQUEST_POLICY_HMAC_KEY).update(canonicalPolicy, "utf8").digest("hex")
 }
 
+function isCurrentServerCheck(
+	state: ServerHealthState | undefined,
+	healthUrl: string,
+	requestPolicyId: string,
+): boolean {
+	const currentUrl = state !== undefined ? state.serverCheckUrl : serverCheckUrl
+	const currentPolicyId = state !== undefined ? state.serverCheckPolicyId : serverCheckPolicyId
+	return currentUrl === healthUrl && currentPolicyId === requestPolicyId
+}
+
 export function createServerHealthState(): ServerHealthState {
 	return {
 		serverAvailable: null,
@@ -58,17 +68,18 @@ export async function isServerRunning(serverUrl: string, options: IsServerRunnin
 	const healthUrl = new URL("/global/health", serverUrl).toString()
 	const redirect = options.redirect ?? "error"
 	const requestPolicyId = createRequestPolicyId(options.headers, redirect)
-	const cachedUrl = options.state ? options.state.serverCheckUrl : serverCheckUrl
-	const cachedAvailable = options.state ? options.state.serverAvailable : serverAvailable
-	const cachedPolicyId = options.state ? options.state.serverCheckPolicyId : serverCheckPolicyId
+	const state = options.state
+	const cachedUrl = state !== undefined ? state.serverCheckUrl : serverCheckUrl
+	const cachedAvailable = state !== undefined ? state.serverAvailable : serverAvailable
+	const cachedPolicyId = state !== undefined ? state.serverCheckPolicyId : serverCheckPolicyId
 	if (cachedUrl === healthUrl && cachedPolicyId === requestPolicyId && cachedAvailable === true) {
 		return true
 	}
 
-	if (options.state) {
-		options.state.serverCheckUrl = healthUrl
-		options.state.serverCheckPolicyId = requestPolicyId
-		options.state.serverAvailable = false
+	if (state !== undefined) {
+		state.serverCheckUrl = healthUrl
+		state.serverCheckPolicyId = requestPolicyId
+		state.serverAvailable = false
 	} else {
 		serverCheckUrl = healthUrl
 		serverCheckPolicyId = requestPolicyId
@@ -79,6 +90,8 @@ export async function isServerRunning(serverUrl: string, options: IsServerRunnin
 	const maxAttempts = 2
 
 	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+		if (!isCurrentServerCheck(state, healthUrl, requestPolicyId)) return false
+
 		const controller = new AbortController()
 		const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
@@ -89,17 +102,11 @@ export async function isServerRunning(serverUrl: string, options: IsServerRunnin
 				signal: controller.signal,
 			}).catch(() => null)
 
+			if (!isCurrentServerCheck(state, healthUrl, requestPolicyId)) return false
+
 			if (response?.ok) {
-				if (options.state) {
-					if (
-						options.state.serverCheckUrl === healthUrl &&
-						options.state.serverCheckPolicyId === requestPolicyId
-					) {
-						options.state.serverAvailable = true
-					}
-				} else if (serverCheckUrl === healthUrl && serverCheckPolicyId === requestPolicyId) {
-					serverAvailable = true
-				}
+				if (state !== undefined) state.serverAvailable = true
+				else serverAvailable = true
 				return true
 			}
 		} finally {
