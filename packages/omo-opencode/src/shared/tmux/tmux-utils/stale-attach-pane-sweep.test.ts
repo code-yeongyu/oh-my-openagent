@@ -1,9 +1,140 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, it } from "bun:test"
-import { sweepStaleOmoAttachPanesWith, type SweepAttachPaneDeps } from "./stale-attach-pane-sweep"
+import {
+	probeHistoricalAttachServerReachability,
+	sweepStaleOmoAttachPanesWith,
+	type SweepAttachPaneDeps,
+} from "./stale-attach-pane-sweep"
 
 describe("sweepStaleOmoAttachPanesWith", () => {
+	it("#given an authenticated historical listener #when swept anonymously #then a 401 response preserves its pane", async () => {
+		const originalPassword = process.env.OPENCODE_SERVER_PASSWORD
+		const originalUsername = process.env.OPENCODE_SERVER_USERNAME
+		const authorizationHeaders: Array<string | null> = []
+		const closed: string[] = []
+		process.env.OPENCODE_SERVER_PASSWORD = "historical-ambient-password"
+		process.env.OPENCODE_SERVER_USERNAME = "historical-ambient-user"
+
+		try {
+			const result = await sweepStaleOmoAttachPanesWith({
+				isInsideTmux: () => true,
+				getTmuxPath: async () => "tmux",
+				listCandidatePanes: async () => [{
+					paneId: "%historical",
+					title: "omo-subagent-historical",
+					attachServerUrl: "http://127.0.0.1:5317",
+					commandLine: "fish",
+				}],
+				probeServerReachability: (serverUrl) => probeHistoricalAttachServerReachability(serverUrl, {
+					fetchImplementation: (async (_input: RequestInfo | URL, init?: RequestInit) => {
+						authorizationHeaders.push(new Headers(init?.headers).get("authorization"))
+						return new Response(null, { status: 401 })
+					}) as typeof fetch,
+					retryDelayMs: 0,
+				}),
+				closePane: async (paneId) => {
+					closed.push(paneId)
+					return true
+				},
+				log: () => undefined,
+			})
+
+			expect(result).toBe(0)
+			expect(authorizationHeaders).toHaveLength(1)
+			expect(authorizationHeaders.every((header) => header === null)).toBe(true)
+			expect(closed).toEqual([])
+		} finally {
+			if (originalPassword === undefined) delete process.env.OPENCODE_SERVER_PASSWORD
+			else process.env.OPENCODE_SERVER_PASSWORD = originalPassword
+			if (originalUsername === undefined) delete process.env.OPENCODE_SERVER_USERNAME
+			else process.env.OPENCODE_SERVER_USERNAME = originalUsername
+		}
+	})
+
+	it("#given a refused historical listener #when both anonymous attempts fail at transport #then its pane is closed", async () => {
+		const requests: RequestInit[] = []
+		const closed: string[] = []
+		const result = await sweepStaleOmoAttachPanesWith({
+			isInsideTmux: () => true,
+			getTmuxPath: async () => "tmux",
+			listCandidatePanes: async () => [{
+				paneId: "%refused",
+				title: "omo-subagent-refused",
+				attachServerUrl: "http://127.0.0.1:5318",
+				commandLine: "fish",
+			}],
+			probeServerReachability: (serverUrl) => probeHistoricalAttachServerReachability(serverUrl, {
+				fetchImplementation: (async (_input: RequestInfo | URL, init?: RequestInit) => {
+					requests.push(init ?? {})
+					throw new TypeError("connection refused")
+				}) as typeof fetch,
+				retryDelayMs: 0,
+			}),
+			closePane: async (paneId) => {
+				closed.push(paneId)
+				return true
+			},
+			log: () => undefined,
+		})
+
+		expect(result).toBe(1)
+		expect(requests).toHaveLength(2)
+		expect(requests.every((request) => request.redirect === "manual")).toBe(true)
+		expect(requests.every((request) => new Headers(request.headers).get("authorization") === null)).toBe(true)
+		expect(closed).toEqual(["%refused"])
+	})
+
+	it("#given direct non-success HTTP responses #when historical reachability is probed #then every response is treated as reachable", async () => {
+		for (const status of [401, 403, 503]) {
+			const result = await probeHistoricalAttachServerReachability("http://127.0.0.1:5319", {
+				fetchImplementation: (async () => new Response(null, { status })) as typeof fetch,
+				retryDelayMs: 0,
+			})
+			expect(result).toBe("reachable")
+		}
+	})
+
+	it("#given a redirecting historical listener #when reachability is probed #then the redirect response preserves the pane without contacting its target", async () => {
+		const requests: Array<{ url: string; init: RequestInit }> = []
+		const closed: string[] = []
+		const fetchImplementation = (async (input: RequestInfo | URL, init?: RequestInit) => {
+			requests.push({ url: input.toString(), init: init ?? {} })
+			return new Response(null, {
+				status: 302,
+				headers: { Location: "http://127.0.0.1:5320/redirect-target" },
+			})
+		}) as typeof fetch
+
+		const result = await sweepStaleOmoAttachPanesWith({
+			isInsideTmux: () => true,
+			getTmuxPath: async () => "tmux",
+			listCandidatePanes: async () => [{
+				paneId: "%redirect",
+				title: "omo-subagent-redirect",
+				attachServerUrl: "http://127.0.0.1:5319/source",
+				commandLine: "fish",
+			}],
+			probeServerReachability: (serverUrl) => probeHistoricalAttachServerReachability(serverUrl, {
+				fetchImplementation,
+				retryDelayMs: 0,
+			}),
+			closePane: async (paneId) => {
+				closed.push(paneId)
+				return true
+			},
+			log: () => undefined,
+		})
+
+		expect(result).toBe(0)
+		expect(requests).toHaveLength(1)
+		expect(requests[0]?.url).toBe("http://127.0.0.1:5319/global/health")
+		expect(requests[0]?.init.redirect).toBe("manual")
+		expect(requests[0]?.init.credentials).toBe("omit")
+		expect(new Headers(requests[0]?.init.headers).get("authorization")).toBeNull()
+		expect(closed).toEqual([])
+	})
+
 	it("#given stale and live OMO attach panes #when sweep called #then only panes with dead servers are closed", async () => {
 		// given
 		const closed: string[] = []
@@ -42,7 +173,7 @@ describe("sweepStaleOmoAttachPanesWith", () => {
 					commandLine: "vim README.md",
 				},
 			],
-			isServerRunning: async (serverUrl: string) => serverUrl === "http://127.0.0.1:4102/",
+			probeServerReachability: async (serverUrl: string) => serverUrl === "http://127.0.0.1:4102/" ? "reachable" : "unreachable",
 			closePane: async (paneId: string) => {
 				closed.push(paneId)
 				return true
@@ -72,7 +203,7 @@ describe("sweepStaleOmoAttachPanesWith", () => {
 					commandLine: "opencode attach http://127.0.0.1:4105 --session ses_manual",
 				},
 			],
-			isServerRunning: async () => false,
+			probeServerReachability: async () => "unreachable",
 			closePane: async (paneId: string) => {
 				closed.push(paneId)
 				return true
@@ -101,7 +232,7 @@ describe("sweepStaleOmoAttachPanesWith", () => {
 					commandLine: "opencode attach http://127.0.0.1:4103 --session ses_dead",
 				},
 			],
-			isServerRunning: async () => false,
+			probeServerReachability: async () => "unreachable",
 			closePane: async () => false,
 			log: () => undefined,
 		}
@@ -134,11 +265,11 @@ describe("sweepStaleOmoAttachPanesWith", () => {
 					commandLine: "opencode attach http://127.0.0.1:4107 --session ses_dead",
 				},
 			],
-			isServerRunning: async (serverUrl: string) => {
+			probeServerReachability: async (serverUrl: string) => {
 				if (serverUrl === "http://127.0.0.1:4106") {
 					throw new Error("bad health check")
 				}
-				return false
+				return "unreachable"
 			},
 			closePane: async (paneId: string) => {
 				closed.push(paneId)
@@ -155,7 +286,7 @@ describe("sweepStaleOmoAttachPanesWith", () => {
 		// then
 		expect(result).toBe(1)
 		expect(closed).toEqual(["%dead"])
-		expect(logged).toContain("[sweepStaleOmoAttachPanesWith] failed to check pane server health")
+		expect(logged).toContain("[sweepStaleOmoAttachPanesWith] failed to probe pane listener reachability")
 	})
 
 	it("#given team pane metadata with overwritten title and shell command line #when sweep called #then metadata server url is used", async () => {
@@ -173,9 +304,9 @@ describe("sweepStaleOmoAttachPanesWith", () => {
 					commandLine: "fish fish",
 				},
 			],
-			isServerRunning: async (serverUrl: string) => {
+			probeServerReachability: async (serverUrl: string) => {
 				checkedUrls.push(serverUrl)
-				return false
+				return "unreachable"
 			},
 			closePane: async (paneId: string) => {
 				closed.push(paneId)
@@ -233,9 +364,9 @@ describe("sweepStaleOmoAttachPanesWith", () => {
 					commandLine: "opencode attach http://localhost:4108 --session ses_local",
 				},
 			],
-			isServerRunning: async (serverUrl: string) => {
+			probeServerReachability: async (serverUrl: string) => {
 				checkedUrls.push(serverUrl)
-				return false
+				return "unreachable"
 			},
 			closePane: async (paneId: string) => {
 				closed.push(paneId)
