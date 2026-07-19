@@ -1,8 +1,13 @@
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { SENPI_ULTRAWORK_DIRECTIVE } from "./generated-directive"
 
-const ULTRAWORK_CURRENT_PROMPT_PATTERN = /(?:ultrawork|ulw)/i
+// `ulw(?!-)` keeps generous matching ("하이ulw", "ulw_helper.ts") while skipping the
+// `ulw-` skill-name family (ulw-plan, ulw-loop, ulw-research): typing a skill name
+// must not arm ultrawork mode on top of the skill itself.
+const ULTRAWORK_CURRENT_PROMPT_PATTERN = /(?:ultrawork|ulw(?!-))/i
 const ULTRAWORK_DISABLED_FLAG = "omo-senpi-ultrawork-disabled"
+const ULTRAWORK_MODE_BLOCK_MARKER = "<ultrawork-mode>"
+const SKILL_COMMAND_PREFIX = "/skill:"
 
 interface SenpiInputEvent {
   type: "input"
@@ -44,6 +49,23 @@ function handleInput(payload: unknown, ctx: ComponentContext): SenpiInputEventRe
 
   if (!isUltraworkInput(payload.text)) {
     return { action: "continue" }
+  }
+
+  // A pasted transcript (or an earlier injection) already carries the directive
+  // block; injecting again would duplicate the same ~17KB of rules in one message.
+  if (payload.text.includes(ULTRAWORK_MODE_BLOCK_MARKER)) {
+    return { action: "continue" }
+  }
+
+  // Senpi expands `/skill:name args` only while the prompt still STARTS with the
+  // command (agent-session `_expandSkillCommand`). Appending preserves that
+  // contract; prepending would silently disable native skill expansion.
+  if (payload.text.startsWith(SKILL_COMMAND_PREFIX)) {
+    return {
+      action: "transform",
+      text: `${payload.text}\n${SENPI_ULTRAWORK_DIRECTIVE}`,
+      images: payload.images,
+    }
   }
 
   return {
