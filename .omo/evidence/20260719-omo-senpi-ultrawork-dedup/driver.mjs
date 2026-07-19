@@ -120,6 +120,18 @@ function main() {
       pass: /<skill name=\\?"frontend/.test(text) && text.includes(DIRECTIVE_SENTINEL),
       detail: "expects native /skill: expansion AND the directive appended after the command",
     })),
+    runScenario(senpiBin, "skill-ultrawork-not-duplicated", "/skill:ultrawork fix this login bug", (text) => ({
+      // Expansion inlines the SKILL.md body (which IS the directive) exactly once;
+      // the hook must NOT append a second copy after the expanded block. Count
+      // <ultrawork-mode> OPEN TAGS (one per block; the sentinel line appears
+      // twice WITHIN a single directive body, so it cannot be the unit).
+      pass: /<skill name=\\?"ultrawork/.test(text) && (text.match(/<ultrawork-mode>/g)?.length ?? 0) === 1,
+      detail: "expects /skill:ultrawork to expand natively with exactly one directive block",
+    })),
+    runScenario(senpiBin, "open-tag-mention-still-arms", "Explain what <ultrawork-mode> means, then ulw this fix", (text) => ({
+      pass: text.includes(DIRECTIVE_SENTINEL),
+      detail: "expects a lone open-tag mention (no closing tag) to still inject the directive",
+    })),
   ]
 
   const afterDigest = digestConfigFiles(realSenpiAgentDir)

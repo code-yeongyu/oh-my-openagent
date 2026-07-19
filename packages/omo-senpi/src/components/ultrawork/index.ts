@@ -6,8 +6,10 @@ import { SENPI_ULTRAWORK_DIRECTIVE } from "./generated-directive"
 // must not arm ultrawork mode on top of the skill itself.
 const ULTRAWORK_CURRENT_PROMPT_PATTERN = /(?:ultrawork|ulw(?!-))/i
 const ULTRAWORK_DISABLED_FLAG = "omo-senpi-ultrawork-disabled"
-const ULTRAWORK_MODE_BLOCK_MARKER = "<ultrawork-mode>"
+const ULTRAWORK_MODE_OPEN_TAG = "<ultrawork-mode>"
+const ULTRAWORK_MODE_CLOSE_TAG = "</ultrawork-mode>"
 const SKILL_COMMAND_PREFIX = "/skill:"
+const ULTRAWORK_SKILL_NAME = "ultrawork"
 
 interface SenpiInputEvent {
   type: "input"
@@ -53,7 +55,9 @@ function handleInput(payload: unknown, ctx: ComponentContext): SenpiInputEventRe
 
   // A pasted transcript (or an earlier injection) already carries the directive
   // block; injecting again would duplicate the same ~17KB of rules in one message.
-  if (payload.text.includes(ULTRAWORK_MODE_BLOCK_MARKER)) {
+  // Require the matched tag PAIR: merely mentioning "<ultrawork-mode>" in a
+  // question must not silently disarm a legitimate trigger.
+  if (payload.text.includes(ULTRAWORK_MODE_OPEN_TAG) && payload.text.includes(ULTRAWORK_MODE_CLOSE_TAG)) {
     return { action: "continue" }
   }
 
@@ -61,6 +65,25 @@ function handleInput(payload: unknown, ctx: ComponentContext): SenpiInputEventRe
   // command (agent-session `_expandSkillCommand`). Appending preserves that
   // contract; prepending would silently disable native skill expansion.
   if (payload.text.startsWith(SKILL_COMMAND_PREFIX)) {
+    // Mirror senpi's parse exactly: skill name runs to the FIRST space (or end).
+    const spaceIndex = payload.text.indexOf(" ")
+    const skillName = spaceIndex === -1 ? payload.text.slice(SKILL_COMMAND_PREFIX.length) : payload.text.slice(SKILL_COMMAND_PREFIX.length, spaceIndex)
+    const args = spaceIndex === -1 ? "" : payload.text.slice(spaceIndex + 1)
+
+    // `/skill:ultrawork` expansion already inlines the full SKILL.md, whose body
+    // IS the directive block. Appending here would either duplicate the block
+    // (with args) or corrupt the skill name senpi parses (without args, the
+    // appended newline+directive becomes part of the name and expansion fails).
+    if (skillName === ULTRAWORK_SKILL_NAME) {
+      return { action: "continue" }
+    }
+
+    // Arm only when the user's own words (the args) carry a trigger; a trigger
+    // that appears solely inside the skill NAME must not arm the mode.
+    if (!isUltraworkInput(args)) {
+      return { action: "continue" }
+    }
+
     return {
       action: "transform",
       text: `${payload.text}\n${SENPI_ULTRAWORK_DIRECTIVE}`,

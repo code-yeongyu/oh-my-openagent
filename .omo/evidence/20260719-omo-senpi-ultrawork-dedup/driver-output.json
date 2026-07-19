@@ -24,8 +24,20 @@
       "prompt": "/skill:frontend ulw please tidy this up",
       "pass": true,
       "detail": "expects native /skill: expansion AND the directive appended after the command"
+    },
+    {
+      "name": "skill-ultrawork-not-duplicated",
+      "prompt": "/skill:ultrawork fix this login bug",
+      "pass": true,
+      "detail": "expects /skill:ultrawork to expand natively with exactly one directive block"
+    },
+    {
+      "name": "open-tag-mention-still-arms",
+      "prompt": "Explain what <ultrawork-mode> means, then ulw this fix",
+      "pass": true,
+      "detail": "expects a lone open-tag mention (no closing tag) to still inject the directive"
     }
   ],
   "realSenpiUntouched": true,
-  "senpiBin": "/home/roach/.local/bin/senpi"
+  "senpiBin": "/opt/homebrew/bin/senpi"
 }

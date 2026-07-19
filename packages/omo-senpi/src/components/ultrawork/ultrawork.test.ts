@@ -183,6 +183,52 @@ describe("omo-senpi ultrawork component", () => {
     expect(transformed).toContain("ULTRAWORK MODE ENABLED!")
   })
 
+  it("#given a lone open-tag mention without a closing tag #when trigger word dispatches #then still injects", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    await createUltraworkComponent().register(pi, createTestContext(pi))
+    const prompt = "Explain what <ultrawork-mode> means, then ulw this fix"
+
+    // when
+    const result = await dispatchInput(pi, prompt)
+    const transformed = getTransformedText(result)
+
+    // then
+    expect(transformed).toContain("ULTRAWORK MODE ENABLED!")
+    expect(markerCount(transformed)).toBe(2)
+  })
+
+  it("#given the /skill:ultrawork command itself #when dispatched #then passes through untouched", async () => {
+    // given: expansion inlines the full SKILL.md (whose body IS the directive);
+    // appending would duplicate it (with args) or corrupt the parsed skill name
+    // (without args, senpi reads the name up to the first SPACE only).
+    const prompts = ["/skill:ultrawork fix this login bug", "/skill:ultrawork"] as const
+
+    for (const prompt of prompts) {
+      const pi = new FakeExtensionAPI()
+      await createUltraworkComponent().register(pi, createTestContext(pi))
+
+      // when
+      const result = await dispatchInput(pi, prompt)
+
+      // then
+      expect(result).toEqual({ action: "continue" })
+    }
+  })
+
+  it("#given /skill: command whose trigger appears only in the skill name #when dispatched #then injects nothing", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    await createUltraworkComponent().register(pi, createTestContext(pi))
+    const prompt = "/skill:myulw run it"
+
+    // when
+    const result = await dispatchInput(pi, prompt)
+
+    // then
+    expect(result).toEqual({ action: "continue" })
+  })
+
   it("#given synced senpi skill artifact #when description is read #then documents inline injection instead of inviting a re-read", () => {
     // given
     const skillPath = resolve("packages/omo-senpi/plugin/skills/ultrawork/SKILL.md")

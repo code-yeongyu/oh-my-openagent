@@ -1,36 +1,39 @@
 # Gate outputs (worktree fix/omo-senpi-ultrawork-dedup, base origin/dev d3c72a873)
 
 ## bun run test:senpi (tail)
-(pass) omo-senpi start-work-continuation > #given zero remaining tasks but total > 0 #when agent_end fires #then still injects final-gate directive [0.25ms]
-(pass) omo-senpi start-work-continuation > #given paused work #when agent_end fires #then injects continuation directive [0.26ms]
-(pass) omo-senpi start-work-continuation > #given identical boulder signature twice #when agent_end repeats #then second is suppressed [0.25ms]
-(pass) omo-senpi start-work-continuation > #given 9 consecutive agent_end events with changing signature #when cap is 8 #then only 8 injections are delivered [0.57ms]
-(pass) omo-senpi start-work-continuation > #given cap reached #when user input arrives #then resets and continuation resumes [0.73ms]
-(pass) omo-senpi start-work-continuation > #given eligible boulder work #when user input arrives #then appends start-work steering reminder [0.22ms]
-(pass) omo-senpi start-work-continuation > #given extension-sourced input #when eligible boulder work exists #then no transform [0.18ms]
-(pass) omo-senpi start-work-continuation > #given missing session manager #when agent_end fires #then skips silently [0.14ms]
+}
 
- 230 pass
+ 233 pass
  0 fail
- 1 snapshots, 752 expect() calls
-Ran 230 tests across 47 files. [1285.00ms]
+ 1 snapshots, 758 expect() calls
+Ran 233 tests across 47 files. [2.22s]
 SENPI_EXIT=0
 
 ## bun run typecheck (exit)
 TYPECHECK_EXIT=0
 
 ## bun test (root, tail)
-packages/omo-opencode/src/hooks/keyword-detector/ultrawork/ultrawork-source-routing.test.ts:
-(pass) Ultrawork source routing > #given agent and model #then getUltraworkSource routes to the expected variant [1.94ms]
+empty-project: cold=72.1ms warm=[39.4, 38.5] median=39.4ms
+in-tree-fixture: cold=65.6ms warm=[41.8, 40.6] median=41.8ms
 
-3 tests skipped:
-(skip) team-mode live tmux smoke > #given a real caller tmux session and two mock members #when createTeamLayout runs #then teammate panes appear in the caller window and cleanup leaves the session intact
-(skip) reapLspDaemons live ownership > #given a live Windows named pipe legacy daemon #when reaping #then it defers without sending POSIX signals
-(skip) team-mode live tmux smoke > #given a real caller tmux session and two mock members #when createTeamLayout runs #then teammate panes appear in the caller window and cleanup leaves the session intact
-
- 11749 pass
+ 11750 pass
  3 skip
- 0 fail
- 2 snapshots, 29048 expect() calls
-Ran 11752 tests across 1509 files. [105.83s]
-ROOTTEST_EXIT=0
+ 2 fail
+ 2 snapshots, 29054 expect() calls
+Ran 11755 tests across 1509 files. [125.47s]
+ROOTTEST_EXIT=1
+
+Note: 2 failures in opencode-config-agents-reader.test.ts are machine-local
+(fail identically on a clean origin/dev checkout on this machine; the test's
+OPENCODE_CONFIG_DIR mock does not mask this host's real opencode config).
+They pass in CI and are unrelated to this change.
+
+## live driver (driver.mjs, real senpi binary + built plugin)
+DRIVER_EXIT=0
+result: PASS | realSenpiUntouched: True
+ - trigger-still-injects PASS
+ - ulw-plan-does-not-arm PASS
+ - pasted-block-not-reinjected PASS
+ - skill-command-appends PASS
+ - skill-ultrawork-not-duplicated PASS
+ - open-tag-mention-still-arms PASS
