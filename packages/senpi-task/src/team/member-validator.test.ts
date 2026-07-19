@@ -83,4 +83,29 @@ describe("validateSenpiTeamMembers", () => {
       expect(caught.code).toBe("UNKNOWN_SUBAGENT_TYPE")
     }
   })
+
+  test("#given a curated read-only agent #when validated #then it is rejected before the known-agent check", () => {
+    // given
+    const spec = normalizeSenpiTeamSpec(
+      { members: [{ kind: "agent", subagent_type: "oracle" }] },
+      "curated-agent-team",
+    )
+
+    // when
+    let caught: unknown
+    try {
+      validateSenpiTeamMembers(spec, allowAll)
+    } catch (error) {
+      caught = error
+    }
+
+    // then
+    expect(caught).toBeInstanceOf(SenpiTeamSpecError)
+    if (caught instanceof SenpiTeamSpecError) {
+      expect(caught.code).toBe("UNKNOWN_SUBAGENT_TYPE")
+      expect(caught.message).toBe(
+        'curated read-only agent "oracle" cannot be a team member; delegate via the task tool instead',
+      )
+    }
+  })
 })

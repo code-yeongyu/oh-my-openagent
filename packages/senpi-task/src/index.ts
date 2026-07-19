@@ -174,8 +174,21 @@ export type {
   TrustedRespawnLaunch,
   TrustedRespawnLaunchResolver,
 } from "./manager"
-export { defineAgent, loadAgents, mapOmoConfigAgents, registerAgent, resolveToolRule } from "./agents"
+export {
+  BUILTIN_AGENTS,
+  BUILTIN_AGENT_DEFAULTS,
+  CURATED_READONLY_AGENT_NAMES,
+  defineAgent,
+  loadAgents,
+  mapOmoConfigAgents,
+  registerAgent,
+  resolveAgent,
+  resolveToolRule,
+} from "./agents"
 export type {
+  AgentModelUnavailableResult,
+  AgentNotFoundResult,
+  AgentResolutionResult,
   AgentDefinition,
   AgentDefinitionInput,
   AgentLoaderDiagnostic,
@@ -183,6 +196,8 @@ export type {
   AgentToolRule,
   LoadAgentsOptions,
   LoadAgentsResult,
+  ResolveAgentOptions,
+  ResolvedAgentResult,
 } from "./agents"
 export {
   buildCompletionDetails,
