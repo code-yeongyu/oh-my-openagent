@@ -191,7 +191,8 @@ SOFTWARE.
 ## 5. Project-original files
 
 `frontend/SKILL.md`, `frontend/references/design/README.md`, `_INDEX.md`, `aside.md`,
-`design-system-architecture.md`, `react-dev-tooling-skill.md`,
+`clone-from-url.md`, `composition-skill.md`, `design-system-architecture.md`,
+`layout-skill.md`, `lazyweb.md`, `react-dev-tooling-skill.md`,
 `frontend/references/perfection/README.md`, `react-perf-tooling.md`, and
 `frontend/scripts/perfection/lighthouse-audit.py` are original to this project and require
 no third-party attribution. The perfection docs and script only invoke third-party tools
@@ -216,3 +217,21 @@ MIT-licensed `JCodesMore/ai-website-cloner-template` clone-website workflow that
 cites; no source from that template is copied. It carries no third-party attribution beyond
 that lineage note, and it grants no license to copy any target site's trademarks, brand
 assets, or proprietary copy.
+
+---
+
+## 6. Hallmark conceptual lineage
+
+`frontend/references/design/composition-skill.md` and its OMO routing draw on three
+concepts reviewed in Hallmark: page shape should fit the brief, color-only structural
+reuse is not meaningful variety, and proof-shaped content must use real inputs. OMO
+expresses those ideas as an evolvable `DESIGN.md` outcome and existing visual QA
+evidence. It does not copy Hallmark files, prose, macrostructure catalogs, checklists,
+runtime state, theme rotation, or generated examples.
+
+- Source: https://github.com/nutlope/hallmark
+- Reviewed commit: aeb42fb354ff4efa36ab475773a082315a3af2ce
+- Source license: MIT
+
+This section records conceptual provenance. Hallmark is not a materialized dependency
+or a separately routed skill in OMO.

@@ -9,7 +9,7 @@ Every frontend project MUST have a `DESIGN.md` at its root. This file is the sin
 
 ## When to Create
 
-- **New project**: If the user gave no concrete visual reference, select one Layer A style skill and one Layer B brand/design-system reference first. Treat them as source material for tokens, layout, component anatomy, states, motion, and taste; customize for the user's product without freestyling past the selected references. Then create `DESIGN.md` before UI, with Section 5 primitives and states defined before implementation.
+- **New project**: Route by surface. Marketing, editorial, portfolio, and discovery work selects one Layer A style skill and one Layer B brand/design-system reference. Operational product UI uses the `taste-skill.md` **Brief to Design System Map** only to choose an official design system, then pairs it with `layout-skill.md`. For an applicable multi-section page, let approved content, proof inputs, and layout research establish a Page Structure outcome and keep it aligned if the visual concept evolves. Treat these inputs as source material for tokens, layout, component anatomy, states, motion, and taste. Complete `DESIGN.md` before UI, with Section 5 primitives and states defined before implementation.
 - **Existing project without one, but with implicit patterns/components**: Extract the design system from existing code before continuing work.
 - **Existing project without one and without a reusable component layer**: Ask whether to preserve the current look with copy-nearby styling or extract a `DESIGN.md` plus reusable components first. Do not silently choose.
 - **Existing project with one**: Read it. Follow it. Update it only when a genuinely new pattern emerges.
@@ -24,8 +24,9 @@ The file has 8 sections plus a greenfield-only `## 0. Research Log`. Every secti
 ## 0. Research Log (greenfield only)
 
 One line per research lane, written before the sections below — a lane with no line did not run:
-- Embedded refs: shortlisted [2-3 Layer B candidates] → picked [Layer A] + [Layer B] because [reason]
+- Embedded refs: [surface route] + [shortlist or official design system] -> [selected references and reason]
 - Lazyweb: [N] queries, [M] screens viewed → [layout grammar taken]
+- Content/composition: [approved decision path] + [proof inputs] -> [Page Structure outcome or exemption]
 - Imagen drafts: [paths] → picked [draft] as the reference-fidelity contract
 - Skipped lanes: [lane] — [tool/network reason]
 
@@ -119,6 +120,16 @@ All spacing derives from a base of **4px**.
 - Tokenize design *intent* — spacing steps, content width, gutters, section gaps, density steps. Keep browser *mechanics* raw: `auto`, `%`, `min-content`, `max-content`, `fit-content`, `clamp()`, viewport/container units, intrinsic sizing. A `clamp(1rem, 4vw, 2rem)` gap or a `minmax(min(16rem, 100%), 1fr)` track is mechanics, not a magic number — do not force it into a token.
 - Asymmetric spacing is intentional, not accidental — document why.
 
+### Page Structure
+
+For each new or substantially restructured multi-section marketing, editorial, portfolio, or discovery route without a user-supplied exact visual reference, describe the intended page-level outcome. Approved content and layout research shape this record; revise it when a concept legitimately changes the composition.
+
+| Route or family | Content decision path | Dominant composition | Nav/footer voice | Proof basis | Reuse rationale |
+|-----------------|-----------------------|----------------------|------------------|-------------|-----------------|
+| /route | hook > explain > prove > convert | editorial spine with evidence rail | compact utility nav; resource-led footer | supplied or cited inputs, explicitly labeled non-production placeholder removed before production, or omitted | distinct from a comparable route, or a concrete reason for parity |
+
+This is an outcome record, not a fixed layout catalog or a per-step checklist. Compare only routes with similar purpose, audience, and content scale. Color, font, illustration, and copy changes alone are not structural differentiation. Component-only work, app shells, exact-reference reproduction, and intentional template families use the exemptions defined in `composition-skill.md`.
+
 ## 5. Components
 
 Document reusable patterns before implementation for greenfield work, and as they emerge or are extracted for existing work. Format:
@@ -193,8 +204,8 @@ New debt is recorded here at the moment it is accepted — never silently.
 
 ### For New Projects
 
-1. **Select references before taste** — no visual reference means `_INDEX.md` shortlist of 2-3 Layer B candidates, then exactly one Layer A style skill and one Layer B brand/design-system reference. Use `open-design` only when the curated set has no fit.
-2. **Assemble from references** — extract tokens, layout grammar, component anatomy, states, motion, and taste decisions, then recombine them into project-specific primitives. Customize for the user's product; never copy logos, trademarked assets, or brand-specific copy.
+1. **Route references by surface**: marketing, editorial, portfolio, and discovery work uses an `_INDEX.md` shortlist, exactly one Layer A style skill, and one Layer B reference. Operational product UI chooses an official design system through the `taste-skill.md` map and pairs it with `layout-skill.md`. Query a configured local Open Design service only when built-in OMO curation has no suitable fit or the user explicitly requests Open Design.
+2. **Assemble from references**: extract tokens, layout grammar, component anatomy, states, motion, and taste decisions, then recombine them into project-specific primitives. For an applicable multi-section page, describe the current Page Structure outcome from approved content, proof inputs, comparable routes, and layout research. Customize for the user's product; never copy logos, trademarked assets, brand-specific copy, or unsupported proof claims.
 3. **Define the system** — atmosphere, palette, typography, spacing, and one depth strategy, grounded in the selected references and product semantics. Sanity-check the palette and type pairing with one `ui-ux-db` domain search (CLI in `references/ui-ux-db/README.md`).
 4. **Document initial primitives** — only components you are about to build, including variants and states.
 5. **Write it to `DESIGN.md`** at project root.
@@ -223,6 +234,7 @@ After every component implementation, check:
 - [ ] Component visual QA passed for each primitive and required state before product screens were composed.
 - [ ] Section 8 accessibility constraints hold for the new component; any new debt is recorded in Section 8, not silently accepted.
 - [ ] Survives content stress: empty, long label, unbroken string. Reflows to one readable column at 375px with no horizontal scroll of primary content.
+- [ ] For an applicable page, the current Page Structure row, DOM order, dominant composition, nav/footer behavior, and responsive captures agree; proof-shaped claims trace to supplied or cited inputs.
 
 ## Memory Management
 
@@ -232,6 +244,7 @@ After every component implementation, check:
 - Color added to serve a genuine new semantic role → add to Section 2
 - Spacing token insufficient for a real need → add to Section 4
 - User explicitly changes direction ("make it warmer", "go brutalist")
+- Eligible route or intentional template family added or substantially restructured -> add or update its Page Structure row
 
 ### When NOT to Update
 

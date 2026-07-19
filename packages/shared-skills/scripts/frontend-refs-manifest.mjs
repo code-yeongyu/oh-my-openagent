@@ -12,6 +12,7 @@ export const designOriginals = [
 	"_INDEX.md",
 	"aside.md",
 	"clone-from-url.md",
+	"composition-skill.md",
 	"design-system-architecture.md",
 	"layout-skill.md",
 	"lazyweb.md",
