@@ -1,0 +1,9 @@
+# `bun run build` (tail, exit=0)
+
+Bundling components/ulw-loop/dist/cli.js
+Bundled 34 modules in 8ms
+
+  cli.js  133.27 KB  (entry point)
+
+build:declarations
+build: all steps completed
