@@ -275,4 +275,47 @@ describe("LspClient diagnostics freshness", () => {
 		expect(elapsedMs).toBeGreaterThanOrEqual(45);
 	});
 
+	it("#given a pull-supported server that cached diagnostics for an older document version #when the file changes and a later pull is rejected as unsupported without any publish #then the fallback resolves empty instead of returning the stale cached diagnostics", async () => {
+		const context = await harness.makeClient(
+			{
+				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
+				diagnosticResponses: [
+					{ report: { kind: "full", resultId: "v1", items: [diagnostic("stale-pull")] } },
+					{ error: { code: -32601, message: "Method not found" } },
+				],
+			},
+			{ diagnosticsFreshnessTimeoutMs: 60, versionlessPublishQuiescenceMs: 5 },
+		);
+
+		const first = await context.client.diagnostics(context.source);
+		expect(first.items).toEqual([diagnostic("stale-pull")]);
+
+		writeFileSync(context.source, "const changed = 1;\n");
+		await context.client.openFile(context.source);
+
+		const second = await context.client.diagnostics(context.source);
+		expect(second.transientError).toBeUndefined();
+		expect(second.items).toEqual([]);
+	});
+
+	it("#given a pull-supported server with a current cached pull report #when a later pull is rejected as unsupported without any publish and the document is unchanged #then the fallback resolves with the current cached diagnostics", async () => {
+		const context = await harness.makeClient(
+			{
+				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
+				diagnosticResponses: [
+					{ report: { kind: "full", resultId: "v1", items: [diagnostic("cached-full")] } },
+					{ error: { code: -32601, message: "Method not found" } },
+				],
+			},
+			{ diagnosticsFreshnessTimeoutMs: 60, versionlessPublishQuiescenceMs: 5 },
+		);
+
+		const first = await context.client.diagnostics(context.source);
+		expect(first.items).toEqual([diagnostic("cached-full")]);
+
+		const second = await context.client.diagnostics(context.source);
+		expect(second.transientError).toBeUndefined();
+		expect(second.items).toEqual([diagnostic("cached-full")]);
+	});
+
 });
