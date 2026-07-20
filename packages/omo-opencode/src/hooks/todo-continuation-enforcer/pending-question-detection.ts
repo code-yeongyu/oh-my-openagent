@@ -32,6 +32,39 @@ function isUnansweredQuestionTool(part: MessagePart): boolean {
   return part.state?.status !== "completed"
 }
 
+function getLastTextTail(part: MessagePart): string {
+  if (part.type !== "text" || typeof part.text !== "string") return ""
+  return part.text.trimEnd()
+}
+
+function lastTextEndsWithQuestion(messages: Message[]): boolean {
+  if (!messages || messages.length === 0) return false
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    const role = msg.info?.role ?? msg.role
+
+    if (role === "user") {
+      if (isSyntheticOrInternalUserMessage(msg)) {
+        continue
+      }
+      return false
+    }
+
+    if (role === "assistant" && msg.parts) {
+      for (let j = msg.parts.length - 1; j >= 0; j--) {
+        const part = msg.parts[j]
+        if (part.type === "text" && typeof part.text === "string") {
+          return getLastTextTail(part).endsWith("?")
+        }
+      }
+      return false
+    }
+  }
+
+  return false
+}
+
 export function hasUnansweredQuestion(messages: Message[]): boolean {
   if (!messages || messages.length === 0) return false
 
@@ -54,6 +87,10 @@ export function hasUnansweredQuestion(messages: Message[]): boolean {
       )
       if (hasQuestion) {
         log(`[${HOOK_NAME}] Detected pending question tool in last assistant message`)
+        return true
+      }
+      if (lastTextEndsWithQuestion([msg])) {
+        log(`[${HOOK_NAME}] Detected pending text question in last assistant message`)
         return true
       }
       return false

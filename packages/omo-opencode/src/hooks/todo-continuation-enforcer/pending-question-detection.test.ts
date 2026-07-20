@@ -172,4 +172,69 @@ describe("hasUnansweredQuestion", () => {
     ]
     expect(hasUnansweredQuestion(messages)).toBe(true)
   })
+
+  test("#given last assistant message with text ending in question mark #when checking pending question #then returns true (issue #5548)", () => {
+    const messages = [
+      { info: { role: "user" } },
+      {
+        info: { role: "assistant" },
+        parts: [
+          {
+            type: "text",
+            text: "Please provide the preferred date and time?",
+          },
+        ],
+      },
+    ]
+    expect(hasUnansweredQuestion(messages)).toBe(true)
+  })
+
+  test("#given last assistant message with multi-line text ending in question mark #when checking pending question #then returns true (issue #5548)", () => {
+    const messages = [
+      { info: { role: "user" } },
+      {
+        info: { role: "assistant" },
+        parts: [
+          {
+            type: "text",
+            text: "I have a couple of questions before I continue.\n\nWhat time works best for you?",
+          },
+        ],
+      },
+    ]
+    expect(hasUnansweredQuestion(messages)).toBe(true)
+  })
+
+  test("#given last assistant message with text NOT ending in question mark #when checking pending question #then returns false (issue #5548)", () => {
+    const messages = [
+      { info: { role: "user" } },
+      {
+        info: { role: "assistant" },
+        parts: [
+          {
+            type: "text",
+            text: "I am going to start working on this now.",
+          },
+        ],
+      },
+    ]
+    expect(hasUnansweredQuestion(messages)).toBe(false)
+  })
+
+  test("#given last assistant message with both text question and tool #when checking pending question #then returns true (issue #5548)", () => {
+    const messages = [
+      { info: { role: "user" } },
+      {
+        info: { role: "assistant" },
+        parts: [
+          { type: "tool_use", name: "bash" },
+          {
+            type: "text",
+            text: "I checked the calendar. What time works for you?",
+          },
+        ],
+      },
+    ]
+    expect(hasUnansweredQuestion(messages)).toBe(true)
+  })
 })
