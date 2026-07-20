@@ -4,7 +4,7 @@ import { dirname, join } from "node:path"
 import type { BoulderPauseReason, BoulderPauseState, BoulderState, BoulderWorkState } from "../types"
 import { getBoulderFilePath } from "./path"
 import { getPlanName } from "./plan-progress"
-import { getBoulderWorks, readBoulderState } from "./read-state"
+import { getBoulderWorks, getWorkForSession, readBoulderState } from "./read-state"
 import { getElapsedMs, normalizeSessionId, nowIsoString, projectWorkToMirror } from "./shared"
 
 export function writeBoulderState(directory: string, state: BoulderState): boolean {
@@ -119,14 +119,22 @@ export function setBoulderPause(
     created_at: input.createdAt ?? now,
   }
 
-  state.pause = pause
-  state.updated_at = now
-  if (state.active_work_id) {
-    const work = state.works?.[state.active_work_id]
-    if (work) {
-      work.pause = pause
-      work.updated_at = now
+  // Persist on the work owning the session; mirror only when that work is active,
+  // otherwise selecting the owning work later would drop the pause.
+  const owningWorkId = getWorkForSession(directory, input.sessionId)?.work_id
+  const targetWork = owningWorkId ? state.works?.[owningWorkId] : undefined
+
+  if (targetWork) {
+    targetWork.pause = pause
+    targetWork.updated_at = now
+    if (state.active_work_id === owningWorkId) {
+      state.pause = pause
+      state.updated_at = now
     }
+  } else {
+    // Legacy single-work state: pause lives only on the top-level mirror.
+    state.pause = pause
+    state.updated_at = now
   }
 
   return writeBoulderState(directory, state) ? state : null
@@ -142,18 +150,26 @@ export function clearBoulderPause(
   }
 
   const normalizedSessionId = normalizeSessionId(input.sessionId)
-  const activeWork = state.active_work_id ? state.works?.[state.active_work_id] : undefined
-  const pause = activeWork?.pause ?? state.pause
+  const owningWorkId = getWorkForSession(directory, input.sessionId)?.work_id
+  const targetWork = owningWorkId ? state.works?.[owningWorkId] : undefined
+
+  // Match the lookup path used by isBoulderPausedForSession() so clear/set stay symmetric.
+  const pause = targetWork?.pause ?? state.pause
   if (pause?.reason !== input.reason || pause.session_id !== normalizedSessionId) {
     return state
   }
 
   const now = nowIsoString()
-  delete state.pause
-  state.updated_at = now
-  if (activeWork) {
-    delete activeWork.pause
-    activeWork.updated_at = now
+  if (targetWork) {
+    delete targetWork.pause
+    targetWork.updated_at = now
+    if (state.active_work_id === owningWorkId) {
+      delete state.pause
+      state.updated_at = now
+    }
+  } else {
+    delete state.pause
+    state.updated_at = now
   }
 
   return writeBoulderState(directory, state) ? state : null
