@@ -540,6 +540,111 @@ describe("pollSyncSession", () => {
     })
   })
 
+  describe("busy status does not hide real staleness", () => {
+    test("#given status stays busy forever with no message progress #when polling #then poll_timeout still fires", async () => {
+      // given
+      const { pollSyncSession } = require("./sync-session-poller")
+      __setTimingConfig({
+        POLL_INTERVAL_MS: 5,
+        MIN_STABILITY_TIME_MS: 0,
+        STABILITY_POLLS_REQUIRED: 1,
+        MAX_POLL_TIME_MS: 50,
+        BUSY_PROGRESS_RECHECK_MS: 5,
+      })
+      let abortCount = 0
+      const frozenMessages = {
+        data: [
+          { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+          {
+            info: { id: "msg_002", role: "assistant", time: { created: 2000 } },
+            parts: [{ type: "text", text: "still thinking" }],
+          },
+        ],
+      }
+      const mockClient = {
+        session: {
+          messages: async () => frozenMessages,
+          status: async () => ({ data: { ses_stuck: { type: "busy" } } }),
+          abort: async () => {
+            abortCount++
+          },
+        },
+      }
+
+      // when
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_stuck",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+      })
+
+      // then: a session.status() that never stops reporting "busy" must not
+      // be able to suppress the timeout forever when the message stream is
+      // frozen -- this is the real-world hang this fix targets.
+      expect(abortCount).toBe(1)
+      expect(result).toContain("Poll inactivity timeout reached")
+    })
+
+    test("#given status stays busy but message content genuinely grows #when polling #then the clock keeps resetting and no timeout fires", async () => {
+      // given
+      const { pollSyncSession } = require("./sync-session-poller")
+      __setTimingConfig({
+        POLL_INTERVAL_MS: 5,
+        MIN_STABILITY_TIME_MS: 0,
+        STABILITY_POLLS_REQUIRED: 1,
+        MAX_POLL_TIME_MS: 30,
+        BUSY_PROGRESS_RECHECK_MS: 1,
+      })
+      let abortCount = 0
+      let statusCallCount = 0
+      const mockClient = {
+        session: {
+          messages: async () => {
+            const growing = statusCallCount
+            return {
+              data: [
+                { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+                {
+                  info: {
+                    id: "msg_002",
+                    role: "assistant",
+                    time: { created: 2000 },
+                    ...(growing >= 20 ? { finish: "end_turn" } : {}),
+                  },
+                  parts: [{ type: "text", text: "x".repeat(growing + 1) }],
+                },
+              ],
+            }
+          },
+          status: async () => {
+            statusCallCount++
+            return { data: { ses_progressing: { type: statusCallCount >= 20 ? "idle" : "busy" } } }
+          },
+          abort: async () => {
+            abortCount++
+          },
+        },
+      }
+
+      // when
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_progressing",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+      })
+
+      // then: the growing text length kept resetting the inactivity clock on
+      // every busy recheck despite total elapsed time exceeding
+      // MAX_POLL_TIME_MS -- the loop only ends because status finally went
+      // idle with a terminal finish, never because it was treated as stale.
+      expect(abortCount).toBe(0)
+      expect(statusCallCount).toBeGreaterThanOrEqual(20)
+      expect(result).toBeNull()
+    })
+  })
+
   describe("isSessionComplete edge cases", () => {
     test("returns false when messages array is empty", () => {
       const { isSessionComplete } = require("./sync-session-poller")
