@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
 import type { TaskRecord } from "../state"
+import { TaskIdSpaceExhaustedError } from "../state/id"
 import { claimTaskRecord } from "./claim"
 import { TaskRecordCollisionError, createTaskRecordStore } from "./record-store"
 import { resolveStateDir } from "./state-dir"
@@ -80,6 +81,38 @@ describe("claimTaskRecord", () => {
 
     // then
     expect(claimed.name).toBe(claimed.task_id)
+  })
+
+  test("#given an unavailable id-derived name #when a draft is claimed #then it skips to the next available id and name", () => {
+    // given
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+
+    // when
+    const claimed = claimTaskRecord(store, baseRecord("st_00000010"), {
+      nameFollowsId: true,
+      nameAvailable: (name) => name !== "st_00000010",
+    })
+
+    // then
+    expect(claimed.task_id).toBe("st_00000011")
+    expect(claimed.name).toBe("st_00000011")
+  })
+
+  test("#given unavailable id-derived names exhaust the attempt budget #when a draft is claimed #then it throws task-id space exhaustion", () => {
+    // given
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+
+    // when
+    const claim = () => claimTaskRecord(store, baseRecord("st_00000010"), {
+      maxAttempts: 2,
+      nameFollowsId: true,
+      nameAvailable: () => false,
+    })
+
+    // then
+    expect(claim).toThrow(TaskIdSpaceExhaustedError)
   })
 
   test("#given a task-id-shaped requested name #when the draft is bumped without nameFollowsId #then its name is preserved verbatim", () => {

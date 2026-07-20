@@ -52,7 +52,12 @@ function replaceFailsOnceStore(
   }
 }
 
-function managerWithStore(store: TaskRecordStore, inProcess = new FakeRunner(), process = new FakeRunner()) {
+function managerWithStore(
+  store: TaskRecordStore,
+  inProcess = new FakeRunner(),
+  process = new FakeRunner(),
+  now?: () => number,
+) {
   const project = tempProject()
   const manager = createTaskManager({
     store,
@@ -60,6 +65,7 @@ function managerWithStore(store: TaskRecordStore, inProcess = new FakeRunner(), 
     planner: categoryPlanner(),
     config: settings({ default_concurrency: 5, max_depth: 1 }),
     cwd: project,
+    ...(now === undefined ? {} : { now }),
   })
   return { manager, inProcess, process }
 }
@@ -105,6 +111,37 @@ describe("TaskManager claim characterization", () => {
     if (result.kind !== "started") throw new Error("expected started")
     expect(result.name).toBe("reviewer-2")
     expect(result.name_warning).toBeDefined()
+  })
+
+  test("#given an id-shaped requested name #when an unnamed task claims its fallback #then every saved sibling name is unique", async () => {
+    // given
+    const project = tempProject()
+    const inner = createTaskRecordStore({ project_dir: project })
+    const invariantStore: TaskRecordStore = {
+      ...inner,
+      save(record) {
+        for (const sibling of inner.list().records) {
+          if (sibling.parent_session_id === record.parent_session_id && sibling.name === record.name) {
+            throw new Error(`duplicate task name persisted: ${record.name}`)
+          }
+        }
+        inner.save(record)
+      },
+    }
+    const clock = () => (Math.floor(Date.now() / 65_536) + 1_000_000) * 65_536
+    const firstTaskId = `st_${Math.floor(clock() / 65_536).toString(16).padStart(8, "0")}`
+    const { manager } = managerWithStore(invariantStore, new FakeRunner(), new FakeRunner(), clock)
+
+    // when
+    const first = await manager.start(baseSpec({ name: bumpTaskId(firstTaskId as `st_${string}`) }))
+    const second = await manager.start(baseSpec())
+
+    // then
+    if (first.kind !== "started" || second.kind !== "started") throw new Error("expected both tasks to start")
+    expect(first.task_id).toBe(firstTaskId)
+    expect(first.name).toBe(bumpTaskId(firstTaskId as `st_${string}`))
+    expect(second.task_id).toBe(bumpTaskId(first.name as `st_${string}`))
+    expect(second.name).toBe(second.task_id)
   })
 
   test("#given a background spec #when started #then the manager tracks its task as background", async () => {

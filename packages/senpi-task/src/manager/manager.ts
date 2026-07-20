@@ -198,7 +198,12 @@ class TaskManagerImpl implements TaskManager {
     try {
       const draft = createTaskRecord(buildRecordInput({ spec, plan, name: "", executionMode }), this.#now())
       const claimDraft: TaskRecord = { ...draft, name: requestedRegistration?.name ?? draft.task_id }
-      claimed = claimTaskRecord(this.#options.store, claimDraft, { nameFollowsId: requestedRegistration === undefined })
+      claimed = claimTaskRecord(this.#options.store, claimDraft, {
+        nameFollowsId: requestedRegistration === undefined,
+        ...(requestedRegistration === undefined
+          ? { nameAvailable: (name) => this.#names.isAvailable(spec.parent_session_id, name) }
+          : {}),
+      })
     } catch (error) {
       if (!(error instanceof TaskRecordCollisionError) && !(error instanceof TaskIdSpaceExhaustedError)) throw error
       if (requestedRegistration !== undefined) this.#names.release(spec.parent_session_id, requestedRegistration.name)
