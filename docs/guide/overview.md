@@ -41,7 +41,7 @@ We used to call this "Claude Code on steroids." That was wrong.
 
 This isn't about making Claude Code better. It's about breaking free from the idea that one model, one provider, one way of working is enough. Anthropic wants you locked in. OpenAI wants you locked in. Everyone wants you locked in.
 
-Oh My OpenAgent doesn't play that game. It orchestrates across models, picking the right brain for the right job. Claude for orchestration. GPT for deep reasoning. Gemini for frontend. GPT-5.4 Mini for quick tasks. All working together, automatically.
+Oh My OpenAgent doesn't play that game. It orchestrates across models, picking the right brain for the right job. Claude-like models for orchestration and communicative fallback. GPT for deep specialist work. Gemini for frontend. GPT-5.4 Mini for quick tasks. All working together, automatically.
 
 ---
 
@@ -87,21 +87,23 @@ Sisyphus is your main orchestrator. He plans, delegates to specialists, and driv
 - **Kimi K2.6** / **K2.5** — Great Claude-like alternatives. K2.6 is the current default fallback in the primary Sisyphus chain after K3; many users run K2.6 or the K2.5/K2.6 combo exclusively.
 - **GLM 5** — Solid option, especially via Z.ai. **GLM 5.2 is experimental:** Sisyphus uses a GLM-5.2-calibrated prompt for model IDs recognized as GLM, but current evidence is one community report without maintainer end-to-end validation. The automatic chain is configured with `glm-5`, and fuzzy availability matching may resolve that entry to GLM 5.1 or GLM 5.2.
 
-Sisyphus works best on Claude Opus 4.8 / 4.7, Kimi K3 / K2.6 (or K2.5), and GLM 5. GPT-5.4 and GPT-5.5 now have dedicated prompt paths, but older GPT models are still a poor fit and should route to Hephaestus instead.
+Sisyphus works best on Claude Opus 4.8 / 4.7, Kimi K3 / K2.6 (or K2.5), and GLM 5. GPT-5.4 and GPT-5.5 have dedicated Sisyphus prompt paths, so they are supported compatibility options, not the preferred orchestrator default. Older GPT models remain a poor fit; use Hephaestus when you want a GPT-native autonomous agent.
 
 ### Hephaestus: The Legitimate Craftsman
 
 Named with intentional irony. Anthropic blocked OpenCode from using their API because of this project. So the team built an autonomous GPT-native agent instead.
 
-Hephaestus prefers GPT-5.6 Sol at medium effort through OpenAI or Vercel, then falls back to GPT-5.5 at medium effort across OpenAI, GitHub Copilot, OpenCode, or Vercel. Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding.
+Hephaestus prefers GPT-5.6 Sol with the `high` variant through OpenAI, GitHub Copilot, or Vercel, while the agent keeps `reasoningEffort: medium`. It then falls back to GPT-5.5 with the `medium` variant across OpenAI, GitHub Copilot, OpenCode, or Vercel. Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding.
 
 Use Hephaestus when you need deep architectural reasoning, complex debugging across many files, or cross-domain knowledge synthesis. Switch to him explicitly when the work benefits from a GPT-native autonomous agent.
+
+The `deep` category is an orchestrator-routed task executed by Sisyphus-Junior with a category prompt and category-scoped permissions. Hephaestus is a primary agent that you select directly, with its own GPT-native prompt, agent permissions, and direct-session behavior. Choose Hephaestus when that complete agent behavior matters, not merely a deep model assignment.
 
 **Why this beats vanilla Codex CLI:**
 
 - **Multi-model orchestration.** Pure Codex is single-model. OmO routes different tasks to different models automatically. GPT for deep reasoning. Gemini for frontend. GPT-5.4 Mini for speed. The right brain for the right job.
 - **Background agents.** Fire 5+ agents in parallel. Something Codex simply cannot do. While one agent writes code, another researches patterns, another checks documentation. Like a real dev team.
-- **Category system.** Tasks are routed by intent, not model name. `visual-engineering` gets Gemini. `ultrabrain` prefers GPT-5.6 Sol xhigh through OpenAI or Vercel. `deep` prefers GPT-5.6 Terra xhigh through OpenAI or Vercel. `artistry` gets Gemini. `quick` gets GPT-5.4 Mini. `unspecified-low` prefers GPT-5.6 Luna xhigh. `unspecified-high` gets Claude Opus. `writing` gets prose-optimized models. No manual juggling.
+- **Category system.** Tasks are routed by intent, not model name. `visual-engineering` gets Gemini. `ultrabrain` prefers GPT-5.6 Sol `xhigh` through OpenAI or Vercel, or `high` through GitHub Copilot. `deep` prefers GPT-5.6 Terra `xhigh` through OpenAI or Vercel, or `high` through GitHub Copilot. `artistry` gets Gemini. `quick` gets GPT-5.4 Mini. `unspecified-low` prefers GPT-5.6 Luna `xhigh` through OpenAI or Vercel, or `high` through GitHub Copilot. `unspecified-high` gets Claude Opus. `writing` gets prose-optimized models. No manual juggling.
 - **Accumulated wisdom.** Subagents learn from previous results. Conventions discovered in task 1 are passed to task 5. Mistakes made early aren't repeated. The system gets smarter as it works.
 
 ### Prometheus: The Strategic Planner
@@ -154,7 +156,9 @@ Use Prometheus for multi-day projects, critical production changes, complex refa
 
 ## Agent Model Matching
 
-Different agents work best with different models. Oh My OpenAgent automatically assigns optimal models, but you can customize everything.
+Different agents work best with different models. Oh My OpenAgent automatically assigns optimal models, but you can customize everything. Keep orchestration and general high-effort fallback on Claude-like models; route deep autonomous specialist work through GPT-native categories or Hephaestus.
+
+Read the [Agent-Model Matching Guide](./agent-model-matching.md) before overriding Sisyphus, `unspecified-high`, `deep`, or Hephaestus. It explains the supported compatibility paths, preferred defaults, and provider priority chains.
 
 ### Default Configuration
 
@@ -195,7 +199,8 @@ You can override specific agents or categories in your config:
     // Hard logic and architecture: GPT-5.6 Sol xhigh
     "ultrabrain": { "model": "openai/gpt-5.6-sol", "variant": "xhigh" },
 
-    // Autonomous research and execution
+    // GPT-native delegated category. Use Hephaestus when you need a directly
+    // selected primary agent with its own prompt and permissions.
     "deep": { "model": "openai/gpt-5.6-terra", "variant": "xhigh" },
 
     // Creative and design work
@@ -207,7 +212,8 @@ You can override specific agents or categories in your config:
     // Low-effort fallback: cheapest available
     "unspecified-low": { "model": "openai/gpt-5.4-mini" },
 
-    // High-effort fallback: best available
+    // General high-effort fallback: communicative Claude-like behavior.
+    // Route GPT-native specialist work to deep/ultrabrain/Hephaestus.
     "unspecified-high": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
 
     // Prose and documentation
@@ -226,9 +232,9 @@ You can override specific agents or categories in your config:
 
 **GPT models** (explicit reasoning, principle-driven):
 
-- GPT-5.6 Sol — preferred for Hephaestus and `ultrabrain` when OpenAI or Vercel exposes it; first fallback for `deep`
-- GPT-5.6 Terra — mid-tier; default for the `deep` category (xhigh); preferred for Momus (high)
-- GPT-5.6 Luna — light tier; default for the `unspecified-low` category (xhigh)
+- GPT-5.6 Sol — preferred for Hephaestus (`high`) through OpenAI, GitHub Copilot, or Vercel; preferred for `ultrabrain` (`xhigh` through OpenAI or Vercel, `high` through GitHub Copilot); first fallback for `deep` (`high`)
+- GPT-5.6 Terra — mid-tier; default for `deep` (`xhigh` through OpenAI or Vercel, `high` through GitHub Copilot); preferred for Momus (`high`)
+- GPT-5.6 Luna — light tier; default for `unspecified-low` (`xhigh` through OpenAI or Vercel, `high` through GitHub Copilot)
 - GPT-5.5 — deep coding powerhouse, default for Oracle and the first GPT fallback for GPT-5.6-native roles
 - GPT-5.4 Mini — fast and cheap utility tasks
 

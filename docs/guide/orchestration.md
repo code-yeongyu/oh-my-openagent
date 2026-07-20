@@ -499,7 +499,7 @@ Atlas is automatically activated when you run `/start-work`. You don't need to m
 
 | Aspect          | Hephaestus                                 | Sisyphus + `ulw` / `ultrawork`                       |
 | --------------- | ------------------------------------------ | ---------------------------------------------------- |
-| **Model**       | `gpt-5.6-sol` (`medium`) when available, then `gpt-5.5` (`medium`) | `claude-opus-4-7` / `kimi-k2.6` / `gpt-5.5` / `glm-5` depending on setup |
+| **Model**       | `gpt-5.6-sol` (`high` variant, `reasoningEffort: medium`) when available, then `gpt-5.5` (`medium`) | `claude-opus-4-7` / `kimi-k2.6` / `gpt-5.5` / `glm-5` depending on setup |
 | **Approach**    | Autonomous deep worker                     | Keyword-activated ultrawork mode                     |
 | **Best For**    | Complex architectural work, deep reasoning | General complex tasks, "just do it" scenarios        |
 | **Planning**    | Self-plans during execution                | Uses Prometheus plans if available                   |
@@ -523,7 +523,7 @@ Switch to Hephaestus (Tab → Select Hephaestus) when:
    - "Migrate from MongoDB to PostgreSQL with zero downtime"
 
 4. **You specifically want GPT-native autonomous reasoning**
-   - Hephaestus prefers GPT-5.6 Sol when OpenAI or Vercel exposes it and retains GPT-5.5 as the broad fallback
+   - Hephaestus prefers GPT-5.6 Sol when OpenAI, GitHub Copilot, or Vercel exposes it and retains GPT-5.5 as the broad fallback
 
 **When to Use Sisyphus + `ulw`:**
 

@@ -57,8 +57,9 @@
     // Standard coding tasks: good quality, fast
     "unspecified-low": { "model": "openai/gpt-5.6-luna", "variant": "xhigh" },
 
-    // Complex refactors: best quality
-    "unspecified-high": { "model": "openai/gpt-5.5" },
+    // Complex general fallback: keep this communicative and Claude-like.
+    // Route purely deep GPT specialist work to deep/ultrabrain or Hephaestus.
+    "unspecified-high": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
 
     // Visual work
     "visual-engineering": { "model": "google/gemini-3.1-pro", "variant": "high" },

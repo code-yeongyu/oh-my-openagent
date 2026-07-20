@@ -67,10 +67,11 @@
 
     "unspecified-low": { "model": "openai/gpt-5.6-luna", "variant": "xhigh" },
 
-    // High-effort planning tasks: maximum reasoning
+    // High-effort planning fallback: communicative Claude-like behavior.
+    // Use ultrabrain/deep or Hephaestus for GPT-native specialist reasoning.
     "unspecified-high": {
-      "model": "openai/gpt-5.5",
-      "variant": "xhigh",
+      "model": "anthropic/claude-opus-4-7",
+      "variant": "max",
     },
 
     // Documentation from plans
