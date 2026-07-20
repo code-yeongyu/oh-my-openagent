@@ -44,7 +44,8 @@ export function createChatMessageHandler(deps: HookDeps) {
       config.restore_primary_after_cooldown &&
       state.currentModel !== state.originalModel &&
       !state.pendingFallbackModel &&
-      !isModelInCooldown(state.originalModel, state, config.cooldown_seconds)
+      !isModelInCooldown(state.originalModel, state, config.cooldown_seconds) &&
+      !state.failedModels.has(state.originalModel)
     ) {
       const activeModel = state.originalModel
       log(`[${HOOK_NAME}] Restoring preferred primary model`, {
