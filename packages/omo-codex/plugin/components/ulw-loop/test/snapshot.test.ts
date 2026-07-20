@@ -220,17 +220,23 @@ describe("renderUlwLoopResumeSnapshot", () => {
 		}
 	});
 
-	it("#given huge pending criteria and evidence #when rendering #then required tail sections survive", () => {
+	it("#given CJK-heavy bounded fields #when rendering #then required tail sections survive", () => {
+		const cjk = "한글😀";
 		const hugeCriteria = Array.from({ length: 700 }, (_, index) =>
 			makeCriterion({
 				id: `C${String(index).padStart(3, "0")}`,
-				scenario: `oversized pending criterion ${index} ${"x".repeat(400)}`,
+				scenario: `oversized pending criterion ${index} ${cjk.repeat(400)}`,
 			}),
 		);
 		const evidenceItems = Array.from(
 			{ length: SNAPSHOT_MAX_EVIDENCE_ITEMS + 20 },
-			(_, index) => `oversized evidence ${index} ${"y".repeat(SNAPSHOT_MAX_EVIDENCE_EXCERPT_CHARS + 100)}`,
+			(_, index) => `oversized evidence ${index} ${cjk.repeat(SNAPSHOT_MAX_EVIDENCE_EXCERPT_CHARS + 100)}`,
 		);
+		const entries = Array.from({ length: SNAPSHOT_MAX_CHANGED_FILES }, (_, index) => ({
+			status: "M",
+			path: `src/${index}-${cjk.repeat(SNAPSHOT_MAX_CHANGED_FILE_LINE_CHARS)}.ts`,
+			line: `M src/${index}-${cjk.repeat(SNAPSHOT_MAX_CHANGED_FILE_LINE_CHARS)}`,
+		}));
 
 		const rendered = renderUlwLoopResumeSnapshot({
 			plan: makePlan({
@@ -241,11 +247,7 @@ describe("renderUlwLoopResumeSnapshot", () => {
 				],
 			}),
 			nextAction: "Run the next verification command",
-			changedFiles: {
-				kind: "available",
-				entries: [],
-				truncated: false,
-			},
+			changedFiles: { kind: "available", entries, truncated: false },
 			evidenceItems,
 		});
 

@@ -5,7 +5,7 @@ interface RedactionRule {
 
 const REDACTION_RULES = [
 	{
-		pattern: /BEGIN TRANSCRIPT[\s\S]*?(?:END TRANSCRIPT|$)/g,
+		pattern: /BEGIN TRANSCRIPT[\s\S]*?(?:END TRANSCRIPT|$)/gi,
 		replacement: "[REDACTED:transcript]",
 	},
 	{

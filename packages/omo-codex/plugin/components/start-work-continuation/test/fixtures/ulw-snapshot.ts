@@ -71,6 +71,20 @@ export const UNSAFE_OR_MALFORMED_SNAPSHOT_CASES = [
 		}),
 	},
 	{
+		name: "mixed-case transcript fixture",
+		markdown: createSnapshotMarkdown({
+			metadata: ["- Session ID: sess_abc", "- Plan Path: .omo/ulw-loop/goals.json"],
+			nextAction: "Begin Transcript\nmixed-case transcript\nEnd Transcript",
+		}),
+	},
+	{
+		name: "lowercase transcript fixture",
+		markdown: createSnapshotMarkdown({
+			metadata: ["- Session ID: sess_abc", "- Plan Path: .omo/ulw-loop/goals.json"],
+			nextAction: "begin transcript\nlowercase transcript\nend transcript",
+		}),
+	},
+	{
 		name: "lowercase labeled token fixture",
 		markdown: createSnapshotMarkdown({
 			metadata: ["- Session ID: sess_abc", "- Plan Path: .omo/ulw-loop/goals.json"],

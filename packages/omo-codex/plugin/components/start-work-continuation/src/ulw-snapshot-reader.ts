@@ -34,7 +34,7 @@ const SECRET_FIXTURE_PATTERNS = [
 	/\bgithub_pat_[A-Za-z0-9_]{6,}\b/i,
 	/\bxox[abprs]-[A-Za-z0-9-]{6,}\b/i,
 	/\bhttps?:\/\/[^\s/:@]+:[^\s@/]+@[^\s)]+/i,
-	/BEGIN TRANSCRIPT[\s\S]*?(?:END TRANSCRIPT|$)/,
+	/BEGIN TRANSCRIPT[\s\S]*?(?:END TRANSCRIPT|$)/i,
 ] as const;
 const INSTRUCTION_INJECTION_PATTERNS = [
 	/\bignore\s+(?:all\s+)?(?:previous\s+)?instructions\b/i,

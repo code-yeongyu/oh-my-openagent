@@ -13,10 +13,17 @@ import {
 	ULW_LOOP_STATUSES,
 } from "./types.js";
 
-function truncateText(value: string, maxChars: number): string {
-	if (value.length <= maxChars) return value;
-	if (maxChars <= 1) return value.slice(0, maxChars);
-	return `${value.slice(0, maxChars - 1)}…`;
+function truncateText(value: string, maxBytes: number): string {
+	if (Buffer.byteLength(value, "utf8") <= maxBytes) return value;
+	if (maxBytes <= 1) return "";
+	const suffix = "…";
+	const budget = maxBytes - Buffer.byteLength(suffix, "utf8");
+	let truncated = "";
+	for (const character of value) {
+		if (Buffer.byteLength(truncated + character, "utf8") > budget) break;
+		truncated += character;
+	}
+	return `${truncated}${suffix}`;
 }
 
 function boundedRedacted(value: string, maxChars: number): string {

@@ -39,6 +39,15 @@ const DEPRECATED_SECRET_MARKER = `${"[REDACTED"}:${"secret]"}`;
 const DEPRECATED_URL_CREDENTIAL_MARKER = `${"[REDACTED:url"}_${"credentials]"}`;
 
 describe("redactSnapshotText", () => {
+	it.each([
+		"Begin Transcript\nmixed-case transcript\nEnd Transcript",
+		"begin transcript\nlowercase transcript\nend transcript",
+	] as const)("#given %s #when redacting transcript text #then replaces the entire block", (fixture) => {
+		const redacted = redactSnapshotText(fixture);
+
+		expect(redacted).toBe("[REDACTED:transcript]");
+	});
+
 	it("#given common credential forms #when redacting text #then uses deterministic replacement kinds", () => {
 		const redacted = redactSnapshotText(SECRET_FIXTURES.join("\n"));
 
