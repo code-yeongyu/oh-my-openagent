@@ -190,6 +190,32 @@ task({
 });
 ```
 
+### Per-Call Model Override
+
+The orchestrator can pin the model (and reasoning) for an individual delegation at its own discretion, instead of relying only on the configured per-agent / per-category default. The override is **gated to connected/available models** — unknown models are rejected before any subagent spawns — and the agent/category fallback chain is preserved for runtime recovery.
+
+Available on `task` (both `subagent_type` and `category`) and on `call_omo_agent`:
+
+- **`model`** (string) — `"provider/model"` or `"provider/model variant"`, e.g. `"openai/gpt-5.5"` or `"openai/gpt-5.5 xhigh"`.
+- **`reasoning_effort`** (string) — `minimal` / `low` / `medium` / `high` / `xhigh` / `max`; takes precedence over a variant embedded in `model`.
+
+```typescript
+task({
+  subagent_type: "librarian",
+  model: "openai/gpt-5.5",
+  reasoning_effort: "xhigh",
+  run_in_background: true,
+  description: "API contract",
+  prompt: "Find the request/response schema for ...",
+});
+```
+
+Omit `model` to keep the configured default. Team members can pin a model the same way — see [Team Mode](../guide/team-mode.md#per-member-model-override).
+
+### `list_models` Tool
+
+`list_models` returns the models currently connected to the session — grouped by provider, as `provider/model` ids you can pass verbatim to `model` — plus the valid `reasoning_effort` vocabulary. It accepts an optional `provider` filter. Call it before passing a per-call model override so you pick a model that exists (unknown models are rejected).
+
 ### Custom Categories
 
 You can define custom categories in your plugin config file. During the rename transition, both `oh-my-openagent.json[c]` and legacy `oh-my-opencode.json[c]` basenames are recognized.

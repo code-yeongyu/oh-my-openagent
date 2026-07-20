@@ -72,6 +72,17 @@ When both scopes define the same team name, project scope wins.
 - **`kind: "subagent_type"`** — direct agent (atlas, sisyphus, sisyphus-junior, hephaestus). `prompt` optional.
 - **`kind: "category"`** — routed through `sisyphus-junior` with the chosen category model. `prompt` REQUIRED.
 
+## Per-member model override
+
+Any member may pin its own model and reasoning, gated to connected/available models. A malformed or unavailable model fails team creation loudly (rather than silently spawning a default). Omit to use the category/subagent default.
+
+- **`model`** (string, optional) — `"provider/model"` or `"provider/model variant"`, e.g. `"openai/gpt-5.5"` or `"openai/gpt-5.5 xhigh"`.
+- **`reasoning_effort`** (string, optional) — `minimal` / `low` / `medium` / `high` / `xhigh` / `max`; takes precedence over a variant embedded in `model`.
+
+```json
+{ "kind": "subagent_type", "name": "scout", "subagent_type": "sisyphus", "model": "openai/gpt-5.5", "reasoning_effort": "xhigh" }
+```
+
 ## Eligible agents
 
 - **Eligible:** `sisyphus`, `atlas`, `sisyphus-junior`.

@@ -15,6 +15,10 @@ import {
 } from "./executor"
 import { prepareDelegateTaskArgs } from "./tool-argument-preparation"
 import { createDelegateTaskPresentation } from "./tool-description"
+import { getAvailableModelsForDelegateTask } from "./available-models"
+import { resolveRequestedModelOverride } from "@oh-my-opencode/delegate-core"
+import { parseModelString } from "../../shared"
+import { fuzzyMatchModel } from "../../shared/model-availability"
 import type { AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
 import { mergeNativeSkillInfos, type NativeSkillEntry } from "../skill/native-skills"
 import type { SkillInfo } from "../skill/types"
@@ -76,6 +80,14 @@ const delegateTaskArgsSchema = {
     .optional()
     .describe("Continuation session id (`ses_...`) from task metadata; not a background task id (`bg_...`)."),
   command: tool.schema.string().optional().describe("The command that triggered this task"),
+  model: tool.schema
+    .string()
+    .optional()
+    .describe("Optional. Override the model for THIS delegation, at your discretion. Format \"provider/model\" or \"provider/model variant\" (e.g. \"openai/gpt-5.5\", \"openai/gpt-5.5 xhigh\"). Must be a connected/available model or the call is rejected — call `list_models` first to see connected models and valid reasoning values. Omit to use the configured default for the agent/category."),
+  reasoning_effort: tool.schema
+    .string()
+    .optional()
+    .describe("Optional. Reasoning/variant for THIS delegation (e.g. \"low\", \"medium\", \"high\", \"xhigh\", \"max\"). Takes precedence over a variant embedded in `model`. Only meaningful together with `model`."),
 }
 
 export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefinition {
@@ -144,6 +156,31 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         ? `${parentContext.model.providerID}/${parentContext.model.modelID}`
         : undefined
 
+      // Orchestrator per-call model override (gated to connected/available models).
+      // Rejected synchronously before any session is spawned when the model is
+      // malformed or unavailable; otherwise it replaces the configured default while
+      // the agent/category fallback chain is preserved for runtime recovery.
+      let requestedOverride: DelegatedModelConfig | undefined
+      if (delegateTaskArgs.model) {
+        const availableModels = options.availableModelsOverride
+          ?? await getAvailableModelsForDelegateTask(options.client)
+        const override = resolveRequestedModelOverride(
+          { model: delegateTaskArgs.model, reasoningEffort: delegateTaskArgs.reasoning_effort },
+          { availableModels, parseModelString, fuzzyMatchModel },
+        )
+        if (override.kind === "error") {
+          return `Invalid model override: ${override.message}`
+        }
+        if (override.kind === "resolved") {
+          requestedOverride = override.model
+          log("[task] orchestrator model override accepted", {
+            requested: delegateTaskArgs.model,
+            matched: override.matched,
+            variant: override.model.variant,
+          })
+        }
+      }
+
       let agentToUse: string
       let categoryModel: DelegatedModelConfig | undefined
       let categoryPromptAppend: string | undefined
@@ -179,7 +216,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
           willForceBackground: isUnstableAgent && isRunInBackgroundExplicitlyFalse,
         })
 
-        if (isUnstableAgent && isRunInBackgroundExplicitlyFalse) {
+        if (!requestedOverride && isUnstableAgent && isRunInBackgroundExplicitlyFalse) {
           const systemContent = buildSystemContent({
             skillContent,
             skillContents,
@@ -201,6 +238,12 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         agentToUse = resolution.agentToUse
         categoryModel = resolution.categoryModel
         fallbackChain = resolution.fallbackChain
+      }
+
+      if (requestedOverride) {
+        categoryModel = requestedOverride
+        actualModel = `${requestedOverride.providerID}/${requestedOverride.modelID}`
+        modelInfo = { model: actualModel, type: "user-defined", source: "override" }
       }
 
       const systemContent = buildSystemContent({

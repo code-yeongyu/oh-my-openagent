@@ -8,6 +8,30 @@ import {
   resolveCategoryExecution,
   resolveSubagentExecution,
 } from "./resolve-member-dependencies"
+import { resolveRequestedModelOverride } from "@oh-my-opencode/delegate-core"
+import { parseModelString } from "../../../shared"
+import { fuzzyMatchModel } from "../../../shared/model-availability"
+import { getAvailableModelsForDelegateTask } from "../../../tools/delegate-task/available-models"
+
+// Optional per-member model override declared on the team member spec, gated to
+// connected/available models. Throws (surfaced as TeamMemberResolutionError) when
+// the declared model is malformed or unavailable, so a bad spec fails team creation
+// loudly instead of silently spawning the configured default.
+async function resolveMemberModelOverride(
+  member: Member,
+  ctx: ExecutorContext,
+): Promise<DelegatedModelConfig | undefined> {
+  if (!member.model) return undefined
+  const availableModels = await getAvailableModelsForDelegateTask(ctx.client)
+  const override = resolveRequestedModelOverride(
+    { model: member.model, reasoningEffort: member.reasoning_effort },
+    { availableModels, parseModelString, fuzzyMatchModel },
+  )
+  if (override.kind === "error") {
+    throw new Error(`model override: ${override.message}`)
+  }
+  return override.kind === "resolved" ? override.model : undefined
+}
 
 export class TeamMemberResolutionError extends Error {
   constructor(public readonly memberName: string, public readonly cause: Error) {
@@ -66,6 +90,8 @@ export async function resolveMember(
   parentAgent?: string,
 ): Promise<ResolvedMember> {
   try {
+    const memberModelOverride = await resolveMemberModelOverride(member, ctx)
+
     if (member.kind === "category") {
       const execution = await resolveCategoryExecution(
         {
@@ -82,16 +108,17 @@ export async function resolveMember(
         throw new Error(execution.error)
       }
 
+      const categoryModel = memberModelOverride ?? execution.categoryModel
       return {
         memberName: member.name,
         agentToUse: execution.agentToUse,
-        model: execution.categoryModel,
+        model: categoryModel,
         fallbackChain: execution.fallbackChain,
         systemContent: resolveSystemContent({
           agentToUse: execution.agentToUse,
           categoryPromptAppend: execution.categoryPromptAppend,
           maxPromptTokens: execution.maxPromptTokens,
-          model: execution.categoryModel,
+          model: categoryModel,
         }),
       }
     }
@@ -114,14 +141,15 @@ export async function resolveMember(
       throw new Error(execution.error)
     }
 
+    const subagentModel = memberModelOverride ?? execution.categoryModel
     return {
       memberName: member.name,
       agentToUse: execution.agentToUse,
-      model: execution.categoryModel,
+      model: subagentModel,
       fallbackChain: execution.fallbackChain,
       systemContent: resolveSystemContent({
         agentToUse: execution.agentToUse,
-        model: execution.categoryModel,
+        model: subagentModel,
       }),
     }
   } catch (error) {

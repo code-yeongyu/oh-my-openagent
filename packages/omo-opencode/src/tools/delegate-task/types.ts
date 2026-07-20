@@ -62,6 +62,10 @@ export interface DelegateTaskArgs {
   task_id?: string
   command?: string
   load_skills: string[]
+  /** Orchestrator per-call model override, e.g. "openai/gpt-5.5" or "openai/gpt-5.5 xhigh". Gated to connected models. */
+  model?: string
+  /** Orchestrator per-call reasoning/variant override (e.g. "xhigh"); takes precedence over a variant inside `model`. */
+  reasoning_effort?: string
 }
 
 export interface ToolContextWithMetadata {
