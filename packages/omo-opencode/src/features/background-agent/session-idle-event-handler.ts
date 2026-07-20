@@ -9,6 +9,7 @@ export function handleSessionIdleBackgroundEvent(args: {
   idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>>
   validateSessionHasOutput: (sessionID: string) => Promise<boolean>
   checkSessionTodos: (sessionID: string) => Promise<boolean>
+  shouldDeferForIncompleteTodos?: (task: BackgroundTask, sessionID: string, source: string) => boolean
   tryCompleteTask: (task: BackgroundTask, source: string) => Promise<boolean>
   emitIdleEvent: (sessionID: string) => void
 }): void {
@@ -18,6 +19,7 @@ export function handleSessionIdleBackgroundEvent(args: {
     idleDeferralTimers,
     validateSessionHasOutput,
     checkSessionTodos,
+    shouldDeferForIncompleteTodos,
     tryCompleteTask,
     emitIdleEvent,
   } = args
@@ -76,7 +78,8 @@ export function handleSessionIdleBackgroundEvent(args: {
         return
       }
 
-      if (hasIncompleteTodos) {
+      const completionSource = "session.idle event"
+      if (hasIncompleteTodos && (shouldDeferForIncompleteTodos?.(task, sessionID, completionSource) ?? true)) {
         log("[background-agent] Task has incomplete todos, waiting for todo-continuation:", task.id)
         return
       }
@@ -89,7 +92,7 @@ export function handleSessionIdleBackgroundEvent(args: {
         return
       }
 
-      await tryCompleteTask(task, "session.idle event")
+      await tryCompleteTask(task, completionSource)
     })
     .catch((err) => {
       log("[background-agent] Error in session.idle handler:", err)

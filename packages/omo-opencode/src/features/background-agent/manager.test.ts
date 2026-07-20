@@ -6912,6 +6912,69 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     manager.shutdown()
   })
 
+  test("completes task on session.idle after incomplete-todo grace expires", async () => {
+    //#given
+    const realDateNow = Date.now
+    const baseNow = realDateNow()
+    const sessionID = "ses-idle-incomplete-todos-grace"
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+        messages: async () => ({
+          data: [
+            {
+              info: { role: "assistant" },
+              parts: [{ type: "text", text: "valid result" }],
+            },
+          ],
+        }),
+        todo: async () => ({
+          data: [{ id: "todo-1", content: "stale todo", status: "in_progress", priority: "high" }],
+        }),
+      },
+    }
+
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+
+    const task = createMockTask({
+      id: "task-idle-incomplete-todos-grace",
+      sessionId: sessionID,
+      parentSessionId: "parent-session",
+      parentMessageId: "msg-idle-grace",
+      description: "task with stale incomplete todos",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(baseNow - (MIN_IDLE_TIME_MS + 10)),
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    try {
+      Date.now = () => baseNow
+
+      //#when
+      manager.handleEvent({ type: "session.idle", properties: { sessionID } })
+      await flushBackgroundNotifications()
+
+      //#then - todo-continuation gets the initial grace chance
+      expect(task.status).toBe("running")
+
+      //#when - the task is still idle with valid output after the grace window
+      Date.now = () => baseNow + 30_001
+      manager.handleEvent({ type: "session.idle", properties: { sessionID } })
+      await flushBackgroundNotifications()
+
+      //#then
+      expect(task.status).toBe("completed")
+      expect(task.completedAt).toBeDefined()
+    } finally {
+      Date.now = realDateNow
+      manager.shutdown()
+    }
+  })
+
   test("retry path releases current concurrency slot and prefers current provider in fallback entry", async () => {
     //#given
     const manager = createBackgroundManager()
@@ -7838,6 +7901,68 @@ describe("BackgroundManager.handleEvent - non-tool event lastUpdate", () => {
     expect(todoCallCount).toBe(1)
 
     manager.shutdown()
+  })
+
+  test("should complete idle polling task after incomplete-todo grace expires", async () => {
+    //#given
+    const realDateNow = Date.now
+    const baseNow = realDateNow()
+    const sessionID = "session-polling-incomplete-todos-grace"
+    const client = {
+      session: {
+        status: async () => ({ data: { [sessionID]: { type: "idle" } } }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+        messages: async () => ({
+          data: [
+            {
+              info: { role: "assistant" },
+              parts: [{ type: "text", text: "valid result" }],
+            },
+          ],
+        }),
+        todo: async () => ({
+          data: [{ id: "todo-1", content: "stale todo", status: "in_progress", priority: "high" }],
+        }),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+
+    const task: BackgroundTask = {
+      id: "task-polling-incomplete-todos-grace",
+      sessionId: sessionID,
+      parentSessionId: "parent-session",
+      parentMessageId: "msg-1",
+      description: "idle polling task with stale todos",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(baseNow - (MIN_IDLE_TIME_MS + 10)),
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    try {
+      Date.now = () => baseNow
+
+      //#when
+      await manager["pollRunningTasks"]()
+
+      //#then - todo-continuation gets the initial grace chance
+      expect(task.status).toBe("running")
+
+      //#when - polling observes the same idle task after the grace window
+      Date.now = () => baseNow + 30_001
+      await manager["pollRunningTasks"]()
+
+      //#then
+      expect(task.status).toBe("completed")
+      expect(task.completedAt).toBeDefined()
+    } finally {
+      Date.now = realDateNow
+      manager.shutdown()
+    }
   })
 })
 

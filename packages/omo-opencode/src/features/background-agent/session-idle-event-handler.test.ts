@@ -310,6 +310,28 @@ describe("handleSessionIdleBackgroundEvent", () => {
       expect(tryCompleteTask).not.toHaveBeenCalled()
     })
 
+    it("#when incomplete todos no longer defer completion #then should complete task", async () => {
+      //#given
+      const task = createRunningTask()
+      const tryCompleteTask = mock(() => Promise.resolve(true))
+
+      //#when
+      handleSessionIdleBackgroundEvent({
+        properties: { sessionID: task.sessionId! },
+        findBySession: () => task,
+        idleDeferralTimers: new Map(),
+        validateSessionHasOutput: () => Promise.resolve(true),
+        checkSessionTodos: () => Promise.resolve(true),
+        shouldDeferForIncompleteTodos: () => false,
+        tryCompleteTask,
+        emitIdleEvent: () => {},
+      })
+
+      //#then
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      expect(tryCompleteTask).toHaveBeenCalledWith(task, "session.idle event")
+    })
+
     it("#when task status changes during validation #then should not complete task", async () => {
       //#given
       const task = createRunningTask()

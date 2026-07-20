@@ -150,6 +150,7 @@ const PENDING_PARENT_WAKE_RETRY_MS = 1_000
 const PENDING_PARENT_WAKE_DEBOUNCE_MS = 100
 const PARENT_WAKE_ACCEPTED_MESSAGE_SKEW_MS = 5_000
 const PARENT_WAKE_TOOL_CALL_DEFER_MAX_MS = 5_000
+const INCOMPLETE_TODO_COMPLETION_GRACE_MS = 30_000
 /**
  * Window during which a freshly-arrived user message in the parent session
  * causes a queued parent-wake to defer instead of dispatching. Mitigates the
@@ -273,6 +274,7 @@ export class BackgroundManager {
   private parentWakeTextDeltaBuffers: Map<string, string> = new Map()
   private observedOutputSessions: Set<string> = new Set()
   private observedIncompleteTodosBySession: Map<string, boolean> = new Map()
+  private incompleteTodoCompletionBlockedAtByTask: Map<string, number> = new Map()
   private rootDescendantCounts: Map<string, number>
   private preStartDescendantReservations: Set<string>
   private enableParentSessionNotifications: boolean
@@ -432,6 +434,7 @@ export class BackgroundManager {
   }
 
   private removeTask(task: BackgroundTask): void {
+    this.clearIncompleteTodoCompletionBlock(task)
     this.archiveCompletedTask(task)
     archiveBackgroundTask(task)
     this.tasks.delete(task.id)
@@ -1548,6 +1551,43 @@ The fallback retry session is now created and can be inspected directly.
     this.observedIncompleteTodosBySession.delete(sessionID)
   }
 
+  private clearIncompleteTodoCompletionBlock(task: Pick<BackgroundTask, "id">): void {
+    this.incompleteTodoCompletionBlockedAtByTask.delete(task.id)
+  }
+
+  private shouldDeferForIncompleteTodos(
+    task: BackgroundTask,
+    sessionID: string,
+    source: string,
+  ): boolean {
+    const now = Date.now()
+    const blockedAt = this.incompleteTodoCompletionBlockedAtByTask.get(task.id)
+    if (blockedAt === undefined) {
+      this.incompleteTodoCompletionBlockedAtByTask.set(task.id, now)
+      log("[background-agent] Starting incomplete-todo completion grace:", {
+        taskId: task.id,
+        sessionID,
+        source,
+        graceMs: INCOMPLETE_TODO_COMPLETION_GRACE_MS,
+      })
+      return true
+    }
+
+    const elapsedMs = now - blockedAt
+    if (elapsedMs < INCOMPLETE_TODO_COMPLETION_GRACE_MS) {
+      return true
+    }
+
+    log("[background-agent] Incomplete-todo completion grace expired; allowing completion:", {
+      taskId: task.id,
+      sessionID,
+      source,
+      elapsedMs,
+      graceMs: INCOMPLETE_TODO_COMPLETION_GRACE_MS,
+    })
+    return false
+  }
+
   private messageUpdatedInfoHasParentWakeOutput(info: Record<string, unknown>, role: unknown): boolean {
     if (role === "tool") {
       return true
@@ -1800,6 +1840,12 @@ The fallback retry session is now created and can be inspected directly.
         return status !== "completed" && status !== "cancelled"
       })
       this.observedIncompleteTodosBySession.set(sessionID, hasIncompleteTodos)
+      if (!hasIncompleteTodos) {
+        const resolved = this.resolveTaskAttemptBySession(sessionID)
+        if (resolved?.isCurrent) {
+          this.clearIncompleteTodoCompletionBlock(resolved.task)
+        }
+      }
       return
     }
 
@@ -1820,6 +1866,7 @@ The fallback retry session is now created and can be inspected directly.
         idleDeferralTimers: this.idleDeferralTimers,
         validateSessionHasOutput: (id) => this.validateSessionHasOutput(id),
         checkSessionTodos: (id) => this.checkSessionTodos(id),
+        shouldDeferForIncompleteTodos: (task, id, source) => this.shouldDeferForIncompleteTodos(task, id, source),
         tryCompleteTask: (task, source) => this.tryCompleteTask(task, source),
         emitIdleEvent: (sessionID) => this.handleEvent({ type: "session.idle", properties: { sessionID } }),
       })
@@ -1987,6 +2034,7 @@ The fallback retry session is now created and can be inspected directly.
     if (task.rootSessionId) {
       this.unregisterRootDescendant(task.rootSessionId)
     }
+    this.clearIncompleteTodoCompletionBlock(task)
     this.taskHistory.record(task.parentSessionId, {
       id: task.id,
       sessionID: task.sessionId,
@@ -2109,6 +2157,7 @@ The fallback retry session is now created and can be inspected directly.
     if (task.rootSessionId) {
       this.unregisterRootDescendant(task.rootSessionId)
     }
+    this.clearIncompleteTodoCompletionBlock(task)
     this.taskHistory.record(task.parentSessionId, { id: task.id, sessionID: task.sessionId, agent: task.agent, description: task.description, status: "error", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
 
     if (task.concurrencyKey) {
@@ -2197,6 +2246,7 @@ The task was re-queued on a fallback model after a retryable failure.
       )
     }
     if (retried && previousSessionID) {
+      this.clearIncompleteTodoCompletionBlock(task)
       this.clearSessionOutputObserved(previousSessionID)
       this.clearSessionTodoObservation(previousSessionID)
       clearDelegatedChildSessionBootstrap(previousSessionID)
@@ -2424,6 +2474,7 @@ The task was re-queued on a fallback model after a retryable failure.
     if (wasRunning && task.rootSessionId) {
       this.unregisterRootDescendant(task.rootSessionId)
     }
+    this.clearIncompleteTodoCompletionBlock(task)
     this.taskHistory.record(task.parentSessionId, { id: task.id, sessionID: task.sessionId, agent: task.agent, description: task.description, status: "cancelled", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
 
     if (task.concurrencyKey) {
@@ -2557,6 +2608,7 @@ The task was re-queued on a fallback model after a retryable failure.
       if (task.rootSessionId) {
         this.unregisterRootDescendant(task.rootSessionId)
       }
+      this.clearIncompleteTodoCompletionBlock(task)
 
       removeTaskToastTracking(task.id)
 
@@ -2958,6 +3010,7 @@ The task was re-queued on a fallback model after a retryable failure.
     if (task.rootSessionId) {
       this.unregisterRootDescendant(task.rootSessionId)
     }
+    this.clearIncompleteTodoCompletionBlock(task)
     this.taskHistory.record(task.parentSessionId, { id: task.id, sessionID: task.sessionId, agent: task.agent, description: task.description, status: "error", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
     if (task.concurrencyKey) {
       this.concurrencyManager.release(task.concurrencyKey)
@@ -3099,7 +3152,7 @@ The task was re-queued on a fallback model after a retryable failure.
           if (task.status !== "running") continue
 
           const hasIncompleteTodos = await this.checkSessionTodos(sessionID)
-          if (hasIncompleteTodos) {
+          if (hasIncompleteTodos && this.shouldDeferForIncompleteTodos(task, sessionID, completionSource)) {
             log("[background-agent] Task has incomplete todos via polling, waiting:", task.id)
             continue
           }
