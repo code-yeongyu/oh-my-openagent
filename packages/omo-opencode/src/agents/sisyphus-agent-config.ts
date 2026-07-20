@@ -59,3 +59,15 @@ export function buildClaudeSisyphusAgentConfig(
     ...buildClaudeThinkingConfig(model),
   };
 }
+
+/**
+ * Generic fallback config for high-performance instruction-following models 
+ * (e.g., Gemma4, Qwen3.6 via llama.cpp) that don't match specific vendor patterns.
+ */
+export function buildGenericSisyphusAgentConfig(
+  mode: AgentMode,
+  model: string,
+  prompt: string,
+): AgentConfig {
+  return buildBaseSisyphusAgentConfig(mode, model, prompt);
+}
