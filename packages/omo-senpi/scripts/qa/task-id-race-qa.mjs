@@ -55,7 +55,11 @@ async function main() {
 function regeneratePlugin() {
   const paths = [pluginEntry, join(pluginRoot, "extensions", "omo-member.js")]
   const originals = paths.map((path) => ({ path, content: existsSync(path) ? readFileSync(path) : undefined }))
-  const result = spawnSync(process.execPath, [join(pluginRoot, "scripts", "build-extension.mjs")], { cwd: resolve(packageRoot, "..", ".."), encoding: "utf8" })
+  const result = spawnSync(process.execPath, [join(pluginRoot, "scripts", "build-extension.mjs")], {
+    cwd: resolve(packageRoot, "..", ".."),
+    encoding: "utf8",
+    timeout: 120_000,
+  })
   if (result.status !== 0 && !existsSync(pluginEntry)) throw new Error(`plugin build failed:\n${result.stdout}${result.stderr}`)
   return originals
 }
@@ -86,7 +90,7 @@ async function runAttempt(input) {
     await Promise.all(parents.map((parent) => waitForFile(parent.readyFile, input.timeoutMs)))
     buckets.before = Math.floor(Date.now() / 65_536)
     for (const parent of parents) writeFileSync(parent.goFile, "go\n", { flag: "wx" })
-    const completions = await Promise.all(runs.map((run) => run.completion))
+    const completions = await Promise.all(runs.map((run) => waitForCompletion(run, input.timeoutMs, attemptDir, "post-go")))
     buckets.after = Math.floor(Date.now() / 65_536)
     after = lsTasks(projectDir)
     taskIds = taskIdsFromListing(after)
@@ -112,7 +116,7 @@ async function runAttempt(input) {
     writeFileSync(join(attemptDir, "tasks-before.ls.txt"), before)
     writeFileSync(join(attemptDir, "tasks-after.ls.txt"), after || lsTasks(projectDir))
   } finally {
-    cleanup = await cleanupRuns(runs, root)
+    cleanup = await cleanupRuns(runs, root, input.timeoutMs, attemptDir)
     writeJson(join(attemptDir, "cleanup-receipt.json"), cleanup)
     writeJson(join(input.evidenceDir, "cleanup-receipt.txt"), cleanup)
   }
@@ -187,7 +191,33 @@ function startSenpi(senpiBin, parent, projectDir, timeoutMs) {
     child.on("close", (status, signal) => resolve({ status, signal, stdout, stderr }))
     child.on("error", (error) => resolve({ status: null, signal: null, stdout, stderr: `${stderr}\n${error.message}` }))
   })
-  return { pid: child.pid, completion }
+  return { name: parent.name, pid: child.pid, completion }
+}
+
+function waitForCompletion(run, timeoutMs, artifactDir, phase) {
+  let timer
+  return Promise.race([
+    run.completion,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        killProcessGroup(run.pid)
+        const timeout = { phase, name: run.name, pid: run.pid, timeout_ms: timeoutMs }
+        writeJson(join(artifactDir, `${run.name}.${phase}.timeout.json`), timeout)
+        reject(new Error(`timed out after ${timeoutMs}ms waiting for ${run.name} during ${phase}`))
+      }, timeoutMs)
+    }),
+  ]).finally(() => clearTimeout(timer))
+}
+
+function killProcessGroup(pid) {
+  if (!Number.isInteger(pid)) return false
+  try {
+    process.kill(-pid, "SIGKILL")
+    return true
+  } catch (error) {
+    if (isMissingProcess(error)) return false
+    throw error
+  }
 }
 
 function waitForFile(path, timeoutMs) {
@@ -212,13 +242,13 @@ function waitForFile(path, timeoutMs) {
   })
 }
 
-async function cleanupRuns(runs, root) {
+async function cleanupRuns(runs, root, timeoutMs, artifactDir) {
   const pids = runs.map((run) => run.pid).filter((pid) => Number.isInteger(pid))
   const terminated = []
   for (const pid of pids) {
-    try { process.kill(-pid, "SIGKILL"); terminated.push(pid) } catch (error) { if (!isMissingProcess(error)) throw error }
+    if (killProcessGroup(pid)) terminated.push(pid)
   }
-  await Promise.all(runs.map((run) => run.completion))
+  await Promise.all(runs.map((run) => waitForCompletion(run, timeoutMs, artifactDir, "teardown")))
   const verified_dead = pids.filter((pid) => !isAlive(pid))
   if (verified_dead.length !== pids.length) throw new Error(`cleanup could not terminate process groups: ${pids.filter((pid) => isAlive(pid)).join(", ")}`)
   rmSync(root, { recursive: true, force: true })
@@ -236,7 +266,7 @@ function isMissingProcess(error) {
 function lsTasks(projectDir) {
   const tasksDir = join(projectDir, ".omo", "senpi-task", "tasks")
   if (!existsSync(tasksDir)) return "<absent>\n"
-  const result = spawnSync("ls", ["-la", tasksDir], { encoding: "utf8" })
+  const result = spawnSync("ls", ["-la", tasksDir], { encoding: "utf8", timeout: 30_000 })
   return `${result.stdout}${result.stderr}`
 }
 
@@ -271,12 +301,12 @@ function resolveSenpi(bin) {
 }
 
 function versionOf(bin) {
-  const result = spawnSync(bin, ["--version"], { encoding: "utf8" })
+  const result = spawnSync(bin, ["--version"], { encoding: "utf8", timeout: 30_000 })
   return `${result.stdout}${result.stderr}`.trim() || "unknown"
 }
 
 function git(...args) {
-  const result = spawnSync("git", args, { cwd: resolve(packageRoot, "..", ".."), encoding: "utf8" })
+  const result = spawnSync("git", args, { cwd: resolve(packageRoot, "..", ".."), encoding: "utf8", timeout: 30_000 })
   return result.status === 0 ? result.stdout.trim() : "unknown"
 }
 
