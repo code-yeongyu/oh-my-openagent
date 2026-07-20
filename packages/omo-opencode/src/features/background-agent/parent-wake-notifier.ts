@@ -116,8 +116,31 @@ export class ParentWakeNotifier {
     this.schedulePendingParentWakeFlush(sessionID, delayMs)
   }
 
+  /**
+   * Queue a pending wake but schedule the flush with a caller-supplied
+   * operation. Used by the manager to route the timer-fired flush through its
+   * own `flushPendingParentWake` wrapper (which applies the consumed-success
+   * race guard) instead of the flush runner directly.
+   */
+  queuePendingParentWakeWithFlushOperation(
+    sessionID: string,
+    notification: string,
+    promptContext: ParentWakePromptContext,
+    shouldReply: boolean,
+    flushOperation: () => Promise<void>,
+    delayMs?: number,
+  ): void {
+    this.pendingQueue.queueWake(sessionID, notification, promptContext, shouldReply)
+    this.pendingQueue.scheduleFlush(sessionID, flushOperation, delayMs)
+  }
+
   async flushPendingParentWake(sessionID: string): Promise<void> {
     await this.flushRunner.flushPendingParentWake(sessionID)
+  }
+
+  deletePendingParentWake(sessionID: string): void {
+    this.pendingQueue.deleteWake(sessionID)
+    this.flushRunner.clearPendingParentWakeTimer(sessionID)
   }
 
   clearDispatchedParentWake(sessionID: string): void {

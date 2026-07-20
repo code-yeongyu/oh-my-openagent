@@ -11,7 +11,10 @@ import { formatTaskResult } from "./task-result-format"
 import { formatTaskStatus } from "./task-status-format"
 
 import { getAgentDisplayName } from "../../shared/agent-display-names"
-import { recordBackgroundOutputConsumption } from "../../shared/background-output-consumption"
+import {
+  recordBackgroundOutputConsumption,
+  recordBackgroundTaskOutputConsumption,
+} from "../../shared/background-output-consumption"
 
 const SISYPHUS_JUNIOR_AGENT = getAgentDisplayName("sisyphus-junior")
 const MISSING_BACKGROUND_TASK_RETRY_DELAY_MS = 100
@@ -175,6 +178,17 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
         const includeToolResults = isActive || (args.include_tool_results ?? false)
 
         if (fullSession) {
+          // Cursor snapshot must be captured before formatFullSession reads the transcript.
+          if (resolvedTask.status === "completed") {
+            recordBackgroundOutputConsumption(ctx.sessionID, ctx.messageID, resolvedTask.sessionId)
+            recordBackgroundTaskOutputConsumption({
+              parentSessionID: ctx.sessionID,
+              parentMessageID: ctx.messageID,
+              taskID: resolvedTask.id,
+              taskSessionID: resolvedTask.sessionId,
+            })
+          }
+
           const output = await formatFullSession(resolvedTask, client, {
             includeThinking,
             messageLimit: args.message_limit,
@@ -189,6 +203,12 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
 
         if (resolvedTask.status === "completed") {
           recordBackgroundOutputConsumption(ctx.sessionID, ctx.messageID, resolvedTask.sessionId)
+          recordBackgroundTaskOutputConsumption({
+            parentSessionID: ctx.sessionID,
+            parentMessageID: ctx.messageID,
+            taskID: resolvedTask.id,
+            taskSessionID: resolvedTask.sessionId,
+          })
           return await formatTaskResult(resolvedTask, client)
         }
 

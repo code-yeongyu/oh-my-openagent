@@ -4,6 +4,7 @@ export type BackgroundTaskNotificationStatus = "COMPLETED" | "CANCELLED" | "INTE
 
 export interface BackgroundTaskNotificationTask {
   id: string
+  sessionId?: string
   description: string
   status: BackgroundTaskStatus
   error?: string
