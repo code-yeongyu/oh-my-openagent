@@ -63,8 +63,27 @@ describe("ULW snapshot bridge", () => {
 		const parsed = parseBlockOutput(output);
 		expect(parsed.reason).toContain("# Repo-native ULW snapshot");
 		expect(parsed.reason).toContain(`- Snapshot path: \`${snapshotPath}\``);
-		expect(parsed.reason).toContain("- Next action: `Run the focused start-work continuation tests`");
+		expect(parsed.reason).toContain('- Next action: "Run the focused start-work continuation tests"');
 		expect(parsed.reason).not.toContain("## Evidence Summary");
+	});
+
+	it("#given a snapshot next action containing backticks #when hook runs #then the action is JSON-quoted", () => {
+		// given
+		const workspace = createWorkspace({ worktreePath: null });
+		writeSnapshot(
+			workspace,
+			createSnapshotMarkdown({
+				metadata: [`- Plan Path: ${join(workspace, ".omo", "ulw-loop", "goals.json")}`],
+				nextAction: "Run `bun test` before updating the PR",
+			}),
+		);
+
+		// when
+		const output = runStopHook(createStopInput(workspace), createDiskBackedFs());
+
+		// then
+		const parsed = parseBlockOutput(output);
+		expect(parsed.reason).toContain('- Next action: "Run `bun test` before updating the PR"');
 	});
 
 	it.each([
@@ -111,7 +130,7 @@ describe("ULW snapshot bridge", () => {
 		const parsed = parseBlockOutput(output);
 		expect(parsed.reason).toContain("# Repo-native ULW snapshot");
 		expect(parsed.reason).toContain(`- Snapshot path: \`${snapshotPath}\``);
-		expect(parsed.reason).toContain("- Next action: `Continue from the active worktree snapshot`");
+		expect(parsed.reason).toContain('- Next action: "Continue from the active worktree snapshot"');
 	});
 
 	it("#given Codex-prefixed scoped ULW snapshot #when hook runs with raw Codex session id #then snapshot is surfaced", () => {
@@ -133,7 +152,7 @@ describe("ULW snapshot bridge", () => {
 		const parsed = parseBlockOutput(output);
 		expect(parsed.reason).toContain("# Repo-native ULW snapshot");
 		expect(parsed.reason).toContain(`- Snapshot path: \`${snapshotPath}\``);
-		expect(parsed.reason).toContain("- Next action: `Continue from the Codex-scoped ULW snapshot`");
+		expect(parsed.reason).toContain('- Next action: "Continue from the Codex-scoped ULW snapshot"');
 	});
 
 	it("#given a writer-normalized Codex-scoped ULW snapshot #when hook runs with the prefixed session id #then snapshot is surfaced", () => {
@@ -155,7 +174,7 @@ describe("ULW snapshot bridge", () => {
 		const parsed = parseBlockOutput(output);
 		expect(parsed.reason).toContain("# Repo-native ULW snapshot");
 		expect(parsed.reason).toContain(`- Snapshot path: \`${snapshotPath}\``);
-		expect(parsed.reason).toContain("- Next action: `Continue from the writer-normalized Codex-scoped snapshot`");
+		expect(parsed.reason).toContain('- Next action: "Continue from the writer-normalized Codex-scoped snapshot"');
 	});
 
 	it("#given raw and legacy Codex-scoped snapshots #when hook runs with the raw session id #then the writer-scoped raw snapshot wins", () => {
@@ -183,7 +202,7 @@ describe("ULW snapshot bridge", () => {
 
 		// then
 		const parsed = parseBlockOutput(output);
-		expect(parsed.reason).toContain("- Next action: `Continue from the current raw snapshot`");
+		expect(parsed.reason).toContain('- Next action: "Continue from the current raw snapshot"');
 		expect(parsed.reason).not.toContain("Continue from the legacy Codex snapshot");
 	});
 
@@ -366,7 +385,7 @@ describe("ULW snapshot bridge", () => {
 		expect(injectedParsed.reason).not.toContain("Repo-native ULW snapshot");
 		expect(injectedParsed.reason).not.toContain(injectedNextAction);
 		expect(safeParsed.reason).toContain("# Repo-native ULW snapshot");
-		expect(safeParsed.reason).toContain("- Next action: `Run the focused continuation tests`");
+		expect(safeParsed.reason).toContain('- Next action: "Run the focused continuation tests"');
 	});
 
 	it("#given unscoped or unreadable scoped ULW state #when reader runs #then snapshot is omitted", () => {

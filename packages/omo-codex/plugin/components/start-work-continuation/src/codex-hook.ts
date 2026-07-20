@@ -35,7 +35,7 @@ function renderDirective(
 					"# Repo-native ULW snapshot",
 					"",
 					`- Snapshot path: \`${snapshot.path}\``,
-					`- Next action: \`${snapshot.nextAction}\``,
+					`- Next action: ${JSON.stringify(snapshot.nextAction)}`,
 					"",
 				].join(lineBreak);
 	const replacements = {
