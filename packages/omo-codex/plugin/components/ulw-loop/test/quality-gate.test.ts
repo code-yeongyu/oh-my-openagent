@@ -1,5 +1,6 @@
 import { existsSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
@@ -12,7 +13,7 @@ const VALID_GATE = {
 		by: "lazycodex-code-reviewer",
 		recommendation: "APPROVE",
 		codeQualityStatus: "CLEAR",
-		reportPath: "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/code-review.md",
+		reportPath: "test/fixtures/artifacts/code-review.md",
 		evidence: "Reviewed diff and focused tests; no blocking code-quality issues remain.",
 		blockers: [],
 	},
@@ -45,20 +46,20 @@ const VALID_GATE = {
 				id: "artifact-cli-pass",
 				kind: "cli-transcript",
 				description: "CLI transcript for valid quality gate acceptance.",
-				path: "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/cli-pass.txt",
+				path: "test/fixtures/artifacts/cli-pass.txt",
 			},
 			{
 				id: "artifact-cli-reject",
 				kind: "log",
 				description: "Log proving malformed quality gate rejection.",
-				path: "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/rejection.txt",
+				path: "test/fixtures/artifacts/rejection.txt",
 			},
 		],
 	},
 	gateReview: {
 		by: "lazycodex-gate-reviewer",
 		recommendation: "APPROVE",
-		reportPath: "packages/omo-codex/plugin/components/ulw-loop/test/fixtures/artifacts/gate-review.md",
+		reportPath: "test/fixtures/artifacts/gate-review.md",
 		evidence: "Rechecked reviewer reports and manual QA artifacts; gate is approved.",
 		blockers: [],
 	},
@@ -77,8 +78,8 @@ const VALID_GATE = {
 		adversarialClassesCovered: ["malformed_input", "stale_state"],
 	},
 } as const;
-const REPO_ROOT = fileURLToPath(new URL("../../../../../..", import.meta.url));
-const FS_OPTS = { repoRoot: REPO_ROOT, fs: { existsSync, statSync } } as const;
+const COMPONENT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const FS_OPTS = { repoRoot: COMPONENT_ROOT, fs: { existsSync, statSync } } as const;
 
 function makeGate(overrides: Record<string, unknown> = {}): Record<string, unknown> {
 	return { ...VALID_GATE, ...overrides };
@@ -223,8 +224,8 @@ describe("validateQualityGate", () => {
 			}),
 		);
 
-		// then
-		expect(error.message).toContain("not_applicable");
+		// then — a reasonless not_applicable now fails on the missing reason field
+		expect(error.message).toContain("reason");
 	});
 
 	it("#given criteria coverage misses required criteria #when validated #then it is rejected", () => {
@@ -247,5 +248,58 @@ describe("validateQualityGate", () => {
 
 		// then
 		expect(error.message).toContain("criteriaCoverage.userOutcomeReview");
+	});
+});
+
+describe("quality gate middle states (WATCH / reasoned not_applicable)", () => {
+	it("#given codeQualityStatus WATCH with APPROVE #when validating #then the gate accepts", () => {
+		const gate = structuredClone(VALID_GATE);
+		(gate.codeReview as { codeQualityStatus: string }).codeQualityStatus = "WATCH";
+		expect(() => validateQualityGate(gate)).not.toThrow();
+	});
+
+	it("#given codeQualityStatus BLOCK #when validating #then the gate rejects", () => {
+		const gate = structuredClone(VALID_GATE);
+		(gate.codeReview as { codeQualityStatus: string }).codeQualityStatus = "BLOCK";
+		expect(() => validateQualityGate(gate)).toThrow(/codeQualityStatus/);
+	});
+
+	it("#given a reasoned not_applicable adversarial case #when validating #then the gate accepts", () => {
+		const gate = structuredClone(VALID_GATE);
+		(gate.manualQa.adversarialCases[0] as { verdict: string; reason?: string }).verdict = "not_applicable";
+		(gate.manualQa.adversarialCases[0] as { verdict: string; reason?: string }).reason = "doc-only change";
+		expect(() => validateQualityGate(gate)).not.toThrow();
+	});
+
+	it("#given a reasonless not_applicable adversarial case #when validating #then the gate rejects", () => {
+		const gate = structuredClone(VALID_GATE);
+		(gate.manualQa.adversarialCases[0] as { verdict: string }).verdict = "not_applicable";
+		expect(() => validateQualityGate(gate)).toThrow(/reason/);
+	});
+
+	it("#given a not_applicable surface evidence verdict #when validating #then the gate still rejects", () => {
+		const gate = structuredClone(VALID_GATE);
+		(gate.manualQa.surfaceEvidence[0] as { verdict: string }).verdict = "not_applicable";
+		expect(() => validateQualityGate(gate)).toThrow(/not_applicable/);
+	});
+});
+
+describe("validateQualityGate attempt containment", () => {
+	const ATTEMPT_OPTS = { ...FS_OPTS, currentAttemptDir: "test/fixtures/artifacts" } as const;
+
+	it("#given artifacts inside the current attempt dir #when validating #then the gate accepts", () => {
+		expect(() => validateQualityGate(makeGate(), ATTEMPT_OPTS)).not.toThrow();
+	});
+
+	it("#given an artifact outside the current attempt dir #when validating #then the gate rejects naming the path", () => {
+		const opts = { ...FS_OPTS, currentAttemptDir: "test/fixtures/elsewhere" } as const;
+		expect(() => validateQualityGate(makeGate(), opts)).toThrow(
+			/\(test\/fixtures\/artifacts\/cli-pass\.txt\) must point to an artifact from the current attempt \(test\/fixtures\/elsewhere\)/,
+		);
+	});
+
+	it("#given a sibling dir sharing the attempt dir prefix #when validating #then the gate still rejects", () => {
+		const opts = { ...FS_OPTS, currentAttemptDir: "test/fixtures/artifact" } as const;
+		expect(() => validateQualityGate(makeGate(), opts)).toThrow(/current attempt/);
 	});
 });

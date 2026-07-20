@@ -91,10 +91,6 @@ jobs:
         with:
           bun-version: "1.3.12"
 
-      - name: Build vendored lsp-tools-mcp package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-tools-mcp
-
       - uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
@@ -103,10 +99,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build vendored lsp-daemon package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-daemon
-
+      # The full install runs the root `prepare` (`bun run build`), whose
+      # `build:lsp-daemon` step already runs `npm ci && npm run build` in
+      # packages/lsp-daemon, so its node_modules and dist exist before the tests.
       - name: Run vendored lsp-daemon tests
         run: npm test
         working-directory: packages/lsp-daemon
@@ -144,21 +139,13 @@ jobs:
         with:
           bun-version: "1.3.12"
 
-      - name: Build vendored lsp-tools-mcp package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-tools-mcp
-
       - uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build vendored lsp-daemon package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-daemon
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Type check
         run: bun run typecheck
@@ -192,21 +179,13 @@ jobs:
         with:
           bun-version: "1.3.12"
 
-      - name: Build vendored lsp-tools-mcp package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-tools-mcp
-
       - uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build vendored lsp-daemon package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-daemon
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Run Codex compatibility tests
         run: bun run test:codex
@@ -222,6 +201,57 @@ jobs:
             - Runs the hermetic `bun run test:codex` gate.
             - Covers Linux, macOS, and Windows compatibility.
           JOB_SUMMARY_NEXT: Inspect the failing component build or the first Codex compatibility test failure for this OS.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  senpi-compatibility:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.12"
+
+      - uses: actions/cache@v5
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Run Senpi compatibility tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun run build:senpi-plugin
+          PACK_DIR="$RUNNER_TEMP/omo-senpi-pack"
+          mkdir -p "$PACK_DIR"
+          npm pack --pack-destination "$PACK_DIR" packages/omo-senpi/plugin
+          npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts
+          bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+          bun test packages/omo-senpi
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Senpi compatibility (${{ matrix.os }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds the local-path Senpi adapter package artifacts.
+            - Builds the shared LSP daemon once before staging Senpi artifacts.
+            - Packs the generated Pi package and runs hermetic Senpi type/tests.
+            - Covers Linux/macOS socket and Windows named-pipe daemon smoke.
+          JOB_SUMMARY_NEXT: Inspect the first omo-senpi build, sync, directive, or package test failure for this OS.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   lazycodex-published-smoke:
@@ -250,13 +280,17 @@ jobs:
 
           npx_install_output=$(npx -y lazycodex-ai@latest --dry-run install --no-tui --codex-autonomous)
           echo "$npx_install_output"
-          if [ "$npx_install_output" != "npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous" ]; then
+          if [ "$npx_install_output" != "npx --yes oh-my-openagent@latest install --platform=codex --no-tui --codex-autonomous" ]; then
             echo "::warning::lazycodex-ai install dry-run output changed: $npx_install_output"
           fi
 
           npx_doctor_output=$(npx -y lazycodex-ai@latest --dry-run doctor)
           echo "$npx_doctor_output"
-          if [ "$npx_doctor_output" != "npx --yes --package oh-my-openagent omo doctor" ]; then
+          if [[ "$npx_doctor_output" != codex\ exec\ * ]] ||
+             [[ "$npx_doctor_output" != *"--sandbox danger-full-access"* ]] ||
+             [[ "$npx_doctor_output" != *'Use $omo:lcx-doctor'* ]] ||
+             [[ "$npx_doctor_output" == *"--model"* ]] ||
+             [[ "$npx_doctor_output" == *"gpt-5.5-codex-mini"* ]]; then
             echo "::warning::lazycodex-ai doctor dry-run output changed: $npx_doctor_output"
           fi
 
@@ -296,21 +330,13 @@ jobs:
         with:
           bun-version: "1.3.12"
 
-      - name: Build vendored lsp-tools-mcp package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-tools-mcp
-
       - uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build vendored lsp-daemon package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-daemon
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Build
         run: bun run build
@@ -338,7 +364,7 @@ jobs:
 
   auto-commit-schema:
     runs-on: ubuntu-latest
-    needs: [test, typecheck, codex-compatibility, build]
+    needs: [test, typecheck, codex-compatibility, senpi-compatibility, build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions:
       contents: write
@@ -351,33 +377,25 @@ jobs:
         with:
           bun-version: "1.3.12"
 
-      - name: Build vendored lsp-tools-mcp package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-tools-mcp
-
       - uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build vendored lsp-daemon package
-        run: npm ci && npm run build
-        working-directory: packages/lsp-daemon
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Build
         run: bun run build
 
       - name: Auto-commit schema changes
         run: |
-          if git diff --quiet assets/oh-my-opencode.schema.json; then
+          if git diff --quiet assets/oh-my-opencode.schema.json assets/omo.schema.json; then
             echo "No schema changes to commit"
           else
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add assets/oh-my-opencode.schema.json
+            git add assets/oh-my-opencode.schema.json assets/omo.schema.json
             git commit -m "chore: auto-update schema.json"
             git push
           fi
@@ -389,14 +407,14 @@ jobs:
           JOB_SUMMARY_TITLE: Schema auto-commit
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
-            - Rebuilds the schema artifact on `master` pushes.
-            - Commits `assets/oh-my-opencode.schema.json` only when generation changes it.
+            - Rebuilds the schema artifacts on `master` pushes.
+            - Commits `assets/oh-my-opencode.schema.json` and `assets/omo.schema.json` only when generation changes them.
           JOB_SUMMARY_NEXT: If this fails, inspect schema generation first, then check bot write permissions.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   draft-release:
     runs-on: ubuntu-latest
-    needs: [test, typecheck, codex-compatibility, build]
+    needs: [test, typecheck, codex-compatibility, senpi-compatibility, build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
     permissions:
       contents: write

@@ -35,9 +35,9 @@ The orchestration system uses a three-layer architecture that solves context ove
 flowchart TB
     subgraph Planning["Planning Layer (Human + Prometheus)"]
         User[(" User")]
-        Prometheus[" Prometheus<br/>(Planner)<br/>claude-opus-4-7 / gpt-5.5 / glm-5"]
-        Metis[" Metis<br/>(Consultant)<br/>claude-sonnet-4-6 / claude-opus-4-7 / gpt-5.5 / glm-5"]
-        Momus[" Momus<br/>(Reviewer)<br/>gpt-5.5 / claude-opus-4-7 / gemini-3.1-pro / glm-5"]
+        Prometheus[" Prometheus<br/>(Planner)<br/>claude-opus-4-7 / gpt-5.5 / glm-5.2"]
+        Metis[" Metis<br/>(Consultant)<br/>claude-sonnet-4-6 / claude-opus-4-7 / gpt-5.5 / glm-5.2"]
+        Momus[" Momus<br/>(Reviewer)<br/>gpt-5.6-terra / gpt-5.5 / claude-opus-4-7 / gemini-3.1-pro / glm-5.2"]
     end
 
     subgraph Execution["Execution Layer (Orchestrator)"]
@@ -46,7 +46,7 @@ flowchart TB
 
     subgraph Workers["Worker Layer (Specialized Agents)"]
         Junior[" Sisyphus-Junior<br/>(Task Executor)<br/>claude-sonnet-4-6 / kimi-k2.6 / gpt-5.5 / minimax-m3 / minimax-m2.7"]
-        Oracle[" Oracle<br/>(Architecture)<br/>gpt-5.5 / gemini-3.1-pro / claude-opus-4-7 / glm-5"]
+        Oracle[" Oracle<br/>(Architecture)<br/>gpt-5.5 / gemini-3.1-pro / claude-opus-4-7 / glm-5.2"]
         Explore[" Explore<br/>(Codebase Grep)<br/>gpt-5.4-mini-fast / minimax-m2.7-highspeed / minimax-m3 / claude-haiku-4-5"]
         Librarian[" Librarian<br/>(Docs/OSS)<br/>gpt-5.4-mini-fast / minimax-m2.7-highspeed / minimax-m3 / claude-haiku-4-5"]
         Frontend[" visual-engineering<br/>(category + frontend)<br/>gemini-3.1-pro / glm-5 / claude-opus-4-7"]
@@ -56,8 +56,10 @@ flowchart TB
     Prometheus -->|"Consult"| Metis
     Prometheus -->|"Interview"| User
     Prometheus -->|"Generate plan"| Plan[".omo/plans/*.md"]
-    Plan -->|"High accuracy?"| Momus
+    Plan -->|"High accuracy review"| Momus
+    Plan -->|"Independent review"| Oracle
     Momus -->|"OKAY / REJECT"| Prometheus
+    Oracle -->|"OKAY / REJECT"| Prometheus
 
     User -->|"/start-work"| Orchestrator
     Plan -->|"Read"| Orchestrator
@@ -93,6 +95,20 @@ Mode distinction:
 - `mode: "primary"`: top-level session agents selected directly in UI/CLI
 - `mode: "subagent"`: worker/consultant agents invoked via `task(..., subagent_type="...")` or `call_omo_agent(...)`
 
+### Display Names vs Providers
+
+`Sisyphus - ultraworker` is the display name for the primary Sisyphus agent. It is not a separate provider, proxy, or replacement for your original model account.
+
+Three names can appear together in logs or the TUI:
+
+- **Agent display name**: `Sisyphus - ultraworker`, `Atlas - Plan Executor`, `Hephaestus - Deep Agent`
+- **Provider namespace**: `anthropic`, `openai`, `github-copilot`, `opencode`, `opencode-go`, `vercel`
+- **Model id**: `claude-opus-4-7`, `kimi-k2.6`, `gpt-5.5`, `glm-5`
+
+The agent decides the prompt and behavior. The provider namespace decides which connected account or gateway serves the request. The model id decides the model family. If you see Sisyphus running through `opencode-go/kimi-k2.6`, that means the Sisyphus prompt is using Kimi through the OpenCode Go provider path; it does not mean OMO replaced your provider silently.
+
+When `ulw` or `ultrawork` is present, Sisyphus receives the ultrawork instruction set for a harder autonomous task. By default it keeps the agent's configured model or fallback chain. An explicit `agents.sisyphus.ultrawork.model` or `variant` setting can override that routing for ultrawork prompts.
+
 ### Delegation Semantics (Important)
 
 - `task(category="...")` routes to **Sisyphus-Junior** with category-optimized model routing
@@ -101,7 +117,7 @@ Mode distinction:
 
 ---
 
-## Planning: Prometheus + Metis + Momus
+## Planning: Prometheus + Metis + Momus + Oracle
 
 ### Prometheus: Your Strategic Consultant
 
@@ -132,11 +148,13 @@ stateDiagram-v2
     MetisConsult --> WritePlan: Incorporate findings
     WritePlan --> HighAccuracyChoice: Present to user
 
-    HighAccuracyChoice --> MomusLoop: User wants high accuracy
+    state "Momus + Oracle review" as DualReview
+
+    HighAccuracyChoice --> DualReview: High accuracy required or selected
     HighAccuracyChoice --> Done: User accepts plan
 
-    MomusLoop --> WritePlan: REJECTED - fix issues
-    MomusLoop --> Done: OKAY - plan approved
+    DualReview --> WritePlan: EITHER REJECTS - fix issues
+    DualReview --> Done: BOTH APPROVE - plan approved
 
     Done --> [*]: Guide to /start-work
 ```
@@ -166,26 +184,29 @@ Before Prometheus writes the plan, Metis catches what Prometheus missed:
 
 The plan author (Prometheus) has "ADHD working memory" - it makes connections that never make it onto the page. Metis forces externalization of implicit knowledge.
 
-### Momus: The Ruthless Reviewer
+### High-Accuracy Review: Momus + Oracle
 
-For high-accuracy mode, Momus validates plans against four core criteria:
+High-accuracy mode runs two independent reviews in parallel: Momus checks plan quality and Oracle checks the plan on the strongest available reasoning model. Both must approve before handoff.
 
-1. **Clarity**: Does each task specify WHERE to find implementation details?
-2. **Verification**: Are acceptance criteria concrete and measurable?
-3. **Context**: Is there sufficient context to proceed without >10% guesswork?
-4. **Big Picture**: Is the purpose, background, and workflow clear?
+**The Dual-Review Loop:**
 
-**The Momus Loop:**
+Momus is approval-biased and rejects only verified blockers. It checks that:
 
-Momus only says "OKAY" when:
+- Referenced files exist and support the plan's claims
+- Every task gives a developer a usable starting point
+- Tasks do not contradict each other
+- QA scenarios name the tool, steps, and expected result
+- No missing information would completely stop execution
 
-- 100% of file references verified
-- ≥80% of tasks have clear reference sources
-- ≥90% of tasks have concrete acceptance criteria
-- Zero tasks require assumptions about business logic
-- Zero critical red flags
+Minor gaps and details that a developer can resolve during implementation do not block approval; a plan that is roughly 80% clear is considered executable.
 
-If REJECTED, Prometheus fixes issues and resubmits. No maximum retry limit.
+If either reviewer rejects the plan, Prometheus fixes every cited issue and resubmits to both reviewers. No maximum retry limit.
+
+### Where to Spend a Scarce Premium Model
+
+Choose a compatible role before optimizing for invocation frequency. For example, a scarce Claude-family model such as Fable 5 fits Metis better than GPT-oriented Oracle or Momus. High-accuracy planning also runs Oracle and Momus together on every review round, so neither is purely an on-demand slot in that workflow.
+
+See [Agent-Model Matching: Where to Spend One Scarce Premium Model](./agent-model-matching.md#where-to-spend-one-scarce-premium-model) for the family-aware heuristic and a concrete configuration.
 
 ---
 
@@ -274,7 +295,7 @@ Junior doesn't need to be the smartest - it needs to be reliable. With:
 3. Clear MUST DO / MUST NOT DO constraints
 4. Verification requirements
 
-Even a mid-tier execution model works when the harness is strict. The current fallback order is `claude-sonnet-4-6` → `kimi-k2.5` → `gpt-5.5` → `minimax-m3` → `minimax-m2.7` → `big-pickle`. The intelligence is in the **system**, not a single worker model.
+Even a mid-tier execution model works when the harness is strict. The current fallback order is `claude-sonnet-4-6` → `kimi-k2.6` → `gpt-5.5` → `minimax-m3` → `minimax-m2.7` → `big-pickle`. The intelligence is in the **system**, not a single worker model.
 
 ### System Reminder Mechanism
 
@@ -478,7 +499,7 @@ Atlas is automatically activated when you run `/start-work`. You don't need to m
 
 | Aspect          | Hephaestus                                 | Sisyphus + `ulw` / `ultrawork`                       |
 | --------------- | ------------------------------------------ | ---------------------------------------------------- |
-| **Model**       | `gpt-5.5` (`medium`)                       | `claude-opus-4-7` / `kimi-k2.5` / `gpt-5.5` / `glm-5` depending on setup |
+| **Model**       | `gpt-5.6-sol` (`medium`) when available, then `gpt-5.5` (`medium`) | `claude-opus-4-7` / `kimi-k2.6` / `gpt-5.5` / `glm-5` depending on setup |
 | **Approach**    | Autonomous deep worker                     | Keyword-activated ultrawork mode                     |
 | **Best For**    | Complex architectural work, deep reasoning | General complex tasks, "just do it" scenarios        |
 | **Planning**    | Self-plans during execution                | Uses Prometheus plans if available                   |
@@ -501,8 +522,8 @@ Switch to Hephaestus (Tab → Select Hephaestus) when:
    - "Integrate our Rust core with the TypeScript frontend"
    - "Migrate from MongoDB to PostgreSQL with zero downtime"
 
-4. **You specifically want GPT-5.5 reasoning**
-   - Some problems benefit from GPT-5.5's training characteristics
+4. **You specifically want GPT-native autonomous reasoning**
+   - Hephaestus prefers GPT-5.6 Sol when OpenAI or Vercel exposes it and retains GPT-5.5 as the broad fallback
 
 **When to Use Sisyphus + `ulw`:**
 
@@ -527,7 +548,32 @@ Use the `ulw` keyword in Sisyphus when:
 **Recommendation:**
 
 - **For most users**: Use `ulw` keyword in Sisyphus. It's the default path and works excellently for 90% of complex tasks.
-- **For power users**: Switch to Hephaestus when you specifically need GPT-5.5's reasoning style or want the "AmpCode deep mode" experience of fully autonomous exploration and execution.
+- **For power users**: Switch to Hephaestus when you want GPT-native reasoning or the "AmpCode deep mode" experience of fully autonomous exploration and execution.
+
+### Brownfield / KISS Mode
+
+For mature projects, the safest default is not "make the best architecture." It is "make the smallest correct change that fits the architecture already here."
+
+Use Prometheus first when a brownfield task could invite broad cleanup, rewrites, or speculative abstractions. Select Prometheus with the agent selector or `/agent`, then ask it to produce a constrained plan with explicit boundaries:
+
+```text
+Fix <problem> in this existing codebase.
+Preserve the current architecture and public behavior.
+Use the smallest viable change.
+Follow local patterns in <files or areas>.
+Do not refactor, rename, reorganize, or clean up unrelated code.
+List exact files in scope and exact verification commands.
+```
+
+Then run `/start-work` from that plan. Atlas will execute against the written scope instead of treating the task as an open-ended modernization pass.
+
+Use `ulw` directly only when the target is already narrow:
+
+```text
+ulw fix the null handling in packages/foo/src/bar.ts using the existing helper style. No unrelated cleanup.
+```
+
+Use Hephaestus when you deliberately want autonomous deep implementation or architectural exploration. If the job is "touch the old system without disturbing it," an explicit Prometheus plan provides written scope boundaries before Atlas starts execution.
 
 ---
 
@@ -578,7 +624,7 @@ Type `exit` or start a new session. Atlas is primarily entered via `/start-work`
 
 **For most tasks**: Type `ulw` in Sisyphus.
 
-**Use Hephaestus when**: You specifically need GPT-5.5's reasoning style for deep architectural work or complex debugging.
+**Use Hephaestus when**: You need GPT-native reasoning for deep architectural work or complex debugging.
 
 ---
 

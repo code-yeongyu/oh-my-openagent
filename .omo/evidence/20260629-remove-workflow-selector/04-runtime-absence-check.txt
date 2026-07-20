@@ -1,3 +1,0 @@
-# runtime absence check
-Mon Jun 29 10:20:51 UTC 2026
-No runtime workflow selector references remain. Test-only regression fixtures/assertions are intentionally outside this check.

@@ -1,0 +1,47 @@
+{
+  "name": "@oh-my-opencode/senpi-task",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Senpi-coupled task state machine and persistent record store for oh-my-openagent.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "bun test src/*.test.ts src/**/*.test.ts"
+  },
+  "dependencies": {
+    "@oh-my-opencode/delegate-core": "workspace:*",
+    "@oh-my-opencode/omo-config-core": "workspace:*",
+    "@oh-my-opencode/team-core": "workspace:*",
+    "@oh-my-opencode/utils": "workspace:*",
+    "typebox": "1.1.38"
+  },
+  "peerDependencies": {
+    "@code-yeongyu/senpi": "2026.7.5-2",
+    "@earendil-works/pi-tui": "0.80.3",
+    "typebox": "*"
+  },
+  "peerDependenciesMeta": {
+    "@code-yeongyu/senpi": {
+      "optional": true
+    },
+    "@earendil-works/pi-tui": {
+      "optional": true
+    },
+    "typebox": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@code-yeongyu/senpi": "2026.7.5-2",
+    "@earendil-works/pi-tui": "0.80.3",
+    "typebox": "1.1.38"
+  },
+  "sideEffects": false
+}

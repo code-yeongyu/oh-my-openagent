@@ -247,6 +247,8 @@ test("#given nested component declares reserved omo bin #when linking bins #then
 		bin: {
 			omo: "./dist/cli.js",
 			"omo-ulw-loop": "./dist/cli.js",
+			ulw: "./dist/cli.js",
+			"ulw-loop": "./dist/cli.js",
 		},
 	});
 	await writeFile(join(componentRoot, "dist", "cli.js"), "#!/usr/bin/env node\n");
@@ -255,9 +257,13 @@ test("#given nested component declares reserved omo bin #when linking bins #then
 
 	assert.deepEqual(linked, [
 		{ name: "omo-ulw-loop", path: join(binDir, "omo-ulw-loop"), target: join(componentRoot, "dist", "cli.js") },
+		{ name: "ulw", path: join(binDir, "ulw"), target: join(componentRoot, "dist", "cli.js") },
+		{ name: "ulw-loop", path: join(binDir, "ulw-loop"), target: join(componentRoot, "dist", "cli.js") },
 	]);
 	await assert.rejects(readlink(join(binDir, "omo")));
 	assert.equal(await readlink(join(binDir, "omo-ulw-loop")), join(componentRoot, "dist", "cli.js"));
+	assert.equal(await readlink(join(binDir, "ulw")), join(componentRoot, "dist", "cli.js"));
+	assert.equal(await readlink(join(binDir, "ulw-loop")), join(componentRoot, "dist", "cli.js"));
 });
 
 test("#given stale managed ulw-loop omo symlink #when linking bins #then removes it without touching user-owned omo", async () => {

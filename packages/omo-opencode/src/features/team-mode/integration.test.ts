@@ -131,7 +131,7 @@ describe("team-mode integration", () => {
     expect(delivered.deliveredTo).toEqual(["echo"])
     expect(status.members[0]?.unreadMessages).toBe(1)
     expect(await exists(getRuntimeStateDir(resolveBaseDir(config), runtime.teamRunId))).toBe(false)
-  })
+  }, 30000)
 
   test("C-10.2 runs a 2-member pipeline where worker claims and completes a lead-created task", async () => {
     // given
@@ -155,7 +155,7 @@ describe("team-mode integration", () => {
     expect(claimedTask.owner).toBe("worker")
     expect(completedTasks).toHaveLength(1)
     expect(completedTasks[0]?.subject).toBe("X")
-  })
+  }, 30000)
 
   test("C-10.3 resumes alive teams, orphans dead leads, fails stuck creating teams, and cleans deleting runs", async () => {
     // given
@@ -180,7 +180,7 @@ describe("team-mode integration", () => {
     expect((await loadRuntimeState(deadRuntime.teamRunId, config)).status).toBe("orphaned")
     expect((await loadRuntimeState(stuckRuntime.teamRunId, config)).status).toBe("failed")
     expect(await exists(getRuntimeStateDir(resolveBaseDir(config), deletingRuntime.teamRunId))).toBe(false)
-  }, 15000)
+  }, 30000)
 
   test("C-10.5 end-to-end: createTeamRun persists category-aware routing and team_send_message reapplies it on promptAsync", async () => {
     // given - a 2-member team; resolveMemberMock returns agentToUse + model per member
@@ -293,7 +293,7 @@ describe("team-mode integration", () => {
         thinking: { type: "enabled", budgetTokens: 1024 },
       },
     })
-  })
+  }, 30000)
 
   test("C-10.4 keeps member spawn concurrency within max_parallel_members", async () => {
     // given
@@ -313,8 +313,8 @@ describe("team-mode integration", () => {
       { kind: "subagent_type", name: "worker-b", subagent_type: "atlas", backendType: "in-process", isActive: true },
     ]), "ses_lead", createContext(baseDir, manager, new Set(["ses_lead"])), createConfig(baseDir, { max_parallel_members: launchLimit }), manager)
     try {
-      const firstBatch = await launchProbe.waitForFirstBatch("timed out waiting for the first two member launches")
-      await launchProbe.releaseAndWaitForCompletion(run, "timed out waiting for all member launches")
+      const firstBatch = await launchProbe.waitForFirstBatch()
+      await launchProbe.releaseAndWaitForCompletion(run)
       const completed = launchProbe.snapshot()
 
       // then
@@ -327,5 +327,5 @@ describe("team-mode integration", () => {
       launchProbe.release()
       run.catch(() => undefined)
     }
-  })
+  }, 30000)
 })

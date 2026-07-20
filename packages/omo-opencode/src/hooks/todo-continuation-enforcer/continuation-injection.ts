@@ -89,6 +89,7 @@ export async function injectContinuation(args: {
 
   const hasRunningBgTasks = backgroundManager
     ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running" || task.status === "pending")
+      || backgroundManager.hasPendingParentWake?.(sessionID) === true
     : false
 
   if (hasRunningBgTasks) {
@@ -172,9 +173,27 @@ export async function injectContinuation(args: {
 Remaining tasks:
 ${todoList}`
 
+  const hasBackgroundWorkBeforeDispatch = backgroundManager
+    ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running" || task.status === "pending")
+      || backgroundManager.hasPendingParentWake?.(sessionID) === true
+    : false
+
+  if (hasBackgroundWorkBeforeDispatch) {
+    log(`[${HOOK_NAME}] Skipped injection: background tasks running before prompt`, { sessionID })
+    return
+  }
+
   const injectionState = sessionStateStore.getExistingState(sessionID)
   if (injectionState?.wasCancelled) {
     log(`[${HOOK_NAME}] Skipped injection: session was cancelled before prompt`, { sessionID })
+    return
+  }
+
+  if (injectionState?.continuationBlockReason) {
+    log(`[${HOOK_NAME}] Skipped injection: continuation paused at turn boundary`, {
+      sessionID,
+      reason: injectionState.continuationBlockReason,
+    })
     return
   }
 
@@ -223,6 +242,9 @@ ${todoList}`
           injectionState.inFlight = false
           injectionState.lastInjectedAt = Date.now()
           injectionState.awaitingPostInjectionProgressCheck = true
+          injectionState.continuationResponseObserved = false
+          injectionState.continuationBlockReason = undefined
+          injectionState.pendingUserMessageID = undefined
           injectionState.consecutiveFailures = 0
         }
         return
@@ -242,6 +264,9 @@ ${todoList}`
       injectionState.inFlight = false
       injectionState.lastInjectedAt = Date.now()
       injectionState.awaitingPostInjectionProgressCheck = true
+      injectionState.continuationResponseObserved = false
+      injectionState.continuationBlockReason = undefined
+      injectionState.pendingUserMessageID = undefined
       injectionState.consecutiveFailures = 0
     }
   } catch (error) {

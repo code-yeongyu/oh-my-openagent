@@ -7,6 +7,7 @@ export const upstreamsRoot: string;
 export const designOriginals: readonly string[];
 export const brandStems: readonly string[];
 export const tasteSkillFiles: Record<string, string>;
+export const tasteSkillArtifactFiles: Record<string, string>;
 export const uiUxDbFileRenames: Record<string, string>;
 export const uiUxDbScripts: readonly string[];
 

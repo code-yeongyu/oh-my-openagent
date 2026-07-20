@@ -76,6 +76,7 @@ export async function handleSessionIdle(args: {
 
   const hasRunningBgTasks = backgroundManager
     ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running" || task.status === "pending")
+      || backgroundManager.hasPendingParentWake?.(sessionID) === true
     : false
 
   if (hasRunningBgTasks) {
@@ -103,7 +104,8 @@ export async function handleSessionIdle(args: {
       return
     }
   } catch (error) {
-    log(`[${HOOK_NAME}] Messages fetch failed, skipping continuation`, { sessionID, error: String(error) })
+    const loggedError = error instanceof Error ? { name: error.name, message: error.message } : String(error)
+    log(`[${HOOK_NAME}] Messages fetch failed, skipping continuation`, { sessionID, error: loggedError })
     return
   }
 
@@ -112,7 +114,8 @@ export async function handleSessionIdle(args: {
     const response = await ctx.client.session.todo({ path: { id: sessionID } })
     todos = normalizeSDKResponse(response, [] as Todo[], { preferResponseOnMissingData: true })
   } catch (error) {
-    log(`[${HOOK_NAME}] Todo fetch failed`, { sessionID, error: String(error) })
+    const loggedError = error instanceof Error ? { name: error.name, message: error.message } : String(error)
+    log(`[${HOOK_NAME}] Todo fetch failed`, { sessionID, error: loggedError })
     return
   }
 
@@ -165,7 +168,8 @@ export async function handleSessionIdle(args: {
     encounteredCompaction = messageInfoResult.encounteredCompaction
     latestMessageWasCompaction = messageInfoResult.latestMessageWasCompaction
   } catch (error) {
-    log(`[${HOOK_NAME}] Failed to fetch messages for agent check`, { sessionID, error: String(error) })
+    const loggedError = error instanceof Error ? { name: error.name, message: error.message } : String(error)
+    log(`[${HOOK_NAME}] Failed to fetch messages for agent check`, { sessionID, error: loggedError })
   }
 
   if (latestMessageWasCompaction) {
@@ -215,6 +219,14 @@ export async function handleSessionIdle(args: {
     incompleteCount,
     todos,
   )
+  if (state.continuationBlockReason) {
+    log(`[${HOOK_NAME}] Skipped: continuation paused at turn boundary`, {
+      sessionID,
+      reason: state.continuationBlockReason,
+      hasProgressed: progressUpdate.hasProgressed,
+    })
+    return
+  }
   if (shouldStopForStagnation({ sessionID, incompleteCount, progressUpdate })) {
     return
   }

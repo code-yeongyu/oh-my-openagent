@@ -22,7 +22,11 @@ export function createLineDecoder(
 					try {
 						onMessage(JSON.parse(raw));
 					} catch (error) {
-						onParseError?.(raw, error);
+						if (error instanceof Error) {
+							onParseError?.(raw, error);
+						} else {
+							throw error;
+						}
 					}
 				}
 				index = buffer.indexOf("\n");

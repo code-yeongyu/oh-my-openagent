@@ -841,7 +841,7 @@ describe("Prometheus category config resolution", () => {
 
     // then
     expect(config).toBeDefined()
-    expect(config?.model).toBe("openai/gpt-5.5")
+    expect(config?.model).toBe("openai/gpt-5.6-sol")
     expect(config?.variant).toBe("xhigh")
   })
 
@@ -901,7 +901,7 @@ describe("Prometheus category config resolution", () => {
 
     // then - falls back to DEFAULT_CATEGORIES
     expect(config).toBeDefined()
-    expect(config?.model).toBe("openai/gpt-5.5")
+    expect(config?.model).toBe("openai/gpt-5.6-sol")
     expect(config?.variant).toBe("xhigh")
   })
 
@@ -1354,7 +1354,7 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
       () => new Promise(() => {})
     )
     const pluginConfig = createPluginConfig({
-      experimental: { plugin_load_timeout_ms: 100 },
+      experimental: { plugin_load_timeout_ms: 10 },
     })
     const config: Record<string, unknown> = {
       model: "anthropic/claude-opus-4-7",

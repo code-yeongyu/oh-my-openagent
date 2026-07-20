@@ -104,6 +104,57 @@ describe("test workflows", () => {
     expect(typecheckBuildsLspToolsMcp, "publish typecheck job must build lsp-tools-mcp before bun run typecheck").toBe(true)
   })
 
+  test("builds publish-main from the prepared release SHA", () => {
+    // #given
+    const workflow = readFileSync(publishWorkflowPath, "utf8")
+    const publishMainJob = sliceWorkflowSection(workflow, "  publish-main:", "  publish-platform:")
+
+    // #when
+    const checksOutPreparedRelease = publishMainJob.includes("ref: ${{ needs.prepare-release-state.outputs.release_sha }}")
+    const regeneratesInstallerBeforeMainBuild = publishMainJob.includes(
+      "bun run build:codex-install && bun run build:lsp-tools-mcp && bun run build:lsp-daemon && bun run build",
+    )
+
+    // #then
+    expect(checksOutPreparedRelease, "publish-main must build the release-state commit after version synchronization").toBe(true)
+    expect(regeneratesInstallerBeforeMainBuild, "publish-main must regenerate the embedded Codex installer from that release commit").toBe(true)
+  })
+
+  test("dispatches a source-pinned publish run before provenance-bearing release operations", () => {
+    // #given
+    const workflow = readFileSync(publishWorkflowPath, "utf8")
+    const prepareJob = sliceWorkflowSection(workflow, "  prepare-release-state:", "  dispatch-provenance-safe-publish:")
+    const dispatchJob = sliceWorkflowSection(workflow, "  dispatch-provenance-safe-publish:", "  publish-main:")
+    const publishMainJob = sliceWorkflowSection(workflow, "  publish-main:", "  publish-platform:")
+    const publishPlatformJob = sliceWorkflowSection(workflow, "  publish-platform:", "  release:")
+    const releaseJob = sliceWorkflowSectionToEnd(workflow, "  release:")
+
+    // #when
+    const exposesPreparedSourceInput = workflow.includes("prepared_release_sha:")
+    const validatesDispatchSource = prepareJob.includes("PREPARED_RELEASE_SHA: ${{ inputs.prepared_release_sha }}") &&
+      prepareJob.includes('"$PREPARED_RELEASE_SHA" != "$GITHUB_SHA"')
+    const dispatchesPinnedTagRun =
+      dispatchJob.includes('git tag "v${VERSION}" "$RELEASE_SHA"') &&
+      dispatchJob.includes('gh workflow run publish.yml --ref "v${VERSION}"') &&
+      dispatchJob.includes('prepared_release_sha=${RELEASE_SHA}')
+    const provenanceOperationsRequirePinnedRun =
+      publishMainJob.includes("inputs.prepared_release_sha != ''") &&
+      publishPlatformJob.includes("inputs.prepared_release_sha != ''") &&
+      releaseJob.includes("inputs.prepared_release_sha != ''")
+    const releaseChecksOutPreparedSource = releaseJob.includes("ref: ${{ needs.prepare-release-state.outputs.release_sha }}")
+    const releaseDoesNotRestampOrRetag =
+      !releaseJob.includes("name: Apply release version to source tree") &&
+      !releaseJob.includes("name: Create release tag")
+
+    // #then
+    expect(exposesPreparedSourceInput, "the follow-up publish run must receive the exact prepared source SHA").toBe(true)
+    expect(validatesDispatchSource, "the provenance-bearing run must reject a dispatch SHA different from the prepared source").toBe(true)
+    expect(dispatchesPinnedTagRun, "the preparation run must tag and dispatch the exact prepared source").toBe(true)
+    expect(provenanceOperationsRequirePinnedRun, "npm, platform, marketplace, and GitHub release operations must only run from the pinned follow-up dispatch").toBe(true)
+    expect(releaseChecksOutPreparedSource, "GitHub release and marketplace operations must check out the prepared source directly").toBe(true)
+    expect(releaseDoesNotRestampOrRetag, "the provenance-bearing release run must not mutate its release source").toBe(true)
+  })
+
   test("runs Codex compatibility checks before publish jobs", () => {
     // #given
     const workflow = readFileSync(publishWorkflowPath, "utf8")
@@ -167,8 +218,8 @@ describe("test workflows", () => {
     const hasCodexCommand = workflow.includes("run: bun run test:codex")
     const buildWaitsForChecks = buildJob.includes("needs:")
     const buildHasReadOnlyContentsPermission = buildJob.includes("permissions:\n      contents: read")
-    const writeGateNeedsAllChecks = autoCommitSchemaJob.includes("needs: [test, typecheck, codex-compatibility, build]")
-    const draftReleaseNeedsAllChecks = draftReleaseJob.includes("needs: [test, typecheck, codex-compatibility, build]")
+    const writeGateNeedsAllChecks = autoCommitSchemaJob.includes("needs: [test, typecheck, codex-compatibility, senpi-compatibility, build]")
+    const draftReleaseNeedsAllChecks = draftReleaseJob.includes("needs: [test, typecheck, codex-compatibility, senpi-compatibility, build]")
 
     // #then
     expect(hasCodexMatrixJob, "CI must expose a Codex compatibility matrix job").toBe(true)
@@ -180,38 +231,32 @@ describe("test workflows", () => {
     expect(draftReleaseNeedsAllChecks, "Draft release must wait for all root checks and build").toBe(true)
   })
 
-  test("prepares lsp-tools-mcp before Codex compatibility tests", () => {
+  test("runs Codex compatibility tests with Node available for the self-built MCP runtimes", () => {
     const workflow = readFileSync(ciWorkflowPath, "utf8")
     const codexCompatibilityJob = sliceWorkflowSection(workflow, "  codex-compatibility:", "  lazycodex-published-smoke:")
 
     const hasNodeSetup = codexCompatibilityJob.includes('node-version: "24"')
-    const buildsLspToolsMcp =
-      codexCompatibilityJob.includes("name: Build vendored lsp-tools-mcp package") &&
-      codexCompatibilityJob.includes("working-directory: packages/lsp-tools-mcp") &&
-      codexCompatibilityJob.indexOf("name: Build vendored lsp-tools-mcp package") <
-        codexCompatibilityJob.indexOf("name: Run Codex compatibility tests")
+    // `bun run test:codex` builds lsp-tools-mcp and lsp-daemon itself (see the
+    // "builds bundled MCP runtimes before Codex compatibility tests" test), so the
+    // job no longer needs an explicit pre-build step.
+    const runsCodexTests = codexCompatibilityJob.includes("run: bun run test:codex")
 
     expect(hasNodeSetup, "Codex compatibility must setup Node for MCP package builds").toBe(true)
-    expect(buildsLspToolsMcp, "Codex compatibility must build lsp-tools-mcp before bun run test:codex").toBe(true)
+    expect(runsCodexTests, "Codex compatibility must run bun run test:codex").toBe(true)
   })
 
-  test("sets up Bun before vendored lsp-tools-mcp builds", () => {
+  test("sets up Bun before vendored lsp-tools-mcp builds in publish workflow jobs", () => {
     // #given
-    const ciWorkflow = readFileSync(ciWorkflowPath, "utf8")
+    // ci.yml no longer pre-builds lsp-tools-mcp in any job: typecheck/codex/build
+    // dropped it as redundant (typecheck needs no build; test:codex and bun run
+    // build self-build it), and the test job's full install rebuilds it via prepare.
+    // publish.yml still pre-builds it, so the ordering guard still applies there.
     const publishWorkflow = readFileSync(publishWorkflowPath, "utf8")
-    const ciTestJob = sliceWorkflowSection(ciWorkflow, "  test:", "  typecheck:")
-    const ciTypecheckJob = sliceWorkflowSection(ciWorkflow, "  typecheck:", "  codex-compatibility:")
-    const ciCodexCompatibilityJob = sliceWorkflowSection(ciWorkflow, "  codex-compatibility:", "  lazycodex-published-smoke:")
-    const ciBuildJob = sliceWorkflowSection(ciWorkflow, "  build:", "  draft-release:")
     const publishTestJob = sliceWorkflowSection(publishWorkflow, "  test:", "  typecheck:")
     const publishTypecheckJob = sliceWorkflowSection(publishWorkflow, "  typecheck:", "  codex-compatibility:")
     const publishCodexCompatibilityJob = sliceWorkflowSection(publishWorkflow, "  codex-compatibility:", "  preflight-trust:")
 
     // #then
-    expectBunSetupBeforeLspToolsBuild(ciTestJob, "CI test job")
-    expectBunSetupBeforeLspToolsBuild(ciTypecheckJob, "CI typecheck job")
-    expectBunSetupBeforeLspToolsBuild(ciCodexCompatibilityJob, "CI Codex compatibility job")
-    expectBunSetupBeforeLspToolsBuild(ciBuildJob, "CI build job")
     expectBunSetupBeforeLspToolsBuild(publishTestJob, "publish test job")
     expectBunSetupBeforeLspToolsBuild(publishTypecheckJob, "publish typecheck job")
     expectBunSetupBeforeLspToolsBuild(publishCodexCompatibilityJob, "publish Codex compatibility job")

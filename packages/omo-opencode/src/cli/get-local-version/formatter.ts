@@ -44,9 +44,17 @@ export function formatVersionOutput(info: VersionInfo): string {
       lines.push(`  ${SYMBOLS.dev} ${color.cyan("Running in local development mode")}`)
       lines.push(`  ${color.dim("Using file:// protocol from config")}`)
       break
+    case "dev":
+      lines.push(`  ${SYMBOLS.dev} ${color.cyan("Running a local dev build")}`)
+      lines.push(`  ${color.dim("Installed from source; update checks are skipped")}`)
+      break
     case "pinned":
       lines.push(`  ${SYMBOLS.pin} ${color.magenta(`Version pinned to ${info.pinnedVersion}`)}`)
       lines.push(`  ${color.dim("Update check skipped for pinned versions")}`)
+      break
+    case "pinned-mismatch":
+      lines.push(`  ${SYMBOLS.warn} ${color.yellow(`Version pinned to ${info.pinnedVersion} but running ${info.currentVersion}`)}`)
+      lines.push(`  ${color.dim("The pin only skips the update check; it does not control which version OpenCode loads")}`)
       break
     case "error":
       lines.push(`  ${SYMBOLS.cross} ${color.red("Unable to check for updates")}`)

@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, utimes, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, symlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { PassThrough } from "node:stream";
 import test from "node:test";
 
-import { resolveAutoUpdatePlan, resolveLazyCodexUpdatePlan, runAutoUpdateCheck } from "../scripts/auto-update.mjs";
+import { readSessionModelFromStdin, resolveAutoUpdatePlan, resolveLazyCodexUpdatePlan, runAutoUpdateCheck } from "../scripts/auto-update.mjs";
 import { detectInstallFlow } from "../scripts/install-flow.mjs";
 import { resolveSpawnInvocation } from "../scripts/spawn-command.mjs";
 
@@ -20,6 +21,12 @@ function autoUpdateEnv(root, extra = {}) {
 	};
 }
 
+function stdinFrom(payload) {
+	const stream = new PassThrough();
+	stream.end(payload);
+	return stream;
+}
+
 test("#given auto update is disabled #when resolving plan #then no command is scheduled", () => {
 	const plan = resolveAutoUpdatePlan({
 		env: { LAZYCODEX_AUTO_UPDATE_DISABLED: "1" },
@@ -29,6 +36,33 @@ test("#given auto update is disabled #when resolving plan #then no command is sc
 
 	assert.equal(plan.shouldRun, false);
 	assert.equal(plan.reason, "disabled");
+});
+
+test("#given SessionStart payload with model #when reading stdin #then returns the model", async () => {
+	const payload = JSON.stringify({
+		hook_event_name: "SessionStart",
+		session_id: "s-1",
+		cwd: "/tmp",
+		model: "gpt-5.6-terra",
+		permission_mode: "default",
+		source: "startup",
+	});
+
+	assert.equal(await readSessionModelFromStdin(stdinFrom(payload)), "gpt-5.6-terra");
+});
+
+test("#given empty or malformed stdin #when reading session model #then returns null", async () => {
+	assert.equal(await readSessionModelFromStdin(stdinFrom("")), null);
+	assert.equal(await readSessionModelFromStdin(stdinFrom("not json")), null);
+	assert.equal(await readSessionModelFromStdin(stdinFrom(JSON.stringify({ model: "  " }))), null);
+	assert.equal(await readSessionModelFromStdin(stdinFrom(JSON.stringify({ session_id: "s-1" }))), null);
+	assert.equal(await readSessionModelFromStdin(null), null);
+});
+
+test("#given a TTY stdin #when reading session model #then returns null without waiting", async () => {
+	const stream = stdinFrom("{}");
+	stream.isTTY = true;
+	assert.equal(await readSessionModelFromStdin(stream), null);
 });
 
 test("#given stale state #when resolving plan #then installer update command is scheduled", () => {
@@ -191,7 +225,7 @@ test("#given test command override #when running check #then records state and l
 			toVersion: "1.0.1",
 		},
 	]);
-	assert.match(await readFile(join(env.CODEX_HOME, "config.toml"), "utf8"), /model = "gpt-5\.5"/);
+	assert.match(await readFile(join(env.CODEX_HOME, "config.toml"), "utf8"), /model = "gpt-5\.6-sol"/);
 });
 
 test("#given failed waited update #when retry window passes #then next update is not blocked by success throttle", async () => {
@@ -245,7 +279,7 @@ test("#given active lock #when running check #then skips concurrent update", asy
 
 	assert.equal(result.started, false);
 	assert.equal(result.reason, "locked");
-	assert.match(await readFile(join(root, "codex-home", "config.toml"), "utf8"), /model_context_window = 400000/);
+	assert.match(await readFile(join(root, "codex-home", "config.toml"), "utf8"), /model_context_window = 372000/);
 });
 
 test("#given stale lock #when running check #then removes lock and runs update", async () => {
@@ -303,9 +337,20 @@ function marketplaceCheckEnv(root, pluginRoot, spawnLogPath, extra = {}) {
 }
 
 test("#given marketplace plugin root without install snapshot #when running check #then skips npx update with marketplace-flow log and upgrade notice", async () => {
-	const { root, pluginRoot } = await makeStorePluginRoot("lazycodex-auto-update-marketplace-");
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-auto-update-marketplace-"));
+	const codexHome = join(root, "codex-home");
+	const pluginRoot = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "1.0.0");
 	const spawnLogPath = join(root, "spawn.log");
-	const env = marketplaceCheckEnv(root, pluginRoot, spawnLogPath);
+	await mkdir(join(codexHome, "plugins", "cache", "sisyphuslabs", ".agents", "plugins"), { recursive: true });
+	await mkdir(pluginRoot, { recursive: true });
+	await writeFile(
+		join(codexHome, "plugins", "cache", "sisyphuslabs", ".agents", "plugins", "marketplace.json"),
+		JSON.stringify({
+			name: "sisyphuslabs",
+			plugins: [{ name: "omo", source: { source: "local", path: "./omo/1.0.0" } }],
+		}),
+	);
+	const env = marketplaceCheckEnv(root, pluginRoot, spawnLogPath, { CODEX_HOME: codexHome });
 
 	const result = await runAutoUpdateCheck({ env, now: 123_456 });
 
@@ -327,6 +372,145 @@ test("#given marketplace plugin root without install snapshot #when running chec
 			kind: "marketplace-flow",
 		},
 	]);
+});
+
+test("#given marketplace flow with stale local cache state #when running check #then starts npx repair instead of marketplace skip", async () => {
+	const { root, pluginRoot } = await makeStorePluginRoot("lazycodex-auto-update-marketplace-repair-");
+	const spawnLogPath = join(root, "spawn.log");
+	const binDir = join(root, "bin");
+	const codexHome = join(root, "codex-home");
+	const missingCachedCli = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "1.0.1", "components", "ulw-loop", "dist", "cli.js");
+	await mkdir(join(codexHome, "plugins", "cache", "sisyphuslabs", ".agents", "plugins"), { recursive: true });
+	await mkdir(binDir, { recursive: true });
+	await writeFile(
+		join(codexHome, "plugins", "cache", "sisyphuslabs", ".agents", "plugins", "marketplace.json"),
+		JSON.stringify({
+			name: "sisyphuslabs",
+			plugins: [{ name: "omo", source: { source: "local", path: "./omo/1.0.1" } }],
+		}),
+	);
+	await symlink(missingCachedCli, join(binDir, "ulw"));
+	const env = marketplaceCheckEnv(root, pluginRoot, spawnLogPath, {
+		CODEX_HOME: codexHome,
+		CODEX_LOCAL_BIN_DIR: binDir,
+	});
+
+	const result = await runAutoUpdateCheck({ env, now: 123_456 });
+
+	assert.equal(result.started, true);
+	assert.equal(result.status, 0);
+	assert.equal(await readFile(spawnLogPath, "utf8"), "ok");
+	assert.equal(result.notices.length, 1);
+	assert.match(result.notices[0], /repair/i);
+	assert.match(result.notices[0], /stale local LazyCodex cache/i);
+	assert.match(result.notices[0], /bundled reinstall repair/);
+	assert.doesNotMatch(result.notices[0], /Repair command/);
+	assert.doesNotMatch(result.notices[0], /plugins[\\/]+cache[\\/]+sisyphuslabs/);
+	const logEntries = (await readFile(env.LAZYCODEX_AUTO_UPDATE_LOG_PATH, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
+	assert.equal(logEntries[0].event, "started");
+	assert.equal(logEntries[0].kind, "marketplace-local-repair");
+	assert.equal(logEntries[0].command, undefined);
+	assert.equal(logEntries[0].args, undefined);
+	assert.deepEqual(logEntries[0].repairReasons, [
+		{ kind: "missing-marketplace-payload" },
+		{ kind: "dangling-managed-bin", binName: "ulw" },
+	]);
+});
+
+test("#given stale marketplace cache and recent success state #when resolving plan #then repair bypasses success throttle", async () => {
+	const { root, pluginRoot } = await makeStorePluginRoot("lazycodex-auto-update-marketplace-repair-throttle-");
+	const spawnLogPath = join(root, "spawn.log");
+	const codexHome = join(root, "codex-home");
+	await mkdir(join(codexHome, "plugins", "cache", "sisyphuslabs", ".agents", "plugins"), { recursive: true });
+	await writeFile(
+		join(codexHome, "plugins", "cache", "sisyphuslabs", ".agents", "plugins", "marketplace.json"),
+		JSON.stringify({
+			name: "sisyphuslabs",
+			plugins: [{ name: "omo", source: { source: "local", path: "./omo/1.0.1" } }],
+		}),
+	);
+	const env = marketplaceCheckEnv(root, pluginRoot, spawnLogPath, {
+		CODEX_HOME: codexHome,
+		LAZYCODEX_LATEST_VERSION: "1.0.1",
+	});
+
+	const plan = resolveAutoUpdatePlan({ env, now: 123_457, lastCheckedAt: 123_456, lastStatus: "success" });
+
+	assert.equal(plan.shouldRun, true);
+	assert.equal(plan.kind, "marketplace-local-repair");
+	assert.deepEqual(plan.repairReasons, [{ kind: "missing-marketplace-payload" }]);
+});
+
+test("#given stale marketplace cache and recent started state #when resolving plan #then repair honors retry throttle", async () => {
+	const { root, pluginRoot } = await makeStorePluginRoot("lazycodex-auto-update-marketplace-repair-retry-");
+	const spawnLogPath = join(root, "spawn.log");
+	const codexHome = join(root, "codex-home");
+	await mkdir(join(codexHome, "plugins", "cache", "sisyphuslabs", ".agents", "plugins"), { recursive: true });
+	await writeFile(
+		join(codexHome, "plugins", "cache", "sisyphuslabs", ".agents", "plugins", "marketplace.json"),
+		JSON.stringify({
+			name: "sisyphuslabs",
+			plugins: [{ name: "omo", source: { source: "local", path: "./omo/1.0.1" } }],
+		}),
+	);
+	const env = marketplaceCheckEnv(root, pluginRoot, spawnLogPath, {
+		CODEX_HOME: codexHome,
+		LAZYCODEX_LATEST_VERSION: "1.0.1",
+	});
+
+	const plan = resolveAutoUpdatePlan({ env, now: 123_457, lastAttemptedAt: 123_456, lastStatus: "started" });
+
+	assert.equal(plan.shouldRun, false);
+	assert.equal(plan.reason, "retry-throttled");
+});
+
+test("#given marketplace flow with stale Windows generated shim #when resolving plan #then starts local repair", async () => {
+	const { root, pluginRoot } = await makeStorePluginRoot("lazycodex-auto-update-marketplace-windows-repair-");
+	const spawnLogPath = join(root, "spawn.log");
+	const binDir = join(root, "bin");
+	const codexHome = join(root, "codex-home");
+	const missingCachedCli = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "1.0.1", "components", "ulw-loop", "dist", "cli.js");
+	await mkdir(binDir, { recursive: true });
+	await writeFile(
+		join(binDir, "omo-ulw-loop.cmd"),
+		[
+			"@echo off",
+			":: generated by oh-my-openagent Codex installer",
+			`\"${missingCachedCli}\" %*`,
+			"",
+		].join("\r\n"),
+	);
+	const env = marketplaceCheckEnv(root, pluginRoot, spawnLogPath, {
+		CODEX_HOME: codexHome,
+		CODEX_LOCAL_BIN_DIR: binDir,
+		LAZYCODEX_LATEST_VERSION: "1.0.1",
+	});
+
+	const plan = resolveAutoUpdatePlan({ env, now: 123_456 });
+
+	assert.equal(plan.shouldRun, true);
+	assert.equal(plan.kind, "marketplace-local-repair");
+	assert.deepEqual(plan.repairReasons, [{ kind: "dangling-managed-bin", binName: "omo-ulw-loop" }]);
+});
+
+test("#given marketplace flow with non-managed stale cache-shaped bin #when resolving plan #then skips local repair", async () => {
+	const { root, pluginRoot } = await makeStorePluginRoot("lazycodex-auto-update-marketplace-user-bin-");
+	const spawnLogPath = join(root, "spawn.log");
+	const binDir = join(root, "bin");
+	const codexHome = join(root, "codex-home");
+	const missingCachedCli = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "1.0.1", "components", "ulw-loop", "dist", "cli.js");
+	await mkdir(binDir, { recursive: true });
+	await symlink(missingCachedCli, join(binDir, "user-tool"));
+	const env = marketplaceCheckEnv(root, pluginRoot, spawnLogPath, {
+		CODEX_HOME: codexHome,
+		CODEX_LOCAL_BIN_DIR: binDir,
+		LAZYCODEX_LATEST_VERSION: "1.0.1",
+	});
+
+	const plan = resolveAutoUpdatePlan({ env, now: 123_456 });
+
+	assert.equal(plan.shouldRun, false);
+	assert.equal(plan.reason, "marketplace-flow");
 });
 
 test("#given install snapshot at plugin root #when running check #then npx update behavior is unchanged", async () => {
@@ -461,8 +645,8 @@ test("#given throttled updater and stale Codex config #when running check #then 
 	const content = await readFile(join(codexHome, "config.toml"), "utf8");
 	assert.equal(result.started, false);
 	assert.equal(result.reason, "throttled");
-	assert.match(content, /model = "gpt-5\.5"/);
-	assert.match(content, /model_context_window = 400000/);
+	assert.match(content, /model = "gpt-5\.6-sol"/);
+	assert.match(content, /model_context_window = 372000/);
 	assert.match(content, /model_reasoning_effort = "high"/);
 	assert.match(content, /plan_mode_reasoning_effort = "xhigh"/);
 	assert.doesNotMatch(content, /gpt-5\.2/);

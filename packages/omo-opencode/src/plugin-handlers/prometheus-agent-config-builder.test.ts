@@ -238,6 +238,52 @@ describe("buildPrometheusAgentConfig", () => {
       });
   });
 
+  describe("#given category fallback_models", () => {
+    test("materializes category fallback_models when Prometheus has no explicit fallback_models", async () => {
+      // given
+      const categoryFallbackModels = ["openai/gpt-5.4"];
+      resolveCategoryConfigSpy.mockReturnValue({
+        fallback_models: categoryFallbackModels,
+      } as CategoryConfig);
+
+      // when
+      const result = await buildPrometheusAgentConfig({
+        configAgentPlan: undefined,
+        pluginPrometheusOverride: { category: "test-category" },
+        userCategories: { "test-category": { fallback_models: categoryFallbackModels } },
+        currentModel: undefined,
+      });
+
+      // then
+      expect(result.fallback_models).toEqual(categoryFallbackModels);
+    });
+
+    test.each([
+      ["explicit fallback_models", ["openai/gpt-5.5"]],
+      ["explicit empty fallback_models", []],
+    ])("preserves %s over category fallback_models", async (_label, explicitFallbackModels) => {
+      // given
+      const categoryFallbackModels = ["openai/gpt-5.4"];
+      resolveCategoryConfigSpy.mockReturnValue({
+        fallback_models: categoryFallbackModels,
+      } as CategoryConfig);
+
+      // when
+      const result = await buildPrometheusAgentConfig({
+        configAgentPlan: undefined,
+        pluginPrometheusOverride: {
+          category: "test-category",
+          fallback_models: explicitFallbackModels,
+        },
+        userCategories: { "test-category": { fallback_models: categoryFallbackModels } },
+        currentModel: undefined,
+      });
+
+      // then
+      expect(result.fallback_models).toEqual(explicitFallbackModels);
+    });
+  });
+
   describe("#given no currentModel and no explicit config", () => {
     test("falls through to fallback chain", async () => {
       // given - no currentModel, no explicit config
@@ -284,7 +330,7 @@ describe("buildPrometheusAgentConfig", () => {
   });
 
   describe("#given a Prometheus prompt override tries to replace the base prompt", () => {
-    test("keeps the mandatory shared ulw-plan skill instruction when prompt is configured", async () => {
+    test("keeps the mandatory ulw-plan skill instruction when prompt is configured", async () => {
       // given
       const replacementOnlyPrompt = "OVERRIDE_PROMPT_NO_SHARED_SKILL";
 
@@ -299,7 +345,7 @@ describe("buildPrometheusAgentConfig", () => {
       // then
       expect(typeof result.prompt).toBe("string");
       if (typeof result.prompt === "string") {
-        expect(result.prompt).toContain('skill(name="shared/ulw-plan")');
+        expect(result.prompt).toContain('skill(name="ulw-plan")');
         expect(result.prompt).toContain(replacementOnlyPrompt);
         expect(result.prompt).not.toBe(replacementOnlyPrompt);
       }

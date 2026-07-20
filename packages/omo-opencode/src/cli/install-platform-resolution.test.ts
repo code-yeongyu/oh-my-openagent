@@ -48,6 +48,31 @@ describe("install platform resolution", () => {
     expect(args.platform).toBe("both")
   })
 
+  test("rejects --platform=senpi while the senpi platform flag is disabled", () => {
+    // given
+    const invocationName = "omo"
+    delete process.env.OMO_ENABLE_SENPI_PLATFORM
+
+    // when / then
+    expect(() => resolveInstallArgs({ tui: true, platform: "senpi" }, invocationName)).toThrow(/OMO_ENABLE_SENPI_PLATFORM/)
+  })
+
+  test("resolves explicit --platform=senpi when the senpi platform flag is enabled", () => {
+    // given
+    const invocationName = "omo"
+    process.env.OMO_ENABLE_SENPI_PLATFORM = "1"
+
+    try {
+      // when
+      const args = resolveInstallArgs({ tui: true, platform: "senpi" }, invocationName)
+
+      // then
+      expect(args.platform).toBe("senpi")
+    } finally {
+      delete process.env.OMO_ENABLE_SENPI_PLATFORM
+    }
+  })
+
   test("resolves explicit --platform=opencode", () => {
     // given
     const invocationName = "omo"
@@ -102,7 +127,7 @@ describe("install platform resolution", () => {
     // then
     expect(installBlock).not.toBeNull()
     expect(installBlock?.[1]).toContain('new Option("--platform <platform>"')
-    expect(installBlock?.[1]).toContain('.choices(["opencode", "codex", "both"])')
+    expect(installBlock?.[1]).toContain(".choices(availableInstallPlatforms())")
     expect(installBlock?.[1]).toContain("--codex-autonomous")
     expect(installBlock?.[1]).toContain("--no-codex-autonomous")
   })
@@ -117,7 +142,7 @@ describe("install platform resolution", () => {
     // then
     expect(rootBlock).not.toBeNull()
     expect(rootBlock?.[1]).toContain('new Option("--platform <platform>"')
-    expect(rootBlock?.[1]).toContain('.choices(["opencode", "codex", "both"])')
+    expect(rootBlock?.[1]).toContain(".choices(availableInstallPlatforms())")
     expect(rootBlock?.[1]).toContain(".hideHelp()")
   })
 })

@@ -5,6 +5,7 @@ import { homedir } from "node:os"
 import { basename, join, resolve } from "node:path"
 import { detectCodexInstallation, type CodexInstallationDetection } from "../../install-codex"
 import { resolveCodexInstallerBinDir } from "../../install-codex/install-codex"
+import { parseHookStateHeaderKey, splitTomlSections } from "../../install-codex/codex-config-toml-sections"
 import { CHECK_IDS, CHECK_NAMES } from "../framework/constants"
 import type { CheckResult, CodexConfigSummary, CodexDoctorSummary, DoctorIssue } from "../framework/types"
 import packageJson from "../../../../package.json" with { type: "json" }
@@ -24,7 +25,9 @@ interface JsonRecord {
 
 const MARKETPLACE_NAME = "sisyphuslabs"
 const PLUGIN_NAME = "omo"
+const COMPANION_PLUGIN_KEY = "codex@openai-codex"
 const DEFAULT_PLUGIN_VERSION = "0.1.0"
+const COMPANION_LIFECYCLE_EVENTS = new Set(["session_start", "stop"])
 const CODEX_BIN_NAMES = [
   "omo",
   "omo-rules",
@@ -81,6 +84,7 @@ export async function checkCodex(deps: CodexDoctorDeps = {}): Promise<CheckResul
       `Distribution: ${summary.packageName ?? "unknown"}@${summary.packageVersion ?? "unknown"}`,
       `Config: ${summary.configPath}`,
       `Enabled plugin: ${summary.config.pluginEnabled ? "omo@sisyphuslabs" : "missing"}`,
+      `Companion plugin: ${formatCompanionPluginStatus(summary.config)}`,
       `Linked bins: ${summary.linkedBins.length > 0 ? summary.linkedBins.join(", ") : "none"}`,
       `Agents: ${summary.agents.length > 0 ? summary.agents.join(", ") : "none"}`,
     ],
@@ -120,10 +124,10 @@ function buildCodexIssues(summary: CodexDoctorSummary): DoctorIssue[] {
     issues.push({
       title: "omo runtime command is not linked",
       description:
-        "The omo runtime wrapper is missing from the installer bin directory, so `omo sparkshell` and `omo ulw-loop` fail in Codex sessions. lazycodex-ai 4.8.0/4.8.1 installs removed the legacy omo bin without writing a replacement.",
+        "The omo runtime wrapper is missing from the installer bin directory, so `omo ulw-loop` fails in Codex sessions. lazycodex-ai 4.8.0/4.8.1 installs removed the legacy omo bin without writing a replacement.",
       fix: "Run: npx lazycodex-ai@latest install",
       severity: "error",
-      affects: ["omo sparkshell", "ulw-loop"],
+      affects: ["ulw-loop"],
     })
   }
   if (!summary.config.pluginEnabled) {
@@ -153,6 +157,18 @@ function buildCodexIssues(summary: CodexDoctorSummary): DoctorIssue[] {
       affects: ["hooks"],
     })
   }
+  if (summary.config.pluginEnabled && hasCompanionLifecycleSurface(summary.config)) {
+    issues.push({
+      title: "Codex Companion lifecycle hooks may conflict with LazyCodex",
+      description: [
+        companionLifecycleSurfaceDescription(summary.config),
+        "LazyCodex does not disable other plugins automatically, but when LazyCodex is your primary Codex workflow these extra lifecycle hooks can produce confusing SessionStart/Stop hook failure banners.",
+      ].join(" "),
+      fix: 'If LazyCodex is your primary Codex workflow, set [plugins."codex@openai-codex"] enabled = false and remove stale [hooks.state."codex@openai-codex:..."] SessionStart/Stop entries if the warning remains.',
+      severity: "warning",
+      affects: ["hooks", "plugin compatibility"],
+    })
+  }
   return issues
 }
 
@@ -166,7 +182,15 @@ async function resolveInstalledPluginRoot(codexHome: string): Promise<string | n
 
 async function readCodexConfigSummary(configPath: string): Promise<CodexConfigSummary> {
   if (!existsSync(configPath)) {
-    return { exists: false, marketplaceConfigured: false, pluginEnabled: false, pluginsFeatureEnabled: false, pluginHooksFeatureEnabled: false }
+    return {
+      exists: false,
+      marketplaceConfigured: false,
+      pluginEnabled: false,
+      pluginsFeatureEnabled: false,
+      pluginHooksFeatureEnabled: false,
+      companionPluginEnabled: false,
+      companionLifecycleHookStateEvents: [],
+    }
   }
   const content = await readFile(configPath, "utf8")
   return {
@@ -175,6 +199,8 @@ async function readCodexConfigSummary(configPath: string): Promise<CodexConfigSu
     pluginEnabled: settingEnabled(sectionBody(content, 'plugins."omo@sisyphuslabs"'), "enabled"),
     pluginsFeatureEnabled: featureEnabled(content, "plugins"),
     pluginHooksFeatureEnabled: featureEnabled(content, "plugin_hooks"),
+    companionPluginEnabled: settingEnabled(sectionBody(content, `plugins.${JSON.stringify(COMPANION_PLUGIN_KEY)}`), "enabled"),
+    companionLifecycleHookStateEvents: readCompanionLifecycleHookStateEvents(content),
   }
 }
 
@@ -215,6 +241,72 @@ function featureEnabled(content: string, name: string): boolean {
 
 function settingEnabled(content: string, name: string): boolean {
   return content.includes(`${name} = true`)
+}
+
+function hasCompanionLifecycleSurface(config: CodexConfigSummary): boolean {
+  return config.companionPluginEnabled || config.companionLifecycleHookStateEvents.length > 0
+}
+
+function companionLifecycleSurfaceDescription(config: CodexConfigSummary): string {
+  const states = config.companionLifecycleHookStateEvents
+  const stateText = states.length > 0
+    ? `trusted ${formatCompanionLifecycleEvents(states)} hook state`
+    : "no trusted SessionStart/Stop hook state detected"
+  const pluginText = config.companionPluginEnabled ? `${COMPANION_PLUGIN_KEY} is enabled` : `${COMPANION_PLUGIN_KEY} appears disabled`
+  return `${pluginText}, with ${stateText}.`
+}
+
+function formatCompanionPluginStatus(config: CodexConfigSummary): string {
+  if (config.companionPluginEnabled) {
+    const suffix = config.companionLifecycleHookStateEvents.length > 0
+      ? ` (${formatCompanionLifecycleEvents(config.companionLifecycleHookStateEvents)} hook trust)`
+      : ""
+    return `${COMPANION_PLUGIN_KEY} enabled${suffix}`
+  }
+  if (config.companionLifecycleHookStateEvents.length > 0) {
+    return `stale ${COMPANION_PLUGIN_KEY} ${formatCompanionLifecycleEvents(config.companionLifecycleHookStateEvents)} hook trust`
+  }
+  return "none"
+}
+
+function readCompanionLifecycleHookStateEvents(content: string): readonly string[] {
+  const events = new Set<string>()
+  for (const section of splitTomlSections(content)) {
+    if (section.header === null) continue
+    const key = parseHookStateHeaderKey(section.header)
+    const event = key === null ? null : companionLifecycleEventFromHookStateKey(key)
+    if (event !== null) events.add(event)
+  }
+  return [...events].sort(compareCompanionLifecycleEvents)
+}
+
+function companionLifecycleEventFromHookStateKey(key: string): string | null {
+  if (!key.startsWith(`${COMPANION_PLUGIN_KEY}:`)) return null
+  const eventName = key.split(":").at(-3)
+  return eventName !== undefined && COMPANION_LIFECYCLE_EVENTS.has(eventName) ? eventName : null
+}
+
+function compareCompanionLifecycleEvents(left: string, right: string): number {
+  return companionLifecycleEventOrder(left) - companionLifecycleEventOrder(right)
+}
+
+function companionLifecycleEventOrder(event: string): number {
+  return event === "session_start" ? 0 : event === "stop" ? 1 : 2
+}
+
+function formatCompanionLifecycleEvents(events: readonly string[]): string {
+  return events.map(formatCompanionLifecycleEvent).join(", ")
+}
+
+function formatCompanionLifecycleEvent(event: string): string {
+  switch (event) {
+    case "session_start":
+      return "SessionStart"
+    case "stop":
+      return "Stop"
+    default:
+      return event
+  }
 }
 
 function sectionBody(content: string, sectionName: string): string {

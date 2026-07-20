@@ -1,0 +1,23 @@
+# `bun run test:codex` summary (trimmed) - lsp-tools-mcp + lsp-daemon + omo-codex plugin gate
+[2m   Duration [22m 1.12s[2m (transform 2.15s, setup 0ms, import 3.04s, tests 1.27s, environment 2ms)[22m
+[2m   Duration [22m 1.90s[2m (transform 2.25s, setup 0ms, import 3.37s, tests 3.22s, environment 3ms)[22m
+(pass) install-codex > #given repoRoot without root CLI dist #when installing omo #then warns about the skipped omo runtime wrapper [67.51ms]
+(pass) codex cleanup > #given malformed project directory #when cleanup runs #then global cleanup still succeeds and project cleanup is skipped [1.79ms]
+(pass) codex cleanup > #given project directory is a regular file #when cleanup runs #then global cleanup still succeeds and project cleanup is skipped [3.04ms]
+(pass) codex cleanup safety > #given destructive cleanup targets #when managed removal runs #then rejects them and records skipped paths [2.43ms]
+(pass) codex cleanup safety > #given traversal-shaped cleanup target #when managed removal runs #then canonical parent escapes are skipped [1.38ms]
+(pass) install-codex project-local cleanup > #given project cleanup hits a filesystem edge #when installing Codex Light #then install succeeds and reports skipped cleanup [69.24ms]
+1 tests skipped:
+✔ #given project .codex is a symlink #when migrating #then project config is skipped (15.718041ms)
+✔ #given project config.toml is a symlink #when migrating #then project config is skipped (22.190792ms)
+✔ #given an already-scaffolded plan #when the script is re-run plain #then it is a no-op that preserves appended todos (resume-safe, no crash, no clobber) (13.941209ms)
+✔ #given repoRoot without root CLI dist #when installing locally #then warns about the skipped omo runtime wrapper (159.526042ms)
+✔ #given project cleanup hits a filesystem edge #when Node installer runs #then install succeeds and reports skipped cleanup (115.453167ms)
+ℹ tests 510
+ℹ suites 0
+ℹ pass 510
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8227.450875

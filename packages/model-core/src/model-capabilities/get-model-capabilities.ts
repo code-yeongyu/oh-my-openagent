@@ -42,7 +42,7 @@ function getProviderOverride(providerID: string, modelID: string): ModelCapabili
 }
 
 export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCapabilities {
-	const canonicalization = resolveModelIDAlias(input.modelID)
+	const canonicalization = resolveModelIDAlias(input.modelID, input.providerID)
 	const override = getOverride(input.modelID)
 	const providerOverride = getProviderOverride(input.providerID, canonicalization.canonicalModelID)
 	const runtimeModel = readRuntimeModel(

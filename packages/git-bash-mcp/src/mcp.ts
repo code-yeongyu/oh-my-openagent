@@ -1,6 +1,6 @@
 import type { Readable, Writable } from "node:stream";
 import { errorResponse, isPlainRecord, jsonRpcId, runJsonRpcStdioServer, successResponse } from "@oh-my-opencode/mcp-stdio-core";
-import type { JsonRpcResponse } from "@oh-my-opencode/mcp-stdio-core";
+import type { JsonRpcResponse, McpLifecycleLog } from "@oh-my-opencode/mcp-stdio-core";
 import { resolveGitBash, resolveGitBashForCurrentProcess, type GitBashResolution } from "./git-bash-resolver";
 import { runGitBashCommand, type GitBashRunResult, type RunGitBashCommand } from "./runner";
 
@@ -14,6 +14,7 @@ const EXEC_COMMAND_TIMEOUT_ENV_KEYS = [
 ] as const;
 
 export interface GitBashMcpOptions {
+  readonly lifecycleLog?: McpLifecycleLog;
   readonly platform?: string;
   readonly env?: { readonly [key: string]: string | undefined };
   readonly exists?: (path: string) => boolean;
@@ -66,6 +67,8 @@ export async function runMcpStdioServer(input: Readable, output: Writable, optio
     output,
     handler: handleGitBashMcpRequest,
     handlerOptions: options,
+    idleTimeoutMs: 0,
+    log: options.lifecycleLog,
     parseErrorResponse: () => errorResponse(null, -32601, "Method not found"),
   });
 }

@@ -1,7 +1,8 @@
 /// <reference types="bun-types" />
 import { afterEach, beforeEach, mock } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { existsSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { _resetForTesting as resetClaudeSessionState } from "./packages/omo-opencode/src/features/claude-code-session-state/state"
 import { _resetTaskToastManagerForTesting as resetTaskToastManager } from "./packages/omo-opencode/src/features/task-toast-manager/manager"
@@ -36,6 +37,25 @@ function ensureVendoredLspDaemonBuilt(): void {
   }
 }
 ensureVendoredLspDaemonBuilt()
+
+// Skill/agent/command discovery reads the developer's real HOME (~/.agents/skills,
+// ~/.claude, ~/.config/opencode). A machine with real user skills installed then makes
+// discovery tests pass or fail depending on whose laptop runs them. Point HOME (and
+// USERPROFILE, which os.homedir() reads on Windows) at one empty per-process temp dir so
+// discovery always falls back to the builtins the tests assert on. The discovery code
+// resolves home through getHomeDirectory() (process.env.HOME || USERPROFILE || homedir()),
+// so setting these env vars is sufficient — os.homedir() itself caches the OS home at
+// process start and ignores this mutation. Deliberately NOT setting XDG_* or CLAUDE/OPENCODE
+// config dirs: config-dir tests control those themselves.
+//
+// Applied ONCE at module load, not per-test: the beforeEach env snapshot below captures
+// this hermetic HOME for tests that don't touch it, and the afterEach restore keeps it.
+// A per-test re-application would clobber HOME for suites that set their own HOME in a
+// beforeAll (e.g. openclaw reply-listener daemon tests) and only reset state — not HOME —
+// in their beforeEach, so it must NOT run every test.
+const HERMETIC_HOME = mkdtempSync(join(tmpdir(), "omo-test-home-"))
+process.env.HOME = HERMETIC_HOME
+process.env.USERPROFILE = HERMETIC_HOME
 
 let isGlobalMockCleanup = false
 const { restoreModuleMocks } = installModuleMockLifecycle(mock, {

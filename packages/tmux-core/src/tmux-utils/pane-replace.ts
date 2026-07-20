@@ -2,7 +2,7 @@ import type { TmuxConfig } from "../types"
 import type { SpawnPaneResult } from "../types"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
 import { isInsideTmux } from "./environment"
-import { buildTmuxPlaceholderCommand } from "./pane-command"
+import { buildPaneAuthEnvironmentArgs, buildTmuxPlaceholderCommand } from "./pane-command"
 
 export type ReplaceTmuxPaneDeps = {
 	readonly log: (message: string, data?: unknown) => void
@@ -53,8 +53,9 @@ export async function replaceTmuxPane(
 	await runTmuxCommand(tmux, ["send-keys", "-t", paneId, "C-c"])
 
 	const placeholderCmd = buildTmuxPlaceholderCommand(description)
+	const authEnvArgs = buildPaneAuthEnvironmentArgs()
 
-	const result = await runTmuxCommand(tmux, ["respawn-pane", "-k", "-t", paneId, placeholderCmd])
+	const result = await runTmuxCommand(tmux, ["respawn-pane", "-k", ...authEnvArgs, "-t", paneId, placeholderCmd])
 
 	if (result.exitCode !== 0) {
 		log("[replaceTmuxPane] FAILED", { paneId, exitCode: result.exitCode, stderr: result.stderr.trim() })

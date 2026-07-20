@@ -91,7 +91,18 @@ function parsePackedPaths(output: string): Set<string> {
   return packedPaths
 }
 
-async function packDryRunPaths(): Promise<Set<string>> {
+// Both tests pack the SAME tree state: beforeAll writes the fake internal artifacts once, and
+// neither test mutates the tree between packs, so a single dry-run covers both. The cache is
+// populated lazily on the first pack, which only runs inside a test body (after beforeAll), so
+// it never captures the pre-mutation tree.
+let cachedPackDryRunPaths: Promise<Set<string>> | undefined
+
+function packDryRunPaths(): Promise<Set<string>> {
+  cachedPackDryRunPaths ??= runPackDryRun()
+  return cachedPackDryRunPaths
+}
+
+async function runPackDryRun(): Promise<Set<string>> {
   const packProcess = Bun.spawn({
     cmd: ["bun", "pm", "pack", "--dry-run", "--ignore-scripts"],
     cwd: repositoryRoot,

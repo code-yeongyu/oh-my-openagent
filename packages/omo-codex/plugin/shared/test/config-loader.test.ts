@@ -67,6 +67,24 @@ describe("getCodexOmoConfig", () => {
 		expect(result.trustedCodegraphInstallDir).toBe("/global-codegraph")
 	})
 
+	it("#given codex SOT sets CodeGraph excluded roots #when loading config #then roots are returned to hooks", () => {
+		// given
+		const homeDir = createTemporaryDirectory("omo-codex-shared-excluded-home-")
+		const cwd = createTemporaryDirectory("omo-codex-shared-excluded-project-")
+		writeOmoConfig(
+			homeDir,
+			JSON.stringify({
+				"[codex]": { codegraph: { excluded_roots: ["/tmp/omo-research", "/private/tmp/omo-research"] } },
+			}),
+		)
+
+		// when
+		const result = getCodexOmoConfig({ cwd, homeDir, env: {} })
+
+		// then
+		expect(result.codegraph?.excluded_roots).toEqual(["/tmp/omo-research", "/private/tmp/omo-research"])
+	})
+
 	it("#given legacy env override and SOT value #when loading config #then env wins over the SOT", () => {
 		// given
 		const homeDir = createTemporaryDirectory("omo-codex-shared-env-")

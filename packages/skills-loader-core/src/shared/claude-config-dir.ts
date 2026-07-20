@@ -1,5 +1,5 @@
-import { homedir } from "node:os"
 import { join } from "node:path"
+import { getHomeDirectory } from "@oh-my-opencode/utils"
 
 export function getClaudeConfigDir(): string {
   const envConfigDir = process.env.CLAUDE_CONFIG_DIR
@@ -7,5 +7,5 @@ export function getClaudeConfigDir(): string {
     return envConfigDir
   }
 
-  return join(homedir(), ".claude")
+  return join(getHomeDirectory(), ".claude")
 }

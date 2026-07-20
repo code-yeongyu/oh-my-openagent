@@ -1,0 +1,31 @@
+{
+  "name": "@code-yeongyu/omo-senpi",
+  "version": "4.19.0",
+  "private": true,
+  "description": "OMO Senpi adapter packaged as one local-path Pi package.",
+  "type": "module",
+  "keywords": [
+    "pi-package",
+    "senpi",
+    "omo",
+    "oh-my-openagent",
+    "pi"
+  ],
+  "pi": {
+    "extensions": [
+      "./extensions/omo.js"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "files": [
+    "extensions",
+    "skills",
+    "runtime",
+    "scripts/install.mjs",
+    "README.md",
+    "NOTICE",
+    "LICENSE"
+  ]
+}

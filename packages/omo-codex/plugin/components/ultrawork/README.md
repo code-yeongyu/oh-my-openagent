@@ -33,9 +33,9 @@ The installer copies the plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/0.
 node ${PLUGIN_ROOT}/dist/cli.js hook user-prompt-submit
 ```
 
-Codex passes the prompt payload on stdin. When the pattern `\b(?:ultrawork|ulw)\b` (case-insensitive) matches, the hook writes the directive to stdout — Codex injects non-JSON stdout as `additional_context` for the next turn. Otherwise the hook writes nothing and exits 0. Malformed input also exits 0 to never block the turn.
+Codex passes the prompt payload on stdin. When the pattern `(?:ultrawork|ulw)` (case-insensitive) matches, the hook emits a compact bootstrap pointer instead of the full directive: the pointer mandates the `ULTRAWORK MODE ENABLED!` opener, an immediate `create_goal` call with `objective` only, and reading the full directive from the bundled `ultrawork` skill (`<plugin root>/skills/ultrawork/SKILL.md`, resolved to an absolute path at runtime). Keeping the injected payload small guarantees Codex App's hook-output truncation can never drop the `create_goal` bootstrap (issue #5828). When the skill file is not present (for example the standalone component install without the plugin skills tree), the hook falls back to emitting the full directive. Otherwise the hook writes nothing and exits 0. Malformed input also exits 0 to never block the turn.
 
-If a prior `UserPromptSubmit` hook output in transcript JSONL already contains `<ultrawork-mode>`, the hook suppresses itself so the same directive is not injected repeatedly. Plain transcript text containing `<ultrawork-mode>` is ignored unless it comes from hook output.
+If a prior `UserPromptSubmit` hook output in transcript JSONL already contains `<ultrawork-mode>`, the hook suppresses itself so the same bootstrap is not injected repeatedly. Plain transcript text containing `<ultrawork-mode>` is ignored unless it comes from hook output.
 
 Bundled agent role TOMLs in `agents/` ship to `CODEX_HOME/agents/` at install time, not via a runtime hook. The installer writes regular file copies on Linux, macOS, and Windows. For the public marketplace, the source is the installed-marketplace snapshot, not the versioned plugin cache, so agent role configs remain valid when Codex replaces `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/` during auto-update or removes temporary marketplace state. Both code paths overwrite stale files and write a `.installed-agents.json` manifest next to the source root for clean uninstall tracking.
 
@@ -47,7 +47,7 @@ npm run build
 echo "$PAYLOAD" | node dist/cli.js hook user-prompt-submit | head -3
 ```
 
-Expect `<ultrawork-mode>` ... directive body.
+Expect `<ultrawork-mode>` ... bootstrap pointer naming `skills/ultrawork/SKILL.md` (or the full directive body when the plugin skills tree is absent).
 
 ## Agent role smoke test
 

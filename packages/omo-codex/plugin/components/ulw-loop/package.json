@@ -1,6 +1,6 @@
 {
 	"name": "@code-yeongyu/codex-ulw-loop",
-	"version": "4.14.0",
+	"version": "4.19.0",
 	"description": "Codex plugin: durable repo-native multi-goal orchestration with embedded success criteria and observable evidence audit.",
 	"type": "module",
 	"packageManager": "npm@11.12.1",
@@ -23,7 +23,9 @@
 		"typescript"
 	],
 	"bin": {
-		"omo-ulw-loop": "./dist/cli.js"
+		"omo-ulw-loop": "./dist/cli.js",
+		"ulw": "./dist/cli.js",
+		"ulw-loop": "./dist/cli.js"
 	},
 	"files": [
 		"dist",

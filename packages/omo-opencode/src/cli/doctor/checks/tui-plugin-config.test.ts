@@ -18,7 +18,7 @@ function writeOpenCodeConfig(plugins: string[]): void {
   )
 }
 
-function writeTuiConfig(plugins: string[]): void {
+function writeTuiConfig(plugins: readonly unknown[]): void {
   writeFileSync(
     join(testConfigDir, "tui.json"),
     JSON.stringify({ plugin: plugins }, null, 2) + "\n",
@@ -80,6 +80,21 @@ describe("tui-plugin-config check", () => {
     expect(result.status).toBe("pass")
     expect(result.issues).toHaveLength(0)
     expect(result.name).toBe("TUI Plugin")
+  })
+
+  it("passes when tui.json contains the package entry and a tuple plugin entry", async () => {
+    //#given opencode.json has the server entry, the installed package exports ./tui,
+    //#      and tui.json has the package entry plus a tuple-style custom TUI plugin
+    writeInstalledPackage(PLUGIN_NAME, { ".": "./dist/index.js", "./tui": "./dist/tui.js" })
+    writeOpenCodeConfig([PLUGIN_NAME])
+    writeTuiConfig([PLUGIN_NAME, ["./badge.tsx", { label: "custom" }]])
+
+    //#when running the check
+    const result = await checkTuiPluginConfig()
+
+    //#then the tuple entry is ignored and OMO's package entry still passes
+    expect(result.status).toBe("pass")
+    expect(result.issues).toHaveLength(0)
   })
 
   it("passes after ensureTuiPluginEntry adds the missing package TUI entry", async () => {

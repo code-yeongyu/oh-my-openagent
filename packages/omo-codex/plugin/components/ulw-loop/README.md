@@ -37,9 +37,11 @@ The snapshot complements `codex resume`; it does not replace Codex's transcript 
 
 This directory is a component of the aggregate `@sisyphuslabs/omo-codex-plugin` root. Plugin discovery (`.codex-plugin/plugin.json`) is owned by that aggregate root, not by this component. The component ships:
 
-- `hooks/hooks.json` registering two hooks:
+- `hooks/hooks.json` registering four hooks:
   - `UserPromptSubmit` -> `node "${PLUGIN_ROOT}/dist/cli.js" hook user-prompt-submit --with-ultrawork`
   - `PreToolUse` matching `^create_goal$` -> `node "${PLUGIN_ROOT}/dist/cli.js" hook pre-tool-use`
+  - `PreToolUse` matching the spawn tool tokens -> `node "${PLUGIN_ROOT}/dist/cli.js" hook pre-tool-use-spawn` (fan-out cap + gate-artifact preflight)
+  - `Stop` -> `node "${PLUGIN_ROOT}/dist/cli.js" hook stop` (auto-resume with a two-strike no-progress cap)
 - `skills/ulw-loop/` for the bundled `ulw-loop` skill.
 - `bin.omo-ulw-loop` -> `dist/cli.js` for standalone CLI invocation.
 

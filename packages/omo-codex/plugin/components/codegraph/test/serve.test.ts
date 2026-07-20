@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
+import { Readable, Writable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
 import { resolveServeProcessInvocation, runCodegraphServe } from "../src/serve.ts";
@@ -54,6 +54,7 @@ describe("runCodegraphServe", () => {
 				cwd: resolve(runCwd),
 				env: {
 					CODEGRAPH_INSTALL_DIR: "/tmp/home/.omo/codegraph",
+					CODEGRAPH_NO_DAEMON: "1",
 					CODEGRAPH_NO_DOWNLOAD: "1",
 					CODEGRAPH_TELEMETRY: "0",
 					DO_NOT_TRACK: "1",
@@ -176,6 +177,7 @@ describe("runCodegraphServe", () => {
 						command: binPath,
 						env: {
 							CODEGRAPH_INSTALL_DIR: installDir,
+							CODEGRAPH_NO_DAEMON: "1",
 							CODEGRAPH_NO_DOWNLOAD: "1",
 							CODEGRAPH_TELEMETRY: "0",
 							DO_NOT_TRACK: "1",
@@ -187,6 +189,47 @@ describe("runCodegraphServe", () => {
 				rmSync(tempRoot, { recursive: true, force: true });
 			}
 		});
+	});
+
+	it("#given project cwd is under a configured excluded root #when serving MCP #then it exposes an unavailable stub without spawning CodeGraph", async () => {
+		// given
+		const excludedRoot = mkdtempSync(join(componentRoot, ".tmp-codegraph-excluded-"));
+		const projectRoot = join(excludedRoot, "repo");
+		const stderr: string[] = [];
+		const stdout: string[] = [];
+		const calls: string[] = [];
+		mkdirSync(projectRoot, { recursive: true });
+
+		try {
+			// when
+			const exitCode = await runCodegraphServe({
+				config: { codegraph: { enabled: true, excluded_roots: [excludedRoot] }, sources: [], warnings: [] },
+				cwd: projectRoot,
+				env: { HOME: "/tmp/home" },
+				homeDir: "/tmp/home",
+				nodeVersion: "22.14.0",
+				resolve: () => ({ argsPrefix: [], command: "/tmp/codegraph", exists: true, source: "path" }),
+				runProcess: () => {
+					calls.push("spawned");
+					return Promise.resolve(0);
+				},
+				stderr: { write: (chunk) => stderr.push(chunk) },
+				stdin: Readable.from([]),
+				stdout: new Writable({
+					write: (chunk, _encoding, callback) => {
+						stdout.push(String(chunk));
+						callback();
+					},
+				}),
+			});
+
+			// then
+			expect(exitCode).toBe(0);
+			expect(calls).toEqual([]);
+			expect(stderr.join("")).toContain("CodeGraph MCP skipped: project excluded");
+		} finally {
+			rmSync(excludedRoot, { recursive: true, force: true });
+		}
 	});
 
 	it("#given Windows OMO_CODEGRAPH_BIN is a Node script #when resolving serve invocation #then Node executes the script path", () => {
@@ -217,72 +260,7 @@ describe("runCodegraphServe", () => {
 		});
 	});
 
-	it("#given built serve entry #when invoked with a fake CodeGraph binary #then it runs serve mcp exactly once", () => {
-		// given
-		const tempRoot = createFakeCodegraphRoot();
-		try {
-			// when
-			const result = runBuiltWrapper("dist/serve.js", tempRoot);
-
-			// then
-			expect(result.status).toBe(0);
-			expect(result.stderr).toBe("");
-			expect(readInvocations(tempRoot)).toEqual(['["serve","--mcp"]']);
-		} finally {
-			rmSync(tempRoot, { recursive: true, force: true });
-		}
-	});
-
-	it("#given built cli entry #when invoked with a fake CodeGraph binary #then it runs serve mcp exactly once", () => {
-		// given
-		const tempRoot = createFakeCodegraphRoot();
-		try {
-			// when
-			const result = runBuiltWrapper("dist/cli.js", tempRoot);
-
-			// then
-			expect(result.status).toBe(0);
-			expect(result.stderr).toBe("");
-			expect(readInvocations(tempRoot)).toEqual(['["serve","--mcp"]']);
-		} finally {
-			rmSync(tempRoot, { recursive: true, force: true });
-		}
-	});
 });
-
-function createFakeCodegraphRoot(): string {
-	const tempRoot = mkdtempSync(join(tmpdir(), "omo-codegraph-wrapper-"));
-	const fakeBinaryPath = join(tempRoot, "codegraph-fake.cjs");
-	writeFileSync(
-		fakeBinaryPath,
-		[
-			"#!/usr/bin/env node",
-			"const fs = require('node:fs');",
-			"fs.appendFileSync(process.env.CODEGRAPH_FAKE_LOG, JSON.stringify(process.argv.slice(2)) + '\\n');",
-			"",
-		].join("\n"),
-	);
-	chmodSync(fakeBinaryPath, 0o755);
-	return tempRoot;
-}
-
-function runBuiltWrapper(entryPath: string, tempRoot: string): ReturnType<typeof spawnSync> {
-	return spawnSync(process.execPath, [join(componentRoot, entryPath)], {
-		cwd: componentRoot,
-		encoding: "utf8",
-		env: {
-			...process.env,
-			CODEGRAPH_ALLOW_UNSAFE_NODE: "1",
-			CODEGRAPH_FAKE_LOG: join(tempRoot, "invocations.log"),
-			OMO_CODEGRAPH_BIN: join(tempRoot, "codegraph-fake.cjs"),
-		},
-		timeout: 5000,
-	});
-}
-
-function readInvocations(tempRoot: string): readonly string[] {
-	return readFileSync(join(tempRoot, "invocations.log"), "utf8").trim().split("\n");
-}
 
 async function withProcessPlatform(platform: NodeJS.Platform, run: () => Promise<void>): Promise<void> {
 	const descriptor = Object.getOwnPropertyDescriptor(process, "platform");

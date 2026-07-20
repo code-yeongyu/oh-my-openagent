@@ -15,7 +15,11 @@ import {
   registerTeamSession,
 } from "../../features/team-mode/team-session-registry"
 import type { RuntimeState } from "../../features/team-mode/types"
-import { loadRuntimeState, saveRuntimeState } from "../../features/team-mode/team-state-store/store"
+import {
+  loadRuntimeState,
+  saveRuntimeState,
+  transitionRuntimeState,
+} from "../../features/team-mode/team-state-store/store"
 import { createTeamMemberErrorHandler } from "./team-member-error-handler"
 
 const temporaryDirectories: string[] = []
@@ -69,6 +73,28 @@ function createRuntimeStateWithPendingMessage(teamRunId: string, messageId: stri
   return runtimeState
 }
 
+function createRuntimeStateWithLeader(teamRunId: string, pendingInjectedMessageIds: string[] = []): RuntimeState {
+  return {
+    ...createRuntimeState(teamRunId),
+    members: [
+      {
+        name: "lead",
+        sessionId: "lead-session",
+        agentType: "leader",
+        status: "running",
+        pendingInjectedMessageIds: [],
+      },
+      {
+        name: "worker",
+        sessionId: "member-session",
+        agentType: "general-purpose",
+        status: "running",
+        pendingInjectedMessageIds,
+      },
+    ],
+  }
+}
+
 async function seedRuntimeState(runtimeState: RuntimeState, config: TeamModeConfig): Promise<void> {
   await mkdir(path.join(config.base_dir ?? "", "runtime", runtimeState.teamRunId), { recursive: true })
   await saveRuntimeState(runtimeState, config)
@@ -118,6 +144,55 @@ describe("createTeamMemberErrorHandler", () => {
     const runtimeState = await loadRuntimeState(teamRunId, config)
     expect(runtimeState.status).toBe("active")
     expect(runtimeState.members[0]?.status).toBe("errored")
+  })
+
+  test("#given fallback retry replaces a member sessionId #when stale session.error settles #then replacement stays running without a member_error announcement", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const messageId = randomUUID()
+    await seedRuntimeState(createRuntimeStateWithLeader(teamRunId, [messageId]), config)
+    await seedReservedMessage(teamRunId, config, messageId)
+    registerTeamSession("member-session", { teamRunId, memberName: "worker", role: "member" })
+    const stubClient = {
+      session: {
+        status: async () => {
+          await transitionRuntimeState(teamRunId, (state) => ({
+            ...state,
+            members: state.members.map((member) => (
+              member.name === "worker"
+                ? { ...member, sessionId: "replacement-session", status: "running" as const }
+                : member
+            )),
+          }), config)
+          return {}
+        },
+      },
+    }
+    const handler = createTeamMemberErrorHandler(config, { client: stubClient, settleMs: 0 })
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID: "member-session", error: new Error("rate limit") },
+      },
+    })
+
+    // then
+    const finalState = await loadRuntimeState(teamRunId, config)
+    const finalWorker = finalState.members.find((member) => member.name === "worker")
+    expect(finalWorker?.sessionId).toBe("replacement-session")
+    expect(finalWorker?.status).toBe("running")
+    expect(finalWorker?.pendingInjectedMessageIds).toEqual([messageId])
+
+    const { listUnreadMessages } = await import("../../features/team-mode/team-mailbox/inbox")
+    expect(await listUnreadMessages(teamRunId, "lead", config)).toEqual([])
+
+    const workerInboxEntries = await readdir(getInboxDir(resolveBaseDir(config), teamRunId, "worker"))
+    expect(workerInboxEntries).toContain(`.delivering-${messageId}.json`)
+    expect(workerInboxEntries).not.toContain(`${messageId}.json`)
   })
 
   test("marks the member errored during the spawn race when the registry tracks the fresh session before disk state persists it", async () => {

@@ -28,9 +28,14 @@ import {
 export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
   let cachedDescription: string | null = null
 
-  const getSkills = async (context?: ToolContext): Promise<LoadedSkill[]> => {
+  const getBaseSkills = async (context?: ToolContext): Promise<LoadedSkill[]> => {
     if (shouldInvalidateSkillCacheForSession(context?.sessionID)) {
       clearSkillCache()
+    }
+
+    if (options.getLoadedSkills) {
+      const loadedSkills = await options.getLoadedSkills()
+      return [...loadedSkills]
     }
 
     const discovered = (await getAllSkills({
@@ -39,17 +44,23 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
       teamModeEnabled: options?.teamModeEnabled,
       directory: options.directory,
     })) ?? []
-    const allSkills = options.skills ? [...options.skills] : discovered
+    return options.skills ? [...options.skills] : discovered
+  }
 
+  const mergeNativeSkillsInto = async (skills: LoadedSkill[]): Promise<void> => {
     if (options.nativeSkills) {
       try {
         const nativeAll = await options.nativeSkills.all()
-        mergeNativeSkills(allSkills, nativeAll, options.disabledSkills)
+        mergeNativeSkills(skills, nativeAll, options.disabledSkills)
       } catch (error) {
         if (!(error instanceof Error)) throw error
       }
     }
+  }
 
+  const getSkills = async (context?: ToolContext): Promise<LoadedSkill[]> => {
+    const allSkills = await getBaseSkills(context)
+    await mergeNativeSkillsInto(allSkills)
     return allSkills
   }
 
@@ -64,8 +75,8 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
 
   const buildDescription = async (force = false): Promise<string> => {
     if (!force && cachedDescription) return cachedDescription
-    const skills = await getSkills()
     const commands = getCommands()
+    const skills = await getSkills()
     // Exclude agent-restricted skills from the description: they must not be
     // visible to agents that are not their designated owner.  The execute-time
     // check already enforces the restriction at call time.
@@ -123,14 +134,20 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
         .describe("Optional arguments or context for command invocation. Example: name='publish', user_message='patch'"),
     },
     async execute(args: SkillArgs, ctx?: ToolContext) {
-      const skills = await getSkills(ctx)
+      const skills = await getBaseSkills(ctx)
       const commands = getCommands()
+
+      const requestedName = args.name.replace(/^\//, "")
+      let matchedSkill = matchSkillByName(skills, requestedName)
+
+      if (!matchedSkill && options.nativeSkills) {
+        await mergeNativeSkillsInto(skills)
+        matchedSkill = matchSkillByName(skills, requestedName)
+      }
+
       cachedDescription = formatCombinedDescription(skills.map(loadedSkillToInfo), commands, {
         includeSkills: options.includeSkillsInDescription,
       })
-
-      const requestedName = args.name.replace(/^\//, "")
-      const matchedSkill = matchSkillByName(skills, requestedName)
 
       if (matchedSkill) {
         await ctx?.ask({

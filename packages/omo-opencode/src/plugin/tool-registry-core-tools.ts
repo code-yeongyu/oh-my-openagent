@@ -1,5 +1,4 @@
 import type { ToolDefinition } from "@opencode-ai/plugin"
-import type { SkillLoadOptions } from "../tools/skill/types"
 import type { AvailableCategory } from "../agents/dynamic-agent-prompt-builder"
 import type { OhMyOpenCodeConfig } from "../config"
 import type { Managers } from "../create-managers"
@@ -8,9 +7,12 @@ import type { PluginContext, ToolsRecord } from "./types"
 import type { ToolRegistryFactories } from "./tool-registry-factories"
 
 import { getMainSessionID } from "../features/claude-code-session-state"
+import { createGoalController, type GoalController } from "../hooks/goal/controller"
+import { createGoalTools } from "../hooks/goal/tools"
 import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
 import { log } from "../shared"
 import { getSisyphusJuniorModelOverride } from "./tool-registry-team-tools"
+import { createNativeSkills, getPluginInputNativeSkills } from "./native-skills"
 import { createSkillContext } from "./skill-context"
 import { createRuntimeSkillsResolver, readRuntimeHostSkills } from "./runtime-skill-resolver"
 
@@ -35,6 +37,17 @@ export function createCoreTools(args: {
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
     (agent) => agent.toLowerCase() === "multimodal-looker",
   )
+  const nativeSkills = getPluginInputNativeSkills(ctx) ?? createNativeSkills({
+    client: ctx.client,
+    directory: ctx.directory,
+  })
+  const getSessionIDForMcp = (): string | undefined => getMainSessionID()
+  const getLoadedSkills = createRuntimeSkillsResolver({
+    baseSkills: skillContext.mergedSkills,
+    readRuntimeHostSkills: () => readRuntimeHostSkills(ctx.client),
+    buildMergedSkills: async (hostSkills) =>
+      (await createSkillContext({ directory: ctx.directory, pluginConfig, hostSkills })).mergedSkills,
+  })
   const delegateTask = factories.createDelegateTask({
     manager: managers.backgroundManager,
     client: ctx.client,
@@ -48,7 +61,8 @@ export function createCoreTools(args: {
     teamModeEnabled: pluginConfig.team_mode?.enabled ?? false,
     availableCategories,
     availableSkills: skillContext.availableSkills,
-    nativeSkills: "skills" in ctx ? (ctx as { skills: SkillLoadOptions["nativeSkills"] }).skills : undefined,
+    nativeSkills,
+    getLoadedSkills,
     sisyphusAgentConfig: pluginConfig.sisyphus_agent,
     syncPollTimeoutMs: pluginConfig.background_task?.syncPollTimeoutMs,
     modelFallbackControllerAccessor: managers.modelFallbackControllerAccessor,
@@ -83,16 +97,9 @@ export function createCoreTools(args: {
     },
   })
 
-  const getSessionIDForMcp = (): string | undefined => getMainSessionID()
-  const getLoadedSkillsForMcp = createRuntimeSkillsResolver({
-    baseSkills: skillContext.mergedSkills,
-    readRuntimeHostSkills: () => readRuntimeHostSkills(ctx.client),
-    buildMergedSkills: async (hostSkills) =>
-      (await createSkillContext({ directory: ctx.directory, pluginConfig, hostSkills })).mergedSkills,
-  })
   const skillMcpTool = factories.createSkillMcpTool({
     manager: managers.skillMcpManager,
-    getLoadedSkills: getLoadedSkillsForMcp,
+    getLoadedSkills,
     getSessionID: getSessionIDForMcp,
   })
   const commands = factories.discoverCommandsSync(ctx.directory, {
@@ -103,13 +110,14 @@ export function createCoreTools(args: {
     directory: ctx.directory,
     commands,
     skills: skillContext.mergedSkills,
+    getLoadedSkills,
     mcpManager: managers.skillMcpManager,
     getSessionID: getSessionIDForMcp,
     gitMasterConfig: pluginConfig.git_master,
     browserProvider: skillContext.browserProvider,
     disabledSkills: skillContext.disabledSkills,
     teamModeEnabled: pluginConfig.team_mode?.enabled ?? false,
-    nativeSkills: "skills" in ctx ? (ctx as { skills: SkillLoadOptions["nativeSkills"] }).skills : undefined,
+    nativeSkills,
     pluginsEnabled: pluginConfig.claude_code?.plugins ?? true,
     enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
     includeSkillsInDescription: true,
@@ -128,6 +136,14 @@ export function createCoreTools(args: {
   tools.task = delegateTask
   tools.skill_mcp = skillMcpTool
   tools.skill = skillTool
+
+  if (pluginConfig.goal?.enabled) {
+    const goalController: GoalController = createGoalController({ projectDir: ctx.directory })
+    Object.assign(tools, createGoalTools({
+      controller: goalController,
+      getSessionID: getMainSessionID,
+    }))
+  }
 
   return tools
 }

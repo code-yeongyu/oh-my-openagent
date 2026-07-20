@@ -69,7 +69,6 @@ test("#given custom CODEX_HOME and PATH without omo #when installing locally wit
 		new RegExp(escapeRegExp(escapePosixDoubleQuoted(toPosixPath(join(repoRoot, "dist", "cli", "index.js"))))),
 	);
 	assert.match(wrapper, /CODEX_HOME/);
-	assert.match(wrapper, /OMO_SPARKSHELL_APP_SERVER_SOCKET/);
 	assert.match(wrapper, /omo-ulw-loop/);
 });
 

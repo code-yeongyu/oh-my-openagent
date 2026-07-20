@@ -101,6 +101,31 @@ describe("linkRootRuntimeBin runtime wrapper parity", () => {
     expect(stderr).toContain("reinstall with: npx --yes lazycodex-ai@latest install --no-tui")
   })
 
+  posixOnly("#given ulw-loop command #when running omo wrapper #then preserves the ulw-loop token", async () => {
+    // given
+    const fixture = await createRepoFixture()
+    const link = await linkRootRuntimeBin({ ...fixture, platform: "linux" })
+    if (link === null) throw new Error("expected runtime wrapper link")
+    await chmod(link.path, 0o755)
+    await mkdir(fixture.binDir, { recursive: true })
+    const ulwLoopBin = join(fixture.binDir, "omo-ulw-loop")
+    await writeFile(ulwLoopBin, "#!/bin/sh\nprintf '%s\\n' \"$*\"\n")
+    await chmod(ulwLoopBin, 0o755)
+
+    // when
+    const process = Bun.spawn([link.path, "ulw-loop", "help"], { env: { ...Bun.env }, stderr: "pipe", stdout: "pipe" })
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(process.stdout).text(),
+      new Response(process.stderr).text(),
+      process.exited,
+    ])
+
+    // then
+    expect(exitCode).toBe(0)
+    expect(stderr).toBe("")
+    expect(stdout.trim()).toBe("ulw-loop help")
+  })
+
   it("#given win32 wrapper target was removed #when writing omo.cmd #then it contains reinstall guidance before bun exec", async () => {
     // given
     const fixture = await createRepoFixture()
@@ -115,5 +140,18 @@ describe("linkRootRuntimeBin runtime wrapper parity", () => {
     expect(guardIndex).toBeGreaterThan(-1)
     expect(guardIndex).toBeLessThan(wrapper.indexOf('"%BUN_BINARY%"'))
     expect(wrapper).toContain("reinstall with: npx --yes lazycodex-ai@latest install --no-tui")
+  })
+
+  it("#given win32 ulw-loop command #when writing omo.cmd #then preserves the ulw-loop token", async () => {
+    // given
+    const fixture = await createRepoFixture()
+
+    // when
+    const link = await linkRootRuntimeBin({ ...fixture, platform: "win32" })
+
+    // then
+    if (link === null) throw new Error("expected runtime wrapper link")
+    const wrapper = await readFile(link.path, "utf8")
+    expect(wrapper).toMatch(/"[^"\r\n]*omo-ulw-loop\.cmd" ulw-loop %\*/)
   })
 })

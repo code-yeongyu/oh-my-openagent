@@ -44,7 +44,7 @@ function renderDirective(
 		BOULDER_PATH: state.boulderPath,
 		REMAINING_COUNT: String(state.checklist.remaining),
 		TOTAL_COUNT: String(state.checklist.total),
-		NEXT_TASK_LABEL: state.checklist.nextTaskLabel ?? "",
+		NEXT_TASK_LABEL: state.checklist.nextTaskLabel ?? "none (final gate pending)",
 		WORKTREE_BLOCK: worktreeBlock,
 		LEDGER_PATH: state.ledgerPath,
 		SESSION_ID: sessionId,

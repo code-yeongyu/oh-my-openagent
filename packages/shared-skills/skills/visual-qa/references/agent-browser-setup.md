@@ -11,11 +11,12 @@ Repo: https://github.com/vercel-labs/agent-browser
 ## Install
 
 ```
-bun add -g agent-browser && agent-browser install
+npm install -g agent-browser && agent-browser install
 ```
 
-`bun add -g agent-browser` installs the CLI globally; `agent-browser install` downloads the
-managed browser it drives. (Equivalent with npm: `npm install -g agent-browser && agent-browser install`.)
+`npm install -g agent-browser` installs the CLI globally; `agent-browser install` downloads the
+managed browser it drives. If Bun is already available, `bun add -g agent-browser && agent-browser install`
+is equivalent, but npm is the default because LazyCodex/Codex installations do not require Bun.
 
 Confirm it is ready and discover the current flags:
 
@@ -36,7 +37,7 @@ agent-browser screenshot actual.png      # add --full for full-page, --screensho
 Then feed the PNG into the diff exactly as in Step 2:
 
 ```
-bun "$SKILL_DIR/scripts/cli.ts" image-diff <reference.png> actual.png
+node "$SKILL_DIR/scripts/visual-qa.mjs" image-diff <reference.png> actual.png
 ```
 
 Match the viewport numbers to whatever the reference/mock was captured at; mismatched

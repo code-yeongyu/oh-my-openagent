@@ -1,18 +1,10 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
-import { existsSync, rmSync, mkdirSync } from "fs"
+import { mkdtempSync, rmSync } from "fs"
+import { tmpdir } from "os"
 import { join } from "path"
 import type { TaskObject } from "./types"
 import { createTaskUpdateTool } from "./task-update"
 
-const TEST_STORAGE = ".test-task-update-tool"
-const TEST_DIR = join(process.cwd(), TEST_STORAGE)
-const TEST_CONFIG = {
-  sisyphus: {
-    tasks: {
-      storage_path: TEST_STORAGE,
-    },
-  },
-}
 const TEST_SESSION_ID = "test-session-123"
 const TEST_ABORT_CONTROLLER = new AbortController()
 const TEST_CONTEXT = {
@@ -24,26 +16,28 @@ const TEST_CONTEXT = {
 
 describe("task_update tool", () => {
   let tool: ReturnType<typeof createTaskUpdateTool>
+  let testDir = ""
 
   beforeEach(() => {
-    if (existsSync(TEST_STORAGE)) {
-      rmSync(TEST_STORAGE, { recursive: true, force: true })
-    }
-    mkdirSync(TEST_DIR, { recursive: true })
-    tool = createTaskUpdateTool(TEST_CONFIG)
+    testDir = mkdtempSync(join(tmpdir(), "omo-task-update-"))
+    tool = createTaskUpdateTool({
+      sisyphus: {
+        tasks: {
+          storage_path: testDir,
+        },
+      },
+    })
   })
 
   afterEach(() => {
-    if (existsSync(TEST_STORAGE)) {
-      rmSync(TEST_STORAGE, { recursive: true, force: true })
-    }
+    rmSync(testDir, { recursive: true, force: true })
   })
 
   describe("update action", () => {
     test("updates task subject when provided", async () => {
       //#given
       const taskId = "T-test-123"
-      const taskPath = join(TEST_DIR, `${taskId}.json`)
+      const taskPath = join(testDir, `${taskId}.json`)
       const initialTask: TaskObject = {
         id: taskId,
         subject: "Original subject",
@@ -72,7 +66,7 @@ describe("task_update tool", () => {
     test("updates task description when provided", async () => {
       //#given
       const taskId = "T-test-124"
-      const taskPath = join(TEST_DIR, `${taskId}.json`)
+      const taskPath = join(testDir, `${taskId}.json`)
       const initialTask: TaskObject = {
         id: taskId,
         subject: "Test subject",
@@ -99,7 +93,7 @@ describe("task_update tool", () => {
     test("updates task status when provided", async () => {
       //#given
       const taskId = "T-test-125"
-      const taskPath = join(TEST_DIR, `${taskId}.json`)
+      const taskPath = join(testDir, `${taskId}.json`)
       const initialTask: TaskObject = {
         id: taskId,
         subject: "Test subject",
@@ -120,13 +114,14 @@ describe("task_update tool", () => {
       const result = JSON.parse(resultStr)
 
       //#then
+      expect(result).toHaveProperty("task")
       expect(result.task.status).toBe("in_progress")
     })
 
     test("additively appends to blocks array without replacing", async () => {
       //#given
       const taskId = "T-test-126"
-      const taskPath = join(TEST_DIR, `${taskId}.json`)
+      const taskPath = join(testDir, `${taskId}.json`)
       const initialTask: TaskObject = {
         id: taskId,
         subject: "Test subject",
@@ -156,7 +151,7 @@ describe("task_update tool", () => {
     test("avoids duplicate blocks when adding", async () => {
       //#given
       const taskId = "T-test-127"
-      const taskPath = join(TEST_DIR, `${taskId}.json`)
+      const taskPath = join(testDir, `${taskId}.json`)
       const initialTask: TaskObject = {
         id: taskId,
         subject: "Test subject",
@@ -185,7 +180,7 @@ describe("task_update tool", () => {
     test("additively appends to blockedBy array without replacing", async () => {
       //#given
       const taskId = "T-test-128"
-      const taskPath = join(TEST_DIR, `${taskId}.json`)
+      const taskPath = join(testDir, `${taskId}.json`)
       const initialTask: TaskObject = {
         id: taskId,
         subject: "Test subject",
@@ -215,7 +210,7 @@ describe("task_update tool", () => {
     test("merges metadata without replacing entire object", async () => {
       //#given
       const taskId = "T-test-129"
-      const taskPath = join(TEST_DIR, `${taskId}.json`)
+      const taskPath = join(testDir, `${taskId}.json`)
       const initialTask: TaskObject = {
         id: taskId,
         subject: "Test subject",
@@ -251,7 +246,7 @@ describe("task_update tool", () => {
     test("deletes metadata keys when set to null", async () => {
       //#given
       const taskId = "T-test-130"
-      const taskPath = join(TEST_DIR, `${taskId}.json`)
+      const taskPath = join(testDir, `${taskId}.json`)
       const initialTask: TaskObject = {
         id: taskId,
         subject: "Test subject",
@@ -287,7 +282,7 @@ describe("task_update tool", () => {
     test("updates activeForm when provided", async () => {
       //#given
       const taskId = "T-test-131"
-      const taskPath = join(TEST_DIR, `${taskId}.json`)
+      const taskPath = join(testDir, `${taskId}.json`)
       const initialTask: TaskObject = {
         id: taskId,
         subject: "Test subject",
@@ -314,7 +309,7 @@ describe("task_update tool", () => {
     test("updates owner when provided", async () => {
       //#given
       const taskId = "T-test-132"
-      const taskPath = join(TEST_DIR, `${taskId}.json`)
+      const taskPath = join(testDir, `${taskId}.json`)
       const initialTask: TaskObject = {
         id: taskId,
         subject: "Test subject",
@@ -371,7 +366,7 @@ describe("task_update tool", () => {
     test("persists changes to file storage", async () => {
       //#given
       const taskId = "T-test-133"
-      const taskPath = join(TEST_DIR, `${taskId}.json`)
+      const taskPath = join(testDir, `${taskId}.json`)
       const initialTask: TaskObject = {
         id: taskId,
         subject: "Original subject",
@@ -399,7 +394,7 @@ describe("task_update tool", () => {
     test("updates multiple fields in single call", async () => {
       //#given
       const taskId = "T-test-134"
-      const taskPath = join(TEST_DIR, `${taskId}.json`)
+      const taskPath = join(testDir, `${taskId}.json`)
       const initialTask: TaskObject = {
         id: taskId,
         subject: "Original subject",

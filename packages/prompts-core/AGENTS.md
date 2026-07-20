@@ -1,6 +1,6 @@
 # prompts-core — Markdown Prompt Loading + Variant Routing (Core)
 
-**Generated:** 2026-06-17
+**Generated:** 2026-07-17 / 7d664b96b
 
 ## OVERVIEW
 
@@ -10,16 +10,16 @@ Owns all static markdown prompt content (`prompts/` tree), bundles it at build t
 
 | Family | Variants |
 |--------|----------|
-| `ultrawork/` | `default`, `gpt`, `gemini`, `planner`, `codex` (5) |
-| `atlas/` | `default`, `gpt`, `gemini`, `kimi`, `kimi-k2-7`, `opus-4-7` (6) |
+| `ultrawork/` | `default`, `gpt`, `gemini`, `glm`, `planner`, `codex` (6) |
+| `atlas/` | `default`, `gpt`, `gemini`, `glm`, `kimi`, `kimi-k2-7`, `kimi-k3`, `opus-4-7` (8) |
 | `prometheus/` | `default` only (no model routing) |
 | `mode/` | `hyperplan`, `team` |
 
 ## PUBLIC API (`src/index.ts`)
 
-- **Constants:** `ULTRAWORK_{DEFAULT,GPT,GEMINI,PLANNER}_PROMPT`, `CODEX_ULTRAWORK_PROMPT`, `HYPERPLAN_MODE_PROMPT`, `TEAM_MODE_PROMPT`; `VariantTable`s `ultraworkPromptVariants`, `codexUltraworkPromptVariants`, `atlasPromptVariants`, `prometheusPromptVariants`.
+- **Constants:** `ULTRAWORK_{DEFAULT,GPT,GEMINI,GLM,PLANNER}_PROMPT`, `CODEX_ULTRAWORK_PROMPT`, `HYPERPLAN_MODE_PROMPT`, `TEAM_MODE_PROMPT`; `VariantTable`s `ultraworkPromptVariants`, `codexUltraworkPromptVariants`, `atlasPromptVariants`, `prometheusPromptVariants`.
 - **Functions:** `resolveVariant(input)` (uses `model-core` matchers), `loadPrompt`/`loadPromptSync` (bundled sync or filesystem async).
-- **Types/errors:** `ModelVariant` (11 literals), `PromptSource`, `LoadedPrompt`, `VariantTable`; `PromptFileNotFoundError`, `PromptPathTraversalError`.
+- **Types/errors:** `ModelVariant` (9 literals), `PromptSource`, `LoadedPrompt`, `VariantTable`; `PromptFileNotFoundError`, `PromptPathTraversalError`.
 
 ## DEPENDENCIES & CONSUMERS
 

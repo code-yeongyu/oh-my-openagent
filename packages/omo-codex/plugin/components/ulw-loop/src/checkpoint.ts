@@ -1,3 +1,4 @@
+import { ulwLoopAttemptEvidenceDir } from "./paths.js";
 import { existsSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -137,12 +138,13 @@ function buildLedger(
 	codexGoal: unknown,
 	aggregateCompletion: UlwLoopAggregateCompletion | undefined,
 ): UlwLoopLedgerEntry {
+	const watch = qualityGate?.codeReview.codeQualityStatus === "WATCH";
 	const entry: UlwLoopLedgerEntry = {
 		at: now,
 		kind: ledgerKind(args.status, goal, aggregateCompletion),
 		goalId: goal.id,
 		status: goal.status,
-		evidence: args.evidence,
+		evidence: watch ? `${args.evidence} | codeQuality=WATCH: ${qualityGate.codeReview.evidence}` : args.evidence,
 	};
 	if (codexGoal !== undefined) entry.codexGoal = codexGoal;
 	if (qualityGate !== undefined) entry.qualityGate = qualityGate;
@@ -222,6 +224,9 @@ export async function checkpointUlwLoop(
 				qualityGate = validateQualityGate(await readJsonInput(args.qualityGateJson, repoRoot), {
 					repoRoot,
 					fs: QUALITY_GATE_FS,
+					...(plan.evidenceLayoutVersion === 2
+						? { currentAttemptDir: ulwLoopAttemptEvidenceDir(goal.id, goal.attempt, scope) }
+						: {}),
 				});
 			goal.status = "complete";
 			goal.completedAt = now;

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 // src/serve.ts
-import { existsSync as existsSync5, realpathSync } from "node:fs";
-import { homedir as homedir6 } from "node:os";
-import { basename as basename3, join as join6, resolve as resolve2 } from "node:path";
+import { existsSync as existsSync5, realpathSync as realpathSync2 } from "node:fs";
+import { homedir as homedir7 } from "node:os";
+import { basename as basename3, join as join7, resolve as resolve3 } from "node:path";
 import {
   cwd as processCwd,
   env as processEnv,
@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { join } from "node:path";
 var CODEGRAPH_INSTALL_DIR_ENV = "CODEGRAPH_INSTALL_DIR";
+var CODEGRAPH_NO_DAEMON_ENV = "CODEGRAPH_NO_DAEMON";
 var CODEGRAPH_NO_DOWNLOAD_ENV = "CODEGRAPH_NO_DOWNLOAD";
 var CODEGRAPH_TELEMETRY_ENV = "CODEGRAPH_TELEMETRY";
 var DO_NOT_TRACK_ENV = "DO_NOT_TRACK";
@@ -50,6 +51,7 @@ var SAFE_CODEGRAPH_RUNTIME_ENV_KEYS = new Set([
   "CODEGRAPH_ALLOW_UNSAFE_NODE",
   "CODEGRAPH_BIN",
   "CODEGRAPH_FAKE_LOG",
+  "CODEGRAPH_NO_DAEMON",
   "CODEGRAPH_NODE_BIN",
   "OMO_CODEGRAPH_BIN",
   "OMO_CODEGRAPH_PROJECT_CWD",
@@ -59,6 +61,7 @@ function buildCodegraphEnv(options = {}) {
   const homeDir = options.homeDir ?? homedir();
   return {
     [CODEGRAPH_INSTALL_DIR_ENV]: join(homeDir, ".omo", "codegraph"),
+    [CODEGRAPH_NO_DAEMON_ENV]: "1",
     [CODEGRAPH_NO_DOWNLOAD_ENV]: "1",
     [CODEGRAPH_TELEMETRY_ENV]: "0",
     [DO_NOT_TRACK_ENV]: "1"
@@ -537,12 +540,80 @@ function resolveCodegraphCommand(options = {}) {
   };
 }
 
+// ../../../../utils/src/codegraph/exclusion.ts
+import { realpathSync } from "node:fs";
+import { homedir as homedir4, tmpdir as osTmpdir } from "node:os";
+import { isAbsolute, join as join5, resolve } from "node:path";
+var POSIX_DEFAULT_EXCLUDED_ROOTS = ["/tmp", "/private/tmp"];
+function expandHome(path, homeDir) {
+  if (path === "~")
+    return homeDir;
+  if (path.startsWith("~/") || path.startsWith("~\\"))
+    return join5(homeDir, path.slice(2));
+  return path;
+}
+function realpathIfPossible(path) {
+  try {
+    return realpathSync(path);
+  } catch (error) {
+    if (error instanceof Error)
+      return resolve(path);
+    throw error;
+  }
+}
+function resolveConfiguredRoot(path, homeDir) {
+  const expanded = expandHome(path, homeDir);
+  return realpathIfPossible(isAbsolute(expanded) ? expanded : join5(homeDir, expanded));
+}
+function normalizeForComparison(path, platform) {
+  const normalized = path.replaceAll("\\", "/").replace(/\/+$/, "");
+  return platform === "win32" ? normalized.toLowerCase() : normalized;
+}
+function pathIsWithin(path, root, platform) {
+  const candidate = normalizeForComparison(path, platform);
+  const normalizedRoot = normalizeForComparison(root, platform);
+  return candidate === normalizedRoot || candidate.startsWith(`${normalizedRoot}/`);
+}
+function hasOmoPathSegment(path) {
+  return path.split(/[\\/]+/).includes(".omo");
+}
+function defaultExcludedRoots(platform, tmpdir) {
+  return platform === "win32" ? [tmpdir] : [...POSIX_DEFAULT_EXCLUDED_ROOTS, tmpdir];
+}
+function shouldExcludeCodegraphProject(workspace, options = {}) {
+  const platform = options.platform ?? process.platform;
+  const homeDir = options.homeDir ?? homedir4();
+  const tmpdir = options.tmpdir ?? osTmpdir();
+  const resolvedWorkspace = realpathIfPossible(resolve(workspace));
+  if (hasOmoPathSegment(resolvedWorkspace)) {
+    return { excluded: true, matchedRoot: ".omo", reason: "omo-state" };
+  }
+  for (const root of defaultExcludedRoots(platform, tmpdir)) {
+    const resolvedRoot = realpathIfPossible(resolve(root));
+    if (pathIsWithin(resolvedWorkspace, resolvedRoot, platform)) {
+      return { excluded: true, matchedRoot: root, reason: "tmp-root" };
+    }
+  }
+  for (const root of options.excludedRoots ?? []) {
+    const trimmedRoot = root.trim();
+    if (trimmedRoot.length === 0)
+      continue;
+    const resolvedRoot = resolveConfiguredRoot(trimmedRoot, homeDir);
+    if (pathIsWithin(resolvedWorkspace, resolvedRoot, platform)) {
+      return { excluded: true, matchedRoot: root, reason: "custom-root" };
+    }
+  }
+  return { excluded: false };
+}
 // ../../shared/src/config-loader.ts
-import { homedir as homedir5 } from "node:os";
+import { homedir as homedir6 } from "node:os";
 
 // ../../../../utils/src/omo-config/loader.ts
-import { existsSync as existsSync4, readFileSync } from "node:fs";
-import { homedir as homedir4 } from "node:os";
+import { existsSync as existsSync4 } from "node:fs";
+import { homedir as homedir5 } from "node:os";
+
+// ../../../../utils/src/omo-config/body.ts
+import { readFileSync } from "node:fs";
 
 // ../../../../utils/src/deep-merge.ts
 var DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
@@ -1420,127 +1491,13 @@ var HARNESS_IDS = ["codex", "opencode", "omo"];
 var SETTING_HARNESS_SUPPORT = {
   "codegraph.auto_provision": HARNESS_IDS,
   "codegraph.enabled": HARNESS_IDS,
+  "codegraph.excluded_roots": ["codex"],
   "codegraph.install_dir": HARNESS_IDS,
   "codegraph.telemetry": HARNESS_IDS,
   "codegraph.watch_debounce_ms": ["opencode", "omo"]
 };
 
-// ../../../../utils/src/omo-config/env-overrides.ts
-var CODEGRAPH_ENV_KEYS = [
-  ["auto_provision", "AUTO_PROVISION", "boolean"],
-  ["enabled", "ENABLED", "boolean"],
-  ["install_dir", "INSTALL_DIR", "string"],
-  ["telemetry", "TELEMETRY", "boolean"],
-  ["watch_debounce_ms", "WATCH_DEBOUNCE_MS", "number"]
-];
-function parseBooleanEnv(value) {
-  const normalized = value.trim().toLowerCase();
-  if (["1", "true", "yes", "on"].includes(normalized))
-    return true;
-  if (["0", "false", "no", "off"].includes(normalized))
-    return false;
-  return null;
-}
-function parseEnvValue(value, kind) {
-  if (kind === "boolean")
-    return parseBooleanEnv(value);
-  if (kind === "number") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-  }
-  return value;
-}
-function setCodegraphSetting(config, key, value) {
-  switch (key) {
-    case "auto_provision":
-      if (typeof value === "boolean")
-        config.auto_provision = value;
-      return;
-    case "enabled":
-      if (typeof value === "boolean")
-        config.enabled = value;
-      return;
-    case "install_dir":
-      if (typeof value === "string")
-        config.install_dir = value;
-      return;
-    case "telemetry":
-      if (typeof value === "boolean")
-        config.telemetry = value;
-      return;
-    case "watch_debounce_ms":
-      if (typeof value === "number")
-        config.watch_debounce_ms = value;
-      return;
-  }
-}
-function buildEnvOverrides(harness, env, warnings, merge) {
-  let config = {};
-  for (const prefix of ["OMO", harness.toUpperCase()]) {
-    const codegraph = {};
-    for (const [settingKey, envSuffix, kind] of CODEGRAPH_ENV_KEYS) {
-      const envKey = `${prefix}_CODEGRAPH_${envSuffix}`;
-      const rawValue = env[envKey];
-      if (rawValue === undefined)
-        continue;
-      const parsed = parseEnvValue(rawValue, kind);
-      if (parsed === null) {
-        warnings.push(`${envKey} has invalid ${kind} value "${rawValue}"`);
-        continue;
-      }
-      setCodegraphSetting(codegraph, settingKey, parsed);
-    }
-    if (Object.keys(codegraph).length > 0) {
-      config = merge(config, { codegraph });
-    }
-  }
-  return config;
-}
-
-// ../../../../utils/src/omo-config/resolve.ts
-import { existsSync as existsSync3 } from "node:fs";
-import { dirname as dirname2, isAbsolute, join as join5, relative, resolve } from "node:path";
-function containsPath(parent, child) {
-  const pathToChild = relative(parent, child);
-  return pathToChild === "" || !pathToChild.startsWith("..") && !isAbsolute(pathToChild);
-}
-function findProjectConfigPathsNearestFirst(cwd, homeDir) {
-  const startDir = resolve(cwd);
-  const stopBeforeDir = containsPath(resolve(homeDir), startDir) ? resolve(homeDir) : null;
-  const paths = [];
-  let currentDir = startDir;
-  while (true) {
-    if (stopBeforeDir !== null && currentDir === stopBeforeDir)
-      break;
-    const configPath = join5(currentDir, ".omo", "config.jsonc");
-    if (existsSync3(configPath)) {
-      paths.push(configPath);
-    }
-    const parentDir = dirname2(currentDir);
-    if (parentDir === currentDir)
-      break;
-    currentDir = parentDir;
-  }
-  return paths;
-}
-function resolveOmoConfigPaths(options) {
-  const globalPath = join5(resolve(options.homeDir), ".omo", "config.jsonc");
-  const projectPathsFarthestFirst = findProjectConfigPathsNearestFirst(options.cwd, options.homeDir).reverse();
-  return [
-    { path: globalPath, scope: "global" },
-    ...projectPathsFarthestFirst.map((path) => ({ path, scope: "project" }))
-  ];
-}
-function toMissingSource(candidate) {
-  return {
-    exists: false,
-    loaded: false,
-    path: candidate.path,
-    scope: candidate.scope
-  };
-}
-
-// ../../../../utils/src/omo-config/loader.ts
+// ../../../../utils/src/omo-config/body.ts
 var BUILT_IN_DEFAULTS = {
   codegraph: {
     auto_provision: true,
@@ -1552,6 +1509,7 @@ var HARNESS_BLOCK_KEYS = HARNESS_IDS.map((harness) => `[${harness}]`);
 var CODEGRAPH_SETTING_KEYS = [
   "auto_provision",
   "enabled",
+  "excluded_roots",
   "install_dir",
   "telemetry",
   "watch_debounce_ms"
@@ -1590,7 +1548,7 @@ function mergeCodegraphConfig(base, override) {
   for (const key of CODEGRAPH_SETTING_KEYS) {
     if (!hasOwn(merged, key))
       continue;
-    setCodegraphSetting2(codegraph, key, merged[key]);
+    setCodegraphSetting(codegraph, key, merged[key]);
   }
   return Object.keys(codegraph).length > 0 ? codegraph : undefined;
 }
@@ -1607,6 +1565,9 @@ function isKnownHarnessBlockKey(key) {
   return HARNESS_BLOCK_KEYS.includes(key);
 }
 function validateCodegraphValue(key, value) {
+  if (key === "excluded_roots") {
+    return Array.isArray(value) && value.every((entry) => typeof entry === "string") ? null : "must be an array of strings";
+  }
   if (key === "install_dir")
     return typeof value === "string" ? null : "must be a string";
   if (key === "watch_debounce_ms") {
@@ -1614,7 +1575,7 @@ function validateCodegraphValue(key, value) {
   }
   return typeof value === "boolean" ? null : "must be a boolean";
 }
-function setCodegraphSetting2(config, key, value) {
+function setCodegraphSetting(config, key, value) {
   switch (key) {
     case "auto_provision":
       if (typeof value === "boolean")
@@ -1623,6 +1584,11 @@ function setCodegraphSetting2(config, key, value) {
     case "enabled":
       if (typeof value === "boolean")
         config.enabled = value;
+      return;
+    case "excluded_roots":
+      if (Array.isArray(value) && value.every((entry) => typeof entry === "string")) {
+        config.excluded_roots = value;
+      }
       return;
     case "install_dir":
       if (typeof value === "string")
@@ -1654,7 +1620,7 @@ function normalizeCodegraphSection(section, pathPrefix, warnings) {
       warnings.push(`${pathPrefix}.${key} ${error}`);
       continue;
     }
-    setCodegraphSetting2(codegraph, key, value);
+    setCodegraphSetting(codegraph, key, value);
   }
   return codegraph;
 }
@@ -1733,9 +1699,131 @@ function validateHarnessApplicability(config, harness) {
   }
   return warnings;
 }
+
+// ../../../../utils/src/omo-config/env-overrides.ts
+var CODEGRAPH_ENV_KEYS = [
+  ["auto_provision", "AUTO_PROVISION", "boolean"],
+  ["enabled", "ENABLED", "boolean"],
+  ["install_dir", "INSTALL_DIR", "string"],
+  ["telemetry", "TELEMETRY", "boolean"],
+  ["watch_debounce_ms", "WATCH_DEBOUNCE_MS", "number"]
+];
+function parseBooleanEnv(value) {
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized))
+    return true;
+  if (["0", "false", "no", "off"].includes(normalized))
+    return false;
+  return null;
+}
+function parseEnvValue(value, kind) {
+  if (kind === "boolean")
+    return parseBooleanEnv(value);
+  if (kind === "number") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  }
+  return value;
+}
+function setCodegraphSetting2(config, key, value) {
+  switch (key) {
+    case "auto_provision":
+      if (typeof value === "boolean")
+        config.auto_provision = value;
+      return;
+    case "enabled":
+      if (typeof value === "boolean")
+        config.enabled = value;
+      return;
+    case "excluded_roots":
+      if (Array.isArray(value) && value.every((entry) => typeof entry === "string")) {
+        config.excluded_roots = value;
+      }
+      return;
+    case "install_dir":
+      if (typeof value === "string")
+        config.install_dir = value;
+      return;
+    case "telemetry":
+      if (typeof value === "boolean")
+        config.telemetry = value;
+      return;
+    case "watch_debounce_ms":
+      if (typeof value === "number")
+        config.watch_debounce_ms = value;
+      return;
+  }
+}
+function buildEnvOverrides(harness, env, warnings, merge) {
+  let config = {};
+  for (const prefix of ["OMO", harness.toUpperCase()]) {
+    const codegraph = {};
+    for (const [settingKey, envSuffix, kind] of CODEGRAPH_ENV_KEYS) {
+      const envKey = `${prefix}_CODEGRAPH_${envSuffix}`;
+      const rawValue = env[envKey];
+      if (rawValue === undefined)
+        continue;
+      const parsed = parseEnvValue(rawValue, kind);
+      if (parsed === null) {
+        warnings.push(`${envKey} has invalid ${kind} value "${rawValue}"`);
+        continue;
+      }
+      setCodegraphSetting2(codegraph, settingKey, parsed);
+    }
+    if (Object.keys(codegraph).length > 0) {
+      config = merge(config, { codegraph });
+    }
+  }
+  return config;
+}
+
+// ../../../../utils/src/omo-config/resolve.ts
+import { existsSync as existsSync3 } from "node:fs";
+import { dirname as dirname2, isAbsolute as isAbsolute2, join as join6, relative, resolve as resolve2 } from "node:path";
+function containsPath(parent, child) {
+  const pathToChild = relative(parent, child);
+  return pathToChild === "" || !pathToChild.startsWith("..") && !isAbsolute2(pathToChild);
+}
+function findProjectConfigPathsNearestFirst(cwd, homeDir) {
+  const startDir = resolve2(cwd);
+  const stopBeforeDir = containsPath(resolve2(homeDir), startDir) ? resolve2(homeDir) : null;
+  const paths = [];
+  let currentDir = startDir;
+  while (true) {
+    if (stopBeforeDir !== null && currentDir === stopBeforeDir)
+      break;
+    const configPath = join6(currentDir, ".omo", "config.jsonc");
+    if (existsSync3(configPath)) {
+      paths.push(configPath);
+    }
+    const parentDir = dirname2(currentDir);
+    if (parentDir === currentDir)
+      break;
+    currentDir = parentDir;
+  }
+  return paths;
+}
+function resolveOmoConfigPaths(options) {
+  const globalPath = join6(resolve2(options.homeDir), ".omo", "config.jsonc");
+  const projectPathsFarthestFirst = findProjectConfigPathsNearestFirst(options.cwd, options.homeDir).reverse();
+  return [
+    { path: globalPath, scope: "global" },
+    ...projectPathsFarthestFirst.map((path) => ({ path, scope: "project" }))
+  ];
+}
+function toMissingSource(candidate) {
+  return {
+    exists: false,
+    loaded: false,
+    path: candidate.path,
+    scope: candidate.scope
+  };
+}
+
+// ../../../../utils/src/omo-config/loader.ts
 function loadOmoConfig(options) {
   const cwd = options.cwd ?? process.cwd();
-  const homeDir = options.homeDir ?? process.env["HOME"] ?? process.env["USERPROFILE"] ?? homedir4();
+  const homeDir = options.homeDir ?? process.env["HOME"] ?? process.env["USERPROFILE"] ?? homedir5();
   const env = options.env ?? process.env;
   let config = BUILT_IN_DEFAULTS;
   const sources = [];
@@ -1789,7 +1877,7 @@ function getCodexOmoConfig(options = {}) {
 }
 function resolveHomeDir(options) {
   const env = options.env ?? process.env;
-  return options.homeDir ?? env["HOME"] ?? env["USERPROFILE"] ?? homedir5();
+  return options.homeDir ?? env["HOME"] ?? env["USERPROFILE"] ?? homedir6();
 }
 
 // src/mcp-bridge.ts
@@ -1808,6 +1896,9 @@ function errorResponse(id, code, message, data) {
 }
 function jsonRpcId(value) {
   return typeof value === "string" || typeof value === "number" || value === null ? value : null;
+}
+function messageFromError(error) {
+  return error instanceof Error ? error.message : String(error);
 }
 // ../../../../mcp-stdio-core/src/transport.ts
 var HEADER_SEPARATOR = Buffer.from(`\r
@@ -1831,16 +1922,45 @@ async function* readStdioJsonRpcMessages(input) {
     yield parseJsonPayload(trailing, "line");
   }
 }
-function writeStdioJsonRpcResponse(output, response, responseMode) {
+async function writeStdioJsonRpcResponse(output, response, responseMode) {
   const body = JSON.stringify(response);
-  if (responseMode === "framed") {
-    output.write(`Content-Length: ${Buffer.byteLength(body, "utf8")}\r
+  const payload = responseMode === "framed" ? `Content-Length: ${Buffer.byteLength(body, "utf8")}\r
 \r
-${body}`);
-    return;
-  }
-  output.write(`${body}
-`);
+${body}` : `${body}
+`;
+  await writeChunk(output, payload);
+}
+function writeChunk(output, chunk) {
+  return new Promise((resolve3, reject) => {
+    let settled = false;
+    const onError = (error) => {
+      if (settled)
+        return;
+      settled = true;
+      reject(error);
+    };
+    output.once("error", onError);
+    try {
+      output.write(chunk, (error) => {
+        if (settled)
+          return;
+        settled = true;
+        if (error) {
+          queueMicrotask(() => output.removeListener("error", onError));
+          reject(error);
+          return;
+        }
+        output.removeListener("error", onError);
+        resolve3();
+      });
+    } catch (error) {
+      output.removeListener("error", onError);
+      if (settled)
+        return;
+      settled = true;
+      reject(error);
+    }
+  });
 }
 function readNextMessage(buffer) {
   if (buffer.length === 0)
@@ -1936,39 +2056,69 @@ async function runJsonRpcStdioServer(config) {
         break;
       idleTimer.arm();
       if (message.kind === "parse_error") {
-        handleParseError(message, config, log);
+        if (!await handleParseError(message, config, log))
+          break;
         continue;
       }
-      await handleRequest(message, config, log);
+      if (!await handleRequest(message, config, log))
+        break;
     }
   } finally {
     idleTimer.clear();
     log("stdio_stopped");
   }
 }
-function handleParseError(message, config, log) {
+async function handleParseError(message, config, log) {
   log("parse_error", { message: message.message });
   const response = config.parseErrorResponse?.(message.message) ?? errorResponse(null, -32700, "Parse error", message.message);
-  if (response !== undefined) {
-    writeStdioJsonRpcResponse(config.output, response, message.responseMode);
-  }
+  if (response === undefined)
+    return true;
+  return writeResponse(response, {
+    output: config.output,
+    responseMode: message.responseMode,
+    log
+  });
 }
 async function handleRequest(message, config, log) {
   const parsed = message.payload;
   const id = isPlainRecord(parsed) ? jsonRpcId(parsed["id"]) : null;
   const method = isPlainRecord(parsed) && typeof parsed["method"] === "string" ? parsed["method"] : null;
   log("request", { id: id === null ? null : String(id), method });
+  let response;
   try {
-    const response = await config.handler(parsed, config.handlerOptions);
-    if (response === undefined)
-      return;
-    writeStdioJsonRpcResponse(config.output, response, message.responseMode);
-    log("response", { id: String(response.id), method, is_error: response.error !== undefined });
+    response = await config.handler(parsed, config.handlerOptions);
   } catch (error) {
     if (config.onHandlerError === undefined)
       throw error;
     config.onHandlerError(error);
+    return true;
   }
+  if (response === undefined)
+    return true;
+  if (!await writeResponse(response, {
+    output: config.output,
+    responseMode: message.responseMode,
+    log
+  }))
+    return false;
+  log("response", { id: String(response.id), method, is_error: response.error !== undefined });
+  return true;
+}
+async function writeResponse(response, context) {
+  try {
+    await writeStdioJsonRpcResponse(context.output, response, context.responseMode);
+    return true;
+  } catch (error) {
+    if (!isTerminalOutputError(error))
+      throw error;
+    context.log("output_error", { message: messageFromError(error) });
+    return false;
+  }
+}
+function isTerminalOutputError(error) {
+  if (!(error instanceof Error) || !("code" in error))
+    return false;
+  return error.code === "EPIPE" || error.code === "ERR_STREAM_DESTROYED" || error.code === "ERR_STREAM_WRITE_AFTER_END";
 }
 function createIdleTimer(idleTimeoutMs, log, onIdleTimeout) {
   let timer = null;
@@ -2022,6 +2172,9 @@ class CodegraphBridgeStdioError extends Error {
     this.streamName = streamName;
   }
 }
+var CODEGRAPH_NODE_DESCRIPTION = "Inspect one named symbol or file. In symbol mode, includeCode=true includes leaf-symbol source when available. Container symbols such as classes, interfaces, structs, enums, modules, and namespaces return structural outlines with member lists by design. For container source, request a specific member symbol or use file mode with symbolsOnly=false plus offset/limit.";
+var CODEGRAPH_NODE_INCLUDE_CODE_DESCRIPTION = "Symbol mode: include leaf-symbol source when available. Container symbols such as classes, interfaces, structs, enums, modules, and namespaces intentionally return structural outlines with members; request a specific member symbol or use file mode with symbolsOnly=false plus offset/limit for source.";
+var CODEGRAPH_CONTAINER_OUTLINE_GUIDANCE = "Container symbols intentionally return structural outlines with members. For source, request a specific member symbol or call codegraph_node in file mode with symbolsOnly=false plus offset/limit around the symbol location.";
 async function runBridgedCodegraphProcess(command, args, options) {
   const invocation = resolveServeProcessInvocation(command, args);
   const child = spawn(invocation.command, invocation.args, {
@@ -2035,7 +2188,7 @@ async function runBridgedCodegraphProcess(command, args, options) {
     throw new CodegraphBridgeStdioError("stdin");
   if (childOutput === null)
     throw new CodegraphBridgeStdioError("stdout");
-  const responseModes = new Map;
+  const pendingResponses = new Map;
   let defaultResponseMode = "framed";
   const childExit = new Promise((resolveExit, reject) => {
     child.once("error", reject);
@@ -2047,20 +2200,30 @@ async function runBridgedCodegraphProcess(command, args, options) {
       resolveExit(signal === null ? 0 : 1);
     });
   });
-  const bridgeDone = Promise.all([
-    forwardClientToCodegraph(options.input, childInput, responseModes, (mode) => {
-      defaultResponseMode = mode;
-    }),
-    forwardCodegraphToClient(childOutput, options.output, responseModes, () => defaultResponseMode)
-  ]);
+  const clientForwardingDone = forwardClientToCodegraph(options.input, childInput, pendingResponses, (mode) => {
+    defaultResponseMode = mode;
+  });
+  const responseForwardingDone = forwardCodegraphToClient(childOutput, options.output, pendingResponses, () => defaultResponseMode);
+  const bridgeDone = Promise.all([clientForwardingDone, responseForwardingDone]);
+  const childAndResponsesDone = Promise.all([childExit, responseForwardingDone]).then(([exitCode]) => exitCode);
   const destroyChildPipes = () => {
     childInput.destroy();
     childOutput.destroy();
   };
   childExit.then(destroyChildPipes, destroyChildPipes);
-  return Promise.race([childExit, bridgeDone.then(() => childExit)]);
+  try {
+    return await Promise.race([childAndResponsesDone, bridgeDone.then(() => childExit)]);
+  } catch (error) {
+    destroyChildPipes();
+    if (child.exitCode === null && child.signalCode === null)
+      child.kill("SIGKILL");
+    await childExit.catch(() => {
+      return;
+    });
+    throw error;
+  }
 }
-async function forwardClientToCodegraph(input, childInput, responseModes, setDefaultResponseMode) {
+async function forwardClientToCodegraph(input, childInput, pendingResponses, setDefaultResponseMode) {
   for await (const message of readStdioJsonRpcMessages(input)) {
     if (message.kind === "parse_error") {
       continue;
@@ -2068,23 +2231,29 @@ async function forwardClientToCodegraph(input, childInput, responseModes, setDef
     const responseMode = message.responseMode;
     setDefaultResponseMode(responseMode);
     const key = responseModeKey(message.payload);
-    if (key !== null)
-      responseModes.set(key, responseMode);
+    if (key !== null) {
+      pendingResponses.set(key, {
+        method: jsonRpcMethod(message.payload),
+        responseMode,
+        toolName: jsonRpcToolName(message.payload)
+      });
+    }
     await writeLine(childInput, JSON.stringify(message.payload));
   }
   childInput.end();
 }
-async function forwardCodegraphToClient(childOutput, output, responseModes, defaultResponseMode) {
+async function forwardCodegraphToClient(childOutput, output, pendingResponses, defaultResponseMode) {
   for await (const message of readStdioJsonRpcMessages(childOutput)) {
     if (message.kind === "parse_error") {
-      writeStdioJsonRpcResponse(output, errorResponse(null, -32700, "Parse error", message.message), defaultResponseMode());
+      await writeStdioJsonRpcResponse(output, errorResponse(null, -32700, "Parse error", message.message), defaultResponseMode());
       continue;
     }
     const key = responseModeKey(message.payload);
-    const responseMode = key === null ? defaultResponseMode() : responseModes.get(key) ?? defaultResponseMode();
+    const pendingResponse = key === null ? undefined : pendingResponses.get(key);
+    const responseMode = pendingResponse?.responseMode ?? defaultResponseMode();
     if (key !== null)
-      responseModes.delete(key);
-    writeStdioJsonRpcResponse(output, message.payload, responseMode);
+      pendingResponses.delete(key);
+    await writeStdioJsonRpcResponse(output, clarifyCodegraphResponse(message.payload, pendingResponse), responseMode);
   }
 }
 function responseModeKey(payload) {
@@ -2092,6 +2261,110 @@ function responseModeKey(payload) {
     return null;
   const id = jsonRpcId(payload["id"]);
   return `${typeof id}:${String(id)}`;
+}
+function jsonRpcMethod(payload) {
+  if (!isPlainRecord(payload))
+    return null;
+  const method = payload["method"];
+  return typeof method === "string" ? method : null;
+}
+function jsonRpcToolName(payload) {
+  if (jsonRpcMethod(payload) !== "tools/call" || !isPlainRecord(payload))
+    return null;
+  const params = payload["params"];
+  if (!isPlainRecord(params))
+    return null;
+  const name = params["name"];
+  return typeof name === "string" ? name : null;
+}
+function clarifyCodegraphResponse(payload, pendingResponse) {
+  if (pendingResponse?.method === "tools/list")
+    return clarifyCodegraphToolsList(payload);
+  if (pendingResponse?.method === "tools/call" && pendingResponse.toolName === "codegraph_node") {
+    return clarifyCodegraphNodeCallResult(payload);
+  }
+  return payload;
+}
+function clarifyCodegraphToolsList(payload) {
+  if (!isPlainRecord(payload))
+    return payload;
+  const result = payload["result"];
+  if (!isPlainRecord(result) || !Array.isArray(result["tools"]))
+    return payload;
+  let changed = false;
+  const tools = result["tools"].map((tool) => {
+    if (!isPlainRecord(tool) || tool["name"] !== "codegraph_node")
+      return tool;
+    if (!hasCodegraphNodeContractMetadata(tool))
+      return tool;
+    changed = true;
+    return clarifyCodegraphNodeTool(tool);
+  });
+  if (!changed)
+    return payload;
+  return { ...payload, result: { ...result, tools } };
+}
+function clarifyCodegraphNodeTool(tool) {
+  const clarified = {
+    ...tool,
+    description: CODEGRAPH_NODE_DESCRIPTION
+  };
+  const inputSchema = tool["inputSchema"];
+  if (isPlainRecord(inputSchema))
+    clarified["inputSchema"] = clarifyCodegraphNodeInputSchema(inputSchema);
+  return clarified;
+}
+function hasCodegraphNodeContractMetadata(tool) {
+  if (typeof tool["description"] === "string")
+    return true;
+  const inputSchema = tool["inputSchema"];
+  if (!isPlainRecord(inputSchema))
+    return false;
+  const properties = inputSchema["properties"];
+  return isPlainRecord(properties) && isPlainRecord(properties["includeCode"]);
+}
+function clarifyCodegraphNodeInputSchema(inputSchema) {
+  const properties = inputSchema["properties"];
+  if (!isPlainRecord(properties))
+    return inputSchema;
+  const includeCode = properties["includeCode"];
+  if (!isPlainRecord(includeCode))
+    return inputSchema;
+  return {
+    ...inputSchema,
+    properties: {
+      ...properties,
+      includeCode: {
+        ...includeCode,
+        description: CODEGRAPH_NODE_INCLUDE_CODE_DESCRIPTION
+      }
+    }
+  };
+}
+function clarifyCodegraphNodeCallResult(payload) {
+  if (!isPlainRecord(payload))
+    return payload;
+  const result = payload["result"];
+  if (!isPlainRecord(result) || !Array.isArray(result["content"]))
+    return payload;
+  let changed = false;
+  const content = result["content"].map((item) => {
+    if (!isPlainRecord(item) || item["type"] !== "text" || typeof item["text"] !== "string")
+      return item;
+    const text = clarifyContainerOutlineGuidance(item["text"]);
+    if (text === item["text"])
+      return item;
+    changed = true;
+    return { ...item, text };
+  });
+  if (!changed)
+    return payload;
+  return { ...payload, result: { ...result, content } };
+}
+function clarifyContainerOutlineGuidance(text) {
+  if (!text.includes("Structural outline only"))
+    return text;
+  return text.replace(/Structural outline only[^\n]*(?:\n[^\n]*(?:Read|read)[^\n]*)?/g, CODEGRAPH_CONTAINER_OUTLINE_GUIDANCE);
 }
 async function writeLine(output, line) {
   if (output.write(`${line}
@@ -2159,17 +2432,27 @@ var CODEGRAPH_SKIP_HINT = `CodeGraph MCP skipped: codegraph binary not found. In
 `;
 var CODEGRAPH_DISABLED_HINT = `CodeGraph MCP skipped: disabled by OMO SOT config. Set [codex].codegraph.enabled=true to enable it.
 `;
+var CODEGRAPH_EXCLUDED_HINT = `CodeGraph MCP skipped: project excluded by OMO CodeGraph policy.
+`;
 var CODEGRAPH_VERSION = "1.0.1";
 var PROJECT_CWD_ENV_KEYS = ["OMO_CODEGRAPH_PROJECT_CWD", SESSION_START_CWD_ENV, "PWD"];
 async function runCodegraphServe(options = {}) {
   const env = options.env ?? processEnv;
-  const homeDir = options.homeDir ?? homedir6();
+  const homeDir = options.homeDir ?? homedir7();
   const wrapperCwd = options.cwd ?? processCwd();
   const projectCwd = resolveProjectCwd(env, wrapperCwd);
   const config = options.config ?? getCodexOmoConfig({ cwd: projectCwd, env, homeDir });
   const codegraphConfig = config.codegraph ?? {};
   if (codegraphConfig.enabled === false) {
     return runUnavailableMcp(CODEGRAPH_DISABLED_HINT, options);
+  }
+  const excludedRoots = codegraphConfig.excluded_roots;
+  const exclusion = shouldExcludeCodegraphProject(projectCwd, {
+    homeDir,
+    ...excludedRoots === undefined ? {} : { excludedRoots }
+  });
+  if (exclusion.excluded) {
+    return runUnavailableMcp(CODEGRAPH_EXCLUDED_HINT, options);
   }
   const trustedInstallDir = config.trustedCodegraphInstallDir;
   const resolutionOptions = {
@@ -2225,10 +2508,10 @@ async function provisionMissingCodegraph(options) {
     return null;
   if (options.config.auto_provision === false)
     return null;
-  const installDir = options.trustedInstallDir ?? join6(options.homeDir, ".omo", "codegraph");
+  const installDir = options.trustedInstallDir ?? join7(options.homeDir, ".omo", "codegraph");
   const result = await options.ensureProvisioned({
     installDir,
-    lockDir: join6(installDir, ".locks"),
+    lockDir: join7(installDir, ".locks"),
     version: CODEGRAPH_VERSION
   });
   if (!result.provisioned || result.binPath === undefined)
@@ -2246,7 +2529,7 @@ function looksLikePath2(command) {
   return command.includes("/") || command.includes("\\");
 }
 function codegraphEnvForConfig(trustedInstallDir, homeDir, buildEnv) {
-  const env = buildEnv?.({ homeDir }) ?? buildCodegraphEnv({ homeDir });
+  const env = { ...buildEnv?.({ homeDir }) ?? buildCodegraphEnv({ homeDir }), [CODEGRAPH_NO_DAEMON_ENV]: "1" };
   return trustedInstallDir === undefined ? env : { ...env, CODEGRAPH_INSTALL_DIR: trustedInstallDir };
 }
 function resolveProjectCwd(env, fallback) {
@@ -2254,16 +2537,16 @@ function resolveProjectCwd(env, fallback) {
     const candidate = env[key]?.trim();
     if (candidate === undefined || candidate.length === 0)
       continue;
-    const resolved = resolve2(candidate);
+    const resolved = resolve3(candidate);
     if (existsSync5(resolved))
       return resolved;
   }
-  return resolve2(fallback);
+  return resolve3(fallback);
 }
 function provisionedBinFromInstallDir(installDir) {
   if (installDir === undefined)
     return null;
-  const candidate = join6(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
+  const candidate = join7(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
   return existsSync5(candidate) ? candidate : null;
 }
 async function runCodegraphServeCli() {
@@ -2283,7 +2566,7 @@ function isDirectInvocation(argvPath) {
   const moduleName = basename3(modulePath);
   if (moduleName !== "serve.js" && moduleName !== "serve.ts")
     return false;
-  return realpathSync(resolve2(argvPath)) === realpathSync(modulePath);
+  return realpathSync2(resolve3(argvPath)) === realpathSync2(modulePath);
 }
 export {
   runCodegraphServeCli,

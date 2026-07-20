@@ -1,6 +1,7 @@
 import { chmod, lstat, mkdir, readFile, readdir, readlink, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { COMMAND_SHIM_MARKER, windowsCommandShim } from "./codex-cache-command-shim"
+import { removeDanglingManagedComponentBins } from "./codex-cache-dangling-bins"
 import { isNodeErrorWithCode, isPlainRecord } from "./codex-cache-fs"
 import { removeLegacyCodexComponentBins } from "./codex-cache-legacy-bins"
 import { RUNTIME_WRAPPER_MARKER, posixRuntimeWrapper, windowsRuntimeWrapper } from "./codex-cache-runtime-wrapper"
@@ -18,6 +19,11 @@ export async function linkCachedPluginBins(input: {
   const platform = input.platform ?? process.platform
   await mkdir(input.binDir, { recursive: true })
   await removeLegacyCodexComponentBins(input.binDir, platform)
+  await removeDanglingManagedComponentBins(
+    input.binDir,
+    platform,
+    new Set(binLinks.map((link) => link.name)),
+  )
   const linked: Array<{ name: string; path: string; target: string }> = []
   for (const link of binLinks) {
     const linkPath = await linkCachedPluginBin(input.binDir, link, platform)

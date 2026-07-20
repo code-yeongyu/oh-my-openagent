@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-import { ULTRAWORK_DIRECTIVE } from "./directive.js";
+import { buildUltraworkAdditionalContext, type UltraworkAdditionalContextOptions } from "./skill-pointer.js";
 
 const ULTRAWORK_CURRENT_PROMPT_PATTERN = /(?:ultrawork|ulw)/i;
 const ULTRAWORK_DIRECTIVE_MARKER = "<ultrawork-mode>";
@@ -28,12 +28,14 @@ interface UserPromptSubmitHookOutput {
 	};
 }
 
-export function runUserPromptSubmitHook(input: unknown): string {
+export function runUserPromptSubmitHook(input: unknown, options: UltraworkAdditionalContextOptions = {}): string {
 	if (!isCodexUserPromptSubmitInput(input)) return "";
 	if (isContextPressureRecoveryPrompt(input.prompt)) return "";
 	if (hasUltraworkDirectiveAlreadyInTranscript(input.transcript_path)) return "";
 	if (isContextPressureTranscript(input.transcript_path)) return "";
-	return isUltraworkPrompt(input.prompt) ? formatAdditionalContextOutput(ULTRAWORK_DIRECTIVE) : "";
+	return isUltraworkPrompt(input.prompt)
+		? formatAdditionalContextOutput(buildUltraworkAdditionalContext(options))
+		: "";
 }
 
 function hasUltraworkDirectiveAlreadyInTranscript(transcriptPath: string | null | undefined): boolean {

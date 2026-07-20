@@ -12,6 +12,8 @@ export const EXPECTED_OMO_COMPONENT_BINS = [
   { name: "omo-start-work-continuation", target: join("components", "start-work-continuation", "dist", "cli.js") },
   { name: "omo-telemetry", target: join("components", "telemetry", "dist", "cli.js") },
   { name: "omo-ulw-loop", target: join("components", "ulw-loop", "dist", "cli.js") },
+  { name: "ulw", target: join("components", "ulw-loop", "dist", "cli.js") },
+  { name: "ulw-loop", target: join("components", "ulw-loop", "dist", "cli.js") },
   { name: "omo-ultrawork", target: join("components", "ultrawork", "dist", "cli.js") },
 ] as const
 
@@ -55,16 +57,20 @@ export async function createRepoWithBuiltComponentBins(
     await createBundledGitBashMcpFixture({ pluginRoot, repoRoot })
   }
 
+  const componentBins = new Map<string, Record<string, string>>()
   for (const entry of EXPECTED_OMO_COMPONENT_BINS) {
     if ("kind" in entry && entry.kind === "runtime-wrapper") continue
     const componentName = entry.target.split(/[\\/]/)[1]
     if (componentName === undefined) throw new Error(`missing component name for ${entry.name}`)
+    const bins = componentBins.get(componentName) ?? {}
+    bins[entry.name] = "./dist/cli.js"
+    componentBins.set(componentName, bins)
+  }
+
+  for (const [componentName, bins] of componentBins) {
     const componentRoot = join(pluginRoot, "components", componentName)
     await mkdir(join(componentRoot, "dist"), { recursive: true })
-    await writeFile(
-      join(componentRoot, "package.json"),
-      JSON.stringify({ name: `@sisyphuslabs/${componentName}`, bin: { [entry.name]: "./dist/cli.js" } }),
-    )
+    await writeFile(join(componentRoot, "package.json"), JSON.stringify({ name: `@sisyphuslabs/${componentName}`, bin: bins }))
     await writeFile(join(componentRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
   }
 

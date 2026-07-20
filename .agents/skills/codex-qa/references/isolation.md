@@ -49,7 +49,7 @@ still lands on the mock.
 ## The `codex` shell-function trap
 
 The interactive shell here wraps `codex` in a function that injects
-`--profile quotio` (sparkshell). That breaks non-runtime subcommands like
+`--profile quotio`. That breaks non-runtime subcommands like
 `generate-json-schema` and would point a turn at the quotio provider. **Bash
 scripts do not inherit that function**, so `codex` inside a `#!/usr/bin/env bash`
 script is the real binary on PATH. `cqa_codex_bin` resolves it explicitly; never

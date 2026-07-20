@@ -13,4 +13,16 @@ describe("codex ultrawork directive source", () => {
 		// then
 		expect(codexPrompt).toBe(directive);
 	});
+
+	it("#given bundled ultrawork skill #when compared to the directive #then it wraps the same bytes with skill frontmatter", () => {
+		// given
+		const directive = readFileSync("directive.md", "utf8");
+
+		// when
+		const skill = readFileSync("skills/ultrawork/SKILL.md", "utf8");
+
+		// then
+		expect(skill.startsWith("---\nname: ultrawork\n")).toBe(true);
+		expect(skill.endsWith(directive)).toBe(true);
+	});
 });

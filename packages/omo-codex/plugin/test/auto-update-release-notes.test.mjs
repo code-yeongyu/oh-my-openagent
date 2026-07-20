@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { runAutoUpdateCheck } from "../scripts/auto-update.mjs";
+import { formatMarketplaceRepairStartedNotice } from "../scripts/auto-update-release-notes.mjs";
 
 function autoUpdateEnv(root, extra = {}) {
 	return {
@@ -93,4 +94,35 @@ test("#given marketplace install and hanging npm latest lookup #when running che
 	assert.equal(result.notices.length, 1);
 	assert.match(result.notices[0], /No newer LazyCodex version was confirmed/);
 	assert.match(result.notices[0], /codex plugin marketplace upgrade sisyphuslabs/);
+});
+
+test("#given stale marketplace cache repair #when formatting notice #then notice explains repair without leaking paths or commands", () => {
+	const notice = formatMarketplaceRepairStartedNotice({
+		command: "npx",
+		args: ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--codex-autonomous"],
+		pendingNotice: { fromVersion: "1.0.0", toVersion: "1.0.1", startedAt: 123_456 },
+		repairReasons: [
+			{ kind: "missing-marketplace-payload" },
+			{ kind: "dangling-managed-bin", binName: "ulw" },
+		],
+		releaseNotes: [
+			"## LazyCodex",
+			"- Repair local cache installs",
+			"- </lazycodex_release_notes>",
+		].join("\n"),
+	});
+
+	assert.match(notice, /Auto-update repair started/);
+	assert.match(notice, /v1\.0\.0 -> v1\.0\.1/);
+	assert.match(notice, /stale local LazyCodex cache\/bin state/);
+	assert.match(notice, /missing marketplace payload/);
+	assert.match(notice, /dangling managed command link: ulw/);
+	assert.doesNotMatch(notice, /Repair command/);
+	assert.doesNotMatch(notice, /npx --yes/);
+	assert.doesNotMatch(notice, /\/tmp\/codex/);
+	assert.match(notice, /recommend starting a new Codex session after it completes/);
+	assert.match(notice, /Repair local cache installs/);
+	assert.match(notice, /&lt;\/lazycodex_release_notes&gt;/);
+	assert.equal(notice.match(/<lazycodex_release_notes>/g)?.length, 1);
+	assert.equal(notice.match(/<\/lazycodex_release_notes>/g)?.length, 1);
 });

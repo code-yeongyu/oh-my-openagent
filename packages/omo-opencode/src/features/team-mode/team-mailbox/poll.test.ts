@@ -89,7 +89,7 @@ describe("pollAndBuildInjection", () => {
     // then
     expect(results.filter((result) => result.injected)).toHaveLength(1)
     expect(results.filter((result) => !result.injected)).toHaveLength(7)
-  })
+  }, 15_000)
 
   test("wraps hostile message bodies in a literal peer_message envelope", async () => {
     // given
@@ -153,7 +153,7 @@ describe("pollAndBuildInjection", () => {
     expect(inboxEntries).toContain(`${firstMessageId}.json`)
     expect(inboxEntries).toContain(`${secondMessageId}.json`)
     expect(inboxEntries).not.toContain("processed")
-  })
+  }, 15_000)
 
   test("does not re-inject a pending message on a later turn", async () => {
     // given

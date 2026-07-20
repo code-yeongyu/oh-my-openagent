@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { isAbsolute, join, relative, sep } from "node:path";
 import {
 	ULW_LOOP_BRIEF,
 	ULW_LOOP_DIR,
@@ -85,4 +85,30 @@ export function repoRelative(absolutePath: string, repoRoot: string): string {
 	if (absolutePath.startsWith(backslashPrefix))
 		return absolutePath.slice(backslashPrefix.length).split("\\").join("/");
 	return absolutePath.split("\\").join("/");
+}
+
+// Both the status --json emitter and the checkpoint enforcement resolve the attempt dir through
+// this function; a second resolution path would let the gate reject its own advertised directory.
+export function ulwLoopAttemptEvidenceDir(goalId: string, attempt: number, scope?: UlwLoopScope): string {
+	const sessionId = normalizeUlwLoopSessionId(scope?.sessionId) ?? resolveUlwLoopSessionIdFromEnv() ?? "session";
+	return `.omo/evidence/ulw/${sessionId}/${goalId}/a${attempt}`;
+}
+
+interface AttemptPathApi {
+	relative(from: string, to: string): string;
+	isAbsolute(path: string): boolean;
+	readonly sep: string;
+}
+
+const PLATFORM_PATH_API: AttemptPathApi = { relative, isAbsolute, sep };
+
+export function isWithinAttemptDir(
+	absolutePath: string,
+	attemptRoot: string,
+	pathApi: AttemptPathApi = PLATFORM_PATH_API,
+): boolean {
+	const relativePath = pathApi.relative(attemptRoot, absolutePath);
+	if (relativePath === "") return true;
+	if (relativePath === ".." || relativePath.startsWith(`..${pathApi.sep}`)) return false;
+	return !pathApi.isAbsolute(relativePath);
 }

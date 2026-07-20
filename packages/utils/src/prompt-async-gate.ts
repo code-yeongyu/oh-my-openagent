@@ -318,7 +318,7 @@ export function releasePromptAsyncReservation(
   }
 
   const expectedSource = options?.reservedBy ?? source
-  if (!reservationSourceMatches(existing.source, expectedSource, options?.reservedByPrefix)) {
+  if (!reservationSourceMatches(existing.source, expectedSource, options?.reservedByPrefix, options?.supersedeTransientRetryOwners)) {
     log("[prompt-async-gate] promptAsync reservation release skipped for different source", {
       sessionID,
       source,

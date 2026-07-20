@@ -1,10 +1,10 @@
-# src/cli/ — CLI: install, run, doctor, mcp-oauth, refresh-model-capabilities, get-local-version, version, boulder, cleanup, sparkshell, ulw-loop
+# src/cli/ — CLI: install, run, doctor, mcp (oauth), refresh-model-capabilities, get-local-version, version, boulder, cleanup, ulw-loop
 
-**Generated:** 2026-06-08
+**Generated:** 2026-07-03
 
 ## OVERVIEW
 
-Commander.js CLI with 11 commands. Entry: `index.ts` → `runCli()` in `cli-program.ts`.
+Commander.js CLI with 10 commands (`sparkshell` removed 2026-07). Entry: `index.ts` → `runCli()` in `cli-program.ts`.
 
 ## COMMANDS
 
@@ -15,11 +15,10 @@ Commander.js CLI with 11 commands. Entry: `index.ts` → `runCli()` in `cli-prog
 | `doctor` | 4-category health checks | System, Config, Tools, Models |
 | `get-local-version` | Version detection | Installed vs npm latest |
 | `version` | Print plugin version | Trivial 2-line subcommand |
-| `mcp-oauth` | OAuth token management | login (PKCE), logout, status |
+| `mcp` | MCP management; nested `oauth` group | `mcp oauth login <server-name>` (PKCE), `logout`, `status` |
 | `refresh-model-capabilities` | Refresh models.dev cache | Model capabilities refresh |
 | `boulder` | Boulder state inspector | Format work-state + tasks from `.omo/boulder-state/` |
 | `cleanup` (alias `uninstall`) | Remove Codex Light state | Clean managed Codex cache/marketplace + repair project-local legacy Codex artifacts |
-| `sparkshell` | Shell-native inspection | Run Sparkshell inspection with explicit raw fallback |
 | `ulw-loop` | Codex ulw-loop CLI | Run the Codex LazyCodex ulw-loop CLI |
 
 `install` accepts `--platform=opencode|codex|both` (default `opencode`). `codex`/`both` route through `install-codex/` to install the Codex CLI Light edition (also `npx lazycodex-ai install`). See `packages/omo-codex/AGENTS.md`.
@@ -29,7 +28,7 @@ Commander.js CLI with 11 commands. Entry: `index.ts` → `runCli()` in `cli-prog
 ```
 cli/
 ├── index.ts                     # Entry point → runCli()
-├── cli-program.ts               # Commander.js program (11 commands)
+├── cli-program.ts               # Commander.js program (10 commands)
 ├── install.ts                   # Routes to TUI or CLI installer
 ├── cli-installer.ts             # Non-interactive (console output)
 ├── tui-installer.ts             # Interactive (@clack/prompts)

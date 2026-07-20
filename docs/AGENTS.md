@@ -1,10 +1,10 @@
 # docs/ — User-Facing Documentation
 
-**Generated:** 2026-05-20
+**Generated:** 2026-07-17 / 7d664b96b
 
 ## OVERVIEW
 
-19 Markdown files across 5 subdirectories + 3 root files. Categorized by audience: user-facing guides + reference, troubleshooting, legal. The web site at [packages/web/](../packages/web) consumes some of these (via `web-deploy.yml` triggers).
+~26 Markdown files across 6 subdirectories (guide, reference, examples, legal, templates, troubleshooting) + root files. Categorized by audience: user-facing guides + reference, troubleshooting, legal. The web site at [packages/web/](../packages/web) consumes some of these (via `web-deploy.yml` triggers).
 
 ## WHERE TO LOOK
 
@@ -15,7 +15,9 @@
 | How agents collaborate | [docs/guide/orchestration.md](guide/orchestration.md) |
 | Picking the right model per agent | [docs/guide/agent-model-matching.md](guide/agent-model-matching.md) |
 | Team Mode (opt-in multi-agent) | [docs/guide/team-mode.md](guide/team-mode.md) |
+| Senpi task delegation and teams | [docs/guide/senpi-task.md](guide/senpi-task.md) |
 | Configuration field reference | [docs/reference/configuration.md](reference/configuration.md) |
+| Harness-neutral `omo.json` config reference | [docs/reference/omo-json.md](reference/omo-json.md) |
 | Feature-by-feature reference | [docs/reference/features.md](reference/features.md) |
 | CLI command reference | [docs/reference/cli.md](reference/cli.md) |
 | Known issues & workarounds | [docs/reference/known-issues.md](reference/known-issues.md) |
@@ -26,6 +28,9 @@
 | GitHub PR evidence attachments | [docs/reference/github-attachment-upload.md](reference/github-attachment-upload.md) |
 | Claiming the lazycodex npm name | [docs/reference/lazycodex-npm-reservation.md](reference/lazycodex-npm-reservation.md) |
 | Rules-injector cross-module comparison | [docs/reference/rules-injection-cross-module-comparison.md](reference/rules-injection-cross-module-comparison.md) |
+| Codex telemetry internals | [docs/reference/codex-telemetry.md](reference/codex-telemetry.md) |
+| Monitor tool reference | [docs/reference/monitor.md](reference/monitor.md) |
+| Web-terminal visual QA helper | [docs/reference/web-terminal-visual-qa.md](reference/web-terminal-visual-qa.md) |
 | Sample configs | [docs/examples/](examples) (default, coding-focused, planning-focused) |
 | Privacy & ToS | [docs/legal/](legal) |
 | Manifesto | [docs/manifesto.md](manifesto.md) |
@@ -38,8 +43,8 @@
 docs/
 ├── manifesto.md                              # The "why" — referenced from README
 ├── model-capabilities-maintenance.md         # How model-capabilities cache is refreshed
-├── guide/                                    # User-facing tutorial-style guides (5 files)
-├── reference/                                # API / config / CLI reference (9 files)
+├── guide/                                    # User-facing tutorial-style guides (6 files)
+├── reference/                                # API / config / CLI reference (15 files)
 ├── examples/                                 # Sample JSONC configs (3 files)
 ├── legal/                                    # privacy-policy.md + terms-of-service.md
 ├── templates/

@@ -29,6 +29,13 @@ function excludeGeneratedSkillMetadata(files) {
 	return files.filter((file) => !generatedSkillMetadataFiles.has(file.replaceAll("\\", "/")));
 }
 
+async function assertNoLegacyResearchAliasInTree(rootDir, label) {
+	for (const file of await listSkillFiles(rootDir)) {
+		const content = await readFile(join(rootDir, file), "utf8");
+		assert.doesNotMatch(content, /ultraresearch/i, `${label}/${file} must not expose ultraresearch`);
+	}
+}
+
 test("#given synced aggregate Codex skills #when inspected #then component and shared skills are present", async () => {
 	// given
 	const skillsRoot = join(root, "skills");
@@ -45,6 +52,26 @@ test("#given synced aggregate Codex skills #when inspected #then component and s
 		const content = await readFile(join(skillsRoot, skillName, "SKILL.md"), "utf8");
 		assert.match(removeCodexCompatibilityGuidance(content), /^---\r?\n/);
 	}
+});
+
+test("#given reference-only designpowers frontend files #when synced for Codex #then nested SKILL.md files are not packaged", async () => {
+	// given
+	const frontendReferencesRoot = join(root, "skills", "frontend", "references");
+	const designpowersVendorSkillsRoot = join(frontendReferencesRoot, "designpowers", "vendor", "skills");
+
+	// when
+	const nestedSkillFiles = (await listSkillFiles(frontendReferencesRoot))
+		.map((file) => file.replaceAll("\\", "/"))
+		.filter((file) => file.endsWith("/SKILL.md") || file === "SKILL.md")
+		.sort();
+	const designpowersReferenceFiles = (await listSkillFiles(designpowersVendorSkillsRoot))
+		.map((file) => file.replaceAll("\\", "/"))
+		.filter((file) => file.endsWith("/reference.md"))
+		.sort();
+
+	// then
+	assert.deepEqual(nestedSkillFiles, []);
+	assert.equal(designpowersReferenceFiles.length, 27);
 });
 
 test("#given aggregate Codex skills #when source wiring is inspected #then shared skills are imported from the shared-skills package", async () => {
@@ -145,7 +172,7 @@ test("#given component skill sources #when aggregate Codex component skills are 
 			const sourceContent = await readFile(join(sourceDir, relativePath), "utf8");
 			const aggregateContent = await readFile(join(aggregateDir, relativePath), "utf8");
 			assert.equal(
-				removeCodexCompatibilityGuidance(aggregateContent),
+				removeCodexSkillOverlays(skillName, removeCodexCompatibilityGuidance(aggregateContent)),
 				removeCodexCompatibilityGuidance(sourceContent),
 				`${skillName}/${relativePath} drifted from its component skill source`,
 			);
@@ -181,18 +208,15 @@ test("#given synced ulw-loop skill #when Codex hint metadata is inspected #then 
 	assert.match(interfaceMetadata, /- "ulw-loop"/);
 });
 
-test("#given synced legacy ultraresearch alias #when inspected #then it points users at ulw-research", async () => {
+test("#given shipped Codex skill payloads #when legacy ultraresearch alias is inspected #then it is not packaged", async () => {
 	// given
-	const skillRoot = join(root, "skills", "ultraresearch");
-
-	// when
-	const skill = await readFile(join(skillRoot, "SKILL.md"), "utf8");
-	const interfaceMetadata = await readFile(join(skillRoot, "agents", "openai.yaml"), "utf8");
+	const skillsRoot = join(root, "skills");
 
 	// then
-	assert.match(skill, /^---\r?\nname: ultraresearch\r?\n/m);
-	assert.match(skill, /legacy name for `ulw-research`/);
-	assert.match(interfaceMetadata, /display_name: "\(OmO\) ultraresearch"/);
+	await assertNoLegacyResearchAliasInTree(skillsRoot, "skills");
+	for (const [skillName, sourcePath] of componentSkillSources) {
+		await assertNoLegacyResearchAliasInTree(join(root, sourcePath), `components/${skillName}`);
+	}
 });
 
 test("#given synced git-master skill #when inspected #then commits and git history route through it", async () => {
@@ -223,14 +247,16 @@ test("#given synced ulw-loop skill #when worker guidance is inspected #then cont
 	);
 	const syncedSkill = await readFile(join(root, "skills", "ulw-loop", "SKILL.md"), "utf8");
 	const syncedWorkflow = await readFile(join(root, "skills", "ulw-loop", "references", "full-workflow.md"), "utf8");
+	// ulw-loop is V2-primary (gpt-5.6 sol/terra use the flat `wait_agent`); the `multi_agent_v1.*`
+	// namespace is documented only as the v1 fallback, so the wait_agent refs accept the bare token.
 	const requiredPatterns = [
-		["multi_agent_v1.wait_agent ref", /multi_agent_v1\.wait_agent/],
+		["wait_agent ref", /\bwait_agent\b/],
 		["local spawned-name tracking", /Track spawned agent names locally/],
 		["wait_agent mailbox path", /wait_agent.*mailbox signals/],
 		["progress status contract", /WORKING:/],
 		["long-running plan/reviewer background guidance", /Plan and reviewer agents may run for a long time/],
-		["bounded plan/reviewer polling", /multi_agent_v1\.wait_agent.*cycles/],
-		["single long wait guard", /single long blocking wait/],
+		["bounded plan/reviewer polling", /wait_agent.*cycles/],
+		["exponential backoff wait guard", /double the timeout up to ~5 minutes/],
 		["git-master checkpointing", /git-master/],
 		["touched-path commit-style probe", /touched-path commit history/],
 		["verified work-unit commit", /verified work unit/],

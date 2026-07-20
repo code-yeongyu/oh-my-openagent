@@ -14,7 +14,7 @@ All published packages expose the same compiled CLI with these bin entries:
 - `oh-my-openagent` (preferred name)
 - `oh-my-opencode` (legacy compatibility name)
 - `omo` (short alias, recommended in docs and prompts)
-- `lazycodex-ai` (Light edition shortcut; `lazycodex-ai install` is equivalent to `omo install --platform=codex` unless `--platform` is explicitly overridden)
+- `lazycodex-ai` (Light edition shortcut; `lazycodex-ai install` is equivalent to `omo install --platform=codex`; any explicit `--platform` value must be `codex`)
 
 ## Basic Usage
 

@@ -68,7 +68,7 @@ describe("ralph-loop dispatch failure invariants", () => {
 					},
 				},
 			},
-		} as never)
+		} as never, { idleSettleMs: 0 })
 
 		hook.startLoop("session-123", "Keep working", {
 			messageCountAtStart: 0,
@@ -115,7 +115,7 @@ describe("ralph-loop dispatch failure invariants", () => {
 					},
 				},
 			},
-		} as never)
+		} as never, { idleSettleMs: 0 })
 
 		hook.startLoop("session-123", "Keep working", {
 			messageCountAtStart: 0,
@@ -161,7 +161,7 @@ describe("ralph-loop dispatch failure invariants", () => {
 					},
 				},
 			},
-		} as never)
+		} as never, { idleSettleMs: 0 })
 
 		hook.startLoop("session-123", "Keep working", {
 			messageCountAtStart: 0,
@@ -223,6 +223,7 @@ describe("ralph-loop dispatch failure invariants", () => {
 				},
 			},
 		} as never, {
+			idleSettleMs: 0,
 			getTranscriptPath: (sessionID): string => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
 		})
 
@@ -295,6 +296,7 @@ describe("ralph-loop dispatch failure invariants", () => {
 				},
 			},
 		} as never, {
+			idleSettleMs: 0,
 			getTranscriptPath: (sessionID): string => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
 		})
 
@@ -361,7 +363,7 @@ describe("ralph-loop dispatch failure invariants", () => {
 					},
 				},
 			},
-		} as never)
+		} as never, { idleSettleMs: 0 })
 
 		hook.startLoop("session-123", "Keep working", {
 			messageCountAtStart: 0,
@@ -721,7 +723,7 @@ describe("ralph-loop dispatch failure invariants", () => {
 					},
 				},
 			},
-		} as never)
+		} as never, { idleSettleMs: 0 })
 
 		hook.startLoop("session-123", "Keep working", {
 			messageCountAtStart: 0,

@@ -221,7 +221,7 @@ Even with only the following subscriptions, `ultrawork` works well (this project
 |   🔎   | **AST-Grep**                                             | Ultimate | Pattern-aware code search and rewriting across 25 languages.                                                                                                                                                     |
 |   🧠   | **Background Agents**                                    | Ultimate | Fire 5+ specialists in parallel. Context stays lean. Results when ready.                                                                                                                                         |
 |   📚   | **Built-in MCPs** (web/docs/code search)                 | Ultimate | Exa (web search), Context7 (official docs), Grep.app (GitHub search). Always on.                                                                                                                                 |
-|   🔁   | **Ralph Loop / `/ulw-loop`**                             | Ultimate | Self-referential loop. Doesn't stop until 100% done.                                                                                                                                                             |
+|   🔁   | **Goal / `/goal`**                                       | Ultimate | Persistent per-session objective. Re-injects a continuation prompt on every idle until a completion audit says it's done.                                                                                        |
 |   ✅   | **Todo Enforcer**                                        | Ultimate | Agent goes idle? System yanks it back. Your task gets done, period.                                                                                                                                              |
 |   💬   | **Comment Checker**                                      | Both     | No AI slop in comments. Code reads like a senior wrote it.                                                                                                                                                       |
 |   📐   | **Rules Injection** (`AGENTS.md` / `.omo/rules/**`)      | Both     | Project rules and AGENTS.md auto-loaded into the agent's context at every prompt.                                                                                                                                |
@@ -241,17 +241,17 @@ Even with only the following subscriptions, `ultrawork` works well (this project
 <td align="center"><img src=".github/assets/hephaestus.png" height="300" /></td>
 </tr></table>
 
-**Sisyphus** (`claude-opus-4-7` / **`kimi-k2.6`** / **`glm-5.1`** ) is your main orchestrator. He plans, delegates to specialists, and drives tasks to completion with aggressive parallel execution. He does not stop halfway.
+**Sisyphus** (`claude-opus-4-8` / `claude-opus-4-7` / **`kimi-k3`** / **`kimi-k2.6`** / **`glm-5`** ) is your main orchestrator. He plans, delegates to specialists, and drives tasks to completion with aggressive parallel execution. He does not stop halfway. Use **Kimi K3** when you can accept its thinking-token cost; otherwise **Claude Opus 4.8 / 4.7** or **Kimi K2.6** are the recommended defaults.
 
-**Hephaestus** (`gpt-5.5`) is your autonomous deep worker. Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding. *The Legitimate Craftsman.*
+**Hephaestus** (`gpt-5.6-sol` on OpenAI or Vercel, then `gpt-5.5`) is your autonomous deep worker. Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding. *The Legitimate Craftsman.*
 
-**Prometheus** (`claude-opus-4-7` / **`kimi-k2.6`** / **`glm-5.1`** ) is your strategic planner. Interview mode: he asks questions, identifies scope, and builds a detailed plan before a single line of code is touched.
+**Prometheus** (`claude-opus-4-7` / **`gpt-5.5`** / **`glm-5.2`** ) is your strategic planner. Interview mode: he asks questions, identifies scope, and builds a detailed plan before a single line of code is touched.
 
 Every agent is tuned to its model's specific strengths. No manual model juggling. [Learn more →](docs/guide/overview.md)
 
 > Anthropic [blocked OpenCode because of us.](https://x.com/thdxr/status/2010149530486911014) That's why Hephaestus is called "The Legitimate Craftsman." The irony is intentional.
 >
-> We run best on Opus, but Kimi K2.6 + GPT-5.5 already beats vanilla Claude Code. Zero config needed.
+> We run best on Opus or Kimi K3, but Kimi K2.6 + GPT-5.5 already beats vanilla Claude Code. Zero config needed.
 
 ### Team Mode (v4.0)
 
@@ -288,7 +288,7 @@ When Sisyphus delegates to a subagent, it doesn't pick a model. It picks a **cat
 | `quick`              | Single-file changes, typos         |
 | `ultrabrain`         | Hard logic, architecture decisions |
 
-The agent says what kind of work it needs; the harness picks the right model. `ultrabrain` now routes to GPT-5.5 xhigh by default. You touch nothing.
+The agent says what kind of work it needs; the harness picks the right model. `ultrabrain` now routes to GPT-5.6 Sol xhigh through OpenAI or Vercel when available, then GPT-5.5 xhigh. You touch nothing.
 
 ### Claude Code Compatibility
 
@@ -433,7 +433,7 @@ See full [Features Documentation](docs/reference/features.md).
 - **Claude Code Compatibility**: Full hook system, commands, skills, agents, MCPs
 - **Built-in MCPs**: websearch (Exa), context7 (docs), grep_app (GitHub search) — injected at runtime by the plugin; not visible in `opencode mcp list` (see [MCP docs](docs/reference/features.md#native-vs-plugin-injected-mcps))
 - **Session Tools**: List, read, search, and analyze session history
-- **Productivity Features**: Ralph Loop, Todo Enforcer, Comment Checker, Think Mode, and more
+- **Productivity Features**: Goal, Todo Enforcer, Comment Checker, Think Mode, and more
 - **Doctor Command**: Built-in diagnostics (`bunx oh-my-opencode doctor`) verify plugin registration, config, models, and environment
 - **Model Fallbacks**: `fallback_models` can mix plain model strings with per-fallback object settings in the same array
 - **File Prompts**: Load prompts from files with `file://` support in agent configurations
@@ -494,7 +494,7 @@ Sounds arrogant? Have a better way? Contribute. You're welcome.
 
 No affiliation with any project or model mentioned. Just personal experimentation.
 
-Credit: The LazyCodex name idea is inspired by [LazyVim](https://github.com/LazyVim/LazyVim). The Ultragoal, UltraQA, and Sparkshell ideas are inspired by [oh-my-codex](https://github.com/Yeachan-Heo/oh-my-codex), reimplemented from concept for OmO.
+Credit: The LazyCodex name idea is inspired by [LazyVim](https://github.com/LazyVim/LazyVim). The Ultragoal and UltraQA ideas are inspired by [oh-my-codex](https://github.com/Yeachan-Heo/oh-my-codex), reimplemented from concept for OmO.
 
 99% of this project was built with OpenCode. I don't really know TypeScript, **but I personally reviewed and largely rewrote this doc.**
 

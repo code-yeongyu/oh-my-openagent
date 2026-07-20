@@ -5,7 +5,8 @@ import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { createRalphLoopHook } from "./index"
 import { readState, writeState, clearState } from "./storage"
-import type { RalphLoopState } from "./types"
+import type { RalphLoopOptions, RalphLoopState } from "./types"
+import type { PluginInput } from "@opencode-ai/plugin"
 import { parseRalphLoopArguments } from "./command-arguments"
 import { DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS } from "../shared/prompt-async-gate"
 
@@ -15,7 +16,7 @@ describe("ralph-loop", () => {
   let toastCalls: Array<{ title: string; message: string; variant: string }>
   let messagesCalls: Array<{ sessionID: string }>
   let createSessionCalls: Array<{ parentID?: string; title?: string; directory?: string }>
-  let mockSessionMessages: Array<{ info?: { role?: string }; parts?: Array<{ type: string; text?: string }> }>
+  let mockSessionMessages: Array<{ info?: { role?: string; finish?: string }; parts?: Array<{ type: string; text?: string }> }>
   let mockMessagesApiResponseShape: "data" | "array"
 
   function createMockPluginInput(): Parameters<typeof createRalphLoopHook>[0] {
@@ -65,6 +66,13 @@ describe("ralph-loop", () => {
       },
       directory: TEST_DIR,
     } as Parameters<typeof createRalphLoopHook>[0]
+  }
+
+  // Idle settling is a real timed wait; default it to 0 so tests that do not
+  // assert settle timing skip the delay. Callers can still pass an explicit
+  // idleSettleMs to exercise the deferral behavior.
+  function makeHook(ctx: PluginInput, options?: RalphLoopOptions): ReturnType<typeof createRalphLoopHook> {
+    return createRalphLoopHook(ctx, { idleSettleMs: 0, ...options })
   }
 
   beforeEach(() => {
@@ -267,7 +275,7 @@ describe("ralph-loop", () => {
   describe("hook", () => {
     test("should start loop and write state", () => {
       // given - hook instance
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = makeHook(createMockPluginInput())
 
       // when - start loop
       const success = hook.startLoop("session-123", "Build something", {
@@ -288,7 +296,7 @@ describe("ralph-loop", () => {
 
     test("should accept ultrawork option in startLoop", () => {
       // given - hook instance
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = makeHook(createMockPluginInput())
 
       // when - start loop with ultrawork
       hook.startLoop("session-123", "Build something", { ultrawork: true })
@@ -300,7 +308,7 @@ describe("ralph-loop", () => {
 
     test("#given active ultrawork loop #when resumeLoop binds a new session #then prompt is preserved", () => {
       // given
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = makeHook(createMockPluginInput())
       hook.startLoop("session-old", "Build feature\nwith long prompt", {
         ultrawork: true,
         messageCountAtStart: 8,
@@ -321,7 +329,7 @@ describe("ralph-loop", () => {
 
     test("should handle missing ultrawork option in startLoop", () => {
       // given - hook instance
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = makeHook(createMockPluginInput())
 
       // when - start loop without ultrawork
       hook.startLoop("session-123", "Build something")
@@ -333,7 +341,7 @@ describe("ralph-loop", () => {
 
     test("should inject continuation when loop active and no completion detected", async () => {
       // given - active loop state
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = makeHook(createMockPluginInput())
       hook.startLoop("session-123", "Build a feature", { maxIterations: 10 })
 
       // when - session goes idle
@@ -358,7 +366,7 @@ describe("ralph-loop", () => {
 
     test("#given synthetic and real idle arrive back-to-back #then only one continuation is injected for the same iteration", async () => {
       // given
-      const hook = createRalphLoopHook(createMockPluginInput(), { idleSettleMs: 0 })
+      const hook = makeHook(createMockPluginInput(), { idleSettleMs: 0 })
       hook.startLoop("session-123", "Build a feature", { maxIterations: 10 })
 
       // when
@@ -386,7 +394,7 @@ describe("ralph-loop", () => {
       const originalDateNow = Date.now
       let currentNow = originalDateNow()
       Date.now = () => currentNow
-      const hook = createRalphLoopHook(createMockPluginInput(), { idleSettleMs: 0 })
+      const hook = makeHook(createMockPluginInput(), { idleSettleMs: 0 })
       try {
         hook.startLoop("session-123", "Build a feature", { maxIterations: 10 })
 
@@ -422,7 +430,7 @@ describe("ralph-loop", () => {
 
     test("should inject continuation when idle event carries session id in info", async () => {
       // given - active loop state and nested session event shape
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = makeHook(createMockPluginInput())
       hook.startLoop("session-info-idle", "Build a feature", { maxIterations: 10 })
 
       // when - session goes idle with id under info
@@ -441,7 +449,7 @@ describe("ralph-loop", () => {
 
     test("should settle idle before injecting continuation", async () => {
       // given - active loop state with a configured idle settle delay
-      const hook = createRalphLoopHook(createMockPluginInput(), { idleSettleMs: 25 })
+      const hook = makeHook(createMockPluginInput(), { idleSettleMs: 25 })
       hook.startLoop("session-123", "Build a feature", { maxIterations: 10 })
 
       // when - session goes idle
@@ -467,7 +475,7 @@ describe("ralph-loop", () => {
       ctx.client.tui = {
         showToast: () => new Promise(() => {}),
       } as never
-      const hook = createRalphLoopHook(ctx, { idleSettleMs: 0 })
+      const hook = makeHook(ctx, { idleSettleMs: 0 })
       hook.startLoop("session-123", "Build a feature", { maxIterations: 10 })
 
       // when - session goes idle
@@ -489,7 +497,7 @@ describe("ralph-loop", () => {
 
     test("should skip continuation when background task is running", async () => {
       // given - active loop state with a running background task
-      const hook = createRalphLoopHook(createMockPluginInput(), {
+      const hook = makeHook(createMockPluginInput(), {
         backgroundManager: {
           getTasksByParentSession: (sessionID: string) => sessionID === "session-123"
             ? [{ status: "running" }]
@@ -516,7 +524,7 @@ describe("ralph-loop", () => {
 
     test("should stop loop when max iterations reached", async () => {
       // given - loop at max iteration
-      const hook = createRalphLoopHook(createMockPluginInput(), { idleSettleMs: 0 })
+      const hook = makeHook(createMockPluginInput(), { idleSettleMs: 0 })
       hook.startLoop("session-123", "Build something", { maxIterations: 2 })
 
       const state = hook.getState()
@@ -548,7 +556,7 @@ describe("ralph-loop", () => {
 
     test("should cancel loop via cancelLoop", () => {
       // given - active loop
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = makeHook(createMockPluginInput())
       hook.startLoop("session-123", "Test task")
 
       // when - cancel loop
@@ -561,7 +569,7 @@ describe("ralph-loop", () => {
 
     test("should not cancel loop for different session", () => {
       // given - active loop for session-123
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = makeHook(createMockPluginInput())
       hook.startLoop("session-123", "Test task")
 
       // when - try to cancel for different session
@@ -574,7 +582,7 @@ describe("ralph-loop", () => {
 
     test("should continue after non-abort session error", async () => {
       // given - active loop and non-abort session error
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = makeHook(createMockPluginInput())
       hook.startLoop("session-123", "Test task")
 
       await hook.event({
@@ -599,7 +607,7 @@ describe("ralph-loop", () => {
 
     test("should clear state on session deletion", async () => {
       // given - active loop
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = makeHook(createMockPluginInput())
       hook.startLoop("session-123", "Test task")
 
       // when - session deleted
@@ -616,7 +624,7 @@ describe("ralph-loop", () => {
 
     test("should not inject for different session than loop owner", async () => {
       // given - loop owned by session-123
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = makeHook(createMockPluginInput())
       hook.startLoop("session-123", "Test task")
 
       // when - different session goes idle
@@ -645,7 +653,7 @@ describe("ralph-loop", () => {
       writeState(TEST_DIR, state)
 
       // Mock sessionExists to return false for the orphaned session
-      const hook = createRalphLoopHook(createMockPluginInput(), {
+      const hook = makeHook(createMockPluginInput(), {
         checkSessionExists: async (sessionID: string) => {
           // Orphaned session doesn't exist, current session does
           return sessionID !== "orphaned-session-999"
@@ -680,7 +688,7 @@ describe("ralph-loop", () => {
       writeState(TEST_DIR, state)
 
       // Mock sessionExists to return true for the active session
-      const hook = createRalphLoopHook(createMockPluginInput(), {
+      const hook = makeHook(createMockPluginInput(), {
         checkSessionExists: async (sessionID: string) => {
           // Original session still exists
           return sessionID === "active-session-123" || sessionID === "new-session-456"
@@ -704,7 +712,7 @@ describe("ralph-loop", () => {
 
     test("should use default config values", () => {
       // given - hook with config
-      const hook = createRalphLoopHook(createMockPluginInput(), {
+      const hook = makeHook(createMockPluginInput(), {
         config: {
           enabled: true,
           default_max_iterations: 200,
@@ -722,7 +730,7 @@ describe("ralph-loop", () => {
 
     test("should default strategy to continue when not specified", () => {
       // given - hook with no strategy option
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = makeHook(createMockPluginInput())
 
       // when - start loop without strategy
       hook.startLoop("session-123", "Test task")
@@ -734,7 +742,7 @@ describe("ralph-loop", () => {
 
     test("should create new session for reset strategy", async () => {
       // given - hook with reset strategy
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = makeHook(createMockPluginInput())
       hook.startLoop("session-123", "Build a feature", { strategy: "reset" })
 
       // when - session goes idle
@@ -754,7 +762,7 @@ describe("ralph-loop", () => {
 
     test("should not inject when no loop is active", async () => {
       // given - no active loop
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = makeHook(createMockPluginInput())
 
       // when - session goes idle
       await hook.event({
@@ -771,7 +779,7 @@ describe("ralph-loop", () => {
     test("should detect completion promise and stop loop", async () => {
       // given - active loop with transcript containing completion
       const transcriptPath = join(TEST_DIR, "transcript.jsonl")
-      const hook = createRalphLoopHook(createMockPluginInput(), {
+      const hook = makeHook(createMockPluginInput(), {
         getTranscriptPath: () => transcriptPath,
       })
       hook.startLoop("session-123", "Build something", { completionPromise: "COMPLETE" })
@@ -798,7 +806,7 @@ describe("ralph-loop", () => {
         { info: { role: "user" }, parts: [{ type: "text", text: "Build something" }] },
         { info: { role: "assistant" }, parts: [{ type: "text", text: "I have completed the task. <promise>API_DONE</promise>" }] },
       ]
-      const hook = createRalphLoopHook(createMockPluginInput(), {
+      const hook = makeHook(createMockPluginInput(), {
         getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
       })
       hook.startLoop("session-123", "Build something", { completionPromise: "API_DONE" })
@@ -828,7 +836,7 @@ describe("ralph-loop", () => {
         { info: { role: "user" }, parts: [{ type: "text", text: "Build something" }] },
         { info: { role: "assistant" }, parts: [{ type: "text", text: "I have completed the task. <promise>API_DONE</promise>" }] },
       ]
-      const hook = createRalphLoopHook(createMockPluginInput(), {
+      const hook = makeHook(createMockPluginInput(), {
         getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
       })
       hook.startLoop("session-123", "Build something", { completionPromise: "API_DONE" })
@@ -873,7 +881,7 @@ describe("ralph-loop", () => {
         },
       })
 
-      const hook = createRalphLoopHook(pluginInput, {
+      const hook = makeHook(pluginInput, {
         getTranscriptPath: () => transcriptPath,
       })
       hook.startLoop("session-123", "Build something", {
@@ -909,7 +917,7 @@ describe("ralph-loop", () => {
           ],
         },
       ]
-      const hook = createRalphLoopHook(createMockPluginInput(), {
+      const hook = makeHook(createMockPluginInput(), {
         getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
       })
       hook.startLoop("session-123", "Build something", {
@@ -936,7 +944,7 @@ describe("ralph-loop", () => {
 
     test("#given duplicate real idle fires before assistant activity #then loop state is preserved without another prompt", async () => {
       // given - active loop
-      const hook = createRalphLoopHook(createMockPluginInput(), { idleSettleMs: 0 })
+      const hook = makeHook(createMockPluginInput(), { idleSettleMs: 0 })
       hook.startLoop("session-123", "Build feature", { maxIterations: 5 })
 
       // when - duplicate idle events arrive without any intervening activity
@@ -957,7 +965,7 @@ describe("ralph-loop", () => {
       const originalDateNow = Date.now
       let currentNow = originalDateNow()
       Date.now = () => currentNow
-      const hook = createRalphLoopHook(createMockPluginInput(), { idleSettleMs: 0 })
+      const hook = makeHook(createMockPluginInput(), { idleSettleMs: 0 })
       hook.startLoop("session-123", "Build feature", { maxIterations: 5 })
 
       try {
@@ -986,7 +994,7 @@ describe("ralph-loop", () => {
       const originalDateNow = Date.now
       let currentNow = originalDateNow()
       Date.now = () => currentNow
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = makeHook(createMockPluginInput())
       hook.startLoop("session-123", "Build feature", { maxIterations: 5 })
 
       try {
@@ -1012,7 +1020,7 @@ describe("ralph-loop", () => {
 
     test("should include prompt and promise in continuation message", async () => {
       // given - loop with specific prompt and promise
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = makeHook(createMockPluginInput())
       hook.startLoop("session-123", "Create a calculator app", {
         completionPromise: "CALCULATOR_DONE",
         maxIterations: 10,
@@ -1058,7 +1066,7 @@ describe("ralph-loop", () => {
         return originalPromptAsync(opts)
       }
 
-      const hook = createRalphLoopHook(mockInput as Parameters<typeof createRalphLoopHook>[0])
+      const hook = makeHook(mockInput as Parameters<typeof createRalphLoopHook>[0])
       hook.startLoop("session-123", "Build feature", { maxIterations: 10 })
 
       // when - second idle arrives while first idle processing is still in flight
@@ -1081,7 +1089,7 @@ describe("ralph-loop", () => {
 
     test("should clear loop state on user abort (MessageAbortedError)", async () => {
       // given - active loop
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = makeHook(createMockPluginInput())
       hook.startLoop("session-123", "Build something")
       expect(hook.getState()).not.toBeNull()
 
@@ -1102,7 +1110,7 @@ describe("ralph-loop", () => {
 
     test("should NOT set recovery mode on user abort", async () => {
       // given - active loop
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = makeHook(createMockPluginInput())
       hook.startLoop("session-123", "Build something")
 
       // when - user aborts (Ctrl+C)
@@ -1137,7 +1145,7 @@ describe("ralph-loop", () => {
         { info: { role: "assistant" }, parts: [{ type: "text", text: "Nearly there... <promise>DONE</promise>" }] },
         { info: { role: "assistant" }, parts: [{ type: "text", text: "(extra output after promise)" }] },
       ]
-      const hook = createRalphLoopHook(createMockPluginInput(), {
+      const hook = makeHook(createMockPluginInput(), {
         getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
       })
       hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
@@ -1162,7 +1170,7 @@ describe("ralph-loop", () => {
         { info: { role: "assistant" }, parts: [{ type: "text", text: "More work 2" }] },
         { info: { role: "assistant" }, parts: [{ type: "text", text: "More work 3" }] },
       ]
-      const hook = createRalphLoopHook(createMockPluginInput(), {
+      const hook = makeHook(createMockPluginInput(), {
         getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
       })
       hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
@@ -1192,7 +1200,7 @@ describe("ralph-loop", () => {
         })
       }
 
-      const hook = createRalphLoopHook(createMockPluginInput(), {
+      const hook = makeHook(createMockPluginInput(), {
         getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
       })
       hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
@@ -1210,7 +1218,7 @@ describe("ralph-loop", () => {
 
     test("should allow starting new loop while previous loop is active (different session)", async () => {
       // given - active loop in session A
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = makeHook(createMockPluginInput())
       hook.startLoop("session-A", "First task", { maxIterations: 10 })
       expect(hook.getState()?.session_id).toBe("session-A")
       expect(hook.getState()?.prompt).toBe("First task")
@@ -1244,7 +1252,7 @@ describe("ralph-loop", () => {
       const originalDateNow = Date.now
       let currentNow = originalDateNow()
       Date.now = () => currentNow
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = makeHook(createMockPluginInput())
       try {
         hook.startLoop("session-A", "First task", { maxIterations: 10 })
       
@@ -1301,7 +1309,7 @@ Output <promise>DONE</promise> when fully complete`
       })
       writeFileSync(transcriptPath, userEntry + "\n")
 
-      const hook = createRalphLoopHook(createMockPluginInput(), {
+      const hook = makeHook(createMockPluginInput(), {
         getTranscriptPath: () => transcriptPath,
       })
       hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
@@ -1332,7 +1340,7 @@ Original task: Build something`
       })
       writeFileSync(transcriptPath, userEntry + "\n")
 
-      const hook = createRalphLoopHook(createMockPluginInput(), {
+      const hook = makeHook(createMockPluginInput(), {
         getTranscriptPath: () => transcriptPath,
       })
       hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
@@ -1361,7 +1369,7 @@ Original task: Build something`
       })
       writeFileSync(transcriptPath, toolResultEntry + "\n")
 
-      const hook = createRalphLoopHook(createMockPluginInput(), {
+      const hook = makeHook(createMockPluginInput(), {
         getTranscriptPath: () => transcriptPath,
       })
       hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
@@ -1386,7 +1394,7 @@ Original task: Build something`
       mockSessionMessages = [
         { info: { role: "assistant" }, parts: [{ type: "text", text: "No promise here" }] },
       ]
-      const hook = createRalphLoopHook(createMockPluginInput(), {
+      const hook = makeHook(createMockPluginInput(), {
         getTranscriptPath: () => transcriptPath,
       })
       hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
@@ -1409,7 +1417,7 @@ Original task: Build something`
     test("should require oracle verification toast for ultrawork completion promise", async () => {
       // given - hook with ultrawork mode and completion in transcript
       const transcriptPath = join(TEST_DIR, "transcript.jsonl")
-      const hook = createRalphLoopHook(createMockPluginInput(), {
+      const hook = makeHook(createMockPluginInput(), {
         getTranscriptPath: () => transcriptPath,
       })
       writeFileSync(transcriptPath, JSON.stringify({ type: "assistant", content: "<promise>DONE</promise>" }) + "\n")
@@ -1444,7 +1452,7 @@ Original task: Build something`
           return { data: mockSessionMessages }
         },
       })
-      const hook = createRalphLoopHook(delayedMock, {
+      const hook = makeHook(delayedMock, {
         getTranscriptPath: () => join(TEST_DIR, "missing-transcript.jsonl"),
         idleSettleMs: 0,
       })
@@ -1475,7 +1483,7 @@ Original task: Build something`
     test("should show regular completion toast when ultrawork disabled", async () => {
       // given - hook without ultrawork
       const transcriptPath = join(TEST_DIR, "transcript.jsonl")
-      const hook = createRalphLoopHook(createMockPluginInput(), {
+      const hook = makeHook(createMockPluginInput(), {
         getTranscriptPath: () => transcriptPath,
       })
       writeFileSync(transcriptPath, JSON.stringify({ type: "assistant", content: "<promise>DONE</promise>" }) + "\n")
@@ -1490,7 +1498,7 @@ Original task: Build something`
 
     test("should prepend ultrawork to continuation prompt when ultrawork=true", async () => {
       // given - hook with ultrawork mode enabled
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = makeHook(createMockPluginInput())
       hook.startLoop("session-123", "Build API", { ultrawork: true })
 
       // when - session goes idle (continuation triggered)
@@ -1505,7 +1513,7 @@ Original task: Build something`
 
     test("should NOT prepend ultrawork to continuation prompt when ultrawork=false", async () => {
       // given - hook without ultrawork mode
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = makeHook(createMockPluginInput())
       hook.startLoop("session-123", "Build API")
 
       // when - session goes idle (continuation triggered)
@@ -1530,7 +1538,7 @@ Original task: Build something`
           throw new Error("API timeout")
         },
       })
-      const hook = createRalphLoopHook(errorMock, {
+      const hook = makeHook(errorMock, {
         getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
         apiTimeout: 100,
       })

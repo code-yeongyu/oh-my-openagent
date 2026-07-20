@@ -1,12 +1,9 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { createRequire } from "node:module";
 import { argv, execPath, stderr } from "node:process";
 
 import { runPostCompactHookCli, runPostToolUseHookCli } from "./codex-hook-cli.js";
-
-const require = createRequire(import.meta.url);
-const PACKAGE_LSP_MCP_CLI = "@code-yeongyu/lsp-daemon/dist/cli.js";
+import { resolveLspDaemonCliPath } from "./daemon-cli-path.js";
 
 async function main(): Promise<void> {
 	const [command = "mcp", subcommand = ""] = argv.slice(2);
@@ -35,7 +32,7 @@ main().catch((error: unknown) => {
 });
 
 async function runPackageLspMcpCli(): Promise<void> {
-	const cliPath = require.resolve(PACKAGE_LSP_MCP_CLI);
+	const cliPath = resolveLspDaemonCliPath();
 	const child = spawn(execPath, [cliPath, "mcp"], { stdio: "inherit" });
 	await new Promise<void>((resolve, reject) => {
 		child.once("error", reject);

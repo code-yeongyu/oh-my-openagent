@@ -19,7 +19,7 @@ Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules 
 - `lsp` (TypeScript + LSP MCP) - exposes LSP diagnostics, navigation, symbols, rename via MCP + post-edit hooks.
 - `git-bash` (TypeScript + Git Bash MCP) - exposes the Windows-only `git_bash` MCP and reminds Codex on the first shell-like call, including the first one after compaction.
 - `ultrawork` (TypeScript) - keyword detector (`ulw` / `ultrawork`) that injects the full ultrawork directive; bundled agent TOML files are installed into `CODEX_HOME/agents`.
-- `ulw-loop` (TypeScript) - durable multi-goal orchestration backed by `.omo/ulw-loop/` evidence audit.
+- `ulw-loop` (TypeScript) - durable multi-goal orchestration backed by `.omo/ulw-loop/` evidence audit; `PreToolUse` spawn guards (fan-out cap + gate-artifact preflight) and a `Stop` auto-resume hook.
 - `start-work-continuation` (TypeScript) - `Stop` / `SubagentStop` continuation hook for `.omo/boulder.json` start-work plans.
 - `telemetry` (TypeScript) - anonymous daily active telemetry hook.
 
@@ -39,8 +39,39 @@ The installer copies the built plugin into `~/.codex/plugins/cache/sisyphuslabs/
 
 To remove managed Codex Light state, run `npx lazycodex-ai uninstall`. The backward-compatible alias is `npx lazycodex-ai cleanup`. Uninstall removes managed `sisyphuslabs` cache/marketplace directories, strips OMO marketplace/plugin/hook-state config blocks with a backup, removes managed agent TOML files from `~/.codex/agents/`, and repairs the known project-local legacy `.codex/config.toml` conflict while leaving project-owned `.codex` files in place.
 
+### Local dev install (dogfood the source build)
+
+To run **this repo's local build** on your real `~/.codex` instead of the published package, stamped so you can see at a glance you're on a dev build:
+
+```bash
+bun run install:codex-dev            # uninstalls current, installs repo HEAD as version "dev"
+bun run script/install-codex-dev.ts --version=dev-$(git rev-parse --short HEAD)  # custom stamp
+bun run script/install-codex-dev.ts --no-uninstall   # skip the uninstall step
+```
+
+This sets `LAZYCODEX_DEV_VERSION` (default `dev`), which threads through `resolveLazyCodexPluginVersion` so the plugin version stamp becomes that value everywhere it appears: the cache dir (`~/.codex/plugins/cache/sisyphuslabs/omo/dev/`), `.codex-plugin/plugin.json`, the stamped `package.json`, and — most visibly — the hook status prefix Codex prints every turn (`(OmO dev) ...`). `omo get-local-version` renders a `[DEV]` badge and skips the npm update check for any non-semver stamp. A plain `LAZYCODEX_DEV_VERSION`-less `lazycodex install` is unchanged. This writes to your REAL `~/.codex`; for isolated QA use the throwaway-`CODEX_HOME` flow instead.
+
+
 The Codex plugin bundle includes Context7 as a default MCP in its `.mcp.json`, using the hosted `https://mcp.context7.com/mcp` endpoint. The installer enables the `omo@sisyphuslabs` plugin MCP policy for Context7 while leaving any existing user-level `[mcp_servers.context7]` block untouched.
 The same plugin-scoped MCP manifest also bundles `grep_app`, `git_bash`, `lsp`, and `codegraph`. The ast-grep capability ships as the `ast-grep` skill and provisions `sg` into the Codex runtime. `git_bash` is enabled only on Windows by default. `codegraph` is enabled only when the installer can resolve a supported local Node runtime for CodeGraph; unsupported runtimes disable that MCP policy while keeping `omo@sisyphuslabs` enabled.
+
+### CodeGraph exclusions
+
+CodeGraph is skipped for project roots under default ephemeral/state locations: POSIX `/tmp`, POSIX `/private/tmp`, the current OS temp directory on every platform, and any path containing a `.omo` segment. Skipped projects do not run the `SessionStart` bootstrap worker and the MCP exposes an unavailable stub instead of starting CodeGraph.
+
+Add extra exclude-only roots with `codegraph.excluded_roots`:
+
+```jsonc
+{
+  "codegraph": {
+    "excluded_roots": ["~/scratch/codegraph", "relative-cache-root"]
+  }
+}
+```
+
+Entries may be absolute, `~`-relative, or relative to the configured home directory. OMO expands `~`, realpath-canonicalizes each configured root when possible, and compares descendants after platform-aware normalization. There is no include override.
+
+CodeGraph runs with `CODEGRAPH_NO_DAEMON=1`, `CODEGRAPH_NO_DOWNLOAD=1`, `CODEGRAPH_TELEMETRY=0`, and `DO_NOT_TRACK=1` in the managed child environment. OMO stores per-project CodeGraph data under the managed CodeGraph home and prunes dead project stores when their recorded source directory no longer exists.
 
 Native Windows installs discover Git Bash before the installer mutates `~/.codex/`. The installer checks `OMO_CODEX_GIT_BASH_PATH`, standard Git for Windows locations such as `C:\Program Files\Git\bin\bash.exe`, and then PATH. If Git Bash is still missing, it prints the install guidance shown here and stops without running `winget` or changing system dependencies:
 

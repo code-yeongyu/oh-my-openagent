@@ -98,6 +98,12 @@ Run the full test suite for the affected package (not just the one new test). Ex
 
 If they don't, your "fix" broke something else. Back to Phase 6 with the new failure as evidence — usually it means the mechanism you thought you fixed was load-bearing for some other code path you didn't know about, and the "broken" test is actually pointing at a better understanding of the system.
 
+### 5. Close the observability gap
+
+If diagnosis burned extra rounds *because state was invisible* — no log line told you which branch ran, what the value was, whether the fallback engaged — that invisibility is a defect adjacent to the bug, and this is the one moment where adding a log line is NOT "just in case": this session is the evidence that the line earns its place. Ship the fix WITH that line, written to the standard of the `programming` skill's `references/logging.md` — level chosen by consumer, placed at the decision point, data in fields not interpolation, through the project's designated logger. If the project deliberately does not log, respect that and skip this step.
+
+This does not soften the artifact rule: every temporary `print` / `dbg!` / `console.log` planted *during* diagnosis stays journaled and gets scrubbed in Phase 9. The triage is the consumer test — a line whose ongoing consumer you can name is part of the fix; a line that only served today's session is an artifact.
+
 ### Update the journal
 
 ```markdown

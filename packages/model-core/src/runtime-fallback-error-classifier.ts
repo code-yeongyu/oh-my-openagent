@@ -21,6 +21,7 @@ export type RuntimeFallbackErrorType =
   | "invalid_api_key"
   | "model_not_found"
   | "quota_exceeded"
+  | "context_overflow"
   | "abort"
 
 export const RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERNS = [
@@ -30,6 +31,8 @@ export const RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERNS = [
   /quota.?exceeded/i,
   /exceeded.*quota/i,
   /usage\s*quota/i,
+  /free.?usage/i,
+  /usage.?exceeded/i,
   /exhausted\s+your\s+capacity/i,
   /limit\s+exhausted/i,
   /all\s+credentials\s+for\s+model/i,
@@ -75,6 +78,10 @@ export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErr
 
   if (errorName?.includes("messageabortederror") || errorName?.includes("aborterror")) {
     return "abort"
+  }
+
+  if (errorName === "contextoverflowerror") {
+    return "context_overflow"
   }
 
   if (
@@ -137,7 +144,8 @@ export function isRuntimeFallbackRetryableError(
   const message = getRuntimeFallbackErrorMessage(error)
   const errorType = classifyRuntimeFallbackError(error)
 
-  if (errorType === "abort") return false
+  // OpenCode starts native compaction for this error; fallback would abort that compaction on its timeout.
+  if (errorType === "abort" || errorType === "context_overflow") return false
 
   if (
     errorType === "missing_api_key" ||

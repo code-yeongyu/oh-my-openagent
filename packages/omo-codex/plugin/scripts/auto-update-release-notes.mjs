@@ -25,6 +25,35 @@ export function formatMarketplaceFlowNotice({ updateContext, releaseNotes }) {
 	].join(" ");
 }
 
+export function formatMarketplaceRepairStartedNotice({ pendingNotice, releaseNotes, repairReasons = [] }) {
+	const reasons = formatRepairReasons(repairReasons);
+	return [
+		`[LazyCodex] Auto-update repair started in the background: v${pendingNotice.fromVersion} -> v${pendingNotice.toVersion}.`,
+		`Detected stale local LazyCodex cache/bin state: ${reasons}.`,
+		"LazyCodex started its bundled reinstall repair. Tell the user, in the user's preferred tone, that LazyCodex found a broken local cache or command link and started a repair; recommend starting a new Codex session after it completes.",
+		formatReleaseNotesForNotice({ version: pendingNotice.toVersion, releaseNotes }),
+	].join(" ");
+}
+
+function formatRepairReasons(repairReasons) {
+	if (repairReasons.length === 0) return "stale local cache state was detected";
+	return [...new Set(repairReasons.map(formatRepairReason))].join("; ");
+}
+
+function formatRepairReason(reason) {
+	if (!isPlainRecord(reason)) return "stale local cache state";
+	if (reason.kind === "missing-marketplace-payload") return "missing marketplace payload";
+	if (reason.kind === "invalid-marketplace-payload") return "invalid marketplace payload";
+	if (reason.kind === "dangling-managed-bin" && typeof reason.binName === "string") {
+		return `dangling managed command link: ${sanitizeBinName(reason.binName)}`;
+	}
+	return "stale local cache state";
+}
+
+function sanitizeBinName(binName) {
+	return /^[a-z0-9][a-z0-9._-]{0,80}$/i.test(binName) ? binName : "managed command";
+}
+
 export async function resolveReleaseNotes({ env, latestVersion }) {
 	const override = env.LAZYCODEX_RELEASE_NOTES?.trim();
 	if (override) return truncateReleaseNotes(override);
@@ -132,4 +161,8 @@ function parsePositiveInteger(value, fallback) {
 	if (value === undefined || value === "") return fallback;
 	const parsed = Number.parseInt(value, 10);
 	return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function isPlainRecord(value) {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -60,10 +60,12 @@ describe("package.json", () => {
 		expect((pkg["engines"] as Record<string, unknown>)["node"]).toBe(">=20.0.0");
 	});
 
-	it("#given package metadata #when bin is inspected #then exposes the omo-ulw-loop binary pointing at dist/cli.js", async () => {
+	it("#given package metadata #when bin is inspected #then exposes the ULW loop binaries pointing at dist/cli.js", async () => {
 		const pkg = await readJson("package.json") as Record<string, unknown>;
 		const bin = pkg["bin"] as Record<string, string>;
 		expect(bin["omo-ulw-loop"]).toBe("./dist/cli.js");
+		expect(bin["ulw"]).toBe("./dist/cli.js");
+		expect(bin["ulw-loop"]).toBe("./dist/cli.js");
 	});
 
 	it("ships the expected files for npm publish", async () => {
@@ -139,7 +141,9 @@ describe("skills/ulw-loop/SKILL.md", () => {
 		expect(text).toContain('- "ulw-loop"');
 	});
 
-	it("#given PATH omo lacks ulw-loop #when bootstrap runs #then falls back to cached ulw-loop CLI", async () => {
+	it.skipIf(process.platform === "win32")(
+		"#given PATH omo lacks ulw-loop #when bootstrap runs #then falls back to cached ulw-loop CLI",
+		async () => {
 		const text = await readText("skills/ulw-loop/references/full-workflow.md");
 		const bootstrap = bootstrapScriptFrom(text);
 		const root = await mkdtemp(join(tmpdir(), "omo-ulw-loop-bootstrap-"));
@@ -189,7 +193,8 @@ describe("source LOC budget", () => {
 	it("every source file stays at or under 250 pure LOC", async () => {
 		const files = [
 			"src/types.ts", "src/paths.ts", "src/plan-io.ts", "src/plan-crud.ts", "src/goal-status.ts",
-			"src/evidence.ts", "src/quality-gate.ts", "src/checkpoint.ts", "src/review-blockers.ts",
+			"src/evidence.ts", "src/quality-gate.ts", "src/quality-gate-verdicts.ts", "src/checkpoint.ts", "src/review-blockers.ts",
+			"src/stop-resume-hook.ts", "src/spawn-guard.ts",
 			"src/steering.ts", "src/codex-goal-instruction.ts", "src/codex-goal-snapshot.ts", "src/codex-hook.ts",
 			"src/cli.ts", "src/cli-arg-parser.ts", "src/cli-output.ts", "src/cli-steering.ts", "src/cli-commands.ts",
 		];

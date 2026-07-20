@@ -1,0 +1,51 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/lsp-core/src/lsp/client-diagnostics-freshness.integration.test.ts:
+(pass) LspClient diagnostics freshness > #given concurrent diagnostics on a cold file and an exact didOpen publish #when pull is not advertised #then one didOpen opens the file and both requests receive the current diagnostics [50.03ms]
+(pass) LspClient diagnostics freshness > #given a versionless publish that arrives after the current change #when no newer eligible publish arrives before quiescence #then diagnostics wait for that quiescence window and return the versionless payload [2070.22ms]
+(pass) LspClient diagnostics freshness > #given only a pre-generation versionless publish #when a newer local version asks for diagnostics #then the stale versionless publish is ignored and the request does not resolve clean [346.31ms]
+(pass) LspClient diagnostics freshness > #given stale and future publish versions #when diagnostics target the current version #then neither stale nor future diagnostics satisfy the request [132.63ms]
+(pass) LspClient diagnostics freshness > #given a pull response overtaken by a later local change #when the stale full report returns first #then diagnostics restart within the same request and resolve from the current version [238.33ms]
+(pass) LspClient diagnostics freshness > #given a full pull report followed by an unchanged report for the same version and resultId #when diagnostics repeat without a local change #then the cached full items are reused [44.03ms]
+[lsp] ignored shutdown request failure during cleanup: LSP server workspace-edit-fixture at /var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/lsp-apply-edit-i3Zktp exited with code 0
+(pass) LspClient diagnostics freshness > #given a server that claims pull support but closes instead of answering #when diagnostics run #then the transport failure is not labeled clean [538.33ms]
+(pass) LspClient diagnostics freshness > #given an advertised pull method that is explicitly unsupported and a matching push publish #when diagnostics run #then the client falls back to push diagnostics [538.47ms]
+(pass) LspClient diagnostics freshness > #given a diagnostic pull request times out #when the fake server keeps it pending #then the client sends cancel for the LSP request id [95.13ms]
+(pass) LspClient diagnostics freshness > #given a server without pull support that never publishes diagnostics #when diagnostics run on a clean file #then the request resolves clean after the freshness window instead of reporting a timeout [93.61ms]
+(pass) LspClient diagnostics freshness > #given a pull-supported server that cached diagnostics for an older document version #when the file changes and a later pull is rejected as unsupported without any publish #then the fallback resolves empty instead of returning the stale cached diagnostics [98.22ms]
+313 | 		const first = await context.client.diagnostics(context.source);
+314 | 		expect(first.items).toEqual([diagnostic("cached-full")]);
+315 | 
+316 | 		const second = await context.client.diagnostics(context.source);
+317 | 		expect(second.transientError).toBeUndefined();
+318 | 		expect(second.items).toEqual([diagnostic("cached-full")]);
+                             ^
+error: expect(received).toEqual(expected)
+
+- [
+-   {
+-     "message": "cached-full",
+-     "range": {
+-       "end": {
+-         "character": 1,
+-         "line": 0,
+-       },
+-       "start": {
+-         "character": 0,
+-         "line": 0,
+-       },
+-     },
+-   },
+- ]
++ []
+
+- Expected  - 15
++ Received  + 1
+
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo-wt/fix-6131/packages/lsp-core/src/lsp/client-diagnostics-freshness.integration.test.ts:318:24)
+(fail) LspClient diagnostics freshness > #given a pull-supported server with a current cached pull report #when a later pull is rejected as unsupported without any publish and the document is unchanged #then the fallback resolves with the current cached diagnostics [93.65ms]
+
+ 11 pass
+ 1 fail
+ 29 expect() calls
+Ran 12 tests across 1 file. [4.43s]

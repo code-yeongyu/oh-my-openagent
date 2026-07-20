@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- **Breaking**: `shared/<name>` skill invocations and `disabled_skills: ["shared/<name>"]` entries no longer resolve. Skills from the shared catalog now register under their bare name (e.g. `ulw-plan`, `frontend`). Update configs and prompts to use bare names. (PR #6180)
 
 ## [4.14.0] - 2026-06-29
 
@@ -64,7 +66,6 @@ Nothing yet.
 - Runtime fallback timeout rearming after blocked escalation. (PR #5491)
 - Delegate-task silent parent wake retry bounding. (PR #5488)
 - Opencode run marker refresh after wake requeues. (PR #5500)
-- Sparkshell guidance contracts and command clarification. (PR #5504)
 - Skill MCP servers resolved from runtime config without deadlock. (PR #5482)
 
 ### Removed
@@ -140,7 +141,6 @@ Nothing yet.
 - Codex marketplace auto-update boundary preserved.
 - CodeGraph MCP path stamped during bootstrap.
 - CodeGraph startup hook output made valid.
-- Sparkshell context ranking documented, stops printing session context.
 - Start-work passes bare session id to SDK session.messages.
 - Background-agent schedules re-flush for reply-required wake after activity window.
 - Lazycodex codegraph missing binary provisioned during MCP serve.

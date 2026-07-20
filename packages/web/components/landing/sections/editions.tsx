@@ -11,9 +11,7 @@ export async function EditionsSection(): Promise<JSX.Element> {
     <section className="border-t border-white/5 bg-[#0a0a0a] py-24" data-section="editions">
       <div className="reveal-on-enter container mx-auto px-4 md:px-6">
         <div className="mb-16 text-center">
-          <h2 className="mb-4 text-4xl font-bold text-white md:text-5xl">
-            {t("editions.title")}
-          </h2>
+          <h2 className="mb-4 text-4xl font-bold text-white md:text-5xl">{t("editions.title")}</h2>
           <p className="text-xl text-zinc-400">{t("editions.subtitle")}</p>
         </div>
 
@@ -24,9 +22,7 @@ export async function EditionsSection(): Promise<JSX.Element> {
               <Badge className="mb-3 w-fit border-cyan-500/30 bg-cyan-500/10 text-cyan-400">
                 {t("editions.ultimate.platform")}
               </Badge>
-              <CardTitle className="text-2xl text-white">
-                {t("editions.ultimate.name")}
-              </CardTitle>
+              <CardTitle className="text-2xl text-white">{t("editions.ultimate.name")}</CardTitle>
               <p className="mt-2 text-sm leading-relaxed text-zinc-400">
                 {t("editions.ultimate.description")}
               </p>
@@ -42,9 +38,7 @@ export async function EditionsSection(): Promise<JSX.Element> {
               <Badge className="mb-3 w-fit border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
                 {t("editions.light.platform")}
               </Badge>
-              <CardTitle className="text-2xl text-white">
-                {t("editions.light.name")}
-              </CardTitle>
+              <CardTitle className="text-2xl text-white">{t("editions.light.name")}</CardTitle>
               <p className="mt-2 text-sm leading-relaxed text-zinc-400">
                 {t("editions.light.description")}
               </p>

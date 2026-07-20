@@ -20,6 +20,8 @@ import {
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 
+const DEFAULT_DEFER_PROMPT_MS = 500 as const
+
 export async function runAggressiveTruncationStrategy(params: {
   sessionID: string
   autoCompactState: AutoCompactState
@@ -28,6 +30,7 @@ export async function runAggressiveTruncationStrategy(params: {
   truncateAttempt: number
   currentTokens: number
   maxTokens: number
+  deferPromptMs?: number
 }): Promise<{ handled: boolean; nextTruncateAttempt: number }> {
   if (params.truncateAttempt >= TRUNCATE_CONFIG.maxTruncateAttempts) {
     return { handled: false, nextTruncateAttempt: params.truncateAttempt }
@@ -127,7 +130,7 @@ export async function runAggressiveTruncationStrategy(params: {
           error: String(error),
         })
       }
-    }, 500)
+    }, params.deferPromptMs ?? DEFAULT_DEFER_PROMPT_MS)
 
     return { handled: true, nextTruncateAttempt }
   }

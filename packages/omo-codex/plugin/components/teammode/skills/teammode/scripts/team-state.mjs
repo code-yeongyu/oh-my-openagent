@@ -9,8 +9,19 @@
 // this file stays the state concern only.
 
 import { randomUUID } from "node:crypto";
-import { lstat, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
+
+import {
+	agentPathForTaskName,
+	assertTransport,
+	isMultiAgentV2,
+	LEADER_AGENT_PATH,
+	parseTaskName,
+	parseTeamTransport,
+	TEAM_SCHEMA_VERSION,
+} from "./team-transport.mjs";
 
 export const LENSES = ["area", "ownership", "perspective"];
 export const MEMBER_STATUSES = ["pending", "active", "reported", "blocked", "archived"];
@@ -24,27 +35,32 @@ export function isUnderstaffed(team) {
 // A team dir is a single child of .omo/teams. This pattern alone blocks "/", "\", and a
 // leading "." so ".." and "a/b" can never name a team dir (the escape guard).
 const SESSION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+const LOCK_TIMEOUT_MS = Number.parseInt(process.env.OMO_TEAMMODE_LOCK_TIMEOUT_MS ?? "10000", 10);
+const LOCK_RETRY_MS = Number.parseInt(process.env.OMO_TEAMMODE_LOCK_RETRY_MS ?? "25", 10);
 
 function isoNow(now) {
 	return now ?? new Date().toISOString();
 }
 
-export function buildTeam({ teamName, sessionName, sessionId = null, dir = null, worktreeEnabled = false, baseBranch = "dev", now }) {
+export function buildTeam({ teamName, sessionName, sessionId = null, dir = null, worktreeEnabled = false, baseBranch = "dev", transport, now }) {
 	if (!teamName?.trim()) throw new Error("team name is required");
 	if (!sessionName?.trim()) throw new Error("session name is required");
+	const teamTransport = parseTeamTransport(transport);
+	const v2 = teamTransport === "multi_agent_v2";
 	const ts = isoNow(now);
 	return {
-		schemaVersion: 2,
+		schemaVersion: TEAM_SCHEMA_VERSION,
+		transport: teamTransport,
 		teamId: randomUUID(),
 		teamName: teamName.trim(),
 		sessionName: sessionName.trim(),
 		sessionId,
-		threadTitleConvention: `[${teamName.trim()}] <member name>`,
+		threadTitleConvention: v2 ? null : `[${teamName.trim()}] <member name>`,
 		status: "active",
 		createdAt: ts,
 		updatedAt: ts,
 		archivedAt: null,
-		leader: { kind: "main-session", sessionId },
+		leader: { kind: "main-session", sessionId: v2 ? null : sessionId, agentPath: v2 ? LEADER_AGENT_PATH : null },
 		communication: { memberLanguage: "english", replyToUserInUserLanguage: true },
 		worktree: { enabled: Boolean(worktreeEnabled), baseBranch, root: dir ? join(dir, "worktrees") : null },
 		paths: dir
@@ -121,21 +137,44 @@ function assertUniqueMemberThreadTitle(team) {
 	}
 }
 
-function assertTeamReadyForThreadBinding(team) {
+function assertUniqueMemberTaskName(team) {
+	const seen = new Map();
+	for (const member of team.members) {
+		const taskName = parseTaskName(member.taskName);
+		const previous = seen.get(taskName);
+		if (previous) {
+			throw new Error(`member taskName "${taskName}" duplicates "${previous.taskName}" (no two members may share an agent path)`);
+		}
+		if (member.agentPath !== agentPathForTaskName(taskName)) {
+			throw new Error(`member "${member.id}" agentPath "${member.agentPath}" does not match task name "${taskName}"`);
+		}
+		seen.set(taskName, member);
+	}
+}
+
+function assertUniqueTransportIdentity(team) {
+	if (isMultiAgentV2(team)) assertUniqueMemberTaskName(team);
+	else assertUniqueMemberThreadTitle(team);
+}
+
+function assertTeamReadyForBinding(team) {
 	if (isUnderstaffed(team)) {
 		throw new Error(
-			`cannot bind member threads until the team has at least ${MIN_MEMBERS} distinct members; current count is ${team.members.length}`,
+			`cannot bind members until the team has at least ${MIN_MEMBERS} distinct members; current count is ${team.members.length}`,
 		);
 	}
 	assertUniqueMemberFocus(team);
 	assertUniqueMemberName(team);
-	assertUniqueMemberThreadTitle(team);
+	assertUniqueTransportIdentity(team);
 }
 
-export function addMember(team, { id, focus, lens, deliverable = "", branch = null, name = null }) {
+export function addMember(team, { id, focus, lens, deliverable = "", branch = null, name = null, taskName = null }) {
 	if (!id?.trim()) throw new Error("member id is required");
 	if (!focus?.trim()) throw new Error("member focus is required - a concrete part, ownership area, or perspective");
 	if (!LENSES.includes(lens)) throw new Error(`invalid lens "${lens}" - use one of: ${LENSES.join(", ")}`);
+	const v2 = isMultiAgentV2(team);
+	if (!v2 && taskName !== null) throw new Error("--task-name is only valid on multi_agent_v2 teams");
+	const memberTaskName = v2 ? parseTaskName(taskName) : null;
 	const memberId = id.trim();
 	const memberFocus = focus.trim();
 	// The member name is the short role label that titles this member's thread. Fall back to the
@@ -148,14 +187,20 @@ export function addMember(team, { id, focus, lens, deliverable = "", branch = nu
 	if (duplicateName) {
 		throw new Error(`member name "${memberName}" duplicates "${duplicateName.name ?? duplicateName.focus}" (no two members may produce the same thread title)`);
 	}
+	if (v2) {
+		const duplicateTask = team.members.find((m) => m.taskName === memberTaskName);
+		if (duplicateTask) throw new Error(`member taskName "${memberTaskName}" duplicates "${duplicateTask.taskName}" (no two members may share an agent path)`);
+	}
 	team.members.push({
 		id: memberId,
 		name: memberName,
 		focus: memberFocus,
 		lens,
 		deliverable: deliverable.trim(),
+		taskName: memberTaskName,
+		agentPath: v2 ? agentPathForTaskName(memberTaskName) : null,
 		threadId: null,
-		threadTitle: `[${team.teamName}] ${memberName}`,
+		threadTitle: v2 ? null : `[${team.teamName}] ${memberName}`,
 		cwd: null,
 		worktree: { path: null, branch: branch ?? null },
 		status: "pending",
@@ -164,14 +209,30 @@ export function addMember(team, { id, focus, lens, deliverable = "", branch = nu
 }
 
 export function bindThread(team, { id, threadId, cwd = null, worktreePath = null }) {
+	assertTransport(team, "codex_app", "bind-thread");
 	if (!threadId?.trim()) throw new Error("thread id is required");
-	assertTeamReadyForThreadBinding(team);
+	assertTeamReadyForBinding(team);
 	const m = memberById(team, id);
 	m.threadId = threadId.trim();
 	m.status = "active";
 	if (cwd) m.cwd = cwd;
 	if (team.worktree.enabled) m.worktree.path = worktreePath ?? cwd ?? m.worktree.path;
 	return touch(team, "bind-thread", `member ${id} -> thread ${threadId.trim()}`);
+}
+
+export function bindAgent(team, { id, agentPath, cwd = null, worktreePath = null }) {
+	assertTransport(team, "multi_agent_v2", "bind-agent");
+	if (!agentPath?.trim()) throw new Error("agent path is required");
+	assertTeamReadyForBinding(team);
+	const m = memberById(team, id);
+	const boundPath = agentPath.trim();
+	if (boundPath !== m.agentPath) {
+		throw new Error(`agent path mismatch for member ${m.id}: expected "${m.agentPath}" (task name "${m.taskName}"), got "${boundPath}"`);
+	}
+	m.status = "active";
+	if (cwd) m.cwd = cwd;
+	if (team.worktree.enabled) m.worktree.path = worktreePath ?? cwd ?? m.worktree.path;
+	return touch(team, "bind-agent", `member ${id} -> agent ${boundPath}`);
 }
 
 export function setMemberStatus(team, { id, status, note = "" }) {
@@ -201,22 +262,44 @@ export function clearMemberWorktree(team, { id }) {
 export function archive(team, { id = null, note = "" } = {}) {
 	if (id) {
 		memberById(team, id).status = "archived";
-		return touch(team, "archive-member", `member ${id}${note ? `: ${note}` : ""}`);
+		const memberQualifier = isMultiAgentV2(team) ? " (team state only; V2 exposes no runtime archive operation)" : "";
+		return touch(team, "archive-member", `member ${id}${memberQualifier}${note ? `: ${note}` : ""}`);
 	}
 	for (const m of team.members) m.status = "archived";
 	team.status = "archived";
 	team.archivedAt = isoNow();
-	return touch(team, "archive", note || "team archived; all members closed");
+	// The default detail must never claim a runtime closure that did not happen: V2 exposes no
+	// runtime archive operation, so only the durable team state is archived there.
+	const defaultDetail = isMultiAgentV2(team)
+		? "team archived; V2 exposes no runtime archive operation - durable team state is the archive"
+		: "team archived; all members closed";
+	return touch(team, "archive", note || defaultDetail);
+}
+
+// schemaVersion 2 predates transports; that skill allowed ONLY Codex App threads as members,
+// so a legacy team is migrated in memory as codex_app and persisted on the next mutation.
+function migrateLegacyTeam(team) {
+	if (team?.schemaVersion !== 2) return team;
+	team.schemaVersion = TEAM_SCHEMA_VERSION;
+	team.transport = "codex_app";
+	if (team.leader && typeof team.leader === "object") team.leader.agentPath = null;
+	for (const member of team.members ?? []) {
+		member.taskName = null;
+		member.agentPath = null;
+	}
+	return team;
 }
 
 export function validateTeam(team) {
-	if (team?.schemaVersion !== 2) throw new Error("invalid team: schemaVersion must be 2");
+	migrateLegacyTeam(team);
+	if (team?.schemaVersion !== TEAM_SCHEMA_VERSION) throw new Error(`invalid team: schemaVersion must be ${TEAM_SCHEMA_VERSION}`);
+	parseTeamTransport(team.transport);
 	if (!team.teamId || !team.teamName) throw new Error("invalid team: teamId and teamName are required");
 	if (team.leader?.kind !== "main-session") throw new Error("invalid team: leader.kind must be main-session");
 	if (!Array.isArray(team.members)) throw new Error("invalid team: members must be an array");
 	assertUniqueMemberFocus(team);
 	assertUniqueMemberName(team);
-	assertUniqueMemberThreadTitle(team);
+	assertUniqueTransportIdentity(team);
 	return team;
 }
 
@@ -231,6 +314,65 @@ async function lstatOrNull(p) {
 		if (error && error.code === "ENOENT") return null;
 		throw error;
 	});
+}
+
+function positiveIntegerOrFallback(value, fallback) {
+	return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+async function readLockOwner(lockDir) {
+	return readFile(join(lockDir, "owner.json"), "utf8")
+		.then((content) => JSON.parse(content))
+		.catch(() => null);
+}
+
+async function describeLockOwner(lockDir) {
+	const owner = await readLockOwner(lockDir);
+	if (!owner || typeof owner !== "object") return "another team.mjs command";
+	const parts = [];
+	if (owner.command) parts.push(String(owner.command));
+	if (owner.pid) parts.push(`pid ${owner.pid}`);
+	if (owner.createdAt) parts.push(`since ${owner.createdAt}`);
+	return parts.length > 0 ? parts.join(", ") : "another team.mjs command";
+}
+
+export async function withTeamLock(dir, command, fn, options = {}) {
+	const timeoutMs = positiveIntegerOrFallback(options.timeoutMs ?? LOCK_TIMEOUT_MS, 10000);
+	const retryMs = positiveIntegerOrFallback(options.retryMs ?? LOCK_RETRY_MS, 25);
+	const lockDir = join(dir, ".team.lock");
+	const deadline = Date.now() + timeoutMs;
+	let acquired = false;
+	for (;;) {
+		try {
+			await mkdir(lockDir, { mode: 0o700 });
+			acquired = true;
+			await writeFile(
+				join(lockDir, "owner.json"),
+				`${JSON.stringify({ pid: process.pid, command, createdAt: new Date().toISOString() }, null, 2)}\n`,
+				{ encoding: "utf8", flag: "wx" },
+			);
+			break;
+		} catch (error) {
+			if (acquired) {
+				await rm(lockDir, { recursive: true, force: true });
+				throw error;
+			}
+			if (!error || error.code !== "EEXIST") throw error;
+			const st = await lstatOrNull(lockDir);
+			if (st?.isSymbolicLink()) throw new Error(`refused: team lock path is a symlink: ${lockDir}`);
+			if (st && !st.isDirectory()) throw new Error(`refused: team lock path is not a directory: ${lockDir}`);
+			if (Date.now() >= deadline) {
+				const owner = await describeLockOwner(lockDir);
+				throw new Error(`team state is locked by ${owner}; retry after that command completes`);
+			}
+			await delay(Math.min(retryMs, Math.max(1, deadline - Date.now())));
+		}
+	}
+	try {
+		return await fn();
+	} finally {
+		await rm(lockDir, { recursive: true, force: true });
+	}
 }
 
 // Create a directory chain refusing any symlinked component, so team state can never be

@@ -146,6 +146,10 @@ describe("resolveActualContextLimit", () => {
     expect(resolveActualContextLimit("anthropic", "claude-mythos-5", {
       anthropicContext1MEnabled: false,
     })).toBe(1_000_000)
+
+    expect(resolveActualContextLimit("anthropic", "claude-sonnet-5", {
+      anthropicContext1MEnabled: false,
+    })).toBe(1_000_000)
   })
 
   it("returns GA 1M for claude-opus-4-8", () => {

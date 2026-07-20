@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -39,6 +39,46 @@ export function runTeamRaw(cwd, ...args) {
 		cwd,
 		encoding: "utf8",
 		timeout: 10_000,
+	});
+}
+
+export function runTeamRawWithEnv(cwd, env, ...args) {
+	return spawnSync(process.execPath, [teamScript, ...args], {
+		cwd,
+		encoding: "utf8",
+		env: { ...process.env, ...env },
+		timeout: 10_000,
+	});
+}
+
+export function runTeamAsync(cwd, ...args) {
+	return new Promise((resolve, reject) => {
+		const child = spawn(process.execPath, [teamScript, ...args], {
+			cwd,
+			stdio: ["ignore", "pipe", "pipe"],
+		});
+		let stdout = "";
+		let stderr = "";
+		const timer = setTimeout(() => {
+			child.kill("SIGKILL");
+			reject(new Error(`team.mjs ${args.join(" ")} timed out`));
+		}, 10_000);
+		child.stdout.setEncoding("utf8");
+		child.stderr.setEncoding("utf8");
+		child.stdout.on("data", (chunk) => {
+			stdout += chunk;
+		});
+		child.stderr.on("data", (chunk) => {
+			stderr += chunk;
+		});
+		child.on("error", (error) => {
+			clearTimeout(timer);
+			reject(error);
+		});
+		child.on("close", (status, signal) => {
+			clearTimeout(timer);
+			resolve({ status, signal, stdout, stderr });
+		});
 	});
 }
 

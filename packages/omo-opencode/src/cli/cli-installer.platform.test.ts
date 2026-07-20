@@ -5,6 +5,7 @@ import { runCliInstaller } from "./cli-installer"
 import * as configManager from "./config-manager"
 import * as astGrepInstall from "./install-ast-grep-sg"
 import * as codexInstaller from "./install-codex"
+import * as senpiInstaller from "./install-senpi"
 import type { CodexInstallResult } from "./install-codex"
 import type { InstallArgs } from "./types"
 
@@ -22,6 +23,14 @@ const codexResult: CodexInstallResult = {
     configs: [],
     artifacts: [],
   },
+}
+
+const senpiResult = {
+  agentDir: "/tmp/senpi-agent",
+  settingsPath: "/tmp/senpi-agent/settings.json",
+  pluginPath: "/tmp/repo/packages/omo-senpi/plugin",
+  changed: true,
+  backupPath: "/tmp/senpi-agent/settings.json.20260703T000000000Z.backup",
 }
 
 function createOpenCodeArgs(platform: "opencode" | "both"): InstallArgs {
@@ -115,6 +124,24 @@ describe("runCliInstaller platform branching", () => {
     expect(codexSpy).toHaveBeenCalledWith({ autonomousPermissions: true })
   })
 
+  test("runs only Senpi installation and skips OpenCode provider checks for platform=senpi", async () => {
+    // given
+    const versionSpy = spyOn(configManager, "getOpenCodeVersion")
+    const writeSpy = spyOn(configManager, "writeOmoConfig")
+    const codexSpy = spyOn(codexInstaller, "runCodexInstaller").mockResolvedValue(codexResult)
+    const senpiSpy = spyOn(senpiInstaller, "runSenpiInstaller").mockResolvedValue(senpiResult)
+
+    // when
+    const result = await runCliInstaller({ tui: false, platform: "senpi" }, "3.4.0")
+
+    // then
+    expect(result).toBe(0)
+    expect(versionSpy).not.toHaveBeenCalled()
+    expect(writeSpy).not.toHaveBeenCalled()
+    expect(codexSpy).not.toHaveBeenCalled()
+    expect(senpiSpy).toHaveBeenCalledTimes(1)
+  })
+
   test("passes Codex autonomous selection into Codex installer", async () => {
     // given
     const codexSpy = spyOn(codexInstaller, "runCodexInstaller").mockResolvedValue(codexResult)
@@ -143,6 +170,7 @@ describe("runCliInstaller platform branching", () => {
     // given
     stubOpenCodeSuccess()
     const codexSpy = spyOn(codexInstaller, "runCodexInstaller").mockResolvedValue(codexResult)
+    const senpiSpy = spyOn(senpiInstaller, "runSenpiInstaller").mockResolvedValue(senpiResult)
     const writeSpy = spyOn(configManager, "writeOmoConfig")
 
     // when
@@ -152,6 +180,18 @@ describe("runCliInstaller platform branching", () => {
     expect(result).toBe(0)
     expect(writeSpy).toHaveBeenCalledTimes(1)
     expect(codexSpy).toHaveBeenCalledTimes(1)
+    expect(senpiSpy).not.toHaveBeenCalled()
+  })
+
+  test("fails when Senpi-only installation cannot install Senpi", async () => {
+    // given
+    spyOn(senpiInstaller, "runSenpiInstaller").mockRejectedValue(new Error("senpi failed"))
+
+    // when
+    const result = await runCliInstaller({ tui: false, platform: "senpi" }, "3.4.0")
+
+    // then
+    expect(result).toBe(1)
   })
 
   test("fails when Codex-only installation cannot install Codex", async () => {

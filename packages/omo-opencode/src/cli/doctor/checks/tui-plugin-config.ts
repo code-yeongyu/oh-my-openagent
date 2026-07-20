@@ -17,11 +17,11 @@ const TUI_SUBPATH = "tui"
 const TUI_EXPORT_SUBPATH = `./${TUI_SUBPATH}`
 
 interface OpenCodeConfigShape {
-  plugin?: string[]
+  plugin?: (string | [string, unknown])[]
 }
 
 interface TuiConfigShape {
-  plugin?: string[]
+  plugin?: (string | [string, unknown])[]
 }
 
 interface ServerPluginInfo {
@@ -64,18 +64,18 @@ function packageJsonExportsTui(pkgJsonPath: string): boolean | null {
   }
 }
 
-function packageNameFromServerEntry(entry: string): string | null {
-  if (entry === PLUGIN_NAME || entry.startsWith(`${PLUGIN_NAME}@`)) return PLUGIN_NAME
-  if (entry === LEGACY_PLUGIN_NAME || entry.startsWith(`${LEGACY_PLUGIN_NAME}@`)) return LEGACY_PLUGIN_NAME
+function packageNameFromServerEntry(entry: unknown): string | null {
+  if (typeof entry === "string" && (entry === PLUGIN_NAME || entry.startsWith(`${PLUGIN_NAME}@`))) return PLUGIN_NAME
+  if (typeof entry === "string" && (entry === LEGACY_PLUGIN_NAME || entry.startsWith(`${LEGACY_PLUGIN_NAME}@`))) return LEGACY_PLUGIN_NAME
   return null
 }
 
-function isPackagePluginEntry(entry: string): boolean {
+function isPackagePluginEntry(entry: unknown): boolean {
   return packageNameFromServerEntry(entry) !== null
 }
 
-function packageExportsTuiForServerEntry(entry: string): boolean | null {
-  if (entry.startsWith("file:")) return packageJsonExportsTui(fileEntryPackageJsonPath(entry))
+function packageExportsTuiForServerEntry(entry: unknown): boolean | null {
+  if (typeof entry === "string" && entry.startsWith("file:")) return packageJsonExportsTui(fileEntryPackageJsonPath(entry))
 
   const packageName = packageNameFromServerEntry(entry)
   if (packageName === null) return null
@@ -83,8 +83,8 @@ function packageExportsTuiForServerEntry(entry: string): boolean | null {
   return packageJsonExportsTui(join(getOpenCodeConfigDir({ binary: "opencode" }), "node_modules", packageName, "package.json"))
 }
 
-export function isOurFilePluginEntry(entry: string): boolean {
-  if (!entry.startsWith("file:")) return false
+export function isOurFilePluginEntry(entry: unknown): boolean {
+  if (typeof entry !== "string" || !entry.startsWith("file:")) return false
   try {
     const pkgJsonPath = fileEntryPackageJsonPath(entry)
     if (!existsSync(pkgJsonPath)) return false
@@ -100,30 +100,30 @@ export function isOurFilePluginEntry(entry: string): boolean {
   }
 }
 
-export function isServerPluginEntry(entry: string): boolean {
-  if (entry === PLUGIN_NAME || entry.startsWith(`${PLUGIN_NAME}@`)) return true
-  if (entry === LEGACY_PLUGIN_NAME || entry.startsWith(`${LEGACY_PLUGIN_NAME}@`)) return true
-  if (entry.startsWith("file:") && isOurFilePluginEntry(entry)) return true
+export function isServerPluginEntry(entry: unknown): entry is string {
+  if (typeof entry === "string" && (entry === PLUGIN_NAME || entry.startsWith(`${PLUGIN_NAME}@`))) return true
+  if (typeof entry === "string" && (entry === LEGACY_PLUGIN_NAME || entry.startsWith(`${LEGACY_PLUGIN_NAME}@`))) return true
+  if (typeof entry === "string" && entry.startsWith("file:") && isOurFilePluginEntry(entry)) return true
   return false
 }
 
-export function isTuiPluginEntry(entry: string): boolean {
-  if (isPackagePluginEntry(entry)) return true
-  if (entry.startsWith("file:") && isOurFilePluginEntry(entry)) return true
-  return false
+export function isTuiPluginEntry(entry: unknown): boolean {
+  return typeof entry === "string" && (isPackagePluginEntry(entry) || (entry.startsWith("file:") && isOurFilePluginEntry(entry)))
 }
 
-export function isNamedTuiPluginEntry(entry: string): boolean {
+export function isNamedTuiPluginEntry(entry: unknown): boolean {
   const canonicalPrefix = `${PLUGIN_NAME}/${TUI_SUBPATH}`
   const legacyPrefix = `${LEGACY_PLUGIN_NAME}/${TUI_SUBPATH}`
-  if (entry === canonicalPrefix || entry.startsWith(`${canonicalPrefix}@`)) return true
-  if (entry === legacyPrefix || entry.startsWith(`${legacyPrefix}@`)) return true
-  return false
+  return typeof entry === "string"
+    && (entry === canonicalPrefix
+      || entry.startsWith(`${canonicalPrefix}@`)
+      || entry === legacyPrefix
+      || entry.startsWith(`${legacyPrefix}@`))
 }
 
-function isCanonicalNamedTuiPluginEntry(entry: string): boolean {
+function isCanonicalNamedTuiPluginEntry(entry: unknown): boolean {
   const canonicalPrefix = `${PLUGIN_NAME}/${TUI_SUBPATH}`
-  return entry === canonicalPrefix || entry.startsWith(`${canonicalPrefix}@`)
+  return typeof entry === "string" && (entry === canonicalPrefix || entry.startsWith(`${canonicalPrefix}@`))
 }
 
 export function detectServerPluginRegistration(): ServerPluginInfo {

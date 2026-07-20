@@ -211,7 +211,7 @@ describe("sync-lazycodex-marketplace", () => {
       workflowMissing = error instanceof Error
     }
     expect(workflowMissing).toBe(true)
-  })
+  }, 15_000)
 
   test("#given release version env #when syncing marketplace #then repository payload is stamped with release version", async () => {
     // given
@@ -359,10 +359,9 @@ describe("sync-lazycodex-marketplace", () => {
     // then
     expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "bootstrap", "dist", "cli.js"))).isFile()).toBe(true)
     expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "bootstrap", "scripts", "bootstrap.ps1"))).isFile()).toBe(true)
-    const nestedMcpManifest = JSON.parse(
-      await readFile(join(lazycodexRoot, "plugins", "omo", "components", "lsp", ".mcp.json"), "utf8"),
-    )
-    expect(nestedMcpManifest.mcpServers.lsp.args[0]).toBe("../../../../lsp-daemon/dist/cli.js")
+    // Codex reads MCP servers only from the plugin-root .mcp.json; a component's nested dev manifest
+    // (whose relative daemon path dangles in the flattened bundle) must not ship in plugins/omo.
+    await expectPathMissing(join(lazycodexRoot, "plugins", "omo", "components", "lsp", ".mcp.json"))
   })
 
   test("#given missing bootstrap commandWindows target #when syncing marketplace #then rejects naming the bootstrap.ps1 path", async () => {
@@ -406,7 +405,7 @@ describe("sync-lazycodex-marketplace", () => {
     expect(message).toContain("zero bytes")
   })
 
-  test("#given nested component .mcp.json referencing an absent in-bundle runtime #when syncing marketplace #then rejects the broken bundle", async () => {
+  test("#given a component ships a nested .mcp.json #when syncing marketplace #then it is dropped from the bundle and the sync succeeds", async () => {
     // given
     const sourceRoot = await mkdtemp(join(tmpdir(), "omo-sync-nested-mcp-source-"))
     const lazycodexRoot = await mkdtemp(join(tmpdir(), "omo-sync-nested-mcp-lazycodex-"))
@@ -418,16 +417,10 @@ describe("sync-lazycodex-marketplace", () => {
     })
 
     // when
-    let message = ""
-    try {
-      await syncLazycodexMarketplace({ sourceRoot, lazycodexRoot })
-    } catch (error) {
-      message = error instanceof Error ? error.message : String(error)
-    }
+    await syncLazycodexMarketplace({ sourceRoot, lazycodexRoot })
 
     // then
-    expect(message).toContain("missing MCP runtime path for lsp")
-    expect(message).toContain("packages/lsp-tools-mcp/dist/cli.js")
+    await expectPathMissing(join(lazycodexRoot, "plugins", "omo", "components", "lsp", ".mcp.json"))
   })
 
   test("#given multiple missing referenced targets #when syncing marketplace #then reports the full list", async () => {

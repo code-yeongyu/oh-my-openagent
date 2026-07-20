@@ -108,6 +108,25 @@ describe("loadOmoConfig", () => {
     }
   })
 
+  test("#given global and project excluded roots #when loading codex config #then roots are merged without duplicates", () => {
+    // given
+    const homeDir = makeTempHome()
+    const cwd = join(homeDir, "repo")
+    mkdirSync(cwd, { recursive: true })
+    writeConfig(homeDir, `{"codegraph":{"excluded_roots":["/tmp/omo-a","/tmp/omo-b"]}}`)
+    writeConfig(cwd, `{"[codex]":{"codegraph":{"excluded_roots":["/tmp/omo-b","/tmp/omo-c"]}}}`)
+
+    try {
+      // when
+      const result = loadOmoConfig({ harness: "codex", cwd, homeDir, env: {} })
+
+      // then
+      expect(result.config.codegraph?.excluded_roots).toEqual(["/tmp/omo-a", "/tmp/omo-b", "/tmp/omo-c"])
+    } finally {
+      rmSync(homeDir, { force: true, recursive: true })
+    }
+  })
+
   test("#given SOT value and env override #when loading config #then env override has highest precedence", () => {
     // given
     const homeDir = makeTempHome()

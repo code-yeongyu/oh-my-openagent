@@ -19,9 +19,11 @@ const STALE_CODEX_COMPONENT_BINS = [
 const LAZYCODEX_AGENT_ROLE_NAMES = [
   "lazycodex-clone-fidelity-reviewer",
   "lazycodex-code-reviewer",
-  "lazycodex-executor",
   "lazycodex-gate-reviewer",
   "lazycodex-qa-executor",
+  "lazycodex-worker-high",
+  "lazycodex-worker-low",
+  "lazycodex-worker-medium",
 ] as const
 
 const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
@@ -70,7 +72,6 @@ describe("lazycodex install surface", () => {
         expect(wrapper).toContain("OMO_GENERATED_RUNTIME_WRAPPER")
         expect(wrapper).toContain(expectedTarget)
         expect(wrapper).toContain("CODEX_HOME")
-        expect(wrapper).toContain("OMO_SPARKSHELL_APP_SERVER_SOCKET")
         expect(wrapper).toContain("omo-ulw-loop")
         expect(wrapper).toContain("bun runtime not found")
         expect(wrapper).toContain("https://bun.sh")
