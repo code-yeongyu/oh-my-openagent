@@ -4,6 +4,8 @@ import type { KeywordDetectorConfig } from "../../config/schema/keyword-detector
 import {
   getMainSessionID,
   getSessionAgent,
+  isUltraworkSessionActive,
+  markUltraworkSessionActive,
   subagentSessions,
 } from "../../features/claude-code-session-state"
 import type { ContextCollector } from "../../features/context-injector"
@@ -116,29 +118,42 @@ export function createKeywordDetectorHook(
       const mainSessionID = getMainSessionID()
       const isNonMainSession = mainSessionID && input.sessionID !== mainSessionID
 
+      let stickyUltraworkContinuation = false
+
       if (detectedKeywords.length === 0) {
-        if (defaultMode?.ultrawork && !isNonMainSession && !defaultModeUltraworkInjectedSessions.has(input.sessionID)) {
-          defaultModeUltraworkInjectedSessions.add(input.sessionID)
+        const stickyUltraworkKeyword =
+          !isPlannerAgent(currentAgent) && isUltraworkSessionActive(input.sessionID)
+            ? detectKeywordsWithType("ultrawork", currentAgent, modelID, disabledKeywords, enabledExpansions)
+              .find((k) => k.type === "ultrawork")
+            : undefined
 
-          log(`[keyword-detector] Default ultrawork mode auto-activated (injected via system prompt)`, { sessionID: input.sessionID })
+        if (stickyUltraworkKeyword) {
+          detectedKeywords = [stickyUltraworkKeyword]
+          stickyUltraworkContinuation = true
+        } else {
+          if (defaultMode?.ultrawork && !isNonMainSession && !defaultModeUltraworkInjectedSessions.has(input.sessionID)) {
+            defaultModeUltraworkInjectedSessions.add(input.sessionID)
 
-          ctx.client.tui
-            .showToast({
-              body: {
-                title: "Ultrawork Mode Activated",
-                message: "Default ultrawork mode enabled. All agents at your disposal.",
-                variant: "success" as const,
-                duration: 3000,
-              },
-            })
-            .catch((err) =>
-              log(`[keyword-detector] Failed to show toast`, {
-                error: err,
-                sessionID: input.sessionID,
+            log(`[keyword-detector] Default ultrawork mode auto-activated (injected via system prompt)`, { sessionID: input.sessionID })
+
+            ctx.client.tui
+              .showToast({
+                body: {
+                  title: "Ultrawork Mode Activated",
+                  message: "Default ultrawork mode enabled. All agents at your disposal.",
+                  variant: "success" as const,
+                  duration: 3000,
+                },
               })
-            )
+              .catch((err) =>
+                log(`[keyword-detector] Failed to show toast`, {
+                  error: err,
+                  sessionID: input.sessionID,
+                })
+              )
+          }
+          return
         }
-        return
       }
 
       if (isNonMainSession) {
@@ -162,32 +177,37 @@ export function createKeywordDetectorHook(
 
       const hasUltrawork = detectedKeywords.some((k) => k.type === "ultrawork")
       if (hasUltrawork) {
-        const runtimeVariant = getRuntimeVariant(input, output.message)
-        const isRuntimeMax = runtimeVariant === "max"
+        markUltraworkSessionActive(input.sessionID)
 
-        log(`[keyword-detector] Ultrawork mode activated`, {
-          sessionID: input.sessionID,
-          runtimeVariant,
-        })
+        if (stickyUltraworkContinuation) {
+          log(`[keyword-detector] Ultrawork mode continued`, { sessionID: input.sessionID })
+        } else {
+          const runtimeVariant = getRuntimeVariant(input, output.message)
+          const isRuntimeMax = runtimeVariant === "max"
 
-        ctx.client.tui
-          .showToast({
-            body: {
-              title: "Ultrawork Mode Activated",
-              message: isRuntimeMax
-                ? "Maximum precision engaged. All agents at your disposal."
-                : "Runtime variant preserved. All agents at your disposal.",
-              variant: "success" as const,
-              duration: 3000,
-            },
+          log(`[keyword-detector] Ultrawork mode activated`, {
+            sessionID: input.sessionID,
+            runtimeVariant,
           })
-          .catch((err) =>
-            log(`[keyword-detector] Failed to show toast`, {
-              error: err,
-              sessionID: input.sessionID,
-            })
-          )
 
+          ctx.client.tui
+            .showToast({
+              body: {
+                title: "Ultrawork Mode Activated",
+                message: isRuntimeMax
+                  ? "Maximum precision engaged. All agents at your disposal."
+                  : "Runtime variant preserved. All agents at your disposal.",
+                variant: "success" as const,
+                duration: 3000,
+              },
+            })
+            .catch((err) =>
+              log(`[keyword-detector] Failed to show toast`, {
+                error: err,
+                sessionID: input.sessionID,
+              })
+            )
+        }
       }
 
       const hasHyperplan = detectedKeywords.some((k) => k.type === "hyperplan")
