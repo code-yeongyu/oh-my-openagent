@@ -320,4 +320,48 @@ session_id: ses_nested_scope_review
     })
     expect(readBoulderState(testDirectory)?.pause).toBeUndefined()
   }, { timeout: 5000 })
+
+  test("a later non-pausing subagent completion does not clear an active final-wave approval pause", async () => {
+    // given - an active persisted pause from a prior final-wave approval gate
+    const sessionID = "atlas-pause-clear-regression-session"
+    setupMessageStorage(sessionID)
+    // Plan still has implementation work pending, so a normal completion does not pause.
+    writePlanState(sessionID, "pause-clear-regression-plan", `# Plan
+
+## TODOs
+- [ ] 1. Ship implementation
+
+## Final Verification Wave (MANDATORY - after ALL implementation tasks)
+- [ ] F1. **Plan Compliance Audit** - \`oracle\`
+`)
+
+    const { setBoulderPause } = await import("../../features/boulder-state")
+    setBoulderPause(testDirectory, {
+      reason: "final_wave_approval",
+      sessionId: sessionID,
+    })
+    expect(readBoulderState(testDirectory)?.pause?.reason).toBe("final_wave_approval")
+
+    const hook = createAtlasHook(createMockPluginInput(), {
+      directory: testDirectory,
+      isCallerOrchestrator: async () => true,
+    })
+
+    // when - a later non-pausing implementation-task completion arrives for the same orchestrator
+    const implOutput = {
+      title: "Implementation task done",
+      output: `Implementation work shipped. Tests pass.
+
+<task_metadata>
+session_id: ses_pause_clear_impl_1
+</task_metadata>`,
+      metadata: {},
+    }
+    await hook["tool.execute.after"]({ tool: "task", sessionID }, implOutput)
+
+    // then - pause is still set (reviewer fix: only an explicit user message clears it)
+    const finalPause = readBoulderState(testDirectory)?.pause
+    expect(finalPause?.reason).toBe("final_wave_approval")
+    expect(finalPause?.session_id).toContain(sessionID)
+  })
 })

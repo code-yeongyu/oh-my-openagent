@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { clearBoulderPause, setBoulderPause } from "../../features/boulder-state"
+import { setBoulderPause } from "../../features/boulder-state"
 import { classifyFinalWaveVerdict, shouldPauseForFinalWaveApproval } from "./final-wave-approval-gate"
 import { readFinalWavePlanState } from "./final-wave-plan-state"
 import type { SessionState } from "./types"
@@ -67,11 +67,6 @@ export async function buildSubagentCompletionReminder(input: {
   }
   if (input.orchestratorSessionId && shouldPause) {
     setBoulderPause(input.ctx.directory, {
-      reason: "final_wave_approval",
-      sessionId: input.orchestratorSessionId,
-    })
-  } else if (input.orchestratorSessionId) {
-    clearBoulderPause(input.ctx.directory, {
       reason: "final_wave_approval",
       sessionId: input.orchestratorSessionId,
     })
