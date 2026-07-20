@@ -450,4 +450,59 @@ describe("fetchSyncResult", () => {
       expect(result.textContent).not.toBe("internal draft sketch")
     }
   })
+
+  test("truncates oversized sync result to the maxTokens budget", async () => {
+    //#given - a subagent deliverable far larger than the budget
+    const { fetchSyncResult } = require("./sync-result-fetcher")
+
+    const oversized = `${"x".repeat(100_000)}`
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 } },
+              parts: [{ type: "text", text: oversized }],
+            },
+          ],
+        }),
+      },
+    }
+
+    //#when - budget of 10 tokens (40 chars at 4 chars/token)
+    const result = await fetchSyncResult(mockClient, "ses_test", undefined, { maxTokens: 10 })
+
+    //#then - the returned content is capped and flagged as truncated
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.textContent.length).toBeLessThan(oversized.length)
+      expect(result.textContent).toContain("[TRUNCATED]")
+    }
+  })
+
+  test("leaves small sync results untouched", async () => {
+    //#given - a normal-sized deliverable well under the default budget
+    const { fetchSyncResult } = require("./sync-result-fetcher")
+
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 } },
+              parts: [{ type: "text", text: "Short deliverable." }],
+            },
+          ],
+        }),
+      },
+    }
+
+    //#when
+    const result = await fetchSyncResult(mockClient, "ses_test")
+
+    //#then - no truncation marker, content preserved verbatim
+    expect(result).toEqual({ ok: true, textContent: "Short deliverable." })
+  })
 })
