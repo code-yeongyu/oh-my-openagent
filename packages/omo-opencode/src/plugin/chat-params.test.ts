@@ -248,4 +248,103 @@ describe("createChatParamsHandler", () => {
     //#then
     expect(output.maxOutputTokens).toBe(4096)
   })
+
+  test("strips reasoningEffort for openai-compatible providers (issue #5529)", async () => {
+    //#given — gpt-5.5 agent config injects reasoningEffort: "medium", but the provider
+    // is openai-compatible (e.g. local llama.cpp, vLLM, salad-cloud) and OpenAI
+    // rejects requests that combine tools + reasoning_effort on /v1/chat/completions
+    setSessionPromptParams("ses_chat_params_compat", {
+      options: {
+        reasoningEffort: "medium",
+      },
+    })
+
+    const handler = createChatParamsHandler()
+
+    const input = {
+      sessionID: "ses_chat_params_compat",
+      agent: { name: "oracle" },
+      model: {
+        providerID: "salad-cloud",
+        modelID: "gpt-5.5",
+        api: { npm: "@ai-sdk/openai-compatible" },
+      },
+      provider: { id: "salad-cloud" },
+      message: {},
+    }
+
+    const output: ChatParamsOutput = {
+      options: {},
+    }
+
+    //#when
+    await handler(input, output)
+
+    //#then — reasoningEffort must NOT be injected for openai-compatible providers
+    expect(output.options).not.toHaveProperty("reasoningEffort")
+  })
+
+  test("preserves reasoningEffort for native openai provider (issue #5529)", async () => {
+    //#given — same agent config, but native openai provider DOES support it
+    setSessionPromptParams("ses_chat_params_native", {
+      options: {
+        reasoningEffort: "medium",
+      },
+    })
+
+    const handler = createChatParamsHandler()
+
+    const input = {
+      sessionID: "ses_chat_params_native",
+      agent: { name: "oracle" },
+      model: {
+        providerID: "openai",
+        modelID: "gpt-5.5",
+        api: { npm: "@ai-sdk/openai" },
+      },
+      provider: { id: "openai" },
+      message: {},
+    }
+
+    const output: ChatParamsOutput = {
+      options: {},
+    }
+
+    //#when
+    await handler(input, output)
+
+    //#then — native openai provider must keep reasoningEffort
+    expect(output.options.reasoningEffort).toBe("medium")
+  })
+
+  test("preserves reasoningEffort when api.npm is missing (backward compat, issue #5529)", async () => {
+    //#given — when the chat-params hook does not receive api.npm, fall back to
+    // existing behavior and let reasoningEffort through. This preserves backward
+    // compatibility for any plugin/hook that does not forward the api field.
+    setSessionPromptParams("ses_chat_params_legacy", {
+      options: {
+        reasoningEffort: "medium",
+      },
+    })
+
+    const handler = createChatParamsHandler()
+
+    const input = {
+      sessionID: "ses_chat_params_legacy",
+      agent: { name: "oracle" },
+      model: { providerID: "openai", modelID: "gpt-5.5" },
+      provider: { id: "openai" },
+      message: {},
+    }
+
+    const output: ChatParamsOutput = {
+      options: {},
+    }
+
+    //#when
+    await handler(input, output)
+
+    //#then — without api.npm, preserve legacy behavior
+    expect(output.options.reasoningEffort).toBe("medium")
+  })
 })
