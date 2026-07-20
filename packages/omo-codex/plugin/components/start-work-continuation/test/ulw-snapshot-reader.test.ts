@@ -40,7 +40,7 @@ describe("ULW snapshot bridge", () => {
 		// then
 		const parsed = parseBlockOutput(output);
 		expect(parsed.reason).toContain("- Plan: `launch-plan`");
-		expect(parsed.reason).toContain("- Next incomplete task: `First`");
+		expect(parsed.reason).toContain("- Next incomplete task: `1. Implement checklist parser parity`");
 		expect(parsed.reason).not.toContain("Repo-native ULW snapshot");
 		expect(parsed.reason).not.toContain("Snapshot path:");
 	});
@@ -158,7 +158,7 @@ describe("ULW snapshot bridge", () => {
 		expect(parsed.reason).toContain("- Next action: `Continue from the writer-normalized Codex-scoped snapshot`");
 	});
 
-	it("#given raw and writer-normalized scoped snapshots #when hook runs with the raw Codex session id #then the Codex snapshot wins", () => {
+	it("#given raw and legacy Codex-scoped snapshots #when hook runs with the raw session id #then the writer-scoped raw snapshot wins", () => {
 		// given
 		const workspace = createWorkspace({ worktreePath: null });
 		writeSnapshotAt(
@@ -166,15 +166,15 @@ describe("ULW snapshot bridge", () => {
 			["sess_abc"],
 			createSnapshotMarkdown({
 				metadata: ["- Session ID: sess_abc", "- Plan Path: .omo/ulw-loop/sess_abc/goals.json"],
-				nextAction: "Continue from the stale raw snapshot",
+				nextAction: "Continue from the current raw snapshot",
 			}),
 		);
-		const codexSnapshotPath = writeSnapshotAt(
+		writeSnapshotAt(
 			workspace,
 			["codex-sess_abc"],
 			createSnapshotMarkdown({
 				metadata: ["- Session ID: codex:sess_abc", "- Plan Path: .omo/ulw-loop/codex-sess_abc/goals.json"],
-				nextAction: "Continue from the current Codex snapshot",
+				nextAction: "Continue from the legacy Codex snapshot",
 			}),
 		);
 
@@ -183,9 +183,8 @@ describe("ULW snapshot bridge", () => {
 
 		// then
 		const parsed = parseBlockOutput(output);
-		expect(parsed.reason).toContain(`- Snapshot path: \`${codexSnapshotPath}\``);
-		expect(parsed.reason).toContain("- Next action: `Continue from the current Codex snapshot`");
-		expect(parsed.reason).not.toContain("Continue from the stale raw snapshot");
+		expect(parsed.reason).toContain("- Next action: `Continue from the current raw snapshot`");
+		expect(parsed.reason).not.toContain("Continue from the legacy Codex snapshot");
 	});
 
 	it.each(

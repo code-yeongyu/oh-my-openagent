@@ -166,11 +166,13 @@ function scopedSnapshotSessionIds(sessionId: string): readonly string[] {
 	const trimmed = sessionId.trim();
 	if (trimmed.length === 0) return [];
 
-	const withoutCodexPrefix = trimmed.startsWith("codex:") ? trimmed.slice("codex:".length) : trimmed;
+	const hasCodexPrefix = trimmed.startsWith("codex:");
+	const withoutCodexPrefix = hasCodexPrefix ? trimmed.slice("codex:".length) : trimmed;
+	const writerScoped = normalizeSnapshotSessionId(trimmed);
+	const rawScoped = normalizeSnapshotSessionId(withoutCodexPrefix);
+	const legacyCodexScoped = normalizeSnapshotSessionId(`codex:${withoutCodexPrefix}`);
 	return uniqueNonNull([
-		normalizeSnapshotSessionId(`codex:${withoutCodexPrefix}`),
-		normalizeSnapshotSessionId(withoutCodexPrefix),
-		normalizeSnapshotSessionId(trimmed),
+		...(hasCodexPrefix ? [writerScoped, rawScoped, legacyCodexScoped] : [rawScoped, legacyCodexScoped]),
 	]);
 }
 

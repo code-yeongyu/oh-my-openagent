@@ -44,7 +44,7 @@ describe("ulw-loop*Path helpers", () => {
 	it("#given no session id #when composing the snapshot path #then returns the default latest snapshot path", () => {
 		// when/then
 		expect(ulwLoopSnapshotRelativePath()).toBe(".omo/ulw-loop/snapshots/latest.md");
-		expect(ulwLoopSnapshotPath("/r")).toBe("/r/.omo/ulw-loop/snapshots/latest.md");
+		expect(ulwLoopSnapshotPath("/r")).toBe(join("/r", ".omo", "ulw-loop", "snapshots", "latest.md"));
 	});
 
 	it("#given a session id #when composing the snapshot path #then returns the scoped latest snapshot path", () => {
@@ -53,7 +53,7 @@ describe("ulw-loop*Path helpers", () => {
 			".omo/ulw-loop/session-A/snapshots/latest.md",
 		);
 		expect(ulwLoopSnapshotPath("/r", { sessionId: "session-A" })).toBe(
-			"/r/.omo/ulw-loop/session-A/snapshots/latest.md",
+			join("/r", ".omo", "ulw-loop", "session-A", "snapshots", "latest.md"),
 		);
 	});
 });

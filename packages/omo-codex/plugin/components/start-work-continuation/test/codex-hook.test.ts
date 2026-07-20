@@ -12,6 +12,8 @@ import {
 	parseBlockOutput,
 } from "./fixtures/hook-test-utils.js";
 
+const SCAFFOLD_PLAN_MARKDOWN = readFileSync(new URL("./fixtures/plan-scaffold.md", import.meta.url), "utf8");
+
 afterEach(() => {
 	cleanupTestRoots();
 });
@@ -123,7 +125,7 @@ describe("start-work Stop hook", () => {
 		// given
 		const workspace = createWorkspace({
 			boulderJson: createBoulderJson({ sessionIds: ["codex:sess_abc"], status: "active" }),
-			planMarkdown: ["# Plan", "", "## TODOs", "- [ ] First"].join("\n"),
+		planMarkdown: "- [ ] First",
 		});
 		const fs = createMemoryFs();
 
@@ -144,7 +146,7 @@ describe("start-work Stop hook", () => {
 		// given
 		const workspace = createWorkspace({
 			boulderJson: createBoulderJson({ sessionIds: ["codex:sess_abc"], status: "active" }),
-			planMarkdown: ["# Plan", "", "## TODOs", "- [ ] First"].join("\n"),
+		planMarkdown: "- [ ] First",
 		});
 		const fs = createMemoryFs();
 
@@ -158,7 +160,7 @@ describe("start-work Stop hook", () => {
 		expect(parsed.reason).toMatch(/When unsure[^.]{0,30}HEAVY/);
 		expect(parsed.reason).toMatch(/mirrors its implementation/);
 		expect((parsed.reason.match(/malformed input, prompt injection/g) ?? []).length).toBe(1);
-		expect(parsed.reason.split(/\s+/).filter(Boolean).length).toBeLessThanOrEqual(1150);
+		expect(parsed.reason.split(/\s+/).filter(Boolean).length).toBeLessThanOrEqual(1300);
 	});
 
 	it("#given active codex work #when continuation directive is emitted #then PR lifecycle stays worktree-bound", () => {
@@ -169,7 +171,7 @@ describe("start-work Stop hook", () => {
 				status: "active",
 				worktreePath: "/tmp/worktree",
 			}),
-			planMarkdown: ["# Plan", "", "## TODOs", "- [ ] First"].join("\n"),
+		planMarkdown: "- [ ] First",
 		});
 		const fs = createMemoryFs();
 

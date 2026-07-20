@@ -8,6 +8,8 @@ import type { ReadonlyFileSystem, StopInput } from "../../src/types.js";
 export const DEFAULT_WORKSPACE = "/repo";
 
 const cleanupRoots: string[] = [];
+const qaSandboxRoot = process.env["OMO_QA_SANDBOX_ROOT"]?.trim();
+const scaffoldPlanMarkdown = readFileSync(new URL("./plan-scaffold.md", import.meta.url), "utf8");
 
 export type BoulderInput = {
 	readonly sessionIds?: readonly string[];
@@ -22,6 +24,7 @@ export type WorkspaceInput = {
 };
 
 export function cleanupTestRoots(): void {
+	if (qaSandboxRoot !== undefined && qaSandboxRoot.length > 0) return;
 	for (const root of cleanupRoots.splice(0)) rmSync(root, { recursive: true, force: true });
 }
 
@@ -47,12 +50,14 @@ export function createWorkspace(input: WorkspaceInput = {}): string {
 }
 
 export function createTempRoot(prefix: string): string {
-	const root = mkdtempSync(join(tmpdir(), prefix));
+	const parent = qaSandboxRoot === undefined || qaSandboxRoot.length === 0 ? tmpdir() : qaSandboxRoot;
+	mkdirSync(parent, { recursive: true });
+	const root = mkdtempSync(join(parent, prefix));
 	cleanupRoots.push(root);
 	return root;
 }
 
-export function createPlan(root: string, planMarkdown = ["# Plan", "", "## TODOs", "- [ ] First"].join("\n")): void {
+export function createPlan(root: string, planMarkdown = scaffoldPlanMarkdown): void {
 	mkdirSync(join(root, ".omo", "plans"), { recursive: true });
 	writeFileSync(join(root, ".omo", "plans", "plan.md"), planMarkdown);
 }
