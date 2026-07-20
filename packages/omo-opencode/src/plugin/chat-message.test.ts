@@ -454,7 +454,7 @@ describe("createChatMessageHandler - goal command handling and stop continuation
     const handler = createChatMessageHandler(args)
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "Ship it" }],
+      parts: [{ type: "text", text: "/goal Ship it" }],
     }
 
     // when
@@ -476,7 +476,7 @@ describe("createChatMessageHandler - goal command handling and stop continuation
     const handler = createChatMessageHandler(args)
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "pause" }],
+      parts: [{ type: "text", text: "/goal pause" }],
     }
 
     // when
@@ -498,7 +498,7 @@ describe("createChatMessageHandler - goal command handling and stop continuation
     const handler = createChatMessageHandler(args)
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "resume" }],
+      parts: [{ type: "text", text: "/goal resume" }],
     }
 
     // when
@@ -520,7 +520,7 @@ describe("createChatMessageHandler - goal command handling and stop continuation
     const handler = createChatMessageHandler(args)
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "clear" }],
+      parts: [{ type: "text", text: "/goal clear" }],
     }
 
     // when
@@ -579,19 +579,19 @@ describe("createChatMessageHandler - goal command handling and stop continuation
     })
     await handler(createMockInput("sisyphus"), {
       message: {},
-      parts: [{ type: "text", text: "Ship it" }],
+      parts: [{ type: "text", text: "/goal Ship it" }],
     })
     await handler(createMockInput("sisyphus"), {
       message: {},
-      parts: [{ type: "text", text: "pause" }],
+      parts: [{ type: "text", text: "/goal pause" }],
     })
     await handler(createMockInput("sisyphus"), {
       message: {},
-      parts: [{ type: "text", text: "resume" }],
+      parts: [{ type: "text", text: "/goal resume" }],
     })
     await handler(createMockInput("sisyphus"), {
       message: {},
-      parts: [{ type: "text", text: "clear" }],
+      parts: [{ type: "text", text: "/goal clear" }],
     })
 
     // then
@@ -602,11 +602,8 @@ describe("createChatMessageHandler - goal command handling and stop continuation
       "test-session",
       "test-session",
     ])
+    // Ordinary start-work template text must not be treated as a goal objective.
     expect(goalMock.setGoalCalls).toEqual([
-      {
-        sessionID: "test-session",
-        objective: "<session-context>context</session-context>\nYou are starting an Atlas work session.",
-      },
       { sessionID: "test-session", objective: "Ship it" },
     ])
     expect(goalMock.pauseGoalCalls).toEqual(["test-session"])
@@ -661,7 +658,7 @@ describe("createChatMessageHandler - /goal raw slash fallback", () => {
     const input = createMockInput("sisyphus")
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "Ship the dashboard" }],
+      parts: [{ type: "text", text: "/goal Ship the dashboard" }],
     }
 
     // when
@@ -682,7 +679,7 @@ describe("createChatMessageHandler - /goal raw slash fallback", () => {
     const input = createMockInput("sisyphus")
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "pause" }],
+      parts: [{ type: "text", text: "/goal pause" }],
     }
 
     // when
@@ -702,7 +699,7 @@ describe("createChatMessageHandler - /goal raw slash fallback", () => {
     const input = createMockInput("sisyphus")
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "resume" }],
+      parts: [{ type: "text", text: "/goal resume" }],
     }
 
     // when
@@ -722,7 +719,7 @@ describe("createChatMessageHandler - /goal raw slash fallback", () => {
     const input = createMockInput("sisyphus")
     const output: ChatMessageHandlerOutput = {
       message: {},
-      parts: [{ type: "text", text: "clear" }],
+      parts: [{ type: "text", text: "/goal clear" }],
     }
 
     // when
