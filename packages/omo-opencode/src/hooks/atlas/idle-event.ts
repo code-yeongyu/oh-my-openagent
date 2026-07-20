@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import {
   normalizeSessionId,
+  isBoulderPausedForSession,
   resolveBoulderPlanPath,
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
@@ -77,7 +78,10 @@ export async function handleAtlasSessionIdle(input: {
   const activePlanPath = resolveBoulderPlanPath(ctx.directory, boulderState)
   resetStallStateForPlanChange(sessionState, activePlanPath)
 
-  if (sessionState.waitingForFinalWaveApproval) {
+  if (sessionState.waitingForFinalWaveApproval || isBoulderPausedForSession(ctx.directory, {
+    reason: "final_wave_approval",
+    sessionId: sessionID,
+  })) {
     log(`[${HOOK_NAME}] Skipped: waiting for explicit final-wave approval`, { sessionID })
     return
   }

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 
-import type { BoulderState, BoulderWorkState } from "../types"
+import type { BoulderPauseReason, BoulderPauseState, BoulderState, BoulderWorkState } from "../types"
 import { getBoulderFilePath } from "./path"
 import { getPlanName } from "./plan-progress"
 import { getBoulderWorks, readBoulderState } from "./read-state"
@@ -32,6 +32,7 @@ export function writeBoulderState(directory: string, state: BoulderState): boole
             ended_at: stateToWrite.ended_at,
             elapsed_ms: stateToWrite.elapsed_ms,
             updated_at: stateToWrite.updated_at,
+            pause: stateToWrite.pause,
             session_ids: [...stateToWrite.session_ids],
             session_origins: stateToWrite.session_origins ? { ...stateToWrite.session_origins } : {},
             agent: stateToWrite.agent,
@@ -100,6 +101,62 @@ export function createBoulderState(planPath: string, sessionId: string, agent?: 
     ...(agent !== undefined ? { agent } : {}),
     ...(worktreePath !== undefined ? { worktree_path: worktreePath } : {}),
   }
+}
+
+export function setBoulderPause(
+  directory: string,
+  input: { reason: BoulderPauseReason; sessionId: string; createdAt?: string },
+): BoulderState | null {
+  const state = readBoulderState(directory)
+  if (!state) {
+    return null
+  }
+
+  const now = nowIsoString()
+  const pause: BoulderPauseState = {
+    reason: input.reason,
+    session_id: normalizeSessionId(input.sessionId),
+    created_at: input.createdAt ?? now,
+  }
+
+  state.pause = pause
+  state.updated_at = now
+  if (state.active_work_id) {
+    const work = state.works?.[state.active_work_id]
+    if (work) {
+      work.pause = pause
+      work.updated_at = now
+    }
+  }
+
+  return writeBoulderState(directory, state) ? state : null
+}
+
+export function clearBoulderPause(
+  directory: string,
+  input: { reason: BoulderPauseReason; sessionId: string },
+): BoulderState | null {
+  const state = readBoulderState(directory)
+  if (!state) {
+    return null
+  }
+
+  const normalizedSessionId = normalizeSessionId(input.sessionId)
+  const activeWork = state.active_work_id ? state.works?.[state.active_work_id] : undefined
+  const pause = activeWork?.pause ?? state.pause
+  if (pause?.reason !== input.reason || pause.session_id !== normalizedSessionId) {
+    return state
+  }
+
+  const now = nowIsoString()
+  delete state.pause
+  state.updated_at = now
+  if (activeWork) {
+    delete activeWork.pause
+    activeWork.updated_at = now
+  }
+
+  return writeBoulderState(directory, state) ? state : null
 }
 
 export function selectActiveWork(directory: string, workId: string): BoulderState | null {

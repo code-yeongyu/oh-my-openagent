@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
+import { isBoulderPausedForSession } from "../../features/boulder-state"
 import {
   getSessionAgent,
   handedBackSyncSessions,
@@ -84,6 +85,14 @@ export async function injectContinuation(args: {
 
   if (isContinuationStopped?.(sessionID)) {
     log(`[${HOOK_NAME}] Skipped injection: continuation stopped for session`, { sessionID })
+    return
+  }
+
+  if (isBoulderPausedForSession(ctx.directory, {
+    reason: "final_wave_approval",
+    sessionId: sessionID,
+  })) {
+    log(`[${HOOK_NAME}] Skipped injection: boulder waiting for explicit final-wave approval`, { sessionID })
     return
   }
 

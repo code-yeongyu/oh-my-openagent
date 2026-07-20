@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import {
   getPlanProgress,
   getTaskSessionState,
+  isBoulderPausedForSession,
   normalizeSessionId,
   readBoulderState,
   readCurrentTopLevelTask,
@@ -55,6 +56,12 @@ export async function injectContinuation(input: {
 
   try {
     const currentBoulder = readBoulderState(input.ctx.directory)
+    if (isBoulderPausedForSession(input.ctx.directory, {
+      reason: "final_wave_approval",
+      sessionId: input.sessionID,
+    })) {
+      return
+    }
     const normalizedSessionID = normalizeSessionId(input.sessionID)
     const currentPlanPath = currentBoulder
       ? resolveBoulderPlanPath(input.ctx.directory, currentBoulder)
@@ -172,6 +179,10 @@ export function scheduleRetry(input: {
       if (sessionState.promptFailureCount >= MAX_CONSECUTIVE_PROMPT_FAILURES) return
       if (sessionState.stalledContinuationReason) return
       if (sessionState.waitingForFinalWaveApproval) return
+      if (isBoulderPausedForSession(ctx.directory, {
+        reason: "final_wave_approval",
+        sessionId: sessionID,
+      })) return
 
       const now = Date.now()
       if (

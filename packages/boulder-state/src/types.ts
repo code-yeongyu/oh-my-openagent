@@ -2,6 +2,7 @@ export interface BoulderState {
   schema_version?: 2
   active_work_id?: string
   works?: Record<string, BoulderWorkState>
+  pause?: BoulderPauseState
   active_plan: string
   started_at: string
   ended_at?: string
@@ -17,11 +18,19 @@ export interface BoulderState {
 }
 
 export type BoulderSessionOrigin = "direct" | "appended"
+export type BoulderPauseReason = "final_wave_approval"
 export type BoulderWorkStatus = "active" | "completed" | "paused" | "abandoned"
 export type BoulderTaskStatus = "running" | "completed" | "cancelled"
 
+export interface BoulderPauseState {
+  reason: BoulderPauseReason
+  session_id: string
+  created_at: string
+}
+
 export interface BoulderWorkState {
   work_id: string
+  pause?: BoulderPauseState
   active_plan: string
   plan_name: string
   status?: BoulderWorkStatus

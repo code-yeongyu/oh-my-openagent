@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs"
 
-import type { BoulderState, BoulderWorkResumeOption, BoulderWorkState, TaskSessionState } from "../types"
+import type { BoulderPauseReason, BoulderState, BoulderWorkResumeOption, BoulderWorkState, TaskSessionState } from "../types"
 import { getBoulderFilePath, resolveBoulderPlanPathForWork } from "./path"
 import { getPlanProgress } from "./plan-progress"
 import { buildWorkFromMirror, isValidWorkStatus, normalizeSessionId, parseIsoToMs, projectWorkToMirror, selectMirrorWork } from "./shared"
@@ -167,6 +167,21 @@ export function getWorkForSession(directory: string, sessionId: string): Boulder
   }
 
   return state.session_ids.includes(normalizedSessionId) ? buildWorkFromMirror(state) : null
+}
+
+export function isBoulderPausedForSession(
+  directory: string,
+  input: { sessionId: string; reason: BoulderPauseReason },
+): boolean {
+  const state = readBoulderState(directory)
+  if (!state) {
+    return false
+  }
+
+  const normalizedSessionId = normalizeSessionId(input.sessionId)
+  const work = getWorkForSession(directory, input.sessionId)
+  const pause = work?.pause ?? state.pause
+  return pause?.reason === input.reason && pause.session_id === normalizedSessionId
 }
 
 export function getWorkResumeOptions(directory: string): BoulderWorkResumeOption[] {

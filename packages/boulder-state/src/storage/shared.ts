@@ -56,6 +56,7 @@ export function buildWorkFromMirror(state: BoulderState): BoulderWorkState {
     ended_at: state.ended_at,
     elapsed_ms: state.elapsed_ms,
     updated_at: state.updated_at,
+    pause: state.pause,
     session_ids: Array.isArray(state.session_ids) ? [...state.session_ids] : [],
     session_origins: state.session_origins,
     agent: state.agent,
@@ -72,6 +73,7 @@ export function projectWorkToMirror(state: BoulderState, work: BoulderWorkState)
   state.ended_at = work.ended_at
   state.elapsed_ms = work.elapsed_ms
   state.updated_at = work.updated_at
+  state.pause = work.pause
   state.session_ids = [...work.session_ids]
   state.session_origins = work.session_origins ? { ...work.session_origins } : {}
   state.agent = work.agent

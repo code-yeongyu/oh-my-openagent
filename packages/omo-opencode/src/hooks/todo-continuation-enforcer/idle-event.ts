@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
+import { isBoulderPausedForSession } from "../../features/boulder-state"
 import { getSessionAgent, handedBackSyncSessions } from "../../features/claude-code-session-state"
 import { normalizeSDKResponse } from "../../shared"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
@@ -211,6 +212,14 @@ export async function handleSessionIdle(args: {
 
   if (isContinuationStopped?.(sessionID)) {
     log(`[${HOOK_NAME}] Skipped: continuation stopped for session`, { sessionID })
+    return
+  }
+
+  if (isBoulderPausedForSession(ctx.directory, {
+    reason: "final_wave_approval",
+    sessionId: sessionID,
+  })) {
+    log(`[${HOOK_NAME}] Skipped: boulder waiting for explicit final-wave approval`, { sessionID })
     return
   }
 

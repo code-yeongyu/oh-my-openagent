@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { clearBoulderPause } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { HOOK_NAME } from "./hook-name"
@@ -58,6 +59,10 @@ export function createAtlasEventHandler(input: {
         state.skipNextIdleAfterRuntimeErrorRetry = false
         if (role === "user") {
           state.waitingForFinalWaveApproval = false
+          clearBoulderPause(ctx.directory, {
+            reason: "final_wave_approval",
+            sessionId: sessionID,
+          })
         }
       }
       return
