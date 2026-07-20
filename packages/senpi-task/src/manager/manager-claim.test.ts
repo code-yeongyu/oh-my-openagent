@@ -1,6 +1,21 @@
+import { resolve } from "node:path"
+
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { FakeRunner, baseSpec, cleanupProjects, flush, makeManager } from "./__fixtures__/manager-fakes"
+
+const seedFloorChildFixturePath = resolve(import.meta.dir, "__fixtures__", "seed-floor-child.ts")
+
+async function expectSeedFloorChildModeToSucceed(mode: string): Promise<void> {
+  const child = Bun.spawn([process.execPath, seedFloorChildFixturePath, mode], { stdout: "pipe", stderr: "pipe" })
+  const [exitCode, stdout, stderr] = await Promise.all([
+    child.exited,
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+  ])
+
+  expect(exitCode, `stdout:\n${stdout}\nstderr:\n${stderr}`).toBe(0)
+}
 
 afterEach(cleanupProjects)
 
@@ -89,4 +104,11 @@ describe("TaskManager claim characterization", () => {
     expect(result.name).toMatch(/^st_[0-9a-f]{8}$/)
     expect(result.name).toBe(result.task_id)
   })
+
+  test.each(["seed", "warm-cache", "diagnostics"])(
+    "#given an isolated manager process #when %s seeds from disk #then it succeeds",
+    async (mode) => {
+      await expectSeedFloorChildModeToSucceed(mode)
+    },
+  )
 })

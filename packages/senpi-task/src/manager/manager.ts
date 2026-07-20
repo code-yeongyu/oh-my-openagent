@@ -5,7 +5,7 @@ import { registerLifecycleReattachPorts, type ReattachResult, type RespawnResult
 import { RunnerError } from "../runners/in-process/runner-error"
 import { RpcProcessRunner } from "../runners/rpc-process"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
-import { createTaskRecord, parseTaskId } from "../state"
+import { createTaskRecord, parseTaskId, syncTaskIdFloor } from "../state"
 import type { TaskRecord } from "../state"
 import { createSteeringEngine } from "../steering"
 import type { CancelOutcome, DestructionPort, InterruptOutcome, SendInput, SendOutcome, SteeringEngine, SteeringPort } from "../steering"
@@ -111,6 +111,19 @@ class TaskManagerImpl implements TaskManager {
 
   constructor(options: TaskManagerImplOptions) {
     this.#options = options
+    try {
+      const listed = options.store.list()
+      if (listed.diagnostics.length > 0) {
+        log("senpi-task manager task record diagnostics while seeding id floor", { count: listed.diagnostics.length })
+      }
+      const maxId = listed.records.reduce<string | undefined>(
+        (maximum, record) => (maximum === undefined || record.task_id > maximum ? record.task_id : maximum),
+        undefined,
+      )
+      if (maxId !== undefined) syncTaskIdFloor(parseTaskId(maxId))
+    } catch (error) {
+      log("senpi-task manager failed to seed task id floor", { error: String(error) })
+    }
     this.#now = options.now ?? Date.now
     this.#rpcRespawnRunner = options.rpcRespawnRunner ?? new RpcProcessRunner()
     this.#concurrency = new TaskConcurrency({
