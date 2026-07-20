@@ -413,4 +413,59 @@ describe("consumed background task output should not trigger a redundant complet
     expect(payload).not.toContain(successTask.id)
     expect(payload).not.toContain(successTask.description)
   })
+
+  test("#given two coalesced successful progress wakes #when only the later-queued task is consumed before flush #then the wake STILL fires and names the unconsumed earlier task (regression: identities must accumulate across coalesced wakes, not be replaced)", async () => {
+    // given - parent has three pending tasks; A and B both complete while C is
+    // still running, producing two coalesced PROGRESS wakes (not all-complete)
+    // for the same parent. The previous side-channel map used `.set()` on each
+    // notify, so A's identity was overwritten by B's; consuming only B made the
+    // flush guard believe the entire coalesced wake was consumed and drop it,
+    // suppressing A's progress notification even though A was never inspected.
+    const { manager, promptAsyncCalls } = createManager(true)
+    managerUnderTest = manager
+    const taskA = createTask({
+      id: "bg_coalesce_a",
+      parentSessionId: "parent-coalesce",
+      sessionId: "ses_coalesce_a",
+      description: "coalesced task A",
+      status: "completed",
+      completedAt: new Date("2026-03-11T00:01:00.000Z"),
+    })
+    const taskB = createTask({
+      id: "bg_coalesce_b",
+      parentSessionId: "parent-coalesce",
+      sessionId: "ses_coalesce_b",
+      description: "coalesced task B",
+      status: "completed",
+      completedAt: new Date("2026-03-11T00:02:00.000Z"),
+    })
+    const taskC = createTask({
+      id: "bg_coalesce_c",
+      parentSessionId: "parent-coalesce",
+      sessionId: "ses_coalesce_c",
+      description: "still running task C",
+      status: "running",
+      startedAt: new Date("2026-03-11T00:00:30.000Z"),
+    })
+    getTasks(manager).set(taskA.id, taskA)
+    getTasks(manager).set(taskB.id, taskB)
+    getTasks(manager).set(taskC.id, taskC)
+    // C stays pending, so A and B each generate a PROGRESS wake (allComplete=false)
+    getPendingByParent(manager).set(taskA.parentSessionId, new Set([taskA.id, taskB.id, taskC.id]))
+
+    // when - A completes first (queues progress(A)); then B completes (progress(B)
+    // coalesces into the same pending wake); parent consumes ONLY B's output;
+    // then the timer flushes
+    await notifyParentSessionForTest(manager, taskA)
+    await notifyParentSessionForTest(manager, taskB)
+    recordBackgroundOutputConsumption(taskB.parentSessionId, taskB.parentMessageId, taskB.sessionId)
+    await waitForCoalescedFlush(manager, promptAsyncCalls)
+
+    // then - the wake MUST fire because A's output was NEVER consumed. The
+    // consumed-success race guard must not drop a coalesced wake when any
+    // referenced task is still unconsumed, and the wake text must name A.
+    expect(promptAsyncCalls).toHaveLength(1)
+    const payload = getPromptText(promptAsyncCalls[0])
+    expect(payload).toContain(taskA.id)
+  })
 })

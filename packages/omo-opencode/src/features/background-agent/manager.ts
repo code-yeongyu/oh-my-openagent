@@ -80,7 +80,7 @@ import {
   recordToolCall,
   resolveCircuitBreakerSettings,
 } from "./loop-detector"
-import { ParentWakeNotifier, type ParentWakePromptContext } from "./parent-wake-notifier"
+import { ParentWakeNotifier, type ParentWakePromptContext, type TaskIdentity } from "./parent-wake-notifier"
 import { isFailureParentWake, type PendingParentWake } from "./parent-wake-dedupe"
 import { isBackgroundTaskOutputConsumption } from "../../shared/background-output-consumption"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "./process-cleanup"
@@ -268,7 +268,6 @@ export class BackgroundManager {
   private completionTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private completedTaskArchive: Map<string, BackgroundTask> = new Map()
   private completedTaskSummaries: Map<string, BackgroundTaskNotificationTask[]> = new Map()
-  private pendingWakeTaskIdentitiesByParent = new Map<string, Array<{ taskID?: string; taskSessionID?: string }>>()
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
   private readonly parentWakeNotifier: ParentWakeNotifier
@@ -2735,13 +2734,15 @@ The task was re-queued on a fallback model after a retryable failure.
         const isTaskFailure = task.status === "error" || task.status === "cancelled" || task.status === "interrupt"
         const shouldReply = allComplete || isTaskFailure
 
-        // Stash the identities this wake actually references, so the flush-time
-        // race guard can re-check consumption and drop the wake if every task it
-        // reports has since been consumed (without dropping failure wakes).
-        const wakeIdentities = allComplete
+        // Stash the identities this wake actually references ON THE WAKE (not a
+        // side-channel map): coalescing replaces notifications in the pending
+        // queue, so a separate map keyed by parent would lose earlier-queued
+        // identities on every later `.set()`. The flush-time race guard reads
+        // `pendingWake.taskIdentities` and drops the wake only when every
+        // referenced task is consumed AND the wake is not a failure wake.
+        const wakeIdentities: TaskIdentity[] = allComplete
           ? reportableCompletedTasks.map((t) => ({ taskID: t.id, taskSessionID: t.sessionId }))
           : [{ taskID: task.id, taskSessionID: task.sessionId }]
-        this.pendingWakeTaskIdentitiesByParent.set(task.parentSessionId, wakeIdentities)
 
         const shouldDeferNotification = await this.isSessionActive(task.parentSessionId)
 
@@ -2752,6 +2753,7 @@ The task was re-queued on a fallback model after a retryable failure.
             parentPromptContext,
             shouldReply,
             PENDING_PARENT_WAKE_DEBOUNCE_MS,
+            wakeIdentities,
           )
           log("[background-agent] Queued notification while parent session is active:", {
             taskId: task.id,
@@ -2766,6 +2768,7 @@ The task was re-queued on a fallback model after a retryable failure.
             parentPromptContext,
             shouldReply,
             PENDING_PARENT_WAKE_DEBOUNCE_MS,
+            wakeIdentities,
           )
           log("[background-agent] Queued notification for short-debounce flush to idle parent:", {
             taskId: task.id,
@@ -2902,6 +2905,7 @@ The task was re-queued on a fallback model after a retryable failure.
     promptContext: ParentWakePromptContext,
     shouldReply: boolean,
     delayMs?: number,
+    taskIdentities?: readonly TaskIdentity[],
   ): void {
     // Route the timer-fired flush through this.flushPendingParentWake (the
     // manager wrapper) so the consumed-success race guard applies. The default
@@ -2921,34 +2925,36 @@ The task was re-queued on a fallback model after a retryable failure.
         }
       },
       delayMs,
+      taskIdentities,
     )
     this.updateBackgroundTaskMarker(sessionID)
   }
 
   private async flushPendingParentWake(sessionID: string): Promise<void> {
-    try {
-      // Race guard: a wake may have been queued BEFORE the parent consumed the
-      // completed output in the same turn. Re-check consumption at flush time and
-      // drop a now-fully-consumed pure-success wake. Failure wakes are NEVER
-      // dropped here (isFailureParentWake), even if their output was inspected.
-      const identities = this.pendingWakeTaskIdentitiesByParent.get(sessionID)
-      const pendingWake = this.parentWakeNotifier.getPendingParentWakes().get(sessionID)
-      if (
-        identities
-        && identities.length > 0
-        && pendingWake
-        && !isFailureParentWake(pendingWake)
-        && identities.every((id) => isBackgroundTaskOutputConsumption({ parentSessionID: sessionID, ...id }))
-      ) {
-        this.parentWakeNotifier.deletePendingParentWake(sessionID)
-        log("[background-agent] Suppressed consumed-success parent wake at flush time:", { sessionID })
-      } else {
-        await this.parentWakeNotifier.flushPendingParentWake(sessionID)
-      }
-    } finally {
-      this.pendingWakeTaskIdentitiesByParent.delete(sessionID)
-      this.updateBackgroundTaskMarker(sessionID)
+    // Race guard: a wake may have been queued BEFORE the parent consumed the
+    // completed output in the same turn. Re-check consumption at flush time and
+    // drop a now-fully-consumed pure-success wake. Failure wakes are NEVER
+    // dropped here (isFailureParentWake), even if their output was inspected.
+    //
+    // Identities are read from `pendingWake.taskIdentities` (stored on the wake
+    // itself) rather than a side-channel map. A side-channel map would lose
+    // earlier-queued identities when a later wake's `.set()` replaced them —
+    // exactly the coalescing race that previously suppressed unconsumed tasks.
+    const pendingWake = this.parentWakeNotifier.getPendingParentWakes().get(sessionID)
+    const identities = pendingWake?.taskIdentities
+    if (
+      identities
+      && identities.length > 0
+      && pendingWake
+      && !isFailureParentWake(pendingWake)
+      && identities.every((id: TaskIdentity) => isBackgroundTaskOutputConsumption({ parentSessionID: sessionID, ...id }))
+    ) {
+      this.parentWakeNotifier.deletePendingParentWake(sessionID)
+      log("[background-agent] Suppressed consumed-success parent wake at flush time:", { sessionID })
+    } else {
+      await this.parentWakeNotifier.flushPendingParentWake(sessionID)
     }
+    this.updateBackgroundTaskMarker(sessionID)
   }
 
   private hasRunningTasks(): boolean {

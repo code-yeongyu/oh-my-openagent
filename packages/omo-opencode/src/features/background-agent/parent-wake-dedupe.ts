@@ -7,6 +7,17 @@ export type ParentWakePromptContext = {
   tools?: Record<string, boolean>
 }
 
+/**
+ * Identity of a background task referenced by a parent wake. Lives on the
+ * wake itself (not a side-channel map) so coalescing, cloning, and requeue
+ * keep identities aligned with the wake — a separate map would lose earlier
+ * identities when a later wake's `.set()` replaced them.
+ */
+export type TaskIdentity = {
+  taskID?: string
+  taskSessionID?: string
+}
+
 export type PendingParentWake = {
   promptContext: ParentWakePromptContext
   notifications: string[]
@@ -17,6 +28,8 @@ export type PendingParentWake = {
   toolCallDeferralStartedAt?: number
   allowEmptyAssistantTurnRetry?: boolean
   noAssistantOutputRetryCount?: number
+  // Flat de-duplicated union across every coalesced notification; intentionally NOT index-aligned with `notifications` (an all-complete wake's identities are a superset of the progress wakes it supersedes). The flush-time race guard drops the wake only when this list is non-empty AND every entry is consumed AND the wake is not a failure wake.
+  taskIdentities?: TaskIdentity[]
 }
 
 export function resolveParentWakePromptContext(promptContext: ParentWakePromptContext): ParentWakePromptContext {
@@ -47,6 +60,7 @@ export function cloneParentWake(wake: PendingParentWake): PendingParentWake {
     ...(wake.noAssistantOutputRetryCount !== undefined
       ? { noAssistantOutputRetryCount: wake.noAssistantOutputRetryCount }
       : {}),
+    ...(wake.taskIdentities ? { taskIdentities: wake.taskIdentities.map((id) => ({ ...id })) } : {}),
   }
 }
 
