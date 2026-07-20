@@ -225,4 +225,29 @@ describe("runRgFiles", () => {
     })
     expect(spawnMock).toHaveBeenCalled()
   })
+
+  if (process.platform !== "win32") {
+    it(
+      "#given GNU grep is the discovery fallback #when glob runs #then it executes find instead of passing find flags to grep",
+      async () => {
+        const commands: string[][] = []
+        const spawnMock = mock((command: string[], _options?: SpawnOptions): SpawnedProcess => {
+          commands.push(command)
+          return createSpawnedProcess(0)
+        })
+
+        const result = await runRgFiles(
+          { pattern: "*.ts", paths: ["."], timeout: 1000 },
+          { path: "/usr/bin/grep", backend: "grep" },
+          spawnMock
+        )
+
+        expect(result.error).toBeUndefined()
+        expect(commands).toHaveLength(1)
+        expect(commands[0]?.[0]).toBe("find")
+        expect(commands[0]).toContain("-maxdepth")
+        expect(commands[0]?.[0]).not.toBe("/usr/bin/grep")
+      }
+    )
+  }
 })
