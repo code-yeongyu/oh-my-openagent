@@ -6,6 +6,7 @@ import { RunnerError } from "../runners/in-process/runner-error"
 import { RpcProcessRunner } from "../runners/rpc-process"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import { createTaskRecord, parseTaskId, syncTaskIdFloor } from "../state"
+import { TaskIdSpaceExhaustedError } from "../state/id"
 import type { TaskRecord } from "../state"
 import { createSteeringEngine } from "../steering"
 import type { CancelOutcome, DestructionPort, InterruptOutcome, SendInput, SendOutcome, SteeringEngine, SteeringPort } from "../steering"
@@ -22,6 +23,7 @@ import {
   nowIso,
   recordSpawnedPid,
 } from "./manager-helpers"
+import { claimTaskRecord, TaskRecordCollisionError } from "../store"
 import { NameRegistry } from "./names"
 import { subscribeTranscriptLog } from "./transcript-log"
 import type {
@@ -73,6 +75,11 @@ type ReattachingTaskManager = TaskManager & {
 const NOOP_DESTRUCTION: DestructionPort = { destroyResidentTask: () => Promise.resolve() }
 const GENERIC_START_FAILURE_MESSAGE = "Task runner failed to start."
 const RESPAWN_CLEANUP_FAILURE_REASON = "rpc respawn cleanup failed"
+
+function normalizeSpecName(value: string | undefined): string | undefined {
+  const trimmed = value?.trim()
+  return trimmed === undefined || trimmed.length === 0 ? undefined : trimmed
+}
 
 function publicStartFailureMessage(error: unknown): string {
   try {
@@ -182,63 +189,114 @@ class TaskManagerImpl implements TaskManager {
       configMode: this.#options.config.default_execution_mode,
     })
 
-    const draft = createTaskRecord(buildRecordInput({ spec, plan, name: spec.name ?? "", executionMode }))
-    const registration = this.#names.register(spec.parent_session_id, spec.name, draft.task_id)
-    const record: TaskRecord = { ...draft, name: registration.name }
-    if (spec.run_in_background === true) this.#background.add(record.task_id)
-    this.#options.store.save(record)
+    const requestedName = normalizeSpecName(spec.name)
+    const requestedRegistration = requestedName === undefined
+      ? undefined
+      : this.#names.register(spec.parent_session_id, requestedName)
 
-    const managedSpec = buildManagedSpec({
-      record,
-      spec,
-      plan,
-      cwd: this.#options.cwd,
-      stateDir: this.#options.store.stateDir,
-    })
-    const persistedRecord: TaskRecord = executionMode === "process"
-      ? {
-          ...record,
-          spawn_spec: {
-            cwd: managedSpec.cwd,
-            ...(managedSpec.extensions === undefined ? {} : { extensions: managedSpec.extensions }),
-            ...(managedSpec.memberEnv === undefined ? {} : { member_env: managedSpec.memberEnv }),
-          },
-        }
-      : record
-    if (persistedRecord !== record) this.#options.store.replace(persistedRecord)
+    let claimed: TaskRecord
+    try {
+      const draft = createTaskRecord(buildRecordInput({ spec, plan, name: "", executionMode }), this.#now())
+      const claimDraft: TaskRecord = { ...draft, name: requestedRegistration?.name ?? draft.task_id }
+      claimed = claimTaskRecord(this.#options.store, claimDraft, { nameFollowsId: requestedRegistration === undefined })
+    } catch (error) {
+      if (!(error instanceof TaskRecordCollisionError) && !(error instanceof TaskIdSpaceExhaustedError)) throw error
+      if (requestedRegistration !== undefined) this.#names.release(spec.parent_session_id, requestedRegistration.name)
+      return {
+        kind: "start_failed",
+        task_id: "",
+        name: requestedName ?? "",
+        ...(spec.category ?? plan.category !== undefined ? { category: spec.category ?? plan.category } : {}),
+        ...(spec.subagent_type ?? plan.agentType !== undefined ? { subagent_type: spec.subagent_type ?? plan.agentType } : {}),
+        execution_mode: executionMode,
+        model: plan.model,
+        ...(plan.resolved_model !== undefined ? { resolved_model: plan.resolved_model } : {}),
+        run_in_background: spec.run_in_background === true,
+        error_message: "task id allocation failed under contention; retry the spawn",
+      }
+    }
+
+    const registration = requestedRegistration ?? this.#names.register(spec.parent_session_id, undefined, claimed.task_id)
+    let finalRecord: TaskRecord
+    let managedSpec: ManagedStartSpec
+    try {
+      const renamedRecord: TaskRecord = registration.name === claimed.name ? claimed : { ...claimed, name: registration.name }
+      managedSpec = buildManagedSpec({
+        record: renamedRecord,
+        spec,
+        plan,
+        cwd: this.#options.cwd,
+        stateDir: this.#options.store.stateDir,
+      })
+      finalRecord = executionMode === "process"
+        ? {
+            ...renamedRecord,
+            spawn_spec: {
+              cwd: managedSpec.cwd,
+              ...(managedSpec.extensions === undefined ? {} : { extensions: managedSpec.extensions }),
+              ...(managedSpec.memberEnv === undefined ? {} : { member_env: managedSpec.memberEnv }),
+            },
+          }
+        : renamedRecord
+      if (finalRecord !== claimed) this.#options.store.replace(finalRecord)
+      if (spec.run_in_background === true) this.#background.add(finalRecord.task_id)
+    } catch (error) {
+      if (registration.name !== claimed.name) this.#names.release(spec.parent_session_id, registration.name)
+      this.#background.delete(claimed.task_id)
+      const timestamp = nowIso(this.#now)
+      const started = this.#options.store.transition(claimed.task_id, { type: "start", timestamp })
+      const failed = this.#options.store.transition(claimed.task_id, {
+        type: "fail",
+        timestamp,
+        error_message: "spawn bookkeeping failed",
+      })
+      if (!started.applied || !failed.applied) throw new Error("spawn bookkeeping failure transitions were not applied")
+      return {
+        kind: "start_failed",
+        task_id: claimed.task_id,
+        name: registration.name,
+        ...(claimed.category !== undefined ? { category: claimed.category } : {}),
+        ...(claimed.agent_type !== undefined ? { subagent_type: claimed.agent_type } : {}),
+        execution_mode: executionMode,
+        model: claimed.model,
+        ...(claimed.resolved_model !== undefined ? { resolved_model: claimed.resolved_model } : {}),
+        run_in_background: spec.run_in_background === true,
+        error_message: "spawn bookkeeping failed",
+      }
+    }
     const runner = this.#options.runners[executionMode]
-    const context: LaunchContext = { record: persistedRecord, managedSpec, runner, model: plan.model }
+    const context: LaunchContext = { record: finalRecord, managedSpec, runner, model: plan.model }
     const startParts = {
       ...(plan.resolved_model !== undefined ? { resolved_model: plan.resolved_model } : {}),
       ...(registration.warning !== undefined ? { name_warning: registration.warning } : {}),
     }
 
     if (this.#concurrency.hasFreeSlot(plan.model)) {
-      this.#concurrency.acquire(plan.model, record.task_id)
+      this.#concurrency.acquire(plan.model, finalRecord.task_id)
       const launched = await this.#launch(context)
       if (!launched.ok) {
         return {
           kind: "start_failed",
-          task_id: record.task_id,
+          task_id: finalRecord.task_id,
           name: registration.name,
-          ...(record.category !== undefined ? { category: record.category } : {}),
-          ...(record.agent_type !== undefined ? { subagent_type: record.agent_type } : {}),
+          ...(finalRecord.category !== undefined ? { category: finalRecord.category } : {}),
+          ...(finalRecord.agent_type !== undefined ? { subagent_type: finalRecord.agent_type } : {}),
           execution_mode: executionMode,
-          model: record.model,
-          ...(record.resolved_model !== undefined ? { resolved_model: record.resolved_model } : {}),
+          model: finalRecord.model,
+          ...(finalRecord.resolved_model !== undefined ? { resolved_model: finalRecord.resolved_model } : {}),
           run_in_background: spec.run_in_background === true,
           error_message: launched.error,
         }
       }
-      return { kind: "started", task_id: record.task_id, status: "running", name: registration.name, ...startParts }
+      return { kind: "started", task_id: finalRecord.task_id, status: "running", name: registration.name, ...startParts }
     }
 
-    const position = this.#concurrency.enqueue(plan.model, record.task_id, () => {
+    const position = this.#concurrency.enqueue(plan.model, finalRecord.task_id, () => {
       void this.#launch(context)
     })
     return {
       kind: "started",
-      task_id: record.task_id,
+      task_id: finalRecord.task_id,
       status: "pending",
       name: registration.name,
       queue_position: position,
