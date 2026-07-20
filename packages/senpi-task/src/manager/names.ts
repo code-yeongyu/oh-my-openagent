@@ -24,6 +24,10 @@ export class NameRegistry {
     taken.add(resolved)
     return { name: resolved, warning: `Task name "${desired}" already exists in this session; using "${resolved}".` }
   }
+
+  release(parentSessionId: string, name: string): void {
+    this.#byParent.get(parentSessionId)?.delete(name)
+  }
 }
 
 function normalize(value: string | undefined): string | undefined {
