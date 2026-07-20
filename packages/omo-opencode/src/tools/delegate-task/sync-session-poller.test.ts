@@ -581,7 +581,7 @@ describe("pollSyncSession", () => {
 
       // then: a session.status() that never stops reporting "busy" must not
       // be able to suppress the timeout forever when the message stream is
-      // frozen -- this is the real-world hang this fix targets.
+      // frozen; this is the real-world hang this fix targets.
       expect(abortCount).toBe(1)
       expect(result).toContain("Poll inactivity timeout reached")
     })
@@ -637,7 +637,7 @@ describe("pollSyncSession", () => {
 
       // then: the growing text length kept resetting the inactivity clock on
       // every busy recheck despite total elapsed time exceeding
-      // MAX_POLL_TIME_MS -- the loop only ends because status finally went
+      // MAX_POLL_TIME_MS; the loop only ends because status finally went
       // idle with a terminal finish, never because it was treated as stale.
       expect(abortCount).toBe(0)
       expect(statusCallCount).toBeGreaterThanOrEqual(20)

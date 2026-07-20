@@ -30,7 +30,7 @@ function isActiveSessionStatus(status: { type: string } | undefined): boolean {
   return status !== undefined && ACTIVE_SESSION_STATUSES.has(status.type)
 }
 
-// Cheap fingerprint of "has anything actually moved" -- message count, the
+// Cheap fingerprint of "has anything actually moved": message count, the
 // identity of the last message, how many parts it has, how long its last
 // text/reasoning part is, and the last tool part's state. Deliberately
 // excludes full text content (avoids hashing/comparing potentially large
