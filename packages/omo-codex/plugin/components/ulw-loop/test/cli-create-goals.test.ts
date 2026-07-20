@@ -71,6 +71,11 @@ async function createPlan(brief = "- Goal A\n- Goal B"): Promise<Record<string, 
 	return parsed;
 }
 
+async function readLatestSnapshot(sessionId?: string): Promise<string> {
+	const parts = sessionId === undefined ? [".omo", "ulw-loop"] : [".omo", "ulw-loop", sessionId];
+	return readFile(join(testDir, ...parts, "snapshots", "latest.md"), "utf8");
+}
+
 async function passCriterion(goalId: string, criterionId: string): Promise<void> {
 	expect(
 		await ulwLoopCommand([
@@ -99,6 +104,8 @@ describe("ulwLoopCommand create-goals", () => {
 		expect(await readFile(join(testDir, ".omo/ulw-loop/brief.md"), "utf8")).toContain("Goal A");
 		expect(await readFile(join(testDir, ".omo/ulw-loop/goals.json"), "utf8")).toContain("successCriteria");
 		expect(await readFile(join(testDir, ".omo/ulw-loop/ledger.jsonl"), "utf8")).toContain("plan_created");
+		expect(await readLatestSnapshot()).toContain("# ULW Loop Resume Snapshot");
+		expect(await readLatestSnapshot()).toContain("- Plan Path: .omo/ulw-loop/goals.json");
 	});
 
 	it("#given completed default aggregate #when creating another default plan #then guides to a fresh session", async () => {
@@ -153,6 +160,8 @@ describe("ulwLoopCommand create-goals", () => {
 
 		expect(await readFile(join(testDir, ".omo/ulw-loop/session-A/goals.json"), "utf8")).toContain("Alpha");
 		expect(await readFile(join(testDir, ".omo/ulw-loop/session-B/goals.json"), "utf8")).toContain("Beta");
+		expect(await readLatestSnapshot("session-A")).toContain(".omo/ulw-loop/session-A/goals.json");
+		await expect(readFile(join(testDir, ".omo/ulw-loop/snapshots/latest.md"), "utf8")).rejects.toThrow();
 
 		expect(await ulwLoopCommand(["status", "--session-id", "session-A", "--json"])).toBe(0);
 		expect(stdoutJson()).toMatchObject({

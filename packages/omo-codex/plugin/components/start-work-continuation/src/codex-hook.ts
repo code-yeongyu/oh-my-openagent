@@ -2,6 +2,7 @@ import type { ContinuationState } from "./boulder-reader.js";
 import { readContinuationState } from "./boulder-reader.js";
 import { START_WORK_CONTINUATION_DIRECTIVE } from "./directive.js";
 import type { ReadonlyFileSystem, StopHookEventName, StopHookOutput, StopInput } from "./types.js";
+import { readUlwSnapshotSummary } from "./ulw-snapshot-reader.js";
 
 export function runStopHook(input: unknown, fs: ReadonlyFileSystem): string {
 	if (!isStopInput(input)) return "";
@@ -9,18 +10,34 @@ export function runStopHook(input: unknown, fs: ReadonlyFileSystem): string {
 	if (transcriptHasContextPressureMarker(input.transcript_path, fs)) return "";
 	const state = readContinuationState(input.cwd, input.session_id);
 	if (state === null) return "";
+	const snapshot = readUlwSnapshotSummary(input.cwd, input.session_id, state.worktreePath, fs);
 	return JSON.stringify({
 		decision: "block",
-		reason: renderDirective(state, input.session_id),
+		reason: renderDirective(state, input.session_id, snapshot),
 	} satisfies StopHookOutput);
 }
 
-function renderDirective(state: ContinuationState, sessionId: string): string {
+function renderDirective(
+	state: ContinuationState,
+	sessionId: string,
+	snapshot: { readonly path: string; readonly nextAction: string } | null,
+): string {
 	const lineBreak = String.fromCharCode(10);
 	const worktreeBlock =
 		state.worktreePath === null
 			? ""
 			: `${lineBreak}- Worktree: \`${state.worktreePath}\` (all edits, tests, and commands run inside this directory)`;
+	const snapshotBlock =
+		snapshot === null
+			? ""
+			: [
+					"",
+					"# Repo-native ULW snapshot",
+					"",
+					`- Snapshot path: \`${snapshot.path}\``,
+					`- Next action: ${JSON.stringify(snapshot.nextAction)}`,
+					"",
+				].join(lineBreak);
 	const replacements = {
 		PLAN_NAME: state.planName,
 		PLAN_PATH: state.planPath,
@@ -31,6 +48,7 @@ function renderDirective(state: ContinuationState, sessionId: string): string {
 		WORKTREE_BLOCK: worktreeBlock,
 		LEDGER_PATH: state.ledgerPath,
 		SESSION_ID: sessionId,
+		ULW_SNAPSHOT_BLOCK: snapshotBlock,
 	} as const;
 	let rendered = START_WORK_CONTINUATION_DIRECTIVE;
 	for (const [placeholder, value] of Object.entries(replacements)) {

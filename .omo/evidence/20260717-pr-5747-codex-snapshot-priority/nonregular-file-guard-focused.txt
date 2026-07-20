@@ -1,0 +1,9 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.8 [39m[90mD:/Vibe Project/Contribute/oh-my-openagent/packages/omo-codex/plugin/components/start-work-continuation[39m
+
+ [32m✓[39m test/ulw-snapshot-reader.test.ts [2m([22m[2m45 tests[22m[2m)[22m[32m 248[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m45 passed[39m[22m[90m (45)[39m
+[2m   Start at [22m 23:44:40
+[2m   Duration [22m 501ms[2m (transform 48ms, setup 0ms, import 73ms, tests 248ms, environment 0ms)[22m

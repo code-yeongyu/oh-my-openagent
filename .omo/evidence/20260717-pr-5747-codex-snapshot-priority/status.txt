@@ -1,0 +1,15 @@
+common_self_check=1
+hook_unit_probe=1
+app_server_drive=1
+test_codex=1
+nonregular_file_guard_red=1
+nonregular_file_guard_focused=0
+nonregular_file_guard_component=0
+nonregular_file_guard_typecheck=0
+nonregular_file_guard_lint=0
+nonregular_file_guard_no_excuse=0
+nonregular_file_guard_diff_check=0
+nonregular_file_guard_test_codex=1
+nonregular_file_guard_common_self_check=1
+nonregular_file_guard_hook_unit_probe=1
+nonregular_file_guard_app_server_drive=1

@@ -5,6 +5,7 @@ import { codexGoalMode, compatibleCodexObjectives, expectedCodexObjective, isFin
 import type { UlwLoopScope } from "./paths.js";
 import { seedDefaultSuccessCriteria } from "./plan-crud.js";
 import { appendLedger, readUlwLoopPlan, withUlwLoopMutationLock, writePlan } from "./plan-io.js";
+import { refreshUlwLoopSnapshot } from "./snapshot.js";
 import type { UlwLoopItem, UlwLoopLedgerEntry, UlwLoopPlan } from "./types.js";
 import { iso, UlwLoopError } from "./types.js";
 
@@ -76,6 +77,7 @@ export async function recordFinalReviewBlockers(
 		const ledgerEntries = [blockedEntry, addedEntry, summaryEntry];
 		await writePlan(repoRoot, plan, scope);
 		for (const entry of ledgerEntries) await appendLedger(repoRoot, entry, scope);
+		await refreshUlwLoopSnapshot(repoRoot, plan, `${goal.id} review blocked; work on ${newGoal.id}.`, scope);
 		return { plan, blockedGoal: goal, newGoal, ledgerEntries };
 	});
 }

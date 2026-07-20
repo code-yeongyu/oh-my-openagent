@@ -10,6 +10,8 @@ import {
 	ulwLoopDir,
 	ulwLoopGoalsPath,
 	ulwLoopLedgerPath,
+	ulwLoopSnapshotPath,
+	ulwLoopSnapshotRelativePath,
 } from "../src/paths.ts";
 
 describe("ulwLoopDir(repo)", () => {
@@ -37,6 +39,22 @@ describe("ulw-loop*Path helpers", () => {
 		expect(ulwLoopBriefPath("/r", { sessionId: "session-A" })).toBe(join("/r", ".omo", "ulw-loop", "session-A", "brief.md"));
 		expect(ulwLoopGoalsPath("/r", { sessionId: "session-A" })).toBe(join("/r", ".omo", "ulw-loop", "session-A", "goals.json"));
 		expect(ulwLoopLedgerPath("/r", { sessionId: "session-A" })).toBe(join("/r", ".omo", "ulw-loop", "session-A", "ledger.jsonl"));
+	});
+
+	it("#given no session id #when composing the snapshot path #then returns the default latest snapshot path", () => {
+		// when/then
+		expect(ulwLoopSnapshotRelativePath()).toBe(".omo/ulw-loop/snapshots/latest.md");
+		expect(ulwLoopSnapshotPath("/r")).toBe(join("/r", ".omo", "ulw-loop", "snapshots", "latest.md"));
+	});
+
+	it("#given a session id #when composing the snapshot path #then returns the scoped latest snapshot path", () => {
+		// when/then
+		expect(ulwLoopSnapshotRelativePath({ sessionId: "session-A" })).toBe(
+			".omo/ulw-loop/session-A/snapshots/latest.md",
+		);
+		expect(ulwLoopSnapshotPath("/r", { sessionId: "session-A" })).toBe(
+			join("/r", ".omo", "ulw-loop", "session-A", "snapshots", "latest.md"),
+		);
 	});
 });
 

@@ -1,0 +1,20 @@
+
+> @code-yeongyu/codex-start-work-continuation@4.14.0 test
+> npm run build --silent && vitest --run
+
+Bundled 5 modules in 15ms
+
+  cli.js  18.46 KB  (entry point)
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.8 [39m[90mD:/Vibe Project/Contribute/oh-my-openagent/packages/omo-codex/plugin/components/start-work-continuation[39m
+
+ [32m✓[39m test/boulder-reader.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 49[2mms[22m[39m
+ [32m✓[39m test/codex-hook.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 50[2mms[22m[39m
+ [32m✓[39m test/cli.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 341[2mms[22m[39m
+ [32m✓[39m test/ulw-snapshot-reader.test.ts [2m([22m[2m45 tests[22m[2m)[22m[32m 295[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m      Tests [22m [1m[32m75 passed[39m[22m[90m (75)[39m
+[2m   Start at [22m 23:44:43
+[2m   Duration [22m 601ms[2m (transform 188ms, setup 0ms, import 297ms, tests 735ms, environment 0ms)[22m

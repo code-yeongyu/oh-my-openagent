@@ -1,5 +1,12 @@
 import { isAbsolute, join, relative, sep } from "node:path";
-import { ULW_LOOP_BRIEF, ULW_LOOP_DIR, ULW_LOOP_GOALS, ULW_LOOP_LEDGER } from "./types.js";
+import {
+	ULW_LOOP_BRIEF,
+	ULW_LOOP_DIR,
+	ULW_LOOP_GOALS,
+	ULW_LOOP_LATEST_SNAPSHOT,
+	ULW_LOOP_LEDGER,
+	ULW_LOOP_SNAPSHOTS,
+} from "./types.js";
 
 export interface UlwLoopScope {
 	readonly sessionId?: string | null;
@@ -51,6 +58,10 @@ export function ulwLoopLedgerRelativePath(scope?: UlwLoopScope): string {
 	return `${ulwLoopRelativeDir(scope)}/${ULW_LOOP_LEDGER}`;
 }
 
+export function ulwLoopSnapshotRelativePath(scope?: UlwLoopScope): string {
+	return `${ulwLoopRelativeDir(scope)}/${ULW_LOOP_SNAPSHOTS}/${ULW_LOOP_LATEST_SNAPSHOT}`;
+}
+
 export function ulwLoopBriefPath(repoRoot: string, scope?: UlwLoopScope): string {
 	return join(ulwLoopDir(repoRoot, scope), ULW_LOOP_BRIEF);
 }
@@ -61,6 +72,10 @@ export function ulwLoopGoalsPath(repoRoot: string, scope?: UlwLoopScope): string
 
 export function ulwLoopLedgerPath(repoRoot: string, scope?: UlwLoopScope): string {
 	return join(ulwLoopDir(repoRoot, scope), ULW_LOOP_LEDGER);
+}
+
+export function ulwLoopSnapshotPath(repoRoot: string, scope?: UlwLoopScope): string {
+	return join(repoRoot, ulwLoopSnapshotRelativePath(scope));
 }
 
 export function repoRelative(absolutePath: string, repoRoot: string): string {

@@ -1,0 +1,10 @@
+Command: npm exec vitest -- --run test/ulw-snapshot-reader.test.ts
+Date: 2026-07-18 (before lstat guard)
+
+Observed result: 44 passed, 1 failed.
+Failing test: #given a non-regular scoped snapshot #when reader runs #then contents are not loaded
+Failure: expected readCount 0, received 1.
+
+This proves the previous stat-based implementation called readFileSync for a
+simulated non-regular snapshot object. The subsequent green run is captured in
+nonregular-file-guard-focused.txt.

@@ -1,6 +1,7 @@
 import { essentialCriteriaOf, hasAllCriteriaPass, hasEssentialCriteriaPass } from "./goal-status.js";
 import type { UlwLoopScope } from "./paths.js";
 import { appendLedger, readUlwLoopPlan, withUlwLoopMutationLock, writePlan } from "./plan-io.js";
+import { refreshUlwLoopSnapshot } from "./snapshot.js";
 import type { UlwLoopItem, UlwLoopLedgerEntry, UlwLoopPlan, UlwLoopSuccessCriterion } from "./types.js";
 import { iso, UlwLoopError } from "./types.js";
 
@@ -88,6 +89,7 @@ export async function recordEvidence(
 			after: { goalId: goal.id, criterionId: criterion.id, status: args.status, evidence, capturedAt, prevStatus },
 		};
 		await appendLedger(repoRoot, ledgerEntry, scope);
+		await refreshUlwLoopSnapshot(repoRoot, plan, `Continue criteria for ${goal.id}.`, scope);
 		return { plan, goal, criterion, ledgerEntry };
 	});
 }
@@ -128,6 +130,7 @@ export async function markCriteriaPendingResetForGoal(
 			},
 			scope,
 		);
+		await refreshUlwLoopSnapshot(repoRoot, plan, `Re-run criteria for ${goal.id}.`, scope);
 		return { plan, resetCount: goal.successCriteria.length };
 	});
 }

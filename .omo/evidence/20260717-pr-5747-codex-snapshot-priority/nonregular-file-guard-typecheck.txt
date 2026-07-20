@@ -1,0 +1,3 @@
+
+> @code-yeongyu/codex-start-work-continuation@4.14.0 typecheck
+> tsc --noEmit

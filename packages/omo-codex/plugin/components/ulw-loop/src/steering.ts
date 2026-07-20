@@ -4,6 +4,7 @@ import type { UlwLoopScope } from "./paths.js";
 import { seedDefaultSuccessCriteria } from "./plan-crud.js";
 import { appendLedger, findAcceptedSteeringLedgerEntry, readUlwLoopPlan, withUlwLoopMutationLock, writePlan } from "./plan-io.js";
 import { buildSteeringPlanSnapshot, changedGoalIdsBetween } from "./steering-snapshot.js";
+import { refreshUlwLoopSnapshot } from "./snapshot.js";
 import type {
 	SteerUlwLoopResult,
 	UlwLoopItem,
@@ -262,8 +263,7 @@ export async function steerUlwLoop(repoRoot: string, proposal: UlwLoopSteeringPr
 			finalAudit.before = buildSteeringPlanSnapshot(plan, changed);
 			finalAudit.after = buildSteeringPlanSnapshot(next, changed);
 		}
-		if (accepted) await writePlan(repoRoot, next, scope);
-		await appendLedger(repoRoot, ledgerEntry(proposal, finalAudit, proposal.now?.toISOString() ?? iso()), scope);
+		if (accepted) await writePlan(repoRoot, next, scope); await appendLedger(repoRoot, ledgerEntry(proposal, finalAudit, proposal.now?.toISOString() ?? iso()), scope); if (accepted) await refreshUlwLoopSnapshot(repoRoot, next, `Steering ${proposal.kind} accepted; continue with the updated plan.`, scope);
 		return { plan: next, accepted, audit: finalAudit, rejectedReasons: audit.invariant.rejectedReasons, deduped: false };
 	});
 }

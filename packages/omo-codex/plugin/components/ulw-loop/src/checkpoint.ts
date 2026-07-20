@@ -27,6 +27,7 @@ import {
 	sameBlockerOccurrences,
 	validateQualityGate,
 } from "./quality-gate.js";
+import { refreshUlwLoopSnapshot } from "./snapshot.js";
 import type {
 	UlwLoopAggregateCompletion,
 	UlwLoopItem,
@@ -241,8 +242,17 @@ export async function checkpointUlwLoop(
 		await writePlan(repoRoot, plan, scope);
 		const ledgerEntry = buildLedger(now, args, goal, qualityGate, codexGoal, aggregateCompletion);
 		await appendLedger(repoRoot, ledgerEntry, scope);
+		await refreshUlwLoopSnapshot(repoRoot, plan, checkpointNextAction(goal, aggregateCompletion), scope);
 		return aggregateCompletion === undefined
 			? { plan, goal, ledgerEntry }
 			: { plan, goal, ledgerEntry, aggregateCompletion };
 	});
+}
+
+function checkpointNextAction(goal: UlwLoopItem, aggregateCompletion: UlwLoopAggregateCompletion | undefined): string {
+	if (aggregateCompletion !== undefined) return "Aggregate is complete.";
+	if (goal.status === "complete") return `${goal.id} is complete; run complete-goals for the next story.`;
+	if (goal.status === "blocked" || goal.status === "failed" || goal.status === "needs_user_decision")
+		return `${goal.id} is ${goal.status}; inspect the checkpoint evidence and decide the next action.`;
+	return `${goal.id} checkpoint wrote ${goal.status}.`;
 }

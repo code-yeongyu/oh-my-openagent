@@ -12,6 +12,7 @@ You are mid-flight on a Prometheus work plan; this turn is an automatic continua
 {{WORKTREE_BLOCK}}
 - Ledger: `{{LEDGER_PATH}}`
 - Your session id in boulder.json: `codex:{{SESSION_ID}}`
+{{ULW_SNAPSHOT_BLOCK}}
 
 # What to do this turn
 

@@ -14,6 +14,7 @@ import {
 } from "./paths.js";
 import { appendGoalToPlan, deriveGoalCandidates, makeGoal } from "./plan-goal-factory.js";
 import { appendLedger, readUlwLoopPlan, withUlwLoopMutationLock, writePlan } from "./plan-io.js";
+import { refreshUlwLoopSnapshot } from "./snapshot.js";
 import type { UlwLoopCodexGoalMode, UlwLoopItem, UlwLoopPlan, UlwLoopSuccessCriterion } from "./types.js";
 import { iso, UlwLoopError } from "./types.js";
 
@@ -98,6 +99,12 @@ export async function createUlwLoopPlan(
 			{ at: now, kind: "plan_created", message: `${goals.length} goal(s) created` },
 			scope,
 		);
+		await refreshUlwLoopSnapshot(
+			repoRoot,
+			plan,
+			"Start the next goal with `omo ulw-loop complete-goals --json`.",
+			scope,
+		);
 		return plan;
 	});
 }
@@ -128,6 +135,7 @@ export async function addUlwLoopGoal(
 			{ at: now, kind: "goal_added", goalId: goal.id, status: goal.status, message: goal.title },
 			scope,
 		);
+		await refreshUlwLoopSnapshot(repoRoot, plan, `Review and schedule ${goal.id}: ${goal.title}.`, scope);
 		return { plan, goal };
 	});
 }
@@ -173,6 +181,7 @@ export async function startNextUlwLoop(
 			{ at: now, kind: "goal_started", goalId: next.id, status: next.status, message: `Attempt ${next.attempt}` },
 			scope,
 		);
+		await refreshUlwLoopSnapshot(repoRoot, plan, `Work on ${next.id}: ${next.title}.`, scope);
 		return { plan, goal: next, resumed: false };
 	});
 }
