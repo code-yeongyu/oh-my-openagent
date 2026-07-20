@@ -76,11 +76,6 @@ const NOOP_DESTRUCTION: DestructionPort = { destroyResidentTask: () => Promise.r
 const GENERIC_START_FAILURE_MESSAGE = "Task runner failed to start."
 const RESPAWN_CLEANUP_FAILURE_REASON = "rpc respawn cleanup failed"
 
-function normalizeSpecName(value: string | undefined): string | undefined {
-  const trimmed = value?.trim()
-  return trimmed === undefined || trimmed.length === 0 ? undefined : trimmed
-}
-
 function publicStartFailureMessage(error: unknown): string {
   try {
     if (!RunnerError.is(error)) return GENERIC_START_FAILURE_MESSAGE
@@ -161,6 +156,11 @@ class TaskManagerImpl implements TaskManager {
   }
 
   async start(spec: ManagerStartSpec): Promise<StartResult> {
+    const normalizeSpecName = (value: string | undefined): string | undefined => {
+      const trimmed = value?.trim()
+      return trimmed === undefined || trimmed.length === 0 ? undefined : trimmed
+    }
+
     const resolution = this.#options.planner(spec)
     if (resolution.kind === "error") return { kind: "plan_unresolved", error: resolution.error }
     const plan = resolution.plan
