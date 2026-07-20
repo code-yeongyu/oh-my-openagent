@@ -6,6 +6,15 @@ import { NATIVE_LOOP_TRIGGERED_FLAG } from "../command-execute-before"
 import { extractPromptText } from "./prompt-text"
 import type { ChatMessageHooks, ChatMessageHandlerOutput, ChatMessageInput } from "./types"
 
+function parseRawGoalSlashCommand(promptText: string): string | null {
+  const trimmed = promptText.trim()
+  const match = trimmed.match(/^\/goal(?:\s+([\s\S]*))?$/i)
+  if (!match) {
+    return null
+  }
+  return match[1]?.trim() ?? ""
+}
+
 export function handleGoalMessage(args: {
   readonly hooks: ChatMessageHooks
   readonly input: ChatMessageInput
@@ -19,38 +28,38 @@ export function handleGoalMessage(args: {
   }
 
   const promptText = extractPromptText(output.parts)
-  const parsed = parseGoalCommand(promptText)
+  const goalArgs = parseRawGoalSlashCommand(promptText)
 
-  switch (parsed.kind) {
-    case "setObjective":
-      hooks.goal.setGoal(input.sessionID, parsed.objective)
-      log("[chat-message] Goal set", { sessionID: input.sessionID, objective: parsed.objective })
-      break
-    case "setStatus":
-      if (parsed.status === "paused") {
-        hooks.goal.pauseGoal(input.sessionID)
-        log("[chat-message] Goal paused", { sessionID: input.sessionID })
-      } else {
-        hooks.goal.resumeGoal(input.sessionID)
-        log("[chat-message] Goal resumed", { sessionID: input.sessionID })
-      }
-      break
-    case "clear":
-      hooks.goal.clearGoal(input.sessionID)
-      log("[chat-message] Goal cleared", { sessionID: input.sessionID })
-      break
-    case "show":
-      // No side effect; the goal is surfaced by TUI mirror and tools.
-      break
-    default:
-      break
+  if (goalArgs !== null) {
+    const parsed = parseGoalCommand(goalArgs)
+
+    switch (parsed.kind) {
+      case "setObjective":
+        hooks.goal.setGoal(input.sessionID, parsed.objective)
+        log("[chat-message] Goal set", { sessionID: input.sessionID, objective: parsed.objective })
+        break
+      case "setStatus":
+        if (parsed.status === "paused") {
+          hooks.goal.pauseGoal(input.sessionID)
+          log("[chat-message] Goal paused", { sessionID: input.sessionID })
+        } else {
+          hooks.goal.resumeGoal(input.sessionID)
+          log("[chat-message] Goal resumed", { sessionID: input.sessionID })
+        }
+        break
+      case "clear":
+        hooks.goal.clearGoal(input.sessionID)
+        log("[chat-message] Goal cleared", { sessionID: input.sessionID })
+        break
+      case "show":
+        break
+      default:
+        break
+    }
+    return
   }
 
-  if (
-    parsed.kind === "show"
-    && isFirstMessage
-    && pluginConfig.default_mode?.goal
-  ) {
+  if (isFirstMessage && pluginConfig.default_mode?.goal) {
     const objective = promptText.trim()
     if (objective.length > 0) {
       hooks.goal.setGoal(input.sessionID, objective)
