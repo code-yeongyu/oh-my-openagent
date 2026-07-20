@@ -263,9 +263,7 @@ export async function steerUlwLoop(repoRoot: string, proposal: UlwLoopSteeringPr
 			finalAudit.before = buildSteeringPlanSnapshot(plan, changed);
 			finalAudit.after = buildSteeringPlanSnapshot(next, changed);
 		}
-		if (accepted) await writePlan(repoRoot, next, scope);
-		await appendLedger(repoRoot, ledgerEntry(proposal, finalAudit, proposal.now?.toISOString() ?? iso()), scope);
-		if (accepted) await refreshUlwLoopSnapshot(repoRoot, next, `Steering ${proposal.kind} accepted; continue with the updated plan.`, scope);
+		if (accepted) await writePlan(repoRoot, next, scope); await appendLedger(repoRoot, ledgerEntry(proposal, finalAudit, proposal.now?.toISOString() ?? iso()), scope); if (accepted) await refreshUlwLoopSnapshot(repoRoot, next, `Steering ${proposal.kind} accepted; continue with the updated plan.`, scope);
 		return { plan: next, accepted, audit: finalAudit, rejectedReasons: audit.invariant.rejectedReasons, deduped: false };
 	});
 }
