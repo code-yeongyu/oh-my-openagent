@@ -7,10 +7,23 @@ import { releaseAllPromptAsyncReservationsForTesting } from "../shared/prompt-as
 import { createTodoContinuationEnforcer } from "."
 import {
   CONTINUATION_COOLDOWN_MS,
+  CONTINUATION_PROMPT,
   FAILURE_RESET_WINDOW_MS,
   MAX_CONSECUTIVE_FAILURES,
   MAX_STAGNATION_COUNT,
 } from "./constants"
+
+describe("CONTINUATION_PROMPT", () => {
+  test("checks approval gates before telling the agent to continue", () => {
+    const stopIndex = CONTINUATION_PROMPT.indexOf("waiting for user input")
+    const proceedIndex = CONTINUATION_PROMPT.indexOf("Otherwise, proceed")
+
+    expect(stopIndex).toBeGreaterThanOrEqual(0)
+    expect(CONTINUATION_PROMPT).toContain("Do not proceed past approval gates")
+    expect(proceedIndex).toBeGreaterThan(stopIndex)
+    expect(CONTINUATION_PROMPT).not.toContain("Do not stop until all tasks are done")
+  })
+})
 
 type TimerCallback = (...args: unknown[]) => void
 type FakeTimerID = number & ReturnType<typeof setTimeout> & ReturnType<typeof setInterval>

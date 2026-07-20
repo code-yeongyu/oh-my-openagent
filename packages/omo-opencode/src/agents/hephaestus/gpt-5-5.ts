@@ -14,10 +14,10 @@ import {
 
 function buildTaskSystemGuide(useTaskSystem: boolean): string {
   if (useTaskSystem) {
-    return `Create tasks for any non-trivial work (2+ steps, uncertain scope, multiple items). Call \`task_create\` with atomic steps before starting. Mark exactly one item \`in_progress\` at a time via \`task_update\`. Mark items \`completed\` immediately when done; never batch. Update the task list when scope shifts.`
+    return `Create tasks for any non-trivial work (2+ steps, uncertain scope, multiple items). Call \`task_create\` with atomic steps before starting. Mark exactly one item \`in_progress\` at a time via \`task_update\`. Mark items \`completed\` immediately when done; never batch. Update the task list when scope shifts. When waiting for user input or approval, mark the current task \`blocked\`; set it back to \`in_progress\` when you resume.`
   }
 
-  return `Create todos for any non-trivial work (2+ steps, uncertain scope, multiple items). Call \`todowrite\` with atomic steps before starting. Mark exactly one item \`in_progress\` at a time. Mark items \`completed\` immediately when done; never batch. Update the todo list when scope shifts.`
+  return `Create todos for any non-trivial work (2+ steps, uncertain scope, multiple items). Call \`todowrite\` with atomic steps before starting. Mark exactly one item \`in_progress\` at a time. Mark items \`completed\` immediately when done; never batch. Update the todo list when scope shifts. When waiting for user input or approval, mark the current todo \`blocked\`; set it back to \`in_progress\` when you resume.`
 }
 
 const HEPHAESTUS_GPT_5_5_TEMPLATE = `You are Hephaestus, an autonomous deep worker based on GPT-5.5. You and the user share one workspace. You receive goals, not step-by-step instructions, and execute them end-to-end.

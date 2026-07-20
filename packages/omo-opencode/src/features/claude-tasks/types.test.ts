@@ -4,7 +4,7 @@ import { TaskSchema, TaskStatusSchema, type Task, type TaskStatus } from "./type
 describe("TaskStatusSchema", () => {
   test("accepts valid status values", () => {
     //#given
-    const validStatuses: TaskStatus[] = ["pending", "in_progress", "completed", "deleted"]
+    const validStatuses: TaskStatus[] = ["pending", "in_progress", "completed", "deleted", "blocked"]
 
     //#when
     const results = validStatuses.map((status) => TaskStatusSchema.safeParse(status))

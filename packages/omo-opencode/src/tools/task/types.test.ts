@@ -12,7 +12,7 @@ import {
 describe("TaskStatusSchema", () => {
   test("accepts valid status values", () => {
     //#given
-    const validStatuses = ["pending", "in_progress", "completed", "deleted"]
+    const validStatuses = ["pending", "in_progress", "completed", "deleted", "blocked"]
 
     //#when
     const results = validStatuses.map((status) => TaskStatusSchema.safeParse(status))

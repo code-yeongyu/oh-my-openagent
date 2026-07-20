@@ -5,7 +5,7 @@ export const TODOWRITE_DESCRIPTION = `Use this tool to create and manage a struc
 The upstream OpenCode \`todowrite\` schema expects each todo item to include:
 
 - \`content\`: string
-- \`status\`: string, one of \`pending\`, \`in_progress\`, \`completed\`, \`cancelled\`
+- \`status\`: string, one of \`pending\`, \`in_progress\`, \`completed\`, \`cancelled\`, \`blocked\`
 - \`priority\`: string, one of \`high\`, \`medium\`, \`low\`
 
 \`priority\` is a string field. Never send numeric priorities such as \`0\`, \`1\`, \`2\`, or labels such as \`P0\`, \`P1\`, \`P2\`.
@@ -34,5 +34,6 @@ Each todo MUST be a single atomic action completable in 1-3 tool calls. If it ne
 
 ## Task Management
 - One in_progress at a time. Complete it before starting the next.
+- When waiting for user input, approval, or a human decision, mark the current todo \`blocked\`; set it back to \`in_progress\` when you resume.
 - Mark completed immediately after finishing each item.
 - Skip this tool for single trivial tasks (one-step, obvious action).`

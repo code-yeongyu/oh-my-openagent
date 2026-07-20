@@ -5,7 +5,7 @@ import type { Task } from "../../features/claude-tasks/types.ts";
 export interface TodoInfo {
   id?: string;
   content: string;
-  status: "pending" | "in_progress" | "completed" | "cancelled";
+  status: "pending" | "in_progress" | "completed" | "cancelled" | "blocked";
   priority?: "low" | "medium" | "high";
 }
 
@@ -24,6 +24,8 @@ function mapTaskStatusToTodoStatus(
       return "in_progress";
     case "completed":
       return "completed";
+    case "blocked":
+      return "blocked";
     case "deleted":
       return null;
     default:

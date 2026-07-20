@@ -38,7 +38,7 @@ Properly managed dependencies enable maximum parallel execution.`,
       subject: tool.schema.string().optional().describe("Task subject"),
       description: tool.schema.string().optional().describe("Task description"),
       status: tool.schema
-        .enum(["pending", "in_progress", "completed", "deleted"])
+        .enum(["pending", "in_progress", "completed", "deleted", "blocked"])
         .optional()
         .describe("Task status"),
       activeForm: tool.schema

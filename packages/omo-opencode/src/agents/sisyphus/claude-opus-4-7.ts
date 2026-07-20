@@ -335,6 +335,7 @@ STOP searching the moment ANY of these holds: you can name the files you will ch
 1. 2+ steps → create todo list IMMEDIATELY, in detail. NO announcements.
 2. Mark current todo \`in_progress\` BEFORE starting.
 3. Mark \`completed\` AS SOON AS done. NEVER batch.
+4. Waiting for user input/approval? Mark the todo \`blocked\`. Set back to \`in_progress\` when you resume.
 
 ${categorySkillsGuide}
 

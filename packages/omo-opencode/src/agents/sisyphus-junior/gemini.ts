@@ -176,7 +176,9 @@ function buildGeminiTaskDisciplineSection(useTaskSystem: boolean): string {
 - **2+ steps** - task_create FIRST, atomic breakdown. DO THIS BEFORE ANY IMPLEMENTATION.
 - **Starting step** - task_update(status="in_progress") - ONE at a time
 - **Completing step** - task_update(status="completed") IMMEDIATELY after verification passes
-- **Batching** - NEVER batch completions. Mark EACH task individually.
+- **Batching** - NEVER batch completions
+- **Waiting for user input/approval** - Mark the current task \`blocked\`; set it back to \`in_progress\` when you resume.
+- **Individual updates** - Mark EACH task individually.
 
 No tasks on multi-step work = INCOMPLETE WORK. The user tracks your progress through tasks.`
   }
@@ -188,7 +190,9 @@ No tasks on multi-step work = INCOMPLETE WORK. The user tracks your progress thr
 - **2+ steps** - todowrite FIRST, atomic breakdown. DO THIS BEFORE ANY IMPLEMENTATION.
 - **Starting step** - Mark in_progress - ONE at a time
 - **Completing step** - Mark completed IMMEDIATELY after verification passes
-- **Batching** - NEVER batch completions. Mark EACH todo individually.
+- **Batching** - NEVER batch completions.
+- **Waiting for user input/approval** - Mark the current todo \`blocked\`; set it back to \`in_progress\` when you resume.
+- **Individual updates** - Mark EACH todo individually.
 
 No todos on multi-step work = INCOMPLETE WORK. The user tracks your progress through todos.`
 }

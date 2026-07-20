@@ -118,6 +118,33 @@ describe("task_update tool", () => {
       expect(result.task.status).toBe("in_progress")
     })
 
+    test("updates task status to blocked when waiting for user input", async () => {
+      //#given
+      const taskId = "T-test-blocked"
+      const taskPath = join(TEST_DIR, `${taskId}.json`)
+      const initialTask: TaskObject = {
+        id: taskId,
+        subject: "Await user approval",
+        description: "Waiting for review gate",
+        status: "in_progress",
+        blocks: [],
+        blockedBy: [],
+        threadID: TEST_SESSION_ID,
+      }
+      await Bun.write(taskPath, JSON.stringify(initialTask))
+
+      //#when
+      const args = {
+        id: taskId,
+        status: "blocked" as const,
+      }
+      const resultStr = await tool.execute(args, TEST_CONTEXT)
+      const result = JSON.parse(resultStr)
+
+      //#then
+      expect(result.task.status).toBe("blocked")
+    })
+
     test("additively appends to blocks array without replacing", async () => {
       //#given
       const taskId = "T-test-126"
