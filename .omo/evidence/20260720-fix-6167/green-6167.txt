@@ -1,0 +1,16 @@
+﻿# GREEN — after fix (issue #6167) — 2026-07-20T10:47:24.0050159+09:00
+
+bun test v1.3.14 (0d9b296a)
+bun : 
+At line:2 char:8
++ $out = bun test packages/lsp-core/src/lsp/workspace-document-state.te ...
++        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ 3 pass
+ 0 fail
+ 11 expect() calls
+Ran 3 tests across 1 file. [292.00ms]
+
+EXIT=0
