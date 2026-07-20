@@ -1,7 +1,7 @@
 import { createTaskId } from "./id"
 import type { TaskRecord, TaskRecordInput } from "./types"
 
-export function createTaskRecord(input: TaskRecordInput): TaskRecord {
+export function createTaskRecord(input: TaskRecordInput, nowMs?: number): TaskRecord {
   const timestamp = new Date().toISOString()
   const {
     agent_type,
@@ -17,7 +17,7 @@ export function createTaskRecord(input: TaskRecordInput): TaskRecord {
     tool_deny,
   } = input
   return {
-    task_id: createTaskId(),
+    task_id: nowMs === undefined ? createTaskId() : createTaskId(nowMs),
     status: "pending",
     residency_state: "resident",
     parent_session_id,

@@ -75,6 +75,25 @@ describe("cleanupExpiredRecords (TTL)", () => {
     expect(result.retained).toContain("st_00000003")
   })
 
+  test("#given a freshly claimed pending record #when the cutoff is far in the future #then it is retained", () => {
+    // given
+    const store = tempStore()
+    seedRecord(store, { task_id: "st_00000007", status: "pending", updated_at: iso(0) })
+    const lifecycle = createTaskLifecycle({
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ ttl_ms: TTL }),
+      now: () => now() + TTL * 100,
+    })
+
+    // when
+    const result = lifecycle.cleanupExpiredRecords()
+
+    // then
+    expect(result.retained).toContain("st_00000007")
+    expect(existsSync(recordPath(store, "st_00000007"))).toBe(true)
+  })
+
   test("#given an old lost RPC record with a LIVE pid #when cleaning #then it is retained (no pid-dead proof)", () => {
     // given
     const store = tempStore()
