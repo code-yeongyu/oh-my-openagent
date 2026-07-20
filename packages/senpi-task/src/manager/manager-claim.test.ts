@@ -7,27 +7,9 @@ import { bumpTaskId } from "../state"
 import type { TaskRecord, TaskTransition, TaskTransitionResult } from "../state"
 import { TaskRecordCollisionError, createTaskRecordStore } from "../store"
 import type { PersistedTaskEvent, TaskRecordStore } from "../store"
+import { collisionStore } from "./__fixtures__/collision-store"
 import { FakeRunner, baseSpec, categoryPlanner, cleanupProjects, flush, makeManager, settings, tempProject } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
-
-function collisionStore(inner: TaskRecordStore): { readonly store: TaskRecordStore; readonly firstCandidate: () => string | undefined } {
-  let firstSave = true
-  let firstCandidate: string | undefined
-  return {
-    store: {
-      ...inner,
-      save(record) {
-        if (firstSave) {
-          firstSave = false
-          firstCandidate = record.task_id
-          inner.save({ ...record, name: "foreign-winner" })
-        }
-        inner.save(record)
-      },
-    },
-    firstCandidate: () => firstCandidate,
-  }
-}
 
 function firstAllocationFailsStore(inner: TaskRecordStore): TaskRecordStore {
   let armed = true
