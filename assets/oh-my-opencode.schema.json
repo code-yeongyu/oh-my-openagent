@@ -6683,6 +6683,36 @@
       ],
       "additionalProperties": false
     },
+    "security_mission": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "max_findings": {
+          "default": 500,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "persistence_dir": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "enabled",
+        "max_findings"
+      ],
+      "additionalProperties": false
+    },
     "keyword_detector": {
       "type": "object",
       "properties": {

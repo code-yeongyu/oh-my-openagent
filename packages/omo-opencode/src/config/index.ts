@@ -13,6 +13,7 @@ export type {
   BuiltinCommandName,
   CodegraphConfig,
   SisyphusAgentConfig,
+  SecurityMissionConfig,
   ExperimentalConfig,
   DynamicContextPruningConfig,
   DefaultModeConfig,

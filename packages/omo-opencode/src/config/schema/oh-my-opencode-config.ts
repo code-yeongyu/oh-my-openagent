@@ -23,6 +23,7 @@ import { MonitorConfigSchema } from "./monitor"
 import { RuntimeFallbackConfigSchema } from "./runtime-fallback"
 import { TeamModeConfigSchema } from "./team-mode"
 import { SkillsConfigSchema } from "./skills"
+import { SecurityMissionConfigSchema } from "./security-mission"
 import { SisyphusConfigSchema } from "./sisyphus"
 import { SisyphusAgentConfigSchema } from "./sisyphus-agent"
 import { TmuxConfigSchema } from "./tmux"
@@ -88,6 +89,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   monitor: MonitorConfigSchema.optional(),
   codegraph: CodegraphConfigSchema.optional(),
   team_mode: TeamModeConfigSchema.optional(),
+  security_mission: SecurityMissionConfigSchema.optional(),
   keyword_detector: KeywordDetectorConfigSchema.optional(),
   babysitting: BabysittingConfigSchema.optional(),
   git_master: GitMasterConfigSchema.default({
