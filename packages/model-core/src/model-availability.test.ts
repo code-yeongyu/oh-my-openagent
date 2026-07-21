@@ -20,4 +20,10 @@ describe("fuzzyMatchModel", () => {
 		const result = fuzzyMatchModel("gpt-5.4", available, ["openai"])
 		expect(result).toBe("openai/gpt-5-4")
 	})
+
+	test("#given a stable model and only a preview candidate #when matching #then rejects the preview alias", () => {
+		const available = new Set(["google/gemini-3.6-flash-preview"])
+		const result = fuzzyMatchModel("google/gemini-3.6-flash", available, ["google"])
+		expect(result).toBeNull()
+	})
 })

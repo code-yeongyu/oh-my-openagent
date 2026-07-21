@@ -148,6 +148,25 @@ describe("resolveModelForDelegateTask", () => {
     })
   })
 
+  test("#given a provider-strict fallback exists only through an unlisted provider #when fallback resolves #then it falls through", () => {
+    // given
+    const fallbackEntry: DelegateFallbackEntry = {
+      providers: ["google", "opencode", "vercel"],
+      model: "gemini-3.6-flash",
+      requireListedProvider: true,
+    }
+
+    // when
+    const result = resolveModelForDelegateTask({
+      availableModels: new Set(["github-copilot/gemini-3.6-flash"]),
+      fallbackChain: [fallbackEntry],
+      systemDefaultModel: "opencode/glm-5.2",
+    }, noCacheDeps)
+
+    // then
+    expect(result).toEqual({ model: "opencode/glm-5.2" })
+  })
+
   test("#given custom and later-rung providers expose the same model #when fallback resolves #then the custom provider keeps the earlier variant", () => {
     const result = resolveModelForDelegateTask({
       availableModels: new Set([

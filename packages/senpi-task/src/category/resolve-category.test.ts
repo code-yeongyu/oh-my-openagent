@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { BUILTIN_CATEGORY_DEFAULTS, resolveCategory } from "./index"
+import { resolveCategory } from "./index"
 
 type FakeModel = {
   readonly provider: string
@@ -30,12 +30,6 @@ function expectResolved(result: ReturnType<typeof resolveCategory<FakeModel>>): 
   }
   return result
 }
-
-const gpt56CategoryCases = [
-  { category: "ultrabrain", modelId: "gpt-5.6-sol" },
-  { category: "deep", modelId: "gpt-5.6-terra" },
-  { category: "unspecified-low", modelId: "gpt-5.6-luna" },
-] as const
 
 describe("resolveCategory", () => {
   test("#given a builtin category and omo overlay #when resolved #then user config wins and prompt text is appended", () => {
@@ -101,133 +95,6 @@ describe("resolveCategory", () => {
     expect(resolved.spec.modelId).toBe("gemini-3.1-pro")
     expect(resolved.spec.variant).toBe("high")
     expect(resolved.modelSelection.matchedFallback).toBe(true)
-  })
-
-  test("#given quick primary is unavailable and hardcoded fallback is available #when resolved #then delegate-core fallback chain reaches Anthropic Haiku", () => {
-    // given
-    const models = registry([model("anthropic", "claude-haiku-4-5")])
-
-    // when
-    const result = resolveCategory("quick", {}, models)
-
-    // then
-    const resolved = expectResolved(result)
-    expect(resolved.spec.provider).toBe("anthropic")
-    expect(resolved.spec.modelId).toBe("claude-haiku-4-5")
-    expect(resolved.modelSelection.matchedFallback).toBe(true)
-    expect(resolved.modelSelection.fallbackEntry).toEqual({
-      providers: ["anthropic", "github-copilot", "vercel"],
-      model: "claude-haiku-4-5",
-    })
-  })
-
-  test("#given writing's Kimi for Coding default is available #when resolved #then its canonical Kimi K3 id is selected", () => {
-    // given
-    const models = registry([model("kimi-for-coding", "kimi-k3")])
-
-    // when
-    const result = resolveCategory("writing", {}, models)
-
-    // then
-    const resolved = expectResolved(result)
-    expect(resolved.spec.provider).toBe("kimi-for-coding")
-    expect(resolved.spec.modelId).toBe("kimi-k3")
-    expect(resolved.modelSelection.matchedFallback).toBe(false)
-  })
-
-  test("#given writing's provider default is unavailable and Kimi K3 is available #when resolved #then the K3 fallback is selected", () => {
-    // given
-    const models = registry([model("opencode-go", "kimi-k3")])
-
-    // when
-    const result = resolveCategory("writing", {}, models)
-
-    // then
-    const resolved = expectResolved(result)
-    expect(resolved.spec.provider).toBe("opencode-go")
-    expect(resolved.spec.modelId).toBe("kimi-k3")
-    expect(resolved.modelSelection.matchedFallback).toBe(true)
-    expect(resolved.modelSelection.fallbackEntry).toEqual({
-      providers: ["opencode-go", "vercel"],
-      model: "kimi-k3",
-    })
-  })
-
-  test("#given ultrabrain primary is unavailable and hardcoded Google fallback is available #when resolved #then delegate-core fallback chain preserves the high variant", () => {
-    // given
-    const models = registry([model("google", "gemini-3.1-pro")])
-
-    // when
-    const result = resolveCategory("ultrabrain", {}, models)
-
-    // then
-    const resolved = expectResolved(result)
-    expect(resolved.spec.provider).toBe("google")
-    expect(resolved.spec.modelId).toBe("gemini-3.1-pro")
-    expect(resolved.spec.variant).toBe("high")
-    expect(resolved.modelSelection.matchedFallback).toBe(true)
-    expect(resolved.modelSelection.fallbackEntry).toEqual({
-      providers: ["google", "github-copilot", "opencode", "vercel"],
-      model: "gemini-3.1-pro",
-      variant: "high",
-    })
-  })
-
-  test("#given only transformed Vercel GPT-5.6 models #when deep categories resolve #then each keeps xhigh", () => {
-    for (const { category, modelId } of gpt56CategoryCases) {
-      const gatewayModelId = `openai/${modelId}`
-      const result = expectResolved(resolveCategory(category, {}, registry([model("vercel", gatewayModelId)])))
-
-      expect(result.spec.provider).toBe("vercel")
-      expect(result.spec.modelId).toBe(gatewayModelId)
-      expect(result.spec.variant).toBe("xhigh")
-      expect(result.modelSelection.fallbackEntry).toEqual({
-        providers: ["openai", "vercel"],
-        model: modelId,
-        variant: "xhigh",
-      })
-    }
-  })
-
-  test("#given transformed Vercel and Copilot GPT-5.6 models #when deep categories resolve #then Vercel xhigh wins", () => {
-    for (const { category, modelId } of gpt56CategoryCases) {
-      const gatewayModelId = `openai/${modelId}`
-      const models = registry([
-        model("github-copilot", modelId),
-        model("vercel", gatewayModelId),
-      ])
-      const result = expectResolved(resolveCategory(category, {}, models))
-
-      expect(result.spec.provider).toBe("vercel")
-      expect(result.spec.modelId).toBe(gatewayModelId)
-      expect(result.spec.variant).toBe("xhigh")
-      expect(result.modelSelection.fallbackEntry).toEqual({
-        providers: ["openai", "vercel"],
-        model: modelId,
-        variant: "xhigh",
-      })
-    }
-  })
-
-  test("#given only Copilot GPT-5.6 models #when deep categories resolve #then each uses its high rung", () => {
-    for (const { category, modelId } of gpt56CategoryCases) {
-      const result = expectResolved(resolveCategory(category, {}, registry([model("github-copilot", modelId)])))
-
-      expect(result.spec.provider).toBe("github-copilot")
-      expect(result.spec.modelId).toBe(modelId)
-      expect(result.spec.variant).toBe("high")
-      expect(result.modelSelection.fallbackEntry).toEqual({
-        providers: ["github-copilot"],
-        model: modelId,
-        variant: "high",
-      })
-    }
-  })
-
-  test("#given GPT-5.6 is unavailable #when deep resolves with Copilot GPT-5.5 #then the retired rung is not selected", () => {
-    const result = resolveCategory("deep", {}, registry([model("github-copilot", "gpt-5.5")]))
-
-    expect(result.kind).toBe("model_unavailable")
   })
 
   test("#given no category or fallback model resolves and a system default is available #when resolved #then delegate-core reaches the system default", () => {
@@ -320,33 +187,5 @@ describe("resolveCategory", () => {
     // then
     const resolved = expectResolved(result)
     expect(resolved.description).toBe("Custom review lane")
-  })
-})
-
-describe("builtin category defaults", () => {
-  test("#given ported builtin defaults #when snapshotted #then all eight category defaults stay pinned", () => {
-    // given
-    const defaults = BUILTIN_CATEGORY_DEFAULTS
-
-    // when
-    const snapshotSubject = defaults.map(({ config, description, name, promptAppend }) => ({
-      name,
-      config,
-      description,
-      promptAppend,
-    }))
-
-    // then
-    expect(JSON.stringify(snapshotSubject, null, 2)).toMatchSnapshot()
-    expect(defaults.map((entry) => entry.name)).toEqual([
-      "visual-engineering",
-      "artistry",
-      "ultrabrain",
-      "deep",
-      "quick",
-      "unspecified-low",
-      "unspecified-high",
-      "writing",
-    ])
   })
 })

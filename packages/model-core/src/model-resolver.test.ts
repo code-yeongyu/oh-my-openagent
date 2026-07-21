@@ -784,11 +784,11 @@ describe("resolveModelWithFallback", () => {
       cacheSpy.mockRestore()
     })
 
-    test("transforms gemini-3-flash in categoryDefaultModel for google connected provider", () => {
-      // given - google connected, category default uses gemini-3-flash
+    test("preserves stable gemini-3.6-flash in categoryDefaultModel for google connected provider", () => {
+      // given - google connected, category default uses gemini-3.6-flash
       const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["google"])
       const input: ExtendedModelResolutionInput = {
-        categoryDefaultModel: "google/gemini-3-flash",
+        categoryDefaultModel: "google/gemini-3.6-flash",
         availableModels: new Set(),
         systemDefaultModel: "anthropic/claude-sonnet-4-5",
       }
@@ -797,9 +797,49 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
       const resolved = expectResolved(result)
 
-      // then - gemini-3-flash should be transformed to gemini-3-flash-preview
-      expect(resolved.model).toBe("google/gemini-3-flash-preview")
+      // then - Gemini 3.6 Flash is a stable Google model ID, not a preview alias
+      expect(resolved.model).toBe("google/gemini-3.6-flash")
       expect(resolved.source).toBe("category-default")
+      cacheSpy.mockRestore()
+    })
+
+    test("does not resolve stable gemini-3.6-flash through a preview-only availability entry", () => {
+      // given
+      const input: ExtendedModelResolutionInput = {
+        fallbackChain: [
+          { providers: ["google"], model: "gemini-3.6-flash" },
+        ],
+        availableModels: new Set(["google/gemini-3.6-flash-preview"]),
+        systemDefaultModel: "system/default",
+      }
+
+      // when
+      const result = resolveModelWithFallback(input)
+      const resolved = expectResolved(result)
+
+      // then
+      expect(resolved.model).toBe("system/default")
+      expect(resolved.source).toBe("system-default")
+    })
+
+    test("does not select Gemini 3.6 Flash for Copilot-only empty availability", () => {
+      // given
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["github-copilot"])
+      const input: ExtendedModelResolutionInput = {
+        fallbackChain: [
+          { providers: ["google", "opencode", "vercel"], model: "gemini-3.6-flash" },
+        ],
+        availableModels: new Set(),
+        systemDefaultModel: "system/default",
+      }
+
+      // when
+      const result = resolveModelWithFallback(input)
+      const resolved = expectResolved(result)
+
+      // then
+      expect(resolved.model).toBe("system/default")
+      expect(resolved.source).toBe("system-default")
       cacheSpy.mockRestore()
     })
 

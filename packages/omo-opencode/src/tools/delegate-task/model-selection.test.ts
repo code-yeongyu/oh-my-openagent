@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { resolveModelForDelegateTask } from "./model-selection"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
+import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 
 describe("resolveModelForDelegateTask", () => {
 	let hasConnectedProvidersSpy: ReturnType<typeof spyOn> | undefined
@@ -442,5 +443,17 @@ describe("resolveModelForDelegateTask", () => {
 				readConnectedProvidersSpy.mockRestore()
 			})
 		})
+	})
+
+	test("#given Gemini 3.6 category fallbacks are only exposed by an unlisted provider #then they fall through", () => {
+		for (const category of ["quick", "unspecified-low", "writing"] as const) {
+			const result = resolveModelForDelegateTask({
+				availableModels: new Set(["github-copilot/gemini-3.6-flash"]),
+				fallbackChain: CATEGORY_MODEL_REQUIREMENTS[category].fallbackChain,
+				systemDefaultModel: "opencode/glm-5.2",
+			})
+
+			expect(result).toEqual({ model: "opencode/glm-5.2" })
+		}
 	})
 })

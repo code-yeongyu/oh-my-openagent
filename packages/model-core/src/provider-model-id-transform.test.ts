@@ -56,6 +56,19 @@ describe("provider model ID transforms", () => {
 		}
 	})
 
+	test("preserves the stable Gemini 3.6 Flash ID", () => {
+		// #given providers with Gemini 3.6 Flash as a stable model ID
+		const providers = ["google", "github-copilot"] as const
+
+		for (const provider of providers) {
+			// #when the model ID is transformed for the provider
+			const result = transformModelForProvider(provider, "gemini-3.6-flash")
+
+			// #then no unavailable preview suffix is introduced
+			expect(result).toBe("gemini-3.6-flash")
+		}
+	})
+
 	test("produces identical results for non-Anthropic providers", () => {
 		// #given non-Anthropic provider/model pairs
 		const scenarios = [

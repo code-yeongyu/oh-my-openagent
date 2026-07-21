@@ -6,6 +6,12 @@ function normalizeModelName(name: string): string {
 		.replace(/\b(glm|gpt)-(\d+)[.-](\d+)/g, "$1-$2.$3")
 }
 
+function isGemini36FlashPreviewMismatch(target: string, candidate: string): boolean {
+	const targetModelID = target.split("/").at(-1) ?? target
+	const candidateModelID = candidate.split("/").at(-1) ?? candidate
+	return targetModelID === "gemini-3.6-flash" && candidateModelID === "gemini-3.6-flash-preview"
+}
+
 export function fuzzyMatchModel(
 	target: string,
 	available: Set<string>,
@@ -30,9 +36,13 @@ export function fuzzyMatchModel(
 		return null
 	}
 
-	const matches = candidates.filter((model) =>
-		normalizeModelName(model).includes(targetNormalized),
-	)
+	const matches = candidates.filter((model) => {
+		const normalizedModel = normalizeModelName(model)
+		return (
+			normalizedModel.includes(targetNormalized) &&
+			!isGemini36FlashPreviewMismatch(targetNormalized, normalizedModel)
+		)
+	})
 
 	if (matches.length === 0) {
 		return null
