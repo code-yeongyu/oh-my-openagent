@@ -15,6 +15,7 @@ import {
 import { appendGoalToPlan, deriveGoalCandidates, makeGoal } from "./plan-goal-factory.js";
 import { appendLedger, readUlwLoopPlan, withUlwLoopMutationLock, writePlan } from "./plan-io.js";
 import type { UlwLoopCodexGoalMode, UlwLoopItem, UlwLoopPlan, UlwLoopSuccessCriterion } from "./types.js";
+import { parseValidationBatches } from "./validation-batch.js";
 import { iso, UlwLoopError } from "./types.js";
 
 export { deriveGoalCandidates, seedDefaultSuccessCriteria } from "./plan-goal-factory.js";
@@ -57,7 +58,7 @@ function clearGoalBlockerFields(goal: UlwLoopItem): void {
 
 export async function createUlwLoopPlan(
 	repoRoot: string,
-	args: { brief: string; codexGoalMode?: UlwLoopCodexGoalMode; force?: boolean },
+	args: { brief: string; codexGoalMode?: UlwLoopCodexGoalMode; force?: boolean; validationBatchesJson?: string },
 	scope?: UlwLoopScope,
 ): Promise<UlwLoopPlan> {
 	return withUlwLoopMutationLock(repoRoot, scope, async () => {
@@ -84,6 +85,8 @@ export async function createUlwLoopPlan(
 			codexGoalMode: args.codexGoalMode ?? "aggregate",
 			goals,
 		};
+		const validationBatches = await parseValidationBatches(args.validationBatchesJson, goals);
+		if (validationBatches !== undefined) plan.validationBatches = validationBatches;
 		if (plan.codexGoalMode === "aggregate") plan.codexObjective = aggregateCodexObjectiveForScope(scope);
 		await mkdir(ulwLoopDir(repoRoot, scope), { recursive: true });
 		await writeFile(

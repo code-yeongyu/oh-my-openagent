@@ -40,12 +40,14 @@ export async function createGoals(
 			"ULW_LOOP_BRIEF_REQUIRED",
 		);
 	}
+	const validationBatchesJson = readValue(argv, "--validation-batch-json");
 	const plan = await createUlwLoopPlan(
 		repoRoot,
 		{
 			brief,
 			codexGoalMode: normalizeCodexGoalMode(readValue(argv, "--codex-goal-mode")),
 			force: hasFlag(argv, "--force"),
+			...(validationBatchesJson === undefined ? {} : { validationBatchesJson }),
 		},
 		scope,
 	);
