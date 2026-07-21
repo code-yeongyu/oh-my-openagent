@@ -52,7 +52,7 @@ const lazycodexAgentInvariants = new Map([
 		"plan.toml",
 		{
 			model: "gpt-5.6-sol",
-			effort: "max",
+			effort: "high",
 			includes: [/strategic planning consultant/i, /\.omo\/plans\/<slug>\.md/, /never implements/i],
 		},
 	],
@@ -67,8 +67,8 @@ const lazycodexAgentInvariants = new Map([
 	[
 		"lazycodex-worker-medium.toml",
 		{
-			model: "gpt-5.6-luna",
-			effort: "max",
+			model: "gpt-5.6-terra",
+			effort: "high",
 			includes: [/EVIDENCE_RECORDED: <path>/, /medium-difficulty/i, /smallest correct change/i],
 		},
 	],
@@ -76,23 +76,23 @@ const lazycodexAgentInvariants = new Map([
 		"lazycodex-worker-high.toml",
 		{
 			model: "gpt-5.6-sol",
-			effort: "max",
+			effort: "medium",
 			includes: [/EVIDENCE_RECORDED: <path>/, /high-difficulty/i, /smallest correct change/i],
 		},
 	],
 	[
 		"lazycodex-clone-fidelity-reviewer.toml",
 		{
-			model: "gpt-5.6-sol",
-			effort: "xhigh",
+			model: "gpt-5.6-terra",
+			effort: "high",
 			includes: [/recommendation/, /blockers/, /\.omo\/evidence\/<goal>-clone-fidelity\.md/],
 		},
 	],
 	[
 		"lazycodex-code-reviewer.toml",
 		{
-			model: "gpt-5.6-sol",
-			effort: "xhigh",
+			model: "gpt-5.6-terra",
+			effort: "medium",
 			includes: [/codeQualityStatus/, /recommendation/, /<attemptDir>\/<goalId>-code-review\.md/, /currentAttemptDir/],
 		},
 	],
@@ -108,7 +108,7 @@ const lazycodexAgentInvariants = new Map([
 		"lazycodex-gate-reviewer.toml",
 		{
 			model: "gpt-5.6-sol",
-			effort: "high",
+			effort: "low",
 			includes: [/APPROVE\/REJECT/, /blockers/, /<attemptDir>\/<goalId>-gate-review\.md/, /currentAttemptDir/],
 		},
 	],
