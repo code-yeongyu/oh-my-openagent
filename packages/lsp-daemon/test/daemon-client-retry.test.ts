@@ -207,7 +207,56 @@ describe("daemon-client retry discipline", () => {
 		expect(requestCount).toBe(1);
 	});
 
-	it("#given the server closes the connection after reading the request #then no retry happens", async () => {
+	it("#given the server closes the connection after reading the request #when the next ensure reopens the daemon #then the second attempt succeeds", async () => {
+		const paths = tempPaths();
+		let ensureCallCount = 0;
+		let requestCount = 0;
+
+		const closingServer = createServer((socket) => {
+			const decoder = createLineDecoder(() => {
+				requestCount += 1;
+				socket.destroy();
+			});
+			socket.on("data", (chunk) => decoder.push(chunk));
+		});
+		servers.push(closingServer);
+
+		const stableServer = createServer((socket) => {
+			const decoder = createLineDecoder((message) => {
+				requestCount += 1;
+				const id = jsonRpcId(message);
+				socket.write(encodeJsonLine({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: "ok" }] } }));
+			});
+			socket.on("data", (chunk) => decoder.push(chunk));
+		});
+		servers.push(stableServer);
+
+		await new Promise<void>((resolve) => closingServer.listen(paths.socket, resolve));
+
+		const ensure = async (): Promise<void> => {
+			ensureCallCount += 1;
+			if (ensureCallCount === 1) return;
+			await new Promise<void>((resolve) => closingServer.close(() => resolve()));
+			await new Promise<void>((resolve) => stableServer.listen(paths.socket, resolve));
+		};
+
+		const result = await callToolViaDaemon(
+			"status",
+			{},
+			{
+				paths,
+				ensure,
+				requestTimeoutMs: 2000,
+				context: defaultContext(),
+			},
+		);
+
+		expect(result.content[0]?.text).toBe("ok");
+		expect(ensureCallCount).toBe(2);
+		expect(requestCount).toBe(2);
+	});
+
+	it("#given every attempt closes the connection after reading the request #when all three retries close #then the call is reported as a daemon connection failure", async () => {
 		const paths = tempPaths();
 		let requestCount = 0;
 		const server = createServer((socket) => {
@@ -233,7 +282,7 @@ describe("daemon-client retry discipline", () => {
 
 		expect(result.isError).toBe(true);
 		expect(result.content[0]?.text).toContain("daemon connection closed");
-		expect(requestCount).toBe(1);
+		expect(requestCount).toBe(3);
 	});
 
 	it("#given a mutating rename cannot connect #when no request bytes were written #then it is not retried", async () => {

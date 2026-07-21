@@ -198,10 +198,8 @@ function sendToolCall(
 			});
 		});
 		socket.on("data", (chunk) => decoder.push(chunk));
-		socket.once("error", (error) => finish(() => reject(new DaemonRequestError(error.message, requestWritten))));
-		socket.once("close", () =>
-			finish(() => reject(new DaemonRequestError("daemon connection closed", requestWritten))),
-		);
+		socket.once("error", (error) => finish(() => reject(new DaemonRequestError(error.message, false))));
+		socket.once("close", () => finish(() => reject(new DaemonRequestError("daemon connection closed", false))));
 	});
 }
 
