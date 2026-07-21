@@ -37,6 +37,7 @@ function fakeManager(overrides: Partial<TaskManager>): TaskManager {
     waitFor: () => notImplemented("waitFor"),
     forget: () => {},
     getResidentHandle: () => undefined,
+    subscribeChild: () => () => {},
     residentTaskIds: () => [],
     wasBackground: () => false,
     ...overrides,
@@ -117,6 +118,27 @@ describe("createTaskTool", () => {
     expect(row).toContain("실제 프롬프트")
     expect(row).toContain(`${ANSI_ITALIC}background${ANSI_ITALIC_END}`)
     expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(72)
+  })
+
+  test("#given a partial child progress result #when rendered #then the live status block is preserved", () => {
+    const tool = createTaskTool(deps(fakeManager({})))
+    const renderResult = tool.renderResult
+    if (renderResult === undefined) throw new Error("task renderResult is missing")
+
+    const component: unknown = Reflect.apply(renderResult, undefined, [
+      {
+        content: [{ type: "text", text: "⏵ st_1 · quick · turn 1 · running read src/foo.ts · 2s\n↳ last: found it" }],
+        details: { task_id: "st_1", status: "running", mode: "spawn" },
+      },
+      { expanded: false, isPartial: true },
+      RENDERER_THEME,
+      {},
+    ])
+
+    expect(renderedLines(component, 120)).toEqual([
+      "\u001b[36m⏵ st_1 · quick · turn 1 · running read src/foo.ts · 2s\u001b[39m",
+      "\u001b[36m↳ last: found it\u001b[39m",
+    ])
   })
 
   test("#given the real task result renderer #when a category result is rendered #then resolved context and italic foreground mode are visible", () => {
