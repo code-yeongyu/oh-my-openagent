@@ -131,5 +131,16 @@ describe("buildCodegraphEnv", () => {
       // then
       expect(result[CODEGRAPH_NO_DAEMON_ENV]).toBe("1")
     })
+
+    it("forwards an ambient CODEGRAPH_DAEMON_IDLE_TIMEOUT_MS to the child", () => {
+      // given / when
+      const result = buildCodegraphChildEnv({
+        codegraphEnv: buildCodegraphEnv({ homeDir: "/Users/alice", daemon: true }),
+        runtimeEnv: { CODEGRAPH_DAEMON_IDLE_TIMEOUT_MS: "10000" },
+      })
+
+      // then
+      expect(result["CODEGRAPH_DAEMON_IDLE_TIMEOUT_MS"]).toBe("10000")
+    })
   })
 })
