@@ -5,7 +5,6 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { createUlwLoopPlan } from "../src/plan-crud.js";
-import { UlwLoopError } from "../src/types.js";
 
 async function repo(): Promise<string> {
 	return mkdtemp(join(tmpdir(), "ug-validation-batch-"));
@@ -23,13 +22,40 @@ describe("createUlwLoopPlan validation batches", () => {
 		]);
 	});
 
-	it("#given an unknown member id #when creating goals #then rejects the batch", async () => {
+	it("#given an unknown member id #when creating goals #then rejects with the member-unknown code", async () => {
 		await expect(
 			createUlwLoopPlan(await repo(), {
 				brief: "- Goal alpha\n- Goal beta",
-				validationBatchesJson: '[{"batchId":"VB001","memberIds":["G001-goal-alpha","missing"],"finalGoalId":"missing"}]',
+				validationBatchesJson: '[{"batchId":"VB001","memberIds":["G001-goal-alpha","missing"],"finalGoalId":"G001-goal-alpha"}]',
 			}),
-		).rejects.toThrow(UlwLoopError);
+		).rejects.toMatchObject({ code: "ULW_LOOP_VALIDATION_BATCH_MEMBER_UNKNOWN" });
+	});
+
+	it("#given a final id outside members #when creating goals #then rejects with the final-not-member code", async () => {
+		await expect(
+			createUlwLoopPlan(await repo(), {
+				brief: "- Goal alpha\n- Goal beta\n- Goal gamma",
+				validationBatchesJson: '[{"batchId":"VB001","memberIds":["G001-goal-alpha","G002-goal-beta"],"finalGoalId":"G003-goal-gamma"}]',
+			}),
+		).rejects.toMatchObject({ code: "ULW_LOOP_VALIDATION_BATCH_FINAL_NOT_MEMBER" });
+	});
+
+	it("#given overlapping validation batches #when creating goals #then rejects with the overlap code", async () => {
+		await expect(
+			createUlwLoopPlan(await repo(), {
+				brief: "- Goal alpha\n- Goal beta\n- Goal gamma",
+				validationBatchesJson: '[{"batchId":"VB001","memberIds":["G001-goal-alpha","G002-goal-beta"],"finalGoalId":"G002-goal-beta"},{"batchId":"VB002","memberIds":["G002-goal-beta","G003-goal-gamma"],"finalGoalId":"G003-goal-gamma"}]',
+			}),
+		).rejects.toMatchObject({ code: "ULW_LOOP_VALIDATION_BATCH_OVERLAP" });
+	});
+
+	it("#given duplicate members #when creating goals #then retains the structural invalid code", async () => {
+		await expect(
+			createUlwLoopPlan(await repo(), {
+				brief: "- Goal alpha\n- Goal beta",
+				validationBatchesJson: '[{"batchId":"VB001","memberIds":["G001-goal-alpha","G001-goal-alpha"],"finalGoalId":"G001-goal-alpha"}]',
+			}),
+		).rejects.toMatchObject({ code: "ULW_LOOP_VALIDATION_BATCH_INVALID" });
 	});
 
 	it("#given a validation batch file #when creating goals #then reads the batch JSON from disk", async () => {

@@ -39,4 +39,19 @@ describe("ulwLoopCommand create-goals validation batches", () => {
 
 		expect(JSON.parse(out.join(""))).toHaveProperty("plan.validationBatches.0.batchId", "VB001");
 	});
+
+	it("#given finalGoalId outside members #when creating goals from CLI #then exits one with the distinct code", async () => {
+		expect(
+			await ulwLoopCommand([
+				"create-goals",
+				"--brief",
+				"- Goal alpha\n- Goal beta\n- Goal gamma",
+				"--validation-batch-json",
+				'[{"batchId":"VB001","memberIds":["G001-goal-alpha","G002-goal-beta"],"finalGoalId":"G003-goal-gamma"}]',
+				"--json",
+			]),
+		).toBe(1);
+
+		expect(JSON.parse(out.join(""))).toHaveProperty("error.code", "ULW_LOOP_VALIDATION_BATCH_FINAL_NOT_MEMBER");
+	});
 });

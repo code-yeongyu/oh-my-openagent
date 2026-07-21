@@ -117,8 +117,21 @@ export async function writePlan(repoRoot: string, plan: UlwLoopPlan, scope?: Ulw
 }
 
 export async function appendLedger(repoRoot: string, entry: UlwLoopLedgerEntry, scope?: UlwLoopScope): Promise<void> {
+	await appendLedgerEntries(repoRoot, [entry], scope);
+}
+
+export async function appendLedgerEntries(
+	repoRoot: string,
+	entries: readonly UlwLoopLedgerEntry[],
+	scope?: UlwLoopScope,
+): Promise<void> {
+	if (entries.length === 0) return;
 	await mkdir(ulwLoopDir(repoRoot, scope), { recursive: true });
-	await appendFile(ulwLoopLedgerPath(repoRoot, scope), `${JSON.stringify(entry)}\n`, "utf8");
+	await appendFile(
+		ulwLoopLedgerPath(repoRoot, scope),
+		`${entries.map((entry) => JSON.stringify(entry)).join("\n")}\n`,
+		"utf8",
+	);
 }
 
 /**

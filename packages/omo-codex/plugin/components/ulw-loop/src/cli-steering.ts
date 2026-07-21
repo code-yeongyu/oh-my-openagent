@@ -106,6 +106,7 @@ export function normalizeSteeringProposal(proposal: CliSteeringProposal): CliSte
 export async function parseSteeringProposals(argv: readonly string[]): Promise<readonly CliSteeringProposal[]> {
 	const input = text(readValue(argv, "--proposals-json"), "--proposals-json");
 	if (input === undefined) return [await parseSteeringProposal(argv)];
+	if (readValue(argv, "--kind") !== undefined) return fail("--kind and --proposals-json are mutually exclusive.", "ULW_LOOP_STEERING_BATCH_CONFLICT", { flags: ["--kind", "--proposals-json"] });
 	const raw = await readJsonInput(input);
 	if (!Array.isArray(raw) || raw.length === 0) return fail("--proposals-json must be a non-empty JSON array.", "ULW_LOOP_STEERING_BATCH_ARRAY_REQUIRED", { flag: "--proposals-json" });
 	const proposals: CliSteeringProposal[] = [];

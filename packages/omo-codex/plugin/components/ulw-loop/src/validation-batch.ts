@@ -54,10 +54,11 @@ function validateBatches(batches: readonly UlwLoopValidationBatch[], goals: read
 	for (const batch of batches) {
 		if (batchIds.has(batch.batchId)) fail(`duplicate validation batch id: ${batch.batchId}.`);
 		batchIds.add(batch.batchId);
-		if (!batch.memberIds.includes(batch.finalGoalId)) fail(`validation batch ${batch.batchId} finalGoalId must be a member.`);
+		if (new Set(batch.memberIds).size !== batch.memberIds.length) fail(`validation batch ${batch.batchId} has duplicate memberIds.`);
+		if (!batch.memberIds.includes(batch.finalGoalId)) fail(`validation batch ${batch.batchId} finalGoalId must be a member.`, "ULW_LOOP_VALIDATION_BATCH_FINAL_NOT_MEMBER");
 		for (const memberId of batch.memberIds) {
-			if (!goalIds.has(memberId)) fail(`validation batch ${batch.batchId} references unknown goal: ${memberId}.`);
-			if (members.has(memberId)) fail(`goal appears in multiple validation batches: ${memberId}.`);
+			if (!goalIds.has(memberId)) fail(`validation batch ${batch.batchId} references unknown goal: ${memberId}.`, "ULW_LOOP_VALIDATION_BATCH_MEMBER_UNKNOWN");
+			if (members.has(memberId)) fail(`goal appears in multiple validation batches: ${memberId}.`, "ULW_LOOP_VALIDATION_BATCH_OVERLAP");
 			members.add(memberId);
 		}
 	}
@@ -116,6 +117,6 @@ function memberResolved(plan: UlwLoopPlan, goalId: string): boolean {
 	return goal !== undefined && isMemberResolved(goal, plan);
 }
 
-function fail(message: string): never {
-	throw new UlwLoopError(message, "ULW_LOOP_VALIDATION_BATCH_INVALID");
+function fail(message: string, code = "ULW_LOOP_VALIDATION_BATCH_INVALID"): never {
+	throw new UlwLoopError(message, code);
 }

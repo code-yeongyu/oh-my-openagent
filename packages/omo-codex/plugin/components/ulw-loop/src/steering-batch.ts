@@ -1,6 +1,6 @@
 // biome-ignore-all format: compact batch steering module stays below the pure LOC budget.
 import type { UlwLoopScope } from "./paths.js";
-import { appendLedger, findAcceptedSteeringLedgerEntry, readUlwLoopPlan, withUlwLoopMutationLock, writePlan } from "./plan-io.js";
+import { appendLedger, appendLedgerEntries, findAcceptedSteeringLedgerEntry, readUlwLoopPlan, withUlwLoopMutationLock, writePlan } from "./plan-io.js";
 import { applySteeringMutation, validateUlwLoopSteeringProposal } from "./steering.js";
 import { buildSteeringPlanSnapshot, changedGoalIdsBetween } from "./steering-snapshot.js";
 import type { UlwLoopLedgerEntry, UlwLoopPlan, UlwLoopSteeringAudit, UlwLoopSteeringProposal } from "./types.js";
@@ -41,17 +41,19 @@ export async function steerUlwLoopBatch(
 		const plan = await readUlwLoopPlan(repoRoot, scope);
 		const prepared = await prepareBatch(repoRoot, plan, proposals, scope);
 		const failed = prepared.results.find((item) => !item.accepted);
-		if (failed !== undefined) return rejected(plan, prepared.results, failed.rejectedReasons);
+		if (failed !== undefined) {
+			const entry = rejectedLedgerEntry(prepared.results);
+			await appendLedger(repoRoot, entry, scope);
+			return rejected(plan, prepared.results, failed.rejectedReasons);
+		}
 		let next = plan;
 		for (const item of prepared.items) if (item.kind === "fresh") next = item.prepared.next;
-		if (prepared.items.some((item) => item.kind === "fresh")) await writePlan(repoRoot, next, scope);
-		for (const item of prepared.items) {
-			if (item.kind === "fresh") {
-				const at = item.prepared.proposal.now?.toISOString() ?? iso();
-				await appendLedger(repoRoot, ledgerEntry(item.prepared.proposal, item.prepared.audit, at), scope);
-				const batchEntry = batchUpdateLedgerEntry(item.prepared.before, item.prepared.next, at);
-				if (batchEntry !== null) await appendLedger(repoRoot, batchEntry, scope);
-			}
+		const fresh = prepared.items.filter((item): item is Extract<PreparedItem, { readonly kind: "fresh" }> => item.kind === "fresh");
+		if (fresh.length > 0) {
+			await writePlan(repoRoot, next, scope);
+			const entries = fresh.map((item) => ledgerEntry(item.prepared.proposal, item.prepared.audit, item.prepared.proposal.now?.toISOString() ?? iso()));
+			const batchEntry = batchUpdateLedgerEntry(plan, next, iso());
+			await appendLedgerEntries(repoRoot, batchEntry === null ? entries : [...entries, batchEntry], scope);
 		}
 		return { plan: next, accepted: true, results: prepared.results, rejectedReasons: [] };
 	});
@@ -99,6 +101,11 @@ function rejected(
 	rejectedReasons: readonly string[],
 ): SteerUlwLoopBatchResult {
 	return { plan, accepted: false, results, rejectedReasons };
+}
+
+function rejectedLedgerEntry(results: readonly SteerUlwLoopBatchItemResult[]): UlwLoopLedgerEntry {
+	const rejectedItems = results.map((result, index) => ({ result, index })).filter((item) => !item.result.accepted);
+	return { at: iso(), kind: "steering_rejected", message: rejectedItems.map((item) => `index ${item.index}: ${item.result.rejectedReasons.join(", ")}`).join("; ") };
 }
 
 function ledgerEntry(proposal: UlwLoopSteeringProposal, audit: UlwLoopSteeringAudit, at: string): UlwLoopLedgerEntry {
