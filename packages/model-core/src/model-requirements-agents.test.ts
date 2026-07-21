@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { AGENT_MODEL_REQUIREMENTS } from "./model-requirements"
 
 describe("AGENT_MODEL_REQUIREMENTS", () => {
-  test("oracle has valid fallbackChain with gpt-5.5 as primary", () => {
+  test("oracle has gpt-5.6-sol xhigh as primary", () => {
     // given
     const oracle = AGENT_MODEL_REQUIREMENTS["oracle"]
 
@@ -12,9 +12,16 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // then
     expect(oracle.fallbackChain).toBeArray()
     expect(oracle.fallbackChain.length).toBeGreaterThan(0)
-    expect(primary?.providers).toContain("openai")
-    expect(primary?.model).toBe("gpt-5.5")
-    expect(primary?.variant).toBe("high")
+    expect(primary).toEqual({
+      providers: ["openai", "opencode", "vercel"],
+      model: "gpt-5.6-sol",
+      variant: "xhigh",
+    })
+    expect(oracle.fallbackChain[1]).toEqual({
+      providers: ["github-copilot"],
+      model: "gpt-5.6-sol",
+      variant: "high",
+    })
   })
 
   test("sisyphus keeps opus primary before kimi-k3, k2p5, kimi-k2.5, gpt-5.5 medium, and big-pickle", () => {
@@ -29,7 +36,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(sisyphus.requiresAnyModel).toBe(true)
     expect(primary).toEqual({
       providers: ["anthropic", "github-copilot", "opencode", "vercel"],
-      model: "claude-opus-4-7",
+      model: "claude-opus-4-8",
       variant: "max",
     })
     expect(second).toEqual({
@@ -129,7 +136,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     })
   })
 
-  test("prometheus has claude-opus-4-7 as primary", () => {
+  test("prometheus has claude-opus-4-8 as primary", () => {
     // given
     const prometheus = AGENT_MODEL_REQUIREMENTS["prometheus"]
 
@@ -140,7 +147,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(prometheus.fallbackChain.length).toBeGreaterThan(1)
     expect(primary).toEqual({
       providers: ["anthropic", "github-copilot", "opencode", "vercel"],
-      model: "claude-opus-4-7",
+      model: "claude-opus-4-8",
       variant: "max",
     })
   })
@@ -160,7 +167,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       providers: ["anthropic", "github-copilot", "opencode", "vercel"],
       model: "claude-sonnet-4-6",
     })
-    expect(opusFallback?.model).toBe("claude-opus-4-7")
+    expect(opusFallback?.model).toBe("claude-opus-4-8")
     expect(opusFallback?.variant).toBe("max")
     expect(openAiFallback).toEqual({
       providers: ["openai", "github-copilot", "opencode", "vercel"],
@@ -174,7 +181,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const momus = AGENT_MODEL_REQUIREMENTS["momus"]
 
     // when
-    const [primary, copilot, legacyFallback] = momus.fallbackChain
+    const [primary, copilot, legacyFallback, opusFallback] = momus.fallbackChain
 
     // then
     expect(momus.fallbackChain.length).toBeGreaterThan(1)
@@ -192,6 +199,11 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       providers: ["openai", "github-copilot", "opencode", "vercel"],
       model: "gpt-5.5",
       variant: "xhigh",
+    })
+    expect(opusFallback).toEqual({
+      providers: ["anthropic", "github-copilot", "opencode", "vercel"],
+      model: "claude-opus-4-8",
+      variant: "max",
     })
   })
 

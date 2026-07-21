@@ -25,7 +25,7 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
   ],
   metis: [
     { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-sonnet-4-6" },
-    { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-4-7", variant: "max" },
+    { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-4-8", variant: "max" },
     { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.5", variant: "high" },
     { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
     { providers: ["kimi-for-coding"], model: "k2p5" },
@@ -34,14 +34,15 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
     { providers: ["openai", "vercel"], model: "gpt-5.6-terra", variant: "high" },
     { providers: ["github-copilot"], model: "gpt-5.6-terra", variant: "high" },
     { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.5", variant: "xhigh" },
-    { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-4-7", variant: "max" },
+    { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-4-8", variant: "max" },
     { providers: ["google", "github-copilot", "opencode", "vercel"], model: "gemini-3.1-pro", variant: "high" },
     { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
   ],
   oracle: [
-    { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.5", variant: "high" },
+    { providers: ["openai", "opencode", "vercel"], model: "gpt-5.6-sol", variant: "xhigh" },
+    { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "high" },
     { providers: ["google", "github-copilot", "opencode", "vercel"], model: "gemini-3.1-pro", variant: "high" },
-    { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-4-7", variant: "max" },
+    { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-4-8", variant: "max" },
     { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
   ],
 }
