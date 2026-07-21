@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 
-// components/codegraph/src/cli.ts
-import { realpathSync as realpathSync6 } from "node:fs";
-import { basename as basename5, resolve as resolve7 } from "node:path";
+// src/cli.ts
+import { realpathSync as realpathSync7 } from "node:fs";
+import { basename as basename5, resolve as resolve8 } from "node:path";
 import { stderr as processStderr4 } from "node:process";
 import { fileURLToPath as fileURLToPath4 } from "node:url";
 
-// components/codegraph/src/hook.ts
+// src/hook.ts
 import { execFile as execFile4, spawn } from "node:child_process";
 import { homedir as homedir13 } from "node:os";
-import { join as join13 } from "node:path";
+import { join as join14 } from "node:path";
 import {
   cwd as processCwd2,
   env as processEnv2,
@@ -19,7 +19,7 @@ import {
 } from "node:process";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
-// ../../utils/src/codegraph/env.ts
+// ../../../../utils/src/codegraph/env.ts
 import { homedir } from "node:os";
 import { join } from "node:path";
 var CODEGRAPH_INSTALL_DIR_ENV = "CODEGRAPH_INSTALL_DIR";
@@ -67,7 +67,7 @@ function buildCodegraphEnv(options = {}) {
   const homeDir = options.homeDir ?? homedir();
   return {
     [CODEGRAPH_INSTALL_DIR_ENV]: join(homeDir, ".omo", "codegraph"),
-    [CODEGRAPH_NO_DAEMON_ENV]: "1",
+    ...options.daemon === true ? {} : { [CODEGRAPH_NO_DAEMON_ENV]: "1" },
     [CODEGRAPH_NO_DOWNLOAD_ENV]: "1",
     [CODEGRAPH_TELEMETRY_ENV]: "0",
     [DO_NOT_TRACK_ENV]: "1"
@@ -94,15 +94,15 @@ function buildCodegraphChildEnv(options = {}) {
   return env;
 }
 
-// ../../utils/src/codegraph/guidance.ts
+// ../../../../utils/src/codegraph/guidance.ts
 import { homedir as homedir5 } from "node:os";
 
-// ../../utils/src/codegraph/workspace.ts
+// ../../../../utils/src/codegraph/workspace.ts
 import { execFileSync } from "node:child_process";
 import { appendFileSync, existsSync as existsSync2, lstatSync as lstatSync2, mkdirSync, realpathSync as realpathSync3, readFileSync as readFileSync2, statSync, symlinkSync } from "node:fs";
 import { dirname, join as join5, resolve as resolve3 } from "node:path";
 
-// ../../utils/src/codegraph/paths.ts
+// ../../../../utils/src/codegraph/paths.ts
 import { createHash } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { homedir as homedir2 } from "node:os";
@@ -139,7 +139,7 @@ function resolveCodegraphWorkspacePaths(workspace, options = {}) {
   };
 }
 
-// ../../utils/src/codegraph/store.ts
+// ../../../../utils/src/codegraph/store.ts
 import { existsSync, lstatSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir as homedir3 } from "node:os";
 import { join as join3 } from "node:path";
@@ -192,7 +192,7 @@ function pruneDeadCodegraphProjectStores(options = {}) {
   return { remainingBytes: 0, removed };
 }
 
-// ../../utils/src/codegraph/exclusion.ts
+// ../../../../utils/src/codegraph/exclusion.ts
 import { realpathSync as realpathSync2 } from "node:fs";
 import { homedir as homedir4, tmpdir as osTmpdir } from "node:os";
 import { isAbsolute, join as join4, resolve as resolve2 } from "node:path";
@@ -258,7 +258,7 @@ function shouldExcludeCodegraphProject(workspace, options = {}) {
   return { excluded: false };
 }
 
-// ../../utils/src/codegraph/workspace.ts
+// ../../../../utils/src/codegraph/workspace.ts
 function fallbackResult(dataRoot, projectLink, reason) {
   return { dataDir: projectLink, dataRoot, linked: false, mode: "in-place-fallback", projectLink, reason };
 }
@@ -393,7 +393,7 @@ function gitMarkerOwnsGitDir(gitMarkerPath, workspace, gitDir) {
   return coreWorktree.length > 0 && realpathSync3.native(resolve3(resolvedGitDir, coreWorktree)) === realpathSync3.native(workspace);
 }
 
-// ../../utils/src/codegraph/guidance.ts
+// ../../../../utils/src/codegraph/guidance.ts
 var CODEGRAPH_UNINITIALIZED_PATTERN = /CodeGraph not initialized in ([\s\S]*?)\.\s*Run ['`]codegraph init['`] in that project first\./i;
 var ANSI_ESCAPE_PATTERN = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
 var CODEGRAPH_STATUS_PROJECT_PATTERN = /^.*?\bProject:\s*(.+?)\s*$/im;
@@ -492,14 +492,14 @@ function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-// ../../utils/src/codegraph/resolve.ts
+// ../../../../utils/src/codegraph/resolve.ts
 import { existsSync as existsSync3 } from "node:fs";
 import { homedir as homedir6 } from "node:os";
 import { spawnSync } from "node:child_process";
 import { basename as basename2, dirname as dirname2, join as join7 } from "node:path";
 import { createRequire } from "node:module";
 
-// ../../utils/src/runtime/which.ts
+// ../../../../utils/src/runtime/which.ts
 import { accessSync, constants } from "node:fs";
 import { delimiter, join as join6 } from "node:path";
 var runtime = globalThis;
@@ -564,7 +564,7 @@ function bunWhich(commandName) {
   return null;
 }
 
-// ../../utils/src/codegraph/node-support.ts
+// ../../../../utils/src/codegraph/node-support.ts
 var CODEGRAPH_MIN_NODE_MAJOR = 20;
 var CODEGRAPH_BLOCKED_NODE_MAJOR = 25;
 var CODEGRAPH_UNSAFE_NODE_ENV = "CODEGRAPH_ALLOW_UNSAFE_NODE";
@@ -593,7 +593,7 @@ function parseNodeMajor(version) {
   return Number.isNaN(major) ? 0 : major;
 }
 
-// ../../utils/src/codegraph/resolve.ts
+// ../../../../utils/src/codegraph/resolve.ts
 function codegraphCommandRequiresSupportedLocalNode(resolution) {
   return resolution.source !== "bundled" && resolution.source !== "env" && resolution.source !== "provisioned";
 }
@@ -725,17 +725,17 @@ function resolveCodegraphCommand(options = {}) {
   };
 }
 
-// shared/src/config-loader.ts
+// ../../shared/src/config-loader.ts
 import { homedir as homedir8 } from "node:os";
 
-// ../../utils/src/omo-config/loader.ts
+// ../../../../utils/src/omo-config/loader.ts
 import { existsSync as existsSync5 } from "node:fs";
 import { homedir as homedir7 } from "node:os";
 
-// ../../utils/src/omo-config/body.ts
+// ../../../../utils/src/omo-config/body.ts
 import { readFileSync as readFileSync3 } from "node:fs";
 
-// ../../utils/src/deep-merge.ts
+// ../../../../utils/src/deep-merge.ts
 var DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 function isUnsafeObjectKey(key) {
   return DANGEROUS_KEYS.has(key);
@@ -744,7 +744,7 @@ function isPlainObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value) && Object.prototype.toString.call(value) === "[object Object]";
 }
 
-// ../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/scanner.js
+// ../../../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/scanner.js
 function createScanner(text, ignoreTrivia = false) {
   const len = text.length;
   let pos = 0, value = "", tokenOffset = 0, token = 16, lineNumber = 0, lineStartOffset = 0, tokenLineStartOffset = 0, prevTokenLineStartOffset = 0, scanError = 0;
@@ -1159,7 +1159,7 @@ var CharacterCodes;
   CharacterCodes2[CharacterCodes2["tab"] = 9] = "tab";
 })(CharacterCodes || (CharacterCodes = {}));
 
-// ../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/string-intern.js
+// ../../../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/string-intern.js
 var cachedSpaces = new Array(20).fill(0).map((_, index) => {
   return " ".repeat(index);
 });
@@ -1193,7 +1193,7 @@ var cachedBreakLinesWithSpaces = {
   }
 };
 
-// ../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/parser.js
+// ../../../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/parser.js
 var ParseOptions;
 (function(ParseOptions2) {
   ParseOptions2.DEFAULT = {
@@ -1496,7 +1496,7 @@ function visit(text, visitor, options = ParseOptions.DEFAULT) {
   return true;
 }
 
-// ../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/main.js
+// ../../../../../node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/main.js
 var ScanError;
 (function(ScanError2) {
   ScanError2[ScanError2["None"] = 0] = "None";
@@ -1585,7 +1585,7 @@ function printParseErrorCode(code) {
   return "<unknown ParseErrorCode>";
 }
 
-// ../../utils/src/jsonc-parser.ts
+// ../../../../utils/src/jsonc-parser.ts
 var pluginConfigFileDetectionCache = new Map;
 function stripBom(content) {
   return content.charCodeAt(0) === 65279 ? content.slice(1) : content;
@@ -1606,7 +1606,7 @@ function parseJsoncSafe(content) {
   };
 }
 
-// ../../utils/src/omo-config.ts
+// ../../../../utils/src/omo-config.ts
 var HARNESS_IDS = ["codex", "opencode", "omo"];
 var SETTING_HARNESS_SUPPORT = {
   "codegraph.auto_provision": HARNESS_IDS,
@@ -1617,7 +1617,7 @@ var SETTING_HARNESS_SUPPORT = {
   "codegraph.watch_debounce_ms": ["opencode", "omo"]
 };
 
-// ../../utils/src/omo-config/body.ts
+// ../../../../utils/src/omo-config/body.ts
 var BUILT_IN_DEFAULTS = {
   codegraph: {
     auto_provision: true,
@@ -1820,7 +1820,7 @@ function validateHarnessApplicability(config, harness) {
   return warnings;
 }
 
-// ../../utils/src/omo-config/env-overrides.ts
+// ../../../../utils/src/omo-config/env-overrides.ts
 var CODEGRAPH_ENV_KEYS = [
   ["auto_provision", "AUTO_PROVISION", "boolean"],
   ["enabled", "ENABLED", "boolean"],
@@ -1897,7 +1897,7 @@ function buildEnvOverrides(harness, env, warnings, merge) {
   return config;
 }
 
-// ../../utils/src/omo-config/resolve.ts
+// ../../../../utils/src/omo-config/resolve.ts
 import { existsSync as existsSync4 } from "node:fs";
 import { dirname as dirname3, isAbsolute as isAbsolute2, join as join8, relative, resolve as resolve4 } from "node:path";
 function containsPath(parent, child) {
@@ -1940,7 +1940,7 @@ function toMissingSource(candidate) {
   };
 }
 
-// ../../utils/src/omo-config/loader.ts
+// ../../../../utils/src/omo-config/loader.ts
 function loadOmoConfig(options) {
   const cwd = options.cwd ?? process.cwd();
   const homeDir = options.homeDir ?? process.env["HOME"] ?? process.env["USERPROFILE"] ?? homedir7();
@@ -1971,7 +1971,7 @@ function loadOmoConfig(options) {
   return { config, sources, warnings };
 }
 
-// shared/src/config-loader.ts
+// ../../shared/src/config-loader.ts
 function getCodexOmoConfig(options = {}) {
   const env = options.env ?? process.env;
   const homeDir = resolveHomeDir(options);
@@ -2000,7 +2000,7 @@ function resolveHomeDir(options) {
   return options.homeDir ?? env["HOME"] ?? env["USERPROFILE"] ?? homedir8();
 }
 
-// components/codegraph/src/cache-gc.ts
+// src/cache-gc.ts
 var NON_FATAL_GC_ERROR_CODES = new Set(["EACCES", "EBUSY", "ENOENT", "ENOTEMPTY", "ENOTDIR", "EPERM"]);
 function pruneCodegraphProjectStoresBestEffort(homeDir, options = {}) {
   try {
@@ -2018,17 +2018,103 @@ function isNonFatalCodegraphGcError(error) {
   return typeof code === "string" && NON_FATAL_GC_ERROR_CODES.has(code);
 }
 
-// components/codegraph/src/hook-sweep.ts
+// src/hook-sweep.ts
 import { fileURLToPath } from "node:url";
-// ../../utils/src/codegraph/process-sweeper.ts
+// ../../../../utils/src/codegraph/process-sweeper.ts
 import { existsSync as existsSync7, mkdirSync as mkdirSync2, statSync as statSync2, utimesSync, writeFileSync as writeFileSync2 } from "node:fs";
 import { homedir as homedir10 } from "node:os";
-import { dirname as dirname4, join as join10 } from "node:path";
+import { dirname as dirname5, join as join11 } from "node:path";
 
-// ../../utils/src/codegraph/process-exec.ts
+// ../../../../utils/src/codegraph/daemon-lock.ts
+import { readFileSync as readFileSync4, realpathSync as realpathSync4 } from "node:fs";
+import { dirname as dirname4, join as join9, resolve as resolve5 } from "node:path";
+function parseDaemonLock(raw) {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0)
+    return null;
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (typeof parsed === "object" && parsed !== null && "pid" in parsed) {
+      const pid = parsed.pid;
+      if (typeof pid === "number" && Number.isSafeInteger(pid) && pid > 0) {
+        const record = parsed;
+        return {
+          pid,
+          ...typeof record["socketPath"] === "string" ? { socketPath: record["socketPath"] } : {},
+          ...typeof record["startedAt"] === "number" ? { startedAt: record["startedAt"] } : {},
+          ...typeof record["version"] === "string" ? { version: record["version"] } : {}
+        };
+      }
+    }
+    return null;
+  } catch (error) {
+    if (!(error instanceof SyntaxError))
+      throw error;
+  }
+  const legacyPid = Number(trimmed);
+  if (Number.isSafeInteger(legacyPid) && legacyPid > 0)
+    return { pid: legacyPid };
+  return null;
+}
+function daemonLockCandidates(projectRoot) {
+  const dirs = new Set;
+  const resolved = resolve5(projectRoot);
+  collectAncestors(resolved, dirs);
+  collectAncestors(realpathIfPossible2(resolved), dirs);
+  return [...dirs].map((dir) => join9(dir, ".codegraph", "daemon.pid"));
+}
+function evaluateDaemonStaleness(pid, projectRoot) {
+  let sawLock = false;
+  for (const lockPath of daemonLockCandidates(projectRoot)) {
+    const raw = readLockIfPresent(lockPath);
+    if (raw === undefined)
+      continue;
+    if (raw === null)
+      return { stale: false, reason: "lock-unreadable" };
+    sawLock = true;
+    const lock = parseDaemonLock(raw);
+    if (lock === null)
+      return { stale: false, reason: "lock-unparseable" };
+    if (lock.pid === pid)
+      return { stale: false, reason: "lock-pid-match" };
+  }
+  return sawLock ? { stale: true, reason: "lock-pid-mismatch" } : { stale: true, reason: "lock-absent" };
+}
+function readLockIfPresent(lockPath) {
+  try {
+    return readFileSync4(lockPath, "utf8");
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT")
+      return;
+    if (error instanceof Error && "code" in error && error.code === "ENOTDIR")
+      return;
+    return null;
+  }
+}
+function collectAncestors(start, output) {
+  let current = start;
+  for (;; ) {
+    output.add(current);
+    const parent = dirname4(current);
+    if (parent === current)
+      return;
+    current = parent;
+  }
+}
+function realpathIfPossible2(path) {
+  try {
+    return realpathSync4(path);
+  } catch (error) {
+    if (error instanceof Error)
+      return path;
+    throw error;
+  }
+}
+
+// ../../../../utils/src/codegraph/process-exec.ts
 import { execFile } from "node:child_process";
 
-// ../../utils/src/codegraph/process-match.ts
+// ../../../../utils/src/codegraph/process-match.ts
 import { posix, win32 } from "node:path";
 var SERVE_WRAPPER_SUFFIX = "/components/codegraph/dist/serve.js";
 var UPSTREAM_PACKAGE_SEGMENT = "/@colbymchenry/codegraph/";
@@ -2069,6 +2155,18 @@ function selectZombieCodegraphProcesses(processes, options) {
   const roots = normalizeRoots(options.ownedRoots, platform);
   const zombies = [];
   for (const processInfo of processes) {
+    const daemon = matchDaemonCommand(processInfo.command, roots, platform);
+    if (daemon !== null) {
+      if (!isOrphaned(processInfo, livePids))
+        continue;
+      zombies.push({
+        ...processInfo,
+        daemonProjectRoot: daemon.projectRoot,
+        matchedRoot: daemon.root,
+        matchKind: "upstream-daemon"
+      });
+      continue;
+    }
     const match = matchOwnedCodegraphCommand(processInfo.command, roots, platform);
     if (match === null)
       continue;
@@ -2077,6 +2175,71 @@ function selectZombieCodegraphProcesses(processes, options) {
     zombies.push({ ...processInfo, matchedRoot: match.root, matchKind: match.kind });
   }
   return zombies;
+}
+var STANDALONE_LAUNCHER_SUFFIXES = ["/bin/codegraph", "/bin/codegraph.exe"];
+var BUNDLE_SCRIPT_SUFFIX = "/lib/dist/bin/codegraph.js";
+function matchDaemonCommand(command, roots, platform) {
+  const projectRoot = extractDaemonProjectRoot(splitCommandTokens(command));
+  if (projectRoot === null)
+    return null;
+  const normalizedCommand = normalizeForComparison2(command, platform);
+  for (const root of roots) {
+    if (root.length === 0)
+      continue;
+    if (upstreamPackagePathIsUnderRoot(normalizedCommand, root))
+      return { projectRoot, root };
+    for (const suffix of STANDALONE_LAUNCHER_SUFFIXES) {
+      if (hasExecutableToken(normalizedCommand, `${root}${suffix}`))
+        return { projectRoot, root };
+    }
+    if (hasExecutableToken(normalizedCommand, `${root}${BUNDLE_SCRIPT_SUFFIX}`))
+      return { projectRoot, root };
+  }
+  return null;
+}
+function extractDaemonProjectRoot(tokens) {
+  if (!tokens.includes("serve") || !tokens.includes("--mcp"))
+    return null;
+  const pathIndex = tokens.indexOf("--path");
+  if (pathIndex < 0)
+    return null;
+  const value = tokens[pathIndex + 1];
+  if (value === undefined || value.length === 0 || value.startsWith("--"))
+    return null;
+  return value;
+}
+function splitCommandTokens(command) {
+  const tokens = [];
+  let current = "";
+  let quote = null;
+  let tokenStarted = false;
+  for (const char of command) {
+    if (quote !== null) {
+      if (char === quote) {
+        quote = null;
+      } else {
+        current += char;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      tokenStarted = true;
+      continue;
+    }
+    if (/\s/.test(char)) {
+      if (tokenStarted || current.length > 0) {
+        tokens.push(current);
+        current = "";
+        tokenStarted = false;
+      }
+      continue;
+    }
+    current += char;
+  }
+  if (tokenStarted || current.length > 0)
+    tokens.push(current);
+  return tokens;
 }
 function matchOwnedCodegraphCommand(command, roots, platform) {
   const normalizedCommand = normalizeForComparison2(command, platform);
@@ -2106,13 +2269,20 @@ function hasExecutableToken(command, expectedPath) {
   }
 }
 function tokenLooksExecutable(command, tokenStart) {
-  const prefix = command.slice(0, tokenStart).trimEnd();
+  let prefix = command.slice(0, tokenStart).trimEnd();
   if (prefix.length === 0)
     return true;
-  const previousTokenStart = findTokenStart(prefix, prefix.length - 1);
-  const previousToken = prefix.slice(previousTokenStart);
-  const executableName = previousToken.split("/").at(-1) ?? previousToken;
-  return /^node\d*(\.exe)?$/.test(executableName) || /^bun(\.exe)?$/.test(executableName);
+  for (;; ) {
+    const previousTokenStart = findTokenStart(prefix, prefix.length - 1);
+    const previousToken = prefix.slice(previousTokenStart);
+    if (!previousToken.startsWith("-")) {
+      const executableName = previousToken.split("/").at(-1) ?? previousToken;
+      return /^node\d*(\.exe)?$/.test(executableName) || /^bun(\.exe)?$/.test(executableName);
+    }
+    prefix = prefix.slice(0, previousTokenStart).trimEnd();
+    if (prefix.length === 0)
+      return false;
+  }
 }
 function upstreamPackagePathIsUnderRoot(command, root) {
   let searchFrom = 0;
@@ -2184,7 +2354,7 @@ function isRecord3(value) {
   return typeof value === "object" && value !== null;
 }
 
-// ../../utils/src/codegraph/process-exec.ts
+// ../../../../utils/src/codegraph/process-exec.ts
 function enumerateCodegraphProcesses(platform = process.platform) {
   return platform === "win32" ? enumerateWindowsProcesses() : enumeratePosixProcesses();
 }
@@ -2265,10 +2435,10 @@ function processKillErrorMeansAlive(error) {
   return false;
 }
 
-// ../../utils/src/codegraph/process-roots.ts
-import { existsSync as existsSync6, readdirSync as readdirSync2, realpathSync as realpathSync4 } from "node:fs";
+// ../../../../utils/src/codegraph/process-roots.ts
+import { existsSync as existsSync6, readdirSync as readdirSync2, realpathSync as realpathSync5 } from "node:fs";
 import { homedir as homedir9 } from "node:os";
-import { join as join9, resolve as resolve5 } from "node:path";
+import { join as join10, resolve as resolve6 } from "node:path";
 function discoverCodegraphOwnedRoots(options = {}) {
   const env = options.env ?? process.env;
   const homeDir = options.homeDir ?? env["HOME"] ?? env["USERPROFILE"] ?? homedir9();
@@ -2278,33 +2448,33 @@ function discoverCodegraphOwnedRoots(options = {}) {
   addRoot(roots, options.pluginRoot);
   for (const root of options.extraRoots ?? [])
     addRoot(roots, root);
-  for (const root of readCodexPluginCacheRoots(options.codexHome ?? env["CODEX_HOME"] ?? join9(homeDir, ".codex"))) {
+  for (const root of readCodexPluginCacheRoots(options.codexHome ?? env["CODEX_HOME"] ?? join10(homeDir, ".codex"))) {
     addRoot(roots, root);
   }
   return [...roots];
 }
 function readCodexPluginCacheRoots(codexHome) {
-  const cacheRoot = join9(codexHome, "plugins", "cache");
+  const cacheRoot = join10(codexHome, "plugins", "cache");
   if (!existsSync6(cacheRoot))
     return [];
   const roots = [];
   for (const publisher of safeReadDir(cacheRoot)) {
     if (!OMO_CODEX_PLUGIN_CACHE_PUBLISHERS.has(publisher))
       continue;
-    const omoRoot = join9(cacheRoot, publisher, "omo");
+    const omoRoot = join10(cacheRoot, publisher, "omo");
     if (!existsSync6(omoRoot))
       continue;
     for (const version of safeReadDir(omoRoot))
-      roots.push(join9(omoRoot, version));
+      roots.push(join10(omoRoot, version));
   }
   return roots;
 }
 function addRoot(roots, root) {
   if (root === undefined || root.trim().length === 0)
     return;
-  const resolved = resolve5(root);
+  const resolved = resolve6(root);
   roots.add(resolved);
-  roots.add(realpathIfPossible2(resolved));
+  roots.add(realpathIfPossible3(resolved));
 }
 function safeReadDir(path) {
   try {
@@ -2315,12 +2485,12 @@ function safeReadDir(path) {
     throw error;
   }
 }
-function realpathIfPossible2(path) {
+function realpathIfPossible3(path) {
   try {
-    return realpathSync4(path);
+    return realpathSync5(path);
   } catch (error) {
     if (error instanceof Error)
-      return resolve5(path);
+      return resolve6(path);
     throw error;
   }
 }
@@ -2332,13 +2502,13 @@ function isNonFatalFsError(error) {
 }
 var OMO_CODEX_PLUGIN_CACHE_PUBLISHERS = new Set(["sisyphuslabs"]);
 
-// ../../utils/src/codegraph/process-sweeper.ts
+// ../../../../utils/src/codegraph/process-sweeper.ts
 var DEFAULT_GRACE_MS = 2000;
 var DEFAULT_THROTTLE_MS = 60 * 60 * 1000;
 var SWEEP_STAMP_FILE = "zombie-sweep.stamp";
 async function sweepCodegraphZombies(options = {}) {
   const homeDir = options.homeDir ?? options.env?.["HOME"] ?? options.env?.["USERPROFILE"] ?? homedir10();
-  const stampFile = join10(codegraphDataRoot(homeDir), SWEEP_STAMP_FILE);
+  const stampFile = join11(codegraphDataRoot(homeDir), SWEEP_STAMP_FILE);
   const nowMs = options.nowMs ?? Date.now();
   const dryRun = options.dryRun === true;
   const ownedRoots = options.ownedRoots ?? discoverCodegraphOwnedRoots(options);
@@ -2351,14 +2521,34 @@ async function sweepCodegraphZombies(options = {}) {
       ownedRoots,
       ...options.platform === undefined ? {} : { platform: options.platform }
     });
-    const result = dryRun ? { failed: [], killed: [] } : await killCandidates(candidates, options.killer ?? createDefaultCodegraphProcessKiller(options.platform), options);
+    const { killList, spared } = partitionByDaemonStaleness(candidates, options.log);
+    const result = dryRun ? { failed: [], killed: [] } : await killCandidates(killList, options.killer ?? createDefaultCodegraphProcessKiller(options.platform), options);
     if (!dryRun)
       writeSweepStamp(stampFile, nowMs);
-    return { action: "swept", candidates, dryRun, failed: result.failed, killed: result.killed, ownedRoots, stampFile };
+    return { action: "swept", candidates, dryRun, failed: result.failed, killed: result.killed, ownedRoots, spared, stampFile };
   } catch (error) {
     options.log?.(`CodeGraph zombie sweep skipped: ${error instanceof Error ? error.message : String(error)}`);
     return emptyResult("failed", dryRun, ownedRoots, stampFile);
   }
+}
+function partitionByDaemonStaleness(candidates, log) {
+  const killList = [];
+  const spared = [];
+  for (const candidate of candidates) {
+    if (candidate.matchKind !== "upstream-daemon") {
+      killList.push(candidate);
+      continue;
+    }
+    const staleness = evaluateDaemonStaleness(candidate.pid, candidate.daemonProjectRoot ?? candidate.matchedRoot);
+    if (staleness.stale) {
+      log?.(`CodeGraph zombie sweep sweeping stale daemon pid ${candidate.pid} (${staleness.reason})`);
+      killList.push(candidate);
+      continue;
+    }
+    log?.(`CodeGraph zombie sweep spared live daemon pid ${candidate.pid} (${staleness.reason})`);
+    spared.push(candidate);
+  }
+  return { killList, spared };
 }
 async function killCandidates(candidates, killer, options) {
   const failed = [];
@@ -2405,14 +2595,14 @@ function isSweepThrottled(stampFile, nowMs, throttleMs) {
   return nowMs - statSync2(stampFile).mtimeMs < throttleMs;
 }
 function writeSweepStamp(stampFile, nowMs) {
-  mkdirSync2(dirname4(stampFile), { recursive: true });
+  mkdirSync2(dirname5(stampFile), { recursive: true });
   writeFileSync2(stampFile, `${new Date(nowMs).toISOString()}
 `);
   const stampDate = new Date(nowMs);
   utimesSync(stampFile, stampDate, stampDate);
 }
 function emptyResult(action, dryRun, ownedRoots, stampFile) {
-  return { action, candidates: [], dryRun, failed: [], killed: [], ownedRoots, stampFile };
+  return { action, candidates: [], dryRun, failed: [], killed: [], ownedRoots, spared: [], stampFile };
 }
 function delay(ms) {
   if (ms <= 0)
@@ -2421,7 +2611,7 @@ function delay(ms) {
     setTimeout(resolvePromise, ms);
   });
 }
-// components/codegraph/src/hook-sweep.ts
+// src/hook-sweep.ts
 async function sweepCodegraphZombiesBestEffort(options, sweep = sweepCodegraphZombies) {
   try {
     await sweep({
@@ -2437,14 +2627,14 @@ function defaultPluginRoot() {
   return fileURLToPath(new URL("../../..", import.meta.url));
 }
 
-// components/codegraph/src/session-start-worker.ts
+// src/session-start-worker.ts
 import { execFile as execFile3 } from "node:child_process";
 import { appendFileSync as appendFileSync2, existsSync as existsSync9, mkdirSync as mkdirSync3 } from "node:fs";
 import { homedir as homedir12 } from "node:os";
-import { extname, join as join12 } from "node:path";
+import { extname, join as join13 } from "node:path";
 import { cwd as processCwd, env as processEnv, execPath as processExecPath, stderr as processStderr } from "node:process";
 
-// ../../utils/src/codegraph/manifest.ts
+// ../../../../utils/src/codegraph/manifest.ts
 var CODEGRAPH_PINNED_VERSION = "1.4.1";
 var CODEGRAPH_PROVISION_MANIFEST = {
   assets: {
@@ -2482,13 +2672,13 @@ var CODEGRAPH_PROVISION_MANIFEST = {
   version: CODEGRAPH_PINNED_VERSION
 };
 
-// ../../utils/src/codegraph/provision.ts
+// ../../../../utils/src/codegraph/provision.ts
 import { createHash as createHash2, randomUUID } from "node:crypto";
 import { execFile as execFile2 } from "node:child_process";
 import { chmod, mkdir, readdir, readFile, rename, rm, rmdir, stat, writeFile } from "node:fs/promises";
 import { existsSync as existsSync8 } from "node:fs";
 import { homedir as homedir11, hostname } from "node:os";
-import { basename as basename3, join as join11 } from "node:path";
+import { basename as basename3, join as join12 } from "node:path";
 import { promisify } from "node:util";
 var DEFAULT_LOCK_WAIT_MS = 5000;
 var DEFAULT_LOCK_STALE_MS = 120000;
@@ -2498,10 +2688,10 @@ function platformKey() {
   return `${process.platform}-${process.arch}`;
 }
 function markerPath(installDir, version) {
-  return join11(installDir, ".provisioned", `codegraph-${version}.json`);
+  return join12(installDir, ".provisioned", `codegraph-${version}.json`);
 }
 function defaultInstallDir() {
-  return join11(homedir11(), ".omo", "codegraph");
+  return join12(homedir11(), ".omo", "codegraph");
 }
 function sha256(bytes) {
   return createHash2("sha256").update(bytes).digest("hex");
@@ -2521,7 +2711,7 @@ async function removeEmptyDirectory(path) {
   }
 }
 function sleep(ms) {
-  return new Promise((resolve6) => setTimeout(resolve6, ms));
+  return new Promise((resolve7) => setTimeout(resolve7, ms));
 }
 async function defaultDownloader(asset, timeoutMs = DEFAULT_DOWNLOAD_TIMEOUT_MS) {
   const response = await fetch(asset.url, { signal: AbortSignal.timeout(timeoutMs) });
@@ -2535,7 +2725,7 @@ function forcedBadChecksumOptions(options) {
   const key = options.platformKey ?? platformKey();
   return {
     downloader: async () => new TextEncoder().encode("checksum mismatch"),
-    installDir: options.installDir ?? join11(options.lockDir, "codegraph-force-bad-checksum"),
+    installDir: options.installDir ?? join12(options.lockDir, "codegraph-force-bad-checksum"),
     manifest: {
       assets: {
         [key]: { executableName: process.platform === "win32" ? "codegraph.cmd" : "codegraph", sha256: "0000", url: "memory://bad" }
@@ -2563,7 +2753,7 @@ async function readMarker(path) {
 }
 async function acquireLock(lockPath, waitMs, staleMs) {
   const startedAt = Date.now();
-  await mkdir(join11(lockPath, ".."), { recursive: true });
+  await mkdir(join12(lockPath, ".."), { recursive: true });
   while (Date.now() - startedAt <= waitMs) {
     try {
       await mkdir(lockPath);
@@ -2588,14 +2778,14 @@ async function installExtractedBundle(extractDir, installDir, executableName) {
   const roots = await readdir(extractDir);
   if (roots.length !== 1)
     throw new Error(`CodeGraph archive should contain one root directory, found ${roots.length}`);
-  const bundleDir = join11(extractDir, roots[0] ?? "");
+  const bundleDir = join12(extractDir, roots[0] ?? "");
   const bundleEntries = await readdir(bundleDir);
   await mkdir(installDir, { recursive: true });
   for (const entry of bundleEntries) {
-    await rm(join11(installDir, entry), { force: true, recursive: true });
-    await rename(join11(bundleDir, entry), join11(installDir, entry));
+    await rm(join12(installDir, entry), { force: true, recursive: true });
+    await rename(join12(bundleDir, entry), join12(installDir, entry));
   }
-  const destination = join11(installDir, "bin", executableName);
+  const destination = join12(installDir, "bin", executableName);
   if (!existsSync8(destination))
     throw new Error(`CodeGraph archive did not contain bin/${executableName}`);
   await chmod(destination, 493);
@@ -2603,9 +2793,9 @@ async function installExtractedBundle(extractDir, installDir, executableName) {
 }
 async function installAsset(layout) {
   const { asset, downloader, installDir, version } = layout;
-  const stagingDir = join11(installDir, ".staging", randomUUID());
-  const archivePath = join11(stagingDir, basename3(asset.url));
-  const extractDir = join11(stagingDir, "extract");
+  const stagingDir = join12(installDir, ".staging", randomUUID());
+  const archivePath = join12(stagingDir, basename3(asset.url));
+  const extractDir = join12(stagingDir, "extract");
   try {
     await mkdir(extractDir, { recursive: true });
     const bytes = await downloader(asset);
@@ -2619,13 +2809,13 @@ async function installAsset(layout) {
     await writeFile(archivePath, bytes);
     await extractTarGz(archivePath, extractDir);
     const destination = await installExtractedBundle(extractDir, installDir, asset.executableName);
-    await mkdir(join11(installDir, ".provisioned"), { recursive: true });
+    await mkdir(join12(installDir, ".provisioned"), { recursive: true });
     await writeFile(markerPath(installDir, version), `${JSON.stringify({ binPath: destination, version })}
 `);
     return destination;
   } finally {
     await rm(stagingDir, { force: true, recursive: true });
-    await removeEmptyDirectory(join11(installDir, ".staging"));
+    await removeEmptyDirectory(join12(installDir, ".staging"));
   }
 }
 async function ensureCodegraphProvisioned(options) {
@@ -2638,7 +2828,7 @@ async function ensureCodegraphProvisioned(options) {
   const existing = await readMarker(marker);
   if (existing !== null)
     return { binPath: existing, provisioned: true };
-  const lockPath = join11(options.lockDir, `codegraph-${hostname()}.lock`);
+  const lockPath = join12(options.lockDir, `codegraph-${hostname()}.lock`);
   const release = await acquireLock(lockPath, options.lockWaitMs ?? DEFAULT_LOCK_WAIT_MS, options.lockStaleMs ?? DEFAULT_LOCK_STALE_MS);
   if (release === null)
     return { error: "timed out waiting for codegraph provisioning lock", provisioned: false };
@@ -2662,7 +2852,7 @@ async function ensureCodegraphProvisioned(options) {
   }
 }
 
-// components/codegraph/src/session-start-worker.ts
+// src/session-start-worker.ts
 var SESSION_START_CWD_ENV = "OMO_CODEGRAPH_SESSION_START_CWD";
 var CODEGRAPH_VERSION = CODEGRAPH_PINNED_VERSION;
 var COMMAND_TIMEOUT_MS = 60000;
@@ -2728,8 +2918,8 @@ async function resolveOrProvisionCommand(deps, config, env, homeDir, nodeSupport
     return { kind: "unsupported-node" };
   if (config.auto_provision === false)
     return { error: "codegraph binary unavailable and auto_provision is disabled", kind: "unavailable", source: resolved.source };
-  const installDir = trustedInstallDir ?? join12(homeDir, ".omo", "codegraph");
-  const provisioned = await deps.ensureProvisioned({ installDir, lockDir: join12(installDir, ".locks"), version: CODEGRAPH_VERSION });
+  const installDir = trustedInstallDir ?? join13(homeDir, ".omo", "codegraph");
+  const provisioned = await deps.ensureProvisioned({ installDir, lockDir: join13(installDir, ".locks"), version: CODEGRAPH_VERSION });
   if (!provisioned.provisioned || provisioned.binPath === undefined) {
     return { error: provisioned.error ?? "provisioning did not produce a binary", kind: "unavailable", source: resolved.source };
   }
@@ -2797,9 +2987,9 @@ function resolveCodegraphCommandInvocation(command, args, platform = process.pla
   return { args: ["/d", "/s", "/c", command, ...args], command: "cmd.exe" };
 }
 function appendOutcome(homeDir, outcome) {
-  const logDir = join12(homeDir, ".omo", "codegraph");
+  const logDir = join13(homeDir, ".omo", "codegraph");
   mkdirSync3(logDir, { recursive: true });
-  appendFileSync2(join12(logDir, "session-start.jsonl"), `${JSON.stringify({ ...outcome, timestamp: new Date().toISOString() })}
+  appendFileSync2(join13(logDir, "session-start.jsonl"), `${JSON.stringify({ ...outcome, timestamp: new Date().toISOString() })}
 `);
 }
 function safeLogOutcome(logOutcome, outcome) {
@@ -2816,7 +3006,7 @@ function safeLogOutcome(logOutcome, outcome) {
 function provisionedBinFromInstallDir(installDir) {
   if (installDir === undefined)
     return null;
-  const candidate = join12(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
+  const candidate = join13(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
   return existsSync9(candidate) ? candidate : null;
 }
 function resolveExitCode(error) {
@@ -2843,7 +3033,7 @@ function isRecord4(value) {
   return typeof value === "object" && value !== null;
 }
 
-// components/codegraph/src/hook.ts
+// src/hook.ts
 var CODEGRAPH_SESSION_START_NOTICE = "LazyCodex CodeGraph bootstrap scheduled in background";
 var STATUS_PROBE_TIMEOUT_MS = 2000;
 async function runCodegraphSessionStartHook(options = {}) {
@@ -2949,7 +3139,7 @@ function codegraphStatusSaysInitialized(stdout) {
 function provisionedBinFromInstallDir2(installDir) {
   if (installDir === undefined)
     return null;
-  return join13(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
+  return join14(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
 }
 async function executeCodegraphPostToolUseHook(options = {}) {
   const env = options.env ?? processEnv2;
@@ -3038,10 +3228,10 @@ function defaultWorkerCliPath() {
   return fileURLToPath2(import.meta.url);
 }
 
-// components/codegraph/src/serve.ts
-import { existsSync as existsSync10, realpathSync as realpathSync5 } from "node:fs";
+// src/serve.ts
+import { existsSync as existsSync10, realpathSync as realpathSync6 } from "node:fs";
 import { homedir as homedir14 } from "node:os";
-import { basename as basename4, join as join14, resolve as resolve6 } from "node:path";
+import { basename as basename4, join as join15, resolve as resolve7 } from "node:path";
 import {
   cwd as processCwd3,
   env as processEnv3,
@@ -3051,14 +3241,14 @@ import {
 } from "node:process";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 
-// components/codegraph/src/mcp-bridge.ts
+// src/mcp-bridge.ts
 import { spawn as spawn2 } from "node:child_process";
 
-// ../../mcp-stdio-core/src/record.ts
+// ../../../../mcp-stdio-core/src/record.ts
 function isPlainRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-// ../../mcp-stdio-core/src/responses.ts
+// ../../../../mcp-stdio-core/src/responses.ts
 function successResponse(id, result) {
   return { jsonrpc: "2.0", id, result };
 }
@@ -3071,7 +3261,7 @@ function jsonRpcId(value) {
 function messageFromError(error) {
   return error instanceof Error ? error.message : String(error);
 }
-// ../../mcp-stdio-core/src/transport.ts
+// ../../../../mcp-stdio-core/src/transport.ts
 var HEADER_SEPARATOR = Buffer.from(`\r
 \r
 `);
@@ -3102,7 +3292,7 @@ ${body}` : `${body}
   await writeChunk(output, payload);
 }
 function writeChunk(output, chunk) {
-  return new Promise((resolve6, reject) => {
+  return new Promise((resolve7, reject) => {
     let settled = false;
     const onError = (error) => {
       if (settled)
@@ -3122,7 +3312,7 @@ function writeChunk(output, chunk) {
           return;
         }
         output.removeListener("error", onError);
-        resolve6();
+        resolve7();
       });
     } catch (error) {
       output.removeListener("error", onError);
@@ -3212,7 +3402,7 @@ function bufferFromChunk(chunk) {
   throw new TypeError(`Unsupported stdio chunk type: ${typeof chunk}`);
 }
 
-// ../../mcp-stdio-core/src/server.ts
+// ../../../../mcp-stdio-core/src/server.ts
 var DEFAULT_IDLE_TIMEOUT_MS = 10 * 60000;
 var noopLog = () => {};
 async function runJsonRpcStdioServer(config) {
@@ -3316,7 +3506,7 @@ function createIdleTimer(idleTimeoutMs, log, onIdleTimeout) {
     closed: () => isClosed
   };
 }
-// components/codegraph/src/serve-invocation.ts
+// src/serve-invocation.ts
 import { extname as extname2 } from "node:path";
 import { execPath as processExecPath2 } from "node:process";
 var WINDOWS_CMD_EXTENSIONS2 = new Set([".bat", ".cmd"]);
@@ -3334,7 +3524,7 @@ function resolveServeProcessInvocation(command, args, platform = process.platfor
   return { args: [...args], command };
 }
 
-// components/codegraph/src/mcp-bridge.ts
+// src/mcp-bridge.ts
 class CodegraphBridgeStdioError extends Error {
   streamName;
   name = "CodegraphBridgeStdioError";
@@ -3547,7 +3737,7 @@ async function writeLine(output, line) {
   });
 }
 
-// components/codegraph/src/mcp-unavailable.ts
+// src/mcp-unavailable.ts
 async function runUnavailableCodegraphMcpServer(options) {
   await runJsonRpcStdioServer({
     handler: handleUnavailableCodegraphMcpRequest,
@@ -3593,7 +3783,7 @@ function requestedProtocolVersion(params) {
   return params["protocolVersion"];
 }
 
-// components/codegraph/src/serve.ts
+// src/serve.ts
 var CODEGRAPH_SKIP_HINT = `CodeGraph MCP skipped: codegraph binary not found. Install CodeGraph or set OMO_CODEGRAPH_BIN.
 `;
 var CODEGRAPH_DISABLED_HINT = `CodeGraph MCP skipped: disabled by OMO SOT config. Set [codex].codegraph.enabled=true to enable it.
@@ -3674,10 +3864,10 @@ async function provisionMissingCodegraph(options) {
     return null;
   if (options.config.auto_provision === false)
     return null;
-  const installDir = options.trustedInstallDir ?? join14(options.homeDir, ".omo", "codegraph");
+  const installDir = options.trustedInstallDir ?? join15(options.homeDir, ".omo", "codegraph");
   const result = await options.ensureProvisioned({
     installDir,
-    lockDir: join14(installDir, ".locks"),
+    lockDir: join15(installDir, ".locks"),
     version: CODEGRAPH_VERSION2
   });
   if (!result.provisioned || result.binPath === undefined)
@@ -3703,16 +3893,16 @@ function resolveProjectCwd(env, fallback) {
     const candidate = env[key]?.trim();
     if (candidate === undefined || candidate.length === 0)
       continue;
-    const resolved = resolve6(candidate);
+    const resolved = resolve7(candidate);
     if (existsSync10(resolved))
       return resolved;
   }
-  return resolve6(fallback);
+  return resolve7(fallback);
 }
 function provisionedBinFromInstallDir3(installDir) {
   if (installDir === undefined)
     return null;
-  const candidate = join14(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
+  const candidate = join15(installDir, "bin", process.platform === "win32" ? "codegraph.cmd" : "codegraph");
   return existsSync10(candidate) ? candidate : null;
 }
 async function runCodegraphServeCli() {
@@ -3732,10 +3922,10 @@ function isDirectInvocation(argvPath) {
   const moduleName = basename4(modulePath);
   if (moduleName !== "serve.js" && moduleName !== "serve.ts")
     return false;
-  return realpathSync5(resolve6(argvPath)) === realpathSync5(modulePath);
+  return realpathSync6(resolve7(argvPath)) === realpathSync6(modulePath);
 }
 
-// components/codegraph/src/sweep-cli.ts
+// src/sweep-cli.ts
 async function runCodegraphSweepCli(options = {}) {
   const args = parseSweepCliArgs(options.argv ?? process.argv);
   const result = await sweepCodegraphZombies({
@@ -3779,6 +3969,7 @@ function writeSweepReport(stdout, result) {
     failed: result.failed,
     killed: result.killed.map(formatProcess),
     ownedRoots: result.ownedRoots,
+    spared: result.spared.map(formatProcess),
     stampFile: result.stampFile
   })}
 `);
@@ -3792,7 +3983,7 @@ function formatProcess(processInfo) {
   };
 }
 
-// components/codegraph/src/cli.ts
+// src/cli.ts
 async function runCodegraphCli(options = {}) {
   const argv = options.argv ?? process.argv;
   const command = argv[2];
@@ -3842,7 +4033,7 @@ function isDirectInvocation2(argvPath) {
   const moduleName = basename5(modulePath);
   if (moduleName !== "cli.js" && moduleName !== "cli.ts")
     return false;
-  return realpathSync6(resolve7(argvPath)) === realpathSync6(modulePath);
+  return realpathSync7(resolve8(argvPath)) === realpathSync7(modulePath);
 }
 export {
   runCodegraphCli
