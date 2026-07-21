@@ -24,15 +24,15 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     })
   })
 
-  test("sisyphus keeps opus primary before kimi-k3, k2p5, kimi-k2.5, gpt-5.5 medium, and big-pickle", () => {
+  test("sisyphus keeps opus primary before the consolidated Kimi K3, GPT, GLM, and big-pickle fallbacks", () => {
     // given
     const sisyphus = AGENT_MODEL_REQUIREMENTS["sisyphus"]
 
     // when
-    const [primary, second, third, fourth, fifth, sixth, seventh, last] = sisyphus.fallbackChain
+    const [primary, second, third, fourth, last] = sisyphus.fallbackChain
 
     // then
-    expect(sisyphus.fallbackChain).toHaveLength(8)
+    expect(sisyphus.fallbackChain).toHaveLength(5)
     expect(sisyphus.requiresAnyModel).toBe(true)
     expect(primary).toEqual({
       providers: ["anthropic", "github-copilot", "opencode", "vercel"],
@@ -40,19 +40,27 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       variant: "max",
     })
     expect(second).toEqual({
-      providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode", "vercel"],
+      providers: [
+        "opencode-go",
+        "kimi-for-coding",
+        "moonshotai",
+        "opencode",
+        "vercel",
+        "bailian-coding-plan",
+        "moonshotai-cn",
+        "firmware",
+        "ollama-cloud",
+        "aihubmix",
+      ],
       model: "kimi-k3",
     })
-    expect(third).toEqual({ providers: ["opencode-go", "vercel"], model: "kimi-k2.6" })
-    expect(fourth).toEqual({ providers: ["kimi-for-coding"], model: "k2p5" })
-    expect(fifth?.model).toBe("kimi-k2.5")
-    expect(sixth).toEqual({
+    expect(third).toEqual({
       providers: ["openai", "github-copilot", "opencode", "vercel"],
       model: "gpt-5.5",
       variant: "medium",
     })
-    expect(seventh?.providers[0]).toBe("zai-coding-plan")
-    expect(seventh?.model).toBe("glm-5")
+    expect(fourth?.providers[0]).toBe("zai-coding-plan")
+    expect(fourth?.model).toBe("glm-5")
     expect(last?.providers[0]).toBe("opencode")
     expect(last?.model).toBe("big-pickle")
   })
@@ -128,7 +136,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       model: "gpt-5.5",
       variant: "medium",
     })
-    expect(secondary).toEqual({ providers: ["opencode-go", "vercel"], model: "kimi-k2.6" })
+    expect(secondary).toEqual({ providers: ["opencode-go", "vercel"], model: "kimi-k3" })
     expect(tertiary?.model).toBe("glm-4.6v")
     expect(last).toEqual({
       providers: ["openai", "github-copilot", "opencode", "vercel"],
@@ -169,6 +177,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     })
     expect(opusFallback?.model).toBe("claude-opus-4-8")
     expect(opusFallback?.variant).toBe("max")
+    expect(metis.fallbackChain.at(-1)).toEqual({ providers: ["kimi-for-coding"], model: "kimi-k3" })
     expect(openAiFallback).toEqual({
       providers: ["openai", "github-copilot", "opencode", "vercel"],
       model: "gpt-5.5",
@@ -218,7 +227,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(atlas.fallbackChain).toHaveLength(6)
     expect(primary?.model).toBe("claude-sonnet-4-6")
     expect(primary?.providers[0]).toBe("anthropic")
-    expect(secondary?.model).toBe("kimi-k2.6")
+    expect(secondary?.model).toBe("kimi-k3")
     expect(secondary?.providers[0]).toBe("opencode-go")
     expect(tertiary).toEqual({
       providers: ["openai", "github-copilot", "opencode", "vercel"],

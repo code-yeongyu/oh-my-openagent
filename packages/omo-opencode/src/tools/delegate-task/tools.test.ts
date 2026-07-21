@@ -2772,7 +2772,7 @@ describe("sisyphus-task", () => {
           anthropic: ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"],
           google: ["gemini-3.1-pro", "gemini-3-flash"],
         openai: ["gpt-5.5", "gpt-5.5", "gpt-5.5"],
-          "kimi-for-coding": ["k2p5"],
+          "kimi-for-coding": ["kimi-k3"],
         },
         connected: ["anthropic", "google", "openai", "kimi-for-coding"],
         updatedAt: "2026-01-01T00:00:00.000Z",
@@ -3643,7 +3643,7 @@ describe("sisyphus-task", () => {
         {
           name: "writing",
           description: "Documentation, prose, technical writing",
-          model: "kimi-for-coding/k2p5",
+          model: "kimi-for-coding/kimi-k3",
         },
       ]
       const availableSkills = [
