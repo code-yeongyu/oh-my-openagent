@@ -95,8 +95,8 @@ export function requireBatchFinalReady(plan: UlwLoopPlan, goal: UlwLoopItem): vo
 	if (open.length > 0) throw new UlwLoopError("Validation batch has unresolved members.", "ULW_LOOP_VALIDATION_BATCH_OPEN", { details: { batchId: batch.batchId, open } });
 }
 
-export function requireAllValidationBatchesClosed(plan: UlwLoopPlan): void {
-	const open = (plan.validationBatches ?? []).filter((batch) => batch.memberIds.some((id) => !memberResolved(plan, id)));
+export function requireAllValidationBatchesClosed(plan: UlwLoopPlan, closingGoalId?: string): void {
+	const open = (plan.validationBatches ?? []).filter((batch) => batch.memberIds.some((id) => id !== closingGoalId && !memberResolved(plan, id)));
 	if (open.length > 0) throw new UlwLoopError("Validation batches remain open.", "ULW_LOOP_VALIDATION_BATCH_OPEN", { details: { batchIds: open.map((batch) => batch.batchId) } });
 }
 

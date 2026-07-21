@@ -171,10 +171,11 @@ export async function checkpointUlwLoop(
 		if (args.status === "complete") {
 			const aggregate = codexGoalMode(plan) === "aggregate";
 			const final = isFinalRunCompletionCandidate(plan, goal);
+			const closesBatch = batchClosedBy(plan, goal.id) !== undefined;
 			if (final) {
 				requireAllCriteriaPass(goal);
 				requireAllPlanCriteriaPass(plan);
-				requireAllValidationBatchesClosed(plan);
+				requireAllValidationBatchesClosed(plan, goal.id);
 			} else if (aggregate) requireEssentialCriteriaPass(goal);
 			else requireAllCriteriaPass(goal);
 			const snapshot = await readCodexGoalSnapshotInput(args.codexGoalJson, repoRoot);
@@ -221,7 +222,6 @@ export async function checkpointUlwLoop(
 						"ulw_loop_codex_snapshot_mismatch",
 					);
 			}
-			const closesBatch = batchClosedBy(plan, goal.id) !== undefined;
 			if (closesBatch) requireBatchFinalReady(plan, goal);
 			if (closesBatch && args.qualityGateJson === undefined)
 				throw new UlwLoopError("Validation batch final checkpoint requires --quality-gate-json.", "ULW_LOOP_VALIDATION_BATCH_GATE_REQUIRED");

@@ -98,6 +98,30 @@ describe("validation-batch checkpoint enforcement", () => {
 		);
 	});
 
+	it("#given batch-final goal is also run-final #when completing it #then closes batch and aggregate", async () => {
+		const repo = await repoWith(
+			plan([
+				goal({ id: "G001", status: "complete", successCriteria: [criterion("C001", "pass")] }),
+				goal({ id: "G002", status: "complete", successCriteria: [criterion("C001", "pass")] }),
+				goal({ id: "G003", status: "in_progress", successCriteria: [criterion("C001", "pass")] }),
+			], { validationBatches: [{ batchId: "VB002", memberIds: ["G002", "G003"], finalGoalId: "G003" }] }),
+		);
+
+		const gate = JSON.parse(await qualityGateJson(repo, undefined, "G003"));
+		gate.criteriaCoverage.totalCriteria = 2;
+		gate.criteriaCoverage.passCount = 2;
+		const result = await checkpointUlwLoop(repo, {
+			goalId: "G003",
+			status: "complete",
+			evidence: "batch final is also aggregate final",
+			codexGoalJson: snapshot("complete"),
+			qualityGateJson: JSON.stringify(gate),
+		});
+
+		expect(result.aggregateCompletion?.status).toBe("complete");
+		expect((await readUlwLoopPlan(repo)).goals.find((item) => item.id === "G003")?.status).toBe("complete");
+	});
+
 	it("#given all batch checks pass #when completing final member #then appends batch closed", async () => {
 		const repo = await repoWith(
 			plan([
