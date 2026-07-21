@@ -132,21 +132,29 @@ describe("runCodegraphServe unavailable CodeGraph paths", () => {
 		stdout.resume();
 		const stderr: string[] = [];
 
-		// when
-		const exitCode = await runCodegraphServe({
-			config: { codegraph: { enabled: false }, sources: [], warnings: [] },
-			env: {},
-			stdin,
-			stdout,
-			stderr: { write: (chunk: string) => stderr.push(chunk) },
-			parentWatchdog: { pollIntervalMs: 10, probeAlive: () => false },
-		});
+		try {
+			// when
+			const exitCode = await runCodegraphServe({
+				config: { codegraph: { enabled: false }, sources: [], warnings: [] },
+				env: {},
+				stdin,
+				stdout,
+				stderr: { write: (chunk: string) => stderr.push(chunk) },
+				parentWatchdog: { pollIntervalMs: 10, probeAlive: () => false },
+			});
 
-		// then
-		expect(exitCode).toBe(0);
-		expect(stderr).toEqual([
-			"CodeGraph MCP skipped: disabled by OMO SOT config. Set [codex].codegraph.enabled=true to enable it.\n",
-		]);
+			// then
+			expect(exitCode).toBe(0);
+			expect(stderr).toEqual([
+				"CodeGraph MCP skipped: disabled by OMO SOT config. Set [codex].codegraph.enabled=true to enable it.\n",
+			]);
+		} finally {
+			// The held-open streams are never ended by the test; destroy them so the
+			// bun test runner's event loop can drain and exit (an undestroyed
+			// PassThrough keeps the process alive on win32 and hangs the suite).
+			stdin.destroy();
+			stdout.destroy();
+		}
 	});
 });
 

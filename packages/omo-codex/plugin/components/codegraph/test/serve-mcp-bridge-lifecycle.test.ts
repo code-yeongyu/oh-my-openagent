@@ -126,6 +126,7 @@ describe("runCodegraphServe MCP bridge lifecycle", () => {
 				process.kill(childPid, "SIGKILL");
 			}
 			input.destroy();
+			output.destroy();
 			rmSync(tempRoot, { recursive: true, force: true });
 		}
 	});
