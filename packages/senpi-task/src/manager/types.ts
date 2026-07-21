@@ -10,7 +10,7 @@ import type {
   SendOutcome,
 } from "../steering"
 import type { TaskRecordStore } from "../store"
-import type { ManagedChildHandle } from "./child-handle"
+import type { ManagedChildHandle, ManagedChildListener } from "./child-handle"
 import type { ExecutionMode } from "./execution-mode"
 
 export type { ExecutionMode } from "./execution-mode"
@@ -184,6 +184,8 @@ export type TaskManager = {
   // Live-handle read seam for the wiring's ResidencyRegistry (W1-V F7: registry and #live share one
   // forget path). Returns the ManagedChildHandle for a task this process still owns, if any.
   getResidentHandle(taskId: string): ManagedChildHandle | undefined
+  // Subscribe at the runner-agnostic handle seam now or when a queued task is promoted.
+  subscribeChild(taskId: string, listener: ManagedChildListener): () => void
   residentTaskIds(): readonly string[]
   // Whether a task was spawned run_in_background, so the store-terminal completion bridge only
   // notifies background terminals (sync spawns are awaited inline by the tool).
