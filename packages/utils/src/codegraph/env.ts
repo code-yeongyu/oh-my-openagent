@@ -47,6 +47,12 @@ const SAFE_CODEGRAPH_RUNTIME_ENV_KEYS = new Set([
 
 export interface BuildCodegraphEnvOptions {
   readonly homeDir?: string
+  // When false (default), the child env pins CODEGRAPH_NO_DAEMON=1 so upstream
+  // never spawns its daemon. When true, the key is OMITTED entirely (never set
+  // to "0" — upstream treats any value except '0'/'false' as opt-out) so the
+  // daemon may run and an ambient CODEGRAPH_NO_DAEMON=1 can still escape-hatch
+  // back to daemon-off.
+  readonly daemon?: boolean
 }
 
 export interface BuildCodegraphChildEnvOptions {
@@ -57,7 +63,7 @@ export interface BuildCodegraphChildEnvOptions {
 
 export type CodegraphEnv = {
   readonly [CODEGRAPH_INSTALL_DIR_ENV]: string
-  readonly [CODEGRAPH_NO_DAEMON_ENV]: "1"
+  readonly [CODEGRAPH_NO_DAEMON_ENV]?: "1"
   readonly [CODEGRAPH_NO_DOWNLOAD_ENV]: "1"
   readonly [CODEGRAPH_TELEMETRY_ENV]: "0"
   readonly [DO_NOT_TRACK_ENV]: "1"
@@ -68,7 +74,7 @@ export function buildCodegraphEnv(options: BuildCodegraphEnvOptions = {}): Codeg
 
   return {
     [CODEGRAPH_INSTALL_DIR_ENV]: join(homeDir, ".omo", "codegraph"),
-    [CODEGRAPH_NO_DAEMON_ENV]: "1",
+    ...(options.daemon === true ? {} : { [CODEGRAPH_NO_DAEMON_ENV]: "1" as const }),
     [CODEGRAPH_NO_DOWNLOAD_ENV]: "1",
     [CODEGRAPH_TELEMETRY_ENV]: "0",
     [DO_NOT_TRACK_ENV]: "1",
@@ -96,6 +102,10 @@ export function buildCodegraphChildEnv(options: BuildCodegraphChildEnvOptions = 
   const env: Record<string, string> = {}
   copyDefinedEnvKeys(env, options.ambientEnv ?? {}, SAFE_AMBIENT_ENV_KEYS)
   copyDefinedEnvKeys(env, options.runtimeEnv ?? {}, SAFE_CODEGRAPH_RUNTIME_ENV_KEYS)
+  // codegraphEnv is applied LAST so our daemon policy wins over ambient input:
+  // with daemon disabled it pins CODEGRAPH_NO_DAEMON=1 over any ambient "0",
+  // and with daemon enabled it omits the key so an ambient "1" escape hatch
+  // (copied above) survives.
   copyDefinedEnv(env, options.codegraphEnv ?? {})
   return env
 }
