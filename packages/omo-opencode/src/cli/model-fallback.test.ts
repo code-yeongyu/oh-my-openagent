@@ -57,11 +57,11 @@ describe("generateModelConfig", () => {
         variant: "high",
         fallback_models: [
           {
-            model: "github-copilot/gpt-5.5",
+            model: "github-copilot/gpt-5.6-sol",
             variant: "high",
           },
           {
-            model: "github-copilot/claude-opus-4.7",
+            model: "github-copilot/claude-opus-4.8",
             variant: "max",
           },
           {
@@ -203,7 +203,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-7")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-8")
     })
 
     test("Sisyphus is created when multiple fallback providers are available", () => {
@@ -220,33 +220,31 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-7")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-8")
     })
 
-    test("Sisyphus resolves to gpt-5.5 medium when only OpenAI is available", () => {
-      // #given
+    test("Sisyphus is omitted when only OpenAI is available", () => {
+      // given
       const config = createConfig({ hasOpenAI: true })
 
-      // #when
+      // when
       const result = generateModelConfig(config)
 
-      // #then
-      expect(result.agents?.sisyphus?.model).toBe("openai/gpt-5.5")
-      expect(result.agents?.sisyphus?.variant).toBe("medium")
+      // then
+      expect(result.agents?.sisyphus).toBeUndefined()
     })
   })
 
   describe("OpenAI fallback coverage", () => {
-    test("Atlas resolves to OpenAI when only OpenAI is available", () => {
-      // #given
+    test("Atlas falls back to OpenCode nano when only OpenAI is available", () => {
+      // given
       const config = createConfig({ hasOpenAI: true })
 
-      // #when
+      // when
       const result = generateModelConfig(config)
 
-      // #then
-      expect(result.agents?.atlas?.model).toBe("openai/gpt-5.5")
-      expect(result.agents?.atlas?.variant).toBe("medium")
+      // then
+      expect(result.agents?.atlas).toEqual({ model: "opencode/gpt-5-nano" })
     })
 
     test("Metis resolves to OpenAI when only OpenAI is available", () => {
@@ -257,20 +255,19 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.metis?.model).toBe("openai/gpt-5.5")
-      expect(result.agents?.metis?.variant).toBe("high")
+      expect(result.agents?.metis?.model).toBe("openai/gpt-5.6-sol")
+      expect(result.agents?.metis?.variant).toBe("medium")
     })
 
-    test("Sisyphus-Junior resolves to OpenAI when only OpenAI is available", () => {
-      // #given
+    test("Sisyphus-Junior falls back to OpenCode nano when only OpenAI is available", () => {
+      // given
       const config = createConfig({ hasOpenAI: true })
 
-      // #when
+      // when
       const result = generateModelConfig(config)
 
-      // #then
-      expect(result.agents?.["sisyphus-junior"]?.model).toBe("openai/gpt-5.5")
-      expect(result.agents?.["sisyphus-junior"]?.variant).toBe("medium")
+      // then
+      expect(result.agents?.["sisyphus-junior"]).toEqual({ model: "opencode/gpt-5-nano" })
     })
   })
 
@@ -286,7 +283,7 @@ describe("generateModelConfig", () => {
       expect(result.agents?.momus?.model).toBe("openai/gpt-5.6-terra")
       expect(result.agents?.momus?.variant).toBe("high")
       expect(result.agents?.momus?.fallback_models?.[0]).toEqual({
-        model: "openai/gpt-5.5",
+        model: "openai/gpt-5.6-sol",
         variant: "xhigh",
       })
     })
@@ -302,26 +299,20 @@ describe("generateModelConfig", () => {
 
       // #then
       expect(result.agents?.hephaestus?.model).toBe("openai/gpt-5.6-sol")
-      expect(result.agents?.hephaestus?.variant).toBe("high")
+      expect(result.agents?.hephaestus?.variant).toBe("medium")
     })
 
-    test("Hephaestus uses Copilot GPT-5.6 Sol high when only Copilot is available", () => {
-      // #given
+    test("Hephaestus uses its merged Copilot GPT-5.6 Sol medium rung", () => {
+      // given
       const config = createConfig({ hasCopilot: true })
 
-      // #when
+      // when
       const result = generateModelConfig(config)
 
-      // #then
+      // then
       expect(result.agents?.hephaestus).toEqual({
         model: "github-copilot/gpt-5.6-sol",
-        variant: "high",
-        fallback_models: [
-          {
-            model: "github-copilot/gpt-5.5",
-            variant: "medium",
-          },
-        ],
+        variant: "medium",
       })
     })
 
@@ -333,7 +324,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.hephaestus?.model).toBe("opencode/gpt-5.5")
+      expect(result.agents?.hephaestus?.model).toBe("opencode/gpt-5.6-sol")
       expect(result.agents?.hephaestus?.variant).toBe("medium")
     })
 
@@ -528,7 +519,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then should prefer native anthropic over gateway
-      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-7")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-8")
     })
   })
 
@@ -556,7 +547,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then OpenCode Go stays primary and MiniMax M3 ordering is preserved in fallbacks
-      expect(result.agents?.atlas?.model).toBe("opencode-go/kimi-k2.6")
+      expect(result.agents?.atlas?.model).toBe("opencode-go/kimi-k3")
       expect(result.agents?.atlas?.fallback_models?.[0]?.model).toBe("opencode-go/minimax-m3")
       expect(result.agents?.atlas?.fallback_models?.[1]?.model).toBe("minimax-coding-plan/MiniMax-M3")
       expect(result.agents?.atlas?.fallback_models?.[2]?.model).toBe("opencode-go/minimax-m2.7")

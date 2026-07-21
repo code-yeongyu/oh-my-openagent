@@ -6,6 +6,22 @@ import {
 } from "@oh-my-opencode/model-core"
 
 describe("transformModelForProvider", () => {
+  describe("kimi-for-coding provider", () => {
+    test("preserves the canonical kimi-k3 model id", () => {
+      // given
+      const provider = "kimi-for-coding"
+      const model = "kimi-k3"
+
+      // when
+      const displayModel = transformModelForProvider(provider, model)
+      const runtimeModel = transformRuntimeModelForProvider(provider, model)
+
+      // then
+      expect(displayModel).toBe("kimi-k3")
+      expect(runtimeModel).toBe("kimi-k3")
+    })
+  })
+
   describe("github-copilot provider", () => {
     test("transforms claude-opus-4-7 to claude-opus-4.7", () => {
       // #given github-copilot provider and claude-opus-4-7 model

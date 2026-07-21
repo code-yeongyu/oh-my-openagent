@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import type { AgentToolUpdateCallback } from "@code-yeongyu/senpi"
 import type { Message } from "@oh-my-opencode/team-core/types"
 
 import { WaitRegistry } from "../../team/messaging/wait-registry"
@@ -26,6 +27,37 @@ function baseDeps(registry: WaitRegistry<Message>): Omit<LeadTeamToolDeps, "reso
 }
 
 describe("lead team_wait", () => {
+  test("#given an active team wait #when it starts #then it emits progress before its message resolves", async () => {
+    const registry = new WaitRegistry<Message>()
+    let resolvePoll: () => void = () => {}
+    let resolveUpdate: () => void = () => {}
+    const updated = new Promise<void>((resolve) => { resolveUpdate = resolve })
+    const updates: Parameters<AgentToolUpdateCallback>[0][] = []
+    const pending = runTeamWait({
+      ...baseDeps(registry),
+      resolveLeadPoller: () => ({
+        pollOnce: () => new Promise<void>((resolve) => { resolvePoll = resolve }),
+        shutdown: () => undefined,
+      }),
+      resolveTeamRunId: async () => ({ ok: true, teamRunId: TEAM_RUN_ID } as const),
+    }, { from: "alpha", timeout_ms: 999 }, undefined, (update) => {
+      updates.push(update)
+      resolveUpdate()
+    })
+
+    await updated
+    expect(updates).toHaveLength(1)
+    expect(updates[0]?.content).toEqual([{ type: "text", text: "waiting for team message from alpha" }])
+    expect(updates[0]?.details).toEqual({
+      kind: "waiting",
+      progress: { activity: "waiting for team message from alpha", startedAt: expect.any(Number), maxWaitMs: 10 },
+    })
+
+    resolvePoll()
+    registry.takeMatch(TEAM_RUN_ID, VALUE)?.resolve()
+    expect((await pending).details).toMatchObject({ kind: "message", message_id: VALUE.messageId })
+  })
+
   test("#given zero resolvable team runs w2lead #when team_wait starts #then the resolver reason is returned without registering", async () => {
     // given
     const registry = new WaitRegistry<Message>()

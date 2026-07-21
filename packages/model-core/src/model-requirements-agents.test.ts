@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { AGENT_MODEL_REQUIREMENTS } from "./model-requirements"
 
 describe("AGENT_MODEL_REQUIREMENTS", () => {
-  test("oracle has valid fallbackChain with gpt-5.5 as primary", () => {
+  test("oracle has gpt-5.6-sol xhigh as primary", () => {
     // given
     const oracle = AGENT_MODEL_REQUIREMENTS["oracle"]
 
@@ -12,40 +12,50 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // then
     expect(oracle.fallbackChain).toBeArray()
     expect(oracle.fallbackChain.length).toBeGreaterThan(0)
-    expect(primary?.providers).toContain("openai")
-    expect(primary?.model).toBe("gpt-5.5")
-    expect(primary?.variant).toBe("high")
+    expect(primary).toEqual({
+      providers: ["openai", "opencode", "vercel"],
+      model: "gpt-5.6-sol",
+      variant: "xhigh",
+    })
+    expect(oracle.fallbackChain[1]).toEqual({
+      providers: ["github-copilot"],
+      model: "gpt-5.6-sol",
+      variant: "high",
+    })
   })
 
-  test("sisyphus keeps opus primary before kimi-k3, k2p5, kimi-k2.5, gpt-5.5 medium, and big-pickle", () => {
+  test("sisyphus keeps opus primary before the consolidated Kimi K3, GLM, and big-pickle fallbacks", () => {
     // given
     const sisyphus = AGENT_MODEL_REQUIREMENTS["sisyphus"]
 
     // when
-    const [primary, second, third, fourth, fifth, sixth, seventh, last] = sisyphus.fallbackChain
+    const [primary, second, third, last] = sisyphus.fallbackChain
 
     // then
-    expect(sisyphus.fallbackChain).toHaveLength(8)
+    expect(sisyphus.fallbackChain).toHaveLength(4)
     expect(sisyphus.requiresAnyModel).toBe(true)
     expect(primary).toEqual({
       providers: ["anthropic", "github-copilot", "opencode", "vercel"],
-      model: "claude-opus-4-7",
+      model: "claude-opus-4-8",
       variant: "max",
     })
     expect(second).toEqual({
-      providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode", "vercel"],
+      providers: [
+        "opencode-go",
+        "kimi-for-coding",
+        "moonshotai",
+        "opencode",
+        "vercel",
+        "bailian-coding-plan",
+        "moonshotai-cn",
+        "firmware",
+        "ollama-cloud",
+        "aihubmix",
+      ],
       model: "kimi-k3",
     })
-    expect(third).toEqual({ providers: ["opencode-go", "vercel"], model: "kimi-k2.6" })
-    expect(fourth).toEqual({ providers: ["kimi-for-coding"], model: "k2p5" })
-    expect(fifth?.model).toBe("kimi-k2.5")
-    expect(sixth).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.5",
-      variant: "medium",
-    })
-    expect(seventh?.providers[0]).toBe("zai-coding-plan")
-    expect(seventh?.model).toBe("glm-5")
+    expect(third?.providers[0]).toBe("zai-coding-plan")
+    expect(third?.model).toBe("glm-5")
     expect(last?.providers[0]).toBe("opencode")
     expect(last?.model).toBe("big-pickle")
   })
@@ -118,10 +128,10 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(multimodalLooker.fallbackChain).toHaveLength(4)
     expect(primary).toEqual({
       providers: ["openai", "opencode", "vercel"],
-      model: "gpt-5.5",
-      variant: "medium",
+      model: "gpt-5.6-sol",
+      variant: "low",
     })
-    expect(secondary).toEqual({ providers: ["opencode-go", "vercel"], model: "kimi-k2.6" })
+    expect(secondary).toEqual({ providers: ["opencode-go", "vercel"], model: "kimi-k3" })
     expect(tertiary?.model).toBe("glm-4.6v")
     expect(last).toEqual({
       providers: ["openai", "github-copilot", "opencode", "vercel"],
@@ -129,23 +139,28 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     })
   })
 
-  test("prometheus has claude-opus-4-7 as primary", () => {
+  test("prometheus keeps claude-opus-4-8 primary before gpt-5.6-sol high", () => {
     // given
     const prometheus = AGENT_MODEL_REQUIREMENTS["prometheus"]
 
     // when
-    const primary = prometheus.fallbackChain[0]
+    const [primary, gptFallback] = prometheus.fallbackChain
 
     // then
     expect(prometheus.fallbackChain.length).toBeGreaterThan(1)
     expect(primary).toEqual({
       providers: ["anthropic", "github-copilot", "opencode", "vercel"],
-      model: "claude-opus-4-7",
+      model: "claude-opus-4-8",
       variant: "max",
+    })
+    expect(gptFallback).toEqual({
+      providers: ["openai", "github-copilot", "opencode", "vercel"],
+      model: "gpt-5.6-sol",
+      variant: "high",
     })
   })
 
-  test("metis has sonnet primary, opus fallback, and OpenAI high fallback", () => {
+  test("metis has sonnet primary, opus fallback, and gpt-5.6-sol medium fallback", () => {
     // given
     const metis = AGENT_MODEL_REQUIREMENTS["metis"]
 
@@ -160,21 +175,22 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       providers: ["anthropic", "github-copilot", "opencode", "vercel"],
       model: "claude-sonnet-4-6",
     })
-    expect(opusFallback?.model).toBe("claude-opus-4-7")
+    expect(opusFallback?.model).toBe("claude-opus-4-8")
     expect(opusFallback?.variant).toBe("max")
+    expect(metis.fallbackChain.at(-1)).toEqual({ providers: ["kimi-for-coding"], model: "kimi-k3" })
     expect(openAiFallback).toEqual({
       providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.5",
-      variant: "high",
+      model: "gpt-5.6-sol",
+      variant: "medium",
     })
   })
 
-  test("momus keeps native gpt-5.6-terra high before Copilot high and gpt-5.5", () => {
+  test("momus keeps native gpt-5.6-terra high before gpt-5.6-sol xhigh", () => {
     // given
     const momus = AGENT_MODEL_REQUIREMENTS["momus"]
 
     // when
-    const [primary, copilot, legacyFallback] = momus.fallbackChain
+    const [primary, copilot, solFallback, opusFallback] = momus.fallbackChain
 
     // then
     expect(momus.fallbackChain.length).toBeGreaterThan(1)
@@ -188,76 +204,58 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       model: "gpt-5.6-terra",
       variant: "high",
     })
-    expect(legacyFallback).toEqual({
+    expect(solFallback).toEqual({
       providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.5",
+      model: "gpt-5.6-sol",
       variant: "xhigh",
+    })
+    expect(opusFallback).toEqual({
+      providers: ["anthropic", "github-copilot", "opencode", "vercel"],
+      model: "claude-opus-4-8",
+      variant: "max",
     })
   })
 
-  test("atlas keeps sonnet, kimi, gpt-5.5, and minimax fallback order", () => {
+  test("atlas keeps sonnet, kimi, and minimax fallback order", () => {
     // given
     const atlas = AGENT_MODEL_REQUIREMENTS["atlas"]
 
     // when
-    const [primary, secondary, tertiary, fourth, fifth, sixth] = atlas.fallbackChain
+    const [primary, secondary, third, fourth, fifth] = atlas.fallbackChain
 
     // then
-    expect(atlas.fallbackChain).toHaveLength(6)
+    expect(atlas.fallbackChain).toHaveLength(5)
     expect(primary?.model).toBe("claude-sonnet-4-6")
     expect(primary?.providers[0]).toBe("anthropic")
-    expect(secondary?.model).toBe("kimi-k2.6")
+    expect(secondary?.model).toBe("kimi-k3")
     expect(secondary?.providers[0]).toBe("opencode-go")
-    expect(tertiary).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.5",
-      variant: "medium",
-    })
-    expect(fourth?.model).toBe("minimax-m3")
-    expect(fourth?.providers[0]).toBe("opencode-go")
-    expect(fifth).toEqual({
+    expect(third?.model).toBe("minimax-m3")
+    expect(third?.providers[0]).toBe("opencode-go")
+    expect(fourth).toEqual({
       providers: ["minimax-coding-plan", "minimax-cn-coding-plan"],
       model: "MiniMax-M3",
     })
-    expect(sixth?.model).toBe("minimax-m2.7")
-    expect(sixth?.providers[0]).toBe("opencode-go")
+    expect(fifth?.model).toBe("minimax-m2.7")
+    expect(fifth?.providers[0]).toBe("opencode-go")
   })
 
-  test("sisyphus-junior keeps OpenAI fallback before minimax and big-pickle", () => {
+  test("sisyphus-junior keeps sonnet, Kimi, minimax, and big-pickle fallbacks", () => {
     // given
     const sisyphusJunior = AGENT_MODEL_REQUIREMENTS["sisyphus-junior"]
 
     // when
-    const openAiFallback = sisyphusJunior.fallbackChain.find((entry) =>
-      entry.providers.includes("openai")
-    )
-    const openAiFallbackIndex = sisyphusJunior.fallbackChain.findIndex((entry) =>
-      entry.providers.includes("openai")
-    )
-    const minimaxM3Index = sisyphusJunior.fallbackChain.findIndex(
-      (entry) => entry.model === "minimax-m3"
-    )
-    const minimaxCodingPlanIndex = sisyphusJunior.fallbackChain.findIndex(
-      (entry) => entry.model === "MiniMax-M3"
-    )
-    const minimaxIndex = sisyphusJunior.fallbackChain.findIndex(
-      (entry) => entry.model === "minimax-m2.7"
-    )
-    const bigPickleIndex = sisyphusJunior.fallbackChain.findIndex(
-      (entry) => entry.model === "big-pickle"
-    )
+    const modelIDs = sisyphusJunior.fallbackChain.map((entry) => entry.model)
 
     // then
-    expect(openAiFallback).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.5",
-      variant: "medium",
-    })
-    expect(openAiFallbackIndex).toBeGreaterThan(-1)
-    expect(minimaxM3Index).toBeGreaterThan(openAiFallbackIndex)
-    expect(minimaxCodingPlanIndex).toBeGreaterThan(minimaxM3Index)
-    expect(minimaxIndex).toBeGreaterThan(minimaxCodingPlanIndex)
-    expect(bigPickleIndex).toBeGreaterThan(minimaxIndex)
+    expect(modelIDs).toEqual([
+      "claude-sonnet-4-6",
+      "kimi-k3",
+      "minimax-m3",
+      "MiniMax-M3",
+      "minimax-m2.7",
+      "big-pickle",
+    ])
+    expect(modelIDs).not.toContain("gpt-5.5")
   })
 
   test("hephaestus supports openai, github-copilot, opencode, and vercel providers", () => {
@@ -277,22 +275,18 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(hephaestus.requiresAnyModel).toBe(true)
   })
 
-  test("hephaestus has gpt-5.6-sol high as primary before gpt-5.5 medium", () => {
+  test("hephaestus has one merged gpt-5.6-sol medium rung", () => {
     // given
     const hephaestus = AGENT_MODEL_REQUIREMENTS["hephaestus"]
 
     // when
-    const [primary, secondary] = hephaestus.fallbackChain
+    const [primary] = hephaestus.fallbackChain
 
     // then
+    expect(hephaestus.fallbackChain).toHaveLength(1)
     expect(primary).toEqual({
-      providers: ["openai", "github-copilot", "vercel"],
+      providers: ["openai", "github-copilot", "vercel", "opencode"],
       model: "gpt-5.6-sol",
-      variant: "high",
-    })
-    expect(secondary).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.5",
       variant: "medium",
     })
   })

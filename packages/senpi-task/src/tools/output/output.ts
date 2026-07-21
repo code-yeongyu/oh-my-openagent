@@ -37,6 +37,7 @@ type WaitRaceInput = {
   readonly timeoutMs: number
   readonly now: () => number
   readonly startedAt: number
+  readonly onTimeout: () => void
 }
 
 const DESCRIPTION = [
@@ -51,6 +52,8 @@ export function runTaskOutput(
   deps: TaskOutputDeps,
   params: TaskOutputInput,
   callerSessionId: string | undefined,
+  signal?: AbortSignal,
+  onUpdate?: (result: TaskOutputToolResult) => void,
 ): Promise<TaskOutputToolResult> {
   const idOrName = params.task_id ?? params.name
   if (idOrName === undefined) return Promise.resolve(invalidArguments("Provide task_id or name to identify the child task."))
@@ -61,7 +64,7 @@ export function runTaskOutput(
 
   const shouldBlock = params.block ?? true
   if (shouldBlock && !isTerminalStatus(record.status)) {
-    return blockedResult(deps, record, params)
+    return blockedResult(deps, record, params, signal, onUpdate)
   }
 
   return Promise.resolve(outputForRecord(deps, record, params))
@@ -79,23 +82,39 @@ function outputForRecord(deps: TaskOutputDeps, record: TaskRecord, params: TaskO
   return transcriptResult(deps, record, snapshot, mode, params.tail_lines ?? DEFAULT_TAIL_LINES)
 }
 
-async function blockedResult(deps: TaskOutputDeps, record: TaskRecord, params: TaskOutputInput): Promise<TaskOutputToolResult> {
+async function blockedResult(
+  deps: TaskOutputDeps,
+  record: TaskRecord,
+  params: TaskOutputInput,
+  signal: AbortSignal | undefined,
+  onUpdate: ((result: TaskOutputToolResult) => void) | undefined,
+): Promise<TaskOutputToolResult> {
   const startedAt = (deps.now ?? Date.now)()
   const timeoutMs = clampWaitTimeout(params.timeout_ms, deps.waitConfig)
-  const winner = await raceWaitFor({
-    completion: deps.manager.waitFor(record.task_id),
-    timeoutMs,
-    now: deps.now ?? Date.now,
-    startedAt,
-  })
-  if (winner.kind === "timed_out") {
-    return toolResult(`${record.task_id} still running after ${winner.waited_ms}ms`, {
-      kind: "timed_out",
-      task_id: record.task_id,
-      waited_ms: winner.waited_ms,
+  const activity = `waiting for ${record.task_id} (${record.status})`
+  onUpdate?.(toolResult(activity, { kind: "waiting", progress: { activity, startedAt, maxWaitMs: timeoutMs } }))
+
+  const waitController = new AbortController()
+  const removeParentAbort = forwardAbort(signal, waitController)
+  try {
+    const winner = await raceWaitFor({
+      completion: deps.manager.waitFor(record.task_id, { signal: waitController.signal }),
+      timeoutMs,
+      now: deps.now ?? Date.now,
+      startedAt,
+      onTimeout: () => waitController.abort(new Error("task_output wait timed out")),
     })
+    if (winner.kind === "timed_out") {
+      return toolResult(`${record.task_id} still running after ${winner.waited_ms}ms`, {
+        kind: "timed_out",
+        task_id: record.task_id,
+        waited_ms: winner.waited_ms,
+      })
+    }
+    return outputForRecord(deps, deps.manager.get(record.task_id) ?? winner.record, params)
+  } finally {
+    removeParentAbort()
   }
-  return outputForRecord(deps, deps.manager.get(record.task_id) ?? winner.record, params)
 }
 
 async function raceWaitFor(
@@ -110,12 +129,23 @@ async function raceWaitFor(
   try {
     const winner = await Promise.race([
       input.completion.then((completed) => ({ kind: "completed" as const, record: completed })),
-      timeout.then(() => ({ kind: "timed_out" as const, waited_ms: Math.max(0, input.now() - input.startedAt) })),
+      timeout.then(() => {
+        input.onTimeout()
+        return { kind: "timed_out" as const, waited_ms: Math.max(0, input.now() - input.startedAt) }
+      }),
     ])
     return winner
   } finally {
     clearTimeout(handle)
   }
+}
+
+function forwardAbort(signal: AbortSignal | undefined, controller: AbortController): () => void {
+  if (signal === undefined) return () => undefined
+  const abort = (): void => controller.abort(signal.reason)
+  if (signal.aborted) abort()
+  else signal.addEventListener("abort", abort, { once: true })
+  return () => signal.removeEventListener("abort", abort)
 }
 
 function transcriptResult(
@@ -179,7 +209,7 @@ export function createTaskOutputTool(deps: TaskOutputDeps): ToolDefinition<typeo
     label: "Task Output",
     description: DESCRIPTION,
     parameters: TaskOutputParams,
-    execute: (_toolCallId, params, _signal, _onUpdate, ctx) => runTaskOutput(deps, params, resolveCaller(ctx)),
+    execute: (_toolCallId, params, signal, onUpdate, ctx) => runTaskOutput(deps, params, resolveCaller(ctx), signal, onUpdate),
     renderCall: (args, theme) => renderTaskOutputCall(args, theme),
     renderResult: (result, options, theme) => renderTaskOutputResult(result, options, theme),
   }

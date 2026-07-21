@@ -10,7 +10,7 @@ import { TaskIdSpaceExhaustedError } from "../state/id"
 import type { TaskRecord } from "../state"
 import { createSteeringEngine } from "../steering"
 import type { CancelOutcome, DestructionPort, InterruptOutcome, SendInput, SendOutcome, SteeringEngine, SteeringPort } from "../steering"
-import { adaptRpcHandle, discardManagedHandle, discardRpcHandle, type ManagedChildHandle } from "./child-handle"
+import { adaptRpcHandle, discardManagedHandle, discardRpcHandle, type ManagedChildHandle, type ManagedChildListener } from "./child-handle"
 import { TaskConcurrency } from "./concurrency"
 import { decideDepthPolicy } from "./depth-policy"
 import { resolveExecutionMode, type ExecutionMode } from "./execution-mode"
@@ -102,6 +102,9 @@ class TaskManagerImpl implements TaskManager {
   readonly #rpcRespawnRunner: RpcRespawnRunner
   readonly #names = new NameRegistry()
   readonly #live = new Map<string, LiveTask>()
+  // Callers can subscribe before a queued task owns a handle. Each entry is attached exactly once
+  // when #launch promotes it, and its returned cleanup owns both pending and live subscriptions.
+  readonly #childSubscribers = new Map<string, Map<ManagedChildListener, () => void>>()
   // Release guard: latest released run_epoch per task_id. A revived task (higher epoch) can still
   // release its LATER occupancy, while a stale re-release of an already-released epoch is a no-op.
   // Keyed by task_id (not `${taskId}:${epoch}`) so growth is bounded by live tasks and forget()
@@ -350,12 +353,30 @@ class TaskManagerImpl implements TaskManager {
   forget(taskId: string): void {
     this.#live.get(taskId)?.unsubscribe()
     this.#live.delete(taskId)
+    const subscribers = this.#childSubscribers.get(taskId)
+    if (subscribers !== undefined) {
+      for (const unsubscribe of subscribers.values()) unsubscribe()
+      this.#childSubscribers.delete(taskId)
+    }
     this.#background.delete(taskId)
     this.#released.delete(taskId)
     this.#steering.dropPending(taskId)
   }
 
   getResidentHandle(taskId: string): ManagedChildHandle | undefined { return this.#live.get(taskId)?.handle }
+
+  subscribeChild(taskId: string, listener: ManagedChildListener): () => void {
+    const live = this.getResidentHandle(taskId)
+    if (live !== undefined) return live.subscribe(listener)
+    const subscribers = this.#childSubscribers.get(taskId) ?? new Map<ManagedChildListener, () => void>()
+    this.#childSubscribers.set(taskId, subscribers)
+    // Pending listeners have no handle yet. A placeholder lets cleanup remove them before promotion.
+    subscribers.set(listener, () => {
+      subscribers.delete(listener)
+      if (subscribers.size === 0) this.#childSubscribers.delete(taskId)
+    })
+    return () => subscribers.get(listener)?.()
+  }
 
   residentTaskIds(): readonly string[] { return [...this.#live.keys()] }
 
@@ -408,6 +429,7 @@ class TaskManagerImpl implements TaskManager {
     try {
       unsubscribe = subscribeTranscriptLog(handle, this.#options.store, record.task_id)
       this.#live.set(record.task_id, { handle, model: record.model, unsubscribe })
+      this.#attachChildSubscribers(record.task_id, handle)
       if (isTerminalRecord(record) && record.status !== "lost") {
         this.#options.store.replace({
           ...record,
@@ -526,6 +548,7 @@ class TaskManagerImpl implements TaskManager {
 
     const unsubscribe = subscribeTranscriptLog(handle, this.#options.store, record.task_id)
     this.#live.set(record.task_id, { handle, model, unsubscribe })
+    this.#attachChildSubscribers(record.task_id, handle)
     this.#recordSpawnFacts(record.task_id, handle)
     this.#trackOutcome(record.task_id, handle, model, record.notification.run_epoch)
     void this.#steering.notifyStarted(record.task_id)
@@ -535,6 +558,14 @@ class TaskManagerImpl implements TaskManager {
   // Persist the spawned child's OS pid onto the running record so task_output(status) and session_start
   // reconciliation can see (and, for an orphan, signal) the live process. The pure decision lives in
   // recordSpawnedPid; in-process children (no pid) and already-terminal records are left untouched.
+  #attachChildSubscribers(taskId: string, handle: ManagedChildHandle): void {
+    const subscribers = this.#childSubscribers.get(taskId)
+    if (subscribers === undefined) return
+    for (const [listener] of subscribers) {
+      subscribers.set(listener, handle.subscribe(listener))
+    }
+  }
+
   #recordSpawnFacts(taskId: string, handle: ManagedChildHandle): void {
     const current = this.#tryLoad(taskId)
     if (current === null || isTerminalRecord(current)) return

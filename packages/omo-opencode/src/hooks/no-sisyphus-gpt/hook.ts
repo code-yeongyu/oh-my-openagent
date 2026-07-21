@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { isGptModel, isGptNativeSisyphusModel } from "../../agents/types"
+import { isGpt5_5Model, isGptModel, isGptNativeSisyphusModel } from "../../agents/types"
 import {
   getSessionAgent,
   resolveRegisteredAgentName,
@@ -31,6 +31,8 @@ function showToast(ctx: PluginInput, sessionID: string): void {
 }
 
 function getNativeSisyphusGptVariant(model: { providerID: string; modelID: string }): string | undefined {
+  if (isGpt5_5Model(model.modelID)) return "medium"
+
   const chain = AGENT_MODEL_REQUIREMENTS["sisyphus"]?.fallbackChain ?? []
   const exactMatch = chain.find((entry) =>
     entry.providers.includes(model.providerID) && entry.model === model.modelID

@@ -45,13 +45,13 @@ describe("model fallback hook", () => {
       "ses_model_fallback_main",
       "Sisyphus - Ultraworker",
       "anthropic",
-      "claude-opus-4-7-thinking",
+      "claude-opus-4-8-thinking",
     )
     expect(set).toBe(true)
 
     const output = {
       message: {
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-8-thinking" },
         variant: "max",
       },
       parts: [{ type: "text", text: "continue" }],
@@ -64,7 +64,7 @@ describe("model fallback hook", () => {
 
     expect(output.message["model"]).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      modelID: "claude-opus-4-8",
     })
   })
 
@@ -78,12 +78,12 @@ describe("model fallback hook", () => {
     const sessionID = "ses_model_fallback_main"
 
     expect(
-      setPendingModelFallback(modelFallback, sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-7-thinking"),
+      setPendingModelFallback(modelFallback, sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-8-thinking"),
     ).toBe(true)
 
     const firstOutput = {
       message: {
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-8-thinking" },
         variant: "max",
       },
       parts: [{ type: "text", text: "continue" }],
@@ -93,16 +93,16 @@ describe("model fallback hook", () => {
 
     expect(firstOutput.message["model"]).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      modelID: "claude-opus-4-8",
     })
 
     expect(
-      setPendingModelFallback(modelFallback, sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-7"),
+      setPendingModelFallback(modelFallback, sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-8"),
     ).toBe(true)
 
     const secondOutput: ChatMessageOutput = {
       message: {
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-8" },
       },
       parts: [{ type: "text", text: "continue" }],
     }

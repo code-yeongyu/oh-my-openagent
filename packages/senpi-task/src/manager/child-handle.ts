@@ -11,6 +11,8 @@ export type ManagedChildEvent = {
   readonly type: string
   readonly message?: unknown
   readonly toolName?: string
+  readonly args?: unknown
+  readonly input?: unknown
   readonly result?: unknown
   readonly isError?: boolean
 }

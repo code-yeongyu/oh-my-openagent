@@ -18,7 +18,7 @@ If task is unclassifiable but moderate-effort, use unspecified-low instead.
 export const ANTHROPIC_CATEGORIES: BuiltinCategoryDefinition[] = [
   {
     name: "unspecified-high",
-    config: { model: "anthropic/claude-opus-4-7", variant: "max" },
+    config: { model: "anthropic/claude-opus-4-8", variant: "max" },
     description: "Tasks that don't fit other categories, high effort required",
     promptAppend: UNSPECIFIED_HIGH_CATEGORY_PROMPT_APPEND,
   },
