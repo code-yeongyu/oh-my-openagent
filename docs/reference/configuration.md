@@ -28,6 +28,7 @@ Complete reference for Oh My OpenCode plugin configuration. During the rename tr
   - [Notification](#notification)
   - [MCPs](#mcps)
   - [LSP](#lsp)
+  - [CodeGraph](#codegraph)
 - [Advanced](#advanced)
   - [Runtime Fallback](#runtime-fallback)
   - [Model Capabilities](#model-capabilities)
@@ -648,6 +649,30 @@ To disable the LSP MCP entirely:
 ```json
 { "disabled_mcps": ["lsp"] }
 ```
+
+### CodeGraph
+
+The `codegraph` MCP ships a pinned CodeGraph 1.4.1 binary; project stores built by older versions migrate automatically on first use, with no manual re-index. Two keys tune where it runs:
+
+```jsonc
+{
+  "codegraph": {
+    // Opt into the upstream shared daemon: one detached daemon per project
+    // serves every client, exits after about five minutes idle, and runs
+    // under an upstream PPID watchdog. Default false: each MCP process runs
+    // the index in-process (CODEGRAPH_NO_DAEMON=1 stays pinned).
+    "daemon": false,
+
+    // Extra exclude-only roots. Projects under these skip CodeGraph entirely.
+    // Entries may be absolute, ~-relative, or relative to the home directory.
+    "excluded_roots": ["~/scratch/codegraph"]
+  }
+}
+```
+
+An ambient `CODEGRAPH_NO_DAEMON=1` forces daemon-off even when `codegraph.daemon` is `true`. Inspect or stop running daemons with the upstream `codegraph daemon` command, an interactive picker that lists running daemons and stops the one you select.
+
+Process hygiene is unconditional and has no config keys: a parent-liveness watchdog exits MCP server processes when their parent dies, a newly started lsp daemon reaps older-version daemons at startup, and a best-effort family sweep removes orphaned codegraph and lsp processes at startup on every adapter (OpenCode plugin startup, the Codex `SessionStart` hook, and Senpi session start).
 
 ---
 
