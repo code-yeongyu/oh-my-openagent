@@ -72,6 +72,8 @@ Hephaestus is the developer who stays in their room coding all day. Doesn't talk
 
 Using Hephaestus with GLM or Kimi would be like assigning your most communicative, sociable developer to sit alone and do nothing but deep technical work. They'd get it done eventually, but they wouldn't shine — you'd be wasting exactly the skills that make them valuable.
 
+Configuration note: `agents.hephaestus.allow_non_gpt_model: true` does **not** make a non-GPT Hephaestus appear in the agent list. Registration still requires a supported GPT-5.3 Codex, GPT-5.4, GPT-5.5, or GPT-5.6 identifier. That flag only tells the runtime `no-hephaestus-non-gpt` guard not to switch away from an already-registered Hephaestus session if the active model later resolves to a non-GPT identifier. If your configured Hephaestus model is `opencode-go/glm-5.1`, `volcengine/glm-5.2`, Kimi, Claude, DeepSeek, or MiniMax, Hephaestus is still skipped during registration.
+
 ### The Takeaway
 
 Every agent's prompt is tuned to match its model's personality. **When you change the model, you change the brain — and the same instructions get understood completely differently.** Model matching isn't about "better" or "worse." It's about fit.
@@ -252,15 +254,17 @@ Used by: Hephaestus, Oracle, Momus, `deep`, `ultrabrain`, `quick`, `unspecified-
 
 | Priority | Model | Provider | Why |
 |---|---|---|---|
-| 1 | `gpt-5.6-sol` (xhigh / high / medium) | `openai`, `vercel` | The GPT-5.6 flagship. Default for Hephaestus (medium) and `ultrabrain` (xhigh); first fallback for `deep`. |
-| 1 | `gpt-5.6-terra` (xhigh / high) | `openai`, `vercel` | GPT-5.6 mid-tier. New default for the `deep` category; default for Momus (high). |
-| 1 | `gpt-5.6-luna` (xhigh) | `openai`, `vercel` | GPT-5.6 light tier. New default for the `unspecified-low` category. |
+| 1 | `gpt-5.6-sol` (xhigh / high) | `openai`, `github-copilot`, `vercel` | The GPT-5.6 flagship. Default for Hephaestus (high) and `ultrabrain` (xhigh); first fallback for `deep`. |
+| 1 | `gpt-5.6-terra` (xhigh / high) | `openai`, `github-copilot`, `vercel` | GPT-5.6 mid-tier. New default for the `deep` category; default for Momus (high). |
+| 1 | `gpt-5.6-luna` (xhigh / high) | `openai`, `github-copilot`, `vercel` | GPT-5.6 light tier. New default for the `unspecified-low` category. |
 | 2 | `gpt-5.5` / `gpt-5.4` (pro / xhigh / high / medium) | `openai`, `github-copilot`, `opencode`, `vercel` | Previous flagship generation; first fallback on providers without GPT-5.6. Hephaestus requires this family. |
 | 3 | `gpt-5.5-codex` | same | Still the deep-coding powerhouse. Kept as an explicit override option. |
-| 3 | **DeepSeek — LIMITED ALTERNATIVE** (`deepseek-v3.2`, `deepseek-chat-v3.1`) | `openrouter/deepseek` | Closest OSS equivalent for autonomous coding behavior. Not wired into default chains — add via `fallback_models`. |
+| 3 | **DeepSeek — LIMITED ALTERNATIVE** (`deepseek-v3.2`, `deepseek-chat-v3.1`) | `openrouter/deepseek` | Closest OSS equivalent for autonomous coding behavior. Not wired into default chains or Hephaestus registration — add via `fallback_models` only on model-flexible GPT-family routes you intentionally own. |
 | 4 | **MiniMax — STRONGLY DISCOURAGED** (`minimax-m3`, `minimax-m2.7`, `minimax-m2.5`) | `opencode-go`, `opencode`, `openrouter/minimax` | Used only in **utility** fallback chains (Explore, Librarian, `quick`). Consistency and long-context management issues make it a poor substitute for Hephaestus/Oracle. Do NOT override deep agents to MiniMax. |
 
 > **DeepSeek ≻≻ MiniMax.** DeepSeek retains GPT's autonomous exploration character. MiniMax loses coherence on multi-step deep work. MiniMax is fine for grep-style utility agents, nothing more.
+
+> **Why Hephaestus still hard-requires GPT:** the DeepSeek entry above is for fallback chains on model-flexible GPT-family routes such as Oracle, `deep`, `ultrabrain`, or custom categories. Hephaestus is a dedicated GPT-native agent with prompt scaffolding and QA expectations tuned against GPT behavior, so registration remains restricted to its supported GPT identifiers. If you want to experiment with DeepSeek, route that work through `fallback_models` on a category or custom agent instead of making Hephaestus pretend DeepSeek is the same runtime contract.
 
 ### Gemini Family (visual, different reasoning style)
 
@@ -317,9 +321,11 @@ These agents are built for GPT's principle-driven style. Their prompts assume au
 
 | Agent | Role | Fallback Chain |
 |---|---|---|
-| **Hephaestus** | Autonomous deep worker | `openai\|vercel/gpt-5.6-sol` (medium) → `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (medium) — GPT-only chain, requires one of those providers. The craftsman. |
+| **Hephaestus** | Autonomous deep worker | `openai\|github-copilot\|vercel/gpt-5.6-sol` (high) → `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (medium) — GPT-only chain, requires one of those providers. The craftsman. |
 | **Oracle** | Architecture consultant | `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (high) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `opencode-go\|vercel/glm-5.2` |
-| **Momus** | Ruthless reviewer | `openai\|vercel/gpt-5.6-terra` (high) → `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (xhigh) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `opencode-go\|vercel/glm-5.2` |
+| **Momus** | Ruthless reviewer | `openai\|vercel/gpt-5.6-terra` (high) → `github-copilot/gpt-5.6-terra` (high) → `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (xhigh) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `opencode-go\|vercel/glm-5.2` |
+
+Hephaestus is intentionally stricter than the general GPT-family table. The table names DeepSeek as a limited alternative for routes that already expose `fallback_models`; it does not mean Hephaestus itself accepts non-GPT models.
 
 ### Utility Runners → Speed over Intelligence
 
@@ -417,11 +423,11 @@ When agents delegate work, they don't pick a model name — they pick a **catego
 |---|---|---|---|
 | `visual-engineering` | Frontend, UI, CSS, design | `google/gemini-3.1-pro` (high) | Gemini → `zai-coding-plan/glm-5` → `claude-opus-4-7` (max) → `opencode-go/glm-5.2` → `kimi-for-coding/k2p5` |
 | `artistry` | Creative, novel approaches | `google/gemini-3.1-pro` (high) | Gemini → `claude-opus-4-7` (max) → `gpt-5.5` |
-| `ultrabrain` | Maximum reasoning needed | `openai/gpt-5.6-sol` (xhigh) | `openai\|vercel/gpt-5.6-sol` (xhigh) → `openai\|opencode\|vercel/gpt-5.5` (xhigh) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `opencode-go\|vercel/glm-5.2` |
-| `deep` | Deep coding, complex logic | `openai/gpt-5.6-terra` (xhigh) | `openai\|vercel/gpt-5.6-terra` (xhigh) → `openai\|vercel/gpt-5.6-sol` (high) → `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (medium) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `opencode-go\|vercel/kimi-k2.6` → `opencode-go\|vercel/glm-5.2` |
+| `ultrabrain` | Maximum reasoning needed | `openai/gpt-5.6-sol` (xhigh) | `openai\|vercel/gpt-5.6-sol` (xhigh) → `github-copilot/gpt-5.6-sol` (high) → `openai\|opencode\|vercel/gpt-5.5` (xhigh) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `opencode-go\|vercel/glm-5.2` |
+| `deep` | Deep coding, complex logic | `openai/gpt-5.6-terra` (xhigh) | `openai\|vercel/gpt-5.6-terra` (xhigh) → `github-copilot/gpt-5.6-terra` (high) → `openai\|github-copilot\|vercel/gpt-5.6-sol` (high) → `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (medium) → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7` (max) → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` (high) → `opencode-go\|vercel/kimi-k2.6` → `opencode-go\|vercel/glm-5.2` |
 | `quick` | Simple, fast tasks | `openai/gpt-5.4-mini` | GPT-5.4-mini → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `gemini-3-flash` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` → `opencode/gpt-5-nano` |
 | `unspecified-high` | General complex work | `anthropic/claude-opus-4-7` (max) | Opus → `gpt-5.5` (high) → `zai-coding-plan/glm-5` → `kimi-for-coding/k2p5` → `opencode-go/glm-5.2` → `opencode/kimi-k2.5` → `moonshotai/kimi-k2.5` |
-| `unspecified-low` | General standard work | `openai/gpt-5.6-luna` (xhigh) | `openai\|vercel/gpt-5.6-luna` (xhigh) → `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `openai\|opencode\|vercel/gpt-5.5` (medium) → `opencode-go\|vercel/kimi-k2.6` → `google\|github-copilot\|opencode\|vercel/gemini-3-flash` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` |
+| `unspecified-low` | General standard work | `openai/gpt-5.6-luna` (xhigh) | `openai\|vercel/gpt-5.6-luna` (xhigh) → `github-copilot/gpt-5.6-luna` (high) → `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `openai\|opencode\|vercel/gpt-5.5` (medium) → `opencode-go\|vercel/kimi-k2.6` → `google\|github-copilot\|opencode\|vercel/gemini-3-flash` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` |
 | `writing` | Text, docs, prose | `kimi-for-coding/k2p5` | `gemini-3-flash` → `opencode-go/kimi-k2.6` → `claude-sonnet-4-6` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` |
 
 See the [Orchestration System Guide](./orchestration.md) for how agents dispatch tasks to categories.
@@ -448,7 +454,7 @@ See the [Orchestration System Guide](./orchestration.md) for how agents dispatch
     },
 
     // Hephaestus: needs GPT. ChatGPT Plus gets you here.
-    "hephaestus": { "model": "openai/gpt-5.6-sol", "variant": "medium" },
+    "hephaestus": { "model": "openai/gpt-5.6-sol", "variant": "high" },
 
     // Architecture consultation: GPT or Claude Opus
     "oracle": { "model": "openai/gpt-5.5", "variant": "high" },
@@ -494,7 +500,7 @@ Highest quality, highest cost. No surprises.
       "model": "anthropic/claude-opus-4-8",
       "variant": "max",
     },
-    "hephaestus": { "model": "openai/gpt-5.6-sol", "variant": "medium" },
+    "hephaestus": { "model": "openai/gpt-5.6-sol", "variant": "high" },
     "oracle": { "model": "openai/gpt-5.5", "variant": "high" },
   },
   "categories": {
@@ -530,9 +536,9 @@ Cheapest full-stack path. Hephaestus won't activate — accept that trade-off.
 }
 ```
 
-### Example D — Adding DeepSeek as GPT Alternative
+### Example D — Adding DeepSeek as GPT Alternative for Flexible Routes
 
-If you have OpenRouter and want DeepSeek in the chain when GPT is unavailable:
+If you have OpenRouter and want DeepSeek in a model-flexible chain when GPT is unavailable:
 
 ```jsonc
 {
@@ -573,6 +579,7 @@ If you have OpenRouter and want DeepSeek in the chain when GPT is unavailable:
 - **Sisyphus → MiMo / DeepSeek**: No working configuration found. Untested and unsupported as the orchestrator.
 - **Sisyphus → older GPT models**: Still a bad fit. GPT-5.4 and GPT-5.5 are the only dedicated GPT prompt paths.
 - **Hephaestus → Claude**: Built for Codex's autonomous style. Claude can't replicate this.
+- **Hephaestus → DeepSeek**: DeepSeek is a limited GPT-family alternative for configurable fallback routes, not a tested Hephaestus runtime contract.
 - **Hephaestus → MiniMax**: MiniMax loses coherence on multi-step deep work. **Never do this.**
 - **Oracle → MiniMax**: Same reason. Oracle needs sustained reasoning; MiniMax drifts.
 - **Explore → Opus**: Massive cost waste. Explore needs speed, not intelligence.
