@@ -57,6 +57,23 @@ function createFakeCodegraphBin(scripts: { readonly posix: string; readonly win3
 	return { binPath, dir };
 }
 
+// Keep the probe hermetic on POSIX but viable on win32: resolveCodegraphCommandInvocation wraps
+// the fake .cmd in `cmd.exe /d /s /c`, and Windows can only resolve cmd.exe when the child env
+// carries the real system PATH (System32) plus SystemRoot (both whitelisted in SAFE_AMBIENT_ENV_KEYS).
+// A POSIX-only PATH makes the probe spawn fail, so the hook reports not-initialized and spawns.
+function probeEnv(homeDir: string, binPath: string): Record<string, string> {
+	if (process.platform === "win32") {
+		const env: Record<string, string> = {
+			HOME: homeDir,
+			OMO_CODEGRAPH_BIN: binPath,
+		};
+		if (process.env.PATH !== undefined) env.PATH = process.env.PATH;
+		if (process.env.SystemRoot !== undefined) env.SystemRoot = process.env.SystemRoot;
+		return env;
+	}
+	return { HOME: homeDir, OMO_CODEGRAPH_BIN: binPath, PATH: "/usr/bin:/bin" };
+}
+
 describe("CodeGraph SessionStart hook with a 1.0.1-era project store under the 1.4.1 binary", () => {
 	it("#given a real 1.4.1 status payload for a migrated 1.0.1 store #when SessionStart probes via the default probe #then it stays silent without spawning a re-init worker", async () => {
 		// given
@@ -76,7 +93,7 @@ describe("CodeGraph SessionStart hook with a 1.0.1-era project store under the 1
 			const result = await executeCodegraphSessionStartHook({
 				config: { codegraph: { enabled: true }, sources: [], warnings: [] },
 				cwd: workspace,
-				env: { HOME: homeDir, OMO_CODEGRAPH_BIN: fake.binPath, PATH: "/usr/bin:/bin" },
+				env: probeEnv(homeDir, fake.binPath),
 				stdin: Readable.from(["{}"]),
 				stdout: { write: (chunk) => stdout.push(chunk) },
 				spawnWorker: (invocation) => spawned.push(invocation),
@@ -110,7 +127,7 @@ describe("CodeGraph SessionStart hook with a 1.0.1-era project store under the 1
 			const result = await executeCodegraphSessionStartHook({
 				config: { codegraph: { enabled: true }, sources: [], warnings: [] },
 				cwd: workspace,
-				env: { HOME: homeDir, OMO_CODEGRAPH_BIN: fake.binPath, PATH: "/usr/bin:/bin" },
+				env: probeEnv(homeDir, fake.binPath),
 				stdin: Readable.from(["{}"]),
 				stdout: { write: (chunk) => stdout.push(chunk) },
 				spawnWorker: (invocation) => spawned.push(invocation),
