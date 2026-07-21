@@ -246,6 +246,37 @@ describe("reconcileOnSessionStart reattach", () => {
     expect(result.outcomes[0]?.kind).toBe("lost")
     expect(respawnRunner.startedSpecs).toHaveLength(0)
   })
+  test(" w2reattach #given a live in-process resident visible in the registry snapshot #when reconciled #then it stays running and resident for completion delivery", async () => {
+    // given
+    const store = tempStore()
+    const handle = fakeHandle("st_00000013", "in-process", [])
+    seedRecord(store, { task_id: "st_00000013", status: "running", residency_state: "resident", execution_mode: "in-process" })
+    const registry = new FakeRegistry()
+    registry.add(handle)
+    const pointLookupMissRegistry = {
+      get: () => undefined,
+      entries: () => registry.entries(),
+      forget: (taskId: string) => registry.forget(taskId),
+      hasPendingSends: (taskId: string) => registry.hasPendingSends(taskId),
+    }
+    const lifecycle = createTaskLifecycle({
+      store,
+      registry: pointLookupMissRegistry,
+      config: settings(),
+      now,
+      signaller: fakeSignaller(new Set(), []),
+    })
+
+    // when
+    const result = await lifecycle.reconcileOnSessionStart()
+
+    // then
+    expect(result.outcomes[0]).toEqual({ task_id: "st_00000013", kind: "resumed", reason: "owned by this process" })
+    expect(store.load("st_00000013")?.status).toBe("running")
+    expect(store.load("st_00000013")?.residency_state).toBe("resident")
+    expect(handle.disposed()).toBe(false)
+  })
+
   test(" w2reattach #given an in-process record marked lost #when reconciled #then its residency claim is released so the slot is reclaimable", async () => {
     // given
     const store = tempStore()

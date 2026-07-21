@@ -20,7 +20,7 @@ export async function reconcileOnSessionStart(context: LifecycleContext): Promis
 }
 
 async function reconcileRecord(context: LifecycleContext, record: TaskRecord): Promise<ReconcileOutcome> {
-  if (context.registry.get(record.task_id) !== undefined) {
+  if (hasLiveResidentHandle(context, record.task_id)) {
     return { task_id: record.task_id, kind: "resumed", reason: "owned by this process" }
   }
 
@@ -147,6 +147,14 @@ async function reconcileTerminalRecord(context: LifecycleContext, record: TaskRe
     return reattachRecord(context, record, sessionPath)
   }
   return { task_id: record.task_id, kind: "resumed" }
+}
+
+function hasLiveResidentHandle(context: LifecycleContext, taskId: string): boolean {
+  // The adapter registry is a view over the manager and can briefly expose an incomplete keyed
+  // lookup while a session transition is publishing its new epoch. The entries snapshot is the
+  // authoritative same-process ownership witness; never classify that resident as a prior-process
+  // task merely because the point lookup missed it.
+  return context.registry.get(taskId) !== undefined || context.registry.entries().some((handle) => handle.task_id === taskId)
 }
 
 function newestSessionPath(context: LifecycleContext, taskId: string): string | undefined {

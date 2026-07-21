@@ -67,6 +67,7 @@ describe("createCodegraphComponent", () => {
 					command: "/opt/homebrew/bin/codegraph",
 					args: ["serve", "--mcp"],
 					enabled: true,
+					lifecycle: "eager",
 					env: {
 						CODEGRAPH_INSTALL_DIR: "/home/test/.omo/codegraph",
 						CODEGRAPH_NO_DAEMON: "1",

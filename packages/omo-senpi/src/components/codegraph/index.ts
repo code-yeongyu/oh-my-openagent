@@ -80,6 +80,7 @@ export function createCodegraphComponent(options: CodegraphComponentOptions = {}
 				args: finalArgs,
 				env: buildEnv(),
 				enabled,
+				lifecycle: "eager",
 			})
 		},
 	}
