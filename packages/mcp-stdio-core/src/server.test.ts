@@ -343,13 +343,15 @@ describe("isProcessAlive", () => {
     }
   })
 
-  test("#given the probe fails unexpectedly #when probed #then the error propagates", () => {
+  test("#given the probe fails with a non-ESRCH error #when probed #then it conservatively reports alive without throwing", () => {
     const failure = Object.assign(new Error("invalid argument"), { code: "EINVAL" })
     const killSpy = spyOn(process, "kill").mockImplementation(() => {
       throw failure
     })
     try {
-      expect(() => isProcessAlive(424_242)).toThrow(failure)
+      // A liveness probe runs inside an unref'd setInterval; a throw there would
+      // wedge the host process, so any non-ESRCH error must be swallowed as alive.
+      expect(isProcessAlive(424_242)).toBe(true)
     } finally {
       killSpy.mockRestore()
     }

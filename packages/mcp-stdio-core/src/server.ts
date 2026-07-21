@@ -43,14 +43,15 @@ export function isProcessAlive(pid: number): boolean {
     process.kill(pid, 0)
     return true
   } catch (error) {
-    // ESRCH means no such process: the parent is gone. EPERM means the process
-    // exists but may not be signalled by us, so it is alive. Node implements
+    // ESRCH means no such process: the parent is gone. Node implements
     // process.kill(pid, 0) on win32 via OpenProcess, which reports ESRCH once
     // the process exits, so this probe is cross-platform; never fall back to a
     // ppid === 1 reparenting check, which is invalid on win32.
-    if (hasErrorCode(error, "ESRCH")) return false
-    if (hasErrorCode(error, "EPERM")) return true
-    throw error
+    // A liveness probe must NEVER throw: it runs inside an unref'd setInterval,
+    // and an uncaught throw there wedges the host process. Any non-ESRCH error
+    // (EPERM, or a win32-specific code) conservatively means "assume alive" -
+    // a false positive only costs one more poll, while a throw is fatal.
+    return !hasErrorCode(error, "ESRCH")
   }
 }
 
