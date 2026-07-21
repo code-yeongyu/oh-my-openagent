@@ -42,10 +42,17 @@ function createAllowedWorkspace(prefix: string): string {
 	return mkdtempSync(join(pluginRoot, `.tmp-${prefix}-`));
 }
 
-function createFakeCodegraphBin(script: string): { readonly binPath: string; readonly dir: string } {
+// On win32 execFile cannot run a #!/bin/sh script, so emit a codegraph.cmd batch file instead;
+// resolveCodegraphCommandInvocation wraps .cmd in `cmd.exe /d /s /c`, exactly like the real codegraph.cmd.
+function createFakeCodegraphBin(scripts: { readonly posix: string; readonly win32: string }): { readonly binPath: string; readonly dir: string } {
 	const dir = mkdtempSync(join(tmpdir(), "omo-codegraph-fake-bin-"));
+	if (process.platform === "win32") {
+		const binPath = join(dir, "codegraph.cmd");
+		writeFileSync(binPath, scripts.win32);
+		return { binPath, dir };
+	}
 	const binPath = join(dir, "codegraph");
-	writeFileSync(binPath, script, { mode: 0o755 });
+	writeFileSync(binPath, scripts.posix, { mode: 0o755 });
 	chmodSync(binPath, 0o755);
 	return { binPath, dir };
 }
@@ -56,7 +63,11 @@ describe("CodeGraph SessionStart hook with a 1.0.1-era project store under the 1
 		const stdout: string[] = [];
 		const spawned: WorkerSpawnInvocation[] = [];
 		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-upgrade-home-"));
-		const fake = createFakeCodegraphBin(`#!/bin/sh\nprintf '%s\\n' '${MIGRATED_1_0_1_STORE_STATUS_JSON}'\n`);
+		// The payload is a single JSON line with no cmd metacharacters (% ^ & < > |), so a plain echo is safe.
+		const fake = createFakeCodegraphBin({
+			posix: `#!/bin/sh\nprintf '%s\\n' '${MIGRATED_1_0_1_STORE_STATUS_JSON}'\n`,
+			win32: `@echo off\r\n@echo ${MIGRATED_1_0_1_STORE_STATUS_JSON}\r\n`,
+		});
 		const workspace = createAllowedWorkspace("codegraph-upgrade-workspace");
 		mkdirSync(join(workspace, ".codegraph"), { recursive: true });
 
@@ -87,7 +98,10 @@ describe("CodeGraph SessionStart hook with a 1.0.1-era project store under the 1
 		const stdout: string[] = [];
 		const spawned: WorkerSpawnInvocation[] = [];
 		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-slow-home-"));
-		const fake = createFakeCodegraphBin("#!/bin/sh\nsleep 30\n");
+		const fake = createFakeCodegraphBin({
+			posix: "#!/bin/sh\nsleep 30\n",
+			win32: '@powershell -NoProfile -Command "Start-Sleep -Seconds 30"\r\n',
+		});
 		const workspace = createAllowedWorkspace("codegraph-slow-probe-workspace");
 
 		try {
