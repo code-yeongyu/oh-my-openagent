@@ -68,7 +68,7 @@ export async function runJsonRpcStdioServer<HandlerOptions>(
     isClosed = true
     log("parent_exit", { parent_pid: parentPid, poll_interval_ms: pollIntervalMs })
     void config.onParentExit?.()
-    // Stop the read loop so the server settles through the same finally path as
+    // Halt the read loop so the server settles through the same finally path as
     // an idle timeout; destroying the input surfaces as ERR_STREAM_PREMATURE_CLOSE
     // below and is swallowed because we initiated the close.
     config.input.destroy()
