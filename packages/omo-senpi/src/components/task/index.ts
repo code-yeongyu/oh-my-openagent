@@ -27,6 +27,7 @@ import { TASK_COMPLETION_MESSAGE_TYPE } from "./parent-notifier"
 import { renderTaskCompletion } from "./renderers"
 import { createTeamMailboxReconciler, createTeamService } from "./team-service"
 import { createSessionTransitionBridge } from "./session-transition-bridge"
+import { wireSessionStartProcessSweep } from "./process-sweep"
 import { createTaskStatusUi } from "./status-ui"
 import { missingTaskCapabilities } from "./surface"
 
@@ -45,6 +46,10 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
   return {
     name: "task",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
+      // Unconditional omo process hygiene (T16): fires on session_start before any
+      // flag/capability gate can skip the rest of the component.
+      wireSessionStartProcessSweep(pi, ctx)
+
       registerTaskFlags(pi)
       if (pi.getFlag(TASK_ENABLED_FLAG) === false) {
         ctx.logger.info("omo-senpi task component disabled by flag")
