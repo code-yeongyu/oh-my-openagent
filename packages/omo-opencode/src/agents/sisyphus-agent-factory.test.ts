@@ -78,6 +78,25 @@ describe("createSisyphusAgent", () => {
         }
       }
     });
+
+    test("#when selecting a tracking mode #then wires the matching tool contract", () => {
+      // given
+      const models = ["openai/gpt-5.5", "openai/gpt-5.6-sol"];
+
+      for (const model of models) {
+        // when
+        const taskAgent = createSisyphusAgent(model, undefined, undefined, undefined, undefined, true);
+        const todoAgent = createSisyphusAgent(model, undefined, undefined, undefined, undefined, false);
+
+        // then
+        expect(taskAgent.prompt).toContain("task_create");
+        expect(taskAgent.prompt).toContain("task_update");
+        expect(taskAgent.prompt).not.toContain("todowrite");
+        expect(todoAgent.prompt).toContain("todowrite");
+        expect(todoAgent.prompt).not.toContain("task_create");
+        expect(todoAgent.prompt).not.toContain("task_update");
+      }
+    });
   });
 
   describe("#given Kimi K3 vs K2.7 vs K2.6 models", () => {

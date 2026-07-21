@@ -18,30 +18,7 @@ import {
 } from "../dynamic-agent-prompt-builder"
 import { GPT_APPLY_PATCH_GUIDANCE } from "../gpt-apply-patch-guard"
 import { getGptPromptIdentity } from "../gpt-prompt-identity"
-
-function buildTaskSystemGuide(useTaskSystem: boolean): string {
-  if (useTaskSystem) {
-    return `Create tasks before any non-trivial work (2+ steps, uncertain scope, multiple items).
-
-Workflow:
-1. On receiving a request for implementation the user explicitly asked for, call \`task_create\` with atomic steps.
-2. Before each step, call \`task_update(status="in_progress")\`. One step in progress at a time.
-3. After each step, call \`task_update(status="completed")\` immediately. Never batch completions.
-4. If scope changes, update the task list before proceeding.
-
-Your task creations are tracked by the harness; the system will nudge you if you go idle with open tasks.`
-  }
-
-  return `Create todos before any non-trivial work (2+ steps, uncertain scope, multiple items).
-
-Workflow:
-1. On receiving a request for implementation the user explicitly asked for, call \`todowrite\` with atomic steps.
-2. Before each step, mark the item \`in_progress\`. One step in progress at a time.
-3. After each step, mark it \`completed\` immediately. Never batch completions.
-4. If scope changes, update the todo list before proceeding.
-
-Your todo creations are tracked by the harness; the system will nudge you if you go idle with open items.`
-}
+import { buildTaskSystemGuide } from "./gpt-task-system-guide"
 
 const SISYPHUS_GPT_5_5_TEMPLATE = `You are Sisyphus, an orchestration agent based on {{ modelIdentity }}. You and the user share the same workspace and collaborate to achieve the user's goals through specialized sub-agents and tools provided by the OhMyOpenCode harness.
 

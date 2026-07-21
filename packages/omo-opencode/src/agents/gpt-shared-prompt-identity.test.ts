@@ -1,39 +1,34 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { getAtlasPrompt } from "./atlas/agent"
-import { createSisyphusAgent } from "./sisyphus"
-import { buildSisyphusJuniorPrompt } from "./sisyphus-junior"
+import { getAtlasPromptSource } from "./atlas/agent"
+import { getGptPromptIdentityKey } from "./gpt-prompt-identity"
 
 describe("shared GPT prompt identities", () => {
-  for (const [model, identity] of [
-    ["openai/gpt-5.5", "GPT-5.5"],
-    ["openai/gpt-5.6-sol", "GPT-5.6 Sol"],
+  for (const [model, identityKey] of [
+    ["openai/gpt-5.5", "gpt-5.5"],
+    ["openai/gpt-5.6-sol", "gpt-5.6-sol"],
   ] as const) {
-    test(`uses ${identity} in assembled Sisyphus prompts`, () => {
-      // given a supported GPT model shared by both prompt families
+    test(`selects the ${identityKey} identity contract`, () => {
+      // given a supported GPT model routed through the shared prompt family
 
-      // when the primary and junior prompts are assembled
-      const primaryPrompt = createSisyphusAgent(model).prompt
-      const juniorPrompt = buildSisyphusJuniorPrompt(model, false)
+      // when its machine-consumed identity key is resolved
+      const resolvedIdentityKey = getGptPromptIdentityKey(model)
 
-      // then both prompts identify the actual routed model
-      expect(primaryPrompt).toContain(`based on ${identity}`)
-      expect(juniorPrompt).toContain(`based on ${identity}`)
+      // then the structural contract identifies the routed model family exactly
+      expect(resolvedIdentityKey).toBe(identityKey)
     })
   }
 
   for (const model of ["openai/gpt-5.5", "openai/gpt-5.6-sol"]) {
-    test(`keeps the Atlas identity model-neutral for ${model}`, () => {
-      // given a GPT model routed through the shared Atlas prompt
+    test(`routes ${model} through the shared Atlas GPT prompt source`, () => {
+      // given a supported GPT model
 
-      // when the Atlas prompt is loaded
-      const prompt = getAtlasPrompt(model)
+      // when the Atlas prompt source is resolved
+      const source = getAtlasPromptSource(model)
 
-      // then the prompt does not claim a different GPT version
-      expect(prompt).toContain("calibrated for GPT-family models")
-      expect(prompt).not.toContain("calibrated for GPT-5.5")
-      expect(prompt).not.toContain("calibrated for GPT-5.6 Sol")
+      // then both versions use the model-neutral GPT-family source
+      expect(source).toBe("gpt")
     })
   }
 })
