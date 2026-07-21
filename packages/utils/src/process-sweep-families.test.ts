@@ -201,7 +201,7 @@ describe("orphaned lsp-daemon proxy sweep", () => {
 
 describe("stale lsp-daemon version sweep", () => {
   it("#given a stale attested daemon and a live current daemon #when sweeping #then only the stale daemon is killed", async () => {
-    // given
+    // given (posix-forced: the kill path is platform-gated; a dedicated win32-defer test covers the real-Windows behavior)
     const homeDir = mkdtempSync(join(tmpdir(), "omo-lsp-daemon-sweep-"))
     const baseDir = join(homeDir, ".omo", "lsp-daemon")
     const calls: string[] = []
@@ -211,6 +211,7 @@ describe("stale lsp-daemon version sweep", () => {
 
       // when
       const result = await sweepStaleLspDaemonVersions({
+        platform: "posix",
         attest: (pid) => Promise.resolve(pid === 710 || pid === 711),
         currentVersion: "9.9.9",
         force: true,
@@ -252,6 +253,7 @@ describe("stale lsp-daemon version sweep", () => {
 
       // when
       const result = await sweepStaleLspDaemonVersions({
+        platform: "posix",
         attest: () => Promise.resolve(false),
         currentVersion: "9.9.9",
         force: true,
