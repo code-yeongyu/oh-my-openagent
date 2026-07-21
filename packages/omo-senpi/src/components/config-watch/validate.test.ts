@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { describe, expect, it } from "bun:test"
@@ -214,20 +214,19 @@ describe("createOmoConfigValidator", () => {
     expect(rejectedErrors(validation).join("\n")).toContain(jsonPath)
   })
 
-  it("#given an unreadable changed config file #when validating #then returns its read diagnostic without throwing", () => {
+  it("#given an unreadable changed config path #when validating #then returns its read diagnostic without throwing", () => {
     const fixture = createFixture()
     const changedPath = configPath(fixture.projectDir)
     writeConfig(changedPath, validTaskConfig)
     const validator = createValidator(fixture)
-    chmodSync(changedPath, 0o000)
+    // Replace the config file with a directory so readFile fails with EISDIR
+    // on both POSIX and Windows. chmod 000 does not block reads on Windows.
+    unlinkSync(changedPath)
+    mkdirSync(changedPath)
 
-    try {
-      const validation = validator.validate([changedPath])
-      expect(validation.ok).toBe(false)
-      expect(rejectedErrors(validation).join("\n")).toContain("Failed to read")
-    } finally {
-      chmodSync(changedPath, 0o600)
-    }
+    const validation = validator.validate([changedPath])
+    expect(validation.ok).toBe(false)
+    expect(rejectedErrors(validation).join("\n")).toContain("Failed to read")
   })
 })
 
