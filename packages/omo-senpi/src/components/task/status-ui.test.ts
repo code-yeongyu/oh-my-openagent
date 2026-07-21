@@ -373,6 +373,61 @@ describe("createTaskStatusUi.syncNow", () => {
   })
 })
 
+describe("createTaskStatusUi.background progress", () => {
+  it("#given two background children #when their latest task events arrive within one debounce window #then footer and widget show truncated descriptions, activity, elapsed time, and spinner frames", () => {
+    // given a controllable 250ms debounce and two active background children created 65 seconds ago
+    const active = new Map<number, () => void>()
+    let nextHandle = 1
+    const timers: StatusUiTimers = {
+      set: (callback) => {
+        const handle = nextHandle++
+        active.set(handle, callback)
+        return handle
+      },
+      clear: (handle) => { if (typeof handle === "number") active.delete(handle) },
+    }
+    const first = record({
+      task_id: "st_first",
+      name: "Investigate the unexpectedly long background child description",
+      status: "running",
+      created_at: "2026-07-07T00:00:00.000Z",
+    })
+    const second = record({ task_id: "st_second", name: "Review tests", status: "running", created_at: "2026-07-07T00:00:00.000Z" })
+    const listeners = new Map<string, (event: { readonly type: string; readonly toolName?: string; readonly args?: unknown }) => void>()
+    const manager: StatusUiManager = {
+      list: () => listed([first, second]),
+      wasBackground: () => true,
+      subscribeChild: (taskId, listener) => {
+        listeners.set(taskId, listener)
+        return () => listeners.delete(taskId)
+      },
+    }
+    const ui = fakeUi()
+    const statusUi = createTaskStatusUi({
+      manager,
+      runtime: runtimeOf(ui, "session-a", "tui"),
+      timers,
+      now: () => Date.parse("2026-07-07T00:01:05.000Z"),
+    })
+
+    // when the manager-handle subscriptions receive child tool events in one debounce window
+    statusUi.syncNow()
+    listeners.get("st_first")?.({ type: "tool_execution_start", toolName: "read", args: { path: "src/foo.ts" } })
+    listeners.get("st_second")?.({ type: "tool_execution_start", toolName: "bash", args: { command: "bun test" } })
+    expect(active.size).toBe(1)
+    for (const callback of active.values()) callback()
+
+    // then each active background child has a compact, single-line live row in the widget and active footer
+    const rows = ui.widgetCalls.at(-1)?.content ?? []
+    expect(rows).toEqual([
+      "⠋ st_first Investigate the... · read src/foo.ts · 1m 5s",
+      "⠋ st_second Review tests · bash bun test · 1m 5s",
+    ])
+    expect(ui.statusCalls.at(-1)).toContain("Investigate the...")
+    expect(ui.statusCalls.at(-1)).toContain("read src/foo.ts")
+  })
+})
+
 describe("createTaskStatusUi.scheduleSync", () => {
   it("#given several rapid schedule calls #when the debounce fires #then syncNow runs once (250ms debounce)", () => {
     // given a controllable timer
