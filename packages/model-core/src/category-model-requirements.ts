@@ -31,6 +31,11 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "high",
       },
       {
+        providers: ["openai", "opencode", "vercel"],
+        model: "gpt-5.6-sol",
+        variant: "xhigh",
+      },
+      {
         providers: ["google", "github-copilot", "opencode", "vercel"],
         model: "gemini-3.1-pro",
         variant: "high",
@@ -59,6 +64,11 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         providers: ["openai", "github-copilot", "vercel"],
         model: "gpt-5.6-sol",
         variant: "high",
+      },
+      {
+        providers: ["openai", "github-copilot", "opencode", "vercel"],
+        model: "gpt-5.6-sol",
+        variant: "medium",
       },
       {
         providers: ["anthropic", "github-copilot", "opencode", "vercel"],
@@ -126,6 +136,11 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       {
         providers: ["anthropic", "github-copilot", "opencode", "vercel"],
         model: "claude-sonnet-4-6",
+      },
+      {
+        providers: ["openai", "opencode", "vercel"],
+        model: "gpt-5.6-sol",
+        variant: "medium",
       },
       { providers: ["opencode-go", "vercel"], model: "kimi-k3" },
       {

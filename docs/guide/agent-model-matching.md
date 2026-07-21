@@ -13,7 +13,9 @@
 - **Claude family:** Fable 5 · Opus 4.8 · Opus 4.8 · Sonnet 4.6
 - **Kimi:** **K3** · K2.7 · K3 · K3
 - **GLM:** 5 / 5.1 *(acceptable — slightly looser on the long nested workflows)*
-- **GPT:** 5.4 / 5.5 *(dedicated GPT prompt path exists — supported, but still **NOT** the recommended default for the orchestrator)*
+- **GPT:** 5.4 / 5.5 / 5.6 Sol *(GPT-native prompt paths exist — supported, but still **NOT** the recommended default for the orchestrator)*
+
+> **Known GPT-5.6 Sisyphus risk:** GPT-5.6 Sol is an automatic fallback and receives a model-aware GPT-native prompt, but [issue #6074](https://github.com/code-yeongyu/oh-my-openagent/issues/6074) tracks over-orchestration on bounded work. Hephaestus remains the recommended GPT-5.6 agent; the Sisyphus route is available for fallback coverage, not a claim that it is the best fit.
 
 **Experimental, not supported: GLM 5.2.** A dedicated GLM-5.2-calibrated prompt exists, and the selector uses it for model IDs recognized as GLM. One community report describes good results, but maintainers have not yet validated the nested todo, delegation, long-context, and non-ultrawork behavior end to end. The Sisyphus fallback chain is configured with the `glm-5` model literal, but fuzzy availability matching can resolve that entry to GLM 5.1 or GLM 5.2. Any resulting GLM 5.2 use remains experimental, not a supported configuration.
 
@@ -53,9 +55,9 @@ Sisyphus is the developer who knows everyone, goes everywhere, and gets things d
 - Understanding nuanced delegation and orchestration patterns
 - Producing well-structured, communicative output
 
-Using Sisyphus with older GPT models would be like taking your best project manager — the one who coordinates everyone, runs standups, and keeps the whole team aligned — and sticking them in a room alone to debug a race condition. Wrong fit. GPT-5.4 and GPT-5.6 Sol now have dedicated Sisyphus prompt paths, but GPT is still not the default recommendation for the orchestrator.
+Using Sisyphus with older GPT models would be like taking your best project manager — the one who coordinates everyone, runs standups, and keeps the whole team aligned — and sticking them in a room alone to debug a race condition. Wrong fit. GPT-5.4 has its own prompt, while GPT-5.5 and GPT-5.6 Sol share a model-aware GPT-native prompt family; GPT is still not the default recommendation for the orchestrator.
 
-> **⚠️ Sisyphus is ONLY tested on Claude (Fable 5 / Opus 4.8 / 4.7 / Sonnet 4.6), Kimi (**K3** / K2.7 / K3 / K3), GLM (5 / 5.1), and GPT (5.4 / 5.5).** Anything else is not maintainer-verified or supported and can break without warning. **MiniMax and Qwen as Sisyphus are strongly discouraged to the point we'd almost forbid it.** Read the **🚨 READ THIS FIRST** warning at the very top of this guide before you override the orchestrator's model.
+> **⚠️ Sisyphus is ONLY tested on Claude (Fable 5 / Opus 4.8 / 4.7 / Sonnet 4.6), Kimi (**K3** / K2.7 / K3 / K3), GLM (5 / 5.1), and GPT (5.4 / 5.5 / 5.6 Sol).** Anything else is not maintainer-verified or supported and can break without warning. **MiniMax and Qwen as Sisyphus are strongly discouraged to the point we'd almost forbid it.** Read the **🚨 READ THIS FIRST** warning at the very top of this guide before you override the orchestrator's model.
 
 > **GLM 5.2 remains experimental.** It has a calibrated prompt and one community report, but no maintainer end-to-end validation. The prompt selector applies to model IDs recognized as GLM. The hardcoded Sisyphus fallback entry is the `glm-5` literal, which fuzzy availability matching may resolve to GLM 5.1 or GLM 5.2.
 
@@ -281,7 +283,7 @@ Used by: `visual-engineering`, `artistry`, Oracle (visual fallback), Multimodal-
 | If you lose... | Swap to (in order) | Avoid |
 |---|---|---|
 | Claude Opus/Sonnet | Kimi K3 → Kimi K2.7 → K3/K3 → GLM 5 → Big Pickle | Older GPT models |
-| GPT-5.4/5.5 | GPT-5.6 Sol Codex → DeepSeek v3.2 | MiniMax (except for utility work) |
+| GPT-5.4/5.5/5.6 Sol | GPT-5.6 Sol Codex → DeepSeek v3.2 | MiniMax (except for utility work) |
 | Gemini 3.1 Pro | Qwen 3.6-plus / 3.5-plus | Claude/Kimi (wrong reasoning style for visual) |
 | GPT-5.4 Mini Fast (Explore/Librarian) | Qwen 3.5-plus → MiniMax M2.7 Highspeed → MiniMax M3 → Claude Haiku | Opus (massive cost waste) |
 
@@ -295,7 +297,7 @@ Exact current runtime chains from [`agent-model-requirements.ts`](../../packages
 
 | Agent | Primary | Full fallback chain |
 | --- | --- | --- |
-| **sisyphus** | `claude-opus-4-8` | `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode\|vercel\|bailian-coding-plan\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k3` → `zai-coding-plan\|opencode\|bailian-coding-plan\|vercel/glm-5` → `opencode/big-pickle` |
+| **sisyphus** | `claude-opus-4-8` | `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode\|vercel\|bailian-coding-plan\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k3` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `zai-coding-plan\|opencode\|bailian-coding-plan\|vercel/glm-5` → `opencode/big-pickle` |
 | **hephaestus** | `gpt-5.6-sol` | `openai\|github-copilot\|vercel\|opencode/gpt-5.6-sol (medium)` |
 | **oracle** | `gpt-5.6-sol` | `openai\|opencode\|vercel/gpt-5.6-sol (xhigh)` → `github-copilot/gpt-5.6-sol (high)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `opencode-go\|vercel/glm-5.2` |
 | **librarian** | `gpt-5.4-mini-fast` | `openai/gpt-5.4-mini-fast` → `opencode-go\|bailian-coding-plan/qwen3.5-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
@@ -303,9 +305,9 @@ Exact current runtime chains from [`agent-model-requirements.ts`](../../packages
 | **multimodal-looker** | `gpt-5.6-sol` | `openai\|opencode\|vercel/gpt-5.6-sol (low)` → `opencode-go\|vercel/kimi-k3` → `zai-coding-plan\|vercel/glm-4.6v` → `openai\|github-copilot\|opencode\|vercel/gpt-5-nano` |
 | **prometheus** | `claude-opus-4-8` | `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (high)` → `opencode-go\|vercel/glm-5.2` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro` |
 | **metis** | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `opencode-go\|vercel/glm-5.2` → `kimi-for-coding/kimi-k3` |
-| **momus** | `gpt-5.6-terra` | `openai\|vercel/gpt-5.6-terra (high)` → `github-copilot/gpt-5.6-terra (high)` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (xhigh)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `opencode-go\|vercel/glm-5.2` |
-| **atlas** | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `opencode-go\|vercel/kimi-k3` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` |
-| **sisyphus-junior** | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `opencode-go\|vercel/kimi-k3` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `opencode/big-pickle` |
+| **momus** | `gpt-5.6-terra` | `openai\|vercel/gpt-5.6-terra (high)` → `github-copilot/gpt-5.6-terra (high)` → `openai\|opencode\|vercel/gpt-5.6-sol (xhigh)` → `github-copilot/gpt-5.6-sol (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `opencode-go\|vercel/glm-5.2` |
+| **atlas** | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `opencode-go\|vercel/kimi-k3` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` |
+| **sisyphus-junior** | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `opencode-go\|vercel/kimi-k3` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `opencode/big-pickle` |
 
 ## Model Families
 
@@ -389,11 +391,11 @@ When agents delegate work, they don't pick a model name — they pick a **catego
 | Category | Used For | Default Model | Full fallback chain |
 | --- | --- | --- | --- |
 | `visual-engineering` | Frontend, UI, CSS, design | `google/gemini-3.1-pro (high)` | `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `zai-coding-plan\|opencode\|bailian-coding-plan\|vercel/glm-5` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `opencode-go\|vercel/glm-5.2` → `kimi-for-coding/kimi-k3` |
-| `ultrabrain` | Maximum reasoning needed | `openai/gpt-5.6-sol (xhigh)` | `openai\|vercel/gpt-5.6-sol (xhigh)` → `github-copilot/gpt-5.6-sol (high)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `opencode-go\|vercel/glm-5.2` |
-| `deep` | Deep coding, complex logic | `openai/gpt-5.6-terra (xhigh)` | `openai\|vercel/gpt-5.6-terra (xhigh)` → `github-copilot/gpt-5.6-terra (high)` → `openai\|github-copilot\|vercel/gpt-5.6-sol (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `opencode-go\|vercel/kimi-k3` → `opencode-go\|vercel/glm-5.2` |
+| `ultrabrain` | Maximum reasoning needed | `openai/gpt-5.6-sol (xhigh)` | `openai\|vercel/gpt-5.6-sol (xhigh)` → `github-copilot/gpt-5.6-sol (high)` → `openai\|opencode\|vercel/gpt-5.6-sol (xhigh)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `opencode-go\|vercel/glm-5.2` |
+| `deep` | Deep coding, complex logic | `openai/gpt-5.6-terra (xhigh)` | `openai\|vercel/gpt-5.6-terra (xhigh)` → `github-copilot/gpt-5.6-terra (high)` → `openai\|github-copilot\|vercel/gpt-5.6-sol (high)` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `opencode-go\|vercel/kimi-k3` → `opencode-go\|vercel/glm-5.2` |
 | `artistry` | Creative, novel approaches | `google/gemini-3.1-pro (high)` | `google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (high)` → `opencode-go\|vercel/kimi-k3` → `opencode-go\|vercel/glm-5.2` |
 | `quick` | Simple, fast tasks | `openai/gpt-5.4-mini` | `openai\|github-copilot\|opencode\|vercel/gpt-5.4-mini` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `google\|github-copilot\|opencode\|vercel/gemini-3-flash` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` → `opencode\|vercel/gpt-5-nano` |
-| `unspecified-low` | General standard work | `openai/gpt-5.6-luna (xhigh)` | `openai\|vercel/gpt-5.6-luna (xhigh)` → `github-copilot/gpt-5.6-luna (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `opencode-go\|vercel/kimi-k3` → `google\|github-copilot\|opencode\|vercel/gemini-3-flash` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` |
+| `unspecified-low` | General standard work | `openai/gpt-5.6-luna (xhigh)` | `openai\|vercel/gpt-5.6-luna (xhigh)` → `github-copilot/gpt-5.6-luna (high)` → `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `openai\|opencode\|vercel/gpt-5.6-sol (medium)` → `opencode-go\|vercel/kimi-k3` → `google\|github-copilot\|opencode\|vercel/gemini-3-flash` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` |
 | `unspecified-high` | General complex work | `anthropic/claude-opus-4-8 (max)` | `anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max)` → `openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (high)` → `zai-coding-plan\|opencode\|bailian-coding-plan\|vercel/glm-5` → `kimi-for-coding/kimi-k3` → `opencode-go\|vercel/glm-5.2` → `opencode\|bailian-coding-plan\|vercel\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k3` |
 | `writing` | Text, docs, prose | `kimi-for-coding/kimi-k3` | `google\|github-copilot\|opencode\|vercel/gemini-3-flash` → `opencode-go\|vercel/kimi-k3` → `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `opencode-go\|vercel/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go\|vercel/minimax-m2.7` |
 
@@ -541,10 +543,10 @@ If you have OpenRouter and want DeepSeek in the chain when GPT is unavailable:
 
 **Dangerous** — personality mismatch:
 
-- **Sisyphus → ANY model not on the tested list**: The supported set is Claude (Fable 5 / Opus 4.8 / 4.7 / Sonnet 4.6), Kimi (K3 / K2.7 / K3 / K3), GLM (5 / 5.1), GPT (5.4 / 5.5). Everything else is not maintainer-verified and can break at the very next patch. **A prompt cannot fix a model** — if it doesn't fit, no tuning makes it fit. See the **🚨 READ THIS FIRST** warning at the very top of this guide.
+- **Sisyphus → ANY model not on the tested list**: The supported set is Claude (Fable 5 / Opus 4.8 / 4.7 / Sonnet 4.6), Kimi (K3 / K2.7 / K3 / K3), GLM (5 / 5.1), GPT (5.4 / 5.5 / 5.6 Sol). Everything else is not maintainer-verified and can break at the very next patch. **A prompt cannot fix a model** — if it doesn't fit, no tuning makes it fit. See the **🚨 READ THIS FIRST** warning at the very top of this guide.
 - **Sisyphus → MiniMax / Qwen**: **Strongly discouraged to the point of "almost forbidden."** Neither holds up under the orchestration prompt. Never use them as the orchestrator.
 - **Sisyphus → MiMo / DeepSeek**: No working configuration found. Untested and unsupported as the orchestrator.
-- **Sisyphus → older GPT models**: Still a bad fit. GPT-5.4 and GPT-5.6 Sol are the only dedicated GPT prompt paths.
+- **Sisyphus → older GPT models**: Still a bad fit. GPT-5.4 has its own prompt; GPT-5.5 and GPT-5.6 Sol share the supported model-aware GPT-native prompt family.
 - **Hephaestus → Claude**: Built for Codex's autonomous style. Claude can't replicate this.
 - **Hephaestus → MiniMax**: MiniMax loses coherence on multi-step deep work. **Never do this.**
 - **Oracle → MiniMax**: Same reason. Oracle needs sustained reasoning; MiniMax drifts.

@@ -87,7 +87,7 @@ Sisyphus is your main orchestrator. He plans, delegates to specialists, and driv
 - **Kimi K3** / **K3** — Great Claude-like alternatives. K3 is the current default fallback in the primary Sisyphus chain after K3; many users run K3 or the K3/K3 combo exclusively.
 - **GLM 5** — Solid option, especially via Z.ai. **GLM 5.2 is experimental:** Sisyphus uses a GLM-5.2-calibrated prompt for model IDs recognized as GLM, but current evidence is one community report without maintainer end-to-end validation. The automatic chain is configured with `glm-5`, and fuzzy availability matching may resolve that entry to GLM 5.1 or GLM 5.2.
 
-Sisyphus works best on Claude Opus 4.8 / 4.7, Kimi K3 (or K3), and GLM 5. GPT-5.4 and GPT-5.6 Sol now have dedicated prompt paths, but older GPT models are still a poor fit and should route to Hephaestus instead.
+Sisyphus works best on Claude Opus 4.8 / 4.7, Kimi K3 (or K3), and GLM 5. GPT-5.4 has its own prompt, while GPT-5.5 and GPT-5.6 Sol share a model-aware GPT-native prompt family. Hephaestus remains the recommended GPT-5.6 agent because [issue #6074](https://github.com/code-yeongyu/oh-my-openagent/issues/6074) tracks Sisyphus over-orchestration on bounded work.
 
 ### Hephaestus: The Legitimate Craftsman
 

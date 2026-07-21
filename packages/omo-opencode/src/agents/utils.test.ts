@@ -1138,7 +1138,7 @@ describe("createBuiltinAgents with requiresAnyModel gating (sisyphus)", () => {
     }
   })
 
-  test("metis resolves to OpenAI while atlas remains unavailable in an OpenAI-only environment without a system default", async () => {
+  test("metis and atlas resolve to Sol in an OpenAI-only environment without a system default", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set(["openai/gpt-5.6-sol"]))
     const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
@@ -1148,7 +1148,7 @@ describe("createBuiltinAgents with requiresAnyModel gating (sisyphus)", () => {
       const agents = await createBuiltinAgents([], {}, undefined, undefined, undefined, undefined, [], {})
 
       // #then
-      expect(agents.atlas).toBeUndefined()
+      expect(agents.atlas).toMatchObject({ model: "openai/gpt-5.6-sol", variant: "medium" })
       expect(agents.metis).toBeDefined()
       expect(agents.metis.model).toBe("openai/gpt-5.6-sol")
       expect(agents.metis.variant).toBe("medium")
