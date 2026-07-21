@@ -1082,12 +1082,22 @@ describe("createEventHandler - model fallback", () => {
 
     //#then - second fallback entry applied (chain advanced past opencode-go/kimi-k3)
     expect(second.message["model"]).toMatchObject({
+      providerID: "kimi-for-coding",
+      modelID: "k3",
+    })
+    expect(second.message["variant"]).toBeUndefined()
+
+    //#when - third retry cycle
+    const third = await triggerRetryCycle("kimi-for-coding", "k3")
+
+    //#then - third fallback entry applied (chain advanced past kimi-for-coding/k3)
+    expect(third.message["model"]).toMatchObject({
       providerID: "opencode-go",
       modelID: "kimi-k2.6",
     })
-    expect(second.message["variant"]).toBeUndefined()
-    expect(abortCalls).toEqual([sessionID, sessionID])
-    expect(promptCalls).toEqual([sessionID, sessionID])
+    expect(third.message["variant"]).toBeUndefined()
+    expect(abortCalls).toEqual([sessionID, sessionID, sessionID])
+    expect(promptCalls).toEqual([sessionID, sessionID, sessionID])
     expect(toastCalls.length).toBeGreaterThanOrEqual(0)
   })
 

@@ -428,6 +428,31 @@ describe("getModelCapabilities", () => {
     }
   })
 
+  test("resolves kimi-for-coding k3 from the bundled snapshot", () => {
+    // given
+    const bundledSnapshot = getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson)
+
+    // when
+    const result = getModelCapabilities({
+      providerID: "kimi-for-coding",
+      modelID: "k3",
+      bundledSnapshot,
+    })
+
+    // then
+    expect(result.diagnostics).toMatchObject({
+      resolutionMode: "snapshot-backed",
+      canonicalization: { source: "canonical" },
+      snapshot: { source: "bundled-snapshot" },
+    })
+    expect(result.family).toBe("kimi")
+    expect(result.reasoning).toBe(true)
+    expect(result.supportsThinking).toBe(true)
+    expect(result.toolCall).toBe(true)
+    expect(result.supportsTemperature).toBe(true)
+    expect(result.maxOutputTokens).toBe(131072)
+  })
+
   test("prefers snapshot reasoning over heuristic supportsThinking: false", () => {
     // given: a model matching the kimi heuristic (supportsThinking: false) but with reasoning: true in snapshot
     const capabilities = getModelCapabilities({

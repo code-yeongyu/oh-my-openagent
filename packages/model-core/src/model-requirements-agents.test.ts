@@ -17,15 +17,15 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary?.variant).toBe("high")
   })
 
-  test("sisyphus keeps opus primary before kimi-k3, k2p5, kimi-k2.5, gpt-5.5 medium, and big-pickle", () => {
+  test("sisyphus keeps opus primary before kimi-k3, k3, k2p5, kimi-k2.5, gpt-5.5 medium, and big-pickle", () => {
     // given
     const sisyphus = AGENT_MODEL_REQUIREMENTS["sisyphus"]
 
     // when
-    const [primary, second, third, fourth, fifth, sixth, seventh, last] = sisyphus.fallbackChain
+    const [primary, second, third, fourth, fifth, sixth, seventh, eighth, last] = sisyphus.fallbackChain
 
     // then
-    expect(sisyphus.fallbackChain).toHaveLength(8)
+    expect(sisyphus.fallbackChain).toHaveLength(9)
     expect(sisyphus.requiresAnyModel).toBe(true)
     expect(primary).toEqual({
       providers: ["anthropic", "github-copilot", "opencode", "vercel"],
@@ -33,19 +33,20 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       variant: "max",
     })
     expect(second).toEqual({
-      providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode", "vercel"],
+      providers: ["opencode-go", "moonshotai", "opencode", "vercel"],
       model: "kimi-k3",
     })
-    expect(third).toEqual({ providers: ["opencode-go", "vercel"], model: "kimi-k2.6" })
-    expect(fourth).toEqual({ providers: ["kimi-for-coding"], model: "k2p5" })
-    expect(fifth?.model).toBe("kimi-k2.5")
-    expect(sixth).toEqual({
+    expect(third).toEqual({ providers: ["kimi-for-coding"], model: "k3" })
+    expect(fourth).toEqual({ providers: ["opencode-go", "vercel"], model: "kimi-k2.6" })
+    expect(fifth).toEqual({ providers: ["kimi-for-coding"], model: "k2p5" })
+    expect(sixth?.model).toBe("kimi-k2.5")
+    expect(seventh).toEqual({
       providers: ["openai", "github-copilot", "opencode", "vercel"],
       model: "gpt-5.5",
       variant: "medium",
     })
-    expect(seventh?.providers[0]).toBe("zai-coding-plan")
-    expect(seventh?.model).toBe("glm-5")
+    expect(eighth?.providers[0]).toBe("zai-coding-plan")
+    expect(eighth?.model).toBe("glm-5")
     expect(last?.providers[0]).toBe("opencode")
     expect(last?.model).toBe("big-pickle")
   })
