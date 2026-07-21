@@ -109,8 +109,8 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then Bailian is limited to compatible utility routes
-      expect(result.agents?.librarian?.model).toBe("bailian-coding-plan/qwen3.5-plus")
-      expect(result.agents?.explore?.model).toBe("bailian-coding-plan/qwen3.5-plus")
+      expect(result.agents?.librarian?.model).toBe("bailian-coding-plan/qwen3.6-plus")
+      expect(result.agents?.explore?.model).toBe("bailian-coding-plan/qwen3.6-plus")
       expect(result.agents?.hephaestus).toBeUndefined()
     })
   })
