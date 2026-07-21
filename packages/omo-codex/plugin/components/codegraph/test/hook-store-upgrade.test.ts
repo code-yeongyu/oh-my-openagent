@@ -117,7 +117,7 @@ describe("CodeGraph SessionStart hook with a 1.0.1-era project store under the 1
 		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-slow-home-"));
 		const fake = createFakeCodegraphBin({
 			posix: "#!/bin/sh\nsleep 30\n",
-			win32: '@powershell -NoProfile -Command "Start-Sleep -Seconds 4"\r\n',
+			win32: "@echo off\r\nset /p _probe_hang=\r\n",
 		});
 		const workspace = createAllowedWorkspace("codegraph-slow-probe-workspace");
 
