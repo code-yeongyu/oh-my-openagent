@@ -10,6 +10,12 @@ const CODEGRAPH_STATUS_UNINITIALIZED_PATTERN =
   /^.*?\bNot initialized\s*$/im
 const CODEGRAPH_INIT_HINT_PATTERN =
   /Run\s+["'`]codegraph init["'`]\s+(?:in that project first|to initialize)\.?/i
+const CODEGRAPH_PROJECT_NOT_INDEXED_PATTERN =
+  /The project at (.+?) isn't indexed with codegraph\b/i
+const CODEGRAPH_NO_PROJECT_LOADED_PATTERN =
+  /No CodeGraph project is loaded for this session\./i
+const CODEGRAPH_NO_PROJECT_SEARCHED_FROM_PATTERN =
+  /^Searched for a \.codegraph\/ directory starting from:\s*(.+?)\s*$/im
 
 export interface CodegraphInitGuidanceInput {
   readonly cwd?: unknown
@@ -66,6 +72,16 @@ function extractProjectPath(output: string): string | null {
   const uninitializedMatch = normalizedOutput.match(CODEGRAPH_UNINITIALIZED_PATTERN)
   const uninitializedProject = uninitializedMatch?.[1]?.trim()
   if (uninitializedProject && uninitializedProject.length > 0) return uninitializedProject
+
+  const notIndexedMatch = normalizedOutput.match(CODEGRAPH_PROJECT_NOT_INDEXED_PATTERN)
+  const notIndexedProject = notIndexedMatch?.[1]?.trim()
+  if (notIndexedProject && notIndexedProject.length > 0) return notIndexedProject
+
+  if (CODEGRAPH_NO_PROJECT_LOADED_PATTERN.test(normalizedOutput)) {
+    const searchedFromMatch = normalizedOutput.match(CODEGRAPH_NO_PROJECT_SEARCHED_FROM_PATTERN)
+    const searchedFromProject = searchedFromMatch?.[1]?.trim()
+    if (searchedFromProject && searchedFromProject.length > 0) return searchedFromProject
+  }
 
   if (!looksLikeCodegraphUninitializedOutput(normalizedOutput)) return null
   const statusMatch = normalizedOutput.match(CODEGRAPH_STATUS_PROJECT_PATTERN)

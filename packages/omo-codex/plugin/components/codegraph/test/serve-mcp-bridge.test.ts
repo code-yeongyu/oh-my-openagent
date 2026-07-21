@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { runCodegraphServe } from "../src/serve.ts";
 import {
 	arrayProperty,
+	CODEGRAPH_141_DEFAULT_TOOLS,
 	findTool,
 	frameMcpRequest,
 	parseMcpBodies,
@@ -93,12 +94,7 @@ describe("runCodegraphServe MCP protocol bridge", () => {
 					id: 2,
 					jsonrpc: "2.0",
 					result: {
-						tools: [
-							{ name: "codegraph_search" },
-							{ name: "codegraph_node" },
-							{ name: "codegraph_explore" },
-							{ name: "codegraph_callers" },
-						],
+						tools: CODEGRAPH_141_DEFAULT_TOOLS,
 					},
 				},
 			]);

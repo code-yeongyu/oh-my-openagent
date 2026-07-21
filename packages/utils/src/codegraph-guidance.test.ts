@@ -91,6 +91,54 @@ describe("CodeGraph initialization guidance", () => {
     expect(projectPath).toBe("/Users/me/project")
   })
 
+  test("#given CodeGraph 1.4.1 MCP reports an explicit projectPath that is not indexed #when parsed #then the project path is extracted", () => {
+    // given
+    const output =
+      "The project at /Users/me/project isn't indexed with codegraph (no .codegraph/ directory found walking up from it), so codegraph cannot query it. Use your built-in tools (Read/Grep/Glob) for that codebase instead, and don't call codegraph for it again this session. Indexing is the user's decision — they can run 'codegraph init' in that project to enable it."
+
+    // when
+    const projectPath = getCodegraphUninitializedProject({
+      toolName: "codegraph_explore",
+      toolOutput: output,
+    })
+
+    // then
+    expect(projectPath).toBe("/Users/me/project")
+  })
+
+  test("#given CodeGraph 1.4.1 MCP reports no project loaded for the session #when parsed #then the searched-from path is extracted", () => {
+    // given
+    const output = [
+      "No CodeGraph project is loaded for this session.",
+      "Searched for a .codegraph/ directory starting from: /Users/me/project",
+      "Either the server root has no index of its own (e.g. a monorepo where only sub-projects are indexed), or the MCP client launched the server outside your project without reporting the workspace root. Either way, target the project explicitly:",
+    ].join("\n")
+
+    // when
+    const projectPath = getCodegraphUninitializedProject({
+      toolName: "codegraph_explore",
+      toolOutput: output,
+    })
+
+    // then
+    expect(projectPath).toBe("/Users/me/project")
+  })
+
+  test("#given CodeGraph 1.4.1 MCP reports a non-indexed project for a non-CodeGraph tool #when parsed #then no guidance is emitted", () => {
+    // given
+    const output =
+      "The project at /Users/me/project isn't indexed with codegraph (no .codegraph/ directory found walking up from it), so codegraph cannot query it."
+
+    // when
+    const projectPath = getCodegraphUninitializedProject({
+      toolName: "bash",
+      toolOutput: output,
+    })
+
+    // then
+    expect(projectPath).toBeNull()
+  })
+
   test("#given an uninitialized project #when guidance is built #then it points to the OMO global store", () => {
     // when
     const guidance = normalizeDisplayPaths(buildCodegraphInitGuidance("/Users/me/project", { homeDir: "/Users/me" }))
