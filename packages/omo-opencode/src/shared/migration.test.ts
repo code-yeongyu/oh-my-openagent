@@ -547,7 +547,7 @@ describe("migrateConfigFile", () => {
      // then: Model version should be migrated
      expect(needsWrite).toBe(true)
      const categories = rawConfig.categories as Record<string, Record<string, unknown>>
-     expect(categories["my-category"].model).toBe("anthropic/claude-opus-4-7")
+     expect(categories["my-category"].model).toBe("anthropic/claude-opus-4-8")
    })
 
    test("does not set needsWrite when no model versions need migration", () => {
@@ -595,10 +595,10 @@ describe("MODEL_VERSION_MAP", () => {
     expect(MODEL_VERSION_MAP["openai/gpt-5.4-codex"]).toBeUndefined()
   })
 
-  test("maps anthropic/claude-opus-4-4 to anthropic/claude-opus-4-7", () => {
+  test("maps anthropic/claude-opus-4-4 to anthropic/claude-opus-4-8", () => {
     // given/when: Check MODEL_VERSION_MAP
     // then: Should contain correct mapping
-    expect(MODEL_VERSION_MAP["anthropic/claude-opus-4-4"]).toBe("anthropic/claude-opus-4-7")
+    expect(MODEL_VERSION_MAP["anthropic/claude-opus-4-4"]).toBe("anthropic/claude-opus-4-8")
   })
 
   test("does not migrate openai/gpt-5.5 (still a supported codex variant, #3777)", () => {
@@ -682,7 +682,7 @@ describe("migrateModelVersions", () => {
     // then: Model should be updated
     expect(changed).toBe(true)
     const prometheus = migrated["prometheus"] as Record<string, unknown>
-    expect(prometheus.model).toBe("anthropic/claude-opus-4-7")
+    expect(prometheus.model).toBe("anthropic/claude-opus-4-8")
   })
 
   test("leaves unknown model strings untouched", () => {
@@ -742,7 +742,7 @@ describe("migrateModelVersions", () => {
     // then: Only mapped models should be updated
     expect(changed).toBe(true)
     expect((migrated["sisyphus"] as Record<string, unknown>).model).toBe("openai/gpt-5.4-codex")
-    expect((migrated["prometheus"] as Record<string, unknown>).model).toBe("anthropic/claude-opus-4-7")
+    expect((migrated["prometheus"] as Record<string, unknown>).model).toBe("anthropic/claude-opus-4-8")
     expect((migrated["oracle"] as Record<string, unknown>).model).toBe("openai/gpt-5.5-preview")
   })
 
@@ -804,9 +804,9 @@ describe("migrateModelVersions", () => {
 
     // then: Only prometheus should be migrated
     expect(changed).toBe(true)
-    expect(newMigrations).toEqual(["model-version:anthropic/claude-opus-4-4->anthropic/claude-opus-4-7"])
+    expect(newMigrations).toEqual(["model-version:anthropic/claude-opus-4-4->anthropic/claude-opus-4-8"])
     expect((migrated["sisyphus"] as Record<string, unknown>).model).toBe("openai/gpt-5.4-codex")
-    expect((migrated["prometheus"] as Record<string, unknown>).model).toBe("anthropic/claude-opus-4-7")
+    expect((migrated["prometheus"] as Record<string, unknown>).model).toBe("anthropic/claude-opus-4-8")
   })
 
   test("backward compatible without appliedMigrations param", () => {
@@ -893,12 +893,12 @@ describe("migrateConfigFile _migrations tracking", () => {
     // (legacy + new) is written to the sidecar file exactly once.
     expect(result).toBe(true)
     expect(rawConfig._migrations).toBeUndefined()
-    expect((rawConfig.agents as Record<string, Record<string, unknown>>).prometheus.model).toBe("anthropic/claude-opus-4-7")
+    expect((rawConfig.agents as Record<string, Record<string, unknown>>).prometheus.model).toBe("anthropic/claude-opus-4-8")
 
     const sidecar = JSON.parse(fs.readFileSync(`${configPath}.migrations.json`, "utf-8"))
     expect(new Set(sidecar.appliedMigrations)).toEqual(new Set([
       "model-version:openai/gpt-5.4-codex->openai/gpt-5.5",
-      "model-version:anthropic/claude-opus-4-4->anthropic/claude-opus-4-7",
+      "model-version:anthropic/claude-opus-4-4->anthropic/claude-opus-4-8",
     ]))
 
     // cleanup
@@ -1322,9 +1322,9 @@ describe("migrateModelVersions with applied migrations", () => {
 
     // then: Skip sisyphus (already applied), apply oracle
     expect(changed).toBe(true)
-    expect(newMigrations).toEqual(["model-version:anthropic/claude-opus-4-4->anthropic/claude-opus-4-7"])
+    expect(newMigrations).toEqual(["model-version:anthropic/claude-opus-4-4->anthropic/claude-opus-4-8"])
     expect((migrated.sisyphus as Record<string, unknown>).model).toBe("openai/gpt-5.4-codex")
-    expect((migrated.oracle as Record<string, unknown>).model).toBe("anthropic/claude-opus-4-7")
+    expect((migrated.oracle as Record<string, unknown>).model).toBe("anthropic/claude-opus-4-8")
   })
 
   test("backward compatible: no appliedMigrations param", () => {
@@ -1408,12 +1408,12 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
 
     expect(needsWrite).toBe(true)
-    expect((rawConfig.agents as Record<string, Record<string, unknown>>).oracle.model).toBe("anthropic/claude-opus-4-7")
+    expect((rawConfig.agents as Record<string, Record<string, unknown>>).oracle.model).toBe("anthropic/claude-opus-4-8")
     expect(rawConfig._migrations).toBeUndefined()
 
     const sidecar = JSON.parse(fs.readFileSync(sidecarPath(testConfigPath), "utf-8"))
     expect(sidecar.appliedMigrations).toEqual([
-      "model-version:anthropic/claude-opus-4-4->anthropic/claude-opus-4-7",
+      "model-version:anthropic/claude-opus-4-4->anthropic/claude-opus-4-8",
     ])
   })
 
@@ -1482,7 +1482,7 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
       JSON.stringify({
         appliedMigrations: [
           "model-version:openai/gpt-5.4->openai/gpt-5.5",
-          "model-version:anthropic/claude-opus-4-4->anthropic/claude-opus-4-7",
+          "model-version:anthropic/claude-opus-4-4->anthropic/claude-opus-4-8",
         ],
       }),
     )
@@ -1490,7 +1490,7 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
       agents: {
         oracle: { model: "anthropic/claude-opus-4-4" },
       },
-      _migrations: ["model-version:anthropic/claude-opus-4-4->anthropic/claude-opus-4-7"],
+      _migrations: ["model-version:anthropic/claude-opus-4-4->anthropic/claude-opus-4-8"],
     }
     fs.writeFileSync(testConfigPath, JSON.stringify(rawConfig, null, 2))
 
@@ -1504,7 +1504,7 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
 
     const sidecar = JSON.parse(fs.readFileSync(sidecarPath(testConfigPath), "utf-8"))
     expect(sidecar.appliedMigrations).toEqual([
-      "model-version:anthropic/claude-opus-4-4->anthropic/claude-opus-4-7",
+      "model-version:anthropic/claude-opus-4-4->anthropic/claude-opus-4-8",
       "model-version:openai/gpt-5.4->openai/gpt-5.5",
     ])
   })
@@ -1534,13 +1534,13 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
     // codex was reverted, must stay
     expect((rawConfig.agents as Record<string, Record<string, unknown>>).codex.model).toBe("openai/gpt-5.4")
     // claude migrates
-    expect((rawConfig.agents as Record<string, Record<string, unknown>>).claude.model).toBe("anthropic/claude-opus-4-7")
+    expect((rawConfig.agents as Record<string, Record<string, unknown>>).claude.model).toBe("anthropic/claude-opus-4-8")
     expect(rawConfig._migrations).toBeUndefined()
 
     const sidecar = JSON.parse(fs.readFileSync(sidecarPath(testConfigPath), "utf-8"))
     expect(new Set(sidecar.appliedMigrations)).toEqual(new Set([
       "model-version:openai/gpt-5.4->openai/gpt-5.5",
-      "model-version:anthropic/claude-opus-4-4->anthropic/claude-opus-4-7",
+      "model-version:anthropic/claude-opus-4-4->anthropic/claude-opus-4-8",
     ]))
   })
 
@@ -1565,7 +1565,7 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
     expect(Array.isArray(migrations)).toBe(true)
     expect(migrations).toContain("model-version:openai/gpt-5.4->openai/gpt-5.5")
     expect(migrations.length).toBeGreaterThanOrEqual(1)
-    expect((rawConfig.agents as Record<string, Record<string, unknown>>).oracle.model).toBe("anthropic/claude-opus-4-7")
+    expect((rawConfig.agents as Record<string, Record<string, unknown>>).oracle.model).toBe("anthropic/claude-opus-4-8")
 
     // Sidecar should still be the blocking directory because write failed
     expect(fs.statSync(sidecarPath(testConfigPath)).isDirectory()).toBe(true)

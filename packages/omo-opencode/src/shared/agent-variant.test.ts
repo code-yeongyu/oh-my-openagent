@@ -84,14 +84,14 @@ describe("applyAgentVariant", () => {
 
 describe("resolveVariantForModel", () => {
   test("returns agent override variant when configured", () => {
-    // given - use a model in sisyphus chain (claude-opus-4-7 has default variant "max")
+    // given - use a model in sisyphus chain (claude-opus-4-8 has default variant "max")
     // to verify override takes precedence over fallback chain
     const config = {
       agents: {
         sisyphus: { variant: "high" },
       },
     } as OhMyOpenCodeConfig
-    const model = { providerID: "anthropic", modelID: "claude-opus-4-7" }
+    const model = { providerID: "anthropic", modelID: "claude-opus-4-8" }
 
     // when
     const variant = resolveVariantForModel(config, "sisyphus", model)
@@ -103,7 +103,7 @@ describe("resolveVariantForModel", () => {
   test("returns correct variant for anthropic provider", () => {
     // given
     const config = {} as OhMyOpenCodeConfig
-    const model = { providerID: "anthropic", modelID: "claude-opus-4-7" }
+    const model = { providerID: "anthropic", modelID: "claude-opus-4-8" }
 
     // when
     const variant = resolveVariantForModel(config, "sisyphus", model)
@@ -188,22 +188,22 @@ describe("resolveVariantForModel", () => {
     expect(variant).toBe("xhigh")
   })
 
-  test("returns correct variant for oracle agent with openai", () => {
+  test("returns xhigh for oracle's openai GPT-5.6 Sol primary", () => {
     // given
     const config = {} as OhMyOpenCodeConfig
-    const model = { providerID: "openai", modelID: "gpt-5.5" }
+    const model = { providerID: "openai", modelID: "gpt-5.6-sol" }
 
     // when
     const variant = resolveVariantForModel(config, "oracle", model)
 
     // then
-    expect(variant).toBe("high")
+    expect(variant).toBe("xhigh")
   })
 
   test("returns correct variant for oracle agent with anthropic", () => {
     // given
     const config = {} as OhMyOpenCodeConfig
-    const model = { providerID: "anthropic", modelID: "claude-opus-4-7" }
+    const model = { providerID: "anthropic", modelID: "claude-opus-4-8" }
 
     // when
     const variant = resolveVariantForModel(config, "oracle", model)

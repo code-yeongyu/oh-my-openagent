@@ -65,7 +65,7 @@ describe("model-resolution check", () => {
         info.agents.find((a) => a.name === "sisyphus"),
         "sisyphus agent resolution",
       )
-      expect(sisyphus.requirement.fallbackChain[0]?.model).toBe("claude-opus-4-7")
+      expect(sisyphus.requirement.fallbackChain[0]?.model).toBe("claude-opus-4-8")
       expect(sisyphus.requirement.fallbackChain[0]?.providers).toContain("anthropic")
     })
 

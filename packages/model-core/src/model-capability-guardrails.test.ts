@@ -22,7 +22,7 @@ describe("model-capability-guardrails", () => {
 
     expect(modelIDs).toEqual([...modelIDs].sort())
     expect(new Set(modelIDs).size).toBe(modelIDs.length)
-    expect(modelIDs).toContain("claude-opus-4-7")
+    expect(modelIDs).toContain("claude-opus-4-8")
     expect(modelIDs).toContain("gpt-5.5")
     expect(modelIDs).toContain("kimi-k2.5")
   })
