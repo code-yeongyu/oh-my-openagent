@@ -11,6 +11,7 @@ type DispatchFallbackRetryOptions = {
   fallbackModels: string[]
   resolvedAgent?: string
   source: string
+  errorType?: string // e.g., "quota_exceeded", "rate_limit", "transient"
 }
 
 function resolveDispatchMessage(result: AutoRetryDispatchOutcome, newModel: string): string {
@@ -31,6 +32,7 @@ export async function dispatchFallbackRetry(
     options.state,
     options.fallbackModels,
     deps.config,
+    { isProviderFailure: options.errorType === "quota_exceeded" || options.errorType === "rate_limit" }
   )
 
   if (result.success && result.newModel) {

@@ -266,12 +266,29 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       sessionLastAccess.set(sessionID, Date.now())
     }
 
+    // Resolve errorType for provider-level failure tracking.
+    // classifyErrorType covers quota_exceeded but not rate_limit (429).
+    // We need both to correctly mark the provider as failed.
+    const classified = classifyErrorType(error)
+    const statusCode = extractStatusCode(error, config.retry_on_errors)
+    const errorMsg = (typeof error === "string" ? error : String((error as Record<string, unknown>)?.message ?? "")).toLowerCase()
+    const isRateLimit =
+      statusCode === 429 ||
+      statusCode === 529 ||
+      /rate.?limit|too.?many.?requests|cool.*down|频率限制|使用上限|请求过于频繁/.test(errorMsg)
+    const errorType = classified === "quota_exceeded"
+      ? "quota_exceeded"
+      : isRateLimit
+        ? "rate_limit"
+        : undefined
+    
     await dispatchFallbackRetry(deps, helpers, {
       sessionID,
       state,
       fallbackModels,
       resolvedAgent,
       source: "session.error",
+      errorType,
     })
   }
 

@@ -136,12 +136,24 @@ export function createSessionStatusHandler(
 
     await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
 
+    // Classify error type from retry message to enable provider-level failure tracking.
+    // Provider-wide issues (rate limit, quota, overload) should mark the entire provider
+    // as failed so fallback skips all models from that provider, not just the current one.
+    const messageLower = retryMessage.toLowerCase()
+    let errorType: string | undefined
+    if (/rate.?limit|too.?many.?requests|(?:^|\s)429(?:\s|$)|quota|exhausted.*capacity|limit\s+exhausted|cool.*down|频率限制|使用上限|请求过于频繁/.test(messageLower)) {
+      errorType = "rate_limit"
+    } else if (/overloaded|(?:^|\s)529(?:\s|$)/.test(messageLower)) {
+      errorType = "quota_exceeded"
+    }
+
     await dispatchFallbackRetry(deps, helpers, {
       sessionID,
       state,
       fallbackModels,
       resolvedAgent,
       source: "session.status",
+      errorType,
     })
   }
 }
