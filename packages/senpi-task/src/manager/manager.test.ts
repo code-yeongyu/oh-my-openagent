@@ -401,6 +401,28 @@ describe("TaskManager.waitFor", () => {
   })
 })
 
+describe("TaskManager child subscriptions", () => {
+  test("#given a pending task #when its concurrency slot is promoted #then the deferred child listener attaches to its managed handle", async () => {
+    const runner = new FakeRunner()
+    const { manager } = makeManager({ config: settings({ default_concurrency: 1 }), inProcess: runner, process: runner })
+    const first = await manager.start(baseSpec({ name: "running" }))
+    const queued = await manager.start(baseSpec({ name: "queued" }))
+    if (first.kind !== "started" || queued.kind !== "started") throw new Error("expected starts")
+    expect(queued.status).toBe("pending")
+
+    const unsubscribe = manager.subscribeChild(queued.task_id, () => {})
+    expect(runner.handles.get(queued.task_id)).toBeUndefined()
+
+    runner.handles.get(first.task_id)?.settle({ status: "completed", finalResponse: "done" })
+    await flush()
+
+    const promoted = runner.handles.get(queued.task_id)
+    expect(promoted?.subscribeCount()).toBe(2)
+    unsubscribe()
+    expect(promoted?.unsubscribeCount()).toBe(1)
+  })
+})
+
 describe("TaskManager pending cancellation", () => {
   test("#given a queued task at the residency cap w2pend #when cancelled #then its wait settles cancelled and a later spawn is admitted", async () => {
     // given
