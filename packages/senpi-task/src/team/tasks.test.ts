@@ -34,7 +34,7 @@ function tempContext(): TeamTasklistContext {
   return { teamRunId: "team-run-tasks", config }
 }
 
-describe("team tasklist orchestration", { timeout: 15_000 }, () => {
+describe("team tasklist orchestration", () => {
   test("#given a task input #when createTeamTask runs #then it persists a pending task with an id", async () => {
     // given
     const ctx = tempContext()
@@ -82,7 +82,7 @@ describe("team tasklist orchestration", { timeout: 15_000 }, () => {
     const claimed = await claimTeamTask(ctx, blocked.id, "alpha")
     expect(claimed.status).toBe("claimed")
     expect(claimed.owner).toBe("alpha")
-  })
+  }, 15_000)
 
   test("#given a claimed task #when a non-owner updates its status #then a typed cross-owner error is raised", async () => {
     // given
