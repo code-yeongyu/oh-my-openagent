@@ -117,10 +117,13 @@ describe("generateOmoConfig - model fallback system", () => {
     const result = generateOmoConfig(config)
 
     //#then
-    expect((result.agents as Record<string, { model: string; variant?: string }>).sisyphus.model).toBe("openai/gpt-5.5")
-    expect((result.agents as Record<string, { model: string; variant?: string }>).sisyphus.variant).toBe("medium")
-    expect((result.agents as Record<string, { model: string }>).oracle.model).toBe("openai/gpt-5.6-sol")
-    expect((result.agents as Record<string, { model: string }>)['multimodal-looker'].model).toBe("openai/gpt-5.5")
+    const agents = result.agents as Record<string, { model: string; variant?: string }>
+    expect(agents.sisyphus).toBeUndefined()
+    expect(agents.oracle.model).toBe("openai/gpt-5.6-sol")
+    expect(agents["multimodal-looker"]).toMatchObject({
+      model: "openai/gpt-5.6-sol",
+      variant: "low",
+    })
   })
 
   test("adds fallback_models when multiple providers are available", () => {
@@ -158,22 +161,13 @@ describe("generateOmoConfig - model fallback system", () => {
 
     //#then
     expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4-8")
-    expect(agents.sisyphus.fallback_models).toEqual([
-      {
-        model: "openai/gpt-5.5",
-        variant: "medium",
-      },
-    ])
+    expect(agents.sisyphus.fallback_models).toBeUndefined()
     expect(categories.deep.model).toBe("openai/gpt-5.6-terra")
     expect(categories.deep.variant).toBe("xhigh")
     expect(categories.deep.fallback_models).toEqual([
       {
         model: "openai/gpt-5.6-sol",
         variant: "high",
-      },
-      {
-        model: "openai/gpt-5.5",
-        variant: "medium",
       },
       {
         model: "anthropic/claude-opus-4-8",
