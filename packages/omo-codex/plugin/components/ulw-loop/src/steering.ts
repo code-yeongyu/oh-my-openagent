@@ -2,8 +2,8 @@
 import { isUlwLoopDone } from "./goal-status.js";
 import type { UlwLoopScope } from "./paths.js";
 import { appendLedger, findAcceptedSteeringLedgerEntry, readUlwLoopPlan, withUlwLoopMutationLock, writePlan } from "./plan-io.js";
-import { buildSteeringPlanSnapshot, changedGoalIdsBetween } from "./steering-snapshot.js";
 import { makeGoal, reviseCriterion, reviseWording, splitOrBlock } from "./steering-mutations.js";
+import { buildSteeringPlanSnapshot, changedGoalIdsBetween } from "./steering-snapshot.js";
 import type {
 	SteerUlwLoopResult,
 	UlwLoopItem,

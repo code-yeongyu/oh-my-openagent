@@ -115,7 +115,7 @@ export async function parseSteeringProposals(argv: readonly string[]): Promise<r
 
 function proposalFromObject(value: unknown): CliSteeringProposal {
 	if (!isPlain(value)) return fail("--proposals-json entries must be objects.", "ULW_LOOP_STEERING_BATCH_ITEM_INVALID", { flag: "--proposals-json" });
-	const kind = readObject(value, "kind"); const source = readObject(value, "source");
+	const kind = readObject(value, "kind"); const source = readObject(value, "source") ?? "cli";
 	if (!isProposalKind(kind)) return fail(`Invalid batch steering kind: ${String(kind)}.`, "ULW_LOOP_STEERING_KIND_INVALID", { value: kind });
 	if (!isProposalSource(source)) return fail(`Invalid batch steering source: ${String(source)}.`, "ULW_LOOP_STEERING_SOURCE_INVALID", { value: source });
 	let proposal: CliSteeringProposal = { kind, source, evidence: objectText(value, "evidence") ?? "", rationale: objectText(value, "rationale") ?? "" };

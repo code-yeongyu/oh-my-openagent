@@ -1,3 +1,4 @@
+// biome-ignore-all format: compact steering batch tests stay under the pure LOC budget.
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

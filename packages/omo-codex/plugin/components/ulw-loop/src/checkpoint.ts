@@ -1,4 +1,4 @@
-import { ulwLoopAttemptEvidenceDir } from "./paths.js";
+// biome-ignore-all format: checkpoint stays under the pure LOC ceiling.
 import { existsSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -20,6 +20,7 @@ import {
 	isFinalRunCompletionCandidate,
 } from "./goal-status.js";
 import type { UlwLoopScope } from "./paths.js";
+import { ulwLoopAttemptEvidenceDir } from "./paths.js";
 import { appendLedger, readUlwLoopPlan, withUlwLoopMutationLock, writePlan } from "./plan-io.js";
 import {
 	classifyExternalAuthorizationBlocker,

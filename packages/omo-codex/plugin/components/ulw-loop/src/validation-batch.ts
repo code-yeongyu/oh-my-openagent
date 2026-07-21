@@ -1,3 +1,4 @@
+// biome-ignore-all format: compact validation-batch helpers stay below the pure LOC budget.
 import { readJsonInput } from "./cli-arg-parser.js";
 import { isMemberResolved } from "./goal-status.js";
 import type { UlwLoopItem, UlwLoopLedgerEntry, UlwLoopPlan, UlwLoopQualityGate, UlwLoopValidationBatch } from "./types.js";

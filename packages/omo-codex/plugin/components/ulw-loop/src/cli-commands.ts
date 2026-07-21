@@ -1,3 +1,4 @@
+import { checkpoint } from "./checkpoint-continuation.js";
 import { hasFlag, readValue } from "./cli-arg-parser.js";
 import { printJsonError, ULW_LOOP_HELP } from "./cli-output.js";
 import {
@@ -10,7 +11,6 @@ import {
 	status,
 	steer,
 } from "./cli-subcommands.js";
-import { checkpoint } from "./checkpoint-continuation.js";
 import { resolveUlwLoopSessionIdFromEnv, type UlwLoopScope } from "./paths.js";
 import { UlwLoopError } from "./types.js";
 

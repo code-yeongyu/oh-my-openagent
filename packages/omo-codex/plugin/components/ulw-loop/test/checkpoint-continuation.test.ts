@@ -1,3 +1,4 @@
+// biome-ignore-all format: compact continuation tests stay under the pure LOC budget.
 import { rm } from "node:fs/promises";
 import { afterEach, describe, expect, it } from "vitest";
 

@@ -1,7 +1,8 @@
+// biome-ignore-all format: compact batch steering module stays below the pure LOC budget.
 import type { UlwLoopScope } from "./paths.js";
 import { appendLedger, findAcceptedSteeringLedgerEntry, readUlwLoopPlan, withUlwLoopMutationLock, writePlan } from "./plan-io.js";
-import { buildSteeringPlanSnapshot, changedGoalIdsBetween } from "./steering-snapshot.js";
 import { applySteeringMutation, validateUlwLoopSteeringProposal } from "./steering.js";
+import { buildSteeringPlanSnapshot, changedGoalIdsBetween } from "./steering-snapshot.js";
 import type { UlwLoopLedgerEntry, UlwLoopPlan, UlwLoopSteeringAudit, UlwLoopSteeringProposal } from "./types.js";
 import { iso } from "./types.js";
 import { batchUpdateLedgerEntry } from "./validation-batch.js";

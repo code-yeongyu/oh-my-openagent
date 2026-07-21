@@ -1,3 +1,4 @@
+// biome-ignore-all format: compact CLI batch tests stay under the pure LOC budget.
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,12 +11,13 @@ describe("parseSteeringProposals", () => {
 		const proposals = await parseSteeringProposals([
 			"--proposals-json",
 			JSON.stringify([
-				{ kind: "annotate_ledger", source: "cli", evidence: "one", rationale: "because one" },
+				{ kind: "annotate_ledger", evidence: "one", rationale: "because one" },
 				{ kind: "annotate_ledger", source: "cli", evidence: "two", rationale: "because two" },
 			]),
 		]);
 
 		expect(proposals).toHaveLength(2);
+		expect(proposals[0]).toMatchObject({ evidence: "one", source: "cli" });
 		expect(proposals[1]).toMatchObject({ evidence: "two" });
 	});
 

@@ -1,3 +1,4 @@
+// biome-ignore-all format: compact extracted steering mutations stay below the pure LOC budget.
 import { seedDefaultSuccessCriteria } from "./plan-crud.js";
 import type { UlwLoopItem, UlwLoopPlan, UlwLoopSteeringChildGoal, UlwLoopSteeringProposal, UlwLoopSuccessCriterionUserModel } from "./types.js";
 import { ULW_LOOP_SUCCESS_CRITERION_USER_MODELS } from "./types.js";

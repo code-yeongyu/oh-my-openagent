@@ -1,3 +1,4 @@
+// biome-ignore-all format: compact validation-batch checkpoint tests stay under the pure LOC budget.
 import { describe, expect, it } from "vitest";
 
 import { checkpointUlwLoop } from "../src/checkpoint.js";

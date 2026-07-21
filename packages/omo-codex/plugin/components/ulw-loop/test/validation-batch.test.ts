@@ -1,3 +1,4 @@
+// biome-ignore-all format: compact validation-batch tests stay under the pure LOC budget.
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

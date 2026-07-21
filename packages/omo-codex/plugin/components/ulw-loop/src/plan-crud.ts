@@ -15,8 +15,8 @@ import {
 import { appendGoalToPlan, deriveGoalCandidates, makeGoal } from "./plan-goal-factory.js";
 import { appendLedger, readUlwLoopPlan, withUlwLoopMutationLock, writePlan } from "./plan-io.js";
 import type { UlwLoopCodexGoalMode, UlwLoopItem, UlwLoopPlan, UlwLoopSuccessCriterion } from "./types.js";
-import { parseValidationBatches } from "./validation-batch.js";
 import { iso, UlwLoopError } from "./types.js";
+import { parseValidationBatches } from "./validation-batch.js";
 
 export { deriveGoalCandidates, seedDefaultSuccessCriteria } from "./plan-goal-factory.js";
 

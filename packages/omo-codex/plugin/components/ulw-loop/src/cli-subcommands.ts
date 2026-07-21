@@ -17,8 +17,8 @@ import { type UlwLoopScope, ulwLoopAttemptEvidenceDir } from "./paths.js";
 import { addUlwLoopGoal, createUlwLoopPlan, startNextUlwLoop, summarizeUlwLoopPlan } from "./plan-crud.js";
 import { readUlwLoopPlan } from "./plan-io.js";
 import { recordFinalReviewBlockers } from "./review-blockers.js";
-import { steerUlwLoopBatch } from "./steering-batch.js";
 import { steerUlwLoop } from "./steering.js";
+import { steerUlwLoopBatch } from "./steering-batch.js";
 import type { UlwLoopItem } from "./types.js";
 import { UlwLoopError } from "./types.js";
 
