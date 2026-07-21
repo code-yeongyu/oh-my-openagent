@@ -106,7 +106,7 @@ describe("CodeGraph SessionStart hook with a 1.0.1-era project store under the 1
 		} finally {
 			rmSync(homeDir, { recursive: true, force: true });
 			rmSync(fake.dir, { recursive: true, force: true });
-			rmSync(workspace, { recursive: true, force: true });
+			rmSync(workspace, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
 		}
 	});
 
@@ -117,7 +117,7 @@ describe("CodeGraph SessionStart hook with a 1.0.1-era project store under the 1
 		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-slow-home-"));
 		const fake = createFakeCodegraphBin({
 			posix: "#!/bin/sh\nsleep 30\n",
-			win32: '@powershell -NoProfile -Command "Start-Sleep -Seconds 30"\r\n',
+			win32: '@powershell -NoProfile -Command "Start-Sleep -Seconds 4"\r\n',
 		});
 		const workspace = createAllowedWorkspace("codegraph-slow-probe-workspace");
 
@@ -142,7 +142,7 @@ describe("CodeGraph SessionStart hook with a 1.0.1-era project store under the 1
 		} finally {
 			rmSync(homeDir, { recursive: true, force: true });
 			rmSync(fake.dir, { recursive: true, force: true });
-			rmSync(workspace, { recursive: true, force: true });
+			rmSync(workspace, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
 		}
 	});
 });
