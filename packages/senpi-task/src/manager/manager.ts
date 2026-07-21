@@ -98,6 +98,7 @@ function publicStartFailureMessage(error: unknown): string {
 class TaskManagerImpl implements TaskManager {
   readonly #options: TaskManagerImplOptions
   readonly #now: () => number
+  readonly #hostPid: number
   readonly #concurrency: TaskConcurrency
   readonly #rpcRespawnRunner: RpcRespawnRunner
   readonly #names = new NameRegistry()
@@ -130,6 +131,7 @@ class TaskManagerImpl implements TaskManager {
       log("senpi-task manager failed to seed task id floor", { error: String(error) })
     }
     this.#now = options.now ?? Date.now
+    this.#hostPid = options.hostPid ?? process.pid
     this.#rpcRespawnRunner = options.rpcRespawnRunner ?? new RpcProcessRunner()
     this.#concurrency = new TaskConcurrency({
       default_concurrency: options.config.default_concurrency,
@@ -200,7 +202,7 @@ class TaskManagerImpl implements TaskManager {
     let claimed: TaskRecord
     try {
       const draft = createTaskRecord(buildRecordInput({ spec, plan, name: "", executionMode }), this.#now())
-      const claimDraft: TaskRecord = { ...draft, name: requestedRegistration?.name ?? draft.task_id }
+      const claimDraft: TaskRecord = { ...draft, name: requestedRegistration?.name ?? draft.task_id, host_pid: this.#hostPid }
       claimed = claimTaskRecord(this.#options.store, claimDraft, {
         nameFollowsId: requestedRegistration === undefined,
         ...(requestedRegistration === undefined
@@ -434,6 +436,7 @@ class TaskManagerImpl implements TaskManager {
         this.#options.store.replace({
           ...record,
           residency_state: "resident",
+          host_pid: this.#hostPid,
           updated_at: nowIso(this.#now),
           ...(handle.pid === undefined ? {} : { pid: handle.pid }),
         })
@@ -445,6 +448,7 @@ class TaskManagerImpl implements TaskManager {
         ...rest,
         status: "running",
         residency_state: "resident",
+        host_pid: this.#hostPid,
         updated_at: nowIso(this.#now),
         notification: { ...record.notification, run_epoch: record.notification.run_epoch + 1 },
         ...(handle.pid === undefined ? {} : { pid: handle.pid }),

@@ -67,6 +67,10 @@ export type TaskRecord = TaskRecordInput & {
   readonly created_at: string
   readonly updated_at: string
   readonly pid?: number
+  // Pid of the host process that spawned (and owns) this child. Lets a sibling process in the same
+  // project distinguish "previous process died" from "a live process still owns this child" during
+  // reconciliation, so cross-process session starts never falsely mark live in-process children lost.
+  readonly host_pid?: number
   readonly child_session_id?: string
   readonly spawn_spec?: TaskSpawnSpec
   readonly final_response?: string
