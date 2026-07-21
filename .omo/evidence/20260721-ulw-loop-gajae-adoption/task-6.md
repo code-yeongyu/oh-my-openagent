@@ -8,17 +8,21 @@
 - Cleanup of all temp QA repos.
 
 ## What was observed
-- Component gate passed: 40 files / 412 tests.
-- Root Codex gate passed: 510 tests, 0 failures.
+- Historical component gate passed: 40 files / 412 tests.
+- Reviewer-fix component gate passed: `npm run check` and full `npm test` with 40 files / 418 tests.
+- Root Codex gate passed before final review and again after reviewer fixes: 510 tests, 0 failures.
 - E2E lifecycle created a three-goal plan with `VB001`, completed G001 and auto-advanced to G002, applied a two-item `--proposals-json` batch, completed G002 and auto-advanced to G003, completed G003 as both validation-batch final and aggregate final, and emitted `batch_closed` for `VB001`.
 - Fail-closed integration probe rejected a batch-final checkpoint while another member was pending with `ULW_LOOP_VALIDATION_BATCH_OPEN`.
+- Reviewer-fix QA confirmed rejected batch goals byte-identical plus exactly one `steering_rejected`, accepted batch replay audit-free, conflict flags fail with `ULW_LOOP_STEERING_BATCH_CONFLICT`, and all validation error code cases.
 - `~/.codex/config.toml` hash before and after was identical: `780c740e287bda48609b5c9d5ee3ee2fc20434ce1a58c36692ec07e279a161d5`.
 - Cleanup receipts:
-  - failed attempt temp repos removed: `tmp.lEHDskyq7B`, `tmp.gGowhcocQp`, `tmp.1f0qwLD50a`.
-  - passing temp repo removed: `/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/tmp.zfDGIZoOCs`.
+  - historical failed attempt temp repos removed: `tmp.lEHDskyq7B`, `tmp.gGowhcocQp`, `tmp.1f0qwLD50a`.
+  - historical passing temp repo removed: `/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/tmp.zfDGIZoOCs`.
+  - reviewer-fix failed attempt removed: `/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/tmp.fCBvMuWI5m`.
+  - reviewer-fix passing temp repo removed: `/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/tmp.q8CGMWc1hV`.
 
 ## Why it is enough
-This covers the requested real built CLI surface, the component suite, the repo Codex compatibility gate, the new auto-advance path, the atomic steering batch path, validation-batch closure, aggregate completion, fail-closed rejection, and real Codex-home isolation.
+This covers the requested real built CLI surface, the component suite, the repo Codex compatibility gate, the new auto-advance path, the atomic steering batch path, validation-batch closure, aggregate completion, fail-closed rejection, independent-review blocker regressions, and real Codex-home isolation.
 
 ## What was omitted
 No live Codex app-server/TUI probe was run because this ulw-loop task changed a standalone component CLI and the plan required CLI-only local-build QA. No published package or real Codex plugin cache was used.
@@ -27,3 +31,5 @@ No live Codex app-server/TUI probe was run because this ulw-loop task changed a 
 - `task-6-component-gate.txt`
 - `task-6-codex-gate.txt`
 - `task-6-e2e-transcript.txt`
+- `reviewer-fix-report.md`
+- `reviewer-fix-transcript.txt`
