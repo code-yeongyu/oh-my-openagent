@@ -118,7 +118,10 @@ describe("generateOmoConfig - model fallback system", () => {
 
     //#then
     const agents = result.agents as Record<string, { model: string; variant?: string }>
-    expect(agents.sisyphus).toBeUndefined()
+    expect(agents.sisyphus).toEqual({
+      model: "openai/gpt-5.6-sol",
+      variant: "medium",
+    })
     expect(agents.oracle.model).toBe("openai/gpt-5.6-sol")
     expect(agents["multimodal-looker"]).toMatchObject({
       model: "openai/gpt-5.6-sol",
@@ -161,13 +164,22 @@ describe("generateOmoConfig - model fallback system", () => {
 
     //#then
     expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4-8")
-    expect(agents.sisyphus.fallback_models).toBeUndefined()
+    expect(agents.sisyphus.fallback_models).toEqual([
+      {
+        model: "openai/gpt-5.6-sol",
+        variant: "medium",
+      },
+    ])
     expect(categories.deep.model).toBe("openai/gpt-5.6-terra")
     expect(categories.deep.variant).toBe("xhigh")
     expect(categories.deep.fallback_models).toEqual([
       {
         model: "openai/gpt-5.6-sol",
         variant: "high",
+      },
+      {
+        model: "openai/gpt-5.6-sol",
+        variant: "medium",
       },
       {
         model: "anthropic/claude-opus-4-8",

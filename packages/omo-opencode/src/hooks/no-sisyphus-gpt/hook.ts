@@ -11,7 +11,7 @@ import { getAgentConfigKey } from "../../shared/agent-display-names"
 const TOAST_TITLE = "NEVER Use Sisyphus with GPT"
 const TOAST_MESSAGE = [
   "Sisyphus works best with Claude Opus, and works fine with Kimi/GLM models.",
-  "Do NOT use Sisyphus with GPT (except GPT-5.4 and GPT-5.5 which have specialized support).",
+  "Do NOT use Sisyphus with GPT (except GPT-5.4, GPT-5.5, and GPT-5.6 Sol, which have GPT-native prompt support).",
   "For other GPT models, always use Hephaestus.",
 ].join("\n")
 function showToast(ctx: PluginInput, sessionID: string): void {

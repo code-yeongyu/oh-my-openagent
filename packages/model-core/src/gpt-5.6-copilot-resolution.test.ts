@@ -95,7 +95,7 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
     })
   })
 
-  test("Momus is the only GPT-5.6 xhigh rung that includes Copilot", () => {
+  test("Copilot is never included in a GPT-5.6 xhigh rung", () => {
     // given
     const requirements = [
       ...Object.values(AGENT_MODEL_REQUIREMENTS),
@@ -111,13 +111,26 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
     )
 
     // then
-    expect(copilotXhighEntries).toEqual([
-      {
-        providers: ["openai", "github-copilot", "opencode", "vercel"],
-        model: "gpt-5.6-sol",
-        variant: "xhigh",
-      },
-    ])
+    expect(copilotXhighEntries).toEqual([])
+  })
+
+  test("momus uses high for its Copilot Sol fallback when Terra is unavailable", () => {
+    // given
+    const availableModels = new Set(["github-copilot/gpt-5.6-sol"])
+
+    // when
+    const result = resolveModelWithFallback({
+      fallbackChain: AGENT_MODEL_REQUIREMENTS.momus.fallbackChain,
+      availableModels,
+      systemDefaultModel: "system/default",
+    })
+
+    // then
+    expect(result).toEqual({
+      model: "github-copilot/gpt-5.6-sol",
+      source: "provider-fallback",
+      variant: "high",
+    })
   })
 
   const fallbackCases = [
