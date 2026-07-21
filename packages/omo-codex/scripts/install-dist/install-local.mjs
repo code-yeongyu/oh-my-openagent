@@ -5903,7 +5903,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "4.18.2",
+    version: "4.19.0",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -9392,6 +9392,10 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       {
         previous: { model: "gpt-5.5", effort: "xhigh" },
         current: { model: "gpt-5.6-sol", effort: "ultra" }
+      },
+      {
+        previous: { model: "gpt-5.6-sol", effort: "ultra" },
+        current: { model: "gpt-5.6-terra", effort: "high" }
       }
     ]
   ],
@@ -9401,6 +9405,10 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       {
         previous: { model: "gpt-5.6-sol", effort: "xhigh" },
         current: { model: "gpt-5.6-sol", effort: "max" }
+      },
+      {
+        previous: { model: "gpt-5.6-sol", effort: "max" },
+        current: { model: "gpt-5.6-sol", effort: "high" }
       }
     ]
   ],
@@ -9410,6 +9418,37 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       {
         previous: { model: "gpt-5.6-sol", effort: "high" },
         current: { model: "gpt-5.6-luna", effort: "max" }
+      },
+      {
+        previous: { model: "gpt-5.6-luna", effort: "max" },
+        current: { model: "gpt-5.6-terra", effort: "high" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-worker-high",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "max" },
+        current: { model: "gpt-5.6-sol", effort: "medium" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-code-reviewer",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "xhigh" },
+        current: { model: "gpt-5.6-terra", effort: "medium" }
+      }
+    ]
+  ],
+  [
+    "lazycodex-clone-fidelity-reviewer",
+    [
+      {
+        previous: { model: "gpt-5.6-sol", effort: "xhigh" },
+        current: { model: "gpt-5.6-terra", effort: "high" }
       }
     ]
   ],
@@ -9428,6 +9467,10 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       {
         previous: { model: "gpt-5.6-sol", effort: "xhigh" },
         current: { model: "gpt-5.6-sol", effort: "high" }
+      },
+      {
+        previous: { model: "gpt-5.6-sol", effort: "high" },
+        current: { model: "gpt-5.6-sol", effort: "low" }
       }
     ]
   ]

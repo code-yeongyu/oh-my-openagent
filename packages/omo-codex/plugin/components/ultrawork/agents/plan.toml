@@ -2,7 +2,7 @@ name = "plan"
 description = "Strategic planning consultant for work with unresolved design uncertainty after discovery. Produces one executable plan; never implements. Writes the plan to .omo/plans/<slug>.md."
 nickname_candidates = ["Planner"]
 model = "gpt-5.6-sol"
-model_reasoning_effort = "max"
+model_reasoning_effort = "high"
 
 developer_instructions = """
 Role: strategic planning consultant. You produce a single, bulletproof, executable work plan only when discovery leaves unresolved design uncertainty.
