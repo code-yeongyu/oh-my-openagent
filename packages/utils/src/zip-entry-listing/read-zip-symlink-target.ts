@@ -5,7 +5,7 @@ export async function readZipSymlinkTarget(
 	archivePath: string,
 	entryPath: string
 ): Promise<string | undefined> {
-	const proc = spawn(["unzip", "-p", archivePath, "--", entryPath], {
+	const proc = spawn(["unzip", "-p", "--", archivePath, entryPath], {
 		stdout: "pipe",
 		stderr: "pipe",
 	})

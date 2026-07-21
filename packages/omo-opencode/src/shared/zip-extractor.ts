@@ -61,7 +61,7 @@ export async function extractZip(archivePath: string, destDir: string): Promise<
     
     switch (extractor) {
       case "tar":
-        proc = spawn(["tar", "-xf", archivePath, "-C", destDir], {
+        proc = spawn(["tar", "-x", "-f", archivePath, "-C", destDir], {
           stdout: "ignore",
           stderr: "pipe",
         })
@@ -81,7 +81,7 @@ export async function extractZip(archivePath: string, destDir: string): Promise<
         break
     }
   } else {
-    proc = spawn(["unzip", "-o", archivePath, "-d", destDir], {
+    proc = spawn(["unzip", "-o", "-d", destDir, "--", archivePath], {
       stdout: "ignore",
       stderr: "pipe",
     })

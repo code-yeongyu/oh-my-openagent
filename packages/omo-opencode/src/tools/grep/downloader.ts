@@ -55,7 +55,7 @@ function getRgPath(): string {
 async function extractTarGz(archivePath: string, destDir: string): Promise<void> {
   const platformKey = getPlatformKey()
 
-  const args = ["tar", "-xzf", archivePath, "--strip-components=1"]
+  const args = ["tar", "-x", "-z", "-f", archivePath, "--strip-components=1"]
 
   if (platformKey.endsWith("-darwin")) {
     args.push("--include=*/rg")

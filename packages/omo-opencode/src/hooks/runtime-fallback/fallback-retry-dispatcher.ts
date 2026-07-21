@@ -70,7 +70,13 @@ export async function dispatchFallbackRetry(
             duration: 5000,
           },
         })
-        .catch(() => {})
+        .catch((error) => {
+          log(`[${HOOK_NAME}] Failed to show fallback toast`, {
+            sessionID: options.sessionID,
+            source: options.source,
+            error,
+          })
+        })
     }
     return
   }

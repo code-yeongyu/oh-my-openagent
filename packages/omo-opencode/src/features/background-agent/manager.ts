@@ -2327,6 +2327,62 @@ The task was re-queued on a fallback model after a retryable failure.
     }
   }
 
+  private completeStaleInterruptedTask(task: BackgroundTask, errorMessage: string): void {
+    if (task.currentAttemptID) {
+      const finalized = finalizeAttempt(task, task.currentAttemptID, "cancelled", errorMessage)
+      if (finalized) return
+    }
+
+    task.status = "cancelled"
+    task.error = errorMessage
+    task.completedAt = new Date()
+  }
+
+  private clearTerminalTaskTimers(taskId: string): void {
+    const completionTimer = this.completionTimers.get(taskId)
+    if (completionTimer) {
+      clearTimeout(completionTimer)
+      this.completionTimers.delete(taskId)
+    }
+
+    const idleTimer = this.idleDeferralTimers.get(taskId)
+    if (idleTimer) {
+      clearTimeout(idleTimer)
+      this.idleDeferralTimers.delete(taskId)
+    }
+  }
+
+  private clearChildSessionBookkeeping(task: BackgroundTask): void {
+    const sessionID = task.sessionId
+    if (!sessionID) return
+
+    subagentSessions.delete(sessionID)
+    clearSessionAgent(sessionID)
+    clearDelegatedChildSessionBootstrap(sessionID)
+    SessionCategoryRegistry.remove(sessionID)
+    this.clearSessionOutputObserved(sessionID)
+    this.clearSessionTodoObservation(sessionID)
+  }
+
+  private prepareStaleInterruptionNotification(task: BackgroundTask): void {
+    if (task.rootSessionId) {
+      this.unregisterRootDescendant(task.rootSessionId)
+    }
+
+    this.taskHistory.record(task.parentSessionId, { id: task.id, sessionID: task.sessionId, agent: task.agent, description: task.description, status: "cancelled", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
+    this.clearTerminalTaskTimers(task.id)
+    this.cleanupPendingByParent(task)
+    this.clearNotificationsForTask(task.id)
+    removeTaskToastTracking(task.id)
+    this.clearChildSessionBookkeeping(task)
+
+    if (task.parentSessionId) {
+      this.updateBackgroundTaskMarker(task.parentSessionId)
+    }
+
+    this.markForNotification(task)
+  }
+
   private clearTaskHistoryWhenParentTasksGone(parentSessionID: string | undefined): void {
     if (!parentSessionID) return
     if (this.getTasksByParentSession(parentSessionID).length > 0) return
@@ -2940,6 +2996,8 @@ The task was re-queued on a fallback model after a retryable failure.
       concurrencyManager: this.concurrencyManager,
       notifyParentSession: (task) => this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)),
       sessionStatuses: allStatuses,
+      completeTask: (task, errorMessage) => this.completeStaleInterruptedTask(task, errorMessage),
+      onTaskInterrupted: (task) => this.prepareStaleInterruptionNotification(task),
     })
   }
 

@@ -39,7 +39,7 @@ export async function listZipEntriesWithZipInfo(
 		throw new Error("zip entry listing requires zipinfo, but zipinfo is not installed")
 	}
 
-	const proc = spawn(["zipinfo", "-l", archivePath], {
+	const proc = spawn(["zipinfo", "-l", "--", archivePath], {
 		stdout: "pipe",
 		stderr: "pipe",
 	})

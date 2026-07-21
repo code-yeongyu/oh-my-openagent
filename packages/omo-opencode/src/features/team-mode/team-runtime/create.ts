@@ -2,6 +2,7 @@ import { access, mkdir } from "node:fs/promises"
 import path from "node:path"
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
+import { log } from "../../../shared"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../../shared/question-denied-session-permission"
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import type { BackgroundTask } from "../../background-agent/types"
@@ -135,7 +136,9 @@ export async function createTeamRun(
 
   const activeTeams = await listActiveTeams(config)
   const activeRunIds = new Set(activeTeams.map((t) => t.teamRunId))
-  sweepStaleTeamSessions(activeRunIds).catch(() => {})
+  sweepStaleTeamSessions(activeRunIds).catch((error) => {
+    log("[team-mode] Failed to sweep stale team sessions before create", { error })
+  })
 
   const baseDir = resolveBaseDir(config)
   await ensureBaseDirs(baseDir)
