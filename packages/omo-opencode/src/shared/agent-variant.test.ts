@@ -112,20 +112,20 @@ describe("resolveVariantForModel", () => {
     expect(variant).toBe("max")
   })
 
-  test("returns correct variant for openai provider (hephaestus agent)", () => {
-    // #given hephaestus has openai/gpt-5.5 with variant "medium" in its chain
+  test("returns medium for Hephaestus's openai gpt-5.6-sol rung", () => {
+    // given
     const config = {} as OhMyOpenCodeConfig
-    const model = { providerID: "openai", modelID: "gpt-5.5" }
+    const model = { providerID: "openai", modelID: "gpt-5.6-sol" }
 
-    // #when
+    // when
     const variant = resolveVariantForModel(config, "hephaestus", model)
 
     // then
     expect(variant).toBe("medium")
   })
 
-  test("returns medium for openai/gpt-5.5 in sisyphus chain", () => {
-    // #given openai/gpt-5.5 is now in sisyphus fallback chain with variant medium
+  test("returns undefined for gpt-5.5 after its sisyphus rung is removed", () => {
+    // given
     const config = {} as OhMyOpenCodeConfig
     const model = { providerID: "openai", modelID: "gpt-5.5" }
 
@@ -133,7 +133,7 @@ describe("resolveVariantForModel", () => {
     const variant = resolveVariantForModel(config, "sisyphus", model)
 
     // then
-    expect(variant).toBe("medium")
+    expect(variant).toBeUndefined()
   })
 
   test("returns undefined for provider not in chain", () => {
@@ -179,7 +179,7 @@ describe("resolveVariantForModel", () => {
         "custom-agent": { category: "ultrabrain" },
       },
     } as OhMyOpenCodeConfig
-    const model = { providerID: "openai", modelID: "gpt-5.5" }
+    const model = { providerID: "openai", modelID: "gpt-5.6-sol" }
 
     // when
     const variant = resolveVariantForModel(config, "custom-agent", model)

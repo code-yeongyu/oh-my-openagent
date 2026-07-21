@@ -20,13 +20,25 @@ export interface CodegraphComponentOptions {
 
 const CODEGRAPH_COMPONENT_NAME = "codegraph"
 const CHILD_SESSION_MARKER_ENV = "SENPI_CODING_AGENT_SESSION_DIR"
+// Config source decision: the senpi-visible config loader (@oh-my-opencode/omo-config-core,
+// used by components/task) has a strict schema (categories/agents/task/teams) with NO
+// codegraph section, and the codegraph section in utils/omo-config targets the
+// codex/opencode/omo harnesses, not senpi. So daemon opt-in is an env toggle, matching
+// existing senpi env-flag truthiness patterns (telemetry-core TRUTHY values).
+const DAEMON_OPT_IN_ENV = "OMO_CODEGRAPH_DAEMON"
+const TRUTHY_ENV_VALUES = new Set(["1", "true", "yes"])
+
+function isDaemonOptedIn(env: Record<string, string | undefined>): boolean {
+	const value = env[DAEMON_OPT_IN_ENV]?.trim().toLowerCase()
+	return value !== undefined && TRUTHY_ENV_VALUES.has(value)
+}
 
 export function createCodegraphComponent(options: CodegraphComponentOptions = {}): OmoSenpiComponent {
 	const resolveCommand = options.resolveCommand ?? resolveCodegraphCommand
 	const resolveNodeSupport = options.resolveNodeSupport ?? resolveCodegraphNodeSupport
-	const buildEnv = options.buildEnv ?? (() => buildCodegraphEnv())
-	const platform = options.platform ?? process.platform
 	const env = options.env ?? process.env
+	const buildEnv = options.buildEnv ?? (() => buildCodegraphEnv({ daemon: isDaemonOptedIn(env) }))
+	const platform = options.platform ?? process.platform
 
 	return {
 		name: CODEGRAPH_COMPONENT_NAME,
@@ -59,12 +71,16 @@ export function createCodegraphComponent(options: CodegraphComponentOptions = {}
 			const finalCommand = isWin32 && isWindowsExecutable ? "cmd.exe" : command
 			const finalArgs = isWin32 && isWindowsExecutable ? ["/d", "/s", "/c", command, ...args] : args
 
+			// DESIGN NOTE: with the daemon opted in, the registered stdio process is upstream's
+			// lightweight proxy; its lifecycle is protected by upstream's own PPID watchdog plus
+			// senpi runtime MCP teardown. No omo-side wrapper is added here (deliberate).
 			pi.registerMcpServer(CODEGRAPH_COMPONENT_NAME, {
 				type: "stdio",
 				command: finalCommand,
 				args: finalArgs,
 				env: buildEnv(),
 				enabled,
+				lifecycle: "eager",
 			})
 		},
 	}

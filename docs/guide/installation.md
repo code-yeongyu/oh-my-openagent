@@ -198,7 +198,7 @@ Map their answer to:
    - **no** → `--claude=no`
 
 2. **Do you have an OpenAI/ChatGPT Plus Subscription?**
-   - **yes** → `--openai=yes` (enables OpenAI routes; Hephaestus prefers GPT-5.6 Sol and Momus prefers GPT-5.6 Terra when available, both falling back to GPT-5.5)
+   - **yes** → `--openai=yes` (enables OpenAI routes; Hephaestus prefers GPT-5.6 Sol and Momus prefers GPT-5.6 Terra when available, both falling back to GPT-5.6 Sol)
    - **no** → `--openai=no` (default)
 
 3. **Will you integrate Gemini models?**
@@ -217,7 +217,7 @@ Map their answer to:
    - **yes** → `--zai-coding-plan=yes`
    - **no** → `--zai-coding-plan=no` (default)
 
-7. **Do you have an OpenCode Go subscription?** ($10/month for GLM-5/5.1, Kimi K2.5/K2.6, MiniMax M2.7/M3)
+7. **Do you have an OpenCode Go subscription?** ($10/month for GLM-5/5.1, Kimi K3/K3, MiniMax M2.7/M3)
    - **yes** → `--opencode-go=yes`
    - **no** → `--opencode-go=no` (default)
 
@@ -470,7 +470,7 @@ After OpenCode sees the provider, reference models with the OpenCode provider pr
 ```json
 {
   "agents": {
-    "sisyphus": { "model": "amazon-bedrock/us.anthropic.claude-opus-4-7" },
+    "sisyphus": { "model": "amazon-bedrock/us.anthropic.claude-opus-4-8" },
     "metis": { "model": "amazon-bedrock/us.anthropic.claude-sonnet-4-6" }
   }
 }
@@ -485,7 +485,7 @@ GitHub Copilot is supported as a **fallback provider** when native providers are
 | Agent         | Model                              |
 | ------------- | ---------------------------------- |
 | **Sisyphus**  | `github-copilot/claude-opus-4.7`   |
-| **Oracle**    | `github-copilot/gpt-5.5`           |
+| **Oracle**    | `github-copilot/gpt-5.6-sol`           |
 | **Explore**   | `github-copilot/claude-haiku-4-5`  |
 | **Atlas**     | `github-copilot/claude-sonnet-4.6` |
 
@@ -506,14 +506,14 @@ When Z.ai is the primary provider, the most important fallbacks are:
 
 ##### OpenCode Zen
 
-OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-7`, `opencode/gpt-5.5`, `opencode/gpt-5.5`, `opencode/gpt-5-nano`, `opencode/glm-5`, `opencode/big-pickle`, `opencode/minimax-m2.7`, and `opencode/minimax-m2.7-highspeed`.
+OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-8`, `opencode/gpt-5.6-sol`, `opencode/gpt-5.6-sol`, `opencode/gpt-5-nano`, `opencode/glm-5`, `opencode/big-pickle`, `opencode/minimax-m2.7`, and `opencode/minimax-m2.7-highspeed`.
 
 When OpenCode Zen is the best available provider, common examples:
 
 | Agent         | Model                                                |
 | ------------- | ---------------------------------------------------- |
-|| **Sisyphus**  | `opencode/claude-opus-4-7` / `opencode-go/kimi-k3`   |
-| **Oracle**    | `opencode/gpt-5.5`                                   |
+|| **Sisyphus**  | `opencode/claude-opus-4-8` / `opencode-go/kimi-k3`   |
+| **Oracle**    | `opencode/gpt-5.6-sol`                                   |
 | **Explore**   | `opencode/minimax-m2.7`                              |
 
 Run the installer with `--opencode-zen=yes` and select "Yes" for OpenCode Zen at the prompt. If your OpenCode environment prompts for provider authentication, follow the OpenCode provider flow for `opencode/` models.
@@ -529,13 +529,13 @@ Not all models behave the same way. Understanding "similar" families helps you m
 | Model                    | Provider(s)                         | Notes                                                                                       |
 | ------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------- |
 || **Claude Opus 4.8**      | anthropic, github-copilot, opencode | Current best Opus. Dedicated per-agent prompt variants.                                     |
-|| **Claude Opus 4.7**      | anthropic, github-copilot, opencode | Still excellent; hardcoded chain default for budget stability.                              |
+|| **Claude Opus 4.8**      | anthropic, github-copilot, opencode | Still excellent; hardcoded chain default for budget stability.                              |
 || **Claude Sonnet 4.6**    | anthropic, github-copilot, opencode | Faster, cheaper. Good balance.                                                              |
 || **Claude Haiku 4.5**     | anthropic, vercel                   | Fast and cheap. Good for quick tasks.                                                       |
 || **Kimi K3**              | opencode-go, kimi-for-coding, moonshotai, opencode, vercel | Top recommended Kimi for Sisyphus when thinking-token cost is acceptable.                   |
-|| **Kimi K2.6**            | opencode-go, vercel                 | Current default fallback after Claude Opus and Kimi K3 in primary Sisyphus chain. Claude-like behavior. |
-|| **Kimi K2.5**            | kimi-for-coding, opencode, moonshotai, moonshotai-cn, firmware, ollama-cloud, aihubmix | Claude-like, available on multiple providers, still in active fallback chains. |
-| **Kimi K2.5 Free**       | opencode                            | Free-tier Kimi. Rate-limited but functional.                                                |
+|| **Kimi K3**            | opencode-go, vercel                 | Current default fallback after Claude Opus and Kimi K3 in primary Sisyphus chain. Claude-like behavior. |
+|| **Kimi K3**            | kimi-for-coding, opencode, moonshotai, moonshotai-cn, firmware, ollama-cloud, aihubmix | Claude-like, available on multiple providers, still in active fallback chains. |
+| **Kimi K3 Free**       | opencode                            | Free-tier Kimi. Rate-limited but functional.                                                |
 | **GLM 5.2**              | opencode-go, vercel                 | Claude-like behavior. Current OpenCode Go/Vercel fallback entry.                             |
 | **GLM 5**                | zai-coding-plan, opencode           | Claude-like behavior. Good for broad tasks.                                                 |
 | **Big Pickle (GLM 4.6)** | opencode                            | Free-tier GLM. Decent fallback.                                                             |
@@ -547,8 +547,8 @@ Not all models behave the same way. Understanding "similar" families helps you m
 | **GPT-5.6 Sol**   | openai, vercel                   | Preferred when available for Hephaestus and `ultrabrain`, with role-specific effort levels; first fallback for `deep`. |
 | **GPT-5.6 Terra** | openai, vercel                   | GPT-5.6 mid-tier. Default for the `deep` category (xhigh) and Momus (high).                                |
 | **GPT-5.6 Luna**  | openai, vercel                   | GPT-5.6 light tier. Default for the `unspecified-low` category (xhigh).                                    |
-| **GPT-5.5-codex** | openai, github-copilot, opencode | Deep coding powerhouse available as an explicit override.                                                  |
-| **GPT-5.5**       | openai, github-copilot, opencode, vercel | Default for Oracle and the first GPT-5.5-family fallback for Hephaestus, Momus, `deep`, and `ultrabrain`. |
+| **GPT-5.6 Sol-codex** | openai, github-copilot, opencode | Deep coding powerhouse available as an explicit override.                                                  |
+| **GPT-5.6 Sol**       | openai, github-copilot, opencode, vercel | Default for Oracle and the first GPT-5.6 Sol-family fallback for Hephaestus, Momus, `deep`, and `ultrabrain`. |
 | **GPT-5.4 Mini**  | openai, github-copilot, opencode, vercel | Fast + strong reasoning. Default for quick category.                                                |
 | **GPT-5-Nano**    | opencode, vercel                 | Ultra-cheap, fast. Good for simple utility tasks.                                                           |
 
@@ -578,8 +578,8 @@ Not all models behave the same way. Understanding "similar" families helps you m
 
 | Agent        | Role             | Default Chain                                              |
 | ------------ | ---------------- | ---------------------------------------------------------- |
-|| **Sisyphus** | Main ultraworker | anthropic\|github-copilot\|opencode/claude-opus-4-7 (max) → opencode-go\|kimi-for-coding\|moonshotai\|opencode\|vercel/kimi-k3 → opencode-go/kimi-k2.6 → kimi-for-coding/k2p5 → opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k2.5 → openai\|github-copilot\|opencode/gpt-5.5 (medium) → zai-coding-plan\|opencode/glm-5 → opencode/big-pickle |
-| **Metis**    | Plan review      | anthropic\|github-copilot\|opencode/claude-sonnet-4-6 → anthropic\|github-copilot\|opencode/claude-opus-4-7 (max) → openai\|github-copilot\|opencode/gpt-5.5 (high) → opencode-go/glm-5.2 → kimi-for-coding/k2p5 |
+|| **Sisyphus** | Main ultraworker | anthropic\|github-copilot\|opencode/claude-opus-4-8 (max) → opencode-go\|kimi-for-coding\|moonshotai\|opencode\|vercel/kimi-k3 → opencode-go/kimi-k3 → kimi-for-coding/kimi-k3 → opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k3 → openai\|github-copilot\|opencode/gpt-5.6-sol (medium) → zai-coding-plan\|opencode/glm-5 → opencode/big-pickle |
+| **Metis**    | Plan review      | anthropic\|github-copilot\|opencode/claude-sonnet-4-6 → anthropic\|github-copilot\|opencode/claude-opus-4-8 (max) → openai\|github-copilot\|opencode/gpt-5.6-sol (high) → opencode-go/glm-5.2 → kimi-for-coding/kimi-k3 |
 
 **Model-Flexible Agents** (fallback across Claude, GPT, and Claude-like models):
 
@@ -587,16 +587,16 @@ Priority: **Claude > GPT > Claude-like models**
 
 | Agent          | Role              | Default Chain                                                                      | Prompt behavior |
 | -------------- | ----------------- | ---------------------------------------------------------------------------------- | --------------- |
-| **Prometheus** | Strategic planner | anthropic\|github-copilot\|opencode/claude-opus-4-7 (max) → openai\|github-copilot\|opencode/gpt-5.5 (high) → opencode-go/glm-5.2 → google\|github-copilot\|opencode/gemini-3.1-pro | Single thin prompt backed by `ulw-plan`; model family does not switch the prompt |
-| **Atlas**      | Todo orchestrator | anthropic\|github-copilot\|opencode/claude-sonnet-4-6 → opencode-go/kimi-k2.6 → openai\|github-copilot\|opencode/gpt-5.5 (medium) → opencode-go/minimax-m3 → opencode-go/minimax-m2.7 | GPT-optimized todo management path |
+| **Prometheus** | Strategic planner | anthropic\|github-copilot\|opencode/claude-opus-4-8 (max) → openai\|github-copilot\|opencode/gpt-5.6-sol (high) → opencode-go/glm-5.2 → google\|github-copilot\|opencode/gemini-3.1-pro | Single thin prompt backed by `ulw-plan`; model family does not switch the prompt |
+| **Atlas**      | Todo orchestrator | anthropic\|github-copilot\|opencode/claude-sonnet-4-6 → opencode-go/kimi-k3 → openai\|github-copilot\|opencode/gpt-5.6-sol (medium) → opencode-go/minimax-m3 → opencode-go/minimax-m2.7 | GPT-optimized todo management path |
 
 **GPT-Native Agents** (built for GPT, don't override to Claude):
 
 | Agent          | Role                   | Default Chain                          | Notes                                                  |
 | -------------- | ---------------------- | -------------------------------------- | ------------------------------------------------------ |
-| **Hephaestus** | Deep autonomous worker | openai\|vercel/gpt-5.6-sol (medium) → openai\|github-copilot\|opencode\|vercel/gpt-5.5 (medium) | "Codex on steroids." GPT-only chain. Requires GPT access. |
-| **Oracle**     | Architecture/debugging | openai\|github-copilot\|opencode/gpt-5.5 (high) → google\|github-copilot\|opencode/gemini-3.1-pro (high) → anthropic\|github-copilot\|opencode/claude-opus-4-7 (max) → opencode-go/glm-5.2 | High-IQ strategic backup. GPT preferred. |
-| **Momus**      | High-accuracy reviewer | openai\|vercel/gpt-5.6-terra (high) → openai\|github-copilot\|opencode\|vercel/gpt-5.5 (xhigh) → anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-7 (max) → google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high) → opencode-go\|vercel/glm-5.2 | Verification agent. GPT preferred. |
+| **Hephaestus** | Deep autonomous worker | openai\|vercel/gpt-5.6-sol (medium) → openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium) | "Codex on steroids." GPT-only chain. Requires GPT access. |
+| **Oracle**     | Architecture/debugging | openai\|github-copilot\|opencode/gpt-5.6-sol (high) → google\|github-copilot\|opencode/gemini-3.1-pro (high) → anthropic\|github-copilot\|opencode/claude-opus-4-8 (max) → opencode-go/glm-5.2 | High-IQ strategic backup. GPT preferred. |
+| **Momus**      | High-accuracy reviewer | openai\|vercel/gpt-5.6-terra (high) → openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (xhigh) → anthropic\|github-copilot\|opencode\|vercel/claude-opus-4-8 (max) → google\|github-copilot\|opencode\|vercel/gemini-3.1-pro (high) → opencode-go\|vercel/glm-5.2 | Verification agent. GPT preferred. |
 
 **Utility Agents** (speed over intelligence — do not "upgrade" them):
 
@@ -604,7 +604,7 @@ Priority: **Claude > GPT > Claude-like models**
 | --------------------- | ------------------ | ---------------------------------------------------------------------- |
 | **Explore**           | Fast codebase grep | openai/gpt-5.4-mini-fast → opencode-go/qwen3.5-plus → vercel/minimax-m2.7-highspeed → opencode-go\|vercel/minimax-m3 → opencode-go\|vercel/minimax-m2.7 → anthropic\|vercel/claude-haiku-4-5 → openai\|vercel/gpt-5.4-nano |
 | **Librarian**         | Docs/code search   | (same chain as Explore)                                                |
-| **Multimodal Looker** | Vision/screenshots | openai\|opencode/gpt-5.5 (medium) → opencode-go/kimi-k2.6 → zai-coding-plan/glm-4.6v → openai\|github-copilot\|opencode/gpt-5-nano |
+| **Multimodal Looker** | Vision/screenshots | openai\|opencode/gpt-5.6-sol (medium) → opencode-go/kimi-k3 → zai-coding-plan/glm-4.6v → openai\|github-copilot\|opencode/gpt-5-nano |
 
 #### Why different models need different prompts
 
@@ -622,13 +622,13 @@ If the user wants to override which model an agent uses, edit the plugin config 
 ```jsonc
 {
   "agents": {
-    "sisyphus": { "model": "kimi-for-coding/k2p5" },
-    "prometheus": { "model": "openai/gpt-5.5" }, // Uses the same ulw-plan-backed prompt
+    "sisyphus": { "model": "kimi-for-coding/kimi-k3" },
+    "prometheus": { "model": "openai/gpt-5.6-sol" }, // Uses the same ulw-plan-backed prompt
   },
 }
 ```
 
-**Lower-risk overrides** (compatible behavior): Sisyphus Opus → Sonnet/Kimi K2.6/GLM 5; Prometheus Opus → GPT-5.5 (same prompt, different model); Atlas Kimi K2.6 → Sonnet/GPT-5.5 (auto-switch).
+**Lower-risk overrides** (compatible behavior): Sisyphus Opus → Sonnet/Kimi K3/GLM 5; Prometheus Opus → GPT-5.6 Sol (same prompt, different model); Atlas Kimi K3 → Sonnet/GPT-5.6 Sol (auto-switch).
 
 **Experimental GLM 5.2:** GLM 5.2 uses the GLM-5.2-calibrated Sisyphus prompt because its model ID is recognized as GLM, but it currently has one community report and no maintainer end-to-end validation. The automatic Sisyphus chain is configured with the `glm-5` literal; fuzzy availability matching may resolve that entry to GLM 5.1 or GLM 5.2. Any GLM 5.2 selection remains experimental.
 
@@ -719,7 +719,7 @@ Add custom skills under `.opencode/skills/<name>/SKILL.md` (project scope) or `~
 
 After verification, tell the user:
 
-1. **Sisyphus strongly recommends Opus 4.7.** Using other models may noticeably degrade the experience.
+1. **Sisyphus strongly recommends Opus 4.8.** Using other models may noticeably degrade the experience.
 2. **Feeling lazy?** Just include `ultrawork` (or `ulw`) in your prompt. The agent figures out the rest.
 3. **Need precision?** Press **Tab** to enter Prometheus (Planner) mode, then run `/start-work` to execute the verified plan.
 4. **Your own agent/category setup?** Read [`docs/guide/agent-model-matching.md`](agent-model-matching.md) — the assistant can interview the user and tune the config.

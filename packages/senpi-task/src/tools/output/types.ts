@@ -10,6 +10,7 @@ export type OutputManager = Pick<TaskManager, "get" | "list" | "waitFor">
 export type TranscriptEntry =
   | { readonly kind: "assistant"; readonly text: string }
   | { readonly kind: "tool"; readonly tool: string; readonly is_error: boolean }
+  | { readonly kind: "error"; readonly message: string }
 
 export type TranscriptSource = "event-log" | "session-jsonl" | "none"
 

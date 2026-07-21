@@ -100,7 +100,7 @@ describe("model requirement global invariants", () => {
     expect(kimiEntries.length).toBeGreaterThan(0)
   })
 
-  test("gpt-5.5 fallback entries use the current plain model id and include OpenAI", () => {
+  test("builtin fallback chains contain no gpt-5.5 entries", () => {
     // given
     const allEntries = [
       ...Object.values(AGENT_MODEL_REQUIREMENTS),
@@ -108,13 +108,9 @@ describe("model requirement global invariants", () => {
     ].flatMap((requirement) => requirement.fallbackChain)
 
     // when
-    const currentEntries = allEntries.filter((entry) => entry.model === "gpt-5.5")
+    const retiredEntries = allEntries.filter((entry) => entry.model === "gpt-5.5")
 
     // then
-    expect(currentEntries.length).toBeGreaterThan(0)
-    for (const entry of currentEntries) {
-      expect(entry.model).toBe("gpt-5.5")
-      expect(entry.providers).toContain("openai")
-    }
+    expect(retiredEntries).toEqual([])
   })
 })

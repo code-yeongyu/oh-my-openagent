@@ -161,10 +161,10 @@ describe("InProcessRunner", () => {
 
   test("#given a completing child #when idle #then the last assistant text is extracted", async () => {
     const fake = createFakeSession()
-    fake.lastText.value = "final answer"
     const runner = new InProcessRunner({ createSession: async () => fake.session })
     const handle = await runner.start(baseSpec())
 
+    fake.lastText.value = "final answer"
     fake.resolvePrompt()
     const outcome = await handle.waitForIdle()
 

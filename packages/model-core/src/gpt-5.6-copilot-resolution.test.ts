@@ -33,8 +33,9 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
   ] as const
 
   for (const { name, requirement, expectedModel } of selectionCases) {
-    test(`${name} selects its Copilot GPT-5.6 model with high`, () => {
+    test(`${name} selects its Copilot GPT-5.6 model with its configured variant`, () => {
       // given
+      const expectedVariant = name === "hephaestus" ? "medium" : "high"
       const availableModels = new Set([expectedModel, "github-copilot/gpt-5.5"])
 
       // when
@@ -48,7 +49,7 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
       expect(result).toEqual({
         model: expectedModel,
         source: "provider-fallback",
-        variant: "high",
+        variant: expectedVariant,
       })
     })
   }
@@ -94,7 +95,7 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
     })
   })
 
-  test("Copilot is never added to a GPT-5.6 xhigh rung", () => {
+  test("Momus is the only GPT-5.6 xhigh rung that includes Copilot", () => {
     // given
     const requirements = [
       ...Object.values(AGENT_MODEL_REQUIREMENTS),
@@ -110,29 +111,23 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
     )
 
     // then
-    expect(copilotXhighEntries).toEqual([])
+    expect(copilotXhighEntries).toEqual([
+      {
+        providers: ["openai", "github-copilot", "opencode", "vercel"],
+        model: "gpt-5.6-sol",
+        variant: "xhigh",
+      },
+    ])
   })
 
   const fallbackCases = [
-    {
-      name: "hephaestus",
-      requirement: AGENT_MODEL_REQUIREMENTS.hephaestus,
-      expectedVariant: "medium",
-    },
-    {
-      name: "momus",
-      requirement: AGENT_MODEL_REQUIREMENTS.momus,
-      expectedVariant: "xhigh",
-    },
-    {
-      name: "deep",
-      requirement: CATEGORY_MODEL_REQUIREMENTS.deep,
-      expectedVariant: "medium",
-    },
+    { name: "hephaestus", requirement: AGENT_MODEL_REQUIREMENTS.hephaestus },
+    { name: "momus", requirement: AGENT_MODEL_REQUIREMENTS.momus },
+    { name: "deep", requirement: CATEGORY_MODEL_REQUIREMENTS.deep },
   ] as const
 
-  for (const { name, requirement, expectedVariant } of fallbackCases) {
-    test(`${name} preserves its GPT-5.5 fallback when GPT-5.6 is unavailable`, () => {
+  for (const { name, requirement } of fallbackCases) {
+    test(`${name} ignores GPT-5.5 when its GPT-5.6 rungs are unavailable`, () => {
       // given
       const availableModels = new Set(["github-copilot/gpt-5.5"])
 
@@ -145,9 +140,8 @@ describe("GitHub Copilot GPT-5.6 resolution", () => {
 
       // then
       expect(result).toEqual({
-        model: "github-copilot/gpt-5.5",
-        source: "provider-fallback",
-        variant: expectedVariant,
+        model: "system/default",
+        source: "system-default",
       })
     })
   }

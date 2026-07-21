@@ -128,7 +128,10 @@ async function resolveOrProvisionCommand(
 }
 
 function codegraphEnvForConfig(config: CodegraphBootstrapConfig, homeDir: string): Record<string, string> {
-	const env = buildCodegraphEnv({ homeDir });
+	// The detached indexing worker must NEVER engage the upstream daemon, even
+	// when the user opted into daemon mode for interactive MCP sessions: a
+	// daemon-backed init/sync would outlive and race the worker's lifecycle.
+	const env = buildCodegraphEnv({ daemon: false, homeDir });
 	return config.trustedCodegraphInstallDir === undefined ? env : { ...env, CODEGRAPH_INSTALL_DIR: config.trustedCodegraphInstallDir };
 }
 

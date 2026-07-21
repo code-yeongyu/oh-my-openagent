@@ -167,6 +167,9 @@ export type TaskManagerOptions = {
   // Resolves launch inputs from the current runtime. Persisted task records never supply executable
   // extensions or environment during a respawn.
   readonly trustedRespawnLaunch?: TrustedRespawnLaunchResolver
+  // Pid recorded as host_pid on every claimed record so sibling processes sharing the project store
+  // can tell a live owner from a dead one. Defaults to process.pid; injectable for tests.
+  readonly hostPid?: number
 }
 
 export type TaskManager = {

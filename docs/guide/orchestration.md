@@ -35,21 +35,21 @@ The orchestration system uses a three-layer architecture that solves context ove
 flowchart TB
     subgraph Planning["Planning Layer (Human + Prometheus)"]
         User[(" User")]
-        Prometheus[" Prometheus<br/>(Planner)<br/>claude-opus-4-7 / gpt-5.5 / glm-5.2"]
-        Metis[" Metis<br/>(Consultant)<br/>claude-sonnet-4-6 / claude-opus-4-7 / gpt-5.5 / glm-5.2"]
-        Momus[" Momus<br/>(Reviewer)<br/>gpt-5.6-terra / gpt-5.5 / claude-opus-4-7 / gemini-3.1-pro / glm-5.2"]
+        Prometheus[" Prometheus<br/>(Planner)<br/>claude-opus-4-8 / gpt-5.6-sol / glm-5.2"]
+        Metis[" Metis<br/>(Consultant)<br/>claude-sonnet-4-6 / claude-opus-4-8 / gpt-5.6-sol / glm-5.2"]
+        Momus[" Momus<br/>(Reviewer)<br/>gpt-5.6-terra / gpt-5.6-sol / claude-opus-4-8 / gemini-3.1-pro / glm-5.2"]
     end
 
     subgraph Execution["Execution Layer (Orchestrator)"]
-        Orchestrator[" Atlas<br/>(Conductor)<br/>claude-sonnet-4-6 / kimi-k2.6 / gpt-5.5 / minimax-m3 / minimax-m2.7"]
+        Orchestrator[" Atlas<br/>(Conductor)<br/>claude-sonnet-4-6 / kimi-k3 / gpt-5.6-sol / minimax-m3 / minimax-m2.7"]
     end
 
     subgraph Workers["Worker Layer (Specialized Agents)"]
-        Junior[" Sisyphus-Junior<br/>(Task Executor)<br/>claude-sonnet-4-6 / kimi-k2.6 / gpt-5.5 / minimax-m3 / minimax-m2.7"]
-        Oracle[" Oracle<br/>(Architecture)<br/>gpt-5.5 / gemini-3.1-pro / claude-opus-4-7 / glm-5.2"]
+        Junior[" Sisyphus-Junior<br/>(Task Executor)<br/>claude-sonnet-4-6 / kimi-k3 / gpt-5.6-sol / minimax-m3 / minimax-m2.7"]
+        Oracle[" Oracle<br/>(Architecture)<br/>gpt-5.6-sol / gemini-3.1-pro / claude-opus-4-8 / glm-5.2"]
         Explore[" Explore<br/>(Codebase Grep)<br/>gpt-5.4-mini-fast / minimax-m2.7-highspeed / minimax-m3 / claude-haiku-4-5"]
         Librarian[" Librarian<br/>(Docs/OSS)<br/>gpt-5.4-mini-fast / minimax-m2.7-highspeed / minimax-m3 / claude-haiku-4-5"]
-        Frontend[" visual-engineering<br/>(category + frontend)<br/>gemini-3.1-pro / glm-5 / claude-opus-4-7"]
+        Frontend[" visual-engineering<br/>(category + frontend)<br/>gemini-3.1-pro / glm-5 / claude-opus-4-8"]
     end
 
     User -->|"Describe work"| Prometheus
@@ -103,9 +103,9 @@ Three names can appear together in logs or the TUI:
 
 - **Agent display name**: `Sisyphus - ultraworker`, `Atlas - Plan Executor`, `Hephaestus - Deep Agent`
 - **Provider namespace**: `anthropic`, `openai`, `github-copilot`, `opencode`, `opencode-go`, `vercel`
-- **Model id**: `claude-opus-4-7`, `kimi-k2.6`, `gpt-5.5`, `glm-5`
+- **Model id**: `claude-opus-4-8`, `kimi-k3`, `gpt-5.6-sol`, `glm-5`
 
-The agent decides the prompt and behavior. The provider namespace decides which connected account or gateway serves the request. The model id decides the model family. If you see Sisyphus running through `opencode-go/kimi-k2.6`, that means the Sisyphus prompt is using Kimi through the OpenCode Go provider path; it does not mean OMO replaced your provider silently.
+The agent decides the prompt and behavior. The provider namespace decides which connected account or gateway serves the request. The model id decides the model family. If you see Sisyphus running through `opencode-go/kimi-k3`, that means the Sisyphus prompt is using Kimi through the OpenCode Go provider path; it does not mean OMO replaced your provider silently.
 
 When `ulw` or `ultrawork` is present, Sisyphus receives the ultrawork instruction set for a harder autonomous task. By default it keeps the agent's configured model or fallback chain. An explicit `agents.sisyphus.ultrawork.model` or `variant` setting can override that routing for ultrawork prompts.
 
@@ -295,7 +295,7 @@ Junior doesn't need to be the smartest - it needs to be reliable. With:
 3. Clear MUST DO / MUST NOT DO constraints
 4. Verification requirements
 
-Even a mid-tier execution model works when the harness is strict. The current fallback order is `claude-sonnet-4-6` → `kimi-k2.6` → `gpt-5.5` → `minimax-m3` → `minimax-m2.7` → `big-pickle`. The intelligence is in the **system**, not a single worker model.
+Even a mid-tier execution model works when the harness is strict. The current fallback order is `claude-sonnet-4-6` → `kimi-k3` → `gpt-5.6-sol` → `minimax-m3` → `minimax-m2.7` → `big-pickle`. The intelligence is in the **system**, not a single worker model.
 
 ### System Reminder Mechanism
 
@@ -324,8 +324,8 @@ This "boulder pushing" mechanism is why the system is named after Sisyphus.
 
 ```typescript
 // OLD: Model name creates distributional bias
-task({ agent: "gpt-5.5", prompt: "..." }); // Model knows its limitations
-task({ agent: "claude-opus-4-7", prompt: "..." }); // Different self-perception
+task({ agent: "gpt-5.6-sol", prompt: "..." }); // Model knows its limitations
+task({ agent: "claude-opus-4-8", prompt: "..." }); // Different self-perception
 ```
 
 **The Solution: Semantic Categories:**
@@ -499,7 +499,7 @@ Atlas is automatically activated when you run `/start-work`. You don't need to m
 
 | Aspect          | Hephaestus                                 | Sisyphus + `ulw` / `ultrawork`                       |
 | --------------- | ------------------------------------------ | ---------------------------------------------------- |
-| **Model**       | `gpt-5.6-sol` (`medium`) when available, then `gpt-5.5` (`medium`) | `claude-opus-4-7` / `kimi-k2.6` / `gpt-5.5` / `glm-5` depending on setup |
+| **Model**       | `gpt-5.6-sol` (`medium`) when available, with `gpt-5.6-sol` (`medium`) only | `claude-opus-4-8` / `kimi-k3` / `gpt-5.6-sol` / `glm-5` depending on setup |
 | **Approach**    | Autonomous deep worker                     | Keyword-activated ultrawork mode                     |
 | **Best For**    | Complex architectural work, deep reasoning | General complex tasks, "just do it" scenarios        |
 | **Planning**    | Self-plans during execution                | Uses Prometheus plans if available                   |
@@ -523,7 +523,7 @@ Switch to Hephaestus (Tab → Select Hephaestus) when:
    - "Migrate from MongoDB to PostgreSQL with zero downtime"
 
 4. **You specifically want GPT-native autonomous reasoning**
-   - Hephaestus prefers GPT-5.6 Sol when OpenAI or Vercel exposes it and retains GPT-5.5 as the broad fallback
+   - Hephaestus prefers GPT-5.6 Sol when OpenAI or Vercel exposes it and retains GPT-5.6 Sol as the broad fallback
 
 **When to Use Sisyphus + `ulw`:**
 

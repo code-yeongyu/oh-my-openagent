@@ -31,11 +31,6 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "high",
       },
       {
-        providers: ["openai", "opencode", "vercel"],
-        model: "gpt-5.5",
-        variant: "xhigh",
-      },
-      {
         providers: ["google", "github-copilot", "opencode", "vercel"],
         model: "gemini-3.1-pro",
         variant: "high",
@@ -66,11 +61,6 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "high",
       },
       {
-        providers: ["openai", "github-copilot", "opencode", "vercel"],
-        model: "gpt-5.5",
-        variant: "medium",
-      },
-      {
         providers: ["anthropic", "github-copilot", "opencode", "vercel"],
         model: "claude-opus-4-8",
         variant: "max",
@@ -96,7 +86,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "claude-opus-4-8",
         variant: "max",
       },
-      { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.5" },
+      { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.6-sol", variant: "high" },
       { providers: ["opencode-go", "vercel"], model: "kimi-k3" },
       { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
     ],
@@ -137,11 +127,6 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         providers: ["anthropic", "github-copilot", "opencode", "vercel"],
         model: "claude-sonnet-4-6",
       },
-      {
-        providers: ["openai", "opencode", "vercel"],
-        model: "gpt-5.5",
-        variant: "medium",
-      },
       { providers: ["opencode-go", "vercel"], model: "kimi-k3" },
       {
         providers: ["google", "github-copilot", "opencode", "vercel"],
@@ -161,7 +146,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["openai", "github-copilot", "opencode", "vercel"],
-        model: "gpt-5.5",
+        model: "gpt-5.6-sol",
         variant: "high",
       },
       { providers: ["zai-coding-plan", "opencode", "bailian-coding-plan", "vercel"], model: "glm-5" },
