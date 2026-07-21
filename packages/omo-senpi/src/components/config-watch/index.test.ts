@@ -154,6 +154,33 @@ describe("createConfigWatchComponent", () => {
     ])
   })
 
+  it("refreshes targets after rejection without replacing the sticky validator", () => {
+    const events = new FakeEvents()
+    const pi = createPi(events)
+    const validate = () => ({ ok: false as const, errors: ["still invalid"] })
+    let targetPass = 0
+    createConfigWatchComponent({
+      resolveCwd: () => "/project",
+      resolveTargets: () => {
+        targetPass += 1
+        return targetPass === 1
+          ? [{ path: "/project", kind: "dir", filterGlobs: [".omo"] }]
+          : [
+              { path: "/project", kind: "dir", filterGlobs: [".omo"] },
+              { path: "/project/.omo", kind: "dir", filterGlobs: ["omo.jsonc", "omo.json"] },
+            ]
+      },
+      createValidator: () => ({ validate }),
+    }).register(pi, createContext([]))
+
+    const before = events.registrations.get("omo")
+    events.emit("config-watch:rejected", { registrationId: "omo", paths: ["/project/.omo"], errors: ["invalid config"] })
+    const after = events.registrations.get("omo")
+
+    expect(after?.targets).toHaveLength(2)
+    expect(after?.validate).toBe(before?.validate)
+  })
+
   it("releases event subscriptions on shutdown and replaces subscriptions on repeated register", () => {
     const events = new FakeEvents()
     const pi = createPi(events)

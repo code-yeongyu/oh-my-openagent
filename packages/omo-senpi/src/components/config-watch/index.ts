@@ -77,7 +77,7 @@ export function createConfigWatchComponent(options: ConfigWatchComponentOptions 
 
       const cwd = resolveCwd()
       const validator = createValidator({ cwd })
-      const registration: ConfigWatchRegistration = {
+      const createRegistration = (): ConfigWatchRegistration => ({
         id: OMO_REGISTRATION_ID,
         displayName: ".omo config",
         targets: resolveTargets({ cwd }).map((target) => ({
@@ -85,8 +85,11 @@ export function createConfigWatchComponent(options: ConfigWatchComponentOptions 
           kind: target.kind,
           filterGlobs: [...target.filterGlobs],
         })),
+        // Preserve one validator across target refreshes so a rejected
+        // diagnostic remains sticky until its source is actually repaired.
         validate: validator.validate,
-      }
+      })
+      let registration = createRegistration()
       const emitRegistration = (): void => events.emit(CONFIG_WATCH_REGISTER, registration)
       const unsubscribes = [
         events.on(CONFIG_WATCH_READY, emitRegistration),
@@ -102,6 +105,11 @@ export function createConfigWatchComponent(options: ConfigWatchComponentOptions 
             errors: payload.errors,
             errorCount: payload.errors.length,
           })
+          // A new ancestor .omo directory is initially covered only by its
+          // parent creation watch. Refresh targets after rejection so its file
+          // watcher sees the repair without resetting sticky validation state.
+          registration = createRegistration()
+          emitRegistration()
         }),
       ]
       const dispose = (): void => release(unsubscribes)

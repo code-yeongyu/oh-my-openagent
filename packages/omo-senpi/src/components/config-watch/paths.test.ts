@@ -90,6 +90,24 @@ describe("resolveOmoConfigWatchTargets", () => {
     ])
   })
 
+  it("#given a newly created ancestor .omo directory #when resolving targets #then keeps watching its config files after a rejected creation", () => {
+    const fixture = createFixture()
+
+    const targets = resolveOmoConfigWatchTargets({
+      cwd: fixture.cwd,
+      env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+      platform: "linux",
+    })
+
+    const creationTarget = targets.find(
+      (target) => target.path === fixture.projectDir && target.filterGlobs.includes(".omo"),
+    )
+
+    // A new invalid config is rejected without a reload, so the original ancestor
+    // watch must also receive the later child-file fix that clears the rejection.
+    expect(creationTarget?.filterGlobs).toEqual([".omo", ".omo/omo.jsonc", ".omo/omo.json"])
+  })
+
   it("#given a symlinked project .omo directory #when resolving targets #then ignores the symlinked config directory", () => {
     const fixture = createFixture()
     const outsideOmoDirectory = join(fixture.homeDir, "outside-omo")
