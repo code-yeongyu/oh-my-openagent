@@ -122,6 +122,32 @@ describe("runCodegraphServe unavailable CodeGraph paths", () => {
 			rmSync(workspace, { recursive: true, force: true });
 		}
 	});
+
+	it("#given the unavailable facade with held-open stdio and a dead parent #when the watchdog polls #then the placeholder server settles without waiting for stdin EOF", async () => {
+		// given
+		// Client stdio is held open and never sees EOF, so the parent-liveness
+		// watchdog is the only settle path for the placeholder server.
+		const stdin = new PassThrough();
+		const stdout = new PassThrough();
+		stdout.resume();
+		const stderr: string[] = [];
+
+		// when
+		const exitCode = await runCodegraphServe({
+			config: { codegraph: { enabled: false }, sources: [], warnings: [] },
+			env: {},
+			stdin,
+			stdout,
+			stderr: { write: (chunk: string) => stderr.push(chunk) },
+			parentWatchdog: { pollIntervalMs: 10, probeAlive: () => false },
+		});
+
+		// then
+		expect(exitCode).toBe(0);
+		expect(stderr).toEqual([
+			"CodeGraph MCP skipped: disabled by OMO SOT config. Set [codex].codegraph.enabled=true to enable it.\n",
+		]);
+	});
 });
 
 function closedMcpStdio(): { readonly stdin: PassThrough; readonly stdout: PassThrough } {

@@ -168,7 +168,7 @@ function hasErrorCode(error: unknown, code: string): boolean {
   return error instanceof Error && "code" in error && error.code === code
 }
 
-function createParentWatchdog(
+export function createParentWatchdog(
   config: ParentWatchdogConfig | undefined,
   onDeadParent: (parentPid: number, pollIntervalMs: number) => void,
 ): { readonly clear: () => void } {
