@@ -13,7 +13,6 @@ import type { Readable, Writable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
 import {
-	CODEGRAPH_NO_DAEMON_ENV,
 	buildCodegraphChildEnv,
 	buildCodegraphEnv,
 } from "../../../../../utils/src/codegraph/env.ts";
@@ -65,7 +64,7 @@ export interface CodegraphServeStderr {
 }
 
 export interface RunCodegraphServeOptions {
-	readonly buildEnv?: (options: { readonly homeDir: string }) => Record<string, string>;
+	readonly buildEnv?: (options: { readonly daemon: boolean; readonly homeDir: string }) => Record<string, string>;
 	readonly commandExists?: (filePath: string) => boolean;
 	readonly config?: CodexOmoConfig;
 	readonly cwd?: string;
@@ -137,7 +136,7 @@ export async function runCodegraphServe(options: RunCodegraphServeOptions = {}):
 	}
 
 	const runProcess = options.runProcess ?? runBridgedCodegraphProcess;
-	const codegraphEnv = codegraphEnvForConfig(trustedInstallDir, homeDir, options.buildEnv);
+	const codegraphEnv = codegraphEnvForConfig(trustedInstallDir, homeDir, codegraphConfig.daemon === true, options.buildEnv);
 	const mergedEnv = buildCodegraphChildEnv({ ambientEnv: env, codegraphEnv, runtimeEnv: env });
 	return runProcess(resolution.command, [...resolution.argsPrefix, "serve", "--mcp"], {
 		cwd: projectCwd,
@@ -196,9 +195,10 @@ function looksLikePath(command: string): boolean {
 function codegraphEnvForConfig(
 	trustedInstallDir: string | undefined,
 	homeDir: string,
-	buildEnv: ((options: { readonly homeDir: string }) => Record<string, string>) | undefined,
+	daemon: boolean,
+	buildEnv: ((options: { readonly daemon: boolean; readonly homeDir: string }) => Record<string, string>) | undefined,
 ): Record<string, string> {
-	const env = { ...(buildEnv?.({ homeDir }) ?? buildCodegraphEnv({ homeDir })), [CODEGRAPH_NO_DAEMON_ENV]: "1" };
+	const env = buildEnv?.({ daemon, homeDir }) ?? buildCodegraphEnv({ daemon, homeDir });
 	return trustedInstallDir === undefined ? env : { ...env, CODEGRAPH_INSTALL_DIR: trustedInstallDir };
 }
 

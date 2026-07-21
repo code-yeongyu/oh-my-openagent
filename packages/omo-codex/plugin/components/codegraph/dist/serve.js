@@ -1489,8 +1489,9 @@ function parseJsoncSafe(content) {
 var HARNESS_IDS = ["codex", "opencode", "omo"];
 var SETTING_HARNESS_SUPPORT = {
   "codegraph.auto_provision": HARNESS_IDS,
+  "codegraph.daemon": ["codex", "opencode"],
   "codegraph.enabled": HARNESS_IDS,
-  "codegraph.excluded_roots": ["codex"],
+  "codegraph.excluded_roots": ["codex", "opencode"],
   "codegraph.install_dir": HARNESS_IDS,
   "codegraph.telemetry": HARNESS_IDS,
   "codegraph.watch_debounce_ms": ["opencode", "omo"]
@@ -1507,6 +1508,7 @@ var BUILT_IN_DEFAULTS = {
 var HARNESS_BLOCK_KEYS = HARNESS_IDS.map((harness) => `[${harness}]`);
 var CODEGRAPH_SETTING_KEYS = [
   "auto_provision",
+  "daemon",
   "enabled",
   "excluded_roots",
   "install_dir",
@@ -1579,6 +1581,10 @@ function setCodegraphSetting(config, key, value) {
     case "auto_provision":
       if (typeof value === "boolean")
         config.auto_provision = value;
+      return;
+    case "daemon":
+      if (typeof value === "boolean")
+        config.daemon = value;
       return;
     case "enabled":
       if (typeof value === "boolean")
@@ -2481,7 +2487,7 @@ async function runCodegraphServe(options = {}) {
     return runUnavailableMcp(buildCodegraphNodeSkipHint(nodeSupport), options);
   }
   const runProcess = options.runProcess ?? runBridgedCodegraphProcess;
-  const codegraphEnv = codegraphEnvForConfig(trustedInstallDir, homeDir, options.buildEnv);
+  const codegraphEnv = codegraphEnvForConfig(trustedInstallDir, homeDir, codegraphConfig.daemon === true, options.buildEnv);
   const mergedEnv = buildCodegraphChildEnv({ ambientEnv: env, codegraphEnv, runtimeEnv: env });
   return runProcess(resolution.command, [...resolution.argsPrefix, "serve", "--mcp"], {
     cwd: projectCwd,
@@ -2527,8 +2533,8 @@ function shouldSkipResolvedCommand(resolution, commandExists) {
 function looksLikePath2(command) {
   return command.includes("/") || command.includes("\\");
 }
-function codegraphEnvForConfig(trustedInstallDir, homeDir, buildEnv) {
-  const env = { ...buildEnv?.({ homeDir }) ?? buildCodegraphEnv({ homeDir }), [CODEGRAPH_NO_DAEMON_ENV]: "1" };
+function codegraphEnvForConfig(trustedInstallDir, homeDir, daemon, buildEnv) {
+  const env = buildEnv?.({ daemon, homeDir }) ?? buildCodegraphEnv({ daemon, homeDir });
   return trustedInstallDir === undefined ? env : { ...env, CODEGRAPH_INSTALL_DIR: trustedInstallDir };
 }
 function resolveProjectCwd(env, fallback) {

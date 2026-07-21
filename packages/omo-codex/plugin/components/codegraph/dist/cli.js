@@ -1610,8 +1610,9 @@ function parseJsoncSafe(content) {
 var HARNESS_IDS = ["codex", "opencode", "omo"];
 var SETTING_HARNESS_SUPPORT = {
   "codegraph.auto_provision": HARNESS_IDS,
+  "codegraph.daemon": ["codex", "opencode"],
   "codegraph.enabled": HARNESS_IDS,
-  "codegraph.excluded_roots": ["codex"],
+  "codegraph.excluded_roots": ["codex", "opencode"],
   "codegraph.install_dir": HARNESS_IDS,
   "codegraph.telemetry": HARNESS_IDS,
   "codegraph.watch_debounce_ms": ["opencode", "omo"]
@@ -1628,6 +1629,7 @@ var BUILT_IN_DEFAULTS = {
 var HARNESS_BLOCK_KEYS = HARNESS_IDS.map((harness) => `[${harness}]`);
 var CODEGRAPH_SETTING_KEYS = [
   "auto_provision",
+  "daemon",
   "enabled",
   "excluded_roots",
   "install_dir",
@@ -1700,6 +1702,10 @@ function setCodegraphSetting(config, key, value) {
     case "auto_provision":
       if (typeof value === "boolean")
         config.auto_provision = value;
+      return;
+    case "daemon":
+      if (typeof value === "boolean")
+        config.daemon = value;
       return;
     case "enabled":
       if (typeof value === "boolean")
@@ -2926,7 +2932,7 @@ async function resolveOrProvisionCommand(deps, config, env, homeDir, nodeSupport
   return { kind: "resolved", resolution: { argsPrefix: [], command: provisioned.binPath, exists: true, source: "provisioned" } };
 }
 function codegraphEnvForConfig(config, homeDir) {
-  const env = buildCodegraphEnv({ homeDir });
+  const env = buildCodegraphEnv({ daemon: false, homeDir });
   return config.trustedCodegraphInstallDir === undefined ? env : { ...env, CODEGRAPH_INSTALL_DIR: config.trustedCodegraphInstallDir };
 }
 function canUseResolvedCommand(resolved, nodeSupport) {
@@ -3067,6 +3073,7 @@ async function executeCodegraphSessionStartHook(options = {}) {
     return { action: "skipped-excluded", exitCode: 0 };
   }
   const isInitialized = await (options.statusProbe ?? isCodegraphProjectInitialized)({
+    daemon: config.codegraph?.daemon === true,
     env,
     homeDir,
     projectRoot,
@@ -3097,7 +3104,7 @@ async function isCodegraphProjectInitialized(options) {
     return false;
   const invocation = resolveCodegraphCommandInvocation(resolved.command, [...resolved.argsPrefix, "status", "--json"]);
   const codegraphEnv = {
-    ...buildCodegraphEnv({ homeDir: options.homeDir }),
+    ...buildCodegraphEnv({ daemon: options.daemon, homeDir: options.homeDir }),
     ...options.trustedCodegraphInstallDir === undefined ? {} : { CODEGRAPH_INSTALL_DIR: options.trustedCodegraphInstallDir }
   };
   const status = await runStatusProbe(options.projectRoot, invocation.command, invocation.args, buildCodegraphChildEnv({ ambientEnv: options.env, codegraphEnv, runtimeEnv: options.env }));
@@ -3838,7 +3845,7 @@ async function runCodegraphServe(options = {}) {
     return runUnavailableMcp(buildCodegraphNodeSkipHint(nodeSupport), options);
   }
   const runProcess = options.runProcess ?? runBridgedCodegraphProcess;
-  const codegraphEnv = codegraphEnvForConfig2(trustedInstallDir, homeDir, options.buildEnv);
+  const codegraphEnv = codegraphEnvForConfig2(trustedInstallDir, homeDir, codegraphConfig.daemon === true, options.buildEnv);
   const mergedEnv = buildCodegraphChildEnv({ ambientEnv: env, codegraphEnv, runtimeEnv: env });
   return runProcess(resolution.command, [...resolution.argsPrefix, "serve", "--mcp"], {
     cwd: projectCwd,
@@ -3884,8 +3891,8 @@ function shouldSkipResolvedCommand(resolution, commandExists) {
 function looksLikePath2(command) {
   return command.includes("/") || command.includes("\\");
 }
-function codegraphEnvForConfig2(trustedInstallDir, homeDir, buildEnv) {
-  const env = { ...buildEnv?.({ homeDir }) ?? buildCodegraphEnv({ homeDir }), [CODEGRAPH_NO_DAEMON_ENV]: "1" };
+function codegraphEnvForConfig2(trustedInstallDir, homeDir, daemon, buildEnv) {
+  const env = buildEnv?.({ daemon, homeDir }) ?? buildCodegraphEnv({ daemon, homeDir });
   return trustedInstallDir === undefined ? env : { ...env, CODEGRAPH_INSTALL_DIR: trustedInstallDir };
 }
 function resolveProjectCwd(env, fallback) {

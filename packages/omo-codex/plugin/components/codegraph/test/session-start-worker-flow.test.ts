@@ -152,6 +152,49 @@ describe("CodeGraph SessionStart worker flow", () => {
 		}
 	});
 
+	it("#given codegraph.daemon=true #when the indexing worker runs #then its env stays daemon-less with CODEGRAPH_NO_DAEMON=1", async () => {
+		// given
+		const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-daemon-"));
+		const homeDir = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-daemon-home-"));
+		const calls: { readonly args: readonly string[]; readonly command: string; readonly env: Record<string, string> }[] = [];
+		try {
+			// when
+			const result = await runCodegraphSessionStartWorker({
+				config: { codegraph: { daemon: true, enabled: true, install_dir: "/tmp/codegraph-install" }, sources: [], trustedCodegraphInstallDir: "/tmp/codegraph-install", warnings: [] },
+				nodeVersion: "22.14.0",
+				cwd: workspace,
+				env: { HOME: homeDir },
+				logOutcome: () => undefined,
+				deps: {
+					ensureGitignored: () => true,
+					ensureProvisioned: () => Promise.resolve({ binPath: "/tmp/codegraph", provisioned: true }),
+					prepareWorkspace: () => ({
+						dataDir: join(homeDir, ".omo/codegraph/projects/test"),
+						dataRoot: join(homeDir, ".omo/codegraph"),
+						linked: true,
+						mode: "global-linked",
+						projectLink: join(workspace, ".codegraph"),
+					}),
+					resolveCommand: () => ({ argsPrefix: [], command: "/tmp/codegraph", exists: true, source: "path" }),
+					runCommand: (_projectRoot, command, args, options) => {
+						calls.push({ args, command, env: options.env });
+						return Promise.resolve({ exitCode: 0, stdout: calls.length === 1 ? '{"initialized":true}' : "", timedOut: false });
+					},
+				},
+			});
+
+			// then
+			expect(result).toEqual({ action: "synced" });
+			expect(calls.length).toBeGreaterThan(0);
+			for (const call of calls) {
+				expect(call.env["CODEGRAPH_NO_DAEMON"]).toBe("1");
+			}
+		} finally {
+			rmSync(workspace, { recursive: true, force: true });
+			rmSync(homeDir, { recursive: true, force: true });
+		}
+	});
+
 	it("#given ambient provider tokens #when default worker runner spawns CodeGraph #then child env only gets safe and controlled variables", async () => {
 		// given
 		const workspace = mkdtempSync(join(tmpdir(), "omo-codegraph-worker-env-"));
