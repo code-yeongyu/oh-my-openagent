@@ -1086,8 +1086,18 @@ describe("createEventHandler - model fallback", () => {
       modelID: "gpt-5.6-sol",
     })
     expect(second.message["variant"]).toBe("medium")
-    expect(abortCalls).toEqual([sessionID, sessionID])
-    expect(promptCalls).toEqual([sessionID, sessionID])
+
+    //#when - third retry cycle
+    const third = await triggerRetryCycle("openai", "gpt-5.6-sol")
+
+    //#then - fallback continues to GLM after the restored Sol rung
+    expect(third.message["model"]).toMatchObject({
+      providerID: "zai-coding-plan",
+      modelID: "glm-5",
+    })
+    expect(third.message["variant"]).toBeUndefined()
+    expect(abortCalls).toEqual([sessionID, sessionID, sessionID])
+    expect(promptCalls).toEqual([sessionID, sessionID, sessionID])
     expect(toastCalls.length).toBeGreaterThanOrEqual(0)
   })
 
