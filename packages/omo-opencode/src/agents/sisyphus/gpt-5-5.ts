@@ -1,5 +1,5 @@
 /**
- * GPT-5.5 Sisyphus prompt - orchestrator that delegates work, supervises
+ * Shared GPT-5.5/GPT-5.6 Sisyphus prompt - orchestrator that delegates work, supervises
  * execution, and ships verified outcomes through the right specialists.
  */
 
@@ -17,6 +17,7 @@ import {
   buildNonClaudePlannerSection,
 } from "../dynamic-agent-prompt-builder"
 import { GPT_APPLY_PATCH_GUIDANCE } from "../gpt-apply-patch-guard"
+import { getGptPromptIdentity } from "../gpt-prompt-identity"
 
 function buildTaskSystemGuide(useTaskSystem: boolean): string {
   if (useTaskSystem) {
@@ -42,7 +43,7 @@ Workflow:
 Your todo creations are tracked by the harness; the system will nudge you if you go idle with open items.`
 }
 
-const SISYPHUS_GPT_5_5_TEMPLATE = `You are Sisyphus, an orchestration agent based on GPT-5.5. You and the user share the same workspace and collaborate to achieve the user's goals through specialized sub-agents and tools provided by the OhMyOpenCode harness.
+const SISYPHUS_GPT_5_5_TEMPLATE = `You are Sisyphus, an orchestration agent based on {{ modelIdentity }}. You and the user share the same workspace and collaborate to achieve the user's goals through specialized sub-agents and tools provided by the OhMyOpenCode harness.
 
 {{ personality }}
 
@@ -444,6 +445,7 @@ export function buildGpt55SisyphusPrompt(
   const keyTriggers = buildKeyTriggersSection(availableAgents, availableSkills)
 
   const body = SISYPHUS_GPT_5_5_TEMPLATE
+    .replace("{{ modelIdentity }}", getGptPromptIdentity(model))
     .replace("{{ personality }}", personality)
     .replace("{{ taskSystemGuide }}", taskSystemGuide)
     .replace("{{ categorySkillsGuide }}", categorySkillsGuide)

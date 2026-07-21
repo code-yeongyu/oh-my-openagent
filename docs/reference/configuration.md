@@ -542,7 +542,7 @@ Guard hooks such as `team-tool-gating`, `write-existing-file-guard`, `bash-file-
 **Notes:**
 
 - `directory-agents-injector` - auto-disabled on OpenCode 1.1.37+ (native AGENTS.md support)
-- `no-sisyphus-gpt` - **do not disable**. It blocks incompatible GPT models for Sisyphus while allowing the dedicated GPT-5.4 and GPT-5.6 Sol prompt paths.
+- `no-sisyphus-gpt` - **do not disable**. It blocks incompatible GPT models for Sisyphus while allowing GPT-5.4 and the shared model-aware GPT-5.5/GPT-5.6 Sol prompt paths.
 - `startup-toast` is a sub-feature of `auto-update-checker`. Disable just the toast by adding `startup-toast` to `disabled_hooks`.
 
 ### Commands

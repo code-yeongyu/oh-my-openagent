@@ -5,7 +5,7 @@
  *
  * Prompt routing (`getAtlasPromptSource`, evaluated by prompts-core variant order):
  * 1. Claude Opus 4.7       → opus-4-7.md   (literal-following + explicit fan-out push)
- * 2. GPT family            → gpt.md        (calibrated for GPT-5.6 Sol)
+ * 2. GPT family            → gpt.md        (shared GPT-family calibration)
  * 3. Gemini family         → gemini.md
  * 4. Kimi K3              → kimi-k3.md    (K3-native; checked first among Kimi)
  * 5. Kimi K2.7             → kimi-k2-7.md  (restrained, outcome-first; checked before generic kimi)

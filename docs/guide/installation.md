@@ -632,7 +632,7 @@ If the user wants to override which model an agent uses, edit the plugin config 
 
 **Experimental GLM 5.2:** GLM 5.2 uses the GLM-5.2-calibrated Sisyphus prompt because its model ID is recognized as GLM, but it currently has one community report and no maintainer end-to-end validation. The automatic Sisyphus chain is configured with the `glm-5` literal; fuzzy availability matching may resolve that entry to GLM 5.1 or GLM 5.2. Any GLM 5.2 selection remains experimental.
 
-**Dangerous overrides** (no prompt support): Sisyphus → older GPT models (only 5.4/5.5 have dedicated GPT paths); Hephaestus → Claude (built for Codex); Explore → Opus (massive cost waste); Librarian → Opus (same).
+**Dangerous overrides** (no prompt support): Sisyphus → unsupported GPT models (the supported GPT paths cover 5.4, 5.5, and 5.6 Sol); Hephaestus → Claude (built for Codex); Explore → Opus (massive cost waste); Librarian → Opus (same).
 
 #### Optional: community model-management tools
 
