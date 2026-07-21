@@ -71,7 +71,41 @@ Add extra exclude-only roots with `codegraph.excluded_roots`:
 
 Entries may be absolute, `~`-relative, or relative to the configured home directory. OMO expands `~`, realpath-canonicalizes each configured root when possible, and compares descendants after platform-aware normalization. There is no include override.
 
-CodeGraph runs with `CODEGRAPH_NO_DAEMON=1`, `CODEGRAPH_NO_DOWNLOAD=1`, `CODEGRAPH_TELEMETRY=0`, and `DO_NOT_TRACK=1` in the managed child environment. OMO stores per-project CodeGraph data under the managed CodeGraph home and prunes dead project stores when their recorded source directory no longer exists.
+CodeGraph runs with `CODEGRAPH_NO_DOWNLOAD=1`, `CODEGRAPH_TELEMETRY=0`, and `DO_NOT_TRACK=1` in the managed child environment, plus `CODEGRAPH_NO_DAEMON=1` unless the shared daemon is opted in (see below). OMO stores per-project CodeGraph data under the managed CodeGraph home and prunes dead project stores when their recorded source directory no longer exists.
+
+### CodeGraph daemon (opt-in)
+
+By default every CodeGraph MCP process runs the index in-process and exits with its client. Set `codegraph.daemon` to `true` in the OMO config (`~/.omo/config.jsonc`, or `.omo/config.jsonc` in a project) to opt into the upstream shared daemon:
+
+```jsonc
+{
+  "codegraph": {
+    // Default false. When true, one detached daemon per project serves every
+    // CodeGraph client instead of each client loading the index in-process.
+    "daemon": true
+  }
+}
+```
+
+With the daemon enabled, upstream CodeGraph spawns one detached daemon per project, rooted at the nearest ancestor holding `.codegraph/codegraph.db`, and every client for that project talks to it over a local socket. The daemon records itself in `.codegraph/daemon.pid`, exits after about five minutes idle, and runs under an upstream PPID watchdog. Opting in trades a detached background process for lower first-query latency once any client has warmed the daemon, plus one shared index across concurrent clients. It ships off by default so no process outlives the client that started it.
+
+Inspect or stop running daemons with the upstream manager:
+
+```bash
+codegraph daemon   # interactive list of running daemons; pick one and press enter to stop it
+```
+
+An ambient `CODEGRAPH_NO_DAEMON=1` in the environment still forces daemon-off when `codegraph.daemon` is `true`.
+
+### Process hygiene and the CodeGraph 1.4.1 upgrade
+
+CodeGraph is pinned to 1.4.1. Project stores built by older versions migrate automatically on first use; no manual re-index is needed.
+
+Process lifecycle is self-cleaning and always on (no config keys):
+
+- MCP server processes (`codegraph`, `lsp`, `git_bash`) run a parent-liveness watchdog and exit when their parent process dies, so a crashed harness does not leave servers behind.
+- A newly started lsp daemon reaps running daemons left over from older versions at startup.
+- A best-effort family sweep removes orphaned codegraph and lsp processes at startup on every adapter (the Codex `SessionStart` hook, OpenCode plugin startup, and Senpi session start) and self-throttles via stamp files.
 
 Native Windows installs discover Git Bash before the installer mutates `~/.codex/`. The installer checks `OMO_CODEX_GIT_BASH_PATH`, standard Git for Windows locations such as `C:\Program Files\Git\bin\bash.exe`, and then PATH. If Git Bash is still missing, it prints the install guidance shown here and stops without running `winget` or changing system dependencies:
 
