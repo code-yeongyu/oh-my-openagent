@@ -10,6 +10,7 @@ export type DelegateFallbackEntry = {
   readonly providers: string[]
   readonly model: string
   readonly variant?: string
+  readonly requireListedProvider?: boolean
 }
 
 export type DelegateModelResolutionInput = {
@@ -239,25 +240,27 @@ export function resolveModelForDelegateTask(
           }
         }
 
-        const laterRungProviders = new Set(
-          fallbackChain
-            .slice(entryIndex + 1)
-            .filter((candidate) => candidate.model === entry.model)
-            .flatMap((candidate) => candidate.providers),
-        )
-        const crossProviderCandidates = new Set(
-          [...input.availableModels].filter((model) => {
-            const [provider] = model.split("/")
-            return provider !== undefined && !laterRungProviders.has(provider)
-          }),
-        )
-        const crossProviderMatch = fuzzyMatchModel(entry.model, crossProviderCandidates)
-        if (crossProviderMatch) {
-          if (explicitHighModel && entry.variant === "high" && crossProviderMatch === explicitHighBaseModel) {
-            return { model: explicitHighModel, fallbackEntry: entry, matchedFallback: true }
-          }
+        if (!entry.requireListedProvider) {
+          const laterRungProviders = new Set(
+            fallbackChain
+              .slice(entryIndex + 1)
+              .filter((candidate) => candidate.model === entry.model)
+              .flatMap((candidate) => candidate.providers),
+          )
+          const crossProviderCandidates = new Set(
+            [...input.availableModels].filter((model) => {
+              const [provider] = model.split("/")
+              return provider !== undefined && !laterRungProviders.has(provider)
+            }),
+          )
+          const crossProviderMatch = fuzzyMatchModel(entry.model, crossProviderCandidates)
+          if (crossProviderMatch) {
+            if (explicitHighModel && entry.variant === "high" && crossProviderMatch === explicitHighBaseModel) {
+              return { model: explicitHighModel, fallbackEntry: entry, matchedFallback: true }
+            }
 
-          return { model: crossProviderMatch, variant: entry.variant, fallbackEntry: entry, matchedFallback: true }
+            return { model: crossProviderMatch, variant: entry.variant, fallbackEntry: entry, matchedFallback: true }
+          }
         }
       }
     }

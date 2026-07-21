@@ -2,6 +2,7 @@ import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 
 // Source of truth mirrored from packages/model-core/src/category-model-requirements.ts.
 // senpi-task cannot import model-core here without adding a package dependency outside this task's scope.
+// Gemini 3.6 Flash requires a listed provider because delegate-core otherwise permits cross-provider fuzzy matches.
 export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFallbackEntry[]>> = {
   "visual-engineering": [
     { providers: ["google", "github-copilot", "opencode", "vercel"], model: "gemini-3.1-pro", variant: "high" },
@@ -38,7 +39,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
   quick: [
     { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.4-mini" },
     { providers: ["anthropic", "github-copilot", "vercel"], model: "claude-haiku-4-5" },
-    { providers: ["google", "opencode", "vercel"], model: "gemini-3.6-flash" },
+    { providers: ["google", "opencode", "vercel"], model: "gemini-3.6-flash", requireListedProvider: true },
     { providers: ["opencode-go", "vercel"], model: "minimax-m3" },
     { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
     { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
@@ -50,7 +51,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
     { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-sonnet-4-6" },
     { providers: ["openai", "opencode", "vercel"], model: "gpt-5.6-sol", variant: "medium" },
     { providers: ["opencode-go", "vercel"], model: "kimi-k3" },
-    { providers: ["google", "opencode", "vercel"], model: "gemini-3.6-flash" },
+    { providers: ["google", "opencode", "vercel"], model: "gemini-3.6-flash", requireListedProvider: true },
     { providers: ["opencode-go", "vercel"], model: "minimax-m3" },
     { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
     { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
@@ -76,7 +77,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
     },
   ],
   writing: [
-    { providers: ["google", "opencode", "vercel"], model: "gemini-3.6-flash" },
+    { providers: ["google", "opencode", "vercel"], model: "gemini-3.6-flash", requireListedProvider: true },
     { providers: ["opencode-go", "vercel"], model: "kimi-k3" },
     { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-sonnet-4-6" },
     { providers: ["opencode-go", "vercel"], model: "minimax-m3" },
