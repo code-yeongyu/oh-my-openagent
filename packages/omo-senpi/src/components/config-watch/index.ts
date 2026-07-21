@@ -1,5 +1,9 @@
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
-import { resolveOmoConfigWatchTargets, type OmoConfigWatchTarget } from "./paths"
+import {
+  resolveOmoConfigWatchTargetResolution,
+  type OmoConfigWatchTarget,
+  type OmoConfigWatchTargetResolution,
+} from "./paths"
 import { createOmoConfigValidator, type OmoConfigValidator } from "./validate"
 
 const CONFIG_WATCH_REGISTER = "config-watch:register"
@@ -28,6 +32,7 @@ type ConfigWatchRejected = ConfigWatchReloaded & {
 export interface ConfigWatchComponentOptions {
   readonly resolveCwd?: () => string
   readonly resolveTargets?: (options: { readonly cwd: string }) => readonly OmoConfigWatchTarget[]
+  readonly resolveTargetResolution?: (options: { readonly cwd: string }) => OmoConfigWatchTargetResolution
   readonly createValidator?: (options: { readonly cwd: string }) => OmoConfigValidator
 }
 
@@ -59,7 +64,15 @@ function release(unsubscribes: readonly (() => void)[]): void {
 /** Registers omo config surfaces with senpi's optional in-process config-watch protocol. */
 export function createConfigWatchComponent(options: ConfigWatchComponentOptions = {}): OmoSenpiComponent {
   const resolveCwd = options.resolveCwd ?? (() => process.cwd())
-  const resolveTargets = options.resolveTargets ?? resolveOmoConfigWatchTargets
+  const resolveTargetResolution = options.resolveTargetResolution
+    ?? ((request: { readonly cwd: string }): OmoConfigWatchTargetResolution => {
+      if (options.resolveTargets === undefined) return resolveOmoConfigWatchTargetResolution(request)
+      return {
+        targets: options.resolveTargets(request),
+        userConfigCreationWatched: true,
+        userConfigCreationDiscovery: "watched",
+      }
+    })
   const createValidator = options.createValidator ?? createOmoConfigValidator
   let releasePrevious: (() => void) | undefined
 
@@ -77,18 +90,28 @@ export function createConfigWatchComponent(options: ConfigWatchComponentOptions 
 
       const cwd = resolveCwd()
       const validator = createValidator({ cwd })
-      const createRegistration = (): ConfigWatchRegistration => ({
-        id: OMO_REGISTRATION_ID,
-        displayName: ".omo config",
-        targets: resolveTargets({ cwd }).map((target) => ({
-          path: target.path,
-          kind: target.kind,
-          filterGlobs: [...target.filterGlobs],
-        })),
-        // Preserve one validator across target refreshes so a rejected
-        // diagnostic remains sticky until its source is actually repaired.
-        validate: validator.validate,
-      })
+      let userConfigReloadWarningLogged = false
+      const createRegistration = (): ConfigWatchRegistration => {
+        const resolution = resolveTargetResolution({ cwd })
+        if (resolution.userConfigCreationDiscovery === "reload_required" && !userConfigReloadWarningLogged) {
+          userConfigReloadWarningLogged = true
+          ctx.logger.warn("config-watch user config discovery requires reload", {
+            userConfigCreationDiscovery: resolution.userConfigCreationDiscovery,
+          })
+        }
+        return {
+          id: OMO_REGISTRATION_ID,
+          displayName: ".omo config",
+          targets: resolution.targets.map((target) => ({
+            path: target.path,
+            kind: target.kind,
+            filterGlobs: [...target.filterGlobs],
+          })),
+          // Preserve one validator across target refreshes so a rejected
+          // diagnostic remains sticky until its source is actually repaired.
+          validate: validator.validate,
+        }
+      }
       let registration = createRegistration()
       const emitRegistration = (): void => events.emit(CONFIG_WATCH_REGISTER, registration)
       const unsubscribes = [

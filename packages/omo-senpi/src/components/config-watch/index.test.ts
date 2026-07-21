@@ -132,6 +132,28 @@ describe("createConfigWatchComponent", () => {
     expect(logs).toEqual([{ level: "warn", message: "config-watch skipped: events capability missing", details: undefined }])
   })
 
+  it("warns that creating user config later requires a reload when its directory and parent are absent", () => {
+    const events = new FakeEvents()
+    const logs: Array<{ level: string; message: string; details?: unknown }> = []
+    createConfigWatchComponent({
+      resolveCwd: () => "/project",
+      resolveTargetResolution: () => ({
+        targets: [],
+        userConfigCreationWatched: false,
+        userConfigCreationDiscovery: "reload_required" as const,
+      }),
+      createValidator: () => ({ validate: () => ({ ok: true }) }),
+    }).register(createPi(events), createContext(logs))
+
+    expect(logs).toEqual([
+      {
+        level: "warn",
+        message: "config-watch user config discovery requires reload",
+        details: { userConfigCreationDiscovery: "reload_required" },
+      },
+    ])
+  })
+
   it("logs omo reload and rejection outcomes with paths and errors", () => {
     const events = new FakeEvents()
     const logs: Array<{ level: string; message: string; details?: unknown }> = []

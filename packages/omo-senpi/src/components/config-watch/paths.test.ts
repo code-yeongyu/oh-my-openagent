@@ -164,6 +164,7 @@ describe("resolveOmoConfigWatchTargets", () => {
     })
 
     expect(resolution.userConfigCreationWatched).toBe(false)
+    expect(resolution.userConfigCreationDiscovery).toBe("reload_required")
     expect(targetFor(resolution.targets, fixture.xdgConfigHome, "omo")).toBe(false)
   })
 })

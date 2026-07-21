@@ -35,6 +35,8 @@ export interface ResolveOmoConfigWatchTargetsOptions {
 export interface OmoConfigWatchTargetResolution {
   readonly targets: readonly OmoConfigWatchTarget[]
   readonly userConfigCreationWatched: boolean
+  /** A later user config directory is discovered only after a full reload in this fallback state. */
+  readonly userConfigCreationDiscovery: "watched" | "reload_required"
 }
 
 function containsPath(parent: string, child: string): boolean {
@@ -131,10 +133,12 @@ export function resolveOmoConfigWatchTargetResolution(
 
   for (const ancestorDirectory of ancestorDirectories) targets.push(creationTarget(ancestorDirectory))
 
+  const userConfigCreationWatched = isExistingDirectory(userConfigDirectory)
+    || isExistingDirectory(dirname(userConfigDirectory))
   return {
     targets,
-    userConfigCreationWatched: isExistingDirectory(userConfigDirectory)
-      || isExistingDirectory(dirname(userConfigDirectory)),
+    userConfigCreationWatched,
+    userConfigCreationDiscovery: userConfigCreationWatched ? "watched" : "reload_required",
   }
 }
 
