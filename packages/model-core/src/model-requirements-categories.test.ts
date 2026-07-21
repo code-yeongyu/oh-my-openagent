@@ -51,7 +51,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(legacyFallback?.providers).toContain("github-copilot")
   })
 
-  test("visual-engineering keeps gemini, glm, opus, opencode-go, and k2p5 fallback order", () => {
+  test("visual-engineering keeps gemini, glm, opus, opencode-go, and Kimi K3 fallback order", () => {
     // given
     const visualEngineering = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
 
@@ -70,7 +70,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(fourth?.providers[0]).toBe("opencode-go")
     expect(fourth?.model).toBe("glm-5.2")
     expect(fifth?.providers[0]).toBe("kimi-for-coding")
-    expect(fifth?.model).toBe("k2p5")
+    expect(fifth?.model).toBe("kimi-k3")
   })
 
   test("quick keeps gpt-5.4-mini primary before claude-haiku-4-5", () => {
@@ -155,7 +155,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(writing.fallbackChain).toHaveLength(6)
     expect(primary?.model).toBe("gemini-3-flash")
     expect(primary?.providers[0]).toBe("google")
-    expect(second?.model).toBe("kimi-k2.6")
+    expect(second?.model).toBe("kimi-k3")
     expect(second?.providers[0]).toBe("opencode-go")
     expect(third?.model).toBe("claude-sonnet-4-6")
     expect(third?.providers[0]).toBe("anthropic")

@@ -121,6 +121,38 @@ describe("resolveCategory", () => {
     })
   })
 
+  test("#given writing's Kimi for Coding default is available #when resolved #then its canonical Kimi K3 id is selected", () => {
+    // given
+    const models = registry([model("kimi-for-coding", "kimi-k3")])
+
+    // when
+    const result = resolveCategory("writing", {}, models)
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.spec.provider).toBe("kimi-for-coding")
+    expect(resolved.spec.modelId).toBe("kimi-k3")
+    expect(resolved.modelSelection.matchedFallback).toBe(false)
+  })
+
+  test("#given writing's provider default is unavailable and Kimi K3 is available #when resolved #then the K3 fallback is selected", () => {
+    // given
+    const models = registry([model("opencode-go", "kimi-k3")])
+
+    // when
+    const result = resolveCategory("writing", {}, models)
+
+    // then
+    const resolved = expectResolved(result)
+    expect(resolved.spec.provider).toBe("opencode-go")
+    expect(resolved.spec.modelId).toBe("kimi-k3")
+    expect(resolved.modelSelection.matchedFallback).toBe(true)
+    expect(resolved.modelSelection.fallbackEntry).toEqual({
+      providers: ["opencode-go", "vercel"],
+      model: "kimi-k3",
+    })
+  })
+
   test("#given ultrabrain primary is unavailable and hardcoded Google fallback is available #when resolved #then delegate-core fallback chain preserves the high variant", () => {
     // given
     const models = registry([model("google", "gemini-3.1-pro")])

@@ -1080,12 +1080,12 @@ describe("createEventHandler - model fallback", () => {
     //#when - second retry cycle
     const second = await triggerRetryCycle("opencode-go", "kimi-k3")
 
-    //#then - second fallback entry applied (chain advanced past opencode-go/kimi-k3)
+    //#then - second fallback entry applied (the consolidated Kimi rung advances to GPT-5.5)
     expect(second.message["model"]).toMatchObject({
-      providerID: "opencode-go",
-      modelID: "kimi-k2.6",
+      providerID: "openai",
+      modelID: "gpt-5.5",
     })
-    expect(second.message["variant"]).toBeUndefined()
+    expect(second.message["variant"]).toBe("medium")
     expect(abortCalls).toEqual([sessionID, sessionID])
     expect(promptCalls).toEqual([sessionID, sessionID])
     expect(toastCalls.length).toBeGreaterThanOrEqual(0)

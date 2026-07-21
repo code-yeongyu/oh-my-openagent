@@ -77,7 +77,7 @@ describe("AGENT_FALLBACK_CHAINS", () => {
         { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-4-8", variant: "max" },
         { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.5", variant: "high" },
         { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
-        { providers: ["kimi-for-coding"], model: "k2p5" },
+        { providers: ["kimi-for-coding"], model: "kimi-k3" },
       ],
       momus: [
         { providers: ["openai", "vercel"], model: "gpt-5.6-terra", variant: "high" },

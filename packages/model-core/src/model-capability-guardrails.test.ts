@@ -24,7 +24,7 @@ describe("model-capability-guardrails", () => {
     expect(new Set(modelIDs).size).toBe(modelIDs.length)
     expect(modelIDs).toContain("claude-opus-4-8")
     expect(modelIDs).toContain("gpt-5.5")
-    expect(modelIDs).toContain("kimi-k2.5")
+    expect(modelIDs).toContain("kimi-k3")
   })
 
   test("flags exact aliases whose canonical target disappears from the snapshot", () => {

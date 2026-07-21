@@ -82,6 +82,24 @@ describe("model requirement global invariants", () => {
     }
   })
 
+  test("builtin Kimi fallback entries use kimi-k3 instead of retired K2 ids", () => {
+    // given
+    const allEntries = [
+      ...Object.values(AGENT_MODEL_REQUIREMENTS),
+      ...Object.values(CATEGORY_MODEL_REQUIREMENTS),
+    ].flatMap((requirement) => requirement.fallbackChain)
+
+    // when
+    const retiredKimiEntries = allEntries.filter((entry) =>
+      ["k2p5", "kimi-k2.5", "kimi-k2.6"].includes(entry.model),
+    )
+    const kimiEntries = allEntries.filter((entry) => entry.model === "kimi-k3")
+
+    // then
+    expect(retiredKimiEntries).toEqual([])
+    expect(kimiEntries.length).toBeGreaterThan(0)
+  })
+
   test("gpt-5.5 fallback entries use the current plain model id and include OpenAI", () => {
     // given
     const allEntries = [
