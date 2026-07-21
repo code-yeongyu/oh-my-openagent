@@ -43,7 +43,7 @@ describe("sweepOmoFamiliesBestEffort()", () => {
     expect(calls.sort()).toEqual(["codegraph", "lsp-proxies", "stale-lsp-daemons"])
     // codegraph + proxy families receive the opencode plugin root as an owned root
     expect(pluginRoots).toHaveLength(2)
-    for (const root of pluginRoots) expect(root?.replace(/\/$/, "").replace(/\\\\/g, "/").endsWith("packages/omo-opencode")).toBe(true)
+    for (const root of pluginRoots) expect(root?.replace(/\/$/, "").replace(/\\/g, "/").endsWith("packages/omo-opencode")).toBe(true)
   })
 
   it("#given one family throws #when the sweep runs #then the failure is logged and the other families still run", async () => {
