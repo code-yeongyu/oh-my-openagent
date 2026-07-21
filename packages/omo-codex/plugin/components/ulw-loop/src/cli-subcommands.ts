@@ -9,7 +9,7 @@ import {
 	readValue,
 } from "./cli-arg-parser.js";
 import { blockedDecisionHandoff, normalizeCodexGoalMode, printJson, printStatus } from "./cli-output.js";
-import { parseSteeringProposal, printSteerResult } from "./cli-steering.js";
+import { parseSteeringProposals, printSteerBatchResult, printSteerResult } from "./cli-steering.js";
 import { buildCodexGoalInstruction } from "./codex-goal-instruction.js";
 import { recordEvidence } from "./evidence.js";
 import { isEssentialCriterion } from "./goal-status.js";
@@ -17,6 +17,7 @@ import { type UlwLoopScope, ulwLoopAttemptEvidenceDir } from "./paths.js";
 import { addUlwLoopGoal, createUlwLoopPlan, startNextUlwLoop, summarizeUlwLoopPlan } from "./plan-crud.js";
 import { readUlwLoopPlan } from "./plan-io.js";
 import { recordFinalReviewBlockers } from "./review-blockers.js";
+import { steerUlwLoopBatch } from "./steering-batch.js";
 import { steerUlwLoop } from "./steering.js";
 import type { UlwLoopItem } from "./types.js";
 import { UlwLoopError } from "./types.js";
@@ -108,9 +109,15 @@ export async function steer(
 	json: boolean,
 	scope?: UlwLoopScope,
 ): Promise<number> {
-	const proposal = await parseSteeringProposal(argv);
-	const result = await steerUlwLoop(repoRoot, proposal, scope);
-	printSteerResult(result, json);
+	const proposals = await parseSteeringProposals(argv);
+	const single = proposals[0];
+	if (single !== undefined && proposals.length === 1 && readValue(argv, "--proposals-json") === undefined) {
+		const result = await steerUlwLoop(repoRoot, single, scope);
+		printSteerResult(result, json);
+		return result.accepted ? 0 : 1;
+	}
+	const result = await steerUlwLoopBatch(repoRoot, proposals, scope);
+	printSteerBatchResult(result, json);
 	return result.accepted ? 0 : 1;
 }
 
