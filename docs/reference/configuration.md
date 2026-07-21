@@ -411,20 +411,39 @@ Control parallel agent execution and concurrency limits.
   "background_task": {
     "defaultConcurrency": 5,
     "staleTimeoutMs": 180000,
+    "maxDepth": 3,
+    "maxToolCalls": 200,
     "providerConcurrency": { "anthropic": 3, "openai": 5, "google": 10 },
-    "modelConcurrency": { "anthropic/claude-opus-4-7": 2 }
+    "modelConcurrency": { "anthropic/claude-opus-4-7": 2 },
+    "circuitBreaker": {
+      "enabled": true,
+      "maxToolCalls": 200,
+      "consecutiveThreshold": 10
+    }
   }
 }
 ```
 
-| Option                | Default  | Description                                                           |
-| --------------------- | -------- | --------------------------------------------------------------------- |
-| `defaultConcurrency`  | -        | Max concurrent tasks (all providers)                                  |
-| `staleTimeoutMs`      | `180000` | Interrupt tasks with no activity (min: 60000)                         |
-| `providerConcurrency` | -        | Per-provider limits (key = provider name)                             |
-| `modelConcurrency`    | -        | Per-model limits (key = `provider/model`). Overrides provider limits. |
+| Option                        | Default   | Description                                                           |
+| ----------------------------- | --------- | --------------------------------------------------------------------- |
+| `defaultConcurrency`          | -         | Max concurrent tasks (all providers)                                  |
+| `providerConcurrency`         | -         | Per-provider limits (key = provider name)                             |
+| `modelConcurrency`            | -         | Per-model limits (key = `provider/model`). Overrides provider limits. |
+| `maxDepth`                    | -         | Maximum nested background-task delegation depth                        |
+| `staleTimeoutMs`              | `180000`  | Interrupt tasks with no activity (min: 60000)                         |
+| `messageStalenessTimeoutMs`   | `1800000` | Interrupt tasks that never produced a progress update (min: 60000)    |
+| `taskTtlMs`                   | `1800000` | Prune non-terminal tasks older than this TTL (min: 300000)            |
+| `sessionGoneTimeoutMs`        | `60000`   | Short timeout when a child session disappears (min: 10000)            |
+| `taskCleanupDelayMs`          | `600000`  | Delay before completed/cancelled/errored tasks leave memory (min: 60000) |
+| `syncPollTimeoutMs`           | -         | Timeout for synchronous polling paths (min: 60000)                    |
+| `maxToolCalls`                | `200`     | Maximum tool calls per subagent task before the runaway guard trips   |
+| `circuitBreaker.enabled`      | -         | Enable the nested circuit-breaker guard                               |
+| `circuitBreaker.maxToolCalls` | -         | Circuit-breaker tool-call threshold (min: 10)                         |
+| `circuitBreaker.consecutiveThreshold` | -  | Consecutive-threshold trip point (min: 5)                             |
 
 Priority: `modelConcurrency` > `providerConcurrency` > `defaultConcurrency`
+
+For memory-pressure investigations, lower `defaultConcurrency`, provider/model concurrency, `maxDepth`, and `maxToolCalls` together. Team Mode has separate bounds under `team_mode.max_parallel_members`, `team_mode.max_wall_clock_minutes`, `team_mode.max_member_turns`, and `team_mode.max_messages_per_run`.
 
 ### Sisyphus Agent
 

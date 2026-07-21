@@ -387,6 +387,45 @@ Background task concurrency defaults to **5** when no overrides are configured.
 - Keyed by model/provider routing key
 - Configurable via `background_task.defaultConcurrency`, `background_task.providerConcurrency`, and `background_task.modelConcurrency`
 
+### Memory-Safe Autonomous Runs
+
+Large `ultrawork` or `/start-work` runs can amplify host memory pressure because each child session has its own prompt history, tool output, subprocesses, and optional tmux pane. If you are running inside an IDE terminal such as Zed, VS Code, or JetBrains, start conservative and raise limits only after the host stays stable.
+
+Use this baseline when investigating memory pressure:
+
+```jsonc
+{
+  "background_task": {
+    "defaultConcurrency": 2,
+    "providerConcurrency": {
+      "anthropic": 1,
+      "openai": 2,
+      "opencode-go": 2
+    },
+    "maxDepth": 2,
+    "maxToolCalls": 120,
+    "staleTimeoutMs": 120000,
+    "messageStalenessTimeoutMs": 600000,
+    "taskTtlMs": 900000,
+    "taskCleanupDelayMs": 60000
+  },
+  "team_mode": {
+    "max_parallel_members": 2,
+    "max_members": 4,
+    "max_wall_clock_minutes": 45,
+    "max_member_turns": 120,
+    "max_messages_per_run": 2000
+  }
+}
+```
+
+Operational rules:
+
+- Prefer one foreground implementation lane plus background `explore`/`librarian` lanes; avoid launching multiple build/test/dev-server workers from an IDE terminal.
+- Treat repeated stale-task interruptions, disappeared sessions, or host memory-pressure warnings as a stop condition. Collect the useful output, cancel disposable lanes individually, and restart from a smaller plan slice.
+- Keep `tmux_visualization` off while diagnosing host memory pressure. Turn it back on only after the same workload is stable without pane rendering.
+- For leak investigations, run outside the IDE terminal when possible and capture host process memory alongside `oh-my-opencode.log`; this separates OMO orchestration pressure from editor/runtime leaks.
+
 ### Team Mode
 
 Team mode is parallel multi-agent orchestration and is **OFF by default**.
