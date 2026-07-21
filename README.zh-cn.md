@@ -49,7 +49,7 @@
 
 </div>
 
-> 这是 oh-my-openagent 运行 Team Mode 的画面。搭配 Kimi K2.6 和 GPT-5.5。
+> 这是 oh-my-openagent 运行 Team Mode 的画面。搭配 Kimi K3 和 GPT-5.6 Sol。
 
 > Anthropic [**因为我们屏蔽了 OpenCode。**](https://x.com/thdxr/status/2010149530486911014) **这是真的。**
 > 他们想把你锁住。Claude Code 是个漂亮的牢笼，但仍然是牢笼。
@@ -199,17 +199,17 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 <td align="center"><img src=".github/assets/hephaestus.png" height="300" /></td>
 </tr></table>
 
-**Sisyphus** (`claude-opus-4-8` / `claude-opus-4-7` / **`kimi-k3`** / **`kimi-k2.6`** / **`glm-5`**) 是你的主指挥官。他负责制定计划、分配任务给专家团队，并以极其激进的并行策略推动任务直至完成。他从不半途而废。如果你能接受 thinking token 的成本，请使用 **Kimi K3**；否则推荐使用 **Claude Opus 4.8 / 4.7** 或 **Kimi K2.6**。
+**Sisyphus** (`claude-opus-4-8` / **`kimi-k3`** / **`glm-5`**) 是你的主指挥官。他负责制定计划、分配任务给专家团队，并以极其激进的并行策略推动任务直至完成。他从不半途而废。Claude Opus 4.8 和 Kimi K3 是推荐默认值。
 
-**Hephaestus** (在 OpenAI 或 Vercel 上优先 `gpt-5.6-sol`，其次 `gpt-5.5`) 是你的自主深度工作者。你只需要给他目标，不要给他具体做法。他会自动探索代码库模式，从头到尾独立执行任务，绝不会中途要你当保姆。*名副其实的正牌工匠。*
+**Hephaestus** (仅通过 OpenAI、GitHub Copilot、Vercel 或 OpenCode 使用 medium effort 的 `gpt-5.6-sol`) 是你的自主深度工作者。你只需要给他目标，不要给他具体做法。他会自动探索代码库模式，从头到尾独立执行任务，绝不会中途要你当保姆。*名副其实的正牌工匠。*
 
-**Prometheus** (`claude-opus-4-7` / **`gpt-5.5`** / **`glm-5.2`**) 是你的战略规划师。他通过访谈模式，在动一行代码之前，先通过提问确定范围并构建详尽的执行计划。
+**Prometheus** (`claude-opus-4-8` / **`gpt-5.6-sol`** / **`glm-5.2`**) 是你的战略规划师。他通过访谈模式，在动一行代码之前，先通过提问确定范围并构建详尽的执行计划。
 
 每一个 Agent 都针对其底层模型的特点进行了专门调优。你无需手动来回切换模型。[阅读背景设定了解更多 →](docs/guide/overview.md)
 
 > Anthropic [因为我们屏蔽了 OpenCode](https://x.com/thdxr/status/2010149530486911014)。这就是为什么我们将 Hephaestus 命名为"正牌工匠 (The Legitimate Craftsman)"。这是一个故意的讽刺。
 >
-> 我们在 Opus 或 Kimi K3 上运行得最好，但仅仅使用 Kimi K2.6 + GPT-5.5 就足以碾压原版的 Claude Code。完全不需要配置。
+> 我们在 Opus 或 Kimi K3 上运行得最好，但仅仅使用 Kimi K3 + GPT-5.6 Sol 就足以碾压原版的 Claude Code。完全不需要配置。
 
 ### Team Mode (v4.0)
 
@@ -246,7 +246,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 | `quick`              | 单文件修改、修错字     |
 | `ultrabrain`         | 复杂硬核逻辑、架构决策 |
 
-智能体只需要说明要做什么类型的工作，框架就会挑选出最合适的模型去干。`ultrabrain` 在 OpenAI 或 Vercel 可用时优先路由到 GPT-5.6 Sol xhigh，其次是 GPT-5.5 xhigh。你完全不需要操心。
+智能体只需要说明要做什么类型的工作，框架就会挑选出最合适的模型去干。`ultrabrain` 在 OpenAI 或 Vercel 可用时优先路由到 GPT-5.6 Sol xhigh，其次是 GPT-5.6 Sol xhigh。你完全不需要操心。
 
 ### 完全兼容 Claude Code
 
