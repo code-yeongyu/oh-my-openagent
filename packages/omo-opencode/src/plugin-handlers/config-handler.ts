@@ -1,5 +1,9 @@
 import type { OhMyOpenCodeConfig } from "../config";
 import { applyRuntimeSkillSourceConfig } from "../features/opencode-runtime-skills"
+import {
+  listProjectAgentProvenance,
+  replaceProjectAgentProvenance,
+} from "../features/team-mode/final-open-code-agent-registry";
 import { setAdditionalAllowedMcpEnvVars } from "../features/claude-code-mcp-loader";
 import type { ModelCacheState } from "../plugin-state";
 import { log } from "../shared";
@@ -44,6 +48,7 @@ type AgentConfigSnapshot = {
   readonly configuredDefaultAgent: string | undefined;
   readonly defaultAgent: unknown;
   readonly agents: Record<string, unknown>;
+  readonly projectAgentNames: readonly string[];
 }
 
 function cloneConfigValue(value: unknown): unknown {
@@ -115,6 +120,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         config.default_agent = agentConfigSnapshot.defaultAgent;
       }
       agentResult = config.agent as Record<string, unknown>;
+      replaceProjectAgentProvenance(ctx.directory, agentConfigSnapshot.projectAgentNames);
       replayAgentConfigSideEffects({
         agentResult,
         configuredDefaultAgent: agentConfigSnapshot.configuredDefaultAgent,
@@ -122,12 +128,14 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       })
     } else {
       const configuredDefaultAgent = getConfiguredDefaultAgent(config);
+      replaceProjectAgentProvenance(ctx.directory, []);
       agentResult = await applyAgentConfig({
         config,
         pluginConfig,
         ctx,
         pluginComponents,
       });
+      const projectAgentNames = listProjectAgentProvenance(ctx.directory);
       agentConfigSnapshot = pluginComponentsLoadFailed
         ? undefined
         : {
@@ -135,6 +143,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
             configuredDefaultAgent,
             defaultAgent: config.default_agent,
             agents: cloneAgentConfig(agentResult),
+            projectAgentNames,
           };
     }
 

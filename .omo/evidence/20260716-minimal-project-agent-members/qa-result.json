@@ -1,0 +1,201 @@
+{
+  "passed": true,
+  "assertionCount": 15,
+  "assertions": {
+    "exactSourceManifestHas15Files": true,
+    "hostSessionCountUnchanged": true,
+    "acceptedRunExitedSuccessfully": true,
+    "acceptedTeamCreateCompleted": true,
+    "acceptedFinalIdentityExact": true,
+    "acceptedFinalModelVariantExact": true,
+    "acceptedChildUsedProjectPromptAndModel": true,
+    "acceptedChildHasRequiredTeamTools": true,
+    "acceptedChildHasNoWriteOrQuestionTools": true,
+    "acceptedSourcePresentForAuthoritativeRegistry": true,
+    "acceptedChildSessionCreated": true,
+    "rejectedRunExitedSuccessfully": true,
+    "rejectedTeamCreateFailedForExactProvenanceReason": true,
+    "rejectedCreatedNoChildRequestOrSession": true,
+    "providersStoppedAndSandboxesRemoved": true
+  },
+  "gitHead": "8d80b19271feb17ff0c8a85be5eb61dfeb53a0cb",
+  "gitStatusShort": [
+    "M .omo/evidence/20260716-minimal-project-agent-members/opencode-run-accepted.jsonl",
+    " M .omo/evidence/20260716-minimal-project-agent-members/opencode-run-rejected.jsonl",
+    " M .omo/evidence/20260716-minimal-project-agent-members/qa-result.json",
+    " M packages/omo-opencode/src/plugin-handlers/project-agent-provenance-cache.test.ts"
+  ],
+  "sourceManifest": [
+    {
+      "file": "docs/guide/team-mode.md",
+      "sha256": "4b113b81a5873aa580fd7bdd24577f760b96a9054c08ba653cc3c8bd13a6224d"
+    },
+    {
+      "file": "packages/omo-opencode/src/features/team-mode/final-open-code-agent-registry.ts",
+      "sha256": "f626182def0598e33990415f9337444f9e05347116c527102e8cdc46aee89ed7"
+    },
+    {
+      "file": "packages/omo-opencode/src/features/team-mode/team-registry/project-agent-loader.test.ts",
+      "sha256": "5059ab69065b0139f2d81ef53c642aab9a5a1b6fbbaaa379b237fa8ae581c230"
+    },
+    {
+      "file": "packages/omo-opencode/src/features/team-mode/team-runtime/resolve-member.test.ts",
+      "sha256": "df1c39cf874f550a10109a91a4cc656c3f907b5d509a40fd493c7ae531fe2c1b"
+    },
+    {
+      "file": "packages/omo-opencode/src/features/team-mode/team-runtime/resolve-member.ts",
+      "sha256": "5172b5f2ed12f03b374b516fa3a026f15cc29372bd53b651820aedbeb39656ec"
+    },
+    {
+      "file": "packages/omo-opencode/src/features/team-mode/tools/lifecycle-create-tool.ts",
+      "sha256": "21847f720b3bbd368c6204cac7b48269486abb7ba0219c8f02240aeb66b8ec0b"
+    },
+    {
+      "file": "packages/omo-opencode/src/features/team-mode/tools/lifecycle-inline-project-agent.test.ts",
+      "sha256": "f23915ce791aceefec21b84e152f31045130f8f83ad674c85149b9ff43d2e8ab"
+    },
+    {
+      "file": "packages/omo-opencode/src/features/team-mode/tools/lifecycle-inline-spec.ts",
+      "sha256": "6518f12c7c3913f589ffae1c8bf37fb6840d4253b116a3b1a27f424640eda3a6"
+    },
+    {
+      "file": "packages/omo-opencode/src/features/team-mode/tools/query.ts",
+      "sha256": "dcae028646863b0ac642c41cc848f2e9d468f53232225a0b399753b8f6954a53"
+    },
+    {
+      "file": "packages/omo-opencode/src/plugin-handlers/agent-config-handler.ts",
+      "sha256": "7e318217a07355b5cffe91c6bf2baa012a3940519aba01a286f58a26873af182"
+    },
+    {
+      "file": "packages/omo-opencode/src/plugin-handlers/config-handler.ts",
+      "sha256": "9bca8a286d90f19205bdc96b4c2048dcaaf785823eea54bef6a96b8c58f6efa3"
+    },
+    {
+      "file": "packages/omo-opencode/src/plugin-handlers/project-agent-provenance-cache.test.ts",
+      "sha256": "6f41c6a80cf52f347a4ceb2376b44b298ab3faff967c756d1b5bf7199a221850"
+    },
+    {
+      "file": "packages/team-core/src/team-registry/loader.ts",
+      "sha256": "1f95ffa056ddfa87be40f8bb68675869a63fadea12560aef258d5f410f8fd8d5"
+    },
+    {
+      "file": "packages/team-core/src/team-registry/validator-options.test.ts",
+      "sha256": "24a75c02bd2c268b6fbfd73598522d6a685dba63a77b221bcd1bc9207f0c4b69"
+    },
+    {
+      "file": "packages/team-core/src/team-registry/validator.ts",
+      "sha256": "41a9617964c70e73b9da25181178718d2df1a15fa86ff2100d4107ae687f348d"
+    }
+  ],
+  "hostIsolation": {
+    "sessionCountBefore": 3996,
+    "sessionCountAfter": 3996,
+    "unchanged": true
+  },
+  "scenarios": {
+    "accepted": {
+      "scenario": "accepted",
+      "exitCode": 0,
+      "stderrSummary": {
+        "bytes": 0,
+        "nonEmptyLines": 0
+      },
+      "teamCreateStatus": "completed",
+      "teamCreateError": null,
+      "teamCreateHasProvenanceError": false,
+      "reviewer": {
+        "name": "reviewer",
+        "subagent_type": "repository-reviewer",
+        "model": {
+          "providerID": "openai",
+          "modelID": "gpt-project-agent",
+          "variant": "xhigh"
+        }
+      },
+      "childRequest": {
+        "scenario": "accepted",
+        "branch": "project-agent-child",
+        "model": "gpt-project-agent",
+        "hasProjectPromptMarker": true,
+        "hasChildTaskMarker": true,
+        "hasToolResult": false,
+        "reasoningEffort": null,
+        "toolNames": [
+          "background_cancel",
+          "background_output",
+          "bash",
+          "call_omo_agent",
+          "codegraph_codegraph_explore",
+          "context7_query-docs",
+          "context7_resolve-library-id",
+          "glob",
+          "grep",
+          "grep_app_searchGitHub",
+          "interactive_bash",
+          "list_mcp_resource_templates",
+          "list_mcp_resources",
+          "look_at",
+          "lsp_diagnostics",
+          "lsp_find_references",
+          "lsp_goto_definition",
+          "lsp_install_decision",
+          "lsp_prepare_rename",
+          "lsp_rename",
+          "lsp_status",
+          "lsp_symbols",
+          "read",
+          "read_mcp_resource",
+          "session_info",
+          "session_list",
+          "session_read",
+          "session_search",
+          "skill",
+          "skill_mcp",
+          "team_approve_shutdown",
+          "team_create",
+          "team_delete",
+          "team_list",
+          "team_reject_shutdown",
+          "team_send_message",
+          "team_shutdown_request",
+          "team_status",
+          "team_task_create",
+          "team_task_get",
+          "team_task_list",
+          "team_task_update",
+          "todowrite",
+          "webfetch",
+          "websearch_web_search_exa"
+        ],
+        "projectAgentPresentBeforeTeamCreateResponse": false
+      },
+      "childRequestCount": 1,
+      "childSessionCount": 1,
+      "projectAgentPresentBeforeTeamCreateResponse": true,
+      "projectAgentExistsAfterRun": true,
+      "providerStopped": true,
+      "sandboxRemoved": true
+    },
+    "rejected": {
+      "scenario": "rejected",
+      "exitCode": 0,
+      "stderrSummary": {
+        "bytes": 0,
+        "nonEmptyLines": 0
+      },
+      "teamCreateStatus": "error",
+      "teamCreateError": "Failed to create team run 'qa-project-agent-team': Failed to resolve member 'reviewer': Project agent 'repository-reviewer' has no config-time provenance for this exact directory.",
+      "teamCreateHasProvenanceError": true,
+      "reviewer": null,
+      "childRequest": null,
+      "childRequestCount": 0,
+      "childSessionCount": 0,
+      "projectAgentPresentBeforeTeamCreateResponse": false,
+      "projectAgentExistsAfterRun": true,
+      "providerStopped": true,
+      "sandboxRemoved": true
+    }
+  },
+  "failure": null,
+  "sanitization": "Provider evidence contains metadata only; OpenCode JSONL replaces sandbox and repository roots; stderr is summarized by byte and line counts."
+}

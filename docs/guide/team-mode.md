@@ -69,8 +69,14 @@ When both scopes define the same team name, project scope wins.
 
 ## Member kinds
 
-- **`kind: "subagent_type"`** — direct agent (atlas, sisyphus, sisyphus-junior, hephaestus). `prompt` optional.
+- **`kind: "subagent_type"`**: direct built-in or project-defined agent. Built-in examples include `atlas`, `sisyphus`, `sisyphus-junior`, and `hephaestus`. `prompt` optional.
 - **`kind: "category"`** — routed through `sisyphus-junior` with the chosen category model. `prompt` REQUIRED.
+
+### Project-defined agent members
+
+Set `subagent_type` to the exact final name of an agent defined in the current project's `.opencode/agents/*.md`. Project-defined agents can be members, not team leads.
+
+The final agent must be visible, non-native, use mode `subagent` or `all`, and unconditionally allow `team_send_message`, `team_task_list`, `team_task_get`, `team_task_update`, and `team_status`. OMO uses the active configuration for that project directory as-is: it does not add permissions, prompts, models, or fallback behavior. A same-name definition from another later source does not qualify; the agent must come from the current project's file.
 
 ## Eligible agents
 
