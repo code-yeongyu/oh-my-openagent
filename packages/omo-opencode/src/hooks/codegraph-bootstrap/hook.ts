@@ -10,8 +10,11 @@ import {
   prepareCodegraphWorkspace,
   resolveCodegraphCommand,
   resolveCodegraphNodeSupport,
+  shouldExcludeCodegraphProject,
   type BuildCodegraphEnvOptions,
   type CodegraphCommandResolution,
+  type CodegraphProjectExclusionDecision,
+  type CodegraphProjectExclusionOptions,
   type CodegraphNodeSupport,
   type CodegraphProvisionResult,
   type CodegraphWorkspacePreparation,
@@ -40,6 +43,10 @@ export interface CodegraphBootstrapEventInput {
 export interface CodegraphBootstrapDeps {
   readonly buildEnv: (options?: BuildCodegraphEnvOptions) => Record<string, string>
   readonly ensureGitignored: (projectRoot: string) => boolean
+  readonly excludeProject: (
+    projectRoot: string,
+    options?: CodegraphProjectExclusionOptions,
+  ) => CodegraphProjectExclusionDecision
   readonly ensureProvisioned: (options: {
     readonly installDir?: string
     readonly lockDir: string
@@ -197,6 +204,7 @@ async function runBootstrap(
 const defaultDeps: CodegraphBootstrapDeps = {
   buildEnv: buildCodegraphEnv,
   ensureGitignored: ensureCodegraphGitignored,
+  excludeProject: shouldExcludeCodegraphProject,
   ensureProvisioned: ensureCodegraphProvisioned,
   log,
   nodeSupport: resolveCodegraphNodeSupport,
@@ -226,6 +234,19 @@ export function createCodegraphBootstrapHook(
 
         const projectRoot = resolveCodegraphProjectRoot(input.event.properties, ctx.directory)
         if (bootstrappedProjects.has(projectRoot)) return
+
+        const excludedRoots = codegraphConfig.excluded_roots
+        const exclusion = deps.excludeProject(projectRoot, {
+          ...(excludedRoots === undefined ? {} : { excludedRoots }),
+        })
+        if (exclusion.excluded) {
+          deps.log("[codegraph-bootstrap] CodeGraph project excluded; skipping bootstrap", {
+            matchedRoot: exclusion.matchedRoot,
+            projectRoot,
+            reason: exclusion.reason,
+          })
+          return
+        }
 
         bootstrappedProjects.add(projectRoot)
         deps.schedule(() => runBootstrap(projectRoot, codegraphConfig, deps))

@@ -60,9 +60,6 @@
         "type": "string",
         "enum": [
           "goal",
-          "ralph-loop",
-          "ulw-loop",
-          "cancel-ralph",
           "refactor",
           "start-work",
           "stop-continuation",
@@ -6159,35 +6156,10 @@
     },
     "ralph_loop": {
       "type": "object",
-      "properties": {
-        "enabled": {
-          "default": false,
-          "type": "boolean"
-        },
-        "default_max_iterations": {
-          "default": 100,
-          "type": "number",
-          "minimum": 1,
-          "maximum": 1000
-        },
-        "state_dir": {
-          "type": "string"
-        },
-        "default_strategy": {
-          "default": "continue",
-          "type": "string",
-          "enum": [
-            "reset",
-            "continue"
-          ]
-        }
+      "propertyNames": {
+        "type": "string"
       },
-      "required": [
-        "enabled",
-        "default_max_iterations",
-        "default_strategy"
-      ],
-      "additionalProperties": false
+      "additionalProperties": {}
     },
     "runtime_fallback": {
       "anyOf": [
@@ -6584,9 +6556,19 @@
           "default": true,
           "type": "boolean"
         },
+        "daemon": {
+          "default": false,
+          "type": "boolean"
+        },
         "enabled": {
           "default": true,
           "type": "boolean"
+        },
+        "excluded_roots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "install_dir": {
           "type": "string"
@@ -6602,6 +6584,7 @@
       "required": [
         "auto_init",
         "auto_provision",
+        "daemon",
         "enabled"
       ],
       "additionalProperties": false
@@ -6931,16 +6914,11 @@
         "goal": {
           "default": false,
           "type": "boolean"
-        },
-        "ralph_loop": {
-          "default": false,
-          "type": "boolean"
         }
       },
       "required": [
         "ultrawork",
-        "goal",
-        "ralph_loop"
+        "goal"
       ],
       "additionalProperties": false
     },
