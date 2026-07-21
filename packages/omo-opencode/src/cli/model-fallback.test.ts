@@ -223,7 +223,7 @@ describe("generateModelConfig", () => {
       expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-8")
     })
 
-    test("Sisyphus is omitted when only OpenAI is available", () => {
+    test("Sisyphus resolves to gpt-5.6-sol medium when only OpenAI is available", () => {
       // given
       const config = createConfig({ hasOpenAI: true })
 
@@ -231,12 +231,15 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // then
-      expect(result.agents?.sisyphus).toBeUndefined()
+      expect(result.agents?.sisyphus).toEqual({
+        model: "openai/gpt-5.6-sol",
+        variant: "medium",
+      })
     })
   })
 
   describe("OpenAI fallback coverage", () => {
-    test("Atlas falls back to OpenCode nano when only OpenAI is available", () => {
+    test("Atlas resolves to gpt-5.6-sol medium when only OpenAI is available", () => {
       // given
       const config = createConfig({ hasOpenAI: true })
 
@@ -244,7 +247,10 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // then
-      expect(result.agents?.atlas).toEqual({ model: "opencode/gpt-5-nano" })
+      expect(result.agents?.atlas).toEqual({
+        model: "openai/gpt-5.6-sol",
+        variant: "medium",
+      })
     })
 
     test("Metis resolves to OpenAI when only OpenAI is available", () => {
@@ -259,7 +265,7 @@ describe("generateModelConfig", () => {
       expect(result.agents?.metis?.variant).toBe("medium")
     })
 
-    test("Sisyphus-Junior falls back to OpenCode nano when only OpenAI is available", () => {
+    test("Sisyphus-Junior resolves to gpt-5.6-sol medium when only OpenAI is available", () => {
       // given
       const config = createConfig({ hasOpenAI: true })
 
@@ -267,7 +273,10 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // then
-      expect(result.agents?.["sisyphus-junior"]).toEqual({ model: "opencode/gpt-5-nano" })
+      expect(result.agents?.["sisyphus-junior"]).toEqual({
+        model: "openai/gpt-5.6-sol",
+        variant: "medium",
+      })
     })
   })
 

@@ -7,7 +7,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const ultrabrain = CATEGORY_MODEL_REQUIREMENTS["ultrabrain"]
 
     // when
-    const [primary, copilot, geminiFallback] = ultrabrain.fallbackChain
+    const [primary, copilot, opencodeSol, geminiFallback] = ultrabrain.fallbackChain
 
     // then
     expect(ultrabrain.fallbackChain.length).toBeGreaterThan(1)
@@ -19,6 +19,11 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       model: "gpt-5.6-sol",
       variant: "high",
     })
+    expect(opencodeSol).toEqual({
+      providers: ["openai", "opencode", "vercel"],
+      model: "gpt-5.6-sol",
+      variant: "xhigh",
+    })
     expect(geminiFallback?.model).toBe("gemini-3.1-pro")
     expect(geminiFallback?.variant).toBe("high")
   })
@@ -28,7 +33,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const deep = CATEGORY_MODEL_REQUIREMENTS["deep"]
 
     // when
-    const [primary, copilot, sharedSol, opusFallback] = deep.fallbackChain
+    const [primary, copilot, sharedSol, mediumSol, opusFallback] = deep.fallbackChain
 
     // then
     expect(deep.fallbackChain.length).toBeGreaterThan(2)
@@ -45,6 +50,11 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       providers: ["openai", "github-copilot", "vercel"],
       model: "gpt-5.6-sol",
       variant: "high",
+    })
+    expect(mediumSol).toEqual({
+      providers: ["openai", "github-copilot", "opencode", "vercel"],
+      model: "gpt-5.6-sol",
+      variant: "medium",
     })
     expect(opusFallback?.model).toBe("claude-opus-4-8")
     expect(opusFallback?.variant).toBe("max")
@@ -92,7 +102,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const unspecifiedLow = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"]
 
     // when
-    const [primary, copilot, legacyFallback] = unspecifiedLow.fallbackChain
+    const [primary, copilot, claudeFallback, solFallback] = unspecifiedLow.fallbackChain
 
     // then
     expect(unspecifiedLow.fallbackChain.length).toBeGreaterThan(1)
@@ -104,8 +114,13 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       model: "gpt-5.6-luna",
       variant: "high",
     })
-    expect(legacyFallback?.model).toBe("claude-sonnet-4-6")
-    expect(legacyFallback?.providers[0]).toBe("anthropic")
+    expect(claudeFallback?.model).toBe("claude-sonnet-4-6")
+    expect(claudeFallback?.providers[0]).toBe("anthropic")
+    expect(solFallback).toEqual({
+      providers: ["openai", "opencode", "vercel"],
+      model: "gpt-5.6-sol",
+      variant: "medium",
+    })
   })
 
   test("unspecified-high keeps opus primary before gpt-5.6-sol high", () => {

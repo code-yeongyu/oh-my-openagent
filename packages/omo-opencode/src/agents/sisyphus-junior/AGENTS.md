@@ -46,7 +46,7 @@ Parent `agent.ts` selects prompt variant by model name:
 - Mode: `subagent` (uses own fallback chain, ignores UI selection)
 - Default model: `claude-sonnet-4-6`
 - Default temperature: `0.1` (`SISYPHUS_JUNIOR_DEFAULTS`)
-- Fallback chain: kimi-k2.6 -> gpt-5.5 medium -> minimax-m3 -> minimax-m2.7 -> big-pickle
+- Fallback chain: claude-sonnet-4-6 -> kimi-k3 -> gpt-5.6-sol medium -> minimax-m3 -> MiniMax-M3 -> minimax-m2.7 -> big-pickle
 - Blocked tools: `task` (all models); `apply_patch` also blocked for GPT models
 - `call_omo_agent` explicitly allowed so subagents can spawn explore/librarian
 - Max tokens: 64000

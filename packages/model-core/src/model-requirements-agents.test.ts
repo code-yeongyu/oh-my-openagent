@@ -24,15 +24,15 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     })
   })
 
-  test("sisyphus keeps opus primary before the consolidated Kimi K3, GLM, and big-pickle fallbacks", () => {
+  test("sisyphus keeps opus primary before Kimi K3, gpt-5.6-sol, GLM, and big-pickle fallbacks", () => {
     // given
     const sisyphus = AGENT_MODEL_REQUIREMENTS["sisyphus"]
 
     // when
-    const [primary, second, third, last] = sisyphus.fallbackChain
+    const [primary, second, solFallback, fourth, last] = sisyphus.fallbackChain
 
     // then
-    expect(sisyphus.fallbackChain).toHaveLength(4)
+    expect(sisyphus.fallbackChain).toHaveLength(5)
     expect(sisyphus.requiresAnyModel).toBe(true)
     expect(primary).toEqual({
       providers: ["anthropic", "github-copilot", "opencode", "vercel"],
@@ -54,8 +54,13 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       ],
       model: "kimi-k3",
     })
-    expect(third?.providers[0]).toBe("zai-coding-plan")
-    expect(third?.model).toBe("glm-5")
+    expect(solFallback).toEqual({
+      providers: ["openai", "github-copilot", "opencode", "vercel"],
+      model: "gpt-5.6-sol",
+      variant: "medium",
+    })
+    expect(fourth?.providers[0]).toBe("zai-coding-plan")
+    expect(fourth?.model).toBe("glm-5")
     expect(last?.providers[0]).toBe("opencode")
     expect(last?.model).toBe("big-pickle")
   })
@@ -190,7 +195,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const momus = AGENT_MODEL_REQUIREMENTS["momus"]
 
     // when
-    const [primary, copilot, solFallback, opusFallback] = momus.fallbackChain
+    const [primary, copilot, solFallback, copilotSolFallback, opusFallback] = momus.fallbackChain
 
     // then
     expect(momus.fallbackChain.length).toBeGreaterThan(1)
@@ -205,9 +210,14 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       variant: "high",
     })
     expect(solFallback).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
+      providers: ["openai", "opencode", "vercel"],
       model: "gpt-5.6-sol",
       variant: "xhigh",
+    })
+    expect(copilotSolFallback).toEqual({
+      providers: ["github-copilot"],
+      model: "gpt-5.6-sol",
+      variant: "high",
     })
     expect(opusFallback).toEqual({
       providers: ["anthropic", "github-copilot", "opencode", "vercel"],
@@ -216,27 +226,32 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     })
   })
 
-  test("atlas keeps sonnet, kimi, and minimax fallback order", () => {
+  test("atlas keeps sonnet, kimi, gpt-5.6-sol, and minimax fallback order", () => {
     // given
     const atlas = AGENT_MODEL_REQUIREMENTS["atlas"]
 
     // when
-    const [primary, secondary, third, fourth, fifth] = atlas.fallbackChain
+    const [primary, secondary, solFallback, fourth, fifth, sixth] = atlas.fallbackChain
 
     // then
-    expect(atlas.fallbackChain).toHaveLength(5)
+    expect(atlas.fallbackChain).toHaveLength(6)
     expect(primary?.model).toBe("claude-sonnet-4-6")
     expect(primary?.providers[0]).toBe("anthropic")
     expect(secondary?.model).toBe("kimi-k3")
     expect(secondary?.providers[0]).toBe("opencode-go")
-    expect(third?.model).toBe("minimax-m3")
-    expect(third?.providers[0]).toBe("opencode-go")
-    expect(fourth).toEqual({
+    expect(solFallback).toEqual({
+      providers: ["openai", "github-copilot", "opencode", "vercel"],
+      model: "gpt-5.6-sol",
+      variant: "medium",
+    })
+    expect(fourth?.model).toBe("minimax-m3")
+    expect(fourth?.providers[0]).toBe("opencode-go")
+    expect(fifth).toEqual({
       providers: ["minimax-coding-plan", "minimax-cn-coding-plan"],
       model: "MiniMax-M3",
     })
-    expect(fifth?.model).toBe("minimax-m2.7")
-    expect(fifth?.providers[0]).toBe("opencode-go")
+    expect(sixth?.model).toBe("minimax-m2.7")
+    expect(sixth?.providers[0]).toBe("opencode-go")
   })
 
   test("sisyphus-junior keeps sonnet, Kimi, minimax, and big-pickle fallbacks", () => {
@@ -250,6 +265,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(modelIDs).toEqual([
       "claude-sonnet-4-6",
       "kimi-k3",
+      "gpt-5.6-sol",
       "minimax-m3",
       "MiniMax-M3",
       "minimax-m2.7",

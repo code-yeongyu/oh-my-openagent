@@ -32,7 +32,7 @@ describe("AGENT_FALLBACK_CHAINS", () => {
       explore: 8,
       librarian: 8,
       metis: 5,
-      momus: 6,
+      momus: 7,
       oracle: 5,
     })
   })
@@ -82,7 +82,8 @@ describe("AGENT_FALLBACK_CHAINS", () => {
       momus: [
         { providers: ["openai", "vercel"], model: "gpt-5.6-terra", variant: "high" },
         { providers: ["github-copilot"], model: "gpt-5.6-terra", variant: "high" },
-        { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.6-sol", variant: "xhigh" },
+        { providers: ["openai", "opencode", "vercel"], model: "gpt-5.6-sol", variant: "xhigh" },
+        { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "high" },
         { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-4-8", variant: "max" },
         { providers: ["google", "github-copilot", "opencode", "vercel"], model: "gemini-3.1-pro", variant: "high" },
         { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
