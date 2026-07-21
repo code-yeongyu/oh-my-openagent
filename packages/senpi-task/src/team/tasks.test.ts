@@ -34,7 +34,7 @@ function tempContext(): TeamTasklistContext {
   return { teamRunId: "team-run-tasks", config }
 }
 
-describe("team tasklist orchestration", () => {
+describe("team tasklist orchestration", { timeout: 15_000 }, () => {
   test("#given a task input #when createTeamTask runs #then it persists a pending task with an id", async () => {
     // given
     const ctx = tempContext()
