@@ -27,12 +27,6 @@ describe("runCodegraphServe", () => {
 			env: { CUSTOM: "drop", HOME: "/tmp/home", OPENAI_API_KEY: "sk-test-secret" },
 			nodeVersion: "22.14.0",
 			homeDir: "/tmp/home",
-			buildEnv: ({ homeDir }) => ({
-				CODEGRAPH_INSTALL_DIR: `${homeDir}/.omo/codegraph`,
-				CODEGRAPH_NO_DOWNLOAD: "1",
-				CODEGRAPH_TELEMETRY: "0",
-				DO_NOT_TRACK: "1",
-			}),
 			resolve: () => ({ argsPrefix: ["shim.js"], command: "node", exists: true, source: "bundled" }),
 			runProcess: (
 				command: string,
@@ -53,7 +47,7 @@ describe("runCodegraphServe", () => {
 				command: "node",
 				cwd: resolve(runCwd),
 				env: {
-					CODEGRAPH_INSTALL_DIR: "/tmp/home/.omo/codegraph",
+					CODEGRAPH_INSTALL_DIR: join("/tmp/home", ".omo", "codegraph"),
 					CODEGRAPH_NO_DAEMON: "1",
 					CODEGRAPH_NO_DOWNLOAD: "1",
 					CODEGRAPH_TELEMETRY: "0",
@@ -63,6 +57,58 @@ describe("runCodegraphServe", () => {
 				stdio: "pipe",
 			},
 		]);
+		expect(calls[0]?.env["CUSTOM"]).toBeUndefined();
+		expect(calls[0]?.env["OPENAI_API_KEY"]).toBeUndefined();
+	});
+
+	it("#given codegraph.daemon=true #when serving MCP #then CODEGRAPH_NO_DAEMON is omitted so the daemon may run", async () => {
+		// given
+		const runCwd = componentRoot;
+		const calls: Array<{
+			readonly args: readonly string[];
+			readonly command: string;
+			readonly cwd: string;
+			readonly env: Record<string, string | undefined>;
+			readonly stdio: "pipe";
+		}> = [];
+
+		// when
+		const exitCode = await runCodegraphServe({
+			config: { codegraph: { daemon: true, enabled: true }, sources: [], warnings: [] },
+			cwd: runCwd,
+			env: { CUSTOM: "drop", HOME: "/tmp/home", OPENAI_API_KEY: "sk-test-secret" },
+			nodeVersion: "22.14.0",
+			homeDir: "/tmp/home",
+			resolve: () => ({ argsPrefix: ["shim.js"], command: "node", exists: true, source: "bundled" }),
+			runProcess: (
+				command: string,
+				args: readonly string[],
+				options: { readonly cwd: string; readonly env: Record<string, string | undefined>; readonly stdio: "pipe" },
+			) => {
+				calls.push({ args, command, cwd: options.cwd, env: options.env, stdio: options.stdio });
+				return Promise.resolve(7);
+			},
+			stderr: { write: () => undefined },
+		});
+
+		// then
+		expect(exitCode).toBe(7);
+		expect(calls).toEqual([
+			{
+				args: ["shim.js", "serve", "--mcp"],
+				command: "node",
+				cwd: resolve(runCwd),
+				env: {
+					CODEGRAPH_INSTALL_DIR: join("/tmp/home", ".omo", "codegraph"),
+					CODEGRAPH_NO_DOWNLOAD: "1",
+					CODEGRAPH_TELEMETRY: "0",
+					DO_NOT_TRACK: "1",
+					HOME: "/tmp/home",
+				},
+				stdio: "pipe",
+			},
+		]);
+		expect(calls[0]?.env["CODEGRAPH_NO_DAEMON"]).toBeUndefined();
 		expect(calls[0]?.env["CUSTOM"]).toBeUndefined();
 		expect(calls[0]?.env["OPENAI_API_KEY"]).toBeUndefined();
 	});
@@ -136,7 +182,7 @@ describe("runCodegraphServe", () => {
 		expect(spawned).toEqual([{ args: ["serve", "--mcp"], command: commandPath }]);
 	});
 
-	it("#given Windows Codex SOT install_dir has codegraph.cmd #when serving MCP #then it resolves there and exports CODEGRAPH_INSTALL_DIR", async () => {
+	it("#given Windows Codex SOT install_dir has codegraph.cmd and daemon is off by default #when serving MCP #then it resolves there, exports CODEGRAPH_INSTALL_DIR, and pins CODEGRAPH_NO_DAEMON=1", async () => {
 		await withProcessPlatform("win32", async () => {
 			// given
 			const tempRoot = mkdtempSync(join(tmpdir(), "omo-codegraph-serve-install-dir-"));
@@ -185,6 +231,61 @@ describe("runCodegraphServe", () => {
 						},
 					},
 				]);
+			} finally {
+				rmSync(tempRoot, { recursive: true, force: true });
+			}
+		});
+	});
+
+	it("#given Windows Codex SOT install_dir with codegraph.daemon=true #when serving MCP #then CODEGRAPH_NO_DAEMON is omitted so the daemon may run", async () => {
+		await withProcessPlatform("win32", async () => {
+			// given
+			const tempRoot = mkdtempSync(join(tmpdir(), "omo-codegraph-serve-install-dir-daemon-"));
+			const installDir = join(tempRoot, "custom-codegraph");
+			const binPath = join(installDir, "bin", "codegraph.cmd");
+			const calls: Array<{
+				readonly args: readonly string[];
+				readonly command: string;
+				readonly env: Record<string, string | undefined>;
+			}> = [];
+
+			try {
+				mkdirSync(join(installDir, "bin"), { recursive: true });
+				writeFileSync(binPath, "");
+
+				// when
+				const exitCode = await runCodegraphServe({
+					config: { codegraph: { daemon: true, enabled: true, install_dir: installDir }, sources: [], trustedCodegraphInstallDir: installDir, warnings: [] },
+					env: { HOME: "/tmp/home" },
+					nodeVersion: "22.14.0",
+					homeDir: "/tmp/home",
+					resolve: (options) => {
+						const provisioned = options.provisioned?.();
+						return { argsPrefix: [], command: provisioned ?? "missing", exists: provisioned !== null && provisioned !== undefined, source: "provisioned" };
+					},
+					runProcess: (command, args, options) => {
+						calls.push({ args, command, env: options.env });
+						return Promise.resolve(0);
+					},
+					stderr: { write: () => undefined },
+				});
+
+				// then
+				expect(exitCode).toBe(0);
+				expect(calls).toEqual([
+					{
+						args: ["serve", "--mcp"],
+						command: binPath,
+						env: {
+							CODEGRAPH_INSTALL_DIR: installDir,
+							CODEGRAPH_NO_DOWNLOAD: "1",
+							CODEGRAPH_TELEMETRY: "0",
+							DO_NOT_TRACK: "1",
+							HOME: "/tmp/home",
+						},
+					},
+				]);
+				expect(calls[0]?.env["CODEGRAPH_NO_DAEMON"]).toBeUndefined();
 			} finally {
 				rmSync(tempRoot, { recursive: true, force: true });
 			}

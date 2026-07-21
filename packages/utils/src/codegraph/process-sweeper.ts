@@ -3,6 +3,7 @@ import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 
 import { codegraphDataRoot } from "./paths"
+import { evaluateDaemonStaleness } from "./daemon-lock"
 import { createDefaultCodegraphProcessKiller, enumerateCodegraphProcesses, type CodegraphProcessKiller } from "./process-exec"
 import { selectZombieCodegraphProcesses, type CodegraphProcessInfo, type CodegraphZombieProcess } from "./process-match"
 import { discoverCodegraphOwnedRoots, type CodegraphOwnedRootsOptions } from "./process-roots"
@@ -29,6 +30,7 @@ export interface SweepCodegraphZombiesResult {
   readonly failed: readonly { readonly error: string; readonly pid: number; readonly stage: "kill" | "terminate" }[]
   readonly killed: readonly CodegraphZombieProcess[]
   readonly ownedRoots: readonly string[]
+  readonly spared: readonly CodegraphZombieProcess[]
   readonly stampFile: string
 }
 
@@ -53,15 +55,46 @@ export async function sweepCodegraphZombies(options: SweepCodegraphZombiesOption
       ownedRoots,
       ...(options.platform === undefined ? {} : { platform: options.platform }),
     })
+    const { killList, spared } = partitionByDaemonStaleness(candidates, options.log)
     const result = dryRun
       ? { failed: [], killed: [] }
-      : await killCandidates(candidates, options.killer ?? createDefaultCodegraphProcessKiller(options.platform), options)
+      : await killCandidates(killList, options.killer ?? createDefaultCodegraphProcessKiller(options.platform), options)
     if (!dryRun) writeSweepStamp(stampFile, nowMs)
-    return { action: "swept", candidates, dryRun, failed: result.failed, killed: result.killed, ownedRoots, stampFile }
+    return { action: "swept", candidates, dryRun, failed: result.failed, killed: result.killed, ownedRoots, spared, stampFile }
   } catch (error) {
     options.log?.(`CodeGraph zombie sweep skipped: ${error instanceof Error ? error.message : String(error)}`)
     return emptyResult("failed", dryRun, ownedRoots, stampFile)
   }
+}
+
+/**
+ * Daemon-shaped candidates (`codegraph serve --mcp --path <root>`, detached
+ * with ppid 1 BY DESIGN) are exempt from the plain orphan rule: they are
+ * swept only when provably stale via the daemon pid lockfile. When staleness
+ * cannot be proven the daemon is spared and logged — a wrong call here kills
+ * a live shared daemon.
+ */
+function partitionByDaemonStaleness(
+  candidates: readonly CodegraphZombieProcess[],
+  log: ((message: string) => void) | undefined,
+): { readonly killList: readonly CodegraphZombieProcess[]; readonly spared: readonly CodegraphZombieProcess[] } {
+  const killList: CodegraphZombieProcess[] = []
+  const spared: CodegraphZombieProcess[] = []
+  for (const candidate of candidates) {
+    if (candidate.matchKind !== "upstream-daemon") {
+      killList.push(candidate)
+      continue
+    }
+    const staleness = evaluateDaemonStaleness(candidate.pid, candidate.daemonProjectRoot ?? candidate.matchedRoot)
+    if (staleness.stale) {
+      log?.(`CodeGraph zombie sweep sweeping stale daemon pid ${candidate.pid} (${staleness.reason})`)
+      killList.push(candidate)
+      continue
+    }
+    log?.(`CodeGraph zombie sweep spared live daemon pid ${candidate.pid} (${staleness.reason})`)
+    spared.push(candidate)
+  }
+  return { killList, spared }
 }
 
 async function killCandidates(
@@ -136,7 +169,7 @@ function emptyResult(
   ownedRoots: readonly string[],
   stampFile: string,
 ): SweepCodegraphZombiesResult {
-  return { action, candidates: [], dryRun, failed: [], killed: [], ownedRoots, stampFile }
+  return { action, candidates: [], dryRun, failed: [], killed: [], ownedRoots, spared: [], stampFile }
 }
 
 function delay(ms: number): Promise<void> {

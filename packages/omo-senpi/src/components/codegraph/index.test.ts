@@ -175,4 +175,62 @@ describe("createCodegraphComponent", () => {
 
 		expect(pi.mcpServers[0]?.config.args).toEqual(["--node-runtime", "node22", "serve", "--mcp"])
 	})
+
+	it("#given OMO_CODEGRAPH_DAEMON=1 and default env builder #when registered #then omits CODEGRAPH_NO_DAEMON", async () => {
+		const pi = new FakeExtensionAPI()
+		const component = createCodegraphComponent({
+			resolveCommand: () => fakeResolution(),
+			resolveNodeSupport: () => fakeNodeSupport(),
+			env: { OMO_CODEGRAPH_DAEMON: "1" },
+		})
+
+		await component.register(pi, fakeContext())
+
+		const env = (pi.mcpServers[0]?.config.env ?? {}) as Record<string, string>
+		expect("CODEGRAPH_NO_DAEMON" in env).toBe(false)
+		expect(env.CODEGRAPH_NO_DOWNLOAD).toBe("1")
+		expect(env.DO_NOT_TRACK).toBe("1")
+	})
+
+	it("#given OMO_CODEGRAPH_DAEMON=true (truthy variant) #when registered #then omits CODEGRAPH_NO_DAEMON", async () => {
+		const pi = new FakeExtensionAPI()
+		const component = createCodegraphComponent({
+			resolveCommand: () => fakeResolution(),
+			resolveNodeSupport: () => fakeNodeSupport(),
+			env: { OMO_CODEGRAPH_DAEMON: " True " },
+		})
+
+		await component.register(pi, fakeContext())
+
+		const env = (pi.mcpServers[0]?.config.env ?? {}) as Record<string, string>
+		expect("CODEGRAPH_NO_DAEMON" in env).toBe(false)
+	})
+
+	it("#given no daemon opt-in and default env builder #when registered #then pins CODEGRAPH_NO_DAEMON=1", async () => {
+		const pi = new FakeExtensionAPI()
+		const component = createCodegraphComponent({
+			resolveCommand: () => fakeResolution(),
+			resolveNodeSupport: () => fakeNodeSupport(),
+			env: {},
+		})
+
+		await component.register(pi, fakeContext())
+
+		const env = (pi.mcpServers[0]?.config.env ?? {}) as Record<string, string>
+		expect(env.CODEGRAPH_NO_DAEMON).toBe("1")
+	})
+
+	it("#given OMO_CODEGRAPH_DAEMON=0 #when registered #then pins CODEGRAPH_NO_DAEMON=1", async () => {
+		const pi = new FakeExtensionAPI()
+		const component = createCodegraphComponent({
+			resolveCommand: () => fakeResolution(),
+			resolveNodeSupport: () => fakeNodeSupport(),
+			env: { OMO_CODEGRAPH_DAEMON: "0" },
+		})
+
+		await component.register(pi, fakeContext())
+
+		const env = (pi.mcpServers[0]?.config.env ?? {}) as Record<string, string>
+		expect(env.CODEGRAPH_NO_DAEMON).toBe("1")
+	})
 })

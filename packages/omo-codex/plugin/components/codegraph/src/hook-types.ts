@@ -77,6 +77,7 @@ export interface SessionStartHookOptions {
 	readonly env?: Record<string, string | undefined>;
 	readonly spawnWorker?: (invocation: WorkerSpawnInvocation) => void;
 	readonly statusProbe?: (options: {
+		readonly daemon: boolean;
 		readonly env: Record<string, string | undefined>;
 		readonly homeDir: string;
 		readonly projectRoot: string;

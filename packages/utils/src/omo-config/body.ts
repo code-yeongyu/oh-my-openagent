@@ -31,6 +31,7 @@ type MutableOmoConfig = {
 
 const CODEGRAPH_SETTING_KEYS: readonly CodegraphSettingKey[] = [
   "auto_provision",
+  "daemon",
   "enabled",
   "excluded_roots",
   "install_dir",
@@ -115,6 +116,9 @@ function setCodegraphSetting(config: MutableCodegraphConfig, key: CodegraphSetti
   switch (key) {
     case "auto_provision":
       if (typeof value === "boolean") config.auto_provision = value
+      return
+    case "daemon":
+      if (typeof value === "boolean") config.daemon = value
       return
     case "enabled":
       if (typeof value === "boolean") config.enabled = value

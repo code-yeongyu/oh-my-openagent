@@ -1,5 +1,12 @@
 export { createDefaultCodegraphProcessKiller, enumerateCodegraphProcesses, type CodegraphProcessKiller } from "./process-exec"
 export {
+  daemonLockCandidates,
+  evaluateDaemonStaleness,
+  parseDaemonLock,
+  type CodegraphDaemonLock,
+  type CodegraphDaemonStaleness,
+} from "./daemon-lock"
+export {
   parsePosixProcessTable,
   parseWindowsProcessTable,
   selectZombieCodegraphProcesses,
