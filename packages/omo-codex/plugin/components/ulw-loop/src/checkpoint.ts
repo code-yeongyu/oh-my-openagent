@@ -35,6 +35,7 @@ import type {
 	UlwLoopQualityGate,
 } from "./types.js";
 import { iso, UlwLoopError } from "./types.js";
+import { batchClosedBy, requireAllValidationBatchesClosed, requireBatchFinalReady, requireBatchGate } from "./validation-batch.js";
 
 export interface CheckpointUlwLoopArgs {
 	readonly goalId: string;
@@ -172,6 +173,7 @@ export async function checkpointUlwLoop(
 			if (final) {
 				requireAllCriteriaPass(goal);
 				requireAllPlanCriteriaPass(plan);
+				requireAllValidationBatchesClosed(plan);
 			} else if (aggregate) requireEssentialCriteriaPass(goal);
 			else requireAllCriteriaPass(goal);
 			const snapshot = await readCodexGoalSnapshotInput(args.codexGoalJson, repoRoot);
@@ -218,8 +220,12 @@ export async function checkpointUlwLoop(
 						"ulw_loop_codex_snapshot_mismatch",
 					);
 			}
+			const closesBatch = batchClosedBy(plan, goal.id) !== undefined;
+			if (closesBatch) requireBatchFinalReady(plan, goal);
+			if (closesBatch && args.qualityGateJson === undefined)
+				throw new UlwLoopError("Validation batch final checkpoint requires --quality-gate-json.", "ULW_LOOP_VALIDATION_BATCH_GATE_REQUIRED");
 			if (final) aggregateCompletion = makeAggregateCompletion(now, evidence, codexGoal);
-			if (final || aggregateCompletion !== undefined)
+			if (final || aggregateCompletion !== undefined || closesBatch) {
 				qualityGate = validateQualityGate(await readJsonInput(args.qualityGateJson, repoRoot), {
 					repoRoot,
 					fs: QUALITY_GATE_FS,
@@ -227,6 +233,8 @@ export async function checkpointUlwLoop(
 						? { currentAttemptDir: ulwLoopAttemptEvidenceDir(goal.id, goal.attempt, scope) }
 						: {}),
 				});
+				requireBatchGate(plan, goal, qualityGate);
+			}
 			goal.status = "complete";
 			goal.completedAt = now;
 			goal.evidence = evidence;
@@ -241,6 +249,8 @@ export async function checkpointUlwLoop(
 		await writePlan(repoRoot, plan, scope);
 		const ledgerEntry = buildLedger(now, args, goal, qualityGate, codexGoal, aggregateCompletion);
 		await appendLedger(repoRoot, ledgerEntry, scope);
+		const closedBatch = args.status === "complete" ? batchClosedBy(plan, goal.id) : undefined;
+		if (closedBatch !== undefined) await appendLedger(repoRoot, { at: now, kind: "batch_closed", goalId: goal.id, message: closedBatch.batchId }, scope);
 		return aggregateCompletion === undefined
 			? { plan, goal, ledgerEntry }
 			: { plan, goal, ledgerEntry, aggregateCompletion };

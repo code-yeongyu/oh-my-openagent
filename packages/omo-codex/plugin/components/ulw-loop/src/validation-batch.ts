@@ -1,5 +1,6 @@
 import { readJsonInput } from "./cli-arg-parser.js";
-import type { UlwLoopItem, UlwLoopValidationBatch } from "./types.js";
+import { isMemberResolved } from "./goal-status.js";
+import type { UlwLoopItem, UlwLoopLedgerEntry, UlwLoopPlan, UlwLoopQualityGate, UlwLoopValidationBatch } from "./types.js";
 import { UlwLoopError } from "./types.js";
 
 function isObject(value: unknown): value is object {
@@ -59,6 +60,59 @@ function validateBatches(batches: readonly UlwLoopValidationBatch[], goals: read
 			members.add(memberId);
 		}
 	}
+}
+
+export function updateBatchesAfterSupersede(plan: UlwLoopPlan, targetId: string, replacementIds: readonly string[]): void {
+	if (replacementIds.length === 0 || plan.validationBatches === undefined) return;
+	plan.validationBatches = plan.validationBatches.map((batch) => {
+		if (!batch.memberIds.includes(targetId)) return batch;
+		const memberIds = batch.memberIds.flatMap((id) => (id === targetId ? [...replacementIds] : [id]));
+		const replacementFinalGoalId = replacementIds[replacementIds.length - 1] ?? batch.finalGoalId;
+		const finalGoalId = batch.finalGoalId === targetId ? replacementFinalGoalId : batch.finalGoalId;
+		return { batchId: batch.batchId, memberIds, finalGoalId };
+	});
+}
+
+export function batchUpdateLedgerEntry(before: UlwLoopPlan, after: UlwLoopPlan, at: string): UlwLoopLedgerEntry | null {
+	if (JSON.stringify(before.validationBatches ?? []) === JSON.stringify(after.validationBatches ?? [])) return null;
+	return { at, kind: "batch_updated", before: before.validationBatches ?? [], after: after.validationBatches ?? [], message: "Validation batch membership updated after steering." };
+}
+
+export function batchOf(plan: UlwLoopPlan, goalId: string): UlwLoopValidationBatch | undefined {
+	return plan.validationBatches?.find((batch) => batch.memberIds.includes(goalId));
+}
+
+export function batchClosedBy(plan: UlwLoopPlan, goalId: string): UlwLoopValidationBatch | undefined {
+	const batch = batchOf(plan, goalId);
+	return batch?.finalGoalId === goalId ? batch : undefined;
+}
+
+export function requireBatchFinalReady(plan: UlwLoopPlan, goal: UlwLoopItem): void {
+	const batch = batchClosedBy(plan, goal.id);
+	if (batch === undefined) return;
+	const open = batch.memberIds.filter((id) => id !== goal.id && !memberResolved(plan, id));
+	if (open.length > 0) throw new UlwLoopError("Validation batch has unresolved members.", "ULW_LOOP_VALIDATION_BATCH_OPEN", { details: { batchId: batch.batchId, open } });
+}
+
+export function requireAllValidationBatchesClosed(plan: UlwLoopPlan): void {
+	const open = (plan.validationBatches ?? []).filter((batch) => batch.memberIds.some((id) => !memberResolved(plan, id)));
+	if (open.length > 0) throw new UlwLoopError("Validation batches remain open.", "ULW_LOOP_VALIDATION_BATCH_OPEN", { details: { batchIds: open.map((batch) => batch.batchId) } });
+}
+
+export function requireBatchGate(plan: UlwLoopPlan, goal: UlwLoopItem, gate: UlwLoopQualityGate): void {
+	const batch = batchClosedBy(plan, goal.id);
+	if (batch === undefined) return;
+	const members = batch.memberIds.map((id) => plan.goals.find((item) => item.id === id)).filter((item): item is UlwLoopItem => item !== undefined);
+	const pending = members.flatMap((member) => member.successCriteria.filter((criterion) => criterion.status !== "pass").map((criterion) => `${member.id}:${criterion.id}`));
+	if (pending.length > 0) throw new UlwLoopError("Validation batch criteria remain pending.", "ULW_LOOP_VALIDATION_BATCH_CRITERIA_PENDING", { details: { batchId: batch.batchId, pending } });
+	const totalCriteria = members.reduce((sum, member) => sum + member.successCriteria.length, 0);
+	const passCount = members.reduce((sum, member) => sum + member.successCriteria.filter((criterion) => criterion.status === "pass").length, 0);
+	if (gate.criteriaCoverage.totalCriteria !== totalCriteria || gate.criteriaCoverage.passCount !== passCount) throw new UlwLoopError("Validation batch gate coverage does not match member criteria.", "ULW_LOOP_VALIDATION_BATCH_GATE_MISMATCH", { details: { batchId: batch.batchId, expected: { totalCriteria, passCount }, actual: gate.criteriaCoverage } });
+}
+
+function memberResolved(plan: UlwLoopPlan, goalId: string): boolean {
+	const goal = plan.goals.find((candidate) => candidate.id === goalId);
+	return goal !== undefined && isMemberResolved(goal, plan);
 }
 
 function fail(message: string): never {

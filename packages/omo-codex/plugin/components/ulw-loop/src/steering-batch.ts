@@ -4,6 +4,7 @@ import { buildSteeringPlanSnapshot, changedGoalIdsBetween } from "./steering-sna
 import { applySteeringMutation, validateUlwLoopSteeringProposal } from "./steering.js";
 import type { UlwLoopLedgerEntry, UlwLoopPlan, UlwLoopSteeringAudit, UlwLoopSteeringProposal } from "./types.js";
 import { iso } from "./types.js";
+import { batchUpdateLedgerEntry } from "./validation-batch.js";
 
 export interface SteerUlwLoopBatchItemResult {
 	readonly accepted: boolean;
@@ -22,6 +23,7 @@ export interface SteerUlwLoopBatchResult {
 type PreparedFresh = {
 	readonly proposal: UlwLoopSteeringProposal;
 	readonly audit: UlwLoopSteeringAudit;
+	readonly before: UlwLoopPlan;
 	readonly next: UlwLoopPlan;
 };
 
@@ -44,7 +46,10 @@ export async function steerUlwLoopBatch(
 		if (prepared.items.some((item) => item.kind === "fresh")) await writePlan(repoRoot, next, scope);
 		for (const item of prepared.items) {
 			if (item.kind === "fresh") {
-				await appendLedger(repoRoot, ledgerEntry(item.prepared.proposal, item.prepared.audit), scope);
+				const at = item.prepared.proposal.now?.toISOString() ?? iso();
+				await appendLedger(repoRoot, ledgerEntry(item.prepared.proposal, item.prepared.audit, at), scope);
+				const batchEntry = batchUpdateLedgerEntry(item.prepared.before, item.prepared.next, at);
+				if (batchEntry !== null) await appendLedger(repoRoot, batchEntry, scope);
 			}
 		}
 		return { plan: next, accepted: true, results: prepared.results, rejectedReasons: [] };
@@ -80,7 +85,7 @@ async function prepareBatch(
 		const changed = changedGoalIdsBetween(current, next);
 		const finalAudit = { ...audit, before: buildSteeringPlanSnapshot(current, changed), after: buildSteeringPlanSnapshot(next, changed) };
 		const result = { accepted: true, deduped: false, audit: finalAudit, rejectedReasons: [] };
-		items.push({ kind: "fresh", prepared: { proposal, audit: finalAudit, next } });
+		items.push({ kind: "fresh", prepared: { proposal, audit: finalAudit, before: current, next } });
 		results.push(result);
 		current = next;
 	}
@@ -95,9 +100,9 @@ function rejected(
 	return { plan, accepted: false, results, rejectedReasons };
 }
 
-function ledgerEntry(proposal: UlwLoopSteeringProposal, audit: UlwLoopSteeringAudit): UlwLoopLedgerEntry {
+function ledgerEntry(proposal: UlwLoopSteeringProposal, audit: UlwLoopSteeringAudit, at: string): UlwLoopLedgerEntry {
 	const entry: UlwLoopLedgerEntry = {
-		at: proposal.now?.toISOString() ?? iso(),
+		at,
 		kind: proposal.kind === "revise_criterion" ? "criteria_revised" : "steering_accepted",
 		evidence: proposal.evidence,
 		message: proposal.rationale,

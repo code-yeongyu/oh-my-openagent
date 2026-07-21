@@ -27,7 +27,7 @@ function isLegacyEnumeratedAggregateObjective(objective: string | undefined): ob
 }
 
 function isSteeringKind(value: unknown): value is UlwLoopLedgerEntry["kind"] {
-	return value === "steering_accepted" || value === "steering_rejected" || value === "criteria_revised";
+	return value === "steering_accepted" || value === "steering_rejected" || value === "criteria_revised" || value === "batch_updated";
 }
 
 export async function withUlwLoopMutationLock<T>(repoRoot: string, fn: () => Promise<T>): Promise<T>;

@@ -77,6 +77,23 @@ describe("steerUlwLoopBatch", () => {
 		expect((await readSteeringLedgerEntries(repo)).filter((entry) => entry.kind === "steering_accepted")).toHaveLength(0);
 	});
 
+	it("#given a batch member split in proposals-json #when applied #then updates validation batch membership", async () => {
+		const repo = await repoWithPlan();
+		const seed = await readUlwLoopPlan(repo);
+		await writePlan(repo, { ...seed, validationBatches: [{ batchId: "VB001", memberIds: ["G001", "G002"], finalGoalId: "G002" }] });
+
+		const result = await steerUlwLoopBatch(repo, [
+			proposal({
+				kind: "split_subgoal",
+				targetGoalId: "G001",
+				childGoals: [{ title: "Child", objective: "Do child" }],
+			}),
+		]);
+
+		expect(result.plan.validationBatches).toEqual([{ batchId: "VB001", memberIds: ["G003", "G002"], finalGoalId: "G002" }]);
+		expect((await readSteeringLedgerEntries(repo)).at(-1)).toMatchObject({ kind: "batch_updated" });
+	});
+
 	it("#given a prior idempotency key #when batched with a fresh proposal #then dedupes one and applies the other", async () => {
 		const repo = await repoWithPlan();
 		await steerUlwLoopBatch(repo, [proposal({ idempotencyKey: "same" })]);

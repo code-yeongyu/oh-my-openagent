@@ -1,9 +1,9 @@
 // biome-ignore-all format: compact steering module must stay below the 240 pure-LOC budget
 import { isUlwLoopDone } from "./goal-status.js";
 import type { UlwLoopScope } from "./paths.js";
-import { seedDefaultSuccessCriteria } from "./plan-crud.js";
 import { appendLedger, findAcceptedSteeringLedgerEntry, readUlwLoopPlan, withUlwLoopMutationLock, writePlan } from "./plan-io.js";
 import { buildSteeringPlanSnapshot, changedGoalIdsBetween } from "./steering-snapshot.js";
+import { makeGoal, reviseCriterion, reviseWording, splitOrBlock } from "./steering-mutations.js";
 import type {
 	SteerUlwLoopResult,
 	UlwLoopItem,
@@ -17,6 +17,7 @@ import type {
 	UlwLoopSuccessCriterionUserModel,
 } from "./types.js";
 import { iso, ULW_LOOP_STEERING_MUTATION_KINDS, ULW_LOOP_SUCCESS_CRITERION_USER_MODELS } from "./types.js";
+import { batchUpdateLedgerEntry } from "./validation-batch.js";
 
 const SOURCES = ["user_prompt_submit", "finding", "cli"] as const satisfies readonly UlwLoopSteeringSource[];
 const PROTECTED = new Set(["aggregateCompletion", "codexObjective", "codexObjectiveAliases", "originalConstraints", "qualityGate", "status", "completedAt", "completionStatus"]);
@@ -63,7 +64,6 @@ function childValues(proposal: object): unknown[] {
 	return Array.isArray(fromAfter) ? fromAfter : [];
 }
 
-const children = (proposal: object): UlwLoopSteeringChildGoal[] => childValues(proposal).map(child).filter((item): item is UlwLoopSteeringChildGoal => item !== null);
 const pendingOrder = (proposal: object): string[] => {
 	const direct = texts(proposal, "pendingOrder");
 	return direct.length > 0 ? direct : texts(after(proposal) ?? proposal, "pendingGoalIds");
@@ -155,21 +155,6 @@ function validateCriterion(plan: UlwLoopPlan, proposal: object, reasons: string[
 	if (model !== undefined && !isModel(model)) reasons.push("invalid userModel");
 }
 
-function nextId(plan: UlwLoopPlan, offset: number): string {
-	const max = plan.goals.reduce((current, item) => {
-		const digits = /^G(\d+)(?:-|$)/u.exec(item.id)?.[1];
-		return digits === undefined ? current : Math.max(current, Number(digits));
-	}, 0);
-	return `G${String(max + offset).padStart(3, "0")}`;
-}
-
-function makeGoal(plan: UlwLoopPlan, childGoal: UlwLoopSteeringChildGoal, evidence: string, now: string, offset: number): UlwLoopItem {
-	const id = nextId(plan, offset);
-	const digits = /^G(\d+)/u.exec(id)?.[1];
-	const goalIndex = digits === undefined ? plan.goals.length + offset - 1 : Number(digits) - 1;
-	return { id, title: childGoal.title, objective: childGoal.objective, status: "pending", successCriteria: seedDefaultSuccessCriteria(goalIndex, childGoal.objective), attempt: 0, createdAt: now, updatedAt: now, evidence };
-}
-
 export function applySteeringMutation(plan: UlwLoopPlan, proposal: UlwLoopSteeringProposal, audit: UlwLoopSteeringAudit): UlwLoopPlan {
 	const next = structuredClone(plan);
 	if (!audit.invariant.accepted) return next;
@@ -184,46 +169,6 @@ export function applySteeringMutation(plan: UlwLoopPlan, proposal: UlwLoopSteeri
 	if (proposal.kind === "revise_criterion") reviseCriterion(next, proposal, now);
 	if (proposal.kind !== "annotate_ledger") next.updatedAt = now;
 	return next;
-}
-
-function reviseWording(plan: UlwLoopPlan, proposal: UlwLoopSteeringProposal, now: string): void {
-	const target = goal(plan, targets(proposal)[0]);
-	if (target === undefined) return;
-	target.title = revised(proposal, "revisedTitle", "title") ?? target.title;
-	target.objective = revised(proposal, "revisedObjective", "objective") ?? target.objective;
-	target.steeringEvidence = proposal.evidence;
-	target.steeringRationale = proposal.rationale;
-	target.updatedAt = now;
-}
-
-function splitOrBlock(plan: UlwLoopPlan, proposal: UlwLoopSteeringProposal, now: string): void {
-	const target = goal(plan, targets(proposal)[0]);
-	if (target === undefined) return;
-	const replacements = children(proposal).map((item, index) => makeGoal(plan, item, proposal.evidence, now, index + 1));
-	target.steeringEvidence = proposal.evidence;
-	target.steeringRationale = proposal.rationale;
-	target.updatedAt = now;
-	if (replacements.length === 0) {
-		target.status = "blocked";
-		target.steeringStatus = "blocked";
-		target.blockedReason = proposal.blockedReason ?? proposal.rationale;
-	} else {
-		target.steeringStatus = "superseded";
-		target.supersededBy = replacements.map((item) => item.id);
-		for (const item of replacements) item.supersedes = [target.id];
-		plan.goals.splice(plan.goals.indexOf(target) + 1, 0, ...replacements);
-	}
-	if (plan.activeGoalId === target.id) delete plan.activeGoalId;
-}
-
-function reviseCriterion(plan: UlwLoopPlan, proposal: UlwLoopSteeringProposal, now: string): void {
-	const target = goal(plan, targets(proposal)[0]);
-	const index = target?.successCriteria.findIndex((item) => item.id === proposal.criterionId) ?? -1;
-	const current = target?.successCriteria[index];
-	if (target === undefined || current === undefined) return;
-	const model = read(proposal, "userModel");
-	target.successCriteria[index] = { ...current, scenario: text(proposal, "scenario") ?? current.scenario, expectedEvidence: text(proposal, "expectedEvidence") ?? current.expectedEvidence, userModel: isModel(model) ? model : current.userModel };
-	target.updatedAt = now;
 }
 
 function isProposal(value: unknown): value is UlwLoopSteeringProposal {
@@ -262,8 +207,11 @@ export async function steerUlwLoop(repoRoot: string, proposal: UlwLoopSteeringPr
 			finalAudit.before = buildSteeringPlanSnapshot(plan, changed);
 			finalAudit.after = buildSteeringPlanSnapshot(next, changed);
 		}
+		const at = proposal.now?.toISOString() ?? iso();
+		const batchEntry = accepted ? batchUpdateLedgerEntry(plan, next, at) : null;
 		if (accepted) await writePlan(repoRoot, next, scope);
-		await appendLedger(repoRoot, ledgerEntry(proposal, finalAudit, proposal.now?.toISOString() ?? iso()), scope);
+		await appendLedger(repoRoot, ledgerEntry(proposal, finalAudit, at), scope);
+		if (batchEntry !== null) await appendLedger(repoRoot, batchEntry, scope);
 		return { plan: next, accepted, audit: finalAudit, rejectedReasons: audit.invariant.rejectedReasons, deduped: false };
 	});
 }
