@@ -40,6 +40,7 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
   readonly userMessages: FakeSendUserMessageCall[] = []
   readonly messageRenderers: FakeMessageRendererRegistration[] = []
   readonly mcpServers: Array<{ name: string; config: Record<string, unknown> }> = []
+  events?: SenpiExtensionAPI["events"]
 
   private readonly flagValues = new Map<string, boolean | string | undefined>()
 

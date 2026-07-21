@@ -29,6 +29,18 @@ async function reconcileRecord(context: LifecycleContext, record: TaskRecord): P
   }
 
   if (record.execution_mode !== "process") {
+    // The project store is shared by every senpi process in this project. A record owned by a LIVE
+    // sibling process is not orphaned: marking it lost here would clobber that process's running
+    // child (its completion would then be dropped as a late transition). Only a dead owner - or a
+    // legacy record with no owner pid - is genuinely unreachable from any process.
+    const ownerPid = record.host_pid
+    if (ownerPid !== undefined && ownerPid !== context.hostPid && context.signaller.isAlive(ownerPid)) {
+      return {
+        task_id: record.task_id,
+        kind: "foreign_live_owner",
+        reason: `in-process child owned by live process pid=${ownerPid}`,
+      }
+    }
     await markLost(context, record, "in-process task from a previous process cannot be reattached")
     return { task_id: record.task_id, kind: "lost", reason: "previous-process in-process" }
   }
