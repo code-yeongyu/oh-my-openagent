@@ -13,7 +13,6 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
   ultrabrain: [
     { providers: ["openai", "vercel"], model: "gpt-5.6-sol", variant: "xhigh" },
     { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "high" },
-    { providers: ["openai", "opencode", "vercel"], model: "gpt-5.5", variant: "xhigh" },
     { providers: ["google", "github-copilot", "opencode", "vercel"], model: "gemini-3.1-pro", variant: "high" },
     { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-4-8", variant: "max" },
     { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
@@ -22,7 +21,6 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
     { providers: ["openai", "vercel"], model: "gpt-5.6-terra", variant: "xhigh" },
     { providers: ["github-copilot"], model: "gpt-5.6-terra", variant: "high" },
     { providers: ["openai", "github-copilot", "vercel"], model: "gpt-5.6-sol", variant: "high" },
-    { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.5", variant: "medium" },
     { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-4-8", variant: "max" },
     { providers: ["google", "github-copilot", "opencode", "vercel"], model: "gemini-3.1-pro", variant: "high" },
     { providers: ["opencode-go", "vercel"], model: "kimi-k3" },
@@ -31,9 +29,9 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
   artistry: [
     { providers: ["google", "github-copilot", "opencode", "vercel"], model: "gemini-3.1-pro", variant: "high" },
     { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-4-8", variant: "max" },
-    { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.5" },
+    { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.6-sol", variant: "high" },
     { providers: ["opencode-go", "vercel"], model: "kimi-k3" },
-    { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
+    { providers: ["opencode-go", "vercel"], model: "glm-5.2" }
   ],
   quick: [
     { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.4-mini" },
@@ -48,7 +46,6 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
     { providers: ["openai", "vercel"], model: "gpt-5.6-luna", variant: "xhigh" },
     { providers: ["github-copilot"], model: "gpt-5.6-luna", variant: "high" },
     { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-sonnet-4-6" },
-    { providers: ["openai", "opencode", "vercel"], model: "gpt-5.5", variant: "medium" },
     { providers: ["opencode-go", "vercel"], model: "kimi-k3" },
     { providers: ["google", "github-copilot", "opencode", "vercel"], model: "gemini-3-flash" },
     { providers: ["opencode-go", "vercel"], model: "minimax-m3" },
@@ -57,7 +54,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
   ],
   "unspecified-high": [
     { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-opus-4-8", variant: "max" },
-    { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.5", variant: "high" },
+    { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.6-sol", variant: "high" },
     { providers: ["zai-coding-plan", "opencode", "bailian-coding-plan", "vercel"], model: "glm-5" },
     { providers: ["kimi-for-coding"], model: "kimi-k3" },
     { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
