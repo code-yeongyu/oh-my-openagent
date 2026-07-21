@@ -113,7 +113,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["google", "github-copilot", "opencode", "vercel"],
-        model: "gemini-3-flash",
+        model: "gemini-3.6-flash",
       },
       { providers: ["opencode-go", "vercel"], model: "minimax-m3" },
       { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
@@ -145,7 +145,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["opencode-go", "vercel"], model: "kimi-k3" },
       {
         providers: ["google", "github-copilot", "opencode", "vercel"],
-        model: "gemini-3-flash",
+        model: "gemini-3.6-flash",
       },
       { providers: ["opencode-go", "vercel"], model: "minimax-m3" },
       { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
@@ -186,7 +186,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["google", "github-copilot", "opencode", "vercel"],
-        model: "gemini-3-flash",
+        model: "gemini-3.6-flash",
       },
       { providers: ["opencode-go", "vercel"], model: "kimi-k3" },
       {

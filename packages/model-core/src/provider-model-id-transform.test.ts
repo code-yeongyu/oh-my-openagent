@@ -61,7 +61,7 @@ describe("provider model ID transforms", () => {
 		const scenarios = [
 			{ provider: "openai", model: "gpt-4o" },
 			{ provider: "google", model: "gemini-2.5-pro" },
-			{ provider: "github-copilot", model: "gemini-3-flash" },
+			{ provider: "github-copilot", model: "gemini-3.6-flash" },
 			{ provider: "vercel", model: "claude-opus-4-7" },
 		] as const
 

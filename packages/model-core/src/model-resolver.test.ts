@@ -784,11 +784,11 @@ describe("resolveModelWithFallback", () => {
       cacheSpy.mockRestore()
     })
 
-    test("transforms gemini-3-flash in categoryDefaultModel for google connected provider", () => {
-      // given - google connected, category default uses gemini-3-flash
+    test("transforms gemini-3.6-flash in categoryDefaultModel for google connected provider", () => {
+      // given - google connected, category default uses gemini-3.6-flash
       const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["google"])
       const input: ExtendedModelResolutionInput = {
-        categoryDefaultModel: "google/gemini-3-flash",
+        categoryDefaultModel: "google/gemini-3.6-flash",
         availableModels: new Set(),
         systemDefaultModel: "anthropic/claude-sonnet-4-5",
       }
@@ -797,8 +797,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
       const resolved = expectResolved(result)
 
-      // then - gemini-3-flash should be transformed to gemini-3-flash-preview
-      expect(resolved.model).toBe("google/gemini-3-flash-preview")
+      // then - gemini-3.6-flash should be transformed to gemini-3.6-flash-preview
+      expect(resolved.model).toBe("google/gemini-3.6-flash-preview")
       expect(resolved.source).toBe("category-default")
       cacheSpy.mockRestore()
     })

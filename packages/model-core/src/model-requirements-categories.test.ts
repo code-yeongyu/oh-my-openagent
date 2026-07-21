@@ -173,7 +173,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
 
     // then
     expect(writing.fallbackChain).toHaveLength(6)
-    expect(primary?.model).toBe("gemini-3-flash")
+    expect(primary?.model).toBe("gemini-3.6-flash")
     expect(primary?.providers[0]).toBe("google")
     expect(second?.model).toBe("kimi-k3")
     expect(second?.providers[0]).toBe("opencode-go")
