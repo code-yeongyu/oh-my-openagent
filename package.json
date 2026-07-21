@@ -59,6 +59,7 @@
     ".agents/skills",
     "packages/lsp-tools-mcp/package.json",
     "packages/lsp-core/package.json",
+    "packages/lsp-core/package.json",
     "packages/lsp-core/src",
     "packages/lsp-tools-mcp/dist",
     "packages/lsp-daemon/package.json",

@@ -94,6 +94,52 @@ describe("codex-cache install", () => {
   )
 
   test(
+    "#given plugin has out-of-tree file: dependency #when caching plugin #then npm install reconciles instead of npm ci (lazycodex#137)",
+    async () => {
+      // given — a file: dependency escaping the plugin root forces the local-dependency rewrite,
+      // after which the shipped package-lock.json no longer matches the mutated manifest and
+      // `npm ci` would refuse with EUSAGE ("Missing: <pkg> from lock file").
+      const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-local-dep-"))
+      const codexHome = join(root, "codex-home")
+      const sourceRoot = join(root, "source", "packages", "omo-codex", "plugin")
+      const sharedRoot = join(root, "source", "packages", "shared-skills")
+      await mkdir(sourceRoot, { recursive: true })
+      await mkdir(sharedRoot, { recursive: true })
+      await writeFile(join(sharedRoot, "package.json"), JSON.stringify({ name: "@scope/shared-skills", version: "0.1.0" }))
+      await writeFile(
+        join(sourceRoot, "package.json"),
+        JSON.stringify({
+          name: "@scope/omo",
+          version: "0.1.0",
+          dependencies: { "@scope/shared-skills": "file:../../shared-skills" },
+        }),
+      )
+      const npmArgs: string[][] = []
+
+      // when
+      const installed = await installCachedPlugin({
+        codexHome,
+        marketplaceName: "debug",
+        name: "omo",
+        sourcePath: sourceRoot,
+        version: "0.1.0",
+        runCommand: async (command, args) => {
+          if (command === "npm") npmArgs.push([...args])
+        },
+      })
+
+      // then — source-build install stays `npm install`; the cache-copy step must NOT be `npm ci`
+      // because the rewrite mutated package.json (lock reconciliation is delegated to npm).
+      expect(npmArgs).toEqual([["install"], ["install", "--omit=dev", "--no-audit", "--no-fund"]])
+      const cachedManifest = JSON.parse(await readFile(join(installed.path, "package.json"), "utf8")) as {
+        dependencies: Record<string, string>
+      }
+      expect(cachedManifest.dependencies["@scope/shared-skills"]).toBe(`file:${join(root, "source", "packages", "shared-skills")}`)
+    },
+    15000,
+  )
+
+  test(
     "#given a component ships its own nested .mcp.json #when caching plugin #then only the plugin-root .mcp.json is cached",
     async () => {
       // given

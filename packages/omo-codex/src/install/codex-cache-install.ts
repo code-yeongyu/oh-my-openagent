@@ -33,10 +33,19 @@ export async function installCachedPlugin(input: {
   await rm(tempPath, { recursive: true, force: true })
   try {
     await copyDirectory(input.sourcePath, tempPath)
-    await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath)
+    const localDependenciesRewritten = await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath)
     await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath })
     await copyRootRuntimeDists({ pluginRoot: tempPath, sourcePath: input.sourcePath })
-    await maybeRunNpmInstall(tempPath, input.runCommand, npmInstallEnv, ["ci", "--omit=dev"])
+    // When local file: dependencies were rewritten to point back into the source tree, the shipped
+    // package-lock.json no longer matches the mutated manifests (npm ci refuses with EUSAGE
+    // "Missing: <pkg> from lock file" — see code-yeongyu/lazycodex#137). Let npm reconcile the lock
+    // itself in that case; the pristine no-rewrite path keeps deterministic `npm ci`.
+    await maybeRunNpmInstall(
+      tempPath,
+      input.runCommand,
+      npmInstallEnv,
+      localDependenciesRewritten ? ["install", "--omit=dev", "--no-audit", "--no-fund"] : ["ci", "--omit=dev"],
+    )
     await removeCachedManagedNpmBinShims(tempPath)
     if (input.buildSource === false) await maybeRunNpmSyncSkills(tempPath, input.runCommand, env)
     await assertNoRemovedSparkshellPromptReferences(tempPath)
