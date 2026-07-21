@@ -29717,6 +29717,29 @@
         "output": 65536
       }
     },
+    "gemini-3.6-flash": {
+      "id": "gemini-3.6-flash",
+      "family": "gemini-flash",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image",
+          "video",
+          "audio",
+          "pdf"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 1048576,
+        "output": 65536
+      }
+    },
     "deepseek-v4-flash-free": {
       "id": "deepseek-v4-flash-free",
       "family": "deepseek-flash-free",

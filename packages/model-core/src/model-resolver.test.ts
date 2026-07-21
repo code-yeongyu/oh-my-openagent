@@ -784,7 +784,7 @@ describe("resolveModelWithFallback", () => {
       cacheSpy.mockRestore()
     })
 
-    test("transforms gemini-3.6-flash in categoryDefaultModel for google connected provider", () => {
+    test("preserves stable gemini-3.6-flash in categoryDefaultModel for google connected provider", () => {
       // given - google connected, category default uses gemini-3.6-flash
       const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["google"])
       const input: ExtendedModelResolutionInput = {
@@ -797,8 +797,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
       const resolved = expectResolved(result)
 
-      // then - gemini-3.6-flash should be transformed to gemini-3.6-flash-preview
-      expect(resolved.model).toBe("google/gemini-3.6-flash-preview")
+      // then - Gemini 3.6 Flash is a stable Google model ID, not a preview alias
+      expect(resolved.model).toBe("google/gemini-3.6-flash")
       expect(resolved.source).toBe("category-default")
       cacheSpy.mockRestore()
     })
