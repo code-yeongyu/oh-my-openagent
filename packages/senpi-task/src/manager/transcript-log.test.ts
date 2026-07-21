@@ -103,3 +103,22 @@ describe("subscribeTranscriptLog", () => {
     expect(unsubscribed).toBe(true)
   })
 })
+
+describe("logTranscriptEvent child errors", () => {
+  test("#given an assistant message_end carrying a stopReason error #when logged #then a child_error transcript event is appended with the diagnostic", () => {
+    // given a provider failure surfaced as an assistant message with stopReason error
+    const store = recordingStore()
+    const event: ManagedChildEvent = {
+      type: "message_end",
+      message: { role: "assistant", content: [], stopReason: "error", errorMessage: "upstream gateway timeout" },
+    }
+
+    // when
+    logTranscriptEvent(store, "st_3", event)
+
+    // then the failure leaves a transcript breadcrumb instead of vanishing
+    expect(store.appended.length).toBe(1)
+    expect(store.appended[0]?.event.type).toBe("child_error")
+    expect(store.appended[0]?.event.payload).toEqual({ message: "upstream gateway timeout", stop_reason: "error" })
+  })
+})
