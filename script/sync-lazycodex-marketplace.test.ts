@@ -62,6 +62,28 @@ async function writePluginFixture(sourceRoot: string, options: WritePluginFixtur
           ],
         },
       ],
+      Stop: [
+        {
+          hooks: [
+            {
+              type: "command",
+              command: 'node "${PLUGIN_ROOT}/components/start-work-continuation/dist/cli.js" hook stop',
+              statusMessage: "LazyCodex(1.2.3): Checking Start-Work Continuation",
+            },
+          ],
+        },
+      ],
+      UserPromptSubmit: [
+        {
+          hooks: [
+            {
+              type: "command",
+              command: 'node "${PLUGIN_ROOT}/components/ulw-loop/dist/cli.js" hook user-prompt-submit',
+              statusMessage: "LazyCodex(1.2.3): Checking Ulw-Loop Steering",
+            },
+          ],
+        },
+      ],
     },
   })
   await writeJson(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "bootstrap", "hooks", "hooks.json"), {
@@ -107,6 +129,13 @@ async function writePluginFixture(sourceRoot: string, options: WritePluginFixtur
   await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "lsp", "dist", "cli.js"), "#!/usr/bin/env node\n")
   await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "comment-checker", "dist"), { recursive: true })
   await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "comment-checker", "dist", "cli.js"), "#!/usr/bin/env node\n")
+  await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "start-work-continuation", "dist"), { recursive: true })
+  await writeFile(
+    join(sourceRoot, "packages", "omo-codex", "plugin", "components", "start-work-continuation", "dist", "cli.js"),
+    "#!/usr/bin/env node\n",
+  )
+  await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "ulw-loop", "dist"), { recursive: true })
+  await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "ulw-loop", "dist", "cli.js"), "#!/usr/bin/env node\n")
   await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "bootstrap", "dist"), { recursive: true })
   await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "bootstrap", "dist", "cli.js"), "#!/usr/bin/env node\n")
   await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "bootstrap", "scripts"), { recursive: true })
@@ -166,6 +195,10 @@ describe("sync-lazycodex-marketplace", () => {
     expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "git-bash-mcp", "dist", "cli.js"))).isFile()).toBe(true)
     expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "lsp-tools-mcp", "dist", "cli.js"))).isFile()).toBe(true)
     expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "lsp-daemon", "dist", "cli.js"))).isFile()).toBe(true)
+    expect(
+      (await stat(join(lazycodexRoot, "plugins", "omo", "components", "start-work-continuation", "dist", "cli.js"))).isFile(),
+    ).toBe(true)
+    expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "ulw-loop", "dist", "cli.js"))).isFile()).toBe(true)
     await expectPathMissing(join(lazycodexRoot, "plugins", "omo", "node_modules"))
     await expectPathMissing(join(lazycodexRoot, "plugins", "omo", ".ulw"))
     await expectPathMissing(join(lazycodexRoot, "plugins", "omo", ".claude"))
