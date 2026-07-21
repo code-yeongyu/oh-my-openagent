@@ -2,6 +2,7 @@ export type FallbackEntry = {
   providers: string[];
   model: string;
   variant?: string; // Entry-specific variant (e.g., GPT->high, Opus->max)
+  requireListedProvider?: boolean;
   reasoningEffort?: string;
   temperature?: number;
   top_p?: number;

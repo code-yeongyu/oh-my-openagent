@@ -114,6 +114,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       {
         providers: ["google", "opencode", "vercel"],
         model: "gemini-3.6-flash",
+        requireListedProvider: true,
       },
       { providers: ["opencode-go", "vercel"], model: "minimax-m3" },
       { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
@@ -146,6 +147,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       {
         providers: ["google", "opencode", "vercel"],
         model: "gemini-3.6-flash",
+        requireListedProvider: true,
       },
       { providers: ["opencode-go", "vercel"], model: "minimax-m3" },
       { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
@@ -187,6 +189,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       {
         providers: ["google", "opencode", "vercel"],
         model: "gemini-3.6-flash",
+        requireListedProvider: true,
       },
       { providers: ["opencode-go", "vercel"], model: "kimi-k3" },
       {

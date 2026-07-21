@@ -98,6 +98,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(geminiFallback).toEqual({
       providers: ["google", "opencode", "vercel"],
       model: "gemini-3.6-flash",
+      requireListedProvider: true,
     })
   })
 
@@ -129,6 +130,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(geminiFallback).toEqual({
       providers: ["google", "opencode", "vercel"],
       model: "gemini-3.6-flash",
+      requireListedProvider: true,
     })
   })
 
@@ -185,6 +187,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary).toEqual({
       providers: ["google", "opencode", "vercel"],
       model: "gemini-3.6-flash",
+      requireListedProvider: true,
     })
     expect(second?.model).toBe("kimi-k3")
     expect(second?.providers[0]).toBe("opencode-go")
