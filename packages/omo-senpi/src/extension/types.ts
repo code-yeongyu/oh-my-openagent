@@ -4,6 +4,10 @@ import type { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 
 export interface SenpiExtensionAPI {
   on(event: string, handler: (payload: unknown, ctx?: unknown) => unknown | Promise<unknown>): void
+  events?: {
+    emit(name: string, payload: unknown): void
+    on(name: string, handler: (payload: unknown) => void): () => void
+  }
   registerTool(tool: Record<string, unknown>): void
   registerCommand(name: string, options: Record<string, unknown>): void
   registerFlag(
