@@ -85,7 +85,7 @@ Sisyphus is your main orchestrator. He plans, delegates to specialists, and driv
 - **Claude Opus 4.8** / **Opus 4.7** — Best overall experience. Sisyphus was built with Claude-optimized prompts.
 - **Kimi K3** — Strongest Kimi for Sisyphus. Recommended when you can accept its thinking-token cost; the K3 prompt is calibrated to stop overthinking and keep work moving.
 - **Kimi K2.6** / **K2.5** — Great Claude-like alternatives. K2.6 is the current default fallback in the primary Sisyphus chain after K3; many users run K2.6 or the K2.5/K2.6 combo exclusively.
-- **GLM 5** — Solid option, especially via Z.ai.
+- **GLM 5** — Solid option, especially via Z.ai. **GLM 5.2 is experimental:** Sisyphus uses a GLM-5.2-calibrated prompt for model IDs recognized as GLM, but current evidence is one community report without maintainer end-to-end validation. The automatic chain is configured with `glm-5`, and fuzzy availability matching may resolve that entry to GLM 5.1 or GLM 5.2.
 
 Sisyphus works best on Claude Opus 4.8 / 4.7, Kimi K3 / K2.6 (or K2.5), and GLM 5. GPT-5.4 and GPT-5.5 now have dedicated prompt paths, but older GPT models are still a poor fit and should route to Hephaestus instead.
 
@@ -258,7 +258,7 @@ Oh My OpenAgent turns that into a coordinated team:
 
 **Skills with embedded MCPs.** Each skill brings its own MCP servers, scoped to the task. Context window stays clean instead of bloating with every tool.
 
-**Discipline enforcement.** Todo enforcer yanks idle agents back to work. Comment checker strips AI slop. Ralph Loop keeps going until 100% done. The system doesn't let the agent slack off.
+**Discipline enforcement.** Todo enforcer yanks idle agents back to work. Comment checker strips AI slop. Goal holds a persistent per-session objective and re-injects a continuation prompt on every idle until a completion audit confirms the work is done. The system doesn't let the agent slack off.
 
 **The fundamental advantage.** Models have different temperaments. Claude thinks deeply. GPT reasons architecturally. Gemini visualizes. Haiku moves fast. Single-model tools force you to pick one personality for all tasks. Oh My OpenAgent leverages them all, routing by task type. This isn't a temporary hack — it's the only architecture that makes sense as models specialize further. The gap between multi-model orchestration and single-model limitation widens every month. We're betting on that future.
 

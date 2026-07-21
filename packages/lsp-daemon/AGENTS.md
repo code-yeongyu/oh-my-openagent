@@ -1,6 +1,6 @@
-# lsp-daemon — Shared Per-User LSP Daemon
+# lsp-daemon -- Shared Per-User LSP Daemon
 
-**Generated:** 2026-06-11
+**Generated:** 2026-07-17 / 7d664b96b
 
 ## OVERVIEW
 
@@ -11,11 +11,11 @@ Vendored, Node-targeted MCP-layer package (`@code-yeongyu/lsp-daemon`). Runs ONE
 | File | Role |
 |------|------|
 | `cli.ts` | Bin `omo-lsp-daemon`. `mcp` (default) → `runMcpStdioProxy()`; `daemon` → `runDaemon()` |
-| `proxy.ts` | `runMcpStdioProxy()` — reads JSON-RPC lines from stdin; `tools/call` → daemon via client; other LSP MCP requests handled locally |
-| `daemon-server.ts` | `startDaemonServer()` — `net.createServer` on the socket, owns the LSP manager, idle auto-shutdown, pid/endpoint files, SIGTERM/SIGINT cleanup |
-| `daemon-client.ts` | `callToolViaDaemon()` / `callDiagnosticsViaDaemon()` — connect to socket, send tool call, await response |
-| `ensure-daemon.ts` | `ensureDaemonRunning()` — probe → lock → spawn detached daemon → poll until reachable (DI'd deps for tests) |
-| `request-routing.ts` | `handleDaemonMessage()` — strips `_context` (cwd/env) from args, runs request inside that `RequestContext` |
+| `proxy.ts` | `runMcpStdioProxy()`: reads JSON-RPC lines from stdin; `tools/call` → daemon via client; other LSP MCP requests handled locally; startup watchdog + aborts on stdin close |
+| `daemon-server.ts` | `startDaemonServer()`: `net.createServer` on the socket, owns the LSP manager, idle auto-shutdown, pid/endpoint files, SIGTERM/SIGINT cleanup |
+| `daemon-client.ts` | `callToolViaDaemon()` / `callDiagnosticsViaDaemon()`: connect to socket, send tool call, await response; honors `AbortSignal`, sends `$/cancelRequest` on abort/timeout |
+| `ensure-daemon.ts` | `ensureDaemonRunning()`: probe → lock → spawn detached daemon → poll until reachable (DI'd deps for tests); accepts `AbortSignal`, abort cancels pending startup |
+| `request-routing.ts` | `handleDaemonMessage()`: strips `_context` (cwd/env) from args, runs request inside that `RequestContext` |
 | `runtime-contract.ts` | Exact three-variable runtime override contract + typed validation errors |
 | `paths.ts` | OMO-owned versioned socket/lock/pid/log path resolution |
 | `lock.ts` | Single-flight file lock + `unlinkQuietly` |
@@ -37,6 +37,9 @@ session → omo-lsp-daemon (mcp proxy, stdio)
 
 ## NOTES
 
+- **Startup watchdog:** the proxy exits if no MCP request arrives within `startupTimeoutMs` (default `DEFAULT_STARTUP_TIMEOUT_MS` = 10 s). The first handler invocation clears the watchdog; on expiry it destroys stdin and writes a `[lsp-daemon]` diagnostic to stderr, then swallows the resulting `ERR_STREAM_PREMATURE_CLOSE`.
+- **Cancellation lifecycle:** the proxy owns an `AbortController` aborted on stdin `end`/`close`. That signal threads through `callToolViaDaemon` into `ensureDaemonAvailable` (rejects `DaemonRequestCancelledError`) and `sendToolCall`, which sends a `$/cancelRequest` (auth envelope + request id) to the daemon and rejects. `callToolViaDaemon` retries only on auth refresh; it breaks on `DaemonRequestCancelledError` and on a `DaemonRequestError` that was already written or names a non-retryable tool (`rename`/`lsp_rename`).
+- **QA smoke scripts:** `scripts/qa/cancellation-smoke.mjs` drives one deterministic socket-to-LSP cancellation end-to-end; `scripts/qa/commit-barrier-smoke.mjs` proves an aborted `textDocument/rename` emits `$/cancelRequest` before any workspace edit applies (an abort mid-apply still commits exactly one edit, reported as a late abort). Both take the repo root as `argv[2]` and are wired into the codex-qa/opencode-qa `lsp-e2e.sh` drivers.
 - **Per-request context threading:** the proxy injects `_context` (cwd + env allowlist) into each `tools/call`; the daemon runs that request inside `runWithRequestContext` so one shared process correctly serves many working directories.
 - **Idle shutdown:** daemon self-exits after 30 min (`DEFAULT_IDLE_SHUTDOWN_MS`) once there are no live connections AND `getLspManager().clientCount() === 0`. Live LSP clients keep it warm.
 - **State root:** `$OMO_LSP_DAEMON_DIR` when it is already absolute, otherwise `~/.omo/lsp-daemon`; every runtime is isolated under `v<version>`.

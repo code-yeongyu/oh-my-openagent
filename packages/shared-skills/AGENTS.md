@@ -1,6 +1,6 @@
 # shared-skills — Cross-Harness SKILL.md Bundle (Skills)
 
-**Generated:** 2026-07-03
+**Generated:** 2026-07-17 (7d664b96b)
 
 ## OVERVIEW
 
@@ -12,7 +12,7 @@ Hand-authored, cross-harness skill bundle shared between the OpenCode and Codex 
 
 The Codex-only `lcx-report-bug`, `lcx-contribute-bug-fix`, and `lcx-doctor` skills live under `packages/omo-codex/plugin/components/lcx/skills/`; they are no longer authored in this package.
 
-Per-skill layout: `SKILL.md` (YAML frontmatter `name:` + single-line `description:` with triggers) + optional `references/` (the real content; SKILL.md is a router/index) + optional `scripts/` + optional `agents/openai.yaml` (6 skills carry the Codex agent role declaration).
+Per-skill layout: `SKILL.md` (YAML frontmatter `name:` + single-line `description:` with triggers) + optional `references/` (the real content; SKILL.md is a router/index) + optional `scripts/` + optional `agents/openai.yaml` (3 skills carry the Codex agent role declaration).
 
 ## PIPELINE
 

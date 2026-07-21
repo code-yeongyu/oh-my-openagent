@@ -2,6 +2,13 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## #5911 - Worktree merge status can ignore dirty filesystem changes
+
+- **Affects**: Agent-managed git worktree handoff and cleanup flows.
+- **Symptom**: A worktree can be reported as already merged when `HEAD` matches the target branch, even though modified, untracked, or ignored task-state files still exist only in the worktree. Treating commit ancestry as the whole truth can make users believe work has been integrated before it has been committed, merged, or cleaned up.
+- **Workaround**: Before deleting a worktree or accepting an "already merged" answer, run `git status --short --untracked-files=all` from the worktree root. If task state may be ignored, also run `git status --short --ignored --untracked-files=all -- .omo` there. Inspect both results, and delete the worktree only after the filesystem is clean or after the remaining changes have been intentionally copied, committed, or discarded.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5911.
+
 ## #5850 - `ulw` planner can fall into native OpenCode plan mode
 
 - **Affects**: Complex `ulw` runs where planning is delegated through a subagent named `plan` while OpenCode's experimental plan mode is enabled.
@@ -132,6 +139,28 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4863.
 
+## #5367 — OpenCode-managed `@latest` cache can stay pinned after update
+
+- **Affects**: OpenCode installs that load `oh-my-openagent@latest` or legacy `oh-my-opencode@latest` through OpenCode's `Npm.add()` package sandbox under `~/.cache/opencode/packages/`.
+- **Symptom**: OMO reports that an update is available, or `doctor` reports a loaded-version mismatch, but restarting OpenCode keeps loading the older package. Clearing the general npm cache does not necessarily change the sandbox path OpenCode is using.
+- **Why it happens**: When the plugin is running from an OpenCode-managed sandbox such as `~/.cache/opencode/packages/oh-my-openagent@latest/node_modules/oh-my-openagent/`, OMO cannot reliably rewrite that sandbox itself. The auto-update checker therefore avoids claiming "Updated!" from that path and should surface an update-available notice instead.
+- **Workaround**: Close OpenCode and keep exactly one OMO entry in the config that currently owns the plugin. If that entry still uses `oh-my-opencode@latest`, replace it with `oh-my-openagent@latest` instead of adding a second entry. Remove the stale OpenCode package sandbox, then reinstall with `--force` in the same config scope:
+
+  ```sh
+  rm -rf ~/.cache/opencode/packages/oh-my-openagent@latest \
+         ~/.cache/opencode/packages/oh-my-opencode@latest
+
+  # User/global config:
+  opencode plugin --global --force oh-my-openagent@latest
+
+  # Project config (run from that project root instead):
+  opencode plugin --force oh-my-openagent@latest
+
+  bunx oh-my-openagent doctor --json
+  ```
+
+- **Status**: Open. The runtime now avoids the misleading auto-updated toast when it detects an OpenCode-managed sandbox, but users may still need the manual cache refresh above until OpenCode exposes a reliable package-sandbox update path. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5367.
+
 ## #4710: `@plan` may stay in Sisyphus instead of switching to Prometheus
 
 - **Affects**: Current OpenCode/Ultimate planning flow.
@@ -164,7 +193,7 @@ Issue #4059 tracks the reland with stabilized regression coverage. The reland is
 
 - **Affects**: Sessions with an active Ralph Loop and background child subagents.
 - **Symptom**: `/tmp/oh-my-opencode.log` repeats `promptAsync reservation release skipped for different source` while child subagents emit message events.
-- **Workaround**: If you are not using Ralph Loop in that workspace, add `"disabled_hooks": ["ralph-loop"]` to `oh-my-openagent.jsonc`. If a loop is already active, run `/cancel-ralph` before disabling the hook.
+- **Workaround**: Ralph Loop was replaced by the Goal subsystem (PR #6184), and the `ralph-loop` hook is no longer wired at HEAD, so the original flooding only affects releases before that migration. On those older releases, the historical controls were `"disabled_hooks": ["ralph-loop"]` in `oh-my-openagent.jsonc` and `/cancel-ralph`. On current releases, Goal is opt-in (`goal.enabled` defaults to `false`); if you see the same log pattern while a Goal continuation is active, disable the hook with `"disabled_hooks": ["goal"]` and run `/goal clear` (or `/stop-continuation`) to stop the active continuation before disabling it.
 - **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/5105.
 
 ## #5025 — OpenCode Desktop loads the plugin but only shows native modes

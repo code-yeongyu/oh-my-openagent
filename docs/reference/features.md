@@ -52,6 +52,22 @@ Ask @explore for the policy on this feature
 | atlas             | Cannot delegate (blocked: task, call_omo_agent)                                         |
 | momus             | Cannot write, edit, or delegate (blocked: write, edit, task)                            |
 
+### Instruction Files vs Enforcement
+
+`AGENTS.md` files are instruction context. They tell agents how to work in a
+project, and OMO can inject that context into prompts, but they are not a
+deterministic permission boundary.
+
+Deterministic enforcement today comes from OMO config (`agents.*.permission`,
+agent `tools`, disabled tools/agents), built-in agent restrictions, OpenCode's
+own permission gate when it is available, and guard hooks such as
+`team-tool-gating`, `write-existing-file-guard`, and `prometheus-md-only`.
+
+OMO does not currently read an `AGENTOWNERS.yml` file or run a generic
+AGENTOWNERS policy-enforcer hook. If a project needs hard agent boundaries,
+encode them in config permissions, tool allowlists, repository protections, or
+review gates rather than relying on prose-only instructions.
+
 ### Background Agents
 
 Run agents in the background and continue working:
@@ -321,12 +337,10 @@ Commands are slash-triggered workflows that execute predefined templates.
 | Command              | Description                                                                                |
 | -------------------- | ------------------------------------------------------------------------------------------ |
 | `/init-deep`         | Initialize hierarchical AGENTS.md knowledge base                                           |
-| `/ralph-loop`        | Start self-referential development loop until completion                                   |
-| `/ulw-loop`          | Start ultrawork loop - continues with ultrawork mode                                       |
-| `/cancel-ralph`      | Cancel active Ralph Loop                                                                   |
+| `/goal`              | Set, show, pause, resume, or clear the active thread goal                                  |
 | `/refactor`          | Intelligent refactoring with LSP, AST-grep, architecture analysis, and TDD verification    |
 | `/start-work`        | Start Atlas work session from Prometheus plan                                              |
-| `/stop-continuation` | Stop all continuation mechanisms (ralph loop, todo continuation, boulder) for this session |
+| `/stop-continuation` | Stop all continuation mechanisms (todo continuation, Goal, boulder) for this session       |
 | `/handoff`           | Create a detailed context summary for continuing work in a new session                     |
 
 ### /init-deep
@@ -350,33 +364,55 @@ project/
 │       └── AGENTS.md                # Component-specific context
 ```
 
-### /ralph-loop
+### /goal
 
-**Purpose**: Self-referential development loop that runs until task completion
-
-**Named after**: Anthropic's Ralph Wiggum plugin
+**Purpose**: Set a persistent thread objective the agent pursues across turns until paused, cleared, or completed.
 
 **Usage**:
 
 ```
-/ralph-loop "Build a REST API with authentication"
-/ralph-loop "Refactor the payment module" --max-iterations=50
+/goal "Build a REST API with authentication"
+/goal                    # show the current goal
+/goal pause              # stop idle continuations
+/goal resume             # resume a paused goal
+/goal clear              # clear the current goal
 ```
 
 **Behavior**:
 
-- Agent works continuously toward the goal
-- Detects `<promise>DONE</promise>` to know when complete
-- Auto-continues if agent stops without completion
-- Ends when: completion detected, max iterations reached (default 100), or `/cancel-ralph`
+- The goal persists for the session and is shown in the TUI.
+- While a goal is active, every `session.idle` re-injects a continuation prompt that tracks `tokensUsed` and `timeUsedSeconds`.
+- The agent calls `update_goal({ status: "complete" })` only after a completion audit confirms the objective is achieved.
+- `pause` stops idle continuations without clearing the goal; `clear` removes it. `session.deleted` also clears the goal.
+- Goal state is stored in `.omo/goal/<sessionID>.json`.
 
-**Configure**: `{ "ralph_loop": { "enabled": true, "default_max_iterations": 100 } }`
+**Tools** (registered only when `goal.enabled` is true):
+
+- `create_goal` - create or replace the active goal objective.
+- `update_goal` - pause, resume, mark complete, or change the objective.
+- `get_goal` - read the current objective, status, and usage accounting.
+
+**Configure**:
+
+```jsonc
+{
+  "goal": {
+    "enabled": true,
+    "auto_start": false,
+    "default_max_iterations": 100
+  }
+}
+```
+
+- `enabled` (default `false`) gates the Goal subsystem and its tools.
+- `auto_start` (default `false`) allows a goal to be auto-created from the first main-session message when `default_mode.goal` is true.
+- `default_max_iterations` (1-1000, default `100`) is the continuation iteration cap, preserved for Ralph Loop behavioral parity.
+
+**Migration**: the legacy top-level `ralph_loop` config auto-migrates to `goal` at load time and logs a deprecation warning; explicit `goal` config wins over migrated values. `default_mode.ralph_loop` was renamed to `default_mode.goal`.
 
 ### /ulw-loop
 
-**Purpose**: Same as ralph-loop but with ultrawork mode active
-
-Everything runs at maximum intensity - parallel agents, background tasks, aggressive exploration.
+The `/ulw-loop` slash command has been removed; continuous goal pursuit is now handled by `/goal`. The `omo ulw-loop` CLI subcommand remains as a passthrough to the Codex LazyCodex ulw-loop CLI.
 
 ### /refactor
 
@@ -412,7 +448,7 @@ Uses atlas agent to execute planned tasks systematically.
 
 **Purpose**: Stop all continuation mechanisms for this session
 
-Stops ralph loop, todo continuation, and boulder state. Use when you want the agent to stop its current multi-step workflow.
+Stops todo continuation, clears the active Goal, and clears boulder state. Use when you want the agent to stop its current multi-step workflow.
 
 ### /handoff
 
@@ -843,7 +879,7 @@ Current composition counts:
 | --------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **keyword-detector**        | Message + Transform | IntentGate detector. Activates `ultrawork`/`ulw`, `search`, `analyze`, and `team` modes from message keywords. |
 | **think-mode**              | Params              | Auto-detects extended thinking needs. Catches "think deeply", "ultrathink" and adjusts model settings.                                                      |
-| **ralph-loop**              | Event + Message     | Manages self-referential loop continuation.                                                                                                                 |
+| **goal**                    | Event               | Re-injects a goal continuation prompt on session.idle while a goal is active; clears the goal on session.deleted.                                           |
 | **start-work**              | Message             | Handles /start-work command execution.                                                                                                                      |
 | **auto-slash-command**      | Message             | Automatically executes slash commands from prompts.                                                                                                         |
 | **stop-continuation-guard** | Event + Message     | Guards the stop-continuation mechanism.                                                                                                                     |

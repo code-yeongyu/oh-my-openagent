@@ -22,6 +22,17 @@ export function createTaskIdFactory(clock: () => number = Date.now): () => TaskI
   }
 }
 
+export function bumpTaskId(id: TaskId): TaskId {
+  const value = Number.parseInt(id.slice(3), 16)
+  if (value >= MAX_TASK_ID_VALUE) throw new TaskIdSpaceExhaustedError()
+  return formatTaskId(value + 1)
+}
+
+export function syncTaskIdFloor(id: TaskId): void {
+  const value = Number.parseInt(id.slice(3), 16)
+  lastTaskIdValue = Math.max(lastTaskIdValue ?? -1, value)
+}
+
 export function parseTaskId(value: string): TaskId {
   if (!isTaskId(value)) throw new Error("Invalid task id; expected st_[0-9a-f]{8}")
   return value

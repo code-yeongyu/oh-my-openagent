@@ -21,7 +21,7 @@ export const RESIDENCY_STATES = [
 export type ResidencyState = (typeof RESIDENCY_STATES)[number]
 export type Messageability = "steer" | "revive" | "not-continuable"
 
-export const RESOLVED_MODEL_SOURCES = ["category", "explicit"] as const
+export const RESOLVED_MODEL_SOURCES = ["category", "explicit", "agent"] as const
 
 export type ResolvedModelSource = (typeof RESOLVED_MODEL_SOURCES)[number]
 

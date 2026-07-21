@@ -107,4 +107,33 @@ describe("admitResident (residency cap + LRU eviction)", () => {
     // then
     expect(result.kind).toBe("admitted")
   })
+  test("#given lost residents pin every slot #when admitting #then the oldest lost resident is evicted (residency-leak regression)", async () => {
+    // given: the leak seen live - {lost, resident} records filling the cap while real work runs
+    const store = tempStore()
+    seedRecord(store, { task_id: "st_000000e0", status: "lost", residency_state: "resident", updated_at: iso(0) })
+    seedRecord(store, { task_id: "st_000000e1", status: "running", residency_state: "resident", updated_at: iso(10) })
+    const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings({ residency_max_children: 2 }) })
+
+    // when
+    const result = await lifecycle.admitResident("parent-1")
+
+    // then
+    expect(result).toEqual({ kind: "evicted", evicted_task_id: "st_000000e0" })
+    expect(store.load("st_000000e0")?.residency_state).toBe("evicted")
+    expect(store.load("st_000000e1")?.residency_state).toBe("resident")
+  })
+
+  test("#given a cancelled resident at the cap #when admitting #then it is evicted like any other terminal", async () => {
+    // given
+    const store = tempStore()
+    seedRecord(store, { task_id: "st_000000f0", status: "cancelled", residency_state: "resident", updated_at: iso(0) })
+    seedRecord(store, { task_id: "st_000000f1", status: "running", residency_state: "resident", updated_at: iso(10) })
+    const lifecycle = createTaskLifecycle({ store, registry: new FakeRegistry(), config: settings({ residency_max_children: 2 }) })
+
+    // when
+    const result = await lifecycle.admitResident("parent-1")
+
+    // then
+    expect(result).toEqual({ kind: "evicted", evicted_task_id: "st_000000f0" })
+  })
 })

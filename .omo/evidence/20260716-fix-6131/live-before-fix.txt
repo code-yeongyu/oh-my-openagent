@@ -1,0 +1,25 @@
+initialize: {"name":"lsp","version":"0.1.0"}
+workspace: C:\Users\pss\AppData\Local\Temp\omo-6131-live-ngnvyT
+marksman: C:/Users/pss/.omo-contrib/tools/marksman.exe
+elapsedMs: 4302
+lsp_diagnostics result:
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Timed out waiting for fresh diagnostics for C:\\Users\\pss\\AppData\\Local\\Temp\\omo-6131-live-ngnvyT\\README.md within 3000ms."
+    }
+  ],
+  "isError": true,
+  "details": {
+    "filePath": "C:\\Users\\pss\\AppData\\Local\\Temp\\omo-6131-live-ngnvyT\\README.md",
+    "severity": "all",
+    "mode": "file",
+    "diagnostics": [],
+    "totalDiagnostics": 0,
+    "truncated": false,
+    "error": "Timed out waiting for fresh diagnostics for C:\\Users\\pss\\AppData\\Local\\Temp\\omo-6131-live-ngnvyT\\README.md within 3000ms.",
+    "errorKind": "freshness_timeout"
+  }
+}
+exit=0

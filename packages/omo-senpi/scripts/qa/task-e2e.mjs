@@ -2,11 +2,12 @@
 import { spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
-import { delimiter, dirname, join, resolve } from "node:path"
+import { basename, delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { createSandbox, digestDirectory, seedSandbox } from "./drive.mjs"
 import {
   changedRealPaths,
+  classifyRealSenpiChanges,
   findBatchFanout,
   findCategoryListingError,
   findInlineFinal,
@@ -166,16 +167,21 @@ function main() {
   const checks = {}
   const capture = {}
   const pids = []
+  const sandboxes = []
   try {
-    for (const runner of [runMainFlow, runBatchFlow, runSyncFlow, runNegativeFlow]) runner(senpiBin, checks, capture, pids)
+    for (const runner of [runMainFlow, runBatchFlow, runSyncFlow, runNegativeFlow]) {
+      sandboxes.push(runner(senpiBin, checks, capture, pids))
+    }
   } finally {
     for (const pid of pids) if (isAlive(pid)) killTree(pid)
   }
 
   const leakedPids = pids.filter(isAlive).length
   const afterDigest = digestDirectory(realSenpiAgentDir)
-  const changedReal = changedRealPaths(beforeSnapshot, snapshotDir(realSenpiAgentDir))
-  const realSenpiUntouched = changedReal.length === 0
+  const allChangedRealPaths = changedRealPaths(beforeSnapshot, snapshotDir(realSenpiAgentDir))
+  const sandboxTokens = sandboxes.map((sandbox) => basename(sandbox.root))
+  const { qaAttributedPaths, concurrentSessionPaths } = classifyRealSenpiChanges(allChangedRealPaths, sandboxTokens)
+  const realSenpiUntouched = qaAttributedPaths.length === 0
   checks.real_senpi_untouched = realSenpiUntouched ? "PASS" : "FAIL"
   checks.no_leaked_pids = leakedPids === 0 ? "PASS" : "FAIL"
 
@@ -187,9 +193,14 @@ function main() {
     leakedPids,
     spawnedPids: pids,
     realSenpiUntouched,
-    realSenpiChangedPaths: changedReal,
+    realSenpiChangedPaths: qaAttributedPaths,
+    concurrentRealSenpiChangedPaths: concurrentSessionPaths,
+    allRealSenpiChangedPaths: allChangedRealPaths,
     realSenpiDigestUnchanged: beforeDigest === afterDigest,
     providedAgentDir,
+    sandboxAgentDirs: sandboxes.map((sandbox) => sandbox.agentDir),
+    sandboxCwds: sandboxes.map((sandbox) => sandbox.cwd),
+    sandboxTokens,
     markerChildExtensions: capture.markerCount,
     mainTaskId: capture.mainTaskId,
     mainSignatures: capture.mainSignatures,

@@ -18,6 +18,7 @@ export interface SenpiExtensionAPI {
   sendMessage(message: Record<string, unknown>, options?: Record<string, unknown>): void
   sendUserMessage(content: string | readonly Record<string, unknown>[], options?: { deliverAs?: "steer" | "followUp" }): void
   registerMessageRenderer?(customType: string, renderer: unknown): void
+  registerMcpServer?(name: string, config: Record<string, unknown>): void
 }
 
 export interface ComponentLogger {

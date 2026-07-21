@@ -221,7 +221,7 @@ Even with only the following subscriptions, `ultrawork` works well (this project
 |   🔎   | **AST-Grep**                                             | Ultimate | Pattern-aware code search and rewriting across 25 languages.                                                                                                                                                     |
 |   🧠   | **Background Agents**                                    | Ultimate | Fire 5+ specialists in parallel. Context stays lean. Results when ready.                                                                                                                                         |
 |   📚   | **Built-in MCPs** (web/docs/code search)                 | Ultimate | Exa (web search), Context7 (official docs), Grep.app (GitHub search). Always on.                                                                                                                                 |
-|   🔁   | **Ralph Loop / `/ulw-loop`**                             | Ultimate | Self-referential loop. Doesn't stop until 100% done.                                                                                                                                                             |
+|   🔁   | **Goal / `/goal`**                                       | Ultimate | Persistent per-session objective. Re-injects a continuation prompt on every idle until a completion audit says it's done.                                                                                        |
 |   ✅   | **Todo Enforcer**                                        | Ultimate | Agent goes idle? System yanks it back. Your task gets done, period.                                                                                                                                              |
 |   💬   | **Comment Checker**                                      | Both     | No AI slop in comments. Code reads like a senior wrote it.                                                                                                                                                       |
 |   📐   | **Rules Injection** (`AGENTS.md` / `.omo/rules/**`)      | Both     | Project rules and AGENTS.md auto-loaded into the agent's context at every prompt.                                                                                                                                |
@@ -433,7 +433,7 @@ See full [Features Documentation](docs/reference/features.md).
 - **Claude Code Compatibility**: Full hook system, commands, skills, agents, MCPs
 - **Built-in MCPs**: websearch (Exa), context7 (docs), grep_app (GitHub search) — injected at runtime by the plugin; not visible in `opencode mcp list` (see [MCP docs](docs/reference/features.md#native-vs-plugin-injected-mcps))
 - **Session Tools**: List, read, search, and analyze session history
-- **Productivity Features**: Ralph Loop, Todo Enforcer, Comment Checker, Think Mode, and more
+- **Productivity Features**: Goal, Todo Enforcer, Comment Checker, Think Mode, and more
 - **Doctor Command**: Built-in diagnostics (`bunx oh-my-opencode doctor`) verify plugin registration, config, models, and environment
 - **Model Fallbacks**: `fallback_models` can mix plain model strings with per-fallback object settings in the same array
 - **File Prompts**: Load prompts from files with `file://` support in agent configurations

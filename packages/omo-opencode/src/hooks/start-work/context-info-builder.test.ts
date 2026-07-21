@@ -412,4 +412,109 @@ describe("buildStartWorkContextInfo", () => {
     }
     expect(workIds).toContain(workC.work_id)
   })
+
+  describe("notepad scaffolding side-effect", () => {
+    test("#given single incomplete plan and no active work #when buildStartWorkContextInfo auto-selects it #then scaffolds .omo/notepads/<plan-basename>/{learnings,decisions,issues,problems}.md", () => {
+      // given
+      writePlan("auto-scaffold-plan", "## TODOs\n- [ ] 1. Auto task")
+
+      // when
+      buildStartWorkContextInfo({
+        ctx: createPluginInput(),
+        explicitPlanName: null,
+        existingState: null,
+        sessionId: "session-current",
+        timestamp: "2026-05-11T00:00:00.000Z",
+        activeAgent: "atlas",
+        worktreePath: undefined,
+        worktreeBlock: "",
+      })
+
+      // then
+      const notepadDir = join(testDirectory, ".omo", "notepads", "auto-scaffold-plan")
+      expect(existsSync(join(notepadDir, "learnings.md"))).toBe(true)
+      expect(existsSync(join(notepadDir, "decisions.md"))).toBe(true)
+      expect(existsSync(join(notepadDir, "issues.md"))).toBe(true)
+      expect(existsSync(join(notepadDir, "problems.md"))).toBe(true)
+    })
+
+    test("#given explicit plan name matching a plan file #when built with explicitPlanName #then scaffolds notepad for that plan", () => {
+      // given
+      writePlan("explicit-scaffold-plan", "## TODOs\n- [ ] 1. Explicit task")
+
+      // when
+      buildStartWorkContextInfo({
+        ctx: createPluginInput(),
+        explicitPlanName: "explicit-scaffold-plan",
+        existingState: null,
+        sessionId: "session-current",
+        timestamp: "2026-05-11T00:00:00.000Z",
+        activeAgent: "atlas",
+        worktreePath: undefined,
+        worktreeBlock: "",
+      })
+
+      // then
+      const notepadDir = join(testDirectory, ".omo", "notepads", "explicit-scaffold-plan")
+      expect(existsSync(join(notepadDir, "learnings.md"))).toBe(true)
+      expect(existsSync(join(notepadDir, "decisions.md"))).toBe(true)
+      expect(existsSync(join(notepadDir, "issues.md"))).toBe(true)
+      expect(existsSync(join(notepadDir, "problems.md"))).toBe(true)
+    })
+
+    test("#given existing active boulder state for a plan #when resume path taken #then scaffolds notepad (idempotent - files appear)", () => {
+      // given
+      const planPath = writePlan("resume-scaffold-plan", "## TODOs\n- [ ] 1. Resume task")
+      const initialState = createBoulderState(planPath, "session-a", "atlas", "/tmp/worktree-resume")
+      writeBoulderState(testDirectory, initialState)
+
+      // when
+      buildStartWorkContextInfo({
+        ctx: createPluginInput(),
+        explicitPlanName: null,
+        existingState: readExistingState(),
+        sessionId: "session-current",
+        timestamp: "2026-05-11T00:00:00.000Z",
+        activeAgent: "atlas",
+        worktreePath: undefined,
+        worktreeBlock: "",
+      })
+
+      // then
+      const notepadDir = join(testDirectory, ".omo", "notepads", "resume-scaffold-plan")
+      expect(existsSync(join(notepadDir, "learnings.md"))).toBe(true)
+      expect(existsSync(join(notepadDir, "decisions.md"))).toBe(true)
+      expect(existsSync(join(notepadDir, "issues.md"))).toBe(true)
+      expect(existsSync(join(notepadDir, "problems.md"))).toBe(true)
+    })
+
+    test("#given multiple active works #when built (ask-user branch) #then does NOT create any notepad files", () => {
+      // given
+      const planAPath = writePlan("multi-scaffold-plan-a", "## TODOs\n- [ ] 1. Multi A")
+      const planBPath = writePlan("multi-scaffold-plan-b", "## TODOs\n- [ ] 1. Multi B")
+      const initialState = createBoulderState(planAPath, "session-a", "atlas", "/tmp/worktree-multi-a")
+      writeBoulderState(testDirectory, initialState)
+      addBoulderWork(testDirectory, {
+        planPath: planBPath,
+        sessionId: "session-b",
+        agent: "atlas",
+        worktreePath: "/tmp/worktree-multi-b",
+      })
+
+      // when
+      buildStartWorkContextInfo({
+        ctx: createPluginInput(),
+        explicitPlanName: null,
+        existingState: readExistingState(),
+        sessionId: "session-current",
+        timestamp: "2026-05-11T00:00:00.000Z",
+        activeAgent: "atlas",
+        worktreePath: undefined,
+        worktreeBlock: "",
+      })
+
+      // then
+      expect(existsSync(join(testDirectory, ".omo", "notepads"))).toBe(false)
+    })
+  })
 })

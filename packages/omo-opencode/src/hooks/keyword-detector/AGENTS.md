@@ -1,6 +1,6 @@
 # src/hooks/keyword-detector/ -- Mode Keyword Injection
 
-**Generated:** 2026-05-24
+**Generated:** 2026-07-17
 
 ## OVERVIEW
 
@@ -32,6 +32,7 @@ keyword-detector/
 │   ├── default.ts     # thin loader for prompts-core/prompts/ultrawork/default.md
 │   ├── gpt.ts         # thin loader for prompts-core/prompts/ultrawork/gpt.md
 │   ├── gemini.ts      # thin loader for prompts-core/prompts/ultrawork/gemini.md
+│   ├── glm.ts         # thin loader for prompts-core/prompts/ultrawork/glm.md
 │   └── planner.ts     # thin loader for prompts-core/prompts/ultrawork/planner.md
 ├── team/
 │   ├── index.ts
@@ -48,6 +49,7 @@ keyword-detector/
 | Ultrawork default | [`packages/prompts-core/prompts/ultrawork/default.md`](../../../../prompts-core/prompts/ultrawork/default.md) |
 | Ultrawork GPT | [`packages/prompts-core/prompts/ultrawork/gpt.md`](../../../../prompts-core/prompts/ultrawork/gpt.md) |
 | Ultrawork Gemini | [`packages/prompts-core/prompts/ultrawork/gemini.md`](../../../../prompts-core/prompts/ultrawork/gemini.md) |
+| Ultrawork GLM | [`packages/prompts-core/prompts/ultrawork/glm.md`](../../../../prompts-core/prompts/ultrawork/glm.md) |
 | Ultrawork planner | [`packages/prompts-core/prompts/ultrawork/planner.md`](../../../../prompts-core/prompts/ultrawork/planner.md) |
 | Team mode | [`packages/prompts-core/prompts/mode/team.md`](../../../../prompts-core/prompts/mode/team.md) |
 | Hyperplan mode | [`packages/prompts-core/prompts/mode/hyperplan.md`](../../../../prompts-core/prompts/mode/hyperplan.md) |
@@ -61,7 +63,8 @@ The `src/hooks/keyword-detector/{team,hyperplan}/default.ts` files keep the rege
 1. Planner agents (`prometheus`, `planner`, or normalized `plan`) route to `planner.md`.
 2. GPT family models, as detected by `isGptModel(modelID)`, route to `gpt.md`.
 3. Gemini family models, as detected by `isGeminiModel(modelID)`, route to `gemini.md`.
-4. Everything else routes to `default.md`.
+4. GLM family models, as detected by `isGlmModel(modelID)`, route to `glm.md`.
+5. Everything else routes to `default.md`.
 
 [`ultrawork/index.ts`](ultrawork/index.ts) exposes `getUltraworkMessage(agentName, modelID)`, switches on that source, and returns the loaded markdown body.
 
