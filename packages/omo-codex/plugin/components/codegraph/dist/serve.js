@@ -88,6 +88,44 @@ function buildCodegraphChildEnv(options = {}) {
   return env;
 }
 
+// ../../../../utils/src/codegraph/manifest.ts
+var CODEGRAPH_PINNED_VERSION = "1.4.1";
+var CODEGRAPH_PROVISION_MANIFEST = {
+  assets: {
+    "darwin-arm64": {
+      executableName: "codegraph",
+      sha256: "4a679ae5a5cb9fff900dd59bb786da6a581b7f68f4cf713bdedd137e347d34dc",
+      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.4.1/codegraph-darwin-arm64.tar.gz"
+    },
+    "darwin-x64": {
+      executableName: "codegraph",
+      sha256: "436f96943cfd926ea6d0a8454f18833d21254d5fd9b3d224317b1426132def95",
+      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.4.1/codegraph-darwin-x64.tar.gz"
+    },
+    "linux-arm64": {
+      executableName: "codegraph",
+      sha256: "0d62c5eb2722f8d19d20f7a1bd974445e18d5294cb59be116a0c3d55ce87591f",
+      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.4.1/codegraph-linux-arm64.tar.gz"
+    },
+    "linux-x64": {
+      executableName: "codegraph",
+      sha256: "fb585ff5018d6faaa46d282b61f4f689bc7967ed8a1b467a5c556dd7ced9b542",
+      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.4.1/codegraph-linux-x64.tar.gz"
+    },
+    "win32-arm64": {
+      executableName: "codegraph.cmd",
+      sha256: "e2a2a28c802a79804c7df203afa50bd461309c6c180ce3f76079fdc7cddc7697",
+      url: "https://registry.npmjs.org/@colbymchenry/codegraph-win32-arm64/-/codegraph-win32-arm64-1.4.1.tgz"
+    },
+    "win32-x64": {
+      executableName: "codegraph.cmd",
+      sha256: "4f08700fda5f4a03ad5b2956135c5788d739a351b3433db2b5820e5d5224c30d",
+      url: "https://registry.npmjs.org/@colbymchenry/codegraph-win32-x64/-/codegraph-win32-x64-1.4.1.tgz"
+    }
+  },
+  version: CODEGRAPH_PINNED_VERSION
+};
+
 // ../../../../utils/src/codegraph/node-support.ts
 var CODEGRAPH_MIN_NODE_MAJOR = 20;
 var CODEGRAPH_BLOCKED_NODE_MAJOR = 25;
@@ -125,45 +163,6 @@ import { existsSync } from "node:fs";
 import { homedir as homedir2, hostname } from "node:os";
 import { basename, join as join2 } from "node:path";
 import { promisify } from "node:util";
-
-// ../../../../utils/src/codegraph/manifest.ts
-var CODEGRAPH_PROVISION_MANIFEST = {
-  assets: {
-    "darwin-arm64": {
-      executableName: "codegraph",
-      sha256: "95bb27bf6382b69659e158e0c04d71cc394778951e1317d582be7807e7866908",
-      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.0.1/codegraph-darwin-arm64.tar.gz"
-    },
-    "darwin-x64": {
-      executableName: "codegraph",
-      sha256: "3311cc1d1f0f0ad742709b6a43d8a9187b1ef0af0dd30e0b58008dc673e29478",
-      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.0.1/codegraph-darwin-x64.tar.gz"
-    },
-    "linux-arm64": {
-      executableName: "codegraph",
-      sha256: "e16f612bc96c2ebccd04574cbed500c9939147c80666ad6bb024398dff7992ae",
-      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.0.1/codegraph-linux-arm64.tar.gz"
-    },
-    "linux-x64": {
-      executableName: "codegraph",
-      sha256: "d45a068f44596a85c7ba7d0ef924eaf7103fbbf3cafbeb668127daff60a52228",
-      url: "https://github.com/colbymchenry/codegraph/releases/download/v1.0.1/codegraph-linux-x64.tar.gz"
-    },
-    "win32-arm64": {
-      executableName: "codegraph.cmd",
-      sha256: "8d57ced73b24d35f758f2ede2318e80e1d7241987f37a999e3d80edb6fddf961",
-      url: "https://registry.npmjs.org/@colbymchenry/codegraph-win32-arm64/-/codegraph-win32-arm64-1.0.1.tgz"
-    },
-    "win32-x64": {
-      executableName: "codegraph.cmd",
-      sha256: "52607fe73b05e741fd1087da2ceca9d3c8f565e36bf1a7070600bdbdf3931e32",
-      url: "https://registry.npmjs.org/@colbymchenry/codegraph-win32-x64/-/codegraph-win32-x64-1.0.1.tgz"
-    }
-  },
-  version: "1.0.1"
-};
-
-// ../../../../utils/src/codegraph/provision.ts
 var DEFAULT_LOCK_WAIT_MS = 5000;
 var DEFAULT_LOCK_STALE_MS = 120000;
 var DEFAULT_DOWNLOAD_TIMEOUT_MS = 60000;
@@ -2434,7 +2433,7 @@ var CODEGRAPH_DISABLED_HINT = `CodeGraph MCP skipped: disabled by OMO SOT config
 `;
 var CODEGRAPH_EXCLUDED_HINT = `CodeGraph MCP skipped: project excluded by OMO CodeGraph policy.
 `;
-var CODEGRAPH_VERSION = "1.0.1";
+var CODEGRAPH_VERSION = CODEGRAPH_PINNED_VERSION;
 var PROJECT_CWD_ENV_KEYS = ["OMO_CODEGRAPH_PROJECT_CWD", SESSION_START_CWD_ENV, "PWD"];
 async function runCodegraphServe(options = {}) {
   const env = options.env ?? processEnv;
