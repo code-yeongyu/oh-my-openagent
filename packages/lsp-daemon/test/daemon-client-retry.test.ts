@@ -87,14 +87,14 @@ function recordMessages(socket: Socket, recorder: ReturnType<typeof createMessag
 	socket.on("data", (chunk: Buffer) => decoder.push(chunk));
 }
 
-	describe("daemon-client retry discipline", () => {
-		it("#given a server that never answers in time #when the call times out #then the request is executed exactly once", async () => {
-			const paths = tempPaths();
-			let requestCount = 0;
-			const server = createServer((socket) => {
-				const decoder = createLineDecoder(() => {
-					requestCount += 1;
-				});
+describe("daemon-client retry discipline", () => {
+	it("#given a server that never answers in time #when the call times out #then the request is executed exactly once", async () => {
+		const paths = tempPaths();
+		let requestCount = 0;
+		const server = createServer((socket) => {
+			const decoder = createLineDecoder(() => {
+				requestCount += 1;
+			});
 			socket.on("data", (chunk) => decoder.push(chunk));
 		});
 		servers.push(server);
@@ -111,69 +111,77 @@ function recordMessages(socket: Socket, recorder: ReturnType<typeof createMessag
 			},
 		);
 
-			expect(result.isError).toBe(true);
-			expect(result.content[0]?.text).toContain("daemon request timed out");
-			expect(requestCount).toBe(1);
-		});
+		expect(result.isError).toBe(true);
+		expect(result.content[0]?.text).toContain("daemon request timed out");
+		expect(result.content[0]?.text).not.toContain("unreachable");
+		expect(requestCount).toBe(1);
+	});
 
-		it("#given a daemon request timeout #when request bytes were written #then an authenticated cancel is sent for the proxy id before close", async () => {
-			const paths = tempPaths();
-			const recorder = createMessageRecorder();
-			const server = createServer((socket) => {
-				recordMessages(socket, recorder);
+	it("#given a daemon request timeout #when request bytes were written #then an authenticated cancel is sent for the proxy id before close", async () => {
+		const paths = tempPaths();
+		const recorder = createMessageRecorder();
+		const server = createServer((socket) => {
+			recordMessages(socket, recorder);
+		});
+		servers.push(server);
+		await new Promise<void>((resolve) => server.listen(paths.socket, resolve));
+
+		const result = await callToolViaDaemon(
+			"status",
+			{},
+			{ paths, ensure: async () => {}, requestTimeoutMs: 50, context: defaultContext() },
+		);
+		await recorder.waitForCount(2);
+
+		const request = recorder.messages.find((message) => jsonRpcMethod(message) === "tools/call");
+		const cancel = recorder.messages.find((message) => jsonRpcMethod(message) === "$/cancelRequest");
+		expect(result.isError).toBe(true);
+		expect(jsonRpcId(request)).not.toBe(1);
+		expect(cancelTargetId(cancel)).toBe(jsonRpcId(request));
+		expect(extractToken(cancel)).toBe("retry-test-token");
+	});
+
+	it("#given a caller abort #when request bytes were written #then the daemon client sends authenticated cancellation for the same proxy id", async () => {
+		const paths = tempPaths();
+		const controller = new AbortController();
+		const recorder = createMessageRecorder();
+		const server = createServer((socket) => {
+			const decoder = createLineDecoder((message) => {
+				recorder.push(message);
+				if (jsonRpcMethod(message) === "tools/call") controller.abort();
 			});
-			servers.push(server);
-			await new Promise<void>((resolve) => server.listen(paths.socket, resolve));
-
-			const result = await callToolViaDaemon("status", {}, { paths, ensure: async () => {}, requestTimeoutMs: 50, context: defaultContext() });
-			await recorder.waitForCount(2);
-
-			const request = recorder.messages.find((message) => jsonRpcMethod(message) === "tools/call");
-			const cancel = recorder.messages.find((message) => jsonRpcMethod(message) === "$/cancelRequest");
-			expect(result.isError).toBe(true);
-			expect(jsonRpcId(request)).not.toBe(1);
-			expect(cancelTargetId(cancel)).toBe(jsonRpcId(request));
-			expect(extractToken(cancel)).toBe("retry-test-token");
+			socket.on("data", (chunk) => decoder.push(chunk));
 		});
+		servers.push(server);
+		await new Promise<void>((resolve) => server.listen(paths.socket, resolve));
 
-		it("#given a caller abort #when request bytes were written #then the daemon client sends authenticated cancellation for the same proxy id", async () => {
-			const paths = tempPaths();
-			const controller = new AbortController();
-			const recorder = createMessageRecorder();
-			const server = createServer((socket) => {
-				const decoder = createLineDecoder((message) => {
-					recorder.push(message);
-					if (jsonRpcMethod(message) === "tools/call") controller.abort();
-				});
-				socket.on("data", (chunk) => decoder.push(chunk));
+		const result = await callToolViaDaemon(
+			"status",
+			{},
+			{ paths, ensure: async () => {}, requestTimeoutMs: 100, signal: controller.signal, context: defaultContext() },
+		);
+		await recorder.waitForCount(2);
+
+		const request = recorder.messages.find((message) => jsonRpcMethod(message) === "tools/call");
+		const cancel = recorder.messages.find((message) => jsonRpcMethod(message) === "$/cancelRequest");
+		expect(result.isError).toBe(true);
+		expect(result.content[0]?.text).toContain("cancelled");
+		expect(result.content[0]?.text).not.toContain("unreachable");
+		expect(cancelTargetId(cancel)).toBe(jsonRpcId(request));
+		expect(extractToken(cancel)).toBe("retry-test-token");
+	});
+
+	it("#given the socket appears only after the first connect failure #when retrying #then the second attempt succeeds with one delivered request", async () => {
+		const paths = tempPaths();
+		let requestCount = 0;
+		let ensureCallCount = 0;
+
+		const server = createServer((socket) => {
+			const decoder = createLineDecoder((message) => {
+				requestCount += 1;
+				const id = jsonRpcId(message);
+				socket.write(encodeJsonLine({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: "ok" }] } }));
 			});
-			servers.push(server);
-			await new Promise<void>((resolve) => server.listen(paths.socket, resolve));
-
-			const result = await callToolViaDaemon("status", {}, { paths, ensure: async () => {}, requestTimeoutMs: 100, signal: controller.signal, context: defaultContext() });
-			await recorder.waitForCount(2);
-
-			const request = recorder.messages.find((message) => jsonRpcMethod(message) === "tools/call");
-			const cancel = recorder.messages.find((message) => jsonRpcMethod(message) === "$/cancelRequest");
-			expect(result.isError).toBe(true);
-			expect(result.content[0]?.text).toContain("cancelled");
-			expect(cancelTargetId(cancel)).toBe(jsonRpcId(request));
-			expect(extractToken(cancel)).toBe("retry-test-token");
-		});
-
-		it("#given the socket appears only after the first connect failure #when retrying #then the second attempt succeeds with one delivered request", async () => {
-			const paths = tempPaths();
-			let requestCount = 0;
-			let ensureCallCount = 0;
-
-			const server = createServer((socket) => {
-				const decoder = createLineDecoder((message) => {
-					requestCount += 1;
-					const id = jsonRpcId(message);
-					socket.write(
-						encodeJsonLine({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: "ok" }] } }),
-					);
-				});
 			socket.on("data", (chunk) => decoder.push(chunk));
 		});
 		servers.push(server);
@@ -258,11 +266,11 @@ function recordMessages(socket: Socket, recorder: ReturnType<typeof createMessag
 	}) => {
 		const paths = tempPaths();
 		let requestCount = 0;
-			const server = createServer((socket) => {
-				const decoder = createLineDecoder((message) => {
-					requestCount += 1;
-					socket.write(encodeJsonLine({ jsonrpc: "2.0", id: jsonRpcId(message), result: invalidResult }));
-				});
+		const server = createServer((socket) => {
+			const decoder = createLineDecoder((message) => {
+				requestCount += 1;
+				socket.write(encodeJsonLine({ jsonrpc: "2.0", id: jsonRpcId(message), result: invalidResult }));
+			});
 			socket.on("data", (chunk) => decoder.push(chunk));
 		});
 		servers.push(server);
@@ -293,42 +301,46 @@ function recordMessages(socket: Socket, recorder: ReturnType<typeof createMessag
 				requestCount += 1;
 				const token = extractToken(message);
 				if (token) seenTokens.push(token);
-					if (requestCount === 1) {
-						writeFileSync(paths.auth, `${freshToken}\n`, { mode: 0o600 });
-						socket.write(
-							encodeJsonLine({
-								jsonrpc: "2.0",
-								id: jsonRpcId(message),
-								error: {
+				if (requestCount === 1) {
+					writeFileSync(paths.auth, `${freshToken}\n`, { mode: 0o600 });
+					socket.write(
+						encodeJsonLine({
+							jsonrpc: "2.0",
+							id: jsonRpcId(message),
+							error: {
 								code: -32001,
 								message: "daemon authentication failed",
 								data: { code: "daemon_authentication_failed" },
 							},
 						}),
 					);
-						return;
-					}
-					socket.write(
-						encodeJsonLine({
-							jsonrpc: "2.0",
-							id: jsonRpcId(message),
-							result: { content: [{ type: "text", text: "ok" }] },
-						}),
-					);
-				});
+					return;
+				}
+				socket.write(
+					encodeJsonLine({
+						jsonrpc: "2.0",
+						id: jsonRpcId(message),
+						result: { content: [{ type: "text", text: "ok" }] },
+					}),
+				);
+			});
 			socket.on("data", (chunk) => decoder.push(chunk));
 		});
 		servers.push(server);
 		await new Promise<void>((resolve) => server.listen(paths.socket, resolve));
 
-		const result = await callToolViaDaemon("status", {}, { paths, ensure: async () => {}, requestTimeoutMs: 2000, context: defaultContext() });
+		const result = await callToolViaDaemon(
+			"status",
+			{},
+			{ paths, ensure: async () => {}, requestTimeoutMs: 2000, context: defaultContext() },
+		);
 
 		expect(result.content[0]?.text).toBe("ok");
 		expect(requestCount).toBe(2);
 		expect(seenTokens).toEqual(["retry-test-token", freshToken]);
 		expect(readFileSync(paths.auth, "utf8").trim()).toBe(freshToken);
 	});
-	});
+});
 
 function extractToken(message: unknown): string | null {
 	if (!message || typeof message !== "object" || Array.isArray(message)) return null;
