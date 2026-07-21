@@ -3,7 +3,7 @@ import { createServer, type Server, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { PassThrough, Writable } from "node:stream";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { DaemonPaths } from "../src/paths.js";
 import { runMcpStdioProxy } from "../src/proxy.js";
@@ -128,6 +128,40 @@ describe("mcp stdio proxy lifecycle", () => {
 		expect(result.content?.[0]?.text).toContain("cancelled");
 		expect(ensureAttempts).toBe(1);
 		expect(observedSignal?.aborted).toBe(true);
+	});
+
+	it("#given an initialized proxy whose stdin stays open #when its parent process dies #then the parent watchdog exits the proxy without waiting for stdin close", async () => {
+		vi.useFakeTimers();
+		const paths = tempPaths();
+		const input = new PassThrough();
+		const outputChunks: string[] = [];
+		const proxy = runMcpStdioProxy({
+			input,
+			output: new Writable({
+				write(chunk, _encoding, callback): void {
+					outputChunks.push(chunk.toString());
+					callback();
+				},
+			}),
+			paths,
+			ensure: noSpawn,
+			parentWatchdog: { pollIntervalMs: 1_000, probeAlive: () => false },
+		});
+		try {
+			input.write(`${JSON.stringify({ jsonrpc: "2.0", id: 51, method: "initialize", params: {} })}\n`);
+			await vi.advanceTimersByTimeAsync(0);
+			expect(outputChunks.join("")).toContain('"id":51');
+			expect(input.destroyed).toBe(false);
+
+			await vi.advanceTimersByTimeAsync(1_000);
+			vi.useRealTimers();
+			await bounded(proxy, "proxy did not settle after the parent watchdog fired");
+
+			expect(input.destroyed).toBe(true);
+		} finally {
+			vi.useRealTimers();
+			input.destroy();
+		}
 	});
 
 	it("#given synchronous proxy setup failure #when the proxy rejects #then parent lifecycle listeners are removed", async () => {

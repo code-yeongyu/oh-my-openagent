@@ -73,6 +73,10 @@
       "types": "./src/migration/*.ts",
       "import": "./src/migration/*.ts"
     },
+    "./process-sweep": {
+      "types": "./src/process-sweep/index.ts",
+      "import": "./src/process-sweep/index.ts"
+    },
     "./process-stream-reader": {
       "types": "./src/process-stream-reader.ts",
       "import": "./src/process-stream-reader.ts"

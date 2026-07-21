@@ -16,6 +16,7 @@ import {
 	buildCodegraphChildEnv,
 	buildCodegraphEnv,
 } from "../../../../../utils/src/codegraph/env.ts";
+import type { ParentWatchdogConfig } from "../../../../../mcp-stdio-core/src/index.ts";
 import { CODEGRAPH_PINNED_VERSION } from "../../../../../utils/src/codegraph/manifest.ts";
 import {
 	buildCodegraphNodeSkipHint,
@@ -48,6 +49,7 @@ export interface CodegraphServeProcessOptions {
 	readonly output: Writable;
 	readonly stderr: CodegraphServeStderr;
 	readonly stdio: ServeStdio;
+	readonly parentWatchdog?: ParentWatchdogConfig;
 }
 
 export type CodegraphServeProcessRunner = (
@@ -77,6 +79,10 @@ export interface RunCodegraphServeOptions {
 	readonly runProcess?: CodegraphServeProcessRunner;
 	readonly stderr?: CodegraphServeStderr;
 	readonly ensureProvisioned?: CodegraphProvisioner;
+	// Test seam: production callers leave this unset so the bridge and the
+	// unavailable facade use the watchdog defaults (parentPid = process.ppid,
+	// 30s poll).
+	readonly parentWatchdog?: ParentWatchdogConfig;
 }
 
 const CODEGRAPH_SKIP_HINT =
@@ -145,6 +151,7 @@ export async function runCodegraphServe(options: RunCodegraphServeOptions = {}):
 		output: options.stdout ?? processStdout,
 		stderr: options.stderr ?? processStderr,
 		stdio: "pipe",
+		parentWatchdog: options.parentWatchdog ?? {},
 	});
 }
 
@@ -155,6 +162,7 @@ async function runUnavailableMcp(reason: string, options: RunCodegraphServeOptio
 		output: options.stdout ?? processStdout,
 		reason,
 		serverVersion: CODEGRAPH_VERSION,
+		parentWatchdog: options.parentWatchdog ?? {},
 	});
 	return 0;
 }
