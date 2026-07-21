@@ -60,7 +60,7 @@ Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `sr
 | `quick` | openai/gpt-5.4-mini | openai-categories.ts | Trivial single-file changes |
 | `unspecified-low` | openai/gpt-5.6-luna (variant: xhigh) | openai-categories.ts | Moderate effort fallback |
 | `unspecified-high` | anthropic/claude-opus-4-7 (variant: max) | anthropic-categories.ts | High effort fallback |
-| `writing` | kimi-for-coding/k2p5 (default) → gemini-3-flash (first fallback) | kimi-categories.ts | Documentation, prose |
+| `writing` | kimi-for-coding/k2p5 (default) → gemini-3.6-flash (first fallback) | kimi-categories.ts | Documentation, prose |
 
 User-defined categories declared in `categories: { ... }` config override and extend this set.
 

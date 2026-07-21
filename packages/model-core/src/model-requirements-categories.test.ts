@@ -82,12 +82,12 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(fifth?.model).toBe("kimi-k3")
   })
 
-  test("quick keeps gpt-5.4-mini primary before claude-haiku-4-5", () => {
+  test("quick keeps gpt-5.4-mini primary before haiku and Gemini 3.6 Flash", () => {
     // given
     const quick = CATEGORY_MODEL_REQUIREMENTS["quick"]
 
     // when
-    const [primary, secondary] = quick.fallbackChain
+    const [primary, secondary, geminiFallback] = quick.fallbackChain
 
     // then
     expect(quick.fallbackChain.length).toBeGreaterThan(1)
@@ -95,14 +95,18 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary?.providers).toContain("openai")
     expect(secondary?.model).toBe("claude-haiku-4-5")
     expect(secondary?.providers).toContain("anthropic")
+    expect(geminiFallback).toEqual({
+      providers: ["google", "opencode", "vercel"],
+      model: "gemini-3.6-flash",
+    })
   })
 
-  test("unspecified-low keeps native gpt-5.6-luna xhigh before Copilot high", () => {
+  test("unspecified-low keeps native gpt-5.6-luna xhigh before Copilot high and Gemini 3.6 Flash", () => {
     // given
     const unspecifiedLow = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"]
 
     // when
-    const [primary, copilot, claudeFallback, solFallback] = unspecifiedLow.fallbackChain
+    const [primary, copilot, claudeFallback, solFallback, kimiFallback, geminiFallback] = unspecifiedLow.fallbackChain
 
     // then
     expect(unspecifiedLow.fallbackChain.length).toBeGreaterThan(1)
@@ -120,6 +124,11 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       providers: ["openai", "opencode", "vercel"],
       model: "gpt-5.6-sol",
       variant: "medium",
+    })
+    expect(kimiFallback?.model).toBe("kimi-k3")
+    expect(geminiFallback).toEqual({
+      providers: ["google", "opencode", "vercel"],
+      model: "gemini-3.6-flash",
     })
   })
 
@@ -173,8 +182,10 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
 
     // then
     expect(writing.fallbackChain).toHaveLength(6)
-    expect(primary?.model).toBe("gemini-3.6-flash")
-    expect(primary?.providers[0]).toBe("google")
+    expect(primary).toEqual({
+      providers: ["google", "opencode", "vercel"],
+      model: "gemini-3.6-flash",
+    })
     expect(second?.model).toBe("kimi-k3")
     expect(second?.providers[0]).toBe("opencode-go")
     expect(third?.model).toBe("claude-sonnet-4-6")

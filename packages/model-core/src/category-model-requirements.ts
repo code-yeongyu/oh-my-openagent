@@ -112,7 +112,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "claude-haiku-4-5",
       },
       {
-        providers: ["google", "github-copilot", "opencode", "vercel"],
+        providers: ["google", "opencode", "vercel"],
         model: "gemini-3.6-flash",
       },
       { providers: ["opencode-go", "vercel"], model: "minimax-m3" },
@@ -144,7 +144,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       { providers: ["opencode-go", "vercel"], model: "kimi-k3" },
       {
-        providers: ["google", "github-copilot", "opencode", "vercel"],
+        providers: ["google", "opencode", "vercel"],
         model: "gemini-3.6-flash",
       },
       { providers: ["opencode-go", "vercel"], model: "minimax-m3" },
@@ -185,7 +185,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   writing: {
     fallbackChain: [
       {
-        providers: ["google", "github-copilot", "opencode", "vercel"],
+        providers: ["google", "opencode", "vercel"],
         model: "gemini-3.6-flash",
       },
       { providers: ["opencode-go", "vercel"], model: "kimi-k3" },

@@ -153,6 +153,22 @@ describe("resolveCategory", () => {
     })
   })
 
+  test("#given Gemini 3.6 Flash is available #when affected category chains resolve #then their mirrored stable rungs are selected", () => {
+    const categories = ["quick", "unspecified-low", "writing"] as const
+
+    for (const category of categories) {
+      const result = expectResolved(resolveCategory(category, {}, registry([model("google", "gemini-3.6-flash")])))
+
+      expect(result.spec.provider).toBe("google")
+      expect(result.spec.modelId).toBe("gemini-3.6-flash")
+      expect(result.modelSelection.matchedFallback).toBe(true)
+      expect(result.modelSelection.fallbackEntry).toEqual({
+        providers: ["google", "opencode", "vercel"],
+        model: "gemini-3.6-flash",
+      })
+    }
+  })
+
   test("#given ultrabrain primary is unavailable and hardcoded Google fallback is available #when resolved #then delegate-core fallback chain preserves the high variant", () => {
     // given
     const models = registry([model("google", "gemini-3.1-pro")])

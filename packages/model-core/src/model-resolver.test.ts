@@ -803,6 +803,46 @@ describe("resolveModelWithFallback", () => {
       cacheSpy.mockRestore()
     })
 
+    test("does not resolve stable gemini-3.6-flash through a preview-only availability entry", () => {
+      // given
+      const input: ExtendedModelResolutionInput = {
+        fallbackChain: [
+          { providers: ["google"], model: "gemini-3.6-flash" },
+        ],
+        availableModels: new Set(["google/gemini-3.6-flash-preview"]),
+        systemDefaultModel: "system/default",
+      }
+
+      // when
+      const result = resolveModelWithFallback(input)
+      const resolved = expectResolved(result)
+
+      // then
+      expect(resolved.model).toBe("system/default")
+      expect(resolved.source).toBe("system-default")
+    })
+
+    test("does not select Gemini 3.6 Flash for Copilot-only empty availability", () => {
+      // given
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["github-copilot"])
+      const input: ExtendedModelResolutionInput = {
+        fallbackChain: [
+          { providers: ["google", "opencode", "vercel"], model: "gemini-3.6-flash" },
+        ],
+        availableModels: new Set(),
+        systemDefaultModel: "system/default",
+      }
+
+      // when
+      const result = resolveModelWithFallback(input)
+      const resolved = expectResolved(result)
+
+      // then
+      expect(resolved.model).toBe("system/default")
+      expect(resolved.source).toBe("system-default")
+      cacheSpy.mockRestore()
+    })
+
     test("does not double-transform categoryDefaultModel already containing -preview", () => {
       // given - category default already has -preview suffix
       const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["google"])

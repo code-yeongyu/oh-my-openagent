@@ -38,7 +38,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
   quick: [
     { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.4-mini" },
     { providers: ["anthropic", "github-copilot", "vercel"], model: "claude-haiku-4-5" },
-    { providers: ["google", "github-copilot", "opencode", "vercel"], model: "gemini-3-flash" },
+    { providers: ["google", "opencode", "vercel"], model: "gemini-3.6-flash" },
     { providers: ["opencode-go", "vercel"], model: "minimax-m3" },
     { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
     { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
@@ -50,7 +50,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
     { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-sonnet-4-6" },
     { providers: ["openai", "opencode", "vercel"], model: "gpt-5.6-sol", variant: "medium" },
     { providers: ["opencode-go", "vercel"], model: "kimi-k3" },
-    { providers: ["google", "github-copilot", "opencode", "vercel"], model: "gemini-3-flash" },
+    { providers: ["google", "opencode", "vercel"], model: "gemini-3.6-flash" },
     { providers: ["opencode-go", "vercel"], model: "minimax-m3" },
     { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
     { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
@@ -76,7 +76,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
     },
   ],
   writing: [
-    { providers: ["google", "github-copilot", "opencode", "vercel"], model: "gemini-3-flash" },
+    { providers: ["google", "opencode", "vercel"], model: "gemini-3.6-flash" },
     { providers: ["opencode-go", "vercel"], model: "kimi-k3" },
     { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-sonnet-4-6" },
     { providers: ["opencode-go", "vercel"], model: "minimax-m3" },

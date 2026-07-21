@@ -557,7 +557,7 @@ Not all models behave the same way. Understanding "similar" families helps you m
 | Model                      | Provider(s)                      | Notes                                                       |
 | -------------------------- | -------------------------------- | ----------------------------------------------------------- |
 | **Gemini 3.1 Pro**         | google, github-copilot, opencode | Excels at visual/frontend tasks. Different reasoning style. |
-| **Gemini 3 Flash**         | google, github-copilot, opencode | Fast, good for doc search and light tasks.                  |
+| **Gemini 3.6 Flash**       | google, opencode, vercel          | Fast stable model for doc search and light tasks.            |
 | **MiniMax M3**             | opencode-go, vercel              | Latest MiniMax flagship. Primary utility fallback, ahead of M2.7.   |
 | **MiniMax M2.7**           | opencode-go, opencode, vercel    | Fast and smart. Utility fallback for various chains.        |
 | **MiniMax M2.7 Highspeed** | vercel, opencode                 | Faster utility variant used in Explore and retrieval chains.|
