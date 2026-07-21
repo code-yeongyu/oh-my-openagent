@@ -1071,30 +1071,21 @@ describe("createEventHandler - model fallback", () => {
     const first = await triggerRetryCycle("anthropic", "claude-opus-4-8-thinking")
 
     //#then - first fallback entry applied (no-op skip: claude-opus-4-8 matches current model after normalization)
-    expect(first.message["model"]).toMatchObject({
-      providerID: "opencode-go",
-      modelID: "kimi-k3",
-    })
+    expect(first.message["model"]).toMatchObject({ providerID: "opencode-go", modelID: "kimi-k3" })
     expect(first.message["variant"]).toBeUndefined()
 
     //#when - second retry cycle
     const second = await triggerRetryCycle("opencode-go", "kimi-k3")
 
     //#then - restored Sol entry applied after the consolidated Kimi rung
-    expect(second.message["model"]).toMatchObject({
-      providerID: "openai",
-      modelID: "gpt-5.6-sol",
-    })
+    expect(second.message["model"]).toMatchObject({ providerID: "openai", modelID: "gpt-5.6-sol" })
     expect(second.message["variant"]).toBe("medium")
 
     //#when - third retry cycle
     const third = await triggerRetryCycle("openai", "gpt-5.6-sol")
 
     //#then - fallback continues to GLM after the restored Sol rung
-    expect(third.message["model"]).toMatchObject({
-      providerID: "zai-coding-plan",
-      modelID: "glm-5",
-    })
+    expect(third.message["model"]).toMatchObject({ providerID: "zai-coding-plan", modelID: "glm-5" })
     expect(third.message["variant"]).toBeUndefined()
     expect(abortCalls).toEqual([sessionID, sessionID, sessionID])
     expect(promptCalls).toEqual([sessionID, sessionID, sessionID])
