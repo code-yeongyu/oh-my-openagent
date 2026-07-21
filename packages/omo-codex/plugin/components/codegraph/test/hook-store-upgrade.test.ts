@@ -67,8 +67,8 @@ function probeEnv(homeDir: string, binPath: string): Record<string, string> {
 			HOME: homeDir,
 			OMO_CODEGRAPH_BIN: binPath,
 		};
-		if (process.env.PATH !== undefined) env.PATH = process.env.PATH;
-		if (process.env.SystemRoot !== undefined) env.SystemRoot = process.env.SystemRoot;
+		if (process.env["PATH"] !== undefined) env["PATH"] = process.env["PATH"];
+		if (process.env["SystemRoot"] !== undefined) env["SystemRoot"] = process.env["SystemRoot"];
 		return env;
 	}
 	return { HOME: homeDir, OMO_CODEGRAPH_BIN: binPath, PATH: "/usr/bin:/bin" };
