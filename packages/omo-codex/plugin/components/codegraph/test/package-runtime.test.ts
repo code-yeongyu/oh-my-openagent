@@ -43,7 +43,7 @@ describe("CodeGraph component runtime package metadata", () => {
 		const files = packageJson.files ?? [];
 
 		// then
-		expect(optionalDependencies["@colbymchenry/codegraph"]).toBe("1.0.1");
+		expect(optionalDependencies["@colbymchenry/codegraph"]).toBe("1.4.1");
 		expect(files).toContain("LICENSE");
 		expect(files).toContain("NODE-RUNTIME-LICENSES.md");
 		expect(files).toContain("NOTICE");

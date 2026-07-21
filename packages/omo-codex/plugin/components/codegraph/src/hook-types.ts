@@ -1,6 +1,7 @@
 import type { Readable } from "node:stream";
 
 import type { CodexOmoConfig as SharedCodexOmoConfig } from "../../../shared/src/config-loader.ts";
+import type { CODEGRAPH_PINNED_VERSION } from "../../../../../utils/src/codegraph/manifest.ts";
 import type { SweepCodegraphZombiesOptions } from "../../../../../utils/src/codegraph/process-sweep.ts";
 import type { CodegraphProvisionResult as SharedCodegraphProvisionResult } from "../../../../../utils/src/codegraph/provision.ts";
 import type {
@@ -58,7 +59,7 @@ export interface CodegraphSessionStartOutcome {
 
 export interface CodegraphSessionStartDeps {
 	readonly ensureGitignored: (projectRoot: string) => boolean;
-	readonly ensureProvisioned: (options: { readonly installDir?: string; readonly lockDir: string; readonly version: "1.0.1" }) => Promise<CodegraphProvisionResult>;
+	readonly ensureProvisioned: (options: { readonly installDir?: string; readonly lockDir: string; readonly version: typeof CODEGRAPH_PINNED_VERSION }) => Promise<CodegraphProvisionResult>;
 	readonly prepareWorkspace: (projectRoot: string, options: { readonly homeDir: string }) => CodegraphWorkspacePreparation;
 	readonly resolveCommand: (options?: ResolveCodegraphCommandOptions) => CodegraphCommandResolution;
 	readonly runCommand: (

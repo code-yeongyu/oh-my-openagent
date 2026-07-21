@@ -1,5 +1,6 @@
 export * from "./env"
 export * from "./guidance"
+export * from "./manifest"
 export * from "./node-support"
 export * from "./provision"
 export * from "./process-sweep"

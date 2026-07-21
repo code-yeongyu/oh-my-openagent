@@ -3,6 +3,7 @@ import { homedir } from "node:os"
 import { join } from "node:path"
 
 import {
+  CODEGRAPH_PINNED_VERSION,
   buildCodegraphEnv,
   ensureCodegraphGitignored,
   ensureCodegraphProvisioned,
@@ -42,7 +43,7 @@ export interface CodegraphBootstrapDeps {
   readonly ensureProvisioned: (options: {
     readonly installDir?: string
     readonly lockDir: string
-    readonly version: "1.0.1"
+    readonly version: typeof CODEGRAPH_PINNED_VERSION
   }) => Promise<CodegraphProvisionResult>
   readonly log: (message: string, data?: Record<string, unknown>) => void
   readonly nodeSupport: () => CodegraphNodeSupport
@@ -60,7 +61,7 @@ export interface CodegraphBootstrapDeps {
   readonly schedule: (task: () => Promise<void>) => void
 }
 
-const CODEGRAPH_VERSION = "1.0.1"
+const CODEGRAPH_VERSION = CODEGRAPH_PINNED_VERSION
 const COMMAND_TIMEOUT_MS = 60_000
 const bootstrappedProjects = new Set<string>()
 

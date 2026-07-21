@@ -12,7 +12,7 @@ export function writeFakeNewlineCodegraph(filePath: string): void {
 			"rl.on('line', (line) => {",
 			"  const request = JSON.parse(line);",
 			"  if (request.method === 'initialize') {",
-			"    process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { capabilities: { tools: { listChanged: false } }, protocolVersion: request.params.protocolVersion, serverInfo: { name: 'codegraph', version: '1.0.1' } } }) + '\\n');",
+			"    process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { capabilities: { tools: { listChanged: false } }, protocolVersion: request.params.protocolVersion, serverInfo: { name: 'codegraph', version: '1.4.1' } } }) + '\\n');",
 			"  }",
 			"  if (request.method === 'tools/list') {",
 			"    process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { tools: [{ name: 'codegraph_search' }, { name: 'codegraph_node' }, { name: 'codegraph_explore' }, { name: 'codegraph_callers' }] } }) + '\\n');",
