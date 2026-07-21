@@ -224,17 +224,10 @@ describe("resolveCategory", () => {
     }
   })
 
-  test("#given GPT-5.6 is unavailable #when deep resolves with Copilot GPT-5.5 #then the legacy medium fallback remains", () => {
-    const result = expectResolved(resolveCategory("deep", {}, registry([model("github-copilot", "gpt-5.5")])))
+  test("#given GPT-5.6 is unavailable #when deep resolves with Copilot GPT-5.5 #then the retired rung is not selected", () => {
+    const result = resolveCategory("deep", {}, registry([model("github-copilot", "gpt-5.5")]))
 
-    expect(result.spec.provider).toBe("github-copilot")
-    expect(result.spec.modelId).toBe("gpt-5.5")
-    expect(result.spec.variant).toBe("medium")
-    expect(result.modelSelection.fallbackEntry).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.5",
-      variant: "medium",
-    })
+    expect(result.kind).toBe("model_unavailable")
   })
 
   test("#given no category or fallback model resolves and a system default is available #when resolved #then delegate-core reaches the system default", () => {

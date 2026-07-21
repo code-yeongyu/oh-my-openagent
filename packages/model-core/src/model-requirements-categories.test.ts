@@ -2,12 +2,12 @@ import { describe, expect, test } from "bun:test"
 import { CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
 describe("CATEGORY_MODEL_REQUIREMENTS", () => {
-  test("ultrabrain keeps native gpt-5.6-sol xhigh before Copilot high and gpt-5.5", () => {
+  test("ultrabrain keeps native gpt-5.6-sol xhigh before Copilot high and Gemini", () => {
     // given
     const ultrabrain = CATEGORY_MODEL_REQUIREMENTS["ultrabrain"]
 
     // when
-    const [primary, copilot, legacyFallback] = ultrabrain.fallbackChain
+    const [primary, copilot, geminiFallback] = ultrabrain.fallbackChain
 
     // then
     expect(ultrabrain.fallbackChain.length).toBeGreaterThan(1)
@@ -19,8 +19,8 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       model: "gpt-5.6-sol",
       variant: "high",
     })
-    expect(legacyFallback?.model).toBe("gpt-5.5")
-    expect(legacyFallback?.variant).toBe("xhigh")
+    expect(geminiFallback?.model).toBe("gemini-3.1-pro")
+    expect(geminiFallback?.variant).toBe("high")
   })
 
   test("deep keeps native gpt-5.6-terra xhigh before Copilot terra high and shared sol high", () => {
@@ -28,7 +28,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const deep = CATEGORY_MODEL_REQUIREMENTS["deep"]
 
     // when
-    const [primary, copilot, sharedSol, legacyFallback] = deep.fallbackChain
+    const [primary, copilot, sharedSol, opusFallback] = deep.fallbackChain
 
     // then
     expect(deep.fallbackChain.length).toBeGreaterThan(2)
@@ -46,9 +46,8 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       model: "gpt-5.6-sol",
       variant: "high",
     })
-    expect(legacyFallback?.model).toBe("gpt-5.5")
-    expect(legacyFallback?.variant).toBe("medium")
-    expect(legacyFallback?.providers).toContain("github-copilot")
+    expect(opusFallback?.model).toBe("claude-opus-4-8")
+    expect(opusFallback?.variant).toBe("max")
   })
 
   test("visual-engineering keeps gemini, glm, opus, opencode-go, and Kimi K3 fallback order", () => {
@@ -109,7 +108,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(legacyFallback?.providers[0]).toBe("anthropic")
   })
 
-  test("unspecified-high keeps opus primary before gpt-5.5 high", () => {
+  test("unspecified-high keeps opus primary before gpt-5.6-sol high", () => {
     // given
     const unspecifiedHigh = CATEGORY_MODEL_REQUIREMENTS["unspecified-high"]
 
@@ -125,23 +124,29 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     })
     expect(secondary).toEqual({
       providers: ["openai", "github-copilot", "opencode", "vercel"],
-      model: "gpt-5.5",
+      model: "gpt-5.6-sol",
       variant: "high",
     })
   })
 
-  test("artistry has gemini-3.1-pro high as primary", () => {
+  test("artistry keeps gemini-3.1-pro high primary and gpt-5.6-sol OpenAI coverage", () => {
     // given
     const artistry = CATEGORY_MODEL_REQUIREMENTS["artistry"]
 
     // when
     const primary = artistry.fallbackChain[0]
+    const openAiFallback = artistry.fallbackChain.find((entry) => entry.providers.includes("openai"))
 
     // then
     expect(artistry.fallbackChain.length).toBeGreaterThan(0)
     expect(primary?.model).toBe("gemini-3.1-pro")
     expect(primary?.variant).toBe("high")
     expect(primary?.providers[0]).toBe("google")
+    expect(openAiFallback).toEqual({
+      providers: ["openai", "github-copilot", "opencode", "vercel"],
+      model: "gpt-5.6-sol",
+      variant: "high",
+    })
   })
 
   test("writing keeps gemini, kimi, sonnet, and minimax fallback order", () => {
