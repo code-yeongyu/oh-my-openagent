@@ -211,7 +211,7 @@ describe("stale lsp-daemon version sweep", () => {
 
       // when
       const result = await sweepStaleLspDaemonVersions({
-        platform: "posix",
+        platform: "linux",
         attest: (pid) => Promise.resolve(pid === 710 || pid === 711),
         currentVersion: "9.9.9",
         force: true,
@@ -253,7 +253,7 @@ describe("stale lsp-daemon version sweep", () => {
 
       // when
       const result = await sweepStaleLspDaemonVersions({
-        platform: "posix",
+        platform: "linux",
         attest: () => Promise.resolve(false),
         currentVersion: "9.9.9",
         force: true,
