@@ -429,6 +429,36 @@ describe("createTaskStatusUi.background progress", () => {
 })
 
 describe("createTaskStatusUi.scheduleSync", () => {
+  it("#given a just-started background child #when the store mutation schedules a render #then it subscribes before the debounce fires", () => {
+    // given a task that can emit its first tool event immediately after the start mutation
+    const active = new Map<number, () => void>()
+    const timers: StatusUiTimers = {
+      set: (callback) => {
+        active.set(1, callback)
+        return 1
+      },
+      clear: (handle) => { if (typeof handle === "number") active.delete(handle) },
+    }
+    const listeners = new Map<string, (event: { readonly type: string }) => void>()
+    const manager: StatusUiManager = {
+      list: () => listed([record({ task_id: "st_background", status: "running" })]),
+      wasBackground: (taskId) => taskId === "st_background",
+      subscribeChild: (taskId, listener) => {
+        listeners.set(taskId, listener)
+        return () => listeners.delete(taskId)
+      },
+    }
+    const ui = fakeUi()
+    const statusUi = createTaskStatusUi({ manager, runtime: runtimeOf(ui, "session-a", "tui"), timers })
+
+    // when the store mutation schedules the debounced render
+    statusUi.scheduleSync()
+
+    // then the child subscription is already installed, before its first tool event can be emitted
+    expect(listeners.has("st_background")).toBe(true)
+    expect(active.size).toBe(1)
+  })
+
   it("#given several rapid schedule calls #when the debounce fires #then syncNow runs once (250ms debounce)", () => {
     // given a controllable timer
     const active = new Map<number, () => void>()

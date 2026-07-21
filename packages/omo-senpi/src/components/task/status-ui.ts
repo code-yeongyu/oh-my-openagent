@@ -248,6 +248,14 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
   }
 
   function scheduleSync(): void {
+    // Store mutations happen synchronously before TaskManager starts the child. Attach here rather
+    // than waiting for the debounced paint, otherwise a fast first tool_execution_start is lost.
+    if (deps.runtime.ui() !== undefined) {
+      const mode = deps.runtime.mode()
+      if (mode === undefined || mode === "tui") {
+        syncChildSubscriptions(scopedRecords(deps.manager, deps.runtime.sessionId()))
+      }
+    }
     if (pending !== undefined) timers.clear(pending)
     pending = timers.set(() => {
       pending = undefined
