@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { basename, dirname, join } from "node:path"
+import { applyEdits, modify } from "jsonc-parser"
 import type { ConfigMergeResult } from "../types"
 import { PLUGIN_NAME, LEGACY_PLUGIN_NAME } from "../../shared"
 import { backupConfigFile } from "./backup-config"
@@ -177,17 +178,13 @@ function writePluginEntryToTarget(params: {
 
     if (target.format === "jsonc") {
       const content = readFileSync(target.path, "utf-8")
-      const pluginArrayRegex = /((?:"plugin"|plugin)\s*:\s*)\[([\s\S]*?)\]/
-      const match = content.match(pluginArrayRegex)
-
-      if (match) {
-        const formattedPlugins = normalizedPlugins.map((p) => `"${p}"`).join(",\n    ")
-        const newContent = content.replace(pluginArrayRegex, `$1[\n    ${formattedPlugins}\n  ]`)
-        writeFileSync(target.path, newContent)
-      } else {
-        const newContent = content.replace(/(\{)/, `$1\n  "plugin": ["${nextPluginEntry}"],`)
-        writeFileSync(target.path, newContent)
-      }
+      const newContent = applyEdits(
+        content,
+        modify(content, ["plugin"], normalizedPlugins, {
+          formattingOptions: { eol: "\n", insertSpaces: true, tabSize: 2 },
+        }),
+      )
+      writeFileSync(target.path, newContent)
     } else {
       writeFileSync(target.path, JSON.stringify(config, null, 2) + "\n")
     }
