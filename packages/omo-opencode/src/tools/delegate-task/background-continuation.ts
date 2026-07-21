@@ -49,6 +49,7 @@ export async function executeBackgroundContinuation(
         load_skills: args.load_skills,
         description: args.description,
         run_in_background: args.run_in_background,
+        background: true,
         taskId: sessionId,
         backgroundTaskId,
         sessionId,
