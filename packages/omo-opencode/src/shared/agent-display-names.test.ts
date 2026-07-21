@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test"
-import { AGENT_DISPLAY_NAMES, getAgentConfigKey, getAgentDisplayName, getAgentListDisplayName, normalizeAgentForPrompt, normalizeAgentForPromptKey, stripAgentListSortPrefix } from "./agent-display-names"
+import { AGENT_DISPLAY_NAMES, getAgentConfigKey, getAgentDisplayName, getAgentListDisplayName, normalizeAgentForPrompt, normalizeAgentForPromptKey, sanitizeAgentNameForDisplay, stripAgentListSortPrefix } from "./agent-display-names"
 
 describe("getAgentDisplayName", () => {
   it("returns display name for lowercase config key (new format)", () => {
@@ -291,5 +291,97 @@ describe("AGENT_DISPLAY_NAMES", () => {
       // then none should contain parentheses
       expect(httpHeaderUnsafe.test(displayName)).toBe(false)
     }
+  })
+})
+
+describe("sanitizeAgentNameForDisplay", () => {
+  it("strips U+200B from a single-prefix name and returns the clean display name", () => {
+    // given a name with a single leading ZWSP prefix
+    const input = "\u200BSisyphus - Ultraworker"
+
+    // when sanitized for display
+    const result = sanitizeAgentNameForDisplay(input)
+
+    // then the invisible prefix is gone
+    expect(result).toBe("Sisyphus - Ultraworker")
+  })
+
+  it("strips all four invisible codepoints (U+200B, U+200C, U+200D, U+FEFF)", () => {
+    // given a name with all four invisible codepoints prepended
+    const input = "\u200B\u200C\u200D\uFEFFAtlas - Plan Executor"
+
+    // when sanitized for display
+    const result = sanitizeAgentNameForDisplay(input)
+
+    // then every invisible codepoint is removed
+    expect(result).toBe("Atlas - Plan Executor")
+  })
+
+  it("passes clean names through unchanged", () => {
+    // given a name with no invisible codepoints
+    const input = "Hephaestus - Deep Agent"
+
+    // when sanitized for display
+    const result = sanitizeAgentNameForDisplay(input)
+
+    // then the input is returned unchanged
+    expect(result).toBe("Hephaestus - Deep Agent")
+  })
+
+  it("is idempotent (sanitize(sanitize(x)) === sanitize(x))", () => {
+    // given a name with repeated invisible prefixes
+    const input = "\u200B\u200BPrometheus - Plan Builder"
+
+    // when sanitized once and then again
+    const once = sanitizeAgentNameForDisplay(input)
+    const twice = sanitizeAgentNameForDisplay(once)
+
+    // then both results match and contain no invisible codepoints
+    expect(once).toBe(twice)
+    expect(/[\u200B\u200C\u200D\uFEFF]/.test(once)).toBe(false)
+  })
+
+  it("returns empty string for empty string input", () => {
+    // given an empty string
+    const input = ""
+
+    // when sanitized for display
+    const result = sanitizeAgentNameForDisplay(input)
+
+    // then the empty string is returned
+    expect(result).toBe("")
+  })
+
+  it("returns empty string for a string made up entirely of invisible codepoints", () => {
+    // given a string containing only invisible codepoints
+    const input = "\u200B\u200C\u200D\uFEFF"
+
+    // when sanitized for display
+    const result = sanitizeAgentNameForDisplay(input)
+
+    // then the entire string is stripped away
+    expect(result).toBe("")
+  })
+
+  it("handles a long string with invisible codepoints scattered throughout", () => {
+    // given visible characters interleaved with invisible codepoints
+    const input = "a\u200Bb\u200Cc\u200Dd\uFEFFe\u200Bf"
+
+    // when sanitized for display
+    const result = sanitizeAgentNameForDisplay(input)
+
+    // then only the visible characters remain in order
+    expect(result).toBe("abcdef")
+  })
+
+  it("cleans a legacy display name with a ZWSP embedded mid-word", () => {
+    // given a legacy name with a ZWSP embedded mid-word
+    const input = "Sisyphus\u200B - Ultraworker"
+
+    // when sanitized for display
+    const result = sanitizeAgentNameForDisplay(input)
+
+    // then the embedded ZWSP is removed
+    expect(result).toBe("Sisyphus - Ultraworker")
   })
 })

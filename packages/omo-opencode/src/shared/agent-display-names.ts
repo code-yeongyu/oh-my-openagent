@@ -160,3 +160,12 @@ export function normalizeAgentForPromptKey(agentName: string | undefined): strin
 
   return resolveKnownAgentConfigKey(trimmed) ?? trimmed
 }
+
+/**
+ * Returns the agent name with invisible codepoints stripped, suitable for
+ * rendering to end-user surfaces (TUIs, HTML, logs). It is opt-in and does not
+ * participate in runtime agent ordering.
+ */
+export function sanitizeAgentNameForDisplay(agentName: string): string {
+  return stripInvisibleAgentCharacters(agentName)
+}
