@@ -82,18 +82,18 @@ Sisyphus is your main orchestrator. He plans, delegates to specialists, and driv
 
 **Recommended models:**
 
-- **Claude Opus 4.8** / **Opus 4.7** — Best overall experience. Sisyphus was built with Claude-optimized prompts.
+- **Claude Opus 4.8** / **Opus 4.8** — Best overall experience. Sisyphus was built with Claude-optimized prompts.
 - **Kimi K3** — Strongest Kimi for Sisyphus. Recommended when you can accept its thinking-token cost; the K3 prompt is calibrated to stop overthinking and keep work moving.
-- **Kimi K2.6** / **K2.5** — Great Claude-like alternatives. K2.6 is the current default fallback in the primary Sisyphus chain after K3; many users run K2.6 or the K2.5/K2.6 combo exclusively.
+- **Kimi K3** / **K3** — Great Claude-like alternatives. K3 is the current default fallback in the primary Sisyphus chain after K3; many users run K3 or the K3/K3 combo exclusively.
 - **GLM 5** — Solid option, especially via Z.ai. **GLM 5.2 is experimental:** Sisyphus uses a GLM-5.2-calibrated prompt for model IDs recognized as GLM, but current evidence is one community report without maintainer end-to-end validation. The automatic chain is configured with `glm-5`, and fuzzy availability matching may resolve that entry to GLM 5.1 or GLM 5.2.
 
-Sisyphus works best on Claude Opus 4.8 / 4.7, Kimi K3 / K2.6 (or K2.5), and GLM 5. GPT-5.4 and GPT-5.5 now have dedicated prompt paths, but older GPT models are still a poor fit and should route to Hephaestus instead.
+Sisyphus works best on Claude Opus 4.8 / 4.7, Kimi K3 (or K3), and GLM 5. GPT-5.4 and GPT-5.6 Sol now have dedicated prompt paths, but older GPT models are still a poor fit and should route to Hephaestus instead.
 
 ### Hephaestus: The Legitimate Craftsman
 
 Named with intentional irony. Anthropic blocked OpenCode from using their API because of this project. So the team built an autonomous GPT-native agent instead.
 
-Hephaestus prefers GPT-5.6 Sol at medium effort through OpenAI or Vercel, then falls back to GPT-5.5 at medium effort across OpenAI, GitHub Copilot, OpenCode, or Vercel. Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding.
+Hephaestus prefers GPT-5.6 Sol at medium effort through OpenAI or Vercel, then falls back to GPT-5.6 Sol at medium effort across OpenAI, GitHub Copilot, OpenCode, or Vercel. Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding.
 
 Use Hephaestus when you need deep architectural reasoning, complex debugging across many files, or cross-domain knowledge synthesis. Switch to him explicitly when the work benefits from a GPT-native autonomous agent.
 
@@ -171,10 +171,10 @@ You can override specific agents or categories in your config:
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
 
   "agents": {
-    // Main orchestrator: Claude Opus or Kimi K2.6 work best
+    // Main orchestrator: Claude Opus or Kimi K3 work best
     "sisyphus": {
-      "model": "kimi-for-coding/k2p5",
-      "ultrawork": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
+      "model": "kimi-for-coding/kimi-k3",
+      "ultrawork": { "model": "anthropic/claude-opus-4-8", "variant": "max" },
     },
 
     // Research agents: cheaper models are fine
@@ -182,7 +182,7 @@ You can override specific agents or categories in your config:
     "explore": { "model": "github-copilot/grok-code-fast-1" },
 
     // Architecture consultation: GPT or Claude Opus
-    "oracle": { "model": "openai/gpt-5.5", "variant": "high" },
+    "oracle": { "model": "openai/gpt-5.6-sol", "variant": "high" },
   },
 
   "categories": {
@@ -208,10 +208,10 @@ You can override specific agents or categories in your config:
     "unspecified-low": { "model": "openai/gpt-5.4-mini" },
 
     // High-effort fallback: best available
-    "unspecified-high": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
+    "unspecified-high": { "model": "anthropic/claude-opus-4-8", "variant": "max" },
 
     // Prose and documentation
-    "writing": { "model": "anthropic/claude-opus-4-7", "variant": "high" },
+    "writing": { "model": "anthropic/claude-opus-4-8", "variant": "high" },
   },
 }
 ```
@@ -220,8 +220,8 @@ You can override specific agents or categories in your config:
 
 **Claude-like models** (instruction-following, structured output):
 
-- Claude Opus 4.7, Claude Haiku 4.5
-- Kimi K2.6 / K2.5 — behaves very similarly to Claude
+- Claude Opus 4.8, Claude Haiku 4.5
+- Kimi K3 — behaves very similarly to Claude
 - GLM 5 — Claude-like behavior, good for broad tasks
 
 **GPT models** (explicit reasoning, principle-driven):
@@ -229,7 +229,7 @@ You can override specific agents or categories in your config:
 - GPT-5.6 Sol — preferred for Hephaestus and `ultrabrain` when OpenAI or Vercel exposes it; first fallback for `deep`
 - GPT-5.6 Terra — mid-tier; default for the `deep` category (xhigh); preferred for Momus (high)
 - GPT-5.6 Luna — light tier; default for the `unspecified-low` category (xhigh)
-- GPT-5.5 — deep coding powerhouse, default for Oracle and the first GPT fallback for GPT-5.6-native roles
+- GPT-5.6 Sol — deep coding powerhouse, default for Oracle and the first GPT fallback for GPT-5.6-native roles
 - GPT-5.4 Mini — fast and cheap utility tasks
 
 **Different-behavior models**:
