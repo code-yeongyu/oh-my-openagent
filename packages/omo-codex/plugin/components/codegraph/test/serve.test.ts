@@ -47,7 +47,7 @@ describe("runCodegraphServe", () => {
 				command: "node",
 				cwd: resolve(runCwd),
 				env: {
-					CODEGRAPH_INSTALL_DIR: "/tmp/home/.omo/codegraph",
+					CODEGRAPH_INSTALL_DIR: join("/tmp/home", ".omo", "codegraph"),
 					CODEGRAPH_NO_DAEMON: "1",
 					CODEGRAPH_NO_DOWNLOAD: "1",
 					CODEGRAPH_TELEMETRY: "0",
@@ -99,7 +99,7 @@ describe("runCodegraphServe", () => {
 				command: "node",
 				cwd: resolve(runCwd),
 				env: {
-					CODEGRAPH_INSTALL_DIR: "/tmp/home/.omo/codegraph",
+					CODEGRAPH_INSTALL_DIR: join("/tmp/home", ".omo", "codegraph"),
 					CODEGRAPH_NO_DOWNLOAD: "1",
 					CODEGRAPH_TELEMETRY: "0",
 					DO_NOT_TRACK: "1",
