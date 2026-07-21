@@ -3,7 +3,6 @@ import { printJsonError, ULW_LOOP_HELP } from "./cli-output.js";
 import {
 	addGoal,
 	captureEvidence,
-	checkpoint,
 	completeGoals,
 	createGoals,
 	criteria,
@@ -11,6 +10,7 @@ import {
 	status,
 	steer,
 } from "./cli-subcommands.js";
+import { checkpoint } from "./checkpoint-continuation.js";
 import { resolveUlwLoopSessionIdFromEnv, type UlwLoopScope } from "./paths.js";
 import { UlwLoopError } from "./types.js";
 

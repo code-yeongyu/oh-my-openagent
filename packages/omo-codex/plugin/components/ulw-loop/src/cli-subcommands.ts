@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
 
-import { type CheckpointUlwLoopArgs, checkpointUlwLoop } from "./checkpoint.js";
 import {
 	hasFlag,
 	parseCodexGoalJson,
@@ -21,8 +20,6 @@ import { recordFinalReviewBlockers } from "./review-blockers.js";
 import { steerUlwLoop } from "./steering.js";
 import type { UlwLoopItem } from "./types.js";
 import { UlwLoopError } from "./types.js";
-
-type CheckpointStatus = "complete" | "failed" | "blocked";
 
 export async function createGoals(
 	repoRoot: string,
@@ -102,35 +99,6 @@ export async function completeGoals(
 	const instruction = buildCodexGoalInstruction({ plan: result.plan, goal: result.goal });
 	if (json) printJson({ ok: true, resumed: result.resumed, goal: result.goal, instruction, plan: result.plan });
 	else process.stdout.write(`${instruction.text}\n`);
-	return 0;
-}
-
-export async function checkpoint(
-	repoRoot: string,
-	argv: readonly string[],
-	json: boolean,
-	scope?: UlwLoopScope,
-): Promise<number> {
-	const goalId = required(argv, "--goal-id");
-	const statusValue = checkpointStatus(required(argv, "--status"));
-	const evidence = required(argv, "--evidence");
-	const codexGoalJson = await parseCodexGoalJson(
-		statusValue === "complete" ? required(argv, "--codex-goal-json") : readValue(argv, "--codex-goal-json"),
-	);
-	if (statusValue === "complete" && codexGoalJson === undefined) {
-		throw new UlwLoopError("Missing --codex-goal-json.", "ULW_LOOP_CODEX_GOAL_JSON_REQUIRED");
-	}
-	const qualityGateJson = readValue(argv, "--quality-gate-json");
-	const args: CheckpointUlwLoopArgs = {
-		goalId,
-		status: statusValue,
-		evidence,
-		...(codexGoalJson === undefined ? {} : { codexGoalJson }),
-		...(qualityGateJson === undefined ? {} : { qualityGateJson }),
-	};
-	const result = await checkpointUlwLoop(repoRoot, args, scope);
-	if (json) printJson({ ok: true, ...result, summary: summarizeUlwLoopPlan(result.plan) });
-	else process.stdout.write(`ulw-loop checkpoint: ${result.goal.id} -> ${result.goal.status}\n`);
 	return 0;
 }
 
@@ -243,15 +211,6 @@ function required(argv: readonly string[], flag: string): string {
 	const value = readValue(argv, flag)?.trim();
 	if (value) return value;
 	throw new UlwLoopError(`Missing ${flag}.`, "ULW_LOOP_ARGUMENT_MISSING", { details: { flag } });
-}
-
-function checkpointStatus(value: string): CheckpointStatus {
-	if (value === "complete" || value === "failed" || value === "blocked") return value;
-	throw new UlwLoopError(
-		"Missing or invalid --status; expected complete, failed, or blocked.",
-		"ULW_LOOP_STATUS_INVALID",
-		{ details: { status: value } },
-	);
 }
 
 function findGoal(plan: { readonly goals: readonly UlwLoopItem[] }, goalId: string): UlwLoopItem {
