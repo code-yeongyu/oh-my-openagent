@@ -71,7 +71,7 @@ export class LspClientConnection extends LspClientTransport {
 			{ timeoutMs: this.initializeTimeoutMs },
 		);
 		this.setDiagnosticPullSupported(supportsDiagnosticPull(result?.capabilities));
-		await this.sendNotification("initialized");
+		await this.sendNotification("initialized", {});
 		await this.sendNotification("workspace/didChangeConfiguration", {
 			settings: { json: { validate: { enable: true } } },
 		});
