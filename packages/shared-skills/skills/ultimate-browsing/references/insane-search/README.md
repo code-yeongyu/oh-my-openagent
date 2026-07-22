@@ -71,9 +71,9 @@
 |------------|------|
 | URL 제공 (`https://...`) | → Phase 0 검사 후 없으면 Phase 1 (generic fetch chain) |
 | 핸들 제공 (`@username`) | → Phase 0 syndication/API |
-| 키워드만 ("X에서 AI 검색") | → WebSearch(`site:{domain} {keyword}`) 먼저 → URL 확보 후 재진입 |
+| 키워드만 ("X에서 AI 검색") | → 웹 검색 도구(`site:{domain} {keyword}`) 먼저 → URL 확보 후 재진입 |
 
-> **한국어 신규 콘텐츠 한계**: 네이버/다음/한국 커뮤니티의 키워드 검색은 WebSearch 경유가 유일하며, 신규 콘텐츠 인덱싱이 지연될 수 있다.
+> **한국어 신규 콘텐츠 한계**: 네이버/다음/한국 커뮤니티의 키워드 검색은 웹 검색 도구 경유가 유일하며, 신규 콘텐츠 인덱싱이 지연될 수 있다.
 
 ## Phase 0 — 플랫폼 공식 API 인덱스
 
@@ -83,7 +83,7 @@
 
 | 플랫폼 | 방법 | 상세 |
 |--------|------|------|
-| X/Twitter | syndication (타임라인) + oEmbed (개별 트윗) + 키워드 검색: WebSearch → oEmbed | [twitter.md](twitter.md) |
+| X/Twitter | syndication (타임라인) + oEmbed (개별 트윗) + 키워드 검색: 웹 검색 도구 → oEmbed | [twitter.md](twitter.md) |
 | Reddit | URL + `.json` + Mobile UA | [json-api.md](json-api.md) |
 | Bluesky | AT Protocol (`public.api.bsky.app/xrpc/...`) | [public-api.md](public-api.md) |
 | Mastodon | 인스턴스별 공개 API | [public-api.md](public-api.md) |
@@ -301,7 +301,7 @@ yt-dlp --write-sub --write-auto-sub --sub-lang "en,ko" --skip-download -o "/tmp/
 |------|-------------|-----------------|
 | [`json-api.md`](json-api.md) | Reddit/Wikipedia/HN/npm/PyPI 등 **URL 변형만으로** JSON을 주는 사이트 | Reddit `/json` suffix + Mobile UA, HN Firebase, Algolia Search, Wikipedia REST, npm/PyPI Registry API |
 | [`public-api.md`](public-api.md) | Bluesky/Mastodon/arXiv/Stack Overflow/CrossRef/GitHub/OpenLibrary/Wayback 공식 API 사용 시 | 인증 없이 쓰는 공식 공개 REST/AT/Atom API 엔드포인트, 요청 형식, 공통 파라미터 |
-| [`twitter.md`](twitter.md) | X/Twitter 접근 — 프로필 타임라인, 특정 트윗, 키워드 검색 | `syndication.twitter.com` 타임라인, oEmbed 개별 트윗, 검색은 WebSearch로 URL 확보 후 oEmbed |
+| [`twitter.md`](twitter.md) | X/Twitter 접근 — 프로필 타임라인, 특정 트윗, 키워드 검색 | `syndication.twitter.com` 타임라인, oEmbed 개별 트윗, 검색은 웹 검색 도구로 URL 확보 후 oEmbed |
 | [`naver.md`](naver.md) | 네이버 블로그·뉴스·증권·검색 접근 | 서비스별 우회(블로그는 `m.blog.naver.com` 변환, 증권은 비공식 JSON, 검색은 `search.naver.com`), 한글 검색 쿼리 패턴 |
 | [`media.md`](media.md) | YouTube/Vimeo/Twitch/TikTok/SoundCloud 등 미디어 메타·자막·오디오 필요 시 | `yt-dlp --dump-json` 기반 1,858개 사이트 커버, 자막 다운로드(`--write-sub`), 포맷 선택, 라이브/팟캐스트 |
 
