@@ -88,6 +88,53 @@ Hard-reject agents fail TeamSpec parsing because they cannot write mailbox state
 4. `team_shutdown_request` → member or lead acks via `team_approve_shutdown` / `team_reject_shutdown`.
 5. `team_delete` — removes runtime state, worktrees, optional tmux layout.
 
+## Practical workflow rules
+
+Team members are signal-driven child sessions, not always-on workers. A member runs its prompt, then goes idle after the turn. If the first prompt tells a member to start immediately, it may finish before the lead has created or assigned tasks. For staged workflows, put an explicit wait condition in each member prompt:
+
+```text
+WAIT for a direct message from lead saying "run-indexer".
+Do not start before that message. When it arrives:
+1. call team_task_list,
+2. claim the lowest unblocked task assigned to you,
+3. do the work,
+4. mark it completed,
+5. send lead a short closure-ready message.
+```
+
+Use the parent session as the lead for complex workflows. A category-backed lead is another member session, so it can be overwhelmed by startup messages before it has created the task graph.
+
+`team_task_create` creates pending tasks only. It has `subject`, `description`, and `blockedBy`; it does not accept `owner`. To assign work, either:
+
+- create the task and send the target member a message telling them to claim it; or
+- create the task, then have the lead call `team_task_update` with `status: "in_progress"` and `owner: "<member-name>"`.
+
+`team_task_update(status: "claimed")` always claims as the caller. Passing `owner` with `status: "claimed"` does not pre-claim for another member.
+
+## Task state machine
+
+Task state is forward-only:
+
+```text
+pending -> claimed -> in_progress -> completed -> deleted
+pending -> in_progress -> completed -> deleted
+```
+
+Reverse transitions are rejected. A task marked `completed` cannot go back to `pending`, `claimed`, or `in_progress`; delete and recreate it if the work must be retried. `blockedBy` dependencies unblock only when every listed blocker is `completed`.
+
+Only the current owner can move a task to a non-delete state. Cross-owner updates are rejected, so recovery plans should either keep ownership with the lead until a member actually starts, or have the owner send a blocker message and update their own task.
+
+## Example phased run
+
+1. Create tasks for all phases with `blockedBy` dependencies.
+2. Send `run-phase-1` only to phase-1 members whose prompts are waiting for that exact signal.
+3. After each completion, re-run `team_task_list` and check which tasks are now unblocked.
+4. Send the next phase signal to the next member group.
+5. For QA gates, create verifier tasks blocked by implementation tasks. Do not close until verifier tasks are `completed`.
+6. Run the closure sequence, then `team_delete`.
+
+Background member jobs can emit completion or idle notifications shortly after shutdown. Treat late notifications from already-deleted teams as cleanup lag unless `team_list` still shows an active run.
+
 ## 12 tools
 
 | Tool | Purpose |
