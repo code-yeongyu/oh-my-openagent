@@ -15,6 +15,7 @@ const LAZYCODEX_PR_SOURCE_GUIDANCE_SOURCE_PATH = join(
   "pr-source-guidance.yml",
 )
 const MARKETPLACE_DESTINATION_PATH = join(".agents", "plugins", "marketplace.json")
+const MARKETPLACE_ROOT_DESTINATION_PATH = "marketplace.json"
 const PLUGIN_DESTINATION_PATH = join("plugins", "omo")
 const LAZYCODEX_PR_SOURCE_GUIDANCE_DESTINATION_PATH = join(".github", "workflows", "pr-source-guidance.yml")
 const GIT_BASH_MCP_SOURCE_ARG = "../../git-bash-mcp/dist/cli.js"
@@ -63,9 +64,15 @@ export async function syncLazycodexMarketplace(input: SyncLazycodexMarketplaceIn
     throw new Error(`Sisyphus Labs plugin manifest must be named omo, got ${pluginManifest.name}`)
   }
 
+  const marketplaceContents = await readFile(marketplacePath, "utf8")
   const destinationMarketplacePath = join(lazycodexRoot, MARKETPLACE_DESTINATION_PATH)
   await mkdir(dirname(destinationMarketplacePath), { recursive: true })
-  await writeFile(destinationMarketplacePath, await readFile(marketplacePath, "utf8"))
+  await writeFile(destinationMarketplacePath, marketplaceContents)
+  // `codex plugin marketplace add <repo>` scans the repository ROOT for a
+  // supported manifest, so publish marketplace.json at the root as well (the
+  // .agents/plugins copy stays for back-compat). Its "source": "./plugins/omo"
+  // resolves correctly from the root, where the plugin payload is copied.
+  await writeFile(join(lazycodexRoot, MARKETPLACE_ROOT_DESTINATION_PATH), marketplaceContents)
 
   const destinationPluginRoot = join(lazycodexRoot, PLUGIN_DESTINATION_PATH)
   await rm(destinationPluginRoot, { recursive: true, force: true })
