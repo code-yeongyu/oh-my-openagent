@@ -501,4 +501,110 @@ describe("TmuxPollingManager overlap", () => {
     //#then
     expect(closedSessionIds).toEqual(["ses-1"])
   })
+
+  test("auto-activates a recently spawned pane even when it is not the focused pane", async () => {
+    //#given a pane created 1s ago (within AUTO_ACTIVATE_GRACE_MS=5000) that is NOT focused
+    const sessions = new Map<string, TrackedSession>()
+    const tracked: TrackedSession = {
+      sessionId: "ses-1",
+      paneId: "%1",
+      description: "test",
+      attachActivated: false,
+      createdAt: new Date(Date.now() - 1_000),
+      lastSeenAt: new Date(),
+      closePending: false,
+      closeRetryCount: 0,
+    }
+    sessions.set("ses-1", tracked)
+
+    const activatedSessionIds: string[] = []
+    const client = {
+      session: {
+        status: async () => ({ data: { "ses-1": { type: "running" } } }),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const windowState: WindowState = {
+      windowWidth: 160,
+      windowHeight: 48,
+      windowActive: true,
+      sessionAttached: true,
+      mainPane: { paneId: "%0", width: 80, height: 48, left: 0, top: 0, title: "main", isActive: true },
+      agentPanes: [
+        { paneId: "%1", width: 80, height: 48, left: 80, top: 0, title: "agent", isActive: false },
+      ],
+    }
+    const manager = new TmuxPollingManager(
+      unsafeTestValue<import("../../tools/delegate-task/types").OpencodeClient>(client),
+      sessions,
+      async () => {},
+      undefined,
+      async () => windowState,
+      async (session) => {
+        activatedSessionIds.push(session.sessionId)
+        return true
+      },
+    )
+    const pollSessions = unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager).pollSessions
+
+    //#when
+    await pollSessions.call(manager)
+
+    //#then
+    expect(activatedSessionIds).toEqual(["ses-1"])
+    expect(tracked.attachActivated).toBe(true)
+  })
+
+  test("does not auto-activate a pane past the grace window when it is not focused", async () => {
+    //#given a pane created 10s ago (past AUTO_ACTIVATE_GRACE_MS=5000) that is NOT focused
+    const sessions = new Map<string, TrackedSession>()
+    const tracked: TrackedSession = {
+      sessionId: "ses-1",
+      paneId: "%1",
+      description: "test",
+      attachActivated: false,
+      createdAt: new Date(Date.now() - 10_000),
+      lastSeenAt: new Date(),
+      closePending: false,
+      closeRetryCount: 0,
+    }
+    sessions.set("ses-1", tracked)
+
+    const activatedSessionIds: string[] = []
+    const client = {
+      session: {
+        status: async () => ({ data: { "ses-1": { type: "running" } } }),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const windowState: WindowState = {
+      windowWidth: 160,
+      windowHeight: 48,
+      windowActive: true,
+      sessionAttached: true,
+      mainPane: { paneId: "%0", width: 80, height: 48, left: 0, top: 0, title: "main", isActive: true },
+      agentPanes: [
+        { paneId: "%1", width: 80, height: 48, left: 80, top: 0, title: "agent", isActive: false },
+      ],
+    }
+    const manager = new TmuxPollingManager(
+      unsafeTestValue<import("../../tools/delegate-task/types").OpencodeClient>(client),
+      sessions,
+      async () => {},
+      undefined,
+      async () => windowState,
+      async (session) => {
+        activatedSessionIds.push(session.sessionId)
+        return true
+      },
+    )
+    const pollSessions = unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager).pollSessions
+
+    //#when
+    await pollSessions.call(manager)
+
+    //#then
+    expect(activatedSessionIds).toEqual([])
+    expect(tracked.attachActivated).toBe(false)
+  })
 })
