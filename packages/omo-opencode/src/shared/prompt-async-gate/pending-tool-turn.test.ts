@@ -401,4 +401,48 @@ describe("latestAssistantTurnBlocksInternalPrompt", () => {
     // then
     expect(blocks).toBe(true)
   })
+
+  test("#given assistant message with info.error #when checking prompt safety #then internal prompts are not blocked (error is terminal)", () => {
+    const messages = [
+      {
+        info: {
+          role: "assistant",
+          time: { created: 2000 },
+          error: { name: "UnknownError", message: "rate-limited" },
+        },
+      },
+    ]
+    const blocks = latestAssistantTurnBlocksInternalPrompt(messages)
+    expect(blocks).toBe(false)
+  })
+
+  test("#given assistant message with error part #when checking prompt safety #then internal prompts are not blocked (error is terminal)", () => {
+    const messages = [
+      {
+        info: {
+          role: "assistant",
+          time: { created: 2000 },
+        },
+        parts: [{ type: "error", text: "All accounts rate-limited" }],
+      },
+    ]
+    const blocks = latestAssistantTurnBlocksInternalPrompt(messages)
+    expect(blocks).toBe(false)
+  })
+
+  test("#given assistant message with info.error and unknown finish #when checking prompt safety #then error check takes priority over unknown-finish block", () => {
+    const messages = [
+      {
+        info: {
+          role: "assistant",
+          finish: "unknown",
+          time: { created: 2000 },
+          error: { name: "ProviderRateLimitError" },
+        },
+        parts: [],
+      },
+    ]
+    const blocks = latestAssistantTurnBlocksInternalPrompt(messages)
+    expect(blocks).toBe(false)
+  })
 })

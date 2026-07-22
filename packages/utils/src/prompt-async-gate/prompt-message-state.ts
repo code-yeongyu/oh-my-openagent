@@ -58,7 +58,13 @@ export function messageHasTerminalError(message: unknown): boolean {
   if (isRecord(info) && info.error !== undefined && info.error !== null) {
     return true
   }
-  return message.error !== undefined && message.error !== null
+  if (message.error !== undefined && message.error !== null) {
+    return true
+  }
+  return (
+    Array.isArray(message.parts) &&
+    (message.parts as unknown[]).some((part) => isRecord(part) && part.type === "error")
+  )
 }
 
 function toInternalInitiatorTextPartLike(part: unknown): InternalInitiatorTextPartLike {

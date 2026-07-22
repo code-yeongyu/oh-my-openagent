@@ -76,11 +76,14 @@ export function latestAssistantTurnBlocksInternalPrompt(messages: unknown[]): bo
       if (finish === "tool-calls") {
         return !isRecord(message) || !Array.isArray(message.parts) || messageHasUnresolvedTool(message)
       }
+      if (messageHasTerminalError(message)) {
+        return false
+      }
       if (
         (finish === undefined || finish === "unknown")
         && !messageHasSubstantiveAssistantOutput(message)
       ) {
-        return !(messageCompleted(message) && messageHasTerminalError(message))
+        return true
       }
       if (messageCompleted(message)) {
         return false
