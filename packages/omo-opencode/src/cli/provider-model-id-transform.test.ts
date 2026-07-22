@@ -182,6 +182,56 @@ describe("transformModelForProvider", () => {
     })
   })
 
+  describe("antigravity gemini-3-flash (issue #117)", () => {
+    test("keeps antigravity-gemini-3-flash unchanged for google provider", () => {
+      // #given google provider and antigravity-gemini-3-flash model
+      const provider = "google"
+      const model = "antigravity-gemini-3-flash"
+
+      // #when transformModelForProvider is called
+      const result = transformModelForProvider(provider, model)
+
+      // #then it stays as the valid antigravity id (NOT -preview)
+      expect(result).toBe("antigravity-gemini-3-flash")
+    })
+
+    test("keeps google/antigravity-gemini-3-flash unchanged for google provider", () => {
+      // #given google provider and google/antigravity-gemini-3-flash model
+      const provider = "google"
+      const model = "google/antigravity-gemini-3-flash"
+
+      // #when transformModelForProvider is called
+      const result = transformModelForProvider(provider, model)
+
+      // #then it stays as the valid antigravity id (NOT -preview)
+      expect(result).toBe("google/antigravity-gemini-3-flash")
+    })
+
+    test("still rewrites plain gemini-3-flash to gemini-3-flash-preview", () => {
+      // #given google provider and plain gemini-3-flash model
+      const provider = "google"
+      const model = "gemini-3-flash"
+
+      // #when transformModelForProvider is called
+      const result = transformModelForProvider(provider, model)
+
+      // #then it becomes the -preview form (unchanged behavior)
+      expect(result).toBe("gemini-3-flash-preview")
+    })
+
+    test("still rewrites google/gemini-3-flash to google/gemini-3-flash-preview", () => {
+      // #given google provider and google/gemini-3-flash model
+      const provider = "google"
+      const model = "google/gemini-3-flash"
+
+      // #when transformModelForProvider is called
+      const result = transformModelForProvider(provider, model)
+
+      // #then it becomes the -preview form (unchanged behavior)
+      expect(result).toBe("google/gemini-3-flash-preview")
+    })
+  })
+
   describe("anthropic provider", () => {
     test("preserves hyphenated claude-opus-4-7 for config output (regression: installer must not write dotted IDs)", () => {
       // #given anthropic provider and claude-opus-4-7 model
