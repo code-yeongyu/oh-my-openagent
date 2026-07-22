@@ -1,5 +1,5 @@
-import { describe, it, expect } from "bun:test"
-import { AGENT_DISPLAY_NAMES, getAgentConfigKey, getAgentDisplayName, getAgentListDisplayName, normalizeAgentForPrompt, normalizeAgentForPromptKey, stripAgentListSortPrefix } from "./agent-display-names"
+import { describe, it, expect, afterEach } from "bun:test"
+import { AGENT_DISPLAY_NAMES, getAgentConfigKey, getAgentDisplayName, getAgentListDisplayName, normalizeAgentForPrompt, normalizeAgentForPromptKey, stripAgentListSortPrefix, setOverrideDisplayNames, _resetOverrideDisplayNamesForTesting } from "./agent-display-names"
 
 describe("getAgentDisplayName", () => {
   it("returns display name for lowercase config key (new format)", () => {
@@ -196,6 +196,132 @@ describe("getAgentConfigKey", () => {
   it("resolves display names even when zero-width characters are embedded", () => {
     expect(getAgentConfigKey("Sisyphus\u200B - Ultraworker")).toBe("sisyphus")
     expect(getAgentConfigKey("\uFEFFAtlas - Plan Executor")).toBe("atlas")
+  })
+})
+
+describe("reverse override lookup (setOverrideDisplayNames)", () => {
+  afterEach(() => {
+    _resetOverrideDisplayNamesForTesting()
+  })
+
+  it("getAgentConfigKey resolves custom display name override back to config key", () => {
+    // given a custom displayName override for sisyphus
+    setOverrideDisplayNames({ sisyphus: { displayName: "总指挥" } })
+
+    // when getAgentConfigKey called with the custom display name
+    // then returns "sisyphus" not "总指挥"
+    expect(getAgentConfigKey("总指挥")).toBe("sisyphus")
+  })
+
+  it("getAgentConfigKey resolves custom display name case-insensitively", () => {
+    setOverrideDisplayNames({ atlas: { displayName: "アトラス" } })
+
+    expect(getAgentConfigKey("アトラス")).toBe("atlas")
+  })
+
+  it("getAgentConfigKey resolves CJK override for hephaestus", () => {
+    setOverrideDisplayNames({ hephaestus: { displayName: "헤파이스토스" } })
+
+    expect(getAgentConfigKey("헤파이스토스")).toBe("hephaestus")
+  })
+
+  it("getAgentConfigKey resolves multiple overrides simultaneously", () => {
+    setOverrideDisplayNames({
+      sisyphus: { displayName: "总指挥" },
+      atlas: { displayName: "アトラス" },
+      hephaestus: { displayName: "헤파이스토스" },
+    })
+
+    expect(getAgentConfigKey("总指挥")).toBe("sisyphus")
+    expect(getAgentConfigKey("アトラス")).toBe("atlas")
+    expect(getAgentConfigKey("헤파이스토스")).toBe("hephaestus")
+  })
+
+  it("override takes precedence over hardcoded display names", () => {
+    // given override that replaces the default display name
+    setOverrideDisplayNames({ sisyphus: { displayName: "Boss" } })
+
+    // the old hardcoded name should no longer resolve (override replaces it)
+    // but the config key itself still works
+    expect(getAgentConfigKey("Boss")).toBe("sisyphus")
+    expect(getAgentConfigKey("sisyphus")).toBe("sisyphus")
+  })
+
+  it("hardcoded display names still work after override is set for a different agent", () => {
+    setOverrideDisplayNames({ sisyphus: { displayName: "总指挥" } })
+
+    // atlas hardcoded name should still resolve
+    expect(getAgentConfigKey("Atlas - Plan Executor")).toBe("atlas")
+  })
+
+  it("normalizeAgentForPrompt resolves override display name to canonical display name", () => {
+    setOverrideDisplayNames({ sisyphus: { displayName: "总指挥" } })
+
+    // normalizeAgentForPrompt should return the override display name
+    expect(normalizeAgentForPrompt("总指挥")).toBe("总指挥")
+  })
+
+  it("normalizeAgentForPromptKey resolves override display name to config key", () => {
+    setOverrideDisplayNames({ atlas: { displayName: "アトラス" } })
+
+    expect(normalizeAgentForPromptKey("アトラス")).toBe("atlas")
+  })
+
+  it("returns lowercased unknown name after reset when override was removed", () => {
+    // given override set then reset
+    setOverrideDisplayNames({ sisyphus: { displayName: "总指挥" } })
+    _resetOverrideDisplayNamesForTesting()
+
+    // when getAgentConfigKey called with the old override name
+    // then returns lowercased unknown (no longer recognized)
+    expect(getAgentConfigKey("总指挥")).toBe("总指挥")
+  })
+
+  it("setOverrideDisplayNames with undefined or empty overrides is a no-op", () => {
+    setOverrideDisplayNames(undefined)
+    setOverrideDisplayNames({})
+
+    // hardcoded names still work
+    expect(getAgentConfigKey("Sisyphus - ultraworker")).toBe("sisyphus")
+  })
+
+  it("agents without displayName override fall back to hardcoded lookup", () => {
+    // given overrides map where sisyphus has no displayName
+    setOverrideDisplayNames({ sisyphus: { }, atlas: { displayName: "アトラス" } })
+
+    // sisyphus hardcoded name still resolves
+    expect(getAgentConfigKey("Sisyphus - ultraworker")).toBe("sisyphus")
+    // atlas override resolves
+    expect(getAgentConfigKey("アトラス")).toBe("atlas")
+  })
+
+  it("normalizeAgentForPrompt resolves config key to override display name", () => {
+    // given override set for sisyphus
+    setOverrideDisplayNames({ sisyphus: { displayName: "总指挥" } })
+
+    // when normalizeAgentForPrompt called with the config key "sisyphus"
+    // then returns the override display name, not the hardcoded one
+    expect(normalizeAgentForPrompt("sisyphus")).toBe("总指挥")
+  })
+
+  it("normalizeAgentForPrompt resolves uppercase config key to override display name", () => {
+    setOverrideDisplayNames({ atlas: { displayName: "アトラス" } })
+
+    // uppercase config key should still resolve to override name
+    expect(normalizeAgentForPrompt("Atlas")).toBe("アトラス")
+  })
+
+  it("resolves legacy config keys in overrides to canonical config keys", () => {
+    // given override with legacy key "omo"
+    setOverrideDisplayNames({ omo: { displayName: "总指挥" } })
+
+    // then getAgentConfigKey resolves "总指挥" to "sisyphus"
+    expect(getAgentConfigKey("总指挥")).toBe("sisyphus")
+
+    // and normalizeAgentForPrompt resolves legacy key "omo" to override display name "总指挥"
+    expect(normalizeAgentForPrompt("omo")).toBe("总指挥")
+    expect(normalizeAgentForPrompt("sisyphus")).toBe("总指挥")
+    expect(normalizeAgentForPromptKey("总指挥")).toBe("sisyphus")
   })
 })
 

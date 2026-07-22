@@ -68,24 +68,26 @@ function getConfigTargets(): ConfigTarget[] {
   })
 }
 
-function isSourceOmoPluginEntry(plugin: string): boolean {
+function isSourceOmoPluginEntry(plugin: unknown): boolean {
+  if (typeof plugin !== 'string') return false
   const normalized = plugin.toLowerCase().replaceAll("\\", "/")
   if (!normalized.startsWith("file://")) return false
 
   return /\/(omo(?:-[^/]*)?|oh-my-opencode|oh-my-openagent)\/(src|dist)\/index\.(ts|js)$/.test(normalized)
 }
 
-function isPackageOmoPluginEntry(plugin: string): boolean {
+function isPackageOmoPluginEntry(plugin: unknown): boolean {
+  if (typeof plugin !== 'string') return false
   return plugin === PLUGIN_NAME || plugin.startsWith(`${PLUGIN_NAME}@`) ||
     plugin === LEGACY_PLUGIN_NAME || plugin.startsWith(`${LEGACY_PLUGIN_NAME}@`)
 }
 
-function isOurPlugin(plugin: string): boolean {
+function isOurPlugin(plugin: unknown): boolean {
   return isPackageOmoPluginEntry(plugin) || isSourceOmoPluginEntry(plugin)
 }
 
-function findOurPluginEntry(plugins: readonly string[]): string | undefined {
-  return plugins.find(isOurPlugin)
+function findOurPluginEntry(plugins: readonly unknown[]): string | undefined {
+  return plugins.find(isOurPlugin) as string | undefined
 }
 
 function findSourcePluginEntryInTarget(target: ConfigTarget): string | null {
@@ -181,11 +183,11 @@ function writePluginEntryToTarget(params: {
       const match = content.match(pluginArrayRegex)
 
       if (match) {
-        const formattedPlugins = normalizedPlugins.map((p) => `"${p}"`).join(",\n    ")
+        const formattedPlugins = normalizedPlugins.map((p) => JSON.stringify(p)).join(",\n    ")
         const newContent = content.replace(pluginArrayRegex, `$1[\n    ${formattedPlugins}\n  ]`)
         writeFileSync(target.path, newContent)
       } else {
-        const newContent = content.replace(/(\{)/, `$1\n  "plugin": ["${nextPluginEntry}"],`)
+        const newContent = content.replace(/(\{)/, `$1\n  "plugin": [${JSON.stringify(nextPluginEntry)}],`)
         writeFileSync(target.path, newContent)
       }
     } else {

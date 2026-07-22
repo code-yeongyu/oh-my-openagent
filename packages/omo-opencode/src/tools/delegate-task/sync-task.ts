@@ -3,6 +3,7 @@ import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { log } from "../../shared/logger"
+import { normalizeAgentForPrompt } from "../../shared/agent-display-names"
 import { formatDetailedError } from "./error-formatting"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import { reserveSyncSubagentSpawn } from "./sync-spawn-reservation"
@@ -32,6 +33,8 @@ export async function executeSyncTask(
     | Awaited<ReturnType<ExecutorContext["manager"]["reserveSubagentSpawn"]>>
     | undefined
 
+  const normalizedAgentName = normalizeAgentForPrompt(agentToUse) ?? agentToUse
+
   try {
     const spawn = await reserveSyncSubagentSpawn(executorCtx, parentContext)
     spawnReservation = spawn.reservation
@@ -39,7 +42,7 @@ export async function executeSyncTask(
 
     const createSessionResult = await deps.createSyncSession(client, {
       parentSessionID: parentContext.sessionID,
-      agentToUse,
+      agentToUse: normalizedAgentName,
       description: args.description,
       defaultDirectory: directory,
       categoryModel,
@@ -61,7 +64,7 @@ export async function executeSyncTask(
         executorCtx,
         sessionID: newSessionID,
         parentContext,
-        agentToUse,
+        agentToUse: normalizedAgentName,
         categoryModel,
         fallbackChain,
         systemContent,
@@ -79,7 +82,7 @@ export async function executeSyncTask(
         currentSessionID,
         currentModel,
         parentContext,
-        agentToUse,
+        agentToUse: normalizedAgentName,
         spawnDepth,
       })
     }
@@ -94,7 +97,7 @@ export async function executeSyncTask(
         id: taskId,
         sessionID,
         description: args.description,
-        agent: agentToUse,
+        agent: normalizedAgentName,
         isBackground: false,
         category: args.category,
         skills: args.load_skills,
@@ -120,7 +123,7 @@ export async function executeSyncTask(
           directory: createSessionResult.parentDirectory,
         },
         parentContext,
-        agentToUse,
+        agentToUse: normalizedAgentName,
         categoryModel,
         fallbackChain,
         deps,
@@ -149,7 +152,7 @@ export async function executeSyncTask(
       operation: "Execute task",
       args,
       sessionID: syncSessionID,
-      agent: agentToUse,
+      agent: normalizedAgentName,
       category: args.category,
     })
   } finally {

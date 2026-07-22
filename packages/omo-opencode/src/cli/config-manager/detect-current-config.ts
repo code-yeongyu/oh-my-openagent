@@ -99,13 +99,26 @@ function detectProvidersFromOmoConfig(): {
   }
 }
 
-function isOurPlugin(plugin: string): boolean {
+function isPackageOmoPluginEntry(plugin: unknown): boolean {
+  if (typeof plugin !== 'string') return false
   return plugin === PLUGIN_NAME || plugin.startsWith(`${PLUGIN_NAME}@`) ||
-         plugin === LEGACY_PLUGIN_NAME || plugin.startsWith(`${LEGACY_PLUGIN_NAME}@`)
+    plugin === LEGACY_PLUGIN_NAME || plugin.startsWith(`${LEGACY_PLUGIN_NAME}@`)
 }
 
-function findOurPluginEntry(plugins: string[]): string | null {
-  return plugins.find(isOurPlugin) ?? null
+function isSourceOmoPluginEntry(plugin: unknown): boolean {
+  if (typeof plugin !== 'string') return false
+  const normalized = plugin.toLowerCase().replaceAll("\\", "/")
+  if (!normalized.startsWith("file://")) return false
+
+  return /\/(omo(?:-[^/]*)?|oh-my-opencode|oh-my-openagent)\/(src|dist)\/index\.(ts|js)$/.test(normalized)
+}
+
+function isOurPlugin(plugin: unknown): boolean {
+  return isPackageOmoPluginEntry(plugin) || isSourceOmoPluginEntry(plugin)
+}
+
+function findOurPluginEntry(plugins: readonly unknown[]): string | null {
+  return plugins.find(isOurPlugin) as string | null
 }
 
 export function detectCurrentConfig(): DetectedConfig {

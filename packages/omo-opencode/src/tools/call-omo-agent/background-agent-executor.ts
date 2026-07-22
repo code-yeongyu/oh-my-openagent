@@ -7,7 +7,7 @@ import type { CallOmoAgentArgs } from "./types"
 import type { ToolContextWithMetadata } from "./tool-context-with-metadata"
 import { getMessageDir } from "./message-storage-directory"
 import { getSessionTools } from "../../shared/session-tools-store"
-import { getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { normalizeAgentForPrompt, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 
 export async function executeBackgroundAgent(
 	args: CallOmoAgentArgs,
@@ -40,7 +40,7 @@ export async function executeBackgroundAgent(
 		const task = await manager.launch({
 			description: args.description,
 			prompt: args.prompt,
-			agent: getAgentDisplayName(stripAgentListSortPrefix(args.subagent_type)),
+			agent: normalizeAgentForPrompt(stripAgentListSortPrefix(args.subagent_type)) ?? stripAgentListSortPrefix(args.subagent_type),
 			parentSessionId: toolContext.sessionID,
 			parentMessageId: toolContext.messageID,
 			parentAgent,
@@ -71,7 +71,7 @@ export async function executeBackgroundAgent(
 
 		await toolContext.metadata?.({
 			title: args.description,
-			metadata: { sessionId: sessionId ?? "pending" },
+			metadata: { sessionId: sessionId ?? "pending", agent: task.agent },
 		})
 
 		return `Background agent task launched successfully.

@@ -3,7 +3,9 @@ import {
   registerAgentName,
 } from "../features/claude-code-session-state";
 import { log } from "../shared";
+import { AGENT_NAME_MAP } from "../shared/migration";
 import { setDefaultAgentForSort } from "../shared/agent-sort-shim";
+import { setOverrideDisplayNames } from "../shared/agent-display-names";
 import { remapAgentKeysToDisplayNames } from "./agent-key-remapper";
 import { reorderAgentsByPriority } from "./agent-priority-order";
 import type { ApplyAgentConfigParams } from "./agent-config-types";
@@ -13,6 +15,23 @@ export function finalizeAgentConfig(
     configuredDefaultAgent: string | undefined;
   },
 ): Record<string, unknown> {
+  // Canonicalize legacy keys in override configs (e.g. "omo" -> "sisyphus")
+  // so that override maps match downstream canonicalized keys.
+  if (params.pluginConfig.agents) {
+    const migratedAgents: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(params.pluginConfig.agents)) {
+      const canonicalKey = AGENT_NAME_MAP[key.toLowerCase()] ?? AGENT_NAME_MAP[key] ?? key
+      migratedAgents[canonicalKey] = value
+    }
+    params.pluginConfig.agents = migratedAgents as typeof params.pluginConfig.agents
+  }
+
+  // Register override display names BEFORE remapping so reverse lookups
+  // (display name → config key) work throughout the plugin lifecycle.
+  setOverrideDisplayNames(
+    params.pluginConfig.agents as Record<string, { displayName?: string } | undefined> | undefined,
+  );
+
   if (params.config.agent) {
     params.config.agent = remapAgentKeysToDisplayNames(
       params.config.agent as Record<string, unknown>,

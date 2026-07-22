@@ -9,7 +9,7 @@ import { getSessionTools } from "../../shared/session-tools-store"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { migrateToolsToPermission } from "../../shared/permission-compat"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
-import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { normalizeAgentForPrompt, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import { resolveMetadataModel } from "./resolve-metadata-model"
 import { getPersistedBackgroundTaskDescription } from "./background-task-description"
@@ -113,7 +113,7 @@ export async function executeBackgroundTask(
 
   try {
     const tddEnabled = executorCtx.sisyphusAgentConfig?.tdd
-    const normalizedAgent = stripAgentListSortPrefix(agentToUse)
+    const normalizedAgent = normalizeAgentForPrompt(agentToUse) ?? stripAgentListSortPrefix(agentToUse)
     const effectivePrompt = buildTaskPrompt(args.prompt, normalizedAgent, tddEnabled)
     const persistedDescription = getPersistedBackgroundTaskDescription(args, normalizedAgent)
     const task = await manager.launch({
@@ -225,7 +225,7 @@ Do NOT call background_output now. Wait for <system-reminder> notification first
     return formatDetailedError(error, {
       operation: "Launch background task",
       args,
-      agent: stripAgentListSortPrefix(agentToUse),
+      agent: normalizeAgentForPrompt(agentToUse) ?? stripAgentListSortPrefix(agentToUse),
       category: args.category,
     })
   }

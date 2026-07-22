@@ -1,6 +1,7 @@
 import { createBuiltinAgents } from "../agents";
 import { collectDisabledSkillAliases } from "../plugin/skill-context";
 import { isTaskSystemEnabled } from "../shared";
+import { setOverrideDisplayNames } from "../shared/agent-display-names";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import { assembleAgentConfig } from "./agent-config-assembly";
 import { finalizeAgentConfig } from "./agent-config-finalizer";
@@ -11,6 +12,23 @@ import type { ApplyAgentConfigParams } from "./agent-config-types";
 export async function applyAgentConfig(
   params: ApplyAgentConfigParams,
 ): Promise<Record<string, unknown>> {
+  // Canonicalize legacy keys in override configs (e.g. "omo" -> "sisyphus")
+  // so that override maps match downstream canonicalized keys.
+  if (params.pluginConfig.agents) {
+    const migratedAgents: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(params.pluginConfig.agents)) {
+      const canonicalKey = AGENT_NAME_MAP[key.toLowerCase()] ?? AGENT_NAME_MAP[key] ?? key
+      migratedAgents[canonicalKey] = value
+    }
+    params.pluginConfig.agents = migratedAgents as typeof params.pluginConfig.agents
+  }
+
+  // Register override display names BEFORE assembly so reverse lookups
+  // (display name -> config key) work in applyDefaultAgent() and throughout.
+  setOverrideDisplayNames(
+    params.pluginConfig.agents as Record<string, { displayName?: string } | undefined> | undefined,
+  );
+
   const migratedDisabledAgents = (params.pluginConfig.disabled_agents ?? []).map(
     (agent: string) => AGENT_NAME_MAP[agent.toLowerCase()] ?? AGENT_NAME_MAP[agent] ?? agent,
   ) as typeof params.pluginConfig.disabled_agents;
