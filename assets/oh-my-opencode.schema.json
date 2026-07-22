@@ -6011,6 +6011,9 @@
         },
         "disable_live_parent_wake_routing": {
           "type": "boolean"
+        },
+        "block_on_background_tasks": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false

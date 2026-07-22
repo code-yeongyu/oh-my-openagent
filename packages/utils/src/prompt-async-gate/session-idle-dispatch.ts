@@ -23,6 +23,7 @@ export async function dispatchAfterSessionIdle<TInput>(args: {
   readonly dispatchTimeoutMs: number
   readonly checkStatus: boolean
   readonly checkToolState: boolean
+  readonly shouldDispatch?: () => boolean
   readonly dispatch: (input: TInput) => Promise<unknown>
 }): Promise<InternalPromptDispatchResult> {
   const {
@@ -38,8 +39,12 @@ export async function dispatchAfterSessionIdle<TInput>(args: {
     dispatchTimeoutMs,
     checkStatus,
     checkToolState,
+    shouldDispatch,
     dispatch,
   } = args
+
+  const dispatchAllowed = (): boolean => shouldDispatch?.() !== false
+  if (!dispatchAllowed()) return { status: "unavailable" }
 
   const existing = getActiveReservation(sessionID)
   if (existing) {
@@ -106,6 +111,8 @@ export async function dispatchAfterSessionIdle<TInput>(args: {
       })
       return { status: "active" }
     }
+
+    if (!dispatchAllowed()) return { status: "unavailable" }
 
     log(`[prompt-async-gate] ${sessionName} dispatching`, { sessionID, source })
     dispatchAttempted = true

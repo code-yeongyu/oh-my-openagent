@@ -10,6 +10,7 @@ import { getMessageDir } from "./message-dir"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { sanitizeSubagentType } from "../delegate-task/subagent-discovery"
 import { getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { getBackgroundCompletionGuidance } from "../background-task/completion-guidance"
 
 export async function executeBackground(
   args: CallOmoAgentArgs,
@@ -24,6 +25,7 @@ export async function executeBackground(
   client: PluginInput["client"],
   fallbackChain?: FallbackEntry[],
   model?: DelegatedModelConfig,
+  isBackgroundWaitAvailable?: (sessionID: string) => boolean,
 ): Promise<string> {
   try {
     const messageDir = getMessageDir(toolContext.sessionID)
@@ -90,7 +92,7 @@ Description: ${task.description}
 Agent: ${task.agent} (subagent)
 Status: ${task.status}
 
-Do NOT call background_output now. Wait for <system-reminder> notification first. The system will deliver the result when the task completes; you do not need to poll for it.`
+${getBackgroundCompletionGuidance(isBackgroundWaitAvailable?.(toolContext.sessionID) ?? false)}`
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return `Failed to launch background agent task: ${message}`

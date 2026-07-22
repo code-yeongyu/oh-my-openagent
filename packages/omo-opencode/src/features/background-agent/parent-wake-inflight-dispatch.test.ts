@@ -8,16 +8,19 @@ type PromptAsyncCall = {
   query?: { directory: string }
 }
 
-function createNotifier(promptAsyncImpl: (call: PromptAsyncCall) => Promise<unknown>): {
+function createNotifier(
+  promptAsyncImpl: (call: PromptAsyncCall) => Promise<unknown>,
+  messagesImpl: () => Promise<unknown> = async () => ({
+    data: [{ info: { role: "assistant", finish: "stop", time: { created: Date.now() - 10_000 } } }],
+  }),
+): {
   notifier: ParentWakeNotifier
   promptAsyncCalls: PromptAsyncCall[]
 } {
   const promptAsyncCalls: PromptAsyncCall[] = []
   const client: ConstructorParameters<typeof ParentWakeNotifier>[0]["client"] = {
     session: {
-      messages: async () => ({
-        data: [{ info: { role: "assistant", finish: "stop", time: { created: Date.now() - 10_000 } } }],
-      }),
+      messages: messagesImpl,
       status: async () => ({ data: {} }),
       promptAsync: async (call: PromptAsyncCall) => {
         promptAsyncCalls.push(call)
@@ -114,6 +117,72 @@ describe("ParentWakeNotifier — in-flight dispatch tracking (P1 race)", () => {
       notifier.shutdown()
       releaseAllPromptAsyncReservationsForTesting()
     }
+  })
+
+  test("#given a parent wake is mid-dispatch #when shutdown wins #then late dispatch completion cannot recreate wake state", async () => {
+    // #given
+    let releaseDispatch: (() => void) | undefined
+    const dispatchGate = new Promise<void>((resolve) => { releaseDispatch = resolve })
+    let signalDispatchStarted: (() => void) | undefined
+    const dispatchStarted = new Promise<void>((resolve) => { signalDispatchStarted = resolve })
+    const { notifier } = createNotifier(async () => {
+      signalDispatchStarted?.()
+      await dispatchGate
+      return { data: {} }
+    })
+    const sessionID = "parent-shutdown-mid-dispatch"
+    notifier.queuePendingParentWake(sessionID, "wake A", { agent: "sisyphus" }, true)
+
+    // #when
+    const flushPromise = notifier.flushPendingParentWake(sessionID)
+    await dispatchStarted
+    notifier.shutdown()
+    releaseDispatch?.()
+    await flushPromise
+
+    // #then
+    expect(notifier.hasInFlightParentWakeDispatch(sessionID)).toBe(false)
+    expect(notifier.getPendingParentWakes().has(sessionID)).toBe(false)
+    expect(notifier.getDispatchedParentWakes().has(sessionID)).toBe(false)
+    expect(notifier.getDispatchedParentWakeTimers().has(sessionID)).toBe(false)
+    releaseAllPromptAsyncReservationsForTesting()
+  })
+
+  test("#given parent wake history inspection is in flight #when shutdown starts #then prompt dispatch never begins", async () => {
+    // #given
+    let releaseHistory: (() => void) | undefined
+    const historyGate = new Promise<void>((resolve) => { releaseHistory = resolve })
+    let signalHistoryStarted: (() => void) | undefined
+    const historyStarted = new Promise<void>((resolve) => { signalHistoryStarted = resolve })
+    let messagesCalls = 0
+    const { notifier, promptAsyncCalls } = createNotifier(
+      async () => ({ data: {} }),
+      async () => {
+        messagesCalls += 1
+        if (messagesCalls === 1) {
+          signalHistoryStarted?.()
+          await historyGate
+        }
+        return {
+          data: [{ info: { role: "assistant", finish: "stop", time: { created: Date.now() - 10_000 } } }],
+        }
+      },
+    )
+    const sessionID = "parent-shutdown-during-history-inspection"
+    notifier.queuePendingParentWake(sessionID, "wake A", { agent: "sisyphus" }, true)
+
+    // #when
+    const flushPromise = notifier.flushPendingParentWake(sessionID)
+    await historyStarted
+    notifier.shutdown()
+    releaseHistory?.()
+    await flushPromise
+
+    // #then
+    expect(messagesCalls).toBeGreaterThanOrEqual(1)
+    expect(promptAsyncCalls).toHaveLength(0)
+    expect(notifier.hasInFlightParentWakeDispatch(sessionID)).toBe(false)
+    releaseAllPromptAsyncReservationsForTesting()
   })
 })
 

@@ -9,6 +9,7 @@ import { isInteractiveBashEnabled } from "../interactive-bash-availability"
 import { filterDisabledTools } from "../shared/disabled-tools"
 import { log } from "../shared"
 import { normalizeToolArgSchemas } from "./normalize-tool-arg-schemas"
+import { createBackgroundWaitAvailability } from "./background-wait-availability"
 import { createCoreTools } from "./tool-registry-core-tools"
 import { defaultToolRegistryFactories } from "./tool-registry-factories"
 import {
@@ -49,6 +50,11 @@ export function createToolRegistry(args: {
     ...toolFactories,
   }
   const taskSystemEnabled = getTaskSystemEnabled(pluginConfig)
+  let backgroundWaitEnabled = false
+  const isBackgroundWaitAvailable = createBackgroundWaitAvailability(
+    pluginConfig,
+    () => backgroundWaitEnabled,
+  )
   const allTools = {
     ...createCoreTools({
       ctx,
@@ -57,6 +63,7 @@ export function createToolRegistry(args: {
       skillContext,
       availableCategories,
       factories,
+      isBackgroundWaitAvailable,
     }),
     ...(interactiveBashEnabled ? { interactive_bash: factories.interactive_bash } : {}),
     ...createTeamModeToolsRecord({ pluginConfig, ctx, managers, factories }),
@@ -83,6 +90,12 @@ export function createToolRegistry(args: {
   if (maxTools) {
     trimToolsToCap(filteredTools, maxTools)
   }
+
+  if (filteredTools["wait-for-background-tasks"] && !filteredTools.background_output) {
+    delete filteredTools["wait-for-background-tasks"]
+  }
+
+  backgroundWaitEnabled = filteredTools["wait-for-background-tasks"] !== undefined
 
   return {
     filteredTools,

@@ -233,6 +233,26 @@ describe("tryFallbackRetry", () => {
       expect(settled).toBe(true)
     })
 
+    test("does not enqueue when shutdown begins while aborting the failed session", async () => {
+      const args = createDefaultArgs({ sessionId: "session-to-abort" })
+      const deferred = createDeferredPromise()
+      let shuttingDown = false
+      args.abortMock.mockImplementationOnce(() => deferred.promise)
+
+      const retryPromise = tryFallbackRetry({
+        ...args,
+        isShuttingDown: () => shuttingDown,
+      })
+      while (args.abortMock.mock.calls.length === 0) await Promise.resolve()
+      shuttingDown = true
+      deferred.resolve()
+      const retried = await retryPromise
+
+      expect(retried).toBe(false)
+      expect(args.queuesByKey.size).toBe(0)
+      expect(args.processKey).not.toHaveBeenCalled()
+    })
+
     test("adds retry input to queue and calls processKey", async () => {
       const args = createDefaultArgs()
 
@@ -289,6 +309,7 @@ describe("tryFallbackRetry", () => {
       const args = createDefaultArgs({
         skillContent: "delegated skill system",
         sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
+        userPermission: { "wait-for-background-tasks": "deny" },
       })
 
       await tryFallbackRetry(args)
@@ -297,6 +318,7 @@ describe("tryFallbackRetry", () => {
       const retryInput = args.queuesByKey.get(key)?.[0]?.input
       expect(retryInput?.skillContent).toBe("delegated skill system")
       expect(retryInput?.sessionPermission).toEqual(QUESTION_DENIED_SESSION_PERMISSION)
+      expect(retryInput?.userPermission).toEqual({ "wait-for-background-tasks": "deny" })
     })
 
     test("finalizes the failed attempt, creates a new pending attempt, and enqueues its explicit attemptID", async () => {

@@ -1,17 +1,18 @@
 # src/tools/background-task/ — Background Task Tool Wrappers
 
-**Generated:** 2026-05-15
+**Generated:** 2026-07-17
 
 ## OVERVIEW
 
-18 files. Tool-layer wrappers for `background_output` and `background_cancel`. Does NOT implement the background execution engine — that lives in `src/features/background-agent/`. This directory provides the LLM-facing tool interface.
+34 files. Tool-layer wrappers for `background_output`, `background_cancel`, and the conditional `wait-for-background-tasks` barrier. Does NOT implement the background execution engine — that lives in `src/features/background-agent/`. This directory provides the LLM-facing tool interface.
 
-## THREE TOOLS
+## TOOL FACTORIES
 
 | Tool | Factory | Purpose |
 |------|---------|---------|
 | `background_output` | `createBackgroundOutput` | Get results from a running/completed background task |
 | `background_cancel` | `createBackgroundCancel` | Cancel running task(s) |
+| `wait-for-background-tasks` | `createWaitForBackgroundTasks` | Block turn completion until root-lineage work settles or the bounded wait times out |
 | `createBackgroundTask` | internal | Shared factory used by both |
 
 ## KEY FILES
@@ -20,6 +21,7 @@
 |------|---------|
 | `create-background-output.ts` | `background_output` tool: fetch task results by task_id |
 | `create-background-cancel.ts` | `background_cancel` tool: cancel by taskId or all=true |
+| `create-wait-for-background-tasks.ts` | Conditional barrier tool: wait across pending launches, descendants, notification preparation, and abort finalization |
 | `create-background-task.ts` | Shared tool factory with common params |
 | `clients.ts` | Client interfaces for background output and cancel |
 | `session-messages.ts` | Fetch session messages from OpenCode |
@@ -42,6 +44,10 @@ background_output(task_id, full_session=true) → return full session transcript
 background_output(task_id, message_limit=N) → last N messages only
 background_output(task_id, include_thinking=true) → include thinking blocks
 ```
+
+## WAIT BARRIER
+
+`wait-for-background-tasks` is registered only when `experimental.block_on_background_tasks` is enabled and the final filtered tool registry still exposes the required background-task surface. It waits across the root task lineage, pending launch registration, notification preparation, and child abort finalization. Timeout output requires another wait while work remains active.
 
 ## RELATIONSHIP TO BACKGROUND ENGINE
 

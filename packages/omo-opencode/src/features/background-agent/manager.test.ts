@@ -1,6 +1,7 @@
 import { tmpdir } from "node:os"
 import { describe, test, expect, beforeEach, afterEach, afterAll, spyOn, mock } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
+import type { BackgroundTaskConfig } from "../../config/schema"
 import * as sharedModule from "../../shared"
 import {
   clearAllDelegatedChildSessionBootstrap,
@@ -16,6 +17,7 @@ import {
   subagentSessions,
 } from "../claude-code-session-state"
 import { _resetTaskToastManagerForTesting, initTaskToastManager } from "../task-toast-manager/manager"
+import { startAttempt } from "./attempt-lifecycle"
 import type { ConcurrencyManager } from "./concurrency"
 import { MIN_IDLE_TIME_MS } from "./constants"
 import { BackgroundManager } from "./manager"
@@ -230,7 +232,7 @@ function createPluginInput(client: unknown, directory = tmpdir()): PluginInput {
   return cast<PluginInput>({ client, directory })
 }
 
-function createBackgroundManager(): BackgroundManager {
+function createBackgroundManager(config?: BackgroundTaskConfig): BackgroundManager {
   const client = {
     session: {
       prompt: async () => ({}),
@@ -238,7 +240,7 @@ function createBackgroundManager(): BackgroundManager {
       abort: async () => ({}),
     },
   }
-  return new BackgroundManager({ pluginContext: createPluginInput(client) })
+  return new BackgroundManager({ pluginContext: createPluginInput(client), config })
 }
 
 function createBackgroundManagerWithOptions(options: Partial<ConstructorParameters<typeof BackgroundManager>[0]>): BackgroundManager {
@@ -278,10 +280,42 @@ function getPendingParentWakes(manager: BackgroundManager): Map<string, PendingP
   }>(manager)).parentWakeNotifier.getPendingParentWakes()
 }
 
+function getPendingParentWakeTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
+  return (cast<{
+    parentWakeNotifier: { getPendingParentWakeTimers: () => Map<string, ReturnType<typeof setTimeout>> }
+  }>(manager)).parentWakeNotifier.getPendingParentWakeTimers()
+}
+
 function getDispatchedParentWakes(manager: BackgroundManager): Map<string, PendingParentWakeForTest> {
   return (cast<{
     parentWakeNotifier: { getDispatchedParentWakes: () => Map<string, PendingParentWakeForTest> }
   }>(manager)).parentWakeNotifier.getDispatchedParentWakes()
+}
+
+function getParentWakeNotifierForWorkState(manager: BackgroundManager): {
+  reserveNotificationPreparation: (sessionID: string) => void
+  releaseNotificationPreparation: (sessionID: string) => void
+  queuePendingParentWake: (
+    sessionID: string,
+    notification: string,
+    promptContext: Record<string, unknown>,
+    shouldReply: boolean,
+    delayMs?: number,
+  ) => void
+} {
+  return (cast<{
+    parentWakeNotifier: {
+      reserveNotificationPreparation: (sessionID: string) => void
+      releaseNotificationPreparation: (sessionID: string) => void
+      queuePendingParentWake: (
+        sessionID: string,
+        notification: string,
+        promptContext: Record<string, unknown>,
+        shouldReply: boolean,
+        delayMs?: number,
+      ) => void
+    }
+  }>(manager)).parentWakeNotifier
 }
 
 function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
@@ -319,6 +353,21 @@ async function tryCompleteTaskForTest(manager: BackgroundManager, task: Backgrou
 
 function stubNotifyParentSession(manager: BackgroundManager): void {
   ;(cast<{ notifyParentSession: () => Promise<void> }>(manager)).notifyParentSession = async () => {}
+}
+
+function blockNotifyParentSession(manager: BackgroundManager): {
+  started: Promise<void>
+  release: () => void
+} {
+  let markStarted: (() => void) | undefined
+  let finishNotification: (() => void) | undefined
+  const started = new Promise<void>((resolve) => { markStarted = resolve })
+  const blockedNotification = new Promise<void>((resolve) => { finishNotification = resolve })
+  ;(cast<{ notifyParentSession: () => Promise<void> }>(manager)).notifyParentSession = async () => {
+    markStarted?.()
+    await blockedNotification
+  }
+  return { started, release: () => finishNotification?.() }
 }
 
 async function flushBackgroundNotifications(): Promise<void> {
@@ -594,7 +643,653 @@ describe("BackgroundManager delegated child-session bootstrap", () => {
   })
 })
 
+describe("BackgroundManager pending launch visibility", () => {
+  test("keeps root wait visible while a nested task finalizes", () => {
+    // #given a nested task whose terminal status is already visible
+    const manager = createBackgroundManager()
+    const task = createMockTask({
+      id: "task-nested-finalizing",
+      rootSessionId: "root-session",
+      sessionId: "nested-session",
+      parentSessionId: "direct-child-session",
+      status: "completed",
+    })
+    const reserveFinalization = cast<{
+      reserveTaskFinalization: (task: BackgroundTask) => () => void
+    }>(manager).reserveTaskFinalization.bind(manager)
+
+    // #when notification preparation is reserved for nested finalization
+    const release = reserveFinalization(task)
+
+    try {
+      // #then both the immediate parent and root wait observe the in-flight work
+      expect(manager.hasBackgroundWorkInFlight(task.parentSessionId)).toBe(true)
+      expect(manager.hasBackgroundWorkInFlight(task.rootSessionId ?? "")).toBe(true)
+    } finally {
+      release()
+      manager.shutdown()
+    }
+  })
+
+  test("reports a running nested descendant after its direct parent completes", () => {
+    // #given a completed direct child with a grandchild still running
+    const manager = createBackgroundManager()
+    const directChild: BackgroundTask = {
+      id: "task-direct-completed",
+      rootSessionId: "root-session",
+      sessionId: "session-direct-completed",
+      parentSessionId: "root-session",
+      parentMessageId: "msg-root",
+      description: "completed direct child",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+    }
+    const grandchild: BackgroundTask = {
+      id: "task-grandchild-running",
+      rootSessionId: "root-session",
+      sessionId: "session-grandchild-running",
+      parentSessionId: directChild.sessionId ?? "",
+      parentMessageId: "msg-direct",
+      description: "running grandchild",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+    }
+    const addTask = cast<{ addTask: (task: BackgroundTask) => void }>(manager).addTask.bind(manager)
+    addTask(directChild)
+    addTask(grandchild)
+    getRootDescendantCounts(manager).set("root-session", 1)
+
+    try {
+      // #when the root checks whether background work remains
+      const workInFlight = manager.hasBackgroundWorkInFlight("root-session")
+
+      // #then the running grandchild keeps the root blocked
+      expect(workInFlight).toBe(true)
+    } finally {
+      manager.shutdown()
+    }
+  })
+
+  test("reports work in flight before asynchronous lineage lookup registers the task", async () => {
+    // #given a launch blocked in its first asynchronous lineage lookup
+    let releaseLineage: (() => void) | undefined
+    const lineageGate = new Promise<void>((resolve) => { releaseLineage = resolve })
+    const client = {
+      session: {
+        get: async () => {
+          await lineageGate
+          return { data: { id: "parent-session" } }
+        },
+        create: async () => ({ data: { id: "child-session" } }),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+
+    try {
+      // #when launch starts but has not registered a BackgroundTask yet
+      const launch = manager.launch({
+        description: "delayed lineage launch",
+        prompt: "test",
+        agent: "explore",
+        parentSessionId: "parent-session",
+        parentMessageId: "parent-message",
+      })
+
+      // #then the parent still exposes authoritative work in flight
+      expect(manager.getTasksByParentSession("parent-session")).toEqual([])
+      expect(manager.hasBackgroundWorkInFlight("parent-session")).toBe(true)
+
+      releaseLineage?.()
+      const task = await launch
+      expect(task.parentSessionId).toBe("parent-session")
+      expect(manager.hasBackgroundWorkInFlight("parent-session")).toBe(true)
+    } finally {
+      releaseLineage?.()
+      manager.shutdown()
+    }
+  })
+
+  test("reports a pending nested launch at the root before lineage lookup completes", async () => {
+    // #given a completed direct child and a nested launch blocked in lineage lookup
+    let releaseLineage: (() => void) | undefined
+    const lineageGate = new Promise<void>((resolve) => { releaseLineage = resolve })
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput({
+        session: {
+          get: async ({ path }: { path: { id: string } }) => {
+            if (path.id === "child-session") {
+              await lineageGate
+              return { data: { id: "child-session", parentID: "root-session" } }
+            }
+            return { data: { id: "root-session" } }
+          },
+          create: async () => ({ data: { id: "grandchild-session" } }),
+          promptAsync: async () => ({}),
+          abort: async () => ({}),
+        },
+      }),
+    })
+    const addTask = cast<{ addTask: (task: BackgroundTask) => void }>(manager).addTask.bind(manager)
+    addTask(createMockTask({
+      id: "completed-direct-child",
+      rootSessionId: "root-session",
+      sessionId: "child-session",
+      parentSessionId: "root-session",
+      status: "completed",
+    }))
+
+    try {
+      // #when the nested launch starts but has not registered its task
+      const launch = manager.launch({
+        description: "delayed nested launch",
+        prompt: "test",
+        agent: "explore",
+        parentSessionId: "child-session",
+        parentMessageId: "child-message",
+      })
+
+      // #then the root remains blocked through the lineage gap
+      const pendingLaunches = cast<{ pendingLaunchesByParentSession: Map<string, number> }>(manager)
+        .pendingLaunchesByParentSession
+      expect(Array.from(pendingLaunches.entries())).toContainEqual(["root-session", 1])
+      expect(manager.hasBackgroundWorkInFlight("root-session")).toBe(true)
+
+      releaseLineage?.()
+      await launch
+    } finally {
+      releaseLineage?.()
+      await manager.shutdown()
+    }
+  })
+
+  test("reports an archived parent's pending nested launch at the root before lineage lookup completes", async () => {
+    // #given a removed direct child and a nested launch blocked in lineage lookup
+    let releaseLineage: (() => void) | undefined
+    const lineageGate = new Promise<void>((resolve) => { releaseLineage = resolve })
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput({
+        session: {
+          get: async ({ path }: { path: { id: string } }) => {
+            if (path.id === "child-session") {
+              await lineageGate
+              return { data: { id: "child-session", parentID: "root-session" } }
+            }
+            return { data: { id: "root-session" } }
+          },
+          create: async () => ({ data: { id: "grandchild-session" } }),
+          promptAsync: async () => ({}),
+          abort: async () => ({}),
+        },
+      }),
+    })
+    const directChild = createMockTask({
+      id: "archived-direct-child",
+      rootSessionId: "root-session",
+      sessionId: "child-session",
+      parentSessionId: "root-session",
+      status: "completed",
+    })
+    getTaskMap(manager).set(directChild.id, directChild)
+    ;(cast<{ removeTask: (task: BackgroundTask) => void }>(manager)).removeTask(directChild)
+
+    try {
+      // #when the archived child launches before lineage resolution completes
+      const launch = manager.launch({
+        description: "delayed archived-parent launch",
+        prompt: "test",
+        agent: "explore",
+        parentSessionId: "child-session",
+        parentMessageId: "child-message",
+      })
+
+      // #then the retained lineage keeps the root wait authoritative
+      expect(manager.hasBackgroundWorkInFlight("root-session")).toBe(true)
+
+      releaseLineage?.()
+      await launch
+    } finally {
+      releaseLineage?.()
+      await manager.shutdown()
+    }
+  })
+
+  test("clears the pending launch reservation when lineage lookup fails", async () => {
+    // #given lineage lookup rejects before task registration
+    const client = {
+      session: {
+        get: async () => { throw new Error("lineage unavailable") },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+
+    try {
+      // #when launch fails
+      await expect(manager.launch({
+        description: "failed lineage launch",
+        prompt: "test",
+        agent: "explore",
+        parentSessionId: "parent-session",
+        parentMessageId: "parent-message",
+      })).rejects.toThrow("lineage unavailable")
+
+      // #then no phantom work remains visible
+      expect(manager.hasBackgroundWorkInFlight("parent-session")).toBe(false)
+    } finally {
+      manager.shutdown()
+    }
+  })
+
+  test("rejects a launch when shutdown wins its delayed lineage lookup", async () => {
+    //#given
+    let releaseLineage: (() => void) | undefined
+    const lineageGate = new Promise<void>((resolve) => { releaseLineage = resolve })
+    let createCalls = 0
+    const client = {
+      session: {
+        get: async () => {
+          await lineageGate
+          return { data: { directory: tmpdir() } }
+        },
+        create: async () => {
+          createCalls += 1
+          return { data: { id: "late-child-session" } }
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+
+    //#when
+    const launch = manager.launch({
+      description: "shutdown-racing launch",
+      prompt: "test",
+      agent: "explore",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+    })
+    await flushBackgroundNotifications()
+    const shutdown = manager.shutdown()
+    let shutdownSettled = false
+    void shutdown.then(() => { shutdownSettled = true })
+    await flushBackgroundNotifications()
+
+    expect(shutdownSettled).toBe(false)
+
+    releaseLineage?.()
+    await shutdown
+
+    //#then
+    await expect(launch).rejects.toThrow("Background manager is shutting down")
+    expect(createCalls).toBe(0)
+    expect(manager.hasBackgroundWorkInFlight("parent-session")).toBe(false)
+  })
+
+  test("aborts a child created after shutdown and never dispatches its prompt", async () => {
+    //#given
+    let releaseCreate: (() => void) | undefined
+    let markCreateStarted: (() => void) | undefined
+    const createStarted = new Promise<void>((resolve) => { markCreateStarted = resolve })
+    const createGate = new Promise<void>((resolve) => { releaseCreate = resolve })
+    const abortedSessions: string[] = []
+    let promptCalls = 0
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: tmpdir() } }),
+        create: async () => {
+          markCreateStarted?.()
+          await createGate
+          return { data: { id: "late-created-session" } }
+        },
+        promptAsync: async () => {
+          promptCalls += 1
+          return {}
+        },
+        abort: async (input: { path: { id: string } }) => {
+          abortedSessions.push(input.path.id)
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+
+    //#when
+    await manager.launch({
+      description: "late-created launch",
+      prompt: "test",
+      agent: "explore",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+    })
+    await createStarted
+    const shutdown = manager.shutdown()
+    let shutdownSettled = false
+    void shutdown.then(() => { shutdownSettled = true })
+    await flushBackgroundNotifications()
+
+    expect(shutdownSettled).toBe(false)
+
+    releaseCreate?.()
+    await shutdown
+
+    //#then
+    expect(abortedSessions).toEqual(["late-created-session"])
+    expect(promptCalls).toBe(0)
+    expect(manager.hasBackgroundWorkInFlight("parent-session")).toBe(false)
+  })
+
+  test("keeps shutdown pending until an admitted stale interruption settles", async () => {
+    //#given
+    let releaseStaleAbort: (() => void) | undefined
+    let markStaleAbortStarted: (() => void) | undefined
+    const staleAbortStarted = new Promise<void>((resolve) => { markStaleAbortStarted = resolve })
+    const staleAbortGate = new Promise<void>((resolve) => { releaseStaleAbort = resolve })
+    let abortCalls = 0
+    const client = {
+      session: {
+        status: async () => ({ data: { "stale-session": { type: "idle" } } }),
+        abort: async () => {
+          abortCalls += 1
+          if (abortCalls === 1) {
+            markStaleAbortStarted?.()
+            await staleAbortGate
+          }
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput(client),
+      config: { messageStalenessTimeoutMs: 1 },
+    })
+    stubNotifyParentSession(manager)
+    const task = createMockTask({
+      id: "stale-task",
+      sessionId: "stale-session",
+      parentSessionId: "parent-session",
+      status: "running",
+      startedAt: new Date(Date.now() - 60_000),
+      progress: undefined,
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    const poll = cast<{ pollRunningTasks: () => Promise<void> }>(manager).pollRunningTasks()
+    await staleAbortStarted
+    const shutdown = manager.shutdown()
+    let shutdownSettled = false
+    void shutdown.then(() => { shutdownSettled = true })
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(shutdownSettled).toBe(false)
+    releaseStaleAbort?.()
+    await Promise.all([poll, shutdown])
+    expect(abortCalls).toBe(2)
+    expect(getTaskMap(manager).size).toBe(0)
+  })
+
+  test("aborts a created child when onSessionCreated rejects", async () => {
+    //#given
+    const abortedSessions: string[] = []
+    let promptCalls = 0
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: tmpdir() } }),
+        create: async () => ({ data: { id: "callback-rejected-session" } }),
+        promptAsync: async () => {
+          promptCalls += 1
+          return {}
+        },
+        abort: async (input: { path: { id: string } }) => {
+          abortedSessions.push(input.path.id)
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+
+    //#when
+    const task = await manager.launch({
+      description: "callback-rejected launch",
+      prompt: "test",
+      agent: "explore",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+      onSessionCreated: async () => { throw new Error("callback failed") },
+    })
+    await waitUntil(() => manager.getTask(task.id)?.status === "error", 600)
+
+    //#then
+    expect(abortedSessions).toEqual(["callback-rejected-session"])
+    expect(promptCalls).toBe(0)
+    expect(manager.getTask(task.id)?.status).toBe("error")
+    expect(manager.hasBackgroundWorkInFlight("parent-session")).toBe(false)
+    await manager.shutdown()
+  })
+})
+
 describe("BackgroundManager prompt rejection fallback routing", () => {
+  test("preserves cancellation while launch fallback routing is pending", async () => {
+    //#given
+    let fallbackRoutingStarted: (() => void) | undefined
+    let finishFallbackRouting: ((retried: boolean) => void) | undefined
+    let abortStarted: (() => void) | undefined
+    let finishAbort: (() => void) | undefined
+    const routingStarted = new Promise<void>((resolve) => {
+      fallbackRoutingStarted = resolve
+    })
+    const fallbackRouting = new Promise<boolean>((resolve) => {
+      finishFallbackRouting = resolve
+    })
+    const blockedAbortStarted = new Promise<void>((resolve) => {
+      abortStarted = resolve
+    })
+    const blockedAbort = new Promise<void>((resolve) => {
+      finishAbort = resolve
+    })
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: tmpdir() } }),
+        create: async () => ({ data: { id: "ses_launch_cancel_race" } }),
+        promptAsync: async () => {
+          throw new Error("launch rejected")
+        },
+        abort: async () => {
+          abortStarted?.()
+          await blockedAbort
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+    ;(cast<{
+      tryFallbackRetry: (task: BackgroundTask, errorInfo: { name?: string; message?: string }, source: string) => Promise<boolean>
+    }>(manager)).tryFallbackRetry = async () => {
+      fallbackRoutingStarted?.()
+      return fallbackRouting
+    }
+
+    //#when
+    const task = await manager.launch({
+      description: "launch cancellation race",
+      prompt: "say hi",
+      agent: "sisyphus-junior",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+    })
+    await routingStarted
+    const cancellation = manager.cancelTask(task.id, {
+      source: "test",
+      skipNotification: true,
+    })
+    await blockedAbortStarted
+    finishFallbackRouting?.(false)
+    await flushBackgroundNotifications()
+    expect(manager.getTask(task.id)?.status).toBe("running")
+    finishAbort?.()
+    const cancelled = await cancellation
+
+    //#then
+    expect(cancelled).toBe(true)
+    expect(manager.getTask(task.id)?.status).toBe("cancelled")
+
+    await manager.shutdown()
+  })
+
+  test("hands launch fallback finalization back when the owning cancellation abort fails", async () => {
+    //#given
+    let fallbackRoutingStarted: (() => void) | undefined
+    let finishFallbackRouting: ((retried: boolean) => void) | undefined
+    let abortStarted: (() => void) | undefined
+    let finishAbort: (() => void) | undefined
+    let abortCallCount = 0
+    const routingStarted = new Promise<void>((resolve) => {
+      fallbackRoutingStarted = resolve
+    })
+    const fallbackRouting = new Promise<boolean>((resolve) => {
+      finishFallbackRouting = resolve
+    })
+    const blockedAbortStarted = new Promise<void>((resolve) => {
+      abortStarted = resolve
+    })
+    const blockedAbort = new Promise<void>((resolve) => {
+      finishAbort = resolve
+    })
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: tmpdir() } }),
+        create: async () => ({ data: { id: "ses_launch_failed_cancel_abort" } }),
+        promptAsync: async () => {
+          throw new Error("launch rejected")
+        },
+        abort: async () => {
+          abortCallCount += 1
+          if (abortCallCount > 1) return {}
+          abortStarted?.()
+          await blockedAbort
+          return { error: { message: "session still active" } }
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+    ;(cast<{
+      tryFallbackRetry: (task: BackgroundTask, errorInfo: { name?: string; message?: string }, source: string) => Promise<boolean>
+    }>(manager)).tryFallbackRetry = async () => {
+      fallbackRoutingStarted?.()
+      return fallbackRouting
+    }
+
+    //#when
+    const launchedTask = await manager.launch({
+      description: "launch failed cancellation abort",
+      prompt: "say hi",
+      agent: "sisyphus-junior",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+    })
+    const task = getTaskMap(manager).get(launchedTask.id)
+    if (!task) throw new Error("Expected launched task to remain registered")
+    await routingStarted
+    const cancellation = manager.cancelTask(task.id, { source: "test", skipNotification: true })
+    await blockedAbortStarted
+    finishFallbackRouting?.(false)
+    finishAbort?.()
+    const cancelled = await cancellation
+    await waitUntil(() => task.status === "interrupt", 100)
+
+    //#then
+    expect(cancelled).toBe(false)
+    expect(task.status).toBe("interrupt")
+    expect(abortCallCount).toBe(2)
+
+    await manager.shutdown()
+  })
+
+  test("does not restart a waiting launch finalizer after shutdown begins", async () => {
+    //#given
+    let fallbackRoutingStarted: (() => void) | undefined
+    let finishFallbackRouting: ((retried: boolean) => void) | undefined
+    let abortStarted: (() => void) | undefined
+    let finishAbort: (() => void) | undefined
+    let abortCallCount = 0
+    const routingStarted = new Promise<void>((resolve) => {
+      fallbackRoutingStarted = resolve
+    })
+    const fallbackRouting = new Promise<boolean>((resolve) => {
+      finishFallbackRouting = resolve
+    })
+    const blockedAbortStarted = new Promise<void>((resolve) => {
+      abortStarted = resolve
+    })
+    const blockedAbort = new Promise<void>((resolve) => {
+      finishAbort = resolve
+    })
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: tmpdir() } }),
+        create: async () => ({ data: { id: "ses_launch_shutdown_waiter" } }),
+        promptAsync: async () => {
+          throw new Error("launch rejected")
+        },
+        abort: async () => {
+          abortCallCount += 1
+          if (abortCallCount > 1) return {}
+          abortStarted?.()
+          await blockedAbort
+          return { error: { message: "session still active" } }
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+    ;(cast<{
+      tryFallbackRetry: (task: BackgroundTask, errorInfo: { name?: string; message?: string }, source: string) => Promise<boolean>
+    }>(manager)).tryFallbackRetry = async () => {
+      fallbackRoutingStarted?.()
+      return fallbackRouting
+    }
+    const launchedTask = await manager.launch({
+      description: "launch shutdown waiter",
+      prompt: "say hi",
+      agent: "sisyphus-junior",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+    })
+    const task = getTaskMap(manager).get(launchedTask.id)
+    if (!task) throw new Error("Expected launched task to remain registered")
+
+    //#when
+    await routingStarted
+    const cancellation = manager.cancelTask(task.id, { source: "test", skipNotification: true })
+    await blockedAbortStarted
+    finishFallbackRouting?.(false)
+    const shutdown = manager.shutdown()
+    let shutdownSettled = false
+    void shutdown.then(() => { shutdownSettled = true })
+    await flushBackgroundNotifications()
+
+    expect(shutdownSettled).toBe(false)
+
+    finishAbort?.()
+    const [cancelled] = await Promise.all([cancellation, shutdown])
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(cancelled).toBe(false)
+    expect(task.status).toBe("running")
+    expect(abortCallCount).toBe(2)
+    expect(getTaskMap(manager).size).toBe(0)
+    expect(getCompletionTimers(manager).size).toBe(0)
+  })
+
   test("routes launch-time prompt rejections into tryFallbackRetry before marking interrupt", async () => {
     //#given
     const promptError = {
@@ -778,6 +1473,160 @@ describe("BackgroundManager prompt rejection fallback routing", () => {
     expect(storedTask?.status).toBe("pending")
   })
 
+  test("preserves cancellation while resume fallback routing is pending", async () => {
+    //#given
+    let fallbackRoutingStarted: (() => void) | undefined
+    let finishFallbackRouting: ((retried: boolean) => void) | undefined
+    let abortStarted: (() => void) | undefined
+    let finishAbort: (() => void) | undefined
+    let abortCallCount = 0
+    const routingStarted = new Promise<void>((resolve) => {
+      fallbackRoutingStarted = resolve
+    })
+    const fallbackRouting = new Promise<boolean>((resolve) => {
+      finishFallbackRouting = resolve
+    })
+    const blockedAbortStarted = new Promise<void>((resolve) => {
+      abortStarted = resolve
+    })
+    const blockedAbort = new Promise<void>((resolve) => {
+      finishAbort = resolve
+    })
+    const client = {
+      session: {
+        promptAsync: async () => {
+          throw new Error("resume rejected")
+        },
+        abort: async () => {
+          abortCallCount += 1
+          if (abortCallCount === 1) return {}
+          abortStarted?.()
+          await blockedAbort
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+    const task = createMockTask({
+      id: "task-resume-cancel-race",
+      parentSessionId: "root-session",
+      sessionId: "session-resume-cancel-race",
+      rootSessionId: "root-session",
+    })
+    getTaskMap(manager).set(task.id, task)
+    getRootDescendantCounts(manager).set("root-session", 2)
+    await tryCompleteTaskForTest(manager, task)
+    expect(getRootDescendantCounts(manager).get("root-session")).toBe(1)
+    ;(cast<{
+      tryFallbackRetry: (task: BackgroundTask, errorInfo: { name?: string; message?: string }, source: string) => Promise<boolean>
+    }>(manager)).tryFallbackRetry = async () => {
+      fallbackRoutingStarted?.()
+      return fallbackRouting
+    }
+
+    //#when
+    await manager.resume({
+      sessionId: task.sessionId,
+      prompt: "continue",
+      parentSessionId: "root-session",
+      parentMessageId: "resume-message",
+    })
+    await routingStarted
+    const cancellation = manager.cancelTask(task.id, {
+      source: "test",
+      skipNotification: true,
+    })
+    await blockedAbortStarted
+    finishFallbackRouting?.(false)
+    await flushBackgroundNotifications()
+    expect(task.status).toBe("running")
+    finishAbort?.()
+    const cancelled = await cancellation
+
+    //#then
+    expect(cancelled).toBe(true)
+    expect(task.status).toBe("cancelled")
+    expect(getRootDescendantCounts(manager).get("root-session")).toBe(1)
+
+    await manager.shutdown()
+  })
+
+  test("hands resume fallback finalization back when the owning cancellation abort fails", async () => {
+    //#given
+    let fallbackRoutingStarted: (() => void) | undefined
+    let finishFallbackRouting: ((retried: boolean) => void) | undefined
+    let abortStarted: (() => void) | undefined
+    let finishAbort: (() => void) | undefined
+    let abortCallCount = 0
+    const routingStarted = new Promise<void>((resolve) => {
+      fallbackRoutingStarted = resolve
+    })
+    const fallbackRouting = new Promise<boolean>((resolve) => {
+      finishFallbackRouting = resolve
+    })
+    const blockedAbortStarted = new Promise<void>((resolve) => {
+      abortStarted = resolve
+    })
+    const blockedAbort = new Promise<void>((resolve) => {
+      finishAbort = resolve
+    })
+    const client = {
+      session: {
+        promptAsync: async () => {
+          throw new Error("resume rejected")
+        },
+        abort: async () => {
+          abortCallCount += 1
+          if (abortCallCount === 1 || abortCallCount > 2) return {}
+          abortStarted?.()
+          await blockedAbort
+          return { error: { message: "session still active" } }
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+    const task = createMockTask({
+      id: "task-resume-failed-cancel-abort",
+      parentSessionId: "root-session",
+      sessionId: "session-resume-failed-cancel-abort",
+      rootSessionId: "root-session",
+    })
+    getTaskMap(manager).set(task.id, task)
+    getRootDescendantCounts(manager).set("root-session", 2)
+    await tryCompleteTaskForTest(manager, task)
+    ;(cast<{
+      tryFallbackRetry: (task: BackgroundTask, errorInfo: { name?: string; message?: string }, source: string) => Promise<boolean>
+    }>(manager)).tryFallbackRetry = async () => {
+      fallbackRoutingStarted?.()
+      return fallbackRouting
+    }
+
+    //#when
+    await manager.resume({
+      sessionId: task.sessionId,
+      prompt: "continue",
+      parentSessionId: "root-session",
+      parentMessageId: "resume-message",
+    })
+    await routingStarted
+    const cancellation = manager.cancelTask(task.id, { source: "test", skipNotification: true })
+    await blockedAbortStarted
+    finishFallbackRouting?.(false)
+    finishAbort?.()
+    const cancelled = await cancellation
+    await waitUntil(() => task.status === "interrupt", 100)
+
+    //#then
+    expect(cancelled).toBe(false)
+    expect(task.status).toBe("interrupt")
+    expect(abortCallCount).toBe(3)
+    expect(getRootDescendantCounts(manager).get("root-session")).toBe(1)
+
+    await manager.shutdown()
+  })
+
   test("keeps resumed task running when promptAsync returns ambiguous EOF after dispatch", async () => {
     //#given
     let abortCalls = 0
@@ -831,6 +1680,888 @@ describe("BackgroundManager prompt rejection fallback routing", () => {
     expect(abortCalls).toBe(0)
     expect(task.status).toBe("running")
     expect(task.completedAt).toBeUndefined()
+  })
+})
+
+describe("BackgroundManager terminal ownership and root reservations", () => {
+  test("keeps cancellation finalization visible until parent notification settles", async () => {
+    //#given
+    const client = { session: { abort: async () => ({}) } }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const notification = blockNotifyParentSession(manager)
+    const task = createMockTask({
+      id: "task-cancel-notification-visibility",
+      parentSessionId: "root-session",
+      sessionId: "session-cancel-notification-visibility",
+      rootSessionId: "root-session",
+    })
+    getTaskMap(manager).set(task.id, task)
+    getRootDescendantCounts(manager).set("root-session", 1)
+
+    //#when
+    const cancellation = manager.cancelTask(task.id, { source: "test" })
+    await notification.started
+
+    //#then
+    expect(task.status).toBe("cancelled")
+    expect(manager.hasBackgroundWorkInFlight("root-session")).toBe(true)
+
+    notification.release()
+    expect(await cancellation).toBe(true)
+    expect(manager.hasBackgroundWorkInFlight("root-session")).toBe(false)
+    await manager.shutdown()
+  })
+
+  test("keeps resume failure cleanup visible while its session abort is blocked", async () => {
+    //#given
+    let markAbortStarted: (() => void) | undefined
+    let finishAbort: (() => void) | undefined
+    const abortStarted = new Promise<void>((resolve) => { markAbortStarted = resolve })
+    const blockedAbort = new Promise<void>((resolve) => { finishAbort = resolve })
+    const client = {
+      session: {
+        promptAsync: async () => { throw new Error("resume rejected") },
+        abort: async () => {
+          markAbortStarted?.()
+          await blockedAbort
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+    ;(cast<{
+      tryFallbackRetry: (task: BackgroundTask, errorInfo: { name?: string; message?: string }, source: string) => Promise<boolean>
+    }>(manager)).tryFallbackRetry = async () => false
+    const task = createMockTask({
+      id: "task-resume-failure-visibility",
+      parentSessionId: "root-session",
+      sessionId: "session-resume-failure-visibility",
+      rootSessionId: "root-session",
+      status: "completed",
+      completedAt: new Date(),
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    await manager.resume({
+      sessionId: task.sessionId ?? "",
+      prompt: "continue",
+      parentSessionId: "root-session",
+      parentMessageId: "resume-message",
+    })
+    await abortStarted
+
+    //#then
+    expect(task.status).toBe("interrupt")
+    expect(manager.hasBackgroundWorkInFlight("root-session")).toBe(true)
+
+    finishAbort?.()
+    await waitUntil(() => !manager.hasBackgroundWorkInFlight("root-session"), 600)
+    expect(manager.hasBackgroundWorkInFlight("root-session")).toBe(false)
+    await manager.shutdown()
+  })
+
+  test("serializes retry with cancellation and releases the root exactly once", async () => {
+    //#given
+    let markAbortStarted: (() => void) | undefined
+    let finishAbort: (() => void) | undefined
+    const abortStarted = new Promise<void>((resolve) => { markAbortStarted = resolve })
+    const blockedAbort = new Promise<void>((resolve) => { finishAbort = resolve })
+    const client = {
+      session: {
+        abort: async () => {
+          markAbortStarted?.()
+          await blockedAbort
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+    ;(cast<{ processKey: () => Promise<void> }>(manager)).processKey = async () => {}
+    ;(cast<{ resolveParentWakePromptContext: () => Promise<Record<string, never>> }>(manager)).resolveParentWakePromptContext = async () => ({})
+    const task = createMockTask({
+      id: "task-retry-cancel-root-ownership",
+      parentSessionId: "root-session",
+      sessionId: "session-retry-cancel-root-ownership",
+      rootSessionId: "root-session",
+      model: { providerID: "anthropic", modelID: "claude-opus" },
+      fallbackChain: [{ model: "claude-sonnet", providers: ["anthropic"] }],
+      attemptCount: 0,
+    })
+    getTaskMap(manager).set(task.id, task)
+    getRootDescendantCounts(manager).set("root-session", 1)
+
+    //#when
+    const retry = (cast<{
+      tryFallbackRetry: (task: BackgroundTask, errorInfo: { name?: string; message?: string }, source: string) => Promise<boolean>
+    }>(manager)).tryFallbackRetry(
+      task,
+      { name: "APIError", message: "Forbidden: Selected provider is forbidden" },
+      "test",
+    )
+    await abortStarted
+    const cancellation = manager.cancelTask(task.id, { source: "test", skipNotification: true })
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(task.status).toBe("pending")
+    finishAbort?.()
+    expect(await retry).toBe(true)
+    expect(await cancellation).toBe(true)
+    expect(task.status).toBe("cancelled")
+    expect(getRootDescendantCounts(manager).has("root-session")).toBe(false)
+    expect(manager.hasBackgroundWorkInFlight("root-session")).toBe(false)
+    await manager.shutdown()
+  })
+
+  test("keeps session error finalization visible until parent notification settles", async () => {
+    //#given
+    const manager = new BackgroundManager({ pluginContext: createPluginInput({ session: {} }) })
+    const notification = blockNotifyParentSession(manager)
+    ;(cast<{ verifySessionExists: () => Promise<boolean> }>(manager)).verifySessionExists = async () => false
+    ;(cast<{
+      tryFallbackRetry: (task: BackgroundTask, errorInfo: { name?: string; message?: string }, source: string) => Promise<boolean>
+    }>(manager)).tryFallbackRetry = async () => false
+    const task = createMockTask({
+      id: "task-session-error-notification-visibility",
+      parentSessionId: "root-session",
+      sessionId: "session-error-notification-visibility",
+      rootSessionId: "root-session",
+    })
+    getTaskMap(manager).set(task.id, task)
+    getRootDescendantCounts(manager).set("root-session", 1)
+
+    //#when
+    const finalization = (cast<{
+      handleSessionErrorEvent: (args: {
+        task: BackgroundTask
+        errorInfo: { name?: string; message?: string }
+        errorName: string | undefined
+        errorMessage: string | undefined
+      }) => Promise<void>
+    }>(manager)).handleSessionErrorEvent({
+      task,
+      errorInfo: { name: "TerminalError", message: "provider failed" },
+      errorName: "TerminalError",
+      errorMessage: "provider failed",
+    })
+    await notification.started
+
+    //#then
+    expect(task.status).toBe("error")
+    expect(manager.hasBackgroundWorkInFlight("root-session")).toBe(true)
+
+    notification.release()
+    await finalization
+    await waitUntil(() => !manager.hasBackgroundWorkInFlight("root-session"), 600)
+    expect(manager.hasBackgroundWorkInFlight("root-session")).toBe(false)
+    await manager.shutdown()
+  })
+
+  test("keeps stale interruption visible until parent notification settles", async () => {
+    //#given
+    const client = { session: { abort: async () => ({}) } }
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput(client),
+      config: { staleTimeoutMs: 1 },
+    })
+    const notification = blockNotifyParentSession(manager)
+    const staleTime = new Date(Date.now() - 60_000)
+    const task = createMockTask({
+      id: "task-stale-interruption-visibility",
+      parentSessionId: "root-session",
+      sessionId: "session-stale-interruption-visibility",
+      rootSessionId: "root-session",
+      startedAt: staleTime,
+      progress: { toolCalls: 0, lastUpdate: staleTime },
+    })
+    getTaskMap(manager).set(task.id, task)
+    getRootDescendantCounts(manager).set("root-session", 1)
+
+    //#when
+    const interruption = (cast<{
+      checkAndInterruptStaleTasks: (statuses: undefined) => Promise<void>
+    }>(manager)).checkAndInterruptStaleTasks(undefined)
+    await notification.started
+
+    //#then
+    expect(task.status).toBe("cancelled")
+    expect(manager.hasBackgroundWorkInFlight("root-session")).toBe(true)
+
+    notification.release()
+    await interruption
+    expect(manager.hasBackgroundWorkInFlight("root-session")).toBe(false)
+    await manager.shutdown()
+  })
+
+  test("keeps stale prune finalization visible until parent notification settles", async () => {
+    //#given
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput({ session: {} }),
+      config: { taskTtlMs: 1 },
+    })
+    const notification = blockNotifyParentSession(manager)
+    const staleTime = new Date(Date.now() - 60_000)
+    const task = createMockTask({
+      id: "task-stale-prune-notification-visibility",
+      parentSessionId: "root-session",
+      sessionId: "session-stale-prune-notification-visibility",
+      rootSessionId: "root-session",
+      startedAt: staleTime,
+      progress: { toolCalls: 0, lastUpdate: staleTime },
+    })
+    getTaskMap(manager).set(task.id, task)
+    getRootDescendantCounts(manager).set("root-session", 1)
+
+    //#when
+    pruneStaleTasksAndNotificationsForTest(manager)
+    await notification.started
+
+    //#then
+    expect(task.status).toBe("error")
+    expect(manager.hasBackgroundWorkInFlight("root-session")).toBe(true)
+
+    notification.release()
+    await waitUntil(() => !manager.hasBackgroundWorkInFlight("root-session"), 600)
+    expect(manager.hasBackgroundWorkInFlight("root-session")).toBe(false)
+    await manager.shutdown()
+  })
+
+  test("rejects resume while stale prune notification still owns finalization", async () => {
+    //#given
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput({ session: {} }),
+      config: { taskTtlMs: 1 },
+    })
+    const notification = blockNotifyParentSession(manager)
+    const staleTime = new Date(Date.now() - 60_000)
+    const task = createMockTask({
+      id: "task-stale-prune-resume-finalization",
+      parentSessionId: "root-session",
+      sessionId: "session-stale-prune-resume-finalization",
+      rootSessionId: "root-session",
+      startedAt: staleTime,
+      progress: { toolCalls: 0, lastUpdate: staleTime },
+    })
+    getTaskMap(manager).set(task.id, task)
+    getRootDescendantCounts(manager).set("root-session", 1)
+
+    //#when
+    pruneStaleTasksAndNotificationsForTest(manager)
+    await notification.started
+    const resumeOutcome = await manager.resume({
+      sessionId: task.sessionId,
+      prompt: "continue during stale notification",
+      parentSessionId: "root-session",
+      parentMessageId: "resume-message",
+    }).then(
+      () => "fulfilled" as const,
+      (error: unknown) => error,
+    )
+
+    //#then
+    expect(resumeOutcome).toBeInstanceOf(Error)
+    expect(resumeOutcome).toHaveProperty("message", expect.stringContaining("cannot accept a continuation prompt"))
+    expect(task.status).toBe("error")
+
+    notification.release()
+    await waitUntil(() => !manager.hasBackgroundWorkInFlight("root-session"), 600)
+    await manager.shutdown()
+  })
+
+  test("keeps crash finalization visible until parent notification settles", async () => {
+    //#given
+    const manager = new BackgroundManager({ pluginContext: createPluginInput({ session: {} }) })
+    const notification = blockNotifyParentSession(manager)
+    const task = createMockTask({
+      id: "task-crash-notification-visibility",
+      parentSessionId: "root-session",
+      sessionId: "session-crash-notification-visibility",
+      rootSessionId: "root-session",
+    })
+    getTaskMap(manager).set(task.id, task)
+    getRootDescendantCounts(manager).set("root-session", 1)
+
+    //#when
+    const finalization = (cast<{
+      failCrashedTask: (task: BackgroundTask, errorMessage: string) => Promise<void>
+    }>(manager)).failCrashedTask(task, "session disappeared")
+    await notification.started
+
+    //#then
+    expect(task.status).toBe("error")
+    expect(manager.hasBackgroundWorkInFlight("root-session")).toBe(true)
+
+    notification.release()
+    await finalization
+    await waitUntil(() => !manager.hasBackgroundWorkInFlight("root-session"), 600)
+    expect(manager.hasBackgroundWorkInFlight("root-session")).toBe(false)
+    await manager.shutdown()
+  })
+
+  test("keeps cancellation authoritative over async prompt failure interruption", async () => {
+    //#given
+    let markAbortStarted: (() => void) | undefined
+    let finishAbort: (() => void) | undefined
+    let abortCalls = 0
+    const abortStarted = new Promise<void>((resolve) => { markAbortStarted = resolve })
+    const blockedAbort = new Promise<void>((resolve) => { finishAbort = resolve })
+    const client = {
+      session: {
+        abort: async () => {
+          abortCalls += 1
+          if (abortCalls === 1) {
+            markAbortStarted?.()
+            await blockedAbort
+          }
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+    const task = createMockTask({
+      id: "task-cancel-async-prompt-race",
+      parentSessionId: "root-session",
+      sessionId: "session-cancel-async-prompt-race",
+      rootSessionId: "root-session",
+    })
+    getTaskMap(manager).set(task.id, task)
+    getRootDescendantCounts(manager).set("root-session", 1)
+
+    //#when
+    const cancellation = manager.cancelTask(task.id, { source: "test", skipNotification: true })
+    await abortStarted
+    const interruption = (cast<{
+      interruptTaskFromAsyncPromptFailure: (task: BackgroundTask, errorMessage: string, reason: string) => Promise<void>
+    }>(manager)).interruptTaskFromAsyncPromptFailure(task, "prompt failed", "test prompt failure")
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(task.status).toBe("running")
+    expect(abortCalls).toBe(1)
+
+    finishAbort?.()
+    expect(await cancellation).toBe(true)
+    await interruption
+    expect(task.status).toBe("cancelled")
+    expect(abortCalls).toBe(1)
+    expect(getRootDescendantCounts(manager).has("root-session")).toBe(false)
+
+    await manager.shutdown()
+  })
+
+  test("keeps cancellation authoritative over terminal session error", async () => {
+    //#given
+    let markAbortStarted: (() => void) | undefined
+    let finishAbort: (() => void) | undefined
+    let abortCalls = 0
+    const abortStarted = new Promise<void>((resolve) => { markAbortStarted = resolve })
+    const blockedAbort = new Promise<void>((resolve) => { finishAbort = resolve })
+    const client = {
+      session: {
+        abort: async () => {
+          abortCalls += 1
+          markAbortStarted?.()
+          await blockedAbort
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+    ;(cast<{ verifySessionExists: () => Promise<boolean> }>(manager)).verifySessionExists = async () => false
+    ;(cast<{
+      tryFallbackRetry: (task: BackgroundTask, errorInfo: { name?: string; message?: string }, source: string) => Promise<boolean>
+    }>(manager)).tryFallbackRetry = async () => false
+    const task = createMockTask({
+      id: "task-cancel-session-error-race",
+      parentSessionId: "root-session",
+      sessionId: "session-cancel-session-error-race",
+      rootSessionId: "root-session",
+    })
+    getTaskMap(manager).set(task.id, task)
+    getRootDescendantCounts(manager).set("root-session", 1)
+
+    //#when
+    const cancellation = manager.cancelTask(task.id, { source: "test", skipNotification: true })
+    await abortStarted
+    const sessionError = (cast<{
+      handleSessionErrorEvent: (args: {
+        task: BackgroundTask
+        errorInfo: { name?: string; message?: string }
+        errorName: string | undefined
+        errorMessage: string | undefined
+      }) => Promise<void>
+    }>(manager)).handleSessionErrorEvent({
+      task,
+      errorInfo: { name: "TerminalError", message: "terminal provider failure" },
+      errorName: "TerminalError",
+      errorMessage: "terminal provider failure",
+    })
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(task.status).toBe("running")
+
+    finishAbort?.()
+    expect(await cancellation).toBe(true)
+    await sessionError
+    expect(task.status).toBe("cancelled")
+    expect(abortCalls).toBe(1)
+    expect(getRootDescendantCounts(manager).has("root-session")).toBe(false)
+
+    await manager.shutdown()
+  })
+
+  test("keeps cancellation authoritative over stale interruption", async () => {
+    //#given
+    let markAbortStarted: (() => void) | undefined
+    let finishAbort: (() => void) | undefined
+    let abortCalls = 0
+    const abortStarted = new Promise<void>((resolve) => { markAbortStarted = resolve })
+    const blockedAbort = new Promise<void>((resolve) => { finishAbort = resolve })
+    const client = {
+      session: {
+        abort: async () => {
+          abortCalls += 1
+          if (abortCalls === 1) {
+            markAbortStarted?.()
+            await blockedAbort
+          }
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput(client),
+      config: { staleTimeoutMs: 1 },
+    })
+    stubNotifyParentSession(manager)
+    const staleTime = new Date(Date.now() - 60_000)
+    const task = createMockTask({
+      id: "task-cancel-stale-race",
+      parentSessionId: "root-session",
+      sessionId: "session-cancel-stale-race",
+      rootSessionId: "root-session",
+      startedAt: staleTime,
+      progress: { toolCalls: 0, lastUpdate: staleTime },
+    })
+    getTaskMap(manager).set(task.id, task)
+    getRootDescendantCounts(manager).set("root-session", 1)
+
+    //#when
+    const cancellation = manager.cancelTask(task.id, { source: "test", skipNotification: true })
+    await abortStarted
+    const staleInterruption = (cast<{
+      checkAndInterruptStaleTasks: (statuses: undefined) => Promise<void>
+    }>(manager)).checkAndInterruptStaleTasks(undefined)
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(task.status).toBe("running")
+    expect(abortCalls).toBe(1)
+
+    finishAbort?.()
+    expect(await cancellation).toBe(true)
+    await staleInterruption
+    expect(task.status).toBe("cancelled")
+    expect(abortCalls).toBe(1)
+
+    await manager.shutdown()
+  })
+
+  test("keeps cancellation authoritative over crash finalization", async () => {
+    //#given
+    let markAbortStarted: (() => void) | undefined
+    let finishAbort: (() => void) | undefined
+    const abortStarted = new Promise<void>((resolve) => { markAbortStarted = resolve })
+    const blockedAbort = new Promise<void>((resolve) => { finishAbort = resolve })
+    const client = {
+      session: {
+        abort: async () => {
+          markAbortStarted?.()
+          await blockedAbort
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+    const task = createMockTask({
+      id: "task-cancel-crash-race",
+      parentSessionId: "root-session",
+      sessionId: "session-cancel-crash-race",
+      rootSessionId: "root-session",
+    })
+    getTaskMap(manager).set(task.id, task)
+    getRootDescendantCounts(manager).set("root-session", 1)
+
+    //#when
+    const cancellation = manager.cancelTask(task.id, { source: "test", skipNotification: true })
+    await abortStarted
+    const crashFinalization = (cast<{
+      failCrashedTask: (task: BackgroundTask, errorMessage: string) => Promise<void>
+    }>(manager)).failCrashedTask(task, "session disappeared")
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(task.status).toBe("running")
+
+    finishAbort?.()
+    expect(await cancellation).toBe(true)
+    await crashFinalization
+    expect(task.status).toBe("cancelled")
+
+    await manager.shutdown()
+  })
+
+  test("keeps cancellation authoritative when completion races a blocked abort", async () => {
+    //#given
+    let abortStarted: (() => void) | undefined
+    let finishAbort: (() => void) | undefined
+    const started = new Promise<void>((resolve) => {
+      abortStarted = resolve
+    })
+    const blockedAbort = new Promise<void>((resolve) => {
+      finishAbort = resolve
+    })
+    const client = {
+      session: {
+        promptAsync: async () => ({}),
+        abort: async () => {
+          abortStarted?.()
+          await blockedAbort
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+    const task = createMockTask({
+      id: "task-cancel-completion-race",
+      parentSessionId: "root-session",
+      sessionId: "session-cancel-completion-race",
+      rootSessionId: "root-session",
+    })
+    getTaskMap(manager).set(task.id, task)
+    getRootDescendantCounts(manager).set("root-session", 2)
+
+    //#when
+    const cancellation = manager.cancelTask(task.id, { source: "test", skipNotification: true })
+    await started
+    const completed = await tryCompleteTaskForTest(manager, task)
+    finishAbort?.()
+    const cancelled = await cancellation
+
+    //#then
+    expect(completed).toBe(false)
+    expect(cancelled).toBe(true)
+    expect(task.status).toBe("cancelled")
+    expect(getRootDescendantCounts(manager).get("root-session")).toBe(1)
+
+    await manager.shutdown()
+  })
+
+  test("reacquires a root reservation before a retained terminal task resumes", async () => {
+    //#given
+    const client = {
+      session: {
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+    const task = createMockTask({
+      id: "task-resume-root-reservation",
+      parentSessionId: "root-session",
+      sessionId: "session-resume-root-reservation",
+      rootSessionId: "root-session",
+    })
+    getTaskMap(manager).set(task.id, task)
+    getRootDescendantCounts(manager).set("root-session", 2)
+    await tryCompleteTaskForTest(manager, task)
+    expect(getRootDescendantCounts(manager).get("root-session")).toBe(1)
+
+    //#when
+    await manager.resume({
+      sessionId: task.sessionId,
+      prompt: "continue",
+      parentSessionId: "root-session",
+      parentMessageId: "resume-message",
+    })
+    const countAfterResume = getRootDescendantCounts(manager).get("root-session")
+    const completed = await tryCompleteTaskForTest(manager, task)
+
+    //#then
+    expect(countAfterResume).toBe(2)
+    expect(completed).toBe(true)
+    expect(getRootDescendantCounts(manager).get("root-session")).toBe(1)
+
+    await manager.shutdown()
+  })
+
+  test("reports a terminal task resume waiting for concurrency as root work in flight", async () => {
+    //#given
+    const client = {
+      session: {
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput(client),
+      config: { defaultConcurrency: 1 },
+    })
+    stubNotifyParentSession(manager)
+    const task = createMockTask({
+      id: "task-queued-resume-liveness",
+      parentSessionId: "root-session",
+      sessionId: "session-queued-resume-liveness",
+      rootSessionId: "root-session",
+      status: "completed",
+      completedAt: new Date(),
+      concurrencyGroup: "explore",
+    })
+    getTaskMap(manager).set(task.id, task)
+    const concurrencyManager = getConcurrencyManager(manager)
+    await concurrencyManager.acquire("explore", "slot-holder")
+
+    //#when
+    const resume = manager.resume({
+      sessionId: task.sessionId,
+      prompt: "continue",
+      parentSessionId: "root-session",
+      parentMessageId: "resume-message",
+    })
+    await Promise.resolve()
+
+    //#then
+    expect(manager.hasBackgroundWorkInFlight("root-session")).toBe(true)
+
+    concurrencyManager.release("explore")
+    await resume
+    await manager.shutdown()
+  })
+
+  test("rejects a concurrent resume before it can acquire duplicate task ownership", async () => {
+    //#given
+    let promptCallCount = 0
+    const client = {
+      session: {
+        promptAsync: async () => {
+          promptCallCount += 1
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput(client),
+      config: { defaultConcurrency: 1 },
+    })
+    stubNotifyParentSession(manager)
+    const task = createMockTask({
+      id: "task-concurrent-resume",
+      parentSessionId: "root-session",
+      sessionId: "session-concurrent-resume",
+      rootSessionId: "root-session",
+    })
+    getTaskMap(manager).set(task.id, task)
+    getRootDescendantCounts(manager).set("root-session", 2)
+    await tryCompleteTaskForTest(manager, task)
+
+    //#when
+    const firstResume = manager.resume({
+      sessionId: task.sessionId,
+      prompt: "first continuation",
+      parentSessionId: "root-session",
+      parentMessageId: "first-message",
+    })
+    const secondResumeOutcome = manager.resume({
+      sessionId: task.sessionId,
+      prompt: "second continuation",
+      parentSessionId: "root-session",
+      parentMessageId: "second-message",
+    }).then(
+      () => "fulfilled" as const,
+      (error: unknown) => error,
+    )
+
+    await firstResume
+    await tryCompleteTaskForTest(manager, task)
+    const secondOutcome = await secondResumeOutcome
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(secondOutcome).toBeInstanceOf(Error)
+    expect(secondOutcome).toHaveProperty("message", expect.stringContaining("cannot accept a continuation prompt"))
+    expect(promptCallCount).toBe(1)
+    expect(task.status).toBe("completed")
+    expect(getConcurrencyManager(manager).getCount("explore")).toBe(0)
+    expect(getRootDescendantCounts(manager).get("root-session")).toBe(1)
+
+    await manager.shutdown()
+  })
+
+  test("rejects resume while completion still owns terminalization", async () => {
+    //#given
+    let promptCallCount = 0
+    const client = {
+      session: {
+        promptAsync: async () => {
+          promptCallCount += 1
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const notification = blockNotifyParentSession(manager)
+    const task = createMockTask({
+      id: "task-resume-during-terminalization",
+      parentSessionId: "root-session",
+      sessionId: "session-resume-during-terminalization",
+      rootSessionId: "root-session",
+    })
+    getTaskMap(manager).set(task.id, task)
+    getRootDescendantCounts(manager).set("root-session", 1)
+
+    //#when
+    const completion = tryCompleteTaskForTest(manager, task)
+    await notification.started
+    const resumeOutcome = await manager.resume({
+      sessionId: task.sessionId,
+      prompt: "continue during completion",
+      parentSessionId: "root-session",
+      parentMessageId: "resume-message",
+    }).then(
+      () => "fulfilled" as const,
+      (error: unknown) => error,
+    )
+    await flushBackgroundNotifications()
+    const statusDuringTerminalization = task.status
+    notification.release()
+    const completed = await completion
+
+    //#then
+    expect(resumeOutcome).toBeInstanceOf(Error)
+    expect(resumeOutcome).toHaveProperty("message", expect.stringContaining("cannot accept a continuation prompt"))
+    expect(promptCallCount).toBe(0)
+    expect(statusDuringTerminalization).toBe("completed")
+    expect(completed).toBe(true)
+    await manager.shutdown()
+  })
+
+  test("rejects resuming an ancestor from its descendant session", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    const ancestor = createMockTask({
+      id: "task-resume-cycle-ancestor",
+      parentSessionId: "root-session",
+      sessionId: "session-resume-cycle-ancestor",
+      rootSessionId: "root-session",
+      status: "completed",
+      completedAt: new Date(),
+    })
+    const descendant = createMockTask({
+      id: "task-resume-cycle-descendant",
+      parentSessionId: ancestor.sessionId,
+      sessionId: "session-resume-cycle-descendant",
+      rootSessionId: "root-session",
+    })
+    getTaskMap(manager).set(ancestor.id, ancestor)
+    getTaskMap(manager).set(descendant.id, descendant)
+
+    //#when / #then
+    await expect(manager.resume({
+      sessionId: ancestor.sessionId,
+      prompt: "continue",
+      parentSessionId: descendant.sessionId,
+      parentMessageId: "resume-cycle-message",
+    })).rejects.toThrow("would create a background task cycle")
+    expect(ancestor.parentSessionId).toBe("root-session")
+
+    await manager.shutdown()
+  })
+
+  test("rejects resuming a task from its own session", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    const task = createMockTask({
+      id: "task-resume-self-cycle",
+      parentSessionId: "root-session",
+      sessionId: "session-resume-self-cycle",
+      rootSessionId: "root-session",
+      status: "completed",
+      completedAt: new Date(),
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when / #then
+    await expect(manager.resume({
+      sessionId: task.sessionId,
+      prompt: "continue",
+      parentSessionId: task.sessionId,
+      parentMessageId: "resume-self-cycle-message",
+    })).rejects.toThrow("would create a background task cycle")
+    expect(task.parentSessionId).toBe("root-session")
+
+    await manager.shutdown()
+  })
+
+  test("rejects resuming a task from a different root session", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    const task = createMockTask({
+      id: "task-resume-cross-root",
+      parentSessionId: "root-session-a",
+      sessionId: "session-resume-cross-root",
+      rootSessionId: "root-session-a",
+      status: "completed",
+      completedAt: new Date(),
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when / #then
+    await expect(manager.resume({
+      sessionId: task.sessionId,
+      prompt: "continue from another root",
+      parentSessionId: "root-session-b",
+      parentMessageId: "resume-cross-root-message",
+    })).rejects.toThrow("belongs to root root-session-a")
+    expect(task.parentSessionId).toBe("root-session-a")
+    expect(task.rootSessionId).toBe("root-session-a")
+
+    await manager.shutdown()
+  })
+
+  test("returns each task once when stored lineage contains a cycle", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    const taskB = createMockTask({
+      id: "task-cycle-b",
+      sessionId: "session-cycle-b",
+      parentSessionId: "session-cycle-a",
+    })
+    const taskA = createMockTask({
+      id: "task-cycle-a",
+      sessionId: "session-cycle-a",
+      parentSessionId: "session-cycle-b",
+    })
+    getTaskMap(manager).set(taskB.id, taskB)
+    getTaskMap(manager).set(taskA.id, taskA)
+
+    //#when
+    const result = manager.getAllDescendantTasks("session-cycle-a")
+
+    //#then
+    expect(result.map(task => task.id)).toEqual(["task-cycle-b", "task-cycle-a"])
+
+    await manager.shutdown()
   })
 })
 
@@ -2575,6 +4306,63 @@ describe("BackgroundManager.tryCompleteTask", () => {
     }
   })
 
+  test("does not recreate parent wakes or cleanup timers when completion resumes after shutdown", async () => {
+    //#given
+    let releaseAbort: (() => void) | undefined
+    let signalAbortStarted: (() => void) | undefined
+    const abortGate = new Promise<void>((resolve) => { releaseAbort = resolve })
+    const abortStarted = new Promise<void>((resolve) => { signalAbortStarted = resolve })
+    const client = {
+      session: {
+        status: async () => ({ data: { "parent-session-shutdown-completion": { type: "busy" } } }),
+        messages: async () => ({ data: [] }),
+        abort: async () => {
+          signalAbortStarted?.()
+          await abortGate
+          return {}
+        },
+      },
+    }
+    manager.shutdown()
+    manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const task = createMockTask({
+      id: "task-shutdown-during-completion",
+      sessionId: "session-shutdown-during-completion",
+      parentSessionId: "parent-session-shutdown-completion",
+      status: "running",
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    const completion = tryCompleteTaskForTest(manager, task)
+    await abortStarted
+    const shutdown = manager.shutdown()
+    releaseAbort?.()
+    await Promise.all([completion, shutdown])
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(getPendingParentWakes(manager).size).toBe(0)
+    expect(getPendingParentWakeTimers(manager).size).toBe(0)
+    expect(getCompletionTimers(manager).size).toBe(0)
+  })
+
+  test("background work clears once finalization queues a wake for the active parent turn", () => {
+    // #given completion preparation is in flight for a parent session
+    const parentSessionID = "session-parent-active-wait"
+    const notifier = getParentWakeNotifierForWorkState(manager)
+    notifier.reserveNotificationPreparation(parentSessionID)
+    expect(manager.hasBackgroundWorkInFlight(parentSessionID)).toBe(true)
+
+    // #when finalization queues the reply-required wake and releases preparation
+    notifier.queuePendingParentWake(parentSessionID, "task complete", {}, true, 60_000)
+    notifier.releaseNotificationPreparation(parentSessionID)
+
+    // #then the active wait tool can finish; wake delivery belongs to the later parent turn
+    expect(manager.hasPendingParentWake(parentSessionID)).toBe(true)
+    expect(manager.hasBackgroundWorkInFlight(parentSessionID)).toBe(false)
+  })
+
   test("should immediately clear completed subagent runtime-fallback eligibility", async () => {
     // #given
     resetClaudeCodeSessionState()
@@ -2906,6 +4694,70 @@ describe("BackgroundManager.trackTask", () => {
     expect(concurrencyManager.getCount("external-key")).toBe(1)
     expect(getTaskMap(manager).size).toBe(1)
   })
+
+  test("shares one task and concurrency slot across concurrent duplicate registration", async () => {
+    //#given
+    const input = {
+      taskId: "task-concurrent",
+      sessionId: "session-concurrent",
+      parentSessionId: "parent-session",
+      description: "external concurrent task",
+      agent: "task",
+      concurrencyKey: "external-key",
+    }
+
+    //#when
+    const [first, second] = await Promise.all([
+      manager.trackTask(input),
+      manager.trackTask(input),
+    ])
+
+    //#then
+    const concurrencyManager = getConcurrencyManager(manager)
+    expect(first).toBe(second)
+    expect(concurrencyManager.getCount("external-key")).toBe(1)
+    expect(getTaskMap(manager).size).toBe(1)
+  })
+
+  test("joins concurrent duplicate registration before a one-slot concurrency wait", async () => {
+    //#given
+    await manager.shutdown()
+    manager = createBackgroundManager({ defaultConcurrency: 1 })
+    stubNotifyParentSession(manager)
+    const input = {
+      taskId: "task-concurrent-one-slot",
+      sessionId: "session-concurrent-one-slot",
+      parentSessionId: "parent-session",
+      description: "external concurrent one-slot task",
+      agent: "task",
+      concurrencyKey: "external-key",
+    }
+
+    //#when
+    const firstRegistration = manager.trackTask(input)
+    const secondRegistration = manager.trackTask(input)
+    const registrations = Promise.all([firstRegistration, secondRegistration])
+    const outcome = await Promise.race([
+      registrations.then((tasks) => ({ kind: "resolved" as const, tasks })),
+      new Promise<{ kind: "timed-out" }>((resolve) => {
+        setTimeout(() => resolve({ kind: "timed-out" }), 100)
+      }),
+    ])
+
+    if (outcome.kind === "timed-out") {
+      await manager.shutdown()
+      await Promise.allSettled([firstRegistration, secondRegistration])
+    }
+
+    //#then
+    expect(outcome.kind).toBe("resolved")
+    if (outcome.kind !== "resolved") return
+    const concurrencyManager = getConcurrencyManager(manager)
+    expect(outcome.tasks[0]).toBe(outcome.tasks[1])
+    expect(concurrencyManager.getCount("external-key")).toBe(1)
+    expect(concurrencyManager.getQueueLength("external-key")).toBe(0)
+    expect(getTaskMap(manager).size).toBe(1)
+  })
 })
 
 describe("BackgroundManager.resume concurrency key", () => {
@@ -3099,6 +4951,62 @@ describe("BackgroundManager.resume promptAsync gate state", () => {
     expect(getPendingByParent(manager).get("parent-session-new")).toBeUndefined()
 
     manager.shutdown()
+  })
+
+  test("does not restore a completed snapshot after cancellation wins a delayed skipped resume", async () => {
+    //#given
+    let resolveStatus: ((value: { data: Record<string, { type: string }> }) => void) | undefined
+    const statusGate = new Promise<{ data: Record<string, { type: string }> }>((resolve) => {
+      resolveStatus = resolve
+    })
+    const client = {
+      session: {
+        status: async () => statusGate,
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const task = createMockTask({
+      id: "task-cancelled-delayed-resume-skip",
+      sessionId: "session-cancelled-delayed-resume-skip",
+      parentSessionId: "parent-session-original",
+      parentMessageId: "msg-original",
+      status: "completed",
+      completedAt: new Date(),
+      concurrencyGroup: "explore",
+      rootSessionId: "root-session-cancelled-delayed-resume-skip",
+    })
+    const newParentTask = createMockTask({
+      id: "task-parent-cancelled-delayed-resume-skip",
+      sessionId: "parent-session-new",
+      parentSessionId: "root-session-cancelled-delayed-resume-skip",
+      rootSessionId: "root-session-cancelled-delayed-resume-skip",
+    })
+    getTaskMap(manager).set(task.id, task)
+    getTaskMap(manager).set(newParentTask.id, newParentTask)
+
+    //#when
+    await manager.resume({
+      sessionId: task.sessionId!,
+      prompt: "continue",
+      parentSessionId: "parent-session-new",
+      parentMessageId: "msg-new",
+    })
+    const cancelled = await manager.cancelTask(task.id, { source: "test", skipNotification: true })
+    expect(cancelled).toBe(true)
+    expect(task.status).toBe("cancelled")
+
+    resolveStatus?.({ data: { [task.sessionId!]: { type: "busy" } } })
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(task.status).toBe("cancelled")
+    expect(task.parentSessionId).toBe("parent-session-new")
+    expect(task.parentMessageId).toBe("msg-new")
+    expect(task.concurrencyKey).toBeUndefined()
+
+    await manager.shutdown()
   })
 
   test("restores completed task state when resume prompt is skipped by an existing reservation", async () => {
@@ -5116,9 +7024,11 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
         toolCalls: 2,
         lastUpdate: new Date(Date.now() - 200_000),
       },
+      rootSessionId: "root-session-stale-running",
     }
 
     getTaskMap(manager).set(task.id, task)
+    getRootDescendantCounts(manager).set(task.rootSessionId, 1)
 
     await manager["checkAndInterruptStaleTasks"](undefined)
 
@@ -5126,6 +7036,9 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     expect(task.error).toContain("Stale timeout")
     expect(task.error).toContain("3min")
     expect(task.completedAt).toBeDefined()
+    expect(getRootDescendantCounts(manager).has(task.rootSessionId)).toBe(false)
+    expect(manager.hasActiveDescendantTasks(task.rootSessionId)).toBe(false)
+    expect(manager.hasBackgroundWorkInFlight(task.rootSessionId)).toBe(false)
   })
 
    test("should respect custom staleTimeoutMs config", async () => {
@@ -5514,6 +7427,44 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 })
 
 describe("BackgroundManager.shutdown session abort", () => {
+  test("shares one pending shutdown barrier across concurrent callers", async () => {
+    //#given
+    let releaseAbort: (() => void) | undefined
+    let markAbortStarted: (() => void) | undefined
+    const abortStarted = new Promise<void>((resolve) => { markAbortStarted = resolve })
+    const abortGate = new Promise<void>((resolve) => { releaseAbort = resolve })
+    const client = {
+      session: {
+        abort: async () => {
+          markAbortStarted?.()
+          await abortGate
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const task = createMockTask({
+      id: "task-shared-shutdown",
+      sessionId: "session-shared-shutdown",
+      status: "running",
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    const firstShutdown = manager.shutdown()
+    await abortStarted
+    const secondShutdown = manager.shutdown()
+    let secondSettled = false
+    void secondShutdown.then(() => { secondSettled = true })
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(secondSettled).toBe(false)
+    releaseAbort?.()
+    await Promise.all([firstShutdown, secondShutdown])
+    expect(getTaskMap(manager).size).toBe(0)
+  })
+
    test("should call session.abort for all running tasks during shutdown", () => {
      // given
      const abortedSessionIDs: string[] = []
@@ -5625,7 +7576,7 @@ describe("BackgroundManager.shutdown session abort", () => {
     expect(abortedSessionIDs).toHaveLength(0)
   })
 
-   test("should call onShutdown callback during shutdown", () => {
+   test("should call onShutdown callback before shutdown resolves", async () => {
      // given
      let shutdownCalled = false
      const client = {
@@ -5642,7 +7593,7 @@ describe("BackgroundManager.shutdown session abort", () => {
     )
 
     // when
-    manager.shutdown()
+    await manager.shutdown()
 
     // then
     expect(shutdownCalled).toBe(true)
@@ -7098,9 +9049,484 @@ describe("BackgroundManager queue processing - error tasks are skipped", () => {
 })
 
 describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tasks from queuesByKey", () => {
-  test("removes stale pending task from queue", () => {
+  test("releases fallback root ownership when stale prune follows an immediately acquired shifted slot", async () => {
+    //#given
+    const manager = createBackgroundManagerWithOptions({ config: { defaultConcurrency: 1 } })
+    stubNotifyParentSession(manager)
+    const task = createMockTask({
+      id: "task-stale-shifted-immediate-fallback",
+      parentSessionId: "parent-session",
+      sessionId: undefined,
+      rootSessionId: "root-session-stale-shifted-immediate-fallback",
+      status: "pending",
+      queuedAt: new Date(Date.now() - 31 * 60 * 1000),
+    })
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionId: task.parentSessionId,
+    }
+    const key = task.agent
+    getTaskMap(manager).set(task.id, task)
+    getQueuesByKey(manager).set(key, [{ task, input }])
+    getRootDescendantCounts(manager).set(task.rootSessionId, 1)
+
+    //#when
+    const processing = processKeyForTest(manager, key)
+    pruneStaleTasksAndNotificationsForTest(manager)
+    await processing
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(task.status).toBe("error")
+    expect(getRootDescendantCounts(manager).has(task.rootSessionId)).toBe(false)
+    expect(manager.hasBackgroundWorkInFlight(task.rootSessionId)).toBe(false)
+    expect(getConcurrencyManager(manager).getCount(key)).toBe(0)
+
+    await manager.shutdown()
+  })
+
+  test("cancels a stale pending task already shifted into concurrency acquisition", async () => {
+    //#given
+    const manager = createBackgroundManagerWithOptions({ config: { defaultConcurrency: 1 } })
+    const task = createMockTask({
+      id: "task-stale-shifted-concurrency-waiter",
+      parentSessionId: "parent-session",
+      sessionId: undefined,
+      rootSessionId: "root-session-stale-shifted-concurrency-waiter",
+      status: "pending",
+      queuedAt: new Date(Date.now() - 31 * 60 * 1000),
+    })
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionId: task.parentSessionId,
+    }
+    const key = task.agent
+    const concurrencyManager = getConcurrencyManager(manager)
+    await concurrencyManager.acquire(key, "slot-owner")
+    getTaskMap(manager).set(task.id, task)
+    getQueuesByKey(manager).set(key, [{ task, input }])
+    getRootDescendantCounts(manager).set(task.rootSessionId, 1)
+    getPreStartDescendantReservations(manager).add(task.id)
+
+    let processingSettled = false
+    const processing = processKeyForTest(manager, key).then(() => {
+      processingSettled = true
+    })
+    await flushBackgroundNotifications()
+    expect(getQueuesByKey(manager).get(key)?.length ?? 0).toBe(0)
+
+    //#when
+    pruneStaleTasksAndNotificationsForTest(manager)
+    await flushBackgroundNotifications()
+    const settledBeforeOwnerRelease = processingSettled
+    const rootReleasedBeforeOwnerRelease = !getRootDescendantCounts(manager).has(task.rootSessionId)
+
+    concurrencyManager.release(key)
+    await processing
+
+    //#then
+    expect(task.status).toBe("error")
+    expect(settledBeforeOwnerRelease).toBe(true)
+    expect(rootReleasedBeforeOwnerRelease).toBe(true)
+    expect(getPreStartDescendantReservations(manager).has(task.id)).toBe(false)
+    expect(manager.hasBackgroundWorkInFlight(task.rootSessionId)).toBe(false)
+
+    await manager.shutdown()
+  })
+
+  test("does not resurrect a stale pending task after session creation resolves", async () => {
+    //#given
+    let resolveCreate: ((value: { data: { id: string } }) => void) | undefined
+    let markCreateStarted: (() => void) | undefined
+    const createStarted = new Promise<void>((resolve) => { markCreateStarted = resolve })
+    const createResult = new Promise<{ data: { id: string } }>((resolve) => { resolveCreate = resolve })
+    const abortedSessions: string[] = []
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: tmpdir() } }),
+        create: async () => {
+          markCreateStarted?.()
+          return createResult
+        },
+        promptAsync: async () => ({}),
+        abort: async ({ path }: { path: { id: string } }) => {
+          abortedSessions.push(path.id)
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const task: BackgroundTask = {
+      id: "task-stale-during-create",
+      parentSessionId: "parent-session",
+      parentMessageId: "msg-1",
+      description: "stale during create",
+      prompt: "test",
+      agent: "test-agent",
+      status: "pending",
+      queuedAt: new Date(Date.now() - 31 * 60 * 1000),
+      rootSessionId: "root-session-stale-during-create",
+    }
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionId: task.parentSessionId,
+      parentMessageId: task.parentMessageId,
+    }
+    const key = task.agent
+    getTaskMap(manager).set(task.id, task)
+    getQueuesByKey(manager).set(key, [{ task, input }])
+    getRootDescendantCounts(manager).set(task.rootSessionId, 1)
+    getPreStartDescendantReservations(manager).add(task.id)
+
+    //#when
+    const processing = processKeyForTest(manager, key)
+    await createStarted
+    pruneStaleTasksAndNotificationsForTest(manager)
+
+    expect(task.status).toBe("error")
+    expect(abortedSessions).toEqual([])
+    expect(manager.hasBackgroundWorkInFlight(task.rootSessionId)).toBe(true)
+
+    resolveCreate?.({ data: { id: "session-stale-during-create" } })
+    await processing
+
+    //#then
+    expect(task.status).toBe("error")
+    expect(task.sessionId).toBeUndefined()
+    expect(abortedSessions).toEqual(["session-stale-during-create"])
+    expect(getRootDescendantCounts(manager).has(task.rootSessionId)).toBe(false)
+    expect(manager.hasBackgroundWorkInFlight(task.rootSessionId)).toBe(false)
+
+    await manager.shutdown()
+  })
+
+  test("releases retained fallback ownership after stale prune and late session creation", async () => {
+    //#given
+    let resolveCreate: ((value: { data: { id: string } }) => void) | undefined
+    let markCreateStarted: (() => void) | undefined
+    const createStarted = new Promise<void>((resolve) => { markCreateStarted = resolve })
+    const createResult = new Promise<{ data: { id: string } }>((resolve) => { resolveCreate = resolve })
+    const abortedSessions: string[] = []
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: tmpdir() } }),
+        create: async () => {
+          markCreateStarted?.()
+          return createResult
+        },
+        promptAsync: async () => ({}),
+        abort: async ({ path }: { path: { id: string } }) => {
+          abortedSessions.push(path.id)
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput(client),
+      config: { defaultConcurrency: 1 },
+    })
+    const task = createMockTask({
+      id: "task-stale-fallback-during-create",
+      parentSessionId: "parent-session",
+      sessionId: undefined,
+      rootSessionId: "root-session-stale-fallback-during-create",
+      status: "pending",
+      queuedAt: new Date(Date.now() - 31 * 60 * 1000),
+    })
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionId: task.parentSessionId,
+    }
+    const key = task.agent
+    const attempt = startAttempt(task, undefined)
+    getTaskMap(manager).set(task.id, task)
+    getQueuesByKey(manager).set(key, [{ task, input, attemptID: attempt.attemptId }])
+    getRootDescendantCounts(manager).set(task.rootSessionId!, 1)
+
+    //#when
+    const processing = processKeyForTest(manager, key)
+    await createStarted
+    pruneStaleTasksAndNotificationsForTest(manager)
+    resolveCreate?.({ data: { id: "session-stale-fallback-during-create" } })
+    await processing
+
+    //#then
+    expect(task.status).toBe("error")
+    expect(abortedSessions).toEqual(["session-stale-fallback-during-create"])
+    expect(getRootDescendantCounts(manager).has(task.rootSessionId!)).toBe(false)
+    expect(manager.hasBackgroundWorkInFlight(task.rootSessionId!)).toBe(false)
+    expect(getConcurrencyManager(manager).getCount(key)).toBe(0)
+
+    await manager.shutdown()
+  })
+
+  test("releases retained fallback ownership after stale prune and failed session creation", async () => {
+    //#given
+    let resolveCreate: ((value: { error: string; data: undefined }) => void) | undefined
+    let markCreateStarted: (() => void) | undefined
+    const createStarted = new Promise<void>((resolve) => { markCreateStarted = resolve })
+    const createResult = new Promise<{ error: string; data: undefined }>((resolve) => { resolveCreate = resolve })
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput({
+        session: {
+          get: async () => ({ data: { directory: tmpdir() } }),
+          create: async () => {
+            markCreateStarted?.()
+            return createResult
+          },
+          promptAsync: async () => ({}),
+          abort: async () => ({}),
+        },
+      }),
+      config: { defaultConcurrency: 1 },
+    })
+    stubNotifyParentSession(manager)
+    const task = createMockTask({
+      id: "task-stale-fallback-create-failure",
+      parentSessionId: "parent-session",
+      sessionId: undefined,
+      rootSessionId: "root-session-stale-fallback-create-failure",
+      status: "pending",
+      queuedAt: new Date(Date.now() - 31 * 60 * 1000),
+    })
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionId: task.parentSessionId,
+    }
+    const key = task.agent
+    const attempt = startAttempt(task, undefined)
+    getTaskMap(manager).set(task.id, task)
+    getQueuesByKey(manager).set(key, [{ task, input, attemptID: attempt.attemptId }])
+    getRootDescendantCounts(manager).set(task.rootSessionId!, 1)
+
+    //#when
+    const processing = processKeyForTest(manager, key)
+    await createStarted
+    pruneStaleTasksAndNotificationsForTest(manager)
+    resolveCreate?.({ error: "session create failed", data: undefined })
+    await processing
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(task.status).toBe("error")
+    expect(getRootDescendantCounts(manager).has(task.rootSessionId!)).toBe(false)
+    expect(manager.hasBackgroundWorkInFlight(task.rootSessionId!)).toBe(false)
+    expect(getConcurrencyManager(manager).getCount(key)).toBe(0)
+
+    await manager.shutdown()
+  })
+
+  test("releases a cancelled dequeued launch before late session creation settles", async () => {
+    //#given
+    let resolveCreate: ((value: { data: { id: string } }) => void) | undefined
+    let markCreateStarted: (() => void) | undefined
+    const createStarted = new Promise<void>((resolve) => { markCreateStarted = resolve })
+    const createResult = new Promise<{ data: { id: string } }>((resolve) => { resolveCreate = resolve })
+    const abortedSessions: string[] = []
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: tmpdir() } }),
+        create: async () => {
+          markCreateStarted?.()
+          return createResult
+        },
+        promptAsync: async () => ({}),
+        abort: async ({ path }: { path: { id: string } }) => {
+          abortedSessions.push(path.id)
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const task: BackgroundTask = {
+      id: "task-cancelled-during-create",
+      parentSessionId: "parent-session",
+      parentMessageId: "msg-1",
+      description: "cancelled during create",
+      prompt: "test",
+      agent: "test-agent",
+      status: "pending",
+      queuedAt: new Date(),
+      rootSessionId: "root-session-cancelled-during-create",
+    }
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionId: task.parentSessionId,
+      parentMessageId: task.parentMessageId,
+    }
+    const key = task.agent
+    getTaskMap(manager).set(task.id, task)
+    getQueuesByKey(manager).set(key, [{ task, input }])
+    getRootDescendantCounts(manager).set(task.rootSessionId, 1)
+    getPreStartDescendantReservations(manager).add(task.id)
+
+    //#when
+    const processing = processKeyForTest(manager, key)
+    await createStarted
+    const cancelled = await manager.cancelTask(task.id, { source: "test", skipNotification: true })
+
+    //#then
+    expect(cancelled).toBe(true)
+    expect(task.status).toBe("cancelled")
+    expect(abortedSessions).toEqual([])
+    expect(manager.hasBackgroundWorkInFlight(task.rootSessionId)).toBe(false)
+    expect(getConcurrencyManager(manager).getCount(key)).toBe(0)
+
+    resolveCreate?.({ data: { id: "session-cancelled-during-create" } })
+    await processing
+
+    expect(abortedSessions).toEqual(["session-cancelled-during-create"])
+    expect(manager.hasBackgroundWorkInFlight(task.rootSessionId)).toBe(false)
+
+    await manager.shutdown()
+  })
+
+  test("releases a dequeued launch slot when creation rejects after cancellation", async () => {
+    //#given
+    let rejectCreate: ((error: Error) => void) | undefined
+    let markCreateStarted: (() => void) | undefined
+    const createStarted = new Promise<void>((resolve) => { markCreateStarted = resolve })
+    const createResult = new Promise<never>((_resolve, reject) => { rejectCreate = reject })
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: tmpdir() } }),
+        create: async () => {
+          markCreateStarted?.()
+          return createResult
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const task: BackgroundTask = {
+      id: "task-cancelled-create-rejection",
+      parentSessionId: "parent-session",
+      parentMessageId: "msg-1",
+      description: "cancelled create rejection",
+      prompt: "test",
+      agent: "test-agent",
+      status: "pending",
+      queuedAt: new Date(),
+      rootSessionId: "root-session-cancelled-create-rejection",
+    }
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionId: task.parentSessionId,
+      parentMessageId: task.parentMessageId,
+    }
+    const key = task.agent
+    getTaskMap(manager).set(task.id, task)
+    getQueuesByKey(manager).set(key, [{ task, input }])
+    getRootDescendantCounts(manager).set(task.rootSessionId, 1)
+    getPreStartDescendantReservations(manager).add(task.id)
+
+    //#when
+    const processing = processKeyForTest(manager, key)
+    await createStarted
+    const cancelled = await manager.cancelTask(task.id, { source: "test", skipNotification: true })
+    rejectCreate?.(new Error("create rejected"))
+    await processing
+
+    //#then
+    expect(cancelled).toBe(true)
+    expect(task.status).toBe("cancelled")
+    expect(getConcurrencyManager(manager).getCount(key)).toBe(0)
+    expect(manager.hasBackgroundWorkInFlight(task.rootSessionId)).toBe(false)
+
+    await manager.shutdown()
+  })
+
+  test("does not double-release a started slot after cancellation owns launch failure", async () => {
+    //#given
+    let markStartTaskEntered: (() => void) | undefined
+    let rejectStartTask: (() => void) | undefined
+    let markAbortStarted: (() => void) | undefined
+    let finishAbort: (() => void) | undefined
+    const startTaskEntered = new Promise<void>((resolve) => { markStartTaskEntered = resolve })
+    const startTaskRejected = new Promise<void>((resolve) => { rejectStartTask = resolve })
+    const abortStarted = new Promise<void>((resolve) => { markAbortStarted = resolve })
+    const blockedAbort = new Promise<void>((resolve) => { finishAbort = resolve })
+    const client = {
+      session: {
+        abort: async () => {
+          markAbortStarted?.()
+          await blockedAbort
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput(client),
+      config: { defaultConcurrency: 2 },
+    })
+    stubNotifyParentSession(manager)
+    const task = createMockTask({
+      id: "task-cancelled-started-launch-failure",
+      parentSessionId: "parent-session",
+      sessionId: undefined,
+      rootSessionId: "root-session-cancelled-started-launch-failure",
+      status: "pending",
+    })
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionId: task.parentSessionId,
+    }
+    const key = task.agent
+    getTaskMap(manager).set(task.id, task)
+    getQueuesByKey(manager).set(key, [{ task, input }])
+    getRootDescendantCounts(manager).set(task.rootSessionId, 1)
+    getPreStartDescendantReservations(manager).add(task.id)
+    ;(cast<{ startTask: (item: unknown) => Promise<void> }>(manager)).startTask = async () => {
+      task.status = "running"
+      task.sessionId = "session-cancelled-started-launch-failure"
+      task.concurrencyKey = key
+      getPreStartDescendantReservations(manager).delete(task.id)
+      markStartTaskEntered?.()
+      await startTaskRejected
+      throw new Error("launch failed after start")
+    }
+
+    //#when
+    const processing = processKeyForTest(manager, key)
+    await startTaskEntered
+    await getConcurrencyManager(manager).acquire(key, "unrelated-task")
+    const cancellation = manager.cancelTask(task.id, { source: "test", skipNotification: true })
+    await abortStarted
+    rejectStartTask?.()
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(getConcurrencyManager(manager).getCount(key)).toBe(2)
+
+    finishAbort?.()
+    expect(await cancellation).toBe(true)
+    await processing
+    expect(task.status).toBe("cancelled")
+    expect(getConcurrencyManager(manager).getCount(key)).toBe(1)
+
+    getConcurrencyManager(manager).release(key)
+    await manager.shutdown()
+  })
+
+  test("removes stale pending task from queue", async () => {
     //#given
     const manager = createBackgroundManager()
+    stubNotifyParentSession(manager)
     const queuedAt = new Date(Date.now() - 31 * 60 * 1000)
     const task: BackgroundTask = {
       id: "task-stale-pending",
@@ -7111,6 +9537,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
       agent: "test-agent",
       status: "pending",
       queuedAt,
+      rootSessionId: "root-session-stale-pending",
     }
     const key = task.agent
 
@@ -7124,12 +9551,56 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
 
     getTaskMap(manager).set(task.id, task)
     getQueuesByKey(manager).set(key, [{ task, input }])
+    getRootDescendantCounts(manager).set(task.rootSessionId, 1)
+    getPreStartDescendantReservations(manager).add(task.id)
 
     //#when
     pruneStaleTasksAndNotificationsForTest(manager)
+    await flushBackgroundNotifications()
 
     //#then
     expect(getQueuesByKey(manager).get(key)).toBeUndefined()
+    expect(task.status).toBe("error")
+    expect(getPreStartDescendantReservations(manager).has(task.id)).toBe(false)
+    expect(getRootDescendantCounts(manager).has(task.rootSessionId)).toBe(false)
+    expect(manager.hasActiveDescendantTasks(task.rootSessionId)).toBe(false)
+    expect(manager.hasBackgroundWorkInFlight(task.rootSessionId)).toBe(false)
+
+    manager.shutdown()
+  })
+
+  test("releases retained root ownership when a stale fallback retry is removed from its queue", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    stubNotifyParentSession(manager)
+    const task = createMockTask({
+      id: "task-stale-fallback-retry",
+      parentSessionId: "parent-session",
+      status: "pending",
+      queuedAt: new Date(Date.now() - 31 * 60 * 1000),
+      startedAt: undefined,
+      rootSessionId: "root-session-stale-fallback-retry",
+    })
+    const key = task.agent
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionId: task.parentSessionId,
+    }
+    getTaskMap(manager).set(task.id, task)
+    getQueuesByKey(manager).set(key, [{ task, input }])
+    getRootDescendantCounts(manager).set(task.rootSessionId!, 1)
+
+    //#when
+    pruneStaleTasksAndNotificationsForTest(manager)
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(getQueuesByKey(manager).get(key)).toBeUndefined()
+    expect(task.status).toBe("error")
+    expect(getRootDescendantCounts(manager).has(task.rootSessionId!)).toBe(false)
+    expect(manager.hasBackgroundWorkInFlight(task.rootSessionId!)).toBe(false)
 
     manager.shutdown()
   })
@@ -7960,6 +10431,81 @@ describe("BackgroundManager regression fixes - resume and aborted notification",
     manager.shutdown()
   })
 
+  test("should retain archived terminal tasks in their root wait snapshot", () => {
+    //#given
+    const manager = createBackgroundManager()
+    const task: BackgroundTask = {
+      id: "task-root-wait-archive-regression",
+      rootSessionId: "root-session",
+      sessionId: "session-root-wait-archive-regression",
+      parentSessionId: "nested-parent-session",
+      parentMessageId: "msg-1",
+      description: "root wait archive regression",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    ;(cast<{ removeTask: (task: BackgroundTask) => void }>(manager)).removeTask(task)
+
+    //#then
+    expect(manager.getTask(task.id)?.rootSessionId).toBe(task.rootSessionId)
+    expect(manager.getTasksForBackgroundWait(task.rootSessionId ?? "").map(({ id }) => id)).toContain(task.id)
+
+    manager.shutdown()
+  })
+
+  test("should retain archived terminal tasks in their immediate parent wait snapshot", () => {
+    //#given
+    const manager = createBackgroundManager()
+    const task: BackgroundTask = {
+      id: "task-parent-wait-archive-regression",
+      rootSessionId: "root-session",
+      sessionId: "session-parent-wait-archive-regression",
+      parentSessionId: "nested-parent-session",
+      parentMessageId: "msg-1",
+      description: "parent wait archive regression",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    ;(cast<{ removeTask: (task: BackgroundTask) => void }>(manager)).removeTask(task)
+
+    //#then
+    expect(manager.getTasksForBackgroundWait(task.parentSessionId).map(({ id }) => id)).toContain(task.id)
+
+    manager.shutdown()
+  })
+
+  test("should release a committed synchronous spawn reservation", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    ;(cast<{ assertCanSpawn: (parentSessionID: string) => Promise<SubagentSpawnContext> }>(manager)).assertCanSpawn = async () => ({
+      rootSessionID: "root-session",
+      parentDepth: 0,
+      childDepth: 1,
+    })
+    const reservation = await manager.reserveSubagentSpawn("root-session")
+    reservation.commit()
+
+    //#when
+    reservation.release()
+
+    //#then
+    expect(manager.hasBackgroundWorkInFlight("root-session")).toBe(false)
+
+    manager.shutdown()
+  })
+
   test("should resolve a completed task registered by an earlier plugin manager instance", () => {
     //#given
     const firstManager = createBackgroundManager()
@@ -8273,6 +10819,7 @@ describe("BackgroundManager - tool permission spread order", () => {
       agent: task.agent,
       parentSessionId: task.parentSessionId,
       parentMessageId: task.parentMessageId,
+      userPermission: { "wait-for-background-tasks": "deny" },
     }
 
     try {
@@ -8285,6 +10832,9 @@ describe("BackgroundManager - tool permission spread order", () => {
       expect(promptCalls).toHaveLength(2)
       expect(promptCalls[0].body.agent).toBe("missing-agent")
       expect(promptCalls[1].body.agent).toBe("general")
+      expect(
+        (promptCalls[1].body.tools as Record<string, boolean>)["wait-for-background-tasks"],
+      ).toBe(false)
       expect(task.agent).toBe("general")
       expect(getSessionAgent("session-manager-fallback")).toBe("general")
       expect(getDelegatedChildSessionBootstrap("session-manager-fallback")?.tools?.call_omo_agent).toBe(true)
@@ -8335,6 +10885,48 @@ describe("BackgroundManager - tool permission spread order", () => {
     expect(capturedTools?.task).toBe(false)
     expect(capturedTools?.write).toBe(false)
     expect(capturedTools?.edit).toBe(false)
+
+    manager.shutdown()
+  })
+
+  test("resume preserves explicit launch tool denials", async () => {
+    //#given
+    let capturedTools: Record<string, unknown> | undefined
+    const client = {
+      session: {
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          capturedTools = args.body.tools as Record<string, unknown>
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const task = cast<BackgroundTask>({
+      id: "task-denied-wait-resume",
+      sessionId: "session-denied-wait-resume",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+      description: "resume task with denied waiter",
+      prompt: "resume prompt",
+      agent: "sisyphus-junior",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      userPermission: { "wait-for-background-tasks": "deny" },
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    await manager.resume({
+      sessionId: "session-denied-wait-resume",
+      prompt: "continue",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+    })
+
+    //#then
+    expect(capturedTools?.["wait-for-background-tasks"]).toBe(false)
 
     manager.shutdown()
   })

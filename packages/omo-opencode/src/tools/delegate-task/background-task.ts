@@ -13,6 +13,7 @@ import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import { resolveMetadataModel } from "./resolve-metadata-model"
 import { getPersistedBackgroundTaskDescription } from "./background-task-description"
+import { getBackgroundCompletionGuidance } from "../background-task/completion-guidance"
 
 function registerBackgroundSessionContext(args: {
   sessionId: string
@@ -213,6 +214,12 @@ export async function executeBackgroundTask(
       })}`
       : ""
 
+    const backgroundWaitAvailable =
+      executorCtx.isBackgroundWaitAvailable?.(parentContext.sessionID)
+      ?? executorCtx.blockOnBackgroundTasks
+      ?? false
+    const completionGuidance = getBackgroundCompletionGuidance(backgroundWaitAvailable)
+
     return `Background task launched.
 
 Background Task ID: ${task.id}
@@ -220,7 +227,7 @@ Description: ${task.description}
 Agent: ${task.agent}${args.category ? ` (category: ${args.category})` : ""}
 Status: ${task.status}
 
-Do NOT call background_output now. Wait for <system-reminder> notification first. The system will deliver the result when the task completes; you do not need to poll for it.${taskMetadataBlock}`
+${completionGuidance}${taskMetadataBlock}`
   } catch (error) {
     return formatDetailedError(error, {
       operation: "Launch background task",

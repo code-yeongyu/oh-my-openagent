@@ -23,9 +23,12 @@ export function createCoreTools(args: {
   readonly skillContext: SkillContext
   readonly availableCategories: AvailableCategory[]
   readonly factories: ToolRegistryFactories
+  readonly isBackgroundWaitAvailable: (sessionID: string) => boolean
 }): Record<string, ToolDefinition> {
-  const { ctx, pluginConfig, managers, skillContext, availableCategories, factories } = args
-  const backgroundTools = factories.createBackgroundTools(managers.backgroundManager, ctx.client)
+  const { ctx, pluginConfig, managers, skillContext, availableCategories, factories, isBackgroundWaitAvailable } = args
+  const backgroundTools = factories.createBackgroundTools(managers.backgroundManager, ctx.client, {
+    blockOnBackgroundTasks: pluginConfig.experimental?.block_on_background_tasks,
+  })
   const callOmoAgent = factories.createCallOmoAgent(
     ctx,
     managers.backgroundManager,
@@ -33,6 +36,7 @@ export function createCoreTools(args: {
     pluginConfig.agents,
     pluginConfig.categories,
     managers.modelFallbackControllerAccessor,
+    isBackgroundWaitAvailable,
   )
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
     (agent) => agent.toLowerCase() === "multimodal-looker",
@@ -65,6 +69,8 @@ export function createCoreTools(args: {
     getLoadedSkills,
     sisyphusAgentConfig: pluginConfig.sisyphus_agent,
     syncPollTimeoutMs: pluginConfig.background_task?.syncPollTimeoutMs,
+    blockOnBackgroundTasks: pluginConfig.experimental?.block_on_background_tasks,
+    isBackgroundWaitAvailable,
     modelFallbackControllerAccessor: managers.modelFallbackControllerAccessor,
     onSyncSessionCreated: async (event) => {
       log("[index] onSyncSessionCreated callback", {

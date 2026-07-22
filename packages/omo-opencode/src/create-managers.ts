@@ -136,6 +136,8 @@ export function createManagers(args: {
           title: event.title,
         })
 
+        if (event.signal.aborted) return
+
         await tmuxSessionManager.onSessionCreated({
           type: "session.created",
           properties: {
@@ -147,6 +149,11 @@ export function createManagers(args: {
           },
         })
 
+        if (event.signal.aborted) {
+          await tmuxSessionManager.onSessionDeleted({ sessionID: event.sessionID })
+          return
+        }
+
         if (pluginConfig.openclaw) {
           await openclawRuntimeDispatch.dispatchOpenClawEvent({
             config: pluginConfig.openclaw,
@@ -157,6 +164,11 @@ export function createManagers(args: {
               tmuxPaneId: tmuxSessionManager.getTrackedPaneId?.(event.sessionID) ?? process.env.TMUX_PANE,
             },
           })
+        }
+
+        if (event.signal.aborted) {
+          await tmuxSessionManager.onSessionDeleted({ sessionID: event.sessionID })
+          return
         }
 
         log("[create-managers] onSubagentSessionCreated callback completed")

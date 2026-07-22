@@ -6,6 +6,7 @@ import { getSessionTools } from "../../shared/session-tools-store"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import { resolveMetadataModel } from "./resolve-metadata-model"
 import { getTaskID } from "./task-id"
+import { getBackgroundCompletionGuidance } from "../background-task/completion-guidance"
 
 export async function executeBackgroundContinuation(
   args: DelegateTaskArgs,
@@ -38,6 +39,11 @@ export async function executeBackgroundContinuation(
     const sessionId = task.sessionId
     const backgroundTaskId = task.id
     const resolvedModel = resolveMetadataModel(task.model, parentContext.model)
+    const backgroundWaitAvailable =
+      executorCtx.isBackgroundWaitAvailable?.(parentContext.sessionID)
+      ?? executorCtx.blockOnBackgroundTasks
+      ?? false
+    const completionGuidance = getBackgroundCompletionGuidance(backgroundWaitAvailable)
 
     const bgContMeta = {
       title: args.description,
@@ -66,7 +72,7 @@ Agent: ${task.agent}
 Status: ${task.status}
 
 Agent continues with full previous context preserved.
-Do NOT call background_output now. Wait for <system-reminder> notification first. The system will deliver the result when the task completes; you do not need to poll for it.
+${completionGuidance}
 
 ${buildTaskMetadataBlock({
       sessionId,

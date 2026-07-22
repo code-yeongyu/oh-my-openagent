@@ -13,6 +13,7 @@ type ParentWakeFlushRunnerDeps = {
   readonly pendingQueue: ParentWakePendingQueue
   readonly dispatchedTracker: ParentWakeDispatchedTracker
   readonly sessionInspector: ParentWakeSessionInspector
+  readonly shouldDispatch: () => boolean
 }
 
 const PENDING_PARENT_WAKE_MAX_ACTIVE_DEFER_MS = 60_000
@@ -237,6 +238,7 @@ export class ParentWakeFlushRunner {
           : {}),
         emptyAssistantTurnRetry: options.emptyAssistantTurnRetry,
         toolWaitDecision: options.toolWaitDecision,
+        shouldDispatch: this.deps.shouldDispatch,
         getDispatchedWake: () => this.deps.dispatchedTracker.getWake(sessionID),
         hasRecordedPromptAfterDispatch: (wake) =>
           this.deps.sessionInspector.hasRecordedPromptMessageAfterDispatchedWake(sessionID, wake),

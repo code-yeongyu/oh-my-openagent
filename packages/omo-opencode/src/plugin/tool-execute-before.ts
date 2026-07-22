@@ -8,10 +8,16 @@ import { stopContinuation } from "./stop-continuation"
 import type { CreatedHooks } from "../create-hooks"
 import type { BackgroundManager } from "../features/background-agent"
 
-const BACKGROUND_WAIT_BLOCK_MESSAGE = [
+const BACKGROUND_REMINDER_WAIT_BLOCK_MESSAGE = [
   "Background task wait is already managed by the plugin.",
   "End this response now and wait for the <system-reminder> completion notification.",
   "After that reminder arrives, call background_output with the task_id from the launch result.",
+].join(" ")
+
+const BACKGROUND_TOOL_WAIT_BLOCK_MESSAGE = [
+  "Background task wait is already managed by the plugin.",
+  "Call `wait-for-background-tasks` now instead of sleeping or ending this response.",
+  "After it returns, call background_output with each completed task_id.",
 ].join(" ")
 
 function isPureSleepCommand(command: string): boolean {
@@ -27,12 +33,17 @@ function isPureSleepCommand(command: string): boolean {
 export function createToolExecuteBeforeHandler(args: {
   ctx: PluginContext
   hooks: CreatedHooks
-  backgroundManager?: Pick<BackgroundManager, "hasActiveChildTasks" | "hasPendingParentWake">
+  backgroundManager?: Pick<
+    BackgroundManager,
+    "hasActiveChildTasks" | "hasBackgroundWorkInFlight" | "hasPendingParentWake"
+  >
+  blockOnBackgroundTasks?: boolean
+  canUseBackgroundWaitTool?: (sessionID: string) => boolean
 }): (
   input: { tool: string; sessionID: string; callID: string },
   output: { args: Record<string, unknown> },
 ) => Promise<void> {
-  const { ctx, hooks, backgroundManager } = args
+  const { ctx, hooks, backgroundManager, blockOnBackgroundTasks, canUseBackgroundWaitTool } = args
 
   return async (input, output): Promise<void> => {
     // Strip mcp_ prefix from tool names — the model may emit mcp_background_output
@@ -57,14 +68,23 @@ export function createToolExecuteBeforeHandler(args: {
         })
       }
 
+      const useBlockingWaitTool = blockOnBackgroundTasks === true
+        && canUseBackgroundWaitTool?.(input.sessionID) !== false
+
       if (
         isPureSleepCommand(output.args.command)
         && (
-          backgroundManager?.hasActiveChildTasks(input.sessionID) === true
+          (useBlockingWaitTool
+            ? backgroundManager?.hasBackgroundWorkInFlight(input.sessionID)
+            : backgroundManager?.hasActiveChildTasks(input.sessionID)) === true
           || backgroundManager?.hasPendingParentWake(input.sessionID) === true
         )
       ) {
-        throw new Error(BACKGROUND_WAIT_BLOCK_MESSAGE)
+        throw new Error(
+          useBlockingWaitTool
+            ? BACKGROUND_TOOL_WAIT_BLOCK_MESSAGE
+            : BACKGROUND_REMINDER_WAIT_BLOCK_MESSAGE,
+        )
       }
     }
 

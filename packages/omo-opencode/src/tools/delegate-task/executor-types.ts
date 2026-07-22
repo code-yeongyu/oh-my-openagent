@@ -16,6 +16,8 @@ export interface ExecutorContext {
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   onSyncSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
   syncPollTimeoutMs?: number
+  blockOnBackgroundTasks?: boolean
+  isBackgroundWaitAvailable?: (sessionID: string) => boolean
 }
 
 export interface ParentContext {

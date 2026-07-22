@@ -21,6 +21,7 @@ type ParentWakePromptDispatchInput = {
   readonly skipPromptGateStatusCheck?: boolean
   readonly emptyAssistantTurnRetry: boolean
   readonly toolWaitDecision: ToolWaitDeferralDecision
+  readonly shouldDispatch: () => boolean
   readonly getDispatchedWake: () => PendingParentWake | undefined
   readonly hasRecordedPromptAfterDispatch: (wake: PendingParentWake) => Promise<boolean>
   readonly trackDispatchedWake: (wake: PendingParentWake, dispatchedAt: number) => void
@@ -43,6 +44,7 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
         : {}),
       settleMs: 0,
       queueBehavior: "defer",
+      shouldDispatch: input.shouldDispatch,
       checkStatus: input.forceNoReply !== true && input.skipPromptGateStatusCheck !== true,
       checkToolState: input.forceNoReply !== true && !input.toolWaitDecision.skipPromptGateToolStateCheck,
       input: {

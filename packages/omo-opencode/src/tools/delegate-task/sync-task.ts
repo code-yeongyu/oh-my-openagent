@@ -153,6 +153,7 @@ export async function executeSyncTask(
       category: args.category,
     })
   } finally {
+    spawnReservation?.release?.()
     if (syncSessionID) {
       cleanupSyncSessionSideEffects(syncSessionID, executorCtx)
       handedBackSyncSessions.add(syncSessionID)

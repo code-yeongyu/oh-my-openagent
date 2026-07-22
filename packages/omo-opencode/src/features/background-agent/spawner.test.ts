@@ -81,6 +81,47 @@ describe("background-agent spawner resume guard", () => {
     expect(task.parentSessionId).toBe("parent-session-original")
     expect(task.parentMessageId).toBe("parent-message-original")
   })
+
+  test("preserves explicit launch tool denials on continuation", async () => {
+    //#given
+    let capturedTools: Record<string, boolean> | undefined
+    const task: BackgroundTask = {
+      id: "task-denied-resume",
+      sessionId: "session-denied-resume",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+      description: "resume task with denied waiter",
+      prompt: "original prompt",
+      agent: "sisyphus-junior",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      userPermission: { "wait-for-background-tasks": "deny" },
+    }
+
+    //#when
+    await resumeTask(task, {
+      sessionId: task.sessionId,
+      prompt: "continuation prompt",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+    }, {
+      client: {
+        session: {
+          promptAsync: async (args: PromptRequest) => {
+            capturedTools = args.body.tools
+            return {}
+          },
+        },
+      },
+      concurrencyManager: { acquire: async () => {}, release: () => {} },
+      directory: "/tmp/test",
+      onTaskError: () => {},
+    } as never)
+
+    //#then
+    expect(capturedTools?.["wait-for-background-tasks"]).toBe(false)
+  })
 })
 
 describe("background-agent spawner agent-not-found fallback", () => {
@@ -117,6 +158,7 @@ describe("background-agent spawner agent-not-found fallback", () => {
       agent: "Sisyphus-Junior",
       parentSessionId: "ses_parent",
       parentMessageId: "msg_parent",
+      userPermission: { "wait-for-background-tasks": "deny" },
     })
 
     const item = {
@@ -130,6 +172,7 @@ describe("background-agent spawner agent-not-found fallback", () => {
         parentModel: task.parentModel,
         parentAgent: task.parentAgent,
         model: task.model,
+        userPermission: task.userPermission,
       },
     }
 
@@ -159,6 +202,7 @@ describe("background-agent spawner agent-not-found fallback", () => {
       task: false,
       call_omo_agent: true,
       question: false,
+      "wait-for-background-tasks": false,
       team_create: false,
       team_delete: false,
       team_shutdown_request: false,

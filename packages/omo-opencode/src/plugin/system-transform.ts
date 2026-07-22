@@ -1,11 +1,30 @@
 import type { DefaultModeConfig } from "../config/schema/default-mode"
+import type { BackgroundManager } from "../features/background-agent"
 import { reconcileSisyphusRuntimePrompt } from "../agents/sisyphus-runtime-prompt-reconciler"
 
 const ULTRAWORK_MODE_TAG = "<ultrawork-mode>"
 
+const BACKGROUND_WAIT_TAG = "[CRITICAL — BACKGROUND TASKS RUNNING]"
+
+const BACKGROUND_WAIT_INSTRUCTION = `<system-reminder>
+${BACKGROUND_WAIT_TAG}
+You have background tasks that are still running or pending. You MUST call the \`wait-for-background-tasks\` tool BEFORE ending your turn. If you end your turn without calling it, the session may be terminated and all background work lost.
+
+Do NOT end your turn with a text response while background tasks are active. Instead:
+1. Call \`wait-for-background-tasks\` to block until all tasks finish, the wait times out, or the call is aborted
+2. If the wait times out with work still active, call the tool again instead of ending your turn
+3. Process the terminal results
+4. Then provide your final response
+</system-reminder>`
+
 export function createSystemTransformHandler(
   defaultMode?: DefaultModeConfig,
   getUltraworkMessage?: (agentName?: string, modelID?: string) => string,
+  options?: {
+    backgroundManager?: Pick<BackgroundManager, "hasBackgroundWorkInFlight">
+    blockOnBackgroundTasks?: boolean
+    canUseBackgroundWaitTool?: (sessionID: string) => boolean
+  },
 ): (
   input: { sessionID?: string; model: { id: string; providerID: string; [key: string]: unknown } },
   output: { system: string[] },
@@ -16,6 +35,8 @@ export function createSystemTransformHandler(
     // is the only seam that knows the model actually selected at runtime, so
     // rebuild the whole body for the runtime model family here (issue #5297).
     reconcileSisyphusRuntimePrompt(output.system, input.model?.id)
+
+    injectBackgroundWaitInstruction(input.sessionID, output.system, options)
 
     if (!defaultMode?.ultrawork || !getUltraworkMessage) return
 
@@ -29,4 +50,22 @@ export function createSystemTransformHandler(
 
     output.system.push(ultraworkMessage)
   }
+}
+
+function injectBackgroundWaitInstruction(
+  sessionID: string | undefined,
+  system: string[],
+  options:
+    | {
+      backgroundManager?: Pick<BackgroundManager, "hasBackgroundWorkInFlight">
+      blockOnBackgroundTasks?: boolean
+      canUseBackgroundWaitTool?: (sessionID: string) => boolean
+    }
+    | undefined,
+): void {
+  if (!options?.blockOnBackgroundTasks || !options.backgroundManager || !sessionID) return
+  if (options.canUseBackgroundWaitTool?.(sessionID) === false) return
+  if (!options.backgroundManager.hasBackgroundWorkInFlight(sessionID)) return
+  if (system.includes(BACKGROUND_WAIT_INSTRUCTION)) return
+  system.push(BACKGROUND_WAIT_INSTRUCTION)
 }

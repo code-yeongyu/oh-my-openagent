@@ -10,6 +10,8 @@ export type BackgroundTaskStatus =
   | "cancelled"
   | "interrupt"
 
+export type UserToolPermission = Record<string, "ask" | "allow" | "deny">
+
 export interface ToolCallWindow {
   lastSignature: string
   consecutiveCount: number
@@ -75,6 +77,8 @@ export interface BackgroundTask {
   parentTools?: Record<string, boolean>
   skillContent?: string
   sessionPermission?: SessionPermissionRule[]
+  /** User tool overrides retained so continuation prompts preserve launch-time denials. */
+  userPermission?: UserToolPermission
   /** Marks if the task was launched from an unstable agent/category */
   isUnstableAgent?: boolean
   /** Category used for this task (e.g., 'quick', 'visual-engineering') */
@@ -130,7 +134,7 @@ export interface LaunchInput {
   sessionPermission?: SessionPermissionRule[]
   onSessionCreated?: (sessionId: string) => void | Promise<void>
   /** User tool overrides (ask/allow/deny) from category or agent config. Merged into launchTools before hardcoded restrictions. */
-  userPermission?: Record<string, "ask" | "allow" | "deny">
+  userPermission?: UserToolPermission
 }
 
 export interface ResumeInput {

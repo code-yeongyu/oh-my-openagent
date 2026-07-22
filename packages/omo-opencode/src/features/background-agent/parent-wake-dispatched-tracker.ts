@@ -25,6 +25,7 @@ export class ParentWakeDispatchedTracker {
   // counter (not a set) so concurrent child teardowns for the same parent each hold
   // their own slot and the predicate only clears once every one has queued its wake.
   private notificationPreparations: Map<string, number> = new Map()
+  private shutdownTriggered = false
 
   constructor(private readonly options: ParentWakeDispatchedTrackerOptions) {}
 
@@ -37,6 +38,7 @@ export class ParentWakeDispatchedTracker {
   }
 
   markInFlight(sessionID: string): void {
+    if (this.shutdownTriggered) return
     this.inFlightDispatches.add(sessionID)
   }
 
@@ -49,6 +51,7 @@ export class ParentWakeDispatchedTracker {
   }
 
   reserveNotificationPreparation(sessionID: string): void {
+    if (this.shutdownTriggered) return
     this.notificationPreparations.set(sessionID, (this.notificationPreparations.get(sessionID) ?? 0) + 1)
   }
 
@@ -86,6 +89,7 @@ export class ParentWakeDispatchedTracker {
   }
 
   trackWake(sessionID: string, wake: PendingParentWake, dispatchedAt: number): void {
+    if (this.shutdownTriggered) return
     this.clearWake(sessionID)
     const dispatchedWake = cloneParentWake(wake)
     dispatchedWake.dispatchedAt = dispatchedAt
@@ -94,6 +98,7 @@ export class ParentWakeDispatchedTracker {
   }
 
   refreshWakeTimer(sessionID: string): void {
+    if (this.shutdownTriggered) return
     if (!this.dispatchedParentWakes.has(sessionID)) {
       return
     }
@@ -118,6 +123,7 @@ export class ParentWakeDispatchedTracker {
   }
 
   shutdown(): void {
+    this.shutdownTriggered = true
     for (const timer of this.dispatchedParentWakeTimers.values()) {
       clearTimeout(timer)
     }

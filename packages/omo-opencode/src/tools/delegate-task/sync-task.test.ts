@@ -180,6 +180,50 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(rollback).toHaveBeenCalledTimes(1)
   })
 
+  test("releases committed descendant ownership after synchronous execution", async () => {
+    const mockClient = {
+      session: {
+        create: async () => ({ data: { id: "ses_test_12345678" } }),
+      },
+    }
+    const { executeSyncTask } = require("./sync-task")
+    const release = mock(() => {})
+    const reserveSubagentSpawn = mock(async () => ({
+      spawnContext: { rootSessionID: "parent-session", parentDepth: 0, childDepth: 1 },
+      descendantCount: 1,
+      commit: mock(() => 1),
+      rollback: mock(() => {}),
+      release,
+    }))
+    const deps = {
+      createSyncSession: async () => ({ ok: true as const, sessionID: "ses_test_12345678", parentDirectory: "/tmp" }),
+      sendSyncPrompt: async () => null,
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+    const mockCtx = { sessionID: "parent-session", callID: "call-123", metadata: () => {} }
+    const mockExecutorCtx = {
+      manager: { reserveSubagentSpawn },
+      client: mockClient,
+      directory: "/tmp",
+      onSyncSessionCreated: null,
+    }
+    const args = {
+      prompt: "test prompt",
+      description: "test task",
+      category: "test",
+      load_skills: [],
+      run_in_background: false,
+      command: null,
+    }
+
+    await executeSyncTask(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+    }, "test-agent", undefined, undefined, undefined, undefined, deps)
+
+    expect(release).toHaveBeenCalledTimes(1)
+  })
+
   test("recovers from MessageAbortedError poll error when result already exists", async () => {
     const mockClient = {
       session: {

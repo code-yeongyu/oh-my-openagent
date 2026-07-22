@@ -185,4 +185,48 @@ describe("executeBackgroundContinuation - subagent metadata", () => {
     expect(result).toContain("Do NOT call background_output now")
     expect(result).toContain("<system-reminder>")
   })
+
+  test("directs blocking-mode continuations to wait-for-background-tasks", async () => {
+    //#given
+    const mockManager = {
+      resume: async () => ({
+        id: "bg_task_blocking",
+        description: "continue task",
+        agent: "oracle",
+        status: "running",
+        sessionId: "ses_resumed_blocking",
+      }),
+    }
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-blocking",
+      metadata: mock(() => Promise.resolve()),
+    }
+    const args = {
+      task_id: "ses_resumed_blocking",
+      prompt: "continue",
+      description: "resume task",
+      load_skills: [],
+      run_in_background: true,
+    }
+
+    //#when
+    const { executeBackgroundContinuation } = require("./background-continuation")
+    const result = await executeBackgroundContinuation(
+      args,
+      mockCtx,
+      {
+        manager: mockManager,
+        isBackgroundWaitAvailable: (sessionID) => {
+          expect(sessionID).toBe("parent-session")
+          return true
+        },
+      },
+      { sessionID: "parent-session", messageID: "msg-parent", agent: "sisyphus" },
+    )
+
+    //#then
+    expect(result).toContain("call `wait-for-background-tasks`")
+    expect(result).not.toContain("Wait for <system-reminder>")
+  })
 })

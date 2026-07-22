@@ -13,9 +13,12 @@ import { createEventHandler } from "./plugin/event"
 import { createToolDefinitionHandler } from "./plugin/tool-definition"
 import { createToolExecuteAfterHandler } from "./plugin/tool-execute-after"
 import { createToolExecuteBeforeHandler } from "./plugin/tool-execute-before"
+import { createBackgroundWaitAvailability } from "./plugin/background-wait-availability"
 
 import type { CreatedHooks } from "./create-hooks"
 import type { Managers } from "./create-managers"
+
+const BACKGROUND_WAIT_TOOL = "wait-for-background-tasks"
 
 export function createPluginInterface(args: {
   ctx: PluginContext
@@ -32,6 +35,10 @@ export function createPluginInterface(args: {
 }): PluginInterface {
   const { ctx, pluginConfig, firstMessageVariantGate, managers, hooks, tools } =
     args
+  const canUseBackgroundWaitTool = createBackgroundWaitAvailability(
+    pluginConfig,
+    () => tools[BACKGROUND_WAIT_TOOL] !== undefined,
+  )
 
   return {
     tool: tools,
@@ -75,6 +82,11 @@ export function createPluginInterface(args: {
     "experimental.chat.system.transform": createSystemTransformHandler(
       pluginConfig.default_mode,
       getUltraworkMessage,
+      {
+        backgroundManager: managers.backgroundManager,
+        blockOnBackgroundTasks: tools[BACKGROUND_WAIT_TOOL] !== undefined,
+        canUseBackgroundWaitTool,
+      },
     ),
 
     config: managers.configHandler,
@@ -95,6 +107,8 @@ export function createPluginInterface(args: {
       ctx,
       hooks,
       backgroundManager: managers.backgroundManager,
+      blockOnBackgroundTasks: tools[BACKGROUND_WAIT_TOOL] !== undefined,
+      canUseBackgroundWaitTool,
     }),
 
     "tool.execute.after": createToolExecuteAfterHandler({

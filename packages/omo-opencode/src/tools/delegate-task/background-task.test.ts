@@ -651,4 +651,95 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     expectFn(result).toContain("Do NOT call background_output now")
     expectFn(result).toContain("<system-reminder>")
   })
+
+  testFn("directs block-on-background callers to retrieve results after waiting", async () => {
+    //#given - a turn-end-kill harness enables the blocking wait path
+    const manager = {
+      launch: async () => ({
+        id: "bg_blocking_wait",
+        sessionId: "ses_blocking_wait",
+        description: "Blocking wait",
+        agent: "explore",
+        status: "running",
+      }),
+      getTask: () => ({ sessionId: "ses_blocking_wait" }),
+    }
+
+    //#when
+    const result = await executeBackgroundTask(
+      {
+        description: "Blocking wait",
+        prompt: "check",
+        run_in_background: true,
+        load_skills: [],
+      },
+      {
+        sessionID: "ses_parent",
+        callID: "call_blocking_wait",
+        metadata: async () => {},
+        abort: new AbortController().signal,
+      },
+      { manager, blockOnBackgroundTasks: true },
+      { sessionID: "ses_parent", messageID: "msg_blocking_wait" },
+      "explore",
+      undefined,
+      undefined,
+      undefined,
+    )
+
+    //#then - the wait result is described accurately and result collection remains explicit
+    expectFn(result).toContain("call `wait-for-background-tasks`")
+    expectFn(result).toContain("final or current statuses")
+    expectFn(result).toContain("times out")
+    expectFn(result).toContain("aborted")
+    expectFn(result).toContain('background_output(task_id="<id>")')
+    expectFn(result).not.toContain("returns their results")
+  })
+
+  testFn("does not mandate the wait tool when final registry filtering removed it", async () => {
+    //#given - the raw flag is on but the final tool registry reports the wait tool unavailable
+    const manager = {
+      launch: async () => ({
+        id: "bg_filtered_wait",
+        sessionId: "ses_filtered_wait",
+        description: "Filtered wait",
+        agent: "explore",
+        status: "running",
+      }),
+      getTask: () => ({ sessionId: "ses_filtered_wait" }),
+    }
+
+    //#when
+    const result = await executeBackgroundTask(
+      {
+        description: "Filtered wait",
+        prompt: "check",
+        run_in_background: true,
+        load_skills: [],
+      },
+      {
+        sessionID: "ses_parent",
+        callID: "call_filtered_wait",
+        metadata: async () => {},
+        abort: new AbortController().signal,
+      },
+      {
+        manager,
+        blockOnBackgroundTasks: true,
+        isBackgroundWaitAvailable: (sessionID) => {
+          expectFn(sessionID).toBe("ses_parent")
+          return false
+        },
+      },
+      { sessionID: "ses_parent", messageID: "msg_filtered_wait" },
+      "explore",
+      undefined,
+      undefined,
+      undefined,
+    )
+
+    //#then - guidance follows effective availability, not the raw feature flag
+    expectFn(result).not.toContain("call `wait-for-background-tasks`")
+    expectFn(result).toContain("Do NOT call background_output now")
+  })
 })

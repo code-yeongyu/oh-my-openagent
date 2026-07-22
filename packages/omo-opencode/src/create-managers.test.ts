@@ -16,7 +16,7 @@ type CleanupSessionTeamRunsFn = typeof import("./features/team-mode/team-runtime
 
 const markServerRunningInProcess = mock(() => {})
 let backgroundManagerOptions: {
-  onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
+  onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string; signal: AbortSignal }) => Promise<void>
   onShutdown?: () => void | Promise<void>
 } | null = null
 const trackedPaneBySession = new Map<string, string>()
@@ -36,7 +36,7 @@ let tuiMirrorStopCount = 0
 
 class MockBackgroundManager {
   constructor(config: {
-    onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
+    onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string; signal: AbortSignal }) => Promise<void>
     onShutdown?: () => void | Promise<void>
   }) {
     backgroundManagerOptions = config
@@ -65,6 +65,10 @@ class MockTmuxSessionManager {
 
   getTrackedPaneId(sessionID: string): string | undefined {
     return trackedPaneBySession.get(sessionID)
+  }
+
+  async onSessionDeleted(event: { sessionID: string }): Promise<void> {
+    trackedPaneBySession.delete(event.sessionID)
   }
 }
 
@@ -252,6 +256,7 @@ describe("createManagers", () => {
       sessionID: "ses-bg-1",
       parentID: "ses-parent",
       title: "child task",
+      signal: new AbortController().signal,
     })
 
     expect(dispatchOpenClawEvent).toHaveBeenCalledTimes(1)
@@ -264,6 +269,48 @@ describe("createManagers", () => {
         tmuxPaneId: "%pane-ses-bg-1",
       },
     })
+  })
+
+  it("#given shutdown begins during openclaw dispatch #when dispatch settles #then it removes the tracked pane", async () => {
+    const dispatchStarted = Promise.withResolvers<void>()
+    const releaseDispatch = Promise.withResolvers<void>()
+    dispatchOpenClawEvent.mockImplementation(async () => {
+      dispatchStarted.resolve()
+      await releaseDispatch.promise
+    })
+    const args = {
+      ctx: createContext("/tmp/project"),
+      pluginConfig: OhMyOpenCodeConfigSchema.parse({
+        openclaw: {
+          enabled: true,
+          gateways: {},
+          hooks: {},
+        },
+      }),
+      tmuxConfig: createTmuxConfig(true),
+      modelCacheState: createModelCacheState(),
+      backgroundNotificationHookEnabled: false,
+      deps: createDeps(),
+    }
+    const abortController = new AbortController()
+
+    createManagers(args)
+
+    const callback = backgroundManagerOptions?.onSubagentSessionCreated?.({
+      sessionID: "ses-bg-shutdown-dispatch",
+      parentID: "ses-parent",
+      title: "child task",
+      signal: abortController.signal,
+    })
+    await dispatchStarted.promise
+
+    // when
+    abortController.abort()
+    releaseDispatch.resolve()
+    await callback
+
+    // then
+    expect(trackedPaneBySession.has("ses-bg-shutdown-dispatch")).toBe(false)
   })
 
   it("#given team mode is enabled #when process cleanup runs #then session team runs are cleaned with tmux visualization dependencies", async () => {
