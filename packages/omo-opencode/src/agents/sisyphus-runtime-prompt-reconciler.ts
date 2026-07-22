@@ -17,12 +17,20 @@ export type SisyphusRuntimePromptContext = {
 
 let context: SisyphusRuntimePromptContext | undefined;
 
+// Per-session cache: avoid calling rebuildPromptForModel on every turn when the
+// runtime model is stable. The cache is keyed by the exact runtimeModel string
+// and is cleared together with `context` at session end.
+let lastReconciledModel: string | undefined;
+let cachedRebuiltPrompt: string | undefined;
+
 export function setSisyphusRuntimePromptContext(ctx: SisyphusRuntimePromptContext): void {
   context = ctx;
 }
 
 export function clearSisyphusRuntimePromptContext(): void {
   context = undefined;
+  lastReconciledModel = undefined;
+  cachedRebuiltPrompt = undefined;
 }
 
 /**
@@ -36,6 +44,12 @@ export function clearSisyphusRuntimePromptContext(): void {
  * model, so rebuild the whole prompt for the runtime family and swap it in here
  * rather than patching individual family-specific lines (which can never convert
  * a GPT body into a non-GPT one).
+ *
+ * Rebuilding is expensive and non-deterministic across calls (it reads live env
+ * and config state), so the result is cached per runtime-model string. The cache
+ * is invalidated when the runtime model changes or the session context is cleared
+ * (fix for #5578: reconciler was rebuilding on every turn causing behavioural
+ * non-determinism within a single session).
  *
  * Returns true if a swap was performed.
  */
@@ -53,7 +67,19 @@ export function reconcileSisyphusRuntimePrompt(
     return false
   }
 
-  const rebuilt = context.rebuildPromptForModel(runtimeModel)
+  // Use the cached rebuilt prompt when the runtime model has not changed since
+  // the last reconciliation. rebuildPromptForModel reads live env/config state
+  // and is therefore not guaranteed to be pure; calling it on every turn can
+  // produce subtly different prompts even with the same model id (#5578).
+  let rebuilt: string;
+  if (runtimeModel === lastReconciledModel && cachedRebuiltPrompt !== undefined) {
+    rebuilt = cachedRebuiltPrompt;
+  } else {
+    rebuilt = context.rebuildPromptForModel(runtimeModel);
+    lastReconciledModel = runtimeModel;
+    cachedRebuiltPrompt = rebuilt;
+  }
+
   if (rebuilt === context.bakedPrompt) return false
 
   // Substring replace rather than exact-equality: opencode core may concatenate
