@@ -16,6 +16,7 @@ import { resolveOmoConfigWatchTargetResolution, resolveOmoConfigWatchTargets } f
 const cleanupRoots: string[] = []
 
 type Fixture = {
+  readonly agentDir: string
   readonly cwd: string
   readonly homeDir: string
   readonly projectDir: string
@@ -31,8 +32,16 @@ function createFixture(): Fixture {
   const projectDir = join(workDir, "project")
   const cwd = join(projectDir, "child")
   const xdgConfigHome = join(root, "xdg")
+  const agentDir = join(root, "senpi-agent")
   mkdirSync(cwd, { recursive: true })
-  return { cwd, homeDir, projectDir, workDir, xdgConfigHome }
+  return { agentDir, cwd, homeDir, projectDir, workDir, xdgConfigHome }
+}
+
+// Keep the senpi agent dir outside the fake HOME so existing ancestor
+// assertions keep covering the full cwd-to-home walk; the restricted-target
+// suite below pins the default under-HOME behavior.
+function fixtureEnv(fixture: Fixture): { HOME: string; XDG_CONFIG_HOME: string; SENPI_CODING_AGENT_DIR: string } {
+  return { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome, SENPI_CODING_AGENT_DIR: fixture.agentDir }
 }
 
 function writeProjectConfig(directory: string): string {
@@ -57,16 +66,16 @@ describe("resolveOmoConfigWatchTargets", () => {
 
     const targets = resolveOmoConfigWatchTargets({
       cwd: fixture.cwd,
-      env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+      env: fixtureEnv(fixture),
       platform: "linux",
     })
     const loaderPaths = resolveOmoConfigPaths({
       cwd: fixture.cwd,
-      env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+      env: fixtureEnv(fixture),
       platform: "linux",
     })
 
-    expect(resolveUserOmoConfigDirectory({ HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome }, "linux"))
+    expect(resolveUserOmoConfigDirectory(fixtureEnv(fixture), "linux"))
       .toBe(userConfigDirectory)
     expect(findProjectConfigPathsFarthestFirst(fixture.cwd, fixture.homeDir, {
       existsSync: (path) => [workConfigPath, projectConfigPath, cwdConfigPath].includes(path),
@@ -95,7 +104,7 @@ describe("resolveOmoConfigWatchTargets", () => {
 
     const targets = resolveOmoConfigWatchTargets({
       cwd: fixture.cwd,
-      env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+      env: fixtureEnv(fixture),
       platform: "linux",
     })
 
@@ -117,7 +126,7 @@ describe("resolveOmoConfigWatchTargets", () => {
 
     const targets = resolveOmoConfigWatchTargets({
       cwd: fixture.cwd,
-      env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+      env: fixtureEnv(fixture),
       platform: "linux",
     })
 
@@ -132,7 +141,7 @@ describe("resolveOmoConfigWatchTargets", () => {
 
     const targets = resolveOmoConfigWatchTargets({
       cwd: fixture.cwd,
-      env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+      env: fixtureEnv(fixture),
       platform: "linux",
     })
 
@@ -146,7 +155,7 @@ describe("resolveOmoConfigWatchTargets", () => {
 
     const resolution = resolveOmoConfigWatchTargetResolution({
       cwd: fixture.cwd,
-      env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+      env: fixtureEnv(fixture),
       platform: "linux",
     })
 
@@ -159,13 +168,53 @@ describe("resolveOmoConfigWatchTargets", () => {
 
     const resolution = resolveOmoConfigWatchTargetResolution({
       cwd: fixture.cwd,
-      env: { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome },
+      env: fixtureEnv(fixture),
       platform: "linux",
     })
 
     expect(resolution.userConfigCreationWatched).toBe(false)
     expect(resolution.userConfigCreationDiscovery).toBe("reload_required")
     expect(targetFor(resolution.targets, fixture.xdgConfigHome, "omo")).toBe(false)
+  })
+
+  it("#given the senpi agent dir defaulting under HOME #when resolving targets #then drops every target covering the protected agent paths", () => {
+    const fixture = createFixture()
+    const env = { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome }
+    const protectedPaths = [
+      join(fixture.homeDir, ".senpi", "agent", "auth.json"),
+      join(fixture.homeDir, ".senpi", "agent", "sessions"),
+      join(fixture.homeDir, ".senpi", "agent", "logs"),
+    ]
+
+    const targets = resolveOmoConfigWatchTargets({ cwd: fixture.cwd, env, platform: "linux" })
+
+    // The bare-HOME ancestor always covers ~/.senpi/agent, so senpi would
+    // deterministically reject the registration; it must never be emitted.
+    expect(targetFor(targets, fixture.homeDir, ".omo")).toBe(false)
+    for (const target of targets) {
+      for (const protectedPath of protectedPaths) {
+        expect(target.path.startsWith(protectedPath)).toBe(false)
+        expect(protectedPath.startsWith(target.path)).toBe(false)
+      }
+    }
+    // Ancestors between cwd and HOME stay watched; only the covering target is dropped.
+    expect(targets.filter((target) => target.filterGlobs.includes(".omo")).map((target) => target.path)).toEqual([
+      fixture.cwd,
+      fixture.projectDir,
+      fixture.workDir,
+    ])
+  })
+
+  it("#given an explicit SENPI_CODING_AGENT_DIR under HOME #when resolving targets #then drops the covering ancestor target", () => {
+    const fixture = createFixture()
+    const agentDir = join(fixture.homeDir, "custom-agent")
+    const env = { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome, SENPI_CODING_AGENT_DIR: agentDir }
+
+    const targets = resolveOmoConfigWatchTargets({ cwd: fixture.cwd, env, platform: "linux" })
+
+    expect(targetFor(targets, fixture.homeDir, ".omo")).toBe(false)
+    expect(targets.some((target) => target.path === agentDir)).toBe(false)
+    expect(targetFor(targets, fixture.workDir, ".omo")).toBe(true)
   })
 })
 
