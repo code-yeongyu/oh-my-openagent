@@ -14,6 +14,7 @@ import {
 import type { AgentSourceMap, AgentSources } from "./agent-config-types";
 import { buildPlanDemoteConfig } from "./plan-model-inheritance";
 import { buildPrometheusAgentConfig } from "./prometheus-agent-config-builder";
+import { deepMerge } from "../shared";
 
 type BuiltinAgentMap = Record<string, AgentConfig | undefined>;
 
@@ -230,6 +231,32 @@ function assembleSisyphusDisabledConfig(params: AssembleAgentConfigParams): void
   };
 }
 
+/**
+ * OpenCode's agent schema has no top-level `providerOptions`; per-request
+ * provider options come from the flat `options` record on the agent, which
+ * OpenCode wraps under the SDK provider key at request time. OMO config,
+ * category expansion, and plan/model inheritance write `providerOptions` as a
+ * top-level agent key, so without this fold it is silently dropped and never
+ * reaches the request body (#5479). Fold each agent's `providerOptions` into
+ * its `options` record and drop the unrecognized key.
+ */
+function foldAgentProviderOptions(agents: Record<string, unknown>): void {
+  for (const value of Object.values(agents)) {
+    if (typeof value !== "object" || value === null) continue;
+    const agent = value as Record<string, unknown>;
+    const providerOptions = agent.providerOptions;
+    if (providerOptions === undefined) continue;
+    if (typeof providerOptions === "object" && providerOptions !== null) {
+      const existing =
+        typeof agent.options === "object" && agent.options !== null
+          ? (agent.options as Record<string, unknown>)
+          : {};
+      agent.options = deepMerge(existing, providerOptions as Record<string, unknown>);
+    }
+    delete agent.providerOptions;
+  }
+}
+
 export async function assembleAgentConfig(params: AssembleAgentConfigParams): Promise<AssemblyResult> {
   const configuredDefaultAgent = getConfiguredDefaultAgent(params.config);
   const isSisyphusEnabled = params.pluginConfig.sisyphus_agent?.disabled !== true;
@@ -238,6 +265,10 @@ export async function assembleAgentConfig(params: AssembleAgentConfigParams): Pr
     await assembleSisyphusEnabledConfig(params);
   } else {
     assembleSisyphusDisabledConfig(params);
+  }
+
+  if (params.config.agent && typeof params.config.agent === "object") {
+    foldAgentProviderOptions(params.config.agent as Record<string, unknown>);
   }
 
   return { configuredDefaultAgent };
