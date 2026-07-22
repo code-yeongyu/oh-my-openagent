@@ -128,6 +128,17 @@ The installer does not write a global Codex shell config. On Windows it enables 
 
 To install both editions in one command, use `--platform=both`.
 
+### Subagent service tier (explorer/librarian)
+
+The bundled `explorer` and `librarian` agent TOMLs ship with `service_tier = "fast"` so recon subagents run on the cheaper Fast tier by default. To opt out, edit the tier in your installed agent files and the installer will preserve your choice across every reinstall and bootstrap:
+
+```toml
+# ~/.codex/agents/explorer.toml (and librarian.toml)
+service_tier = "standard"   # use the default/parent tier instead of Fast
+```
+
+Delete the `service_tier` line entirely to inherit the parent session's tier. On reinstall the bootstrap captures your current tier and re-applies it after relinking the bundled agents, so a changed or removed tier is never silently reset back to `fast`.
+
 ## Telemetry
 
 Anonymous telemetry uses the same PostHog project as oh-my-openagent but emits the distinct event `omo_codex_daily_active`. The event is sent at most once per UTC day per machine from two sources:
