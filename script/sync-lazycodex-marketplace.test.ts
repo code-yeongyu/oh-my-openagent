@@ -207,6 +207,29 @@ describe("sync-lazycodex-marketplace", () => {
     await expectPathMissing(join(lazycodexRoot, "plugins", "omo", ".claude"))
   })
 
+  test("#given marketplace sync #when copying the manifest #then also emits a root-level marketplace.json byte-identical to the source (lazycodex #139)", async () => {
+    // given
+    const sourceRoot = await mkdtemp(join(tmpdir(), "omo-sync-root-manifest-source-"))
+    const lazycodexRoot = await mkdtemp(join(tmpdir(), "omo-sync-root-manifest-lazycodex-"))
+    await writePluginFixture(sourceRoot)
+
+    // when
+    await syncLazycodexMarketplace({ sourceRoot, lazycodexRoot })
+
+    // then
+    // Codex's `plugin marketplace add` scans only the repo ROOT for a supported manifest,
+    // so the root copy must exist and stay byte-identical to both the source manifest and
+    // the .agents/plugins/ copy. Its root-relative source must keep pointing at ./plugins/omo.
+    const sourceManifest = await readFile(join(sourceRoot, "packages", "omo-codex", "marketplace.json"), "utf8")
+    const rootManifest = await readFile(join(lazycodexRoot, "marketplace.json"), "utf8")
+    const nestedManifest = await readFile(join(lazycodexRoot, ".agents", "plugins", "marketplace.json"), "utf8")
+    expect(rootManifest).toBe(sourceManifest)
+    expect(rootManifest).toBe(nestedManifest)
+    const parsed = JSON.parse(rootManifest)
+    expect(parsed.name).toBe("sisyphuslabs")
+    expect(parsed.plugins[0].source).toBe("./plugins/omo")
+  })
+
   test("rejects a source tree without a Codex plugin manifest", async () => {
     // given
     const sourceRoot = await mkdtemp(join(tmpdir(), "omo-sync-bad-source-"))
