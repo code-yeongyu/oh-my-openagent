@@ -52,6 +52,8 @@ export interface SessionState {
   awaitingToolProgressAfterContinuation?: boolean
   iterationsSinceLastToolProgress?: number
   lastToolProgressAt?: number
+  /** Last successful bash output fingerprint counted as progress; repeated matches do not reset stall tracking. */
+  lastBashProgressFingerprint?: string
   stalledContinuationReason?: string
   stalledContinuationPlanPath?: string
   /** The plan path the in-progress no-tool-progress counter is keyed to. Changes here reset the counter. */
