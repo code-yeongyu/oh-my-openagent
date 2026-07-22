@@ -45,10 +45,14 @@ function isRegistration(value: unknown): value is Registration {
 
 class FakeEvents {
   readonly registrations = new Map<string, Registration>()
+  readonly registerEmits: Registration[] = []
   private readonly listeners = new Map<string, Set<EventHandler>>()
 
   emit(name: string, payload: unknown): void {
-    if (name === "config-watch:register" && isRegistration(payload)) this.registrations.set(payload.id, payload)
+    if (name === "config-watch:register" && isRegistration(payload)) {
+      this.registrations.set(payload.id, payload)
+      this.registerEmits.push(payload)
+    }
     for (const handler of this.listeners.get(name) ?? []) handler(payload)
   }
 
@@ -111,6 +115,17 @@ function createComponent() {
     resolveTargets: () => [{ path: "/project/.omo", kind: "dir", filterGlobs: ["omo.jsonc", "omo.json"] }],
     createValidator: () => ({ validate: () => ({ ok: true }) }),
   })
+}
+
+// Awaits the next config-watch:register emission directly instead of sleeping:
+// the deferred retry is scheduled on a macrotask, so the signal is deterministic.
+function nextRegisterEmit(events: FakeEvents): Promise<void> {
+  const { promise, resolve } = Promise.withResolvers<void>()
+  const off = events.on("config-watch:register", () => {
+    off()
+    resolve()
+  })
+  return promise
 }
 
 describe("createConfigWatchComponent", () => {
@@ -176,7 +191,7 @@ describe("createConfigWatchComponent", () => {
     ])
   })
 
-  it("refreshes targets after rejection without replacing the sticky validator", () => {
+  it("refreshes targets after rejection without replacing the sticky validator, deferring the re-registration", async () => {
     const events = new FakeEvents()
     const pi = createPi(events)
     const validate = () => ({ ok: false as const, errors: ["still invalid"] })
@@ -196,11 +211,81 @@ describe("createConfigWatchComponent", () => {
     }).register(pi, createContext([]))
 
     const before = events.registrations.get("omo")
+    const deferred = nextRegisterEmit(events)
     events.emit("config-watch:rejected", { registrationId: "omo", paths: ["/project/.omo"], errors: ["invalid config"] })
+
+    // The rejection must NOT synchronously re-emit: senpi rejects on the same
+    // stack as REGISTER, so a direct re-emit recurses until stack overflow.
+    expect(events.registerEmits).toHaveLength(1)
+    expect(events.registrations.get("omo")?.targets).toHaveLength(1)
+
+    await deferred
     const after = events.registrations.get("omo")
 
+    expect(events.registerEmits).toHaveLength(2)
     expect(after?.targets).toHaveLength(2)
     expect(after?.validate).toBe(before?.validate)
+  })
+
+  it("caps deferred re-registration retries when the host rejects deterministically", async () => {
+    const events = new FakeEvents()
+    const logs: Array<{ level: string; message: string; details?: unknown }> = []
+    // Mimic senpi's restricted-target rejection: synchronous and deterministic.
+    events.on("config-watch:register", () => {
+      events.emit("config-watch:rejected", {
+        registrationId: "omo",
+        paths: ["/project"],
+        errors: ["watch target covers protected senpi agent paths"],
+      })
+    })
+
+    createComponent().register(createPi(events), createContext(logs))
+    expect(events.registerEmits).toHaveLength(1)
+
+    await nextRegisterEmit(events) // retry 1
+    await nextRegisterEmit(events) // retry 2
+    await nextRegisterEmit(events) // retry 3; its rejection exhausts the budget synchronously
+
+    // No retry timer is pending after exhaustion, so no further emission can
+    // occur: the loop stops at 1 initial + 3 retries without a stack overflow.
+    expect(events.registerEmits).toHaveLength(4)
+    expect(logs.filter((entry) => entry.message === "omo config hot-reload retry budget exhausted")).toHaveLength(1)
+  })
+
+  it("resets the rejection retry budget when the registration payload changes", async () => {
+    const events = new FakeEvents()
+    let version = 1
+    createConfigWatchComponent({
+      resolveCwd: () => "/project",
+      resolveTargets: () => [{ path: `/project/v${version}`, kind: "dir", filterGlobs: [".omo"] }],
+      createValidator: () => ({ validate: () => ({ ok: true }) }),
+    }).register(createPi(events), createContext([]))
+    const rejected = (): void => {
+      events.emit("config-watch:rejected", {
+        registrationId: "omo",
+        paths: ["/project"],
+        errors: ["invalid config"],
+      })
+    }
+
+    for (const expectedCount of [2, 3, 4]) {
+      const deferred = nextRegisterEmit(events)
+      rejected()
+      await deferred
+      expect(events.registerEmits).toHaveLength(expectedCount)
+    }
+
+    // Fourth identical rejection: budget for this payload is exhausted.
+    rejected()
+    expect(events.registerEmits).toHaveLength(4)
+
+    // A changed payload (the repair landing) resets the budget and retries again.
+    version = 2
+    const deferred = nextRegisterEmit(events)
+    rejected()
+    await deferred
+    expect(events.registerEmits).toHaveLength(5)
+    expect(events.registrations.get("omo")?.targets[0]?.path).toBe("/project/v2")
   })
 
   it("releases event subscriptions on shutdown and replaces subscriptions on repeated register", () => {
