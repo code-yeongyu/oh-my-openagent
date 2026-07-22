@@ -21,7 +21,7 @@ test("#given aggregate plugin build script #when inspected #then generated asset
 	);
 	assert.match(buildScript, /^node scripts\/sync-version\.mjs &&/);
 	assert.match(buildScript, /materialize-shared-upstreams\.mjs --strict && node scripts\/sync-skills\.mjs/);
-	assert.equal(testScript, "node --test test/*.test.mjs");
+	assert.equal(testScript, "node scripts/run-node-test-files.mjs");
 	assert(packageJson.workspaces.includes("components/ultrawork"));
 	assert.doesNotMatch(packageText, /\bpython3?\b|ultrawork-detector\.py/);
 });
