@@ -159,6 +159,7 @@ describe("background-agent spawner agent-not-found fallback", () => {
       task: false,
       call_omo_agent: true,
       question: false,
+      lsp_install_decision: true,
       team_create: false,
       team_delete: false,
       team_shutdown_request: false,
@@ -949,7 +950,25 @@ describe("background-agent spawner fallback helper characterization", () => {
         task: false,
         call_omo_agent: true,
         question: false,
+        lsp_install_decision: true,
       },
     })
+  })
+
+  test("#given a fallback body for any background subagent #when buildFallbackBody is invoked #then lsp_install_decision is auto-permitted so the agent can record a decline without a human prompt (#5260)", () => {
+    //#given
+    const originalBody = {
+      agent: "Sisyphus-Junior",
+      parts: [{ type: "text", text: "irrelevant" }],
+      tools: { task: true },
+    }
+
+    //#when
+    const fallbackBody = buildFallbackBody(originalBody, "general", {
+      includeTeamToolDenylist: false,
+    })
+
+    //#then
+    expect((fallbackBody.tools as Record<string, boolean>).lsp_install_decision).toBe(true)
   })
 })
