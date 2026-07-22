@@ -1,0 +1,10 @@
+== bun test packages/omo-senpi/src/components/config-watch ==
+bun test v1.3.14 (0d9b296a)
+
+ 29 pass
+ 0 fail
+ 87 expect() calls
+Ran 29 tests across 3 files. [230.00ms]
+
+== tsgo --noEmit -p packages/omo-senpi/tsconfig.json ==
+tsgo: clean (exit 0)
