@@ -163,11 +163,13 @@ export function createConfigWatchComponent(options: ConfigWatchComponentOptions 
           }
           rejectionRetries += 1
           clearRetryTimer()
+          // No unref(): a 0ms retry timer is self-draining (and dispose clears
+          // it), while an unref'd one-shot timer can be starved indefinitely
+          // under Bun on Windows — observed as a senpi-compatibility CI hang.
           retryTimer = setTimeout(() => {
             retryTimer = undefined
             emitRegistration()
           }, 0)
-          retryTimer.unref()
         }),
       ]
       const dispose = (): void => {

@@ -225,7 +225,8 @@ describe("createConfigWatchComponent", () => {
     expect(events.registerEmits).toHaveLength(2)
     expect(after?.targets).toHaveLength(2)
     expect(after?.validate).toBe(before?.validate)
-  })
+    // Bounded timeout: a starved deferred emit must fail fast, not hang CI.
+  }, 10_000)
 
   it("caps deferred re-registration retries when the host rejects deterministically", async () => {
     const events = new FakeEvents()
@@ -250,7 +251,7 @@ describe("createConfigWatchComponent", () => {
     // occur: the loop stops at 1 initial + 3 retries without a stack overflow.
     expect(events.registerEmits).toHaveLength(4)
     expect(logs.filter((entry) => entry.message === "omo config hot-reload retry budget exhausted")).toHaveLength(1)
-  })
+  }, 10_000)
 
   it("resets the rejection retry budget when the registration payload changes", async () => {
     const events = new FakeEvents()
@@ -286,7 +287,7 @@ describe("createConfigWatchComponent", () => {
     await deferred
     expect(events.registerEmits).toHaveLength(5)
     expect(events.registrations.get("omo")?.targets[0]?.path).toBe("/project/v2")
-  })
+  }, 10_000)
 
   it("releases event subscriptions on shutdown and replaces subscriptions on repeated register", () => {
     const events = new FakeEvents()

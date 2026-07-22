@@ -69,3 +69,18 @@ senpi-side behavior and is reproduced verbatim by the fake host.
 
 - No real senpi agent dir was touched; the repro uses a fake HOME and an
   in-memory event bus. No tokens, credentials, or environment dumps recorded.
+
+## CI postmortem (Windows senpi-compatibility hang)
+
+The first pushed revision scheduled the deferred retry with
+`setTimeout(0)` + `retryTimer.unref()`. On the Windows CI runner (Bun
+1.3.12) the unref'd one-shot timer never fired, so the first async test
+awaiting the deferred emit hung 61 minutes until the job was cancelled
+(attempt-1 step log: four config-watch tests pass, then silence from
+06:47:26Z to cancellation at 07:48:29Z). macOS and Ubuntu were unaffected.
+
+Fix: drop `.unref()` — a 0ms retry timer is self-draining and dispose clears
+it, so unref bought nothing. The three async tests also carry a 10s per-test
+timeout now, so any future starvation fails fast instead of hanging the job.
+`test-and-typecheck.log` re-captured after this fix; repro driver output
+unchanged (`survived`, 4 register emissions).
