@@ -19,6 +19,10 @@
  * Usage:
  *   bun run scripts/check-no-excuse-rules.ts <file-or-dir>...
  *
+ * The `typescript` package is resolved from the caller project (process.cwd()),
+ * not from this script's location, so the script works when executed from an
+ * installed skill-cache path (e.g. ~/.codex/...) against a project checkout.
+ *
  * Exit codes:
  *   0 - no violations
  *   1 - violations found
@@ -26,9 +30,35 @@
  */
 
 import fs from "node:fs"
+import { createRequire } from "node:module"
 import path from "node:path"
 import process from "node:process"
-import ts from "typescript"
+import type * as tsTypes from "typescript"
+
+type TsModule = typeof import("typescript")
+
+function loadTypescriptFromCaller(): TsModule {
+  // A static `import ts from "typescript"` resolves from this script's location —
+  // an installed skill-cache path (e.g. ~/.codex/...) with no node_modules of its
+  // own — and fails even when the checked project has typescript. Resolve from the
+  // caller project (cwd) instead. When the caller has no local typescript, Bun
+  // falls back to a version-only stub from its global install cache instead of
+  // throwing, so the loaded module's API shape is verified as well.
+  const callerRequire = createRequire(path.join(process.cwd(), "no-excuse-anchor.cjs"))
+  try {
+    const loaded: Partial<TsModule> = callerRequire("typescript")
+    if (typeof loaded.createSourceFile === "function") return loaded as TsModule
+  } catch { // no-excuse-ok: catch
+    // fall through to the clear error below
+  }
+  console.error(
+    `error: cannot resolve "typescript" from the caller project (${process.cwd()}). ` +
+      "Install it in the project being checked (e.g. `bun add -d typescript`) and re-run.",
+  )
+  process.exit(2)
+}
+
+const ts: TsModule = loadTypescriptFromCaller()
 
 type RuleId =
   | "no-any-assertion"
@@ -95,7 +125,7 @@ function discoverFiles(inputs: string[]): string[] {
   return files
 }
 
-function getLineText(sourceFile: ts.SourceFile, line: number): string {
+function getLineText(sourceFile: tsTypes.SourceFile, line: number): string {
   const lineStarts = sourceFile.getLineStarts()
   const start = lineStarts[line]
   const end = line + 1 < lineStarts.length ? lineStarts[line + 1] : sourceFile.getEnd()
@@ -107,17 +137,17 @@ function analyzeFile(filePath: string): Violation[] {
   const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true)
   const violations: Violation[] = []
 
-  function pos(node: ts.Node): { line: number; column: number } {
+  function pos(node: tsTypes.Node): { line: number; column: number } {
     const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
     return { line: line + 1, column: character + 1 }
   }
 
-  function lineHasOptOut(node: ts.Node): boolean {
+  function lineHasOptOut(node: tsTypes.Node): boolean {
     const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
     return OPT_OUT_RE.test(getLineText(sourceFile, line))
   }
 
-  function visit(node: ts.Node): void {
+  function visit(node: tsTypes.Node): void {
     // ── as any / as unknown ──
     if (ts.isAsExpression(node)) {
       const typeText = node.type.getText(sourceFile)
