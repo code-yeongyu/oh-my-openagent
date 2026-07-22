@@ -98,7 +98,8 @@ async function validatePluginManagedBins(pluginRoot: string, issues: string[]): 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue
     for (const binTarget of await readBinTargets(join(componentsRoot, entry.name, "package.json"))) {
-      const relativePath = join("components", entry.name, binTarget)
+      // Marketplace payload paths are POSIX; join() would emit backslashes on win32.
+      const relativePath = join("components", entry.name, binTarget).split(sep).join("/")
       await collectBundleFileIssue(pluginRoot, pluginRoot, relativePath, "missing managed bin target", issues, {
         allowEscape: false,
       })
