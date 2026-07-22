@@ -2,6 +2,7 @@ import type { Theme, ThemeColor } from "@code-yeongyu/senpi"
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui"
 
 import type { TaskToolDetails, TaskToolItemDetail } from "./types"
+import { qualifyResolvedModelDisplay } from "./resolved-model-display"
 
 const DEFAULT_EXCERPT_WIDTH = 120
 const TASK_PROMPT_EXCERPT_WIDTH = 30
@@ -226,11 +227,10 @@ function resolvedModelToken(details: TaskToolDetails): string | undefined {
   if (resolved === undefined) return formatResolvedModel(details.model)
 
   const display = optionalRendererText(resolved.display) ?? formatResolvedModel(details.model)
+  const qualifiedDisplay = qualifyResolvedModelDisplay(optionalRendererText(resolved.provider), display)
   const reasoning = optionalRendererText(resolved.reasoning_effort)
   const variant = usefulVariant(optionalRendererText(resolved.variant), reasoning, display)
-  const content = joinRendererTokens([
-    display,
-    reasoning === undefined ? undefined : `reasoning:${reasoning}`,
+  const content = joinRendererTokens([qualifiedDisplay, reasoning === undefined ? undefined : `reasoning:${reasoning}`,
     variant === undefined ? undefined : `variant:${variant}`,
   ])
   return content.length > 0 ? `(${content})` : undefined
@@ -310,12 +310,11 @@ function compactResolvedModelToken(details: TaskToolDetails, maxWidth: number): 
   const resolved = details.resolved_model
   if (resolved === undefined) return formatResolvedModel(details.model)
   const reasoning = optionalRendererText(resolved.reasoning_effort)
-  const candidates = [
-    optionalRendererText(resolved.display),
-    optionalRendererText(`${resolved.provider}/${resolved.model_id}`),
-    optionalRendererText(resolved.model_id),
-    optionalRendererText(details.model),
-  ].filter((candidate): candidate is string => candidate !== undefined)
+  const display = optionalRendererText(resolved.display)
+  const qualifiedDisplay = qualifyResolvedModelDisplay(optionalRendererText(resolved.provider), display)
+  const candidates = [qualifiedDisplay, `${resolved.provider}/${resolved.model_id}`, resolved.model_id, details.model]
+    .map(optionalRendererText)
+    .filter((candidate): candidate is string => candidate !== undefined)
   for (const candidate of candidates) {
     const token = `(${joinRendererTokens([candidate, reasoning])})`
     if (rendererVisibleWidth(token) <= maxWidth) return token

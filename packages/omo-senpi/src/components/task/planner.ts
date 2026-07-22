@@ -151,7 +151,7 @@ function toPlanResolution(
           source: "category",
           provider: resolution.spec.provider,
           model_id: resolution.spec.modelId,
-          display: `${resolution.spec.provider}/${resolution.spec.modelId}`,
+          display: resolution.spec.displayName ?? `${resolution.spec.provider}/${resolution.spec.modelId}`,
           ...(resolution.spec.variant !== undefined ? { variant: resolution.spec.variant } : {}),
           ...(resolution.spec.reasoningEffort !== undefined ? { reasoning_effort: resolution.spec.reasoningEffort } : {}),
         },
