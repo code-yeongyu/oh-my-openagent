@@ -183,6 +183,10 @@ describe("sync-lazycodex-marketplace", () => {
     const marketplace = JSON.parse(await readFile(join(lazycodexRoot, ".agents", "plugins", "marketplace.json"), "utf8"))
     expect(marketplace.name).toBe("sisyphuslabs")
     expect(marketplace.plugins[0].source).toBe("./plugins/omo")
+    // `codex plugin marketplace add <repo>` scans the repo ROOT for the manifest,
+    // so it must ship at the root too, identical to the .agents/plugins copy (lazycodex#139).
+    const rootMarketplace = JSON.parse(await readFile(join(lazycodexRoot, "marketplace.json"), "utf8"))
+    expect(rootMarketplace).toEqual(marketplace)
     const manifest = JSON.parse(await readFile(join(lazycodexRoot, "plugins", "omo", ".codex-plugin", "plugin.json"), "utf8"))
     expect(manifest).toMatchObject({ name: "omo", version: "1.2.3" })
     const workflow = await readFile(join(lazycodexRoot, ".github", "workflows", "pr-source-guidance.yml"), "utf8")
