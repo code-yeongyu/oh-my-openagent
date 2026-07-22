@@ -17,7 +17,7 @@
     "cols": 72,
     "rows": 8
   },
-  "cleanup": "pty pid 46069 killed",
+  "cleanup": "pty pid 60306 killed",
   "files": {
     "png": "/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-category-model-status/.omo/evidence/20260722-senpi-task-model-status/terminal/terminal.png",
     "text": "/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-category-model-status/.omo/evidence/20260722-senpi-task-model-status/terminal/terminal.txt",

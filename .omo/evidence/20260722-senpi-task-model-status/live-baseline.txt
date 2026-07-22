@@ -12,6 +12,12 @@ Changed branch before sync:
 - Leaked PIDs: 0.
 - Real Senpi state was classified untouched after concurrent session changes were excluded.
 
+Changed branch after syncing to `origin/dev@499b52358`:
+- The same `followup_revive`, `task_output_block`, and `jsonl_sequence` checks failed.
+- Spawn/background, wake, full output, extension suppression, batch fanout, inline sync, negative category error, real-state isolation, and no-leaked-PID checks passed.
+- Leaked PIDs: 0.
+- All four post-rebase sandbox roots were removed.
+
 Conclusion:
 The three lifecycle failures reproduce on current unmodified `dev` and are not caused by this task-status rendering change.
 

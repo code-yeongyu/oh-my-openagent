@@ -15,4 +15,4 @@ Artifacts:
 - Metadata: `.omo/evidence/20260722-senpi-task-model-status/terminal/metadata.json`
 
 Cleanup:
-The xterm driver recorded `pty pid 46069 killed`. No browser or PTY process was left live.
+The refreshed post-rebase xterm driver recorded `pty pid 60306 killed`. No browser or PTY process was left live.

@@ -6,7 +6,7 @@ PASS
 - Registry model-name boundary rejects inherited/accessor/control-bearing/oversized names.
 - Persisted provider-prefixed displays do not duplicate the provider.
 - senpi-task package suite: 824 pass, 0 fail.
-- Senpi adapter gate: 308 pass, 0 fail.
+- Senpi adapter gate after rebase: 312 pass, 0 fail.
 - Touched package tsgo checks.
 - Root `bun run typecheck`.
 - CI-pinned Bun 1.3.12 repository build.
@@ -25,6 +25,13 @@ Live Senpi lifecycle probe
 - The probe reported zero leaked PIDs and real Senpi state untouched. Concurrent real-state changes were classified as unrelated active sessions.
 - Cleanup receipt: removed all four temporary `omo-senpi-qa-*` sandbox roots and verified they no longer existed.
 - Baseline proof: the same three lifecycle failures reproduce on unmodified `origin/dev@499b52358`; see `live-baseline.txt`.
+- Changed-branch proof after rebase: the same three lifecycle failures reproduced, all rendering-adjacent live checks passed, leaked PIDs remained 0, and real Senpi state was untouched.
+- Post-rebase cleanup receipt: removed the four changed-branch `omo-senpi-qa-*` roots; refreshed xterm PTY pid 60306 was killed by the driver.
+
+Transient unrelated test:
+- The first post-rebase `bun test packages/senpi-task` run timed out only `senpi-api-tripwire.test.ts` at its 5-second limit after 823 passes.
+- The isolated tripwire passed in 2.87 seconds.
+- The next full package run passed 824/824 in one run.
 
 File-size audit
 - `packages/senpi-task/src/tools/task/renderers.ts`: base 292 pure LOC, current 291.
