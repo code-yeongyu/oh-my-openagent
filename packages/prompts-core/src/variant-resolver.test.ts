@@ -10,12 +10,18 @@ const variants = {
   gemini: promptSource("/prompts/gemini"),
   kimi: promptSource("/prompts/kimi"),
   glm: promptSource("/prompts/glm"),
+  "opus-4-7": promptSource("/prompts/opus-4-7"),
+  minimax: promptSource("/prompts/minimax"),
   default: promptSource("/prompts/default"),
 } satisfies VariantTable
 
 describe("resolveVariant", () => {
   test("#given Claude Opus 4.7 model #then resolves default variant", () => {
-    expect(resolveVariant({ modelID: "claude-opus-4-7", variants })).toBe("default")
+    const variantsWithoutOpus = {
+      default: promptSource("/prompts/default"),
+    } satisfies VariantTable
+
+    expect(resolveVariant({ modelID: "claude-opus-4-7", variants: variantsWithoutOpus })).toBe("default")
   })
 
   test("#given GPT model #then resolves gpt variant", () => {
@@ -57,6 +63,14 @@ describe("resolveVariant", () => {
 
   test("#given GLM model #then resolves glm variant", () => {
     expect(resolveVariant({ modelID: "glm-5-1", variants })).toBe("glm")
+  })
+
+  test("#given Claude Opus 4.7 model #then resolves opus prompt variant when available", () => {
+    expect(resolveVariant({ modelID: "anthropic/claude-opus-4-7", variants })).toBe("opus-4-7")
+  })
+
+  test("#given MiniMax model #then resolves minimax prompt variant when available", () => {
+    expect(resolveVariant({ modelID: "volcengine/minimax-m2.7", variants })).toBe("minimax")
   })
 
   test("#given Prometheus agent #then planner overrides model variant", () => {
