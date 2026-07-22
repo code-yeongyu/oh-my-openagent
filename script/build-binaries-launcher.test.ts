@@ -34,7 +34,7 @@ async function createLauncherFixture(
       'console.log("OMO_NODE_OK", process.argv.slice(2).join(" "));\n',
     );
   }
-  const launcherPath = join(root, "launcher.mjs");
+  const launcherPath = join(root, "launcher.js");
   await writeFile(launcherPath, createPlatformLauncherSource());
   return { launcherPath, wrapperPackageRoot, root };
 }
@@ -153,5 +153,29 @@ describe("platform launcher runtime fallback (lazycodex#47)", () => {
 
     expect(result.status).toBe(2);
     expect(result.stderr).toContain("failed to execute Bun");
+  });
+});
+
+describe("platform launcher module system (#6231)", () => {
+  it("#given the launcher shipped as .js in a package without type:module #when node loads it directly #then it parses as a module instead of throwing a SyntaxError", async () => {
+    // given: the launcher written with the production filename (bin/oh-my-opencode.js) in a
+    // directory with no package.json - exactly how each platform package ships it, since the
+    // platform package.json does not declare "type": "module"
+    const dir = await mkdtemp(join(tmpdir(), "omo-launcher-modsys-"));
+    const launcherPath = join(dir, "oh-my-opencode.js");
+    await writeFile(launcherPath, createPlatformLauncherSource());
+
+    // when: node loads the file directly, as the Windows npm/bunx wrapper does.
+    // --no-experimental-detect-module reproduces the CJS interpretation used by node < 22.7
+    // (and any node with syntax detection disabled), which is where the SyntaxError manifests.
+    const result = spawnSync("node", ["--no-experimental-detect-module", launcherPath], {
+      encoding: "utf8",
+      env: { PATH: process.env.PATH ?? "" },
+    });
+
+    // then: it must not fail to parse as a module, and must reach its own missing-root guard
+    expect(result.stderr).not.toContain("Cannot use import statement outside a module");
+    expect(result.stderr).toContain("OMO_WRAPPER_PACKAGE_ROOT is required");
+    expect(result.status).toBe(2);
   });
 });

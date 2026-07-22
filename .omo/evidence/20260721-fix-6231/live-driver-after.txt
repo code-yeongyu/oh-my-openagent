@@ -1,0 +1,7 @@
+﻿# LIVE-SURFACE AFTER FIX (#6231) - 2026-07-22T11:28:44.6600045+09:00
+launcher import line: const { spawnSync } = require("node:child_process");
+node exit    : 2
+node stderr  : oh-my-opencode: OMO_WRAPPER_PACKAGE_ROOT is required to launch the packaged CLI.
+RESULT: PASS - launcher loads under node and reaches its own guard
+
+EXIT=0
