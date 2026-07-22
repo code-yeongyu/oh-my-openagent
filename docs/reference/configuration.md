@@ -44,15 +44,23 @@ Complete reference for Oh My OpenCode plugin configuration. During the rename tr
 
 ### File Locations
 
+`opencode.json` registers the plugin with OpenCode. `oh-my-openagent.json[c]` configures OmO itself. Keep those files separate.
+
 User config loads first. Project configs are discovered by walking from the working directory up to `$HOME`; closer configs win. If the working directory is outside `$HOME`, only that directory is checked.
 
-1. Walked configs: `.opencode/oh-my-openagent.json[c]` or legacy `.opencode/oh-my-opencode.json[c]`
-2. User config (`.jsonc` preferred over `.json`):
+1. User config (`.jsonc` preferred over `.json`):
 
-| Platform    | Path candidates |
-| ----------- | --------------- |
-| macOS/Linux | `~/.config/opencode/oh-my-openagent.json[c]`, `~/.config/opencode/oh-my-opencode.json[c]` |
-| Windows     | `%APPDATA%\opencode\oh-my-openagent.json[c]`, `%APPDATA%\opencode\oh-my-opencode.json[c]` |
+| Source | Path candidates |
+| ------ | --------------- |
+| Explicit OpenCode profile | `$OPENCODE_CONFIG_DIR/oh-my-openagent.json[c]`, `$OPENCODE_CONFIG_DIR/oh-my-opencode.json[c]` |
+| OpenCode CLI default | `$XDG_CONFIG_HOME/opencode/oh-my-openagent.json[c]` or `~/.config/opencode/oh-my-openagent.json[c]` |
+| Legacy basename | Same directories, `oh-my-opencode.json[c]` |
+
+2. Walked project configs: `<cwd-or-ancestor>/.opencode/oh-my-openagent.json[c]` or legacy `<cwd-or-ancestor>/.opencode/oh-my-opencode.json[c]`
+
+The OpenCode CLI default is `~/.config/opencode` on all platforms when `XDG_CONFIG_HOME` and `OPENCODE_CONFIG_DIR` are unset, including Windows. OpenCode Desktop has its own app config directory for host registration, but OmO project overrides still live under `.opencode/` in the workspace.
+
+Do not place project config at `<project>/oh-my-openagent.json`; it will not be discovered. Use `<project>/.opencode/oh-my-openagent.jsonc`.
 
 **Security note:** `mcp_env_allowlist` is user-only. Walked configs cannot extend it.
 

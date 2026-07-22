@@ -15,6 +15,41 @@ Most users want **Ultimate**. Pick **Light** if you are already invested in Code
 
 `lazycodex-ai` defaults to the Codex Light installer and runs through Node/npm. `--platform` on the shared `omo` CLI still defaults to `opencode` (Ultimate). `lazycodex-ai` is the npm/bin alias; `lazycodex` is the GitHub repository that hosts the marketplace bundle. Neither is the Codex marketplace name.
 
+## Where Things Live
+
+`bunx oh-my-openagent install` is a package-runner invocation. It does not create a supported global `oh-my-openagent` install. Bun may keep its own package cache, but OmO's durable state is the OpenCode plugin registration and the OmO config files listed below.
+
+### Ultimate Edition paths
+
+| Thing | Location | Notes |
+| ----- | -------- | ----- |
+| OpenCode plugin registration | Active OpenCode config dir, `opencode.json` or `opencode.jsonc` | Usually `~/.config/opencode` for the OpenCode CLI unless `OPENCODE_CONFIG_DIR` is set. OpenCode Desktop uses its app config dir unless an existing CLI config is detected. |
+| OmO user config | Active OpenCode config dir, `oh-my-openagent.json[c]` | Legacy `oh-my-opencode.json[c]` still loads during the rename transition. Prefer the `oh-my-openagent` basename for new configs. |
+| OmO project config | `<project>/.opencode/oh-my-openagent.json[c]` | The loader walks from the working directory up to `$HOME`; closer project configs override farther ones. Root-level `oh-my-openagent.json` is not a project config. |
+| OpenCode provider auth | OpenCode-managed auth storage | Use `opencode auth list` and `opencode auth login`; OmO does not store provider tokens in its plugin config. |
+
+To inspect the active state, run:
+
+```bash
+bunx oh-my-openagent doctor
+bunx oh-my-openagent version
+opencode auth list
+opencode agent list
+```
+
+### Light Edition paths
+
+| Thing | Location | Notes |
+| ----- | -------- | ----- |
+| Codex home | `CODEX_HOME` or `~/.codex` | Codex CLI owns this directory. The Light installer writes managed plugin state inside it. |
+| Plugin cache | `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/` | Safe to regenerate by rerunning `npx lazycodex-ai install`. |
+| Marketplace snapshot | `~/.codex/.tmp/marketplaces/sisyphuslabs/` | Local marketplace metadata for Codex plugin discovery. |
+| Codex config | `~/.codex/config.toml` | Contains `[marketplaces.sisyphuslabs]`, `[plugins."omo@sisyphuslabs"]`, hook trust hashes, managed agent blocks, and optional autonomous permission settings. |
+| Codex agent roles | `~/.codex/agents/*.toml` | Managed entries are tracked so uninstall can remove them safely. |
+| Component CLIs | `~/.local/bin` or `$CODEX_LOCAL_BIN_DIR` | Add this directory to `PATH` if hook commands cannot find `omo-*` binaries. |
+
+For cleanup, prefer `npx lazycodex-ai uninstall` or `omo cleanup --platform=codex`. If you only need to clear a broken cache before reinstall, remove `~/.codex/plugins/cache/sisyphuslabs` and rerun the installer. Do not blindly delete project-local `.codex/` or generated `AGENTS.md` files; the cleanup command reports project-local artifacts and only repairs known config conflicts automatically.
+
 ## For Humans
 
 **Strongly recommended: let an LLM agent install Ultimate for you.** Ultimate setup involves subscription detection, model selection across 11 agents, provider authentication, and config migration — humans fat-finger these. An LLM agent reads the full guide and walks every step correctly.
