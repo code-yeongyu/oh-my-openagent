@@ -23,6 +23,7 @@ export type ResolvedChildSpec<TModel extends SenpiModelPort> = {
   readonly model: TModel
   readonly provider: string
   readonly modelId: string
+  readonly displayName?: string
   readonly variant?: string
   readonly temperature?: number
   readonly top_p?: number

@@ -1,0 +1,18 @@
+Surface:
+Production task planner -> resolved model metadata -> production task result component -> xterm.js browser terminal at 72 columns.
+
+Command:
+`node script/qa/web-terminal-visual-qa.mjs --title "Senpi task category model status" --command "bun .omo/evidence/20260722-senpi-task-model-status/render-status.ts" --cwd /Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-category-model-status --cols 72 --rows 8 --dwell-ms 1200 --evidence-dir .omo/evidence/20260722-senpi-task-model-status/terminal`
+
+Observed:
+`task category:ultrabrain (openai GPT-5.6 Sol xhigh) background pending`
+`PASS provider=openai model=GPT-5.6 Sol reasoning=xhigh width=72`
+
+Artifacts:
+- Screenshot: `.omo/evidence/20260722-senpi-task-model-status/terminal/terminal.png`
+- Plain transcript: `.omo/evidence/20260722-senpi-task-model-status/terminal/terminal.txt`
+- ANSI stream: `.omo/evidence/20260722-senpi-task-model-status/terminal/terminal-ansi.txt`
+- Metadata: `.omo/evidence/20260722-senpi-task-model-status/terminal/metadata.json`
+
+Cleanup:
+The xterm driver recorded `pty pid 46069 killed`. No browser or PTY process was left live.

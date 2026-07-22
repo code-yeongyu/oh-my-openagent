@@ -1,16 +1,13 @@
 import { describe, expect, test } from "bun:test"
 
-import { BUILTIN_AGENTS } from "@oh-my-opencode/senpi-task"
+import { BUILTIN_AGENTS, type SenpiModelPort } from "@oh-my-opencode/senpi-task"
 
 import { createTaskChildPlanner, type TaskModelRegistry } from "./planner"
 
-type FakeModel = {
-  readonly provider: string
-  readonly id: string
-}
+type FakeModel = SenpiModelPort & { readonly name?: string }
 
-function model(provider: string, id: string): FakeModel {
-  return { provider, id }
+function model(provider: string, id: string, name?: string): FakeModel {
+  return { provider, id, ...(name === undefined ? {} : { name }) }
 }
 
 function registry(models: readonly FakeModel[]): TaskModelRegistry {
@@ -42,7 +39,7 @@ describe("createTaskChildPlanner", () => {
         },
       },
       {},
-      () => registry([model("google", "gemini-3.1-pro")]),
+      () => registry([model("google", "gemini-3.1-pro", "Gemini 3.1 Pro")]),
     )
 
     // when
@@ -60,7 +57,7 @@ describe("createTaskChildPlanner", () => {
       source: "category",
       provider: "google",
       model_id: "gemini-3.1-pro",
-      display: "google/gemini-3.1-pro",
+      display: "Gemini 3.1 Pro",
       variant: "high",
       reasoning_effort: "xhigh",
     })

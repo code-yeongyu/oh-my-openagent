@@ -1,0 +1,20 @@
+Current dev baseline:
+- Commit: `499b52358` (`origin/dev` at baseline time).
+- Command: `SENPI_BIN="$(command -v senpi)" node packages/omo-senpi/scripts/qa/task-e2e.mjs`.
+- Matching baseline failures: `followup_revive`, `task_output_block`, `jsonl_sequence`.
+- Passed on baseline: spawn/background, unconditional wake, full output, extension suppression, two-child batch fanout, inline sync, negative category error, no leaked PIDs.
+- Baseline leaked PIDs: 0.
+- Baseline additionally observed a concurrent `logs/mcp/codegraph.log` change in the real Senpi directory.
+
+Changed branch before sync:
+- The same three lifecycle checks failed.
+- The same task-rendering-adjacent checks passed.
+- Leaked PIDs: 0.
+- Real Senpi state was classified untouched after concurrent session changes were excluded.
+
+Conclusion:
+The three lifecycle failures reproduce on current unmodified `dev` and are not caused by this task-status rendering change.
+
+Cleanup:
+- Removed four baseline `omo-senpi-qa-*` sandboxes.
+- Removed the detached baseline QA worktree.

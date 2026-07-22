@@ -1,0 +1,35 @@
+Verification summary
+
+PASS
+- Focused renderer and planner RED-to-GREEN tests.
+- Reviewer-blocker RED-to-GREEN tests: 41 pass, 0 fail.
+- Registry model-name boundary rejects inherited/accessor/control-bearing/oversized names.
+- Persisted provider-prefixed displays do not duplicate the provider.
+- senpi-task package suite: 824 pass, 0 fail.
+- Senpi adapter gate: 308 pass, 0 fail.
+- Touched package tsgo checks.
+- Root `bun run typecheck`.
+- CI-pinned Bun 1.3.12 repository build.
+- `git diff --check`.
+- xterm.js visual surface at 72 columns.
+- Generated Senpi extension rebuilt with Bun 1.3.12.
+
+LSP
+- The workspace LSP proxy rejects files outside the session cwd, so it could not target the sibling task worktree.
+- Equivalent compiler diagnostics were run with tsgo for both touched packages and the whole repository; all exited 0.
+
+Live Senpi lifecycle probe
+- `SENPI_BIN="$(command -v senpi)" node packages/omo-senpi/scripts/qa/task-e2e.mjs`
+- Passed: spawn_background, unconditional_wake, task_output_full, extension_suppression, batch_fanout_two_children, sync_inline_no_notification, negative_category_error, real_senpi_untouched, no_leaked_pids.
+- Failed outside this rendering path: followup_revive, task_output_block, jsonl_sequence.
+- The probe reported zero leaked PIDs and real Senpi state untouched. Concurrent real-state changes were classified as unrelated active sessions.
+- Cleanup receipt: removed all four temporary `omo-senpi-qa-*` sandbox roots and verified they no longer existed.
+- Baseline proof: the same three lifecycle failures reproduce on unmodified `origin/dev@499b52358`; see `live-baseline.txt`.
+
+File-size audit
+- `packages/senpi-task/src/tools/task/renderers.ts`: base 292 pure LOC, current 291.
+- `packages/omo-senpi/src/components/task/planner.test.ts`: base 263 pure LOC, current 260.
+- Other oversized touched test files received replacement-only expectation updates, not new behavior blocks.
+
+Unrelated generated drift
+- Root build regenerated Codex/codegraph installer artifacts that are unrelated to this change. They are excluded from the intended commit.

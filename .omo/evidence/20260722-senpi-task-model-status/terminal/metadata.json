@@ -1,0 +1,27 @@
+{
+  "title": "Senpi task category model status",
+  "connector": "xterm-node-pty",
+  "colorPath": "xterm.js (true color; not tmux)",
+  "browserCapture": "captured",
+  "source": {
+    "kind": "command",
+    "label": "redacted command"
+  },
+  "interaction": [],
+  "redaction": {
+    "builtInRules": 7,
+    "literalRules": 0,
+    "regexRules": 0
+  },
+  "dimensions": {
+    "cols": 72,
+    "rows": 8
+  },
+  "cleanup": "pty pid 46069 killed",
+  "files": {
+    "png": "/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-category-model-status/.omo/evidence/20260722-senpi-task-model-status/terminal/terminal.png",
+    "text": "/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-category-model-status/.omo/evidence/20260722-senpi-task-model-status/terminal/terminal.txt",
+    "ansi": "/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-category-model-status/.omo/evidence/20260722-senpi-task-model-status/terminal/terminal-ansi.txt",
+    "metadata": "/Users/yeongyu/local-workspaces/omo-wt/fix/senpi-task-category-model-status/.omo/evidence/20260722-senpi-task-model-status/terminal/metadata.json"
+  }
+}

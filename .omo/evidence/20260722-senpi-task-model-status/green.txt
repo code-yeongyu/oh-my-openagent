@@ -1,0 +1,23 @@
+Focused GREEN:
+- Initial planner + renderer proof: 27 pass, 0 fail, 94 assertions.
+- Reviewer blocker proof: 41 pass, 0 fail, 170 assertions.
+
+Package GREEN:
+- `bun test packages/senpi-task`
+- Result: 824 pass, 0 fail, 1 snapshot, 2776 assertions.
+- `bun run test:senpi`
+- Result: 308 pass, 0 fail, 1 snapshot, 906 assertions.
+
+Type GREEN:
+- `tsgo --noEmit -p packages/senpi-task/tsconfig.json`
+- `tsgo --noEmit -p packages/omo-senpi/tsconfig.json`
+- `bun run typecheck`
+- Result: all commands exited 0.
+
+Build GREEN:
+- `mise exec bun@1.3.12 -- bun run build`
+- Result: all build steps completed with the CI-pinned Bun version.
+
+Behavior now observed:
+- Plain result: `task category:ultrabrain (openai GPT-5.6 Sol reasoning:xhigh) ...`
+- 72-column component: `task category:ultrabrain (openai GPT-5.6 Sol xhigh) background pending`
