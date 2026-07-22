@@ -11,6 +11,7 @@ import {
 } from "@oh-my-opencode/omo-config-core"
 
 const MAX_ANCESTOR_WATCH_TARGETS = 128
+const SENPI_AGENT_DIR_ENV = "SENPI_CODING_AGENT_DIR"
 
 export const OMO_CONFIG_FILE_FILTER_GLOBS = ["omo.jsonc", "omo.json"] as const
 // Keep listening for config-file writes below a new `.omo` directory. If its first
@@ -42,6 +43,28 @@ export interface OmoConfigWatchTargetResolution {
 function containsPath(parent: string, child: string): boolean {
   const pathToChild = relative(parent, child)
   return pathToChild === "" || (!pathToChild.startsWith("..") && !isAbsolute(pathToChild))
+}
+
+/**
+ * senpi's config-reload host rejects every registration whose watch targets
+ * cover the senpi agent dir's protected paths (auth.json, sessions/, logs/).
+ * A bare-$HOME ancestor target always covers them, so the rejection is
+ * deterministic and must be avoided here instead of retried. Tradeoff: a NEW
+ * `.omo` directory created directly in the $HOME root is no longer
+ * auto-discovered; it is picked up on the next session start (an existing
+ * `$HOME/.omo` config target is still watched, and `$HOME` ancestors below it
+ * are unaffected).
+ */
+function resolveSenpiProtectedPaths(env: OmoConfigEnv): readonly string[] {
+  const agentDir = resolve(env[SENPI_AGENT_DIR_ENV] ?? join(resolveHomeDir(env), ".senpi", "agent"))
+  return [join(agentDir, "auth.json"), join(agentDir, "sessions"), join(agentDir, "logs")]
+}
+
+function isSenpiRestrictedTarget(path: string, protectedPaths: readonly string[]): boolean {
+  const resolvedPath = resolve(path)
+  return protectedPaths.some(
+    (protectedPath) => containsPath(resolvedPath, protectedPath) || containsPath(protectedPath, resolvedPath),
+  )
 }
 
 function findAncestorDirectories(cwd: string, homeDir: string): readonly string[] {
@@ -133,10 +156,13 @@ export function resolveOmoConfigWatchTargetResolution(
 
   for (const ancestorDirectory of ancestorDirectories) targets.push(creationTarget(ancestorDirectory))
 
+  const senpiProtectedPaths = resolveSenpiProtectedPaths(env)
+  const permittedTargets = targets.filter((target) => !isSenpiRestrictedTarget(target.path, senpiProtectedPaths))
+
   const userConfigCreationWatched = isExistingDirectory(userConfigDirectory)
     || isExistingDirectory(dirname(userConfigDirectory))
   return {
-    targets,
+    targets: permittedTargets,
     userConfigCreationWatched,
     userConfigCreationDiscovery: userConfigCreationWatched ? "watched" : "reload_required",
   }
