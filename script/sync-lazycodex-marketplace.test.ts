@@ -111,6 +111,10 @@ async function writePluginFixture(sourceRoot: string, options: WritePluginFixtur
   await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "bootstrap", "dist", "cli.js"), "#!/usr/bin/env node\n")
   await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "bootstrap", "scripts"), { recursive: true })
   await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "bootstrap", "scripts", "bootstrap.ps1"), "exit 0\n")
+  // Components whose managed bins point at a gitignored dist/cli.js (lazycodex#108): the sync must
+  // ship the built CLI and must not ship the nested .gitignore that re-ignores dist/ downstream.
+  await writeManagedBinComponentFixture(sourceRoot, "start-work-continuation", ["omo-start-work-continuation"])
+  await writeManagedBinComponentFixture(sourceRoot, "ulw-loop", ["omo-ulw-loop", "ulw", "ulw-loop"])
   await mkdir(join(sourceRoot, "packages", "git-bash-mcp", "dist"), { recursive: true })
   await writeFile(join(sourceRoot, "packages", "git-bash-mcp", "dist", "cli.js"), "#!/usr/bin/env node\n")
   await mkdir(join(sourceRoot, "packages", "lsp-tools-mcp", "dist"), { recursive: true })
@@ -127,6 +131,32 @@ async function writePluginFixture(sourceRoot: string, options: WritePluginFixtur
   await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", ".ulw", "evidence", "loop.json"), "{}\n")
   await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", ".claude"), { recursive: true })
   await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", ".claude", "settings.local.json"), "{}\n")
+}
+
+async function writeManagedBinComponentFixture(sourceRoot: string, componentName: string, binNames: string[]): Promise<void> {
+  const componentRoot = join(sourceRoot, "packages", "omo-codex", "plugin", "components", componentName)
+  await writeJson(join(componentRoot, "package.json"), {
+    name: `@code-yeongyu/codex-${componentName}`,
+    version: "1.2.3",
+    bin: Object.fromEntries(binNames.map((binName) => [binName, "./dist/cli.js"])),
+  })
+  await writeJson(join(componentRoot, "hooks", "hooks.json"), {
+    hooks: {
+      Stop: [
+        {
+          hooks: [
+            {
+              type: "command",
+              command: `node "\${PLUGIN_ROOT}/components/${componentName}/dist/cli.js" hook stop`,
+            },
+          ],
+        },
+      ],
+    },
+  })
+  await mkdir(join(componentRoot, "dist"), { recursive: true })
+  await writeFile(join(componentRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
+  await writeFile(join(componentRoot, ".gitignore"), "dist/\nnode_modules/\n")
 }
 
 async function expectPathMissing(path: string): Promise<void> {
@@ -166,6 +196,12 @@ describe("sync-lazycodex-marketplace", () => {
     expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "git-bash-mcp", "dist", "cli.js"))).isFile()).toBe(true)
     expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "lsp-tools-mcp", "dist", "cli.js"))).isFile()).toBe(true)
     expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "lsp-daemon", "dist", "cli.js"))).isFile()).toBe(true)
+    // hook/bin-referenced component CLIs must ship even though their dist/ is gitignored upstream (lazycodex#108)
+    expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "start-work-continuation", "dist", "cli.js"))).isFile()).toBe(true)
+    expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "ulw-loop", "dist", "cli.js"))).isFile()).toBe(true)
+    // nested component .gitignore files re-ignore dist/ inside the lazycodex repo and must not ship
+    await expectPathMissing(join(lazycodexRoot, "plugins", "omo", "components", "start-work-continuation", ".gitignore"))
+    await expectPathMissing(join(lazycodexRoot, "plugins", "omo", "components", "ulw-loop", ".gitignore"))
     await expectPathMissing(join(lazycodexRoot, "plugins", "omo", "node_modules"))
     await expectPathMissing(join(lazycodexRoot, "plugins", "omo", ".ulw"))
     await expectPathMissing(join(lazycodexRoot, "plugins", "omo", ".claude"))
@@ -443,6 +479,17 @@ describe("sync-lazycodex-marketplace", () => {
     expect(message).toContain("missing hook command target")
     expect(message).toContain("components/bootstrap/dist/cli.js")
     expect(message).toContain("components/bootstrap/scripts/bootstrap.ps1")
+  })
+
+  test("#given a managed-bin component dist is not built #when syncing marketplace #then rejects naming the missing component dist", async () => {
+    // given
+    const sourceRoot = await mkdtemp(join(tmpdir(), "omo-sync-missing-component-dist-source-"))
+    const lazycodexRoot = await mkdtemp(join(tmpdir(), "omo-sync-missing-component-dist-lazycodex-"))
+    await writePluginFixture(sourceRoot)
+    await rm(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "start-work-continuation", "dist"), { recursive: true, force: true })
+
+    // when/then
+    await expect(syncLazycodexMarketplace({ sourceRoot, lazycodexRoot })).rejects.toThrow(/missing built start-work-continuation component dist/)
   })
 
   test("#given a missing lsp-daemon dist without the flag #then still hard-throws", async () => {

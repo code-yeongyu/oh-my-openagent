@@ -224,11 +224,20 @@ function shouldCopyPluginPath(path: string, root: string): boolean {
   if (relative.length === 0) return true
   const parts = relative.split(sep)
   if (parts.some((part) => PLUGIN_COPY_DENYLIST.has(part))) return false
+  if (parts.length <= 1) return true
+  const name = parts.at(-1)
   // Codex loads MCP servers only from the plugin-root .mcp.json (.codex-plugin/plugin.json declares
   // "mcpServers": "./.mcp.json"). A component's own nested .mcp.json is a standalone-plugin dev
   // manifest whose relative daemon path dangles once the plugin is flattened into the bundle, so it
   // must never ship in plugins/omo.
-  return !(parts.length > 1 && parts.at(-1) === ".mcp.json")
+  if (name === ".mcp.json") return false
+  // A component's nested .gitignore is a standalone-repository dev artifact. When it ships in the
+  // marketplace payload, a `dist/` rule in it overrides the lazycodex repository's root negation
+  // (`!plugins/omo/components/*/dist/**`), so `git add plugins/omo` silently drops the component's
+  // built CLI from the repo even though the file was copied and validated on disk. That is how
+  // start-work-continuation/dist/cli.js and ulw-loop/dist/cli.js went missing while rules and
+  // ultrawork (whose nested .gitignore has no `dist/` rule) survived (lazycodex#108).
+  return name !== ".gitignore"
 }
 
 
