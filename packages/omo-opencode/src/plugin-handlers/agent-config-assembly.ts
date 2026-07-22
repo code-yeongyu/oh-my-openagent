@@ -12,8 +12,35 @@ import {
   filterProtectedAgentOverrides,
 } from "./agent-override-protection";
 import type { AgentSourceMap, AgentSources } from "./agent-config-types";
-import { buildPlanDemoteConfig } from "./plan-model-inheritance";
+import { applyInheritFromSisyphus, buildPlanDemoteConfig, type InheritableModelSettings } from "./plan-model-inheritance";
 import { buildPrometheusAgentConfig } from "./prometheus-agent-config-builder";
+import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
+
+/**
+ * Builtin agents that never inherit Sisyphus's model even when
+ * `sisyphus_agent.inherit_model` is on:
+ * - `sisyphus` is the inheritance source.
+ * - `multimodal-looker` needs a vision-capable model.
+ * - `prometheus` is the strategic planner and feeds plan demotion.
+ * - `atlas` is a primary orchestrator; `sisyphus-junior` derives its model.
+ * - `sisyphus-junior` already derives from Atlas.
+ *
+ * Agents with a hard model/provider requirement (e.g. Hephaestus) are excluded
+ * dynamically via `AGENT_MODEL_REQUIREMENTS`.
+ */
+const INHERIT_FROM_SISYPHUS_EXCLUDED: ReadonlySet<string> = new Set([
+  "sisyphus",
+  "multimodal-looker",
+  "prometheus",
+  "atlas",
+  "sisyphus-junior",
+]);
+
+function isBlockedFromSisyphusInheritance(agentName: string): boolean {
+  if (INHERIT_FROM_SISYPHUS_EXCLUDED.has(agentName)) return true;
+  const requirement = AGENT_MODEL_REQUIREMENTS[agentName];
+  return Boolean(requirement?.requiresModel || requirement?.requiresProvider);
+}
 
 type BuiltinAgentMap = Record<string, AgentConfig | undefined>;
 
@@ -212,6 +239,18 @@ async function assembleSisyphusEnabledConfig(params: AssembleAgentConfigParams):
     build: { ...migratedBuild, mode: "subagent", hidden: true },
     ...(planDemoteConfig ? { plan: planDemoteConfig } : {}),
   };
+
+  if (params.pluginConfig.sisyphus_agent?.inherit_model) {
+    const finalAgents = params.config.agent as Record<string, unknown>;
+    applyInheritFromSisyphus({
+      agents: finalAgents,
+      sisyphus: finalAgents.sisyphus as InheritableModelSettings | undefined,
+      eligibleAgentNames: Object.keys(AGENT_MODEL_REQUIREMENTS),
+      isBlocked: isBlockedFromSisyphusInheritance,
+      getUserOverride: (agentName) =>
+        params.pluginConfig.agents?.[agentName] as { model?: unknown; category?: unknown } | undefined,
+    });
+  }
 }
 
 function assembleSisyphusDisabledConfig(params: AssembleAgentConfigParams): void {

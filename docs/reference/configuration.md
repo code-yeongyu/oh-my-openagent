@@ -437,7 +437,8 @@ Configure the main orchestration system.
     "disabled": false,
     "default_builder_enabled": false,
     "planner_enabled": true,
-    "replace_plan": true
+    "replace_plan": true,
+    "inherit_model": false
   }
 }
 ```
@@ -448,8 +449,15 @@ Configure the main orchestration system.
 | `default_builder_enabled` | `false` | Enable OpenCode-Builder agent (off by default)                  |
 | `planner_enabled`         | `true`  | Enable Prometheus (Planner) agent                               |
 | `replace_plan`            | `true`  | Demote default plan agent to subagent mode                      |
+| `inherit_model`           | `false` | Make eligible research subagents reuse Sisyphus's model/variant |
 
 Sisyphus agents can also be customized under `agents` using their names: `Sisyphus`, `OpenCode-Builder`, `Prometheus (Planner)`, `Metis (Plan Consultant)`.
+
+#### Inherit model from Sisyphus
+
+Set `sisyphus_agent.inherit_model: true` to make eligible builtin research subagents (`oracle`, `librarian`, `explore`, `metis`, `momus`) reuse Sisyphus's resolved `model` and `variant`. This keeps a whole research fleet on one model without repeating it per agent.
+
+Precedence: an explicit per-agent `model` or `category` under `agents` always wins. Agents that pin a provider or need a specific model keep their own resolution, so Hephaestus (requires a GPT provider), `multimodal-looker` (needs a vision model), and the Prometheus and Atlas orchestration roles are never overridden. Inheritance is resolved at config load, so it follows `agents.sisyphus.model` in one place; it does not track a live model switch in the TUI, which matches how subagents already behave. Default: off.
 
 ### Sisyphus Tasks
 
