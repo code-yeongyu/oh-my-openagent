@@ -41,20 +41,32 @@ export function setContinuationMarkerSource(
 ): ContinuationMarker {
   const now = new Date().toISOString()
   const existing = readContinuationMarker(directory, sessionID)
+  const sources: ContinuationMarker["sources"] = {
+    ...(existing?.sources ?? {}),
+  }
+
+  if (state === "idle") {
+    delete sources[source]
+  } else {
+    sources[source] = {
+      state,
+      ...(reason ? { reason } : {}),
+      updatedAt: now,
+    }
+  }
+
   const next: ContinuationMarker = {
     sessionID,
     updatedAt: now,
-    sources: {
-      ...(existing?.sources ?? {}),
-      [source]: {
-        state,
-        ...(reason ? { reason } : {}),
-        updatedAt: now,
-      },
-    },
+    sources,
   }
 
   const markerPath = getMarkerPath(directory, sessionID)
+  if (Object.keys(sources).length === 0) {
+    clearContinuationMarker(directory, sessionID)
+    return next
+  }
+
   mkdirSync(join(directory, CONTINUATION_MARKER_DIR), { recursive: true })
   writeFileSync(markerPath, JSON.stringify(next, null, 2), "utf-8")
   return next

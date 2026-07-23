@@ -75,6 +75,36 @@ describe("run-continuation-state storage", () => {
     expect(isActive).toBe(false)
   })
 
+  it("removes idle-only markers instead of leaving stale session files", () => {
+    // given
+    const directory = createTempDir()
+    const sessionID = "ses_idle_only"
+    setContinuationMarkerSource(directory, sessionID, "background-task", "active", "1 task active")
+
+    // when
+    setContinuationMarkerSource(directory, sessionID, "background-task", "idle")
+    const marker = readContinuationMarker(directory, sessionID)
+
+    // then
+    expect(marker).toBeNull()
+  })
+
+  it("removes only the idle source when another source still needs the marker", () => {
+    // given
+    const directory = createTempDir()
+    const sessionID = "ses_mixed_sources"
+    setContinuationMarkerSource(directory, sessionID, "stop", "stopped", "user stopped continuation")
+    setContinuationMarkerSource(directory, sessionID, "background-task", "active", "1 task active")
+
+    // when
+    setContinuationMarkerSource(directory, sessionID, "background-task", "idle")
+    const marker = readContinuationMarker(directory, sessionID)
+
+    // then
+    expect(marker?.sources.stop?.state).toBe("stopped")
+    expect(marker?.sources["background-task"]).toBeUndefined()
+  })
+
   it("clears marker for a session", () => {
     // given
     const directory = createTempDir()

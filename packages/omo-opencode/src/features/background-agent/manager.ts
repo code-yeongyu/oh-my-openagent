@@ -1125,14 +1125,62 @@ The fallback retry session is now created and can be inspected directly.
   }
 
   private updateBackgroundTaskMarker(parentSessionID: string): void {
-    const tasks = this.getTasksByParentSession(parentSessionID)
-    const activeTasks = tasks.filter(t => t.status === "running" || t.status === "pending")
-    writeBackgroundTaskMarker({
-      directory: this.directory,
-      parentSessionID,
-      activeTaskCount: activeTasks.length,
-      hasUndeliveredParentWake: this.hasUndeliveredParentWake(parentSessionID),
-    })
+    for (const markerSessionID of this.resolveBackgroundMarkerSessionIDs(parentSessionID)) {
+      writeBackgroundTaskMarker({
+        directory: this.directory,
+        parentSessionID: markerSessionID,
+        activeTaskCount: this.countActiveTasksForBackgroundMarker(markerSessionID),
+        hasUndeliveredParentWake: this.hasUndeliveredParentWakeForBackgroundMarker(markerSessionID),
+      })
+    }
+  }
+
+  private resolveBackgroundMarkerSessionIDs(parentSessionID: string): Set<string> {
+    const markerSessionIDs = new Set<string>()
+    for (const task of this.tasks.values()) {
+      if (task.parentSessionId !== parentSessionID) {
+        continue
+      }
+      markerSessionIDs.add(task.rootSessionId ?? task.parentSessionId)
+    }
+
+    if (markerSessionIDs.size === 0) {
+      markerSessionIDs.add(parentSessionID)
+    }
+
+    return markerSessionIDs
+  }
+
+  private countActiveTasksForBackgroundMarker(markerSessionID: string): number {
+    let activeCount = 0
+    for (const task of this.tasks.values()) {
+      if (task.status !== "running" && task.status !== "pending") {
+        continue
+      }
+      const taskMarkerSessionID = task.rootSessionId ?? task.parentSessionId
+      if (taskMarkerSessionID === markerSessionID) {
+        activeCount += 1
+      }
+    }
+    return activeCount
+  }
+
+  private hasUndeliveredParentWakeForBackgroundMarker(markerSessionID: string): boolean {
+    if (this.hasUndeliveredParentWake(markerSessionID)) {
+      return true
+    }
+
+    for (const task of this.tasks.values()) {
+      const taskMarkerSessionID = task.rootSessionId ?? task.parentSessionId
+      if (taskMarkerSessionID !== markerSessionID) {
+        continue
+      }
+      if (this.hasUndeliveredParentWake(task.parentSessionId)) {
+        return true
+      }
+    }
+
+    return false
   }
 
   getAllDescendantTasks(sessionID: string): BackgroundTask[] {

@@ -85,13 +85,16 @@ function createRunningTask(overrides: Partial<BackgroundTask> & { id: string; pa
 async function waitForBackgroundTaskMarkerState(
   directory: string,
   parentSessionID: string,
-  expectedState: "active" | "idle",
+  expectedState: "active" | "missing",
 ): Promise<void> {
   const deadline = Date.now() + 1_000
   let observedState: string | undefined
   while (Date.now() < deadline) {
     const marker = readContinuationMarker(directory, parentSessionID)
     observedState = marker?.sources["background-task"]?.state
+    if (expectedState === "missing" && !marker) {
+      return
+    }
     if (observedState === expectedState) {
       return
     }
@@ -123,7 +126,7 @@ describe("BackgroundManager run continuation marker parent-wake races", () => {
     }
   })
 
-  test("#given a completion parent wake is queued #when dispatch accepts it #then the marker returns idle", async () => {
+  test("#given a completion parent wake is queued #when dispatch accepts it #then the marker is removed", async () => {
     // given
     const directory = createTestDirectory()
     const parentSessionID = "parent-queued-wake"
@@ -145,13 +148,13 @@ describe("BackgroundManager run continuation marker parent-wake races", () => {
 
       // then
       const dispatchedMarker = readContinuationMarker(directory, parentSessionID)
-      expect(dispatchedMarker?.sources["background-task"]?.state).toBe("idle")
+      expect(dispatchedMarker).toBeNull()
     } finally {
       manager.shutdown()
     }
   })
 
-  test("#given parent notifications are disabled #when final child completion releases preparation #then the marker returns idle", async () => {
+  test("#given parent notifications are disabled #when final child completion releases preparation #then the marker is removed", async () => {
     // given
     const directory = createTestDirectory()
     const parentSessionID = "parent-disabled-notifications"
@@ -172,13 +175,13 @@ describe("BackgroundManager run continuation marker parent-wake races", () => {
       // then
       expect(completed).toBe(true)
       const marker = readContinuationMarker(directory, parentSessionID)
-      expect(marker?.sources["background-task"]?.state).toBe("idle")
+      expect(marker).toBeNull()
     } finally {
       manager.shutdown()
     }
   })
 
-  test("#given a completion parent wake is queued on the scheduled timer #when the timer flush accepts it #then the marker returns idle", async () => {
+  test("#given a completion parent wake is queued on the scheduled timer #when the timer flush accepts it #then the marker is removed", async () => {
     // given
     const directory = createTestDirectory()
     const parentSessionID = "parent-timer-wake"
@@ -189,11 +192,11 @@ describe("BackgroundManager run continuation marker parent-wake races", () => {
     try {
       // when
       internals.queuePendingParentWake(parentSessionID, notification, {}, true, 0)
-      await waitForBackgroundTaskMarkerState(directory, parentSessionID, "idle")
+      await waitForBackgroundTaskMarkerState(directory, parentSessionID, "missing")
 
       // then
       const marker = readContinuationMarker(directory, parentSessionID)
-      expect(marker?.sources["background-task"]?.state).toBe("idle")
+      expect(marker).toBeNull()
     } finally {
       manager.shutdown()
     }
@@ -211,7 +214,7 @@ describe("BackgroundManager run continuation marker parent-wake races", () => {
       internals.queuePendingParentWake(parentSessionID, notification, {}, true, 10_000)
       await internals.flushPendingParentWake(parentSessionID)
       const dispatchedMarker = readContinuationMarker(directory, parentSessionID)
-      expect(dispatchedMarker?.sources["background-task"]?.state).toBe("idle")
+      expect(dispatchedMarker).toBeNull()
 
       // when
       const requeued = await internals.parentWakeNotifier.requeueDispatchedParentWake(
@@ -241,7 +244,7 @@ describe("BackgroundManager run continuation marker parent-wake races", () => {
       internals.queuePendingParentWake(parentSessionID, notification, {}, true, 10_000)
       await internals.flushPendingParentWake(parentSessionID)
       const dispatchedMarker = readContinuationMarker(directory, parentSessionID)
-      expect(dispatchedMarker?.sources["background-task"]?.state).toBe("idle")
+      expect(dispatchedMarker).toBeNull()
 
       // when
       const requeued = internals.parentWakeNotifier.requeueDispatchedParentWakeAfterEmptyAssistantTurn(parentSessionID)
@@ -251,6 +254,36 @@ describe("BackgroundManager run continuation marker parent-wake races", () => {
       const requeuedMarker = readContinuationMarker(directory, parentSessionID)
       expect(requeuedMarker?.sources["background-task"]?.state).toBe("active")
       expect(requeuedMarker?.sources["background-task"]?.reason).toBe(BACKGROUND_COMPLETION_WAKE_PENDING_REASON)
+    } finally {
+      manager.shutdown()
+    }
+  })
+
+  test("#given a descendant task has a root session #when refreshing the run marker #then only the root session marker is written", () => {
+    // given
+    const directory = createTestDirectory()
+    const rootSessionID = "root-run-session"
+    const childParentSessionID = "child-parent-session"
+    const manager = createManager(directory)
+    const internals = unsafeTestValue<BackgroundManagerMarkerInternals>(manager)
+    const task = createRunningTask({
+      id: "task-descendant-marker",
+      parentSessionId: childParentSessionID,
+      rootSessionId: rootSessionID,
+      sessionId: "grandchild-background-session",
+    })
+    internals.tasks.set(task.id, task)
+    internals.pendingByParent.set(childParentSessionID, new Set([task.id]))
+
+    try {
+      // when
+      internals.updateBackgroundTaskMarker(childParentSessionID)
+
+      // then
+      const rootMarker = readContinuationMarker(directory, rootSessionID)
+      expect(rootMarker?.sources["background-task"]?.state).toBe("active")
+      expect(rootMarker?.sources["background-task"]?.reason).toBe("1 background task(s) active")
+      expect(readContinuationMarker(directory, childParentSessionID)).toBeNull()
     } finally {
       manager.shutdown()
     }
