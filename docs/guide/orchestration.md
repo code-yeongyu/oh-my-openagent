@@ -115,6 +115,8 @@ When `ulw` or `ultrawork` is present, Sisyphus receives the ultrawork instructio
 - `task(subagent_type="...")` invokes that specific agent directly (for example `oracle`, `explore`, `librarian`)
 - Category and `subagent_type` are mutually exclusive inputs in one call
 
+Spawn admission defaults to one child level and has an immutable cross-harness ceiling of two. Effective depth is the minimum of configured and per-agent limits. Unknown lineage fails closed, and target allowlists only narrow access. Sisyphus and Atlas are coordinators and may use `task`, `call_omo_agent`, and `look_at`. Workers such as Hephaestus and Sisyphus-Junior, reviewers such as Momus and Oracle, specialists, team members, and unknown roles may not. Fallback retries re-run admission before creating a replacement child session.
+
 ---
 
 ## Planning: Prometheus + Metis + Momus + Oracle

@@ -25,6 +25,7 @@ import {
   requireRuntime,
   resetLifecycleTestState,
 } from "./lifecycle-test-fixture"
+import type { TeamCreateExecutorConfig } from "./lifecycle-inline-spec"
 
 const {
   createTeamApproveShutdownTool,
@@ -45,8 +46,8 @@ const lifecycleDeps = {
   rejectShutdown: rejectShutdownMock,
 }
 
-function createTeamCreateToolForTest() {
-  return createTeamCreateTool(config, mockClient, backgroundManager, undefined, undefined, lifecycleDeps)
+function createTeamCreateToolForTest(executorConfig?: TeamCreateExecutorConfig) {
+  return createTeamCreateTool(config, mockClient, backgroundManager, undefined, executorConfig, lifecycleDeps)
 }
 
 function parseToolResult<TValue>(value: ToolResult): TValue {
@@ -79,7 +80,7 @@ describe("team lifecycle tools", () => {
       config,
       backgroundManager,
       undefined,
-      { callerAgentTypeId: undefined, parentMessageID: expect.any(String) },
+      { callerAgentTypeId: "sisyphus", parentMessageID: expect.any(String) },
     )
   })
 
@@ -104,6 +105,50 @@ describe("team lifecycle tools", () => {
       undefined,
       { callerAgentTypeId: "sisyphus", parentMessageID: expect.any(String) },
     )
+  })
+
+  test.each([
+    ["ASCII Sisyphus", "Release Coordinator", "sisyphus"],
+    ["CJK Atlas", "执行总监", "atlas"],
+  ])("team_create resolves configured %s alias before creating runtime state", async (_label, agent, callerAgentTypeId) => {
+    // given
+    const teamCreateTool = createTeamCreateToolForTest({
+      agentOverrides: {
+        sisyphus: { displayName: "Release Coordinator" },
+        atlas: { displayName: "执行总监" },
+      },
+    })
+
+    // when
+    await teamCreateTool.execute({ inline_spec: createSpec() }, { ...createToolContext("lead-session"), agent })
+
+    // then
+    expect(createTeamRunMock).toHaveBeenCalledWith(
+      expect.anything(),
+      "lead-session",
+      expect.anything(),
+      config,
+      backgroundManager,
+      undefined,
+      { callerAgentTypeId, parentMessageID: expect.any(String) },
+    )
+  })
+
+  test("team_create rejects an unknown alias before creating runtime state", async () => {
+    // given
+    const teamCreateTool = createTeamCreateToolForTest({
+      agentOverrides: { sisyphus: { displayName: "Release Coordinator" } },
+    })
+
+    // when
+    const result = teamCreateTool.execute(
+      { inline_spec: createSpec() },
+      { ...createToolContext("lead-session"), agent: "Unknown Coordinator" },
+    )
+
+    // then
+    await expect(result).rejects.toThrow("not an eligible team lead")
+    expect(createTeamRunMock).not.toHaveBeenCalled()
   })
 
   test("team_create returns teamRunId and sanitized runtimeState for inline specs", async () => {
@@ -141,18 +186,18 @@ describe("team lifecycle tools", () => {
       config,
       expect.anything(),
       undefined,
-      { callerAgentTypeId: undefined, parentMessageID: expect.any(String) },
+      { callerAgentTypeId: "sisyphus", parentMessageID: expect.any(String) },
     )
     expect(result.runtimeState.members).toHaveLength(2)
     expect(result.runtimeState.members[0]).toMatchObject({ name: "lead", agentType: "leader" })
   })
 
-  test("team_create treats an empty leadSessionId override as absent and uses the context session", async () => {
+  test("team_create ignores an untrusted leadSessionId override and uses the context session", async () => {
     // given
     const teamCreateTool = createTeamCreateToolForTest()
 
     // when
-    await teamCreateTool.execute({ inline_spec: createSpec(), leadSessionId: "" }, createToolContext("lead-session"))
+    await teamCreateTool.execute({ inline_spec: createSpec(), leadSessionId: "spoofed-session" }, createToolContext("lead-session"))
 
     // then
     expect(createTeamRunMock).toHaveBeenCalledWith(
@@ -162,34 +207,34 @@ describe("team lifecycle tools", () => {
       config,
       expect.anything(),
       undefined,
-      { callerAgentTypeId: undefined, parentMessageID: expect.any(String) },
+      { callerAgentTypeId: "sisyphus", parentMessageID: expect.any(String) },
     )
   })
 
-  test("team_create rejects when neither leadSessionId nor a context session is available", async () => {
+  test("team_create rejects a missing context session even when leadSessionId is provided", async () => {
     // given
     const teamCreateTool = createTeamCreateToolForTest()
 
     // when
     let errorMessage = ""
     try {
-      await teamCreateTool.execute({ inline_spec: createSpec(), leadSessionId: "" }, createToolContext(""))
+      await teamCreateTool.execute({ inline_spec: createSpec(), leadSessionId: "spoofed-session" }, createToolContext(""))
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : String(error)
     }
 
     // then
-    expect(errorMessage).toContain("leadSessionId")
+    expect(errorMessage).toContain("tool context sessionID")
   })
 
-  test("team_create checks participant conflicts against the effective leadSessionId override", async () => {
+  test("team_create checks participant conflicts against the trusted context session", async () => {
     // given
     const teamCreateTool = createTeamCreateToolForTest()
-    await teamCreateTool.execute({ inline_spec: createSpec(), leadSessionId: "effective-lead-session" }, createToolContext("caller-session-a"))
+    await teamCreateTool.execute({ inline_spec: createSpec() }, createToolContext("lead-session"))
     const betaSpec = { ...createSpec(), name: "beta-team" }
 
     // when
-    const result = teamCreateTool.execute({ inline_spec: betaSpec, leadSessionId: "effective-lead-session" }, createToolContext("caller-session-b"))
+    const result = teamCreateTool.execute({ inline_spec: betaSpec, leadSessionId: "outside-session" }, createToolContext("lead-session"))
 
     // then
     expect(result).rejects.toThrow("team_create denied: session is already a participant")
@@ -366,6 +411,22 @@ describe("team lifecycle tools", () => {
     expect(errorMessage).toContain("team_create denied")
     expect(errorMessage).toContain("prometheus")
     expect(errorMessage).toContain("hard-reject")
+    expect(createTeamRunMock).not.toHaveBeenCalled()
+  })
+
+  test("team_create denies an unknown caller before runtime creation", async () => {
+    // given
+    const teamCreateTool = createTeamCreateToolForTest()
+    const unknownCallerContext = {
+      ...createToolContext("lead-session"),
+      agent: "custom-agent",
+    }
+
+    // when
+    const result = teamCreateTool.execute({ inline_spec: createSpec() }, unknownCallerContext)
+
+    // then
+    await expect(result).rejects.toThrow("team_create denied: caller 'custom-agent' is not an eligible team lead")
     expect(createTeamRunMock).not.toHaveBeenCalled()
   })
 

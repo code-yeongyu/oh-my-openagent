@@ -82,6 +82,41 @@ describe("#given disabled native skills in the registry skill context", () => {
   })
 })
 
+test("#given look_at is enabled #when core tools register it #then spawn admission config is threaded", () => {
+  const createLookAt = mock((..._args: Parameters<ToolRegistryFactories["createLookAt"]>) => fakeTool)
+  const backgroundTaskConfig = unsafeTestValue({ maxDepth: 1 })
+  const agentOverrides = unsafeTestValue({ sisyphus: { maxDepth: 1 } })
+  const teamModeConfig = unsafeTestValue({ enabled: true })
+
+  createCoreTools({
+    ctx: unsafeTestValue({ directory: "/tmp/project", client: {} }),
+    pluginConfig: unsafeTestValue({
+      background_task: backgroundTaskConfig,
+      agents: agentOverrides,
+      team_mode: teamModeConfig,
+    }),
+    managers: unsafeTestValue({
+      backgroundManager: {},
+      tmuxSessionManager: {},
+      skillMcpManager: {},
+      modelFallbackControllerAccessor: {},
+    }),
+    skillContext: {
+      mergedSkills: [],
+      availableSkills: [],
+      browserProvider: "playwright",
+      disabledSkills: new Set(),
+    },
+    availableCategories: [],
+    factories: { ...createFactories(() => fakeTool), createLookAt },
+  })
+
+  expect(createLookAt).toHaveBeenCalledWith(
+    expect.anything(),
+    { backgroundTaskConfig, agentOverrides, teamModeConfig },
+  )
+})
+
 describe("#given core skill tools are registered", () => {
   test("#when core tools are created #then skill task and skill_mcp share the runtime skill resolver", () => {
     const createSkillTool = mock((options: SkillLoadOptions) => fakeTool)

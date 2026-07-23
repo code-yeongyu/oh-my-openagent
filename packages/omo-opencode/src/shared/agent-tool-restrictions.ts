@@ -1,6 +1,6 @@
 import type { SpawnCallerRole } from "@oh-my-opencode/delegate-core"
 
-import { getAgentConfigKey } from "./agent-display-names"
+import { getAgentConfigKey, type AgentDisplayOverrides } from "./agent-display-names"
 
 const TEAM_TOOL_DENYLIST: Record<string, false> = {
   team_create: false, team_delete: false, team_shutdown_request: false, team_approve_shutdown: false,
@@ -18,9 +18,14 @@ export type AgentSpawnPolicy = {
 }
 export type AgentSpawnPolicyInput = {
   readonly agentName: string
+  readonly agentOverrides?: AgentDisplayOverrides
   readonly teamSessionRole?: string
 }
-export type AgentToolRestrictionsOptions = { readonly includeTeamToolDenylist?: boolean; readonly teamSessionRole?: string }
+export type AgentToolRestrictionsOptions = {
+  readonly agentOverrides?: AgentDisplayOverrides
+  readonly includeTeamToolDenylist?: boolean
+  readonly teamSessionRole?: string
+}
 
 const coordinatorPolicy = { callerRole: "coordinator" } as const satisfies AgentSpawnPolicy
 const planningPolicy = {
@@ -70,7 +75,7 @@ export function getAgentSpawnPolicy(input: AgentSpawnPolicyInput): AgentSpawnPol
   switch (input.teamSessionRole) {
     case undefined:
     case "lead":
-      return agentSpawnPolicies[getAgentConfigKey(input.agentName)] ?? leafPolicy
+      return agentSpawnPolicies[getAgentConfigKey(input.agentName, input.agentOverrides)] ?? leafPolicy
     case "member":
       return teamMemberPolicy
     default:
@@ -86,11 +91,15 @@ export function getAgentToolRestrictions(
   agentName: string,
   options: AgentToolRestrictionsOptions = {},
 ): Record<string, boolean> {
-  const agentKey = getAgentConfigKey(agentName)
+  const agentKey = getAgentConfigKey(agentName, options.agentOverrides)
   return {
     ...(options.includeTeamToolDenylist === false ? {} : TEAM_TOOL_DENYLIST),
     ...(agentRestrictions[agentKey] ?? {}),
-    ...getAgentSpawnToolRestrictions({ agentName, teamSessionRole: options.teamSessionRole }),
+    ...getAgentSpawnToolRestrictions({
+      agentName,
+      agentOverrides: options.agentOverrides,
+      teamSessionRole: options.teamSessionRole,
+    }),
   }
 }
 

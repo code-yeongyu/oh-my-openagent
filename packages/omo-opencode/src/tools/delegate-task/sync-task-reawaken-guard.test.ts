@@ -68,13 +68,16 @@ describe("issue #5112 - delegate-task sync child must not be re-awakened after h
   test("#given a sync task whose session was created and handed back #when the child later idles #then todo-continuation does not re-awaken it and the child was aborted", async () => {
     //#given
     const abortMock = mock(async () => ({ data: true }))
-    const mockCtx = { sessionID: "parent-session", callID: "call-123", metadata: () => {} }
+    const mockCtx = { sessionID: "parent-session", agent: "sisyphus", callID: "call-123", metadata: () => {} }
     const mockExecutorCtx = {
       client: {
         session: {
           create: async () => ({ data: { id: CHILD_SESSION_ID } }),
           abort: abortMock,
         },
+      },
+      manager: {
+        assertCanSpawn: async () => ({ rootSessionID: "parent-session", parentDepth: 0, childDepth: 1 }),
       },
       directory: "/tmp",
       onSyncSessionCreated: null,
@@ -89,6 +92,7 @@ describe("issue #5112 - delegate-task sync child must not be re-awakened after h
     }
     await executeSyncTask(args as never, mockCtx as never, mockExecutorCtx as never, {
       sessionID: "parent-session",
+      agent: "sisyphus",
     } as never, "test-agent", undefined, undefined, undefined, undefined, createDeps() as never)
 
     //#when

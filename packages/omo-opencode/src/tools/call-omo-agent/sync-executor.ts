@@ -32,11 +32,6 @@ type ExecuteSyncDeps = {
   clearSessionFallbackChain: (sessionID: string) => void
 }
 
-type SpawnReservation = {
-  commit: () => number
-  rollback: () => void
-}
-
 const defaultDeps: ExecuteSyncDeps = {
   createOrGetSession,
   waitForCompletion,
@@ -83,7 +78,6 @@ export async function executeSync(
   ctx: PluginInput,
   deps: ExecuteSyncDeps = defaultDeps,
   fallbackChain?: FallbackEntry[],
-  spawnReservation?: SpawnReservation,
   model?: DelegatedModelConfig,
 ): Promise<string> {
   let sessionID: string | undefined
@@ -97,10 +91,6 @@ export async function executeSync(
     subagentSessions.add(sessionID)
     syncSubagentSessions.add(sessionID)
     handedBackSyncSessions.delete(sessionID)
-
-    if (session.isNew) {
-      spawnReservation?.commit()
-    }
 
     if (fallbackChain && fallbackChain.length > 0) {
       deps.setSessionFallbackChain(sessionID, fallbackChain)
@@ -183,9 +173,6 @@ export async function executeSync(
     const responseText = await deps.processMessages(sessionID, ctx)
 
     return responseText + "\n\n" + ["<task_metadata>", `session_id: ${sessionID}`, "</task_metadata>"].join("\n")
-  } catch (error) {
-    spawnReservation?.rollback()
-    throw error
   } finally {
     if (sessionID && appliedFallbackChain) {
       deps.clearSessionFallbackChain(sessionID)

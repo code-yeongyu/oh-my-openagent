@@ -10,6 +10,12 @@ function clearRequireCache(modulePath: string): void {
 type AddTaskArg = Parameters<import("../../features/task-toast-manager/manager").TaskToastManager["addTask"]>[0]
 type CapturedMetadata = { title?: string; metadata: Record<string, unknown> }
 
+function createAllowedAdmissionManager() {
+  return {
+    assertCanSpawn: mock(async () => ({ rootSessionID: "parent-session", parentDepth: 0, childDepth: 1 })),
+  }
+}
+
 describe("executeSyncTask - cleanup on error paths", () => {
   let removeTaskCalls: string[] = []
   let addTaskCalls: AddTaskArg[] = []
@@ -89,11 +95,13 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const mockCtx = {
       sessionID: "parent-session",
+      agent: "sisyphus",
       callID: "call-123",
       metadata: () => {},
     }
 
     const mockExecutorCtx = {
+      manager: createAllowedAdmissionManager(),
       client: mockClient,
       directory: "/tmp",
       onSyncSessionCreated: null,
@@ -121,7 +129,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(deleteCalls[0]).toBe("ses_test_12345678")
   })
 
-  test("rolls back reserved descendant quota when sync session creation fails", async () => {
+  test("returns session creation failure after admission", async () => {
     const mockClient = {
       session: {
         create: async () => ({ data: { id: "ses_test_12345678" } }),
@@ -130,14 +138,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const { executeSyncTask } = require("./sync-task")
 
-    const commit = mock(() => 1)
-    const rollback = mock(() => {})
-    const reserveSubagentSpawn = mock(async () => ({
-      spawnContext: { rootSessionID: "parent-session", parentDepth: 0, childDepth: 1 },
-      descendantCount: 1,
-      commit,
-      rollback,
-    }))
+    const assertCanSpawn = mock(async () => ({ rootSessionID: "parent-session", parentDepth: 0, childDepth: 1 }))
 
     const deps = {
       createSyncSession: async () => ({ ok: false as const, error: "Failed to create session" }),
@@ -148,12 +149,13 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const mockCtx = {
       sessionID: "parent-session",
+      agent: "sisyphus",
       callID: "call-123",
       metadata: () => {},
     }
 
     const mockExecutorCtx = {
-      manager: { reserveSubagentSpawn },
+      manager: { assertCanSpawn },
       client: mockClient,
       directory: "/tmp",
       onSyncSessionCreated: null,
@@ -171,13 +173,16 @@ describe("executeSyncTask - cleanup on error paths", () => {
     //#when
     const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
       sessionID: "parent-session",
+      agent: "sisyphus",
     }, "test-agent", undefined, undefined, undefined, undefined, deps)
 
     //#then
     expect(result).toBe("Failed to create session")
-    expect(reserveSubagentSpawn).toHaveBeenCalledWith("parent-session")
-    expect(commit).toHaveBeenCalledTimes(0)
-    expect(rollback).toHaveBeenCalledTimes(1)
+    expect(assertCanSpawn).toHaveBeenCalledWith({
+      parentSessionID: "parent-session",
+      parentAgent: "sisyphus",
+      targetAgent: "test-agent",
+    })
   })
 
   test("recovers from MessageAbortedError poll error when result already exists", async () => {
@@ -198,11 +203,13 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const mockCtx = {
       sessionID: "parent-session",
+      agent: "sisyphus",
       callID: "call-123",
       metadata: () => {},
     }
 
     const mockExecutorCtx = {
+      manager: createAllowedAdmissionManager(),
       client: mockClient,
       directory: "/tmp",
       onSyncSessionCreated: null,
@@ -249,11 +256,13 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const mockCtx = {
       sessionID: "parent-session",
+      agent: "sisyphus",
       callID: "call-123",
       metadata: () => {},
     }
 
     const mockExecutorCtx = {
+      manager: createAllowedAdmissionManager(),
       client: mockClient,
       directory: "/tmp",
       onSyncSessionCreated: null,
@@ -300,11 +309,13 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const mockCtx = {
       sessionID: "parent-session",
+      agent: "sisyphus",
       callID: "call-123",
       metadata: () => {},
     }
 
     const mockExecutorCtx = {
+      manager: createAllowedAdmissionManager(),
       client: mockClient,
       directory: "/tmp",
       onSyncSessionCreated: null,
@@ -352,11 +363,13 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const mockCtx = {
       sessionID: "parent-session",
+      agent: "sisyphus",
       callID: "call-123",
       metadata: () => {},
     }
 
     const mockExecutorCtx = {
+      manager: createAllowedAdmissionManager(),
       client: mockClient,
       directory: "/tmp",
       onSyncSessionCreated: null,
@@ -406,11 +419,13 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const mockCtx = {
       sessionID: "parent-session",
+      agent: "sisyphus",
       callID: "call-123",
       metadata: () => {},
     }
 
     const mockExecutorCtx = {
+      manager: createAllowedAdmissionManager(),
       client: mockClient,
       directory: "/tmp",
       onSyncSessionCreated: null,
@@ -473,11 +488,13 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const mockCtx = {
       sessionID: "parent-session",
+      agent: "sisyphus",
       callID: "call-123",
       metadata: () => {},
     }
 
     const mockExecutorCtx = {
+      manager: createAllowedAdmissionManager(),
       client: mockClient,
       directory: "/tmp",
       onSyncSessionCreated: null,
@@ -563,21 +580,14 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const mockCtx = {
       sessionID: "parent-session",
+      agent: "sisyphus",
       callID: "call-123",
       metadata: () => {},
     }
 
-    const commit = mock(() => 1)
-    const rollback = mock(() => {})
-
     const mockExecutorCtx = {
       manager: {
-        reserveSubagentSpawn: mock(async () => ({
-          spawnContext: { rootSessionID: "parent-session", parentDepth: 0, childDepth: 1 },
-          descendantCount: 1,
-          commit,
-          rollback,
-        })),
+        assertCanSpawn: mock(async () => ({ rootSessionID: "parent-session", parentDepth: 0, childDepth: 1 })),
       },
       client: mockClient,
       directory: "/tmp",
@@ -596,13 +606,16 @@ describe("executeSyncTask - cleanup on error paths", () => {
     //#when - executeSyncTask completes successfully
     const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
       sessionID: "parent-session",
+      agent: "sisyphus",
     }, "test-agent", undefined, undefined, undefined, undefined, deps)
 
     //#then - should complete and cleanup resources
     expect(result).toContain("Task completed")
-    expect(mockExecutorCtx.manager.reserveSubagentSpawn).toHaveBeenCalledWith("parent-session")
-    expect(commit).toHaveBeenCalledTimes(1)
-    expect(rollback).toHaveBeenCalledTimes(0)
+    expect(mockExecutorCtx.manager.assertCanSpawn).toHaveBeenCalledWith({
+      parentSessionID: "parent-session",
+      parentAgent: "sisyphus",
+      targetAgent: "test-agent",
+    })
     expect(removeTaskCalls.length).toBe(1)
     expect(removeTaskCalls[0]).toBe("sync_ses_test")
     expect(deleteCalls.length).toBe(1)
@@ -643,11 +656,13 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const metadataCalls: CapturedMetadata[] = []
     const mockCtx = {
       sessionID: "parent-session",
+      agent: "sisyphus",
       callID: "call-123",
       metadata: (input: { title?: string; metadata?: Record<string, unknown> }) => { metadataCalls.push(input as CapturedMetadata) },
     }
 
     const mockExecutorCtx = {
+      manager: createAllowedAdmissionManager(),
       client: mockClient,
       directory: "/tmp",
       onSyncSessionCreated: null,
@@ -737,10 +752,12 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const mockCtx = {
       sessionID: "parent-session",
+      agent: "sisyphus",
       callID: "call-123",
       metadata: () => {},
     }
     const mockExecutorCtx = {
+      manager: createAllowedAdmissionManager(),
       client: mockClient,
       directory: "/tmp",
       onSyncSessionCreated: null,
@@ -810,11 +827,13 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const mockCtx = {
       sessionID: "parent-session",
+      agent: "sisyphus",
       callID: "call-123",
       metadata: () => {},
     }
 
     const mockExecutorCtx = {
+      manager: createAllowedAdmissionManager(),
       client: mockClient,
       directory: "/tmp",
       onSyncSessionCreated: null,
@@ -869,11 +888,13 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const mockCtx = {
       sessionID: "parent-session",
+      agent: "sisyphus",
       callID: "call-123",
       metadata: () => {},
     }
 
     const mockExecutorCtx = {
+      manager: createAllowedAdmissionManager(),
       client: mockClient,
       directory: "/tmp",
       onSyncSessionCreated: null,
@@ -900,7 +921,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(observedBootstrapPrompts[0]).toContain("sync bootstrap prompt")
     expect(observedBootstrapSystems[0]).toBe("sync delegated skill system")
     expect(observedBootstrapTools[0]?.question).toBe(false)
-    expect(observedBootstrapTools[0]?.call_omo_agent).toBe(true)
+    expect(observedBootstrapTools[0]?.call_omo_agent).toBe(false)
     expect(getDelegatedChildSessionBootstrap("ses_bootstrap_sync")).toBeUndefined()
   })
 
@@ -933,11 +954,13 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const metadataCalls: CapturedMetadata[] = []
     const mockCtx = {
       sessionID: "parent-session",
+      agent: "sisyphus",
       callID: "call-123",
       metadata: (input: { title?: string; metadata?: Record<string, unknown> }) => { metadataCalls.push(input as CapturedMetadata) },
     }
 
     const mockExecutorCtx = {
+      manager: createAllowedAdmissionManager(),
       client: mockClient,
       directory: "/tmp",
       onSyncSessionCreated,
@@ -1007,11 +1030,13 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const metadataCalls: CapturedMetadata[] = []
     const mockCtx = {
       sessionID: "parent-session",
+      agent: "sisyphus",
       callID: "call-123",
       metadata: (input: { title?: string; metadata?: Record<string, unknown> }) => { metadataCalls.push(input as CapturedMetadata) },
     }
 
     const mockExecutorCtx = {
+      manager: createAllowedAdmissionManager(),
       client: mockClient,
       directory: "/tmp",
       onSyncSessionCreated: null,
@@ -1055,7 +1080,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     })
   })
 
-  test("depth regression: blocks spawn when reserveSubagentSpawn throws depth limit error", async () => {
+  test("depth regression: blocks spawn when admission throws depth limit error", async () => {
     const mockClient = {
       session: {
         create: async () => ({ data: { id: "ses_test_12345678" } }),
@@ -1064,7 +1089,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const { executeSyncTask } = require("./sync-task")
 
-    const reserveSubagentSpawn = mock(async () => {
+    const assertCanSpawn = mock(async () => {
       throw new Error(
         "Subagent spawn blocked: child depth 4 exceeds background_task.maxDepth=3. Parent session: parent. Root session: root. Continue in an existing subagent session instead of spawning another."
       )
@@ -1079,12 +1104,13 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const mockCtx = {
       sessionID: "parent-session",
+      agent: "sisyphus",
       callID: "call-123",
       metadata: () => {},
     }
 
     const mockExecutorCtx = {
-      manager: { reserveSubagentSpawn },
+      manager: { assertCanSpawn },
       client: mockClient,
       directory: "/tmp",
       onSyncSessionCreated: null,
@@ -1102,13 +1128,18 @@ describe("executeSyncTask - cleanup on error paths", () => {
     //#when - executeSyncTask is called from a session at max depth
     const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
       sessionID: "parent-session",
+      agent: "sisyphus",
     }, "test-agent", undefined, undefined, undefined, undefined, deps)
 
     //#then - should propagate the depth limit error and NOT create the session
     expect(result).toContain("Subagent spawn blocked")
     expect(result).toContain("child depth 4")
     expect(result).toContain("maxDepth=3")
-    expect(reserveSubagentSpawn).toHaveBeenCalledWith("parent-session")
+    expect(assertCanSpawn).toHaveBeenCalledWith({
+      parentSessionID: "parent-session",
+      parentAgent: "sisyphus",
+      targetAgent: "test-agent",
+    })
     expect(addCalls.length).toBe(0)
   })
 
@@ -1121,19 +1152,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const { executeSyncTask } = require("./sync-task")
 
-    let reservedDepth: number | undefined
-    const commit = mock(() => 1)
-    const rollback = mock(() => {})
-    const reserveSubagentSpawn = mock(async () => {
-      // Return a depth that proves the real manager was consulted
-      reservedDepth = 3
-      return {
-        spawnContext: { rootSessionID: "root", parentDepth: 2, childDepth: 3 },
-        descendantCount: 5,
-        commit,
-        rollback,
-      }
-    })
+    const assertCanSpawn = mock(async () => ({ rootSessionID: "root", parentDepth: 2, childDepth: 3 }))
 
     const deps = {
       createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
@@ -1145,12 +1164,13 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const metadataCalls: CapturedMetadata[] = []
     const mockCtx = {
       sessionID: "parent-session",
+      agent: "sisyphus",
       callID: "call-123",
       metadata: (input: { title?: string; metadata?: Record<string, unknown> }) => { metadataCalls.push(input as CapturedMetadata) },
     }
 
     const mockExecutorCtx = {
-      manager: { reserveSubagentSpawn },
+      manager: { assertCanSpawn },
       client: mockClient,
       directory: "/tmp",
       onSyncSessionCreated: null,
@@ -1170,8 +1190,8 @@ describe("executeSyncTask - cleanup on error paths", () => {
       sessionID: "parent-session",
     }, "test-agent", undefined, undefined, undefined, undefined, deps)
 
-    //#then - the spawnDepth recorded in metadata MUST match what reserveSubagentSpawn returned
-    expect(reservedDepth).toBe(3)
+    //#then - the spawnDepth recorded in metadata MUST match admission
+    expect(assertCanSpawn).toHaveBeenCalledTimes(1)
     const taskMeta = metadataCalls.find((c) => c.metadata?.spawnDepth !== undefined)
     expect(taskMeta).toBeDefined()
     if (!taskMeta) {

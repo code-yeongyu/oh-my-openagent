@@ -1,5 +1,9 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
+import {
+  assertOpenCodeSpawnAdmission,
+  requireSpawnCallerIdentity,
+} from "../../features/background-agent/subagent-spawn-limits"
 import { isAmbiguousPromptDispatchFailure, log, promptSyncWithModelSuggestionRetry } from "../../shared"
 import { extractLatestAssistantText } from "./assistant-message-extractor"
 import { MULTIMODAL_LOOKER_AGENT } from "./constants"
@@ -7,12 +11,14 @@ import { READ_ENABLED, buildLookAtPrompt } from "./look-at-prompt"
 import type { LookAtFilePart, LookAtInputPart } from "./look-at-input-preparer"
 import { resolveMultimodalLookerAgentMetadata } from "./multimodal-agent-metadata"
 import { waitForLookAtSessionResult } from "./session-poller"
+import type { LookAtSpawnAdmissionConfig } from "./tools"
 
 interface RunLookAtSessionInput {
   ctx: PluginInput
   toolContext: ToolContext
   goal: string
   inputParts: LookAtInputPart[]
+  spawnAdmissionConfig: LookAtSpawnAdmissionConfig
 }
 
 export async function runLookAtSession({
@@ -20,9 +26,22 @@ export async function runLookAtSession({
   toolContext,
   goal,
   inputParts,
+  spawnAdmissionConfig,
 }: RunLookAtSessionInput): Promise<string> {
   const fileParts = inputParts.filter((part): part is LookAtFilePart => part.type === "file")
   const prompt = buildLookAtPrompt(goal, fileParts)
+  await assertOpenCodeSpawnAdmission({
+    client: ctx.client,
+    directory: ctx.directory,
+    config: spawnAdmissionConfig.backgroundTaskConfig,
+    agentOverrides: spawnAdmissionConfig.agentOverrides,
+    teamModeConfig: spawnAdmissionConfig.teamModeConfig,
+    request: {
+      parentSessionID: toolContext.sessionID,
+      parentAgent: requireSpawnCallerIdentity(toolContext.agent),
+      targetAgent: MULTIMODAL_LOOKER_AGENT,
+    },
+  })
   const { agentModel, agentVariant } = await resolveMultimodalLookerAgentMetadata(ctx)
 
   log(`[look_at] Creating session with parent: ${toolContext.sessionID}`)

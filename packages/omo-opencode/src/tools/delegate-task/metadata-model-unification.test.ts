@@ -6,6 +6,9 @@ import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
 const MODEL = { providerID: "anthropic", modelID: "claude-sonnet-4-6" }
 const MODEL_WITH_VARIANT = { providerID: "google", modelID: "gemini-3.1-pro", variant: "high" }
+const admissionManager = unsafeTestValue({
+  assertCanSpawn: async () => ({ rootSessionID: "ses_parent", parentDepth: 0, childDepth: 1 }),
+})
 
 type CapturedMetadata = { title?: string; metadata: Record<string, unknown> }
 
@@ -49,6 +52,7 @@ describe("metadata model unification", () => {
 
         await executeSyncTask(args, ctx, {
           client: { session: { create: async () => ({ data: { id: "ses_sync" } }) } },
+          manager: admissionManager,
           directory: "/tmp",
           onSyncSessionCreated: null,
         }, parentContext, "explore", MODEL, undefined, undefined, undefined, deps)
@@ -159,6 +163,7 @@ describe("metadata model unification", () => {
         await executeSyncContinuation(args, ctx, unsafeTestValue({
           client: {
             session: {
+              get: async () => ({ data: { parentID: "ses_parent" } }),
               messages: async () => ({
                 data: [{ info: { agent: "explore", model: MODEL, providerID: "anthropic", modelID: "claude-sonnet-4-6" } }],
               }),
@@ -192,6 +197,7 @@ describe("metadata model unification", () => {
 
         await executeSyncTask(args, ctx, {
           client: { session: { create: async () => ({ data: { id: "ses_sync" } }) } },
+          manager: admissionManager,
           directory: "/tmp",
           onSyncSessionCreated: null,
         }, parentContext, "explore", undefined, undefined, undefined, undefined, deps)
@@ -303,6 +309,7 @@ describe("metadata model unification", () => {
         await executeSyncContinuation(args, ctx, unsafeTestValue({
           client: {
             session: {
+              get: async () => ({ data: { parentID: "ses_parent" } }),
               messages: async () => ({ data: [] }),
               prompt: async () => ({}),
             },
@@ -339,6 +346,7 @@ describe("metadata model unification", () => {
 
       await executeSyncTask(args, ctx, {
         client: { session: { create: async () => ({ data: { id: "ses_sync" } }) } },
+        manager: admissionManager,
         directory: "/tmp",
         onSyncSessionCreated: null,
       }, parentContextWithoutModel, "explore", undefined, undefined, undefined, undefined, deps)
@@ -367,6 +375,7 @@ describe("metadata model unification", () => {
 
         await executeSyncTask(args, ctx, {
           client: { session: { create: async () => ({ data: { id: "ses_sync_variant" } }) } },
+          manager: admissionManager,
           directory: "/tmp",
           onSyncSessionCreated: null,
         }, parentContext, "explore", MODEL_WITH_VARIANT, undefined, undefined, undefined, deps)
@@ -478,6 +487,7 @@ describe("metadata model unification", () => {
         await executeSyncContinuation(args, ctx, unsafeTestValue({
           client: {
             session: {
+              get: async () => ({ data: { parentID: "ses_parent" } }),
               messages: async () => ({
                 data: [{ info: { agent: "explore", model: MODEL_WITH_VARIANT, providerID: "google", modelID: "gemini-3.1-pro" } }],
               }),

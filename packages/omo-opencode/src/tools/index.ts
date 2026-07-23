@@ -13,7 +13,6 @@ import {
   createBackgroundOutput,
   createBackgroundCancel,
   type BackgroundOutputManager,
-  type BackgroundCancelClient,
 } from "./background-task"
 
 import type { PluginInput, ToolDefinition } from "@opencode-ai/plugin"
@@ -36,9 +35,8 @@ export { createTeamSendMessageTool } from "../features/team-mode/tools/messaging
 
 export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient): Record<string, ToolDefinition> {
   const outputManager: BackgroundOutputManager = manager
-  const cancelClient: BackgroundCancelClient = client
   return {
     background_output: createBackgroundOutput(outputManager, client),
-    background_cancel: createBackgroundCancel(manager, cancelClient),
+    background_cancel: createBackgroundCancel(manager),
   }
 }

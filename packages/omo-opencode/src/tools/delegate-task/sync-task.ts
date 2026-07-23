@@ -5,7 +5,7 @@ import type { FallbackEntry } from "../../shared/model-requirements"
 import { log } from "../../shared/logger"
 import { formatDetailedError } from "./error-formatting"
 import type { ExecutorContext, ParentContext } from "./executor-types"
-import { reserveSyncSubagentSpawn } from "./sync-spawn-reservation"
+import { assertSyncSubagentSpawn } from "./sync-spawn-reservation"
 import { type SyncTaskDeps, syncTaskDeps } from "./sync-task-deps"
 import { publishSyncTaskMetadata } from "./sync-task-metadata"
 import { runSyncTaskLoop } from "./sync-task-runner"
@@ -28,14 +28,12 @@ export async function executeSyncTask(
   const toastManager = getTaskToastManager()
   let taskId: string | undefined
   let syncSessionID: string | undefined
-  let spawnReservation:
-    | Awaited<ReturnType<ExecutorContext["manager"]["reserveSubagentSpawn"]>>
-    | undefined
-
   try {
-    const spawn = await reserveSyncSubagentSpawn(executorCtx, parentContext)
-    spawnReservation = spawn.reservation
-    const { spawnContext } = spawn
+    const spawnContext = await assertSyncSubagentSpawn(
+      executorCtx,
+      { ...parentContext, agent: parentContext.agent ?? ctx.agent },
+      agentToUse,
+    )
 
     const createSessionResult = await deps.createSyncSession(client, {
       parentSessionID: parentContext.sessionID,
@@ -46,12 +44,10 @@ export async function executeSyncTask(
     })
 
     if (!createSessionResult.ok) {
-      spawnReservation?.rollback()
       return createSessionResult.error
     }
 
     const sessionID = createSessionResult.sessionID
-    spawnReservation?.commit()
     syncSessionID = sessionID
 
     const registerSyncSession = async (newSessionID: string): Promise<void> => {
@@ -143,7 +139,6 @@ export async function executeSyncTask(
       }
     }
   } catch (error) {
-    spawnReservation?.rollback()
     const errorToFormat = error instanceof Error ? error : String(error)
     return formatDetailedError(errorToFormat, {
       operation: "Execute task",

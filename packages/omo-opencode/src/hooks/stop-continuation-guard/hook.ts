@@ -12,7 +12,7 @@ const HOOK_NAME = "stop-continuation-guard"
 
 type StopContinuationBackgroundManager = Pick<
   BackgroundManager,
-  "getAllDescendantTasks" | "cancelTask"
+  "getAllDescendantTasks" | "cancelTaskForCleanup"
 >
 
 export interface StopContinuationGuard {
@@ -51,7 +51,7 @@ export function createStopContinuationGuardHook(
 
     void Promise.allSettled(
       cancellableTasks.map(async (task) => {
-        await backgroundManager.cancelTask(task.id, {
+        await backgroundManager.cancelTaskForCleanup(task.id, {
           source: "stop-continuation",
           reason: "Continuation stopped via /stop-continuation",
           abortSession: task.status === "running",

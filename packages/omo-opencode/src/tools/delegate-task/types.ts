@@ -21,7 +21,7 @@ type SessionCreateResult =
   | { readonly data?: undefined; readonly error: unknown }
 
 type SessionGetResult = {
-  readonly data?: { readonly directory?: string }
+  readonly data?: { readonly directory?: string; readonly parentID?: string }
   readonly error?: unknown
 }
 

@@ -281,4 +281,23 @@ describe("executeBackground", () => {
     expect(result).toContain("Do NOT call background_output now")
     expect(result).toContain("<system-reminder>")
   })
+
+  test("#given missing caller identity #when background execution runs #then it fails before launch", async () => {
+    launchMock.mockClear()
+    const missingCallerContext = {
+      sessionID: testContext.sessionID,
+      messageID: testContext.messageID,
+      abort: testContext.abort,
+    }
+
+    const result = await executeBackground(
+      testArgs,
+      missingCallerContext,
+      mockManager,
+      mockClient,
+    )
+
+    expect(result).toContain("trusted caller identity is required")
+    expect(launchMock).not.toHaveBeenCalled()
+  })
 })

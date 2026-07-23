@@ -101,7 +101,7 @@ describe("BackgroundManager.cancelTask cleanup", () => {
     getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
 
     // when
-    const cancelled = await manager.cancelTask(task.id, {
+    const cancelled = await manager.cancelTaskForCleanup(task.id, {
       skipNotification: true,
       source: "test",
     })
@@ -127,7 +127,7 @@ describe("BackgroundManager.cancelTask cleanup", () => {
     getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
 
     // when
-    const cancelled = await manager.cancelTask(task.id, {
+    const cancelled = await manager.cancelTaskForCleanup(task.id, {
       skipNotification: true,
       source: "test",
     })
@@ -152,7 +152,7 @@ describe("BackgroundManager.cancelTask cleanup", () => {
     getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
 
     // when
-    const cancelled = await manager.cancelTask(task.id, {
+    const cancelled = await manager.cancelTaskForCleanup(task.id, {
       skipNotification: false,
       source: "test",
     })
@@ -208,7 +208,7 @@ describe("BackgroundManager.cancelTask cleanup", () => {
     })
 
     // when
-    const cancelled = await manager.cancelTask(runningTask.id, {
+    const cancelled = await manager.cancelTaskForCleanup(runningTask.id, {
       abortSession: false,
       skipNotification: true,
       source: "test",

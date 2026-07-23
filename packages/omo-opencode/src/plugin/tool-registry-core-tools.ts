@@ -131,7 +131,11 @@ export function createCoreTools(args: {
     call_omo_agent: callOmoAgent,
   }
   if (isMultimodalLookerEnabled) {
-    tools.look_at = factories.createLookAt(ctx)
+    tools.look_at = factories.createLookAt(ctx, {
+      backgroundTaskConfig: pluginConfig.background_task,
+      agentOverrides: pluginConfig.agents,
+      teamModeConfig: pluginConfig.team_mode,
+    })
   }
   tools.task = delegateTask
   tools.skill_mcp = skillMcpTool

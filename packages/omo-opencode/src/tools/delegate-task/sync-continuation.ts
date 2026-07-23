@@ -16,6 +16,7 @@ import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-
 import { getTaskID } from "./task-id"
 import { resolveMetadataModel } from "./resolve-metadata-model"
 import { log } from "../../shared/logger"
+import { assertContinuationOwnership } from "../../shared/continuation-ownership"
 
 type ResumeModel = { providerID: string; modelID: string }
 
@@ -104,6 +105,17 @@ export async function executeSyncContinuation(
   const continuationID = getTaskID(args)
   if (!continuationID) {
     throw new Error("task_id is required to continue a sync task")
+  }
+  try {
+    const sessionResult = await client.session.get({ path: { id: continuationID } })
+    assertContinuationOwnership({
+      callerSessionID: parentContext.sessionID,
+      targetSessionID: continuationID,
+      ownerSessionID: sessionResult.error ? undefined : sessionResult.data?.parentID,
+    })
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
+    return `${error.message}\n\nTask ID: ${continuationID}`
   }
   const taskId = `resume_sync_${continuationID.slice(0, 8)}`
   const startTime = new Date()

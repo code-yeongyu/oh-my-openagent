@@ -133,6 +133,8 @@ export function createManagers(args: {
   backgroundManager = new deps.BackgroundManagerClass({
     pluginContext: ctx,
     config: pluginConfig.background_task,
+    agentOverrides: pluginConfig.agents,
+    teamModeConfig: pluginConfig.team_mode,
     tmuxConfig,
     onSubagentSessionCreated: async (event: SubagentSessionCreatedEvent) => {
         log("[create-managers] onSubagentSessionCreated callback received", {

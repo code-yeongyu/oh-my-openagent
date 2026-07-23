@@ -10,7 +10,7 @@ import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
 type CancelCall = {
   taskId: string
-  options?: Parameters<BackgroundManager["cancelTask"]>[1]
+  options?: Parameters<BackgroundManager["cancelTaskForCleanup"]>[1]
 }
 
 describe("stop-continuation-guard", () => {
@@ -54,10 +54,10 @@ describe("stop-continuation-guard", () => {
     }
   }
 
-  function createMockBackgroundManager(tasks: BackgroundTask[], cancelCalls: CancelCall[]): Pick<BackgroundManager, "getAllDescendantTasks" | "cancelTask"> {
+  function createMockBackgroundManager(tasks: BackgroundTask[], cancelCalls: CancelCall[]): Pick<BackgroundManager, "getAllDescendantTasks" | "cancelTaskForCleanup"> {
     return {
       getAllDescendantTasks: () => tasks,
-      cancelTask: async (taskId: string, options?: Parameters<BackgroundManager["cancelTask"]>[1]) => {
+      cancelTaskForCleanup: async (taskId: string, options?: Parameters<BackgroundManager["cancelTaskForCleanup"]>[1]) => {
         cancelCalls.push({ taskId, options })
         return true
       },

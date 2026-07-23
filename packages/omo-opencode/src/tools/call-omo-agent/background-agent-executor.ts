@@ -1,40 +1,24 @@
 import type { BackgroundManager } from "../../features/background-agent"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { resolveMessageContext } from "../../features/hook-message-injector"
-import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared"
 import type { CallOmoAgentArgs } from "./types"
 import type { ToolContextWithMetadata } from "./tool-context-with-metadata"
-import { getMessageDir } from "./message-storage-directory"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { requireSpawnCallerIdentity } from "../../features/background-agent/subagent-spawn-limits"
 
 export async function executeBackgroundAgent(
 	args: CallOmoAgentArgs,
-	toolContext: ToolContextWithMetadata,
+	toolContext: Omit<ToolContextWithMetadata, "agent"> & { readonly agent?: string },
 	manager: BackgroundManager,
 	client: PluginInput["client"],
 ): Promise<string> {
 	try {
-		const messageDir = getMessageDir(toolContext.sessionID)
-		const { prevMessage, firstMessageAgent } = await resolveMessageContext(
-			toolContext.sessionID,
-			client,
-			messageDir
-		)
-
-		const sessionAgent = getSessionAgent(toolContext.sessionID)
-		const parentAgent =
-			toolContext.agent ?? sessionAgent ?? firstMessageAgent ?? prevMessage?.agent
-
-		log("[call_omo_agent] parentAgent resolution", {
+		const parentAgent = requireSpawnCallerIdentity(toolContext.agent)
+		log("[call_omo_agent] trusted parent agent", {
 			sessionID: toolContext.sessionID,
-			messageDir,
 			ctxAgent: toolContext.agent,
-			sessionAgent,
-			firstMessageAgent,
-			prevMessageAgent: prevMessage?.agent,
-			resolvedParentAgent: parentAgent,
+			parentAgent,
 		})
 
 		const task = await manager.launch({

@@ -1,49 +1,23 @@
-import { log } from "../../shared/logger"
+import { requireSpawnCallerIdentity } from "../../features/background-agent/subagent-spawn-limits"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 
-export interface SyncSpawnReservation {
-  readonly spawnContext: {
-    readonly rootSessionID: string
-    readonly parentDepth: number
-    readonly childDepth: number
+export class SyncSpawnAdmissionUnavailableError extends Error {
+  readonly name = "SyncSpawnAdmissionUnavailableError"
+
+  constructor() {
+    super("Subagent spawn admission unavailable")
   }
-  readonly reservation: Awaited<ReturnType<ExecutorContext["manager"]["reserveSubagentSpawn"]>> | undefined
 }
 
-export async function reserveSyncSubagentSpawn(
+export async function assertSyncSubagentSpawn(
   executorCtx: Pick<ExecutorContext, "manager">,
-  parentContext: Pick<ParentContext, "sessionID">
-): Promise<SyncSpawnReservation> {
-  const { manager } = executorCtx
-  const reservation = typeof manager?.reserveSubagentSpawn === "function"
-    ? await manager.reserveSubagentSpawn(parentContext.sessionID)
-    : undefined
-
-  if (reservation?.spawnContext) {
-    return {
-      spawnContext: reservation.spawnContext,
-      reservation,
-    }
-  }
-
-  if (typeof manager?.assertCanSpawn === "function") {
-    return {
-      spawnContext: await manager.assertCanSpawn(parentContext.sessionID),
-      reservation,
-    }
-  }
-
-  log(
-    "[task] WARNING: BackgroundManager has no spawn enforcement methods (reserveSubagentSpawn / assertCanSpawn). " +
-    "Depth limits cannot be enforced for this task. This indicates an old SDK or a misconfiguration.",
-    { parentSessionID: parentContext.sessionID }
-  )
-  return {
-    spawnContext: {
-      rootSessionID: parentContext.sessionID,
-      parentDepth: 0,
-      childDepth: 1,
-    },
-    reservation,
-  }
+  parentContext: Pick<ParentContext, "sessionID" | "agent">,
+  targetAgent: string,
+): Promise<Awaited<ReturnType<ExecutorContext["manager"]["assertCanSpawn"]>>> {
+  if (!executorCtx.manager) throw new SyncSpawnAdmissionUnavailableError()
+  return executorCtx.manager.assertCanSpawn({
+    parentSessionID: parentContext.sessionID,
+    parentAgent: requireSpawnCallerIdentity(parentContext.agent),
+    targetAgent,
+  })
 }

@@ -13,6 +13,7 @@ import {
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 import { abortWithTimeout } from "./abort-with-timeout"
 import { ensureCurrentAttempt, scheduleRetryAttempt } from "./attempt-lifecycle"
+import { requireSpawnCallerIdentity, type SpawnAdmissionRequest } from "./subagent-spawn-limits"
 
 export class TeamModeFallbackError extends Error {
   constructor(message: string) {
@@ -58,6 +59,7 @@ export async function tryFallbackRetry(args: {
   idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>>
   queuesByKey: Map<string, QueueItem[]>
   processKey: (key: string) => void
+  admitRetrySpawn: (request: SpawnAdmissionRequest) => Promise<unknown>
   onRetrying?: (details: {
     task: BackgroundTask
     source: string
@@ -142,6 +144,12 @@ export async function tryFallbackRetry(args: {
     errorMessage: errorInfo.message?.slice(0, 100),
     attemptCount: selectedAttemptCount,
     nextModel: `${providerID}/${nextFallback.model}`,
+  })
+
+  await args.admitRetrySpawn({
+    parentSessionID: task.parentSessionId,
+    parentAgent: requireSpawnCallerIdentity(task.parentAgent),
+    targetAgent: task.agent,
   })
 
   if (task.concurrencyKey) {

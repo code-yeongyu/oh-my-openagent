@@ -44,7 +44,7 @@ function createRuntimeState(teamRunId: string): RuntimeState {
 
 function createStubBgMgr(): BackgroundManager {
   return unsafeTestValue<BackgroundManager>({
-    cancelTask: async () => undefined,
+    cancelTaskForCleanup: async () => undefined,
   })
 }
 

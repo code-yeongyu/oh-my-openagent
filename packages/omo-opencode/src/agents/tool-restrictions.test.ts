@@ -30,6 +30,32 @@ const TEAM_TOOL_NAMES = [
 describe("read-only agent tool restrictions", () => {
   const FILE_WRITE_TOOLS = ["write", "edit", "apply_patch"]
 
+  test("resolves configured ASCII and CJK display aliases before building spawn tool maps", () => {
+    const agentOverrides = {
+      sisyphus: { displayName: "Release Coordinator" },
+      atlas: { displayName: "执行总监" },
+      prometheus: { displayName: "计划总监" },
+    }
+
+    const sisyphus = getAgentToolRestrictions("Release Coordinator", { agentOverrides })
+    const atlas = getAgentToolRestrictions("执行总监", { agentOverrides })
+    const prometheus = getAgentToolRestrictions("计划总监", { agentOverrides })
+    const unknown = getAgentToolRestrictions("Unmapped Alias", { agentOverrides })
+
+    for (const coordinator of [sisyphus, atlas]) {
+      expect(coordinator.task).toBeUndefined()
+      expect(coordinator.call_omo_agent).toBeUndefined()
+      expect(coordinator.look_at).toBeUndefined()
+    }
+    expect(prometheus.task).toBeUndefined()
+    expect(prometheus.call_omo_agent).toBeUndefined()
+    expect(prometheus.look_at).toBe(false)
+    expect(prometheus.team_create).toBe(false)
+    expect(unknown.task).toBe(false)
+    expect(unknown.call_omo_agent).toBe(false)
+    expect(unknown.look_at).toBe(false)
+  })
+
   test("denies team tools for every delegated subagent prompt", () => {
     // given
     const restrictedAgentNames = [

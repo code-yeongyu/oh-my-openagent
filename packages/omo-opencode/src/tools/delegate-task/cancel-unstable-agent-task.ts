@@ -5,12 +5,12 @@ export async function cancelUnstableAgentTask(
   taskID: string | undefined,
   reason: string
 ): Promise<void> {
-  if (!taskID || typeof manager.cancelTask !== "function") {
+  if (!taskID || typeof manager.cancelTaskForCleanup !== "function") {
     return
   }
 
   await Promise.allSettled([
-    manager.cancelTask(taskID, {
+    manager.cancelTaskForCleanup(taskID, {
       source: "unstable-agent-task",
       reason,
       skipNotification: true,

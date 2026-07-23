@@ -30,6 +30,7 @@ describe("BackgroundManager session permission", () => {
       agent: "explore",
       parentSessionId: "ses_parent",
       parentMessageId: "msg_parent",
+      parentAgent: "sisyphus",
     })
     await new Promise(resolve => setTimeout(resolve, 50))
     manager.shutdown()
@@ -63,6 +64,7 @@ describe("BackgroundManager session permission", () => {
       agent: "explore",
       parentSessionId: "ses_parent",
       parentMessageId: "msg_parent",
+      parentAgent: "sisyphus",
     })
     await new Promise((resolve) => setTimeout(resolve, 50))
     manager.shutdown()
@@ -104,6 +106,7 @@ describe("BackgroundManager session permission", () => {
       agent: "explore",
       parentSessionId: "ses_parent",
       parentMessageId: "msg_parent",
+      parentAgent: "sisyphus",
       sessionPermission: [
         { permission: "question", action: "deny", pattern: "*" },
       ],

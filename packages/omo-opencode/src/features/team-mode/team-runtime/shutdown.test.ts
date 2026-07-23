@@ -425,6 +425,7 @@ describe("team-runtime shutdown", () => {
         { id: "team-task-b", sessionId: "session-b", parentMessageId: `team-create:${fixture.teamRunId}:member-b` },
       ],
       cancelTask: cancelTaskMock,
+      cancelTaskForCleanup: cancelTaskMock,
     }
 
     // when

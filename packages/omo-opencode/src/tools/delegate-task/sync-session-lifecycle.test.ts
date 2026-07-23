@@ -59,11 +59,15 @@ describe("executeSyncTask - sync session lifecycle ordering", () => {
     }
     const mockCtx = {
       sessionID: "parent-session",
+      agent: "sisyphus",
       callID: "call-123",
       metadata: () => {},
     }
     const mockExecutorCtx = {
       client: mockClient,
+      manager: {
+        assertCanSpawn: async () => ({ rootSessionID: "parent-session", parentDepth: 0, childDepth: 1 }),
+      },
       directory: "/tmp",
       onSyncSessionCreated,
     }
@@ -79,6 +83,7 @@ describe("executeSyncTask - sync session lifecycle ordering", () => {
     //#when
     const resultPromise = executeSyncTask(args, mockCtx, mockExecutorCtx, {
       sessionID: "parent-session",
+      agent: "sisyphus",
     }, "test-agent", undefined, undefined, undefined, undefined, deps)
     await syncCallbackStarted
 

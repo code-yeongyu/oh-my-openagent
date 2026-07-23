@@ -1,5 +1,4 @@
 export type {
-  BackgroundCancelClient,
   BackgroundOutputClient,
   BackgroundOutputManager,
   BackgroundOutputMessage,

@@ -6,7 +6,6 @@ type OpencodeClient = import("@opencode-ai/plugin").PluginInput["client"]
 type PluginInput = { client: OpencodeClient; directory: string }
 type BackgroundManager = {
   assertCanSpawn: Function
-  reserveSubagentSpawn: Function
   launch: Function
   getTask: Function
 }
@@ -39,18 +38,9 @@ const DEFAULT_AGENTS = [
 ]
 
 const assertCanSpawnMock = mock(() => Promise.resolve(undefined))
-const reserveCommitMock = mock(() => 1)
-const reserveRollbackMock = mock(() => {})
-const reserveSubagentSpawnMock = mock(() => Promise.resolve({
-  spawnContext: { rootSessionID: "root-session", parentDepth: 0, childDepth: 1 },
-  descendantCount: 1,
-  commit: reserveCommitMock,
-  rollback: reserveRollbackMock,
-}))
 
 const mockBackgroundManager = {
   assertCanSpawn: assertCanSpawnMock,
-  reserveSubagentSpawn: reserveSubagentSpawnMock,
   launch: mock(() => Promise.resolve({
     id: "test-task-id",
     sessionId: null,
@@ -71,9 +61,6 @@ const toolCtx = {
 beforeEach(() => {
   clearCallableAgentsCache()
   assertCanSpawnMock.mockClear()
-  reserveSubagentSpawnMock.mockClear()
-  reserveCommitMock.mockClear()
-  reserveRollbackMock.mockClear()
 })
 
 describe("createCallOmoAgent", () => {
@@ -547,7 +534,7 @@ describe("createCallOmoAgent", () => {
   test("should return a tool error when sync spawn depth validation fails", async () => {
     //#given
     const mockCtx = createMockCtx(DEFAULT_AGENTS)
-    reserveSubagentSpawnMock.mockRejectedValueOnce(new Error("Subagent spawn blocked: child depth 4 exceeds background_task.maxDepth=3."))
+    assertCanSpawnMock.mockRejectedValueOnce(new Error("Subagent spawn blocked: child depth 4 exceeds background_task.maxDepth=3."))
     const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
     const executeFunc = toolDef.execute as Function
 

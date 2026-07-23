@@ -8,10 +8,15 @@ import { __resetModelCache } from "../../shared/model-availability"
 import { clearSkillCache } from "../../features/opencode-skill-loader/skill-content"
 import { __setTimingConfig, __resetTimingConfig } from "./timing"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
-import * as executor from "./executor"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
 
 const runtimeRequire = require as NodeJS.Require & { cache?: Record<string, unknown> }
+
+mock.module("./sync-spawn-reservation", () => ({
+  assertSyncSubagentSpawn: async () => ({ childDepth: 1 }),
+}))
+
+const executor = require("./executor")
 
 function clearRequireCache(modulePath: string): void {
   const resolvedPath = runtimeRequire.resolve(modulePath)
@@ -1188,7 +1193,7 @@ describe("sisyphus-task", () => {
        const { createDelegateTask } = require("./tools")
        let promptBody: CapturedPromptBody = {}
 
-       const mockManager = { launch: async () => ({}) }
+        const mockManager = { launch: async () => ({}), assertCanSpawn: async () => ({ childDepth: 1 }) }
 
        const promptMock = async (input: CapturedPromptInput) => {
          promptBody = input.body
@@ -1887,8 +1892,9 @@ describe("sisyphus-task", () => {
     
       let messagesCallCount = 0
 
-      const mockClient = {
+       const mockClient = {
          session: {
+           get: async () => ({ data: { parentID: "parent-session" } }),
            prompt: async () => ({ data: {} }),
            promptAsync: async () => ({ data: {} }),
            messages: async (args?: { path?: { id?: string } }) => {
@@ -1998,6 +2004,7 @@ describe("sisyphus-task", () => {
 
     const mockClient = {
       session: {
+        get: async () => ({ data: { parentID: "parent-session" } }),
         prompt: promptMock,
         promptAsync: promptMock,
         messages: async (input: CapturedSessionMessagesInput) => {
@@ -4760,7 +4767,7 @@ describe("buildSyncPromptTools (issue #5182)", () => {
     // hardcoded restriction (task: false) still applies
     expect(result.task).toBe(false)
     // unconditionally allowed tools remain unchanged
-    expect(result.call_omo_agent).toBe(true)
+    expect(result.call_omo_agent).toBe(false)
     expect(result.question).toBe(false)
   })
 
@@ -4811,15 +4818,15 @@ describe("buildSyncPromptTools (issue #5182)", () => {
     // #then session tools include user's grep:false and glob:false denials
     const storedTools = getSessionTools(sessionID)
     expect(storedTools).toBeDefined()
-    expect(storedTools!.grep).toBe(false)
-    expect(storedTools!.glob).toBe(false)
+    expect(storedTools?.grep).toBe(false)
+    expect(storedTools?.glob).toBe(false)
     // hardcoded restriction (task: false for sisyphus-junior) still applies
-    expect(storedTools!.task).toBe(false)
+    expect(storedTools?.task).toBe(false)
     // unconditionally allowed tools remain unchanged
-    expect(storedTools!.call_omo_agent).toBe(true)
-    expect(storedTools!.question).toBe(false)
+    expect(storedTools?.call_omo_agent).toBe(false)
+    expect(storedTools?.question).toBe(false)
     // buildSyncPromptTools only processes denials, not allows,
     // so read:true from tools config does not appear in the result
-    expect(storedTools!.read).toBeUndefined()
+    expect(storedTools?.read).toBeUndefined()
   })
 })

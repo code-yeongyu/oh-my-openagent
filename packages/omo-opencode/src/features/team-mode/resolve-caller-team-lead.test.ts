@@ -20,6 +20,23 @@ function makeSpec(overrides: Partial<TeamSpec> = {}): TeamSpec {
 }
 
 describe("resolveCallerTeamLead", () => {
+  test.each([
+    ["ASCII Sisyphus", "Release Coordinator", "sisyphus"],
+    ["CJK Atlas", "执行总监", "atlas"],
+  ])("resolves configured %s alias to its trusted lead", (_label, rawAgentName, agentTypeId) => {
+    // given
+    const agentOverrides = {
+      sisyphus: { displayName: "Release Coordinator" },
+      atlas: { displayName: "执行总监" },
+    }
+
+    // when
+    const result = resolveCallerTeamLead(rawAgentName, agentOverrides)
+
+    // then
+    expect(result).toMatchObject({ agentTypeId, isEligibleForTeamLead: true })
+  })
+
   test("returns an eligible sisyphus lead for the plain display name", () => {
     // given
     const rawAgentName = "Sisyphus"

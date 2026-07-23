@@ -19,6 +19,7 @@ function createTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
     status: "error",
     parentSessionId: "parent-session-1",
     parentMessageId: "parent-message-1",
+    parentAgent: "sisyphus",
     fallbackChain,
     attemptCount: 0,
     concurrencyKey: "provider-a/original-model",
@@ -56,6 +57,7 @@ function createRetryArgs(overrides: Partial<BackgroundTask> = {}) {
     idleDeferralTimers: new Map<string, ReturnType<typeof setTimeout>>(),
     queuesByKey: new Map<string, QueueItem[]>(),
     processKey: mock(() => {}),
+    admitRetrySpawn: mock(async () => {}),
     deps: createDeps(),
   }
 }
