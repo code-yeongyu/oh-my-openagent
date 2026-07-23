@@ -5,19 +5,37 @@ export const syncSubagentSessions = new Set<string>()
 export const handedBackSyncSessions = new Set<string>()
 
 let _mainSessionID: string | undefined
+const mainSessionIDs = new Set<string>()
 
 export function setMainSession(id: string | undefined) {
+  if (id === undefined) {
+    _mainSessionID = undefined
+    mainSessionIDs.clear()
+    return
+  }
   _mainSessionID = id
+  mainSessionIDs.delete(id)
+  mainSessionIDs.add(id)
 }
 
 export function getMainSessionID(): string | undefined {
   return _mainSessionID
 }
 
+export function isMainSession(id: string): boolean {
+  return mainSessionIDs.has(id)
+}
+
+export function removeMainSession(id: string): void {
+  mainSessionIDs.delete(id)
+  if (_mainSessionID !== id) return
+  _mainSessionID = [...mainSessionIDs].at(-1)
+}
+
 const registeredAgentNames = new Set<string>()
 const registeredAgentAliases = new Map<string, string>()
 
-const ZERO_WIDTH_CHARACTERS_REGEX = /[\u200B\u200C\u200D\uFEFF]/g
+const ZERO_WIDTH_CHARACTERS_REGEX = /\u200B|\u200C|\u200D|\uFEFF/g
 
 function normalizeRegisteredAgentName(name: string): string {
   return name.replace(ZERO_WIDTH_CHARACTERS_REGEX, "").toLowerCase()
@@ -76,6 +94,7 @@ export function resolveRegisteredAgentName(name: string | undefined): string | u
 /** @internal For testing only */
 export function _resetForTesting(): void {
   _mainSessionID = undefined
+  mainSessionIDs.clear()
   subagentSessions.clear()
   syncSubagentSessions.clear()
   handedBackSyncSessions.clear()

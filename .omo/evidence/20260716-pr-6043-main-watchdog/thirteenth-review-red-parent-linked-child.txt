@@ -1,0 +1,30 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-main-session.test.ts:
+34 |
+35 |     try {
+36 |       watchdog.onUserMessage(childSessionID, PRIMARY_MODEL, AGENT)
+37 |       await timers.advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+38 |
+39 |       expect(calls.abort).toEqual([])
+                               ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   {
++     "sessionID": "session-parent-linked-child",
++     "source": "first-prompt-watchdog",
++   },
++ ]
+
+- Expected  - 1
++ Received  + 6
+
+      at <anonymous> (<worktree>/packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-main-session.test.ts:39:27)
+(fail) first-prompt watchdog main-session identity > #given an authoritative main session exists #when an unregistered parent-linked child stays silent #then the main-session watchdog does not claim it [1.56ms]
+
+ 0 pass
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [134.00ms]

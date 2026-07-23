@@ -1,0 +1,29 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-abort.test.ts:
+(pass) createAbortSessionRequest reservation release > #given a session reserved by model-suggestion-retry on a provider retry signal #when the runtime-fallback abort fires #then the reservation is released so the fallback dispatch can acquire the session [1.39ms]
+(pass) createAbortSessionRequest reservation release > #given a session reserved by model-suggestion-retry:sync #when the runtime-fallback abort fires #then the reservation is released [0.12ms]
+(pass) createAbortSessionRequest reservation release > #given a session reserved by the runtime-fallback path itself #when the abort fires #then the reservation is still released [0.08ms]
+(pass) createAbortSessionRequest reservation release > #given a session reserved by an unrelated user prompt #when the runtime-fallback abort fires #then the reservation is preserved (abort must not steal a foreground user turn) [0.15ms]
+(pass) createAbortSessionRequest reservation release > #given a watchdog aborts a still-running session #when the abort fires #then the abort is marked internal for the resulting session.error [0.10ms]
+(pass) createAbortSessionRequest reservation release > #given a watchdog abort request fails #when the abort rejects #then no internal-abort marker remains [0.18ms]
+(pass) createAbortSessionRequest reservation release > #given the SDK resolves a non-2xx abort #when the watchdog aborts #then ownership and the prompt reservation are preserved [0.14ms]
+(pass) createAbortSessionRequest reservation release > #given two overlapping internal abort callers #when the first request is still pending #then only the wire owner continues [0.15ms]
+(pass) createAbortSessionRequest reservation release > #given an abort starts with one prompt reservation #when a newer reservation replaces it before abort completion #then the newer reservation remains owned [0.09ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/abort-wire-ordering.test.ts:
+(pass) runtime-fallback abort wire ordering > #given OpenCode publishes the watchdog abort before its HTTP response #when the event is observed #then fallback ownership survives and dispatch continues [2.51ms]
+(pass) runtime-fallback abort wire ordering > #given overlapping internal abort callers for one session #when OpenCode emits one internal terminal #then the next abort event remains a genuine cancellation [0.44ms]
+(pass) runtime-fallback abort wire ordering > #given status fallback and watchdog share one abort #when the terminal arrives during status dispatch #then the status fallback remains authoritative [0.52ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-boundaries.test.ts:
+(pass) first-prompt watchdog boundaries > #given session emits message.part.delta with field/delta but no part.type #when watchdog tracks #then the watchdog recognizes progress [0.57ms]
+(pass) first-prompt watchdog boundaries > #given a delta belongs to the current user message #when observed #then it does not disarm silence recovery [0.19ms]
+(pass) first-prompt watchdog boundaries > #given a subagent leaves subagentSessions before the threshold #when the watchdog fires #then it is suppressed [0.10ms]
+(pass) first-prompt watchdog boundaries > #given a subagent reaches a terminal session state before the threshold #when onSessionTerminal is called #then the watchdog is cancelled and no fallback is dispatched [0.12ms]
+(pass) first-prompt watchdog boundaries > #given a main session is silent past the threshold with no fallback configured #when the watchdog fires #then it does not abort or dispatch [0.10ms]
+
+ 17 pass
+ 0 fail
+ 36 expect() calls
+Ran 17 tests across 3 files. [148.00ms]

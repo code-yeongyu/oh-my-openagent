@@ -1,0 +1,3 @@
+PASS source_head=d0778a6cc23fb59977be4d6ce933cd4441a59db5 real_db_unchanged=yes older_root_fallback=yes two_active_roots=yes deletion_restored_older=yes fallback_watchdog_rearmed=no later_user_abort=external
+live_session_next_event_count=0
+coverage_note=installed OpenCode emitted no session.next events in this scenario; deterministic real-watchdog matrix covers typed control/output variants

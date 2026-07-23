@@ -713,7 +713,7 @@ Auto-switches to backup models on API errors.
 | `retry_on_errors`       | `[429,500,502,503,504]` | HTTP codes that trigger fallback. Also handles classified provider key errors.                                              |
 | `max_fallback_attempts` | `3`                 | Max fallback attempts per session (1–20)                                                                                       |
 | `cooldown_seconds`      | `60`                | Seconds before retrying a failed model                                                                                         |
-| `timeout_seconds`       | `30`                | Seconds before forcing next fallback. **Set to `0` to disable timeout-based escalation and `message.updated` provider retry signal detection.** Structured `session.status` retry events can still trigger fallback. |
+| `timeout_seconds`       | `30`                | Seconds before forcing next fallback. **Set to `0` to disable timeout-based escalation, main-session first-prompt watchdog escalation, and `message.updated` provider retry signal detection.** The historical 90-second subagent first-prompt watchdog and structured `session.status` retry events remain active. |
 | `notify_on_fallback`    | `true`              | Toast notification on model switch                                                                                             |
 
 #### Speeding Up Fallback (Proxy APIs)

@@ -54,6 +54,7 @@ function createHelpers(abortCalls: string[], retryCalls: Array<{ sessionID: stri
   return {
     abortSessionRequest: async (sessionID: string) => {
       abortCalls.push(sessionID)
+      return true
     },
     clearSessionFallbackTimeout: () => {},
     scheduleSessionFallbackTimeout: () => {},
@@ -84,7 +85,7 @@ describe("createSessionStatusHandler", () => {
     state.pendingFallbackPromptMayHaveBeenAccepted = true
     deps.sessionStates.set(sessionID, state)
 
-    const handler = createSessionStatusHandler(deps, createHelpers(abortCalls, retryCalls), deps.sessionStatusRetryKeys)
+    const handler = createSessionStatusHandler(deps, createHelpers(abortCalls, retryCalls))
 
     // when
     await handler({
@@ -123,7 +124,7 @@ describe("createSessionStatusHandler", () => {
     state.failedModels.set("anthropic/claude-opus-4-7", Date.now())
     deps.sessionStates.set(sessionID, state)
 
-    const handler = createSessionStatusHandler(deps, createHelpers(abortCalls, retryCalls), deps.sessionStatusRetryKeys)
+    const handler = createSessionStatusHandler(deps, createHelpers(abortCalls, retryCalls))
 
     // when
     await handler({

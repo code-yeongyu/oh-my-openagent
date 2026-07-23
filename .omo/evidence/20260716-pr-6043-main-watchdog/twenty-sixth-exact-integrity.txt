@@ -1,0 +1,13 @@
+source_head=69c41c05481cbf7eb1dae55e57cb711fede845c3
+source_commit_subject=fix(runtime-fallback): coalesce watchdog abort requests
+git_diff_check=pass
+real_db_session_count=5751
+packages/omo-opencode/src/hooks/runtime-fallback/abort-wire-ordering.test.ts=107
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-abort.test.ts=174
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-abort.ts=83
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-fire.ts=103
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-lifecycle.test.ts=222
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts=250
+packages/omo-opencode/src/hooks/runtime-fallback/hook.ts=149
+packages/omo-opencode/src/hooks/runtime-fallback/types.ts=86
+packages/omo-opencode/src/hooks/runtime-fallback/watchdog-abort-provenance.ts=104

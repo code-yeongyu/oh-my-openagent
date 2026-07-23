@@ -1,6 +1,6 @@
 import {
   clearSessionAgent,
-  getMainSessionID,
+  removeMainSession,
   setMainSession,
   subagentSessions,
   syncSubagentSessions,
@@ -61,12 +61,14 @@ export async function handleSessionCreatedEvent(args: {
   pluginContext: PluginEventContext;
   managers: Managers;
   firstMessageVariantGate: FirstMessageVariantGate;
+  sessionDeletionTasks: Map<string, Promise<void>>;
 }): Promise<void> {
   const sessionInfo = args.props?.info as { id?: string; title?: string; parentID?: string } | undefined;
   const sessionID = resolveSessionEventID(args.props);
+  if (sessionID) await args.sessionDeletionTasks.get(sessionID)?.catch(() => undefined);
   const isSubagentSession = !!sessionInfo?.parentID || !!sessionID && subagentSessions.has(sessionID);
 
-  if (!isSubagentSession) setMainSession(sessionID);
+  if (sessionID && !isSubagentSession) setMainSession(sessionID);
   args.firstMessageVariantGate.markSessionCreated(sessionInfo);
 
   if (args.tmuxIntegrationEnabled && !isSubagentSession) {
@@ -83,7 +85,7 @@ export async function handleSessionCreatedEvent(args: {
   }
 }
 
-export async function handleSessionDeletedEvent(args: {
+type SessionDeletedEventArgs = {
   props?: Record<string, unknown>;
   tmuxIntegrationEnabled: boolean;
   pluginConfig: OhMyOpenCodeConfig;
@@ -91,27 +93,62 @@ export async function handleSessionDeletedEvent(args: {
   managers: Managers;
   firstMessageVariantGate: FirstMessageVariantGate;
   clearModelFallbackSession: (sessionID: string) => void;
-}): Promise<void> {
-  const sessionID = resolveSessionEventID(args.props);
-  if (sessionID === getMainSessionID()) setMainSession(undefined);
-  if (!sessionID) return;
+  sessionDeletionTasks: Map<string, Promise<void>>;
+};
 
-  await args.managers.monitorManager?.stopSessionMonitors(sessionID);
-  const wasSyncSubagentSession = syncSubagentSessions.has(sessionID);
-  clearSessionAgent(sessionID);
-  args.clearModelFallbackSession(sessionID);
-  resetMessageCursor(sessionID);
-  clearBackgroundOutputConsumptionsForParentSession(sessionID);
-  clearBackgroundOutputConsumptionsForTaskSession(sessionID);
-  args.firstMessageVariantGate.clear(sessionID);
-  clearSessionModel(sessionID);
-  clearSessionPromptParams(sessionID);
-  syncSubagentSessions.delete(sessionID);
-  await dispatchOpenClawSessionEvent({ ...args, rawEvent: "session.deleted", sessionID });
-  if (wasSyncSubagentSession) subagentSessions.delete(sessionID);
-  deleteSessionTools(sessionID);
-  await args.managers.skillMcpManager.disconnectSession(sessionID);
-  if (args.tmuxIntegrationEnabled) await args.managers.tmuxSessionManager.onSessionDeleted({ sessionID });
+export type SessionDeletionReservation = {
+  readonly task: Promise<void>;
+  start: () => void;
+};
+
+export function reserveSessionDeletedEvent(args: SessionDeletedEventArgs): SessionDeletionReservation {
+  const sessionID = resolveSessionEventID(args.props);
+  if (!sessionID) return { task: Promise.resolve(), start: () => {} };
+
+  let startCleanup: (() => void) | undefined;
+  let started = false;
+  const startGate = new Promise<void>((resolve) => { startCleanup = resolve; });
+  const previousTask = args.sessionDeletionTasks.get(sessionID);
+  const cleanup = (async (): Promise<void> => {
+    await previousTask?.catch(() => undefined);
+    await startGate;
+    removeMainSession(sessionID);
+    const wasSyncSubagentSession = syncSubagentSessions.has(sessionID);
+    clearSessionAgent(sessionID);
+    args.clearModelFallbackSession(sessionID);
+    resetMessageCursor(sessionID);
+    clearBackgroundOutputConsumptionsForParentSession(sessionID);
+    clearBackgroundOutputConsumptionsForTaskSession(sessionID);
+    args.firstMessageVariantGate.clear(sessionID);
+    clearSessionModel(sessionID);
+    clearSessionPromptParams(sessionID);
+    syncSubagentSessions.delete(sessionID);
+    if (wasSyncSubagentSession) subagentSessions.delete(sessionID);
+    deleteSessionTools(sessionID);
+
+    await args.managers.monitorManager?.stopSessionMonitors(sessionID);
+    await dispatchOpenClawSessionEvent({ ...args, rawEvent: "session.deleted", sessionID });
+    await args.managers.skillMcpManager.disconnectSession(sessionID);
+    if (args.tmuxIntegrationEnabled) await args.managers.tmuxSessionManager.onSessionDeleted({ sessionID });
+  })();
+  const task = cleanup.finally(() => {
+    if (args.sessionDeletionTasks.get(sessionID) === task) args.sessionDeletionTasks.delete(sessionID);
+  });
+  args.sessionDeletionTasks.set(sessionID, task);
+  return {
+    task,
+    start: () => {
+      if (started) return;
+      started = true;
+      startCleanup?.();
+    },
+  };
+}
+
+export function handleSessionDeletedEvent(args: SessionDeletedEventArgs): Promise<void> {
+  const reservation = reserveSessionDeletedEvent(args);
+  reservation.start();
+  return reservation.task;
 }
 
 export function handleMessageRemovedEvent(props?: Record<string, unknown>): void {

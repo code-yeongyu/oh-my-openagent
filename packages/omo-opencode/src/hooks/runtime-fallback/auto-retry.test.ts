@@ -2,7 +2,14 @@ import { describe, expect, test } from "bun:test"
 
 import { createAutoRetryHelpers } from "./auto-retry"
 import { createFallbackState } from "./fallback-state"
+import { consumeInternalAbortOwnership } from "./internal-abort-ownership"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((done) => { resolve = done })
+  return { promise, resolve }
+}
 
 function createContext(promptCalls: { count: number }): RuntimeFallbackPluginInput {
   const session = {
@@ -202,5 +209,64 @@ describe("createAutoRetryHelpers", () => {
     expect(deps.sessionStates.has(sessionID)).toBe(false)
     expect(deps.sessionLastAccess.has(sessionID)).toBe(false)
     expect(deps.internallyAbortedSessions.has(sessionID)).toBe(false)
+  })
+
+  test("#given a stale session has a pending internal abort #when cleanup evicts it #then a late response stays invalidated", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    const abortResponse = deferred<unknown>()
+    const abortStarted = deferred<void>()
+    deps.ctx.client.session.abort = async () => {
+      abortStarted.resolve()
+      return abortResponse.promise
+    }
+    const helpers = createAutoRetryHelpers(deps)
+    const sessionID = "session-stale-pending-abort"
+
+    // when
+    const pendingAbort = helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
+    await abortStarted.promise
+    deps.sessionLastAccess.set(sessionID, Date.now() - 31 * 60 * 1000)
+    helpers.cleanupStaleSessions()
+    abortResponse.resolve({})
+
+    // then
+    expect(await pendingAbort).toBe(false)
+    expect(deps.internalAbortRequests?.has(sessionID)).toBe(false)
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(false)
+  })
+
+  test("#given cleanup permits a replacement abort #when the stale abort resolves #then replacement ownership remains intact", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    const staleResponse = deferred<unknown>()
+    const replacementResponse = deferred<unknown>()
+    let abortCalls = 0
+    deps.ctx.client.session.abort = async () => {
+      abortCalls += 1
+      return abortCalls === 1 ? staleResponse.promise : replacementResponse.promise
+    }
+    const helpers = createAutoRetryHelpers(deps)
+    const sessionID = "session-stale-replacement-abort"
+
+    // when
+    const staleAbort = helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
+    while (abortCalls < 1) await Promise.resolve()
+    deps.sessionLastAccess.set(sessionID, Date.now() - 31 * 60 * 1000)
+    helpers.cleanupStaleSessions()
+    const replacementAbort = helpers.abortSessionRequest(sessionID, "first-prompt-watchdog")
+    while (abortCalls < 2) await Promise.resolve()
+    staleResponse.resolve({})
+
+    // then
+    expect(await staleAbort).toBe(false)
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
+    expect(deps.internalAbortOwnershipCounts?.get(sessionID)).toBe(1)
+    expect(consumeInternalAbortOwnership(deps, sessionID)).toBe(true)
+
+    replacementResponse.resolve({})
+    expect(await replacementAbort).toBe(true)
   })
 })

@@ -1,0 +1,23 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/abort-wire-ordering.test.ts:
+(pass) runtime-fallback abort wire ordering > #given OpenCode publishes the watchdog abort before its HTTP response #when the event is observed #then fallback ownership survives and dispatch continues [3.12ms]
+(pass) runtime-fallback abort wire ordering > #given overlapping internal abort callers for one session #when OpenCode emits one internal terminal #then the next abort event remains a genuine cancellation [0.45ms]
+(pass) runtime-fallback abort wire ordering > #given status fallback and watchdog share one abort #when the terminal arrives during status dispatch #then the status fallback remains authoritative [0.55ms]
+(pass) runtime-fallback abort wire ordering > #given a status fallback replaces the silent request #when the original watchdog deadline passes #then the accepted fallback is not aborted or advanced [0.50ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-three-generation.test.ts:
+(pass) first-prompt watchdog three-generation races > #given generation one retains abort provenance #when progress cancels generation two before generation three arms #then generation three still recovers [3.45ms]
+(pass) first-prompt watchdog three-generation races > #given generation one retains abort provenance #when status resolution cancels generation two before generation three arms #then generation three still recovers [2.74ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/abort-rejection-handlers.test.ts:
+(pass) runtime fallback abort rejection > #given a message retry signal while a retry is active #when abort is rejected #then ownership and the active retry are preserved [0.58ms]
+(pass) runtime fallback abort rejection > #given a quota error with a fallback #when abort is rejected #then no replacement request is dispatched [0.45ms]
+(pass) runtime fallback abort rejection > #given a session retry signal while a retry is active #when abort is rejected #then the active retry remains authoritative [0.11ms]
+(pass) runtime fallback abort rejection > #given a rejected session retry abort #when the same retry signal arrives again #then it can acquire ownership and dispatch fallback [0.16ms]
+(pass) runtime fallback abort rejection > #given a pending fallback and a newer session retry signal #when abort is rejected #then pending ownership is preserved [0.09ms]
+
+ 11 pass
+ 0 fail
+ 41 expect() calls
+Ran 11 tests across 3 files. [103.00ms]

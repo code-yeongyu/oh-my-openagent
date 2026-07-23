@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { createFallbackTimeoutHelpers } from "./auto-retry-timeout"
 import { createFallbackState } from "./fallback-state"
+import { bumpSessionGeneration, getSessionGeneration } from "./session-generation"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 
@@ -73,7 +74,7 @@ describe("createFallbackTimeoutHelpers", () => {
     })
     const helpers = createFallbackTimeoutHelpers(
       deps,
-      async () => {},
+      async () => true,
       async (_sessionID, model) => {
         retryModel = model
         resolveRetry?.()
@@ -120,7 +121,7 @@ describe("createFallbackTimeoutHelpers", () => {
     })
     const helpers = createFallbackTimeoutHelpers(
       deps,
-      async () => {},
+      async () => true,
       async () => {
         resolveRetry?.()
         return { accepted: false, status: "blocked", reason: "test gate blocked dispatch" }
@@ -140,6 +141,114 @@ describe("createFallbackTimeoutHelpers", () => {
     // then
     expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
     expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(true)
+    helpers.clearSessionFallbackTimeout(sessionID)
+  })
+
+  test("#given timeout escalation cannot abort the active request #when the timeout fires #then it preserves retry ownership and does not dispatch a fallback", async () => {
+    const sessionID = "session-timeout-abort-failed"
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createDeps()
+    const state = createFallbackState("openai/gpt-5.4")
+    state.pendingFallbackModel = "litellm/openai.eu.gpt-5.5"
+    state.pendingFallbackPromptMayHaveBeenAccepted = true
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionRetryInFlight.add(sessionID)
+
+    let resolveAbort: (() => void) | undefined
+    const abortCalled = new Promise<void>((resolve) => {
+      resolveAbort = resolve
+    })
+    let dispatchCount = 0
+    const helpers = createFallbackTimeoutHelpers(
+      deps,
+      async () => {
+        resolveAbort?.()
+        return false
+      },
+      async () => {
+        dispatchCount += 1
+        return { accepted: true, status: "dispatched" }
+      },
+    )
+
+    helpers.scheduleSessionFallbackTimeout(sessionID)
+    await Promise.race([
+      abortCalled,
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("timer did not fire")), 1000)
+      }),
+    ])
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(dispatchCount).toBe(0)
+    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(true)
+    expect(state.pendingFallbackModel).toBe("litellm/openai.eu.gpt-5.5")
+    expect(state.pendingFallbackPromptMayHaveBeenAccepted).toBe(true)
+    expect(state.currentModel).toBe("openai/gpt-5.4")
+    expect(state.attemptCount).toBe(0)
+  })
+
+  test("#given an old timeout abort is pending #when a newer user generation starts #then stale completion preserves the newer owner and timer", async () => {
+    // given
+    const sessionID = "session-timeout-stale-generation"
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createDeps()
+    const state = createFallbackState("openai/gpt-5.4")
+    state.pendingFallbackModel = "litellm/openai.eu.gpt-5.5"
+    state.pendingFallbackPromptMayHaveBeenAccepted = true
+    deps.sessionStates.set(sessionID, state)
+    getSessionGeneration(deps, sessionID)
+
+    let resolveAbortStarted: (() => void) | undefined
+    const abortStarted = new Promise<void>((resolve) => {
+      resolveAbortStarted = resolve
+    })
+    let resolveAbortResult: ((result: boolean) => void) | undefined
+    const abortResult = new Promise<boolean>((resolve) => {
+      resolveAbortResult = resolve
+    })
+    let dispatchCount = 0
+    const helpers = createFallbackTimeoutHelpers(
+      deps,
+      async () => {
+        resolveAbortStarted?.()
+        return abortResult
+      },
+      async () => {
+        dispatchCount += 1
+        return { accepted: true, status: "dispatched" }
+      },
+    )
+
+    helpers.scheduleSessionFallbackTimeout(sessionID)
+    await Promise.race([
+      abortStarted,
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("timer did not fire")), 1000)
+      }),
+    ])
+
+    // when
+    bumpSessionGeneration(deps, sessionID)
+    if (deps.options) deps.options.session_timeout_ms = 10_000
+    deps.sessionRetryInFlight.add(sessionID)
+    const newerOwner = Symbol("newer-owner")
+    deps.sessionRetryOwners = new Map([[sessionID, newerOwner]])
+    helpers.scheduleSessionFallbackTimeout(sessionID)
+    const newerTimer = deps.sessionFallbackTimeouts.get(sessionID)
+    resolveAbortResult?.(true)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    // then
+    expect(dispatchCount).toBe(0)
+    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(true)
+    expect(deps.sessionRetryOwners.get(sessionID)).toBe(newerOwner)
+    expect(deps.sessionFallbackTimeouts.get(sessionID)).toBe(newerTimer)
+    expect(state.currentModel).toBe("openai/gpt-5.4")
+    expect(state.fallbackIndex).toBe(-1)
+    expect(state.attemptCount).toBe(0)
+    expect(state.pendingFallbackModel).toBe("litellm/openai.eu.gpt-5.5")
+    expect(state.pendingFallbackPromptMayHaveBeenAccepted).toBe(true)
     helpers.clearSessionFallbackTimeout(sessionID)
   })
 })

@@ -1,0 +1,10 @@
+git_diff_check=pass
+changed_production_pure_loc=event-handler.ts:228,event-session-lifecycle.ts:167,event.ts:227
+debug_markers=none
+temporary_no_excuse_runner=removed
+debug_journal=removed
+git_info_exclude_entry=absent
+owned_processes=none
+owned_tmux_sessions=none
+owned_live_sandboxes=none
+real_opencode_db_session_count=5751

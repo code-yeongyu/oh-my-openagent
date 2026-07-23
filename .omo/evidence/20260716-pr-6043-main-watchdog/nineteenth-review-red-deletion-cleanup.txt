@@ -1,0 +1,36 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-deletion.test.ts:
+28 |     watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+29 |     expect(generations.has(sessionID)).toBe(true)
+30 |
+31 |     watchdog.onSessionTerminal(sessionID, "session.deleted")
+32 |
+33 |     expect(generations.has(sessionID)).toBe(false)
+                                            ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-deletion.test.ts:33:40)
+(fail) first-prompt watchdog deletion cleanup > #given a session has an armed watchdog #when the session is deleted #then its generation bookkeeping is removed [0.77ms]
+54 |         sessionID,
+55 |       })
+56 |
+57 |       watchdog.onSessionTerminal(sessionID, "session.deleted")
+58 |
+59 |       expect(generations.has(sessionID)).toBe(false)
+                                              ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-deletion.test.ts:59:42)
+(fail) first-prompt watchdog deletion cleanup > #given a session is suspended for delayed-abort correlation #when the session is deleted #then its generation bookkeeping is removed [1.08ms]
+
+ 0 pass
+ 2 fail
+ 4 expect() calls
+Ran 2 tests across 1 file. [65.00ms]

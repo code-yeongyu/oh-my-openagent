@@ -1,0 +1,12 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-abort-lifecycle-races.test.ts:
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort is rejected #when the same retry arrives again #then the hook retries cancellation and dispatches fallback [3.23ms]
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort event precedes its response #when the next retry arrives #then fallback ownership advances to the second model [0.84ms]
+(pass) runtime-fallback composed abort lifecycle races > #given a status abort is pending #when the hook is disposed #then its response cannot dispatch or recreate a timeout [0.14ms]
+(pass) runtime-fallback composed abort lifecycle races > #given an older status retry is resolving #when a newer user turn arrives #then the stale retry cannot abort or dispatch [0.52ms]
+
+ 4 pass
+ 0 fail
+ 5 expect() calls
+Ran 4 tests across 1 file. [64.00ms]

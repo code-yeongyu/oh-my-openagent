@@ -1,0 +1,9 @@
+head=783ee580b514256079be9ff69324247e6947c4e3
+branch=review/pr-6043
+real_db_count=5751
+diff_check=pass
+pure_loc=245 packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.ts
+pure_loc=37 packages/omo-opencode/src/hooks/runtime-fallback/reserved-retry-dispatch.ts
+pure_loc=247 packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts
+pure_loc=50 packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-state.ts
+pure_loc_gate=pass

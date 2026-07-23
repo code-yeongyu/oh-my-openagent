@@ -1,0 +1,7 @@
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-generation-race.test.ts pure_loc=237 limit=250 PASS
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-message-fetch-ordering.test.ts pure_loc=119 limit=250 PASS
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-ownership.ts pure_loc=126 limit=250 PASS
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-terminal-races.test.ts pure_loc=122 limit=250 PASS
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts pure_loc=249 limit=250 PASS
+packages/omo-opencode/src/hooks/runtime-fallback/hook.ts pure_loc=182 limit=250 PASS
+packages/omo-opencode/src/hooks/runtime-fallback/watchdog-abort-provenance.ts pure_loc=112 limit=250 PASS

@@ -1,0 +1,18 @@
+COMMAND: opencode-qa common self-check
+PASS: dependencies present (opencode sqlite3 curl jq tmux)
+PASS: oqa_db_path -> /Users/yeongyu/.local/share/opencode/opencode.db
+PASS: oqa_sql_escape quotes single quotes
+PASS: oqa_free_port -> 60657
+PASS: isolated XDG sandbox auto-removed on exit (/var/folders/h6/w548ypzn1k78_xqndn63y7xc0000gn/T/oqa-xdg.XXXXXX.WmL1Qn7qN4)
+PASS: isolated HOME points inside sandbox
+PASS: isolated HOME preserves HOME-based opencode shim
+PASS: common.sh self-check
+COMMAND: sse-hook-probe self-test
+first matching event: {"type":"server.connected"}
+PASS: SSE /event opened and delivered server.connected
+COMMAND: tui-smoke self-test
+PASS: TUI rendered under tmux (marker found; version 1.17.13)
+PASS: send-keys reached the TUI composer (sentinel echoed)
+PASS: tmux session torn down (has-session false)
+PASS: real DB untouched (session count 5751 unchanged)
+PASS: tui-smoke

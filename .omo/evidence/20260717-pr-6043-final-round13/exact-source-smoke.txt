@@ -1,0 +1,30 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin/event-main-session-lifecycle.test.ts:
+(pass) main session lifecycle > #given roots A and B #when root B is deleted #then root A remains active and becomes current [0.89ms]
+(pass) main session lifecycle > #given an active root #when session.created has no ID #then current identity and membership are preserved [0.09ms]
+(pass) main session lifecycle > #given deletion pauses during monitor cleanup #when the same ID is recreated #then stale cleanup cannot clear or disconnect replacement state [0.30ms]
+
+packages/omo-opencode/src/plugin/event-session-deletion-ordering.test.ts:
+(pass) plugin session deletion ordering > #given creation pauses before registration #when deletion arrives later #then the deleted ID is not resurrected [1.00ms]
+(pass) plugin session deletion ordering > #given deletion pauses in an earlier hook #when the same ID is recreated #then creation waits for lifecycle cleanup [0.28ms]
+(pass) plugin session deletion ordering > #given overlapping deletions for one ID #when recreation starts #then all cleanup completes before replacement creation [1.69ms]
+(pass) plugin session deletion ordering > #given deletion pauses before later hooks #when the same ID is recreated #then replacement hooks wait for deletion fan-out [1.69ms]
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.test.ts:
+(pass) first-prompt-watchdog > #given a main session stays silent past the threshold and has a fallback configured #when the watchdog fires #then it aborts the in-flight request and dispatches the fallback model [1.52ms]
+(pass) first-prompt-watchdog > #given the watchdog cannot abort a silent main session #when the abort fails #then it does not dispatch a competing fallback request [0.33ms]
+(pass) first-prompt-watchdog > #given timeout escalation is disabled for a main session #when the first prompt stays silent #then the main-session watchdog does not arm [0.10ms]
+(pass) first-prompt-watchdog > #given an active subagent stays silent past the threshold and has a fallback configured #when the watchdog fires #then it still aborts and dispatches the fallback model [0.16ms]
+(pass) first-prompt-watchdog > #given timeout escalation is disabled and an active subagent stays silent #when the watchdog fires #then the historical subagent safety net remains active [0.14ms]
+(pass) first-prompt-watchdog > #given a main session produces assistant text before the threshold #when progress is observed #then the watchdog is cancelled and no fallback is dispatched [0.15ms]
+(pass) first-prompt-watchdog > #given a fallback dispatch is already awaiting its result #when its internal user update is observed #then the first-prompt watchdog does not arm for that retry [0.09ms]
+(pass) first-prompt-watchdog > #given assistant progress cancels an armed watchdog #when a later user turn stays silent #then the watchdog re-arms for the new turn [0.12ms]
+(pass) first-prompt-watchdog > #given a watchdog is armed for one user message #when a distinct user message arrives #then the deadline belongs to the newer turn [0.15ms]
+(pass) first-prompt-watchdog > #given session emits message.part.updated with sessionID under properties.part #when watchdog tracks #then the watchdog recognizes progress and resets the silence timer [0.25ms]
+(pass) first-prompt-watchdog > #given the user prompt part arrives after the watchdog arms #when the provider stays silent #then the user part does not cancel fallback recovery [0.20ms]
+
+ 18 pass
+ 0 fail
+ 52 expect() calls
+Ran 18 tests across 3 files. [92.00ms]

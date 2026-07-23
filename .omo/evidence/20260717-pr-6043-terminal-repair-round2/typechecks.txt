@@ -1,0 +1,2 @@
+$ tsgo --noEmit -p tsconfig.json
+$ tsgo --noEmit -p tsconfig.json

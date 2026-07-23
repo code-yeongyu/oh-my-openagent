@@ -1,0 +1,22 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-progress-delayed-terminal.test.ts:
+123 |         },
+124 |       },
+125 |     })
+126 |
+127 |     expect(dispatchCount).toBe(1)
+128 |     expect(deps?.sessionStates.get(SESSION_ID)?.currentModel).toBe(FALLBACK_MODEL)
+                                                                    ^
+error: expect(received).toBe(expected)
+
+Expected: "anthropic/claude-haiku-4-5"
+Received: "openai/gpt-5.4-mini"
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/hook-progress-delayed-terminal.test.ts:128:63)
+(fail) runtime-fallback progress before delayed terminal > #given generation two has assistant progress #when generation one's delayed abort arrives #then the accepted fallback state is preserved [3.56ms]
+
+ 0 pass
+ 1 fail
+ 2 expect() calls
+Ran 1 test across 1 file. [126.00ms]

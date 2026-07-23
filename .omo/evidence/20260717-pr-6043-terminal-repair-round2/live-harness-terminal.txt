@@ -1,0 +1,11 @@
+command=WATCHDOG_WAIT_SECONDS=125 bash <round-two transformed copy of run-live-watchdog-qa.sh>
+result=PASS
+source_code_tree=418b5933d5a44ca8fd89ba82d999b68e05a23172
+real_db_unchanged=yes
+older_root_fallback=yes
+two_active_roots=yes
+deletion_restored_older=yes
+fallback_watchdog_rearmed=no
+later_user_abort=external
+cleanup=server provider and SSE processes terminated; temporary sandbox removed
+note=the outer zsh capture wrapper returned nonzero only because it assigned the reserved variable name status after the harness had printed PASS; the harness receipt and cleanup artifacts were complete

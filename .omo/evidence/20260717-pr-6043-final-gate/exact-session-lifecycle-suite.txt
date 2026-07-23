@@ -1,0 +1,54 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin/event-main-session-lifecycle.test.ts:
+(pass) main session lifecycle > #given roots A and B #when root B is deleted #then root A remains active and becomes current [0.78ms]
+(pass) main session lifecycle > #given an active root #when session.created has no ID #then current identity and membership are preserved [0.09ms]
+
+packages/omo-opencode/src/plugin/event.model-fallback.test.ts:
+(pass) createEventHandler - model fallback > triggers retry prompt for assistant message.updated APIError payloads (headless resume) [154.90ms]
+(pass) createEventHandler - model fallback > #given model-fallback promptAsync may have been accepted before EOF #when the same assistant error repeats after the gate hold #then fallback continue is not duplicated [162.53ms]
+(pass) createEventHandler - model fallback > triggers retry prompt for nested model error payloads [152.63ms]
+(pass) createEventHandler - model fallback > does not dispatch duplicate fallback continuations when error events overlap [153.26ms]
+(pass) createEventHandler - model fallback > does not dispatch duplicate fallback continuations when session.error omits provider after dispatch [153.08ms]
+(pass) createEventHandler - model fallback > #given abort fails before model-fallback continuation #when fallback handles assistant error #then it does not inject another prompt [0.36ms]
+(pass) createEventHandler - model fallback > does not collapse fallback continuations for different providers with the same model id [304.37ms]
+(pass) createEventHandler - model fallback > triggers retry prompt on session.status retry events and applies fallback [154.49ms]
+(pass) createEventHandler - model fallback > does not spam abort/prompt when session.status retry countdown updates [153.21ms]
+(pass) createEventHandler - model fallback > re-handles the same retry key after session recovers through session.idle [304.41ms]
+(pass) createEventHandler - model fallback > does not leave stale pending fallback when a providerless duplicate arrives after fallback was applied [153.36ms]
+(pass) createEventHandler - model fallback > does not trigger model-fallback from session.status when runtime_fallback is enabled [0.27ms]
+(pass) createEventHandler - model fallback > prefers user-configured fallback_models over hardcoded chain on session.status retry [153.39ms]
+(pass) createEventHandler - model fallback > advances main-session fallback chain across repeated session.error retries end-to-end [305.75ms]
+(pass) createEventHandler - model fallback > does not trigger model-fallback retry when modelFallback hook is not provided (disabled by default) [0.28ms]
+
+packages/omo-opencode/src/plugin/event-model-fallback-abort-boundary.test.ts:
+(pass) model-fallback abort boundary > #given the SDK resolves a non-2xx abort #when continuation starts #then throwing semantics are requested and no prompt is injected [0.22ms]
+
+packages/omo-opencode/src/features/claude-code-session-state/state.test.ts:
+(pass) claude-code-session-state > setSessionAgent > should store agent for session [0.11ms]
+(pass) claude-code-session-state > setSessionAgent > should strip zero-width ordering prefixes before storing agent for session [0.07ms]
+(pass) claude-code-session-state > setSessionAgent > should NOT overwrite existing agent (first-write wins) [0.04ms]
+(pass) claude-code-session-state > setSessionAgent > should return undefined for unknown session [0.04ms]
+(pass) claude-code-session-state > updateSessionAgent > should overwrite existing agent [0.05ms]
+(pass) claude-code-session-state > updateSessionAgent > should strip zero-width ordering prefixes when overwriting existing agent [0.04ms]
+(pass) claude-code-session-state > clearSessionAgent > should remove agent from session [0.04ms]
+(pass) claude-code-session-state > mainSessionID > should store and retrieve main session ID [0.04ms]
+(pass) claude-code-session-state > mainSessionID > should return undefined when not set [0.04ms]
+(pass) claude-code-session-state > mainSessionID > should retain all active root sessions while exposing the latest one [0.04ms]
+(pass) claude-code-session-state > mainSessionID > should restore the previous active root when the latest root is removed [0.04ms]
+(pass) claude-code-session-state > agent registration > should register config-key lookup when given a display name [0.07ms]
+(pass) claude-code-session-state > agent registration > should resolve config keys back to the registered raw agent name [0.06ms]
+(pass) claude-code-session-state > agent registration > should resolve legacy parenthesized names to registered agent [0.05ms]
+(pass) claude-code-session-state > agent registration > should resolve bare lowercase name from historical session [0.05ms]
+(pass) claude-code-session-state > agent registration > should clear registered agent names without clearing session ownership [0.06ms]
+(pass) claude-code-session-state > agent registration > #given atlas display name with zero-width prefix > #when checking registration without the zero-width prefix > #then it treats the display name as registered [0.05ms]
+(pass) claude-code-session-state > prometheus-md-only integration scenario > should correctly identify Prometheus agent for permission checks [0.06ms]
+(pass) claude-code-session-state > prometheus-md-only integration scenario > should return undefined when agent not set (bug scenario) [0.04ms]
+(pass) claude-code-session-state > issue #893: custom agent switch reset > should preserve custom agent when default agent is sent on subsequent messages [0.04ms]
+(pass) claude-code-session-state > issue #893: custom agent switch reset > should allow explicit agent update via updateSessionAgent [0.04ms]
+(pass) claude-code-session-state > backward compatibility > strips legacy ZWSP-prefixed agent names from persisted session state (GH-3259) [0.04ms]
+
+ 40 pass
+ 0 fail
+ 87 expect() calls
+Ran 40 tests across 4 files. [2.40s]

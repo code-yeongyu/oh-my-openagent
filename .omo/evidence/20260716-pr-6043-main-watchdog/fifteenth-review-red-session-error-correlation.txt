@@ -1,0 +1,29 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-provider-error-correlation.test.ts:
+(pass) runtime-fallback provider error during abort correlation > #given a prior watchdog abort is suspended #when the current request emits a retryable provider error #then the fallback chain advances without resetting [2.44ms]
+199 |             error: { name: "ProviderRateLimitError", statusCode: 429 },
+200 |           },
+201 |         },
+202 |       })
+203 |
+204 |       expect(dispatchedModels).toEqual([FIRST_FALLBACK, SECOND_FALLBACK])
+                                     ^
+error: expect(received).toEqual(expected)
+
+  [
+    "anthropic/fallback-1",
+-   "google/fallback-2",
++   "anthropic/fallback-1",
+  ]
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/hook-provider-error-correlation.test.ts:204:32)
+(fail) runtime-fallback provider error during abort correlation > #given a prior watchdog abort is suspended #when the current request emits a retryable provider session error #then the fallback chain advances without resetting [0.73ms]
+
+ 1 pass
+ 1 fail
+ 6 expect() calls
+Ran 2 tests across 1 file. [83.00ms]

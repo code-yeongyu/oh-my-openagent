@@ -1,0 +1,106 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/plugin/event.monitor.test.ts:
+(pass) createEventHandler monitor wiring > #given a monitor manager #when session.deleted arrives #then it stops session monitors once [1.56ms]
+(pass) createEventHandler monitor wiring > #given a monitor manager #when session.idle arrives #then it handles the normalized idle event after idle hooks [0.29ms]
+(pass) createEventHandler monitor wiring > #given existing deleted-session cleanup state #when session.deleted arrives #then monitor teardown does not skip cleanup [0.24ms]
+
+packages/omo-opencode/src/plugin/event.test.ts:
+(pass) event error extraction > prefers nested APIError message over generic top-level message [0.20ms]
+(pass) createEventHandler - idle deduplication > #given tmux integration enabled #when session.idle arrives #then it forwards the event to tmuxSessionManager.onEvent [0.25ms]
+(pass) createEventHandler - idle deduplication > #given tmux integration enabled #when session.status reports idle #then synthetic idle forwards to tmuxSessionManager.onEvent [0.28ms]
+(pass) createEventHandler - idle deduplication > #given a readiness retry is pending #when session.idle arrives through the plugin handler #then tmux retry spawns the pane [4.61ms]
+(pass) createEventHandler - idle deduplication > #given session.status already emitted a synthetic idle #when real session.idle follows immediately #then hooks run once [0.21ms]
+(pass) createEventHandler - idle deduplication > keeps other session dedup state untouched when suppressing real-idle-after-synthetic-idle [0.27ms]
+(pass) createEventHandler - idle deduplication > dedups back-to-back real session.idle events for the same sessionID within 500ms [0.21ms]
+(pass) createEventHandler - idle deduplication > still dedups synthetic-idle-after-real-idle as before [0.13ms]
+(pass) createEventHandler - idle deduplication > does NOT dedup session.idle events for DIFFERENT sessionIDs [0.18ms]
+(pass) createEventHandler - idle deduplication > both maps pruned on every event [603.12ms]
+(pass) createEventHandler - idle deduplication > dispatches both idle events once the dedup window expires [602.64ms]
+(pass) createEventHandler - event forwarding > forwards message activity events to tmux session manager [0.29ms]
+(pass) createEventHandler - event forwarding > forwards legacy message.part.updated activity with part-only session id to tmux session manager [0.18ms]
+(pass) createEventHandler - event forwarding > does not forward tmux activity events when tmux integration is disabled [0.14ms]
+(pass) createEventHandler - event forwarding > does not forward session.created to tmux session manager when tmux integration is disabled [0.20ms]
+(pass) createEventHandler - event forwarding > skips tmux dispatch for subagent sessions marked only via subagentSessions (no parentID) [0.16ms]
+(pass) createEventHandler - event forwarding > still dispatches for a primary session not in subagentSessions [0.15ms]
+(pass) createEventHandler - event forwarding > Path A skips dispatch even when subagentSessions Set is populated only AFTER the event arrives (parentID covers it) [0.14ms]
+(pass) createEventHandler - event forwarding > dispatches OpenClaw after session.created for main sessions (no parentID) [0.17ms]
+(pass) createEventHandler - event forwarding > does NOT dispatch OpenClaw for subagent sessions (with parentID) [0.12ms]
+(pass) createEventHandler - event forwarding > forwards session.deleted to write-existing-file-guard hook [0.15ms]
+(pass) createEventHandler - event forwarding > dispatches OpenClaw for synthetic session.idle events [0.13ms]
+(pass) createEventHandler - event forwarding > clears stored prompt params on session.deleted [0.12ms]
+(pass) createEventHandler - retry dedupe lifecycle > re-handles same retry key after session recovers to idle status [318.23ms]
+(pass) createEventHandler - event hook isolation > continues dispatching later event hooks when an earlier hook throws [2.12ms]
+(pass) createEventHandler - event hook isolation > preserves hook fan-out order while isolating individual hook failures [1.29ms]
+
+packages/omo-opencode/src/shared/prompt-async-gate-client-identity.test.ts:
+(pass) prompt-async-gate client-identity characterization > #given a recording fake client #when the gate dispatches #then status messages and promptAsync are all called on the same session object [2.98ms]
+(pass) prompt-async-gate client-identity characterization > #given checkStatus false and checkToolState false #when the gate dispatches #then status and messages are never invoked [0.69ms]
+(pass) prompt-async-gate client-identity characterization > #given session.status reports the session as busy #when the gate checks activity #then result is active and promptAsync is not called [0.58ms]
+(pass) prompt-async-gate client-identity characterization > #given a dispatch hold is active #when a second dispatch arrives before the hold expires #then it is coalesced and reports reserved or queued [1.41ms]
+(pass) prompt-async-gate client-identity characterization > #given promptAsync rejects after dispatch was attempted #when the result is classified #then status is failed dispatchAttempted is true and isAmbiguousPostDispatchPromptFailure is true [1.12ms]
+
+packages/omo-opencode/src/shared/prompt-async-gate-path-compat.test.ts:
+(pass) dispatchInternalPrompt path compatibility > #given sync prompt rejects object-form session path #when dispatching #then it retries with string-form path [0.97ms]
+(pass) dispatchInternalPrompt path compatibility > #given async prompt rejects object-form session path #when dispatching #then it retries with string-form path [0.54ms]
+
+packages/omo-opencode/src/features/claude-code-session-state/state.test.ts:
+(pass) claude-code-session-state > setSessionAgent > should store agent for session [1.06ms]
+(pass) claude-code-session-state > setSessionAgent > should strip zero-width ordering prefixes before storing agent for session [0.34ms]
+(pass) claude-code-session-state > setSessionAgent > should NOT overwrite existing agent (first-write wins) [0.25ms]
+(pass) claude-code-session-state > setSessionAgent > should return undefined for unknown session [0.27ms]
+(pass) claude-code-session-state > updateSessionAgent > should overwrite existing agent [1.03ms]
+(pass) claude-code-session-state > updateSessionAgent > should strip zero-width ordering prefixes when overwriting existing agent [0.30ms]
+(pass) claude-code-session-state > clearSessionAgent > should remove agent from session [0.24ms]
+(pass) claude-code-session-state > mainSessionID > should store and retrieve main session ID [0.23ms]
+(pass) claude-code-session-state > mainSessionID > should return undefined when not set [0.33ms]
+(pass) claude-code-session-state > mainSessionID > should retain all active root sessions while exposing the latest one [0.44ms]
+(pass) claude-code-session-state > mainSessionID > should restore the previous active root when the latest root is removed [0.49ms]
+(pass) claude-code-session-state > agent registration > should register config-key lookup when given a display name [0.37ms]
+(pass) claude-code-session-state > agent registration > should resolve config keys back to the registered raw agent name [0.41ms]
+(pass) claude-code-session-state > agent registration > should resolve legacy parenthesized names to registered agent [0.34ms]
+(pass) claude-code-session-state > agent registration > should resolve bare lowercase name from historical session [0.25ms]
+(pass) claude-code-session-state > agent registration > should clear registered agent names without clearing session ownership [0.31ms]
+(pass) claude-code-session-state > agent registration > #given atlas display name with zero-width prefix > #when checking registration without the zero-width prefix > #then it treats the display name as registered [0.25ms]
+(pass) claude-code-session-state > prometheus-md-only integration scenario > should correctly identify Prometheus agent for permission checks [0.18ms]
+(pass) claude-code-session-state > prometheus-md-only integration scenario > should return undefined when agent not set (bug scenario) [0.19ms]
+(pass) claude-code-session-state > issue #893: custom agent switch reset > should preserve custom agent when default agent is sent on subsequent messages [0.18ms]
+(pass) claude-code-session-state > issue #893: custom agent switch reset > should allow explicit agent update via updateSessionAgent [0.18ms]
+(pass) claude-code-session-state > backward compatibility > strips legacy ZWSP-prefixed agent names from persisted session state (GH-3259) [0.16ms]
+
+packages/omo-opencode/src/shared/prompt-async-gate/pending-tool-turn-metadata.test.ts:
+(pass) latestAssistantTurnBlocksInternalPrompt metadata-only messages > #given empty unknown assistant turn has no parts loaded #when checking prompt safety #then internal prompts stay blocked [0.68ms]
+(pass) latestAssistantTurnBlocksInternalPrompt metadata-only messages > #given completed tool-calls assistant turn has no parts loaded #when checking prompt safety #then internal prompts stay blocked [0.39ms]
+
+packages/omo-opencode/src/shared/prompt-async-gate/pending-tool-turn.test.ts:
+(pass) latestAssistantTurnBlocksInternalPrompt > #given completed assistant question tool has no real user answer #when checking prompt safety #then internal prompts stay blocked [0.52ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given internal wake follows an unanswered question #when checking prompt safety #then the internal wake does not count as an answer [0.82ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given opencode question tool field has no real user answer #when checking prompt safety #then internal prompts stay blocked [0.27ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given opencode ask-user-question tool field has no real user answer #when checking prompt safety #then internal prompts stay blocked [0.27ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given answered question tool completed #when checking prompt safety #then internal prompts are not blocked by that question [0.38ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given real user answer follows a question #when checking prompt safety #then internal prompts are not blocked by that question [0.27ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given completed assistant is followed by an orphaned reply-required internal wake #when checking prompt safety #then internal prompts are admitted [0.24ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given internal continuation gets only an empty unknown assistant turn #when checking prompt safety #then internal prompts stay blocked [0.46ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given internal continuation receives assistant text #when checking prompt safety #then internal prompts are not blocked [0.39ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given a completed assistant is followed by a noReply notification tail #when checking prompt safety #then internal prompts are not blocked [0.69ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given a completed assistant is followed by several stacked noReply notification tails #when checking prompt safety #then internal prompts are not blocked [0.20ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given a reply-expecting internal tail sits behind a noReply tail after completion #when checking prompt safety #then internal prompts are admitted [0.16ms]
+(pass) latestAssistantTurnBlocksInternalPrompt > #given an actively waiting assistant sits behind a noReply tail #when checking prompt safety #then internal prompts stay blocked [0.16ms]
+
+packages/omo-opencode/src/hooks/model-fallback/hook.test.ts:
+(pass) model fallback hook > applies pending fallback on chat.message by overriding model [0.44ms]
+(pass) model fallback hook > preserves fallback progression across repeated session.error retries [0.54ms]
+(pass) model fallback hook > does not re-arm fallback when one is already pending [0.12ms]
+(pass) model fallback hook > isolates stored fallback chains from caller mutations on set and get [0.19ms]
+(pass) model fallback hook > skips no-op fallback entries that resolve to same provider/model [0.24ms]
+(pass) model fallback hook > skips no-op fallback entries even when variant differs [0.21ms]
+(pass) model fallback hook > uses connected preferred provider when fallback entry providers are disconnected [2.22ms]
+(pass) model fallback hook > does not fall back to hardcoded agent chain when session explicitly stores no fallback chain [regression #2941] [0.11ms]
+(pass) model fallback hook > shows toast when fallback is applied [0.28ms]
+(pass) model fallback hook > transforms model names for github-copilot provider via fallback chain [0.32ms]
+(pass) model fallback hook > preserves canonical google preview model names via fallback chain [0.21ms]
+
+ 84 pass
+ 0 fail
+ 157 expect() calls
+Ran 84 tests across 8 files. [1.67s]

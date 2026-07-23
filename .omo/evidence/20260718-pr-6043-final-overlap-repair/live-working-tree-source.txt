@@ -1,0 +1,11 @@
+base_head=6a3567fbd1ddcabedcd56ec6e11da23f19ed78ec
+source_diff_sha256=1c2eef9816019b09dca2e37f76d6414abe4e8b1407289b98b86d6daa43560c17
+source_files_sha256_before=d785ee5a7f8e31ea9a63e0dd17b2a69f317aa2b4856a23c43fc76e4bfe3debe3
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-fire.ts
+packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-fire.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/session-status-handler.ts
+?? packages/omo-opencode/src/hooks/runtime-fallback/generation-token-regressions.test.ts
+?? packages/omo-opencode/src/hooks/runtime-fallback/watchdog-status-overlap-regression.test.ts
+source_files_sha256_after=d785ee5a7f8e31ea9a63e0dd17b2a69f317aa2b4856a23c43fc76e4bfe3debe3
+source_unchanged_during_qa=yes

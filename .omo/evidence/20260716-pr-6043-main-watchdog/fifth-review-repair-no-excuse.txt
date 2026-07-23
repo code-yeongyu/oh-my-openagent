@@ -1,0 +1,1 @@
+PASS: scoped no-excuse pattern audit found no forbidden constructs

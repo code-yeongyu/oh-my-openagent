@@ -1,0 +1,28 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-message-fetch-ordering.test.ts:
+68 |     const decision = observeEventForWatchdog(abortEvent, watchdog)
+69 |     if (decision?.kind !== "consume-terminal") {
+70 |       await eventHandler({ event: abortEvent })
+71 |     }
+72 |
+73 |     expect(decision).toEqual({ kind: "consume-terminal", sessionID })
+                          ^
+error: expect(received).toEqual(expected)
+
+- {
+-   "kind": "consume-terminal",
+-   "sessionID": "session-watchdog-message-fetch-pending",
+- }
++ undefined
+
+- Expected  - 4
++ Received  + 1
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-message-fetch-ordering.test.ts:73:22)
+(fail) first-prompt watchdog message-fetch ordering > #given abort resolved while retry messages are pending #when its terminal arrives #then fallback ownership survives through dispatch [3.85ms]
+
+ 0 pass
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [59.00ms]

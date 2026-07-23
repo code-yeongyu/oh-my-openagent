@@ -1,0 +1,24 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-generation-race.test.ts:
+(pass) first-prompt watchdog generation races > #given the watchdog abort is acknowledged #when a user abort arrives while fallback dispatch is settling #then cancellation wins and the fallback request is stopped [2.75ms]
+(pass) first-prompt watchdog generation races > #given generation one dispatched a fallback #when its delayed abort arrives after generation two arms #then generation two remains owned [12.17ms]
+202 |     watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+203 |     watchdog.onSessionTerminal(sessionID, "session.error", true)
+204 |     await eventHandler(createAbortEvent(sessionID))
+205 |     await new Promise((resolve) => setTimeout(resolve, 5))
+206 |
+207 |     expect(calls.dispatch).toBe(1)
+                                 ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 2
+
+      at <anonymous> (<worktree>/packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-generation-race.test.ts:207:28)
+(fail) first-prompt watchdog generation races > #given generation one retains abort provenance #when generation two is cancelled before the delayed abort arrives #then cancellation prevents a second fallback [12.59ms]
+
+ 2 pass
+ 1 fail
+ 11 expect() calls
+Ran 3 tests across 1 file. [84.00ms]

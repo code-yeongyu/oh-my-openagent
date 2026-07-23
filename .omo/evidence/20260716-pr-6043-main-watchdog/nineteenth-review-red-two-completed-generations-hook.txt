@@ -1,0 +1,22 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/hook-two-completed-generations.test.ts:
+133 |       expect(deps.sessionStates.get(SESSION_ID)?.attemptCount).toBe(2)
+134 |
+135 |       await harness.hook.event(abortTerminal)
+136 |       await harness.hook.event(abortTerminal)
+137 |
+138 |       expect(deps.sessionStates.get(SESSION_ID)?.currentModel).toBe(FALLBACK_TWO)
+                                                                     ^
+error: expect(received).toBe(expected)
+
+Expected: "google/fallback-2"
+Received: "openai/gpt-5.4-mini"
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/hook-two-completed-generations.test.ts:138:64)
+(fail) runtime-fallback completed watchdog generations > #given two watchdog fallbacks completed visibly #when newest then oldest delayed aborts arrive #then latest fallback remains until a later real cancellation [3.40ms]
+
+ 0 pass
+ 1 fail
+ 3 expect() calls
+Ran 1 test across 1 file. [69.00ms]

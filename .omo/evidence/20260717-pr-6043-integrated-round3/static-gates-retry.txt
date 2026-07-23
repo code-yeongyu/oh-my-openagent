@@ -1,0 +1,4 @@
+No violations in 2 file(s).
+Resolving dependencies
+Resolved, downloaded and extracted [2]
+Saved lockfile

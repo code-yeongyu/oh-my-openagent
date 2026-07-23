@@ -1,0 +1,8 @@
+integrated_head=c385befaae1ea080ca28e19249f74b9f8a649e96
+integrated_parents=40e0624440c772312d254ae86ca3b3eb683fdb2a 6457ca1da78fcfd2a39ea391ee559b8d945b240a
+dev=6457ca1da78fcfd2a39ea391ee559b8d945b240a
+merge_base=6457ca1da78fcfd2a39ea391ee559b8d945b240a
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-types.ts pure_loc=14
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts pure_loc=248
+packages/omo-opencode/src/hooks/runtime-fallback/hook.ts pure_loc=137
+packages/omo-opencode/src/hooks/runtime-fallback/hook-multiple-delayed-terminals.test.ts pure_loc=134

@@ -1,0 +1,30 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-generation-race.test.ts:
+(pass) first-prompt watchdog generation races > #given the watchdog abort is acknowledged #when a user abort arrives while fallback dispatch is settling #then cancellation wins and the fallback request is stopped [3.21ms]
+(pass) first-prompt watchdog generation races > #given generation one dispatched a fallback #when its delayed abort arrives after generation two arms #then generation two remains owned [3.01ms]
+242 |       sessionID,
+243 |     })
+244 |     await eventHandler(createAbortEvent(sessionID))
+245 |
+246 |     watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT, "user-generation-3")
+247 |     expect(watchdog.onSessionTerminal(sessionID, "session.error", true)).toEqual({
+                                                                               ^
+error: expect(received).toEqual(expected)
+
+- {
+-   "kind": "defer-terminal",
+-   "sessionID": "session-current-cancellation-before-delayed-abort",
+- }
++ undefined
+
+- Expected  - 4
++ Received  + 1
+
+      at <anonymous> (/Users/yeongyu/.codex/orchestration/omo-sisyphus-sweep/.omo/teams/019f5fe0-9d4e-7431-9fd3-e0df776b9192/worktrees/P6043/packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-generation-race.test.ts:247:74)
+(fail) first-prompt watchdog generation races > #given generation one retains abort provenance #when generation two is cancelled before the delayed abort arrives #then cancellation prevents a second fallback [1.72ms]
+
+ 2 pass
+ 1 fail
+ 16 expect() calls
+Ran 3 tests across 1 file. [90.00ms]

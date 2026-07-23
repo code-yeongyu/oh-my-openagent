@@ -1,0 +1,17 @@
+base_head=d07c422e21f9dd9a7bb51b02a669ac89f73cfe58
+source_diff_sha256=18ad23bf6ad03a5578bbbeab3aa5f54ab10bf917b6d5d5b0c252b6193a596df9
+source_files_sha256_before=e1247c8500ce2aa65732d902a105fa11d74d2064fb64a739bcf346b68bc800c9
+packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.ts
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-fire.ts
+packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts
+packages/omo-opencode/src/hooks/runtime-fallback/hook.ts
+packages/omo-opencode/src/hooks/runtime-fallback/types.ts
+packages/omo-opencode/src/hooks/runtime-fallback/watchdog-abort-provenance.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/auto-retry-dispatch.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog-fire.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/first-prompt-watchdog.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/hook.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/types.ts
+ M packages/omo-opencode/src/hooks/runtime-fallback/watchdog-abort-provenance.ts
+source_files_sha256_after=e1247c8500ce2aa65732d902a105fa11d74d2064fb64a739bcf346b68bc800c9
+source_unchanged_during_qa=yes
