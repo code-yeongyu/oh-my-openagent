@@ -85,6 +85,7 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
       if (entry.ownerSessionId === sessionId && ownedIds.has(teamRunId)) continue
       entry.poller.shutdown()
       pollers.delete(teamRunId)
+      deps.deliveryJournal?.dropTeam(teamRunId)
     }
 
     if (sessionId === undefined || deps.runtime.sessionFile() === undefined) return owned

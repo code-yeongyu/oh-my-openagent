@@ -293,7 +293,7 @@ describe("lead poller", () => {
     expect(harness.injections).toHaveLength(0)
     expect(existsSync(processedPath(harness, value))).toBe(true)
     expect(journal.takeOldestUnreported(TEAM_RUN_ID, {})).toBeUndefined()
-    expect(harness.events.at(-1)).toMatchObject({ event: { type: "team_message_delivered" } })
+    expect(harness.events.map((entry) => entry.event.type)).toEqual(["team_message_delivered", "team_message_waited"])
   })
 
   test("#given an already-flushed delivery w2lead #when suppressDelivered runs #then it refuses and the persistence path still completes", async () => {
@@ -365,6 +365,50 @@ describe("lead poller", () => {
     expect(harness.injections).toHaveLength(0)
     expect(existsSync(processedPath(harness, value))).toBe(true)
     expect(harness.registry.size).toBe(0)
+  })
+
+  test("#given a delivery committed via the steer-and-persist path w2lead #when the journal is drained #then the steered message is not re-reported", async () => {
+    // given
+    const harness = createHarness()
+    const value = message("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")
+    await seed(harness, value)
+    const journal = createLeadDeliveryJournal()
+    const leadPoller = poller(harness, { journal })
+    await leadPoller.pollOnce()
+    expect(harness.injections).toHaveLength(1)
+
+    // when the injection flushes and the envelope persists, and the poller settles the commit
+    flushLatest(harness)
+    persistEnvelope(harness, value)
+    await leadPoller.pollOnce()
+
+    // then the push channel won; the journal must not re-report it to a later wait
+    expect(existsSync(processedPath(harness, value))).toBe(true)
+    expect(journal.takeOldestUnreported(TEAM_RUN_ID, {})).toBeUndefined()
+  })
+
+  test("#given a suppressed delivery w2lead #when suppressDelivered succeeds #then a waited recovery event is appended", async () => {
+    // given
+    const harness = createHarness()
+    const value = message("ffffffff-ffff-4fff-8fff-ffffffffffff")
+    await seed(harness, value)
+    const leadPoller = poller(harness, {
+      remove: (key) => {
+        if (!key.startsWith("team-message:")) return false
+        harness.injections.splice(0)
+        return true
+      },
+    })
+    await leadPoller.pollOnce()
+
+    // when
+    const suppressed = await leadPoller.suppressDelivered(value.messageId)
+
+    // then
+    expect(suppressed).toBe(true)
+    expect(harness.events.at(-1)).toMatchObject({
+      event: { type: "team_message_waited", payload: { message_id: value.messageId, from: "alpha", body: "ready" } },
+    })
   })
 
   test("#given an aborted lead wait w2lead #when cancellation wins #then no registered wait remains", async () => {

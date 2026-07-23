@@ -130,6 +130,7 @@ describe("lead team_wait", () => {
     const text = result.content[0]?.type === "text" ? result.content[0].text : ""
     expect(text).toContain("short summary")
     expect(text).toContain("truncated")
+    expect(text).toContain("team_message_waited")
     expect(text.length).toBeLessThan(longBody.length)
     if (result.details.kind !== "message") throw new Error("expected message")
     expect(result.details.body).toBe(longBody)

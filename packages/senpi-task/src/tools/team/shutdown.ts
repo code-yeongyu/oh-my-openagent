@@ -65,7 +65,7 @@ export async function runTeamApproveShutdown(service: TeamToolsService, params: 
 export async function runTeamRejectShutdown(service: TeamToolsService, params: TeamRejectShutdownInput): Promise<AgentToolResult<TeamRejectShutdownDetails>> {
   try {
     await service.rejectShutdown(params.team_run_id, params.member, params.reason)
-    return toolResult(`Rejected shutdown for '${params.member}' (team ${params.team_run_id}): ${params.reason}`, { kind: "rejected", team_run_id: params.team_run_id, member: params.member, reason: params.reason })
+    return toolResult(`Rejected shutdown for '${params.member}' (team ${params.team_run_id}): ${params.reason.replace(/\s+/g, " ").trim().slice(0, 160)}`, { kind: "rejected", team_run_id: params.team_run_id, member: params.member, reason: params.reason })
   } catch (error) {
     const view = shutdownErrorView(error)
     return toolResult(view.reason, view)

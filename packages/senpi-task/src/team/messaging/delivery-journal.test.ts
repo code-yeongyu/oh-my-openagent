@@ -59,6 +59,18 @@ describe("lead delivery journal", () => {
     expect(journal.takeOldestUnreported(TEAM, {})?.messageId).toBe("m1")
   })
 
+  test("#given a dropped team #when drained #then nothing remains", () => {
+    // given
+    const journal = createLeadDeliveryJournal()
+    journal.record(TEAM, message("m1"))
+
+    // when
+    journal.dropTeam(TEAM)
+
+    // then
+    expect(journal.takeOldestUnreported(TEAM, {})).toBeUndefined()
+  })
+
   test("#given more deliveries than the cap #when drained #then the oldest are evicted and order is preserved", () => {
     // given
     const journal = createLeadDeliveryJournal({ maxPerTeam: 3 })

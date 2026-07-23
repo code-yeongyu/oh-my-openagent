@@ -40,6 +40,19 @@ describe("task_create tool", () => {
     expect(text).toContain("blocked by: task-0")
   })
 
+  test("#given a subject with embedded newlines #when create runs #then the text collapses them onto one line", async () => {
+    // given
+    const service = createFakeTeamService({ createTask: async () => fakeTask({ subject: "line one\nline two" }) })
+
+    // when
+    const result = await runTeamTaskCreate(service, { team_run_id: "run-1", subject: "line one\nline two", description: "d" })
+
+    // then
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    expect(text).toContain("'line one line two'")
+    expect(text.split("\n")).toHaveLength(1)
+  })
+
   test("#given the factory #when built #then it names the tool task_create", () => {
     expect(createTeamTaskCreateTool({ service: createFakeTeamService() }).name).toBe("task_create")
   })
