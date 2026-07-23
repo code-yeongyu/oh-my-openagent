@@ -6709,6 +6709,33 @@
       ],
       "additionalProperties": false
     },
+    "compaction": {
+      "type": "object",
+      "properties": {
+        "preemptive_threshold": {
+          "default": 0.78,
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "cooldown_ms": {
+          "default": 60000,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "preemptive_threshold",
+        "cooldown_ms",
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
     "git_master": {
       "default": {
         "commit_footer": true,
