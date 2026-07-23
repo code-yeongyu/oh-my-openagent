@@ -112,7 +112,7 @@ async function acquireLock(lockPath: string, ownerTag: string, staleAfterMs: num
     }
 
     try {
-      const fileHandle = await open(lockPath, "wx")
+      const fileHandle = await open(lockPath, "wx", 0o600)
       try {
         await fileHandle.writeFile(buildOwnerContent(ownerTag))
         await tolerantFsync(fileHandle, `acquireLock:${lockPath}`)
@@ -195,7 +195,7 @@ export async function atomicWrite(
   const removeFile = deps.rm ?? rm
 
   try {
-    const fileHandle = await openFile(tmpPath, "wx")
+    const fileHandle = await openFile(tmpPath, "wx", 0o600)
     try {
       await fileHandle.writeFile(content)
       await tolerantFsync(fileHandle, `atomicWrite:${filePath}`)

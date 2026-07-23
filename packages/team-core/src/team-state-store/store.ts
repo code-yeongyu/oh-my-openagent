@@ -154,7 +154,7 @@ export async function createRuntimeState(
     },
   }, teamRunId)
 
-  await mkdir(runtimeDirectoryPath, { recursive: true })
+  await mkdir(runtimeDirectoryPath, { recursive: true, mode: 0o700 })
   await atomicWrite(getStatePath(baseDir, teamRunId), serializeRuntimeState(runtimeState))
   return runtimeState
 }

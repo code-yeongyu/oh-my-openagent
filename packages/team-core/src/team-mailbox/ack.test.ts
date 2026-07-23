@@ -30,7 +30,6 @@ describe("ackMessages", () => {
       body: "hello",
       timestamp: 100,
     }, teamRunId, config, { isLead: true, activeMembers: ["m1"] })
-
     // when
     await ackMessages(teamRunId, "m1", [messageId], config)
     await ackMessages(teamRunId, "m1", [messageId], config)
