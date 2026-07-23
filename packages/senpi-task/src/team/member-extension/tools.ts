@@ -9,6 +9,7 @@ import { Type, type Static } from "typebox"
 import type { PersistedTaskEvent } from "../../store"
 import { clampWaitTimeout, type WaitBounds } from "../../tools/control/clamp"
 import { toolResult } from "../../tools/control/tool-result"
+import { formatMessageText } from "../../tools/team/wait"
 import { buildTeamMessage } from "../messaging/message"
 import type { WaitRegistration, WaitRegistry } from "../messaging/wait-registry"
 import { TEAM_LEAD_SENTINEL } from "../normalize"
@@ -98,7 +99,7 @@ export async function runMemberTaskSend(
     type: "team_message_sent",
     payload: { message_id: message.messageId, from: message.from, to: message.to, kind: message.kind },
   })
-  return toolResult(`Message enqueued to ${input.to}.`, {
+  return toolResult(`Message enqueued to ${input.to} (id: ${message.messageId}).`, {
     kind: "team_message",
     message_id: message.messageId,
     to: input.to,
@@ -123,7 +124,7 @@ export async function runMemberTeamWait(
           { kind: "timeout", timeout_ms: timeoutMs },
         )
       case "message":
-        return toolResult(`Message from ${outcome.message.from}.`, {
+        return toolResult(formatMessageText(outcome.message), {
           kind: "message",
           message_id: outcome.message.messageId,
           from: outcome.message.from,

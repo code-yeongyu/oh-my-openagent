@@ -16,6 +16,7 @@ import {
   SenpiTeamRuntimeError,
   type CreateTeamDeps,
   type CreateTeamResult,
+  type CreatedMemberInfo,
   type DeleteTeamDeps,
   type DeleteTeamResult,
 } from "./runtime-types"
@@ -28,6 +29,8 @@ export { SenpiTeamRuntimeError } from "./runtime-types"
 export type {
   CreateTeamDeps,
   CreateTeamResult,
+  CreatedMemberInfo,
+  CreatedMemberRole,
   DeleteTeamDeps,
   DeleteTeamResult,
   TeamRuntimeManagerPort,
@@ -104,7 +107,39 @@ export async function createTeam(
   }
 
   const activated = await activateTeam(teamRunId, result.spawned, config)
-  return { runtimeState: activated, memberTaskIds }
+  return { runtimeState: activated, memberTaskIds, members: toCreatedMemberInfos(spec, result.spawned, activated) }
+}
+
+const PROMPT_EXCERPT_MAX = 120
+
+function excerptPrompt(prompt: string): string {
+  const collapsed = prompt.replace(/\s+/g, " ").trim()
+  return collapsed.length <= PROMPT_EXCERPT_MAX ? collapsed : `${collapsed.slice(0, PROMPT_EXCERPT_MAX)}...`
+}
+
+// Builds the caller-facing per-member views from the spec (role, prompt), the spawn outcomes (task
+// id, resolved model), and the activated runtime state (live status). Spawn success guarantees every
+// spec member has an outcome; a member missing from the map is skipped defensively.
+function toCreatedMemberInfos(
+  spec: TeamSpec,
+  spawned: ReadonlyMap<string, SpawnedMember>,
+  state: RuntimeState,
+): CreatedMemberInfo[] {
+  return spec.members.flatMap((member) => {
+    const outcome = spawned.get(member.name)
+    if (outcome === undefined) return []
+    const stateMember = state.members.find((candidate) => candidate.name === member.name)
+    return [{
+      name: member.name,
+      taskId: outcome.taskId,
+      status: stateMember?.status ?? outcome.status,
+      role: member.kind === "category"
+        ? { kind: "category", category: member.category }
+        : { kind: "subagent_type", subagentType: member.subagent_type },
+      ...(outcome.resolvedModel !== undefined ? { model: outcome.resolvedModel } : {}),
+      ...(member.prompt !== undefined ? { promptExcerpt: excerptPrompt(member.prompt) } : {}),
+    }]
+  })
 }
 
 async function activateTeam(

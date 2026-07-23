@@ -42,7 +42,7 @@ export async function routeStructuredMessage(
       if (!(error instanceof SenpiShutdownError) && !isMissingStateError(error)) throw error
       return shutdownFailure(error, { operation: "request", team_run_id: runId, member: to })
     }
-    return toolResult(`Shutdown requested for ${to}.`, { kind: "shutdown_requested", team_run_id: runId, member: to })
+    return toolResult(`Shutdown requested for ${to} (team ${runId}).`, { kind: "shutdown_requested", team_run_id: runId, member: to })
   }
 
   if (message.approve === true) {
@@ -52,7 +52,7 @@ export async function routeStructuredMessage(
       if (!(error instanceof SenpiShutdownError) && !isMissingStateError(error)) throw error
       return shutdownFailure(error, { operation: "approve", team_run_id: runId, member: to })
     }
-    return toolResult(`Shutdown approved for ${to}.`, {
+    return toolResult(`Shutdown approved for ${to} (team ${runId}).`, {
       kind: "shutdown_responded",
       team_run_id: runId,
       member: to,
@@ -70,7 +70,7 @@ export async function routeStructuredMessage(
     if (!(error instanceof SenpiShutdownError) && !isMissingStateError(error)) throw error
     return shutdownFailure(error, { operation: "reject", team_run_id: runId, member: to })
   }
-  return toolResult(`Shutdown rejected for ${to}.`, {
+  return toolResult(`Shutdown rejected for ${to} (team ${runId}).`, {
     kind: "shutdown_responded",
     team_run_id: runId,
     member: to,

@@ -3,7 +3,9 @@ import {
   createLeadPoller,
   readMemberTaskMap,
   type ActiveTeamSummary,
+  type LeadDeliveryJournal,
   type LeadInjection,
+  type LeadInjectionSink,
   type LeadPoller,
   type LeadPollerDeps,
   type ParentState,
@@ -25,10 +27,11 @@ export type LeadPollerLifecycleDeps = {
   readonly config: TeamCoreConfig
   readonly runtimeDir: (teamRunId: string) => string
   readonly waitRegistry: WaitRegistry<Message>
+  readonly deliveryJournal?: LeadDeliveryJournal
   readonly appendTaskEvent: (taskId: string, event: PersistedTaskEvent) => void
   readonly pi: Pick<SenpiExtensionAPI, "sendUserMessage">
   readonly logger: ComponentLogger
-  readonly coordinator?: Pick<IdleInjectionCoordinator, "enqueue" | "scheduleFlush" | "flushSoon">
+  readonly coordinator?: Pick<IdleInjectionCoordinator, "enqueue" | "scheduleFlush" | "flushSoon" | "remove">
   readonly createPoller?: (input: LeadPollerFactoryInput) => LeadPollerPort
   readonly readMemberTaskMap?: (runtimeDir: string) => Promise<Readonly<Record<string, string>>>
   readonly scheduleInterval?: (tick: () => void, intervalMs: number) => () => void
@@ -82,6 +85,7 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
       if (entry.ownerSessionId === sessionId && ownedIds.has(teamRunId)) continue
       entry.poller.shutdown()
       pollers.delete(teamRunId)
+      deps.deliveryJournal?.dropTeam(teamRunId)
     }
 
     if (sessionId === undefined || deps.runtime.sessionFile() === undefined) return owned
@@ -94,6 +98,7 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
         config: deps.config,
         coordinator: sink,
         waitRegistry: deps.waitRegistry,
+        ...(deps.deliveryJournal !== undefined ? { deliveryJournal: deps.deliveryJournal } : {}),
         appendEvent: deps.appendTaskEvent,
         eventTaskId: (message) => memberTaskMap[message.from],
         leadSessionFile: () => deps.runtime.sessionFile(),
@@ -166,7 +171,7 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
     },
   }
 
-  function createInjectionSink(input: LeadPollerLifecycleDeps): { enqueue(injection: LeadInjection): void } {
+  function createInjectionSink(input: LeadPollerLifecycleDeps): LeadInjectionSink {
     return {
       enqueue(injection) {
         if (input.coordinator === undefined) {
@@ -190,6 +195,9 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
           default:
             return assertNever(parentState)
         }
+      },
+      remove(key) {
+        return input.coordinator?.remove(key) ?? false
       },
     }
   }

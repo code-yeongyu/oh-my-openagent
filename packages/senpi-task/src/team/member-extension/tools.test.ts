@@ -98,6 +98,47 @@ describe("member extension tools", () => {
     })
   })
 
+  test("#given a resolved message w2mem #when member team_wait returns #then the text carries the body and id like the lead-side format", async () => {
+    // given
+    const harness = createHarness()
+    const value = message("99999999-9999-4999-8999-999999999999", "bob", "round 1 findings")
+    await seed(harness, value)
+    const deps = {
+      poller: harness.poller,
+      waitRegistry: harness.registry,
+      waitBounds: { min_ms: 5, default_ms: 50, max_ms: 100 },
+    }
+
+    // when
+    const result = await runMemberTeamWait(deps, { from: "bob", timeout_ms: 50 }, undefined)
+
+    // then
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    expect(text).toContain("Message from bob")
+    expect(text).toContain(value.messageId)
+    expect(text).toContain("round 1 findings")
+  })
+
+  test("#given a member send w2mem #when runMemberTaskSend returns #then the text carries the message id", async () => {
+    // given
+    const harness = createHarness()
+    const deps = {
+      teamRunId: TEAM_RUN_ID,
+      memberName: "alice",
+      taskId: "st_00000001" as const,
+      config: harness.config,
+      members: ["alice", "bob"],
+      appendEvent: () => undefined,
+    }
+
+    // when
+    const result = await runMemberTaskSend(deps, { to: "lead", message: "hi" })
+
+    // then
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    expect(text).toMatch(/^Message enqueued to lead \(id: .+\)\.$/)
+  })
+
   test("#given a parked team_wait w2mem #when the poller receives a later match #then commit precedes promise resolution", async () => {
     // given
     const harness = createHarness()

@@ -1,6 +1,7 @@
 import type { Message, RuntimeState, Task } from "@oh-my-opencode/team-core/types"
 
 import type { CreateTeamResult, DeleteTeamResult, SendTeamMessageInput, SendTeamMessageResult } from "../../team"
+import type { LeadDeliveryJournal } from "../../team/messaging/delivery-journal"
 import type { LeadPoller } from "../../team/messaging/lead-poller"
 import type { WaitRegistry } from "../../team/messaging/wait-registry"
 import type { WaitBounds } from "../control"
@@ -54,11 +55,18 @@ export type TeamToolsService = {
 type TeamWaitDeps = {
   readonly waitBounds: WaitBounds
   readonly registry: WaitRegistry<Message>
-  readonly resolveLeadPoller: (teamRunId: string) => LeadPoller | undefined
+  readonly deliveryJournal?: LeadDeliveryJournal
+  readonly resolveLeadPoller: (teamRunId: string) => LeadPollerWaitPort | undefined
   readonly resolveTeamRunId: (explicit?: string) => Promise<
     | { readonly ok: true; readonly teamRunId: string }
     | { readonly ok: false; readonly reason: string }
   >
+}
+
+// The narrow poller surface team_wait needs: suppression is optional so lightweight fakes and the
+// lifecycle LeadPollerPort stay structurally compatible.
+export type LeadPollerWaitPort = Pick<LeadPoller, "pollOnce" | "shutdown"> & {
+  readonly suppressDelivered?: LeadPoller["suppressDelivered"]
 }
 
 export type TeamToolDeps = {
