@@ -1,0 +1,19 @@
+MISSING-PLAN EDGE
+command:
+  omo ulw-loop status --json --cwd <worktree>
+observed:
+  code: ULW_LOOP_PLAN_MISSING
+  status_exit=1
+  cleanup: no status process remains
+
+VALID-PLAN HAPPY PATH
+command:
+  QA_DIR=$(mktemp -d)
+  omo ulw-loop create-goals --cwd "$QA_DIR" --session-id run-command-qa --brief "<status completion criterion>" --json
+  omo ulw-loop status --cwd "$QA_DIR" --session-id run-command-qa --json
+observed:
+  create_exit=0
+  status_exit=0
+  valid plan JSON returned
+  cleanup: removed /tmp/omo-senpi-run-command-qa.KL6n7S
+  cleanup: no matching status process remained

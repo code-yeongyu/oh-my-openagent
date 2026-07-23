@@ -1,4 +1,5 @@
 import { chmodSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { execFileSync } from "node:child_process"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -125,6 +126,7 @@ export async function withEnvAsync<T>(patch: Record<string, string | undefined>,
 }
 
 export function createTempOmoBin(stdout = activeStatus()): { dir: string; bin: string; cleanup: () => void } {
+  const nodeExecutable = resolveNodeExecutable()
   const dir = mkdtempSync(join(tmpdir(), "omo-senpi-ulw-loop-"))
   const bin = join(dir, process.platform === "win32" ? "omo.cmd" : "omo")
   const runner = join(dir, "omo-runner.cjs")
@@ -133,14 +135,15 @@ export function createTempOmoBin(stdout = activeStatus()): { dir: string; bin: s
     [
       "const { realpathSync, writeFileSync } = require('node:fs')",
       `writeFileSync(${JSON.stringify(join(dir, "cwd.txt"))}, realpathSync(process.cwd()))`,
+      `writeFileSync(${JSON.stringify(join(dir, "runtime.json"))}, JSON.stringify({ bunVersion: process.versions.bun ?? null }))`,
       `process.stdout.write(${JSON.stringify(`${stdout}\n`)})`,
       "",
     ].join("\n"),
   )
   const script =
     process.platform === "win32"
-      ? `@echo off\r\n"${process.execPath}" "${runner}"\r\n`
-      : `#!/bin/sh\n'${process.execPath.replace(/'/g, "'\\''")}' '${runner.replace(/'/g, "'\\''")}'\n`
+      ? `@echo off\r\n"${nodeExecutable}" "${runner}"\r\n`
+      : `#!/bin/sh\n'${nodeExecutable.replace(/'/g, "'\\''")}' '${runner.replace(/'/g, "'\\''")}'\n`
   writeFileSync(bin, script)
   chmodSync(bin, 0o755)
   return {
@@ -152,6 +155,26 @@ export function createTempOmoBin(stdout = activeStatus()): { dir: string; bin: s
 
 export function readRealCwd(dir: string): string {
   return realpathSync(readFileSync(join(dir, "cwd.txt"), "utf8").trim())
+}
+
+export function readRunnerRuntime(dir: string): { bunVersion: string | null } {
+  return JSON.parse(readFileSync(join(dir, "runtime.json"), "utf8")) as {
+    bunVersion: string | null
+  }
+}
+
+let cachedNodeExecutable: string | undefined
+
+function resolveNodeExecutable(): string {
+  if (cachedNodeExecutable !== undefined) return cachedNodeExecutable
+  const executable = execFileSync("node", ["-p", "process.execPath"], {
+    encoding: "utf8",
+    timeout: 5_000,
+    windowsHide: true,
+  }).trim()
+  if (executable.length === 0) throw new Error("node did not report process.execPath")
+  cachedNodeExecutable = executable
+  return executable
 }
 
 export async function registerWithRunner(outputs: string[], logger = createLogger()): Promise<{
