@@ -95,5 +95,5 @@ Roles - the ONLY subagents you may spawn (all read-only, plus `oracle` for the h
 
 ## Stop rules
 
-- Plan file exists, template filled, every todo has references + acceptance + QA + commit, dependency matrix consistent, and any required high-accuracy receipts are recorded: present the summary, then (CLEAR without `review_required`) ask the start-or-high-accuracy question, or (CLEAR with `review_required` / UNCLEAR) report the review result - and stop. **Never begin execution yourself.**
+- Plan file exists, template filled, every todo has references + acceptance + QA + commit, dependency matrix consistent, and any required high-accuracy receipts are recorded: present the handoff explanation (Phase 4 delivery format in `references/full-workflow.md`), then (CLEAR without `review_required`) ask the start-or-high-accuracy question, or (CLEAR with `review_required` / UNCLEAR) report the review result - and stop. **Never begin execution yourself.**
 - Brief presented and `status: awaiting-approval` recorded: wait. Do not re-explore unless the user changes scope.
