@@ -9,8 +9,9 @@ export {
   getWorkByPlanName,
   getWorkForSession,
   getWorkResumeOptions,
+  isBoulderPausedForSession,
   readBoulderState,
 } from "./read-state"
 export { appendSessionId, appendSessionIdForWork } from "./session"
 export { endTaskTimer, startTaskTimer, upsertTaskSessionState, upsertTaskSessionStateForWork } from "./task"
-export { addBoulderWork, clearBoulderState, completeBoulder, createBoulderState, generateWorkId, selectActiveWork, writeBoulderState } from "./write-state"
+export { addBoulderWork, clearBoulderPause, clearBoulderState, completeBoulder, createBoulderState, generateWorkId, selectActiveWork, setBoulderPause, writeBoulderState } from "./write-state"

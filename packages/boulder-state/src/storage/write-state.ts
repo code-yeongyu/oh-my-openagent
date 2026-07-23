@@ -1,10 +1,10 @@
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 
-import type { BoulderState, BoulderWorkState } from "../types"
+import type { BoulderPauseReason, BoulderPauseState, BoulderState, BoulderWorkState } from "../types"
 import { getBoulderFilePath } from "./path"
 import { getPlanName } from "./plan-progress"
-import { getBoulderWorks, readBoulderState } from "./read-state"
+import { getBoulderWorks, getWorkForSession, readBoulderState } from "./read-state"
 import { getElapsedMs, normalizeSessionId, nowIsoString, projectWorkToMirror } from "./shared"
 
 export function writeBoulderState(directory: string, state: BoulderState): boolean {
@@ -32,6 +32,7 @@ export function writeBoulderState(directory: string, state: BoulderState): boole
             ended_at: stateToWrite.ended_at,
             elapsed_ms: stateToWrite.elapsed_ms,
             updated_at: stateToWrite.updated_at,
+            pause: stateToWrite.pause,
             session_ids: [...stateToWrite.session_ids],
             session_origins: stateToWrite.session_origins ? { ...stateToWrite.session_origins } : {},
             agent: stateToWrite.agent,
@@ -100,6 +101,78 @@ export function createBoulderState(planPath: string, sessionId: string, agent?: 
     ...(agent !== undefined ? { agent } : {}),
     ...(worktreePath !== undefined ? { worktree_path: worktreePath } : {}),
   }
+}
+
+export function setBoulderPause(
+  directory: string,
+  input: { reason: BoulderPauseReason; sessionId: string; createdAt?: string },
+): BoulderState | null {
+  const state = readBoulderState(directory)
+  if (!state) {
+    return null
+  }
+
+  const now = nowIsoString()
+  const pause: BoulderPauseState = {
+    reason: input.reason,
+    session_id: normalizeSessionId(input.sessionId),
+    created_at: input.createdAt ?? now,
+  }
+
+  // Persist on the work owning the session; mirror only when that work is active,
+  // otherwise selecting the owning work later would drop the pause.
+  const owningWorkId = getWorkForSession(directory, input.sessionId)?.work_id
+  const targetWork = owningWorkId ? state.works?.[owningWorkId] : undefined
+
+  if (targetWork) {
+    targetWork.pause = pause
+    targetWork.updated_at = now
+    if (state.active_work_id === owningWorkId) {
+      state.pause = pause
+      state.updated_at = now
+    }
+  } else {
+    // Legacy single-work state: pause lives only on the top-level mirror.
+    state.pause = pause
+    state.updated_at = now
+  }
+
+  return writeBoulderState(directory, state) ? state : null
+}
+
+export function clearBoulderPause(
+  directory: string,
+  input: { reason: BoulderPauseReason; sessionId: string },
+): BoulderState | null {
+  const state = readBoulderState(directory)
+  if (!state) {
+    return null
+  }
+
+  const normalizedSessionId = normalizeSessionId(input.sessionId)
+  const owningWorkId = getWorkForSession(directory, input.sessionId)?.work_id
+  const targetWork = owningWorkId ? state.works?.[owningWorkId] : undefined
+
+  // Match the lookup path used by isBoulderPausedForSession() so clear/set stay symmetric.
+  const pause = targetWork?.pause ?? state.pause
+  if (pause?.reason !== input.reason || pause.session_id !== normalizedSessionId) {
+    return state
+  }
+
+  const now = nowIsoString()
+  if (targetWork) {
+    delete targetWork.pause
+    targetWork.updated_at = now
+    if (state.active_work_id === owningWorkId) {
+      delete state.pause
+      state.updated_at = now
+    }
+  } else {
+    delete state.pause
+    state.updated_at = now
+  }
+
+  return writeBoulderState(directory, state) ? state : null
 }
 
 export function selectActiveWork(directory: string, workId: string): BoulderState | null {

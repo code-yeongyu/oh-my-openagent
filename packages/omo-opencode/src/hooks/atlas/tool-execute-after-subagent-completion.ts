@@ -207,6 +207,7 @@ export async function handleSubagentCompletionAfter(input: {
     progress,
     preferredSessionId,
     originalResponse,
+    orchestratorSessionId: toolInput.sessionID,
     currentTask,
     sessionState,
     isAlreadyVerified,

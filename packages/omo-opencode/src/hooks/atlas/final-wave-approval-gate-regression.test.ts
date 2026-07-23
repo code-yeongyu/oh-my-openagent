@@ -6,7 +6,9 @@ import { join } from "node:path"
 import { createOpencodeClient } from "@opencode-ai/sdk"
 import type { AssistantMessage, Session } from "@opencode-ai/sdk"
 import type { BoulderState } from "../../features/boulder-state"
-import { clearBoulderState, writeBoulderState } from "../../features/boulder-state"
+import { clearBoulderState, readBoulderState, writeBoulderState } from "../../features/boulder-state"
+import { releaseAllPromptAsyncReservationsForTesting } from "../shared/prompt-async-gate"
+import { createTodoContinuationEnforcer } from "../todo-continuation-enforcer"
 
 const TEST_STORAGE_ROOT = join(tmpdir(), `atlas-final-wave-regression-storage-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
@@ -38,6 +40,7 @@ type AtlasHookContext = Parameters<typeof createAtlasHook>[0]
 
 describe("Atlas final-wave approval gate regressions", () => {
   let testDirectory = ""
+  let promptAsyncCalls = 0
 
   function createMockPluginInput(): AtlasHookContext {
     const client = createOpencodeClient({ baseUrl: "http://localhost" })
@@ -48,9 +51,43 @@ describe("Atlas final-wave approval gate regressions", () => {
       response: new Response(),
     }))
 
-    Reflect.set(client.session, "promptAsync", async () => ({
+    Reflect.set(client.session, "promptAsync", async () => {
+      promptAsyncCalls += 1
+      return {
       data: undefined,
       request: new Request("http://localhost/session/prompt_async"),
+      response: new Response(),
+      }
+    })
+
+    Reflect.set(client.session, "todo", async () => ({
+      data: [
+        { id: "todo-1", content: "Wait for final approval", status: "pending", priority: "high" },
+      ],
+      request: new Request("http://localhost/session/todo"),
+      response: new Response(),
+    }))
+
+    Reflect.set(client.session, "messages", async () => ({
+      data: [
+        {
+          info: {
+            id: "msg-atlas-1",
+            role: "user",
+            agent: "atlas",
+            model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+            finish: "stop",
+          },
+          parts: [{ type: "text", text: "Continue the final wave" }],
+        },
+      ],
+      request: new Request("http://localhost/session/messages"),
+      response: new Response(),
+    }))
+
+    Reflect.set(client.tui, "showToast", async () => ({
+      data: undefined,
+      request: new Request("http://localhost/tui/show-toast"),
       response: new Response(),
     }))
 
@@ -75,6 +112,7 @@ describe("Atlas final-wave approval gate regressions", () => {
       directory: testDirectory,
       project: {} as AtlasHookContext["project"],
       worktree: testDirectory,
+      experimental_workspace: { register() {} },
       serverUrl: new URL("http://localhost"),
       $: {} as AtlasHookContext["$"],
       client,
@@ -114,10 +152,13 @@ describe("Atlas final-wave approval gate regressions", () => {
   beforeEach(() => {
     testDirectory = join(tmpdir(), `atlas-final-wave-regression-${randomUUID()}`)
     mkdirSync(join(testDirectory, ".omo"), { recursive: true })
+    promptAsyncCalls = 0
+    releaseAllPromptAsyncReservationsForTesting()
     clearBoulderState(testDirectory)
   })
 
   afterEach(() => {
+    releaseAllPromptAsyncReservationsForTesting()
     clearBoulderState(testDirectory)
     if (existsSync(testDirectory)) {
       rmSync(testDirectory, { recursive: true, force: true })
@@ -226,5 +267,101 @@ session_id: ses_parallel_review_4
     expect(lastOutput.output).toContain("FINAL WAVE APPROVAL GATE")
     expect(lastOutput.output).toContain("explicit user approval")
     expect(lastOutput.output).not.toContain("STEP 8: PROCEED TO NEXT TASK")
+  })
+
+  test("keeps todo continuation silent while final-wave approval is pending", async () => {
+    // given
+    const sessionID = "atlas-final-wave-todo-session"
+    setupMessageStorage(sessionID)
+    writePlanState(sessionID, "todo-suppressed-final-wave-plan", `# Plan
+
+## TODOs
+- [x] 1. Ship implementation
+
+## Final Verification Wave (MANDATORY - after ALL implementation tasks)
+- [x] F1. **Plan Compliance Audit** - \`oracle\`
+- [x] F2. **Code Quality Review** - \`unspecified-high\`
+- [x] F3. **Real Manual QA** - \`unspecified-high\`
+- [ ] F4. **Scope Fidelity Check** - \`deep\`
+`)
+
+    const mockInput = createMockPluginInput()
+    const atlasHook = createAtlasHook(mockInput, {
+      directory: testDirectory,
+      isCallerOrchestrator: async () => true,
+    })
+    const todoContinuation = createTodoContinuationEnforcer(mockInput)
+    const toolOutput = {
+      title: "Final review 4",
+      output: `Reviewer 4 | VERDICT: APPROVE
+
+<task_metadata>
+session_id: ses_nested_scope_review
+</task_metadata>`,
+      metadata: {},
+    }
+
+    // when
+    await atlasHook["tool.execute.after"]({ tool: "task", sessionID }, toolOutput)
+    const pausedState = readBoulderState(testDirectory)
+    await todoContinuation.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await new Promise((resolve) => setTimeout(resolve, 2200))
+
+    // then
+    expect(toolOutput.output).toContain("FINAL WAVE APPROVAL GATE")
+    expect(pausedState?.pause?.reason).toBe("final_wave_approval")
+    expect(promptAsyncCalls).toBe(0)
+
+    await atlasHook.handler({
+      event: {
+        type: "message.updated",
+        properties: { sessionID, info: { role: "user" } },
+      },
+    })
+    expect(readBoulderState(testDirectory)?.pause).toBeUndefined()
+  }, { timeout: 5000 })
+
+  test("a later non-pausing subagent completion does not clear an active final-wave approval pause", async () => {
+    // given - an active persisted pause from a prior final-wave approval gate
+    const sessionID = "atlas-pause-clear-regression-session"
+    setupMessageStorage(sessionID)
+    // Plan still has implementation work pending, so a normal completion does not pause.
+    writePlanState(sessionID, "pause-clear-regression-plan", `# Plan
+
+## TODOs
+- [ ] 1. Ship implementation
+
+## Final Verification Wave (MANDATORY - after ALL implementation tasks)
+- [ ] F1. **Plan Compliance Audit** - \`oracle\`
+`)
+
+    const { setBoulderPause } = await import("../../features/boulder-state")
+    setBoulderPause(testDirectory, {
+      reason: "final_wave_approval",
+      sessionId: sessionID,
+    })
+    expect(readBoulderState(testDirectory)?.pause?.reason).toBe("final_wave_approval")
+
+    const hook = createAtlasHook(createMockPluginInput(), {
+      directory: testDirectory,
+      isCallerOrchestrator: async () => true,
+    })
+
+    // when - a later non-pausing implementation-task completion arrives for the same orchestrator
+    const implOutput = {
+      title: "Implementation task done",
+      output: `Implementation work shipped. Tests pass.
+
+<task_metadata>
+session_id: ses_pause_clear_impl_1
+</task_metadata>`,
+      metadata: {},
+    }
+    await hook["tool.execute.after"]({ tool: "task", sessionID }, implOutput)
+
+    // then - pause is still set (reviewer fix: only an explicit user message clears it)
+    const finalPause = readBoulderState(testDirectory)?.pause
+    expect(finalPause?.reason).toBe("final_wave_approval")
+    expect(finalPause?.session_id).toContain(sessionID)
   })
 })

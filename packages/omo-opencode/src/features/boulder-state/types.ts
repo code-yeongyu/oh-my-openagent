@@ -1,5 +1,7 @@
 export type {
   BoulderSessionOrigin,
+  BoulderPauseReason,
+  BoulderPauseState,
   BoulderState,
   BoulderTaskStatus,
   BoulderWorkResumeOption,

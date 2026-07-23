@@ -1,0 +1,10 @@
+PASS: dependencies present (opencode sqlite3 curl jq tmux)
+PASS: oqa_db_path -> /home/node/.local/share/opencode/opencode.db
+PASS: oqa_sql_escape quotes single quotes
+PASS: oqa_free_port -> 60929
+PASS: isolated XDG sandbox auto-removed on exit (/tmp/oqa-xdg.pFLD9z)
+PASS: isolated HOME points inside sandbox
+PASS: isolated HOME preserves HOME-based opencode shim
+PASS: common.sh self-check
+first matching event: {"type":"server.connected"}
+PASS: SSE /event opened and delivered server.connected
