@@ -6,8 +6,8 @@
    - `packages/tmux-core/src/tmux-utils.test.ts`
    - `packages/tmux-core/src/tmux-utils/pane-spawn-runner.test.ts`
    - `packages/omo-opencode/src/shared/tmux/tmux-utils.test.ts`
-2. The complete affected tmux, manager, and background-agent suites: 97 files,
-   1,044 tests.
+2. The complete affected tmux, manager, and background-agent suites: 112 files,
+   1,111 tests.
 3. Full repository typecheck and build.
 4. Strict TypeScript no-excuse rules on every edited TypeScript file.
 5. A production-module driver importing the OpenCode pane-spawn adapter and
@@ -30,6 +30,8 @@
   assertions.
 - Review round 4 GREEN: 1,044 affected-scope pass across 97 files with 2,579
   assertions.
+- Review round 5 GREEN: 1,111 affected-scope pass across 112 files with 2,720
+  assertions.
 - Typecheck: clean across root, scripts, and all packages.
 - Build: completed successfully.
 - Strict TypeScript audit: no violations in thirteen edited source/test files.
@@ -44,6 +46,10 @@
   after.
 - Final post-review rerun loaded the rebuilt plugin on isolated port 45482,
   created session `ses_070da0fd9ffeDC9YLuxO6nPzgy`, observed
+  `session.created`, preserved the same 21,931 real-session count, and removed
+  the server, port listener, and temp directory.
+- Release-candidate rerun after round 4 loaded the rebuilt plugin on isolated
+  port 45483, created session `ses_070b2a731ffe1xM8M4OFL2v8kI`, observed
   `session.created`, preserved the same 21,931 real-session count, and removed
   the server, port listener, and temp directory.
 
@@ -81,3 +87,7 @@ event type, counts, and cleanup state.
 - Killed final isolated server `bash_103`, confirmed TCP 45482 was free, and
   removed `/tmp/omo-pr5811-final-qa`.
 - Confirmed both shell-injection probe paths under `/tmp` are absent.
+- Killed release-candidate server `bash_155`, confirmed TCP 45483 was free, and
+  removed `/tmp/omo-pr5811-release-qa`.
+- Re-ran native-tmux auth tests under an outer fake-cmux environment; all pass.
+- Confirmed session cleanup sends no commands under fake cmux `TMUX`.

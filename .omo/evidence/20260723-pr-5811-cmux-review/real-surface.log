@@ -76,3 +76,13 @@ Authenticated cmux edge:
 - Credentials reached runner: false
 - `/tmp/omo-cmux-user-injected`: absent
 - `/tmp/omo-cmux-password-injected`: absent
+
+Release-candidate OpenCode proof:
+- GET /global/health on isolated port 45483:
+  {"healthy":true,"version":"1.18.4"}
+- GET /config listed the rebuilt local plugin `dist/index.js`.
+- Created isolated session: ses_070b2a731ffe1xM8M4OFL2v8kI
+- SSE probe observed `session.created`: PASS
+- Real OpenCode session count after release-candidate QA: 21931
+- Listener on TCP 45483 after teardown: none
+- /tmp/omo-pr5811-release-qa after teardown: absent

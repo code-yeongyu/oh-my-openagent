@@ -1,0 +1,17 @@
+Review round 5 RED:
+
+Host-environment independence:
+- Ran `pane-auth-env.test.ts` with fake cmux `TMUX` and `CMUX_SOCKET_PATH`
+  injected into the test process.
+- 3 pass, 3 fail.
+- Native tmux auth tests inherited cmux and failed before runner invocation.
+
+Session cleanup:
+- Adapter session-kill mock supplied `isInsideTmux=true` and
+  `isNativeTmux=false`.
+- Expected no runner calls, but literal-tmux cleanup invoked two commands.
+- Pair reproduction also exposed process-global Bun module mock contract drift.
+
+The RED proves native-tmux tests must set and restore their own environment,
+session cleanup must use native eligibility, and every shared environment mock
+must preserve the full exported contract.

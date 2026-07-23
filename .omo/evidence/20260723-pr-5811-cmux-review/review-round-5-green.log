@@ -1,0 +1,28 @@
+Review round 5 GREEN:
+
+Test determinism:
+- Native-tmux auth tests explicitly set a native `TMUX` value, clear
+  `CMUX_SOCKET_PATH`, and restore both variables.
+- The same tests pass when the outer process injects fake cmux environment.
+
+Session cleanup:
+- OpenCode session-kill adapter now uses `isNativeTmux`.
+- Fake cmux `TMUX` skips `has-session` and `kill-session`.
+- All shared environment module mocks provide `isInsideTmux`,
+  `isNativeTmux`, and `isTmuxPaneCompatible`, preventing single-process
+  Bun mock leakage.
+
+Targeted:
+- Host-injected auth plus session cleanup: 13 pass, 0 fail.
+- Shared mock pair reproduction: 8 pass, 0 fail.
+
+Complete affected scope:
+- 112 test files
+- 1,111 pass
+- 0 fail
+- 2,720 expect() calls
+
+Static gates:
+- Full `bun run typecheck`: PASS
+- Full `bun run build`: PASS
+- Strict audit: no violations in the three final source/test files.

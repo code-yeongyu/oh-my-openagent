@@ -1,3 +1,8 @@
+SUPERSEDED BY `review-round-5-green.log`.
+
+Review round 4 hardened spawn paths but left session cleanup using literal tmux
+and left native-tmux auth tests dependent on the host terminal environment.
+
 Review round 4 GREEN:
 
 Final isolation policy:

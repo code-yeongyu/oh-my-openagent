@@ -16,6 +16,7 @@ const runTmuxCommandMock = mock(async (): Promise<TmuxCommandResult> => ({
 	exitCode: 0,
 }))
 const isInsideTmuxMock = mock((): boolean => true)
+const isNativeTmuxMock = mock((): boolean => true)
 const getTmuxPathMock = mock(async (): Promise<string | undefined> => "sh")
 const logMock = mock(() => undefined)
 
@@ -25,7 +26,11 @@ async function loadKillTmuxSessionIfExists(): Promise<typeof import("./session-k
 }
 
 function registerModuleMocks(): void {
-	mock.module(environmentSpecifier, () => ({ isInsideTmux: isInsideTmuxMock }))
+	mock.module(environmentSpecifier, () => ({
+		isInsideTmux: isInsideTmuxMock,
+		isNativeTmux: isNativeTmuxMock,
+		isTmuxPaneCompatible: isInsideTmuxMock,
+	}))
 	mock.module(loggerSpecifier, () => ({ log: logMock }))
 	mock.module(runnerSpecifier, () => ({ runTmuxCommand: runTmuxCommandMock }))
 	mock.module(tmuxPathResolverSpecifier, () => ({ getTmuxPath: getTmuxPathMock }))
@@ -36,6 +41,7 @@ describe("killTmuxSessionIfExists runner integration", () => {
 		registerModuleMocks()
 		runTmuxCommandMock.mockClear()
 		isInsideTmuxMock.mockClear()
+		isNativeTmuxMock.mockClear()
 		getTmuxPathMock.mockClear()
 		logMock.mockClear()
 
@@ -43,6 +49,7 @@ describe("killTmuxSessionIfExists runner integration", () => {
 			.mockResolvedValueOnce({ success: true, output: "", stdout: "", stderr: "", exitCode: 0 })
 			.mockResolvedValueOnce({ success: true, output: "", stdout: "", stderr: "", exitCode: 0 })
 		isInsideTmuxMock.mockReturnValue(true)
+		isNativeTmuxMock.mockReturnValue(true)
 		getTmuxPathMock.mockResolvedValue("sh")
 	})
 
@@ -59,5 +66,19 @@ describe("killTmuxSessionIfExists runner integration", () => {
 			["sh", ["has-session", "-t", "omo-agents"]],
 			["sh", ["kill-session", "-t", "omo-agents"]],
 		])
+	})
+
+	it("#given cmux fake TMUX is not native #when killTmuxSessionIfExists called #then skips session commands", async () => {
+		// given
+		isInsideTmuxMock.mockReturnValue(true)
+		isNativeTmuxMock.mockReturnValue(false)
+		const killTmuxSessionIfExists = await loadKillTmuxSessionIfExists()
+
+		// when
+		const result = await killTmuxSessionIfExists("omo-agents")
+
+		// then
+		expect(result).toBe(false)
+		expect(runTmuxCommandMock).not.toHaveBeenCalled()
 	})
 })
