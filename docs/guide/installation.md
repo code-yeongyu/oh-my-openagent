@@ -943,11 +943,19 @@ See [Privacy Policy](../legal/privacy-policy.md) and [Terms of Service](../legal
 
 ### Remove the OpenCode plugin
 
+If you only want to disable oh-my-openagent temporarily, remove the plugin entries from `opencode.json` and `tui.json`, then leave the plugin config files in place. Restart OpenCode after editing the files. On Desktop, fully quit and reopen the app so the plugin process is recreated.
+
 ```bash
-# 1. Remove the plugin entry from opencode.json
+# 1. Remove the server plugin entry from opencode.json
 jq '.plugin = [.plugin[] | select(. != "oh-my-openagent" and . != "oh-my-opencode")]' \
     ~/.config/opencode/opencode.json > /tmp/oc.json && \
     mv /tmp/oc.json ~/.config/opencode/opencode.json
+
+# If present, remove the TUI plugin entry as well
+test ! -f ~/.config/opencode/tui.json || \
+  jq '.plugin = [.plugin[] | select(. != "oh-my-openagent" and . != "oh-my-opencode")]' \
+    ~/.config/opencode/tui.json > /tmp/tui.json && \
+    mv /tmp/tui.json ~/.config/opencode/tui.json
 
 # 2. Remove plugin config files (optional)
 rm -f ~/.config/opencode/oh-my-openagent.jsonc ~/.config/opencode/oh-my-openagent.json \
@@ -958,9 +966,12 @@ rm -f .opencode/oh-my-openagent.jsonc .opencode/oh-my-openagent.json \
       .opencode/oh-my-opencode.jsonc .opencode/oh-my-opencode.json
 
 # 4. Verify removal
-opencode --version
-# Plugin should no longer be loaded
+bunx oh-my-openagent doctor --status
+grep -R "oh-my-openagent\|oh-my-opencode" \
+  ~/.config/opencode/opencode.json ~/.config/opencode/opencode.jsonc ~/.config/opencode/tui.json 2>/dev/null
 ```
+
+The doctor output should report that the plugin is not registered, and the `grep` command should print no active OpenCode or TUI plugin entry. If OpenCode still shows oh-my-openagent agents or sidebar UI, restart the terminal or Desktop app after saving both config files.
 
 ### Remove the Codex CLI Light edition
 
