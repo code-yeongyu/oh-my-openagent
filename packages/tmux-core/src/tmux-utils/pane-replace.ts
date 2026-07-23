@@ -1,6 +1,7 @@
 import type { TmuxConfig } from "../types"
 import type { SpawnPaneResult } from "../types"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
+import { isCmuxCompatEnvironment } from "../cmux-detect"
 import { isInsideTmux } from "./environment"
 import { buildPaneAuthEnvironmentArgs, buildTmuxPlaceholderCommand } from "./pane-command"
 
@@ -44,6 +45,12 @@ export async function replaceTmuxPane(
 		return { success: false }
 	}
 
+	const authEnvArgs = buildPaneAuthEnvironmentArgs()
+	if (isCmuxCompatEnvironment() && authEnvArgs.length > 0) {
+		log("[replaceTmuxPane] SKIP: authenticated cmux panes are unsupported", { paneId, sessionId })
+		return { success: false }
+	}
+
 	const tmux = await deps.getTmuxPath()
 	if (!tmux) {
 		return { success: false }
@@ -53,7 +60,6 @@ export async function replaceTmuxPane(
 	await runTmuxCommand(tmux, ["send-keys", "-t", paneId, "C-c"])
 
 	const placeholderCmd = buildTmuxPlaceholderCommand(description)
-	const authEnvArgs = buildPaneAuthEnvironmentArgs()
 
 	const result = await runTmuxCommand(tmux, ["respawn-pane", "-k", ...authEnvArgs, "-t", paneId, placeholderCmd])
 

@@ -1,4 +1,9 @@
-Final review-fix GREEN:
+SUPERSEDED BY `review-round-3-green.log`.
+
+Review round 2 fixed isolation scoping but did not remove the two producer-side
+literal-tmux gates and did not account for cmux rejecting tmux `-e` auth flags.
+
+Review-round-2 GREEN:
 
 Targeted inline cmux and pane lifecycle:
 - 33 pass

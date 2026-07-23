@@ -21,6 +21,8 @@ const config = {
 const originalTmux = process.env.TMUX
 const originalTmuxPane = process.env.TMUX_PANE
 const originalCmuxSocketPath = process.env.CMUX_SOCKET_PATH
+const originalUsername = process.env.OPENCODE_SERVER_USERNAME
+const originalPassword = process.env.OPENCODE_SERVER_PASSWORD
 const commands: string[][] = []
 
 const runTmuxCommand = async (
@@ -80,6 +82,26 @@ try {
 	assert.ok(commands.some((args) => args.join(" ") === "send-keys -t %42 C-c"))
 	assert.ok(commands.some((args) => args.join(" ") === "kill-pane -t %42"))
 
+	process.env.OPENCODE_SERVER_USERNAME = "$(touch /tmp/omo-cmux-user-injected)"
+	process.env.OPENCODE_SERVER_PASSWORD = "$(touch /tmp/omo-cmux-password-injected)"
+	const commandCountBeforeAuthenticatedSpawn = commands.length
+	const authenticatedSpawn = await spawnTmuxPane(
+		"session-cmux-auth",
+		"qa-worker",
+		config,
+		"http://127.0.0.1:4096",
+		"/tmp/omo project",
+		"%0",
+		"-h",
+		{
+			runTmuxCommand,
+			isServerRunning: async () => true,
+			getTmuxPath: async () => "/opt/homebrew/bin/tmux",
+		},
+	)
+	assert.deepEqual(authenticatedSpawn, { success: false })
+	assert.equal(commands.length, commandCountBeforeAuthenticatedSpawn)
+
 	console.log(JSON.stringify({
 		environment: {
 			TMUX: process.env.TMUX ?? null,
@@ -91,6 +113,8 @@ try {
 		spawned,
 		initialCommand,
 		closed,
+		authenticatedSpawn,
+		authenticatedCredentialsReachedRunner: false,
 		commands,
 	}, null, 2))
 } finally {
@@ -108,5 +132,15 @@ try {
 		delete process.env.CMUX_SOCKET_PATH
 	} else {
 		process.env.CMUX_SOCKET_PATH = originalCmuxSocketPath
+	}
+	if (originalUsername === undefined) {
+		delete process.env.OPENCODE_SERVER_USERNAME
+	} else {
+		process.env.OPENCODE_SERVER_USERNAME = originalUsername
+	}
+	if (originalPassword === undefined) {
+		delete process.env.OPENCODE_SERVER_PASSWORD
+	} else {
+		process.env.OPENCODE_SERVER_PASSWORD = originalPassword
 	}
 }

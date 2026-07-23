@@ -1,0 +1,38 @@
+Review round 3 GREEN:
+
+Background producer path:
+- Both background-agent launch paths now invoke one shared callback helper.
+- The producers no longer re-check literal tmux; the selected
+  `TmuxSessionManager` predicate owns inline versus isolated policy.
+- Targeted helper/spawner tests: 15 pass, 0 fail.
+
+Authenticated cmux:
+- Pane spawn, activate, and replace fail closed when cmux compatibility and
+  OpenCode server authentication are both present.
+- No username or password reaches `runTmuxCommand`.
+- Standard tmux authentication propagation remains unchanged.
+- Security scope: 22 pass, 0 fail.
+
+Complete affected scope:
+- 108 test files
+- 1041 pass
+- 0 fail
+- 1912 expect() calls
+
+Static gates:
+- Full `bun run typecheck`: PASS
+- Full `bun run build`: PASS
+
+Real module surface:
+- Unauthenticated inline cmux: eager attach spawn and graceful close PASS.
+- Authenticated inline cmux with `$()` metacharacters: `{ success: false }`.
+- Command runner call count did not change.
+- `/tmp/omo-cmux-user-injected` and
+  `/tmp/omo-cmux-password-injected` were not created.
+
+cmux pane identity contract:
+- Local cmux source `CLI/cmux.swift:13299-13308` derives `TMUX_PANE` from the
+  focused pane and exports it with `TMUX` and `CMUX_SOCKET_PATH`.
+- Official cmux issue #3157 documents fake `TMUX` and `TMUX_PANE`.
+- Official cmux issue #2556 records `TMUX_PANE` correctly set during compatible
+  split-window operation.

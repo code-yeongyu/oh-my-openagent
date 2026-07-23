@@ -78,10 +78,15 @@ export async function spawnTmuxPane(
 
 	log("[spawnTmuxPane] all checks passed, spawning...")
 
+	const authEnvArgs = buildPaneAuthEnvironmentArgs()
+	if (deps.isCmuxCompatEnvironment() && authEnvArgs.length > 0) {
+		log("[spawnTmuxPane] SKIP: authenticated cmux panes are unsupported")
+		return { success: false }
+	}
+
 	const initialCmd = deps.isCmuxCompatEnvironment()
 		? buildTmuxAttachCommand(serverUrl, sessionId, _directory)
 		: buildTmuxPlaceholderCommand(description)
-	const authEnvArgs = buildPaneAuthEnvironmentArgs()
 
 	const args = [
 		"split-window",

@@ -14,6 +14,10 @@ Production module driver:
   },
   "initialCommand": "/bin/sh -c \"opencode attach 'http://127.0.0.1:4096' --session 'session-cmux-only' --dir '/tmp/omo project'\"",
   "closed": true,
+  "authenticatedSpawn": {
+    "success": false
+  },
+  "authenticatedCredentialsReachedRunner": false,
   "commands": [
     ["split-window", "-h", "-d", "-P", "-F", "#{pane_id}", "-t", "%0", "/bin/sh -c \"opencode attach 'http://127.0.0.1:4096' --session 'session-cmux-only' --dir '/tmp/omo project'\""],
     ["select-pane", "-t", "%42", "-T", "omo-subagent-qa-worker"],
@@ -50,3 +54,11 @@ Final post-review OpenCode proof:
 - Real OpenCode session count after final QA: 21931
 - Listener on TCP 45482 after teardown: none
 - /tmp/omo-pr5811-final-qa after teardown: absent
+
+Authenticated cmux edge:
+- Username: shell-metacharacter probe (redacted from output)
+- Password: shell-metacharacter probe (redacted from output)
+- Spawn result: `{ "success": false }`
+- Credentials reached runner: false
+- `/tmp/omo-cmux-user-injected`: absent
+- `/tmp/omo-cmux-password-injected`: absent

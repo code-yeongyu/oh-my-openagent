@@ -1200,13 +1200,13 @@ describe('TmuxSessionManager', () => {
     })
 
     test('enables manager in headless cmux environment (CMUX_SOCKET_PATH set, TMUX unset)', async () => {
-      // given — isInsideTmux()=false but cmux-compat detector says supported
+      // given — createManagers selects the inline cmux-compatible predicate
       const savedTmux = process.env.TMUX
       const savedCmuxSocket = process.env.CMUX_SOCKET_PATH
       delete process.env.TMUX
       process.env.CMUX_SOCKET_PATH = '/tmp/cmux-headless-test.sock'
       try {
-        mockIsInsideTmux.mockReturnValue(false) // real behavior: TMUX unset → false
+        mockIsInsideTmux.mockReturnValue(Boolean(process.env.CMUX_SOCKET_PATH) && !process.env.TMUX)
         // force capacity-full so the session defers (mirror the cmux-detected R1 setup)
         mockQueryWindowState.mockImplementation(async () =>
           createWindowState({
@@ -1242,10 +1242,10 @@ describe('TmuxSessionManager', () => {
         })
         const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
 
-        // when — session created while the pre-fix gate (enabled && isInsideTmux) would have rejected
+        // when — session created with the selected inline eligibility predicate
         await manager.onSessionCreated(createSessionCreatedEvent('ses_headless', 'ses_parent', 'Task headless'))
 
-        // then — manager is enabled via cmux-compat: flow proceeded past `if (!enabled) return`.
+        // then — manager is enabled via injected cmux-compat: flow proceeded past the gate.
         // Capacity-full window state routes the session into the deferred queue, which is only
         // reachable once isEnabled() returned true.
         expect(getManagerInternals(manager).deferredQueue).toContain('ses_headless')

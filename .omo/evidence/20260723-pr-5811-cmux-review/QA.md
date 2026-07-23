@@ -6,7 +6,8 @@
    - `packages/tmux-core/src/tmux-utils.test.ts`
    - `packages/tmux-core/src/tmux-utils/pane-spawn-runner.test.ts`
    - `packages/omo-opencode/src/shared/tmux/tmux-utils.test.ts`
-2. The complete affected tmux and manager suites: 37 files, 289 tests.
+2. The complete affected tmux, manager, and background-agent suites: 108 files,
+   1,041 tests.
 3. Full repository typecheck and build.
 4. Strict TypeScript no-excuse rules on every edited TypeScript file.
 5. A production-module driver importing the OpenCode pane-spawn adapter and
@@ -25,11 +26,15 @@
   pane predicate and real manager path.
 - Review round 2 GREEN: 33 targeted pass, then 289 affected-scope pass across
   37 files with 662 assertions.
+- Review round 3 GREEN: 1,041 affected-scope pass across 108 files with 1,912
+  assertions.
 - Typecheck: clean across root, scripts, and all packages.
 - Build: completed successfully.
 - Strict TypeScript audit: no violations in thirteen edited source/test files.
 - Real module surface: eager pane spawn succeeded, then graceful close executed
   both `send-keys C-c` and `kill-pane`.
+- Authenticated cmux module surface failed closed before either metacharacter
+  credential reached the command runner; neither probe file was created.
 - OpenCode surface: local plugin configuration was visible through `/config`,
   server health was good, and the event wire delivered `session.created`.
 - Isolation: the real OpenCode database stayed at 21,931 sessions before and
@@ -46,6 +51,9 @@ reason. The final design keeps literal tmux detection unchanged and scopes cmux
 compatibility to inline pane lifecycle only. The broader suites protect
 standard tmux, disabled environments,
 escaping, spawn, activation, replacement, closing, and polling behavior.
+The background callback test proves producer entry points delegate eligibility
+instead of stopping before the manager. Security tests prove cmux never receives
+tmux `-e` credential arguments.
 The production-module driver exercises the OpenCode adapter's selected inline
 pane predicate and uses the same predicate for tmux-core close. Literal
 tmux-core defaults remain unchanged for unsupported window/session operations.
@@ -69,3 +77,4 @@ event type, counts, and cleanup state.
 - Confirmed the real OpenCode session count remained 21,931.
 - Killed final isolated server `bash_103`, confirmed TCP 45482 was free, and
   removed `/tmp/omo-pr5811-final-qa`.
+- Confirmed both shell-injection probe paths under `/tmp` are absent.
