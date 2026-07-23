@@ -1,0 +1,56 @@
+﻿# RED — before fix (issue #6167) — 2026-07-20T10:45:42.8312653+09:00
+# host: Windows; drive-case mismatch reproduced
+
+bun test v1.3.14 (0d9b296a)
+bun : 
+At line:3 char:8
++ $out = bun test packages/lsp-core/src/lsp/workspace-document-state.te ...
++        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+packages\lsp-core\src\lsp\workspace-document-state.test.ts:
+91 | 
+92 | 				// when: the server-cased URI flows through recordPublishedDiagnostics, as the transport does
+93 | 				documents.recordPublishedDiagnostics({ uri: publishedUri, diagnostics: [diagnostic] });
+94 | 
+95 | 				// then: the push resolves ready for the open snapshot (the client.diagnostics() gate), not "missing"
+96 | 				expect(documents.resolvePushDiagnostics(snapshot)).toEqual({ status: "ready", diagnostics: [diagnostic] });
+                                                            ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "diagnostics": [
+-     {
+-       "message": "Missing expression after unary operator '--'.",
+-       "range": {
+-         "end": {
+-           "character": 10,
+-           "line": 99,
+-         },
+-         "start": {
+-           "character": 4,
+-           "line": 99,
+-         },
+-       },
+-       "severity": 1,
+-     },
+-   ],
+-   "status": "ready",
++   "status": "missing",
+  }
+
+- Expected  - 17
++ Received  + 1
+
+      at <anonymous> 
+(C:\Users\pss\.omo-contrib\work\dev-baseline\packages\lsp-core\src\lsp\workspace-document-state.test.ts:96:56)
+(fail) WorkspaceDocumentState drive-letter case (issue #6167) > #given a server publishes under a lowercase Windows 
+drive URI #when the open document is resolved #then the diagnostics are recorded, not dropped [9.34ms]
+
+ 2 pass
+ 1 fail
+ 10 expect() calls
+Ran 3 tests across 1 file. [306.00ms]
+
+EXIT=1

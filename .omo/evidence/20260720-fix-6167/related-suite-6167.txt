@@ -1,0 +1,18 @@
+﻿# RELATED SUITE - bun test packages/lsp-core - 2026-07-20T10:48:30.8777359+09:00
+
+bun test v1.3.14 (0d9b296a)
+bun : [lsp] ignored shutdown request failure during cleanup: LSP server workspace-edit-fixture at 
+C:\Users\pss\AppData\Local\Temp\lsp-apply-edit-VOnehM exited with code 0
+At line:5 char:8
++ $out = bun test packages/lsp-core 2>&1 | Out-String
++        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([lsp] ignored s...ted with code 0:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+ 93 pass
+ 0 fail
+ 277 expect() calls
+Ran 93 tests across 21 files. [22.15s]
+
+EXIT=0

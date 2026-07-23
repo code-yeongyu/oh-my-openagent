@@ -1,0 +1,10 @@
+﻿# LIVE-SURFACE DRIVER - AFTER FIX (fix applied) - 2026-07-20T10:53:06.6367395+09:00
+# real LspClient over real stdio JSON-RPC vs fixture LSP server publishing a lowercase-drive URI
+
+openByUri store key (pathToFileURL): file:///C:/Users/pss/AppData/Local/Temp/omo-6167-drive-XxF6e4/gdrive-sync.ps1
+server-published URI (PSES-style)  : file:///c:/Users/pss/AppData/Local/Temp/omo-6167-drive-XxF6e4/gdrive-sync.ps1
+diagnostics().items      = [{"range":{"start":{"line":99,"character":4},"end":{"line":99,"character":10}},"severity":1,"message":"Missing expression after unary operator '--'."}]
+diagnostics().transient  = null
+RESULT: PASS - diagnostics delivered end-to-end
+
+EXIT=0 (expected 0 = diagnostics delivered)

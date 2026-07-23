@@ -1,0 +1,10 @@
+﻿# LIVE-SURFACE DRIVER - BEFORE FIX (fix stashed) - 2026-07-20T10:53:26.8749244+09:00
+# real LspClient over real stdio JSON-RPC vs fixture LSP server publishing a lowercase-drive URI
+
+openByUri store key (pathToFileURL): file:///C:/Users/pss/AppData/Local/Temp/omo-6167-drive-InlNdM/gdrive-sync.ps1
+server-published URI (PSES-style)  : file:///c:/Users/pss/AppData/Local/Temp/omo-6167-drive-InlNdM/gdrive-sync.ps1
+diagnostics().items      = []
+diagnostics().transient  = null
+RESULT: FAIL - dropped -> freshness timeout
+
+EXIT=1 (expected 1 = diagnostics dropped -> freshness timeout)
