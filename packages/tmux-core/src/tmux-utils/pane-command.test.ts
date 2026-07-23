@@ -136,8 +136,8 @@ describe("buildTmuxAttachCommand", () => {
   it("falls back to process.cwd() when directory argument is omitted", () => {
     const cwd = process.cwd()
     const cmd = buildTmuxAttachCommand("http://127.0.0.1:3000", "ses_abc123")
-    // No directory passed → should use process.cwd() as default
-    expect(cmd).toContain(cwd)
+    // Nested /bin/sh quoting doubles Windows path separators.
+    expect(cmd).toContain(cwd.replaceAll("\\", "\\\\"))
     expect(cmd).toContain("--dir")
   })
 })
