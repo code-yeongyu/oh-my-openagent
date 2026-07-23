@@ -1,0 +1,33 @@
+FOCUSED COMPONENT
+command:
+  bun test packages/omo-senpi/src/components/ulw-loop
+observed:
+  27 pass
+  0 fail
+
+TYPECHECK
+command:
+  bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+observed:
+  exit 0
+
+FULL GATE RUN 1
+command:
+  bun run test:senpi
+observed:
+  323 pass
+  0 fail
+
+FULL GATE RUN 2
+command:
+  bun run test:senpi
+observed:
+  323 pass
+  0 fail
+
+DIAGNOSTICS
+runtime.test.ts:
+  LSP: no diagnostics
+ulw-loop.test-support.ts:
+  LSP server fresh-diagnostic request timed out twice.
+  Package tsgo completed successfully and is the blocking semantic diagnostic.
