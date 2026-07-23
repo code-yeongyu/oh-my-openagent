@@ -156,13 +156,17 @@ export function createCategorySkillReminderHook(
     const target = findLatestReminderTarget(output.messages, sessionStates)
     if (!target) return
 
-    target.message.parts.splice(target.textPartIndex, 0, {
-      id: `prt_category_skill_reminder_${target.messageID}`,
-      sessionID: target.sessionID,
-      messageID: target.messageID,
-      type: "text",
-      text: reminderMessage,
-      synthetic: true,
+    const reminderID = `msg_category_skill_reminder_${target.sessionID}`
+    output.messages.push({
+      info: { ...target.message.info, id: reminderID },
+      parts: [{
+        id: `prt_category_skill_reminder_${target.sessionID}`,
+        sessionID: target.sessionID,
+        messageID: reminderID,
+        type: "text",
+        text: reminderMessage,
+        synthetic: true,
+      }],
     })
     target.state.reminderPending = false
     target.state.reminderShown = true

@@ -94,7 +94,7 @@ afterEach(() => {
 
 describe("category-skill-reminder hook", () => {
   test.each(["Sisyphus", "Atlas", "sisyphus-junior"])(
-    "#given target agent %s #when three delegatable tools finish #then one reminder is injected before the user text",
+    "#given target agent %s #when three delegatable tools finish #then one reminder is appended as a new user message",
     async (agent) => {
       const hook = createHook()
       const sessionID = `target-${agent}`
@@ -106,8 +106,13 @@ describe("category-skill-reminder hook", () => {
 
       expect(output.output).toBe("result")
       expect(findReminderParts(messages)).toHaveLength(1)
-      expect(messages[0]?.parts[0]).toMatchObject({ synthetic: true, type: "text" })
-      expect(messages[0]?.parts[1]).toMatchObject({ text: "continue working", type: "text" })
+      const originalMessage = messages[0]
+      expect(messages).toHaveLength(2)
+      expect(originalMessage.parts).toHaveLength(1)
+      expect(originalMessage.parts[0]).toMatchObject({ text: "continue working", type: "text" })
+      const appended = messages[1]
+      expect(appended.info.role).toBe("user")
+      expect(appended.parts[0]).toMatchObject({ synthetic: true, type: "text" })
     },
   )
 
@@ -132,11 +137,17 @@ describe("category-skill-reminder hook", () => {
     await useTools({ hook, sessionID: targetSessionID, tools: ["read", "grep", "glob"] })
     const targetMessage = createUserTurn(targetSessionID, "target request")
     const otherMessage = createUserTurn(otherSessionID, "other request")
+    const messages = [targetMessage, otherMessage]
 
-    await transformMessages(hook, [targetMessage, otherMessage])
+    await transformMessages(hook, messages)
 
-    expect(findReminderParts([targetMessage])).toHaveLength(1)
-    expect(findReminderParts([otherMessage])).toHaveLength(0)
+    expect(messages).toHaveLength(3)
+    const appended = messages[2]
+    expect(appended.info.sessionID).toBe(targetSessionID)
+    expect(appended.info.role).toBe("user")
+    expect(appended.parts[0]).toMatchObject({ synthetic: true, type: "text" })
+    expect(targetMessage.parts).toHaveLength(1)
+    expect(otherMessage.parts).toHaveLength(1)
   })
 
   test("#given no tracked agent #when the tool input identifies Sisyphus #then the reminder is injected", async () => {
@@ -227,7 +238,7 @@ describe("category-skill-reminder hook", () => {
     expect(findReminderParts(realMessages)).toHaveLength(1)
   })
 
-  test("#given multiple real and synthetic user texts #when a reminder is pending #then exactly one is inserted before the latest real text", async () => {
+  test("#given multiple real and synthetic user texts #when a reminder is pending #then exactly one reminder is appended as a new message leaving prior parts untouched", async () => {
     const hook = createHook()
     const sessionID = "latest-real-text"
     updateSessionAgent(sessionID, "Sisyphus")
@@ -256,24 +267,33 @@ describe("category-skill-reminder hook", () => {
       latestTurn,
       createUserTurn(sessionID, "synthetic tail", { id: "msg_tail", synthetic: true }),
     ]
+    const originalPartsSnapshot = messages.map((message) => message.parts.map((part) => part.id))
 
     await transformMessages(hook, messages)
     await transformMessages(hook, messages)
 
-    const reminderIndex = latestTurn.parts.findIndex(
-      (part) => part.type === "text" && part.text.includes(REMINDER_MARKER),
-    )
-    const latestTextIndex = latestTurn.parts.findIndex(
-      (part) => part.type === "text" && part.text === "latest real text",
-    )
     expect(findReminderParts(messages)).toHaveLength(1)
-    expect(reminderIndex).toBe(latestTextIndex - 1)
-    expect(latestTurn.parts[reminderIndex]).toMatchObject({
-      messageID: "msg_latest",
+    expect(messages).toHaveLength(4)
+    const appended = messages[3]
+    expect(appended.info.sessionID).toBe(sessionID)
+    expect(appended.info.role).toBe("user")
+    expect(appended.parts[0]).toMatchObject({
+      messageID: `msg_category_skill_reminder_${sessionID}`,
       sessionID,
       synthetic: true,
       type: "text",
     })
+    // prior messages' parts arrays are byte-identical (cache prefix preserved)
+    expect(messages[0]!.parts.map((part) => part.id)).toEqual(originalPartsSnapshot[0])
+    expect(messages[1]!.parts.map((part) => part.id)).toEqual(originalPartsSnapshot[1])
+    expect(messages[2]!.parts.map((part) => part.id)).toEqual(originalPartsSnapshot[2])
+    // latestTurn keeps exactly its original 3 parts, in order
+    expect(latestTurn.parts).toHaveLength(3)
+    expect(latestTurn.parts.map((part) => part.text)).toEqual([
+      "earlier text in latest turn",
+      "internal context",
+      "latest real text",
+    ])
   })
 
   test("#given a reminder is inserted #when transforms and tools repeat without assistant completion #then the same bytes appear only once", async () => {
@@ -295,6 +315,29 @@ describe("category-skill-reminder hook", () => {
     expect(findReminderParts(firstMessages)).toHaveLength(1)
     expect(JSON.stringify(findReminderParts(firstMessages)[0])).toBe(injectedBytes)
     expect(findReminderParts(secondMessages)).toHaveLength(0)
+  })
+
+  test("#given a reminder is appended #when the transform runs #then all prior messages and their parts are byte-identical before and after", async () => {
+    const hook = createHook()
+    const sessionID = "cache-prefix-session"
+    updateSessionAgent(sessionID, "Sisyphus")
+    await useTools({ hook, sessionID, tools: ["read", "grep", "bash"] })
+
+    const userMessage = createUserTurn(sessionID, "original user text", { id: "msg_user" })
+    const messages = [userMessage]
+    const priorSnapshot = JSON.stringify(messages.map((message) => ({
+      info: message.info,
+      parts: message.parts,
+    })))
+
+    await transformMessages(hook, messages)
+
+    // the reminder is appended as a new message
+    expect(messages).toHaveLength(2)
+    expect(findReminderParts(messages)).toHaveLength(1)
+    // the original user message and its parts array are unchanged -> cache prefix preserved
+    expect(messages[0]).toBe(userMessage)
+    expect(JSON.stringify([{ info: messages[0]!.info, parts: messages[0]!.parts }])).toBe(priorSnapshot)
   })
 
   test("#given a reminder is pending #when the session is deleted #then pending state and counts are cleared", async () => {
