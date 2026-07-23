@@ -57,6 +57,20 @@ export async function runTeamWait(
   const filter = input.from === undefined ? {} : { from: input.from }
   const registration = deps.registry.register(resolved.teamRunId, filter)
   try {
+    const delivered = deps.deliveryJournal?.takeOldestUnreported(resolved.teamRunId, filter)
+    if (delivered !== undefined) {
+      registration.cancel()
+      // Deliberate: deliver the drained message even when suppression throws or the caller already
+      // aborted. The journal entry is consumed either way; a failed suppress only means the flushed
+      // envelope may also land as a steering duplicate (bounded, id-identical), never a loss.
+      await poller.suppressDelivered?.(delivered.messageId).catch(() => false)
+      return toolResult(formatMessageText(delivered), {
+        kind: "message",
+        message_id: delivered.messageId,
+        from: delivered.from,
+        body: delivered.body,
+      })
+    }
     await poller.pollOnce(filter)
     const outcome = await waitForMessage(registration, timeoutMs, signal)
     switch (outcome.kind) {
@@ -66,7 +80,7 @@ export async function runTeamWait(
           { kind: "timeout", timeout_ms: timeoutMs },
         )
       case "message":
-        return toolResult(`Message from ${outcome.message.from}.`, {
+        return toolResult(formatMessageText(outcome.message), {
           kind: "message",
           message_id: outcome.message.messageId,
           from: outcome.message.from,
@@ -146,6 +160,25 @@ async function waitForMessage(
     if (timer !== undefined) clearTimeout(timer)
     if (signal !== undefined && abortListener !== undefined) signal.removeEventListener("abort", abortListener)
   }
+}
+
+const MESSAGE_BODY_TEXT_MAX = 4_000
+const MESSAGE_SUMMARY_TEXT_MAX = 400
+
+// The wait result is the ONLY model-visible copy of the body (tool details never reach the model),
+// so the text must carry it; oversized bodies are bounded with a pointer to the recovery event.
+export function formatMessageText(message: Message): string {
+  const header = `Message from ${message.from} (id: ${message.messageId}):`
+  const summary = message.summary === undefined ? "" : `\nsummary: ${collapseEcho(message.summary, MESSAGE_SUMMARY_TEXT_MAX)}`
+  const body = message.body.length <= MESSAGE_BODY_TEXT_MAX
+    ? message.body
+    : `${message.body.slice(0, MESSAGE_BODY_TEXT_MAX)}\n...[truncated, full body in the team_message_waited task event]`
+  return `${header}${summary}\n${body}`
+}
+
+function collapseEcho(value: string, max: number): string {
+  const collapsed = value.replace(/\s+/g, " ").trim()
+  return collapsed.length <= max ? collapsed : `${collapsed.slice(0, max)}...`
 }
 
 function assertNever(value: never): never {

@@ -82,6 +82,10 @@ export class IdleInjectionCoordinator {
     return this.#pending.size
   }
 
+  remove(key: string): boolean {
+    return this.#pending.delete(key)
+  }
+
   // Flush the whole queue as one injection. Returns how many queued items were collapsed (0 = no-op).
   flushOnIdle(): number {
     if (this.#pending.size === 0) return 0

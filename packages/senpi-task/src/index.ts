@@ -370,6 +370,7 @@ export {
   reclaimStaleTeamReservations,
   reconcileTeamMailboxOnSessionStart,
   resolveMemberExtensionEntryPath,
+  createLeadDeliveryJournal,
   createTeamMemberRespawnLaunchResolver,
   TeamMemberRespawnLaunchError,
   sendTeamMessage,
@@ -377,6 +378,8 @@ export {
 } from "./team"
 export type {
   BuildTeamMessageOptions,
+  LeadDeliveryJournal,
+  LeadDeliveryJournalOptions,
   LeadInjection,
   LeadInjectionSink,
   LeadPollFilter,
@@ -435,6 +438,7 @@ export {
 export type {
   CreateTeamDeps,
   CreateTeamResult,
+  CreatedMemberInfo,
   DeleteTeamDeps,
   DeleteTeamResult,
   MemberStatusPort,

@@ -3,7 +3,10 @@ import { Type } from "typebox"
 import type { Static } from "typebox"
 
 import { SenpiTeamRuntimeError, SenpiTeamSpecError } from "../../team"
+import type { CreatedMemberInfo } from "../../team"
+import type { ResolvedModelRecord } from "../../state"
 import { toolResult } from "../control"
+import { qualifyResolvedModelDisplay } from "../task/resolved-model-display"
 import type { TeamToolDeps, TeamToolsService } from "./types"
 
 export const TeamCreateParams = Type.Object({
@@ -23,7 +26,14 @@ export const TeamDeleteParams = Type.Object({
 export type TeamCreateInput = Static<typeof TeamCreateParams>
 export type TeamDeleteInput = Static<typeof TeamDeleteParams>
 
-export type TeamCreateMemberView = { readonly name: string; readonly status: string }
+export type TeamCreateMemberView = {
+  readonly name: string
+  readonly status: string
+  readonly role: string
+  readonly task_id: string
+  readonly model?: ResolvedModelRecord
+  readonly prompt_excerpt?: string
+}
 
 export type TeamCreateDetails =
   | { readonly kind: "created"; readonly team_run_id: string; readonly team_name: string; readonly members: readonly TeamCreateMemberView[] }
@@ -54,9 +64,20 @@ export async function runTeamCreate(service: TeamToolsService, params: TeamCreat
       hasName ? { teamName: params.team_name } : { inlineSpec: params.inline_spec },
     )
     const state = result.runtimeState
-    const members = state.members.map((member) => ({ name: member.name, status: member.status }))
-    return toolResult(
+    const members: TeamCreateMemberView[] = result.members.map((member) => ({
+      name: member.name,
+      status: member.status,
+      role: formatMemberRole(member.role),
+      task_id: member.taskId,
+      ...(member.model !== undefined ? { model: member.model } : {}),
+      ...(member.promptExcerpt !== undefined ? { prompt_excerpt: member.promptExcerpt } : {}),
+    }))
+    const lines = [
       `Created team '${state.teamName}' (${state.teamRunId}) with ${members.length} members.`,
+      ...result.members.map((member) => formatCreatedMemberLine(member)),
+    ]
+    return toolResult(
+      lines.join("\n"),
       { kind: "created", team_run_id: state.teamRunId, team_name: state.teamName, members },
     )
   } catch (error) {
@@ -69,8 +90,10 @@ export async function runTeamCreate(service: TeamToolsService, params: TeamCreat
 export async function runTeamDelete(service: TeamToolsService, params: TeamDeleteInput): Promise<AgentToolResult<TeamDeleteDetails>> {
   try {
     const result = await service.deleteTeam({ teamRunId: params.team_run_id, force: params.force })
+    const cancelled = result.cancelledTaskIds
+    const suffix = cancelled.length === 0 ? "" : `: ${cancelled.join(", ")}`
     return toolResult(
-      `Deleted team ${result.teamRunId}; cancelled ${result.cancelledTaskIds.length} member tasks.`,
+      `Deleted team ${result.teamRunId}; cancelled ${cancelled.length} member task(s)${suffix}.`,
       { kind: "deleted", team_run_id: result.teamRunId, cancelled_task_ids: result.cancelledTaskIds },
     )
   } catch (error) {
@@ -79,6 +102,25 @@ export async function runTeamDelete(service: TeamToolsService, params: TeamDelet
     }
     throw error
   }
+}
+
+function formatMemberRole(role: CreatedMemberInfo["role"]): string {
+  return role.kind === "category" ? `category:${role.category}` : `subagent_type:${role.subagentType}`
+}
+
+// Prompt excerpts stay in details, never in the text lines: echoing raw member prompts into the
+// lead conversation lets their content spoof scanners that match markers in the message stream
+// (e2e role detection, keyword triggers).
+function formatCreatedMemberLine(member: CreatedMemberInfo): string {
+  return `- ${member.name} [${member.status}] ${formatMemberRole(member.role)}${formatModelSegment(member.model)} task:${member.taskId}`
+}
+
+function formatModelSegment(model: ResolvedModelRecord | undefined): string {
+  if (model === undefined) return ""
+  const display = qualifyResolvedModelDisplay(model.provider, model.display) ?? model.model_id
+  const reasoning = model.reasoning_effort === undefined ? "" : ` reasoning:${model.reasoning_effort}`
+  const variant = model.variant === undefined ? "" : ` variant:${model.variant}`
+  return ` (${display}${reasoning}${variant})`
 }
 
 export function createTeamCreateTool(deps: TeamToolDeps): ToolDefinition {
