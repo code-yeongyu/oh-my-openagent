@@ -1,0 +1,30 @@
+SUPERSEDED BY `review-round-2-green.log`.
+
+This first GREEN proved the original blocker but used an over-broad
+`isInsideTmuxEnvironment` change. The review gate rejected that design because
+it also enabled unsupported cmux window/session isolation. It is retained as
+the audit trail for review round 1, not as final approval evidence.
+
+Command:
+cd /Users/yeongyu/local-workspaces/omo-wt/review/pr-5811-cmux-eligibility &&
+bun test packages/tmux-core/src/tmux-utils.test.ts \
+  packages/tmux-core/src/tmux-utils/pane-spawn-runner.test.ts \
+  packages/omo-opencode/src/shared/tmux/tmux-utils.test.ts
+
+Observed after the production fix:
+- PASS: `CMUX_SOCKET_PATH` without `TMUX` is accepted by the shared environment predicate.
+- PASS: `spawnTmuxPane` reaches eager `split-window` and emits `opencode attach`.
+- PASS: the OpenCode adapter mirror observes the same eligibility behavior.
+
+Summary:
+44 pass
+0 fail
+61 expect() calls
+
+Implementation:
+- `isCmuxCompatEnvironment(environment)` now accepts an explicit environment,
+  retaining `process.env` as its production default.
+- `isInsideTmuxEnvironment(environment)` accepts either a real `TMUX` value or
+  the existing cmux compatibility detector.
+- All existing manager, pane, close, replace, session, and sweep guards continue
+  consuming the one shared `isInsideTmux()` predicate.

@@ -31,6 +31,7 @@ type TmuxSessionManagerInternals = {
   serverUrl: string
   deferredQueue: string[]
   tryAttachDeferredSession: () => Promise<void>
+  sessions: Map<string, import('./types').TrackedSession>
 }
 
 function cast<TValue>(value: unknown): TValue {
@@ -1072,6 +1073,188 @@ describe('TmuxSessionManager', () => {
       // then
       expect(attachOrder).toEqual(['ses_1', 'ses_2', 'ses_3'])
       expect(getManagerInternals(manager).deferredQueue).toEqual([])
+    })
+
+    test('marks deferred inline attach as attachActivated=true when cmux detected', async () => {
+      // given — cmux environment triggers eager attach
+      const savedTmux = process.env.TMUX
+      const savedCmuxSocket = process.env.CMUX_SOCKET_PATH
+      process.env.TMUX = '/tmp/cmuxterm-test.sock,1234,0'
+      delete process.env.CMUX_SOCKET_PATH
+      try {
+        mockIsInsideTmux.mockReturnValue(true)
+        // force capacity-full so the session defers (mirror the FIFO deferred test setup)
+        mockQueryWindowState.mockImplementation(async () =>
+          createWindowState({
+            windowWidth: 160,
+            windowHeight: 11,
+            agentPanes: [
+              { paneId: '%1', width: 80, height: 11, left: 80, top: 0, title: 'old', isActive: false },
+            ],
+          })
+        )
+        mockExecuteActions.mockImplementation(async (actions: PaneAction[]) => {
+          for (const action of actions) {
+            if (action.type === 'spawn') {
+              trackedSessions.add(action.sessionId)
+              return {
+                success: true,
+                spawnedPaneId: `%${action.sessionId}`,
+                results: [{ action, result: { success: true, paneId: `%${action.sessionId}` } }],
+              }
+            }
+          }
+          return { success: true, results: [] }
+        })
+
+        const { TmuxSessionManager } = await import('./manager')
+        const ctx = createMockContext()
+        const config = createTmuxConfig({
+          enabled: true,
+          layout: 'main-vertical',
+          main_pane_size: 60,
+          main_pane_min_width: 120,
+          agent_pane_min_width: 40,
+        })
+        const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+        await manager.onSessionCreated(createSessionCreatedEvent('ses_cmux', 'ses_parent', 'Task cmux'))
+        // sanity: it was deferred
+        expect(getManagerInternals(manager).deferredQueue).toContain('ses_cmux')
+
+        // when — capacity opens up and deferred attach runs
+        mockQueryWindowState.mockImplementation(async () => createWindowState())
+        await getManagerInternals(manager).tryAttachDeferredSession()
+
+        // then — the deferred inline attach tracked session is eager-activated
+        const tracked = getManagerInternals(manager).sessions.get('ses_cmux')
+        expect(tracked).toBeDefined()
+        expect(tracked?.attachActivated).toBe(true)
+      } finally {
+        if (savedTmux === undefined) delete process.env.TMUX
+        else process.env.TMUX = savedTmux
+        if (savedCmuxSocket === undefined) delete process.env.CMUX_SOCKET_PATH
+        else process.env.CMUX_SOCKET_PATH = savedCmuxSocket
+      }
+    })
+
+    test('marks deferred inline attach as attachActivated=false when not cmux (regression guard)', async () => {
+      // given — standard tmux (no cmuxterm)
+      const savedTmux = process.env.TMUX
+      const savedCmuxSocket = process.env.CMUX_SOCKET_PATH
+      process.env.TMUX = '/tmp/tmux-1000/default,1234,0'
+      delete process.env.CMUX_SOCKET_PATH
+      try {
+        mockIsInsideTmux.mockReturnValue(true)
+        mockQueryWindowState.mockImplementation(async () =>
+          createWindowState({
+            windowWidth: 160,
+            windowHeight: 11,
+            agentPanes: [
+              { paneId: '%1', width: 80, height: 11, left: 80, top: 0, title: 'old', isActive: false },
+            ],
+          })
+        )
+        mockExecuteActions.mockImplementation(async (actions: PaneAction[]) => {
+          for (const action of actions) {
+            if (action.type === 'spawn') {
+              trackedSessions.add(action.sessionId)
+              return {
+                success: true,
+                spawnedPaneId: `%${action.sessionId}`,
+                results: [{ action, result: { success: true, paneId: `%${action.sessionId}` } }],
+              }
+            }
+          }
+          return { success: true, results: [] }
+        })
+
+        const { TmuxSessionManager } = await import('./manager')
+        const ctx = createMockContext()
+        const config = createTmuxConfig({
+          enabled: true,
+          layout: 'main-vertical',
+          main_pane_size: 60,
+          main_pane_min_width: 120,
+          agent_pane_min_width: 40,
+        })
+        const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+        await manager.onSessionCreated(createSessionCreatedEvent('ses_std', 'ses_parent', 'Task std'))
+        expect(getManagerInternals(manager).deferredQueue).toContain('ses_std')
+
+        // when
+        mockQueryWindowState.mockImplementation(async () => createWindowState())
+        await getManagerInternals(manager).tryAttachDeferredSession()
+
+        // then — standard tmux keeps focus-defer behavior (attachActivated stays false)
+        const tracked = getManagerInternals(manager).sessions.get('ses_std')
+        expect(tracked).toBeDefined()
+        expect(tracked?.attachActivated).toBe(false)
+      } finally {
+        if (savedTmux === undefined) delete process.env.TMUX
+        else process.env.TMUX = savedTmux
+        if (savedCmuxSocket === undefined) delete process.env.CMUX_SOCKET_PATH
+        else process.env.CMUX_SOCKET_PATH = savedCmuxSocket
+      }
+    })
+
+    test('enables manager in headless cmux environment (CMUX_SOCKET_PATH set, TMUX unset)', async () => {
+      // given — createManagers selects the inline cmux-compatible predicate
+      const savedTmux = process.env.TMUX
+      const savedCmuxSocket = process.env.CMUX_SOCKET_PATH
+      delete process.env.TMUX
+      process.env.CMUX_SOCKET_PATH = '/tmp/cmux-headless-test.sock'
+      try {
+        mockIsInsideTmux.mockReturnValue(Boolean(process.env.CMUX_SOCKET_PATH) && !process.env.TMUX)
+        // force capacity-full so the session defers (mirror the cmux-detected R1 setup)
+        mockQueryWindowState.mockImplementation(async () =>
+          createWindowState({
+            windowWidth: 160,
+            windowHeight: 11,
+            agentPanes: [
+              { paneId: '%1', width: 80, height: 11, left: 80, top: 0, title: 'old', isActive: false },
+            ],
+          })
+        )
+        mockExecuteActions.mockImplementation(async (actions: PaneAction[]) => {
+          for (const action of actions) {
+            if (action.type === 'spawn') {
+              trackedSessions.add(action.sessionId)
+              return {
+                success: true,
+                spawnedPaneId: `%${action.sessionId}`,
+                results: [{ action, result: { success: true, paneId: `%${action.sessionId}` } }],
+              }
+            }
+          }
+          return { success: true, results: [] }
+        })
+
+        const { TmuxSessionManager } = await import('./manager')
+        const ctx = createMockContext()
+        const config = createTmuxConfig({
+          enabled: true,
+          layout: 'main-vertical',
+          main_pane_size: 60,
+          main_pane_min_width: 120,
+          agent_pane_min_width: 40,
+        })
+        const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+        // when — session created with the selected inline eligibility predicate
+        await manager.onSessionCreated(createSessionCreatedEvent('ses_headless', 'ses_parent', 'Task headless'))
+
+        // then — manager is enabled via injected cmux-compat: flow proceeded past the gate.
+        // Capacity-full window state routes the session into the deferred queue, which is only
+        // reachable once isEnabled() returned true.
+        expect(getManagerInternals(manager).deferredQueue).toContain('ses_headless')
+      } finally {
+        if (savedTmux === undefined) delete process.env.TMUX
+        else process.env.TMUX = savedTmux
+        if (savedCmuxSocket === undefined) delete process.env.CMUX_SOCKET_PATH
+        else process.env.CMUX_SOCKET_PATH = savedCmuxSocket
+      }
     })
 
     test('does not attach deferred session more than once across repeated retries', async () => {

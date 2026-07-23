@@ -1,4 +1,5 @@
 export * from "./manager"
+export * from "./environment-eligibility"
 export * from "./event-handlers"
 export * from "./polling"
 export * from "./session-created-event"

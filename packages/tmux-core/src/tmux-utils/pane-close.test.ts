@@ -129,4 +129,22 @@ describe("closeTmuxPane", () => {
 		// then
 		expect(result).toBe(true)
 	})
+
+	it("#given cmux eager pane whose opencode attach exited naturally #when kill-pane reports can't find pane #then returns true (eager exit is graceful)", async () => {
+		// given — cmux pane exited because opencode attach process terminated on session end
+		// polling then attempts kill-pane which finds the pane already gone
+		const fixture = createFixture({
+			results: [
+				tmuxResult(), // send-keys Ctrl+C: pane may already be gone, response ignored
+				tmuxResult({ success: false, stderr: "can't find pane: %55", exitCode: 1 }),
+			],
+		})
+
+		// when
+		const result = await closeTmuxPaneWithDependencies("%55", fixture.dependencies)
+
+		// then — already-gone pane is treated as graceful success, no error thrown
+		expect(result).toBe(true)
+		expect(fixture.calls[1]?.args).toEqual(["kill-pane", "-t", "%55"])
+	})
 })

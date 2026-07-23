@@ -4,7 +4,8 @@ import type { runTmuxCommand as RunTmuxCommand } from "../runner"
 import type { SplitDirection } from "./environment"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
-import { buildPaneAuthEnvironmentArgs, buildTmuxPlaceholderCommand } from "./pane-command"
+import { buildPaneAuthEnvironmentArgs, buildTmuxAttachCommand, buildTmuxPlaceholderCommand } from "./pane-command"
+import { isCmuxCompatEnvironment as _isCmuxCompatEnvironment } from "../cmux-detect"
 
 export type SpawnTmuxPaneDeps = {
 	readonly log: (message: string, data?: unknown) => void
@@ -12,6 +13,7 @@ export type SpawnTmuxPaneDeps = {
 	readonly isInsideTmux: typeof isInsideTmux
 	readonly isServerRunning: typeof isServerRunning
 	readonly getTmuxPath: () => Promise<string | null | undefined>
+	readonly isCmuxCompatEnvironment: () => boolean
 }
 
 async function resolveSpawnTmuxPaneDeps(deps?: Partial<SpawnTmuxPaneDeps>): Promise<SpawnTmuxPaneDeps> {
@@ -23,6 +25,7 @@ async function resolveSpawnTmuxPaneDeps(deps?: Partial<SpawnTmuxPaneDeps>): Prom
 		isInsideTmux,
 		isServerRunning,
 		getTmuxPath: async () => null,
+		isCmuxCompatEnvironment: _isCmuxCompatEnvironment,
 		...deps,
 	}
 }
@@ -53,8 +56,11 @@ export async function spawnTmuxPane(
 		log("[spawnTmuxPane] SKIP: config.enabled is false")
 		return { success: false }
 	}
-	if (!deps.isInsideTmux()) {
-		log("[spawnTmuxPane] SKIP: not inside tmux", { TMUX: process.env.TMUX })
+	if (!deps.isInsideTmux() && !deps.isCmuxCompatEnvironment()) {
+		log("[spawnTmuxPane] SKIP: not inside tmux or cmux-compat environment", {
+			TMUX: process.env.TMUX,
+			CMUX_SOCKET_PATH: process.env.CMUX_SOCKET_PATH,
+		})
 		return { success: false }
 	}
 
@@ -72,8 +78,15 @@ export async function spawnTmuxPane(
 
 	log("[spawnTmuxPane] all checks passed, spawning...")
 
-	const placeholderCmd = buildTmuxPlaceholderCommand(description)
 	const authEnvArgs = buildPaneAuthEnvironmentArgs()
+	if (deps.isCmuxCompatEnvironment() && authEnvArgs.length > 0) {
+		log("[spawnTmuxPane] SKIP: authenticated cmux panes are unsupported")
+		return { success: false }
+	}
+
+	const initialCmd = deps.isCmuxCompatEnvironment()
+		? buildTmuxAttachCommand(serverUrl, sessionId, _directory)
+		: buildTmuxPlaceholderCommand(description)
 
 	const args = [
 		"split-window",
@@ -84,7 +97,7 @@ export async function spawnTmuxPane(
 		"#{pane_id}",
 		...(targetPaneId ? ["-t", targetPaneId] : []),
 		...authEnvArgs,
-		placeholderCmd,
+		initialCmd,
 	]
 
 	const result = await runTmuxCommand(tmux, args)

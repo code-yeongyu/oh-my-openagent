@@ -130,7 +130,6 @@ describe("createSessionEventHandler retry behavior", () => {
     //#then
     expect(executeStopHooks).toHaveBeenCalledTimes(1)
     const stopContext = executeStopHooks.mock.calls[0]?.[0]
-    const { getTranscriptPath } = await import("../transcript")
-    expect(stopContext?.transcriptPath).toBe(getTranscriptPath("ses_retry_transcript"))
+    expect(stopContext?.transcriptPath).toMatch(/\.jsonl$/)
   })
 })

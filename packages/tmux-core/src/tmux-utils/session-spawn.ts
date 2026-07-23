@@ -1,6 +1,7 @@
 import type { TmuxConfig } from "../types"
 import type { SpawnPaneResult } from "../types"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
+import { isCmuxCompatEnvironment } from "../cmux-detect"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
 import { buildPaneAuthEnvironmentArgs, buildTmuxPlaceholderCommand } from "./pane-command"
@@ -89,6 +90,12 @@ export async function spawnTmuxSession(
 		return { success: false }
 	}
 
+	const authEnvArgs = buildPaneAuthEnvironmentArgs()
+	if (isCmuxCompatEnvironment() && authEnvArgs.length > 0) {
+		log("[spawnTmuxSession] SKIP: authenticated cmux sessions are unsupported")
+		return { success: false }
+	}
+
 	const tmux = await deps.getTmuxPath()
 	if (!tmux) {
 		log("[spawnTmuxSession] SKIP: tmux not found")
@@ -98,7 +105,6 @@ export async function spawnTmuxSession(
 	log("[spawnTmuxSession] all checks passed, creating isolated session...")
 
 	const placeholderCmd = buildTmuxPlaceholderCommand(description)
-	const authEnvArgs = buildPaneAuthEnvironmentArgs()
 
 	const sizeArgs: string[] = []
 	if (sourcePaneId) {
