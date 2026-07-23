@@ -119,7 +119,7 @@ A record of agent name to definition (`schema/agent.ts`).
 | `tools` | record<string, boolean> | |
 | `execution_mode` | `in-process \| process` | overrides `task.default_execution_mode`; curated builtin agents remain in-process |
 | `background` | boolean | |
-| `max_depth` | int >= 0 | |
+| `max_depth` | int 0..2 | caller-specific narrowing; Senpi effective ceiling is currently `1` |
 | `allowed_subagents` | string[] | |
 | `temperature` | number 0..2 | |
 | `disable` | boolean | |
@@ -178,7 +178,7 @@ Task engine settings; every field has a default, so the whole object is optional
 | `default_concurrency` | positive int | `5` |
 | `provider_concurrency` | record<string, positive int> | unset |
 | `model_concurrency` | record<string, positive int> | unset |
-| `max_depth` | int >= 0 | `1` |
+| `max_depth` | int 0..2 | `1` |
 | `residency_max_children` | positive int | `8` |
 | `ttl_ms` | positive int | `86400000` (24h) |
 | `state_dir` | string | unset (defaults to `<project>/.omo/senpi-task`) |
@@ -190,6 +190,8 @@ Task engine settings; every field has a default, so the whole object is optional
 | `team.max_wall_clock_minutes` | positive int | `120` |
 
 `state_dir` defaults to `<project_dir>/.omo/senpi-task` when unset (`packages/senpi-task/src/store/state-dir.ts`). Completion delivery is not configurable: every child completion is batched with any other ready notifications and steered into the parent's running turn at the next tool-call boundary; see the completion routing table in [`packages/senpi-task/AGENTS.md`](../../packages/senpi-task/AGENTS.md).
+
+The shared spawn-policy ceiling is `2`, but the Senpi adapter currently caps effective depth at `1` because delegated child runtimes do not expose general spawn tools. `allowed_subagents` narrows target names only and cannot expand caller-role, lineage, or depth permission. Process recovery rebuilds launch inputs from current target resolution, runtime paths, extensions, environment, and caller policy; persisted launch fields never control a respawn.
 
 ### `teams`
 

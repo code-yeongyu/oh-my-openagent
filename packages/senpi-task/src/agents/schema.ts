@@ -19,8 +19,8 @@ export const RawAgentDefinitionSchema = z.object({
   allowed_subagents: z.array(z.string()).optional(),
   disallowedTools: z.array(z.string()).optional(),
   disallowed_tools: z.array(z.string()).optional(),
-  maxDepth: z.number().int().nonnegative().optional(),
-  max_depth: z.number().int().nonnegative().optional(),
+  maxDepth: z.number().int().min(0).max(1).optional(),
+  max_depth: z.number().int().min(0).max(1).optional(),
   maxTurns: z.number().int().nonnegative().optional(),
   max_turns: z.number().int().nonnegative().optional(),
 }).passthrough()

@@ -389,6 +389,17 @@
             "maxTokens": {
               "type": "number"
             },
+            "maxDepth": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "allowedSubagents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "thinking": {
               "type": "object",
               "properties": {
@@ -751,6 +762,17 @@
             },
             "maxTokens": {
               "type": "number"
+            },
+            "maxDepth": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "allowedSubagents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             },
             "thinking": {
               "type": "object",
@@ -1115,6 +1137,17 @@
             "maxTokens": {
               "type": "number"
             },
+            "maxDepth": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "allowedSubagents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "thinking": {
               "type": "object",
               "properties": {
@@ -1477,6 +1510,17 @@
             },
             "maxTokens": {
               "type": "number"
+            },
+            "maxDepth": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "allowedSubagents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             },
             "thinking": {
               "type": "object",
@@ -1844,6 +1888,17 @@
             "maxTokens": {
               "type": "number"
             },
+            "maxDepth": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "allowedSubagents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "thinking": {
               "type": "object",
               "properties": {
@@ -2206,6 +2261,17 @@
             },
             "maxTokens": {
               "type": "number"
+            },
+            "maxDepth": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "allowedSubagents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             },
             "thinking": {
               "type": "object",
@@ -2570,6 +2636,17 @@
             "maxTokens": {
               "type": "number"
             },
+            "maxDepth": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "allowedSubagents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "thinking": {
               "type": "object",
               "properties": {
@@ -2932,6 +3009,17 @@
             },
             "maxTokens": {
               "type": "number"
+            },
+            "maxDepth": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "allowedSubagents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             },
             "thinking": {
               "type": "object",
@@ -3296,6 +3384,17 @@
             "maxTokens": {
               "type": "number"
             },
+            "maxDepth": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "allowedSubagents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "thinking": {
               "type": "object",
               "properties": {
@@ -3658,6 +3757,17 @@
             },
             "maxTokens": {
               "type": "number"
+            },
+            "maxDepth": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "allowedSubagents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             },
             "thinking": {
               "type": "object",
@@ -4022,6 +4132,17 @@
             "maxTokens": {
               "type": "number"
             },
+            "maxDepth": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "allowedSubagents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "thinking": {
               "type": "object",
               "properties": {
@@ -4384,6 +4505,17 @@
             },
             "maxTokens": {
               "type": "number"
+            },
+            "maxDepth": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "allowedSubagents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             },
             "thinking": {
               "type": "object",
@@ -4748,6 +4880,17 @@
             "maxTokens": {
               "type": "number"
             },
+            "maxDepth": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "allowedSubagents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "thinking": {
               "type": "object",
               "properties": {
@@ -5110,6 +5253,17 @@
             },
             "maxTokens": {
               "type": "number"
+            },
+            "maxDepth": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "allowedSubagents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             },
             "thinking": {
               "type": "object",
@@ -5474,6 +5628,17 @@
           },
           "maxTokens": {
             "type": "number"
+          },
+          "maxDepth": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "allowedSubagents": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "thinking": {
             "type": "object",
@@ -6232,7 +6397,7 @@
         "maxDepth": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 9007199254740991
+          "maximum": 2
         },
         "staleTimeoutMs": {
           "type": "number",

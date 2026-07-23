@@ -316,7 +316,7 @@ Reader
             execution_mode: "process",
             allowed_subagents: ["worker"],
             disallowed_tools: ["shell"],
-            max_depth: 2,
+            max_depth: 1,
             max_turns: 9,
           },
         },
@@ -330,7 +330,7 @@ Reader
     expect(result.agents.planner?.executionMode).toBe("process")
     expect(result.agents.planner?.allowedSubagents).toEqual(["worker"])
     expect(result.agents.planner?.disallowedTools).toEqual(["shell"])
-    expect(result.agents.planner?.maxDepth).toBe(2)
+    expect(result.agents.planner?.maxDepth).toBe(1)
     expect(result.agents.planner?.maxTurns).toBe(9)
   })
 })

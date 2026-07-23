@@ -12,7 +12,7 @@
 config/schema/
 ├── oh-my-opencode-config.ts    # ROOT: composes all sub-schemas
 ├── agent-names.ts              # BuiltinAgentNameSchema enum (11 names: sisyphus, hephaestus, prometheus, oracle, librarian, explore, multimodal-looker, metis, momus, atlas, sisyphus-junior)
-├── agent-overrides.ts          # AgentOverrideConfigSchema (21 fields per agent)
+├── agent-overrides.ts          # AgentOverrideConfigSchema (23 fields per agent, including spawn limits)
 ├── agent-definitions.ts        # custom agent definition schema
 ├── categories.ts               # 8 built-in + custom categories
 ├── hooks.ts                    # HookNameSchema (56 enum values; `team-tool-gating` is the only team-* one in schema; others are wired by direct config gates)
@@ -85,7 +85,7 @@ When `enabled: true`:
 
 ## AGENT OVERRIDE FIELDS (per-agent)
 
-`model`, `variant`, `category`, `skills`, `temperature`, `top_p`, `prompt`, `prompt_append`, `tools`, `disable`, `description`, `mode`, `color`, `permission`, `maxTokens`, `thinking`, `reasoningEffort`, `textVerbosity`, `providerOptions`, `fallback_models`, `ultrawork`.
+`model`, `variant`, `category`, `skills`, `temperature`, `top_p`, `prompt`, `prompt_append`, `tools`, `disable`, `description`, `mode`, `color`, `permission`, `maxTokens`, `thinking`, `reasoningEffort`, `textVerbosity`, `providerOptions`, `fallback_models`, `ultrawork`, `maxDepth`, `allowedSubagents`.
 
 ## HOW TO ADD A CONFIG FIELD
 
