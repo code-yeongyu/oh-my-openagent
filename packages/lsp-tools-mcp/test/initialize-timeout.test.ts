@@ -10,6 +10,7 @@ import type { ResolvedServer } from "../src/lsp/types.js";
 
 const FAKE_LSP_SERVER_SCRIPT = `
 let buffer = Buffer.alloc(0);
+let initialized = false;
 const initializeDelayMs = Number(process.env.FAKE_LSP_INITIALIZE_DELAY_MS ?? "0");
 function send(message) {
 	const body = Buffer.from(JSON.stringify(message), "utf8");
@@ -19,6 +20,15 @@ function send(message) {
 function onMessage(message) {
 	if (message.method === "initialize") {
 		setTimeout(() => send({ jsonrpc: "2.0", id: message.id, result: { capabilities: {} } }), initializeDelayMs);
+		return;
+	}
+	if (message.method === "initialized") {
+		initialized = message.params !== null && typeof message.params === "object" && !Array.isArray(message.params);
+		return;
+	}
+	if (message.method === "textDocument/documentSymbol") {
+		if (initialized) send({ jsonrpc: "2.0", id: message.id, result: [] });
+		else send({ jsonrpc: "2.0", id: message.id, error: { code: -32002, message: "Server not initialized" } });
 		return;
 	}
 	if (message.method === "shutdown") {
@@ -116,5 +126,24 @@ describe("LspClientConnection timeouts", () => {
 		// then
 		await expect(request).rejects.toThrow(LspRequestTimeoutError);
 		expect(Date.now() - startedAt).toBeLessThan(2_000);
+	});
+
+	it("#given a server that requires initialized params #when initialize completes #then subsequent requests succeed", async () => {
+		// given
+		const connection = new TestConnection(root, fakeServer(0), {
+			requestTimeoutMs: 1_000,
+			initializeTimeoutMs: 5_000,
+		});
+		connections.push(connection);
+		await connection.start();
+
+		// when
+		await connection.initialize();
+		const result = connection.request<unknown[]>("textDocument/documentSymbol", {
+			textDocument: { uri: "file:///strict.fake" },
+		});
+
+		// then
+		await expect(result).resolves.toEqual([]);
 	});
 });
