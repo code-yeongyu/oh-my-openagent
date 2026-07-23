@@ -45,6 +45,24 @@ test("#given buildPlanSkeleton #when intent is clear #then it surfaces a decisio
 	assert.doesNotMatch(plan, /Decisions I made for you/);
 });
 
+test("#given buildDraft #when generated #then it includes epistemic planning ledgers promised by ulw-plan", async () => {
+	// given
+	const { buildDraft } = await import(scriptUrl);
+	const draft = buildDraft("demo", "clear");
+
+	// then
+	assert.match(draft, /## Claim graph/);
+	assert.match(draft, /expected truth/);
+	assert.match(draft, /observed reality/);
+	assert.match(draft, /diff/);
+	assert.match(draft, /## Observation manifest/);
+	assert.match(draft, /independence basis/);
+	assert.match(draft, /## Verification economics/);
+	assert.match(draft, /error cost/);
+	assert.match(draft, /## Cause disappearance/);
+	assert.match(draft, /disconfirming observation/);
+});
+
 test("#given resolveSafeOmoPath #when the target escapes .omo or the workspace #then it is refused (the script never escapes .omo)", async () => {
 	// given
 	const { resolveSafeOmoPath } = await import(scriptUrl);

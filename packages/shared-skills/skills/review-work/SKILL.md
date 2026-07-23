@@ -61,6 +61,10 @@ aggregate result.
 
 Launch 5 specialized sub-agents in parallel to review completed implementation work from every angle. All 5 must pass for the review to pass. If even ONE fails, the review fails.
 
+## Epistemic workflow
+
+Treat every review claim as a claim until expected truth, observed reality, and the diff are visible in evidence. Use independent observation or review when error cost is high, size verification economics to that cost, and close fixes only on cause disappearance with baseline characterization, failing-first proof, runtime truth, or real-surface proof.
+
 The 5 agents cover complementary concerns - together they form a comprehensive review that no single reviewer could match:
 
 | # | Agent | Type | Role | Focus Level |

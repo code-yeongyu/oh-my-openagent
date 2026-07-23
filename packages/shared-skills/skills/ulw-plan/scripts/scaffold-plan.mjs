@@ -205,6 +205,20 @@ approach: <fill: the approach you intend to plan>
 
 ## Findings (cited - path:lines)
 
+<!-- Epistemic workflow ledgers: keep expected truth, observed reality, diff, and independent evidence linked. -->
+
+## Claim graph
+<!-- claim id | expected truth | observed reality | diff | support | counterevidence | status -->
+
+## Observation manifest
+<!-- observation id | source | observer group | independence basis | artifact path | valid at | contamination notes -->
+
+## Verification economics
+<!-- claim/risk | error cost | verification cost | chosen proof path | outcome | residual risk -->
+
+## Cause disappearance
+<!-- cause id | violated invariant | previous observation | disconfirming observation | status | proof artifact -->
+
 ## Decisions (with rationale)
 
 ## Scope IN

@@ -35,6 +35,10 @@ Plan and reviewer agents may run for a long time: spawn them in the background a
 
 Execute a Prometheus work plan until every top-level checkbox is complete. This skill pairs with the Codex `Stop` / `SubagentStop` continuation hook (`components/start-work-continuation`), which re-injects the next turn while `.omo/boulder.json` says this `codex:<session_id>` still has unchecked plan work.
 
+## Epistemic workflow
+
+Treat every worker output as a claim until expected truth, observed reality, and the diff are visible in evidence. Use independent observation or review when error cost is high, size verification economics to that cost, and close fixes only on cause disappearance with baseline characterization, failing-first proof, runtime truth, or real-surface proof.
+
 ## Usage
 
 ```text

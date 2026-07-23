@@ -477,6 +477,8 @@ Skill sets provide specialized workflows with embedded MCP servers and detailed 
 
 `ulw-research` is intentionally explicit. Ordinary questions and normal implementation context-gathering will not trigger a saturation swarm. Use `ulw-research` when the research itself is the deliverable and every claim needs a citation, a proof artifact, or an execution-backed verdict.
 
+The epistemic workflow introduced for `ulw-research` is also a general work discipline across planning, execution, review, debugging, refactoring, programming, and cleanup skills: expected truth is compared with observed reality, independent evidence is preferred for risky claims, verification effort scales with error cost, and fixes close only when the cause disappears from observable proof.
+
 #### git-master Core Principles
 
 **Multiple Commits by Default**:
