@@ -1,3 +1,8 @@
+SUPERSEDED BY `review-round-4-green.log`.
+
+Review round 3 protected inline pane lifecycle but still allowed cmux fake
+`TMUX` to select unsupported window/session isolation.
+
 Review round 3 GREEN:
 
 Background producer path:

@@ -1,13 +1,19 @@
 Production module driver:
 
 {
-  "environment": {
+  "inlineEnvironment": {
     "TMUX": null,
     "TMUX_PANE": "%0",
     "CMUX_SOCKET_PATH": "/tmp/ulw-cmux-only.sock"
   },
-  "insideTmux": false,
-  "paneCompatible": true,
+  "authenticatedContainerEnvironment": {
+    "TMUX": "/tmp/cmuxterm-test.sock,1234,0",
+    "TMUX_PANE": "%0",
+    "CMUX_SOCKET_PATH": "/tmp/ulw-cmux-only.sock"
+  },
+  "inlineInsideTmux": false,
+  "inlinePaneCompatible": true,
+  "authenticatedNativeTmux": false,
   "spawned": {
     "success": true,
     "paneId": "%42"
@@ -15,6 +21,12 @@ Production module driver:
   "initialCommand": "/bin/sh -c \"opencode attach 'http://127.0.0.1:4096' --session 'session-cmux-only' --dir '/tmp/omo project'\"",
   "closed": true,
   "authenticatedSpawn": {
+    "success": false
+  },
+  "authenticatedWindow": {
+    "success": false
+  },
+  "authenticatedSession": {
     "success": false
   },
   "authenticatedCredentialsReachedRunner": false,
@@ -59,6 +71,8 @@ Authenticated cmux edge:
 - Username: shell-metacharacter probe (redacted from output)
 - Password: shell-metacharacter probe (redacted from output)
 - Spawn result: `{ "success": false }`
+- Window result: `{ "success": false }`
+- Session result: `{ "success": false }`
 - Credentials reached runner: false
 - `/tmp/omo-cmux-user-injected`: absent
 - `/tmp/omo-cmux-password-injected`: absent

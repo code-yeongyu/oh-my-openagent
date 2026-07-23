@@ -159,4 +159,44 @@ describe("TmuxSessionManager cmux eligibility", () => {
 
 		await manager.cleanup()
 	})
+
+	test("#given cmux fake TMUX #when isolation is window #then unsupported container spawn stays disabled", async () => {
+		// given
+		process.env.TMUX = "/tmp/cmuxterm-test.sock,1234,0"
+		const environmentEligible = selectTmuxManagerEnvironmentPredicate("window")
+		const queryWindowState = mock(async (): Promise<WindowState | null> => null)
+		const context = unsafeTestValue<PluginInput>({
+			directory: "/tmp/omo-project",
+			serverUrl: new URL("http://127.0.0.1:4096"),
+			client: { session: { status: mock(async () => ({ data: {} })) } },
+		})
+		const manager = new TmuxSessionManager(
+			context,
+			{ ...config, isolation: "window" },
+			{
+				isInsideTmux: selectTmuxManagerEnvironmentPredicate("window"),
+				queryWindowState,
+				waitForSessionReady: mock(async () => true),
+				log: mock(() => undefined),
+			},
+		)
+
+		// when
+		await manager.onSessionCreated({
+			type: "session.created",
+			properties: {
+				info: {
+					id: "session-cmux-window",
+					parentID: "parent-session",
+					title: "isolated worker",
+				},
+			},
+		})
+
+		// then
+		expect(environmentEligible()).toBe(false)
+		expect(queryWindowState).not.toHaveBeenCalled()
+
+		await manager.cleanup()
+	})
 })

@@ -4,9 +4,12 @@ import type { TmuxCommandResult } from "../../../packages/tmux-core/src/runner"
 import type { TmuxConfig } from "../../../packages/tmux-core/src/types"
 import {
 	isInsideTmux,
+	isNativeTmux,
 	isTmuxPaneCompatible,
 } from "../../../packages/tmux-core/src/tmux-utils/environment"
 import { closeTmuxPaneWithDependencies } from "../../../packages/tmux-core/src/tmux-utils/pane-close"
+import { spawnTmuxSession } from "../../../packages/tmux-core/src/tmux-utils/session-spawn"
+import { spawnTmuxWindow } from "../../../packages/tmux-core/src/tmux-utils/window-spawn"
 import { spawnTmuxPane } from "../../../packages/omo-opencode/src/shared/tmux/tmux-utils/pane-spawn"
 
 const config = {
@@ -45,8 +48,10 @@ try {
 	process.env.TMUX_PANE = "%0"
 	process.env.CMUX_SOCKET_PATH = "/tmp/ulw-cmux-only.sock"
 
-	assert.equal(isInsideTmux(), false, "cmux must not pretend to be literal tmux")
-	assert.equal(isTmuxPaneCompatible(), true, "cmux inline pane environment must be eligible")
+	const inlineInsideTmux = isInsideTmux()
+	const inlinePaneCompatible = isTmuxPaneCompatible()
+	assert.equal(inlineInsideTmux, false, "cmux must not pretend to be literal tmux")
+	assert.equal(inlinePaneCompatible, true, "cmux inline pane environment must be eligible")
 
 	const spawned = await spawnTmuxPane(
 		"session-cmux-only",
@@ -102,18 +107,58 @@ try {
 	assert.deepEqual(authenticatedSpawn, { success: false })
 	assert.equal(commands.length, commandCountBeforeAuthenticatedSpawn)
 
+	process.env.TMUX = "/tmp/cmuxterm-test.sock,1234,0"
+	const authenticatedNativeTmux = isNativeTmux()
+	assert.equal(authenticatedNativeTmux, false)
+	const authenticatedWindow = await spawnTmuxWindow(
+		"session-cmux-auth",
+		"qa-worker",
+		config,
+		"http://127.0.0.1:4096",
+		"/tmp/omo project",
+		{
+			runTmuxCommand,
+			isServerRunning: async () => true,
+			getTmuxPath: async () => "/opt/homebrew/bin/tmux",
+		},
+	)
+	const authenticatedSession = await spawnTmuxSession(
+		"session-cmux-auth",
+		"qa-worker",
+		config,
+		"http://127.0.0.1:4096",
+		"/tmp/omo project",
+		"%0",
+		{
+			runTmuxCommand,
+			isServerRunning: async () => true,
+			getTmuxPath: async () => "/opt/homebrew/bin/tmux",
+		},
+	)
+	assert.deepEqual(authenticatedWindow, { success: false })
+	assert.deepEqual(authenticatedSession, { success: false })
+	assert.equal(commands.length, commandCountBeforeAuthenticatedSpawn)
+
 	console.log(JSON.stringify({
-		environment: {
+		inlineEnvironment: {
+			TMUX: null,
+			TMUX_PANE: process.env.TMUX_PANE,
+			CMUX_SOCKET_PATH: process.env.CMUX_SOCKET_PATH,
+		},
+		authenticatedContainerEnvironment: {
 			TMUX: process.env.TMUX ?? null,
 			TMUX_PANE: process.env.TMUX_PANE,
 			CMUX_SOCKET_PATH: process.env.CMUX_SOCKET_PATH,
 		},
-		insideTmux: false,
-		paneCompatible: true,
+		inlineInsideTmux,
+		inlinePaneCompatible,
+		authenticatedNativeTmux,
 		spawned,
 		initialCommand,
 		closed,
 		authenticatedSpawn,
+		authenticatedWindow,
+		authenticatedSession,
 		authenticatedCredentialsReachedRunner: false,
 		commands,
 	}, null, 2))

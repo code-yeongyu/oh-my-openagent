@@ -6,8 +6,8 @@
    - `packages/tmux-core/src/tmux-utils.test.ts`
    - `packages/tmux-core/src/tmux-utils/pane-spawn-runner.test.ts`
    - `packages/omo-opencode/src/shared/tmux/tmux-utils.test.ts`
-2. The complete affected tmux, manager, and background-agent suites: 108 files,
-   1,041 tests.
+2. The complete affected tmux, manager, and background-agent suites: 97 files,
+   1,044 tests.
 3. Full repository typecheck and build.
 4. Strict TypeScript no-excuse rules on every edited TypeScript file.
 5. A production-module driver importing the OpenCode pane-spawn adapter and
@@ -28,13 +28,16 @@
   37 files with 662 assertions.
 - Review round 3 GREEN: 1,041 affected-scope pass across 108 files with 1,912
   assertions.
+- Review round 4 GREEN: 1,044 affected-scope pass across 97 files with 2,579
+  assertions.
 - Typecheck: clean across root, scripts, and all packages.
 - Build: completed successfully.
 - Strict TypeScript audit: no violations in thirteen edited source/test files.
 - Real module surface: eager pane spawn succeeded, then graceful close executed
   both `send-keys C-c` and `kill-pane`.
-- Authenticated cmux module surface failed closed before either metacharacter
-  credential reached the command runner; neither probe file was created.
+- Authenticated cmux pane, window, and session surfaces failed closed before
+  either metacharacter credential reached the command runner; neither probe
+  file was created.
 - OpenCode surface: local plugin configuration was visible through `/config`,
   server health was good, and the event wire delivered `session.created`.
 - Isolation: the real OpenCode database stayed at 21,931 sessions before and

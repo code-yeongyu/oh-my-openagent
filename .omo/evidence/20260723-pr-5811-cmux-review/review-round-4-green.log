@@ -1,0 +1,33 @@
+Review round 4 GREEN:
+
+Final isolation policy:
+- `isNativeTmuxEnvironment` requires `TMUX` and rejects cmux compatibility.
+- Inline isolation selects `isTmuxPaneCompatible`.
+- Window/session isolation selects `isNativeTmux`.
+- Fake cmux `TMUX` cannot enable unsupported containers.
+
+Final authenticated cmux policy:
+- Pane spawn, activate, replace, window spawn, and session spawn all fail
+  before runner invocation when auth is configured.
+- Standard native tmux auth behavior remains unchanged.
+
+Targeted boundary:
+- 16 pass
+- 0 fail
+- 42 expect() calls
+
+Complete affected scope:
+- 97 test files
+- 1,044 pass
+- 0 fail
+- 2,579 expect() calls
+
+Static gates:
+- Full `bun run typecheck`: PASS
+- Full `bun run build`: PASS
+
+Real module surface:
+- Inline unauthenticated cmux eager attach and close: PASS.
+- Authenticated inline pane, window, and session: all `{ success: false }`.
+- Credentials reached runner: false.
+- Both shell-injection probe paths absent.

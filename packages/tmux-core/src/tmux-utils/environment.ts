@@ -14,6 +14,14 @@ export function isInsideTmux(): boolean {
 	return isInsideTmuxEnvironment(process.env)
 }
 
+export function isNativeTmuxEnvironment(environment: Record<string, string | undefined>): boolean {
+	return isInsideTmuxEnvironment(environment) && !isCmuxCompatEnvironment(environment)
+}
+
+export function isNativeTmux(): boolean {
+	return isNativeTmuxEnvironment(process.env)
+}
+
 export function isTmuxPaneCompatible(): boolean {
 	return isTmuxPaneCompatibleEnvironment(process.env)
 }

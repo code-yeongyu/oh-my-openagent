@@ -4,7 +4,9 @@ import type { TmuxCommandResult } from "../runner"
 import type { TmuxConfig } from "../types"
 import { activateTmuxPane } from "./pane-activate"
 import { replaceTmuxPane } from "./pane-replace"
+import { spawnTmuxSession } from "./session-spawn"
 import { spawnTmuxPane } from "./pane-spawn"
+import { spawnTmuxWindow } from "./window-spawn"
 
 const originalTmux = process.env.TMUX
 const originalCmuxSocketPath = process.env.CMUX_SOCKET_PATH
@@ -117,6 +119,59 @@ describe("cmux authenticated pane lifecycle", () => {
 			{
 				runTmuxCommand,
 				isInsideTmux: () => true,
+				getTmuxPath: async () => "cmux",
+				log: mock(() => undefined),
+			},
+		)
+
+		// then
+		expect(result).toEqual({ success: false })
+		expect(runTmuxCommand).not.toHaveBeenCalled()
+	})
+
+	test("#given authenticated cmux with fake TMUX #when spawning a window #then fails before credentials reach the command runner", async () => {
+		// given
+		process.env.TMUX = "/tmp/cmuxterm-test.sock,1234,0"
+		const runTmuxCommand = mock(async (): Promise<TmuxCommandResult> => commandResult)
+
+		// when
+		const result = await spawnTmuxWindow(
+			"session-cmux-auth",
+			"worker",
+			config,
+			"http://127.0.0.1:4096",
+			"/tmp/project",
+			{
+				runTmuxCommand,
+				isInsideTmux: () => true,
+				isServerRunning: async () => true,
+				getTmuxPath: async () => "cmux",
+				log: mock(() => undefined),
+			},
+		)
+
+		// then
+		expect(result).toEqual({ success: false })
+		expect(runTmuxCommand).not.toHaveBeenCalled()
+	})
+
+	test("#given authenticated cmux with fake TMUX #when spawning a session #then fails before credentials reach the command runner", async () => {
+		// given
+		process.env.TMUX = "/tmp/cmuxterm-test.sock,1234,0"
+		const runTmuxCommand = mock(async (): Promise<TmuxCommandResult> => commandResult)
+
+		// when
+		const result = await spawnTmuxSession(
+			"session-cmux-auth",
+			"worker",
+			config,
+			"http://127.0.0.1:4096",
+			"/tmp/project",
+			"%0",
+			{
+				runTmuxCommand,
+				isInsideTmux: () => true,
+				isServerRunning: async () => true,
 				getTmuxPath: async () => "cmux",
 				log: mock(() => undefined),
 			},
