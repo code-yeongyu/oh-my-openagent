@@ -73,7 +73,7 @@ export async function runTeamTaskCreate(service: TeamToolsService, params: TeamT
     status: "pending",
     ...(params.blocked_by !== undefined ? { blockedBy: params.blocked_by } : {}),
   })
-  const blockers = task.blockedBy.length > 0 ? `, blocked by: ${task.blockedBy.join(", ")}` : ""
+  const blockers = task.blockedBy.length > 0 ? `, blocked by: ${collapseEcho(task.blockedBy.join(", "))}` : ""
   return toolResult(`Created task ${task.id}: '${collapseEcho(task.subject)}' (status: ${task.status}${blockers}).`, { kind: "created", task })
 }
 
@@ -84,8 +84,8 @@ export async function runTeamTaskList(service: TeamToolsService, params: TeamTas
   }
   const tasks = await service.listTasks(params.team_run_id, filter)
   const lines = tasks.map((task) => {
-    const owner = task.owner === undefined ? "" : ` owner:${task.owner}`
-    const blockers = task.blockedBy.length > 0 ? ` (blocked by: ${task.blockedBy.join(", ")})` : ""
+    const owner = task.owner === undefined ? "" : ` owner:${collapseEcho(task.owner)}`
+    const blockers = task.blockedBy.length > 0 ? ` (blocked by: ${collapseEcho(task.blockedBy.join(", "))})` : ""
     return `- ${task.id} [${task.status}]${owner} '${collapseEcho(task.subject)}'${blockers}`
   })
   return toolResult([`${tasks.length} task(s).`, ...lines].join("\n"), { kind: "list", tasks })
@@ -97,10 +97,10 @@ export async function runTeamTaskGet(service: TeamToolsService, params: TeamTask
     const lines = [
       `Task ${task.id}: ${task.status}.`,
       `subject: ${collapseEcho(task.subject)}`,
-      ...(task.owner === undefined ? [] : [`owner: ${task.owner}`]),
+      ...(task.owner === undefined ? [] : [`owner: ${collapseEcho(task.owner)}`]),
       `description: ${collapseEcho(task.description, ECHO_DESCRIPTION_MAX)}`,
-      ...(task.blocks.length > 0 ? [`blocks: ${task.blocks.join(", ")}`] : []),
-      ...(task.blockedBy.length > 0 ? [`blocked by: ${task.blockedBy.join(", ")}`] : []),
+      ...(task.blocks.length > 0 ? [`blocks: ${collapseEcho(task.blocks.join(", "))}`] : []),
+      ...(task.blockedBy.length > 0 ? [`blocked by: ${collapseEcho(task.blockedBy.join(", "))}`] : []),
     ]
     return toolResult(lines.join("\n"), { kind: "task", task })
   } catch (error) {
@@ -117,7 +117,7 @@ export async function runTeamTaskUpdate(service: TeamToolsService, params: TeamT
       status: params.status,
       ...(params.owner !== undefined ? { owner: params.owner } : {}),
     })
-    const owner = task.owner === undefined ? "" : ` (owner: ${task.owner})`
+    const owner = task.owner === undefined ? "" : ` (owner: ${collapseEcho(task.owner)})`
     return toolResult(`Updated task ${task.id} to ${task.status}${owner}: '${collapseEcho(task.subject)}'.`, { kind: "updated", task })
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error)

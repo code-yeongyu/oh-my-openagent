@@ -53,6 +53,39 @@ describe("task_create tool", () => {
     expect(text.split("\n")).toHaveLength(1)
   })
 
+  test("#given a subject with embedded newlines #when create runs #then the text collapses them onto one line", async () => {
+    // given
+    const service = createFakeTeamService({ createTask: async () => fakeTask({ subject: "line one\nline two" }) })
+
+    // when
+    const result = await runTeamTaskCreate(service, { team_run_id: "run-1", subject: "line one\nline two", description: "d" })
+
+    // then
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    expect(text).toContain("'line one line two'")
+    expect(text.split("\n")).toHaveLength(1)
+  })
+
+  test("#given adversarial owner and blocked_by values #when list and get run #then the echoed fields are collapsed and bounded", async () => {
+    // given
+    const hostile = `x\ninjected ${"y".repeat(500)}`
+    const task = fakeTask({ owner: hostile, blockedBy: [hostile], blocks: [hostile] })
+    const service = createFakeTeamService({ listTasks: async () => [task], getTask: async () => task })
+
+    // when
+    const listed = await runTeamTaskList(service, { team_run_id: "run-1" })
+    const fetched = await runTeamTaskGet(service, { team_run_id: "run-1", task_id: "task-1" })
+
+    // then
+    for (const result of [listed, fetched]) {
+      const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+      expect(text).not.toContain("injected\n")
+      expect(text).not.toContain(hostile)
+    }
+    const listText = listed.content[0]?.type === "text" ? listed.content[0].text : ""
+    expect(listText).toContain("owner:x injected")
+  })
+
   test("#given the factory #when built #then it names the tool task_create", () => {
     expect(createTeamTaskCreateTool({ service: createFakeTeamService() }).name).toBe("task_create")
   })
