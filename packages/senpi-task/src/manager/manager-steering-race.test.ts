@@ -15,7 +15,7 @@ describe.each(flavors)("steering single-writer over the %s launch-outcome tracke
     if (started.kind !== "started") throw new Error("expected started")
 
     // when
-    const outcome = await manager.interruptTask(started.task_id)
+    const outcome = await manager.interruptTask({ idOrName: started.task_id, callerSessionId: "parent-1" })
 
     // then
     if (outcome.kind !== "interrupted") throw new Error(`expected interrupted, got ${outcome.kind}`)
@@ -31,7 +31,7 @@ describe.each(flavors)("steering single-writer over the %s launch-outcome tracke
     if (started.kind !== "started") throw new Error("expected started")
 
     // when
-    const outcome = await manager.cancelTask(started.task_id, "user aborted")
+    const outcome = await manager.cancelTask(started.task_id, "user aborted", "parent-1")
 
     // then
     if (outcome.kind !== "cancelled") throw new Error(`expected cancelled, got ${outcome.kind}`)
@@ -44,10 +44,10 @@ describe.each(flavors)("steering single-writer over the %s launch-outcome tracke
     const { manager, destruction } = makeRaceHarness(flavor)
     const started = await manager.start(baseSpec())
     if (started.kind !== "started") throw new Error("expected started")
-    await manager.cancelTask(started.task_id)
+    await manager.cancelTask(started.task_id, undefined, "parent-1")
 
     // when
-    const second = await manager.cancelTask(started.task_id)
+    const second = await manager.cancelTask(started.task_id, undefined, "parent-1")
 
     // then
     expect(second.kind).toBe("noop")
@@ -59,10 +59,10 @@ describe.each(flavors)("steering single-writer over the %s launch-outcome tracke
     const { manager } = makeRaceHarness(flavor)
     const started = await manager.start(baseSpec())
     if (started.kind !== "started") throw new Error("expected started")
-    await manager.interruptTask(started.task_id)
+    await manager.interruptTask({ idOrName: started.task_id, callerSessionId: "parent-1" })
 
     // when
-    const second = await manager.interruptTask(started.task_id)
+    const second = await manager.interruptTask({ idOrName: started.task_id, callerSessionId: "parent-1" })
 
     // then
     expect(second.kind).toBe("noop")

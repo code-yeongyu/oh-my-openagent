@@ -28,7 +28,7 @@ function recordPath(store: TaskRecordStore, taskId: string): string {
 }
 
 function aliveSignaller(alive: Set<number>): ProcessSignaller {
-  return { isAlive: (pid) => alive.has(pid), signal: () => {} }
+  return { isAlive: (pid) => alive.has(pid) }
 }
 
 describe("cleanupExpiredRecords (TTL)", () => {

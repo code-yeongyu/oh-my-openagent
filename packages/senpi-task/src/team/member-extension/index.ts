@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url"
+import { join, resolve } from "node:path"
 
-import type { ExtensionAPI } from "@code-yeongyu/senpi"
 import { OmoTaskWaitSchema } from "@oh-my-opencode/omo-config-core"
 import { TeamModeConfigSchema, type TeamModeConfig } from "@oh-my-opencode/team-core/config"
 import type { Message } from "@oh-my-opencode/team-core/types"
@@ -8,8 +8,13 @@ import { log } from "@oh-my-opencode/utils"
 
 import { parseTaskId, type TaskId } from "../../state"
 import { createTaskRecordStore } from "../../store"
+import type { TaskRecordStore } from "../../store"
+import { resolveChildSessionDir } from "../../runners/rpc/spawn"
 import type { WaitBounds } from "../../tools/control/clamp"
+import { readMemberTaskMap } from "../member-map"
 import { WaitRegistry } from "../messaging/wait-registry"
+import { resolveTeamRuntimeDirs, teamStorageBaseDir } from "../storage"
+import { loadRuntimeState } from "@oh-my-opencode/team-core/team-state-store"
 import { createMemberSelfPoller, type MemberSelfPoller } from "./self-poller"
 import { createQaAfterInjectHold } from "./qa-inject-hold"
 import { createMemberTaskSendTool, createMemberTeamWaitTool } from "./tools"
@@ -37,6 +42,8 @@ export type MemberExtensionConfigErrorCode =
   | "invalid_identity"
   | "invalid_task_id"
   | "invalid_team_config"
+  | "identity_unverified"
+  | "identity_pending"
 
 export class MemberExtensionConfigError extends Error {
   readonly code: MemberExtensionConfigErrorCode
@@ -63,7 +70,14 @@ type ActiveRuntime = {
   ackTimer?: ReturnType<typeof setInterval>
 }
 
-const activeRuntimes = new WeakMap<ExtensionAPI, ActiveRuntime>()
+type MemberExtensionApi = {
+  on(event: "session_start" | "session_shutdown", handler: () => unknown | Promise<unknown>): void
+  registerTool(tool: ReturnType<typeof createMemberTaskSendTool> | ReturnType<typeof createMemberTeamWaitTool>): void
+  sendUserMessage(content: string, options: { readonly deliverAs: "followUp" }): void
+}
+
+const activeRuntimes = new WeakMap<MemberExtensionApi, ActiveRuntime>()
+const registeredApis = new WeakSet<MemberExtensionApi>()
 
 export function resolveMemberExtensionEntryPath(extensionUrl = import.meta.url): string {
   return fileURLToPath(new URL(`./${MEMBER_EXTENSION_BUNDLE_NAME}`, extensionUrl))
@@ -128,39 +142,111 @@ export function parseMemberExtensionEnv(env: NodeJS.ProcessEnv): ParsedMemberExt
   }
 }
 
-export default async function registerMemberExtension(pi: ExtensionAPI): Promise<void> {
-  if (activeRuntimes.has(pi)) return
+export default async function registerMemberExtension(pi: MemberExtensionApi): Promise<void> {
+  if (registeredApis.has(pi)) return
+  registeredApis.add(pi)
   const parsed = parseMemberExtensionEnv(process.env)
   const store = createTaskRecordStore({ project_dir: parsed.stateDir, task: { state_dir: parsed.stateDir } })
-  const registry = new WaitRegistry<Message>()
-  const afterInject = createQaAfterInjectHold(process.env)
-  const appendEvent = (event: Parameters<typeof store.appendEvent>[1]): void => {
-    store.appendEvent(parsed.taskId, event)
-  }
-  const poller = createMemberSelfPoller({
-    teamRunId: parsed.teamRunId,
-    memberName: parsed.memberName,
-    config: parsed.config,
-    sessionDir: parsed.sessionDir,
-    waitRegistry: registry,
-    sendUserMessage: (content) => pi.sendUserMessage(content, { deliverAs: "followUp" }),
-    appendEvent,
-    ...(afterInject !== undefined ? { afterInject } : {}),
+  pi.on("session_start", async () => {
+    if (activeRuntimes.has(pi)) return
+    const validated = await waitForValidatedIdentity(parsed, store)
+    const registry = new WaitRegistry<Message>()
+    const afterInject = createQaAfterInjectHold(process.env)
+    const poller = createMemberSelfPoller({
+      teamRunId: validated.teamRunId,
+      memberName: validated.memberName,
+      config: validated.config,
+      sessionDir: validated.sessionDir,
+      waitRegistry: registry,
+      sendUserMessage: (content) => pi.sendUserMessage(content, { deliverAs: "followUp" }),
+      appendEvent: (event) => store.appendEvent(validated.taskId, event),
+      ...(afterInject !== undefined ? { afterInject } : {}),
+    })
+    const runtime: ActiveRuntime = { poller, registry, started: false }
+    activeRuntimes.set(pi, runtime)
+    pi.registerTool(createMemberTaskSendTool({
+      teamRunId: validated.teamRunId,
+      memberName: validated.memberName,
+      taskId: validated.taskId,
+      config: validated.config,
+      members: validated.members,
+      appendEvent: (taskId, event) => store.appendEvent(taskId, event),
+    }))
+    pi.registerTool(createMemberTeamWaitTool({ poller, waitRegistry: registry, waitBounds: validated.waitBounds }))
+    await startRuntime(runtime)
   })
-  const runtime: ActiveRuntime = { poller, registry, started: false }
-  activeRuntimes.set(pi, runtime)
+  pi.on("session_shutdown", () => {
+    const runtime = activeRuntimes.get(pi)
+    if (runtime !== undefined) stopRuntime(pi, runtime)
+  })
+}
 
-  pi.registerTool(createMemberTaskSendTool({
-    teamRunId: parsed.teamRunId,
-    memberName: parsed.memberName,
-    taskId: parsed.taskId,
-    config: parsed.config,
-    members: parsed.members,
-    appendEvent: (taskId, event) => store.appendEvent(taskId, event),
-  }))
-  pi.registerTool(createMemberTeamWaitTool({ poller, waitRegistry: registry, waitBounds: parsed.waitBounds }))
-  pi.on("session_start", () => startRuntime(runtime))
-  pi.on("session_shutdown", () => stopRuntime(pi, runtime))
+export async function validateMemberExtensionIdentity(
+  parsed: ParsedMemberExtensionEnv,
+  store: TaskRecordStore,
+): Promise<ParsedMemberExtensionEnv> {
+  const expectedBaseDir = teamStorageBaseDir({ project_dir: parsed.stateDir, task: { state_dir: parsed.stateDir } })
+  const expectedSessionDir = resolveChildSessionDir(join(parsed.stateDir, "children", parsed.taskId), parsed.taskId)
+  if (resolve(parsed.config.base_dir) !== resolve(expectedBaseDir) || resolve(parsed.sessionDir) !== resolve(expectedSessionDir)) {
+    throw unverifiedIdentity()
+  }
+
+  let runtime
+  try {
+    runtime = await loadRuntimeState(parsed.teamRunId, parsed.config)
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
+    throw unverifiedIdentity()
+  }
+  if (runtime.status === "creating") {
+    throw new MemberExtensionConfigError("member identity is not active yet", "identity_pending")
+  }
+  if (runtime.status !== "active" && runtime.status !== "shutdown_requested") throw unverifiedIdentity()
+  const member = runtime.members.find((candidate) => candidate.name === parsed.memberName)
+  if (member === undefined || runtime.leadSessionId === undefined) throw unverifiedIdentity()
+
+  const map = await readMemberTaskMap(resolveTeamRuntimeDirs(
+    { project_dir: parsed.stateDir, task: { state_dir: parsed.stateDir } },
+    parsed.teamRunId,
+  ).runtimeDir)
+  const mappedTaskId = map[parsed.memberName]
+  if (mappedTaskId === undefined) {
+    throw new MemberExtensionConfigError("member identity map is not ready", "identity_pending")
+  }
+  if (mappedTaskId !== parsed.taskId) throw unverifiedIdentity()
+
+  const record = store.load(parsed.taskId)
+  if (
+    record === null
+    || record.spawn_role !== "team_member"
+    || record.parent_session_id !== runtime.leadSessionId
+    || (member.sessionId !== undefined && record.child_session_id !== undefined && member.sessionId !== record.child_session_id)
+  ) throw unverifiedIdentity()
+  if (record.pid === undefined) {
+    throw new MemberExtensionConfigError("member identity is not active yet", "identity_pending")
+  }
+  if (record.pid !== process.pid && record.pid !== process.ppid) throw unverifiedIdentity()
+
+  return { ...parsed, members: runtime.members.map((candidate) => candidate.name) }
+}
+
+async function waitForValidatedIdentity(
+  parsed: ParsedMemberExtensionEnv,
+  store: TaskRecordStore,
+): Promise<ParsedMemberExtensionEnv> {
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    try {
+      return await validateMemberExtensionIdentity(parsed, store)
+    } catch (error) {
+      if (!(error instanceof MemberExtensionConfigError) || error.code !== "identity_pending" || attempt === 79) throw error
+      await new Promise((done) => setTimeout(done, 25))
+    }
+  }
+  throw unverifiedIdentity()
+}
+
+function unverifiedIdentity(): MemberExtensionConfigError {
+  return new MemberExtensionConfigError("member identity could not be verified", "identity_unverified")
 }
 
 async function startRuntime(runtime: ActiveRuntime): Promise<void> {
@@ -177,7 +263,7 @@ async function startRuntime(runtime: ActiveRuntime): Promise<void> {
   }
 }
 
-function stopRuntime(pi: ExtensionAPI, runtime: ActiveRuntime): void {
+function stopRuntime(pi: MemberExtensionApi, runtime: ActiveRuntime): void {
   runtime.started = false
   if (runtime.pollTimer !== undefined) clearInterval(runtime.pollTimer)
   if (runtime.ackTimer !== undefined) clearInterval(runtime.ackTimer)

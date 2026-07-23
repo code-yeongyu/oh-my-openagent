@@ -36,8 +36,16 @@ const hangingChildSteps = (name) => [
 
 const runningRpcChild = (r) => r.execution_mode === "process" && r.status === "running" && typeof r.pid === "number"
 
-function childArgv(sessionDir, prompt) {
-  return ["-e", mockProviderEntry, "-p", "--mode", "json", "--provider", "omo-mock", "--model", "mock-1", "--session-dir", sessionDir, prompt]
+function childArgv(sessionDir, prompt, sessionId) {
+  return [
+    "-e", mockProviderEntry,
+    "-p", "--mode", "json",
+    "--provider", "omo-mock",
+    "--model", "mock-1",
+    "--session-dir", sessionDir,
+    ...(sessionId === undefined ? [] : ["--session", sessionId]),
+    prompt,
+  ]
 }
 
 function childEnv(sandbox, sessionDir, senpiBin) {
@@ -58,11 +66,11 @@ export function prepareScenarioSandbox() {
   return { sandbox, sessionDir, stateDir: join(sandbox.cwd, ".omo", "senpi-task") }
 }
 
-export function driveSenpi(senpiBin, sandbox, sessionDir, parentSteps, childSteps = CHILD_STEPS_COMPLETE, prompt = "run the rpc-process task e2e") {
-  writeScript(sandbox, parentSteps, childSteps)
-  const run = spawnSync(senpiBin, childArgv(sessionDir, prompt), {
-    cwd: sandbox.cwd,
-    env: childEnv(sandbox, sessionDir, senpiBin),
+export function driveSenpi(input) {
+  writeScript(input.sandbox, input.parentSteps, input.childSteps ?? CHILD_STEPS_COMPLETE)
+  const run = spawnSync(input.senpiBin, childArgv(input.sessionDir, input.prompt ?? "run the rpc-process task e2e", input.sessionId), {
+    cwd: input.sandbox.cwd,
+    env: childEnv(input.sandbox, input.sessionDir, input.senpiBin),
     encoding: "utf8",
     timeout: 120_000,
     maxBuffer: 64 * 1024 * 1024,
@@ -116,20 +124,28 @@ export async function runReconcileCheck(senpiBin) {
   try {
     const running = await pollRecord(stateDir, (r) => r.name === "pr" && runningRpcChild(r), 40_000)
     if (running === undefined) {
-      return { check: "reconcile_lost_terminates_orphan", verdict: "FAIL", reason: "no running rpc child appeared to reconcile" }
+      return { check: "reconcile_preserves_untrusted_live_process", verdict: "FAIL", reason: "no running rpc child appeared to reconcile" }
     }
     orphanPid = running.pid
     parent.kill("SIGKILL")
     await sleep(1_500)
-    const relaunch = driveSenpi(senpiBin, sandbox, sessionDir, RECONCILE_RELAUNCH_STEPS, CHILD_STEPS_COMPLETE, "relaunch for reconcile")
-    const lost = readRecords(stateDir).find((r) => r.task_id === running.task_id && r.status === "lost" && typeof r.pid === "number")
-    const orphanDead = pidAlive(orphanPid) === false
-    const pass = relaunch.status === 0 && lost !== undefined && orphanDead
+    const relaunch = driveSenpi({
+      senpiBin,
+      sandbox,
+      sessionDir,
+      parentSteps: RECONCILE_RELAUNCH_STEPS,
+      childSteps: CHILD_STEPS_COMPLETE,
+      prompt: "relaunch for reconcile",
+      sessionId: running.parent_session_id,
+    })
+    const preserved = readRecords(stateDir).find((r) => r.task_id === running.task_id && r.status === "running" && r.pid === orphanPid)
+    const orphanAlive = pidAlive(orphanPid)
+    const pass = relaunch.status === 0 && preserved !== undefined && orphanAlive
     return {
-      check: "reconcile_lost_terminates_orphan",
+      check: "reconcile_preserves_untrusted_live_process",
       verdict: pass ? "PASS" : "FAIL",
-      ...(pass ? {} : { reason: `relaunchOk=${relaunch.status === 0} lostWithPid=${lost !== undefined} orphanDead=${orphanDead}` }),
-      facts: { orphanPid, lostPid: lost?.pid, orphanDead, breadcrumb: (lost?.error_message ?? "").slice(0, 120) },
+      ...(pass ? {} : { reason: `relaunchOk=${relaunch.status === 0} preserved=${preserved !== undefined} orphanAlive=${orphanAlive}` }),
+      facts: { orphanPid, preservedPid: preserved?.pid, orphanAlive, breadcrumb: (preserved?.error_message ?? "").slice(0, 120) },
     }
   } finally {
     try {

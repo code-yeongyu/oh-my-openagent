@@ -13,6 +13,8 @@ Use the `task` tool. Only `prompt` is required, and it must be written in Englis
 - `name` gives the child a stable, human-friendly handle within the session so you can steer it by name instead of id.
 - `model` overrides the resolved model; `load_skills` prepends named SKILL.md content to the child prompt.
 
+Spawn admission uses trusted runtime lineage and caller identity. Unknown lineage fails closed, reviewer and specialist sessions cannot spawn, and target allowlists only narrow access. Senpi currently permits one child level; `task.max_depth: 2` remains valid in the shared schema but is capped to `1` by this adapter because child runtimes do not receive general spawn tools.
+
 To continue an existing child with full context instead of spawning a new one, use `task_send` with `to` set to the child id or name.
 
 For fanout, pass `tasks:[...]` instead of the top-level `prompt`/target fields. Each item chooses its own `category` or `subagent_type` and may set `name`, `model`, and `load_skills`:
@@ -35,6 +37,8 @@ Two runners back a child (`packages/senpi-task/src/runners/`):
 
 - **in-process (default).** The child runs inside the same Senpi runtime and executes through the SAME parent tool closures, minus the `task_*` / `team_*` family. This is the cheapest path and needs no extra process.
 - **process.** The child is spawned as an isolated Senpi process. Steering (`steer` / `abort` / `prompt`) crosses a JSON-RPC boundary, and the child's transcript is written below `children/<taskId>/sessions/<taskId>/`. On the next session start, a dead process child with a persisted session can be respawned without replaying its original prompt and rebound with `switch_session`.
+
+Before a persisted child is respawned, the adapter resolves its target, model, variant, working directory, extensions, environment, caller, lineage, and depth from current configuration and runtime state. Persisted launch fields do not control recovery. Disabling or removing a target prevents recovery from reviving it.
 
 The default comes from `task.default_execution_mode` in `omo.json`; a per-agent `execution_mode` can override it.
 

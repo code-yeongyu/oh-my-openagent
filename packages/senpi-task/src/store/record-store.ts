@@ -1,6 +1,6 @@
 import {
   closeSync,
-  mkdirSync,
+  lstatSync,
   openSync,
   readdirSync,
   readFileSync,
@@ -18,6 +18,7 @@ import type { TaskId, TaskRecord } from "../state"
 import { parseTaskRecord } from "./record-parse"
 import { redactEventPayload } from "./redaction"
 import { resolveStateDir } from "./state-dir"
+import { ensurePrivateDirectory, StatePermissionsError } from "./state-permissions"
 import type {
   ListTaskRecordsResult,
   PersistedTaskEvent,
@@ -120,7 +121,7 @@ function removeRecord(
 
 function listRecords(stateDir: string, cache: Map<string, CacheEntry>): ListTaskRecordsResult {
   const tasksDir = join(stateDir, "tasks")
-  mkdirSync(tasksDir, { recursive: true })
+  ensurePrivateDirectory(tasksDir)
   const records: TaskRecord[] = []
   const diagnostics: TaskRecordDiagnostic[] = []
   const seen = new Set<string>()
@@ -179,13 +180,14 @@ function readRecord(path: string): TaskRecord | null {
 
 function writeRecord(stateDir: string, record: TaskRecord, mode: WriteRecordMode): void {
   const tasksDir = join(stateDir, "tasks")
-  mkdirSync(tasksDir, { recursive: true })
+  ensurePrivateDirectory(tasksDir)
   const taskId = parseTaskId(record.task_id)
   const path = taskPath(stateDir, taskId)
+  assertNoSymlink(path)
   const payload = JSON.stringify(record)
   if (mode === "create") {
     try {
-      writeFileSync(path, payload, { encoding: "utf8", flag: "wx" })
+      writeFileSync(path, payload, { encoding: "utf8", flag: "wx", mode: 0o600 })
       return
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "EEXIST") {
@@ -196,7 +198,7 @@ function writeRecord(stateDir: string, record: TaskRecord, mode: WriteRecordMode
   }
 
   const tmpPath = `${path}.${process.pid}.tmp`
-  writeFileSync(tmpPath, payload, "utf8")
+  writeFileSync(tmpPath, payload, { encoding: "utf8", mode: 0o600 })
   renameSync(tmpPath, path)
 }
 
@@ -207,8 +209,9 @@ function appendTaskEvent(
   appendFds: Map<string, number>,
 ): string {
   const logsDir = join(stateDir, "logs")
-  mkdirSync(logsDir, { recursive: true })
+  ensurePrivateDirectory(logsDir)
   const path = join(logsDir, `${taskId}.jsonl`)
+  assertNoSymlink(path)
   const line = `${JSON.stringify({ type: event.type, payload: redactEventPayload(event.payload) })}
 `
   const fd = appendFdFor(path, appendFds)
@@ -225,7 +228,7 @@ function appendFdFor(path: string, appendFds: Map<string, number>): number {
     return existing
   }
 
-  const fd = openSync(path, "a")
+  const fd = openSync(path, "a", 0o600)
   appendFds.set(path, fd)
   if (appendFds.size > APPEND_FD_CAP) {
     const [oldPath, oldFd] = appendFds.entries().next().value as [string, number]
@@ -237,6 +240,15 @@ function appendFdFor(path: string, appendFds: Map<string, number>): number {
 
 function taskPath(stateDir: string, taskId: TaskId): string {
   return join(stateDir, "tasks", `${taskId}.json`)
+}
+
+function assertNoSymlink(path: string): void {
+  try {
+    if (lstatSync(path).isSymbolicLink()) throw new StatePermissionsError(path)
+  } catch (error) {
+    if (isEnoent(error)) return
+    throw error
+  }
 }
 
 function isEnoent(error: unknown): boolean {

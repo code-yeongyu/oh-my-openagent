@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import type { TaskRecord } from "../state"
 import { FakeRunner, baseSpec, cleanupProjects, makeManager } from "./__fixtures__/manager-fakes"
+import type { ChildPlanner, ManagerStartSpec } from "./types"
 import { recordSpawnedPid } from "./manager-helpers"
 
 afterEach(cleanupProjects)
@@ -52,6 +53,42 @@ describe("recordSpawnedPid", () => {
 })
 
 describe("TaskManager spawn-fact persistence", () => {
+  test.each([
+    {
+      label: "agent alias",
+      spec: { category: undefined, subagent_type: "legacy-agent" },
+      plan: { agentType: "canonical-agent" },
+      field: "agent_type" as const,
+      canonical: "canonical-agent",
+    },
+    {
+      label: "category alias",
+      spec: { category: "legacy-category", subagent_type: undefined },
+      plan: { category: "canonical-category" },
+      field: "category" as const,
+      canonical: "canonical-category",
+    },
+  ])("#given a planner-normalized $label #when a task starts #then admission and persistence use the canonical target", async ({ spec, plan, field, canonical }) => {
+    // given
+    const planner: ChildPlanner = (_spec: ManagerStartSpec) => ({
+      kind: "resolved",
+      plan: { model: "openai/current", ...plan },
+    })
+    const { manager, store } = makeManager({ planner })
+
+    // when
+    const result = await manager.start(baseSpec({
+      ...spec,
+      allowed_subagents: [canonical],
+    }))
+
+    // then
+    expect(result.kind).toBe("started")
+    if (result.kind !== "started") throw new Error("expected started")
+    expect(store.load(result.task_id)?.[field]).toBe(canonical)
+    expect(store.load(result.task_id)?.model).toBe("openai/current")
+  })
+
   test("#given member launch env #when a process task starts #then the generated task id is threaded into the child env", async () => {
     // given
     const processRunner = new FakeRunner()
@@ -69,6 +106,7 @@ describe("TaskManager spawn-fact persistence", () => {
     // then
     if (result.kind !== "started") throw new Error("expected started")
     expect(processRunner.startedSpecs[0]?.memberEnv).toEqual({
+      SENPI_TASK_LINEAGE_TASK_ID: result.task_id,
       SENPI_TASK_MEMBER: "11111111-1111-4111-8111-111111111111::alpha",
       SENPI_TASK_TEAM_CONFIG: "{}",
       SENPI_TASK_MEMBER_TASK_ID: result.task_id,
@@ -82,7 +120,11 @@ describe("TaskManager spawn-fact persistence", () => {
     const { manager, store } = makeManager({ process: processRunner })
 
     // when a task is launched in process execution mode
-    const result = await manager.start(baseSpec({ execution_mode: "process" }))
+    const result = await manager.start(baseSpec({
+      execution_mode: "process",
+      caller_max_depth: 1,
+      allowed_subagents: ["quick"],
+    }))
 
     // then the running record persisted the pid so status + reconciliation can see the live process
     if (result.kind !== "started") throw new Error("expected started")

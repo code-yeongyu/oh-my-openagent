@@ -30,16 +30,16 @@ export function wireEventBridge(
 
   pi.on("session_start", async (_payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
-    transitions.onSessionStart(engine.runtime.sessionId())
-    await engine.lifecycle.reconcileOnSessionStart()
+    const currentSessionId = engine.runtime.sessionId()
+    transitions.onSessionStart(currentSessionId)
+    await engine.lifecycle.reconcileOnSessionStart(currentSessionId)
     const cleanup = engine.lifecycle.cleanupExpiredRecords()
     if (cleanup.deleted.length > 0) {
       ctx.logger.info("senpi-task ttl cleanup", { deleted: cleanup.deleted.length, retained: cleanup.retained.length })
     }
     await reconcileTeamMailboxBestEffort(ctx, state)
-    const sessionId = engine.runtime.sessionId()
-    if (sessionId !== undefined) {
-      engine.notifier.reconcileFailedNotifications({ sessionId, parentState: engine.runtime.parentState() })
+    if (currentSessionId !== undefined) {
+      engine.notifier.reconcileFailedNotifications({ sessionId: currentSessionId, parentState: engine.runtime.parentState() })
     }
     await tickLeadPollersBestEffort(ctx, state)
     if (state.warnDualConfig && !warnedDualConfig) {

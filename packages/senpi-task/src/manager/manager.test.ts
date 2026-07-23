@@ -438,7 +438,7 @@ describe("TaskManager pending cancellation", () => {
     const waiting = manager.waitFor(queued.task_id)
 
     // when
-    const cancelled = await manager.cancelTask(queued.task_id, "queue no longer needed")
+    const cancelled = await manager.cancelTask(queued.task_id, "queue no longer needed", "parent-1")
 
     // then
     if (cancelled.kind !== "cancelled") throw new Error("expected cancelled")
@@ -546,7 +546,7 @@ describe("TaskManager pending cancellation", () => {
     await secondStarted
 
     // when
-    const cancelled = await manager.cancelTask(queued.task_id, "cancel during start")
+    const cancelled = await manager.cancelTask(queued.task_id, "cancel during start", "parent-1")
     if (delayedHandle === undefined) throw new Error("expected delayed handle")
     resolveSecondStart(delayedHandle)
     await flush()
@@ -571,7 +571,7 @@ describe("TaskManager pending cancellation", () => {
     if (running.kind !== "started" || queued.kind !== "started") throw new Error("expected started")
 
     // when
-    const cancelled = await manager.cancelTask(running.task_id, "stop")
+    const cancelled = await manager.cancelTask(running.task_id, "stop", "parent-1")
     await flush()
 
     // then

@@ -1,10 +1,12 @@
 import type { ToolDefinition } from "@code-yeongyu/senpi"
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
+import type { SpawnCallerRole, SpawnLineage, SpawnPolicyDecision } from "@oh-my-opencode/delegate-core"
 
 import type { ResolvedModelRecord, TaskRecord, TaskStatus } from "../state"
 import type {
   CancelOutcome,
   DestructionPort,
+  InterruptInput,
   InterruptOutcome,
   SendInput,
   SendOutcome,
@@ -52,6 +54,9 @@ export type ManagerStartSpec = {
   readonly cwd?: string
   readonly instructions?: string
   readonly allowed_subagents?: readonly string[]
+  readonly caller_max_depth?: number
+  readonly caller_role?: SpawnCallerRole
+  readonly lineage?: SpawnLineage
   readonly run_in_background?: boolean
   readonly memberScopedTools?: readonly ToolDefinition[]
   readonly extensions?: readonly string[]
@@ -100,6 +105,7 @@ export type StartResult =
       readonly reason: string
       readonly child_depth: number
       readonly max_depth: number
+      readonly denial?: Extract<SpawnPolicyDecision, { readonly allowed: false }>
     }
   | { readonly kind: "plan_unresolved"; readonly error: PlanResolutionError }
   | {
@@ -147,11 +153,26 @@ export type SpawnAdmission =
 export type AdmitResident = (parentSessionId: string) => Promise<SpawnAdmission>
 
 export type TrustedRespawnLaunch = {
+  readonly cwd?: string
   readonly extensions?: readonly string[]
   readonly memberEnv?: Readonly<Record<string, string>>
 }
 
 export type TrustedRespawnLaunchResolver = (record: TaskRecord) => Promise<TrustedRespawnLaunch | undefined>
+
+export type TrustedRespawnAdmission = {
+  readonly callerRole: SpawnCallerRole
+  readonly lineage: SpawnLineage
+  readonly rootSessionId: string
+  readonly childDepth: number
+  readonly callerMaxDepth?: number
+  readonly allowedSubagents?: readonly string[]
+}
+
+export type TrustedRespawnAdmissionResolver = (
+  record: TaskRecord,
+  currentSessionId: string,
+) => Promise<TrustedRespawnAdmission | undefined>
 
 export type TaskManagerOptions = {
   readonly store: TaskRecordStore
@@ -169,6 +190,7 @@ export type TaskManagerOptions = {
   // Resolves launch inputs from the current runtime. Persisted task records never supply executable
   // extensions or environment during a respawn.
   readonly trustedRespawnLaunch?: TrustedRespawnLaunchResolver
+  readonly trustedRespawnAdmission?: TrustedRespawnAdmissionResolver
   // Pid recorded as host_pid on every claimed record so sibling processes sharing the project store
   // can tell a live owner from a dead one. Defaults to process.pid; injectable for tests.
   readonly hostPid?: number
@@ -176,10 +198,10 @@ export type TaskManagerOptions = {
 
 export type TaskManager = {
   start(spec: ManagerStartSpec): Promise<StartResult>
-  continueTask(taskIdOrName: string, prompt: string, deliverAs?: "steer" | "followUp"): Promise<ContinueResult>
+  continueTask(taskIdOrName: string, prompt: string, callerSessionId?: string, deliverAs?: "steer" | "followUp"): Promise<ContinueResult>
   sendToTask(input: SendInput): Promise<SendOutcome>
-  interruptTask(idOrName: string): Promise<InterruptOutcome>
-  cancelTask(idOrName: string, reason?: string): Promise<CancelOutcome>
+  interruptTask(input: InterruptInput): Promise<InterruptOutcome>
+  cancelTask(idOrName: string, reason?: string, callerSessionId?: string): Promise<CancelOutcome>
   get(taskId: string): TaskRecord | undefined
   list(scope: ListScope): readonly ListedTask[]
   waitFor(taskId: string, options?: { readonly signal?: AbortSignal }): Promise<TaskRecord>

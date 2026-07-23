@@ -1,11 +1,12 @@
 export { createTaskManager } from "./manager"
 export { TaskConcurrency } from "./concurrency"
 export type { TaskConcurrencyConfig } from "./concurrency"
-export { decideDepthPolicy } from "./depth-policy"
+export { decideDepthPolicy, SENPI_MAX_CHILD_DEPTH } from "./depth-policy"
 export type { DepthDecision, DepthPolicyInput } from "./depth-policy"
 export { NameRegistry } from "./names"
 export type { NameRegistration } from "./names"
 export { resolveExecutionMode } from "./execution-mode"
+export { SENPI_TASK_LINEAGE_TASK_ID_ENV } from "./lineage-env"
 export type { ExecutionMode, ExecutionModeSources } from "./execution-mode"
 export { adaptInProcessHandle, adaptRpcHandle } from "./child-handle"
 export type { ManagedChildEvent, ManagedChildHandle, ManagedChildListener } from "./child-handle"
@@ -38,6 +39,8 @@ export type {
   PlanResolution,
   PlanResolutionError,
   ResolvedChildPlan,
+  TrustedRespawnAdmission,
+  TrustedRespawnAdmissionResolver,
   TrustedRespawnLaunch,
   TrustedRespawnLaunchResolver,
   SpawnAdmission,

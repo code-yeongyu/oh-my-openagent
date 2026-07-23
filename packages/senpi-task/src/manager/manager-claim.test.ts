@@ -28,13 +28,15 @@ function firstAllocationFailsStore(inner: TaskRecordStore): TaskRecordStore {
 function replaceFailsOnceStore(
   inner: TaskRecordStore,
   transitions: TaskTransition[],
-): { readonly store: TaskRecordStore; readonly applied: () => readonly boolean[] } {
+): { readonly store: TaskRecordStore; readonly applied: () => readonly boolean[]; readonly replaceCalls: () => number } {
   let failReplace = true
+  let replaceCalls = 0
   const applied: boolean[] = []
   return {
     store: {
       ...inner,
       replace(record) {
+        replaceCalls += 1
         if (failReplace) {
           failReplace = false
           throw new Error("injected bookkeeping failure")
@@ -49,6 +51,7 @@ function replaceFailsOnceStore(
       },
     },
     applied: () => applied,
+    replaceCalls: () => replaceCalls,
   }
 }
 
@@ -177,7 +180,7 @@ describe("TaskManager claim characterization", () => {
     expect(retried.name_warning).toBeDefined()
   })
 
-  test("#given process execution mode #when started #then its record persists a spawn spec", async () => {
+  test("#given process execution mode #when started #then launch inputs are not persisted", async () => {
     // given
     const { manager, store } = makeManager()
 
@@ -186,7 +189,7 @@ describe("TaskManager claim characterization", () => {
 
     // then
     if (result.kind !== "started") throw new Error("expected started")
-    expect(store.load(result.task_id)?.spawn_spec).toBeDefined()
+    expect(store.load(result.task_id)).not.toHaveProperty("spawn_spec")
   })
 
   test.each(["", "   "])("#given a blank requested name %p #when started #then it falls back to the task id", async (name) => {
@@ -295,7 +298,7 @@ describe("TaskManager claim characterization", () => {
     expect(retried.name).toBe("todo11")
   })
 
-  test("#given bookkeeping fails after a claim #when process mode starts #then it records a terminal failure", async () => {
+  test("#given an obsolete launch bookkeeping replacement failure #when process mode starts #then no persisted launch write occurs", async () => {
     // given
     const project = tempProject()
     const inner = createTaskRecordStore({ project_dir: project })
@@ -307,14 +310,11 @@ describe("TaskManager claim characterization", () => {
     const result = await manager.start(baseSpec({ execution_mode: "process", run_in_background: true }))
 
     // then
-    expect(result.kind).toBe("start_failed")
-    if (result.kind !== "start_failed") throw new Error("expected start_failed")
-    expect(result.task_id).toMatch(/^st_[0-9a-f]{8}$/)
-    expect(inner.load(result.task_id)?.status).toBe("error")
-    expect(inner.load(result.task_id)?.error_message).toBe("spawn bookkeeping failed")
-    expect(transitions.map((transition) => transition.type)).toEqual(["start", "fail"])
-    expect(bookkeeping.applied()).toEqual([true, true])
-    expect(manager.wasBackground(result.task_id)).toBe(false)
+    if (result.kind !== "started") throw new Error("expected started")
+    expect(bookkeeping.replaceCalls()).toBe(0)
+    expect(transitions.map((transition) => transition.type)).toEqual(["start"])
+    expect(bookkeeping.applied()).toEqual([true])
+    expect(manager.wasBackground(result.task_id)).toBe(true)
   })
 
   test("#given a whitespace requested name #when a collision is claimed #then the fallback follows the final id", async () => {

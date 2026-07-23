@@ -4,7 +4,7 @@ import type { ManagedChildHandle } from "../manager/child-handle"
 import type { TaskRecord } from "../state"
 import type { TaskRecordStore } from "../store"
 
-// Why a task is being torn down. Cancel (todo 10), LRU eviction, TTL cleanup, session shutdown, and
+// Why a task is being torn down. Cancel, LRU eviction, TTL cleanup, session shutdown, and
 // session_start reconciliation ALL route their destruction through the single-writer port.
 export type DestroyCause = "cancel" | "evict" | "ttl" | "shutdown" | "reconcile_lost"
 
@@ -33,11 +33,9 @@ export type ResidencyRegistry = {
   hasPendingSends(taskId: string): boolean
 }
 
-// Injectable OS-process signalling so unit tests never spawn real children. Defaults use
-// process.kill (the sole audited process.kill site lives in src/lifecycle).
+// Injectable process liveness probe. Persisted records are untrusted and cannot signal a PID.
 export type ProcessSignaller = {
   isAlive(pid: number): boolean
-  signal(pid: number, signal: "SIGTERM" | "SIGKILL"): void
 }
 
 export type RespawnResult =
@@ -48,7 +46,7 @@ export type ReattachResult =
   | { readonly ok: true }
   | { readonly ok: false; readonly kind: "already_attached" | "failed"; readonly reason: string }
 
-export type RespawnPort = (record: TaskRecord, resumeSessionPath: string) => Promise<RespawnResult>
+export type RespawnPort = (record: TaskRecord, currentSessionId: string, resumeSessionPath: string) => Promise<RespawnResult>
 export type ReattachPort = (record: TaskRecord, handle: ManagedChildHandle) => Promise<ReattachResult>
 
 export type LifecycleReattachPorts = {
@@ -77,8 +75,6 @@ export type LifecycleDeps = {
   readonly signaller?: ProcessSignaller
   readonly respawn?: RespawnPort
   readonly reattach?: ReattachPort
-  // Delay before escalating an orphan SIGTERM to SIGKILL during reconciliation. Defaults to 5s.
-  readonly orphanKillDelayMs?: number
   // Pid of THIS host process. Defaults to process.pid; injectable so reconciliation tests can
   // simulate cross-process ownership deterministically.
   readonly hostPid?: number

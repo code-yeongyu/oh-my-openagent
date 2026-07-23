@@ -1,4 +1,5 @@
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
+import type { SpawnCallerRole, SpawnLineage } from "@oh-my-opencode/delegate-core"
 
 import type { AgentDefinition } from "../../agents"
 import type { TaskManager } from "../../manager"
@@ -14,10 +15,14 @@ export type TaskToolContext = {
 }
 
 // Parent-session ancestry the tool folds into the child spawn: the child's depth is the parent's
-// depth + 1 and the root session is inherited. Absent ancestry means a top-level session (depth 0).
+// depth + 1 and the root session is inherited. Missing ancestry fails closed in manager admission.
 export type TaskAncestry = {
   readonly depth: number
   readonly rootSessionId: string
+  readonly lineage?: SpawnLineage
+  readonly callerRole?: SpawnCallerRole
+  readonly callerMaxDepth?: number
+  readonly allowedSubagents?: readonly string[]
 }
 
 export type ResolveAncestry = (parentSessionId: string) => TaskAncestry | undefined

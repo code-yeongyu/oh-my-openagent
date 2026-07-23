@@ -26,9 +26,6 @@ export const TaskSendParams = Type.Object({
   ),
   team_run_id: Type.Optional(Type.String({ description: "Team run id for lead-to-member messages or shutdown messages." })),
   summary: Type.Optional(Type.String({ description: "Optional one-line summary for team messages." })),
-  all_scope: Type.Optional(
-    Type.Boolean({ description: "Allow messaging a child owned by another session. Off by default." }),
-  ),
 })
 
 export type TaskSendInput = Static<typeof TaskSendParams>

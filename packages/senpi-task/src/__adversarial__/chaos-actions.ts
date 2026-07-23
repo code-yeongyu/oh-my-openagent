@@ -84,25 +84,25 @@ async function settleWith(state: ChaosState, outcome: "clean" | "signal"): Promi
 async function actSteer(state: ChaosState): Promise<void> {
   const id = pick(state, byStatus(state, (record) => record.status === "running" && record.residency_state === "resident"))
   if (id === undefined) return
-  await state.harness.manager.continueTask(id, "keep going", "steer")
+  await state.harness.manager.continueTask(id, "keep going", CHAOS_SESSION, "steer")
 }
 
 async function actInterrupt(state: ChaosState): Promise<void> {
   const id = pick(state, byStatus(state, (record) => record.status === "running"))
   if (id === undefined) return
-  await state.harness.manager.interruptTask(id)
+  await state.harness.manager.interruptTask({ idOrName: id, callerSessionId: CHAOS_SESSION })
 }
 
 async function actCancel(state: ChaosState): Promise<void> {
   const id = pick(state, byStatus(state, (record) => record.status === "running"))
   if (id === undefined) return
-  await state.harness.manager.cancelTask(id, state.rng.bool() ? "user aborted" : undefined)
+  await state.harness.manager.cancelTask(id, state.rng.bool() ? "user aborted" : undefined, CHAOS_SESSION)
 }
 
 async function actCancelPending(state: ChaosState): Promise<void> {
   const id = pick(state, byStatus(state, (record) => record.status === "pending"))
   if (id === undefined) return
-  await state.harness.manager.cancelTask(id, state.rng.bool() ? "cancelled while queued" : undefined)
+  await state.harness.manager.cancelTask(id, state.rng.bool() ? "cancelled while queued" : undefined, CHAOS_SESSION)
 }
 
 async function actAbortParentWait(state: ChaosState): Promise<void> {
@@ -114,7 +114,7 @@ async function actAbortParentWait(state: ChaosState): Promise<void> {
 async function actRevive(state: ChaosState): Promise<void> {
   const id = pick(state, byStatus(state, (record) => REVIVABLE.has(record.status) && record.residency_state === "resident"))
   if (id === undefined) return
-  await state.harness.manager.continueTask(id, "revive please")
+  await state.harness.manager.continueTask(id, "revive please", CHAOS_SESSION)
 }
 
 function expectedDelta(result: NotifyResult): number {
@@ -189,7 +189,7 @@ async function actEvict(state: ChaosState): Promise<void> {
 }
 
 async function actReconcile(state: ChaosState): Promise<void> {
-  await state.harness.lifecycle.reconcileOnSessionStart()
+  await state.harness.lifecycle.reconcileOnSessionStart(CHAOS_SESSION)
   state.harness.notifier.reconcileFailedNotifications({ sessionId: CHAOS_SESSION, parentState: { kind: "idle" } })
 }
 

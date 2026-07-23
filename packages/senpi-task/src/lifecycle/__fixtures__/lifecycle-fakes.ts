@@ -74,7 +74,7 @@ export function fakeHandle(
   taskId: string,
   kind: "in-process" | "rpc",
   order: CallLog,
-  options: { pid?: number; abortRejects?: boolean } = {},
+  options: { pid?: number; abortRejects?: boolean; disposeRejects?: boolean } = {},
 ): FakeHandle {
   let didAbort = false
   let didDispose = false
@@ -91,6 +91,7 @@ export function fakeHandle(
     dispose: async () => {
       didDispose = true
       order.push(`dispose:${taskId}`)
+      if (options.disposeRejects === true) throw new Error("dispose failed")
     },
     terminate: async () => {
       didTerminate = true

@@ -6,13 +6,17 @@ import type { TaskRecord } from "../state"
 import {
   DEFAULT_SEND_DELIVERY,
   type CancelOutcome,
+  type CancelInput,
   type InterruptOutcome,
+  type InterruptInput,
   type SendDelivery,
   type SendInput,
   type SendOutcome,
   type SteeringEngine,
   type SteeringPort,
+  type UnmanagedLiveProcessOutcome,
 } from "./types"
+import { decideContinuationOwnership } from "./ownership"
 
 const TASK_OUTPUT_SUGGESTION = "Use task_output to read the final result."
 const NOT_FOUND_SUGGESTION = "Use /tasks to see available tasks, or task_output to read a known task."
@@ -116,19 +120,23 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     }
   }
 
-  async function interruptTask(idOrName: string): Promise<InterruptOutcome> {
-    const record = resolve(idOrName)
-    if (record === undefined) return { kind: "not_found", reason: `No task found for "${idOrName}".` }
+  async function interruptTask(input: InterruptInput): Promise<InterruptOutcome> {
+    const record = resolve(input.idOrName)
+    if (record === undefined) return { kind: "not_found", reason: `No task found for "${input.idOrName}".` }
+    const denied = scopeDenied(record, input)
+    if (denied !== undefined) return denied
     if (record.status !== "running") {
       return { kind: "noop", task_id: record.task_id, status: record.status, reason: `Task ${record.task_id} is ${record.status}, not running.` }
     }
+    const handle = port.liveHandle(record.task_id)
+    const unmanaged = unmanagedLiveProcess(record, handle)
+    if (unmanaged !== undefined) return unmanaged
     // Transition BEFORE abort so steering is the single terminal writer: abort settles the launch
     // outcome tracker, whose late complete/cancel transition is then rejected by terminal idempotence.
     const result = port.store.transition(record.task_id, { type: "interrupt", timestamp: nowIso() })
     if (!result.applied) {
       return { kind: "noop", task_id: record.task_id, status: result.record.status, reason: `Task ${record.task_id} could not be interrupted from running.` }
     }
-    const handle = port.liveHandle(record.task_id)
     if (handle !== undefined) await handle.abort()
     const partial = handle?.lastAssistantText()
     if (partial !== undefined && partial.length > 0) {
@@ -138,9 +146,12 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     return { kind: "interrupted", task_id: record.task_id, previous_status: "running" }
   }
 
-  async function cancelTask(idOrName: string, reason?: string): Promise<CancelOutcome> {
-    const record = resolve(idOrName)
-    if (record === undefined) return { kind: "not_found", reason: `No task found for "${idOrName}".` }
+  async function cancelTask(input: CancelInput): Promise<CancelOutcome> {
+    const record = resolve(input.idOrName)
+    if (record === undefined) return { kind: "not_found", reason: `No task found for "${input.idOrName}".` }
+    const denied = scopeDenied(record, input)
+    if (denied !== undefined) return denied
+    const reason = input.reason
     if (record.status === "pending") {
       const result = port.store.transition(record.task_id, {
         type: "cancel",
@@ -160,6 +171,9 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
       const reasonText = record.status === "cancelled" ? `Task ${record.task_id} is already cancelled.` : `Task ${record.task_id} is ${record.status}, not running.`
       return { kind: "noop", task_id: record.task_id, status: record.status, reason: reasonText }
     }
+    const handle = port.liveHandle(record.task_id)
+    const unmanaged = unmanagedLiveProcess(record, handle)
+    if (unmanaged !== undefined) return unmanaged
     // Transition BEFORE abort so this cancel is the single terminal write; the tracker's later
     // complete/cancel transition (settled by abort) is rejected by terminal idempotence.
     const result = port.store.transition(record.task_id, {
@@ -170,7 +184,6 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     if (!result.applied) {
       return { kind: "noop", task_id: record.task_id, status: result.record.status, reason: `Task ${record.task_id} could not be cancelled from running.` }
     }
-    const handle = port.liveHandle(record.task_id)
     // The record is already terminal (cancelled) above. abort() is best-effort: an rpc child that
     // already exited rejects the abort send (protocol-client isExited), and a rejection here must NOT
     // skip the destruction that moves the record OUT of resident - otherwise it freezes at
@@ -191,15 +204,33 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
   return { sendToTask, interruptTask, cancelTask, notifyStarted, dropPending }
 }
 
-function scopeDenied(record: TaskRecord, input: SendInput): SendOutcome | undefined {
-  if (input.callerSessionId === undefined || input.allScope === true) return undefined
-  const caller = input.callerSessionId
-  if (caller === record.parent_session_id || caller === record.root_session_id) return undefined
+function unmanagedLiveProcess(
+  record: TaskRecord,
+  handle: ManagedChildHandle | undefined,
+): UnmanagedLiveProcessOutcome | undefined {
+  if (handle !== undefined || record.execution_mode !== "process" || record.residency_state !== "resident" || record.pid === undefined) {
+    return undefined
+  }
+  return {
+    kind: "unmanaged_live_process",
+    task_id: record.task_id,
+    pid: record.pid,
+    reason: `Task ${record.task_id} has no local handle for process pid ${record.pid}.`,
+  }
+}
+
+function scopeDenied(
+  record: TaskRecord,
+  input: Pick<SendInput, "callerSessionId">,
+): Extract<SendOutcome, { readonly kind: "scope_denied" }> | undefined {
+  const decision = decideContinuationOwnership(record, input.callerSessionId)
+  if (decision.allowed) return undefined
   return {
     kind: "scope_denied",
     task_id: record.task_id,
     owning_session_id: record.parent_session_id,
-    reason: `Task ${record.task_id} belongs to session ${record.parent_session_id}; pass all_scope to send across sessions.`,
+    ownership_reason: decision.reason,
+    reason: `Task ${record.task_id} can only be continued by direct owner session ${record.parent_session_id}.`,
   }
 }
 

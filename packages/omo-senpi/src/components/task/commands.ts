@@ -9,7 +9,7 @@ const CANCELLABLE_STATUSES: ReadonlySet<TaskStatus> = new Set(["running", "pendi
 // The manager read/act seam the commands need: a scoped list plus cancellation.
 export interface CommandManager {
   list(scope: ListScope): readonly ListedTask[]
-  cancelTask(idOrName: string, reason?: string): Promise<CancelOutcome>
+  cancelTask(idOrName: string, reason?: string, callerSessionId?: string): Promise<CancelOutcome>
 }
 
 // Structural slice of senpi's ExtensionCommandContext the commands read. The real context satisfies it.
@@ -61,7 +61,13 @@ async function runTasksCommand(manager: CommandManager, args: string, ctx: Comma
 async function runTaskKillCommand(manager: CommandManager, ctx: CommandContext): Promise<void> {
   const ui = ctx.ui
   if (ui === undefined) return
-  const cancellable = collect(manager, scopeFor(ctx, false)).filter((record) => CANCELLABLE_STATUSES.has(record.status))
+  const callerSessionId = ctx.sessionManager?.getSessionId()
+  if (callerSessionId === undefined) {
+    ui.notify("Cannot cancel task without a current session.", "warning")
+    return
+  }
+  const cancellable = collect(manager, { scope: "parent-session", session_id: callerSessionId })
+    .filter((record) => CANCELLABLE_STATUSES.has(record.status))
   if (cancellable.length === 0) {
     ui.notify("No cancellable tasks.", "info")
     return
@@ -73,8 +79,18 @@ async function runTaskKillCommand(manager: CommandManager, ctx: CommandContext):
   if (taskId === undefined || taskId.length === 0) return
   const confirmed = await ui.confirm("Cancel task", `Cancel ${taskId}?`)
   if (!confirmed) return
-  await manager.cancelTask(taskId, KILL_REASON)
-  ui.notify(`Cancelled ${taskId}.`, "info")
+  const outcome = await manager.cancelTask(taskId, KILL_REASON, callerSessionId)
+  switch (outcome.kind) {
+    case "cancelled":
+      ui.notify(`Cancelled ${taskId}.`, "info")
+      return
+    case "unmanaged_live_process":
+    case "noop":
+    case "not_found":
+    case "scope_denied":
+      ui.notify(outcome.reason, "warning")
+      return
+  }
 }
 
 function killOption(record: TaskRecord): string {

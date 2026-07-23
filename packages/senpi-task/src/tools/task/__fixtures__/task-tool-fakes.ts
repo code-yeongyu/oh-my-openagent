@@ -51,6 +51,7 @@ export function makeDeps(manager: TaskManager, extra: Partial<TaskToolDeps> = {}
     manager,
     omoConfig: OMO_CONFIG,
     agents: {},
+    resolveAncestry: (sessionId) => ({ depth: 0, rootSessionId: sessionId, lineage: "known", callerRole: "coordinator" }),
     loadSkills: () => ({ prepend: "", resolved: [], missing: [] }) satisfies SkillResolution,
     ...extra,
   }

@@ -1,10 +1,10 @@
-import { existsSync } from "node:fs"
-import { mkdtempSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, symlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, sep } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
 
 import type { StateDirConfig } from "../store"
+import { StatePermissionsError } from "../store/state-permissions"
 import {
   ensureTeamRuntimeDirs,
   resolveProjectTeamSpecPath,
@@ -85,5 +85,21 @@ describe("team storage layout", () => {
     expect(existsSync(dirs.tasksDir)).toBe(true)
     expect(existsSync(resolveTeamMemberInboxDir(config, teamRunId, "finder"))).toBe(true)
     expect(existsSync(resolveTeamMemberInboxDir(config, teamRunId, "quick-1"))).toBe(true)
+  })
+
+  test.skipIf(process.platform === "win32")("#given a symlinked team base #when runtime storage is ensured #then the external target is unchanged", async () => {
+    // given
+    const projectDir = makeProjectDir()
+    const config: StateDirConfig = { project_dir: projectDir }
+    const stateDir = join(projectDir, ".omo", "senpi-task")
+    const outsideDir = join(projectDir, "outside-team")
+    mkdirSync(stateDir, { recursive: true })
+    mkdirSync(outsideDir, { mode: 0o755 })
+    symlinkSync(outsideDir, join(stateDir, "teams"))
+
+    // when / then
+    await expect(ensureTeamRuntimeDirs(config, "44444444-4444-4444-4444-444444444444", ["finder"]))
+      .rejects.toBeInstanceOf(StatePermissionsError)
+    expect(statSync(outsideDir).mode & 0o777).toBe(0o755)
   })
 })

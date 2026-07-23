@@ -3,9 +3,10 @@ import { Type } from "typebox"
 import type { Static } from "typebox"
 
 import type { TaskStatus } from "../../state"
+import { defaultResolveCallerSessionId } from "./caller-session"
 import { renderTaskCancelCall, renderTaskCancelResult } from "./renderers"
 import { toolResult } from "./tool-result"
-import type { CancelManager, CancelResultDetails, CancelToolResult } from "./types"
+import type { CallerSessionResolver, CancelManager, CancelResultDetails, CancelToolResult } from "./types"
 
 export const TaskCancelParams = Type.Object({
   task_id: Type.Optional(Type.String({ description: "Task id (st_...) of the child to cancel." })),
@@ -23,9 +24,10 @@ const DESCRIPTION = [
 
 export type TaskCancelDeps = {
   readonly manager: CancelManager
+  readonly resolveCallerSessionId?: CallerSessionResolver
 }
 
-export async function runTaskCancel(manager: CancelManager, params: TaskCancelInput): Promise<CancelToolResult> {
+export async function runTaskCancel(manager: CancelManager, params: TaskCancelInput, callerSessionId?: string): Promise<CancelToolResult> {
   const idOrName = params.task_id ?? params.name
   if (idOrName === undefined) {
     return toolResult("Provide task_id or name to identify the child task.", {
@@ -34,7 +36,7 @@ export async function runTaskCancel(manager: CancelManager, params: TaskCancelIn
     })
   }
 
-  const outcome = await manager.cancelTask(idOrName, params.reason)
+  const outcome = await manager.cancelTask(idOrName, params.reason, callerSessionId)
   switch (outcome.kind) {
     case "cancelled": {
       const status = manager.get(outcome.task_id)?.status ?? ("cancelled" satisfies TaskStatus)
@@ -45,6 +47,8 @@ export async function runTaskCancel(manager: CancelManager, params: TaskCancelIn
         status,
       })
     }
+    case "unmanaged_live_process":
+      return toolResult(outcome.reason, outcome)
     case "noop":
       return toolResult(`${outcome.reason} No change.`, {
         kind: "noop",
@@ -54,16 +58,19 @@ export async function runTaskCancel(manager: CancelManager, params: TaskCancelIn
       })
     case "not_found":
       return toolResult(outcome.reason, { kind: "not_found", reason: outcome.reason })
+    case "scope_denied":
+      return toolResult(outcome.reason, outcome)
   }
 }
 
 export function createTaskCancelTool(deps: TaskCancelDeps): ToolDefinition<typeof TaskCancelParams, CancelResultDetails> {
+  const resolveCaller = deps.resolveCallerSessionId ?? defaultResolveCallerSessionId
   return {
     name: "task_cancel",
     label: "Task Cancel",
     description: DESCRIPTION,
     parameters: TaskCancelParams,
-    execute: (_toolCallId, params) => runTaskCancel(deps.manager, params),
+    execute: (_toolCallId, params, _signal, _onUpdate, ctx) => runTaskCancel(deps.manager, params, resolveCaller(ctx)),
     renderCall: (args, theme) => renderTaskCancelCall(args, theme),
     renderResult: (result, options, theme) => renderTaskCancelResult(result, options, theme),
   }

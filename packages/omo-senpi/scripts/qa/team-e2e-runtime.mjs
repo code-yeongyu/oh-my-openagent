@@ -18,6 +18,7 @@ export function startSenpiRun(input) {
     "mock-1",
     "--session-dir",
     sessionDir,
+    ...(input.sessionId === undefined ? [] : ["--session", input.sessionId]),
     input.prompt,
   ]
   const child = spawn(input.senpiBin, args, {

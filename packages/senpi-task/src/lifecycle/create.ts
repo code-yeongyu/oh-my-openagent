@@ -17,7 +17,7 @@ export function createTaskLifecycle(deps: LifecycleDeps): TaskLifecycle {
   return {
     destroyResidentTask: (taskId: string, cause: DestroyCause) => destroyResidentTask(context, taskId, cause),
     admitResident: (parentSessionId: string) => admitResident(context, parentSessionId),
-    reconcileOnSessionStart: () => reconcileOnSessionStart(context),
+    reconcileOnSessionStart: (currentSessionId: string | undefined) => reconcileOnSessionStart(context, currentSessionId),
     cleanupExpiredRecords: () => cleanupExpiredRecords(context),
     teardownOnSessionShutdown: () => teardownOnSessionShutdown(context),
   }

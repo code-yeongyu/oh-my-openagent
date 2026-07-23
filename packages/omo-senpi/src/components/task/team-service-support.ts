@@ -75,19 +75,36 @@ async function memberTaskId(stateDir: StateDirConfig, teamRunId: string, memberN
 
 // Delivers a shutdown-protocol notice to the target member's background child as a follow-up, resolving
 // the member->task mapping from the run sidecar. A member with no live task is a silent no-op.
-export function makeShutdownMessenger(manager: TaskManager, stateDir: StateDirConfig, teamRunId: string): ShutdownMessenger {
+export function makeShutdownMessenger(
+  manager: TaskManager,
+  stateDir: StateDirConfig,
+  teamRunId: string,
+  callerSessionId: () => string,
+): ShutdownMessenger {
   return async (message) => {
     const taskId = await memberTaskId(stateDir, teamRunId, message.to)
     if (taskId === undefined) return
-    await manager.sendToTask({ idOrName: taskId, message: `[team ${message.kind}] ${message.body}`, deliverAs: "followUp" })
+    const outcome = await manager.sendToTask({
+      idOrName: taskId,
+      message: `[team ${message.kind}] ${message.body}`,
+      deliverAs: "followUp",
+      callerSessionId: callerSessionId(),
+    })
+    if (outcome.kind === "scope_denied") throw new Error(outcome.reason)
   }
 }
 
 // Cancels a member's background child (approve-shutdown teardown), resolving its task via the sidecar.
-export function makeCancelMemberTask(manager: TaskManager, stateDir: StateDirConfig, teamRunId: string): (memberName: string) => Promise<void> {
+export function makeCancelMemberTask(
+  manager: TaskManager,
+  stateDir: StateDirConfig,
+  teamRunId: string,
+  callerSessionId: () => string,
+): (memberName: string) => Promise<void> {
   return async (memberName) => {
     const taskId = await memberTaskId(stateDir, teamRunId, memberName)
     if (taskId === undefined) return
-    await manager.cancelTask(taskId, `team ${teamRunId} shutdown approved`)
+    const outcome = await manager.cancelTask(taskId, `team ${teamRunId} shutdown approved`, callerSessionId())
+    if (outcome.kind === "scope_denied") throw new Error(outcome.reason)
   }
 }

@@ -1,8 +1,10 @@
 import { join } from "node:path"
 
 import type { TaskRecord, TaskRecordInput } from "../state"
+import { isProcessPid } from "../state/pid"
 import type { ManagedStartSpec, ManagerStartSpec, ResolvedChildPlan } from "./types"
 import type { ExecutionMode } from "./execution-mode"
+import { buildTaskLineageEnv } from "./lineage-env"
 
 export function nowIso(now: () => number): string {
   return new Date(now()).toISOString()
@@ -15,8 +17,8 @@ export function buildRecordInput(input: {
   readonly executionMode: ExecutionMode
 }): TaskRecordInput {
   const { spec, plan, name, executionMode } = input
-  const agentType = spec.subagent_type ?? plan.agentType
-  const category = spec.category ?? plan.category
+  const agentType = plan.agentType ?? spec.subagent_type
+  const category = plan.category ?? spec.category
   return {
     name,
     parent_session_id: spec.parent_session_id,
@@ -28,6 +30,13 @@ export function buildRecordInput(input: {
     ...(agentType !== undefined ? { agent_type: agentType } : {}),
     ...(category !== undefined ? { category } : {}),
     ...(plan.toolAllowlist !== undefined ? { tool_allow: plan.toolAllowlist } : {}),
+    spawn_role: spec.memberEnv?.SENPI_TASK_MEMBER === undefined ? "worker" : "team_member",
+    spawn_policy: {
+      caller_role: spec.caller_role ?? "leaf",
+      lineage: spec.lineage ?? "unknown",
+      ...(spec.caller_max_depth === undefined ? {} : { caller_max_depth: spec.caller_max_depth }),
+      ...(spec.allowed_subagents === undefined ? {} : { allowed_subagents: spec.allowed_subagents }),
+    },
   }
 }
 
@@ -41,9 +50,12 @@ export function buildManagedSpec(input: {
   const { record, spec, plan, cwd, stateDir } = input
   const prompt = plan.promptAppend ? `${spec.prompt}\n\n${plan.promptAppend}` : spec.prompt
   const instructions = spec.instructions ?? plan.instructions
-  const memberEnv = spec.memberEnv === undefined
-    ? undefined
-    : { ...spec.memberEnv, SENPI_TASK_MEMBER_TASK_ID: record.task_id }
+  const memberEnv = buildTaskLineageEnv(
+    record,
+    spec.memberEnv === undefined
+      ? undefined
+      : { ...spec.memberEnv, SENPI_TASK_MEMBER_TASK_ID: record.task_id },
+  )
   return {
     taskId: record.task_id,
     cwd: spec.cwd ?? cwd,
@@ -73,7 +85,7 @@ export function inSession(record: TaskRecord, sessionId: string): boolean {
 // in-process child (no pid) and an already-terminal record are both left untouched so a settled task
 // is never resurrected and an in-process record stays byte-identical.
 export function recordSpawnedPid(record: TaskRecord, pid: number | undefined): TaskRecord | undefined {
-  if (pid === undefined || isTerminalRecord(record)) return undefined
+  if (pid === undefined || !isProcessPid(pid) || isTerminalRecord(record)) return undefined
   return { ...record, pid }
 }
 

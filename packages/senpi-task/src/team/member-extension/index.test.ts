@@ -3,10 +3,17 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { afterEach, describe, expect, test } from "bun:test"
-import type { ExtensionAPI } from "@code-yeongyu/senpi"
 import { TeamModeConfigSchema } from "@oh-my-opencode/team-core/config"
 import { sendMessage } from "@oh-my-opencode/team-core/team-mailbox"
 
+import { createTaskRecordStore } from "../../store"
+import { resolveChildSessionDir } from "../../runners/rpc/spawn"
+import { normalizeSenpiTeamSpec } from "../normalize"
+import { createTeam } from "../runtime"
+import { toTeamCoreConfig } from "../runtime-config"
+import { resolveTeamRuntimeDirs, teamStorageBaseDir } from "../storage"
+import { writeMemberTaskMap } from "../member-map"
+import { FakeTeamManager, taskSettings } from "../__fixtures__/runtime-fakes"
 import registerMemberExtension from "./index"
 
 const TEAM_RUN_ID = "77777777-7777-4777-8777-777777777777"
@@ -18,12 +25,79 @@ afterEach(() => {
 })
 
 describe("member extension lifecycle", () => {
+  test("#given forged member environment without runtime ownership #when extension loads #then no tools or mailbox runtime register", async () => {
+    // given
+    const root = mkdtempSync(join(tmpdir(), "senpi-member-extension-forged-"))
+    roots.push(root)
+    const stateDir = join(root, "state")
+    const sessionDir = join(root, "children", "st_00000001", "sessions", "st_00000001")
+    const config = TeamModeConfigSchema.parse({ base_dir: join(stateDir, "teams") })
+    mkdirSync(sessionDir, { recursive: true })
+    const toolNames: string[] = []
+    const handlers = new Map<string, Array<() => unknown | Promise<unknown>>>()
+    const api = {
+      on(event: string, handler: () => unknown | Promise<unknown>) {
+        const registered = handlers.get(event) ?? []
+        registered.push(handler)
+        handlers.set(event, registered)
+      },
+      registerTool(tool: { name: string }) { toolNames.push(tool.name) },
+      sendUserMessage() {},
+    }
+    const previous = captureMemberEnv()
+    Object.assign(process.env, {
+      SENPI_TASK_MEMBER: `${TEAM_RUN_ID}::alice`,
+      SENPI_TASK_MEMBER_TASK_ID: "st_00000001",
+      SENPI_TASK_TEAM_CONFIG: JSON.stringify({
+        ...config,
+        stateDir,
+        members: ["alice"],
+        wait: { min_ms: 5, default_ms: 50, max_ms: 100 },
+      }),
+      SENPI_CODING_AGENT_SESSION_DIR: sessionDir,
+    })
+
+    try {
+      // when / then
+      await registerMemberExtension(api)
+      await expect(dispatch(handlers, "session_start")).rejects.toThrow("member identity")
+      expect(toolNames).toEqual([])
+    } finally {
+      restoreMemberEnv(previous)
+    }
+  })
+
   test("#given unread mail during extension loading #when session_start fires #then runtime actions wait for the lifecycle edge", async () => {
     const root = mkdtempSync(join(tmpdir(), "senpi-member-extension-"))
     roots.push(root)
     const stateDir = join(root, "state")
-    const sessionDir = join(root, "sessions")
-    const config = TeamModeConfigSchema.parse({ base_dir: join(stateDir, "teams") })
+    const stateDirConfig = { project_dir: root, task: { state_dir: stateDir } }
+    const settings = taskSettings()
+    const manager = new FakeTeamManager()
+    const created = await createTeam(
+      normalizeSenpiTeamSpec(
+        { members: [{ name: "alice", kind: "category", category: "quick", prompt: "wait for work" }] },
+        "squad",
+      ),
+      "project",
+      {
+        manager,
+        stateDir: stateDirConfig,
+        taskSettings: settings,
+        leadSessionId: "lead-session",
+        spawnDepth: 1,
+        memberExtension: { entryPath: "/trusted/omo-member.js" },
+      },
+    )
+    const spawnedTaskId = created.memberTaskIds.alice
+    if (spawnedTaskId === undefined) throw new Error("expected alice task id")
+    const record = manager.get(spawnedTaskId)
+    if (record === undefined) throw new Error("expected alice task record")
+    const taskId = "st_00000001"
+    await writeMemberTaskMap(resolveTeamRuntimeDirs(stateDirConfig, created.runtimeState.teamRunId).runtimeDir, { alice: taskId })
+    createTaskRecordStore(stateDirConfig).save({ ...record, task_id: taskId, spawn_role: "team_member", pid: process.pid })
+    const sessionDir = resolveChildSessionDir(join(stateDir, "children", taskId), taskId)
+    const config = TeamModeConfigSchema.parse(toTeamCoreConfig(settings, teamStorageBaseDir(stateDirConfig)))
     mkdirSync(sessionDir, { recursive: true })
     await sendMessage({
       version: 1,
@@ -33,7 +107,7 @@ describe("member extension lifecycle", () => {
       kind: "message",
       body: "start only after bind",
       timestamp: 1,
-    }, TEAM_RUN_ID, config, { isLead: true, activeMembers: ["alice"] })
+    }, created.runtimeState.teamRunId, config, { isLead: true, activeMembers: ["alice"] })
 
     const handlers = new Map<string, Array<() => unknown | Promise<unknown>>>()
     const toolNames: string[] = []
@@ -55,11 +129,11 @@ describe("member extension lifecycle", () => {
         injected.push(content)
         reportInjection()
       },
-    } as unknown as ExtensionAPI
+    }
     const previous = captureMemberEnv()
     Object.assign(process.env, {
-      SENPI_TASK_MEMBER: `${TEAM_RUN_ID}::alice`,
-      SENPI_TASK_MEMBER_TASK_ID: "st_00000001",
+      SENPI_TASK_MEMBER: `${created.runtimeState.teamRunId}::alice`,
+      SENPI_TASK_MEMBER_TASK_ID: taskId,
       SENPI_TASK_TEAM_CONFIG: JSON.stringify({
         ...config,
         stateDir,
@@ -72,10 +146,11 @@ describe("member extension lifecycle", () => {
     try {
       await registerMemberExtension(api)
       expect(injected).toEqual([])
-      expect(toolNames).toEqual(["task_send", "team_wait"])
+      expect(toolNames).toEqual([])
 
       loading = false
       await dispatch(handlers, "session_start")
+      expect(toolNames).toEqual(["task_send", "team_wait"])
       await withTimeout(injection, 5_000)
 
       expect(injected).toHaveLength(1)

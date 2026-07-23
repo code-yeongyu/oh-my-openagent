@@ -1,4 +1,5 @@
 import type { TaskRecord } from "../state"
+import { isProcessPid } from "../state/pid"
 import { TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import { AgentLimitReached } from "./errors"
@@ -41,6 +42,18 @@ function residentsFor(context: LifecycleContext, parentSessionId: string): reado
 // lost and cancelled) is reclaimable: a lost child is unreachable and must never pin a slot.
 function lruEvictable(context: LifecycleContext, residents: readonly TaskRecord[]): TaskRecord | undefined {
   return [...residents]
-    .filter((record) => TERMINAL_STATUSES.has(record.status) && !context.registry.hasPendingSends(record.task_id))
+    .filter(
+      (record) =>
+        TERMINAL_STATUSES.has(record.status) &&
+        !context.registry.hasPendingSends(record.task_id) &&
+        !hasHandlelessLiveProcess(context, record),
+    )
     .toSorted((left, right) => left.updated_at.localeCompare(right.updated_at))[0]
+}
+
+function hasHandlelessLiveProcess(context: LifecycleContext, record: TaskRecord): boolean {
+  const pid = record.pid
+  if (record.execution_mode !== "process" || pid === undefined || !isProcessPid(pid)) return false
+  if (context.registry.get(record.task_id) !== undefined) return false
+  return context.signaller.isAlive(pid)
 }

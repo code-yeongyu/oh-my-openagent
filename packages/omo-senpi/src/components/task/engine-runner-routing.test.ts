@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
+import { loadOmoConfig, OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
 import type {
   ExecutionMode,
   ManagedChildHandle,
@@ -76,6 +76,22 @@ function composeWithSpies(): { inProcess: Spy; process: Spy; engine: ReturnType<
 }
 
 describe("task engine runner routing", () => {
+  it("#given shared omo.json permits depth two #when the Senpi engine composes #then effective max depth is one", () => {
+    // given
+    const cwd = tempProject()
+
+    // when
+    const engine = composeTaskEngine({
+      pi: new FakeExtensionAPI(),
+      omoConfig: { task: OmoTaskSettingsSchema.parse({ max_depth: 2 }) },
+      cwd,
+      sharedParentTools: () => [],
+    })
+
+    // then
+    expect(engine.settings.max_depth).toBe(1)
+  })
+
   it("#given an invalid event task id #when the adapter appends an audit event #then store rejection is contained", () => {
     // given
     const { engine } = composeWithSpies()
@@ -92,7 +108,9 @@ describe("task engine runner routing", () => {
     const result = await engine.manager.start({
       prompt: "do the process work",
       parent_session_id: "session-a",
-      depth: 0,
+      depth: 1,
+      caller_role: "coordinator",
+      lineage: "known",
       execution_mode: "process",
       model: "omo-mock/mock-1",
       run_in_background: true,
@@ -112,7 +130,9 @@ describe("task engine runner routing", () => {
     const result = await engine.manager.start({
       prompt: "do the in-process work",
       parent_session_id: "session-a",
-      depth: 0,
+      depth: 1,
+      caller_role: "coordinator",
+      lineage: "known",
       execution_mode: "in-process",
       model: "omo-mock/mock-1",
       run_in_background: true,

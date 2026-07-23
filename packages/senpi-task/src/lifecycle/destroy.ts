@@ -1,11 +1,21 @@
 import { log } from "@oh-my-opencode/utils"
 
-import { delay, nowIso, type LifecycleContext } from "./context"
+import { nowIso, type LifecycleContext } from "./context"
 import type { DestroyCause, ResidentHandle } from "./port"
+
+export class ResidentTaskDisposalError extends Error {
+  readonly cause: unknown
+
+  constructor(taskId: string, cause: unknown) {
+    super(`Failed to dispose resident task: ${taskId}`)
+    this.name = "ResidentTaskDisposalError"
+    this.cause = cause
+  }
+}
 
 /**
  * THE single-writer destruction port. This is the ONLY function in the package that invokes a
- * handle's dispose()/terminate() or (for a previous-process orphan) an OS kill. Cancel (todo 10),
+ * handle's dispose()/terminate(). Cancel,
  * LRU eviction, TTL, session shutdown, and reconciliation all route here so terminal state never
  * auto-disposes and every teardown is bookkept identically.
  */
@@ -16,10 +26,18 @@ export async function destroyResidentTask(
 ): Promise<void> {
   const handle = context.registry.get(taskId)
   if (handle !== undefined) {
-    await teardownHandle(handle)
-    context.registry.forget(taskId)
-  } else if (cause === "reconcile_lost") {
-    await terminateOrphan(context, taskId)
+    let disposalFailure: unknown
+    try {
+      await teardownHandle(handle)
+    } catch (error) {
+      if (!(error instanceof Error)) throw error
+      disposalFailure = error
+    } finally {
+      context.registry.forget(taskId)
+      recordResidency(context, taskId, cause)
+    }
+    if (disposalFailure !== undefined) throw new ResidentTaskDisposalError(taskId, disposalFailure)
+    return
   }
   recordResidency(context, taskId, cause)
 }
@@ -39,25 +57,6 @@ async function bestEffort(taskId: string, step: "abort" | "terminate", run: () =
     await run()
   } catch (error) {
     log("senpi-task teardown pre-dispose step rejected", { taskId, step, error: String(error) })
-  }
-}
-
-// Kill a live orphan process left behind by a previous session: SIGTERM, then SIGKILL after the
-// escalation window if it is still alive. Upholds the no-orphan law - a process nobody can reach
-// must not survive reconciliation. Breadcrumbs are already persisted on the `lost` record by the
-// caller BEFORE this runs.
-async function terminateOrphan(context: LifecycleContext, taskId: string): Promise<void> {
-  const record = context.store.load(taskId)
-  const pid = record?.pid
-  if (record === null || record.execution_mode !== "process" || pid === undefined) return
-  if (!context.signaller.isAlive(pid)) return
-
-  context.signaller.signal(pid, "SIGTERM")
-  context.store.appendEvent(taskId, { type: "reconcile_terminated", payload: { pid, signal: "SIGTERM" } })
-  await delay(context.orphanKillDelayMs)
-  if (context.signaller.isAlive(pid)) {
-    context.signaller.signal(pid, "SIGKILL")
-    context.store.appendEvent(taskId, { type: "reconcile_terminated", payload: { pid, signal: "SIGKILL" } })
   }
 }
 

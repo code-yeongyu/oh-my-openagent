@@ -169,7 +169,7 @@ async function rollbackFailedCreate(
   config: TeamCoreConfig,
 ): Promise<void> {
   for (const member of result.spawned.values()) {
-    const outcome = await deps.manager.cancelTask(member.taskId, `team ${teamRunId} create rollback`)
+    const outcome = await deps.manager.cancelTask(member.taskId, `team ${teamRunId} create rollback`, deps.leadSessionId)
     if (outcome.kind !== "cancelled") {
       log("senpi-task team create rollback cancel skipped", { teamRunId, taskId: member.taskId, outcome: outcome.kind })
     }
@@ -194,6 +194,9 @@ export async function deleteTeam(teamRunId: string, deps: DeleteTeamDeps): Promi
 
   const runtimeState = await loadRuntimeStateOrNull(teamRunId, config)
   if (runtimeState === null) return { teamRunId, cancelledTaskIds: [] }
+  if (runtimeState.leadSessionId !== deps.callerSessionId) {
+    throw new SenpiTeamRuntimeError(`session '${deps.callerSessionId}' does not own team '${teamRunId}'`, "foreign_lead", teamRunId)
+  }
 
   if (runtimeState.status === "active" || runtimeState.status === "shutdown_requested") {
     await transitionRuntimeState(teamRunId, (state) => ({ ...state, status: "deleting" }), config)
@@ -218,7 +221,7 @@ async function cancelMemberTasks(teamRunId: string, runtimeDir: string, deps: De
   const map = await readMemberTaskMap(runtimeDir)
   const cancelled: string[] = []
   for (const taskId of Object.values(map)) {
-    const outcome = await deps.manager.cancelTask(taskId, `delete team ${teamRunId}`)
+    const outcome = await deps.manager.cancelTask(taskId, `delete team ${teamRunId}`, deps.callerSessionId)
     if (outcome.kind === "cancelled") cancelled.push(taskId)
   }
   return cancelled

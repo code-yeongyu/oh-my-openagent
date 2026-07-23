@@ -19,8 +19,8 @@ function spyManager(
       sendCalls.push(input)
       return Promise.resolve(outcome)
     },
-    interruptTask: (idOrName) => {
-      interruptCalls.push(idOrName)
+    interruptTask: (input) => {
+      interruptCalls.push(input.idOrName)
       return Promise.resolve(interruptOutcome)
     },
     list: () => [],
@@ -84,16 +84,6 @@ describe("runTaskSend", () => {
     await runTaskSend(manager, { to: "st_00000001", message: "hi" }, "session-42")
 
     expect(sendCalls[0]?.callerSessionId).toBe("session-42")
-    expect(sendCalls[0]?.allScope).toBeUndefined()
-  })
-
-  test("#given all_scope true #when sending #then allScope is forwarded to the engine", async () => {
-    const { manager, sendCalls } = spyManager({ kind: "steered", task_id: "st_00000001", status: "running", delivered: "steer" })
-
-    await runTaskSend(manager, { to: "st_00000001", message: "hi", deliver_as: "steer", all_scope: true }, "session-42")
-
-    expect(sendCalls[0]?.allScope).toBe(true)
-    expect(sendCalls[0]?.deliverAs).toBe("steer")
   })
 
   test("#given interrupt park mode #when sent without a message #then it calls interrupt before child send", async () => {
@@ -209,7 +199,7 @@ describe("runTaskSend", () => {
     const { manager } = makeManager({})
     const started = await manager.start(baseSpec({ parent_session_id: "p1" }))
     if (started.kind !== "started") throw new Error("expected started")
-    await manager.cancelTask(started.task_id, "done")
+    await manager.cancelTask(started.task_id, "done", "p1")
 
     const result = await runTaskSend(manager, { to: started.task_id, message: "revive?" }, "p1")
 
