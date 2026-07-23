@@ -243,12 +243,11 @@ describe("omo-senpi ultrawork component", () => {
     expect(description).not.toContain("Read the whole file")
   })
 
-  it("#given embedded directive #when inspected #then contains zero forbidden Codex tokens", () => {
+  it("#given embedded directive #when inspected #then contains zero forbidden non-senpi tokens", () => {
     // then
     for (const token of FORBIDDEN_DIRECTIVE_TOKENS) {
       expect(SENPI_ULTRAWORK_DIRECTIVE.toLowerCase()).not.toContain(token.toLowerCase())
     }
-    expect(SENPI_ULTRAWORK_DIRECTIVE).not.toMatch(/browser:control-in-app-browser|Codex Browser plugin/i)
   })
 
   it("#given embedded directive #when inspected #then keeps required ultrawork anchors", () => {
@@ -257,6 +256,16 @@ describe("omo-senpi ultrawork component", () => {
     expect(SENPI_ULTRAWORK_DIRECTIVE).toMatch(/# Tier triage/i)
     expect(SENPI_ULTRAWORK_DIRECTIVE).toMatch(/Evidence-driven|captured evidence|evidence/i)
     expect(markerCount(SENPI_ULTRAWORK_DIRECTIVE)).toBe(1)
+  })
+
+  it("#given embedded directive #when inspected #then keeps the senpi-native tool contract", () => {
+    // then: the senpi surface HAS goal/todo/task/team tools — the codex-derived
+    // embed used to strip exactly these blocks out of the injected directive.
+    expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("create_goal")
+    expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("`todo`")
+    expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("team_create")
+    expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("# Parallel execution")
+    expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("# Stop rules")
   })
 
   it("#given generated directive #when embed script runs check #then passes without drift", () => {

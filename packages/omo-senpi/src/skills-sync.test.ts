@@ -28,13 +28,14 @@ const expectedSkillNames = [
 ] as const
 
 const CODEX_DERIVED_SKILL_NAMES: Record<string, true> = {
-  ultrawork: true,
   "ulw-loop": true,
 }
 // Skills authored directly against the omo-senpi tool surface. They already speak native Senpi tools,
 // so they carry no OpenCode examples and need no "Senpi Harness Tool Compatibility" translation banner.
 const NATIVE_SENPI_SKILL_NAMES: Record<string, true> = {
   hyperplan: true,
+  ultrawork: true,
+  "ulw-research": true,
 }
 const sharedSkillNames = expectedSkillNames.filter(
   (name) => !(name in CODEX_DERIVED_SKILL_NAMES) && !(name in NATIVE_SENPI_SKILL_NAMES),
@@ -122,10 +123,10 @@ describe("OMO Senpi scoped skill sync", () => {
     }
   })
 
-  test("#given codex-derived skill roots #when scanned #then no Codex or multi-agent harness guidance survives", () => {
+  test("#given codex-derived and native skill roots #when scanned #then no Codex or multi-agent harness guidance survives", () => {
     const leaks: string[] = []
 
-    for (const skillName of Object.keys(CODEX_DERIVED_SKILL_NAMES)) {
+    for (const skillName of [...Object.keys(CODEX_DERIVED_SKILL_NAMES), ...Object.keys(NATIVE_SENPI_SKILL_NAMES)]) {
       const skillRoot = join(skillsRoot, skillName)
       if (!existsSync(skillRoot)) continue
 
@@ -138,6 +139,22 @@ describe("OMO Senpi scoped skill sync", () => {
     }
 
     expect(leaks).toEqual([])
+  })
+
+  test("#given native senpi skills #when synced output is compared #then they ship verbatim modulo blank-line normalization and carry no compatibility banner", () => {
+    for (const skillName of Object.keys(NATIVE_SENPI_SKILL_NAMES)) {
+      const sourceFile = join(repoRoot, "packages", "omo-senpi", "skills", skillName, "SKILL.md")
+      expect(existsSync(sourceFile), `${relative(repoRoot, sourceFile)} must exist`).toBe(true)
+
+      const source = readFileSync(sourceFile, "utf8").replace(/\n{3,}/g, "\n\n")
+      const shippedPath = join(skillsRoot, skillName, "SKILL.md")
+      const shipped = readFileSync(shippedPath, "utf8")
+      expect(shipped, `${relative(repoRoot, shippedPath)} must ship the native source verbatim`).toBe(source)
+      expect(
+        shipped.includes(compatibilitySectionHeading),
+        `${skillName} is senpi-native and must not carry the compatibility banner`,
+      ).toBe(false)
+    }
   })
 
   test("#given shared skill roots with opencode orchestration #when inspected #then a Senpi compatibility section precedes the first example", () => {
