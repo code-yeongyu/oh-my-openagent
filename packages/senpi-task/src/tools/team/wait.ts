@@ -66,7 +66,7 @@ export async function runTeamWait(
           { kind: "timeout", timeout_ms: timeoutMs },
         )
       case "message":
-        return toolResult(`Message from ${outcome.message.from}.`, {
+        return toolResult(formatMessageText(outcome.message), {
           kind: "message",
           message_id: outcome.message.messageId,
           from: outcome.message.from,
@@ -146,6 +146,19 @@ async function waitForMessage(
     if (timer !== undefined) clearTimeout(timer)
     if (signal !== undefined && abortListener !== undefined) signal.removeEventListener("abort", abortListener)
   }
+}
+
+const MESSAGE_BODY_TEXT_MAX = 4_000
+
+// The wait result is the ONLY model-visible copy of the body (tool details never reach the model),
+// so the text must carry it; oversized bodies are bounded with a pointer to the structured details.
+function formatMessageText(message: Message): string {
+  const header = `Message from ${message.from} (id: ${message.messageId}):`
+  const summary = message.summary === undefined ? "" : `\nsummary: ${message.summary}`
+  const body = message.body.length <= MESSAGE_BODY_TEXT_MAX
+    ? message.body
+    : `${message.body.slice(0, MESSAGE_BODY_TEXT_MAX)}\n...[truncated, full body in details]`
+  return `${header}${summary}\n${body}`
 }
 
 function assertNever(value: never): never {

@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { OmoTaskSettingsSchema, type OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
 import type { ManagerStartSpec, StartResult } from "../../manager"
-import type { TaskRecord, TaskStatus } from "../../state"
+import type { ResolvedModelRecord, TaskRecord, TaskStatus } from "../../state"
 import type { CancelOutcome } from "../../steering"
 import type { StateDirConfig } from "../../store"
 
@@ -38,7 +38,7 @@ export function taskSettings(team: TeamBoundsOverrides = {}): OmoTaskSettings {
 }
 
 export type StartBehavior =
-  | { readonly kind: "ok"; readonly status?: TaskStatus }
+  | { readonly kind: "ok"; readonly status?: TaskStatus; readonly resolvedModel?: ResolvedModelRecord }
   | { readonly kind: "throw"; readonly message: string }
   | { readonly kind: "reject"; readonly result: StartResult }
 
@@ -47,7 +47,7 @@ export type FakeTeamManagerOptions = {
   readonly defaultBehavior?: StartBehavior
 }
 
-function buildRecord(taskId: string, spec: ManagerStartSpec, status: TaskStatus): TaskRecord {
+function buildRecord(taskId: string, spec: ManagerStartSpec, status: TaskStatus, resolvedModel?: ResolvedModelRecord): TaskRecord {
   const timestamp = new Date().toISOString()
   return {
     task_id: taskId,
@@ -62,6 +62,7 @@ function buildRecord(taskId: string, spec: ManagerStartSpec, status: TaskStatus)
     model: spec.model ?? "fake/model",
     child_session_id: `sess-${taskId}`,
     notification: { run_epoch: 0, notified_epoch: -1 },
+    ...(resolvedModel !== undefined ? { resolved_model: resolvedModel } : {}),
     ...(spec.name !== undefined ? { name: spec.name } : {}),
     ...(spec.category !== undefined ? { category: spec.category } : {}),
     ...(spec.subagent_type !== undefined ? { agent_type: spec.subagent_type } : {}),
@@ -91,12 +92,13 @@ export class FakeTeamManager {
     this.#counter += 1
     const taskId = `st_${this.#counter.toString().padStart(6, "0")}`
     const status = behavior.status ?? "running"
-    this.#records.set(taskId, buildRecord(taskId, spec, status))
+    this.#records.set(taskId, buildRecord(taskId, spec, status, behavior.resolvedModel))
     return Promise.resolve({
       kind: "started",
       task_id: taskId,
       status: status === "pending" ? "pending" : "running",
       name: spec.name ?? taskId,
+      ...(behavior.resolvedModel !== undefined ? { resolved_model: behavior.resolvedModel } : {}),
     })
   }
 

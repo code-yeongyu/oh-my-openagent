@@ -3,6 +3,7 @@ import { mkdir } from "node:fs/promises"
 import type { TeamSpec } from "@oh-my-opencode/team-core/types"
 
 import type { ManagerStartSpec, StartResult } from "../manager"
+import type { ResolvedModelRecord } from "../state"
 import { projectMemberStatus, type RuntimeMemberStatus } from "./member-projection"
 import {
   SenpiTeamRuntimeError,
@@ -16,6 +17,7 @@ export type SpawnedMember = {
   readonly taskId: string
   readonly sessionId?: string
   readonly status: RuntimeMemberStatus
+  readonly resolvedModel?: ResolvedModelRecord
 }
 
 export type SpawnMembersInput = {
@@ -106,7 +108,13 @@ async function spawnOneMember(input: SpawnMembersInput, member: TeamMember): Pro
   const record = input.manager.get(result.task_id)
   const sessionId = input.manager.getResidentHandle(result.task_id)?.sessionId ?? record?.child_session_id
   const status = projectMemberStatus(record?.status ?? (result.status === "pending" ? "pending" : "running"))
-  return { taskId: result.task_id, ...(sessionId !== undefined ? { sessionId } : {}), status }
+  const resolvedModel = result.resolved_model ?? record?.resolved_model
+  return {
+    taskId: result.task_id,
+    ...(sessionId !== undefined ? { sessionId } : {}),
+    status,
+    ...(resolvedModel !== undefined ? { resolvedModel } : {}),
+  }
 }
 
 function buildMemberStartSpec(input: SpawnMembersInput, member: TeamMember): ManagerStartSpec {

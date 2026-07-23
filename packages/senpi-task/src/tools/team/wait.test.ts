@@ -100,7 +100,38 @@ describe("lead team_wait", () => {
       from: "alpha",
       body: "ready",
     })
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    expect(text).toContain("Message from alpha")
+    expect(text).toContain(VALUE.messageId)
+    expect(text).toContain("ready")
     expect(registry.size).toBe(0)
+  })
+
+  test("#given a message with a summary and an oversized body #when team_wait resolves #then the text carries the summary and a bounded body while details keep the full body", async () => {
+    // given
+    const registry = new WaitRegistry<Message>()
+    const longBody = `line ${"x".repeat(6000)}`
+    const rich: Message = { ...VALUE, summary: "short summary", body: longBody }
+
+    // when
+    const result = await runTeamWait({
+      ...baseDeps(registry),
+      resolveLeadPoller: () => ({
+        pollOnce: async () => {
+          registry.takeMatch(TEAM_RUN_ID, rich)?.resolve()
+        },
+        shutdown: () => undefined,
+      }),
+      resolveTeamRunId: async () => ({ ok: true, teamRunId: TEAM_RUN_ID } as const),
+    }, {}, undefined)
+
+    // then
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    expect(text).toContain("short summary")
+    expect(text).toContain("truncated")
+    expect(text.length).toBeLessThan(longBody.length)
+    if (result.details.kind !== "message") throw new Error("expected message")
+    expect(result.details.body).toBe(longBody)
   })
 
   test("#given multiple team runs w2lead #when no run id is passed #then team_wait asks for team_run_id", async () => {

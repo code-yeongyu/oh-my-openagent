@@ -435,6 +435,7 @@ export {
 export type {
   CreateTeamDeps,
   CreateTeamResult,
+  CreatedMemberInfo,
   DeleteTeamDeps,
   DeleteTeamResult,
   MemberStatusPort,

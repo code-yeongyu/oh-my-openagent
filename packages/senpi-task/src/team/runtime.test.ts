@@ -107,6 +107,54 @@ describe("createTeam", () => {
     }
   })
 
+  test("#given roles, prompts, and a resolved model #when created #then member views carry role, model, task id, and prompt excerpt", async () => {
+    // given
+    const stateDir = stateDirConfig(tempProjectDir())
+    const manager = new FakeTeamManager({
+      behaviors: [
+        {
+          kind: "ok",
+          resolvedModel: {
+            provider: "anthropic",
+            model_id: "claude-opus-4-7",
+            display: "Claude Opus 4.7",
+            reasoning_effort: "high",
+            source: "category",
+          },
+        },
+        { kind: "ok" },
+        { kind: "ok" },
+      ],
+    })
+
+    // when
+    const created = await createTeam(threeMemberSpec(), "project", {
+      manager,
+      stateDir,
+      taskSettings: taskSettings(),
+      leadSessionId: "lead-session",
+      spawnDepth: 1,
+    })
+
+    // then
+    const [alpha, beta, gamma] = created.members
+    expect(created.members).toHaveLength(3)
+    expect(alpha).toMatchObject({
+      name: "alpha",
+      status: "running",
+      role: { kind: "category", category: "quick" },
+      promptExcerpt: "task alpha",
+    })
+    expect(alpha?.taskId).toMatch(/^st_/)
+    expect(alpha?.model).toMatchObject({ provider: "anthropic", display: "Claude Opus 4.7", reasoning_effort: "high" })
+    expect(beta?.model).toBeUndefined()
+    expect(gamma).toMatchObject({
+      name: "gamma",
+      role: { kind: "subagent_type", subagentType: "sisyphus" },
+      promptExcerpt: "task gamma",
+    })
+  })
+
   test("#given the created team #when the sidecar is read #then it maps every member to its st_ id", async () => {
     // given
     const stateDir = stateDirConfig(tempProjectDir())

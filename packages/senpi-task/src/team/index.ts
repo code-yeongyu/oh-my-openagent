@@ -24,6 +24,8 @@ export { createTeam, deleteTeam, SenpiTeamRuntimeError } from "./runtime"
 export type {
   CreateTeamDeps,
   CreateTeamResult,
+  CreatedMemberInfo,
+  CreatedMemberRole,
   DeleteTeamDeps,
   DeleteTeamResult,
   TeamRuntimeManagerPort,

@@ -23,10 +23,21 @@ describe("task_create tool", () => {
     const service = createFakeTeamService({ createTask: async () => fakeTask() })
     const result = await runTeamTaskCreate(service, { team_run_id: "run-1", subject: "s", description: "d" })
     expect(result.details).toMatchObject({ kind: "created" })
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    expect(text).toContain("Created task task-1")
+    expect(text).toContain("'do the thing'")
+    expect(text).toContain("pending")
     expect(service.calls[0]).toMatchObject({
       method: "createTask",
       args: ["run-1", { subject: "s", description: "d", status: "pending" }],
     })
+  })
+
+  test("#given a blocked task #when create runs #then the text names the blockers", async () => {
+    const service = createFakeTeamService({ createTask: async () => fakeTask({ blockedBy: ["task-0"] }) })
+    const result = await runTeamTaskCreate(service, { team_run_id: "run-1", subject: "s", description: "d", blocked_by: ["task-0"] })
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    expect(text).toContain("blocked by: task-0")
   })
 
   test("#given the factory #when built #then it names the tool task_create", () => {
@@ -36,11 +47,16 @@ describe("task_create tool", () => {
 
 describe("task_list tool", () => {
   test("#given tasks #when list runs #then it reports them, forwarding the filter", async () => {
-    const service = createFakeTeamService({ listTasks: async () => [fakeTask(), fakeTask({ id: "task-2" })] })
+    const service = createFakeTeamService({ listTasks: async () => [fakeTask(), fakeTask({ id: "task-2", status: "claimed", owner: "alpha" })] })
     const result = await runTeamTaskList(service, { team_run_id: "run-1", status: "pending" })
     expect(result.details.kind).toBe("list")
     if (result.details.kind !== "list") throw new Error("expected list")
     expect(result.details.tasks).toHaveLength(2)
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    const [firstLine = ""] = text.split("\n")
+    expect(firstLine).toBe("2 task(s).")
+    expect(text).toContain("- task-1 [pending] 'do the thing'")
+    expect(text).toContain("- task-2 [claimed] owner:alpha 'do the thing'")
     expect(service.calls[0]).toMatchObject({ method: "listTasks", args: ["run-1", { status: "pending" }] })
   })
 
@@ -51,9 +67,14 @@ describe("task_list tool", () => {
 
 describe("task_get tool", () => {
   test("#given an existing task #when get runs #then it reports the task", async () => {
-    const service = createFakeTeamService({ getTask: async () => fakeTask() })
+    const service = createFakeTeamService({ getTask: async () => fakeTask({ owner: "alpha" }) })
     const result = await runTeamTaskGet(service, { team_run_id: "run-1", task_id: "task-1" })
     expect(result.details).toMatchObject({ kind: "task" })
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    expect(text).toContain("Task task-1: pending.")
+    expect(text).toContain("subject: do the thing")
+    expect(text).toContain("owner: alpha")
+    expect(text).toContain("description: details")
   })
 
   test("#given a missing task #when get runs #then it reports not_found", async () => {
@@ -78,6 +99,9 @@ describe("task_update tool", () => {
     const service = createFakeTeamService({ updateTask: async () => fakeTask({ status: "in_progress" }) })
     const result = await runTeamTaskUpdate(service, { team_run_id: "run-1", task_id: "task-1", status: "in_progress" })
     expect(result.details).toMatchObject({ kind: "updated" })
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    expect(text).toContain("Updated task task-1 to in_progress")
+    expect(text).toContain("'do the thing'")
     expect(service.calls[0]).toMatchObject({
       method: "updateTask",
       args: [{ teamRunId: "run-1", taskId: "task-1", status: "in_progress" }],

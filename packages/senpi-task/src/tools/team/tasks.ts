@@ -65,7 +65,8 @@ export async function runTeamTaskCreate(service: TeamToolsService, params: TeamT
     status: "pending",
     ...(params.blocked_by !== undefined ? { blockedBy: params.blocked_by } : {}),
   })
-  return toolResult(`Created task ${task.id}.`, { kind: "created", task })
+  const blockers = task.blockedBy.length > 0 ? `, blocked by: ${task.blockedBy.join(", ")}` : ""
+  return toolResult(`Created task ${task.id}: '${task.subject}' (status: ${task.status}${blockers}).`, { kind: "created", task })
 }
 
 export async function runTeamTaskList(service: TeamToolsService, params: TeamTaskListInput): Promise<AgentToolResult<TeamTaskListDetails>> {
@@ -74,13 +75,26 @@ export async function runTeamTaskList(service: TeamToolsService, params: TeamTas
     ...(params.owner !== undefined ? { owner: params.owner } : {}),
   }
   const tasks = await service.listTasks(params.team_run_id, filter)
-  return toolResult(`${tasks.length} task(s).`, { kind: "list", tasks })
+  const lines = tasks.map((task) => {
+    const owner = task.owner === undefined ? "" : ` owner:${task.owner}`
+    const blockers = task.blockedBy.length > 0 ? ` (blocked by: ${task.blockedBy.join(", ")})` : ""
+    return `- ${task.id} [${task.status}]${owner} '${task.subject}'${blockers}`
+  })
+  return toolResult([`${tasks.length} task(s).`, ...lines].join("\n"), { kind: "list", tasks })
 }
 
 export async function runTeamTaskGet(service: TeamToolsService, params: TeamTaskGetInput): Promise<AgentToolResult<TeamTaskGetDetails>> {
   try {
     const task = await service.getTask(params.team_run_id, params.task_id)
-    return toolResult(`Task ${task.id}: ${task.status}.`, { kind: "task", task })
+    const lines = [
+      `Task ${task.id}: ${task.status}.`,
+      `subject: ${task.subject}`,
+      ...(task.owner === undefined ? [] : [`owner: ${task.owner}`]),
+      `description: ${task.description}`,
+      ...(task.blocks.length > 0 ? [`blocks: ${task.blocks.join(", ")}`] : []),
+      ...(task.blockedBy.length > 0 ? [`blocked by: ${task.blockedBy.join(", ")}`] : []),
+    ]
+    return toolResult(lines.join("\n"), { kind: "task", task })
   } catch (error) {
     if (isMissingStateError(error)) return toolResult(`No task '${params.task_id}'.`, { kind: "not_found", task_id: params.task_id })
     throw error
@@ -95,7 +109,8 @@ export async function runTeamTaskUpdate(service: TeamToolsService, params: TeamT
       status: params.status,
       ...(params.owner !== undefined ? { owner: params.owner } : {}),
     })
-    return toolResult(`Updated task ${task.id} to ${task.status}.`, { kind: "updated", task })
+    const owner = task.owner === undefined ? "" : ` (owner: ${task.owner})`
+    return toolResult(`Updated task ${task.id} to ${task.status}${owner}: '${task.subject}'.`, { kind: "updated", task })
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error)
     if (error instanceof TeamTaskAlreadyClaimedError) return toolResult(reason, { kind: "already_claimed", task_id: params.task_id, reason })
