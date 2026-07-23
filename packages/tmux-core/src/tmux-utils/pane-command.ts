@@ -1,5 +1,7 @@
 import { shellEscapeForDoubleQuotedCommand } from "@oh-my-opencode/utils"
 
+import type { TmuxPaneEnvironment } from "../types"
+
 const TMUX_COMMAND_SHELL = "/bin/sh"
 
 function shellQuoteForNestedCommand(value: string): string {
@@ -22,17 +24,8 @@ export function buildTmuxPlaceholderCommand(description: string): string {
   return `${TMUX_COMMAND_SHELL} -c "printf '%s\\n%s\\n' \\"OMO subagent pane ready: ${escapedDescription}\\" \\"Focus this pane to attach.\\"; while :; do sleep 86400; done"`
 }
 
-export function buildPaneAuthEnvironmentArgs(): string[] {
-  const password = process.env.OPENCODE_SERVER_PASSWORD
-  if (!password) {
-    return []
-  }
-
-  const args = ["-e", `OPENCODE_SERVER_PASSWORD=${password}`]
-  const username = process.env.OPENCODE_SERVER_USERNAME
-  if (username !== undefined) {
-    args.push("-e", `OPENCODE_SERVER_USERNAME=${username}`)
-  }
-
-  return args
+export function buildTmuxEnvironmentArgs(environment: TmuxPaneEnvironment): string[] {
+  return Object.entries(environment)
+    .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+    .flatMap(([name, value]) => ["-e", `${name}=${value}`])
 }

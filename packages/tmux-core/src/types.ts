@@ -20,6 +20,16 @@ export type TmuxConfig = {
   readonly isolation: TmuxIsolation
 }
 
+export type TmuxPaneEnvironment = Readonly<Record<string, string>>
+
+export type TmuxServerAccess = {
+  readonly serverUrl: string
+  readonly checkServerHealth: () => Promise<boolean>
+  readonly getPaneEnvironment: () => TmuxPaneEnvironment
+}
+
+export type TmuxServerTarget = string | TmuxServerAccess
+
 export interface SpawnPaneResult {
   readonly success: boolean
   readonly paneId?: string

@@ -4,6 +4,7 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 
 let getServerBasicAuthHeader: (typeof import("./opencode-server-auth"))["getServerBasicAuthHeader"]
 let injectServerAuthIntoClient: (typeof import("./opencode-server-auth"))["injectServerAuthIntoClient"]
+let resolveOpenCodeServerCredentials: (typeof import("./opencode-server-auth"))["resolveOpenCodeServerCredentials"]
 
 async function importFreshOpencodeServerAuthModule(): Promise<typeof import("./opencode-server-auth")> {
   return import(`./opencode-server-auth?test=${Date.now()}-${Math.random()}`)
@@ -17,7 +18,7 @@ describe("opencode-server-auth", () => {
       OPENCODE_SERVER_PASSWORD: process.env.OPENCODE_SERVER_PASSWORD,
       OPENCODE_SERVER_USERNAME: process.env.OPENCODE_SERVER_USERNAME,
     }
-    ;({ getServerBasicAuthHeader, injectServerAuthIntoClient } = await importFreshOpencodeServerAuthModule())
+    ;({ getServerBasicAuthHeader, injectServerAuthIntoClient, resolveOpenCodeServerCredentials } = await importFreshOpencodeServerAuthModule())
   })
 
   afterEach(() => {
@@ -54,6 +55,25 @@ describe("opencode-server-auth", () => {
     const result = getServerBasicAuthHeader()
 
     expect(result).toBe("Basic ZGFuOnNlY3JldA==")
+  })
+
+  test("#given an injected environment #when resolving credentials #then process env is not consulted", () => {
+    process.env.OPENCODE_SERVER_PASSWORD = "ambient-secret"
+
+    expect(resolveOpenCodeServerCredentials({
+      OPENCODE_SERVER_PASSWORD: "injected-secret",
+      OPENCODE_SERVER_USERNAME: "",
+    })).toEqual({
+      password: "injected-secret",
+      username: "",
+    })
+  })
+
+  test("#given UTF-8 injected credentials #when building auth header #then bytes are preserved", () => {
+    expect(getServerBasicAuthHeader({
+      OPENCODE_SERVER_PASSWORD: "päss🔐",
+      OPENCODE_SERVER_USERNAME: "üser",
+    })).toBe(`Basic ${Buffer.from("üser:päss🔐", "utf8").toString("base64")}`)
   })
 
   test("#given server password #when injecting into client #then updates client headers", () => {

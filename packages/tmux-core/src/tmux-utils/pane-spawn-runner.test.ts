@@ -120,6 +120,21 @@ describe("spawnTmuxPane runner integration", () => {
 		expect(getSplitWindowCommand()).not.toContain("opencode attach")
 	})
 
+	it("#given a secret-bearing listener URL #when readiness fails #then lifecycle logs contain only its origin", async () => {
+		const spawnTmuxPane = await loadSpawnTmuxPane()
+		const serverUrl = "https://user-fixture:password-fixture@127.0.0.1:43127/private-fixture?query-fixture=secret#fragment-fixture"
+		isServerRunningMock.mockResolvedValue(false)
+
+		await spawnTmuxPane("session-log", "worker", enabledTmuxConfig, serverUrl, "/tmp/project", "%0", "-h", createDeps())
+
+		const serializedLogs = JSON.stringify(logMock.mock.calls)
+		expect(serializedLogs).toContain("https://127.0.0.1:43127")
+		expect(serializedLogs).toContain("server listener not ready")
+		for (const secret of ["user-fixture", "password-fixture", "private-fixture", "query-fixture", "fragment-fixture"]) {
+			expect(serializedLogs).not.toContain(secret)
+		}
+	})
+
 	it("#given description with spaces #when spawnTmuxPane called #then includes it in the placeholder", async () => {
 		// given
 		const spawnTmuxPane = await loadSpawnTmuxPane()

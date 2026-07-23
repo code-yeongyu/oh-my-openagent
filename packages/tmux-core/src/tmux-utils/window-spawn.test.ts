@@ -34,8 +34,9 @@ function defaultTmuxCommandResults(): TmuxCommandResult[] {
 	]
 }
 
-function createHarness() {
+function createHarness(serverReady = true) {
 	const calls: Array<[string, string[]]> = []
+	const logs: Array<readonly [message: string, data?: unknown]> = []
 	const tmuxCommandResults = defaultTmuxCommandResults()
 	const runTmuxCommand = async (command: string, args: string[]): Promise<TmuxCommandResult> => {
 		calls.push([command, [...args]])
@@ -46,10 +47,10 @@ function createHarness() {
 		return nextResult
 	}
 	const deps: SpawnTmuxWindowDeps = {
-		log: () => undefined,
+		log: (message, data) => { logs.push([message, data]) },
 		runTmuxCommand,
 		isInsideTmux: (): boolean => true,
-		isServerRunning: async (): Promise<boolean> => true,
+		isServerRunning: async (): Promise<boolean> => serverReady,
 		getTmuxPath: async (): Promise<string | null> => "sh",
 	}
 
@@ -72,7 +73,7 @@ function createHarness() {
 		return newWindowCommand
 	}
 
-	return { deps, getRunTmuxCommandCall, getNewWindowCommand }
+	return { deps, getRunTmuxCommandCall, getNewWindowCommand, logs }
 }
 
 describe("spawnTmuxWindow runner integration", () => {
@@ -93,6 +94,20 @@ describe("spawnTmuxWindow runner integration", () => {
 		expect(harness.getNewWindowCommand()).toContain("Focus this pane to attach.")
 		expect(harness.getNewWindowCommand()).toContain("while :; do sleep 86400; done")
 		expect(harness.getNewWindowCommand()).not.toContain("opencode attach")
+	})
+
+	it("#given a secret-bearing listener URL #when readiness fails #then lifecycle logs contain only its origin", async () => {
+		const harness = createHarness(false)
+		const serverUrl = "https://user-fixture:password-fixture@127.0.0.1:43127/private-fixture?query-fixture=secret#fragment-fixture"
+
+		await spawnTmuxWindow("session-log", "worker", enabledTmuxConfig, serverUrl, "/tmp/project", harness.deps)
+
+		const serializedLogs = JSON.stringify(harness.logs)
+		expect(serializedLogs).toContain("https://127.0.0.1:43127")
+		expect(serializedLogs).toContain("server listener not ready")
+		for (const secret of ["user-fixture", "password-fixture", "private-fixture", "query-fixture", "fragment-fixture"]) {
+			expect(serializedLogs).not.toContain(secret)
+		}
 	})
 
 	it("#given description with spaces #when spawnTmuxWindow called #then includes it in the placeholder", async () => {

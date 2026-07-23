@@ -1,8 +1,10 @@
 import type { TmuxConfig } from "../types"
 import type { SpawnPaneResult } from "../types"
+import type { TmuxServerTarget } from "../types"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
+import { normalizeTmuxServerTarget } from "../tmux-server-target"
 import { isInsideTmux } from "./environment"
-import { buildPaneAuthEnvironmentArgs, buildTmuxPlaceholderCommand } from "./pane-command"
+import { buildTmuxEnvironmentArgs, buildTmuxPlaceholderCommand } from "./pane-command"
 
 export type ReplaceTmuxPaneDeps = {
 	readonly log: (message: string, data?: unknown) => void
@@ -28,12 +30,13 @@ export async function replaceTmuxPane(
 	sessionId: string,
 	description: string,
 	config: TmuxConfig,
-	_serverUrl: string,
+	serverTarget: TmuxServerTarget,
 	_directory: string,
 	depsInput?: Partial<ReplaceTmuxPaneDeps>,
 ): Promise<SpawnPaneResult> {
 	const deps = await resolveReplaceTmuxPaneDeps(depsInput)
 	const { log, runTmuxCommand } = deps
+	const serverAccess = normalizeTmuxServerTarget(serverTarget)
 
 	log("[replaceTmuxPane] called", { paneId, sessionId, description })
 
@@ -53,9 +56,9 @@ export async function replaceTmuxPane(
 	await runTmuxCommand(tmux, ["send-keys", "-t", paneId, "C-c"])
 
 	const placeholderCmd = buildTmuxPlaceholderCommand(description)
-	const authEnvArgs = buildPaneAuthEnvironmentArgs()
+	const paneEnvironmentArgs = buildTmuxEnvironmentArgs(serverAccess.getPaneEnvironment())
 
-	const result = await runTmuxCommand(tmux, ["respawn-pane", "-k", ...authEnvArgs, "-t", paneId, placeholderCmd])
+	const result = await runTmuxCommand(tmux, ["respawn-pane", "-k", ...paneEnvironmentArgs, "-t", paneId, placeholderCmd])
 
 	if (result.exitCode !== 0) {
 		log("[replaceTmuxPane] FAILED", { paneId, exitCode: result.exitCode, stderr: result.stderr.trim() })

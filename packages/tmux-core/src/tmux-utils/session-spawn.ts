@@ -1,9 +1,11 @@
 import type { TmuxConfig } from "../types"
 import type { SpawnPaneResult } from "../types"
+import type { TmuxServerTarget } from "../types"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
+import { getHttpServerOriginForLog, normalizeTmuxServerTarget } from "../tmux-server-target"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
-import { buildPaneAuthEnvironmentArgs, buildTmuxPlaceholderCommand } from "./pane-command"
+import { buildTmuxEnvironmentArgs, buildTmuxPlaceholderCommand } from "./pane-command"
 
 const ISOLATED_SESSION_NAME_PREFIX = "omo-agents"
 
@@ -58,7 +60,7 @@ export async function spawnTmuxSession(
 	sessionId: string,
 	description: string,
 	config: TmuxConfig,
-	serverUrl: string,
+	serverTarget: TmuxServerTarget,
 	_directory: string,
 	sourcePaneId?: string,
 	depsInput?: Partial<SpawnTmuxSessionDeps>,
@@ -66,11 +68,13 @@ export async function spawnTmuxSession(
 ): Promise<SpawnPaneResult> {
 	const deps = await resolveSpawnTmuxSessionDeps(depsInput)
 	const { log, runTmuxCommand } = deps
+	const serverAccess = normalizeTmuxServerTarget(serverTarget, depsInput?.isServerRunning)
+	const serverOrigin = getHttpServerOriginForLog(serverAccess.serverUrl)
 
 	log("[spawnTmuxSession] called", {
 		sessionId,
 		description,
-		serverUrl,
+		serverOrigin,
 		configEnabled: config.enabled,
 	})
 
@@ -83,9 +87,9 @@ export async function spawnTmuxSession(
 		return { success: false }
 	}
 
-	const serverRunning = await deps.isServerRunning(serverUrl)
+	const serverRunning = await serverAccess.checkServerHealth()
 	if (!serverRunning) {
-		log("[spawnTmuxSession] SKIP: server not running", { serverUrl })
+		log("[spawnTmuxSession] SKIP: server listener not ready", { serverOrigin })
 		return { success: false }
 	}
 
@@ -98,7 +102,7 @@ export async function spawnTmuxSession(
 	log("[spawnTmuxSession] all checks passed, creating isolated session...")
 
 	const placeholderCmd = buildTmuxPlaceholderCommand(description)
-	const authEnvArgs = buildPaneAuthEnvironmentArgs()
+	const paneEnvironmentArgs = buildTmuxEnvironmentArgs(serverAccess.getPaneEnvironment())
 
 	const sizeArgs: string[] = []
 	if (sourcePaneId) {
@@ -117,7 +121,7 @@ export async function spawnTmuxSession(
 			"-t", isolatedSessionName,
 			"-P",
 			"-F", "#{pane_id}",
-			...authEnvArgs,
+			...paneEnvironmentArgs,
 			placeholderCmd,
 		]
 		: [
@@ -127,7 +131,7 @@ export async function spawnTmuxSession(
 			...sizeArgs,
 			"-P",
 			"-F", "#{pane_id}",
-			...authEnvArgs,
+			...paneEnvironmentArgs,
 			placeholderCmd,
 		]
 

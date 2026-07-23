@@ -113,9 +113,11 @@ Add `"worktreePath": "../wt-scout"` to a member entry. Path is filesystem-relati
 
 ## tmux visualization (optional)
 
-Set `tmux_visualization: true`. Requires running inside a tmux session and tmux on PATH. Failures are isolated - a missing tmux never blocks team creation.
+Set `tmux_visualization: true`. Requires running inside a tmux session, tmux on PATH, and an OpenCode HTTP listener started with `opencode --port <port>`. Reachability alone does not establish readiness. The `/global/health` probe reuses `OPENCODE_SERVER_PASSWORD` and optional `OPENCODE_SERVER_USERNAME` only when OpenCode reports the current listener URL or `OPENCODE_PORT` identifies it explicitly; the username defaults to `opencode`. If OMO cannot verify that an address belongs to the current listener, such as a default address or one left by an older pane, it probes without credentials. Redirects and unsuccessful responses do not establish readiness. Successful readiness is cached for the listener address and current authentication settings, including credential changes, without storing the credentials; failed checks are not cached.
 
-When enabled, each member gets a dedicated tmux pane attached to that member's session via `opencode attach`. The pane runs the full interactive opencode TUI for the member so you can watch streaming output in real time. Panes start in each member worktree when configured, otherwise the repo root.
+Each newly spawned or respawned pane targeting that verified listener receives the current server authentication variables. Panes targeting any other address explicitly clear those variables. Existing panes and tmux's global environment are not changed retroactively. Failures remain isolated: if tmux is missing or the listener is not ready, background agents and teams continue while only pane visualization is skipped.
+
+When enabled, each member gets a dedicated tmux pane that uses `opencode attach` to connect to that external listener and open the member's session. The pane runs the full interactive opencode TUI for the member so you can watch streaming output in real time. Panes start in each member worktree when configured, otherwise the repo root.
 
 `team_delete` closes the panes and tears down the team layout. Per-member shutdown closes just that pane and rebalances the remaining layout.
 

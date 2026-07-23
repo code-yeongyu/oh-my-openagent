@@ -1,9 +1,11 @@
 import type { TmuxConfig } from "../types"
 import type { SpawnPaneResult } from "../types"
+import type { TmuxServerTarget } from "../types"
+import { getHttpServerOriginForLog, normalizeTmuxServerTarget } from "../tmux-server-target"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
-import { buildPaneAuthEnvironmentArgs, buildTmuxPlaceholderCommand } from "./pane-command"
+import { buildTmuxEnvironmentArgs, buildTmuxPlaceholderCommand } from "./pane-command"
 
 const ISOLATED_WINDOW_NAME = "omo-agents"
 
@@ -32,17 +34,19 @@ export async function spawnTmuxWindow(
 	sessionId: string,
 	description: string,
 	config: TmuxConfig,
-	serverUrl: string,
+	serverTarget: TmuxServerTarget,
 	_directory: string,
 	depsInput?: Partial<SpawnTmuxWindowDeps>,
 ): Promise<SpawnPaneResult> {
 	const deps = await resolveSpawnTmuxWindowDeps(depsInput)
 	const { log, runTmuxCommand } = deps
+	const serverAccess = normalizeTmuxServerTarget(serverTarget, depsInput?.isServerRunning)
+	const serverOrigin = getHttpServerOriginForLog(serverAccess.serverUrl)
 
 	log("[spawnTmuxWindow] called", {
 		sessionId,
 		description,
-		serverUrl,
+		serverOrigin,
 		configEnabled: config.enabled,
 	})
 
@@ -55,9 +59,9 @@ export async function spawnTmuxWindow(
 		return { success: false }
 	}
 
-	const serverRunning = await deps.isServerRunning(serverUrl)
+	const serverRunning = await serverAccess.checkServerHealth()
 	if (!serverRunning) {
-		log("[spawnTmuxWindow] SKIP: server not running", { serverUrl })
+		log("[spawnTmuxWindow] SKIP: server listener not ready", { serverOrigin })
 		return { success: false }
 	}
 
@@ -70,7 +74,7 @@ export async function spawnTmuxWindow(
 	log("[spawnTmuxWindow] all checks passed, creating isolated window...")
 
 	const placeholderCmd = buildTmuxPlaceholderCommand(description)
-	const authEnvArgs = buildPaneAuthEnvironmentArgs()
+	const paneEnvironmentArgs = buildTmuxEnvironmentArgs(serverAccess.getPaneEnvironment())
 
 	const args = [
 		"new-window",
@@ -78,7 +82,7 @@ export async function spawnTmuxWindow(
 		"-n", ISOLATED_WINDOW_NAME,
 		"-P",
 		"-F", "#{pane_id}",
-		...authEnvArgs,
+		...paneEnvironmentArgs,
 		placeholderCmd,
 	]
 

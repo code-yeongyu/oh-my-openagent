@@ -14,7 +14,6 @@ type CleanupRegistration = {
 
 type CleanupSessionTeamRunsFn = typeof import("./features/team-mode/team-runtime/session-cleanup").cleanupSessionTeamRuns
 
-const markServerRunningInProcess = mock(() => {})
 let backgroundManagerOptions: {
   onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
   onShutdown?: () => void | Promise<void>
@@ -104,7 +103,6 @@ function createDeps(): NonNullable<Parameters<typeof createManagers>[0]["deps"]>
     registerManagerForCleanupFn: registerManagerForCleanup,
     cleanupSessionTeamRunsFn: cleanupSessionTeamRunsMock as CleanupSessionTeamRunsFn,
     createConfigHandlerFn: createConfigHandler,
-    markServerRunningInProcessFn: markServerRunningInProcess,
   }
 }
 
@@ -162,7 +160,6 @@ describe("createManagers", () => {
 
   beforeEach(() => {
     dispatchOpenClawEvent = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent")
-    markServerRunningInProcess.mockClear()
     dispatchOpenClawEvent.mockReset()
     backgroundManagerOptions = null
     trackedPaneBySession.clear()
@@ -176,58 +173,6 @@ describe("createManagers", () => {
 
   afterEach(() => {
     dispatchOpenClawEvent.mockRestore()
-  })
-
-  it("#given tmux integration is disabled #when managers are created #then it does not mark the tmux server as running", () => {
-    const args = {
-      ctx: createContext("/tmp"),
-      pluginConfig: OhMyOpenCodeConfigSchema.parse({}),
-      tmuxConfig: createTmuxConfig(false),
-      modelCacheState: createModelCacheState(),
-      backgroundNotificationHookEnabled: false,
-      deps: createDeps(),
-    }
-
-    createManagers(args)
-
-    expect(markServerRunningInProcess).not.toHaveBeenCalled()
-  })
-
-  it("#given tmux integration is enabled #when managers are created #then it marks the tmux server as running", () => {
-    const args = {
-      ctx: createContext("/tmp"),
-      pluginConfig: OhMyOpenCodeConfigSchema.parse({}),
-      tmuxConfig: createTmuxConfig(true),
-      modelCacheState: createModelCacheState(),
-      backgroundNotificationHookEnabled: false,
-      deps: createDeps(),
-    }
-
-    createManagers(args)
-
-    expect(markServerRunningInProcess).toHaveBeenCalledTimes(1)
-  })
-
-  it("#given tmux is enabled but ctx.serverUrl is undefined #when managers are created #then it does NOT mark the server as running (issue #3894)", () => {
-    // Vanilla `opencode` (no `opencode serve` / `opencode web`) leaves
-    // ctx.serverUrl undefined. Marking the server as in-process running
-    // would short-circuit isServerRunning() in createTeamLayout, letting
-    // it spawn tmux panes whose `opencode attach` then fails because no
-    // server is actually listening on the fallback port.
-    const ctx = createContext("/tmp")
-    const ctxWithoutServerUrl = { ...ctx, serverUrl: undefined as unknown as URL }
-    const args = {
-      ctx: ctxWithoutServerUrl,
-      pluginConfig: OhMyOpenCodeConfigSchema.parse({}),
-      tmuxConfig: createTmuxConfig(true),
-      modelCacheState: createModelCacheState(),
-      backgroundNotificationHookEnabled: false,
-      deps: createDeps(),
-    }
-
-    createManagers(args)
-
-    expect(markServerRunningInProcess).not.toHaveBeenCalled()
   })
 
   it("#given openclaw is enabled #when the background session-created callback runs #then it dispatches openclaw with the tracked pane id", async () => {
