@@ -8,6 +8,7 @@ import {
   createLogger,
   createTempOmoBin,
   readRealCwd,
+  readRunnerRuntime,
   withEnv,
   withEnvAsync,
 } from "./ulw-loop.test-support"
@@ -37,6 +38,7 @@ describe("omo-senpi ulw-loop runtime", () => {
 
       expect(result).toEqual({ code: 0, stdout: `${activeStatus("NODE-RUNNER")}\n` })
       expect(readRealCwd(fake.dir)).toBe(realpathSync(fake.dir))
+      expect(readRunnerRuntime(fake.dir).bunVersion).toBeNull()
     } finally {
       fake.cleanup()
     }
